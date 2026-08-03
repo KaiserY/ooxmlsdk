@@ -2350,7 +2350,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       font_sync_group: None,
       text_order,
       constraints: self.active_constraints(layout_node),
-      direct_constraints: direct_constraints_unfiltered(layout_node),
+      direct_constraints: self.active_constraints_unfiltered(layout_node),
       rules: self.active_rules(layout_node),
       children: Vec::new(),
     };
@@ -2484,6 +2484,15 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     constraints
   }
 
+  fn active_constraints_unfiltered(&self, node: &'a dgm::LayoutNode) -> Vec<DiagramConstraint> {
+    let mut constraints = direct_constraints_unfiltered(node);
+    self.collect_active_constraints_unfiltered_from_choices(
+      &node.layout_node_choice,
+      &mut constraints,
+    );
+    constraints
+  }
+
   fn collect_active_constraints_from_choices(
     &self,
     choices: &'a [dgm::LayoutNodeChoice],
@@ -2525,6 +2534,54 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
           }
           dgm::DiagramChooseElseChoice::Choose(choose) => {
             self.collect_active_constraints_from_choose(choose, constraints);
+          }
+          _ => {}
+        }
+      }
+    }
+  }
+
+  fn collect_active_constraints_unfiltered_from_choices(
+    &self,
+    choices: &'a [dgm::LayoutNodeChoice],
+    constraints: &mut Vec<DiagramConstraint>,
+  ) {
+    for choice in choices {
+      if let dgm::LayoutNodeChoice::Choose(choose) = choice {
+        self.collect_active_constraints_unfiltered_from_choose(choose, constraints);
+      }
+    }
+  }
+
+  fn collect_active_constraints_unfiltered_from_choose(
+    &self,
+    choose: &'a dgm::Choose,
+    constraints: &mut Vec<DiagramConstraint>,
+  ) {
+    for branch in &choose.diagram_choose_if {
+      if self.choose_if_decision(branch) {
+        for choice in &branch.diagram_choose_if_choice {
+          match choice {
+            dgm::DiagramChooseIfChoice::Constraints(list) => {
+              constraints.extend(parse_constraints_unfiltered(list));
+            }
+            dgm::DiagramChooseIfChoice::Choose(choose) => {
+              self.collect_active_constraints_unfiltered_from_choose(choose, constraints);
+            }
+            _ => {}
+          }
+        }
+        return;
+      }
+    }
+    if let Some(branch) = choose.diagram_choose_else.as_ref() {
+      for choice in &branch.diagram_choose_else_choice {
+        match choice {
+          dgm::DiagramChooseElseChoice::Constraints(list) => {
+            constraints.extend(parse_constraints_unfiltered(list));
+          }
+          dgm::DiagramChooseElseChoice::Choose(choose) => {
+            self.collect_active_constraints_unfiltered_from_choose(choose, constraints);
           }
           _ => {}
         }
@@ -2821,11 +2878,7 @@ fn parse_constraint(
   {
     return None;
   }
-  if !matches!(
-    constraint.operator.unwrap_or_default(),
-    dgm::BoolOperatorValues::None | dgm::BoolOperatorValues::Equal
-  ) || constraint.r#type == dgm::ConstraintValues::None
-  {
+  if constraint.r#type == dgm::ConstraintValues::None {
     return None;
   }
   Some(DiagramConstraint {
@@ -3601,12 +3654,76 @@ fn assign_diagram_font_sync_groups(
   }
 }
 
+fn apply_direct_node_size_constraints(node: &mut DiagramShapeNode) {
+  let original_width = node.width;
+  let original_height = node.height;
+  let mut width = original_width;
+  let mut height = original_height;
+
+  for constraint in &node.direct_constraints {
+    if !matches!(
+      constraint.target,
+      dgm::ConstraintValues::Width | dgm::ConstraintValues::Height
+    ) || !constraint
+      .relationship
+      .is_none_or(|relationship| relationship == dgm::ConstraintRelationshipValues::_Self)
+      || (!constraint.for_name.is_empty() && constraint.for_name != node.internal_name)
+      || (!constraint.ref_for_name.is_empty() && constraint.ref_for_name != node.internal_name)
+      || constraint.point_type.is_some_and(|point_type| {
+        point_type != dgm::ElementValues::All && Some(point_type) != node.data_node_type
+      })
+    {
+      continue;
+    }
+
+    let reference = match constraint.reference {
+      dgm::ConstraintValues::Width => width,
+      dgm::ConstraintValues::Height => height,
+      dgm::ConstraintValues::None if constraint.value != 0.0 => constraint_value_points(constraint),
+      _ => continue,
+    };
+    let desired = if constraint.reference == dgm::ConstraintValues::None {
+      reference
+    } else {
+      reference * constraint.factor
+    };
+    if !desired.is_finite() || desired < 0.0 {
+      continue;
+    }
+
+    let current = match constraint.target {
+      dgm::ConstraintValues::Width => width,
+      dgm::ConstraintValues::Height => height,
+      _ => unreachable!("filtered to diagram size constraints"),
+    };
+    let constrained = match constraint.operator.unwrap_or_default() {
+      dgm::BoolOperatorValues::None | dgm::BoolOperatorValues::Equal => desired,
+      dgm::BoolOperatorValues::GreaterThanOrEqualTo => current.max(desired),
+      dgm::BoolOperatorValues::LessThanOrEqualTo => current.min(desired),
+    };
+    match constraint.target {
+      dgm::ConstraintValues::Width => width = constrained,
+      dgm::ConstraintValues::Height => height = constrained,
+      _ => unreachable!("filtered to diagram size constraints"),
+    }
+  }
+
+  // The parent algorithm has already assigned this node's slot. Applying a
+  // self width/height constraint changes the extent around that slot's center,
+  // matching DrawingML's shape-centered layout model.
+  node.x += (original_width - width) / 2.0;
+  node.y += (original_height - height) / 2.0;
+  node.width = width;
+  node.height = height;
+}
+
 fn layout_diagram_shape_node(
   node: &mut DiagramShapeNode,
   inherited_constraints: &[DiagramConstraint],
   inherited_rules: &[DiagramRule],
   inherited_vertical_alignment: Option<dgm::TextAnchorVerticalValues>,
 ) {
+  apply_direct_node_size_constraints(node);
   let mut constraints = inherited_constraints.to_vec();
   constraints.extend(node.constraints.clone());
   let mut rules = inherited_rules.to_vec();
@@ -4026,10 +4143,16 @@ fn apply_constraint_to_layout(
     })
     .map(|value| value * constraint.factor)
     .unwrap_or_else(|| constraint_value_points(constraint));
-  properties
-    .entry(constraint.for_name.clone())
-    .or_default()
-    .insert(constraint.target, value);
+  let properties = properties.entry(constraint.for_name.clone()).or_default();
+  let value = match (
+    constraint.operator.unwrap_or_default(),
+    properties.get(&constraint.target).copied(),
+  ) {
+    (dgm::BoolOperatorValues::GreaterThanOrEqualTo, Some(current)) => current.max(value),
+    (dgm::BoolOperatorValues::LessThanOrEqualTo, Some(current)) => current.min(value),
+    _ => value,
+  };
+  properties.insert(constraint.target, value);
 }
 
 fn constraint_value_points(constraint: &DiagramConstraint) -> f32 {

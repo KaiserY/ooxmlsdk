@@ -9,6 +9,7 @@ use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2014_chartex as cx,
 };
 
+use crate::model::common_rgb;
 pub(crate) use crate::model::{
   BorderDashPattern, BorderStyle, CellBordersModel, DynamicFieldKind, FieldNumberFormat,
   FormWidget, FormWidgetKind, ImageCrop, LegacyTextRelief, LineNumbering, PageSetup, RgbColor,
@@ -161,7 +162,7 @@ pub(crate) struct FloatingFrame {
   /// Ordinary `framePr` paragraphs retain their own `pBdr`/`shd` because
   /// adjacent paragraphs can share one frame while carrying different
   /// paragraph decoration.
-  pub outer_fill_color: Option<RgbColor>,
+  pub outer_fill_color: Option<ShadingPaint>,
   pub outer_borders: ParagraphBordersModel,
 }
 
@@ -285,13 +286,43 @@ pub(crate) struct TableRow {
   pub width_after_pt: Option<f32>,
   pub layout: Option<TableLayoutMode>,
   pub borders: Option<TableBordersModel>,
+  /// Row-scoped `w:tblPrEx/w:shd`, with the table-level paint as its base.
+  pub spacing_shading: Option<ShadingPaint>,
   pub redline_color: Option<RgbColor>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ShadingPaint {
+  None,
+  Solid(RgbColor),
+  Pattern(common::PatternFill),
+}
+
+impl ShadingPaint {
+  pub(crate) fn solid_color(self) -> Option<RgbColor> {
+    match self {
+      Self::Solid(color) => Some(color),
+      Self::None | Self::Pattern(_) => None,
+    }
+  }
+
+  pub(crate) fn common_fill(self) -> Option<common::Fill<'static>> {
+    match self {
+      Self::None => None,
+      Self::Solid(color) => Some(common::Fill::Solid(common_rgb(color, 1.0))),
+      Self::Pattern(pattern) => Some(common::Fill::Pattern(pattern)),
+    }
+  }
+
+  pub(crate) fn is_visible(self) -> bool {
+    !matches!(self, Self::None)
+  }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct TableCell {
   pub blocks: Vec<Block>,
-  pub shading: Option<RgbColor>,
+  pub shading: Option<ShadingPaint>,
   pub borders: CellBordersModel,
   pub border_suppressions: CellBorderSuppressions,
   pub margins: CellMargins,
@@ -406,7 +437,10 @@ pub(crate) struct ParagraphFormat {
   pub alignment: ParagraphAlignment,
   pub justification: ParagraphJustification,
   pub bidi: bool,
-  pub shading: Option<RgbColor>,
+  /// Presence records an authored/inherited `w:shd`; `None` inside the paint
+  /// is represented by [`ShadingPaint::None`] so `w:val="nil"` can cancel an
+  /// inherited value without becoming indistinguishable from omission.
+  pub shading: Option<ShadingPaint>,
   pub borders: ParagraphBordersModel,
   pub page_break_before: bool,
   pub page_break_before_set: bool,
@@ -710,6 +744,7 @@ impl FormWidgetIdAllocator {
 #[derive(Clone, Debug)]
 pub(crate) enum InlineItem {
   Text(TextRun),
+  ClearLineBreak(LineBreakClear),
   PositionalTab(PositionalTab),
   Ruby(RubyInline),
   LegacyFormCheckBox(LegacyFormCheckBox),
@@ -723,6 +758,13 @@ pub(crate) enum InlineItem {
   LastRenderedPageBreak,
   PageBreak,
   ColumnBreak,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum LineBreakClear {
+  Left,
+  Right,
+  All,
 }
 
 #[derive(Clone, Debug)]
@@ -807,15 +849,34 @@ pub(crate) struct InlineShape {
   pub effects: Option<common::DrawingEffectSource>,
   pub static3d: Option<common::drawingml_3d::Static3dStyle>,
   pub text_upright: bool,
+  pub text_box_writing_mode: TextBoxWritingMode,
   pub text_box_blocks: Vec<Block>,
   pub text_inset_left_pt: f32,
   pub text_inset_top_pt: f32,
   pub text_inset_right_pt: f32,
   pub text_inset_bottom_pt: f32,
   pub text_box_auto_fit: bool,
-  pub text_box_resizes_height_to_fit: bool,
+  pub text_box_resizes_to_fit: bool,
   pub text_box_word_wrap: bool,
   pub text_vertical_alignment: TextBoxVerticalAlignment,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum TextBoxWritingMode {
+  #[default]
+  Horizontal,
+  TopToBottomRightToLeft,
+  BottomToTopLeftToRight,
+  EastAsianVerticalRightToLeft,
+  MongolianVerticalLeftToRight,
+  StackedLeftToRight,
+  StackedRightToLeft,
+}
+
+impl TextBoxWritingMode {
+  pub(crate) fn is_vertical(self) -> bool {
+    !matches!(self, Self::Horizontal)
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -828,9 +889,12 @@ pub(crate) struct InlineChart {
   pub ui_language: Option<String>,
   pub automatic_title: String,
   pub title_style: TextStyle,
-  /// Legend and axis-title text. Axis tick labels have independent OOXML
-  /// text bodies and therefore use the role-specific styles below.
+  /// Legend text. Axis titles and tick labels have independent OOXML text
+  /// bodies and therefore use the role-specific styles below.
   pub label_style: TextStyle,
+  pub category_axis_title_style: TextStyle,
+  pub value_axis_title_style: TextStyle,
+  pub additional_axis_title_styles: Vec<TextStyle>,
   pub category_label_style: TextStyle,
   pub value_label_style: TextStyle,
   pub series_label_style: TextStyle,
@@ -838,12 +902,15 @@ pub(crate) struct InlineChart {
   pub data_label_styles: Vec<Vec<Option<TextStyle>>>,
   pub data_label_rich_text_styles: Vec<Vec<Vec<TextStyle>>>,
   pub gridline_color: RgbColor,
+  pub automatic_chart_area_line_width_pt: f32,
   pub value_gridline_width_pt: Option<f32>,
   pub axis_line_width_pt: Option<f32>,
   pub category_major_gridline: Option<(RgbColor, f32)>,
   pub category_minor_gridline: Option<(RgbColor, f32)>,
   pub series_colors: Vec<RgbColor>,
+  pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
   pub series_styles: Vec<common::ShapeStyle<'static>>,
+  pub trendline_styles: Vec<Vec<common::ShapeStyle<'static>>>,
   pub series_point_styles: Vec<Vec<Option<common::ShapeStyle<'static>>>>,
   pub surface_band_colors: Vec<Vec<(u32, RgbColor)>>,
   pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,

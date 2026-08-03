@@ -4,8 +4,9 @@ use super::{
   StylesCatalog, TextStyle, ThemeColors, ThemeFonts, WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE,
   apply_w14_scheme_transforms, automatic_text_color_for_background,
   drawingml_text_effect_common_fill, drawingml_text_outline_effect_common_fill,
-  merge_paragraph_format, opacity_from_w14_rgb_transforms, opacity_from_w14_scheme_transforms,
-  parse_hex_color, resolve_run_color, resolve_text_fill, resolve_text_outline, shading_fill,
+  merge_paragraph_format_with_theme, opacity_from_w14_rgb_transforms,
+  opacity_from_w14_scheme_transforms, parse_hex_color, resolve_run_color, resolve_text_fill,
+  resolve_text_outline, text_background_shading_fill,
 };
 use crate::common;
 use crate::units;
@@ -20,7 +21,12 @@ pub(super) fn paragraph_format(
   direct_properties: Option<ParagraphProps<'_>>,
 ) -> ParagraphFormat {
   let mut format = styles.paragraph_format_with_base(style_id, base_format);
-  merge_paragraph_format(&mut format, direct_properties, styles.import_settings);
+  merge_paragraph_format_with_theme(
+    &mut format,
+    direct_properties,
+    styles.import_settings,
+    &styles.theme_colors,
+  );
   format
 }
 
@@ -266,7 +272,7 @@ pub(super) fn merge_run_style(
     }
   }
   if let Some(shading) = properties.shading()
-    && let Some(background) = shading_fill(shading)
+    && let Some(background) = text_background_shading_fill(shading, theme_colors).solid_color()
   {
     // ECMA-376 Part 1 §17.3.2.32 makes run shading a background behind
     // the run contents. Automatic text remains context-sensitive, and Word
@@ -613,7 +619,10 @@ pub(super) fn merge_doc_default_run_style(
     theme_colors,
   );
   if style.color_is_automatic
-    && let Some(background) = effective.shading.as_ref().and_then(shading_fill)
+    && let Some(background) = effective
+      .shading
+      .as_ref()
+      .and_then(|shading| text_background_shading_fill(shading, theme_colors).solid_color())
   {
     // Office adapts automatic text to dark shading inherited from
     // docDefaults. Direct run shading and w:highlight retain black automatic

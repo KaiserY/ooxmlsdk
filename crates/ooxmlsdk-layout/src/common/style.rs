@@ -256,9 +256,70 @@ pub enum Fill<'doc> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PatternFill {
-  pub hatch_style: EmfPlusHatchStyle,
+  pub mask: PatternMask,
+  /// Physical width and height of one 8×8 tile, in thousandths of a point.
+  ///
+  /// DrawingML preset patterns and WordprocessingML shading use different
+  /// host brushes even when their names look similar. Keeping the authored
+  /// mask and tile size together prevents one host's scale from leaking into
+  /// the other.
+  pub tile_size_milli_points: u16,
   pub foreground: Color,
   pub background: Color,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PatternMask {
+  EmfPlusHatch(EmfPlusHatchStyle),
+  Bitmap8([u8; 8]),
+}
+
+impl PatternFill {
+  pub const DRAWINGML_TILE_SIZE_MILLI_POINTS: u16 = 6_000;
+
+  pub const fn drawingml(
+    hatch_style: EmfPlusHatchStyle,
+    foreground: Color,
+    background: Color,
+  ) -> Self {
+    Self {
+      mask: PatternMask::EmfPlusHatch(hatch_style),
+      tile_size_milli_points: Self::DRAWINGML_TILE_SIZE_MILLI_POINTS,
+      foreground,
+      background,
+    }
+  }
+
+  pub const fn bitmap8(
+    rows: [u8; 8],
+    tile_size_milli_points: u16,
+    foreground: Color,
+    background: Color,
+  ) -> Self {
+    Self {
+      mask: PatternMask::Bitmap8(rows),
+      tile_size_milli_points,
+      foreground,
+      background,
+    }
+  }
+
+  pub fn tile_size_points(self) -> f32 {
+    f32::from(self.tile_size_milli_points) / 1_000.0
+  }
+
+  pub const fn pattern_rows(&self) -> &[u8; 8] {
+    match &self.mask {
+      PatternMask::EmfPlusHatch(style) => style.pattern_rows(),
+      PatternMask::Bitmap8(rows) => rows,
+    }
+  }
+
+  pub fn is_foreground(self, x: i32, y: i32) -> bool {
+    let column = x.rem_euclid(8) as usize;
+    let row = y.rem_euclid(8) as usize;
+    self.pattern_rows()[row] & (0x80_u8 >> column) != 0
+  }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

@@ -67,6 +67,8 @@ harfrust = { version = "0.10.0", default-features = false, features = ["std"] }
 html5ever = "0.39.0"
 hypher = "0.1.7"
 icu_collator = { version = "2.2.1", features = ["compiled_data"] }
+icu_calendar = { version = "2.2.0", features = ["compiled_data"] }
+icu_datetime = { version = "2.2.0", features = ["compiled_data"] }
 icu_locale = { version = "2.2.0", features = ["compiled_data"] }
 icu_properties = { version = "2.2.0", features = ["compiled_data"] }
 icu_segmenter = { version = "2.2.0", features = ["compiled_data"] }
@@ -101,6 +103,7 @@ unicode-bidi-mirroring = "0.4.0"
 unicode-script = "0.5.8"
 usvg = { version = "0.47.0", default-features = false, features = ["text"] }
 winnow = "1.0.4"
+writeable = "0.6.3"
 yoke = { version = "0.8.3", features = ["derive"] }
 
 [profile.dev]

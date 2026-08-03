@@ -1950,10 +1950,13 @@ fn render_cell_area(
       &import.styles,
       cell.address,
     );
+    let pivot_builtin_style =
+      super::pivot::pivot_builtin_style_for_address(page.sheet, &import.styles, cell.address);
     if !scan_context_only
       && let Some(fill_color) = conditional_fill_color(import, page.sheet, cell)
-        .or(table_builtin_style.fill)
         .or_else(|| pivot_format_fill_color(import, cell))
+        .or(pivot_builtin_style.fill)
+        .or(table_builtin_style.fill)
         .or_else(|| import.styles.fill_color_for_cell(cell.style_index))
     {
       items.push(PageItem::Rect(RectItem {
@@ -1969,8 +1972,6 @@ fn render_cell_area(
     }
     let mut borders = import.styles.borders_for_cell(cell.style_index);
     merge_cell_borders(&mut borders, table_builtin_style.borders);
-    let pivot_builtin_style =
-      super::pivot::pivot_builtin_style_for_address(page.sheet, cell.address);
     merge_cell_borders(&mut borders, pivot_builtin_style.borders);
     if let Some(format_id) = cell.pivot_format_id
       && let Some(pivot_borders) = import.styles.differential_borders(format_id)
@@ -2008,17 +2009,17 @@ fn render_cell_area(
       &import.styles,
       &mut measurement_style,
     );
+    super::pivot::apply_builtin_pivot_text_style(
+      pivot_builtin_style,
+      &import.styles,
+      &mut measurement_style,
+    );
     if let Some(color) = direct_font_color {
       measurement_style.color = color;
     }
     apply_conditional_text_style(import, page.sheet, cell, &mut measurement_style);
     // sc/source/ui/view/output2.cxx ScDrawStringsVars::SetPattern(). Calc's
     // print map mode scales cell geometry and the font used for measurement.
-    let pivot_builtin_style =
-      super::pivot::pivot_builtin_style_for_address(page.sheet, cell.address);
-    if pivot_builtin_style.bold {
-      measurement_style.bold = true;
-    }
     if let Some(format_id) = cell.pivot_format_id {
       import
         .styles
@@ -5299,12 +5300,20 @@ fn lower_drawing_chart(
     return (!items.is_empty()).then_some(items);
   }
   let chart_space = resource.chart_space.as_deref()?;
+  let chart_style = xlsx_chart_style_id(chart_space);
 
   if let Some(mut chart) = shared_chart::pie_chart_model(chart_space) {
     if chart_space.chart.title.is_none()
       && matches!(chart.title, Some(shared_chart::ChartTitleText::Automatic))
     {
       chart.title = None;
+    }
+    if chart.title.is_none() && excel_empty_automatic_title_is_visible(chart_space) {
+      // ChartSpaceConverter::convertFromModel keeps an authored empty title
+      // container when autoTitleDeleted is false. A real series title was
+      // already promoted by pie_chart_model; when none exists, Office/Calc
+      // materialize the localized generic chart-title resource instead.
+      chart.title = Some(shared_chart::ChartTitleText::Automatic);
     }
     let mut title_style = import.styles.default_chart_text_style();
     title_style.font_size_pt = 14.0;
@@ -5356,8 +5365,24 @@ fn lower_drawing_chart(
               .series_solid_fill
               .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
           })
-          .or_else(|| import.styles.theme_color(4 + index as u32 % 6, 0.0))
-          .unwrap_or(XLSX_DEFAULT_CHART_SERIES_COLORS[index % 6])
+          .or_else(|| {
+            let (formatting_index, maximum_formatting_index) = if chart.vary_colors {
+              (index, chart.values.len().saturating_sub(1))
+            } else {
+              (
+                chart.series_formatting_index,
+                chart.maximum_series_formatting_index,
+              )
+            };
+            xlsx_automatic_chart_color(
+              chart_space,
+              import,
+              chart_style.unwrap_or(2),
+              formatting_index,
+              maximum_formatting_index,
+            )
+          })
+          .unwrap_or_default()
       })
       .collect();
     let inherited_point_style = xlsx_chart_shape_style(
@@ -5453,9 +5478,10 @@ fn lower_drawing_chart(
     }
   }
 
-  let mut chart = shared_chart::cartesian_chart_for_ui_language(
+  let mut chart = shared_chart::cartesian_chart_for_locales(
     chart_space,
     Some(import.styles.output_ui_language()),
+    import.styles.output_format_locale(),
   )?;
   let rect = if chart.date_axis.is_some()
     && chart
@@ -5472,7 +5498,6 @@ fn lower_drawing_chart(
   } else {
     rect
   };
-  let chart_style = xlsx_chart_style_id(chart_space);
   let has_visible_empty_automatic_title = excel_empty_automatic_title_is_visible(chart_space);
   if chart_space.chart.title.is_none()
     && matches!(chart.title, Some(shared_chart::ChartTitleText::Automatic))
@@ -5503,28 +5528,48 @@ fn lower_drawing_chart(
   ) && chart.series.len() == 1
     && (chart.gap_width_percent - 219.0).abs() < f64::EPSILON
     && (chart.overlap_percent + 27.0).abs() < f64::EPSILON;
+  let has_legacy_default_single_series_profile = chart_style.is_none()
+    && matches!(
+      chart.title.as_ref(),
+      Some(shared_chart::ChartTitleText::Explicit(_))
+    )
+    && chart.series.len() == 1;
   if (chart.title.is_none() && chart.has_automatic_title_marker && chart.has_explicit_categories)
     || has_explicit_single_series_compact_label_profile
+    || has_legacy_default_single_series_profile
   {
     // Excel's synthesized legend labels are compact (`Series1` / `系列1`)
-    // in the established automatic-title family and in the matching
-    // explicitly titled legacy layout. Other compatibility profiles retain
-    // their existing host spelling until fixture evidence says otherwise.
+    // in the established automatic-title family and in explicitly titled
+    // single-series legacy layouts, including packages without c:style.
+    // Other compatibility profiles retain their host spelling.
     apply_excel_automatic_series_names(&mut chart, Some(import.styles.output_ui_language()));
   }
   resolve_hidden_chart_values(import, chart_space, &mut chart);
   apply_excel_chart_missing_value_treatment(chart_space, chart_style.is_some(), &mut chart);
   apply_excel_chart_smoothing_default(chart_style.is_some(), &mut chart);
+  let maximum_series_formatting_index = chart
+    .series
+    .iter()
+    .map(|series| series.formatting_index)
+    .max()
+    .unwrap_or(0);
   let series_colors = chart
     .series
     .iter()
-    .enumerate()
-    .map(|(index, series)| {
+    .map(|series| {
       series
         .solid_fill
         .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
-        .or_else(|| import.styles.theme_color(4 + index as u32 % 6, 0.0))
-        .unwrap_or(XLSX_DEFAULT_CHART_SERIES_COLORS[index % 6])
+        .or_else(|| {
+          xlsx_automatic_chart_color(
+            chart_space,
+            import,
+            chart_style.unwrap_or(2),
+            series.formatting_index,
+            maximum_series_formatting_index,
+          )
+        })
+        .unwrap_or_default()
     })
     .collect();
   let series_point_styles = chart
@@ -5548,6 +5593,35 @@ fn lower_drawing_chart(
         .collect()
     })
     .collect::<Vec<_>>();
+  let series_point_colors = chart
+    .series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      if !chart.vary_colors_by_point
+        || chart.series.len() != 1
+        || series_index != 0
+        || series
+          .shape_properties
+          .and_then(shared_chart::chart_shape_solid_fill)
+          .is_some()
+      {
+        return vec![None; series.values.len()];
+      }
+      let maximum_point_index = series.values.len().saturating_sub(1);
+      (0..series.values.len())
+        .map(|point_index| {
+          xlsx_automatic_chart_color(
+            chart_space,
+            import,
+            chart_style.unwrap_or(2),
+            point_index,
+            maximum_point_index,
+          )
+        })
+        .collect()
+    })
+    .collect::<Vec<_>>();
   let surface_band_colors = chart
     .surface_groups
     .iter()
@@ -5562,7 +5636,7 @@ fn lower_drawing_chart(
     })
     .collect();
   let mut title_style = import.styles.default_chart_text_style();
-  title_style.font_size_pt = if has_visible_empty_automatic_title {
+  title_style.font_size_pt = if has_visible_empty_automatic_title || chart_style.is_none() {
     18.0
   } else {
     14.0
@@ -5652,6 +5726,27 @@ fn lower_drawing_chart(
   {
     apply_xlsx_chart_text_properties(&mut value_label_style, properties, import);
   }
+  let category_axis_title_style = xlsx_chart_axis_title_style(
+    &label_style,
+    shared_chart::category_axis_title_source(&chart),
+    import,
+  );
+  let value_axis_title_style = xlsx_chart_axis_title_style(
+    &label_style,
+    shared_chart::value_axis_title_source(&chart),
+    import,
+  );
+  let additional_axis_title_styles = chart
+    .additional_axis_titles
+    .iter()
+    .map(|title| {
+      xlsx_chart_axis_title_style(
+        &label_style,
+        Some((title.source, title.automatic_rotation_deg)),
+        import,
+      )
+    })
+    .collect();
   let mut series_label_style = label_style.clone();
   if let Some(properties) = chart
     .axis_sets
@@ -5692,7 +5787,10 @@ fn lower_drawing_chart(
     .and_then(shared_chart::chart_shape_outline_solid_fill)
     .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
     .unwrap_or_else(|| {
-      if chart_style == Some(2) {
+      // ECMA's omitted legacy chart style resolves to style 2. LibreOffice's
+      // ChartSpaceModel likewise initializes mnStyle to 2 before parsing an
+      // optional c:style element.
+      if chart_style.unwrap_or(2) == 2 {
         RgbColor {
           r: 0x86,
           g: 0x86,
@@ -5710,7 +5808,8 @@ fn lower_drawing_chart(
     .value_axis
     .and_then(|axis| axis.major_gridlines.as_deref())
     .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
-    .and_then(xlsx_chart_outline_width_pt);
+    .and_then(xlsx_chart_outline_width_pt)
+    .or_else(|| chart_style.is_none().then_some(0.75 * drawing_scale));
   let axis_line_width_pt = chart
     .date_axis
     .and_then(|axis| axis.chart_shape_properties.as_deref())
@@ -5720,7 +5819,8 @@ fn lower_drawing_chart(
         .category_axis
         .and_then(|axis| axis.chart_shape_properties.as_deref())
         .and_then(xlsx_chart_outline_width_pt)
-    });
+    })
+    .or_else(|| chart_style.is_none().then_some(0.75 * drawing_scale));
   let category_major_gridline = chart.date_axis.and_then(|axis| {
     let properties = axis
       .major_gridlines
@@ -5749,26 +5849,36 @@ fn lower_drawing_chart(
     .and_then(shared_chart::shape_properties_outline_solid_fill)
     .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
     .or_else(|| {
-      (chart_style == Some(2)).then_some(
-        if chart.title.is_none()
-          && chart.has_automatic_title_marker
-          && chart.has_explicit_categories
-          || chart.legend_position.is_none() && chart.has_explicit_categories
-        {
-          // LibreOffice Chart2ImportTest::testAutoChartAreaBorderPropXLSX
-          // records the imported automatic border as D9D9D9 at 0.75pt.
-          // Excel's style-2/102 fixed output applies the chart-style line
-          // transform, matching the neutral-gray automatic gridline stroke.
-          RgbColor {
-            r: 0x86,
-            g: 0x86,
-            b: 0x86,
-          }
-        } else {
-          // Preserve the existing explicit-title style-2 profile.
-          RgbColor { r: 0, g: 0, b: 0 }
-        },
-      )
+      if chart_style.is_none() {
+        // The legacy default-style chart area keeps the same neutral-gray
+        // automatic line transform as its major gridlines.
+        Some(RgbColor {
+          r: 0x86,
+          g: 0x86,
+          b: 0x86,
+        })
+      } else {
+        (chart_style == Some(2)).then_some(
+          if chart.title.is_none()
+            && chart.has_automatic_title_marker
+            && chart.has_explicit_categories
+            || chart.legend_position.is_none() && chart.has_explicit_categories
+          {
+            // LibreOffice Chart2ImportTest::testAutoChartAreaBorderPropXLSX
+            // records the imported automatic border as D9D9D9 at 0.75pt.
+            // Excel's style-2/102 fixed output applies the chart-style line
+            // transform, matching the neutral-gray automatic gridline stroke.
+            RgbColor {
+              r: 0x86,
+              g: 0x86,
+              b: 0x86,
+            }
+          } else {
+            // Preserve the existing explicit-title style-2 profile.
+            RgbColor { r: 0, g: 0, b: 0 }
+          },
+        )
+      }
     });
   let series_styles = chart
     .series
@@ -5862,6 +5972,7 @@ fn lower_drawing_chart(
     shared_chart::automatic_chart_title(Some(import.styles.output_ui_language())),
     &ClusteredColumnStyle {
       layout_profile: ChartLayoutProfile::Excel,
+      chart_style_id: chart_style.unwrap_or(2),
       modern_excel_profile: chart_style.is_some(),
       stroke_scale: drawing_scale,
       automatic_line_width_pt: 1.5,
@@ -5870,10 +5981,25 @@ fn lower_drawing_chart(
         .title
         .as_deref()
         .is_some_and(|title| title.chart_text.is_some()),
+      title_top_adjustment_ratio: if chart_style.is_none()
+        && chart_space
+          .chart
+          .title
+          .as_deref()
+          .is_some_and(|title| title.chart_text.is_some())
+        && (title_style.font_size_pt - 18.0).abs() < f32::EPSILON
+      {
+        crate::render::chart_layout_profiles::EXCEL_LEGACY_DEFAULT_TITLE_TOP_ADJUSTMENT_RATIO
+      } else {
+        0.0
+      },
       title: title_style,
       title_fill_color,
       label: legend_label_style.clone(),
       legend: legend_label_style,
+      category_axis_title: category_axis_title_style,
+      value_axis_title: value_axis_title_style,
+      additional_axis_titles: additional_axis_title_styles,
       category_label: category_label_style,
       value_label: value_label_style,
       series_label: series_label_style,
@@ -5886,6 +6012,7 @@ fn lower_drawing_chart(
       category_major_gridline,
       category_minor_gridline,
       series_colors,
+      series_point_colors,
       series_styles,
       trendline_styles,
       series_point_styles,
@@ -6126,22 +6253,91 @@ fn resolve_hidden_chart_values(
     .as_ref()
     .and_then(|value| value.val)
     .is_some_and(|value| !value.as_bool());
-  if !include_hidden_cells {
-    return;
+  let mut resolved_any = false;
+  let mut resolved_categories_from_reference = false;
+  let mut name_replacements = Vec::new();
+  for series in &mut chart.series {
+    if !series.has_nonempty_explicit_name
+      && let Some(formula) = series.name_formula
+      && let Some(name) = chart_reference_text_values(import, formula)
+        .and_then(|values| values.into_iter().find(|value| !value.is_empty()))
+    {
+      let old_name = std::mem::replace(&mut series.name, name);
+      series.has_nonempty_explicit_name = true;
+      for label in &mut series.data_labels {
+        label.text = label.text.replace(&old_name, &series.name);
+      }
+      name_replacements.push((old_name, series.name.clone()));
+    }
+
+    let values_missing = series.values.is_empty() || series.values.iter().all(Option::is_none);
+    if (include_hidden_cells || values_missing)
+      && let Some(formula) = series.value_formula
+      && let Some(values) = chart_reference_numeric_values(import, formula)
+    {
+      series.values = values;
+      resolved_any = true;
+    }
+
+    let x_values_missing =
+      series.x_values.is_empty() || series.x_values.iter().all(Option::is_none);
+    if (include_hidden_cells || x_values_missing)
+      && let Some(formula) = series.x_value_formula
+      && let Some(values) = chart_reference_numeric_values(import, formula)
+    {
+      series.x_values = values;
+      resolved_any = true;
+    }
+
+    let bubble_sizes_missing =
+      series.bubble_sizes.is_empty() || series.bubble_sizes.iter().all(Option::is_none);
+    if (include_hidden_cells || bubble_sizes_missing)
+      && let Some(formula) = series.bubble_size_formula
+      && let Some(values) = chart_reference_numeric_values(import, formula)
+    {
+      series.bubble_sizes = values;
+      resolved_any = true;
+    }
   }
 
-  let mut resolved_any = false;
-  for series in &mut chart.series {
-    let Some(formula) = series.value_formula else {
-      continue;
-    };
-    let Some(values) = chart_reference_numeric_values(import, formula) else {
-      continue;
-    };
-    series.values = values;
+  if let Some(shared_chart::ChartTitleText::Explicit(title)) = chart.title.as_mut() {
+    for (old_name, new_name) in name_replacements {
+      if title == &old_name {
+        title.clone_from(&new_name);
+        break;
+      }
+    }
+  }
+
+  let category_formula = chart
+    .series
+    .iter()
+    .find_map(|series| series.category_formula)
+    .map(str::to_owned);
+  if let Some(formula) = category_formula.as_deref()
+    && let Some(format_code) = chart_reference_number_format_code(import, formula)
+  {
+    chart.category_number_format_code = Some(format_code);
+  }
+  if let Some(formula) = category_formula
+    // `plotVisOnly=false` makes the backing range authoritative for series
+    // values, but Office still preserves an authored category cache (including
+    // intentional sparse/blank labels). Only reconstruct categories when the
+    // package supplied no usable cache at all.
+    && !chart.has_explicit_categories
+    && let Some(categories) = chart_reference_text_values(import, &formula)
+    && !categories.is_empty()
+  {
+    chart.category_axis_values =
+      chart_reference_numeric_values(import, &formula).unwrap_or_default();
+    chart.cached_category_count = categories.len();
+    chart.categories = categories;
+    chart.has_explicit_categories = true;
     resolved_any = true;
+    resolved_categories_from_reference = true;
   }
   if resolved_any
+    && !resolved_categories_from_reference
     && chart
       .categories
       .iter()
@@ -6159,7 +6355,10 @@ fn resolve_hidden_chart_values(
   }
 }
 
-fn chart_reference_numeric_values(import: &ExcelImport, formula: &str) -> Option<Vec<Option<f64>>> {
+fn chart_reference_sheet_and_range<'a>(
+  import: &'a ExcelImport,
+  formula: &str,
+) -> Option<(&'a CalcSheet, CellRange)> {
   let (sheet_name, _) = formula.rsplit_once('!')?;
   // External workbook references require link resolution and must keep using
   // the embedded chart cache until that ownership is modeled.
@@ -6172,6 +6371,11 @@ fn chart_reference_numeric_values(import: &ExcelImport, formula: &str) -> Option
     .iter()
     .find(|sheet| sheet.name == sheet_name)?;
   let range = CellRange::parse_a1_range(formula)?;
+  Some((sheet, range))
+}
+
+fn chart_reference_numeric_values(import: &ExcelImport, formula: &str) -> Option<Vec<Option<f64>>> {
+  let (sheet, range) = chart_reference_sheet_and_range(import, formula)?;
   let mut values = Vec::new();
   for row in range.start.row..=range.end.row {
     for col in range.start.col..=range.end.col {
@@ -6180,6 +6384,44 @@ fn chart_reference_numeric_values(import: &ExcelImport, formula: &str) -> Option
           .cell_at(CellAddress { col, row })
           .and_then(|cell| cell.cached_value.as_deref())
           .and_then(|value| value.parse::<f64>().ok()),
+      );
+    }
+  }
+  Some(values)
+}
+
+fn chart_reference_number_format_code(import: &ExcelImport, formula: &str) -> Option<String> {
+  let (sheet, range) = chart_reference_sheet_and_range(import, formula)?;
+  for row in range.start.row..=range.end.row {
+    for col in range.start.col..=range.end.col {
+      let address = CellAddress { col, row };
+      let is_nonempty_number = sheet
+        .cell_at(address)
+        .and_then(|cell| cell.cached_value.as_deref())
+        .is_some_and(|value| value.parse::<f64>().is_ok());
+      if !is_nonempty_number {
+        continue;
+      }
+      let style_index = sheet.effective_cell_style_index_at(address);
+      return import
+        .styles
+        .number_format_code_for_cell(style_index)
+        .map(ToOwned::to_owned);
+    }
+  }
+  None
+}
+
+fn chart_reference_text_values(import: &ExcelImport, formula: &str) -> Option<Vec<String>> {
+  let (sheet, range) = chart_reference_sheet_and_range(import, formula)?;
+  let mut values = Vec::new();
+  for row in range.start.row..=range.end.row {
+    for col in range.start.col..=range.end.col {
+      values.push(
+        sheet
+          .cell_at(CellAddress { col, row })
+          .map(|cell| cell.display_text.clone())
+          .unwrap_or_default(),
       );
     }
   }
@@ -6297,6 +6539,29 @@ fn apply_xlsx_chart_rich_title_properties(
   {
     apply_xlsx_run_properties(style, properties, import);
   }
+}
+
+fn xlsx_chart_axis_title_style(
+  base_style: &TextStyle,
+  source: Option<(&c::Title, f32)>,
+  import: &ExcelImport,
+) -> TextStyle {
+  let mut style = base_style.clone();
+  // spAxisTitleTexts is the automatic role. Direct c:title text properties
+  // overlay it and may explicitly disable the automatic bold face.
+  style.bold = true;
+  let Some((title, automatic_rotation_deg)) = source else {
+    return style;
+  };
+  style.rotation_deg = automatic_rotation_deg;
+  if let Some(properties) = title.text_properties.as_deref() {
+    apply_xlsx_chart_text_properties(&mut style, properties, import);
+  }
+  apply_xlsx_chart_rich_title_properties(&mut style, title, import);
+  if let Some(rotation) = shared_chart::title_rotation_degrees(title) {
+    style.rotation_deg = rotation;
+  }
+  style
 }
 
 fn xlsx_chart_data_label_host_styles(
@@ -6479,7 +6744,8 @@ fn clip_chart_item_to_rect(
     // area in the PDF text layer.
     PageItem::Text(text) => {
       let clip_right = clip.x_pt + clip.width_pt;
-      let mut right = text.x_pt + metrics.measure_text(&text.text, &text.style);
+      let mut measured_width = metrics.measure_text(&text.text, &text.style);
+      let (mut left, mut right) = chart_text_horizontal_bounds(text, measured_width);
       if text.discard_if_horizontally_clipped && right > clip_right {
         // A chart data table is an actual table shape, not a collection of
         // independent chart labels. LibreOffice DataTableView::createShapes
@@ -6495,19 +6761,31 @@ fn clip_chart_item_to_rect(
         // page boundary the separator glyph can be outside the clip even
         // though the preceding series-name run still intersects it.
         text.text.pop();
-        right = text.x_pt + metrics.measure_text(&text.text, &text.style);
+        measured_width = metrics.measure_text(&text.text, &text.style);
+        (left, right) = chart_text_horizontal_bounds(text, measured_width);
       }
       // Office retains a text object whose final glyph reaches the printable
       // boundary even when fixed-output clipping hides its ink. Half an em
       // covers the pre-shaping/final-glyph-box difference without duplicating
       // a category label whose complete glyph box belongs to the prior page.
+      let is_date_axis_tick = right_truncated_texts.contains(&text.text);
       let left_boundary_slack = text.style.font_size_pt * text_boundary_slack.left_em;
-      let right_boundary_slack = text.style.font_size_pt * text_boundary_slack.right_em;
+      let right_boundary_slack =
+        if is_date_axis_tick && text.style.rotation_deg.abs() > f32::EPSILON {
+          // A rotated date tick is already classified with its post-rotation
+          // ink bounds. Excel does not add the horizontal half-em shaping band
+          // used for ordinary text: a complete label beyond the right page clip
+          // belongs only to the continuation page.
+          0.0
+        } else {
+          text.style.font_size_pt * text_boundary_slack.right_em
+        };
       let retained =
-        right + left_boundary_slack >= clip.x_pt && text.x_pt <= clip_right + right_boundary_slack;
+        right + left_boundary_slack >= clip.x_pt && left <= clip_right + right_boundary_slack;
       if retained {
         if right > clip_right
-          && right_truncated_texts.contains(&text.text)
+          && text.style.rotation_deg.abs() <= f32::EPSILON
+          && is_date_axis_tick
           && text.x_pt < clip_right
         {
           // Excel emits only the date-axis glyph prefix whose origins remain
@@ -6594,6 +6872,31 @@ fn clip_chart_item_to_rect(
     }
     PageItem::Image(_) | PageItem::LinkArea(_) => true,
   }
+}
+
+fn chart_text_horizontal_bounds(text: &crate::model::TextItem, width_pt: f32) -> (f32, f32) {
+  if text.style.rotation_deg.abs() <= f32::EPSILON {
+    return (text.x_pt, text.x_pt + width_pt);
+  }
+  let (rotation_x, rotation_y) = text.rotation_center_pt.unwrap_or((text.x_pt, text.y_pt));
+  let angle = text.style.rotation_deg.to_radians();
+  let sin = angle.sin();
+  let cos = angle.cos();
+  let mut left = f32::INFINITY;
+  let mut right = f32::NEG_INFINITY;
+  for (x, y) in [
+    (text.x_pt, text.y_pt),
+    (text.x_pt + width_pt, text.y_pt),
+    (text.x_pt + width_pt, text.y_pt + text.line_height_pt),
+    (text.x_pt, text.y_pt + text.line_height_pt),
+  ] {
+    let dx = x - rotation_x;
+    let dy = y - rotation_y;
+    let rotated_x = rotation_x + dx * cos - dy * sin;
+    left = left.min(rotated_x);
+    right = right.max(rotated_x);
+  }
+  (left, right)
 }
 
 fn truncate_text_to_width(
@@ -7000,6 +7303,75 @@ fn xlsx_chart_color(color: Color, import: &ExcelImport) -> Option<RgbColor> {
     g: color.g,
     b: color.b,
   })
+}
+
+fn xlsx_automatic_chart_color(
+  chart_space: &c::ChartSpace,
+  import: &ExcelImport,
+  chart_style_id: u8,
+  formatting_index: usize,
+  maximum_formatting_index: usize,
+) -> Option<RgbColor> {
+  shared_chart::automatic_chart_series_color(
+    chart_style_id,
+    formatting_index,
+    maximum_formatting_index,
+    |token| {
+      let mapped =
+        shared_chart::scheme_color_token(chart_space.color_map_override.as_deref(), token)?;
+      let theme_index = match mapped {
+        a::ColorSchemeIndexValues::Light1 => 0,
+        a::ColorSchemeIndexValues::Dark1 => 1,
+        a::ColorSchemeIndexValues::Light2 => 2,
+        a::ColorSchemeIndexValues::Dark2 => 3,
+        a::ColorSchemeIndexValues::Accent1 => 4,
+        a::ColorSchemeIndexValues::Accent2 => 5,
+        a::ColorSchemeIndexValues::Accent3 => 6,
+        a::ColorSchemeIndexValues::Accent4 => 7,
+        a::ColorSchemeIndexValues::Accent5 => 8,
+        a::ColorSchemeIndexValues::Accent6 => 9,
+        a::ColorSchemeIndexValues::Hyperlink => 10,
+        a::ColorSchemeIndexValues::FollowedHyperlink => 11,
+      };
+      import
+        .styles
+        .theme_color(theme_index, 0.0)
+        .or_else(|| xlsx_default_chart_theme_color(theme_index))
+    },
+  )
+}
+
+fn xlsx_default_chart_theme_color(index: u32) -> Option<RgbColor> {
+  match index {
+    0 => Some(RgbColor {
+      r: 0xff,
+      g: 0xff,
+      b: 0xff,
+    }),
+    1 => Some(RgbColor { r: 0, g: 0, b: 0 }),
+    2 => Some(RgbColor {
+      r: 0xe7,
+      g: 0xe6,
+      b: 0xe6,
+    }),
+    3 => Some(RgbColor {
+      r: 0x44,
+      g: 0x54,
+      b: 0x6a,
+    }),
+    4..=9 => Some(XLSX_DEFAULT_CHART_SERIES_COLORS[(index - 4) as usize]),
+    10 => Some(RgbColor {
+      r: 0x05,
+      g: 0x63,
+      b: 0xc1,
+    }),
+    11 => Some(RgbColor {
+      r: 0x95,
+      g: 0x4f,
+      b: 0x72,
+    }),
+    _ => None,
+  }
 }
 
 fn xlsx_chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
@@ -8042,11 +8414,11 @@ fn drawing_object_pattern_fill(
       b: u8::MAX,
       a: u8::MAX,
     });
-  Some(common::PatternFill {
-    hatch_style: common::drawingml_pattern::hatch_style(fill.preset),
+  Some(common::PatternFill::drawingml(
+    common::drawingml_pattern::hatch_style(fill.preset),
     foreground,
     background,
-  })
+  ))
 }
 
 fn xlsx_drawing_color(color: Color, import: &ExcelImport) -> Option<common::Color> {

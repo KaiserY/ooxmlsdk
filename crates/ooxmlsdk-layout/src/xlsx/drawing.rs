@@ -1986,11 +1986,11 @@ fn drawingml_pattern_fill(fill: &a::PatternFill) -> Option<common::PatternFill> 
       a: u8::MAX,
     },
   };
-  Some(common::PatternFill {
-    hatch_style: common::drawingml_pattern::hatch_style(fill.preset),
+  Some(common::PatternFill::drawingml(
+    common::drawingml_pattern::hatch_style(fill.preset),
     foreground,
     background,
-  })
+  ))
 }
 
 fn resolve_drawingml_pattern_color(color: Color) -> Option<common::Color> {

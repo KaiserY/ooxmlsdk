@@ -1,6 +1,7 @@
 pub mod common;
 pub mod docx;
 pub mod error;
+mod field_datetime;
 pub mod fonts;
 #[doc(hidden)]
 pub mod localization;

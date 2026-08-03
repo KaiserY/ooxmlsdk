@@ -18,7 +18,7 @@ impl Default for TableLookModel {
       first_column: true,
       last_column: false,
       horizontal_banding: true,
-      vertical_banding: true,
+      vertical_banding: false,
     }
   }
 }
@@ -44,19 +44,21 @@ impl TableConditionalStyleMask {
     look: TableLookModel,
     row_index: usize,
     row_count: usize,
+    row_band_size: usize,
+    is_header_row: bool,
   ) -> Self {
     let mut mask = Self::default();
-    if look.first_row && row_index == 0 {
+    if is_header_row || (look.first_row && row_index == 0) {
       mask.first_row = true;
     } else if look.last_row && row_index + 1 == row_count {
       mask.last_row = true;
     }
-    if !mask.has_row_style() && look.horizontal_banding {
-      let mut band_index = row_index + 1;
-      if look.first_row {
-        band_index += 1;
-      }
-      if band_index % 2 == 1 {
+    if !mask.has_row_style() && look.horizontal_banding && row_band_size > 0 {
+      // The emphasized first row is outside the alternating band sequence.
+      // ECMA-376 Part 1 §17.7.6.7 groups the remaining rows into authored-size
+      // bands; [MS-OI29500] makes size zero mean no row band formatting.
+      let band_position = row_index.saturating_sub(usize::from(look.first_row));
+      if (band_position / row_band_size) % 2 == 0 {
         mask.odd_horizontal_band = true;
       } else {
         mask.even_horizontal_band = true;
@@ -69,6 +71,7 @@ impl TableConditionalStyleMask {
     look: TableLookModel,
     cell_index: usize,
     cell_count: usize,
+    column_band_size: usize,
   ) -> Self {
     let mut mask = Self::default();
     if look.first_column && cell_index == 0 {
@@ -76,52 +79,17 @@ impl TableConditionalStyleMask {
     } else if look.last_column && cell_index + 1 == cell_count {
       mask.last_column = true;
     }
-    if !mask.has_column_style() && look.vertical_banding {
-      let mut band_index = cell_index + 1;
-      if look.first_column {
-        band_index += 1;
-      }
-      if band_index % 2 == 1 {
+    if !mask.has_column_style() && look.vertical_banding && column_band_size > 0 {
+      // As with row bands, the emphasized first column does not consume the
+      // first authored band. A zero width disables column band formatting in
+      // Word instead of falling back to one-column alternation.
+      let band_position = cell_index.saturating_sub(usize::from(look.first_column));
+      if (band_position / column_band_size) % 2 == 0 {
         mask.odd_vertical_band = true;
       } else {
         mask.even_vertical_band = true;
       }
     }
-    mask
-  }
-
-  pub(super) fn from_cnf_style(style: &w::ConditionalFormatStyle) -> Self {
-    let mut mask = style
-      .val
-      .as_deref()
-      .map(Self::from_cnf_value)
-      .unwrap_or_default();
-    mask.first_row |= style.first_row.is_some_and(|value| value.as_bool());
-    mask.last_row |= style.last_row.is_some_and(|value| value.as_bool());
-    mask.first_column |= style.first_column.is_some_and(|value| value.as_bool());
-    mask.last_column |= style.last_column.is_some_and(|value| value.as_bool());
-    mask.odd_vertical_band |= style.odd_vertical_band.is_some_and(|value| value.as_bool());
-    mask.even_vertical_band |= style
-      .even_vertical_band
-      .is_some_and(|value| value.as_bool());
-    mask.odd_horizontal_band |= style
-      .odd_horizontal_band
-      .is_some_and(|value| value.as_bool());
-    mask.even_horizontal_band |= style
-      .even_horizontal_band
-      .is_some_and(|value| value.as_bool());
-    mask.first_row_first_column |= style
-      .first_row_first_column
-      .is_some_and(|value| value.as_bool());
-    mask.first_row_last_column |= style
-      .first_row_last_column
-      .is_some_and(|value| value.as_bool());
-    mask.last_row_first_column |= style
-      .last_row_first_column
-      .is_some_and(|value| value.as_bool());
-    mask.last_row_last_column |= style
-      .last_row_last_column
-      .is_some_and(|value| value.as_bool());
     mask
   }
 
@@ -167,24 +135,6 @@ impl TableConditionalStyleMask {
     }
   }
 
-  fn from_cnf_value(value: &str) -> Self {
-    let mut mask = Self::default();
-    let mut bits = value.chars();
-    mask.first_row = matches!(bits.next(), Some('1'));
-    mask.last_row = matches!(bits.next(), Some('1'));
-    mask.first_column = matches!(bits.next(), Some('1'));
-    mask.last_column = matches!(bits.next(), Some('1'));
-    mask.odd_vertical_band = matches!(bits.next(), Some('1'));
-    mask.even_vertical_band = matches!(bits.next(), Some('1'));
-    mask.odd_horizontal_band = matches!(bits.next(), Some('1'));
-    mask.even_horizontal_band = matches!(bits.next(), Some('1'));
-    mask.first_row_first_column = matches!(bits.next(), Some('1'));
-    mask.first_row_last_column = matches!(bits.next(), Some('1'));
-    mask.last_row_first_column = matches!(bits.next(), Some('1'));
-    mask.last_row_last_column = matches!(bits.next(), Some('1'));
-    mask
-  }
-
   fn has_row_style(self) -> bool {
     self.first_row || self.last_row
   }
@@ -211,9 +161,17 @@ pub(super) fn row_style_condition_applies(
   look: TableLookModel,
   row_index: usize,
   row_count: usize,
+  row_band_size: usize,
+  is_header_row: bool,
 ) -> bool {
-  TableConditionalStyleMask::from_row_position(look, row_index, row_count)
-    .row_condition_applies(condition)
+  TableConditionalStyleMask::from_row_position(
+    look,
+    row_index,
+    row_count,
+    row_band_size,
+    is_header_row,
+  )
+  .row_condition_applies(condition)
 }
 
 pub(super) fn cell_style_condition_applies(
@@ -223,10 +181,43 @@ pub(super) fn cell_style_condition_applies(
   row_count: usize,
   cell_index: usize,
   cell_count: usize,
+  row_band_size: usize,
+  column_band_size: usize,
+  is_header_row: bool,
 ) -> bool {
-  TableConditionalStyleMask::from_row_position(look, row_index, row_count)
-    .with_cell_mask(TableConditionalStyleMask::from_cell_position(
-      look, cell_index, cell_count,
-    ))
-    .cell_condition_applies(condition)
+  TableConditionalStyleMask::from_row_position(
+    look,
+    row_index,
+    row_count,
+    row_band_size,
+    is_header_row,
+  )
+  .with_cell_mask(TableConditionalStyleMask::from_cell_position(
+    look,
+    cell_index,
+    cell_count,
+    column_band_size,
+  ))
+  .cell_condition_applies(condition)
+}
+
+pub(super) fn conditional_style_priority(condition: w::TableStyleOverrideValues) -> u8 {
+  // [MS-OI29500] Part 1 §17.7.6(c) documents the order used by Office,
+  // where later regions override earlier ones. This intentionally differs
+  // from both XML document order and the ISO ordering of row/column regions.
+  match condition {
+    w::TableStyleOverrideValues::WholeTable => 0,
+    w::TableStyleOverrideValues::Band1Horizontal => 1,
+    w::TableStyleOverrideValues::Band2Horizontal => 2,
+    w::TableStyleOverrideValues::Band1Vertical => 3,
+    w::TableStyleOverrideValues::Band2Vertical => 4,
+    w::TableStyleOverrideValues::FirstColumn => 5,
+    w::TableStyleOverrideValues::LastColumn => 6,
+    w::TableStyleOverrideValues::FirstRow => 7,
+    w::TableStyleOverrideValues::LastRow => 8,
+    w::TableStyleOverrideValues::NorthWestCell => 9,
+    w::TableStyleOverrideValues::NorthEastCell => 10,
+    w::TableStyleOverrideValues::SouthWestCell => 11,
+    w::TableStyleOverrideValues::SouthEastCell => 12,
+  }
 }

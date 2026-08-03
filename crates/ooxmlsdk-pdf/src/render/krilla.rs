@@ -77,9 +77,6 @@ const PATH_GRADIENT_BINARY_STEPS: usize = 10;
 // Office emits DrawingML preset hatches as 16×16 image cells under a 0.375
 // pattern matrix, i.e. a 6pt tile. The canonical GDI+ mask is 8×8, so each
 // logical mask cell occupies 0.75pt.
-const DRAWINGML_PATTERN_TILE_PT: f32 = 6.0;
-const DRAWINGML_PATTERN_CELL_PT: f32 =
-  DRAWINGML_PATTERN_TILE_PT / emfsdk::emfplus::EmfPlusHatchStyle::TILE_SIZE as f32;
 
 type PaintTextPortionRanges = SmallVec<[(PaintTextPortionKind, Range<usize>); 2]>;
 type PaintGlyphFontRuns = SmallVec<[PaintGlyphFontRun; 2]>;
@@ -539,13 +536,18 @@ struct LinkAreaItem<'doc> {
 }
 
 #[derive(Clone, Copy, Debug)]
+enum RectFill {
+  Solid { color: RgbColor, opacity: f32 },
+  Pattern(common::PatternFill),
+}
+
+#[derive(Clone, Copy, Debug)]
 struct RectItem {
   x_pt: f32,
   y_pt: f32,
   width_pt: f32,
   height_pt: f32,
-  fill_color: Option<RgbColor>,
-  fill_opacity: f32,
+  fill: Option<RectFill>,
   stroke: Option<BorderStyle>,
   stroke_opacity: f32,
 }
@@ -2082,16 +2084,23 @@ fn polyline_from_common<'doc>(path: &'doc common::PathItem<'static>) -> Polyline
 }
 
 fn rect_item_from_common(rect: &common::RectItem<'static>) -> RectItem {
-  let (fill_color, fill_opacity) = solid_color(&rect.fill)
-    .map(|color| (Some(rgb(color)), opacity(color)))
-    .unwrap_or((None, 1.0));
+  let fill = match &rect.fill {
+    common::Fill::Solid(color) => Some(RectFill::Solid {
+      color: rgb(*color),
+      opacity: opacity(*color),
+    }),
+    common::Fill::Pattern(pattern) => Some(RectFill::Pattern(*pattern)),
+    common::Fill::None
+    | common::Fill::Theme(_)
+    | common::Fill::Gradient(_)
+    | common::Fill::Image { .. } => None,
+  };
   RectItem {
     x_pt: rect.bounds.origin.x.0,
     y_pt: rect.bounds.origin.y.0,
     width_pt: rect.bounds.size.width.0,
     height_pt: rect.bounds.size.height.0,
-    fill_color,
-    fill_opacity,
+    fill,
     stroke: rect.stroke.as_ref().map(stroke_from_common),
     stroke_opacity: rect
       .stroke
@@ -2253,17 +2262,6 @@ fn stroke_from_common(stroke: &common::Stroke<'static>) -> BorderStyle {
   BorderStyle {
     width_pt: stroke.width.0,
     color: rgb(stroke.color),
-  }
-}
-
-fn solid_color(fill: &common::Fill<'static>) -> Option<common::Color> {
-  match fill {
-    common::Fill::Solid(color) => Some(*color),
-    common::Fill::None
-    | common::Fill::Theme(_)
-    | common::Fill::Gradient(_)
-    | common::Fill::Image { .. }
-    | common::Fill::Pattern(_) => None,
   }
 }
 
@@ -5686,43 +5684,45 @@ fn drawingml_pattern_paint(
   origin_x: f32,
   origin_y: f32,
 ) -> krilla::paint::Paint {
+  let tile_size_pt = pattern.tile_size_points();
+  let cell_size_pt = tile_size_pt / 8.0;
   let mut stream_builder = surface.stream_builder();
   let mut pattern_surface = stream_builder.surface();
-  pattern_surface.set_stroke(None);
-  pattern_surface.set_fill(Some(pattern_color_fill(pattern.background)));
-  if let Some(background) = rect_path(
-    0.0,
-    0.0,
-    DRAWINGML_PATTERN_TILE_PT,
-    DRAWINGML_PATTERN_TILE_PT,
+  if let (Some(image), Some(size)) = (
+    pattern_tile_image(pattern),
+    Size::from_wh(tile_size_pt, tile_size_pt),
   ) {
-    pattern_surface.draw_path(&background);
-  }
-
-  let mut foreground = PathBuilder::new();
-  for (row, mask) in pattern
-    .hatch_style
-    .pattern_rows()
-    .iter()
-    .copied()
-    .enumerate()
-  {
-    for column in 0..emfsdk::emfplus::EmfPlusHatchStyle::TILE_SIZE as usize {
-      if mask & (0x80_u8 >> column) == 0 {
-        continue;
-      }
-      let x = column as f32 * DRAWINGML_PATTERN_CELL_PT;
-      let y = row as f32 * DRAWINGML_PATTERN_CELL_PT;
-      foreground.move_to(x, y);
-      foreground.line_to(x + DRAWINGML_PATTERN_CELL_PT, y);
-      foreground.line_to(x + DRAWINGML_PATTERN_CELL_PT, y + DRAWINGML_PATTERN_CELL_PT);
-      foreground.line_to(x, y + DRAWINGML_PATTERN_CELL_PT);
-      foreground.close();
+    // Office fixed output embeds the authored 8×8 mask as a non-interpolated
+    // bitmap inside the tiling pattern. Vectorizing its 0.12pt cells lets PDF
+    // antialiasing blend away the foreground color and changes the apparent
+    // hatch density, especially for Word's 0.96pt shading brush.
+    pattern_surface.draw_image(image, size);
+  } else {
+    pattern_surface.set_stroke(None);
+    pattern_surface.set_fill(Some(pattern_color_fill(pattern.background)));
+    if let Some(background) = rect_path(0.0, 0.0, tile_size_pt, tile_size_pt) {
+      pattern_surface.draw_path(&background);
     }
-  }
-  pattern_surface.set_fill(Some(pattern_color_fill(pattern.foreground)));
-  if let Some(foreground) = foreground.finish() {
-    pattern_surface.draw_path(&foreground);
+
+    let mut foreground = PathBuilder::new();
+    for (row, mask) in pattern.pattern_rows().iter().copied().enumerate() {
+      for column in 0..emfsdk::emfplus::EmfPlusHatchStyle::TILE_SIZE as usize {
+        if mask & (0x80_u8 >> column) == 0 {
+          continue;
+        }
+        let x = column as f32 * cell_size_pt;
+        let y = row as f32 * cell_size_pt;
+        foreground.move_to(x, y);
+        foreground.line_to(x + cell_size_pt, y);
+        foreground.line_to(x + cell_size_pt, y + cell_size_pt);
+        foreground.line_to(x, y + cell_size_pt);
+        foreground.close();
+      }
+    }
+    pattern_surface.set_fill(Some(pattern_color_fill(pattern.foreground)));
+    if let Some(foreground) = foreground.finish() {
+      pattern_surface.draw_path(&foreground);
+    }
   }
   pattern_surface.finish();
 
@@ -5732,17 +5732,49 @@ fn drawingml_pattern_paint(
     // an equivalent global tile boundary near the path so separate shapes do
     // not restart the 8x8 mask at their own top-left corners.
     transform: Transform::from_translate(
-      drawingml_pattern_origin(origin_x),
-      drawingml_pattern_origin(origin_y),
+      pattern_origin(origin_x, tile_size_pt),
+      pattern_origin(origin_y, tile_size_pt),
     ),
-    width: DRAWINGML_PATTERN_TILE_PT,
-    height: DRAWINGML_PATTERN_TILE_PT,
+    width: tile_size_pt,
+    height: tile_size_pt,
   }
   .into()
 }
 
-fn drawingml_pattern_origin(value: f32) -> f32 {
-  (value / DRAWINGML_PATTERN_TILE_PT).floor() * DRAWINGML_PATTERN_TILE_PT
+fn pattern_tile_image(pattern: common::PatternFill) -> Option<Image> {
+  if !matches!(pattern.mask, common::PatternMask::Bitmap8(_)) {
+    return None;
+  }
+  let has_alpha = pattern.foreground.a != u8::MAX || pattern.background.a != u8::MAX;
+  let component_count = if has_alpha { 4 } else { 3 };
+  let mut pixels = Vec::with_capacity(8 * 8 * component_count);
+  for y in 0..8 {
+    for x in 0..8 {
+      let color = if pattern.is_foreground(x, y) {
+        pattern.foreground
+      } else {
+        pattern.background
+      };
+      pixels.extend_from_slice(&[color.r, color.g, color.b]);
+      if has_alpha {
+        pixels.push(color.a);
+      }
+    }
+  }
+  let color_type = if has_alpha {
+    ColorType::Rgba8
+  } else {
+    ColorType::Rgb8
+  };
+  let mut encoded = Cursor::new(Vec::new());
+  PngEncoder::new(&mut encoded)
+    .write_image(&pixels, 8, 8, color_type.into())
+    .ok()?;
+  Image::from_png(encoded.into_inner().into(), false).ok()
+}
+
+fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
+  (value / tile_size_pt).floor() * tile_size_pt
 }
 
 fn pattern_color_fill(color: common::Color) -> Fill {
@@ -6104,18 +6136,26 @@ fn pdf_gradient_stops(stops: &[common::GradientStop<'static>], reverse: bool) ->
 }
 
 fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
-  if let Some(fill_color) = rect.fill_color {
-    surface.set_fill(Some(Fill {
-      paint: rgb::Color::new(fill_color.r, fill_color.g, fill_color.b).into(),
-      opacity: NormalizedF32::new(rect.fill_opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ZERO),
-      rule: FillRule::EvenOdd,
-    }));
+  if let Some(fill) = rect.fill {
+    let fill = match fill {
+      RectFill::Solid { color, opacity } => Fill {
+        paint: rgb::Color::new(color.r, color.g, color.b).into(),
+        opacity: NormalizedF32::new(opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ZERO),
+        rule: FillRule::EvenOdd,
+      },
+      RectFill::Pattern(pattern) => Fill {
+        paint: drawingml_pattern_paint(surface, pattern, rect.x_pt, rect.y_pt),
+        opacity: NormalizedF32::ONE,
+        rule: FillRule::EvenOdd,
+      },
+    };
+    surface.set_fill(Some(fill));
     surface.set_stroke(None);
     draw_rect_path(surface, rect);
   }
 
   if let Some(stroke) = rect.stroke
-    && (rect.stroke_opacity > f32::EPSILON || (rect.fill_color.is_none() && rect.height_pt < 50.0))
+    && (rect.stroke_opacity > f32::EPSILON || (rect.fill.is_none() && rect.height_pt < 50.0))
   {
     surface.set_fill(None);
     surface.set_stroke(Some(Stroke {

@@ -836,7 +836,11 @@ Current progress:
   headers and more than 10 header rows do not repeat. Repeated header fit
   checks include the following cell-spacing gutter so a headline is not
   repainted when the header plus the next row cannot actually fit in the follow
-  region.
+  region. A directly authored `w:tblHeader` also forces the table style's
+  `firstRow` condition on every such header row, including a later header row
+  and even when `tblLook/@firstRow` is false. This follows LibreOffice
+  `DomainMapperTableHandler.cxx` and its `tdf138020_all_rows_tblHeader` guard;
+  `w:cnfStyle` remains only a producer cache.
 - Table and cell margins are imported through generated `w::TableCellMarginDefault`
   and `w::TableCellMargin` types. Layout uses those margins for row height,
   content inset, and vertical alignment instead of a fixed padding constant,
@@ -865,6 +869,13 @@ Current progress:
   and paints internal horizontal edges once from the preceding row, following
   Writer's collapsed table-edge direction and Typst's resolved-grid stroke
   priority model instead of blindly overpainting both neighboring edges.
+- Simple solid table borders use one fixed-output paint path for ordinary,
+  nested, and floating tables. Word emits these rules as printer-grid-aligned
+  fill rectangles rather than centerline strokes; LibreOffice likewise gathers
+  all table rules through `SwTabFramePainter` and device-aligns the resulting
+  border primitives. Dashed and compound rules retain their styled-line path,
+  and a collapsed horizontal rule owns the corner where a vertical rule starts.
+  Following-text-flow is a placement state, not a border-paint selector.
 - When `tblCellMar` and the table style hierarchy omit a margin, cell margins
   use the ECMA-376 Part 1 §17.4 defaults: start/end are `115` twips and
   top/bottom are zero. When recovering a package without a Styles part, Word
@@ -893,14 +904,28 @@ Current progress:
   `pPr/rPr` values are applied as the base for cell paragraph/run import before
   paragraph style, character style, and direct `pPr/rPr`, matching Writer's
   property stack direction and Typst's inner-value-wins fold model. `tblStylePr`
-  currently applies `wholeTable`, first/last row, first/last column, horizontal
-  and vertical band, and corner-cell formatting. Conditional `tblPr` now feeds
-  table alignment, indentation, and cell spacing into the same table-level style
-  cascade; conditional `trPr` is imported into a row-style model for row header
-  repetition, cant-split behavior, and row-level cell spacing, with direct
-  table/row properties applied after the table style. Explicit row/cell
-  `cnfStyle` masks are parsed from generated OOXML types and combined like
-  LibreOffice's row mask plus cell mask before corner conditions are applied.
+  resolves first/last row, first/last column, horizontal and vertical bands,
+  and corner-cell formatting; Word-defined `wholeTable` overrides are discarded
+  in favor of the unconditional style-level properties. Conditional `tblPr`
+  remains region-scoped: shading,
+  per-side cell margins, and borders resolve on matching cells, while cell
+  spacing resolves on matching rows. It is not promoted into table alignment,
+  indentation, or other unconditional table geometry. Conditional `trPr` is
+  imported into a row-style model for row header repetition, cant-split
+  behavior, and row-level cell spacing, with direct table/row properties
+  applied after the table style. The effective `tblLook` selects conditional
+  regions; row/cell `cnfStyle` values are producer caches and do not resurrect
+  regions which `tblLook` disables. A direct row `tblHeader` is different from
+  that cache and explicitly selects `firstRow`; a `tblHeader` inherited only
+  from conditional first-row style remains subject to `tblLook`. Horizontal and
+  vertical band selection also
+  honors the inherited style-level `tblStyleRowBandSize` and
+  `tblStyleColBandSize`: emphasized first/last rows or columns stay outside the
+  alternating sequence, and the remaining positions are grouped by the authored
+  size. Word's missing/zero band-size behavior disables that band axis (rather
+  than using the ISO default of one), and Word accepts only values 0 through 3;
+  the importer preserves an explicit zero across style inheritance and rejects
+  out-of-range values.
   Collapsed adjacent border selection now carries enough style information to
   apply LibreOffice's width-first, simple-over-compound tie breaker instead of
   comparing only numeric widths. Direct `tcBorders` now overlays table-style
@@ -910,6 +935,25 @@ Current progress:
   This follows
   LibreOffice's `StyleSheetTable` / `TblStylePrHandler` split while keeping the
   final resolved row/cell properties in the Typst-like grid style shape.
+- WordprocessingML shading now preserves paint kind instead of collapsing every
+  `w:shd` to one RGB color. `nil` cancels inherited shading; `clear` uses a
+  concrete background fill but an omitted/`auto` fill is transparent; `solid`
+  uses the foreground; percentage patterns blend automatic black over automatic
+  white; geometric patterns retain an Office 8-by-8 bitmap tile. The transparent
+  `clear/auto` distinction is required so a later cell background does not cover
+  conditional table borders or nested floating content. LibreOffice
+  `CellColorHandler.cxx` carries this as `COL_AUTO`, while Office fixed output for
+  the Calendar table styles provides the rendering counterexample. Direct
+  table-level shading is kept for cell-spacing gutters, matching
+  [MS-OI29500] Part 1 §17.4.31 rather than leaking into every cell.
+- WordprocessingShape text boxes retain the complete DrawingML writing-mode
+  state. The ordinary `vert` and `vert270` modes lower as clockwise and
+  counter-clockwise physical text-frame transforms, while East Asian,
+  Mongolian, and stacked WordArt modes remain distinct typed states for a
+  future per-glyph column lowerer rather than being conflated with rotation.
+  Shape AutoFit measures the shared block layout and transposes its logical
+  and physical axes for vertical text, so wrapped vertical text grows the
+  physical width instead of using a fixture-sized fallback frame.
 - Table cell content now uses nested cell flow instead of the old one-line
   clipping path. Paragraphs and nested tables inside cells reuse the same
   paragraph/table layout functions used by body flow, so wrapping, run styles,
@@ -941,6 +985,17 @@ Current progress:
   destination `FlowContext` to the body frame. Following blocks therefore keep
   formatting in the column/page that owns the paragraph follow, matching the
   Writer master/follow invariant rather than restarting from the old body leaf.
+- Run-level text-wrapping breaks retain `w:br/@clear` as a typed inline control.
+  Omitted/`none` remains an ordinary line break; `left`, `right`, and `all`
+  advance the next line below the applicable floating-wrap bottom. The layout
+  uses physical side tests, ignores side-specific clearing in RTL paragraphs,
+  and excludes repeating header/footer objects and through-wrapped drawings.
+  This follows ECMA-376 Part 1 §§17.3.3.1 and 17.18.3, Microsoft's typed
+  [`Break.Clear`](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.break.clear?view=openxml-3.0.1)
+  contract, and LibreOffice
+  `SwBreakPortion::Format()`/`SwTextFly::GetMaxBottom()`. The Office golden
+  `clearing-break.docx` identities cover the positive behavior, while
+  `clearing-break-wrap-through.docx` guards the non-blocking counterexample.
 - PDF text paint now consumes the same rustybuzz-shaped glyph advances used by
   layout measurement and emits krilla glyph runs rather than relying on
   `draw_text` auto shaping. This follows Typst's `typst-pdf/src/text.rs`
@@ -1234,9 +1289,11 @@ Implement:
   `wholeTable`, `firstRow`, `lastRow`, and horizontal band formatting is wired
   for table alignment/indent/spacing, row header/cantSplit/spacing, and cell
   shading/borders/margins/vertical alignment, including first/last column,
-  vertical banding, and corner cells. Row/cell `w:cnfStyle` is imported through
-  generated `ConditionalFormatStyle` and folded into the same Writer-style row
-  mask plus cell mask that LibreOffice uses before resolving corner conditions.
+  vertical banding, and corner cells. Row/cell `w:cnfStyle` remains generated
+  metadata but is not a second style selector. Direct row `w:tblHeader` forces
+  the `firstRow` mask for all header rows, matching LibreOffice's table mapper;
+  ordinary row/column/band/corner masks come from the effective `tblLook` and
+  physical cell position.
   Adjacent collapsed borders now follow LibreOffice's `SvxBorderLine`
   priority shape by comparing rendered width first, then preferring a simple
   line over a compound line when widths tie. Direct cell borders are resolved

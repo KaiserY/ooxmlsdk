@@ -130,11 +130,6 @@ impl<'a> CalcPrintDocument<'a> {
         scale.top_down,
         &mut text_metrics,
       );
-      let drawing_only_implicit_range = named_ranges.resolved_print_areas.is_empty()
-        && areas
-          .iter()
-          .copied()
-          .all(|area| print_area_is_empty(import, sheet, area, &mut text_metrics));
       let page_states = page_areas
         .iter()
         .map(|area| {
@@ -146,7 +141,9 @@ impl<'a> CalcPrintDocument<'a> {
           (drawing_summary, empty)
         })
         .collect::<Vec<_>>();
-      let last_implicit_printable_page = drawing_only_implicit_range
+      let last_implicit_printable_page = named_ranges
+        .resolved_print_areas
+        .is_empty()
         .then(|| page_states.iter().rposition(|(_, empty)| !empty))
         .flatten();
       let mut sheet_page_index = 0usize;
@@ -180,16 +177,16 @@ impl<'a> CalcPrintDocument<'a> {
         // content is painted only for page ranges that survive that test. A
         // workbook made entirely of header/footer-only empty visible sheets
         // still emits one page; otherwise later empty sheets keep being hidden.
-        // Excel differs from Calc's bSkipEmpty path for a drawing-only
-        // implicit sheet range: completely blank pages ahead of a distant
-        // drawing are retained. Do not extend this to sheets with cell
-        // content: those keep their established per-page empty suppression.
+        // Excel fixed output retains blank pages ahead of later printable
+        // cells or drawings in the actual page order. The implicit range has
+        // already excluded invisible blank-cell XF metadata, so this does not
+        // turn a font/alignment-only tail such as tdf131536 into empty pages.
         // Empty trailing pages and independent empty sheets remain hidden.
-        let implicit_page_ahead_of_content = last_implicit_printable_page
+        let implicit_page_before_content = last_implicit_printable_page
           .is_some_and(|last_printable| page_area_index < last_printable);
         if scale.skip_empty
           && empty
-          && !implicit_page_ahead_of_content
+          && !implicit_page_before_content
           && !(keep_header_footer_only_page && sheet_page_index == 0)
         {
           continue;
@@ -308,17 +305,16 @@ fn print_scale_state(
         .max(forced_break_min_rows)
     };
     zoom = fit_zoom_to_pages(
+      import,
       sheet,
       areas,
       named_ranges,
       auto_page_columns,
       auto_page_rows,
     );
-    if zoom == sheet.page_settings.scale && sheet.page_settings.scale != 100 {
-      // ScaleToPagesX/Y or PageScale. In fit-to-pages mode, pageSetup scale is
-      // not a fallback zoom.
-      zoom = 100;
-    }
+    // ECMA-376 pageSetup says fitToWidth/fitToHeight override scale. Keep the
+    // metric-derived fit zoom even when it happens to equal the serialized
+    // scale; equality does not switch the worksheet back to 100 percent.
     if fit_to_width > 0
       && fit_to_height == 0
       && actual_row_page_count(import, sheet, areas, named_ranges, zoom, text_metrics) > 1
@@ -395,6 +391,7 @@ fn actual_row_page_count(
 }
 
 fn fit_zoom_to_pages(
+  import: &ExcelImport,
   sheet: &CalcSheet,
   areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges,
@@ -415,7 +412,7 @@ fn fit_zoom_to_pages(
     .unwrap_or(0.0);
   let page_width = (content.0 - repeat_width).max(1.0);
   let page_height = (content.1 - repeat_height).max(1.0);
-  let fit_area = fit_scale_area(sheet, area, named_ranges);
+  let fit_area = fit_scale_area(import, sheet, area, named_ranges);
   let area_rect = sheet.range_rect(fit_area);
   let width_zoom = if page_columns > 0 && area_rect.width_pt > 0.0 {
     (page_width * page_columns as f32 * 100.0 / area_rect.width_pt).floor() as u32
@@ -435,6 +432,7 @@ fn fit_zoom_to_pages(
 }
 
 fn fit_scale_area(
+  import: &ExcelImport,
   sheet: &CalcSheet,
   area: CellRange,
   named_ranges: &CalcPrintNamedRanges,
@@ -442,7 +440,7 @@ fn fit_scale_area(
   if !named_ranges.resolved_print_areas.is_empty() {
     return area;
   }
-  sheet.used_range().map_or(area, |used| {
+  sheet.used_range(&import.styles).map_or(area, |used| {
     let range = CellRange::new(CellAddress { col: 1, row: 1 }, used.end);
     extend_print_area_for_merges(sheet, range)
   })
@@ -572,7 +570,7 @@ fn print_areas_for_sheet(
       .map(|range| extend_print_area_for_merges(sheet, range))
       .collect();
   }
-  match sheet.used_range() {
+  match sheet.used_range(&import.styles) {
     // Implicit print ranges start at A1; ScDocument::GetPrintArea() only
     // supplies the lower-right used cell. Empty leading rows/columns still
     // participate in page-break calculation and are skipped later by
@@ -1143,12 +1141,14 @@ fn last_visible_row_attribute(
   data_end_row: u32,
 ) -> Option<u32> {
   // calls ScAttrArray::GetLastVisibleAttr after data detection. Explicit row
-  // formatting near the end of the sheet extends the print area even when the
-  // rows contain no cells; long equal formatting runs are stopped at
-  // SC_VISATTR_STOP.
+  // formatting near the data can extend the print area even when the rows
+  // contain no cells. The scan stops at the first SC_VISATTR_STOP-sized run,
+  // including the implicit default-format gap between authored row records;
+  // attributes beyond that run are stale tail metadata, not print content.
   let mut last_row = None;
   let mut run_len = 0u32;
   let mut previous_row = None;
+  let mut last_row_before_run = None;
   for row in sheet
     .rows
     .iter()
@@ -1158,15 +1158,23 @@ fn last_visible_row_attribute(
     if row_index <= data_end_row {
       continue;
     }
+    let previous = previous_row.unwrap_or(data_end_row);
+    let default_gap = row_index.saturating_sub(previous.saturating_add(1));
+    if default_gap >= SC_VISATTR_STOP {
+      break;
+    }
     if previous_row.is_some_and(|previous| previous + 1 == row_index) {
       run_len = run_len.saturating_add(1);
     } else {
       run_len = 1;
+      last_row_before_run = last_row;
     }
     previous_row = Some(row_index);
-    if run_len < SC_VISATTR_STOP {
-      last_row = Some(row_index);
+    if run_len >= SC_VISATTR_STOP {
+      last_row = last_row_before_run;
+      break;
     }
+    last_row = Some(row_index);
   }
   last_row
 }
@@ -1813,6 +1821,9 @@ fn pivot_virtual_print_cells<'a>(
 ) -> Vec<CalcPrintCell<'a>> {
   let mut cells = Vec::new();
   for pivot in &sheet.resources.pivot_tables.tables {
+    if !pivot.refresh_on_load {
+      continue;
+    }
     let geometry = pivot.output_geometry;
     if !geometry.table_range.intersects(area) {
       continue;

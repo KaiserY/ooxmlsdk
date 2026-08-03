@@ -347,6 +347,7 @@ pub(super) fn paragraph_model_with_base<'a>(
       super::InlineItem::FormWidgetStart(_) | super::InlineItem::FormWidgetEnd(_) => None,
       super::InlineItem::DrawingGroupStart(_) | super::InlineItem::DrawingGroupEnd => None,
       super::InlineItem::LastRenderedPageBreak => None,
+      super::InlineItem::ClearLineBreak(_) => None,
       super::InlineItem::PageBreak | super::InlineItem::ColumnBreak => None,
     })
     .collect();

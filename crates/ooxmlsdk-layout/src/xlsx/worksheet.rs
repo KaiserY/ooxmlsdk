@@ -81,6 +81,7 @@ pub(crate) struct SpreadsheetProducerProfile {
   pub(crate) macintosh_excel: bool,
   pub(crate) libreoffice_document: bool,
   pub(crate) excel_major_version: Option<u16>,
+  pub(crate) lowest_edited_version: Option<u16>,
 }
 
 #[derive(Clone, Debug)]
@@ -156,6 +157,7 @@ pub(crate) struct SheetMetrics {
   indexed_scatter_print_grid: bool,
   modern_excel_implicit_columns: bool,
   legacy_calibri_implicit_columns: bool,
+  compatibility_mode_implicit_columns: bool,
   legacy_mac_excel12_verdana10_grid: bool,
   pub(crate) columns: Vec<ColumnModel>,
   pub(crate) merged_ranges: Vec<String>,
@@ -405,18 +407,19 @@ impl CalcSheet {
       )
   }
 
-  pub(crate) fn used_range(&self) -> Option<CellRange> {
+  pub(crate) fn used_range(&self, styles: &StylesCatalog) -> Option<CellRange> {
     let mut used: Option<CellRange> = None;
     for (row_position, row) in self.rows.iter().enumerate() {
       let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
       for (cell_position, cell) in row.cells.iter().enumerate() {
-        if !cell.has_print_data() {
-          continue;
-        }
         let address = cell.address().unwrap_or(CellAddress {
           col: cell_position as u32 + 1,
           row: row_index,
         });
+        let style_index = self.effective_cell_style_index(row, cell, address);
+        if !cell.has_print_data(styles, style_index) {
+          continue;
+        }
         let Some(print_address) = super::pivot::pivot_print_address(self, address) else {
           continue;
         };
@@ -425,6 +428,15 @@ impl CalcSheet {
           None => CellRange::single(print_address),
         });
       }
+    }
+    for merged in &self.geometry.merged_ranges {
+      // An authored merge is a rectangular worksheet object even when its
+      // anchor is blank. Office includes distant blank merges in the implicit
+      // print extent (the POI many-merges fixture spans hundreds of pages).
+      used = Some(match used {
+        Some(used) => used.union(*merged),
+        None => *merged,
+      });
     }
     for pivot in &self.resources.pivot_tables.tables {
       used = Some(match used {
@@ -587,6 +599,13 @@ impl CalcSheet {
     self.rows.get(row)?.cells.get(cell)
   }
 
+  pub(crate) fn effective_cell_style_index_at(&self, address: CellAddress) -> Option<u32> {
+    let &(row_index, cell_index) = self.cell_positions.get(&address)?;
+    let row = self.rows.get(row_index)?;
+    let cell = row.cells.get(cell_index)?;
+    self.effective_cell_style_index(row, cell, address)
+  }
+
   pub(crate) fn cell_at_mut(&mut self, address: CellAddress) -> Option<&mut CalcCell> {
     let &(row, cell) = self.cell_positions.get(&address)?;
     self.rows.get_mut(row)?.cells.get_mut(cell)
@@ -644,10 +663,11 @@ impl SheetGeometry {
     vertical_dpi: Option<u32>,
   ) -> Self {
     let authored_legacy_best_fit_profile = metrics.modern_excel_implicit_columns
-      && metrics
-        .format
-        .dy_descent_pt
-        .is_some_and(|value| (value - 0.35).abs() <= f32::EPSILON)
+      && (metrics.compatibility_mode_implicit_columns
+        || metrics
+          .format
+          .dy_descent_pt
+          .is_some_and(|value| (value - 0.35).abs() <= f32::EPSILON))
       && metrics
         .columns
         .iter()
@@ -679,12 +699,14 @@ impl SheetGeometry {
     {
       // ECMA-376 Part 1 §18.3.1.13 says bestFit marks an authored,
       // non-default column whose width was derived from its contents. The
-      // Excel 16 Calibri-minor/0.35-descent producer profile preserves the
-      // accompanying legacy application default for un-authored columns:
-      // tdf116818's B-to-C boundary is 50.04pt in Office fixed output while
-      // its explicit best-fit A width retains the Normal-font MDW path.
-      // Do not generalize this to every 0.35-descent workbook; the corpus has
-      // independently shown that such a rule changes unrelated identities.
+      // Excel 16's compatibility-mode and Calibri-minor/0.35-descent
+      // producer profiles preserve the accompanying legacy application
+      // default for un-authored columns. tdf134118 carries
+      // fileVersion@lowestEdited=6 and resolves its implicit B column to
+      // 50.05pt; tdf116818 independently exposes the same boundary through
+      // its 0.35-descent best-fit A column. Explicit best-fit widths retain
+      // the Normal-font MDW path. Do not generalize this to every legacy file:
+      // the best-fit marker is the authored compatibility-grid evidence.
       OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT
     } else if metrics.modern_excel_implicit_columns
       && metrics.format.mso_document
@@ -1026,16 +1048,25 @@ fn apply_excel16_chartex_implicit_row_printer_grid(
 }
 
 impl CalcCell {
-  fn has_print_data(&self) -> bool {
-    self.formula.is_some()
+  fn has_print_data(&self, styles: &StylesCatalog, style_index: Option<u32>) -> bool {
+    if self.formula.is_some()
       || self.cached_value.is_some()
       || !self.display_text.is_empty()
+      || !self.rich_text_runs.is_empty()
       || self.data_type.is_some()
-      // ECMA-376 Part 1 §18.3.1.35 defines a formatted cell as used even
-      // when it has no value. Excel includes those cells in the implicit
-      // print range, so a styled blank tail can legitimately create another
-      // printed page.
-      || self.style_index.is_some()
+    {
+      return true;
+    }
+    // A serialized cell XF makes a cell part of the worksheet's broad used
+    // range, but font, number-format, alignment, and protection metadata have
+    // no visible body when the cell is blank. Office fixed output extends the
+    // implicit print range only for visible blank-cell paint here.
+    let borders = styles.borders_for_cell(style_index);
+    borders.left.is_some()
+      || borders.right.is_some()
+      || borders.top.is_some()
+      || borders.bottom.is_some()
+      || styles.fill_for_cell(style_index).color.is_some()
   }
 }
 
@@ -1280,6 +1311,13 @@ impl SheetMetrics {
         && styles.normal_style_uses_calibri_11_minor_theme(),
       legacy_calibri_implicit_columns: mso_document
         && styles.normal_style_uses_calibri_11_minor_theme(),
+      compatibility_mode_implicit_columns: mso_document
+        && producer
+          .excel_major_version
+          .is_some_and(|version| version >= 16)
+        && producer
+          .lowest_edited_version
+          .is_some_and(|version| version < 7),
       legacy_mac_excel12_verdana10_grid,
       columns: worksheet
         .columns
@@ -1976,7 +2014,7 @@ mod tests {
   }
 
   #[test]
-  fn excel_16_legacy_best_fit_profile_keeps_un_authored_columns_legacy() {
+  fn excel_16_compatibility_best_fit_profile_keeps_un_authored_columns_legacy() {
     let mut metrics = SheetMetrics::default();
     metrics.format.mso_document = true;
     metrics.format.dy_descent_pt = Some(0.35);
@@ -2002,6 +2040,13 @@ mod tests {
       OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT
     );
     metrics.format.dy_descent_pt = Some(0.25);
+    metrics.compatibility_mode_implicit_columns = true;
+    let compatibility_geometry = SheetGeometry::new(&metrics, &[], None, None);
+    assert_eq!(
+      compatibility_geometry.column_width_pt(2),
+      OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT
+    );
+    metrics.compatibility_mode_implicit_columns = false;
     let modern_geometry = SheetGeometry::new(&metrics, &[], None, None);
     assert_eq!(
       modern_geometry.column_width_pt(2),
@@ -2010,7 +2055,7 @@ mod tests {
   }
 
   #[test]
-  fn explicitly_formatted_blank_cell_is_used() {
+  fn style_only_blank_cell_is_not_used() {
     let cell = CalcCell {
       address: Some(CellAddress { col: 11, row: 20 }),
       style_index: Some(5),
@@ -2021,7 +2066,8 @@ mod tests {
       rich_text_runs: Vec::new(),
     };
 
-    assert!(cell.has_print_data());
+    let styles = StylesCatalog::default();
+    assert!(!cell.has_print_data(&styles, cell.style_index));
   }
 
   #[test]

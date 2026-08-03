@@ -3,7 +3,11 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use std::borrow::Cow;
 
-use crate::localization::{ChartDisplayUnit, OfficeStringCatalog};
+use crate::common::color_math;
+use crate::field_datetime;
+use crate::localization::{ChartDisplayUnit, ChartTrendlineKind, OfficeStringCatalog};
+use crate::model::RgbColor;
+use crate::options::FieldUpdateDateTime;
 use crate::{render::math::text_math_text, units};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -20,8 +24,19 @@ pub enum ChartKind {
   Other,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ChartHostApplication {
+  Wordprocessing,
+  Spreadsheet,
+  Presentation,
+}
+
 #[derive(Clone, Copy)]
 pub struct ChartSeriesRef<'a> {
+  /// `c:ser/c:idx`, used by the classic chart-style formatting algorithm.
+  /// This is independent from display order and may contain gaps in combined
+  /// charts, so reducing it to the vector position changes fade colors.
+  pub formatting_index: usize,
   pub series_text: Option<&'a c::SeriesText>,
   pub category_axis_data: Option<&'a c::CategoryAxisData>,
   pub values: Option<&'a c::Values>,
@@ -95,6 +110,10 @@ pub struct Chart3DView {
   /// must be fitted from the rotated scene, rather than treated as 100%.
   pub height_percent_is_explicit: bool,
   pub depth_percent: f32,
+  /// Whether `c:depthPercent` was authored. When it is omitted, Office uses
+  /// the chart type's preferred 3-D aspect ratio instead of a one-chart-width
+  /// depth.
+  pub depth_percent_is_explicit: bool,
   pub right_angle_axes: bool,
   /// OOXML stores the field-of-view angle in half degrees.
   pub perspective_half_degrees: f32,
@@ -108,6 +127,7 @@ impl Default for Chart3DView {
       height_percent: 100.0,
       height_percent_is_explicit: false,
       depth_percent: 100.0,
+      depth_percent_is_explicit: false,
       right_angle_axes: false,
       perspective_half_degrees: 30.0,
     }
@@ -157,6 +177,9 @@ pub enum RadialChartKind {
 
 #[derive(Clone, Debug)]
 pub struct ClusteredColumnSeries<'a> {
+  /// `c:ser/c:idx`, retained for ECMA-376 §21.2.3.46 Table 5 automatic
+  /// series formatting. It is not interchangeable with display order.
+  pub formatting_index: usize,
   pub name: String,
   pub has_explicit_name: bool,
   /// Whether c:tx carries a non-empty cached or literal series title.
@@ -175,6 +198,12 @@ pub struct ClusteredColumnSeries<'a> {
   /// any DrawingML fill/outline, including an explicit `a:noFill`; reducing
   /// this list to solid RGB values loses both inheritance and line paint.
   pub data_points: &'a [c::DataPoint],
+  /// Worksheet reference backing the series name, when `c:tx` uses a
+  /// `c:strRef`. Spreadsheet hosts use it when the embedded string cache is
+  /// absent rather than substituting an application-generated name.
+  pub name_formula: Option<&'a str>,
+  /// Worksheet reference backing category coordinates or labels.
+  pub category_formula: Option<&'a str>,
   /// Formula backing the numeric values, when the chart uses a worksheet
   /// reference. Renderers normally use the embedded cache, but spreadsheet
   /// hosts need the reference when `plotVisOnly=0` asks for hidden cells that
@@ -182,12 +211,33 @@ pub struct ClusteredColumnSeries<'a> {
   pub value_formula: Option<&'a str>,
   pub values: Vec<Option<f64>>,
   pub number_format_code: Option<&'a str>,
+  /// Worksheet reference backing scatter/bubble X values.
+  pub x_value_formula: Option<&'a str>,
   pub x_values: Vec<Option<f64>>,
   /// Cached number format for a scatter/bubble X-value sequence.  Numeric X
   /// and Y axes can both be `c:valAx`, but `sourceLinked` resolves them from
   /// different data roles.
   pub x_number_format_code: Option<&'a str>,
+  /// Worksheet reference backing bubble sizes.
+  pub bubble_size_formula: Option<&'a str>,
   pub bubble_sizes: Vec<Option<f64>>,
+  /// Bubble-chart group that owns this series. Keeping group identity avoids
+  /// combining maxima and scaling rules from independent bubble groups in a
+  /// mixed chart.
+  pub bubble_group_index: Option<usize>,
+  /// `c:bubbleScale`, as a percentage of the application's default bubble
+  /// diameter. ECMA-376 constrains the value to 0..=300 and gives an omitted
+  /// value the default 100.
+  pub bubble_scale_percent: f64,
+  /// Whether a bubble value controls its painted area or its diameter.
+  pub bubble_size_represents: c::SizeRepresentsValues,
+  /// `c:showNegBubbles`: negative sizes are hidden unless the owning group
+  /// explicitly requests their absolute magnitudes.
+  pub show_negative_bubbles: bool,
+  /// Effective group/series `c:bubble3D` state. A point-level `c:dPt`
+  /// override remains available through `data_points` and is resolved by the
+  /// renderer for that point.
+  pub bubble_3d: bool,
   pub solid_fill: Option<&'a a::SolidFill>,
   pub data_point_fills: Vec<ChartDataPointFill<'a>>,
   pub data_labels: Vec<ClusteredColumnDataLabel<'a>>,
@@ -283,10 +333,29 @@ pub struct CartesianAxisSet<'a> {
 }
 
 #[derive(Clone, Debug)]
+pub struct AdditionalAxisTitle<'a> {
+  pub text: String,
+  pub source: &'a c::Title,
+  pub position: c::AxisPositionValues,
+  pub automatic_rotation_deg: f32,
+  pub layout: Option<ChartManualLayout>,
+}
+
+#[derive(Clone, Debug)]
 pub struct ClusteredColumnChart<'a> {
   /// Output UI language used for application-generated chart text such as
   /// automatic titles, series names, and built-in display-unit labels.
   pub ui_language: Option<String>,
+  /// Output format locale used for locale-dependent numeric and date labels.
+  /// This remains independent from UI resources such as automatic titles.
+  pub format_locale: Option<String>,
+  /// Chart-wide DrawingML text-body geometry from `c:chartSpace/c:txPr`.
+  ///
+  /// Axis-local `c:txPr` overrides this body. Keeping the chart default in
+  /// the shared model is important even when `a:bodyPr` is empty: ECMA-376
+  /// assigns non-zero schema defaults to all four text-box insets, and Office
+  /// includes the resulting generated label shape in automatic axis scaling.
+  pub default_text_body_properties: Option<&'a a::BodyProperties>,
   pub title: Option<ChartTitleText>,
   pub title_overlay: bool,
   pub title_layout: Option<ChartManualLayout>,
@@ -307,12 +376,24 @@ pub struct ClusteredColumnChart<'a> {
   pub cached_category_count: usize,
   pub has_explicit_categories: bool,
   pub category_axis_title: Option<String>,
+  /// Manual position authored on the primary horizontal-axis title. Title
+  /// layouts use fitted text-box semantics rather than plot-rectangle size.
+  pub category_axis_title_layout: Option<ChartManualLayout>,
   pub value_axis_title: Option<String>,
-  pub additional_axis_titles: Vec<String>,
+  /// Manual position authored on the primary vertical-axis title.
+  pub value_axis_title_layout: Option<ChartManualLayout>,
+  /// Titles owned by non-primary category, value, or series axes. Retaining
+  /// the source and axis position prevents secondary titles from being
+  /// flattened to a generic right-side, -90-degree label.
+  pub additional_axis_titles: Vec<AdditionalAxisTitle<'a>>,
   pub categories: Vec<String>,
   /// Numeric category coordinates retained for a date axis. String
   /// formatting alone loses the spacing and major-unit rhythm Office uses.
   pub category_axis_values: Vec<Option<f64>>,
+  /// Number format carried by the numeric category sequence. A date axis
+  /// whose c:numFmt is source-linked resolves through this format rather than
+  /// treating the axis' persisted fallback code as authoritative.
+  pub category_number_format_code: Option<String>,
   pub date_1904: bool,
   pub series: Vec<ClusteredColumnSeries<'a>>,
   pub surface_groups: Vec<SurfaceChartGroup<'a>>,
@@ -338,6 +419,11 @@ pub struct ClusteredColumnChart<'a> {
   /// present (MS-OI29500 §21.2.2.227).
   pub vary_colors_by_point: bool,
   pub visible_legend_indices: Vec<usize>,
+  /// Zero-based indices of application legend entries suppressed by
+  /// `c:legendEntry/c:delete`. For an ordinary cartesian chart the logical
+  /// entry stream is each series followed by that series' trendlines; a
+  /// vary-colors series contributes its point entries before its trendlines.
+  pub deleted_legend_entry_indices: Vec<usize>,
   pub legend_layout: Option<ChartManualLayout>,
   pub plot_layout: Option<ChartManualLayout>,
   pub data_table: Option<&'a c::DataTable>,
@@ -358,7 +444,17 @@ pub struct PieChartModel<'a> {
   pub title: Option<ChartTitleText>,
   pub title_layout: Option<ChartManualLayout>,
   pub title_rotation_deg: f32,
+  /// Formatting index of the displayed first series and the highest index in
+  /// the radial chart group. When `varyColors` is false, classic chart-style
+  /// fade colors are selected from these values rather than point position.
+  pub series_formatting_index: usize,
+  pub maximum_series_formatting_index: usize,
   pub series_name: String,
+  /// Whether the displayed first series owns a non-empty authored c:tx.
+  ///
+  /// Office may use that caption as an automatic chart title, but must not
+  /// promote an application-generated Row/Column fallback in its place.
+  pub has_nonempty_explicit_series_name: bool,
   pub categories: Vec<String>,
   pub values: Vec<Option<f64>>,
   pub series_shape_properties: Option<&'a c::ChartShapeProperties>,
@@ -407,12 +503,20 @@ pub(crate) struct LinearAxisScaleOptions {
   /// extra 1/21 border interval for every 3-D plotter. Two-dimensional
   /// plotters retain it so markers and line strokes do not sit on the frame.
   pub expand_if_values_close_to_border: bool,
+  /// Smallest automatically selected major unit for an ordinal numeric axis.
+  ///
+  /// Scatter charts whose `xVal` sequence contains text are repaired by
+  /// Office to one-based ordinal positions.  Those positions may be thinned
+  /// when the plot is crowded, but fractional positions do not exist and an
+  /// automatic 0.5-unit scale would expose synthetic half-categories.
+  pub minimum_automatic_major_unit: Option<f64>,
 }
 
 impl Default for LinearAxisScaleOptions {
   fn default() -> Self {
     Self {
       expand_if_values_close_to_border: true,
+      minimum_automatic_major_unit: None,
     }
   }
 }
@@ -427,6 +531,10 @@ pub struct ClusteredColumnSlot {
 pub struct ChartCategoryTick {
   /// Normalized position in the plot band, before axis reversal.
   pub position: f64,
+  /// Unshifted major-tick/gridline position. Date-axis labels use the center
+  /// of a shifted time interval, while Office keeps tick marks and gridlines
+  /// on the interval boundary.
+  pub gridline_position: f64,
   pub text: String,
 }
 
@@ -452,6 +560,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
   ui_language: Option<&str>,
 ) -> Option<ClusteredColumnChart<'a>> {
   let category_axis_values = chart_numeric_category_values(chart_space);
+  let category_number_format_code = chart_numeric_category_format_code(chart_space);
   let bar_chart = chart_space
     .chart
     .plot_area
@@ -525,17 +634,27 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       },
     );
     series.push(ClusteredColumnSeries {
+      formatting_index: series_ref.formatting_index,
       name,
       has_explicit_name: series_ref.series_text.is_some(),
       has_nonempty_explicit_name: explicit_name.is_some(),
       shape_properties: series_ref.chart_shape_properties,
       data_points: &source.data_point,
+      name_formula: series_name_formula(series_ref),
+      category_formula: series_category_formula(series_ref),
       value_formula: series_value_formula(series_ref),
       values,
       number_format_code: series_number_format_code(series_ref),
+      x_value_formula: series_x_value_formula(series_ref),
       x_values: Vec::new(),
       x_number_format_code: None,
+      bubble_size_formula: series_bubble_size_formula(series_ref),
       bubble_sizes: Vec::new(),
+      bubble_group_index: None,
+      bubble_scale_percent: 100.0,
+      bubble_size_represents: c::SizeRepresentsValues::Area,
+      show_negative_bubbles: false,
+      bubble_3d: false,
       solid_fill,
       data_point_fills,
       data_labels,
@@ -645,9 +764,19 @@ pub fn clustered_column_chart_for_ui_language<'a>(
   } else {
     bar_chart.bar_chart_series.len()
   };
+  let category_axis_title_source = category_axis
+    .and_then(|axis| axis.title.as_deref())
+    .or_else(|| date_axis.and_then(|axis| axis.title.as_deref()))
+    .or_else(|| horizontal_value_axis.and_then(|axis| axis.title.as_deref()));
+  let value_axis_title_source = value_axis.and_then(|axis| axis.title.as_deref());
 
   Some(ClusteredColumnChart {
     ui_language: ui_language.map(ToOwned::to_owned),
+    format_locale: ui_language.map(ToOwned::to_owned),
+    default_text_body_properties: chart_space
+      .text_properties
+      .as_deref()
+      .map(|properties| properties.body_properties.as_ref()),
     title,
     title_overlay: chart_space
       .chart
@@ -666,17 +795,20 @@ pub fn clustered_column_chart_for_ui_language<'a>(
     has_automatic_title_marker: chart_space.chart.auto_title_deleted.is_some(),
     cached_category_count,
     has_explicit_categories,
-    category_axis_title: category_axis
-      .and_then(|axis| axis.title.as_deref())
-      .and_then(|title| title_text_or_automatic(title, ui_language)),
-    value_axis_title: value_axes
-      .first()
-      .copied()
-      .and_then(|axis| axis.title.as_deref())
-      .and_then(|title| title_text_or_automatic(title, ui_language)),
+    category_axis_title: category_axis_title_source.and_then(|title| {
+      title_text_or_automatic(title, ChartHostApplication::Spreadsheet, ui_language)
+    }),
+    category_axis_title_layout: category_axis_title_source
+      .and_then(|title| chart_text_layout(title.layout.as_deref())),
+    value_axis_title: value_axis_title_source.and_then(|title| {
+      title_text_or_automatic(title, ChartHostApplication::Spreadsheet, ui_language)
+    }),
+    value_axis_title_layout: value_axis_title_source
+      .and_then(|title| chart_text_layout(title.layout.as_deref())),
     additional_axis_titles: Vec::new(),
     categories,
     category_axis_values,
+    category_number_format_code,
     date_1904: chart_uses_1904_date_system(chart_space),
     series,
     surface_groups: Vec::new(),
@@ -720,6 +852,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       chart_space.chart.legend.as_deref(),
       legend_entry_count,
     ),
+    deleted_legend_entry_indices: deleted_legend_entry_indices(chart_space.chart.legend.as_deref()),
     legend_layout: chart_space
       .chart
       .legend
@@ -933,7 +1066,30 @@ pub fn cartesian_chart_for_ui_language<'a>(
   chart_space: &'a c::ChartSpace,
   ui_language: Option<&str>,
 ) -> Option<ClusteredColumnChart<'a>> {
+  cartesian_chart_for_locales(chart_space, ui_language, ui_language)
+}
+
+pub fn cartesian_chart_for_locales<'a>(
+  chart_space: &'a c::ChartSpace,
+  ui_language: Option<&str>,
+  format_locale: Option<&str>,
+) -> Option<ClusteredColumnChart<'a>> {
+  cartesian_chart_for_host_locales(
+    chart_space,
+    ChartHostApplication::Spreadsheet,
+    ui_language,
+    format_locale,
+  )
+}
+
+pub fn cartesian_chart_for_host_locales<'a>(
+  chart_space: &'a c::ChartSpace,
+  host: ChartHostApplication,
+  ui_language: Option<&str>,
+  format_locale: Option<&str>,
+) -> Option<ClusteredColumnChart<'a>> {
   let category_axis_values = chart_numeric_category_values(chart_space);
+  let category_number_format_code = chart_numeric_category_format_code(chart_space);
   let mut series = Vec::new();
   let mut categories = Vec::new();
   let mut gap_width_percent = 150.0;
@@ -943,6 +1099,7 @@ pub fn cartesian_chart_for_ui_language<'a>(
   let mut vary_colors_requested = false;
   let mut axis_id_sets = Vec::<Vec<i32>>::new();
   let mut surface_groups = Vec::new();
+  let mut bubble_group_count = 0usize;
 
   for choice in &chart_space.chart.plot_area.plot_area_choice1 {
     let axis_set_index = plot_area_choice_axis_ids(choice)
@@ -1245,19 +1402,53 @@ pub fn cartesian_chart_for_ui_language<'a>(
           band_fills: surface_band_fills(chart.band_formats.as_ref()),
         });
       }
-      c::PlotAreaChoice::BubbleChart(chart) => append_cartesian_series(
-        &mut series,
-        &mut categories,
-        chart.bubble_chart_series.iter().map(bubble_series_ref),
-        chart.data_labels.as_deref(),
-        (
-          ChartSeriesKind::Bubble,
-          ChartSeriesGrouping::Standard,
-          false,
-        ),
-        axis_set_index,
-        ui_language,
-      ),
+      c::PlotAreaChoice::BubbleChart(chart) => {
+        let first_series_index = series.len();
+        append_cartesian_series(
+          &mut series,
+          &mut categories,
+          chart.bubble_chart_series.iter().map(bubble_series_ref),
+          chart.data_labels.as_deref(),
+          (
+            ChartSeriesKind::Bubble,
+            ChartSeriesGrouping::Standard,
+            false,
+          ),
+          axis_set_index,
+          ui_language,
+        );
+        let group_bubble_3d = chart
+          .bubble3_d
+          .as_ref()
+          .is_some_and(|bubble| bubble.val.is_none_or(|value| value.as_bool()));
+        let bubble_scale_percent = chart
+          .bubble_scale
+          .as_ref()
+          .and_then(|scale| scale.val)
+          .map_or(100.0, f64::from);
+        let show_negative_bubbles = chart
+          .show_negative_bubbles
+          .as_ref()
+          .is_some_and(|show| show.val.is_none_or(|value| value.as_bool()));
+        let size_represents = chart
+          .size_represents
+          .as_ref()
+          .and_then(|size| size.val)
+          .unwrap_or(c::SizeRepresentsValues::Area);
+        for (target, source) in series[first_series_index..]
+          .iter_mut()
+          .zip(&chart.bubble_chart_series)
+        {
+          target.bubble_group_index = Some(bubble_group_count);
+          target.bubble_scale_percent = bubble_scale_percent;
+          target.bubble_size_represents = size_represents;
+          target.show_negative_bubbles = show_negative_bubbles;
+          target.bubble_3d = source.bubble3_d.as_ref().map_or(group_bubble_3d, |bubble| {
+            bubble.val.is_none_or(|value| value.as_bool())
+          });
+        }
+        bubble_group_count += 1;
+      }
       c::PlotAreaChoice::PieChart(_)
       | c::PlotAreaChoice::Pie3DChart(_)
       | c::PlotAreaChoice::DoughnutChart(_)
@@ -1311,43 +1502,102 @@ pub fn cartesian_chart_for_ui_language<'a>(
     .and_then(|set| set.vertical_value_axis)
     .or(value_axis);
   apply_axis_display_units_to_data_labels(&mut series, &axis_sets, value_axis);
-  let category_axis_title = category_axis
+  let category_axis_title_source = category_axis
     .and_then(|axis| axis.title.as_deref())
     .or_else(|| date_axis.and_then(|axis| axis.title.as_deref()))
-    .or_else(|| horizontal_value_axis.and_then(|axis| axis.title.as_deref()))
-    .and_then(|title| title_text_or_automatic(title, ui_language));
-  let value_axis_title = value_axis
-    .and_then(|axis| axis.title.as_deref())
-    .and_then(|title| title_text_or_automatic(title, ui_language));
+    .or_else(|| horizontal_value_axis.and_then(|axis| axis.title.as_deref()));
+  let category_axis_title =
+    category_axis_title_source.and_then(|title| title_text_or_automatic(title, host, ui_language));
+  let value_axis_title_source = value_axis.and_then(|axis| axis.title.as_deref());
+  let value_axis_title =
+    value_axis_title_source.and_then(|title| title_text_or_automatic(title, host, ui_language));
   let mut additional_axis_titles = Vec::new();
   for (axis_set_index, set) in axis_sets.iter().enumerate() {
+    let horizontal_bar = axis_set_uses_horizontal_bars(&series, axis_set_index);
     if axis_set_index != category_axis_set_index {
       additional_axis_titles.extend(
         set
           .category_axis
-          .and_then(|axis| axis.title.as_deref())
-          .or_else(|| set.date_axis.and_then(|axis| axis.title.as_deref()))
-          .or_else(|| {
-            set
-              .horizontal_value_axis
-              .and_then(|axis| axis.title.as_deref())
+          .and_then(|axis| {
+            axis
+              .title
+              .as_deref()
+              .map(|title| (title, axis.axis_position.val))
           })
-          .and_then(|title| title_text_or_automatic(title, ui_language)),
+          .or_else(|| {
+            set.date_axis.and_then(|axis| {
+              axis
+                .title
+                .as_deref()
+                .map(|title| (title, axis.axis_position.val))
+            })
+          })
+          .or_else(|| {
+            set.horizontal_value_axis.and_then(|axis| {
+              axis
+                .title
+                .as_deref()
+                .map(|title| (title, axis.axis_position.val))
+            })
+          })
+          .and_then(|(title, position)| {
+            additional_axis_title(
+              title,
+              position,
+              automatic_axis_title_rotation_for_dimension(
+                position,
+                ChartAxisDimension::X,
+                horizontal_bar,
+              ),
+              host,
+              ui_language,
+            )
+          }),
       );
     }
     if axis_set_index != 0 {
       additional_axis_titles.extend(
         set
           .vertical_value_axis
-          .and_then(|axis| axis.title.as_deref())
-          .and_then(|title| title_text_or_automatic(title, ui_language)),
+          .and_then(|axis| {
+            axis
+              .title
+              .as_deref()
+              .map(|title| (title, axis.axis_position.val))
+          })
+          .and_then(|(title, position)| {
+            additional_axis_title(
+              title,
+              position,
+              automatic_axis_title_rotation_for_dimension(
+                position,
+                ChartAxisDimension::Y,
+                horizontal_bar,
+              ),
+              host,
+              ui_language,
+            )
+          }),
       );
     }
     additional_axis_titles.extend(
       set
         .series_axis
-        .and_then(|axis| axis.title.as_deref())
-        .and_then(|title| title_text_or_automatic(title, ui_language)),
+        .and_then(|axis| {
+          axis
+            .title
+            .as_deref()
+            .map(|title| (title, axis.axis_position.val))
+        })
+        .and_then(|(title, position)| {
+          additional_axis_title(
+            title,
+            position,
+            automatic_axis_title_rotation_degrees(position),
+            host,
+            ui_language,
+          )
+        }),
     );
   }
   let series_count = series.len();
@@ -1370,6 +1620,11 @@ pub fn cartesian_chart_for_ui_language<'a>(
 
   Some(ClusteredColumnChart {
     ui_language: ui_language.map(ToOwned::to_owned),
+    format_locale: format_locale.or(ui_language).map(ToOwned::to_owned),
+    default_text_body_properties: chart_space
+      .text_properties
+      .as_deref()
+      .map(|properties| properties.body_properties.as_ref()),
     title: chart_title_text(&chart_space.chart),
     title_overlay: chart_space
       .chart
@@ -1389,10 +1644,15 @@ pub fn cartesian_chart_for_ui_language<'a>(
     cached_category_count,
     has_explicit_categories,
     category_axis_title,
+    category_axis_title_layout: category_axis_title_source
+      .and_then(|title| chart_text_layout(title.layout.as_deref())),
     value_axis_title,
+    value_axis_title_layout: value_axis_title_source
+      .and_then(|title| chart_text_layout(title.layout.as_deref())),
     additional_axis_titles,
     categories,
     category_axis_values,
+    category_number_format_code,
     date_1904: chart_uses_1904_date_system(chart_space),
     series,
     surface_groups,
@@ -1428,6 +1688,7 @@ pub fn cartesian_chart_for_ui_language<'a>(
       chart_space.chart.legend.as_deref(),
       legend_entry_count,
     ),
+    deleted_legend_entry_indices: deleted_legend_entry_indices(chart_space.chart.legend.as_deref()),
     legend_layout: chart_space
       .chart
       .legend
@@ -1441,6 +1702,22 @@ pub fn cartesian_chart_for_ui_language<'a>(
   })
 }
 
+fn additional_axis_title<'a>(
+  title: &'a c::Title,
+  position: c::AxisPositionValues,
+  automatic_rotation_deg: f32,
+  host: ChartHostApplication,
+  ui_language: Option<&str>,
+) -> Option<AdditionalAxisTitle<'a>> {
+  Some(AdditionalAxisTitle {
+    text: title_text_or_automatic(title, host, ui_language)?,
+    source: title,
+    position,
+    automatic_rotation_deg,
+    layout: chart_text_layout(title.layout.as_deref()),
+  })
+}
+
 pub(crate) fn chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
   match chart_space.chart_space_choice.as_ref()? {
     c::ChartSpaceChoice::C14Style(style) => {
@@ -1450,6 +1727,121 @@ pub(crate) fn chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
     c::ChartSpaceChoice::CStyle(style) => Some(style.val.unwrap_or(2)),
     c::ChartSpaceChoice::AlternateContent(_) => None,
   }
+}
+
+#[derive(Clone, Copy)]
+enum AutomaticChartColorTransform {
+  /// DrawingML `a:tint/@val`: the retained fraction of the input color.
+  Tint(i32),
+  /// DrawingML `a:shade/@val`: the retained fraction of the input color.
+  Shade(i32),
+}
+
+/// Resolves the automatic series/data-point color defined by the classic
+/// chart styles 1..=48.
+///
+/// ECMA-376 Part 1 §21.2.3.46 Tables 5 and 6 define two six-color patterns,
+/// two neutral `dk1` tint patterns, and six single-accent fade styles in each
+/// eight-style family. `[MS-OI29500]` clarifies that `accent1-6` means one
+/// accent per successive style. LibreOffice
+/// `drawingml::chart::DetailFormatterBase::getPhColor()` supplies the
+/// interoperable cycle-fade algorithm: the leading cycle is shaded, the
+/// trailing cycle is tinted, and the exclusive endpoints are -70% and +70%.
+///
+/// `formatting_index` is `c:ser/c:idx` for a series or the point index for a
+/// vary-colors single series. It must not be replaced by display order.
+pub(crate) fn automatic_chart_series_color(
+  chart_style_id: u8,
+  formatting_index: usize,
+  maximum_formatting_index: usize,
+  mut resolve_scheme: impl FnMut(a::SchemeColorValues) -> Option<RgbColor>,
+) -> Option<RgbColor> {
+  const PATTERN_1_TINTS: [i32; 6] = [88_500, 55_000, 78_000, 92_500, 70_000, 30_000];
+  const PATTERN_4_TINTS: [i32; 6] = [5_000, 55_000, 78_000, 15_000, 70_000, 30_000];
+
+  let style = if (1..=48).contains(&chart_style_id) {
+    chart_style_id
+  } else {
+    2
+  };
+  let family_slot = (style - 1) % 8;
+  let (scheme, base_transform, pattern_length) = match family_slot {
+    0 => {
+      let pattern_index = formatting_index % PATTERN_1_TINTS.len();
+      let tint = if style == 41 {
+        PATTERN_4_TINTS[pattern_index]
+      } else {
+        PATTERN_1_TINTS[pattern_index]
+      };
+      (
+        a::SchemeColorValues::Dark1,
+        Some(AutomaticChartColorTransform::Tint(tint)),
+        PATTERN_1_TINTS.len(),
+      )
+    }
+    // Styles 2/10/18/26/34/42 use Pattern 2. In particular, ECMA Table 5
+    // resolves style 42 as Pattern 2; this avoids inheriting LibreOffice's
+    // overlapping 41..=42 Pattern 4 lookup range.
+    1 => (chart_accent_scheme_color(formatting_index % 6), None, 6),
+    // The remaining six styles in each family select one accent and fade it
+    // across the formatting-index stream.
+    2..=7 => (
+      chart_accent_scheme_color(usize::from(family_slot - 2)),
+      None,
+      1,
+    ),
+    _ => unreachable!(),
+  };
+
+  let mut color = resolve_scheme(scheme)?;
+  if let Some(transform) = base_transform {
+    color = apply_automatic_chart_color_transform(color, transform);
+  }
+
+  let cycle_index = formatting_index / pattern_length;
+  let maximum_cycle_index = maximum_formatting_index.max(formatting_index) / pattern_length;
+  let shade_or_tint = (cycle_index + 1) as f64 / (maximum_cycle_index + 2) as f64 * 1.4 - 0.7;
+  let transform = if shade_or_tint < -f64::EPSILON {
+    Some(AutomaticChartColorTransform::Shade(
+      ((1.0 + shade_or_tint) * 100_000.0).round() as i32,
+    ))
+  } else if shade_or_tint > f64::EPSILON {
+    Some(AutomaticChartColorTransform::Tint(
+      ((1.0 - shade_or_tint) * 100_000.0).round() as i32,
+    ))
+  } else {
+    None
+  };
+  Some(transform.map_or(color, |transform| {
+    apply_automatic_chart_color_transform(color, transform)
+  }))
+}
+
+fn chart_accent_scheme_color(index: usize) -> a::SchemeColorValues {
+  [
+    a::SchemeColorValues::Accent1,
+    a::SchemeColorValues::Accent2,
+    a::SchemeColorValues::Accent3,
+    a::SchemeColorValues::Accent4,
+    a::SchemeColorValues::Accent5,
+    a::SchemeColorValues::Accent6,
+  ][index % 6]
+}
+
+fn apply_automatic_chart_color_transform(
+  color: RgbColor,
+  transform: AutomaticChartColorTransform,
+) -> RgbColor {
+  let rgb = [color.r, color.g, color.b];
+  let [r, g, b] = match transform {
+    AutomaticChartColorTransform::Tint(retention) => {
+      color_math::drawingml_tint_srgb8(rgb, retention)
+    }
+    AutomaticChartColorTransform::Shade(retention) => {
+      color_math::drawingml_shade_srgb8(rgb, retention)
+    }
+  };
+  RgbColor { r, g, b }
 }
 
 pub(crate) fn automatic_linear_series_line_width_scale(chart_space: &c::ChartSpace) -> f32 {
@@ -1505,15 +1897,25 @@ fn append_cartesian_series<'a>(
       .map(indexed_bubble_size_values)
       .unwrap_or_default();
     target.push(ClusteredColumnSeries {
+      formatting_index: source.formatting_index,
       name: name.clone(),
       has_explicit_name: source.series_text.is_some(),
       has_nonempty_explicit_name: explicit_name.is_some(),
       shape_properties: source.chart_shape_properties,
       data_points: source.data_points,
+      name_formula: series_name_formula(source),
+      category_formula: series_category_formula(source),
       value_formula: series_value_formula(source),
+      x_value_formula: series_x_value_formula(source),
       x_values: chart_series_x_numeric_values(source),
       x_number_format_code: series_x_number_format_code(source),
+      bubble_size_formula: series_bubble_size_formula(source),
       bubble_sizes: bubble_sizes.clone(),
+      bubble_group_index: None,
+      bubble_scale_percent: 100.0,
+      bubble_size_represents: c::SizeRepresentsValues::Area,
+      show_negative_bubbles: false,
+      bubble_3d: false,
       solid_fill: source.chart_shape_properties.and_then(|properties| {
         chart_shape_solid_fill(properties).or_else(|| chart_shape_outline_solid_fill(properties))
       }),
@@ -1614,6 +2016,10 @@ fn chart_3d_view(chart: &c::Chart) -> Chart3DView {
   let Some(view) = chart.view3_d.as_deref() else {
     return Chart3DView::default();
   };
+  let right_angle_axes = view
+    .right_angle_axes
+    .as_ref()
+    .is_some_and(|right_angle| right_angle.val.is_none_or(|value| value.as_bool()));
   Chart3DView {
     rotate_x_deg: f32::from(
       view
@@ -1627,6 +2033,8 @@ fn chart_3d_view(chart: &c::Chart) -> Chart3DView {
         .rotate_y
         .as_ref()
         .and_then(|rotation| rotation.val)
+        // LibreOffice's OOXML converter applies Office's type-dependent
+        // default to 3-D bar/area/line charts even with right-angle axes.
         .unwrap_or(20),
     ),
     height_percent: f32::from(
@@ -1644,10 +2052,8 @@ fn chart_3d_view(chart: &c::Chart) -> Chart3DView {
         .and_then(|depth| depth.val)
         .unwrap_or(100),
     ),
-    right_angle_axes: view
-      .right_angle_axes
-      .as_ref()
-      .is_some_and(|right_angle| right_angle.val.is_none_or(|value| value.as_bool())),
+    depth_percent_is_explicit: view.depth_percent.is_some(),
+    right_angle_axes,
     perspective_half_degrees: f32::from(
       view
         .perspective
@@ -1681,21 +2087,59 @@ fn default_data_label_position(
   }
 }
 
-fn visible_series_legend_indices(legend: Option<&c::Legend>, count: usize) -> Vec<usize> {
-  let mut indices = (0..count).collect::<Vec<_>>();
-  if let Some(legend) = legend {
-    indices.retain(|index| {
-      !legend.legend_entry.iter().any(|entry| {
-        entry.index.val as usize == *index
-          && matches!(
-            entry.legend_entry_choice.as_ref(),
-            Some(c::LegendEntryChoice::Delete(delete))
-              if delete.val.is_none_or(|value| value.as_bool())
-          )
-      })
-    });
-  }
+fn deleted_legend_entry_indices(legend: Option<&c::Legend>) -> Vec<usize> {
+  let mut indices = legend
+    .into_iter()
+    .flat_map(|legend| &legend.legend_entry)
+    .filter_map(|entry| {
+      matches!(
+        entry.legend_entry_choice.as_ref(),
+        Some(c::LegendEntryChoice::Delete(delete))
+          if delete.val.is_none_or(|value| value.as_bool())
+      )
+      .then_some(entry.index.val as usize)
+    })
+    .collect::<Vec<_>>();
+  indices.sort_unstable();
+  indices.dedup();
   indices
+}
+
+fn visible_series_legend_indices(legend: Option<&c::Legend>, count: usize) -> Vec<usize> {
+  let deleted = deleted_legend_entry_indices(legend);
+  (0..count)
+    .filter(|index| deleted.binary_search(index).is_err())
+    .collect()
+}
+
+pub(crate) fn trendline_legend_title<'a>(
+  trendline: &'a c::Trendline,
+  series_name: &str,
+  ui_language: Option<&str>,
+) -> Cow<'a, str> {
+  if let Some(name) = trendline
+    .trendline_name
+    .as_deref()
+    .filter(|name| !name.is_empty())
+  {
+    return Cow::Borrowed(name);
+  }
+  let kind = match trendline
+    .trendline_type
+    .val
+    .unwrap_or(c::TrendlineValues::Linear)
+  {
+    c::TrendlineValues::Linear => ChartTrendlineKind::Linear,
+    c::TrendlineValues::Logarithmic => ChartTrendlineKind::Logarithmic,
+    c::TrendlineValues::Exponential => ChartTrendlineKind::Exponential,
+    c::TrendlineValues::Power => ChartTrendlineKind::Power,
+    c::TrendlineValues::Polynomial => ChartTrendlineKind::Polynomial,
+    c::TrendlineValues::MovingAverage => ChartTrendlineKind::MovingAverage,
+  };
+  Cow::Owned(
+    OfficeStringCatalog::for_ui_language(ui_language)
+      .chart_trendline_legend_title(kind, series_name),
+  )
 }
 
 fn chart_layout(layout: Option<&c::Layout>) -> Option<ChartManualLayout> {
@@ -2034,6 +2478,11 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
   let secondary_indices = of_pie
     .map(|chart| of_pie_secondary_indices(chart, &values))
     .unwrap_or_default();
+  let maximum_series_formatting_index = pie_series
+    .iter()
+    .map(|series| series.index.as_ref().map_or(0, |index| index.val as usize))
+    .max()
+    .unwrap_or(0);
 
   Some(PieChartModel {
     kind: radial_kind,
@@ -2041,7 +2490,10 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
     title,
     title_layout: chart_title_layout(&chart_space.chart),
     title_rotation_deg: chart_title_rotation_degrees(&chart_space.chart),
+    series_formatting_index: series_ref.formatting_index,
+    maximum_series_formatting_index,
     series_name,
+    has_nonempty_explicit_series_name: explicit_series_name.is_some(),
     categories,
     values,
     series_shape_properties: series.chart_shape_properties.as_deref(),
@@ -2922,21 +3374,65 @@ fn data_label_field_cache_value<'a>(label: &'a c::DataLabel, field_id: &str) -> 
 }
 
 fn general_chart_number(value: f64) -> String {
-  let rounded = value.round();
-  if (value - rounded).abs() < 1.0e-12 {
-    format!("{rounded:.0}")
-  } else {
-    // Chart caches routinely contain IEEE-754 tails such as
-    // -68.70000000000002. Office's General formatter keeps 15 significant
-    // decimal digits and does not expose those transport artifacts.
-    let magnitude = value.abs().log10().floor() as i32;
-    let decimals = (14 - magnitude).clamp(0, 15) as usize;
-    let formatted = format!("{value:.decimals$}");
-    formatted
-      .trim_end_matches('0')
-      .trim_end_matches('.')
-      .to_string()
+  // ECMA-376 Part 1, 18.8.30 gives General a display budget of 11
+  // characters (excluding a negative sign, including the decimal point).
+  // Office also switches twelve-digit integers and sufficiently small
+  // fractions to exponential notation. Chart labels use that same number
+  // format language even though they are not worksheet cells.
+  const DISPLAY_CHARACTERS: usize = 11;
+
+  if value == 0.0 {
+    return "0".to_string();
   }
+  if !value.is_finite() {
+    return value.to_string();
+  }
+
+  let absolute = value.abs();
+  if !(1.0e-4..1.0e11).contains(&absolute) {
+    return format_general_chart_scientific(value, DISPLAY_CHARACTERS);
+  }
+
+  let integer_digits = absolute.log10().floor().max(0.0) as usize + 1;
+  let decimals = DISPLAY_CHARACTERS.saturating_sub(integer_digits + 1);
+  let formatted = trim_general_chart_fraction(format!("{value:.decimals$}"));
+  if formatted.trim_start_matches('-').len() <= DISPLAY_CHARACTERS {
+    formatted
+  } else {
+    // Rounding can carry an eleven-digit fixed value into a twelfth digit.
+    format_general_chart_scientific(value, DISPLAY_CHARACTERS)
+  }
+}
+
+fn format_general_chart_scientific(value: f64, display_characters: usize) -> String {
+  let estimated_exponent = value.abs().log10().floor() as i32;
+  let exponent_digits = estimated_exponent.unsigned_abs().to_string().len().max(2);
+  // One mantissa digit, decimal point, E, exponent sign and exponent digits
+  // consume the rest of the General-format display budget.
+  let decimals = display_characters.saturating_sub(4 + exponent_digits);
+  let scientific = format!("{value:.decimals$e}");
+  let Some((mantissa, exponent)) = scientific.split_once('e') else {
+    return scientific;
+  };
+  let mantissa = trim_general_chart_fraction(mantissa.to_string());
+  let exponent = exponent.parse::<i32>().unwrap_or(estimated_exponent);
+  format!(
+    "{mantissa}E{}{absolute:02}",
+    if exponent < 0 { '-' } else { '+' },
+    absolute = exponent.unsigned_abs()
+  )
+}
+
+fn trim_general_chart_fraction(mut text: String) -> String {
+  if text.contains('.') {
+    while text.ends_with('0') {
+      text.pop();
+    }
+    if text.ends_with('.') {
+      text.pop();
+    }
+  }
+  if text == "-0" { "0".to_string() } else { text }
 }
 
 /// LibreOffice's `CategoryPositionHelper` slot calculation translated to a
@@ -3075,7 +3571,12 @@ pub(crate) fn linear_axis_scale_with_options(
     .flatten()
     .filter(|unit| unit.is_finite() && *unit > 0.0)
     .unwrap_or_else(|| {
-      nice_increment((temporary_maximum - temporary_minimum) / max_increments as f64)
+      let automatic =
+        nice_increment((temporary_maximum - temporary_minimum) / max_increments as f64);
+      options
+        .minimum_automatic_major_unit
+        .filter(|unit| unit.is_finite() && *unit > 0.0)
+        .map_or(automatic, |minimum| automatic.max(minimum))
     });
   let automatic_unit = explicit_unit.flatten().is_none();
   loop {
@@ -3098,6 +3599,9 @@ pub(crate) fn linear_axis_scale_with_options(
       maximum += major_unit;
     }
     let increment_count = axis_interval_count(minimum, maximum, major_unit, usize::MAX);
+    // ScaleAutomatism performs this check after both automatic borders have
+    // been aligned and expanded. Boundary breathing space therefore consumes
+    // the same interval budget as the data-bearing range.
     if increment_count <= max_increments || !automatic_unit {
       return Some(restore_scale(LinearAxisScale {
         minimum,
@@ -3363,6 +3867,18 @@ pub fn fixed_output_texts_for_ui_language(
   chart_space: &c::ChartSpace,
   ui_language: Option<&str>,
 ) -> Vec<String> {
+  fixed_output_texts_for_host_ui_language(
+    chart_space,
+    ChartHostApplication::Spreadsheet,
+    ui_language,
+  )
+}
+
+pub fn fixed_output_texts_for_host_ui_language(
+  chart_space: &c::ChartSpace,
+  host: ChartHostApplication,
+  ui_language: Option<&str>,
+) -> Vec<String> {
   let mut texts = Vec::new();
   let chart_series = series(chart_space);
 
@@ -3461,6 +3977,7 @@ pub fn fixed_output_texts_for_ui_language(
             chart_space,
             axis.axis_id.val,
           ),
+          minimum_automatic_major_unit: None,
         },
       )
     };
@@ -3502,7 +4019,7 @@ pub fn fixed_output_texts_for_ui_language(
     .unwrap_or(1.0);
   push_fixed_data_labels(&mut texts, &chart_series, display_unit);
 
-  push_fixed_axis_titles(&mut texts, chart_space, ui_language);
+  push_fixed_axis_titles(&mut texts, chart_space, host, ui_language);
 
   if chart_space.chart.plot_area.data_table.is_some() {
     if let Some(categories) = chart_series
@@ -3527,7 +4044,7 @@ pub fn fixed_output_texts_for_ui_language(
   push_fixed_chart_title(&mut texts, chart_space, ui_language);
 
   if chart_space.chart.legend.is_some() {
-    let cartesian = cartesian_chart_for_ui_language(chart_space, ui_language);
+    let cartesian = cartesian_chart_for_host_locales(chart_space, host, ui_language, ui_language);
     if let Some(chart) = cartesian
       .as_ref()
       .filter(|chart| chart.vary_colors_by_point)
@@ -3604,6 +4121,7 @@ fn normalize_fixed_chart_title(title: &str) -> String {
 fn push_fixed_axis_titles(
   texts: &mut Vec<String>,
   chart_space: &c::ChartSpace,
+  host: ChartHostApplication,
   ui_language: Option<&str>,
 ) {
   for choice in &chart_space.chart.plot_area.plot_area_choice2 {
@@ -3611,7 +4129,7 @@ fn push_fixed_axis_titles(
       c::PlotAreaChoice2::ValueAxis(axis) => axis.title.as_deref(),
       _ => None,
     };
-    push_fixed_axis_title(texts, title, chart_space, ui_language);
+    push_fixed_axis_title(texts, title, host, ui_language);
   }
   for choice in &chart_space.chart.plot_area.plot_area_choice2 {
     let title = match choice {
@@ -3620,14 +4138,14 @@ fn push_fixed_axis_titles(
       c::PlotAreaChoice2::SeriesAxis(axis) => axis.title.as_deref(),
       c::PlotAreaChoice2::ValueAxis(_) => None,
     };
-    push_fixed_axis_title(texts, title, chart_space, ui_language);
+    push_fixed_axis_title(texts, title, host, ui_language);
   }
 }
 
 fn push_fixed_axis_title(
   texts: &mut Vec<String>,
   title: Option<&c::Title>,
-  _chart_space: &c::ChartSpace,
+  host: ChartHostApplication,
   ui_language: Option<&str>,
 ) {
   let Some(title) = title else {
@@ -3635,8 +4153,10 @@ fn push_fixed_axis_title(
   };
   let before = texts.len();
   push_title_texts(texts, title);
-  if texts.len() == before {
-    push_unique_text(texts, automatic_axis_title(ui_language));
+  if texts.len() == before
+    && let Some(text) = title_text_or_automatic(title, host, ui_language)
+  {
+    push_unique_text(texts, &text);
   }
 }
 
@@ -4637,6 +5157,37 @@ fn default_series_label(
   strings.chart_row_title(series_index)
 }
 
+fn series_name_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
+  series
+    .series_text
+    .and_then(|text| match text.series_text_choice.as_ref() {
+      Some(c::SeriesTextChoice::StringReference(reference)) => {
+        reference.formula.xml_content.as_deref()
+      }
+      Some(c::SeriesTextChoice::NumericValue(_)) | None => None,
+    })
+}
+
+fn series_category_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
+  series
+    .category_axis_data
+    .and_then(|data| match data.category_axis_data_choice.as_ref() {
+      Some(c::CategoryAxisDataChoice::StringReference(reference)) => {
+        reference.formula.xml_content.as_deref()
+      }
+      Some(c::CategoryAxisDataChoice::NumberReference(reference)) => {
+        reference.formula.xml_content.as_deref()
+      }
+      Some(c::CategoryAxisDataChoice::MultiLevelStringReference(reference)) => {
+        reference.formula.xml_content.as_deref()
+      }
+      Some(
+        c::CategoryAxisDataChoice::StringLiteral(_) | c::CategoryAxisDataChoice::NumberLiteral(_),
+      )
+      | None => None,
+    })
+}
+
 fn series_value_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
   series
     .values
@@ -4653,6 +5204,38 @@ fn series_value_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
           }
           _ => None,
         })
+    })
+}
+
+fn series_x_value_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
+  series
+    .x_values
+    .and_then(|values| match values.x_values_choice.as_ref() {
+      Some(c::XValuesChoice::NumberReference(reference)) => {
+        reference.formula.xml_content.as_deref()
+      }
+      // String and multi-level string x-values are category/index axes, not
+      // numeric scatter coordinates. Their authored caches must stay intact;
+      // reading the backing cells through the numeric resolver would turn a
+      // valid string cache into an all-missing numeric sequence.
+      Some(
+        c::XValuesChoice::StringReference(_)
+        | c::XValuesChoice::MultiLevelStringReference(_)
+        | c::XValuesChoice::NumberLiteral(_)
+        | c::XValuesChoice::StringLiteral(_),
+      )
+      | None => None,
+    })
+}
+
+fn series_bubble_size_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
+  series
+    .bubble_size
+    .and_then(|values| match values.bubble_size_choice.as_ref() {
+      Some(c::BubbleSizeChoice::NumberReference(reference)) => {
+        reference.formula.xml_content.as_deref()
+      }
+      Some(c::BubbleSizeChoice::NumberLiteral(_)) | None => None,
     })
 }
 
@@ -4942,24 +5525,154 @@ fn chart_title_layout(chart: &c::Chart) -> Option<ChartManualLayout> {
 }
 
 fn chart_title_rotation_degrees(chart: &c::Chart) -> f32 {
-  let Some(rotation) = chart
+  chart
     .title
     .as_deref()
-    .and_then(|title| title.chart_text.as_deref())
-    .and_then(|text| match text.chart_text_choice.as_ref()? {
-      c::ChartTextChoice::RichText(rich) => rich.body_properties.rotation,
-      c::ChartTextChoice::StringReference(_) | c::ChartTextChoice::StringLiteral(_) => None,
-    })
-  else {
-    return 0.0;
-  };
+    .and_then(title_rotation_degrees)
+    .unwrap_or(0.0)
+}
+
+pub(crate) fn title_rotation_degrees(title: &c::Title) -> Option<f32> {
+  // LibreOffice's TitleConverter selects c:title/c:txPr when present and
+  // otherwise falls back to the body properties on c:tx/c:rich. This matters
+  // for linked/string titles, which do not own a rich text body at all.
+  let rotation = title
+    .text_properties
+    .as_deref()
+    .and_then(|properties| properties.body_properties.rotation)
+    .or_else(|| {
+      title
+        .chart_text
+        .as_deref()
+        .and_then(|text| match text.chart_text_choice.as_ref()? {
+          c::ChartTextChoice::RichText(rich) => rich.body_properties.rotation,
+          c::ChartTextChoice::StringReference(_) | c::ChartTextChoice::StringLiteral(_) => None,
+        })
+    })?;
   let normalized = rotation.rem_euclid(21_600_000);
   let normalized = if normalized > 10_800_000 {
     normalized - 21_600_000
   } else {
     normalized
   };
-  normalized as f32 / 60_000.0
+  Some(normalized as f32 / 60_000.0)
+}
+
+pub(crate) fn category_axis_title_source<'a>(
+  chart: &ClusteredColumnChart<'a>,
+) -> Option<(&'a c::Title, f32)> {
+  let axis_set_index = visible_category_axis_set_index(&chart.axis_sets);
+  let horizontal_bar = axis_set_uses_horizontal_bars(&chart.series, axis_set_index);
+  chart
+    .category_axis
+    .and_then(|axis| {
+      axis.title.as_deref().map(|title| {
+        (
+          title,
+          automatic_axis_title_rotation_for_dimension(
+            axis.axis_position.val,
+            ChartAxisDimension::X,
+            horizontal_bar,
+          ),
+        )
+      })
+    })
+    .or_else(|| {
+      chart.date_axis.and_then(|axis| {
+        axis.title.as_deref().map(|title| {
+          (
+            title,
+            automatic_axis_title_rotation_for_dimension(
+              axis.axis_position.val,
+              ChartAxisDimension::X,
+              horizontal_bar,
+            ),
+          )
+        })
+      })
+    })
+    .or_else(|| {
+      chart.horizontal_value_axis.and_then(|axis| {
+        axis.title.as_deref().map(|title| {
+          (
+            title,
+            automatic_axis_title_rotation_for_dimension(
+              axis.axis_position.val,
+              ChartAxisDimension::X,
+              horizontal_bar,
+            ),
+          )
+        })
+      })
+    })
+}
+
+pub(crate) fn value_axis_title_source<'a>(
+  chart: &ClusteredColumnChart<'a>,
+) -> Option<(&'a c::Title, f32)> {
+  let horizontal_bar = axis_set_uses_horizontal_bars(&chart.series, 0);
+  chart.value_axis.and_then(|axis| {
+    axis.title.as_deref().map(|title| {
+      (
+        title,
+        automatic_axis_title_rotation_for_dimension(
+          axis.axis_position.val,
+          ChartAxisDimension::Y,
+          horizontal_bar,
+        ),
+      )
+    })
+  })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ChartAxisDimension {
+  X,
+  Y,
+}
+
+fn axis_set_uses_horizontal_bars(
+  series: &[ClusteredColumnSeries<'_>],
+  axis_set_index: usize,
+) -> bool {
+  let mut attached = series
+    .iter()
+    .filter(|series| series.axis_set_index == axis_set_index);
+  let Some(first) = attached.next() else {
+    return false;
+  };
+  first.kind == ChartSeriesKind::Bar && attached.all(|series| series.kind == ChartSeriesKind::Bar)
+}
+
+fn automatic_axis_title_rotation_for_dimension(
+  position: c::AxisPositionValues,
+  dimension: ChartAxisDimension,
+  horizontal_bar: bool,
+) -> f32 {
+  // LibreOffice AxisConverter::convertFromModel starts with the c:axPos
+  // default imported by AxisContext, then makes the logical X dimension
+  // horizontal for ordinary charts and the logical Y dimension horizontal
+  // for horizontal bar charts. This distinction is observable when an X
+  // axis is authored on the left or right: its title remains horizontal.
+  let horizontal_dimension = if horizontal_bar {
+    ChartAxisDimension::Y
+  } else {
+    ChartAxisDimension::X
+  };
+  if dimension == horizontal_dimension {
+    0.0
+  } else {
+    automatic_axis_title_rotation_degrees(position)
+  }
+}
+
+pub(crate) fn automatic_axis_title_rotation_degrees(position: c::AxisPositionValues) -> f32 {
+  // AxisContext's initial title default follows c:axPos. AxisConverter later
+  // applies the logical-axis/chart-type correction above.
+  match position {
+    c::AxisPositionValues::Left | c::AxisPositionValues::Right => -90.0,
+    c::AxisPositionValues::Top | c::AxisPositionValues::Bottom => 0.0,
+  }
 }
 
 fn explicit_title_text(title: &c::Title) -> Option<String> {
@@ -4969,8 +5682,68 @@ fn explicit_title_text(title: &c::Title) -> Option<String> {
   (!value.is_empty()).then_some(value)
 }
 
-fn title_text_or_automatic(title: &c::Title, ui_language: Option<&str>) -> Option<String> {
-  explicit_title_text(title).or(Some(automatic_axis_title(ui_language).to_string()))
+fn title_text_or_automatic(
+  title: &c::Title,
+  host: ChartHostApplication,
+  ui_language: Option<&str>,
+) -> Option<String> {
+  if let Some(text) = explicit_title_text(title) {
+    return Some(text);
+  }
+  // MS-OI29500 §21.2.2.210 gives an omitted c:tx a localized default specific
+  // to the title's parent. Word fixed output materializes that default from a
+  // bare axis c:title and from a formatting-only title. Excel preserves a
+  // formatting-only title whose defRPr is empty as invisible, as demonstrated
+  // by axis_title_rotated.xlsx, while axis_title_rotation.xlsx has authored
+  // character properties and displays the localized default. Keep this host
+  // distinction explicit instead of weakening either counterexample.
+  if title.chart_text.is_some() {
+    return None;
+  }
+  if host != ChartHostApplication::Wordprocessing
+    && !title
+      .text_properties
+      .as_deref()
+      .is_some_and(text_properties_have_character_properties)
+  {
+    return None;
+  }
+  Some(automatic_axis_title(ui_language).to_string())
+}
+
+fn text_properties_have_character_properties(properties: &c::TextProperties) -> bool {
+  let default_properties = a::DefaultRunProperties::default();
+  let direct_properties = a::RunProperties::default();
+  properties.paragraph.iter().any(|paragraph| {
+    paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.default_run_properties.as_deref())
+      .is_some_and(|properties| properties != &default_properties)
+      || paragraph
+        .paragraph_choice
+        .iter()
+        .any(|choice| match choice {
+          a::ParagraphChoice::Run(run) => run
+            .run_properties
+            .as_deref()
+            .is_some_and(|properties| properties != &direct_properties),
+          a::ParagraphChoice::Break(line_break) => line_break
+            .run_properties
+            .as_deref()
+            .is_some_and(|properties| properties != &direct_properties),
+          a::ParagraphChoice::Field(field) => field
+            .run_properties
+            .as_deref()
+            .is_some_and(|properties| properties != &direct_properties),
+          a::ParagraphChoice::TextMath(_) | a::ParagraphChoice::AlternateContent(_) => false,
+        })
+  }) || properties
+    .list_style
+    .as_deref()
+    .and_then(|style| style.default_paragraph_properties.as_deref())
+    .and_then(|properties| properties.default_run_properties.as_deref())
+    .is_some_and(|properties| properties != &default_properties)
 }
 
 pub fn has_powerpoint_automatic_title_placeholder(chart: &c::Chart) -> bool {
@@ -5106,6 +5879,32 @@ fn chart_numeric_category_values(chart_space: &c::ChartSpace) -> Vec<Option<f64>
     .unwrap_or_default()
 }
 
+fn chart_numeric_category_format_code(chart_space: &c::ChartSpace) -> Option<String> {
+  series(chart_space)
+    .into_iter()
+    .filter_map(|series| series.category_axis_data)
+    .find_map(indexed_category_axis_number_format_code)
+    .map(ToOwned::to_owned)
+}
+
+fn indexed_category_axis_number_format_code(data: &c::CategoryAxisData) -> Option<&str> {
+  match data.category_axis_data_choice.as_ref()? {
+    c::CategoryAxisDataChoice::NumberReference(reference) => reference
+      .numbering_cache
+      .as_deref()?
+      .format_code
+      .as_ref()?
+      .xml_content
+      .as_deref(),
+    c::CategoryAxisDataChoice::NumberLiteral(literal) => {
+      literal.format_code.as_ref()?.xml_content.as_deref()
+    }
+    c::CategoryAxisDataChoice::StringReference(_)
+    | c::CategoryAxisDataChoice::StringLiteral(_)
+    | c::CategoryAxisDataChoice::MultiLevelStringReference(_) => None,
+  }
+}
+
 fn indexed_category_axis_numeric_values(data: &c::CategoryAxisData) -> Option<Vec<Option<f64>>> {
   let points =
     match data.category_axis_data_choice.as_ref()? {
@@ -5143,168 +5942,112 @@ fn chart_uses_1904_date_system(chart_space: &c::ChartSpace) -> bool {
 /// contain data points, not the date-axis ticks: Office advances the latter
 /// in calendar days, months, or years according to c:majorTimeUnit.
 pub fn date_axis_ticks(chart: &ClusteredColumnChart<'_>) -> Option<Vec<ChartCategoryTick>> {
-  let axis = chart.date_axis?;
-  let (minimum, maximum) = date_axis_bounds(chart)?;
-  let unit_count = axis
-    .major_unit
-    .as_ref()
-    .map_or(1.0, |unit| unit.val)
-    .round()
-    .max(1.0) as i32;
-  let time_unit = axis
-    .major_time_unit
-    .as_ref()
-    .and_then(|unit| unit.val)
-    .or_else(|| axis.base_time_unit.as_ref().and_then(|unit| unit.val))
-    .unwrap_or(c::TimeUnitValues::Days);
-  let date_1904 = chart.date_1904;
-  let (mut year, mut month, mut day) = chart_date_from_serial(minimum.ceil() as i64, date_1904)?;
-  match time_unit {
-    c::TimeUnitValues::Days => {}
-    c::TimeUnitValues::Months => {
-      if day != 1 {
-        month += 1;
-        if month > 12 {
-          month = 1;
-          year += 1;
-        }
-      }
-      day = 1;
-    }
-    c::TimeUnitValues::Years => {
-      if month != 1 || day != 1 {
-        year += 1;
-      }
-      month = 1;
-      day = 1;
-    }
-  }
+  date_axis_ticks_with_maximum_auto_increment_count(chart, 500)
+}
 
-  let format_code = axis
-    .numbering_format
-    .as_ref()
-    .map(|format| format.format_code.as_str());
+pub fn date_axis_ticks_with_maximum_auto_increment_count(
+  chart: &ClusteredColumnChart<'_>,
+  maximum_auto_increment_count: usize,
+) -> Option<Vec<ChartCategoryTick>> {
+  let axis = chart.date_axis?;
+  let scale = date_axis_scale(chart)?;
+  let interval = date_axis_major_interval(axis, scale, maximum_auto_increment_count);
+  let date_1904 = chart.date_1904;
+  let (mut year, mut month, mut day) = chart_date_from_serial(scale.minimum as i64, date_1904)?;
+  let (format_code, source_linked) = effective_date_axis_number_format(chart, axis);
   let mut ticks = Vec::new();
   for _ in 0..10_000 {
     let serial = chart_date_serial(year, month, day, date_1904)?;
-    if serial > maximum + f64::EPSILON {
+    if serial > scale.maximum + f64::EPSILON
+      || (scale.shifted && serial >= scale.maximum - f64::EPSILON)
+    {
       break;
     }
-    if serial >= minimum - f64::EPSILON {
+    if serial >= scale.minimum - f64::EPSILON {
       ticks.push(ChartCategoryTick {
-        position: date_axis_tick_position(chart, (serial - minimum) / (maximum - minimum)),
-        text: format_chart_date(year, month as u32, day as u32, format_code),
+        position: date_axis_position(chart, scale, year, month, day, true)?,
+        gridline_position: date_axis_position(chart, scale, year, month, day, false)?,
+        text: format_chart_date(
+          year,
+          month as u32,
+          day as u32,
+          format_code,
+          source_linked,
+          chart.format_locale.as_deref(),
+        ),
       });
     }
-    match time_unit {
-      c::TimeUnitValues::Days => {
-        let next = chart_date_from_serial(serial as i64 + i64::from(unit_count), date_1904)?;
-        (year, month, day) = (next.0, next.1, next.2);
-      }
-      c::TimeUnitValues::Months => {
-        let month_index = year * 12 + month - 1 + unit_count;
-        year = month_index.div_euclid(12);
-        month = month_index.rem_euclid(12) + 1;
-      }
-      c::TimeUnitValues::Years => year += unit_count,
-    }
+    (year, month, day) = advance_chart_date(year, month, day, interval, date_1904)?;
   }
   (!ticks.is_empty()).then_some(ticks)
-}
-
-fn date_axis_tick_position(chart: &ClusteredColumnChart<'_>, position: f64) -> f64 {
-  let explicitly_between = chart
-    .value_axis
-    .and_then(|axis| axis.cross_between.as_ref())
-    .is_some_and(|crossing| crossing.val == c::CrossBetweenValues::Between);
-  if !explicitly_between {
-    return position;
-  }
-  let category_count = chart
-    .category_axis_values
-    .len()
-    .max(chart.categories.len())
-    .max(
-      chart
-        .series
-        .iter()
-        .map(|series| series.values.len())
-        .max()
-        .unwrap_or(0),
-    )
-    .max(1);
-  (position * category_count.saturating_sub(1) as f64 + 0.5) / category_count as f64
 }
 
 /// Builds the minor gridline positions for an OOXML date axis. Like the
 /// major labels, these are calendar ticks rather than cached category points.
 pub fn date_axis_minor_tick_positions(chart: &ClusteredColumnChart<'_>) -> Option<Vec<f64>> {
-  let axis = chart.date_axis?;
-  let (minimum, maximum) = date_axis_bounds(chart)?;
-  let unit_count = axis
-    .minor_unit
-    .as_ref()
-    .map_or(1.0, |unit| unit.val)
-    .round()
-    .max(1.0) as i32;
-  let time_unit = axis
-    .minor_time_unit
-    .as_ref()
-    .and_then(|unit| unit.val)
-    .or_else(|| axis.base_time_unit.as_ref().and_then(|unit| unit.val))
-    .unwrap_or(c::TimeUnitValues::Days);
-  let date_1904 = chart.date_1904;
-  let (mut year, mut month, mut day) = chart_date_from_serial(minimum.ceil() as i64, date_1904)?;
-  match time_unit {
-    c::TimeUnitValues::Days => {}
-    c::TimeUnitValues::Months => {
-      if day != 1 {
-        month += 1;
-        if month > 12 {
-          month = 1;
-          year += 1;
-        }
-      }
-      day = 1;
-    }
-    c::TimeUnitValues::Years => {
-      if month != 1 || day != 1 {
-        year += 1;
-      }
-      month = 1;
-      day = 1;
-    }
-  }
+  date_axis_minor_tick_positions_with_maximum_auto_increment_count(chart, 500)
+}
 
+pub fn date_axis_minor_tick_positions_with_maximum_auto_increment_count(
+  chart: &ClusteredColumnChart<'_>,
+  maximum_auto_increment_count: usize,
+) -> Option<Vec<f64>> {
+  let axis = chart.date_axis?;
+  let scale = date_axis_scale(chart)?;
+  let interval = date_axis_minor_interval(axis, scale, maximum_auto_increment_count);
+  let date_1904 = chart.date_1904;
+  let (mut year, mut month, mut day) = chart_date_from_serial(scale.minimum as i64, date_1904)?;
   let mut positions = Vec::new();
   for _ in 0..10_000 {
     let serial = chart_date_serial(year, month, day, date_1904)?;
-    if serial > maximum + f64::EPSILON {
+    if serial > scale.maximum + f64::EPSILON
+      || (scale.shifted && serial >= scale.maximum - f64::EPSILON)
+    {
       break;
     }
-    if serial >= minimum - f64::EPSILON {
-      positions.push(date_axis_tick_position(
-        chart,
-        (serial - minimum) / (maximum - minimum),
-      ));
+    if serial >= scale.minimum - f64::EPSILON {
+      positions.push(date_axis_position(chart, scale, year, month, day, false)?);
     }
-    match time_unit {
-      c::TimeUnitValues::Days => {
-        let next = chart_date_from_serial(serial as i64 + i64::from(unit_count), date_1904)?;
-        (year, month, day) = (next.0, next.1, next.2);
-      }
-      c::TimeUnitValues::Months => {
-        let month_index = year * 12 + month - 1 + unit_count;
-        year = month_index.div_euclid(12);
-        month = month_index.rem_euclid(12) + 1;
-      }
-      c::TimeUnitValues::Years => year += unit_count,
-    }
+    (year, month, day) = advance_chart_date(year, month, day, interval, date_1904)?;
   }
   (!positions.is_empty()).then_some(positions)
 }
 
-fn date_axis_bounds(chart: &ClusteredColumnChart<'_>) -> Option<(f64, f64)> {
+/// Maps a cached date-category serial to the normalized plot coordinate used
+/// by the series geometry. LibreOffice keeps the authored date scaling
+/// unshifted for data points; `crossBetween="between"` only substitutes a
+/// shifted scaling while it builds axis labels (`Tickmarks_Dates.cxx`).
+///
+/// The returned coordinate is intentionally not clamped. Chart plotters clip
+/// the resulting series geometry to the visible scale rectangle, so segments
+/// that enter or leave an explicitly narrowed date window retain their exact
+/// boundary intersection.
+pub fn date_axis_data_position(chart: &ClusteredColumnChart<'_>, serial: f64) -> Option<f64> {
+  if !serial.is_finite() {
+    return None;
+  }
+  let scale = date_axis_scale(chart)?;
+  let minimum = date_axis_scaled_serial_value(chart, scale, scale.minimum, false)?;
+  let maximum = date_axis_scaled_serial_value(chart, scale, scale.maximum, false)?;
+  let value = date_axis_scaled_serial_value(chart, scale, serial, false)?;
+  (maximum > minimum).then_some((value - minimum) / (maximum - minimum))
+}
+
+#[derive(Clone, Copy)]
+struct DateAxisScale {
+  minimum: f64,
+  maximum: f64,
+  resolution: c::TimeUnitValues,
+  shifted: bool,
+}
+
+#[derive(Clone, Copy)]
+struct DateAxisInterval {
+  count: i32,
+  unit: c::TimeUnitValues,
+}
+
+fn date_axis_scale(chart: &ClusteredColumnChart<'_>) -> Option<DateAxisScale> {
   let axis = chart.date_axis?;
   let mut source_minimum = f64::INFINITY;
   let mut source_maximum = f64::NEG_INFINITY;
@@ -5318,36 +6061,371 @@ fn date_axis_bounds(chart: &ClusteredColumnChart<'_>) -> Option<(f64, f64)> {
     source_minimum = source_minimum.min(value);
     source_maximum = source_maximum.max(value);
   }
-  if !source_minimum.is_finite() || !source_maximum.is_finite() || source_maximum <= source_minimum
-  {
+  if !source_minimum.is_finite() || !source_maximum.is_finite() {
     return None;
   }
-  let minimum = axis
+  let mut minimum = axis
     .scaling
     .min_axis_value
     .as_ref()
-    .map_or(source_minimum, |value| value.val);
-  let maximum = axis
+    .map_or(source_minimum, |value| value.val)
+    .floor();
+  let mut maximum = axis
     .scaling
     .max_axis_value
     .as_ref()
-    .map_or(source_maximum, |value| value.val);
-  (maximum > minimum).then_some((minimum, maximum))
+    .map_or(source_maximum, |value| value.val)
+    .floor();
+  if !minimum.is_finite() || !maximum.is_finite() {
+    return None;
+  }
+  if minimum > maximum {
+    std::mem::swap(&mut minimum, &mut maximum);
+  }
+  let resolution = axis
+    .base_time_unit
+    .as_ref()
+    .and_then(|unit| unit.val)
+    .unwrap_or(c::TimeUnitValues::Days);
+  let date_1904 = chart.date_1904;
+  let (mut minimum_year, mut minimum_month, mut minimum_day) =
+    chart_date_from_serial(minimum as i64, date_1904)?;
+  let (mut maximum_year, mut maximum_month, mut maximum_day) =
+    chart_date_from_serial(maximum as i64, date_1904)?;
+  align_date_to_resolution_start(
+    &mut minimum_year,
+    &mut minimum_month,
+    &mut minimum_day,
+    resolution,
+  );
+  align_date_to_resolution_start(
+    &mut maximum_year,
+    &mut maximum_month,
+    &mut maximum_day,
+    resolution,
+  );
+  minimum = chart_date_serial(minimum_year, minimum_month, minimum_day, date_1904)?;
+  maximum = chart_date_serial(maximum_year, maximum_month, maximum_day, date_1904)?;
+  let shifted = chart.category_axis_shifted;
+  if shifted || maximum <= minimum {
+    (maximum_year, maximum_month, maximum_day) = advance_chart_date(
+      maximum_year,
+      maximum_month,
+      maximum_day,
+      DateAxisInterval {
+        count: 1,
+        unit: resolution,
+      },
+      date_1904,
+    )?;
+    maximum = chart_date_serial(maximum_year, maximum_month, maximum_day, date_1904)?;
+  }
+  (maximum > minimum).then_some(DateAxisScale {
+    minimum,
+    maximum,
+    resolution,
+    shifted,
+  })
+}
+
+fn align_date_to_resolution_start(
+  year: &mut i32,
+  month: &mut i32,
+  day: &mut i32,
+  resolution: c::TimeUnitValues,
+) {
+  match resolution {
+    c::TimeUnitValues::Days => {}
+    c::TimeUnitValues::Months => *day = 1,
+    c::TimeUnitValues::Years => {
+      *month = 1;
+      *day = 1;
+    }
+  }
+  let _ = year;
+}
+
+fn date_axis_major_interval(
+  axis: &c::DateAxis,
+  scale: DateAxisScale,
+  maximum_auto_increment_count: usize,
+) -> DateAxisInterval {
+  if let Some(count) = axis
+    .major_unit
+    .as_ref()
+    .map(|unit| unit.val)
+    .filter(|count| count.is_finite() && *count >= 1.0)
+  {
+    let unit = axis
+      .major_time_unit
+      .as_ref()
+      .and_then(|unit| unit.val)
+      .unwrap_or(c::TimeUnitValues::Days);
+    return DateAxisInterval {
+      count: count.trunc().min(f64::from(i32::MAX)) as i32,
+      unit: coarser_time_unit(unit, scale.resolution),
+    };
+  }
+
+  let maximum_count = maximum_auto_increment_count.max(2).saturating_sub(1) as i64;
+  let day_count = (scale.maximum - scale.minimum).floor().max(1.0) as i64;
+  let interval_days = day_count / maximum_count.max(1);
+  let (mut unit, days_per_unit) =
+    if interval_days > 365 || scale.resolution == c::TimeUnitValues::Years {
+      (c::TimeUnitValues::Years, 365.0)
+    } else if interval_days > 31 || scale.resolution == c::TimeUnitValues::Months {
+      (c::TimeUnitValues::Months, 31.0)
+    } else {
+      (c::TimeUnitValues::Days, 1.0)
+    };
+  let mut count = ((interval_days as f64 / days_per_unit).floor() as i32).max(1);
+  if unit == c::TimeUnitValues::Days {
+    if (3..7).contains(&count) {
+      count = 7;
+    } else if count > 7 {
+      unit = c::TimeUnitValues::Months;
+      count = ((interval_days as f64 / 31.0).floor() as i32).max(1);
+    }
+  }
+  DateAxisInterval { count, unit }
+}
+
+fn date_axis_minor_interval(
+  axis: &c::DateAxis,
+  scale: DateAxisScale,
+  maximum_auto_increment_count: usize,
+) -> DateAxisInterval {
+  let major = date_axis_major_interval(axis, scale, maximum_auto_increment_count);
+  if let Some(count) = axis
+    .minor_unit
+    .as_ref()
+    .map(|unit| unit.val)
+    .filter(|count| count.is_finite() && *count >= 1.0)
+  {
+    let unit = axis
+      .minor_time_unit
+      .as_ref()
+      .and_then(|unit| unit.val)
+      .unwrap_or(c::TimeUnitValues::Days);
+    return DateAxisInterval {
+      count: count.trunc().min(f64::from(i32::MAX)) as i32,
+      unit: finer_time_unit(unit, major.unit),
+    };
+  }
+
+  let mut minor = DateAxisInterval {
+    count: 1,
+    unit: major.unit,
+  };
+  if major.count >= 2 {
+    minor.count = if major.count % 2 == 0 {
+      major.count / 2
+    } else if major.count % 3 == 0 {
+      major.count / 3
+    } else if major.count % 5 == 0 {
+      major.count / 5
+    } else if major.count > 50 {
+      major.count
+    } else {
+      1
+    };
+  } else if major.unit == c::TimeUnitValues::Months && scale.resolution == c::TimeUnitValues::Days {
+    minor.unit = c::TimeUnitValues::Days;
+  } else if major.unit == c::TimeUnitValues::Years && scale.resolution != c::TimeUnitValues::Years {
+    minor.unit = c::TimeUnitValues::Months;
+  }
+  minor
+}
+
+fn time_unit_rank(unit: c::TimeUnitValues) -> u8 {
+  match unit {
+    c::TimeUnitValues::Days => 0,
+    c::TimeUnitValues::Months => 1,
+    c::TimeUnitValues::Years => 2,
+  }
+}
+
+fn coarser_time_unit(left: c::TimeUnitValues, right: c::TimeUnitValues) -> c::TimeUnitValues {
+  if time_unit_rank(left) >= time_unit_rank(right) {
+    left
+  } else {
+    right
+  }
+}
+
+fn finer_time_unit(left: c::TimeUnitValues, right: c::TimeUnitValues) -> c::TimeUnitValues {
+  if time_unit_rank(left) <= time_unit_rank(right) {
+    left
+  } else {
+    right
+  }
+}
+
+fn advance_chart_date(
+  year: i32,
+  month: i32,
+  day: i32,
+  interval: DateAxisInterval,
+  date_1904: bool,
+) -> Option<(i32, i32, i32)> {
+  match interval.unit {
+    c::TimeUnitValues::Days => {
+      let serial = chart_date_serial(year, month, day, date_1904)? as i64;
+      chart_date_from_serial(serial + i64::from(interval.count), date_1904)
+    }
+    c::TimeUnitValues::Months => {
+      let month_index = year
+        .checked_mul(12)?
+        .checked_add(month - 1)?
+        .checked_add(interval.count)?;
+      let year = month_index.div_euclid(12);
+      let month = month_index.rem_euclid(12) + 1;
+      Some((year, month, day.min(gregorian_days_in_month(year, month)?)))
+    }
+    c::TimeUnitValues::Years => {
+      let year = year.checked_add(interval.count)?;
+      Some((year, month, day.min(gregorian_days_in_month(year, month)?)))
+    }
+  }
+}
+
+fn date_axis_position(
+  chart: &ClusteredColumnChart<'_>,
+  scale: DateAxisScale,
+  year: i32,
+  month: i32,
+  day: i32,
+  shifted_label: bool,
+) -> Option<f64> {
+  let (minimum_year, minimum_month, minimum_day) =
+    chart_date_from_serial(scale.minimum as i64, chart.date_1904)?;
+  let (maximum_year, maximum_month, maximum_day) =
+    chart_date_from_serial(scale.maximum as i64, chart.date_1904)?;
+  let minimum = date_axis_scaled_value(
+    chart,
+    scale.resolution,
+    minimum_year,
+    minimum_month,
+    minimum_day,
+    false,
+  )?;
+  let maximum = date_axis_scaled_value(
+    chart,
+    scale.resolution,
+    maximum_year,
+    maximum_month,
+    maximum_day,
+    false,
+  )?;
+  let value = date_axis_scaled_value(
+    chart,
+    scale.resolution,
+    year,
+    month,
+    day,
+    scale.shifted && shifted_label,
+  )?;
+  (maximum > minimum).then_some((value - minimum) / (maximum - minimum))
+}
+
+fn date_axis_scaled_serial_value(
+  chart: &ClusteredColumnChart<'_>,
+  scale: DateAxisScale,
+  serial: f64,
+  shifted: bool,
+) -> Option<f64> {
+  let whole_days = serial.floor();
+  if whole_days < i64::MIN as f64 || whole_days > i64::MAX as f64 {
+    return None;
+  }
+  let day_fraction = serial - whole_days;
+  let (year, month, day) = chart_date_from_serial(whole_days as i64, chart.date_1904)?;
+  let mut value = date_axis_scaled_value(chart, scale.resolution, year, month, day, shifted)?;
+  value += if scale.resolution == c::TimeUnitValues::Days {
+    day_fraction
+  } else {
+    day_fraction / f64::from(gregorian_days_in_month(year, month)?)
+  };
+  Some(value)
+}
+
+fn date_axis_scaled_value(
+  chart: &ClusteredColumnChart<'_>,
+  resolution: c::TimeUnitValues,
+  year: i32,
+  month: i32,
+  day: i32,
+  shifted: bool,
+) -> Option<f64> {
+  if resolution == c::TimeUnitValues::Days {
+    return Some(
+      chart_date_serial(year, month, day, chart.date_1904)? + if shifted { 0.5 } else { 0.0 },
+    );
+  }
+  let days_in_month = f64::from(gregorian_days_in_month(year, month)?);
+  let mut value = f64::from(year) * 12.0 + f64::from(month) + f64::from(day - 1) / days_in_month;
+  if shifted {
+    value += if resolution == c::TimeUnitValues::Years {
+      6.0
+    } else {
+      0.5
+    };
+  }
+  Some(value)
+}
+
+fn effective_date_axis_number_format<'a>(
+  chart: &'a ClusteredColumnChart<'_>,
+  axis: &'a c::DateAxis,
+) -> (Option<&'a str>, bool) {
+  let numbering_format = axis.numbering_format.as_ref();
+  let authored = numbering_format
+    .map(|format| format.format_code.as_str())
+    .filter(|format| !format.is_empty());
+  let source_linked = numbering_format.is_none_or(|format| {
+    format
+      .source_linked
+      .is_none_or(|source_linked| source_linked.as_bool())
+  });
+  if source_linked {
+    (
+      chart.category_number_format_code.as_deref().or(authored),
+      true,
+    )
+  } else {
+    (authored, false)
+  }
 }
 
 fn chart_date_from_serial(serial: i64, date_1904: bool) -> Option<(i32, i32, i32)> {
-  let unix_days = serial - if date_1904 { 24_107 } else { 25_569 };
+  let unix_days = serial
+    - if date_1904 {
+      24_107
+    } else if serial < 60 {
+      25_568
+    } else {
+      25_569
+    };
   let (year, month, day) = civil_from_days(unix_days);
   Some((i32::try_from(year).ok()?, month as i32, day as i32))
 }
 
 fn chart_date_serial(year: i32, month: i32, day: i32, date_1904: bool) -> Option<f64> {
   let unix_days = days_from_civil(i64::from(year), month, day)?;
-  Some((unix_days + if date_1904 { 24_107 } else { 25_569 }) as f64)
+  let offset = if date_1904 {
+    24_107
+  } else if (year, month, day) < (1900, 3, 1) {
+    25_568
+  } else {
+    25_569
+  };
+  Some((unix_days + offset) as f64)
 }
 
 fn days_from_civil(year: i64, month: i32, day: i32) -> Option<i64> {
-  if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+  if !(1..=12).contains(&month)
+    || !(1..=gregorian_days_in_month(i32::try_from(year).ok()?, month)?).contains(&day)
+  {
     return None;
   }
   let year = year - i64::from(month <= 2);
@@ -5359,36 +6437,71 @@ fn days_from_civil(year: i64, month: i32, day: i32) -> Option<i64> {
   Some(era * 146_097 + day_of_era - 719_468)
 }
 
-fn format_chart_date(year: i32, month: u32, day: u32, format_code: Option<&str>) -> String {
-  let code = format_code.unwrap_or("yyyy/m/d").to_ascii_lowercase();
-  let separator = if code.contains("\\-") {
-    // ECMA-376 Part 1 §18.8.31: a backslash makes the following
-    // character literal and is not displayed itself. It does not add
-    // whitespace around that character.
-    "-"
-  } else if code.contains('-') {
-    "-"
-  } else if code.contains('.') {
-    "."
-  } else {
-    "/"
+fn gregorian_days_in_month(year: i32, month: i32) -> Option<i32> {
+  let days = match month {
+    1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+    4 | 6 | 9 | 11 => 30,
+    2 if year.rem_euclid(4) == 0 && (year.rem_euclid(100) != 0 || year.rem_euclid(400) == 0) => 29,
+    2 => 28,
+    _ => return None,
   };
-  let year = if code.contains("yyyy") {
-    format!("{year:04}")
-  } else {
-    format!("{:02}", year.rem_euclid(100))
+  Some(days)
+}
+
+fn format_chart_date(
+  year: i32,
+  month: u32,
+  day: u32,
+  format_code: Option<&str>,
+  source_linked: bool,
+  format_locale: Option<&str>,
+) -> String {
+  let Some(value) = u16::try_from(year).ok().map(|year| FieldUpdateDateTime {
+    year,
+    month: month as u8,
+    day: day as u8,
+    hour: 0,
+    minute: 0,
+    second: 0,
+  }) else {
+    return format!("{year:04}/{month}/{day}");
   };
-  let month = if code.contains("mm") {
-    format!("{month:02}")
-  } else {
-    month.to_string()
-  };
-  let day = if code.contains("dd") {
-    format!("{day:02}")
-  } else {
-    day.to_string()
-  };
-  format!("{year}{separator}{month}{separator}{day}")
+  if source_linked
+    && format_code.is_none_or(is_source_linked_short_date_format)
+    && let Some(text) = field_datetime::format_office_short_date(format_locale, value)
+  {
+    return text;
+  }
+  if let Some(code) = format_code {
+    // Cached custom chart formats without an LCID retain the invariant Office
+    // month-name vocabulary; explicit axis formats use the caller's format
+    // locale. An embedded [$-LCID] marker overrides either fallback.
+    let language = if source_linked {
+      Some("en-US")
+    } else {
+      format_locale.or(Some("en-US"))
+    };
+    if let Some(text) = field_datetime::format_spreadsheet_date_picture(code, language, value) {
+      return text;
+    }
+  }
+  field_datetime::format_office_short_date(format_locale, value)
+    .unwrap_or_else(|| format!("{year:04}/{month}/{day}"))
+}
+
+fn is_source_linked_short_date_format(code: &str) -> bool {
+  let normalized = code
+    .split(';')
+    .next()
+    .unwrap_or(code)
+    .chars()
+    .filter(|ch| !ch.is_ascii_whitespace())
+    .flat_map(char::to_lowercase)
+    .collect::<String>();
+  matches!(
+    normalized.as_str(),
+    "m/d/yy" | "m/d/yyyy" | "mm/dd/yy" | "mm/dd/yyyy"
+  )
 }
 
 fn indexed_values(values: &c::Values) -> Vec<Option<f64>> {
@@ -5516,6 +6629,7 @@ pub fn scheme_color_token(
 
 fn area_series_ref(ser: &c::AreaChartSeries) -> ChartSeriesRef<'_> {
   ChartSeriesRef {
+    formatting_index: ser.index.val as usize,
     series_text: ser.series_text.as_deref(),
     category_axis_data: ser.category_axis_data.as_deref(),
     values: ser.values.as_deref(),
@@ -5533,6 +6647,7 @@ fn area_series_ref(ser: &c::AreaChartSeries) -> ChartSeriesRef<'_> {
 
 fn line_series_ref(ser: &c::LineChartSeries) -> ChartSeriesRef<'_> {
   ChartSeriesRef {
+    formatting_index: ser.index.val as usize,
     series_text: ser.series_text.as_deref(),
     category_axis_data: ser.category_axis_data.as_deref(),
     values: ser.values.as_deref(),
@@ -5550,6 +6665,7 @@ fn line_series_ref(ser: &c::LineChartSeries) -> ChartSeriesRef<'_> {
 
 fn radar_series_ref(ser: &c::RadarChartSeries) -> ChartSeriesRef<'_> {
   ChartSeriesRef {
+    formatting_index: ser.index.val as usize,
     series_text: ser.series_text.as_deref(),
     category_axis_data: ser.category_axis_data.as_deref(),
     values: ser.values.as_deref(),
@@ -5567,6 +6683,7 @@ fn radar_series_ref(ser: &c::RadarChartSeries) -> ChartSeriesRef<'_> {
 
 fn scatter_series_ref(ser: &c::ScatterChartSeries) -> ChartSeriesRef<'_> {
   ChartSeriesRef {
+    formatting_index: ser.index.val as usize,
     series_text: ser.series_text.as_deref(),
     category_axis_data: None,
     values: None,
@@ -5584,6 +6701,7 @@ fn scatter_series_ref(ser: &c::ScatterChartSeries) -> ChartSeriesRef<'_> {
 
 fn pie_series_ref(ser: &c::PieChartSeries) -> ChartSeriesRef<'_> {
   ChartSeriesRef {
+    formatting_index: ser.index.as_ref().map_or(0, |index| index.val as usize),
     series_text: ser.series_text.as_deref(),
     category_axis_data: ser.category_axis_data.as_deref(),
     values: ser.values.as_deref(),
@@ -5601,6 +6719,7 @@ fn pie_series_ref(ser: &c::PieChartSeries) -> ChartSeriesRef<'_> {
 
 fn bar_series_ref(ser: &c::BarChartSeries) -> ChartSeriesRef<'_> {
   ChartSeriesRef {
+    formatting_index: ser.index.val as usize,
     series_text: ser.series_text.as_deref(),
     category_axis_data: ser.category_axis_data.as_deref(),
     values: ser.values.as_deref(),
@@ -5618,6 +6737,7 @@ fn bar_series_ref(ser: &c::BarChartSeries) -> ChartSeriesRef<'_> {
 
 fn surface_series_ref(ser: &c::SurfaceChartSeries) -> ChartSeriesRef<'_> {
   ChartSeriesRef {
+    formatting_index: ser.index.val as usize,
     series_text: ser.series_text.as_deref(),
     category_axis_data: ser.category_axis_data.as_deref(),
     values: ser.values.as_deref(),
@@ -5635,6 +6755,7 @@ fn surface_series_ref(ser: &c::SurfaceChartSeries) -> ChartSeriesRef<'_> {
 
 fn bubble_series_ref(ser: &c::BubbleChartSeries) -> ChartSeriesRef<'_> {
   ChartSeriesRef {
+    formatting_index: ser.index.val as usize,
     series_text: ser.series_text.as_deref(),
     category_axis_data: None,
     values: None,
@@ -6368,6 +7489,7 @@ mod tests {
       10,
       LinearAxisScaleOptions {
         expand_if_values_close_to_border: false,
+        minimum_automatic_major_unit: None,
       },
     )
     .expect("finite values produce a scale");
@@ -6447,11 +7569,11 @@ mod tests {
         "2019-05-01",
       ]
     );
-    assert_eq!(ticks.first().map(|tick| tick.position), Some(0.0));
-    assert_eq!(ticks.last().map(|tick| tick.position), Some(1.0));
+    assert_eq!(ticks.first().map(|tick| tick.position), Some(0.5 / 121.0));
+    assert_eq!(ticks.last().map(|tick| tick.position), Some(120.5 / 121.0));
     let minor = super::date_axis_minor_tick_positions(&chart).expect("minor date ticks");
     assert_eq!(minor.len(), 18);
-    assert!((minor[1] - 7.0 / 120.0).abs() < f64::EPSILON);
+    assert!((minor[1] - 7.0 / 121.0).abs() < f64::EPSILON);
   }
 
   #[test]

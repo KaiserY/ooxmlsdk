@@ -10,6 +10,7 @@ pub(crate) mod object_resources;
 mod office_web_extension_assets;
 mod page_settings;
 mod pivot;
+mod pivot_style;
 mod print;
 mod query;
 mod sheet_conditions;

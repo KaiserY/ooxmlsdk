@@ -102,7 +102,12 @@ pub fn layout_document(
   package: &mut PresentationDocument,
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
-  let import = PowerPointImport::import_document(package)?;
+  let mut import = PowerPointImport::import_document(package)?;
+  import.field_update_datetime = options.field_update_datetime;
+  import.field_format_locale = options
+    .format_locale
+    .clone()
+    .or_else(|| options.ui_language.clone());
   let mut document = display::lower_to_layout_document(&import, options);
   if options.diagnostics.collect_debug_records {
     document

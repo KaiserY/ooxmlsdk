@@ -23,9 +23,11 @@ fn chart_text_blocks(
     // Typed radial and cartesian charts are laid out at their drawing anchor.
     // Cached series data is not separate document body text.
     let typed_chart = shared_chart::pie_chart_model(chart_space).is_some()
-      || shared_chart::cartesian_chart_for_ui_language(
+      || shared_chart::cartesian_chart_for_host_locales(
         chart_space,
+        shared_chart::ChartHostApplication::Wordprocessing,
         styles.locales.ui_language(),
+        styles.locales.format_locale(),
       )
       .is_some();
     let vertical_axis_labels = chart_vertical_multilevel_axis_labels(chart_space);
@@ -36,8 +38,9 @@ fn chart_text_blocks(
     let texts = if typed_chart {
       vertical_axis_labels.clone()
     } else {
-      shared_chart::fixed_output_texts_for_ui_language(
+      shared_chart::fixed_output_texts_for_host_ui_language(
         chart_space,
+        shared_chart::ChartHostApplication::Wordprocessing,
         styles.locales.ui_language(),
       )
     };

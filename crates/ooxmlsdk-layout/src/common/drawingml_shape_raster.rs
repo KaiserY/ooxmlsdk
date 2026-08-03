@@ -19,7 +19,6 @@ use crate::text_metrics::TextMetrics;
 
 const MAX_EFFECT_RASTER_PIXELS: f32 = 250_000.0;
 const MAX_EFFECT_PIXELS_PER_POINT: f32 = 2.0;
-const DRAWINGML_PATTERN_TILE_PT: f32 = 6.0;
 
 #[derive(Debug)]
 pub(crate) struct DrawingRaster {
@@ -1082,8 +1081,8 @@ fn draw_fill(
           FilterQuality::Nearest,
           1.0,
           SkTransform::from_translate(
-            drawingml_pattern_origin(bounds.origin.x.0),
-            drawingml_pattern_origin(bounds.origin.y.0),
+            pattern_origin(bounds.origin.x.0, pattern.tile_size_points()),
+            pattern_origin(bounds.origin.y.0, pattern.tile_size_points()),
           ),
         ),
         ..Paint::default()
@@ -1235,8 +1234,8 @@ fn draw_stroke(
         FilterQuality::Nearest,
         1.0,
         SkTransform::from_translate(
-          drawingml_pattern_origin(bounds.origin.x.0),
-          drawingml_pattern_origin(bounds.origin.y.0),
+          pattern_origin(bounds.origin.x.0, pattern.tile_size_points()),
+          pattern_origin(bounds.origin.y.0, pattern.tile_size_points()),
         ),
       ),
       ..Paint::default()
@@ -1321,15 +1320,19 @@ fn linear_gradient_line(
 }
 
 fn pattern_tile(pattern: PatternFill, pixels_per_point: f32) -> Option<Pixmap> {
-  let tile_px = (DRAWINGML_PATTERN_TILE_PT * pixels_per_point)
+  let minimum_tile_px = match pattern.mask {
+    super::PatternMask::EmfPlusHatch(_) => 8.0,
+    super::PatternMask::Bitmap8(_) => 1.0,
+  };
+  let tile_px = (pattern.tile_size_points() * pixels_per_point)
     .round()
-    .max(8.0) as u32;
+    .max(minimum_tile_px) as u32;
   let mut pixmap = Pixmap::new(tile_px, tile_px)?;
   for y in 0..tile_px {
     for x in 0..tile_px {
       let hatch_x = (u64::from(x) * 8 / u64::from(tile_px)) as i32;
       let hatch_y = (u64::from(y) * 8 / u64::from(tile_px)) as i32;
-      let color = if pattern.hatch_style.is_foreground(hatch_x, hatch_y) {
+      let color = if pattern.is_foreground(hatch_x, hatch_y) {
         pattern.foreground
       } else {
         pattern.background
@@ -1347,8 +1350,8 @@ fn pattern_tile(pattern: PatternFill, pixels_per_point: f32) -> Option<Pixmap> {
   Some(pixmap)
 }
 
-fn drawingml_pattern_origin(value: f32) -> f32 {
-  (value / DRAWINGML_PATTERN_TILE_PT).floor() * DRAWINGML_PATTERN_TILE_PT
+fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
+  (value / tile_size_pt).floor() * tile_size_pt
 }
 
 #[cfg(test)]

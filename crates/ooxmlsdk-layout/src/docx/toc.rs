@@ -1939,6 +1939,7 @@ mod tests {
         width_after_pt: None,
         layout: None,
         borders: None,
+        spacing_shading: None,
         redline_color: None,
       }],
     }

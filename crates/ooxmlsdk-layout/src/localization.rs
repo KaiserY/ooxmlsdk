@@ -106,6 +106,17 @@ pub(crate) enum ChartDisplayUnit {
   Trillions,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(usize)]
+pub(crate) enum ChartTrendlineKind {
+  Linear,
+  Logarithmic,
+  Exponential,
+  Power,
+  Polynomial,
+  MovingAverage,
+}
+
 /// Cross-crate resource needed by the PDF lowering layer.
 ///
 /// This is public only because `ooxmlsdk-pdf` is a separate crate; callers
@@ -161,6 +172,7 @@ pub(crate) struct OfficeStringCatalog {
   chart_series: &'static str,
   chart_row: &'static str,
   chart_column: &'static str,
+  chart_trendlines: [&'static str; 6],
   waterfall_increase: &'static str,
   waterfall_decrease: &'static str,
   waterfall_total: &'static str,
@@ -210,6 +222,20 @@ impl OfficeStringCatalog {
 
   pub(crate) fn chart_column_title(self, index: usize) -> String {
     format!("{} {index}", self.chart_column)
+  }
+
+  pub(crate) fn chart_trendline_legend_title(
+    self,
+    kind: ChartTrendlineKind,
+    series_name: &str,
+  ) -> String {
+    let type_name = self.chart_trendlines[kind as usize];
+    match self.resource_locale {
+      OfficeResourceLocale::English => format!("{type_name} ({series_name})"),
+      OfficeResourceLocale::SimplifiedChinese | OfficeResourceLocale::TraditionalChinese => {
+        format!("{type_name}({series_name})")
+      }
+    }
   }
 
   pub(crate) fn waterfall_legend(self) -> [&'static str; 3] {
@@ -278,6 +304,14 @@ const OFFICE_STRINGS_EN: OfficeStringCatalog = OfficeStringCatalog {
   chart_series: "Series",
   chart_row: "Row",
   chart_column: "Column",
+  chart_trendlines: [
+    "Linear",
+    "Logarithmic",
+    "Exponential",
+    "Power",
+    "Polynomial",
+    "Moving Average",
+  ],
   waterfall_increase: "Increase",
   waterfall_decrease: "Decrease",
   waterfall_total: "Total",
@@ -309,6 +343,7 @@ const OFFICE_STRINGS_ZH_HANS: OfficeStringCatalog = OfficeStringCatalog {
   chart_series: "系列",
   chart_row: "行",
   chart_column: "列",
+  chart_trendlines: ["线性", "对数", "指数", "乘幂", "多项式", "移动平均"],
   waterfall_increase: "增加",
   waterfall_decrease: "减少",
   waterfall_total: "汇总",
@@ -332,6 +367,7 @@ const OFFICE_STRINGS_ZH_HANT: OfficeStringCatalog = OfficeStringCatalog {
   chart_series: "數列",
   chart_row: "列",
   chart_column: "欄",
+  chart_trendlines: ["線性", "對數", "指數", "乘冪", "多項式", "移動平均"],
   waterfall_increase: "增加",
   waterfall_decrease: "減少",
   waterfall_total: "總計",

@@ -18,6 +18,8 @@ emfsdk = { workspace = true }
 encoding_rs = { workspace = true }
 html5ever = { workspace = true }
 hypher = { workspace = true }
+icu_calendar = { workspace = true }
+icu_datetime = { workspace = true }
 icu_locale = { workspace = true }
 icu_segmenter = { workspace = true }
 image = { workspace = true }
@@ -35,3 +37,4 @@ thiserror = { workspace = true }
 tiny-skia = "0.12.0"
 unicode-bidi = { workspace = true }
 unicode-script = { workspace = true }
+writeable = { workspace = true }

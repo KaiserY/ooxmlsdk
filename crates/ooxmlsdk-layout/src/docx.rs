@@ -1,6 +1,5 @@
 mod custom_xml;
 mod drawing;
-mod field_datetime;
 mod field_localization;
 mod hyphenation;
 mod layout;
@@ -50,6 +49,7 @@ use crate::common::drawingml_image_effects::{
   ImageEffect, ImageEffectColorResolver, ResolvedEffectColor,
 };
 use crate::error::Result;
+use crate::field_datetime;
 use crate::localization::{OfficeLocaleContext, OfficeResourceLocale, OfficeStringCatalog};
 use crate::model::common_rgb;
 use crate::options::{
@@ -75,7 +75,7 @@ use settings::{
   hyphenation_settings, no_column_balance, split_page_break_and_paragraph_mark,
   update_fields_on_open,
 };
-use table::{TableConditionalStyleMask, TableLookModel};
+use table::TableLookModel;
 use text::{
   ParagraphImportBase, paragraph_mark_is_deleted, paragraph_model, paragraph_model_with_base,
 };
@@ -1615,7 +1615,7 @@ fn paragraph_body_is_effectively_empty(paragraph: &Paragraph) -> bool {
       InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
       InlineItem::DrawingGroupStart(_) | InlineItem::DrawingGroupEnd => true,
       InlineItem::LastRenderedPageBreak => true,
-      InlineItem::PageBreak | InlineItem::ColumnBreak => false,
+      InlineItem::ClearLineBreak(_) | InlineItem::PageBreak | InlineItem::ColumnBreak => false,
     })
 }
 
@@ -1660,6 +1660,7 @@ fn paragraph_drop_cap_text(paragraph: &Paragraph) -> Option<String> {
       | InlineItem::DrawingGroupStart(_)
       | InlineItem::DrawingGroupEnd
       | InlineItem::LastRenderedPageBreak
+      | InlineItem::ClearLineBreak(_)
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => None,
     })
@@ -3360,11 +3361,10 @@ fn table_model(
     .and_then(|properties| properties.table_cell_margin_default.as_deref())
     .map(|margins| table_cell_margin_default_with_base(margins, style_cell_margins))
     .unwrap_or(style_cell_margins);
-  let table_shading = properties
+  let table_spacing_shading = properties
     .and_then(|properties| properties.shading.as_ref())
-    .map(shading_fill)
-    .or(table_style.table_shading)
-    .flatten();
+    .map(|shading| shading_fill(shading, &env.styles.theme_colors))
+    .or(table_style.table_shading);
   let table_borders = properties
     .and_then(|properties| properties.table_borders.as_deref())
     .map(|borders| direct_table_borders_model(table_style.table_borders, borders))
@@ -3391,7 +3391,7 @@ fn table_model(
       form_widget_ids: env.form_widget_ids,
       cell_margins,
       direct_cell_margins,
-      table_shading,
+      table_spacing_shading,
       table_borders,
       table_style: &table_style,
       table_look,
@@ -3569,7 +3569,9 @@ pub(super) fn paragraph_starts_after_last_rendered_page_break(inlines: &[InlineI
       | InlineItem::LegacyFormCheckBox(_) => {
         return saw_last_rendered_page_break;
       }
-      InlineItem::PageBreak | InlineItem::ColumnBreak => return false,
+      InlineItem::ClearLineBreak(_) | InlineItem::PageBreak | InlineItem::ColumnBreak => {
+        return false;
+      }
       InlineItem::Text(_)
       | InlineItem::BookmarkStart(_)
       | InlineItem::FormWidgetStart(_)
@@ -3713,30 +3715,31 @@ fn table_row_model(
 ) -> TableRow {
   let (grid_before, grid_after) = table_row_grid_properties(row.table_row_properties.as_deref());
   // ECMA-376 Part 1 §17.4.60 makes tblPrEx properties replace tblPr for the
-  // current row. In particular, the row's tblLook controls which conditional
-  // table-style regions apply to both its row and its cells.
+  // current row. In particular, the effective tblLook controls which
+  // conditional table-style regions apply to both its row and its cells.
+  // w:cnfStyle only records the conditional formatting already applied by a
+  // producer; it is an optimization, not a second selector. A real tblHeader,
+  // however, forces the firstRow condition for every header row even when the
+  // table look disables the geometrical first row. This is Word behavior
+  // covered by LibreOffice's tdf138020 import test and table mapper.
   let row_table_look = table_row_look(row, context.table_look);
-  let row_condition = table_row_conditional_style(row.table_row_properties.as_deref())
-    .unwrap_or_else(|| {
-      TableConditionalStyleMask::from_row_position(row_table_look, row_index, context.row_count)
-    });
+  let direct_row_style = direct_table_row_style(row.table_row_properties.as_deref());
+  let is_header_row = direct_row_style.repeat_header == Some(true);
   let mut row_style = table_row_style_for(
     context.table_style,
     row_table_look,
     row_index,
     context.row_count,
-    row_condition,
+    is_header_row,
   );
-  merge_table_row_style(
-    &mut row_style,
-    &direct_table_row_style(row.table_row_properties.as_deref()),
-  );
-  let row_table_shading = row
+  merge_table_row_style(&mut row_style, &direct_row_style);
+  let row_spacing_shading = row
     .table_property_exceptions
     .as_deref()
     .and_then(|properties| properties.shading.as_ref())
-    .map(shading_fill)
-    .unwrap_or(context.table_shading);
+    .map(|shading| shading_fill(shading, &context.styles.theme_colors))
+    .or(context.table_spacing_shading)
+    .filter(|paint| paint.is_visible());
   let cell_flow = table_cell_flow(row);
   let cell_count = cell_flow
     .iter()
@@ -3752,7 +3755,6 @@ fn table_row_model(
           source.sdt_properties,
           context,
           row.table_property_exceptions.as_deref(),
-          row_table_shading,
           table_cell_style_for(
             context.table_style,
             TableCellStyleContext {
@@ -3761,12 +3763,7 @@ fn table_row_model(
               row_count: context.row_count,
               cell_index: cells.len(),
               cell_count,
-              row_condition,
-              cell_condition: source
-                .cell
-                .table_cell_properties
-                .as_deref()
-                .and_then(table_cell_conditional_style),
+              is_header_row,
             },
           ),
         );
@@ -3803,6 +3800,7 @@ fn table_row_model(
       .as_deref()
       .and_then(|properties| properties.table_borders.as_deref())
       .map(|borders| direct_table_borders_model(context.table_borders, borders)),
+    spacing_shading: row_spacing_shading,
     redline_color: None,
     cells,
   }
@@ -3969,13 +3967,18 @@ fn table_row_style_for(
   look: TableLookModel,
   row_index: usize,
   row_count: usize,
-  condition_mask: TableConditionalStyleMask,
+  is_header_row: bool,
 ) -> TableRowStyle {
   let mut style = table_style.whole_row;
   for (condition, conditional_style) in &table_style.conditional_rows {
-    let applies = table::row_style_condition_applies(*condition, look, row_index, row_count)
-      || condition_mask.row_condition_applies(*condition);
-    if applies {
+    if table::row_style_condition_applies(
+      *condition,
+      look,
+      row_index,
+      row_count,
+      table_style.row_band_size.unwrap_or(0),
+      is_header_row,
+    ) {
       merge_table_row_style(&mut style, conditional_style);
     }
   }
@@ -3989,8 +3992,7 @@ struct TableCellStyleContext {
   row_count: usize,
   cell_index: usize,
   cell_count: usize,
-  row_condition: TableConditionalStyleMask,
-  cell_condition: Option<TableConditionalStyleMask>,
+  is_header_row: bool,
 }
 
 fn table_cell_style_for(
@@ -3998,37 +4000,28 @@ fn table_cell_style_for(
   context: TableCellStyleContext,
 ) -> TableCellStyle {
   let mut style = table_style.whole_table.clone();
-  let position_mask = TableConditionalStyleMask::from_row_position(
-    context.look,
-    context.row_index,
-    context.row_count,
-  )
-  .with_cell_mask(TableConditionalStyleMask::from_cell_position(
-    context.look,
-    context.cell_index,
-    context.cell_count,
-  ));
-  let condition_mask = context
-    .row_condition
-    .with_cell_mask(context.cell_condition.unwrap_or_else(|| {
-      TableConditionalStyleMask::from_cell_position(
-        context.look,
-        context.cell_index,
-        context.cell_count,
-      )
-    }));
   for (condition, conditional_style) in &table_style.conditional {
-    let applies = table::cell_style_condition_applies(
+    if table::cell_style_condition_applies(
       *condition,
       context.look,
       context.row_index,
       context.row_count,
       context.cell_index,
       context.cell_count,
-    ) || position_mask.cell_condition_applies(*condition)
-      || condition_mask.cell_condition_applies(*condition);
-    if applies {
-      merge_table_cell_style(&mut style, conditional_style);
+      table_style.row_band_size.unwrap_or(0),
+      table_style.column_band_size.unwrap_or(0),
+      context.is_header_row,
+    ) {
+      let mut conditional_style = conditional_style.clone();
+      if let Some(table_borders) = conditional_style.conditional_table_borders.take() {
+        let mut borders = conditional_table_borders_for_cell(table_borders, context);
+        // Within one tblStylePr, tcPr follows tblPr and therefore wins per
+        // border side. The resulting sides then participate in the normal
+        // Office conditional-region cascade.
+        merge_cell_borders(&mut borders, &conditional_style.borders);
+        conditional_style.borders = borders;
+      }
+      merge_table_cell_style(&mut style, &conditional_style);
     }
   }
   style
@@ -4039,7 +4032,6 @@ fn table_cell_model(
   sdt_properties: Option<&w::SdtProperties>,
   context: &mut TableImportContext<'_>,
   row_table_exceptions: Option<&w::TablePropertyExceptions>,
-  row_table_shading: Option<RgbColor>,
   style: TableCellStyle,
 ) -> TableCell {
   let properties = cell.table_cell_properties.as_deref();
@@ -4051,7 +4043,7 @@ fn table_cell_model(
   let base_margins = if context.direct_cell_margins {
     context.cell_margins
   } else {
-    style.margins.unwrap_or(context.cell_margins)
+    style.margins.apply(context.cell_margins)
   };
   let row_cell_margins = row_table_exceptions
     .and_then(|exceptions| exceptions.table_cell_margin_default.as_deref())
@@ -4202,9 +4194,8 @@ fn table_cell_model(
     shading: resolved_table_cell_shading(
       properties
         .and_then(|properties| properties.shading.as_ref())
-        .map(shading_fill),
+        .map(|shading| shading_fill(shading, &context.styles.theme_colors)),
       style.shading,
-      row_table_shading,
     ),
     borders: properties
       .and_then(|properties| properties.table_cell_borders.as_deref())
@@ -4250,11 +4241,12 @@ fn table_cell_model(
 }
 
 fn resolved_table_cell_shading(
-  direct_cell: Option<Option<RgbColor>>,
-  styled_cell: Option<Option<RgbColor>>,
-  row_or_table: Option<RgbColor>,
-) -> Option<RgbColor> {
-  direct_cell.or(styled_cell).unwrap_or(row_or_table)
+  direct_cell: Option<ShadingPaint>,
+  styled_cell: Option<ShadingPaint>,
+) -> Option<ShadingPaint> {
+  direct_cell
+    .or(styled_cell)
+    .filter(|paint| paint.is_visible())
 }
 
 fn prepend_out_of_place_paragraph_to_nested_table(
@@ -4342,32 +4334,6 @@ fn table_row_grid_properties(properties: Option<&w::TableRowProperties>) -> (usi
   (grid_before, grid_after)
 }
 
-fn table_row_conditional_style(
-  properties: Option<&w::TableRowProperties>,
-) -> Option<TableConditionalStyleMask> {
-  properties.and_then(|properties| {
-    properties
-      .table_row_properties_choice1
-      .iter()
-      .find_map(|choice| {
-        if let w::TableRowPropertiesChoice::ConditionalFormatStyle(style) = choice {
-          Some(TableConditionalStyleMask::from_cnf_style(style))
-        } else {
-          None
-        }
-      })
-  })
-}
-
-fn table_cell_conditional_style(
-  properties: &w::TableCellProperties,
-) -> Option<TableConditionalStyleMask> {
-  properties
-    .conditional_format_style
-    .as_ref()
-    .map(TableConditionalStyleMask::from_cnf_style)
-}
-
 fn table_cell_margin_default(margins: &w::TableCellMarginDefault) -> CellMargins {
   table_cell_margin_default_with_base(margins, CellMargins::default())
 }
@@ -4441,6 +4407,52 @@ fn table_cell_margin(margins: &w::TableCellMargin, mut model: CellMargins) -> Ce
     model.right_pt = value;
   }
   model
+}
+
+fn table_cell_margin_default_style(margins: &w::TableCellMarginDefault) -> CellMarginStyle {
+  let mut style = CellMarginStyle::default();
+  if let Some(top) = &margins.top_margin {
+    style.top_pt = margin_width_to_points(top.width.as_ref(), top.r#type);
+  }
+  if let Some(bottom) = &margins.bottom_margin {
+    style.bottom_pt = margin_width_to_points(bottom.width.as_ref(), bottom.r#type);
+  }
+  if let Some(left) = &margins.table_cell_left_margin {
+    style.left_pt = margin_width_to_points(left.width.as_ref(), left.r#type);
+  }
+  if let Some(start) = &margins.start_margin {
+    style.left_pt = margin_width_to_points(start.width.as_ref(), start.r#type);
+  }
+  if let Some(right) = &margins.table_cell_right_margin {
+    style.right_pt = margin_width_to_points(right.width.as_ref(), right.r#type);
+  }
+  if let Some(end) = &margins.end_margin {
+    style.right_pt = margin_width_to_points(end.width.as_ref(), end.r#type);
+  }
+  style
+}
+
+fn table_cell_margin_style(margins: &w::TableCellMargin) -> CellMarginStyle {
+  let mut style = CellMarginStyle::default();
+  if let Some(top) = &margins.top_margin {
+    style.top_pt = margin_width_to_points(top.width.as_ref(), top.r#type);
+  }
+  if let Some(bottom) = &margins.bottom_margin {
+    style.bottom_pt = margin_width_to_points(bottom.width.as_ref(), bottom.r#type);
+  }
+  if let Some(left) = &margins.left_margin {
+    style.left_pt = margin_width_to_points(left.width.as_ref(), left.r#type);
+  }
+  if let Some(start) = &margins.start_margin {
+    style.left_pt = margin_width_to_points(start.width.as_ref(), start.r#type);
+  }
+  if let Some(right) = &margins.right_margin {
+    style.right_pt = margin_width_to_points(right.width.as_ref(), right.r#type);
+  }
+  if let Some(end) = &margins.end_margin {
+    style.right_pt = margin_width_to_points(end.width.as_ref(), end.r#type);
+  }
+  style
 }
 
 fn margin_width_to_points(
@@ -4556,8 +4568,202 @@ fn table_layout_mode(layout: &w::TableLayout) -> TableLayoutMode {
   }
 }
 
-fn shading_fill(shading: &w::Shading) -> Option<RgbColor> {
-  shading.fill.as_deref().and_then(parse_hex_color)
+const WORD_SHADING_PATTERN_TILE_MILLI_POINTS: u16 = 960;
+
+fn shading_fill(shading: &w::Shading, theme_colors: &ThemeColors) -> ShadingPaint {
+  use w::ShadingPatternValues as Pattern;
+
+  let pattern = shading.val.unwrap_or(Pattern::Nil);
+  if pattern == Pattern::Nil {
+    return ShadingPaint::None;
+  }
+
+  let foreground = resolve_optional_shading_color(
+    shading.color.as_deref(),
+    shading.theme_color,
+    shading.theme_tint.as_deref(),
+    shading.theme_shade.as_deref(),
+    theme_colors,
+  );
+  let background = resolve_optional_shading_color(
+    shading.fill.as_deref(),
+    shading.theme_fill,
+    shading.theme_fill_tint.as_deref(),
+    shading.theme_fill_shade.as_deref(),
+    theme_colors,
+  );
+  let automatic_foreground = RgbColor { r: 0, g: 0, b: 0 };
+  let automatic_background = RgbColor {
+    r: u8::MAX,
+    g: u8::MAX,
+    b: u8::MAX,
+  };
+
+  if let Some(ratio) = shading_percentage(pattern) {
+    return ShadingPaint::Solid(blend_shading_colors(
+      foreground.unwrap_or(automatic_foreground),
+      background.unwrap_or(automatic_background),
+      ratio,
+    ));
+  }
+
+  match pattern {
+    Pattern::Nil => ShadingPaint::None,
+    // A clear brush with an automatic or omitted fill is transparent. This is
+    // distinct from the white automatic background used to compose a real
+    // percentage/geometric pattern. LibreOffice preserves the distinction as
+    // COL_AUTO in CellColorHandler, and Word's Calendar1 fixed output relies
+    // on it so later cell paint does not cover conditional table borders.
+    Pattern::Clear => background.map_or(ShadingPaint::None, ShadingPaint::Solid),
+    Pattern::Solid => ShadingPaint::Solid(foreground.unwrap_or(automatic_foreground)),
+    pattern => word_shading_pattern_rows(pattern).map_or(
+      ShadingPaint::Solid(background.unwrap_or(automatic_background)),
+      |rows| {
+        ShadingPaint::Pattern(common::PatternFill::bitmap8(
+          rows,
+          WORD_SHADING_PATTERN_TILE_MILLI_POINTS,
+          common_rgb(foreground.unwrap_or(automatic_foreground), 1.0),
+          common_rgb(background.unwrap_or(automatic_background), 1.0),
+        ))
+      },
+    ),
+  }
+}
+
+fn text_background_shading_fill(shading: &w::Shading, theme_colors: &ThemeColors) -> ShadingPaint {
+  match shading_fill(shading, theme_colors) {
+    ShadingPaint::Pattern(pattern) => ShadingPaint::Solid(RgbColor {
+      r: pattern.background.r,
+      g: pattern.background.g,
+      b: pattern.background.b,
+    }),
+    paint => paint,
+  }
+}
+
+fn resolve_optional_shading_color(
+  explicit: Option<&str>,
+  theme: Option<w::ThemeColorValues>,
+  tint: Option<&str>,
+  shade: Option<&str>,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  let themed = theme.and_then(|value| theme_colors.resolve_wordprocessing(value));
+  let mut resolved = themed.or_else(|| explicit.and_then(parse_hex_color))?;
+  if themed.is_some() {
+    // [MS-OI29500] §17.4.32(a): Word gives tint precedence when both
+    // transforms are authored.
+    if let Some(tint) = tint {
+      resolved = apply_word_tint(resolved, tint);
+    } else if let Some(shade) = shade {
+      resolved = apply_word_shade(resolved, shade);
+    }
+  }
+  Some(resolved)
+}
+
+fn blend_shading_colors(foreground: RgbColor, background: RgbColor, ratio: f32) -> RgbColor {
+  fn channel(foreground: u8, background: u8, ratio: f32) -> u8 {
+    (f32::from(foreground) * ratio + f32::from(background) * (1.0 - ratio))
+      .round()
+      .clamp(0.0, f32::from(u8::MAX)) as u8
+  }
+  RgbColor {
+    r: channel(foreground.r, background.r, ratio),
+    g: channel(foreground.g, background.g, ratio),
+    b: channel(foreground.b, background.b, ratio),
+  }
+}
+
+fn shading_percentage(pattern: w::ShadingPatternValues) -> Option<f32> {
+  use w::ShadingPatternValues as Pattern;
+  Some(match pattern {
+    Pattern::Percent5 => 0.05,
+    Pattern::Percent10 => 0.10,
+    Pattern::Percent12 => 0.125,
+    Pattern::Percent15 => 0.15,
+    Pattern::Percent20 => 0.20,
+    Pattern::Percent25 => 0.25,
+    Pattern::Percent30 => 0.30,
+    Pattern::Percent35 => 0.35,
+    Pattern::Percent37 => 0.375,
+    Pattern::Percent40 => 0.40,
+    Pattern::Percent45 => 0.45,
+    Pattern::Percent50 => 0.50,
+    Pattern::Percent55 => 0.55,
+    Pattern::Percent60 => 0.60,
+    Pattern::Percent62 => 0.625,
+    Pattern::Percent65 => 0.65,
+    Pattern::Percent70 => 0.70,
+    Pattern::Percent75 => 0.75,
+    Pattern::Percent80 => 0.80,
+    Pattern::Percent85 => 0.85,
+    Pattern::Percent87 => 0.875,
+    Pattern::Percent90 => 0.90,
+    Pattern::Percent95 => 0.95,
+    Pattern::Nil
+    | Pattern::Clear
+    | Pattern::Solid
+    | Pattern::HorizontalStripe
+    | Pattern::VerticalStripe
+    | Pattern::ReverseDiagonalStripe
+    | Pattern::DiagonalStripe
+    | Pattern::HorizontalCross
+    | Pattern::DiagonalCross
+    | Pattern::ThinHorizontalStripe
+    | Pattern::ThinVerticalStripe
+    | Pattern::ThinReverseDiagonalStripe
+    | Pattern::ThinDiagonalStripe
+    | Pattern::ThinHorizontalCross
+    | Pattern::ThinDiagonalCross => return None,
+  })
+}
+
+fn word_shading_pattern_rows(pattern: w::ShadingPatternValues) -> Option<[u8; 8]> {
+  use w::ShadingPatternValues as Pattern;
+  // ECMA-376 Part 1 §17.18.78 defines these as tiled 8×8 masks. The two
+  // horizontal masks below use the rows emitted by current Word fixed output;
+  // the remaining masks are transcribed from the normative ECMA diagrams.
+  Some(match pattern {
+    Pattern::HorizontalStripe => [0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00],
+    Pattern::VerticalStripe => [0x33; 8],
+    Pattern::ReverseDiagonalStripe => [0x99, 0xCC, 0x66, 0x33, 0x99, 0xCC, 0x66, 0x33],
+    Pattern::DiagonalStripe => [0x77, 0xEE, 0xDD, 0xBB, 0x77, 0xEE, 0xDD, 0xBB],
+    Pattern::HorizontalCross => [0x66, 0x99, 0x99, 0x66, 0x66, 0x99, 0x99, 0x66],
+    Pattern::DiagonalCross => [0x66, 0xFF, 0x99, 0xFF, 0x66, 0xFF, 0x99, 0xFF],
+    Pattern::ThinHorizontalStripe => [0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    Pattern::ThinVerticalStripe => [0x22; 8],
+    Pattern::ThinReverseDiagonalStripe => [0x11, 0x88, 0x44, 0x22, 0x11, 0x88, 0x44, 0x22],
+    Pattern::ThinDiagonalStripe => [0x88, 0x11, 0x22, 0x44, 0x88, 0x11, 0x22, 0x44],
+    Pattern::ThinHorizontalCross => [0x22, 0x22, 0x22, 0xFF, 0x22, 0x22, 0x22, 0xFF],
+    Pattern::ThinDiagonalCross => [0x55, 0x22, 0x55, 0x88, 0x55, 0x22, 0x55, 0x88],
+    Pattern::Nil
+    | Pattern::Clear
+    | Pattern::Solid
+    | Pattern::Percent5
+    | Pattern::Percent10
+    | Pattern::Percent12
+    | Pattern::Percent15
+    | Pattern::Percent20
+    | Pattern::Percent25
+    | Pattern::Percent30
+    | Pattern::Percent35
+    | Pattern::Percent37
+    | Pattern::Percent40
+    | Pattern::Percent45
+    | Pattern::Percent50
+    | Pattern::Percent55
+    | Pattern::Percent60
+    | Pattern::Percent62
+    | Pattern::Percent65
+    | Pattern::Percent70
+    | Pattern::Percent75
+    | Pattern::Percent80
+    | Pattern::Percent85
+    | Pattern::Percent87
+    | Pattern::Percent90
+    | Pattern::Percent95 => return None,
+  })
 }
 
 fn table_cell_vertical_alignment(
@@ -4653,6 +4859,50 @@ fn cell_borders_model(borders: &w::TableCellBorders) -> CellBordersModel {
       .as_ref()
       .and_then(start_border_style)
       .or_else(|| borders.left_border.as_ref().and_then(left_border_style)),
+  }
+}
+
+fn conditional_table_borders_for_cell(
+  borders: TableBordersModel,
+  context: TableCellStyleContext,
+) -> CellBordersModel {
+  let mut cell = CellBordersModel {
+    top: borders.top,
+    right: borders.right,
+    bottom: borders.bottom,
+    left: borders.left,
+  };
+  if let Some(inside_vertical) = borders.inside_vertical {
+    if context.cell_index > 0 {
+      cell.left = cell.left.or(Some(inside_vertical));
+    }
+    if context.cell_index + 1 < context.cell_count {
+      cell.right = cell.right.or(Some(inside_vertical));
+    }
+  }
+  if let Some(inside_horizontal) = borders.inside_horizontal {
+    if context.row_index > 0 {
+      cell.top = cell.top.or(Some(inside_horizontal));
+    }
+    if context.row_index + 1 < context.row_count {
+      cell.bottom = cell.bottom.or(Some(inside_horizontal));
+    }
+  }
+  cell
+}
+
+fn merge_cell_borders(target: &mut CellBordersModel, source: &CellBordersModel) {
+  if source.top.is_some() {
+    target.top = source.top;
+  }
+  if source.right.is_some() {
+    target.right = source.right;
+  }
+  if source.bottom.is_some() {
+    target.bottom = source.bottom;
+  }
+  if source.left.is_some() {
+    target.left = source.left;
   }
 }
 
@@ -4880,10 +5130,11 @@ fn vml_background_pattern_color(background: &v::Background) -> Option<RgbColor> 
     .or_else(|| background.fillcolor.as_deref().and_then(parse_vml_color))
 }
 
-fn merge_paragraph_format(
+fn merge_paragraph_format_with_theme(
   format: &mut ParagraphFormat,
   properties: Option<ParagraphProps<'_>>,
   import_settings: ImportSettings,
+  theme_colors: &ThemeColors,
 ) {
   let Some(properties) = properties else {
     return;
@@ -5103,7 +5354,13 @@ fn merge_paragraph_format(
   }
 
   if let Some(shading) = properties.shading() {
-    format.shading = shading_fill(shading);
+    // The Office paragraph brush box is not the same rectangle as this
+    // layout's complete line frame. Keep the geometric mask in the shared
+    // and table-cell models, but retain the established background-color
+    // fallback for paragraph paint until that box is represented. Enabling
+    // the mask against the wrong bounds regresses both theme-preservation
+    // counterexamples even though the 8×8 tile itself is correct.
+    format.shading = Some(text_background_shading_fill(shading, theme_colors));
   }
 
   if let Some(borders) = properties.paragraph_borders() {
@@ -5125,6 +5382,15 @@ fn merge_paragraph_format(
   {
     merge_paragraph_frame_properties(format, frame);
   }
+}
+
+#[cfg(test)]
+fn merge_paragraph_format(
+  format: &mut ParagraphFormat,
+  properties: Option<ParagraphProps<'_>>,
+  import_settings: ImportSettings,
+) {
+  merge_paragraph_format_with_theme(format, properties, import_settings, &ThemeColors::default());
 }
 
 fn paragraph_justification(
@@ -6056,6 +6322,7 @@ fn apply_field_hyperlink_url(result: &mut [InlineItem], url: &str) {
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
       | InlineItem::LastRenderedPageBreak
+      | InlineItem::ClearLineBreak(_)
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => {}
     }
@@ -6546,6 +6813,7 @@ fn field_result_text(result: &[InlineItem]) -> Option<String> {
     match item {
       InlineItem::Text(run) => text.push_str(&run.text),
       InlineItem::PositionalTab(_) => text.push('\t'),
+      InlineItem::ClearLineBreak(_) => text.push('\n'),
       InlineItem::Ruby(ruby) => {
         for run in &ruby.base {
           text.push_str(&run.text);
@@ -7197,7 +7465,26 @@ fn push_run_with_character_style_policy(
           );
           inlines.push(InlineItem::ColumnBreak);
         }
-        Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
+        Some(w::BreakValues::TextWrapping) | None => {
+          let clear = match br.clear {
+            Some(w::BreakTextRestartLocationValues::Left) => Some(LineBreakClear::Left),
+            Some(w::BreakTextRestartLocationValues::Right) => Some(LineBreakClear::Right),
+            Some(w::BreakTextRestartLocationValues::All) => Some(LineBreakClear::All),
+            Some(w::BreakTextRestartLocationValues::None) | None => None,
+          };
+          if let Some(clear) = clear {
+            flush_run_text(
+              inlines,
+              &mut text,
+              style.clone(),
+              hyperlink_url,
+              &style_ref_keys,
+            );
+            inlines.push(InlineItem::ClearLineBreak(clear));
+          } else {
+            text.push('\n');
+          }
+        }
       },
       // This is a cached layout artifact from Word, not an author-authored break.
       w::RunChoice::LastRenderedPageBreak => {
@@ -7738,6 +8025,7 @@ fn ruby_text_runs(items: &[InlineItem]) -> Option<Vec<TextRun>> {
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
       | InlineItem::LastRenderedPageBreak
+      | InlineItem::ClearLineBreak(_)
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => return None,
     }
@@ -8909,7 +9197,7 @@ fn merge_textbox_frame_into_owning_shape(
     || !text_box_frame.additional_fill_colors.is_empty()
     || text_box_frame.chart.is_some()
     || (text_box_frame.placement != ImagePlacement::Inline
-      && !text_box_frame.text_box_resizes_height_to_fit)
+      && !text_box_frame.text_box_resizes_to_fit)
   {
     return Err(Box::new(text_box_frame));
   }
@@ -8922,7 +9210,7 @@ fn merge_textbox_frame_into_owning_shape(
       && textbox_owner_placement_matches(
         shape.placement,
         text_box_frame.placement,
-        text_box_frame.text_box_resizes_height_to_fit,
+        text_box_frame.text_box_resizes_to_fit,
       )
       && (shape.width_pt - text_box_frame.width_pt).abs() <= 0.01
       && (shape.height_pt - text_box_frame.height_pt).abs() <= 0.01
@@ -8939,9 +9227,10 @@ fn merge_textbox_frame_into_owning_shape(
   shape.text_inset_right_pt = text_box_frame.text_inset_right_pt;
   shape.text_inset_bottom_pt = text_box_frame.text_inset_bottom_pt;
   shape.text_box_auto_fit = text_box_frame.text_box_auto_fit;
-  shape.text_box_resizes_height_to_fit = text_box_frame.text_box_resizes_height_to_fit;
+  shape.text_box_resizes_to_fit = text_box_frame.text_box_resizes_to_fit;
   shape.text_box_word_wrap = text_box_frame.text_box_word_wrap;
   shape.text_vertical_alignment = text_box_frame.text_vertical_alignment;
+  shape.text_box_writing_mode = text_box_frame.text_box_writing_mode;
   shape.text_fill = text_box_frame.text_fill.take();
   Ok(())
 }
@@ -9011,16 +9300,6 @@ fn wordprocessing_shape_textbox_uses_auto_fit(shape: &wps::WordprocessingShape) 
       .as_deref()
       .and_then(|properties| properties.text_body_properties_choice1.as_ref()),
     Some(wps::TextBodyPropertiesChoice::ShapeAutoFit)
-  )
-}
-
-fn wordprocessing_shape_textbox_is_vertical(shape: &wps::WordprocessingShape) -> bool {
-  matches!(
-    shape
-      .text_body_properties
-      .as_ref()
-      .and_then(|properties| properties.vertical),
-    Some(a::TextVerticalValues::Vertical)
   )
 }
 
@@ -9399,6 +9678,7 @@ struct TextBoxFrameContent {
   bottom_pt: f32,
   word_wrap: bool,
   vertical_alignment: TextBoxVerticalAlignment,
+  writing_mode: TextBoxWritingMode,
 }
 
 impl TextBoxFrameContent {
@@ -9411,6 +9691,7 @@ impl TextBoxFrameContent {
       bottom_pt: DEFAULT_TEXTBOX_TOP_BOTTOM_INSET_PT,
       word_wrap: true,
       vertical_alignment: TextBoxVerticalAlignment::Top,
+      writing_mode: TextBoxWritingMode::Horizontal,
     }
   }
 }
@@ -9444,7 +9725,9 @@ fn text_box_frame_from_wordprocessing_shape(
   if let Some(properties) = shape.text_body_properties.as_deref() {
     apply_wordprocessing_shape_textbox_body_properties(properties, &mut frame);
   }
-  if let Some(rotation_deg) = wordprocessing_shape_textbox_text_rotation(shape) {
+  if frame.writing_mode == TextBoxWritingMode::Horizontal
+    && let Some(rotation_deg) = wordprocessing_shape_textbox_text_rotation(shape)
+  {
     rotate_textbox_blocks(&mut frame.blocks, rotation_deg);
   }
   let shape_auto_fit = wordprocessing_shape_textbox_uses_auto_fit(shape);
@@ -9491,16 +9774,7 @@ fn wordprocessing_shape_no_fill_outline_half_width_pt(
 
 fn wordprocessing_shape_textbox_text_rotation(shape: &wps::WordprocessingShape) -> Option<f32> {
   let properties = shape.text_body_properties.as_deref()?;
-  let vertical_rotation = match properties.vertical {
-    Some(a::TextVerticalValues::Vertical)
-    | Some(a::TextVerticalValues::WordArtVertical)
-    | Some(a::TextVerticalValues::EastAsianVetical) => 90.0,
-    Some(a::TextVerticalValues::Vertical270) | Some(a::TextVerticalValues::WordArtLeftToRight) => {
-      -90.0
-    }
-    _ => 0.0,
-  };
-  let text_area_rotation = if properties
+  let rotation = if properties
     .up_right
     .as_ref()
     .is_some_and(|value| value.as_bool())
@@ -9512,7 +9786,6 @@ fn wordprocessing_shape_textbox_text_rotation(shape: &wps::WordprocessingShape) 
       .map(|value| sdk_units::drawingml_angle_to_degrees(value) as f32)
       .unwrap_or_default()
   };
-  let rotation = vertical_rotation + text_area_rotation;
   (rotation.abs() > f32::EPSILON).then_some(rotation)
 }
 
@@ -9603,6 +9876,17 @@ fn apply_wordprocessing_shape_textbox_body_properties(
   frame.word_wrap = properties
     .wrap
     .is_none_or(|wrap| wrap == a::TextWrappingValues::Square);
+  frame.writing_mode = match properties.vertical.unwrap_or_default() {
+    a::TextVerticalValues::Horizontal => TextBoxWritingMode::Horizontal,
+    a::TextVerticalValues::Vertical => TextBoxWritingMode::TopToBottomRightToLeft,
+    a::TextVerticalValues::Vertical270 => TextBoxWritingMode::BottomToTopLeftToRight,
+    a::TextVerticalValues::EastAsianVetical => TextBoxWritingMode::EastAsianVerticalRightToLeft,
+    a::TextVerticalValues::MongolianVertical => TextBoxWritingMode::MongolianVerticalLeftToRight,
+    a::TextVerticalValues::WordArtVertical => TextBoxWritingMode::StackedLeftToRight,
+    // The generated Rust variant retains an older upstream semantic name;
+    // its serialized value is wordArtVertRtl.
+    a::TextVerticalValues::WordArtLeftToRight => TextBoxWritingMode::StackedRightToLeft,
+  };
   let body_properties = DrawingMlBodyProperties {
     left_inset_emu: properties.left_inset.map(i64::from),
     top_inset_emu: properties.top_inset.map(i64::from),
@@ -9854,7 +10138,6 @@ fn wordprocessing_shape_textbox_frame(
     context.hyperlinks,
   );
   let auto_fit = wordprocessing_shape_textbox_uses_auto_fit(shape);
-  let expands_auto_fit = auto_fit && wordprocessing_shape_textbox_is_vertical(shape);
   let frame_stroke = wordprocessing_shape_textbox_frame_stroke(shape, auto_fit, placement);
   let properties = DrawingMlShapeProperties::Wordprocessing(shape_properties);
   let geometry = properties
@@ -9878,25 +10161,17 @@ fn wordprocessing_shape_textbox_frame(
   apply_wordprocessing_shape_preset_text_rectangle(
     &properties,
     (mapped.width_pt, mapped.height_pt),
-    (
-      wordprocessing_shape_textbox_text_rotation(shape).unwrap_or_default(),
-      mapped.rotation_deg,
-    ),
     (mapped.flip_horizontal, mapped.flip_vertical),
     &mut text_box,
   );
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
     (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
-  let width_pt = if expands_auto_fit {
-    shape_width_pt.max(DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT)
-  } else {
-    shape_width_pt.max(DEFAULT_TEXTBOX_MIN_WIDTH_PT)
-  };
-  let height_pt = if expands_auto_fit {
-    shape_height_pt.max(300.0)
-  } else {
-    shape_height_pt.max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT)
-  };
+  // Keep the authored geometry here so the WPS text frame can merge with its
+  // owning shape. spAutoFit is resolved from measured content during layout;
+  // inventing an import-time rectangle both duplicates the shape and gives a
+  // vertical text body an unrelated logical line length.
+  let width_pt = shape_width_pt.max(DEFAULT_TEXTBOX_MIN_WIDTH_PT);
+  let height_pt = shape_height_pt.max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT);
   let text_warp = wordprocessing_shape_textbox_fontwork_warp(shape);
   let has_fontwork_warp = text_warp.is_some();
   let text_fill = has_fontwork_warp
@@ -9940,7 +10215,7 @@ fn wordprocessing_shape_textbox_frame(
     fill_override: None,
     additional_fill_colors,
     fill_image: None,
-    stroke: frame_stroke.or_else(|| expands_auto_fit.then_some(BorderStyle::default())),
+    stroke: frame_stroke,
     stroke_pattern: None,
     stroke_override: None,
     suppress_zero_relative_background: false,
@@ -9957,13 +10232,14 @@ fn wordprocessing_shape_textbox_frame(
       .as_ref()
       .and_then(|properties| properties.up_right.as_ref())
       .is_some_and(|value| value.as_bool()),
+    text_box_writing_mode: text_box.writing_mode,
     text_box_blocks: text_box.blocks,
     text_inset_left_pt: text_box.left_pt,
     text_inset_top_pt: text_box.top_pt,
     text_inset_right_pt: text_box.right_pt,
     text_inset_bottom_pt: text_box.bottom_pt,
     text_box_auto_fit: auto_fit,
-    text_box_resizes_height_to_fit: auto_fit && !expands_auto_fit,
+    text_box_resizes_to_fit: auto_fit,
     text_box_word_wrap: text_box.word_wrap,
     text_vertical_alignment: text_box.vertical_alignment,
   })
@@ -9972,12 +10248,10 @@ fn wordprocessing_shape_textbox_frame(
 fn apply_wordprocessing_shape_preset_text_rectangle(
   properties: &DrawingMlShapeProperties,
   size_pt: (f32, f32),
-  rotations_deg: (f32, f32),
   flips: (bool, bool),
   frame: &mut TextBoxFrameContent,
 ) {
   let (width_pt, height_pt) = size_pt;
-  let (text_rotation_deg, shape_rotation_deg) = rotations_deg;
   let (flip_horizontal, flip_vertical) = flips;
   let Some(mut insets) = properties
     .preset_geometry()
@@ -9991,36 +10265,10 @@ fn apply_wordprocessing_shape_preset_text_rectangle(
   if flip_vertical {
     insets.swap(1, 3);
   }
-  if rotations_cancel(text_rotation_deg, shape_rotation_deg) {
-    // The PDF display model stores the text-body and owning-shape rotations
-    // as one angle. When they cancel, no final rotation transform remains to
-    // carry the preset text rectangle's off-center placement into page
-    // coordinates. Rotate that center bias eagerly; retain the existing
-    // wrapping extent until rotated text rectangles become a first-class
-    // layout primitive.
-    let center_dx = (insets[0] - insets[2]) * 0.5;
-    let center_dy = (insets[1] - insets[3]) * 0.5;
-    let angle = shape_rotation_deg.to_radians();
-    let rotated_dx = center_dx * angle.cos() - center_dy * angle.sin();
-    let rotated_dy = center_dx * angle.sin() + center_dy * angle.cos();
-    insets = [
-      (rotated_dx * 2.0).max(0.0),
-      (rotated_dy * 2.0).max(0.0),
-      (-rotated_dx * 2.0).max(0.0),
-      (-rotated_dy * 2.0).max(0.0),
-    ];
-  }
   frame.left_pt += insets[0];
   frame.top_pt += insets[1];
   frame.right_pt += insets[2];
   frame.bottom_pt += insets[3];
-}
-
-fn rotations_cancel(left_deg: f32, right_deg: f32) -> bool {
-  let normalized = (left_deg + right_deg).rem_euclid(360.0);
-  normalized.min(360.0 - normalized) <= 0.001
-    && left_deg.abs() > f32::EPSILON
-    && right_deg.abs() > f32::EPSILON
 }
 
 fn drawingml_preset_text_rectangle_insets(
@@ -10624,13 +10872,14 @@ fn drawingml_generic_shape_shape(
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: properties.static3d(&context.styles.theme_colors),
     text_upright: false,
+    text_box_writing_mode: TextBoxWritingMode::Horizontal,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
-    text_box_resizes_height_to_fit: false,
+    text_box_resizes_to_fit: false,
     text_box_word_wrap: true,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
@@ -11030,13 +11279,14 @@ fn wordprocessing_shape_shape(
     effects,
     static3d: properties.static3d(&context.styles.theme_colors),
     text_upright: false,
+    text_box_writing_mode: TextBoxWritingMode::Horizontal,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
-    text_box_resizes_height_to_fit: false,
+    text_box_resizes_to_fit: false,
     text_box_word_wrap: true,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
@@ -11404,13 +11654,14 @@ fn drawingml_diagram_shape_shape(
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: properties.static3d(&context.styles.theme_colors),
     text_upright: false,
+    text_box_writing_mode: TextBoxWritingMode::Horizontal,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
-    text_box_resizes_height_to_fit: false,
+    text_box_resizes_to_fit: false,
     text_box_word_wrap: true,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   };
@@ -11550,50 +11801,21 @@ fn drawing_chart_shapes(
   let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
   let effect_extent = drawing_effect_extent(drawing);
   let placement = drawing_placement_with_effect_extent(placement, effect_extent);
-  let theme_series_colors = [
-    styles.theme_colors.accent1,
-    styles.theme_colors.accent2,
-    styles.theme_colors.accent3,
-    styles.theme_colors.accent4,
-    styles.theme_colors.accent5,
-    styles.theme_colors.accent6,
-  ];
-  let fallback_series_colors = [
-    RgbColor {
-      r: 79,
-      g: 129,
-      b: 189,
-    },
-    RgbColor {
-      r: 192,
-      g: 80,
-      b: 77,
-    },
-    RgbColor {
-      r: 155,
-      g: 187,
-      b: 89,
-    },
-    RgbColor {
-      r: 128,
-      g: 100,
-      b: 162,
-    },
-    RgbColor {
-      r: 75,
-      g: 172,
-      b: 198,
-    },
-    RgbColor {
-      r: 247,
-      g: 150,
-      b: 70,
-    },
-  ];
-  let cartesian =
-    shared_chart::cartesian_chart_for_ui_language(chart_space, styles.locales.ui_language());
+  let chart_style_id = shared_chart::chart_style_id(chart_space).unwrap_or(2);
+  let default_theme_colors = ThemeColors::default();
+  let cartesian = shared_chart::cartesian_chart_for_host_locales(
+    chart_space,
+    shared_chart::ChartHostApplication::Wordprocessing,
+    styles.locales.ui_language(),
+    styles.locales.format_locale(),
+  );
   let series = shared_chart::series(chart_space);
   let series_count = series.len();
+  let maximum_series_formatting_index = series
+    .iter()
+    .map(|series| series.formatting_index)
+    .max()
+    .unwrap_or(0);
   let series_colors = (0..series_count)
     .map(|index| {
       cartesian
@@ -11602,14 +11824,39 @@ fn drawing_chart_shapes(
         .and_then(|series| series.solid_fill)
         .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
         .map(|fill| fill.color)
-        .or(theme_series_colors[index % theme_series_colors.len()])
-        .unwrap_or(fallback_series_colors[index % fallback_series_colors.len()])
+        .or_else(|| {
+          shared_chart::automatic_chart_series_color(
+            chart_style_id,
+            series[index].formatting_index,
+            maximum_series_formatting_index,
+            |token| {
+              word_chart_scheme_color(chart_space, &styles.theme_colors, token)
+                .or_else(|| word_chart_scheme_color(chart_space, &default_theme_colors, token))
+            },
+          )
+        })
+        .unwrap_or_default()
     })
     .collect();
   let series_styles = series
     .iter()
     .map(|series| {
       drawingml_chart_shape_common_style(series.chart_shape_properties, &styles.theme_colors)
+    })
+    .collect::<Vec<_>>();
+  let trendline_styles = series
+    .iter()
+    .map(|series| {
+      series
+        .trendlines
+        .iter()
+        .map(|trendline| {
+          drawingml_chart_shape_common_style(
+            trendline.chart_shape_properties.as_deref(),
+            &styles.theme_colors,
+          )
+        })
+        .collect()
     })
     .collect::<Vec<_>>();
   let series_point_styles = series
@@ -11645,6 +11892,42 @@ fn drawing_chart_shapes(
       point_styles
     })
     .collect::<Vec<_>>();
+  let series_point_colors = cartesian
+    .as_ref()
+    .map(|chart| {
+      chart
+        .series
+        .iter()
+        .enumerate()
+        .map(|(series_index, series)| {
+          if !chart.vary_colors_by_point
+            || chart.series.len() != 1
+            || series_index != 0
+            || series
+              .shape_properties
+              .and_then(shared_chart::chart_shape_solid_fill)
+              .is_some()
+          {
+            return vec![None; series.values.len()];
+          }
+          let maximum_point_index = series.values.len().saturating_sub(1);
+          (0..series.values.len())
+            .map(|point_index| {
+              shared_chart::automatic_chart_series_color(
+                chart_style_id,
+                point_index,
+                maximum_point_index,
+                |token| {
+                  word_chart_scheme_color(chart_space, &styles.theme_colors, token)
+                    .or_else(|| word_chart_scheme_color(chart_space, &default_theme_colors, token))
+                },
+              )
+            })
+            .collect()
+        })
+        .collect()
+    })
+    .unwrap_or_default();
   let surface_band_colors = cartesian
     .as_ref()
     .map(|chart| {
@@ -11680,13 +11963,25 @@ fn drawing_chart_shapes(
             })
             .map(|fill| fill.color)
             .or_else(|| {
-              let color_index = if pie.vary_colors { index } else { 0 };
-              theme_series_colors[color_index % theme_series_colors.len()]
+              let (formatting_index, maximum_formatting_index) = if pie.vary_colors {
+                (index, pie.values.len().saturating_sub(1))
+              } else {
+                (
+                  pie.series_formatting_index,
+                  pie.maximum_series_formatting_index,
+                )
+              };
+              shared_chart::automatic_chart_series_color(
+                chart_style_id,
+                formatting_index,
+                maximum_formatting_index,
+                |token| {
+                  word_chart_scheme_color(chart_space, &styles.theme_colors, token)
+                    .or_else(|| word_chart_scheme_color(chart_space, &default_theme_colors, token))
+                },
+              )
             })
-            .unwrap_or_else(|| {
-              let color_index = if pie.vary_colors { index } else { 0 };
-              fallback_series_colors[color_index % fallback_series_colors.len()]
-            })
+            .unwrap_or_default()
         })
         .collect()
     })
@@ -11835,6 +12130,36 @@ fn drawing_chart_shapes(
   {
     apply_chart_text_properties(&mut value_label_style, properties, styles);
   }
+  let category_axis_title_style = word_chart_axis_title_style(
+    &label_style,
+    cartesian
+      .as_ref()
+      .and_then(shared_chart::category_axis_title_source),
+    styles,
+  );
+  let value_axis_title_style = word_chart_axis_title_style(
+    &label_style,
+    cartesian
+      .as_ref()
+      .and_then(shared_chart::value_axis_title_source),
+    styles,
+  );
+  let additional_axis_title_styles = cartesian
+    .as_ref()
+    .map(|chart| {
+      chart
+        .additional_axis_titles
+        .iter()
+        .map(|title| {
+          word_chart_axis_title_style(
+            &label_style,
+            Some((title.source, title.automatic_rotation_deg)),
+            styles,
+          )
+        })
+        .collect()
+    })
+    .unwrap_or_default();
   let mut series_label_style = label_style.clone();
   if let Some(properties) = cartesian.as_ref().and_then(|chart| {
     chart
@@ -11964,6 +12289,9 @@ fn drawing_chart_shapes(
     automatic_title,
     title_style,
     label_style: legend_style,
+    category_axis_title_style,
+    value_axis_title_style,
+    additional_axis_title_styles,
     category_label_style,
     value_label_style,
     series_label_style,
@@ -11971,12 +12299,15 @@ fn drawing_chart_shapes(
     data_label_styles,
     data_label_rich_text_styles,
     gridline_color,
+    automatic_chart_area_line_width_pt: styles.theme_lines.width_pt(1).unwrap_or(0.5),
     value_gridline_width_pt,
     axis_line_width_pt,
     category_major_gridline,
     category_minor_gridline,
     series_colors,
+    series_point_colors,
     series_styles,
+    trendline_styles,
     series_point_styles,
     surface_band_colors,
     data_label_fill_colors,
@@ -11987,6 +12318,28 @@ fn drawing_chart_shapes(
     plot_area_style,
   }));
   Some(vec![shape])
+}
+
+fn word_chart_scheme_color(
+  chart_space: &c::ChartSpace,
+  theme_colors: &ThemeColors,
+  token: a::SchemeColorValues,
+) -> Option<RgbColor> {
+  let mapped = shared_chart::scheme_color_token(chart_space.color_map_override.as_deref(), token)?;
+  match mapped {
+    a::ColorSchemeIndexValues::Dark1 => theme_colors.dark1,
+    a::ColorSchemeIndexValues::Light1 => theme_colors.light1,
+    a::ColorSchemeIndexValues::Dark2 => theme_colors.dark2,
+    a::ColorSchemeIndexValues::Light2 => theme_colors.light2,
+    a::ColorSchemeIndexValues::Accent1 => theme_colors.accent1,
+    a::ColorSchemeIndexValues::Accent2 => theme_colors.accent2,
+    a::ColorSchemeIndexValues::Accent3 => theme_colors.accent3,
+    a::ColorSchemeIndexValues::Accent4 => theme_colors.accent4,
+    a::ColorSchemeIndexValues::Accent5 => theme_colors.accent5,
+    a::ColorSchemeIndexValues::Accent6 => theme_colors.accent6,
+    a::ColorSchemeIndexValues::Hyperlink => theme_colors.hyperlink,
+    a::ColorSchemeIndexValues::FollowedHyperlink => theme_colors.followed_hyperlink,
+  }
 }
 
 fn chart_shape_outline_width_pt(properties: &c::ChartShapeProperties) -> Option<f32> {
@@ -12062,6 +12415,10 @@ fn drawing_extended_chart_shapes(
   };
   title_style.east_asia_font_family = chart_east_asia_font.clone();
   label_style.east_asia_font_family = chart_east_asia_font;
+  let mut category_axis_title_style = label_style.clone();
+  category_axis_title_style.bold = true;
+  let mut value_axis_title_style = category_axis_title_style.clone();
+  value_axis_title_style.rotation_deg = -90.0;
   let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
   apply_drawing_effect_extent_to_shape(&mut shape, effect_extent);
   shape.chart = Some(Box::new(InlineChart {
@@ -12074,6 +12431,9 @@ fn drawing_extended_chart_shapes(
     automatic_title: shared_chart::automatic_chart_title(styles.locales.ui_language()).to_string(),
     title_style,
     label_style: label_style.clone(),
+    category_axis_title_style,
+    value_axis_title_style,
+    additional_axis_title_styles: Vec::new(),
     category_label_style: label_style.clone(),
     value_label_style: label_style.clone(),
     series_label_style: label_style.clone(),
@@ -12085,12 +12445,15 @@ fn drawing_extended_chart_shapes(
       g: 134,
       b: 134,
     },
+    automatic_chart_area_line_width_pt: styles.theme_lines.width_pt(1).unwrap_or(0.5),
     value_gridline_width_pt: None,
     axis_line_width_pt: None,
     category_major_gridline: None,
     category_minor_gridline: None,
     series_colors: Vec::new(),
+    series_point_colors: Vec::new(),
     series_styles: Vec::new(),
+    trendline_styles: Vec::new(),
     series_point_styles: Vec::new(),
     surface_band_colors: Vec::new(),
     data_label_fill_colors: Vec::new(),
@@ -12161,6 +12524,27 @@ fn apply_chart_rich_title_properties(
   {
     apply_chart_run_properties(style, properties, styles);
   }
+}
+
+fn word_chart_axis_title_style(
+  base_style: &TextStyle,
+  source: Option<(&c::Title, f32)>,
+  styles: &StylesCatalog,
+) -> TextStyle {
+  let mut style = base_style.clone();
+  style.bold = true;
+  let Some((title, automatic_rotation_deg)) = source else {
+    return style;
+  };
+  style.rotation_deg = automatic_rotation_deg;
+  if let Some(properties) = title.text_properties.as_deref() {
+    apply_chart_text_properties(&mut style, properties, styles);
+  }
+  apply_chart_rich_title_properties(&mut style, title, styles);
+  if let Some(rotation) = shared_chart::title_rotation_degrees(title) {
+    style.rotation_deg = rotation;
+  }
+  style
 }
 
 fn chart_data_label_host_styles(
@@ -12395,13 +12779,14 @@ fn chart_shape(
     effects: None,
     static3d: None,
     text_upright: false,
+    text_box_writing_mode: TextBoxWritingMode::Horizontal,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
-    text_box_resizes_height_to_fit: false,
+    text_box_resizes_to_fit: false,
     text_box_word_wrap: true,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   }
@@ -12924,13 +13309,14 @@ fn anchor_wrap_polygon_shape(
     effects: None,
     static3d: None,
     text_upright: false,
+    text_box_writing_mode: TextBoxWritingMode::Horizontal,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
-    text_box_resizes_height_to_fit: false,
+    text_box_resizes_to_fit: false,
     text_box_word_wrap: true,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
@@ -13315,13 +13701,14 @@ fn drawingml_picture_frame(
     effects: None,
     static3d: None,
     text_upright: false,
+    text_box_writing_mode: TextBoxWritingMode::Horizontal,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
-    text_box_resizes_height_to_fit: false,
+    text_box_resizes_to_fit: false,
     text_box_word_wrap: true,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
@@ -13552,11 +13939,11 @@ fn drawingml_pattern_fill(
       opacity: 1.0,
     },
   };
-  Some(common::PatternFill {
-    hatch_style: common::drawingml_pattern::hatch_style(fill.preset),
-    foreground: common_rgb(foreground.color, foreground.opacity),
-    background: common_rgb(background.color, background.opacity),
-  })
+  Some(common::PatternFill::drawingml(
+    common::drawingml_pattern::hatch_style(fill.preset),
+    common_rgb(foreground.color, foreground.opacity),
+    common_rgb(background.color, background.opacity),
+  ))
 }
 
 fn drawingml_gradient_fill(
@@ -15585,13 +15972,14 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     effects: None,
     static3d: None,
     text_upright: false,
+    text_box_writing_mode: TextBoxWritingMode::Horizontal,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
-    text_box_resizes_height_to_fit: false,
+    text_box_resizes_to_fit: false,
     text_box_word_wrap: true,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   };
@@ -15776,13 +16164,14 @@ fn vml_shape_frame(
     effects: None,
     static3d: None,
     text_upright: false,
+    text_box_writing_mode: TextBoxWritingMode::Horizontal,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
-    text_box_resizes_height_to_fit: false,
+    text_box_resizes_to_fit: false,
     text_box_word_wrap: true,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
@@ -15807,7 +16196,7 @@ fn vml_textbox_frame(
   style.layout_in_cell = layout_in_cell;
   let (shape_width_pt, shape_height_pt) = style.size_pt?;
   let mut frame = TextBoxFrameContent::new(textbox_blocks(content, styles, images, hyperlinks));
-  apply_vml_textbox_properties(textbox, &mut frame);
+  apply_vml_textbox_properties(shape_style, textbox, &mut frame);
   let auto_fit = vml_textbox_fits_shape_to_text(textbox);
   let width_pt = if auto_fit {
     // frames that can grow horizontally instead of wrapping on the narrow
@@ -15850,13 +16239,14 @@ fn vml_textbox_frame(
     effects: None,
     static3d: None,
     text_upright: false,
+    text_box_writing_mode: frame.writing_mode,
     text_box_blocks: frame.blocks,
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: auto_fit,
-    text_box_resizes_height_to_fit: false,
+    text_box_resizes_to_fit: false,
     text_box_word_wrap: true,
     text_vertical_alignment: frame.vertical_alignment,
   })
@@ -15877,7 +16267,11 @@ fn vml_textbox_fits_shape_to_text(textbox: &v::TextBox) -> bool {
   })
 }
 
-fn apply_vml_textbox_properties(textbox: &v::TextBox, frame: &mut TextBoxFrameContent) {
+fn apply_vml_textbox_properties(
+  shape_style: Option<&str>,
+  textbox: &v::TextBox,
+  frame: &mut TextBoxFrameContent,
+) {
   if let Some(inset) = textbox.inset.as_deref() {
     let mut values = inset.split(',').map(str::trim);
     frame.left_pt = values
@@ -15898,19 +16292,74 @@ fn apply_vml_textbox_properties(textbox: &v::TextBox, frame: &mut TextBoxFrameCo
       .unwrap_or(frame.bottom_pt);
   }
 
+  // Word writes v-text-anchor on the owning VML shape. LibreOffice imports
+  // that shape-style property into maVTextAnchor before applying the textbox
+  // writing mode (oox/source/vml/vmlshapecontext.cxx + vmlshape.cxx).
+  if let Some(alignment) = shape_style.and_then(vml_textbox_vertical_alignment) {
+    frame.vertical_alignment = alignment;
+  }
+
   if let Some(style) = textbox.style.as_deref() {
+    let mut layout_flow = None;
+    let mut layout_flow_alt = None;
     for declaration in style.split(';') {
       let Some((name, value)) = declaration.split_once(':') else {
         continue;
       };
-      if name.trim().eq_ignore_ascii_case("v-text-anchor") {
-        frame.vertical_alignment = match value.trim().to_ascii_lowercase().as_str() {
-          "middle" => TextBoxVerticalAlignment::Center,
-          "bottom" => TextBoxVerticalAlignment::Bottom,
-          _ => frame.vertical_alignment,
-        };
+      let name = name.trim();
+      let value = value.trim();
+      if name.eq_ignore_ascii_case("layout-flow") {
+        layout_flow = Some(value);
+      } else if name.eq_ignore_ascii_case("mso-layout-flow-alt") {
+        layout_flow_alt = Some(value);
+      } else if name.eq_ignore_ascii_case("v-text-anchor") {
+        frame.vertical_alignment =
+          vml_textbox_vertical_alignment_value(value).unwrap_or(frame.vertical_alignment);
       }
     }
+    frame.writing_mode =
+      if layout_flow_alt.is_some_and(|value| value.eq_ignore_ascii_case("bottom-to-top")) {
+        TextBoxWritingMode::BottomToTopLeftToRight
+      } else if layout_flow_alt.is_some_and(|value| value.eq_ignore_ascii_case("top-to-bottom")) {
+        // [MS-OI29500] §2.1.1811 specifies this Office extension as a
+        // clockwise-rotated top-to-bottom line in Word. Excel gives the same
+        // lexical value a distinct stacked-text meaning; this is the DOCX path.
+        TextBoxWritingMode::TopToBottomRightToLeft
+      } else if layout_flow_alt.is_none()
+        && layout_flow.is_some_and(|value| value.eq_ignore_ascii_case("vertical"))
+      {
+        TextBoxWritingMode::TopToBottomRightToLeft
+      } else if layout_flow_alt.is_none()
+        && layout_flow.is_some_and(|value| value.eq_ignore_ascii_case("vertical-ideographic"))
+      {
+        TextBoxWritingMode::EastAsianVerticalRightToLeft
+      } else {
+        TextBoxWritingMode::Horizontal
+      };
+  }
+}
+
+fn vml_textbox_vertical_alignment(style: &str) -> Option<TextBoxVerticalAlignment> {
+  style.split(';').find_map(|declaration| {
+    let (name, value) = declaration.split_once(':')?;
+    name
+      .trim()
+      .eq_ignore_ascii_case("v-text-anchor")
+      .then(|| vml_textbox_vertical_alignment_value(value.trim()))
+      .flatten()
+  })
+}
+
+fn vml_textbox_vertical_alignment_value(value: &str) -> Option<TextBoxVerticalAlignment> {
+  match value.to_ascii_lowercase().as_str() {
+    "top" | "top-center" | "top-baseline" | "top-center-baseline" => {
+      Some(TextBoxVerticalAlignment::Top)
+    }
+    "middle" | "middle-center" | "middle-center-baseline" => Some(TextBoxVerticalAlignment::Center),
+    "bottom" | "bottom-center" | "bottom-baseline" | "bottom-center-baseline" => {
+      Some(TextBoxVerticalAlignment::Bottom)
+    }
+    _ => None,
   }
 }
 
@@ -18116,8 +18565,13 @@ struct RunStyleOverrides {
 
 #[derive(Clone, Debug, Default)]
 struct TableStyleModel {
+  /// Word defaults an omitted band size to zero, which disables that banding
+  /// direction. Keep presence so a derived style can explicitly override an
+  /// inherited size with zero.
+  row_band_size: Option<usize>,
+  column_band_size: Option<usize>,
   table_borders: Option<TableBordersModel>,
-  table_shading: Option<Option<RgbColor>>,
+  table_shading: Option<ShadingPaint>,
   cell_margins: Option<CellMargins>,
   cell_spacing_pt: Option<f32>,
   indent_left_pt: Option<f32>,
@@ -18140,11 +18594,40 @@ struct TableRowStyle {
   width_after_pt: Option<f32>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct CellMarginStyle {
+  top_pt: Option<f32>,
+  right_pt: Option<f32>,
+  bottom_pt: Option<f32>,
+  left_pt: Option<f32>,
+}
+
+impl CellMarginStyle {
+  fn apply(self, mut base: CellMargins) -> CellMargins {
+    if let Some(value) = self.top_pt {
+      base.top_pt = value;
+    }
+    if let Some(value) = self.right_pt {
+      base.right_pt = value;
+    }
+    if let Some(value) = self.bottom_pt {
+      base.bottom_pt = value;
+    }
+    if let Some(value) = self.left_pt {
+      base.left_pt = value;
+    }
+    base
+  }
+}
+
 #[derive(Clone, Debug, Default)]
 struct TableCellStyle {
-  shading: Option<Option<RgbColor>>,
+  shading: Option<ShadingPaint>,
+  /// A tblBorders nested in a conditional tblStylePr/tblPr is resolved for
+  /// the matching cell, not promoted to the table's unconditional borders.
+  conditional_table_borders: Option<TableBordersModel>,
   borders: CellBordersModel,
-  margins: Option<CellMargins>,
+  margins: CellMarginStyle,
   vertical_alignment: Option<TableCellVerticalAlignment>,
   no_wrap: Option<bool>,
   paragraph_format: ParagraphFormat,
@@ -18161,7 +18644,7 @@ struct TableImportContext<'a> {
   form_widget_ids: &'a mut FormWidgetIdAllocator,
   cell_margins: CellMargins,
   direct_cell_margins: bool,
-  table_shading: Option<RgbColor>,
+  table_spacing_shading: Option<ShadingPaint>,
   table_borders: Option<TableBordersModel>,
   table_style: &'a TableStyleModel,
   table_look: TableLookModel,
@@ -18266,7 +18749,7 @@ impl StylesCatalog {
     catalog.doc_default_run.ligatures = Some(common::OpenTypeLigatures::default());
 
     if let Some(defaults) = styles.doc_defaults.as_deref() {
-      merge_paragraph_format(
+      merge_paragraph_format_with_theme(
         &mut catalog.doc_default_paragraph,
         defaults
           .paragraph_properties_default
@@ -18274,6 +18757,7 @@ impl StylesCatalog {
           .and_then(|default| default.paragraph_properties_base_style.as_deref())
           .map(ParagraphProps::BaseStyle),
         catalog.import_settings,
+        &catalog.theme_colors,
       );
       properties::merge_doc_default_run_style(
         &mut catalog.doc_default_run,
@@ -18319,13 +18803,14 @@ impl StylesCatalog {
         run_overrides: RunStyleOverrides::default(),
         table_style: TableStyleModel::default(),
       };
-      merge_paragraph_format(
+      merge_paragraph_format_with_theme(
         &mut entry.paragraph_format,
         style
           .style_paragraph_properties
           .as_deref()
           .map(ParagraphProps::Style),
         catalog.import_settings,
+        &catalog.theme_colors,
       );
       entry.paragraph_numbering = style
         .style_paragraph_properties
@@ -18639,6 +19124,16 @@ impl StylesCatalog {
         merge_table_style_model(&mut style, &entry.table_style);
       }
     }
+    // Table styles are inherited base-to-derived, but their conditional
+    // regions do not cascade in XML order. A stable sort preserves that
+    // inheritance order within each region while enforcing Office's fixed
+    // region precedence across regions.
+    style
+      .conditional_rows
+      .sort_by_key(|(condition, _)| table::conditional_style_priority(*condition));
+    style
+      .conditional
+      .sort_by_key(|(condition, _)| table::conditional_style_priority(*condition));
     style
   }
 
@@ -19349,6 +19844,14 @@ fn table_style_model(
     merge_table_level_style(
       &mut model,
       &style_table_level_style(
+        properties
+          .table_style_row_band_size
+          .as_ref()
+          .and_then(|size| word_table_style_band_size(size.val)),
+        properties
+          .table_style_column_band_size
+          .as_ref()
+          .and_then(|size| word_table_style_band_size(size.val)),
         properties.table_borders.as_deref(),
         properties.table_cell_margin_default.as_deref(),
         properties.table_cell_spacing.as_ref(),
@@ -19356,11 +19859,12 @@ fn table_style_model(
         properties.table_justification.as_ref(),
         properties.table_layout.as_ref(),
         properties.shading.as_ref(),
+        theme_colors,
       ),
     );
   }
   if let Some(properties) = style.style_table_cell_properties.as_deref() {
-    model.whole_table = style_table_cell_style(properties);
+    model.whole_table = style_table_cell_style(properties, theme_colors);
   }
   if let Some(properties) = style
     .table_style_conditional_formatting_table_row_properties
@@ -19368,13 +19872,14 @@ fn table_style_model(
   {
     model.whole_row = style_table_row_style(properties);
   }
-  merge_paragraph_format(
+  merge_paragraph_format_with_theme(
     &mut model.whole_table.paragraph_format,
     style
       .style_paragraph_properties
       .as_deref()
       .map(ParagraphProps::Style),
     import_settings,
+    theme_colors,
   );
   properties::merge_run_style(
     &mut model.whole_table.run_style,
@@ -19389,14 +19894,23 @@ fn table_style_model(
     model.whole_table.run_overrides,
   );
   for conditional in &style.table_style_properties {
+    // [MS-OI29500] Part 1 §17.18.89(a): Word does not apply a
+    // tblStylePr whose type is wholeTable and discards it on save. The
+    // unconditional style-level tblPr/trPr/tcPr above is the whole-table
+    // formatting source.
+    if matches!(conditional.r#type, w::TableStyleOverrideValues::WholeTable) {
+      continue;
+    }
     let mut cell_style = TableCellStyle::default();
-    merge_paragraph_format(
+    let mut row_style = TableRowStyle::default();
+    merge_paragraph_format_with_theme(
       &mut cell_style.paragraph_format,
       conditional
         .style_paragraph_properties
         .as_deref()
         .map(ParagraphProps::Style),
       import_settings,
+      theme_colors,
     );
     properties::merge_run_style(
       &mut cell_style.run_style,
@@ -19419,37 +19933,60 @@ fn table_style_model(
       .as_deref()
     {
       if let Some(shading) = properties.shading.as_ref() {
-        cell_style.shading = Some(shading_fill(shading));
+        cell_style.shading = Some(shading_fill(shading, theme_colors));
       }
-      merge_table_level_style(&mut model, &conditional_table_level_style(properties));
+      if let Some(margins) = properties.table_cell_margin_default.as_deref() {
+        merge_cell_margin_style(
+          &mut cell_style.margins,
+          &table_cell_margin_default_style(margins),
+        );
+      }
+      cell_style.conditional_table_borders =
+        properties.table_borders.as_deref().map(table_borders_model);
+      row_style.cell_spacing_pt = properties
+        .table_cell_spacing
+        .as_ref()
+        .and_then(table_cell_spacing_to_points);
+      // jc and tblInd are row/table-frame geometry. They must not be
+      // globalized merely because they live under tblPr; row-scoped frame
+      // geometry is kept separate from the cell-property route above.
     }
     if let Some(properties) = conditional
       .table_style_conditional_formatting_table_row_properties
       .as_ref()
     {
-      model
-        .conditional_rows
-        .push((conditional.r#type, style_table_row_style(properties)));
+      merge_table_row_style(&mut row_style, &style_table_row_style(properties));
     }
+    model.conditional_rows.push((conditional.r#type, row_style));
     if let Some(properties) = conditional
       .table_style_conditional_formatting_table_cell_properties
       .as_deref()
     {
-      merge_table_cell_style(&mut cell_style, &conditional_table_cell_style(properties));
+      merge_table_cell_style(
+        &mut cell_style,
+        &conditional_table_cell_style(properties, theme_colors),
+      );
     }
     model.conditional.push((conditional.r#type, cell_style));
   }
   model
 }
 
-fn style_table_cell_style(properties: &w::StyleTableCellProperties) -> TableCellStyle {
+fn style_table_cell_style(
+  properties: &w::StyleTableCellProperties,
+  theme_colors: &ThemeColors,
+) -> TableCellStyle {
   TableCellStyle {
-    shading: properties.shading.as_ref().map(shading_fill),
+    shading: properties
+      .shading
+      .as_ref()
+      .map(|shading| shading_fill(shading, theme_colors)),
     borders: CellBordersModel::default(),
     margins: properties
       .table_cell_margin
       .as_deref()
-      .map(|margins| table_cell_margin(margins, CellMargins::default())),
+      .map(table_cell_margin_style)
+      .unwrap_or_default(),
     vertical_alignment: properties
       .table_cell_vertical_alignment
       .as_ref()
@@ -19464,9 +20001,13 @@ fn style_table_cell_style(properties: &w::StyleTableCellProperties) -> TableCell
 
 fn conditional_table_cell_style(
   properties: &w::TableStyleConditionalFormattingTableCellProperties,
+  theme_colors: &ThemeColors,
 ) -> TableCellStyle {
   TableCellStyle {
-    shading: properties.shading.as_ref().map(shading_fill),
+    shading: properties
+      .shading
+      .as_ref()
+      .map(|shading| shading_fill(shading, theme_colors)),
     borders: properties
       .table_cell_borders
       .as_deref()
@@ -19475,7 +20016,8 @@ fn conditional_table_cell_style(
     margins: properties
       .table_cell_margin
       .as_deref()
-      .map(|margins| table_cell_margin(margins, CellMargins::default())),
+      .map(table_cell_margin_style)
+      .unwrap_or_default(),
     vertical_alignment: properties
       .table_cell_vertical_alignment
       .as_ref()
@@ -19501,6 +20043,8 @@ fn merge_table_style_model(target: &mut TableStyleModel, source: &TableStyleMode
 }
 
 fn style_table_level_style(
+  row_band_size: Option<usize>,
+  column_band_size: Option<usize>,
   borders: Option<&w::TableBorders>,
   margins: Option<&w::TableCellMarginDefault>,
   spacing: Option<&w::TableCellSpacing>,
@@ -19508,10 +20052,13 @@ fn style_table_level_style(
   justification: Option<&w::TableJustification>,
   layout: Option<&w::TableLayout>,
   shading: Option<&w::Shading>,
+  theme_colors: &ThemeColors,
 ) -> TableStyleModel {
   TableStyleModel {
+    row_band_size,
+    column_band_size,
     table_borders: borders.map(table_borders_model),
-    table_shading: shading.map(shading_fill),
+    table_shading: shading.map(|shading| shading_fill(shading, theme_colors)),
     cell_margins: margins.map(table_cell_margin_default),
     cell_spacing_pt: spacing.and_then(table_cell_spacing_to_points),
     indent_left_pt: indentation.and_then(table_indentation_to_points),
@@ -19521,21 +20068,13 @@ fn style_table_level_style(
   }
 }
 
-fn conditional_table_level_style(
-  properties: &w::TableStyleConditionalFormattingTableProperties,
-) -> TableStyleModel {
-  style_table_level_style(
-    properties.table_borders.as_deref(),
-    properties.table_cell_margin_default.as_deref(),
-    properties.table_cell_spacing.as_ref(),
-    properties.table_indentation.as_ref(),
-    properties.table_justification.as_ref(),
-    None,
-    None,
-  )
-}
-
 fn merge_table_level_style(target: &mut TableStyleModel, source: &TableStyleModel) {
+  if source.row_band_size.is_some() {
+    target.row_band_size = source.row_band_size;
+  }
+  if source.column_band_size.is_some() {
+    target.column_band_size = source.column_band_size;
+  }
   if source.table_borders.is_some() {
     target.table_borders = source.table_borders;
   }
@@ -19557,6 +20096,13 @@ fn merge_table_level_style(target: &mut TableStyleModel, source: &TableStyleMode
   if source.layout.is_some() {
     target.layout = source.layout;
   }
+}
+
+fn word_table_style_band_size(value: i32) -> Option<usize> {
+  // The generated schema already enforces the Office 0..=3 domain. Retain a
+  // defensive boundary here because layout should not turn an invalid signed
+  // value into a very large usize if a model is assembled programmatically.
+  usize::try_from(value).ok().filter(|value| *value <= 3)
 }
 
 fn direct_table_row_style(properties: Option<&w::TableRowProperties>) -> TableRowStyle {
@@ -19653,16 +20199,30 @@ fn merge_table_row_style(target: &mut TableRowStyle, source: &TableRowStyle) {
   }
 }
 
+fn merge_cell_margin_style(target: &mut CellMarginStyle, source: &CellMarginStyle) {
+  if source.top_pt.is_some() {
+    target.top_pt = source.top_pt;
+  }
+  if source.right_pt.is_some() {
+    target.right_pt = source.right_pt;
+  }
+  if source.bottom_pt.is_some() {
+    target.bottom_pt = source.bottom_pt;
+  }
+  if source.left_pt.is_some() {
+    target.left_pt = source.left_pt;
+  }
+}
+
 fn merge_table_cell_style(target: &mut TableCellStyle, source: &TableCellStyle) {
   if source.shading.is_some() {
     target.shading = source.shading;
   }
-  if source.borders != CellBordersModel::default() {
-    target.borders = source.borders;
+  if source.conditional_table_borders.is_some() {
+    target.conditional_table_borders = source.conditional_table_borders;
   }
-  if source.margins.is_some() {
-    target.margins = source.margins;
-  }
+  merge_cell_borders(&mut target.borders, &source.borders);
+  merge_cell_margin_style(&mut target.margins, &source.margins);
   if source.vertical_alignment.is_some() {
     target.vertical_alignment = source.vertical_alignment;
   }
@@ -19730,26 +20290,44 @@ fn merge_run_style_overrides(
 }
 
 fn table_look_model(look: &w::TableLook) -> TableLookModel {
-  let mut model = TableLookModel::default();
-  if let Some(value) = look.first_row {
-    model.first_row = value.as_bool();
+  let has_explicit_selector = look.first_row.is_some()
+    || look.last_row.is_some()
+    || look.first_column.is_some()
+    || look.last_column.is_some()
+    || look.no_horizontal_band.is_some()
+    || look.no_vertical_band.is_some();
+  if has_explicit_selector {
+    // [MS-OI29500] §17.4.54(b): Word reads w:val only when none of
+    // these selector attributes are present. LibreOffice's
+    // DomainMapperTableManager mirrors Word by treating omitted selectors in
+    // this attribute form as true. Consequently an omitted noHBand/noVBand
+    // disables that banding direction.
+    return TableLookModel {
+      first_row: look.first_row.is_none_or(|value| value.as_bool()),
+      last_row: look.last_row.is_none_or(|value| value.as_bool()),
+      first_column: look.first_column.is_none_or(|value| value.as_bool()),
+      last_column: look.last_column.is_none_or(|value| value.as_bool()),
+      horizontal_banding: !look.no_horizontal_band.is_none_or(|value| value.as_bool()),
+      vertical_banding: !look.no_vertical_band.is_none_or(|value| value.as_bool()),
+    };
   }
-  if let Some(value) = look.last_row {
-    model.last_row = value.as_bool();
+
+  // [MS-OE376] §2.4.51(a): when tblLook itself is omitted, Word uses
+  // 0x04A0 rather than the ISO 0x0000 default. The same value is the safe
+  // fallback for a missing or malformed legacy bitmask.
+  let bits = look
+    .w_val
+    .as_deref()
+    .and_then(|value| u16::from_str_radix(value, 16).ok())
+    .unwrap_or(0x04A0);
+  TableLookModel {
+    first_row: bits & 0x0020 != 0,
+    last_row: bits & 0x0040 != 0,
+    first_column: bits & 0x0080 != 0,
+    last_column: bits & 0x0100 != 0,
+    horizontal_banding: bits & 0x0200 == 0,
+    vertical_banding: bits & 0x0400 == 0,
   }
-  if let Some(value) = look.first_column {
-    model.first_column = value.as_bool();
-  }
-  if let Some(value) = look.last_column {
-    model.last_column = value.as_bool();
-  }
-  if let Some(value) = look.no_horizontal_band {
-    model.horizontal_banding = !value.as_bool();
-  }
-  if let Some(value) = look.no_vertical_band {
-    model.vertical_banding = !value.as_bool();
-  }
-  model
 }
 
 fn is_toc_entry_style_name(value: &str) -> bool {
@@ -20581,7 +21159,7 @@ impl NumberingCatalog {
       for level in &abstract_num.level {
         entry.levels.insert(
           level.level_index,
-          numbering_level_model(level, import_settings),
+          numbering_level_model_with_theme(level, import_settings, &styles.theme_colors),
         );
       }
       catalog
@@ -20601,10 +21179,9 @@ impl NumberingCatalog {
                 .start_override_numbering_value
                 .as_ref()
                 .map(|value| value.val),
-              level: level
-                .level
-                .as_deref()
-                .map(|level| numbering_level_model(level, import_settings)),
+              level: level.level.as_deref().map(|level| {
+                numbering_level_model_with_theme(level, import_settings, &styles.theme_colors)
+              }),
             },
           )
         })
@@ -20864,15 +21441,25 @@ impl NumberingCatalog {
   }
 }
 
+#[cfg(test)]
 fn numbering_level_model(level: &w::Level, import_settings: ImportSettings) -> NumberingLevel {
+  numbering_level_model_with_theme(level, import_settings, &ThemeColors::default())
+}
+
+fn numbering_level_model_with_theme(
+  level: &w::Level,
+  import_settings: ImportSettings,
+  theme_colors: &ThemeColors,
+) -> NumberingLevel {
   let mut format_properties = ParagraphFormat::default();
-  merge_paragraph_format(
+  merge_paragraph_format_with_theme(
     &mut format_properties,
     level
       .previous_paragraph_properties
       .as_deref()
       .map(ParagraphProps::Previous),
     import_settings,
+    theme_colors,
   );
 
   NumberingLevel {
@@ -22926,20 +23513,20 @@ mod tests {
     };
     let mut first = merge_test_paragraph("bordered");
     first.format.frame = Some(frame);
-    first.format.shading = Some(RgbColor {
+    first.format.shading = Some(ShadingPaint::Solid(RgbColor {
       r: 0xe5,
       g: 0xdf,
       b: 0xec,
-    });
+    }));
     first.format.borders.top = Some(BorderStyle::default());
 
     let mut second = merge_test_paragraph("shaded");
     second.format.frame = Some(frame);
-    second.format.shading = Some(RgbColor {
+    second.format.shading = Some(ShadingPaint::Solid(RgbColor {
       r: 0x8d,
       g: 0xb3,
       b: 0xe2,
-    });
+    }));
 
     let mut third = merge_test_paragraph("differently bordered");
     third.format.frame = Some(frame);
@@ -25740,6 +26327,7 @@ mod tests {
         val: ooxmlsdk::simple_type::SignedHpsMeasureValue::HalfPoints(18),
       }),
       shading: Some(w::Shading {
+        val: Some(w::ShadingPatternValues::Clear),
         fill: Some("880088".into()),
         ..Default::default()
       }),
@@ -25961,7 +26549,7 @@ mod tests {
     };
     assert_eq!(shape.text_box_blocks.len(), 1);
     assert!(shape.text_box_auto_fit);
-    assert!(shape.text_box_resizes_height_to_fit);
+    assert!(shape.text_box_resizes_to_fit);
     assert!(!shape.text_box_word_wrap);
     assert!((shape.text_inset_left_pt - 7.2).abs() < 0.001);
     assert!((shape.stroke.expect("authored outline").width_pt - 0.75).abs() < 0.001);
@@ -26447,10 +27035,13 @@ mod tests {
 
   #[test]
   fn table_cell_no_wrap_cascades_from_style_and_direct_false_overrides_it() {
-    let style = style_table_cell_style(&w::StyleTableCellProperties {
-      no_wrap: Some(w::NoWrap { val: None }),
-      ..Default::default()
-    });
+    let style = style_table_cell_style(
+      &w::StyleTableCellProperties {
+        no_wrap: Some(w::NoWrap { val: None }),
+        ..Default::default()
+      },
+      &ThemeColors::default(),
+    );
     assert_eq!(style.no_wrap, Some(true));
 
     let direct = w::TableCellProperties {
@@ -26470,34 +27061,25 @@ mod tests {
   }
 
   #[test]
-  fn table_cell_shading_overrides_row_exception_and_table_shading() {
-    let table = RgbColor { r: 1, g: 2, b: 3 };
-    let row = RgbColor { r: 4, g: 5, b: 6 };
-    let styled_cell = RgbColor { r: 7, g: 8, b: 9 };
-    let direct_cell = RgbColor {
+  fn table_cell_shading_uses_cell_scope_and_direct_nil_cancels_style() {
+    let styled_cell = ShadingPaint::Solid(RgbColor { r: 7, g: 8, b: 9 });
+    let direct_cell = ShadingPaint::Solid(RgbColor {
       r: 10,
       g: 11,
       b: 12,
-    };
+    });
 
+    assert_eq!(resolved_table_cell_shading(None, None), None);
     assert_eq!(
-      resolved_table_cell_shading(None, None, Some(table)),
-      Some(table)
-    );
-    assert_eq!(
-      resolved_table_cell_shading(None, None, Some(row)),
-      Some(row)
-    );
-    assert_eq!(
-      resolved_table_cell_shading(None, Some(Some(styled_cell)), Some(row)),
+      resolved_table_cell_shading(None, Some(styled_cell)),
       Some(styled_cell)
     );
     assert_eq!(
-      resolved_table_cell_shading(Some(Some(direct_cell)), Some(Some(styled_cell)), Some(row)),
+      resolved_table_cell_shading(Some(direct_cell), Some(styled_cell)),
       Some(direct_cell)
     );
     assert_eq!(
-      resolved_table_cell_shading(Some(None), Some(Some(styled_cell)), Some(row)),
+      resolved_table_cell_shading(Some(ShadingPaint::None), Some(styled_cell)),
       None
     );
   }
@@ -26651,6 +27233,7 @@ mod tests {
   fn table_style_first_row_overrides_whole_table_cell_style() {
     fn shading(fill: &str) -> w::Shading {
       w::Shading {
+        val: Some(w::ShadingPatternValues::Clear),
         fill: Some(fill.into()),
         ..Default::default()
       }
@@ -26702,12 +27285,7 @@ mod tests {
         row_count: 2,
         cell_index: 0,
         cell_count: 1,
-        row_condition: TableConditionalStyleMask::from_row_position(
-          TableLookModel::default(),
-          0,
-          2,
-        ),
-        cell_condition: None,
+        is_header_row: false,
       },
     );
     let body_row = table_cell_style_for(
@@ -26718,18 +27296,13 @@ mod tests {
         row_count: 2,
         cell_index: 0,
         cell_count: 1,
-        row_condition: TableConditionalStyleMask::from_row_position(
-          TableLookModel::default(),
-          1,
-          2,
-        ),
-        cell_condition: None,
+        is_header_row: false,
       },
     );
 
     assert_eq!(
       first_row.shading,
-      Some(Some(RgbColor {
+      Some(ShadingPaint::Solid(RgbColor {
         r: 0x44,
         g: 0x72,
         b: 0xC4
@@ -26750,7 +27323,7 @@ mod tests {
     );
     assert_eq!(
       body_row.shading,
-      Some(Some(RgbColor {
+      Some(ShadingPaint::Solid(RgbColor {
         r: 0xEE,
         g: 0xEE,
         b: 0xEE
@@ -26762,7 +27335,7 @@ mod tests {
   fn table_style_column_and_corner_conditions_apply_by_cell_position() {
     fn style(fill: &str) -> TableCellStyle {
       TableCellStyle {
-        shading: Some(Some(parse_hex_color(fill).unwrap())),
+        shading: Some(ShadingPaint::Solid(parse_hex_color(fill).unwrap())),
         ..Default::default()
       }
     }
@@ -26787,8 +27360,7 @@ mod tests {
         row_count: 2,
         cell_index: 2,
         cell_count: 3,
-        row_condition: TableConditionalStyleMask::from_row_position(look, 0, 2),
-        cell_condition: None,
+        is_header_row: false,
       },
     );
     let body_right = table_cell_style_for(
@@ -26799,14 +27371,13 @@ mod tests {
         row_count: 2,
         cell_index: 2,
         cell_count: 3,
-        row_condition: TableConditionalStyleMask::from_row_position(look, 1, 2),
-        cell_condition: None,
+        is_header_row: false,
       },
     );
 
     assert_eq!(
       top_right.shading,
-      Some(Some(RgbColor {
+      Some(ShadingPaint::Solid(RgbColor {
         r: 0xFF,
         g: 0x00,
         b: 0x00
@@ -26814,12 +27385,75 @@ mod tests {
     );
     assert_eq!(
       body_right.shading,
-      Some(Some(RgbColor {
+      Some(ShadingPaint::Solid(RgbColor {
         r: 0x00,
         g: 0xFF,
         b: 0x00
       }))
     );
+  }
+
+  #[test]
+  fn table_style_band_sizes_group_rows_and_columns_and_zero_disables_them() {
+    let look = TableLookModel {
+      vertical_banding: true,
+      ..Default::default()
+    };
+
+    assert!(!table::row_style_condition_applies(
+      w::TableStyleOverrideValues::Band1Horizontal,
+      look,
+      1,
+      6,
+      0,
+      false,
+    ));
+    for row_index in [1, 2] {
+      assert!(table::row_style_condition_applies(
+        w::TableStyleOverrideValues::Band1Horizontal,
+        look,
+        row_index,
+        6,
+        2,
+        false,
+      ));
+    }
+    for row_index in [3, 4] {
+      assert!(table::row_style_condition_applies(
+        w::TableStyleOverrideValues::Band2Horizontal,
+        look,
+        row_index,
+        6,
+        2,
+        false,
+      ));
+    }
+    for cell_index in [1, 2] {
+      assert!(table::cell_style_condition_applies(
+        w::TableStyleOverrideValues::Band1Vertical,
+        look,
+        1,
+        2,
+        cell_index,
+        5,
+        1,
+        2,
+        false,
+      ));
+    }
+    for cell_index in [3, 4] {
+      assert!(table::cell_style_condition_applies(
+        w::TableStyleOverrideValues::Band2Vertical,
+        look,
+        1,
+        2,
+        cell_index,
+        5,
+        1,
+        2,
+        false,
+      ));
+    }
   }
 
   #[test]
@@ -26923,64 +27557,6 @@ mod tests {
   }
 
   #[test]
-  fn table_cell_cnf_style_masks_apply_writer_corner_conditions() {
-    fn style(fill: &str) -> TableCellStyle {
-      TableCellStyle {
-        shading: Some(Some(parse_hex_color(fill).unwrap())),
-        ..Default::default()
-      }
-    }
-
-    let table_style = TableStyleModel {
-      conditional: vec![
-        (w::TableStyleOverrideValues::FirstRow, style("4472C4")),
-        (w::TableStyleOverrideValues::LastColumn, style("00FF00")),
-        (w::TableStyleOverrideValues::NorthEastCell, style("FF0000")),
-      ],
-      ..Default::default()
-    };
-    let look = TableLookModel {
-      first_row: false,
-      first_column: false,
-      horizontal_banding: false,
-      vertical_banding: false,
-      ..Default::default()
-    };
-    let row_condition = TableConditionalStyleMask::from_cnf_style(&w::ConditionalFormatStyle {
-      val: Some("100000000000".into()),
-      first_row: Some(true.into()),
-      ..Default::default()
-    });
-    let cell_condition = TableConditionalStyleMask::from_cnf_style(&w::ConditionalFormatStyle {
-      val: Some("000100000000".into()),
-      last_column: Some(true.into()),
-      ..Default::default()
-    });
-
-    let styled = table_cell_style_for(
-      &table_style,
-      TableCellStyleContext {
-        look,
-        row_index: 1,
-        row_count: 3,
-        cell_index: 0,
-        cell_count: 2,
-        row_condition,
-        cell_condition: Some(cell_condition),
-      },
-    );
-
-    assert_eq!(
-      styled.shading,
-      Some(Some(RgbColor {
-        r: 0xFF,
-        g: 0x00,
-        b: 0x00
-      }))
-    );
-  }
-
-  #[test]
   fn table_style_row_properties_apply_and_direct_row_properties_override() {
     let style = table_style_model(
       &w::Style {
@@ -27014,20 +27590,8 @@ mod tests {
       ImportSettings::default(),
     );
 
-    let mut first_row = table_row_style_for(
-      &style,
-      TableLookModel::default(),
-      0,
-      2,
-      TableConditionalStyleMask::from_row_position(TableLookModel::default(), 0, 2),
-    );
-    let body_row = table_row_style_for(
-      &style,
-      TableLookModel::default(),
-      1,
-      2,
-      TableConditionalStyleMask::from_row_position(TableLookModel::default(), 1, 2),
-    );
+    let mut first_row = table_row_style_for(&style, TableLookModel::default(), 0, 2, false);
+    let body_row = table_row_style_for(&style, TableLookModel::default(), 1, 2, false);
     merge_table_row_style(
       &mut first_row,
       &direct_table_row_style(Some(&w::TableRowProperties {
@@ -27053,30 +27617,48 @@ mod tests {
   }
 
   #[test]
-  fn table_style_conditional_table_properties_apply_to_table_level_model() {
+  fn table_style_conditional_table_properties_stay_region_scoped() {
     let style = table_style_model(
       &w::Style {
         r#type: Some(w::StyleValues::Table),
-        table_style_properties: vec![w::TableStyleProperties {
-          r#type: w::TableStyleOverrideValues::WholeTable,
-          table_style_conditional_formatting_table_properties: Some(Box::new(
-            w::TableStyleConditionalFormattingTableProperties {
-              table_justification: Some(w::TableJustification {
-                val: w::TableRowAlignmentValues::Center,
-              }),
-              table_indentation: Some(w::TableIndentation {
-                width: Some(measurement(720)),
-                r#type: Some(w::TableWidthUnitValues::Dxa),
-              }),
-              table_cell_spacing: Some(w::TableCellSpacing {
-                width: Some(measurement(120)),
-                r#type: Some(w::TableWidthUnitValues::Dxa),
-              }),
-              ..Default::default()
-            },
-          )),
-          ..Default::default()
-        }],
+        table_style_properties: vec![
+          w::TableStyleProperties {
+            r#type: w::TableStyleOverrideValues::WholeTable,
+            table_style_conditional_formatting_table_properties: Some(Box::new(
+              w::TableStyleConditionalFormattingTableProperties {
+                table_justification: Some(w::TableJustification {
+                  val: w::TableRowAlignmentValues::Center,
+                }),
+                table_indentation: Some(w::TableIndentation {
+                  width: Some(measurement(720)),
+                  r#type: Some(w::TableWidthUnitValues::Dxa),
+                }),
+                ..Default::default()
+              },
+            )),
+            ..Default::default()
+          },
+          w::TableStyleProperties {
+            r#type: w::TableStyleOverrideValues::FirstRow,
+            table_style_conditional_formatting_table_properties: Some(Box::new(
+              w::TableStyleConditionalFormattingTableProperties {
+                table_cell_spacing: Some(w::TableCellSpacing {
+                  width: Some(measurement(120)),
+                  r#type: Some(w::TableWidthUnitValues::Dxa),
+                }),
+                table_cell_margin_default: Some(Box::new(w::TableCellMarginDefault {
+                  top_margin: Some(w::TopMargin {
+                    width: Some(measurement(80)),
+                    r#type: Some(w::TableWidthUnitValues::Dxa),
+                  }),
+                  ..Default::default()
+                })),
+                ..Default::default()
+              },
+            )),
+            ..Default::default()
+          },
+        ],
         ..Default::default()
       },
       &ThemeFonts::default(),
@@ -27084,9 +27666,29 @@ mod tests {
       ImportSettings::default(),
     );
 
-    assert_eq!(style.alignment, Some(TableAlignment::Center));
-    assert_eq!(style.indent_left_pt, Some(36.0));
-    assert_eq!(style.cell_spacing_pt, Some(6.0));
+    assert_eq!(style.alignment, None);
+    assert_eq!(style.indent_left_pt, None);
+    assert_eq!(style.cell_spacing_pt, None);
+
+    let first_row = table_row_style_for(&style, TableLookModel::default(), 0, 2, false);
+    let body_row = table_row_style_for(&style, TableLookModel::default(), 1, 2, false);
+    assert_eq!(first_row.cell_spacing_pt, Some(6.0));
+    assert_eq!(body_row.cell_spacing_pt, None);
+
+    let first_cell = table_cell_style_for(
+      &style,
+      TableCellStyleContext {
+        look: TableLookModel::default(),
+        row_index: 0,
+        row_count: 2,
+        cell_index: 0,
+        cell_count: 2,
+        is_header_row: false,
+      },
+    );
+    let margins = first_cell.margins.apply(CellMargins::default());
+    assert_eq!(margins.top_pt, 4.0);
+    assert!((margins.left_pt - 5.75).abs() < 0.001);
   }
 
   #[test]
@@ -27561,7 +28163,7 @@ mod tests {
       form_widget_ids: &mut form_widget_ids,
       cell_margins: CellMargins::default(),
       direct_cell_margins: false,
-      table_shading: None,
+      table_spacing_shading: None,
       table_borders: None,
       table_style: &TableStyleModel::default(),
       table_look: TableLookModel::default(),
@@ -27570,7 +28172,7 @@ mod tests {
       in_header_footer: false,
     };
 
-    let cell = table_cell_model(&cell, None, &mut context, None, None, style);
+    let cell = table_cell_model(&cell, None, &mut context, None, style);
 
     let Block::Paragraph(paragraph) = &cell.blocks[0] else {
       panic!("expected paragraph");
@@ -28857,6 +29459,7 @@ mod tests {
         | InlineItem::DrawingGroupStart(_)
         | InlineItem::DrawingGroupEnd
         | InlineItem::LastRenderedPageBreak
+        | InlineItem::ClearLineBreak(_)
         | InlineItem::PageBreak
         | InlineItem::ColumnBreak => None,
       })
@@ -29286,30 +29889,39 @@ mod tests {
       br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:bodyPr rot="5400000" upright="1" vert="vert"/></wps:wsp>"#,
     )
     .expect("upright WPS shape");
-    assert_eq!(
-      wordprocessing_shape_textbox_text_rotation(&upright),
-      Some(90.0)
-    );
+    assert_eq!(wordprocessing_shape_textbox_text_rotation(&upright), None);
   }
 
   #[test]
-  fn drawingml_textbox_vertical_flow_uses_drawingml_clockwise_angles() {
+  fn drawingml_textbox_vertical_flow_preserves_typed_writing_modes() {
     let vertical = wps::WordprocessingShape::from_bytes(
       br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:bodyPr vert="vert"/></wps:wsp>"#,
     )
     .expect("vertical WPS shape");
-    assert_eq!(
-      wordprocessing_shape_textbox_text_rotation(&vertical),
-      Some(90.0)
+    let mut vertical_frame = TextBoxFrameContent::new(Vec::new());
+    apply_wordprocessing_shape_textbox_body_properties(
+      vertical.text_body_properties.as_deref().expect("bodyPr"),
+      &mut vertical_frame,
     );
-
+    assert_eq!(
+      vertical_frame.writing_mode,
+      TextBoxWritingMode::TopToBottomRightToLeft
+    );
     let vertical_270 = wps::WordprocessingShape::from_bytes(
       br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:bodyPr vert="vert270"/></wps:wsp>"#,
     )
     .expect("vertical-270 WPS shape");
+    let mut vertical_270_frame = TextBoxFrameContent::new(Vec::new());
+    apply_wordprocessing_shape_textbox_body_properties(
+      vertical_270
+        .text_body_properties
+        .as_deref()
+        .expect("bodyPr"),
+      &mut vertical_270_frame,
+    );
     assert_eq!(
-      wordprocessing_shape_textbox_text_rotation(&vertical_270),
-      Some(-90.0)
+      vertical_270_frame.writing_mode,
+      TextBoxWritingMode::BottomToTopLeftToRight
     );
   }
 
@@ -29326,9 +29938,6 @@ mod tests {
     assert!((insets[1] - 23.1).abs() < 0.001);
     assert!((insets[2] - 23.1).abs() < 0.001);
     assert!((insets[3] - 23.1).abs() < 0.001);
-    assert!(rotations_cancel(-90.0, 90.0));
-    assert!(rotations_cancel(270.0, 90.0));
-    assert!(!rotations_cancel(90.0, 90.0));
   }
 
   #[test]
@@ -30300,6 +30909,7 @@ mod tests {
       match item {
         InlineItem::Text(run) => text.push_str(&run.text),
         InlineItem::PositionalTab(_) => text.push('\t'),
+        InlineItem::ClearLineBreak(_) => text.push('\n'),
         InlineItem::Ruby(ruby) => {
           for run in &ruby.base {
             text.push_str(&run.text);

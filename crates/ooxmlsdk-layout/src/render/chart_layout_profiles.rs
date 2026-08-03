@@ -42,6 +42,20 @@ pub(crate) const EXCEL_CARTESIAN_DEFAULTS: CartesianHostDefaults = CartesianHost
   titled_top_legend_gap_ratio: 0.009,
 };
 
+/// Additional top inset for a legacy Excel cartesian title that inherits the
+/// application's 18pt default instead of carrying an authored run size.
+pub(crate) const EXCEL_LEGACY_DEFAULT_TITLE_TOP_ADJUSTMENT_RATIO: f32 = 0.023_15;
+pub(crate) const EXCEL_LEGACY_DEFAULT_SINGLE_SERIES_SIDE_TITLE: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    category_top_ratio: 0.002_61,
+    plot_top_ratio: -0.001_5,
+    plot_bottom_ratio: -0.001_92,
+    plot_left_ratio: 0.007_31,
+    plot_right_ratio: 0.003_2,
+    ..ZERO_ADJUSTMENT
+  };
+pub(crate) const EXCEL_LEGACY_DEFAULT_SINGLE_SERIES_LEGEND_RESERVATION_EM: f32 = 0.5;
+
 pub(crate) const TOP_LEGEND_LEFT_INSET_RATIO: f32 = 0.004;
 pub(crate) const UNTITLED_TOP_LEGEND_TOP_RATIO: f32 = 0.018;
 
@@ -91,6 +105,26 @@ pub(crate) const POWERPOINT_GENERATED_TITLE_BOTTOM_LEGEND: CartesianLayoutAdjust
     ..ZERO_ADJUSTMENT
   };
 
+/// PowerPoint's generated-title layout without a legend.
+///
+/// A title element without `c:tx`, combined with `autoTitleDeleted="0"`,
+/// resolves to the first series name. PowerPoint reserves a balanced inner
+/// plot around that generated title even when no legend consumes the right or
+/// bottom band. The ratios come from the immutable Microsoft fixed output for
+/// LibreOffice `date-categories.pptx`; its explicit date window and 90-degree
+/// tick labels expose every edge of the resulting plot rectangle.
+pub(crate) const POWERPOINT_GENERATED_TITLE_NO_LEGEND: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    title_top_ratio: 0.010_795,
+    category_top_ratio: -0.012_536,
+    plot_top_ratio: 0.024_713,
+    plot_bottom_ratio: -0.008_722,
+    tick_left_ratio: 0.015_232,
+    tick_top_ratio: 0.0,
+    plot_left_ratio: 0.012_497,
+    plot_right_ratio: -0.024_926,
+  };
+
 /// The swapped axes of the matching horizontal-bar fixture use a taller plot
 /// band and a narrower horizontal value-axis span than line/scatter charts.
 pub(crate) const POWERPOINT_DERIVED_SERIES_TITLE_HORIZONTAL_BAR: CartesianLayoutAdjustment =
@@ -112,6 +146,54 @@ pub(crate) const POWERPOINT_DERIVED_SERIES_TITLE_LEGEND_Y_RATIO: f32 = 0.051_91;
 /// value axes. This remains a physical distance rather than a plot ratio,
 /// matching LibreOffice's `AXIS2D_TICKLENGTH` fixed-distance model.
 pub(crate) const POWERPOINT_AUTOMATIC_MAJOR_TICK_LENGTH_PT: f32 = 5.71;
+
+/// Normalized half-aperture used by Office's cartesian 3-D chart camera.
+///
+/// `c:perspective` stores twice the field-of-view angle (MS-OE376,
+/// §21.2.2.152). The projection therefore follows the ordinary pinhole
+/// relation `distance = aperture / tan(field_of_view / 2)`. The aperture is
+/// expressed in the unit-width chart volume used by the lowering code and is
+/// calibrated against Microsoft's immutable O12 PowerPoint fixed output; the
+/// same camera is shared by Word, Excel, and PowerPoint chart hosts.
+pub(crate) const OFFICE_CARTESIAN_3D_CAMERA_HALF_APERTURE: f32 = 0.414_75;
+
+/// Office's default directional-light response for the receding side of a
+/// solid cartesian 3-D box.
+///
+/// The ratio is stable across the blue, red, and green series in Microsoft's
+/// immutable O12 PowerPoint output. LibreOffice likewise delegates cuboid
+/// face colors to its 3-D scene lights instead of applying a white tint.
+pub(crate) const OFFICE_CARTESIAN_3D_BOX_SIDE_SHADE: f32 = 0.64;
+
+/// Office's default directional-light response for the visible top face of a
+/// solid cartesian 3-D box.
+pub(crate) const OFFICE_CARTESIAN_3D_BOX_TOP_SHADE: f32 = 0.76;
+
+/// Residual PowerPoint screen transform after the standards-defined camera
+/// projection and automatic scene fit.
+///
+/// The matrix is normalized around the fitted scene center. It is measured
+/// from the front horizontal and vertical edges of Microsoft's immutable O12
+/// 3-D column output, and keeps those independent vectors separate from the
+/// camera's depth convergence.
+pub(crate) const POWERPOINT_CARTESIAN_3D_SCREEN_MATRIX: [f32; 4] =
+  [1.006_924, -0.009_923, -0.014_393, 1.006_372];
+
+/// A visible projected series axis moves PowerPoint's complete 3-D scene
+/// upward within the automatic chart frame before category-label placement.
+pub(crate) const POWERPOINT_CARTESIAN_3D_SERIES_AXIS_TOP_RATIO: f32 = -0.031_64;
+
+/// Category text remains below the shifted front floor, using the larger
+/// automatic gap observed for PowerPoint's projected series-axis layout.
+pub(crate) const POWERPOINT_CARTESIAN_3D_CATEGORY_LABEL_GAP_EM: f32 = 0.93;
+
+/// Position of a PowerPoint shifted series-axis label inside its depth slab.
+///
+/// LibreOffice's axis pipeline explicitly builds shifted tick information for
+/// series labels and a separate unshifted set for tick marks. Microsoft's O12
+/// fixed output places the label axis in the leading part of each marker slab,
+/// independently of the marker's geometric center.
+pub(crate) const POWERPOINT_CARTESIAN_3D_SERIES_AXIS_SLOT_RATIO: f32 = 0.225;
 
 /// Word side-legend charts with an explicit title.
 ///
@@ -185,6 +267,29 @@ pub(crate) const EXCEL_EXPLICIT_TITLE_SIDE_LEGEND: CartesianLayoutAdjustment =
     plot_right_ratio: 0.007_094,
     ..ZERO_ADJUSTMENT
   };
+
+/// Excel date-line charts with a title, an overlaid top-right legend, and
+/// independent category/value axis titles.
+///
+/// The immutable Office PDF for LibreOffice `tdf118150.xlsx` exposes all 28
+/// monthly ticks across a worksheet page break. Their first/last centers and
+/// constant interval independently determine both plot edges; the vertical
+/// value grid determines the remaining band offsets. These are residual
+/// deltas on top of Excel's generic automatic plot bands, not a source-file
+/// special case.
+pub(crate) const EXCEL_EXPLICIT_DATE_LINE_TOP_RIGHT_OVERLAY: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    category_top_ratio: 0.010_99,
+    plot_top_ratio: -0.003_18,
+    plot_bottom_ratio: -0.006_10,
+    plot_left_ratio: -0.014_30,
+    plot_right_ratio: 0.075_85,
+    ..ZERO_ADJUSTMENT
+  };
+
+/// Leftward residual for the vertical value-axis title in the matching
+/// date-line profile. The title occupies its own band outside the tick-label
+/// ink; applying this separately avoids moving the value ticks themselves.
 
 pub(crate) const EXCEL_TITLE_ONLY: CartesianLayoutAdjustment = CartesianLayoutAdjustment {
   category_top_ratio: 0.020_87,

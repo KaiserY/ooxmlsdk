@@ -194,6 +194,10 @@ impl StylesCatalog {
     self.locales.ui_language_or_default()
   }
 
+  pub(crate) fn output_format_locale(&self) -> Option<&str> {
+    self.locales.format_locale()
+  }
+
   pub(crate) fn theme_color(&self, index: u32, tint: f64) -> Option<RgbColor> {
     let base = self.theme_colors.get(index)?;
     if tint == 0.0 {
@@ -482,6 +486,13 @@ impl StylesCatalog {
       49 => Some("@"),
       _ => None,
     }
+  }
+
+  pub(crate) fn number_format_code_for_cell(&self, style_index: Option<u32>) -> Option<&str> {
+    self
+      .effective_cell_format(style_index)?
+      .number_format_id
+      .and_then(|id| self.number_format_code(id))
   }
 
   pub(crate) fn resolve_drawingml_theme_font<'a>(&'a self, typeface: &'a str) -> &'a str {

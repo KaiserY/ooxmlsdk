@@ -14,6 +14,7 @@ use crate::common::{self, DebugProperty, DebugRecord, DebugShape, DebugValue, Po
 use crate::common::{
   drawingml_custom_geometry as custom_geometry, drawingml_preset_geometry as preset_geometry,
 };
+use crate::field_datetime;
 use crate::localization::OfficeLocaleContext;
 use crate::model::{
   BorderStyle, ImageCrop, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PageSetup,
@@ -21,7 +22,7 @@ use crate::model::{
   common_page_setup, common_point, common_rect, common_rgb, common_stroke_from_border,
   common_text_style,
 };
-use crate::options::LayoutOptions;
+use crate::options::{FieldUpdateDateTime, LayoutOptions};
 use crate::render::chart as shared_chart;
 use crate::render::diagram as shared_diagram;
 use crate::render::symbol as shared_symbol;
@@ -1226,12 +1227,25 @@ fn lower_chart(
               .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
               .map(|paint| paint.color)
           })
-          .or_else(|| display_color_for_chart_series(import, slide, chart_resource, index))
-          .unwrap_or(RgbColor {
-            r: 68,
-            g: 114,
-            b: 196,
+          .or_else(|| {
+            let (formatting_index, maximum_formatting_index) = if chart.vary_colors {
+              (index, chart.values.len().saturating_sub(1))
+            } else {
+              (
+                chart.series_formatting_index,
+                chart.maximum_series_formatting_index,
+              )
+            };
+            display_color_for_chart_series(
+              import,
+              slide,
+              chart_resource,
+              shared_chart::chart_style_id(&chart_resource.chart_space).unwrap_or(2),
+              formatting_index,
+              maximum_formatting_index,
+            )
           })
+          .unwrap_or_default()
       })
       .collect();
     let inherited_point_style =
@@ -1357,9 +1371,11 @@ fn lower_chart(
     }
   }
 
-  if let Some(mut chart) =
-    shared_chart::cartesian_chart_for_ui_language(&chart_resource.chart_space, ui_language)
-  {
+  if let Some(mut chart) = shared_chart::cartesian_chart_for_locales(
+    &chart_resource.chart_space,
+    ui_language,
+    locales.format_locale(),
+  ) {
     if chart.title.is_none()
       && shared_chart::has_powerpoint_automatic_title_placeholder(&chart_resource.chart_space.chart)
     {
@@ -1370,50 +1386,32 @@ fn lower_chart(
         .map(|series| shared_chart::ChartTitleText::Explicit(series.name.clone()))
         .or(Some(shared_chart::ChartTitleText::Automatic));
     }
+    let chart_style_id = shared_chart::chart_style_id(&chart_resource.chart_space).unwrap_or(2);
+    let maximum_series_formatting_index = chart
+      .series
+      .iter()
+      .map(|series| series.formatting_index)
+      .max()
+      .unwrap_or(0);
     let series_colors = chart
       .series
       .iter()
-      .enumerate()
-      .map(|(index, series)| {
+      .map(|series| {
         series
           .solid_fill
           .and_then(|fill| display_paint_for_chart(import, slide, chart_resource, fill))
           .map(|paint| paint.color)
-          .or_else(|| display_color_for_chart_series(import, slide, chart_resource, index))
-          .unwrap_or(
-            [
-              RgbColor {
-                r: 68,
-                g: 114,
-                b: 196,
-              },
-              RgbColor {
-                r: 237,
-                g: 125,
-                b: 49,
-              },
-              RgbColor {
-                r: 165,
-                g: 165,
-                b: 165,
-              },
-              RgbColor {
-                r: 255,
-                g: 192,
-                b: 0,
-              },
-              RgbColor {
-                r: 91,
-                g: 155,
-                b: 213,
-              },
-              RgbColor {
-                r: 112,
-                g: 173,
-                b: 71,
-              },
-            ][index % 6],
-          )
+          .or_else(|| {
+            display_color_for_chart_series(
+              import,
+              slide,
+              chart_resource,
+              chart_style_id,
+              series.formatting_index,
+              maximum_series_formatting_index,
+            )
+          })
+          .unwrap_or_default()
       })
       .collect::<Vec<_>>();
     let series_styles = chart
@@ -1439,6 +1437,36 @@ fn lower_chart(
                   point.chart_shape_properties.as_deref(),
                 )
               })
+          })
+          .collect()
+      })
+      .collect::<Vec<_>>();
+    let series_point_colors = chart
+      .series
+      .iter()
+      .enumerate()
+      .map(|(series_index, series)| {
+        if !chart.vary_colors_by_point
+          || chart.series.len() != 1
+          || series_index != 0
+          || series
+            .shape_properties
+            .and_then(shared_chart::chart_shape_solid_fill)
+            .is_some()
+        {
+          return vec![None; series.values.len()];
+        }
+        let maximum_point_index = series.values.len().saturating_sub(1);
+        (0..series.values.len())
+          .map(|point_index| {
+            display_color_for_chart_series(
+              import,
+              slide,
+              chart_resource,
+              chart_style_id,
+              point_index,
+              maximum_point_index,
+            )
           })
           .collect()
       })
@@ -1504,21 +1532,23 @@ fn lower_chart(
             _ => None,
           },
         );
-      let label_properties = chart
+      let value_label_properties = chart
         .value_axis
+        .and_then(|axis| axis.text_properties.as_deref());
+      let category_label_properties = chart
+        .category_axis
         .and_then(|axis| axis.text_properties.as_deref())
         .or_else(|| {
-          chart_resource
-            .chart_space
-            .chart
-            .plot_area
-            .plot_area_choice2
-            .iter()
-            .find_map(|choice| match choice {
-              c::PlotAreaChoice2::CategoryAxis(axis) => axis.text_properties.as_deref(),
-              _ => None,
-            })
+          chart
+            .date_axis
+            .and_then(|axis| axis.text_properties.as_deref())
+        })
+        .or_else(|| {
+          chart
+            .horizontal_value_axis
+            .and_then(|axis| axis.text_properties.as_deref())
         });
+      let label_properties = value_label_properties.or(category_label_properties);
       let legend_properties = chart_resource
         .chart_space
         .chart
@@ -1551,6 +1581,24 @@ fn lower_chart(
         theme_language: default_document_language,
         ..title_text_style_context
       };
+      let category_axis_title_style = powerpoint_chart_axis_title_style(
+        label_text_style_context,
+        shared_chart::category_axis_title_source(&chart),
+      );
+      let value_axis_title_style = powerpoint_chart_axis_title_style(
+        label_text_style_context,
+        shared_chart::value_axis_title_source(&chart),
+      );
+      let additional_axis_title_styles = chart
+        .additional_axis_titles
+        .iter()
+        .map(|title| {
+          powerpoint_chart_axis_title_style(
+            label_text_style_context,
+            Some((title.source, title.automatic_rotation_deg)),
+          )
+        })
+        .collect();
       let data_label_style = chart_text_style(
         label_text_style_context,
         data_label_properties,
@@ -1595,6 +1643,7 @@ fn lower_chart(
         shared_chart::automatic_chart_title(ui_language),
         &ClusteredColumnStyle {
           layout_profile: ChartLayoutProfile::PowerPoint,
+          chart_style_id: shared_chart::chart_style_id(&chart_resource.chart_space).unwrap_or(2),
           modern_excel_profile: false,
           stroke_scale: 1.0,
           automatic_line_width_pt: powerpoint_chart_automatic_line_width_pt(
@@ -1607,6 +1656,7 @@ fn lower_chart(
             .title
             .as_deref()
             .is_some_and(|title| title.chart_text.is_some()),
+          title_top_adjustment_ratio: 0.0,
           title: chart_text_style(
             title_text_style_context,
             title_properties,
@@ -1626,15 +1676,18 @@ fn lower_chart(
             POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
+          category_axis_title: category_axis_title_style,
+          value_axis_title: value_axis_title_style,
+          additional_axis_titles: additional_axis_title_styles,
           category_label: chart_text_style(
             label_text_style_context,
-            label_properties,
+            category_label_properties,
             POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
           value_label: chart_text_style(
             label_text_style_context,
-            label_properties,
+            value_label_properties,
             POWERPOINT_CHART_LABEL_FALLBACK,
             None,
           ),
@@ -1653,6 +1706,7 @@ fn lower_chart(
           category_major_gridline: None,
           category_minor_gridline: None,
           series_colors,
+          series_point_colors,
           series_styles,
           trendline_styles,
           series_point_styles,
@@ -1895,15 +1949,23 @@ struct ChartTextStyleContext<'a> {
 struct ChartTextFallback {
   size_pt: f32,
   bold: bool,
+  automatic_title_scale: bool,
 }
 
 const POWERPOINT_CHART_TITLE_FALLBACK: ChartTextFallback = ChartTextFallback {
   size_pt: 18.0,
   bold: true,
+  automatic_title_scale: true,
 };
 const POWERPOINT_CHART_LABEL_FALLBACK: ChartTextFallback = ChartTextFallback {
   size_pt: 12.0,
   bold: false,
+  automatic_title_scale: false,
+};
+const POWERPOINT_CHART_AXIS_TITLE_FALLBACK: ChartTextFallback = ChartTextFallback {
+  size_pt: 12.0,
+  bold: true,
+  automatic_title_scale: false,
 };
 const POWERPOINT_AUTOMATIC_CHART_TITLE_SCALE: f32 = 1.2;
 
@@ -2004,6 +2066,7 @@ fn chart_text_style(
       apply_run_common(
         context.import,
         RunCommon {
+          language: properties.language.as_deref(),
           font_size: properties.font_size,
           bold: properties.bold.as_ref().map(|value| value.as_bool()),
           italic: properties.italic.as_ref().map(|value| value.as_bool()),
@@ -2037,13 +2100,31 @@ fn chart_text_style(
   {
     style.east_asia_font_family = Some(Arc::from(typeface));
   }
-  if fallback.bold && !title_has_explicit_size {
+  if fallback.automatic_title_scale && !title_has_explicit_size {
     // PowerPoint's automatic chart-title style promotes the chart-space text
     // default by 120%. A direct title txPr or rich run size replaces that
     // automatic style size rather than being scaled again.
     style.font_size_pt *= POWERPOINT_AUTOMATIC_CHART_TITLE_SCALE;
   }
   style.font_size_pt = units::quantize_points_to_office_print_grid(style.font_size_pt);
+  style
+}
+
+fn powerpoint_chart_axis_title_style(
+  context: ChartTextStyleContext<'_>,
+  source: Option<(&c::Title, f32)>,
+) -> TextStyle {
+  let Some((title, automatic_rotation_deg)) = source else {
+    return chart_text_style(context, None, POWERPOINT_CHART_AXIS_TITLE_FALLBACK, None);
+  };
+  let mut style = chart_text_style(
+    context,
+    title.text_properties.as_deref(),
+    POWERPOINT_CHART_AXIS_TITLE_FALLBACK,
+    Some(title),
+  );
+  style.rotation_deg =
+    shared_chart::title_rotation_degrees(title).unwrap_or(automatic_rotation_deg);
   style
 }
 
@@ -2102,30 +2183,96 @@ fn display_color_for_chart_series(
   import: &PowerPointImport,
   slide: &SlidePersist,
   chart_resource: &ChartResource,
-  series_index: usize,
+  chart_style_id: u8,
+  formatting_index: usize,
+  maximum_formatting_index: usize,
 ) -> Option<RgbColor> {
-  let token = [
-    a::SchemeColorValues::Accent1,
-    a::SchemeColorValues::Accent2,
-    a::SchemeColorValues::Accent3,
-    a::SchemeColorValues::Accent4,
-    a::SchemeColorValues::Accent5,
-    a::SchemeColorValues::Accent6,
-  ][series_index % 6];
-  let theme = chart_theme(import, slide)?;
+  let theme = chart_theme(import, slide);
   let color_map = chart_resource.chart_space.color_map_override.as_deref();
-  let mapped = shared_chart::scheme_color_token(color_map, token)?;
-  let color = theme.color_scheme.get_color(mapped)?.clone();
-  let mut scheme_resolver = |token| {
-    let mapped = shared_chart::scheme_color_token(color_map, token)?;
-    theme.color_scheme.get_color(mapped).cloned()
-  };
-  let resolved = color.resolve_rgb(&mut scheme_resolver, None)?;
-  Some(RgbColor {
-    r: resolved.r,
-    g: resolved.g,
-    b: resolved.b,
-  })
+  shared_chart::automatic_chart_series_color(
+    chart_style_id,
+    formatting_index,
+    maximum_formatting_index,
+    |token| {
+      let mapped = shared_chart::scheme_color_token(color_map, token)?;
+      theme
+        .and_then(|theme| {
+          let color = theme.color_scheme.get_color(mapped)?.clone();
+          let mut scheme_resolver = |nested| {
+            let mapped = shared_chart::scheme_color_token(color_map, nested)?;
+            theme.color_scheme.get_color(mapped).cloned()
+          };
+          let resolved = color.resolve_rgb(&mut scheme_resolver, None)?;
+          Some(RgbColor {
+            r: resolved.r,
+            g: resolved.g,
+            b: resolved.b,
+          })
+        })
+        .or_else(|| powerpoint_default_chart_theme_color(mapped))
+    },
+  )
+}
+
+fn powerpoint_default_chart_theme_color(token: a::ColorSchemeIndexValues) -> Option<RgbColor> {
+  match token {
+    a::ColorSchemeIndexValues::Dark1 => Some(RgbColor { r: 0, g: 0, b: 0 }),
+    a::ColorSchemeIndexValues::Light1 => Some(RgbColor {
+      r: 0xff,
+      g: 0xff,
+      b: 0xff,
+    }),
+    a::ColorSchemeIndexValues::Dark2 => Some(RgbColor {
+      r: 0x44,
+      g: 0x54,
+      b: 0x6a,
+    }),
+    a::ColorSchemeIndexValues::Light2 => Some(RgbColor {
+      r: 0xe7,
+      g: 0xe6,
+      b: 0xe6,
+    }),
+    a::ColorSchemeIndexValues::Accent1 => Some(RgbColor {
+      r: 0x44,
+      g: 0x72,
+      b: 0xc4,
+    }),
+    a::ColorSchemeIndexValues::Accent2 => Some(RgbColor {
+      r: 0xed,
+      g: 0x7d,
+      b: 0x31,
+    }),
+    a::ColorSchemeIndexValues::Accent3 => Some(RgbColor {
+      r: 0xa5,
+      g: 0xa5,
+      b: 0xa5,
+    }),
+    a::ColorSchemeIndexValues::Accent4 => Some(RgbColor {
+      r: 0xff,
+      g: 0xc0,
+      b: 0x00,
+    }),
+    a::ColorSchemeIndexValues::Accent5 => Some(RgbColor {
+      r: 0x5b,
+      g: 0x9b,
+      b: 0xd5,
+    }),
+    a::ColorSchemeIndexValues::Accent6 => Some(RgbColor {
+      r: 0x70,
+      g: 0xad,
+      b: 0x47,
+    }),
+    a::ColorSchemeIndexValues::Hyperlink => Some(RgbColor {
+      r: 0x05,
+      g: 0x63,
+      b: 0xc1,
+    }),
+    a::ColorSchemeIndexValues::FollowedHyperlink => Some(RgbColor {
+      r: 0x95,
+      g: 0x4f,
+      b: 0x72,
+    }),
+  }
 }
 
 fn lower_chart_texts(
@@ -2449,11 +2596,11 @@ fn pptx_chart_pattern_fill(
       b: u8::MAX,
       a: u8::MAX,
     });
-  Some(common::PatternFill {
-    hatch_style: common::drawingml_pattern::hatch_style(fill.preset),
+  Some(common::PatternFill::drawingml(
+    common::drawingml_pattern::hatch_style(fill.preset),
     foreground,
     background,
-  })
+  ))
 }
 
 fn pptx_chart_blip_fill(fill: &a::BlipFill) -> common::Fill<'static> {
@@ -9633,7 +9780,7 @@ fn layout_text_lines<'a>(
       matches!(
         run.kind,
         TextRunKind::Run | TextRunKind::Field | TextRunKind::Math
-      ) && !run.text.is_empty()
+      ) && (!run.text.is_empty() || presentation_field_may_generate_text(context.import, run))
     })
     .collect::<Vec<_>>();
   if visible_runs.is_empty() {
@@ -9655,7 +9802,13 @@ fn layout_text_lines<'a>(
         context.options,
         run,
       );
-      let field_text = presentation_field_text(run, context.slide_number);
+      let field_text = presentation_field_text(
+        run,
+        context.slide_number,
+        context.import.field_update_datetime,
+        context.import.field_format_locale.as_deref(),
+        style.language.as_deref(),
+      );
       let text = if style.uppercase {
         field_text.to_uppercase()
       } else {
@@ -9783,7 +9936,7 @@ fn layout_text_lines_legacy<'a>(
       matches!(
         run.kind,
         TextRunKind::Run | TextRunKind::Field | TextRunKind::Math
-      ) && !run.text.is_empty()
+      ) && (!run.text.is_empty() || presentation_field_may_generate_text(context.import, run))
     })
     .collect::<Vec<_>>();
 
@@ -9797,7 +9950,13 @@ fn layout_text_lines_legacy<'a>(
       context.options,
       run,
     );
-    let field_text = presentation_field_text(run, context.slide_number);
+    let field_text = presentation_field_text(
+      run,
+      context.slide_number,
+      context.import.field_update_datetime,
+      context.import.field_format_locale.as_deref(),
+      style.language.as_deref(),
+    );
     let uppercase_text;
     let text = if style.uppercase {
       uppercase_text = field_text.to_uppercase();
@@ -10264,11 +10423,98 @@ fn presentation_slide_number(import: &PowerPointImport, page_index: usize) -> i3
     .saturating_add(i32::try_from(page_index).unwrap_or(i32::MAX))
 }
 
-fn presentation_field_text(run: &TextRun, slide_number: i32) -> Cow<'_, str> {
-  if run.kind == TextRunKind::Field && run.field_type.as_deref() == Some("slidenum") {
-    Cow::Owned(slide_number.to_string())
-  } else {
-    Cow::Borrowed(&run.text)
+fn presentation_field_text<'a>(
+  run: &'a TextRun,
+  slide_number: i32,
+  field_update_datetime: Option<FieldUpdateDateTime>,
+  field_format_locale: Option<&str>,
+  language: Option<&str>,
+) -> Cow<'a, str> {
+  if run.kind != TextRunKind::Field {
+    return Cow::Borrowed(&run.text);
+  }
+  let Some(field_type) = run.field_type.as_deref() else {
+    return Cow::Borrowed(&run.text);
+  };
+  if field_type.eq_ignore_ascii_case("slidenum") {
+    return Cow::Owned(slide_number.to_string());
+  }
+  let Some(value) = field_update_datetime else {
+    return Cow::Borrowed(&run.text);
+  };
+  let language = language.or(field_format_locale);
+  format_presentation_date_time_field(field_type, language, value)
+    .map(Cow::<str>::Owned)
+    .unwrap_or_else(|| Cow::Borrowed(run.text.as_str()))
+}
+
+fn presentation_field_may_generate_text(import: &PowerPointImport, run: &TextRun) -> bool {
+  if run.kind != TextRunKind::Field {
+    return false;
+  }
+  run.field_type.as_deref().is_some_and(|field_type| {
+    field_type.eq_ignore_ascii_case("slidenum")
+      || (import.field_update_datetime.is_some()
+        && presentation_date_time_field_is_reserved(field_type))
+  })
+}
+
+fn presentation_date_time_field_is_reserved(field_type: &str) -> bool {
+  matches!(
+    field_type.to_ascii_lowercase().as_str(),
+    "datetime"
+      | "datetime1"
+      | "datetime2"
+      | "datetime3"
+      | "datetime4"
+      | "datetime5"
+      | "datetime6"
+      | "datetime7"
+      | "datetime8"
+      | "datetime9"
+      | "datetime10"
+      | "datetime11"
+      | "datetime12"
+      | "datetime13"
+  )
+}
+
+fn format_presentation_date_time_field(
+  field_type: &str,
+  language: Option<&str>,
+  value: FieldUpdateDateTime,
+) -> Option<String> {
+  // ISO/IEC 29500-1 §20.1.5.2 reserves datetime and datetime1..13 for
+  // periodically refreshed DrawingML fields. PowerPoint takes the formatting
+  // locale from a:fld/a:rPr/@lang (numfmt.pptx demonstrates en-US and en-IN in
+  // one package). The reserved type selects an Office semantic shape; ICU owns
+  // locale order, names, digits, and day periods. LibreOffice maps datetime3
+  // and datetime4 to the same locale-long date shape, which also matches the
+  // en-IN cached counterexample where datetime4 is day-month-year.
+  match field_type.to_ascii_lowercase().as_str() {
+    "datetime" | "datetime1" => field_datetime::format_office_short_date(language, value),
+    "datetime2" => field_datetime::format_office_long_date(language, value, true),
+    "datetime3" | "datetime4" => field_datetime::format_office_long_date(language, value, false),
+    "datetime5" => field_datetime::format_date_time_picture("dd-MMM-yy", language, value),
+    "datetime6" => field_datetime::format_date_time_picture("MMMM yy", language, value),
+    "datetime7" => field_datetime::format_date_time_picture("MMM-yy", language, value),
+    "datetime8" | "datetime9" => {
+      let time_picture = if field_type.eq_ignore_ascii_case("datetime8") {
+        "h:mm am/pm"
+      } else {
+        "h:mm:ss am/pm"
+      };
+      Some(format!(
+        "{} {}",
+        field_datetime::format_office_short_date(language, value)?,
+        field_datetime::format_date_time_picture(time_picture, language, value)?
+      ))
+    }
+    "datetime10" => field_datetime::format_date_time_picture("H:mm", language, value),
+    "datetime11" => field_datetime::format_date_time_picture("H:mm:ss", language, value),
+    "datetime12" => field_datetime::format_date_time_picture("h:mm am/pm", language, value),
+    "datetime13" => field_datetime::format_date_time_picture("h:mm:ss am/pm", language, value),
+    _ => None,
   }
 }
 
@@ -11752,6 +11998,7 @@ fn apply_drawingml_run_properties(
   apply_run_common(
     import,
     RunCommon {
+      language: properties.language.as_deref(),
       font_size: properties.font_size,
       bold: properties.bold.as_ref().map(|value| value.as_bool()),
       italic: properties.italic.as_ref().map(|value| value.as_bool()),
@@ -11806,6 +12053,7 @@ fn apply_default_run_properties(
   apply_run_common(
     import,
     RunCommon {
+      language: properties.language.as_deref(),
       font_size: properties.font_size,
       bold: properties.bold.as_ref().map(|value| value.as_bool()),
       italic: properties.italic.as_ref().map(|value| value.as_bool()),
@@ -11875,6 +12123,7 @@ fn drawingml_default_run_effects(
 }
 
 struct RunCommon<'a> {
+  language: Option<&'a str>,
   font_size: Option<i32>,
   bold: Option<bool>,
   italic: Option<bool>,
@@ -11890,6 +12139,9 @@ struct RunCommon<'a> {
 }
 
 fn apply_run_common(import: &PowerPointImport, properties: RunCommon<'_>, style: &mut TextStyle) {
+  if let Some(language) = properties.language {
+    style.language = Some(Arc::from(language));
+  }
   if let Some(font_size) = properties.font_size {
     style.font_size_pt = ooxmlsdk::units::drawingml_text_size_to_points(font_size) as f32;
   }
@@ -12402,11 +12654,11 @@ fn pattern_fill_for_optional_slide(
       b: u8::MAX,
       a: u8::MAX,
     });
-  common::PatternFill {
-    hatch_style: common::drawingml_pattern::hatch_style(fill.preset),
+  common::PatternFill::drawingml(
+    common::drawingml_pattern::hatch_style(fill.preset),
     foreground,
     background,
-  }
+  )
 }
 
 fn default_page_background_paint() -> DisplayPaint {
@@ -12602,7 +12854,7 @@ mod tests {
       run_properties: None,
       field_paragraph_properties: None,
     };
-    assert_eq!(presentation_field_text(&run, 7), "7");
+    assert_eq!(presentation_field_text(&run, 7, None, None, None), "7");
   }
 
   #[test]

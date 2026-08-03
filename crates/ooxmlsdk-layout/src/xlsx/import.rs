@@ -35,7 +35,7 @@ impl ExcelImport {
     let workbook = workbook_part.root_element(package)?.clone();
     let globals = WorkbookGlobals::from_workbook(&workbook);
     let workbook_catalog = WorkbookCatalog::from_workbook_part(package, &workbook_part)?;
-    let producer = spreadsheet_producer_profile(package);
+    let producer = spreadsheet_producer_profile(package, &workbook);
     let locales = OfficeLocaleContext::new(
       options.ui_language.as_deref(),
       options.format_locale.as_deref(),
@@ -71,7 +71,10 @@ impl ExcelImport {
   }
 }
 
-fn spreadsheet_producer_profile(package: &mut SpreadsheetDocument) -> SpreadsheetProducerProfile {
+fn spreadsheet_producer_profile(
+  package: &mut SpreadsheetDocument,
+  workbook: &ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workbook,
+) -> SpreadsheetProducerProfile {
   let extended_properties_part = {
     package
       .get_parts_of_type::<
@@ -90,10 +93,16 @@ fn spreadsheet_producer_profile(package: &mut SpreadsheetDocument) -> Spreadshee
     .and_then(|properties| properties.application_version.as_deref())
     .and_then(|version| version.split('.').next())
     .and_then(|major| major.parse::<u16>().ok());
+  let lowest_edited_version = workbook
+    .file_version
+    .as_ref()
+    .and_then(|version| version.lowest_edited.as_deref())
+    .and_then(|version| version.parse::<u16>().ok());
   SpreadsheetProducerProfile {
     mso_document: application.is_some_and(|value| value.contains("Microsoft")),
     macintosh_excel: application.is_some_and(|value| value == "Microsoft Macintosh Excel"),
     libreoffice_document: application.is_some_and(|value| value.contains("LibreOffice")),
     excel_major_version,
+    lowest_edited_version,
   }
 }

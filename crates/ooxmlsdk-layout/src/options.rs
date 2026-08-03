@@ -19,7 +19,8 @@ pub struct LayoutOptions {
   /// fallback for callers of the pre-existing API.
   pub default_document_language: Option<String>,
   /// Local civil time to use when an application explicitly refreshes
-  /// unlocked WordprocessingML DATE, TIME, PRINTDATE, and SAVEDATE fields.
+  /// unlocked WordprocessingML DATE, TIME, PRINTDATE, and SAVEDATE fields or
+  /// generated PresentationML `datetime` text fields.
   ///
   /// Leaving this unset preserves the package's cached field results.
   pub field_update_datetime: Option<FieldUpdateDateTime>,
@@ -27,7 +28,7 @@ pub struct LayoutOptions {
   pub diagnostics: LayoutDiagnosticsOptions,
 }
 
-/// Deterministic local civil time supplied for WordprocessingML field updates.
+/// Deterministic local civil time supplied for Office field updates.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FieldUpdateDateTime {
   pub year: u16,

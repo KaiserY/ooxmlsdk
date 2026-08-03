@@ -8,11 +8,12 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use super::print::rendered_number_text;
 use super::styles::BorderRecord;
 use super::styles::StylesCatalog;
+use super::styles::TableStyleRecord;
 use super::text::decode_excel_escaped_text;
 use super::workbook::SharedStringModel;
 use super::worksheet::{CalcSheet, CellAddress, CellRange};
 use crate::error::Result;
-use crate::model::{BorderStyle, RgbColor};
+use crate::model::{BorderStyle, RgbColor, TextStyle};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct PivotTableCatalog {
@@ -23,6 +24,7 @@ pub(crate) struct PivotTableCatalog {
 pub(crate) struct PivotTableModel {
   pub(crate) name: String,
   pub(crate) cache_id: u32,
+  pub(crate) refresh_on_load: bool,
   pub(crate) location_reference: String,
   pub(crate) printable_location_reference: String,
   pub(crate) output_geometry: PivotOutputGeometry,
@@ -32,6 +34,11 @@ pub(crate) struct PivotTableModel {
   pub(crate) calculated_only_data_fields: bool,
   pub(crate) data_layout_axis: PivotDataLayoutAxis,
   pub(crate) style_name: Option<String>,
+  pub(crate) style_show_row_headers: bool,
+  pub(crate) style_show_column_headers: bool,
+  pub(crate) style_show_row_stripes: bool,
+  pub(crate) style_show_column_stripes: bool,
+  pub(crate) style_show_last_column: bool,
   pub(crate) pivot_fields: usize,
   pub(crate) row_fields: usize,
   pub(crate) column_fields: usize,
@@ -124,9 +131,20 @@ pub(crate) struct PivotTableFormatSelection {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct PivotBuiltinCellStyle {
+  pub(crate) fill: Option<RgbColor>,
+  pub(crate) text_color: Option<RgbColor>,
   pub(crate) bold: bool,
   pub(crate) left_align: bool,
   pub(crate) borders: BorderRecord,
+  differential_format_ids: [Option<u32>; 28],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PivotRenderGeometry {
+  whole_range: CellRange,
+  table_range: CellRange,
+  result_range: CellRange,
+  data_start: CellAddress,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -144,6 +162,7 @@ struct PivotFormatFieldData {
   is_set: bool,
   is_member: bool,
   subtotal: bool,
+  grand_total: bool,
   continues: bool,
 }
 
@@ -232,7 +251,7 @@ impl Eq for PivotCacheItemValue {}
 pub(crate) fn pivot_format_id_for_address(sheet: &CalcSheet, address: CellAddress) -> Option<u32> {
   let mut format_id = None;
   for pivot in &sheet.resources.pivot_tables.tables {
-    if !pivot.output_geometry.table_range.contains(address) {
+    if !pivot_render_geometry(pivot).table_range.contains(address) {
       continue;
     }
     for format in &pivot.format_models {
@@ -255,11 +274,12 @@ pub(crate) fn pivot_table_contains_address(sheet: &CalcSheet, address: CellAddre
     .pivot_tables
     .tables
     .iter()
-    .any(|pivot| pivot.output_geometry.table_range.contains(address))
+    .any(|pivot| pivot_render_geometry(pivot).table_range.contains(address))
 }
 
 pub(crate) fn pivot_builtin_style_for_address(
   sheet: &CalcSheet,
+  styles: &StylesCatalog,
   address: CellAddress,
 ) -> PivotBuiltinCellStyle {
   let Some(pivot) = sheet
@@ -267,44 +287,49 @@ pub(crate) fn pivot_builtin_style_for_address(
     .pivot_tables
     .tables
     .iter()
-    .find(|pivot| pivot.output_geometry.table_range.contains(address))
+    .find(|pivot| pivot_render_geometry(pivot).whole_range.contains(address))
   else {
     return PivotBuiltinCellStyle::default();
   };
-  let mut style = PivotBuiltinCellStyle::default();
-  if pivot.output_geometry.result_range.contains(address) {
-    style.bold = pivot
-      .format_row_lines
-      .iter()
-      .find(|line| line.line == address.row)
-      .is_some_and(pivot_format_line_has_subtotal)
-      || pivot
-        .format_column_lines
-        .iter()
-        .find(|line| line.line == address.col)
-        .is_some_and(pivot_format_line_has_subtotal);
-    style.borders = pivot_builtin_borders_for_address(pivot, address);
-    return style;
-  }
-  if let Some(line) = pivot
-    .format_row_lines
-    .iter()
-    .find(|line| line.line == address.row && line.position == address.col)
+  let geometry = pivot_render_geometry(pivot);
+  let mut style =
+    pivot_named_style_for_address(pivot, styles, geometry, address).unwrap_or_else(|| {
+      if pivot.refresh_on_load {
+        pivot_fallback_style_for_address(pivot, geometry, address)
+      } else {
+        // A non-refreshing PivotTable is already materialized in the worksheet.
+        // Keep those persisted cell styles and layer only an explicitly named
+        // table style or the PivotTable's differential formats on top of them.
+        PivotBuiltinCellStyle::default()
+      }
+    });
+  if pivot.data_fields > 0
+    && pivot.style_name.as_deref() == Some("PivotStyleLight16")
+    && pivot_grand_total_row_at_address(pivot, geometry, address)
   {
-    style.left_align = true;
-    style.bold = pivot_format_line_has_subtotal(line);
-    return style;
+    // ScDPOutput::HeaderCell applies its result style to a generated grand
+    // total row. A label-only PivotTable has no result cells and does not get
+    // that bold result layer.
+    style.bold = true;
   }
-  if let Some(line) = pivot
-    .format_column_lines
-    .iter()
-    .find(|line| line.line == address.col && line.position == address.row)
-  {
-    style.left_align = true;
-    style.bold = pivot_format_line_has_subtotal(line);
-  }
-  style.borders = pivot_builtin_borders_for_address(pivot, address);
+  style.left_align |= pivot_label_line_at_address(pivot, geometry, address);
   style
+}
+
+pub(crate) fn apply_builtin_pivot_text_style(
+  style: PivotBuiltinCellStyle,
+  styles: &StylesCatalog,
+  text_style: &mut TextStyle,
+) {
+  for format_id in style.differential_format_ids.into_iter().flatten() {
+    styles.apply_differential_text_style(format_id, text_style);
+  }
+  if let Some(color) = style.text_color {
+    text_style.color = color;
+  }
+  if style.bold {
+    text_style.bold = true;
+  }
 }
 
 pub(crate) fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Option<CellAddress> {
@@ -315,6 +340,13 @@ pub(crate) fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Op
     let printable_location = pivot.output_geometry.table_range;
     if !location.contains(address) {
       continue;
+    }
+    if !pivot.refresh_on_load {
+      // The worksheet cells are Excel's last materialized PivotTable report.
+      // Workbooks.Open followed by ExportAsFixedFormat preserves those cells
+      // unless refreshOnLoad is true; moving them to a reconstructed
+      // DataPilot geometry drops captions and changes column widths.
+      return Some(address);
     }
     let mut print_address = address;
     if pivot.first_header_row > 1 {
@@ -368,6 +400,608 @@ pub(crate) fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Op
     return (!suppress).then_some(print_address);
   }
   Some(address)
+}
+
+const PIVOT_STYLE_PRECEDENCE: [x::TableStyleValues; 28] = [
+  x::TableStyleValues::WholeTable,
+  x::TableStyleValues::PageFieldLabels,
+  x::TableStyleValues::PageFieldValues,
+  x::TableStyleValues::FirstColumnStripe,
+  x::TableStyleValues::SecondColumnStripe,
+  x::TableStyleValues::FirstRowStripe,
+  x::TableStyleValues::SecondRowStripe,
+  x::TableStyleValues::LastColumn,
+  x::TableStyleValues::FirstColumn,
+  x::TableStyleValues::HeaderRow,
+  x::TableStyleValues::TotalRow,
+  x::TableStyleValues::FirstHeaderCell,
+  x::TableStyleValues::LastHeaderCell,
+  x::TableStyleValues::FirstTotalCell,
+  x::TableStyleValues::LastTotalCell,
+  x::TableStyleValues::FirstSubtotalColumn,
+  x::TableStyleValues::SecondSubtotalColumn,
+  x::TableStyleValues::ThirdSubtotalColumn,
+  x::TableStyleValues::BlankRow,
+  x::TableStyleValues::FirstSubtotalRow,
+  x::TableStyleValues::SecondSubtotalRow,
+  x::TableStyleValues::ThirdSubtotalRow,
+  x::TableStyleValues::FirstColumnSubheading,
+  x::TableStyleValues::SecondColumnSubheading,
+  x::TableStyleValues::ThirdColumnSubheading,
+  x::TableStyleValues::FirstRowSubheading,
+  x::TableStyleValues::SecondRowSubheading,
+  x::TableStyleValues::ThirdRowSubheading,
+];
+
+fn pivot_render_geometry(pivot: &PivotTableModel) -> PivotRenderGeometry {
+  if pivot.refresh_on_load {
+    return PivotRenderGeometry {
+      whole_range: pivot.output_geometry.whole_range,
+      table_range: pivot.output_geometry.table_range,
+      result_range: pivot.output_geometry.result_range,
+      data_start: pivot.output_geometry.data_start,
+    };
+  }
+  let table_range = CellRange::parse_a1_range(&pivot.location_reference)
+    .unwrap_or(pivot.output_geometry.table_range);
+  let data_start = CellAddress {
+    col: table_range
+      .start
+      .col
+      .saturating_add(pivot.first_data_column)
+      .min(table_range.end.col),
+    row: table_range
+      .start
+      .row
+      .saturating_add(pivot.first_data_row)
+      .min(table_range.end.row),
+  };
+  PivotRenderGeometry {
+    whole_range: CellRange::new(pivot.output_geometry.output_start, table_range.end),
+    table_range,
+    result_range: CellRange::new(data_start, table_range.end),
+    data_start,
+  }
+}
+
+fn pivot_named_style_for_address(
+  pivot: &PivotTableModel,
+  styles: &StylesCatalog,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+) -> Option<PivotBuiltinCellStyle> {
+  let name = pivot.style_name.as_deref()?;
+  if let Some(custom) = styles.table_style(name) {
+    return Some(custom_pivot_style_for_address(
+      pivot, styles, custom, geometry, address,
+    ));
+  }
+  let preset = super::pivot_style::PresetPivotStyle::from_name(name)?;
+  let mut result = PivotBuiltinCellStyle::default();
+  for element_type in PIVOT_STYLE_PRECEDENCE {
+    let Some(region) =
+      pivot_style_element_region(pivot, geometry, address, element_type, (1, 1), (1, 1))
+    else {
+      continue;
+    };
+    let Some(differential) = preset.differential(element_type) else {
+      continue;
+    };
+    merge_preset_pivot_differential(&mut result, styles, differential, region, address);
+  }
+  Some(result)
+}
+
+fn custom_pivot_style_for_address(
+  pivot: &PivotTableModel,
+  styles: &StylesCatalog,
+  style: &TableStyleRecord,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+) -> PivotBuiltinCellStyle {
+  let row_stripes = pivot_style_stripe_sizes(style, true);
+  let column_stripes = pivot_style_stripe_sizes(style, false);
+  let mut result = PivotBuiltinCellStyle::default();
+  for element_type in PIVOT_STYLE_PRECEDENCE {
+    let Some(element) = style
+      .elements
+      .iter()
+      .find(|element| element.r#type == element_type)
+    else {
+      continue;
+    };
+    let Some(region) = pivot_style_element_region(
+      pivot,
+      geometry,
+      address,
+      element_type,
+      row_stripes,
+      column_stripes,
+    ) else {
+      continue;
+    };
+    let Some(format_id) = element.format_id else {
+      continue;
+    };
+    merge_custom_pivot_differential(&mut result, styles, format_id, region, address);
+  }
+  result
+}
+
+fn pivot_style_stripe_sizes(style: &TableStyleRecord, rows: bool) -> (u32, u32) {
+  let (first, second) = if rows {
+    (
+      x::TableStyleValues::FirstRowStripe,
+      x::TableStyleValues::SecondRowStripe,
+    )
+  } else {
+    (
+      x::TableStyleValues::FirstColumnStripe,
+      x::TableStyleValues::SecondColumnStripe,
+    )
+  };
+  let size = |kind| {
+    style
+      .elements
+      .iter()
+      .find(|element| element.r#type == kind)
+      .map_or(1, |element| element.size.clamp(1, 9))
+  };
+  (size(first), size(second))
+}
+
+fn pivot_style_element_region(
+  pivot: &PivotTableModel,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+  element_type: x::TableStyleValues,
+  row_stripes: (u32, u32),
+  column_stripes: (u32, u32),
+) -> Option<CellRange> {
+  let table = geometry.table_range;
+  let single_row = |row| {
+    CellRange::new(
+      CellAddress {
+        col: table.start.col,
+        row,
+      },
+      CellAddress {
+        col: table.end.col,
+        row,
+      },
+    )
+  };
+  let single_column = |col| {
+    CellRange::new(
+      CellAddress {
+        col,
+        row: table.start.row,
+      },
+      CellAddress {
+        col,
+        row: table.end.row,
+      },
+    )
+  };
+  let header = (geometry.data_start.row > table.start.row).then(|| {
+    CellRange::new(
+      table.start,
+      CellAddress {
+        col: table.end.col,
+        row: geometry.data_start.row - 1,
+      },
+    )
+  });
+  let row_labels = (geometry.data_start.col > table.start.col).then(|| {
+    CellRange::new(
+      table.start,
+      CellAddress {
+        col: geometry.data_start.col - 1,
+        row: table.end.row,
+      },
+    )
+  });
+  let page_field_rows = u32::try_from(pivot.page_fields.saturating_sub(1)).unwrap_or(u32::MAX);
+  let region = match element_type {
+    x::TableStyleValues::WholeTable => Some(geometry.whole_range),
+    x::TableStyleValues::PageFieldLabels if pivot.page_fields > 0 => Some(CellRange::new(
+      geometry.whole_range.start,
+      CellAddress {
+        col: geometry.whole_range.start.col,
+        row: geometry
+          .whole_range
+          .start
+          .row
+          .saturating_add(page_field_rows),
+      },
+    )),
+    x::TableStyleValues::PageFieldValues if pivot.page_fields > 0 => Some(CellRange::new(
+      CellAddress {
+        col: geometry.whole_range.start.col + 1,
+        row: geometry.whole_range.start.row,
+      },
+      CellAddress {
+        col: geometry.whole_range.start.col + 1,
+        row: geometry
+          .whole_range
+          .start
+          .row
+          .saturating_add(page_field_rows),
+      },
+    )),
+    x::TableStyleValues::FirstColumnStripe if pivot.style_show_column_stripes => {
+      pivot_stripe_region(geometry.result_range, address, false, true, column_stripes)
+    }
+    x::TableStyleValues::SecondColumnStripe if pivot.style_show_column_stripes => {
+      pivot_stripe_region(geometry.result_range, address, false, false, column_stripes)
+    }
+    x::TableStyleValues::FirstRowStripe if pivot.style_show_row_stripes => {
+      pivot_stripe_region(geometry.result_range, address, true, true, row_stripes)
+    }
+    x::TableStyleValues::SecondRowStripe if pivot.style_show_row_stripes => {
+      pivot_stripe_region(geometry.result_range, address, true, false, row_stripes)
+    }
+    x::TableStyleValues::LastColumn
+      if pivot.style_show_last_column && pivot.column_grand_totals =>
+    {
+      Some(single_column(table.end.col))
+    }
+    x::TableStyleValues::FirstColumn if pivot.style_show_row_headers => row_labels,
+    x::TableStyleValues::HeaderRow if pivot.style_show_column_headers => header,
+    x::TableStyleValues::TotalRow if pivot.row_grand_totals => Some(single_row(table.end.row)),
+    x::TableStyleValues::FirstHeaderCell
+      if pivot.style_show_row_headers && pivot.style_show_column_headers =>
+    {
+      pivot_range_intersection(row_labels?, header?)
+    }
+    x::TableStyleValues::FirstSubtotalColumn
+    | x::TableStyleValues::SecondSubtotalColumn
+    | x::TableStyleValues::ThirdSubtotalColumn => {
+      let level = pivot_style_level(element_type);
+      pivot_column_style_line(pivot, geometry, address, true, level).map(single_column)
+    }
+    x::TableStyleValues::FirstSubtotalRow
+    | x::TableStyleValues::SecondSubtotalRow
+    | x::TableStyleValues::ThirdSubtotalRow => {
+      let level = pivot_style_level(element_type);
+      pivot_row_style_line(pivot, geometry, address, true, level).map(single_row)
+    }
+    x::TableStyleValues::FirstColumnSubheading
+    | x::TableStyleValues::SecondColumnSubheading
+    | x::TableStyleValues::ThirdColumnSubheading => {
+      let level = pivot_style_level(element_type);
+      pivot_column_style_line(pivot, geometry, address, false, level).map(single_column)
+    }
+    x::TableStyleValues::FirstRowSubheading
+    | x::TableStyleValues::SecondRowSubheading
+    | x::TableStyleValues::ThirdRowSubheading => {
+      let level = pivot_style_level(element_type);
+      pivot_row_style_line(pivot, geometry, address, false, level).map(single_row)
+    }
+    _ => None,
+  }?;
+  region.contains(address).then_some(region)
+}
+
+fn pivot_range_intersection(left: CellRange, right: CellRange) -> Option<CellRange> {
+  let start = CellAddress {
+    col: left.start.col.max(right.start.col),
+    row: left.start.row.max(right.start.row),
+  };
+  let end = CellAddress {
+    col: left.end.col.min(right.end.col),
+    row: left.end.row.min(right.end.row),
+  };
+  (start.col <= end.col && start.row <= end.row).then_some(CellRange::new(start, end))
+}
+
+fn pivot_stripe_region(
+  range: CellRange,
+  address: CellAddress,
+  rows: bool,
+  first: bool,
+  sizes: (u32, u32),
+) -> Option<CellRange> {
+  let start = if rows {
+    range.start.row
+  } else {
+    range.start.col
+  };
+  let end = if rows { range.end.row } else { range.end.col };
+  let target = if rows { address.row } else { address.col };
+  if target < start || target > end {
+    return None;
+  }
+  let period = sizes.0.saturating_add(sizes.1);
+  let offset = target - start;
+  let band_offset = offset % period;
+  let applies = if first {
+    band_offset < sizes.0
+  } else {
+    band_offset >= sizes.0
+  };
+  if !applies {
+    return None;
+  }
+  let period_start = target - band_offset;
+  let (stripe_start, stripe_end) = if first {
+    (period_start, period_start + sizes.0 - 1)
+  } else {
+    (period_start + sizes.0, period_start + sizes.0 + sizes.1 - 1)
+  };
+  Some(if rows {
+    CellRange::new(
+      CellAddress {
+        col: range.start.col,
+        row: stripe_start,
+      },
+      CellAddress {
+        col: range.end.col,
+        row: stripe_end.min(range.end.row),
+      },
+    )
+  } else {
+    CellRange::new(
+      CellAddress {
+        col: stripe_start,
+        row: range.start.row,
+      },
+      CellAddress {
+        col: stripe_end.min(range.end.col),
+        row: range.end.row,
+      },
+    )
+  })
+}
+
+fn pivot_style_level(element_type: x::TableStyleValues) -> usize {
+  match element_type {
+    x::TableStyleValues::FirstSubtotalColumn
+    | x::TableStyleValues::FirstSubtotalRow
+    | x::TableStyleValues::FirstColumnSubheading
+    | x::TableStyleValues::FirstRowSubheading => 0,
+    x::TableStyleValues::SecondSubtotalColumn
+    | x::TableStyleValues::SecondSubtotalRow
+    | x::TableStyleValues::SecondColumnSubheading
+    | x::TableStyleValues::SecondRowSubheading => 1,
+    _ => 2,
+  }
+}
+
+fn pivot_row_style_line(
+  pivot: &PivotTableModel,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+  subtotal: bool,
+  style_level: usize,
+) -> Option<u32> {
+  pivot.format_row_lines.iter().find_map(|line| {
+    let rendered = pivot_shifted_axis_line(
+      line.line,
+      pivot.output_geometry.data_start.row,
+      geometry.data_start.row,
+    );
+    (rendered == address.row && pivot_format_line_style_level(line, subtotal) == Some(style_level))
+      .then_some(rendered)
+  })
+}
+
+fn pivot_column_style_line(
+  pivot: &PivotTableModel,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+  subtotal: bool,
+  style_level: usize,
+) -> Option<u32> {
+  pivot.format_column_lines.iter().find_map(|line| {
+    let rendered = pivot_shifted_axis_line(
+      line.line,
+      pivot.output_geometry.data_start.col,
+      geometry.data_start.col,
+    );
+    (rendered == address.col && pivot_format_line_style_level(line, subtotal) == Some(style_level))
+      .then_some(rendered)
+  })
+}
+
+fn pivot_format_line_style_level(line: &PivotFormatLineData, subtotal: bool) -> Option<usize> {
+  let field = line.fields.iter().position(|field| {
+    if subtotal {
+      field.subtotal
+    } else {
+      field.is_set && !field.is_member && !field.subtotal && !field.grand_total
+    }
+  })?;
+  Some(if field == 0 {
+    0
+  } else if field % 2 == 1 {
+    1
+  } else {
+    2
+  })
+}
+
+fn pivot_shifted_axis_line(line: u32, imported_start: u32, rendered_start: u32) -> u32 {
+  if line >= imported_start {
+    rendered_start.saturating_add(line - imported_start)
+  } else {
+    rendered_start.saturating_sub(imported_start - line)
+  }
+}
+
+fn merge_custom_pivot_differential(
+  result: &mut PivotBuiltinCellStyle,
+  styles: &StylesCatalog,
+  format_id: u32,
+  region: CellRange,
+  address: CellAddress,
+) {
+  if let Some(slot) = result
+    .differential_format_ids
+    .iter_mut()
+    .find(|slot| slot.is_none())
+  {
+    *slot = Some(format_id);
+  }
+  if let Some(fill) = styles.differential_fill_color(format_id) {
+    result.fill = Some(fill);
+  }
+  let Some(border) = styles.differential_borders(format_id) else {
+    return;
+  };
+  if address.col == region.start.col && border.left.is_some() {
+    result.borders.left = border.left;
+  }
+  if address.col == region.end.col && border.right.is_some() {
+    result.borders.right = border.right;
+  }
+  if address.row == region.start.row && border.top.is_some() {
+    result.borders.top = border.top;
+  }
+  if address.row == region.end.row && border.bottom.is_some() {
+    result.borders.bottom = border.bottom;
+  }
+}
+
+fn merge_preset_pivot_differential(
+  result: &mut PivotBuiltinCellStyle,
+  styles: &StylesCatalog,
+  differential: super::pivot_style::PresetPivotDifferential,
+  region: CellRange,
+  address: CellAddress,
+) {
+  if let Some(color) = differential.font_color {
+    result.text_color = styles.theme_color(color.theme, color.tint);
+  }
+  if differential.bold {
+    result.bold = true;
+  }
+  if let Some(color) = differential.fill {
+    result.fill = styles.theme_color(color.theme, color.tint);
+  }
+  let borders = differential.borders;
+  if address.col == region.start.col {
+    merge_preset_border(&mut result.borders.left, styles, borders.left);
+  }
+  if address.col == region.end.col {
+    merge_preset_border(&mut result.borders.right, styles, borders.right);
+  }
+  if address.row == region.start.row {
+    merge_preset_border(&mut result.borders.top, styles, borders.top);
+  }
+  if address.row == region.end.row {
+    merge_preset_border(&mut result.borders.bottom, styles, borders.bottom);
+  }
+  if address.row > region.start.row {
+    merge_preset_border(&mut result.borders.top, styles, borders.horizontal);
+  }
+  if address.col > region.start.col {
+    merge_preset_border(&mut result.borders.left, styles, borders.vertical);
+  }
+}
+
+fn merge_preset_border(
+  target: &mut Option<BorderStyle>,
+  styles: &StylesCatalog,
+  border: super::pivot_style::PresetBorderSide,
+) {
+  match border {
+    super::pivot_style::PresetBorderSide::Inherit => {}
+    super::pivot_style::PresetBorderSide::Line(line) => {
+      let Some(color) = styles.theme_color(line.color.theme, line.color.tint) else {
+        return;
+      };
+      let (width_pt, compound) = match line.weight {
+        super::pivot_style::PresetBorderWeight::Thin => (1.0, false),
+        super::pivot_style::PresetBorderWeight::Double => (2.0, true),
+      };
+      *target = Some(BorderStyle {
+        width_pt,
+        color,
+        compound,
+        ..BorderStyle::default()
+      });
+    }
+  }
+}
+
+fn pivot_fallback_style_for_address(
+  pivot: &PivotTableModel,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+) -> PivotBuiltinCellStyle {
+  let mut style = PivotBuiltinCellStyle::default();
+  if geometry.result_range.contains(address) {
+    style.bold = pivot
+      .format_row_lines
+      .iter()
+      .find(|line| {
+        pivot_shifted_axis_line(
+          line.line,
+          pivot.output_geometry.data_start.row,
+          geometry.data_start.row,
+        ) == address.row
+      })
+      .is_some_and(pivot_format_line_has_subtotal)
+      || pivot
+        .format_column_lines
+        .iter()
+        .find(|line| {
+          pivot_shifted_axis_line(
+            line.line,
+            pivot.output_geometry.data_start.col,
+            geometry.data_start.col,
+          ) == address.col
+        })
+        .is_some_and(pivot_format_line_has_subtotal);
+  }
+  style.borders = pivot_builtin_borders_for_address(pivot, address);
+  style
+}
+
+fn pivot_label_line_at_address(
+  pivot: &PivotTableModel,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+) -> bool {
+  pivot.format_row_lines.iter().any(|line| {
+    pivot_shifted_axis_line(
+      line.line,
+      pivot.output_geometry.data_start.row,
+      geometry.data_start.row,
+    ) == address.row
+      && pivot_shifted_axis_line(
+        line.position,
+        pivot.output_geometry.table_start.col,
+        geometry.table_range.start.col,
+      ) == address.col
+  }) || pivot.format_column_lines.iter().any(|line| {
+    pivot_shifted_axis_line(
+      line.line,
+      pivot.output_geometry.data_start.col,
+      geometry.data_start.col,
+    ) == address.col
+      && pivot_shifted_axis_line(
+        line.position,
+        pivot.output_geometry.table_start.row,
+        geometry.table_range.start.row,
+      ) == address.row
+  })
+}
+
+fn pivot_grand_total_row_at_address(
+  pivot: &PivotTableModel,
+  geometry: PivotRenderGeometry,
+  address: CellAddress,
+) -> bool {
+  pivot.format_row_lines.iter().any(|line| {
+    pivot_shifted_axis_line(
+      line.line,
+      pivot.output_geometry.data_start.row,
+      geometry.data_start.row,
+    ) == address.row
+      && line.fields.iter().any(|field| field.grand_total)
+  })
 }
 
 fn pivot_format_line_has_subtotal(line: &PivotFormatLineData) -> bool {
@@ -452,11 +1086,11 @@ fn pivot_format_kind_contains_address(
   kind: PivotTableFormatKind,
   address: CellAddress,
 ) -> bool {
+  let geometry = pivot_render_geometry(pivot);
   match kind {
-    PivotTableFormatKind::Data => pivot.output_geometry.result_range.contains(address),
+    PivotTableFormatKind::Data => geometry.result_range.contains(address),
     PivotTableFormatKind::Label => {
-      pivot.output_geometry.table_range.contains(address)
-        && !pivot.output_geometry.result_range.contains(address)
+      geometry.table_range.contains(address) && !geometry.result_range.contains(address)
     }
     PivotTableFormatKind::None => false,
   }
@@ -992,6 +1626,14 @@ impl PivotTableModel {
     Ok(Self {
       name: definition.name.clone(),
       cache_id: definition.cache_id,
+      // Excel's Workbooks.Open path does not refresh a PivotTable unless its
+      // cache explicitly requests RefreshOnFileOpen/refreshOnLoad.  Retain
+      // that boundary so fixed-format output can use the persisted worksheet
+      // report instead of unconditionally rebuilding it like DataPilot.
+      refresh_on_load: cache_definition
+        .as_ref()
+        .and_then(|cache| cache.refresh_on_load)
+        .is_some_and(|value| value.as_bool()),
       location_reference: definition.location.reference.clone(),
       printable_location_reference,
       output_geometry,
@@ -1005,6 +1647,31 @@ impl PivotTableModel {
         .as_ref()
         .and_then(|style| style.name.clone())
         .or_else(|| definition.pivot_table_style_name.clone()),
+      style_show_row_headers: definition
+        .pivot_table_style
+        .as_ref()
+        .and_then(|style| style.show_row_headers)
+        .is_some_and(|value| value.as_bool()),
+      style_show_column_headers: definition
+        .pivot_table_style
+        .as_ref()
+        .and_then(|style| style.show_column_headers)
+        .is_some_and(|value| value.as_bool()),
+      style_show_row_stripes: definition
+        .pivot_table_style
+        .as_ref()
+        .and_then(|style| style.show_row_stripes)
+        .is_some_and(|value| value.as_bool()),
+      style_show_column_stripes: definition
+        .pivot_table_style
+        .as_ref()
+        .and_then(|style| style.show_column_stripes)
+        .is_some_and(|value| value.as_bool()),
+      style_show_last_column: definition
+        .pivot_table_style
+        .as_ref()
+        .and_then(|style| style.show_last_column)
+        .is_some_and(|value| value.as_bool()),
       pivot_fields: definition
         .pivot_fields
         .as_ref()
@@ -1788,11 +2455,21 @@ fn pivot_format_item_fields(
   field_indexes: &[i32],
   item_names: &[Vec<String>],
 ) -> Vec<PivotFormatFieldData> {
+  let item_type = item.item_type.unwrap_or_default();
+  let subtotal_item = pivot_format_item_is_subtotal(item_type);
+  let explicit_fields = u32::try_from(item.member_property_index.len()).unwrap_or(u32::MAX);
+  let subtotal_position = usize::try_from(
+    item
+      .repeated_item_count
+      .unwrap_or(0)
+      .saturating_add(explicit_fields)
+      .saturating_sub(1),
+  )
+  .unwrap_or(usize::MAX);
   field_indexes
     .iter()
     .enumerate()
     .map(|(field_position, dimension)| {
-      let item_type = item.item_type.unwrap_or_default();
       let continues = pivot_format_item_continues(item, field_position);
       let index = if *dimension == PIVOT_FORMAT_DATA_DIMENSION {
         item.index.map(|index| index as i32).unwrap_or(0)
@@ -1819,7 +2496,8 @@ fn pivot_format_item_fields(
         index,
         is_set: !continues,
         is_member: item_type == x::ItemValues::Data && !continues,
-        subtotal: pivot_format_item_is_subtotal(item_type),
+        subtotal: subtotal_item && field_position == subtotal_position,
+        grand_total: item_type == x::ItemValues::Grand,
         continues,
       }
     })
@@ -1846,7 +2524,8 @@ fn pivot_format_item_continues(item: &x::RowItem, field_position: usize) -> bool
 fn pivot_format_item_is_subtotal(item_type: x::ItemValues) -> bool {
   matches!(
     item_type,
-    x::ItemValues::Sum
+    x::ItemValues::Default
+      | x::ItemValues::Sum
       | x::ItemValues::CountA
       | x::ItemValues::Average
       | x::ItemValues::Maximum
@@ -1857,7 +2536,6 @@ fn pivot_format_item_is_subtotal(item_type: x::ItemValues) -> bool {
       | x::ItemValues::StandardDeviationP
       | x::ItemValues::Variance
       | x::ItemValues::VarianceP
-      | x::ItemValues::Grand
   )
 }
 

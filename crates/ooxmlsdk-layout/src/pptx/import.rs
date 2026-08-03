@@ -3,6 +3,7 @@ use ooxmlsdk::parts::presentation_part::PresentationPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
 use crate::error::Result;
+use crate::options::FieldUpdateDateTime;
 
 use super::drawingml::color::Color;
 use super::drawingml::fill::FillProperties;
@@ -31,6 +32,10 @@ pub(crate) struct PowerPointImport {
   pub(crate) actual_slide_persist_context: Option<Box<SlidePersist>>,
   pub(crate) table_style_list_path: Option<String>,
   pub(crate) table_style_list: Option<TableStyleList>,
+  /// Rendering-time field policy. These values are populated after package
+  /// import so the imported cache remains the default for ordinary callers.
+  pub(crate) field_update_datetime: Option<FieldUpdateDateTime>,
+  pub(crate) field_format_locale: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -65,6 +70,8 @@ impl PowerPointImport {
       actual_slide_persist_context: None,
       table_style_list_path: None,
       table_style_list: None,
+      field_update_datetime: None,
+      field_format_locale: None,
     };
 
     let mut handler = PresentationFragmentHandler::new(package, presentation_part.clone())?;

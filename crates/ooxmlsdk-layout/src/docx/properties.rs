@@ -189,6 +189,14 @@ pub(super) fn merge_run_style(
       style.bidi_language = Some(Arc::<str>::from(language));
     }
   }
+  if let Some(vertical) = properties
+    .east_asian_layout()
+    .and_then(|layout| layout.vertical)
+  {
+    // LibreOffice's WordprocessingML mapper imports w:eastAsianLayout/@w:vert
+    // as CharRotation: true is 900 tenths of a degree and false is 0.
+    style.rotation_deg = if vertical.as_bool() { 90.0 } else { 0.0 };
+  }
   if let Some(bold) = properties.bold() {
     let bold = bold.val.is_none_or(|value| value.as_bool());
     style.bold = bold;

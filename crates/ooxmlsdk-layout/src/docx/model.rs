@@ -89,6 +89,7 @@ pub(crate) struct NoteNumberingSpec {
 #[derive(Clone, Debug)]
 pub(crate) struct ImportedSection {
   pub break_kind: SectionBreakKind,
+  pub discarded_carrier_spacing_after_pt: Option<f32>,
   pub section_properties: Option<w::SectionProperties>,
   pub page: PageSetup,
   pub columns: SectionColumns,
@@ -155,6 +156,7 @@ pub(crate) struct FloatingFrame {
   pub width_pt: Option<f32>,
   pub height_pt: Option<f32>,
   pub height_rule: FrameHeightRule,
+  pub vertical_text_flow: Option<VerticalTextFlow>,
   pub placement: FloatingFramePlacement,
   pub suppress_overlap: bool,
   /// Decoration supplied by a non-content anchor paragraph.
@@ -164,6 +166,12 @@ pub(crate) struct FloatingFrame {
   /// paragraph decoration.
   pub outer_fill_color: Option<ShadingPaint>,
   pub outer_borders: ParagraphBordersModel,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum VerticalTextFlow {
+  TopToBottomRightToLeft,
+  BottomToTopLeftToRight,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -405,6 +413,7 @@ impl ParagraphBordersModel {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ParagraphFormat {
   pub style_id: Option<Arc<str>>,
+  pub numbering_id: Option<i32>,
   pub spacing_before_pt: f32,
   pub spacing_before_lines: Option<f32>,
   pub spacing_before_auto: Option<bool>,
@@ -415,6 +424,7 @@ pub(crate) struct ParagraphFormat {
   pub spacing_before_set: bool,
   pub spacing_after_set: bool,
   pub line_height_pt: Option<f32>,
+  pub line_height_set: bool,
   pub line_height_rule: LineHeightRule,
   pub snap_to_grid: Option<bool>,
   pub line_vertical_alignment: Option<common::LineVerticalAlignment>,
@@ -436,7 +446,9 @@ pub(crate) struct ParagraphFormat {
   pub list_label_justification: w::LevelJustificationValues,
   pub alignment: ParagraphAlignment,
   pub justification: ParagraphJustification,
+  pub justification_set: bool,
   pub bidi: bool,
+  pub bidi_set: bool,
   /// Presence records an authored/inherited `w:shd`; `None` inside the paint
   /// is represented by [`ShadingPaint::None`] so `w:val="nil"` can cancel an
   /// inherited value without becoming indistinguishable from omission.
@@ -464,6 +476,7 @@ pub(crate) struct ParagraphFormat {
   /// value; `\u` uses the final `outline_level` below.
   pub style_outline_level: Option<u8>,
   pub outline_level: Option<u8>,
+  pub vertical_text_flow: Option<VerticalTextFlow>,
   pub frame: Option<ParagraphFrameProperties>,
 }
 
@@ -992,6 +1005,8 @@ pub(crate) struct FloatingImagePlacement {
   pub alignment_extent: Option<FloatingAlignmentExtent>,
   pub horizontal_offset_pt: f32,
   pub vertical_offset_pt: f32,
+  pub horizontal_offset_pct: Option<f32>,
+  pub vertical_offset_pct: Option<f32>,
   pub wrap: ImageWrapMode,
   pub wrap_side: ImageWrapSide,
   pub behind_text: bool,

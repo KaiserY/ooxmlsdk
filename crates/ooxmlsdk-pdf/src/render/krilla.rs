@@ -2218,6 +2218,13 @@ fn dynamic_field_borrowed<'doc>(
     common::DynamicField::NumPages { number_format } => common::DynamicField::NumPages {
       number_format: *number_format,
     },
+    common::DynamicField::Sequence {
+      identifier,
+      number_format,
+    } => common::DynamicField::Sequence {
+      identifier: Cow::Borrowed(identifier.as_ref()),
+      number_format: *number_format,
+    },
     common::DynamicField::PageRef { bookmark_name } => common::DynamicField::PageRef {
       bookmark_name: Cow::Borrowed(bookmark_name.as_ref()),
     },

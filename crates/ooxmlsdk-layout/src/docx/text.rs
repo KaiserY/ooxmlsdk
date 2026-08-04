@@ -76,17 +76,32 @@ pub(super) fn paragraph_model_with_base<'a>(
   } else {
     paragraph_properties.map(ParagraphProps::Direct)
   };
+  let has_authored_direct_indentation = direct_paragraph_properties
+    .as_ref()
+    .is_some_and(|properties| properties.indentation().is_some());
   let numbering_format_context = NumberingFormatMergeContext {
     direct_tab_stops: direct_paragraph_properties
       .as_ref()
       .is_some_and(|properties| properties.tabs().is_some()),
     ..NumberingFormatMergeContext::from_direct_properties(direct_paragraph_properties)
   };
+  let has_direct_line_height = direct_paragraph_properties
+    .as_ref()
+    .and_then(|properties| properties.spacing_between_lines())
+    .is_some_and(|spacing| spacing.line.is_some());
+  let has_direct_justification = direct_paragraph_properties
+    .as_ref()
+    .is_some_and(|properties| properties.justification().is_some());
   let style_outline_level = styles
     .paragraph_format_with_base(style_id, base.format.clone())
     .outline_level;
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
+  // The Word-compatible proportional-gap path is driven by the paragraph's
+  // directly authored line spacing. A line value inherited from a style still
+  // determines total line height, but does not move the first-line baseline.
+  format.line_height_set = has_direct_line_height;
+  format.justification_set = has_direct_justification;
   format.style_id = style_id.map(Arc::<str>::from);
   format.style_outline_level = style_outline_level;
   if [
@@ -125,6 +140,7 @@ pub(super) fn paragraph_model_with_base<'a>(
   let style_numbering = styles.paragraph_numbering_reference(style_id);
   let (numbering_reference, style_numbering_applies, numbering_cancelled) =
     select_paragraph_numbering(direct_numbering, style_numbering);
+  format.numbering_id = numbering_reference.map(NumberingReference::num_id);
   if numbering_cancelled {
     let (left, first_line) = styles.paragraph_indents_without_numbering(style_id);
     if !numbering_format_context.direct_indent_left {
@@ -323,10 +339,12 @@ pub(super) fn paragraph_model_with_base<'a>(
       replacement_text,
     })
   });
-  if !has_direct_indentation && let Some(legacy_image) = list_label_image.take() {
+  if !has_authored_direct_indentation && let Some(legacy_image) = list_label_image.take() {
     // A style-owned legacy list keeps its graphic in the number portion's
-    // inline line box. Direct paragraph indentation switches Word to the
-    // fixed label-alignment margin model handled by `list_label_image`.
+    // inline line box. An authored direct w:ind switches Word to the fixed
+    // label-alignment margin model handled by `list_label_image`; an explicit
+    // zero character-unit indent still counts because it clears the inherited
+    // character indent under MS-OI29500 section 2.1.87.
     for _ in 0..legacy_image.replacement_text.chars().count() {
       inlines.insert(0, super::InlineItem::Image(legacy_image.image.clone()));
     }
@@ -373,7 +391,7 @@ pub(super) fn paragraph_model_with_base<'a>(
   }
 }
 
-fn paragraph_style_ref_text(
+pub(super) fn paragraph_style_ref_text(
   inlines: &[super::InlineItem],
   list_label: Option<&str>,
 ) -> Option<Arc<str>> {

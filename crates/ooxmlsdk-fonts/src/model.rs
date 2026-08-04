@@ -1856,7 +1856,12 @@ impl<'book> ResolvedFont<'book> {
         };
         let mut x_advance_pt =
           position.x_advance as f32 / units_per_em * shape_size.0 * horizontal_scale;
-        if tracking.abs() > f32::EPSILON && index + 1 < infos.len() {
+        // ECMA-376 Part 1 §17.3.2.35 adds the authored pitch after each
+        // character. Retain it on the final glyph as well: it participates in
+        // centered/right-aligned run measurement and separates this run from
+        // a following differently shaped run without moving the final glyph's
+        // own paint origin.
+        if tracking.abs() > f32::EPSILON {
           x_advance_pt += tracking;
         }
         let justification = source_char.map(glyph_justification).unwrap_or_default();
@@ -2697,6 +2702,10 @@ const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
   ("Helvetica Neue", "Arial"),
   ("Helvetica Neue Light", "Arial"),
   ("Helvetica Neue Medium", "Arial"),
+  // Nyala is an optional Windows Ethiopic supplemental font. Office fixed
+  // output without that feature uses Calibri for its Latin portions and the
+  // system African-script face from the requested-family fallback below.
+  ("Nyala", "Calibri"),
   // Apache POI bug65228.pptx carries a macOS Graphik theme, while Office's
   // fixed PDF substitutes Calibri for the unavailable family.
   ("Graphik", "Calibri"),
@@ -2725,6 +2734,24 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
     ),
     office_family_fallback("Arial", &["Liberation Sans", "Arimo"]),
     office_family_fallback("Arial Black", &["Arial", "Liberation Sans"]),
+    // Microsoft's SimSun family inventory lists SimSun-ExtB and SimSun as
+    // members of the same family. Prefer the installed base face for covered
+    // BMP glyphs when the Ext-B member is unavailable; true Extension-B
+    // characters that it cannot cover continue through script fallback.
+    office_family_fallback("SimSun-ExtB", &["SimSun"]),
+    // Word keeps Liberation Sans for its covered Latin glyphs, but fixed
+    // output links missing Han glyphs from that requested face through SimSun.
+    // Scope this to Han so explicit Chinese faces and other script fallbacks
+    // continue to use their own chains.
+    FontFallbackChain {
+      requested_family: Some(Cow::Borrowed("Liberation Sans")),
+      script: Some(TextScript::Han),
+      language: None,
+      families: vec![Cow::Borrowed("SimSun")],
+    },
+    // Ebrima is Windows' default African-language face and supplies real
+    // regular/bold Ethiopic fonts when optional Nyala is unavailable.
+    office_family_fallback("Nyala", &["Ebrima"]),
     // AR PL SungtiL GB is the legacy Simplified Chinese Song face written by
     // older LibreOffice documents. Current LibreOffice's zh-CN CJK_TEXT list
     // starts with Source Han/Noto Serif CJK SC before SimSun-style fallbacks;

@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
+
 use crate::common;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -338,6 +340,10 @@ pub enum DynamicFieldKind {
   NumPages {
     number_format: FieldNumberFormat,
   },
+  Sequence {
+    identifier: Arc<str>,
+    number_format: FieldNumberFormat,
+  },
   PageRef {
     bookmark_name: Arc<str>,
     number_format: FieldNumberFormat,
@@ -361,6 +367,9 @@ pub enum FieldNumberFormat {
   UpperRoman,
   LowerLetter,
   UpperLetter,
+  /// Preserve any page-number format authored through
+  /// WordprocessingML `w:pgNumType/@w:fmt`.
+  WordprocessingMl(w::NumberFormatValues),
 }
 
 #[derive(Clone, Debug)]

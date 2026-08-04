@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use ooxmlsdk_fonts::{FontId, ShapedGlyph, ShapedRun};
 
 use crate::common::{Color, Fill, Insets, Point, Pt, Rect, Size, Stroke, Transform};
@@ -600,6 +601,10 @@ pub enum DynamicField<'doc> {
   NumPages {
     number_format: FieldNumberFormat,
   },
+  Sequence {
+    identifier: Cow<'doc, str>,
+    number_format: FieldNumberFormat,
+  },
   PageRef {
     bookmark_name: Cow<'doc, str>,
   },
@@ -617,6 +622,7 @@ pub enum FieldNumberFormat {
   UpperRoman,
   LowerLetter,
   UpperLetter,
+  WordprocessingMl(w::NumberFormatValues),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

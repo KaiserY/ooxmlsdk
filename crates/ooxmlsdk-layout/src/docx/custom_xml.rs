@@ -1,11 +1,13 @@
 use super::*;
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use std::cell::RefCell;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CustomXmlBindings {
   entries: Vec<CustomXmlBindingEntry>,
   glossary_placeholders: HashMap<String, w::DocPartBody>,
+  inline_placeholder_contents: RefCell<HashMap<String, Vec<InlineItem>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -69,6 +71,7 @@ impl CustomXmlBindings {
     Self {
       entries,
       glossary_placeholders,
+      inline_placeholder_contents: RefCell::default(),
     }
   }
 
@@ -80,6 +83,7 @@ impl CustomXmlBindings {
         xml: xml.to_owned(),
       }],
       glossary_placeholders: HashMap::new(),
+      inline_placeholder_contents: RefCell::default(),
     }
   }
 
@@ -91,6 +95,21 @@ impl CustomXmlBindings {
 
   pub(super) fn glossary_placeholder(&self, name: &str) -> Option<&w::DocPartBody> {
     self.glossary_placeholders.get(name)
+  }
+
+  pub(super) fn inline_placeholder_content(&self, name: &str) -> Option<Vec<InlineItem>> {
+    self.inline_placeholder_contents.borrow().get(name).cloned()
+  }
+
+  pub(super) fn remember_inline_placeholder_content(&self, name: &str, content: &[InlineItem]) {
+    if content.is_empty() {
+      return;
+    }
+    self
+      .inline_placeholder_contents
+      .borrow_mut()
+      .entry(name.to_owned())
+      .or_insert_with(|| content.to_vec());
   }
 
   pub(super) fn value_for_sdt(&self, properties: &w::SdtProperties) -> Option<String> {

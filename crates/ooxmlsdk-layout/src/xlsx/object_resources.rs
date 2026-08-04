@@ -1127,12 +1127,13 @@ fn collect_typed_vml_stroke(model: &mut VmlShapeModel, stroke: &vml::Stroke) {
 }
 
 fn vml_group_shape_models(group: &vml::Group) -> Vec<VmlShapeModel> {
-  vml_group_shape_models_with_style(group, group.style.as_deref())
+  vml_group_shape_models_with_style(group, group.style.as_deref(), true)
 }
 
 fn vml_group_shape_models_with_style(
   group: &vml::Group,
   group_style: Option<&str>,
+  root_anchor: bool,
 ) -> Vec<VmlShapeModel> {
   let mut shapes = Vec::new();
   let mut group_model = VmlShapeModel {
@@ -1145,31 +1146,52 @@ fn vml_group_shape_models_with_style(
   for child in &group.group_choice {
     match child {
       vml::GroupChoice::Group(child_group) => {
-        let child_style =
-          crate::docx::vml_group_child_style(group, group_style, child_group.style.as_deref());
+        let child_style = crate::docx::vml_group_child_style(
+          group,
+          group_style,
+          child_group.style.as_deref(),
+          root_anchor,
+          true,
+        );
         shapes.extend(vml_group_shape_models_with_style(
           child_group,
           child_style.as_deref().or(child_group.style.as_deref()),
+          false,
         ));
       }
       vml::GroupChoice::Shape(shape) => {
-        let mut model =
-          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Shape);
+        let mut model = vml_group_child_model(
+          group,
+          group_style,
+          shape.as_ref(),
+          VmlShapeKind::Shape,
+          root_anchor,
+        );
         model.shape_type_reference.clone_from(&shape.r#type);
         model.path = shape.edge_path.clone().or(model.path);
         shapes.push(model);
       }
       vml::GroupChoice::Arc(shape) => {
-        let mut model =
-          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Arc);
+        let mut model = vml_group_child_model(
+          group,
+          group_style,
+          shape.as_ref(),
+          VmlShapeKind::Arc,
+          root_anchor,
+        );
         model.coordinate_origin.clone_from(&shape.coordinate_origin);
         model.start_angle = shape.start_angle.as_ref().map(ToString::to_string);
         model.end_angle = shape.end_angle.as_ref().map(ToString::to_string);
         shapes.push(model);
       }
       vml::GroupChoice::Curve(shape) => {
-        let mut model =
-          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Curve);
+        let mut model = vml_group_child_model(
+          group,
+          group_style,
+          shape.as_ref(),
+          VmlShapeKind::Curve,
+          root_anchor,
+        );
         model.coordinate_origin.clone_from(&shape.coordinate_origin);
         model.from.clone_from(&shape.from);
         model.to.clone_from(&shape.to);
@@ -1183,32 +1205,53 @@ fn vml_group_shape_models_with_style(
           group_style,
           shape.as_ref(),
           VmlShapeKind::Image,
+          root_anchor,
         ));
       }
       vml::GroupChoice::Line(shape) => {
-        let mut model =
-          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Line);
+        let mut model = vml_group_child_model(
+          group,
+          group_style,
+          shape.as_ref(),
+          VmlShapeKind::Line,
+          root_anchor,
+        );
         model.coordinate_origin.clone_from(&shape.coordinate_origin);
         model.from.clone_from(&shape.from);
         model.to.clone_from(&shape.to);
         shapes.push(model);
       }
       vml::GroupChoice::Oval(shape) => {
-        let mut model =
-          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Oval);
+        let mut model = vml_group_child_model(
+          group,
+          group_style,
+          shape.as_ref(),
+          VmlShapeKind::Oval,
+          root_anchor,
+        );
         model.coordinate_origin.clone_from(&shape.coordinate_origin);
         shapes.push(model);
       }
       vml::GroupChoice::PolyLine(shape) => {
-        let mut model =
-          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Polyline);
+        let mut model = vml_group_child_model(
+          group,
+          group_style,
+          shape.as_ref(),
+          VmlShapeKind::Polyline,
+          root_anchor,
+        );
         model.coordinate_origin.clone_from(&shape.coordinate_origin);
         model.points.clone_from(&shape.points);
         shapes.push(model);
       }
       vml::GroupChoice::Rectangle(shape) => {
-        let mut model =
-          vml_group_child_model(group, group_style, shape.as_ref(), VmlShapeKind::Rectangle);
+        let mut model = vml_group_child_model(
+          group,
+          group_style,
+          shape.as_ref(),
+          VmlShapeKind::Rectangle,
+          root_anchor,
+        );
         model.coordinate_origin.clone_from(&shape.coordinate_origin);
         shapes.push(model);
       }
@@ -1218,6 +1261,7 @@ fn vml_group_shape_models_with_style(
           group_style,
           shape.as_ref(),
           VmlShapeKind::RoundRectangle,
+          root_anchor,
         );
         model.arc_size.clone_from(&shape.arc_size);
         shapes.push(model);
@@ -1243,11 +1287,16 @@ fn vml_group_child_model(
   group_style: Option<&str>,
   shape: &impl VmlShapeElement,
   kind: VmlShapeKind,
+  root_anchor: bool,
 ) -> VmlShapeModel {
   let mut model = vml_shape_from_typed(shape, kind);
-  if let Some(style) =
-    crate::docx::vml_group_child_style(group, group_style, model.style.as_deref())
-  {
+  if let Some(style) = crate::docx::vml_group_child_style(
+    group,
+    group_style,
+    model.style.as_deref(),
+    root_anchor,
+    false,
+  ) {
     model.style = Some(style);
   }
   model

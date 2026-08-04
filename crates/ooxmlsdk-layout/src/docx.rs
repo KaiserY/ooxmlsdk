@@ -24,8 +24,7 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
-  schemas_microsoft_com_office_office as o, schemas_microsoft_com_office_word as w10,
-  schemas_microsoft_com_office_word_2010_wordml as w14,
+  schemas_microsoft_com_office_word as w10, schemas_microsoft_com_office_word_2010_wordml as w14,
   schemas_microsoft_com_office_word_2010_wordprocessing_canvas as wpc,
   schemas_microsoft_com_office_word_2010_wordprocessing_drawing as wp14,
   schemas_microsoft_com_office_word_2010_wordprocessing_group as wpg,
@@ -517,6 +516,8 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
         alignment_extent: None,
         horizontal_offset_pt: 0.0,
         vertical_offset_pt: 0.0,
+        horizontal_offset_pct: None,
+        vertical_offset_pct: None,
         wrap: ImageWrapMode::None,
         wrap_side: ImageWrapSide::BothSides,
         behind_text: true,
@@ -979,7 +980,7 @@ fn last_table_cell_paragraph_mut(cells: &mut [TableCell]) -> Option<&mut Paragra
 }
 
 fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection> {
-  let mut sections = Vec::new();
+  let mut sections: Vec<ImportedSection> = Vec::new();
   let mut current_blocks = Vec::new();
   let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
   let mut previous_properties = None;
@@ -1074,7 +1075,22 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
             // Word can retain an inherited style number on an otherwise empty
             // page-section carrier. Besides the visible outline item, this
             // preserves section pagination and STYLEREF state (tdf#170602).
-            section_metadata_only = !had_numbering_label;
+            // The unnumbered continuous carrier in tdf#103975 remains one
+            // empty flow line because it follows an authored column break.
+            // A leading carrier or one after a page break is pure metadata;
+            // retaining a line there creates a spurious page (tdf#149313).
+            let preceding_block = current_blocks
+              .last()
+              .or_else(|| sections.last().and_then(|section| section.blocks.last()));
+            let follows_column_break = preceding_block.is_some_and(|block| {
+              matches!(
+                block,
+                Block::Paragraph(paragraph)
+                  if matches!(paragraph.inlines.last(), Some(InlineItem::ColumnBreak))
+              )
+            });
+            section_metadata_only = !had_numbering_label
+              && !(section_break == SectionBreakKind::Continuous && follows_column_break);
           }
           if section_metadata_only {
             promote_preceding_table_to_anchored_frame(&mut current_blocks, &model);
@@ -1084,6 +1100,15 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           boundary_bookmarks.attach_to_paragraph_start(&mut model);
         }
         if let Some(section_properties) = section_properties {
+          let discarded_carrier_spacing_after_pt = section_metadata_only.then(|| {
+            paragraph
+              .paragraph_properties
+              .as_deref()
+              .and_then(|properties| properties.spacing_between_lines.as_ref())
+              .and_then(|spacing| spacing.after.as_ref())
+              .and_then(signed_twips_measure_to_points)
+              .unwrap_or(0.0)
+          });
           if !section_metadata_only {
             push_body_paragraph(&mut current_blocks, model);
           }
@@ -1094,6 +1119,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
             &mut sections,
             &mut current_blocks,
             Some(section_properties),
+            discarded_carrier_spacing_after_pt,
             &mut previous_properties,
           );
         } else {
@@ -1208,6 +1234,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
       &mut sections,
       &mut current_blocks,
       body.section_properties.as_deref().cloned(),
+      None,
       &mut previous_properties,
     );
   }
@@ -1422,6 +1449,37 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   if let Some(Block::Paragraph(previous)) = blocks.last_mut()
     && (previous.format.hidden_separator || previous.format.deleted_separator)
   {
+    if previous.format.deleted_separator {
+      // ECMA-376 Part 1 section 17.13.5.15: deleting the delimiter combines
+      // the current contents with the following paragraph. The surviving
+      // paragraph mark is the following one, so its paragraph properties,
+      // mark style, and numbering own the combined paragraph. Preserve the
+      // preceding story/event order while replacing that deleted-mark model.
+      let starts_after_last_rendered_page_break = previous.starts_after_last_rendered_page_break;
+      let mut inlines = std::mem::take(&mut previous.inlines);
+      inlines.append(&mut paragraph.inlines);
+      paragraph.inlines = inlines;
+      let mut field_events = std::mem::take(&mut previous.field_events);
+      field_events.append(&mut paragraph.field_events);
+      paragraph.field_events = field_events;
+      let mut footnote_reference_ids = std::mem::take(&mut previous.footnote_reference_ids);
+      footnote_reference_ids.append(&mut paragraph.footnote_reference_ids);
+      paragraph.footnote_reference_ids = footnote_reference_ids;
+      let mut endnote_reference_ids = std::mem::take(&mut previous.endnote_reference_ids);
+      endnote_reference_ids.append(&mut paragraph.endnote_reference_ids);
+      paragraph.endnote_reference_ids = endnote_reference_ids;
+      paragraph.starts_after_last_rendered_page_break = starts_after_last_rendered_page_break;
+      #[cfg(test)]
+      {
+        let mut runs = std::mem::take(&mut previous.runs);
+        runs.append(&mut paragraph.runs);
+        paragraph.runs = runs;
+      }
+      paragraph.style_ref_text =
+        text::paragraph_style_ref_text(&paragraph.inlines, paragraph.list_label.as_deref());
+      **previous = paragraph;
+      return;
+    }
     if previous.format.hidden_separator {
       previous
         .format
@@ -1442,9 +1500,10 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   }
   if let Some(frame) = paragraph.format.frame {
     let suppress_overlap = paragraph.format.suppress_overlap == Some(true);
+    let vertical_text_flow = paragraph.format.vertical_text_flow;
     paragraph.format.frame = None;
     if let Some(Block::Frame(previous)) = blocks.last_mut()
-      && paragraph_belongs_to_frame(previous, frame, suppress_overlap)
+      && paragraph_belongs_to_frame(previous, frame, suppress_overlap, vertical_text_flow)
     {
       previous.blocks.push(Block::paragraph(paragraph));
       return;
@@ -1454,6 +1513,7 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
       width_pt: frame.width_pt,
       height_pt: frame.height_pt,
       height_rule: frame.height_rule,
+      vertical_text_flow,
       placement: frame.placement,
       suppress_overlap,
       outer_fill_color: None,
@@ -1543,6 +1603,7 @@ fn promote_preceding_table_to_anchored_frame(blocks: &mut Vec<Block>, anchor: &P
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
+    vertical_text_flow: anchor.format.vertical_text_flow,
     placement: frame.placement,
     suppress_overlap: anchor.format.suppress_overlap == Some(true),
     outer_fill_color: anchor.format.shading,
@@ -1569,10 +1630,12 @@ fn paragraph_belongs_to_frame(
   frame: &FloatingFrame,
   properties: ParagraphFrameProperties,
   suppress_overlap: bool,
+  vertical_text_flow: Option<VerticalTextFlow>,
 ) -> bool {
   frame.width_pt == properties.width_pt
     && frame.height_pt == properties.height_pt
     && frame.height_rule == properties.height_rule
+    && frame.vertical_text_flow == vertical_text_flow
     && frame.placement == properties.placement
     && frame.suppress_overlap == suppress_overlap
 }
@@ -1699,11 +1762,16 @@ fn close_section(
   sections: &mut Vec<ImportedSection>,
   current_blocks: &mut Vec<Block>,
   section_properties: Option<w::SectionProperties>,
+  discarded_carrier_spacing_after_pt: Option<f32>,
   previous_properties: &mut Option<w::SectionProperties>,
 ) {
-  if let Some(rotation_deg) = section_properties
+  if section_properties
     .as_ref()
-    .and_then(section_text_rotation_degrees)
+    .and_then(section_vertical_text_flow)
+    .is_none()
+    && let Some(rotation_deg) = section_properties
+      .as_ref()
+      .and_then(section_text_rotation_degrees)
   {
     rotate_blocks_text(current_blocks, rotation_deg);
   }
@@ -1725,6 +1793,7 @@ fn close_section(
 
   sections.push(ImportedSection {
     break_kind,
+    discarded_carrier_spacing_after_pt,
     section_properties: section_properties.clone(),
     page,
     columns,
@@ -1746,6 +1815,7 @@ fn close_section(
 fn default_section(blocks: Vec<Block>) -> ImportedSection {
   ImportedSection {
     break_kind: SectionBreakKind::NextPage,
+    discarded_carrier_spacing_after_pt: None,
     section_properties: None,
     page: default_word_page_setup_with_size(PageSetup::default()),
     columns: SectionColumns::default(),
@@ -1828,6 +1898,33 @@ fn section_orientation(section: &w::SectionProperties) -> w::PageOrientationValu
       )
     })
     .unwrap_or_default()
+}
+
+pub(super) fn section_vertical_text_flow(
+  section: &w::SectionProperties,
+) -> Option<VerticalTextFlow> {
+  vertical_text_flow(section.text_direction.as_ref()?.val)
+}
+
+fn vertical_text_flow(direction: w::TextDirectionValues) -> Option<VerticalTextFlow> {
+  match direction {
+    w::TextDirectionValues::TopToBottomRightToLeft
+    | w::TextDirectionValues::TopToBottomRightToLeft2010 => {
+      Some(VerticalTextFlow::TopToBottomRightToLeft)
+    }
+    w::TextDirectionValues::BottomToTopLeftToRight
+    | w::TextDirectionValues::BottomToTopLeftToRight2010 => {
+      Some(VerticalTextFlow::BottomToTopLeftToRight)
+    }
+    w::TextDirectionValues::LefToRightTopToBottom
+    | w::TextDirectionValues::LeftToRightTopToBottom2010
+    | w::TextDirectionValues::LefttoRightTopToBottomRotated
+    | w::TextDirectionValues::LeftToRightTopToBottomRotated2010
+    | w::TextDirectionValues::TopToBottomRightToLeftRotated
+    | w::TextDirectionValues::TopToBottomRightToLeftRotated2010
+    | w::TextDirectionValues::TopToBottomLeftToRightRotated
+    | w::TextDirectionValues::TopToBottomLeftToRightRotated2010 => None,
+  }
 }
 
 fn section_text_rotation_degrees(section: &w::SectionProperties) -> Option<f32> {
@@ -1991,17 +2088,16 @@ fn sdt_block_blocks_with_base(
     return Vec::new();
   };
 
-  let bound_value = sdt
-    .sdt_properties
-    .as_ref()
-    .and_then(|properties| sdt_bound_replacement(custom_xml_bindings, properties));
+  let sdt_properties = sdt.sdt_properties.as_ref();
+  let bound_value =
+    sdt_properties.and_then(|properties| sdt_bound_replacement(custom_xml_bindings, properties));
   let mut blocks = Vec::new();
   let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
   for choice in &content.sdt_content_block_choice {
     let block_start = blocks.len();
     match choice {
       w::SdtContentBlockChoice::Paragraph(paragraph) => {
-        let mut model = block_content_paragraph_model(
+        let Some(mut model) = block_content_paragraph_model(
           paragraph,
           BlockContentParagraphEnv {
             styles,
@@ -2013,7 +2109,9 @@ fn sdt_block_blocks_with_base(
             in_header_footer,
             paragraph_base,
           },
-        );
+        ) else {
+          continue;
+        };
         boundary_bookmarks.attach_to_paragraph_start(&mut model);
         blocks.push(Block::paragraph(model));
       }
@@ -2072,7 +2170,7 @@ fn sdt_block_blocks_with_base(
   }
   boundary_bookmarks.finish(&mut blocks);
   if let Some(value) = bound_value {
-    replace_sdt_block_text(&mut blocks, value);
+    replace_sdt_block_text(&mut blocks, value, sdt_properties, styles);
   }
   blocks
 }
@@ -2097,7 +2195,7 @@ fn custom_xml_block_blocks_with_base(
     let block_start = blocks.len();
     match choice {
       w::CustomXmlBlockChoice::Paragraph(paragraph) => {
-        let mut model = block_content_paragraph_model(
+        let Some(mut model) = block_content_paragraph_model(
           paragraph,
           BlockContentParagraphEnv {
             styles,
@@ -2109,7 +2207,9 @@ fn custom_xml_block_blocks_with_base(
             in_header_footer,
             paragraph_base,
           },
-        );
+        ) else {
+          continue;
+        };
         boundary_bookmarks.attach_to_paragraph_start(&mut model);
         blocks.push(Block::paragraph(model));
       }
@@ -2182,7 +2282,7 @@ struct BlockContentParagraphEnv<'a> {
 fn block_content_paragraph_model(
   paragraph: &w::Paragraph,
   env: BlockContentParagraphEnv<'_>,
-) -> Paragraph {
+) -> Option<Paragraph> {
   let BlockContentParagraphEnv {
     styles,
     numbering,
@@ -2193,6 +2293,8 @@ fn block_content_paragraph_model(
     in_header_footer,
     paragraph_base,
   } = env;
+  let deleted_paragraph_mark = paragraph_mark_is_deleted(paragraph);
+  let numbering_state = deleted_paragraph_mark.then(|| numbering.counter_state());
   let mut model = if let Some(base) = paragraph_base {
     paragraph_model_with_base(
       paragraph,
@@ -2222,20 +2324,47 @@ fn block_content_paragraph_model(
   if !in_header_footer {
     apply_recovered_body_paragraph_defaults(paragraph, styles, &mut model);
   }
-  model
+  if deleted_paragraph_mark && paragraph_body_is_effectively_empty(&model) {
+    // ECMA-376 Part 1 §17.13.5.21 makes a move-source paragraph mark a
+    // revision of that paragraph's existence. When all of its contents are
+    // moveFrom/deleted too, the paragraph is absent from the current story
+    // even inside block SDT/customXml content. A moved mark with later,
+    // non-moved content remains visible, as the standard explicitly permits.
+    numbering.restore_counter_state(
+      numbering_state.expect("deleted block-content paragraph captured numbering state"),
+    );
+    return None;
+  }
+  Some(model)
 }
 
-fn replace_sdt_block_text(blocks: &mut [Block], value: String) {
-  fn replace(blocks: &mut [Block], value: &mut Option<String>) {
+fn replace_sdt_block_text(
+  blocks: &mut [Block],
+  value: String,
+  properties: Option<&w::SdtProperties>,
+  styles: &StylesCatalog,
+) {
+  fn replace(
+    blocks: &mut [Block],
+    value: &mut Option<String>,
+    run_properties: Option<&w::RunProperties>,
+    styles: &StylesCatalog,
+  ) {
     for block in blocks {
       match block {
         Block::Paragraph(paragraph) => {
           for inline in &mut paragraph.inlines {
             match inline {
               InlineItem::Text(run) => {
-                run.text = value.take().unwrap_or_default();
+                if let Some(run_properties) = run_properties {
+                  run.style =
+                    properties::run_style(Some(run_properties), run.style.clone(), styles);
+                }
+                run.text = run_display_text(value.take().unwrap_or_default(), run.style.clone());
               }
-              InlineItem::Shape(shape) => replace(&mut shape.text_box_blocks, value),
+              InlineItem::Shape(shape) => {
+                replace(&mut shape.text_box_blocks, value, run_properties, styles)
+              }
               _ => {}
             }
           }
@@ -2243,16 +2372,21 @@ fn replace_sdt_block_text(blocks: &mut [Block], value: String) {
         Block::Table(table) => {
           for row in &mut table.rows {
             for cell in &mut row.cells {
-              replace(&mut cell.blocks, value);
+              replace(&mut cell.blocks, value, run_properties, styles);
             }
           }
         }
-        Block::Frame(frame) => replace(&mut frame.blocks, value),
+        Block::Frame(frame) => replace(&mut frame.blocks, value, run_properties, styles),
       }
     }
   }
 
-  replace(blocks, &mut Some(value));
+  replace(
+    blocks,
+    &mut Some(value),
+    sdt_replacement_run_properties(properties),
+    styles,
+  );
 }
 
 fn apply_recovered_body_paragraph_defaults(
@@ -4186,7 +4320,7 @@ fn table_cell_model(
   if let Some(value) = sdt_properties
     .and_then(|properties| sdt_bound_replacement(context.custom_xml_bindings, properties))
   {
-    replace_sdt_block_text(&mut blocks, value);
+    replace_sdt_block_text(&mut blocks, value, sdt_properties, context.styles);
   }
   let text_rotation_deg = properties.and_then(table_cell_text_rotation_degrees);
   if let Some(rotation_deg) = text_rotation_deg {
@@ -4199,14 +4333,26 @@ fn table_cell_model(
     // later visible rows.
     context.numbering.restore_counter_state(numbering_state);
   }
+  let direct_shading = properties.and_then(|properties| properties.shading.as_ref());
+  let direct_non_theme_shading = direct_shading.is_some_and(|shading| shading.theme_fill.is_none());
+  let shading = resolved_table_cell_shading(
+    direct_shading.map(|shading| shading_fill(shading, &context.styles.theme_colors)),
+    style.shading,
+  );
+  if direct_non_theme_shading && let Some(background) = shading.and_then(ShadingPaint::solid_color)
+  {
+    // ECMA-376 Part 1 §17.3.2.6 leaves `auto` text color dependent on
+    // its display background. Word resolves automatic text in a solid dark
+    // table cell to white; explicit colors and paragraph/run backgrounds stay
+    // authoritative (tdf#64264).
+    apply_automatic_text_color_to_blocks(
+      &mut blocks,
+      automatic_text_color_for_background(background),
+    );
+  }
   TableCell {
     blocks,
-    shading: resolved_table_cell_shading(
-      properties
-        .and_then(|properties| properties.shading.as_ref())
-        .map(|shading| shading_fill(shading, &context.styles.theme_colors)),
-      style.shading,
-    ),
+    shading,
     borders: properties
       .and_then(|properties| properties.table_cell_borders.as_deref())
       .map(|borders| direct_cell_borders_model(style.borders, borders))
@@ -4305,9 +4451,10 @@ fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     return;
   };
   let suppress_overlap = paragraph.format.suppress_overlap == Some(true);
+  let vertical_text_flow = paragraph.format.vertical_text_flow;
   paragraph.format.frame = None;
   if let Some(Block::Frame(previous)) = blocks.last_mut()
-    && paragraph_belongs_to_frame(previous, frame, suppress_overlap)
+    && paragraph_belongs_to_frame(previous, frame, suppress_overlap, vertical_text_flow)
   {
     previous.blocks.push(Block::paragraph(paragraph));
     return;
@@ -4317,6 +4464,7 @@ fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
+    vertical_text_flow,
     placement: frame.placement,
     suppress_overlap,
     outer_fill_color: None,
@@ -5247,6 +5395,7 @@ fn merge_paragraph_format_with_theme(
         });
     }
     if let Some(line) = spacing.line.as_ref() {
+      format.line_height_set = true;
       let negative_line = signed_twips_measure_to_twips(line).is_some_and(|value| value < 0.0);
       if negative_line {
         // LibreOffice's OOXML DomainMapper_Impl::SetLineSpacing() treats the
@@ -5361,6 +5510,7 @@ fn merge_paragraph_format_with_theme(
 
   if let Some(bidi) = properties.bidi() {
     format.bidi = bidi.val.is_none_or(|value| value.as_bool());
+    format.bidi_set = true;
   }
 
   if let Some(shading) = properties.shading() {
@@ -5381,6 +5531,13 @@ fn merge_paragraph_format_with_theme(
     format.outline_level = u8::try_from(outline_level.val)
       .ok()
       .filter(|level| *level <= 8);
+  }
+
+  if let Some(text_direction) = properties.text_direction() {
+    // [MS-OI29500] §17.3.1.41: Word applies paragraph textDirection only
+    // inside a frame. Retain it in the paragraph cascade here; frame layout
+    // consumes it only after a direct framePr has formed a FloatingFrame.
+    format.vertical_text_flow = vertical_text_flow(text_direction.val);
   }
 
   // ECMA-376 §17.3.1.11 makes the presence of framePr in the current
@@ -6095,11 +6252,29 @@ fn push_run_or_complex_field(
         flush_complex_field(inlines, fields, true, context.styles);
       }
       w::RunChoice::FieldCode(code) => {
-        if let Some(field) = fields.last_mut()
-          && !field.in_result
-          && let Some(content) = word_text_value(code, context.styles.preserve_word_text_whitespace)
-        {
-          field.instr.push_str(content);
+        if let Some(field) = fields.last_mut() {
+          if !field.in_result {
+            if let Some(content) =
+              word_text_value(code, context.styles.preserve_word_text_whitespace)
+            {
+              field.instr.push_str(content);
+            }
+          } else {
+            // ECMA-376 Part 1 §17.16.23: instrText outside the field-code
+            // portion of a complex field is regular text.  The separator has
+            // already moved this field into its persisted-result portion.
+            if let Some(content) =
+              word_text_value(code, context.styles.preserve_word_text_whitespace)
+            {
+              push_resolved_field_text(
+                &mut field.result,
+                content.to_string(),
+                style.clone(),
+                hyperlink_url,
+              );
+            }
+            break;
+          }
         }
       }
       _ => {
@@ -6186,6 +6361,67 @@ fn flush_complex_field(
   {
     let style = field_result_style(&state.result).unwrap_or(state.style);
     push_resolved_field_text(&mut resolved, text, style, state.hyperlink_url.as_deref());
+  } else if closed
+    && state.result.is_empty()
+    && fields.is_empty()
+    && let Some(combined) = refreshed_combined_characters_eq_field(&state.instr)
+  {
+    // ECMA-376 Part 4 §14.10.4.6: EQ \o overlays invisible character
+    // boxes, while nested \s\up/\do arguments move their contents by the
+    // authored point values. LibreOffice's tdf#66401 export path documents
+    // Word's Combined Characters encoding and halves only w:sz (not w:szCs)
+    // for these field operands.
+    let mut upper_style = state.style.clone();
+    upper_style.font_size_pt /= 2.0;
+    upper_style.baseline_shift_pt += combined.upper_shift_pt;
+    let mut lower_style = state.style.clone();
+    lower_style.font_size_pt /= 2.0;
+    lower_style.baseline_shift_pt -= combined.lower_shift_pt;
+    push_resolved_field_text(
+      &mut resolved,
+      format!("{} ", combined.upper),
+      upper_style,
+      state.hyperlink_url.as_deref(),
+    );
+    push_resolved_field_text(
+      &mut resolved,
+      combined.lower,
+      lower_style,
+      state.hyperlink_url.as_deref(),
+    );
+  } else if closed
+    && state.result.is_empty()
+    && fields.is_empty()
+    && let Some(text) = refreshed_left_aligned_eq_array_field(&state.instr)
+  {
+    // ECMA-376 Part 4 §14.10.4.6: EQ \a consumes its arguments in
+    // row-major order, defaults to one column, and \al left-aligns each
+    // column.  With one column this is exactly a sequence of hard lines.
+    // Only refresh a field without a persisted result: cached EQ output,
+    // locked fields, multi-column/spacing forms, and nested EQ fields remain
+    // authoritative until their equation layout is modeled.
+    push_resolved_field_text(
+      &mut resolved,
+      text,
+      state.style,
+      state.hyperlink_url.as_deref(),
+    );
+  } else if closed
+    && state.result.is_empty()
+    && fields.is_empty()
+    && let Some(text) = button_field_display_text(&state.instr)
+  {
+    // ECMA-376 Part 1 §17.16.5.23 and §17.16.5.34 define the second
+    // GOTOBUTTON/MACROBUTTON argument as the visible button text. Word emits
+    // no result for either field when it is nested ([MS-OI29500] §2.1.475
+    // and §2.1.485), so keep this refresh restricted to top-level fields
+    // without a persisted result.
+    push_resolved_field_text(
+      &mut resolved,
+      text,
+      state.style,
+      state.hyperlink_url.as_deref(),
+    );
   } else if let Some(kind) = dynamic_field_kind(&state.instr) {
     if let DynamicFieldKind::StyleRef { style_name, .. } = &kind
       && styles.style_ref_name_requires_localized_error(style_name)
@@ -6203,7 +6439,9 @@ fn flush_complex_field(
       // replaces the result text.  In particular, the generated PAGE value
       // must retain direct/theme formatting authored on its cached result
       // rather than inheriting the field-begin character's formatting.
-      let style = if field_uses_merge_format(&state.instr) {
+      let style = if matches!(&kind, DynamicFieldKind::Sequence { .. })
+        || field_uses_merge_format(&state.instr)
+      {
         field_result_style(&state.result).unwrap_or(state.style)
       } else {
         state.style
@@ -6248,9 +6486,11 @@ fn flush_complex_field(
   if let Some(parent) = fields.last_mut() {
     if parent.in_result {
       parent.result.extend(resolved);
-    } else if parent.form_date_time_tokens.is_none() {
-      inlines.extend(resolved);
     }
+    // A nested field closed while its parent is still in the instruction
+    // region contributes to evaluating that parent; it is not independent
+    // visible document content. The parent's persisted result, after its own
+    // separator, remains authoritative for unsupported calculations/IFs.
   } else {
     inlines.extend(resolved);
   }
@@ -6264,6 +6504,18 @@ fn field_instruction_name(instr: &str) -> Option<String> {
 
 fn field_result_is_visible(instr: &str) -> bool {
   !field_instruction_name(instr).is_some_and(|name| matches!(name.as_str(), "ASK" | "SET"))
+}
+
+fn button_field_display_text(instr: &str) -> Option<String> {
+  let tokens = field_instruction_tokens(instr);
+  tokens
+    .first()
+    .is_some_and(|name| {
+      name.eq_ignore_ascii_case("GOTOBUTTON") || name.eq_ignore_ascii_case("MACROBUTTON")
+    })
+    .then(|| tokens.get(2..).map(|text| text.join(" ")))
+    .flatten()
+    .filter(|text| !text.is_empty())
 }
 
 fn complex_field_hyperlink_url(instr: &str) -> Option<String> {
@@ -6587,15 +6839,43 @@ fn dynamic_field_kind(instr: &str) -> Option<DynamicFieldKind> {
   let name = field_instruction_name(instr)?;
   match name.as_str() {
     "PAGE" => Some(DynamicFieldKind::Page {
-      number_format: field_number_format(&tokens[1..]).unwrap_or(FieldNumberFormat::PageStyle),
+      number_format: page_field_number_format(&tokens[1..]).unwrap_or(FieldNumberFormat::PageStyle),
     }),
     "NUMPAGES" => Some(DynamicFieldKind::NumPages {
       number_format: field_number_format(&tokens[1..]).unwrap_or(FieldNumberFormat::Decimal),
     }),
+    "SEQ" => sequence_field_kind(&tokens[1..]),
     "PAGEREF" => page_ref_field_kind(&tokens[1..]),
     "STYLEREF" => style_ref_field_kind(&tokens[1..]),
     _ => None,
   }
+}
+
+fn sequence_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
+  let identifier = tokens.first()?.as_str();
+  if identifier.starts_with('\\') {
+    return None;
+  }
+
+  // ECMA-376 Part 1 §17.16.5.58 defines the bare SEQ field as the next value
+  // of the named sequence. Preserve cached results for state-changing or
+  // context-dependent switches until those semantics are modeled explicitly.
+  let mut index = 1usize;
+  while index < tokens.len() {
+    if tokens[index].eq_ignore_ascii_case(r"\*") {
+      index += 2;
+      continue;
+    }
+    if tokens[index].starts_with('\\') {
+      return None;
+    }
+    index += 1;
+  }
+
+  Some(DynamicFieldKind::Sequence {
+    identifier: Arc::from(identifier),
+    number_format: field_number_format(tokens).unwrap_or(FieldNumberFormat::Decimal),
+  })
 }
 
 fn refreshed_date_time_field(
@@ -6618,6 +6898,158 @@ fn refreshed_form_date_time_field(
     style.language.as_deref(),
     styles.import_settings.field_update_datetime?,
   )
+}
+
+fn refreshed_left_aligned_eq_array_field(instr: &str) -> Option<String> {
+  if field_instruction_name(instr)?.as_str() != "EQ" {
+    return None;
+  }
+
+  let open = instr.find('(')?;
+  let close = instr.rfind(')')?;
+  if close <= open || !instr[close + 1..].trim().is_empty() {
+    return None;
+  }
+
+  let switches = field_instruction_tokens(&instr[..open]);
+  let mut saw_array = false;
+  let mut saw_left_alignment = false;
+  let mut columns = 1usize;
+  let mut index = 1usize;
+  while index < switches.len() {
+    match switches[index].to_ascii_lowercase().as_str() {
+      r"\a" if !saw_array => saw_array = true,
+      r"\al" if !saw_left_alignment => saw_left_alignment = true,
+      r"\co" => {
+        index += 1;
+        columns = switches.get(index)?.parse().ok()?;
+      }
+      _ => return None,
+    }
+    index += 1;
+  }
+  if !saw_array || !saw_left_alignment || columns != 1 {
+    return None;
+  }
+
+  let arguments = &instr[open + 1..close];
+  // Nested EQ arguments and locale-dependent semicolon lists require the
+  // equation parser, rather than being flattened into ordinary text here.
+  if arguments.contains(['(', ')', ';']) {
+    return None;
+  }
+  Some(
+    arguments
+      .split(',')
+      .map(str::trim)
+      .collect::<Vec<_>>()
+      .join("\n"),
+  )
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct CombinedCharactersEqField {
+  upper: String,
+  lower: String,
+  upper_shift_pt: f32,
+  lower_shift_pt: f32,
+}
+
+fn refreshed_combined_characters_eq_field(instr: &str) -> Option<CombinedCharactersEqField> {
+  if field_instruction_name(instr)?.as_str() != "EQ" {
+    return None;
+  }
+
+  let mut rest = instr.trim_start();
+  rest = strip_ascii_case_prefix(rest, "eq")?.trim_start();
+  rest = strip_ascii_case_prefix(rest, r"\o")?.trim_start();
+  let (arguments, trailing) = eq_parenthesized_argument(rest)?;
+  if !trailing.trim().is_empty() {
+    return None;
+  }
+  let (upper, lower) = split_eq_top_level_pair(arguments)?;
+  let (upper_shift_pt, upper) = combined_characters_script(upper, r"\up")?;
+  let (lower_shift_pt, lower) = combined_characters_script(lower, r"\do")?;
+
+  // Word's Combined Characters field uses one blank character box after the
+  // upper glyph and before the lower glyph. Do not reinterpret arbitrary EQ
+  // overstrikes, whose multiple arguments and alignment switches need the
+  // general equation layout engine.
+  if !upper.chars().next_back().is_some_and(char::is_whitespace)
+    || !lower.chars().next().is_some_and(char::is_whitespace)
+  {
+    return None;
+  }
+  let upper = upper.trim();
+  let lower = lower.trim();
+  if upper.chars().count() != 1 || lower.chars().count() != 1 {
+    return None;
+  }
+
+  Some(CombinedCharactersEqField {
+    upper: upper.to_string(),
+    lower: lower.to_string(),
+    upper_shift_pt,
+    lower_shift_pt,
+  })
+}
+
+fn combined_characters_script<'a>(value: &'a str, direction: &str) -> Option<(f32, &'a str)> {
+  let mut rest = value.trim();
+  rest = strip_ascii_case_prefix(rest, r"\s")?.trim_start();
+  rest = strip_ascii_case_prefix(rest, direction)?.trim_start();
+  let open = rest.find('(')?;
+  let shift_pt = rest[..open].trim().parse::<f32>().ok()?;
+  if !shift_pt.is_finite() || shift_pt < 0.0 {
+    return None;
+  }
+  let (text, trailing) = eq_parenthesized_argument(&rest[open..])?;
+  trailing.trim().is_empty().then_some((shift_pt, text))
+}
+
+fn strip_ascii_case_prefix<'a>(value: &'a str, prefix: &str) -> Option<&'a str> {
+  let candidate = value.get(..prefix.len())?;
+  candidate
+    .eq_ignore_ascii_case(prefix)
+    .then(|| &value[prefix.len()..])
+}
+
+fn eq_parenthesized_argument(value: &str) -> Option<(&str, &str)> {
+  let value = value.trim_start();
+  let inner = value.strip_prefix('(')?;
+  let mut depth = 1usize;
+  for (index, character) in inner.char_indices() {
+    match character {
+      '(' => depth += 1,
+      ')' => {
+        depth -= 1;
+        if depth == 0 {
+          return Some((&inner[..index], &inner[index + character.len_utf8()..]));
+        }
+      }
+      _ => {}
+    }
+  }
+  None
+}
+
+fn split_eq_top_level_pair(arguments: &str) -> Option<(&str, &str)> {
+  let mut depth = 0usize;
+  let mut separator = None;
+  for (index, character) in arguments.char_indices() {
+    match character {
+      '(' => depth += 1,
+      ')' => depth = depth.checked_sub(1)?,
+      ',' | ';' if depth == 0 => {
+        if separator.replace((index, character.len_utf8())).is_some() {
+          return None;
+        }
+      }
+      _ => {}
+    }
+  }
+  let (index, length) = separator?;
+  Some((&arguments[..index], &arguments[index + length..]))
 }
 
 fn field_number_format(tokens: &[String]) -> Option<FieldNumberFormat> {
@@ -6646,6 +7078,19 @@ fn field_number_format(tokens: &[String]) -> Option<FieldNumberFormat> {
   })
 }
 
+fn page_field_number_format(tokens: &[String]) -> Option<FieldNumberFormat> {
+  // Microsoft documents ArabicDash as a PAGE-only numeric switch. Keep it
+  // out of the shared SEQ/PAGEREF formatter while reusing the equivalent
+  // WordprocessingML numbering format.
+  tokens
+    .windows(2)
+    .find(|tokens| {
+      tokens[0].eq_ignore_ascii_case(r"\*") && tokens[1].eq_ignore_ascii_case("ArabicDash")
+    })
+    .map(|_| FieldNumberFormat::WordprocessingMl(w::NumberFormatValues::NumberInDash))
+    .or_else(|| field_number_format(tokens))
+}
+
 fn field_uses_merge_format(instr: &str) -> bool {
   field_instruction_tokens(instr)
     .windows(2)
@@ -6661,6 +7106,7 @@ fn format_field_number(value: usize, format: FieldNumberFormat) -> String {
     FieldNumberFormat::UpperRoman => w::NumberFormatValues::UpperRoman,
     FieldNumberFormat::LowerLetter => w::NumberFormatValues::LowerLetter,
     FieldNumberFormat::UpperLetter => w::NumberFormatValues::UpperLetter,
+    FieldNumberFormat::WordprocessingMl(format) => format,
   };
   format_numbering_value(value, format, false)
 }
@@ -8081,14 +8527,18 @@ fn push_sdt_run(
   if let Some(widget_id) = widget_id {
     inlines.push(InlineItem::FormWidgetStart(widget_id));
   }
-  if let Some(value) = sdt
-    .sdt_properties
-    .as_ref()
-    .and_then(|properties| sdt_bound_replacement(context.custom_xml_bindings, properties))
-  {
+  let content_start = inlines.len();
+  if let Some((properties, value)) = sdt.sdt_properties.as_ref().and_then(|properties| {
+    sdt_bound_replacement(context.custom_xml_bindings, properties).map(|value| (properties, value))
+  }) {
+    let style = if let Some(run_properties) = sdt_replacement_run_properties(Some(properties)) {
+      properties::run_style(Some(run_properties), base_style, context.styles)
+    } else {
+      base_style
+    };
     inlines.push(InlineItem::Text(TextRun {
-      text: value,
-      style: base_style,
+      text: run_display_text(value, style.clone()),
+      style,
       hyperlink_url: hyperlink_url.map(str::to_owned),
       dynamic_field: None,
       style_ref_keys: Vec::new(),
@@ -8096,6 +8546,23 @@ fn push_sdt_run(
       style_ref_numbering_text: None,
       preserve_text_portion: false,
     }));
+    if let Some(widget_id) = widget_id {
+      inlines.push(InlineItem::FormWidgetEnd(widget_id));
+    }
+    return;
+  }
+  let placeholder_doc_part = showing_placeholder
+    .then(|| {
+      sdt
+        .sdt_properties
+        .as_ref()
+        .and_then(sdt_placeholder_doc_part)
+    })
+    .flatten();
+  if let Some(content) = placeholder_doc_part
+    .and_then(|name| context.custom_xml_bindings.inline_placeholder_content(name))
+  {
+    inlines.extend(content);
     if let Some(widget_id) = widget_id {
       inlines.push(InlineItem::FormWidgetEnd(widget_id));
     }
@@ -8215,22 +8682,48 @@ fn push_sdt_run(
       }
     }
   }
+  if let Some(name) = placeholder_doc_part {
+    // ECMA-376 Part 1 §17.5.2.33 permits an inline placeholder cache to be
+    // refreshed from its named Glossary Document part. Word fixed output
+    // shares that named inline placeholder content between controls; keep
+    // block-level controls and data-bound replacement on their own paths.
+    context
+      .custom_xml_bindings
+      .remember_inline_placeholder_content(name, &inlines[content_start..]);
+  }
   if let Some(widget_id) = widget_id {
     inlines.push(InlineItem::FormWidgetEnd(widget_id));
   }
 }
 
+fn sdt_replacement_run_properties(
+  properties: Option<&w::SdtProperties>,
+) -> Option<&w::RunProperties> {
+  properties?.sdt_properties_choice.iter().find_map(|choice| {
+    let w::SdtPropertiesChoice::RunProperties(properties) = choice else {
+      return None;
+    };
+    Some(properties.as_ref())
+  })
+}
+
 fn sdt_bound_display_text(properties: &w::SdtProperties, value: String) -> String {
-  let date_format = properties
+  let date_display = properties
     .sdt_properties_choice
     .iter()
     .find_map(|choice| match choice {
-      w::SdtPropertiesChoice::SdtContentDate(date) => {
-        date.date_format.as_ref().map(|format| format.val.as_str())
-      }
+      w::SdtPropertiesChoice::SdtContentDate(date) => date.date_format.as_ref().map(|format| {
+        (
+          format.val.as_str(),
+          date
+            .language_id
+            .as_ref()
+            .map(|language| language.val.as_str()),
+        )
+      }),
       _ => None,
     });
-  let Some(date_format) = date_format else {
+  let Some((date_format, language)) = date_display else {
     return value;
   };
   let Some(date) = value.get(..10) else {
@@ -8245,10 +8738,12 @@ fn sdt_bound_display_text(properties: &w::SdtProperties, value: String) -> Strin
   ) else {
     return value;
   };
-  let (Ok(month), Ok(day)) = (month.parse::<u8>(), day.parse::<u8>()) else {
+  let (Ok(year), Ok(month), Ok(day)) =
+    (year.parse::<u16>(), month.parse::<u8>(), day.parse::<u8>())
+  else {
     return value;
   };
-  format_sdt_date(date_format, year, month, day).unwrap_or(value)
+  format_sdt_date(date_format, language, year, month, day).unwrap_or(value)
 }
 
 fn sdt_supports_bound_text(properties: &w::SdtProperties) -> bool {
@@ -8330,34 +8825,29 @@ fn sdt_bound_replacement_text(properties: &w::SdtProperties, value: String) -> O
   Some(sdt_bound_display_text(properties, value))
 }
 
-fn format_sdt_date(format: &str, year: &str, month: u8, day: u8) -> Option<String> {
-  let mut output = String::new();
-  let mut chars = format.chars().peekable();
-  while let Some(ch) = chars.next() {
-    let token = matches!(ch, 'd' | 'M' | 'y');
-    if !token {
-      if ch.is_ascii_alphabetic() {
-        return None;
-      }
-      output.push(ch);
-      continue;
-    }
-    let mut count = 1usize;
-    while chars.peek() == Some(&ch) {
-      chars.next();
-      count += 1;
-    }
-    match ch {
-      'd' if count == 1 => output.push_str(&day.to_string()),
-      'd' => output.push_str(&format!("{day:02}")),
-      'M' if count == 1 => output.push_str(&month.to_string()),
-      'M' => output.push_str(&format!("{month:02}")),
-      'y' if count == 2 => output.push_str(year.get(year.len().saturating_sub(2)..)?),
-      'y' => output.push_str(year),
-      _ => unreachable!(),
-    }
-  }
-  Some(output)
+fn format_sdt_date(
+  format: &str,
+  language: Option<&str>,
+  year: u16,
+  month: u8,
+  day: u8,
+) -> Option<String> {
+  // ECMA-376 Part 1 §17.5.2.7 supplies the date picture together with the
+  // date-picker language (§17.5.2.20). Use the shared locale-aware Office
+  // formatter so `MMM`/`MMMM` resolve month names instead of collapsing every
+  // multi-character month token to a two-digit number.
+  field_datetime::format_date_time_picture(
+    format,
+    language,
+    FieldUpdateDateTime {
+      year,
+      month,
+      day,
+      hour: 0,
+      minute: 0,
+      second: 0,
+    },
+  )
 }
 
 fn sdt_showing_placeholder(properties: &w::SdtProperties) -> bool {
@@ -8701,8 +9191,11 @@ fn symbol_transport_char(symbol: &w::SymbolChar) -> Option<char> {
   let mapped = shared_symbol::font_symbol_code(symbol.font.as_deref(), code)?;
   if font.eq_ignore_ascii_case("Symbol") && code & 0xFF == 0x94 {
     Some(mapped)
-  } else if is_symbol_font && (!is_wingdings || code & 0xFF >= 0x80) {
-    char::from_u32(code)
+  } else if is_symbol_font {
+    // ECMA-376 CT_Sym stores the character code within the declared symbol
+    // font. Keep that transport code here; the PDF backend supplies
+    // standardized ToUnicode values only for the Office-confirmed mappings.
+    char::from_u32(code).or(Some(mapped))
   } else {
     Some(mapped)
   }
@@ -8905,6 +9398,12 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
       .map(|position| units::emu_to_points(position.y.to_emu()))
       .or_else(|| vertical_position.and_then(vertical_position_offset))
       .unwrap_or(0.0),
+    horizontal_offset_pct: simple_position
+      .map(|_| None)
+      .unwrap_or_else(|| horizontal_position.and_then(horizontal_position_percentage_offset)),
+    vertical_offset_pct: simple_position
+      .map(|_| None)
+      .unwrap_or_else(|| vertical_position.and_then(vertical_position_percentage_offset)),
     wrap: anchor
       .anchor_choice
       .as_ref()
@@ -9060,6 +9559,16 @@ fn horizontal_position_offset(position: &wp::HorizontalPosition) -> Option<f32> 
   }
 }
 
+fn horizontal_position_percentage_offset(position: &wp::HorizontalPosition) -> Option<f32> {
+  match position.horizontal_position_choice.as_ref()? {
+    wp::HorizontalPositionChoice::PercentagePositionHeightOffset(offset) => {
+      drawingml_percent_to_ratio(offset)
+    }
+    wp::HorizontalPositionChoice::HorizontalAlignment(_)
+    | wp::HorizontalPositionChoice::PositionOffset(_) => None,
+  }
+}
+
 fn horizontal_position_alignment(
   position: &wp::HorizontalPosition,
 ) -> Option<HorizontalImageAlignment> {
@@ -9083,6 +9592,16 @@ fn vertical_position_offset(position: &wp::VerticalPosition) -> Option<f32> {
     }
     wp::VerticalPositionChoice::VerticalAlignment(_)
     | wp::VerticalPositionChoice::PercentagePositionVerticalOffset(_) => None,
+  }
+}
+
+fn vertical_position_percentage_offset(position: &wp::VerticalPosition) -> Option<f32> {
+  match position.vertical_position_choice.as_ref()? {
+    wp::VerticalPositionChoice::PercentagePositionVerticalOffset(offset) => {
+      drawingml_percent_to_ratio(offset)
+    }
+    wp::VerticalPositionChoice::VerticalAlignment(_)
+    | wp::VerticalPositionChoice::PositionOffset(_) => None,
   }
 }
 
@@ -9112,7 +9631,10 @@ fn vertical_position_alignment(position: &wp::VerticalPosition) -> Option<Vertic
 
 fn image_wrap_mode(choice: &wp::AnchorChoice) -> ImageWrapMode {
   match choice {
-    wp::AnchorChoice::WrapNone => ImageWrapMode::Through,
+    // ECMA-376 Part 1 §20.4.2.15: wrapNone creates no text-wrapping
+    // boundary. Keep it distinct from wrapThrough, whose polygon still
+    // participates in text flow (including the layout-in-cell fallback).
+    wp::AnchorChoice::WrapNone => ImageWrapMode::None,
     wp::AnchorChoice::WrapSquare(_) => ImageWrapMode::Square,
     wp::AnchorChoice::WrapTight(_) => ImageWrapMode::Tight,
     wp::AnchorChoice::WrapThrough(_) => ImageWrapMode::Through,
@@ -9164,6 +9686,11 @@ fn push_drawing_textboxes_impl(
     }
     None => return,
   };
+  // Keep the textbox pass on the same host coordinate system as the shape
+  // pass.  Group child transforms use the enclosing wp:extent when chExt is
+  // empty; dropping it here moves the text independently of its geometry.
+  let transform =
+    DrawingMlGroupTransform::identity().with_fallback_size(drawing_extent_size(drawing));
 
   for child in graphic_data.graphic_data_choice.iter() {
     let textbox_context = DrawingTextBoxImportContext {
@@ -9172,12 +9699,8 @@ fn push_drawing_textboxes_impl(
       images,
       hyperlinks,
     };
-    let text_box_frames = drawing_graphic_data_choice_textbox_frames(
-      child,
-      placement,
-      DrawingMlGroupTransform::identity(),
-      textbox_context,
-    );
+    let text_box_frames =
+      drawing_graphic_data_choice_textbox_frames(child, placement, transform, textbox_context);
     if !text_box_frames.is_empty() {
       for text_box_frame in text_box_frames {
         if let Err(text_box_frame) = merge_textbox_frame_into_owning_shape(inlines, text_box_frame)
@@ -9668,6 +10191,61 @@ fn first_text_color_in_block(block: &Block) -> Option<RgbColor> {
   }
 }
 
+fn apply_automatic_text_color_to_blocks(blocks: &mut [Block], color: RgbColor) {
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => {
+        // LibreOffice c15412eb96bd (tdf#153791) mirrors Word's shape-text
+        // cascade: a visible paragraph background suppresses fontRef for the
+        // complete paragraph. Otherwise the shape color is applied only to
+        // automatic runs without a character background; explicit run colors
+        // remain authoritative.
+        if paragraph
+          .format
+          .shading
+          .is_some_and(ShadingPaint::is_visible)
+        {
+          continue;
+        }
+        apply_automatic_text_color_to_style(&mut paragraph.base_style, color);
+        apply_automatic_text_color_to_style(&mut paragraph.list_label_style, color);
+        for inline in &mut paragraph.inlines {
+          match inline {
+            InlineItem::Text(run) => {
+              apply_automatic_text_color_to_style(&mut run.style, color);
+            }
+            InlineItem::PositionalTab(tab) => {
+              apply_automatic_text_color_to_style(&mut tab.style, color);
+            }
+            InlineItem::Ruby(ruby) => {
+              for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
+                apply_automatic_text_color_to_style(&mut run.style, color);
+              }
+            }
+            InlineItem::LegacyFormCheckBox(check_box) => {
+              apply_automatic_text_color_to_style(&mut check_box.style, color);
+            }
+            _ => {}
+          }
+        }
+      }
+      Block::Table(table) => {
+        for cell in table.rows.iter_mut().flat_map(|row| &mut row.cells) {
+          apply_automatic_text_color_to_blocks(&mut cell.blocks, color);
+        }
+      }
+      Block::Frame(frame) => apply_automatic_text_color_to_blocks(&mut frame.blocks, color),
+    }
+  }
+}
+
+fn apply_automatic_text_color_to_style(style: &mut TextStyle, color: RgbColor) {
+  if style.color_is_automatic && style.highlight.is_none() {
+    style.color = color;
+    style.color_is_automatic = false;
+  }
+}
+
 fn wordprocessing_shape_textbox_frame_stroke(
   shape: &wps::WordprocessingShape,
   auto_fit: bool,
@@ -9717,7 +10295,7 @@ impl TextBoxFrameContent {
 fn text_box_frame_from_wordprocessing_shape(
   shape: &wps::WordprocessingShape,
   content: &w::TextBoxContent,
-  mut base_style: TextStyle,
+  base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
@@ -9726,20 +10304,20 @@ fn text_box_frame_from_wordprocessing_shape(
   // color through a:fontRef, while §17.3.2.6 lets an automatic run color
   // adapt to its background. [MS-OI29500] §20.1.2.2.37 gives textbox
   // content precedence over the shape style.
-  if let Some(color) = shape
+  let shape_text_color = shape
     .shape_style
     .as_ref()
     .and_then(|style| drawingml_font_reference_color(&style.font_reference, &styles.theme_colors))
     .or_else(|| {
       wordprocessing_shape_fill_color(shape, &styles.theme_colors)
         .map(automatic_text_color_for_background)
-    })
-  {
-    base_style.color = color;
-  }
+    });
   let mut frame = TextBoxFrameContent::new(textbox_blocks_with_base(
     content, base_style, styles, images, hyperlinks,
   ));
+  if let Some(color) = shape_text_color {
+    apply_automatic_text_color_to_blocks(&mut frame.blocks, color);
+  }
   if let Some(properties) = shape.text_body_properties.as_deref() {
     apply_wordprocessing_shape_textbox_body_properties(properties, &mut frame);
   }
@@ -10313,6 +10891,38 @@ fn drawingml_preset_text_rectangle_insets(
       .unwrap_or(default)
   };
   match preset.preset {
+    a::ShapeTypeValues::Ellipse => {
+      // ECMA-376 presetShapeDefinitions.xml defines the ellipse text rect
+      // from the 45-degree points on each semi-axis:
+      // il=hc-cos(wd2,45deg), it=vc-sin(hd2,45deg), with symmetric ir/ib.
+      // This is the axis-aligned rectangle inscribed in the ellipse.
+      let inset_ratio = (1.0 - std::f32::consts::FRAC_1_SQRT_2) / 2.0;
+      let horizontal = width_pt * inset_ratio;
+      let vertical = height_pt * inset_ratio;
+      Some([horizontal, vertical, horizontal, vertical])
+    }
+    a::ShapeTypeValues::Parallelogram => {
+      // ECMA-376 presetShapeDefinitions.xml defines rect=(il,it,ir,ib),
+      // where q2=(1 + 5*a/maxAdj)/12 and the inset on each axis is q2
+      // times that axis.  Use the authored adjustment, clamped by the
+      // width/short-side-dependent maxAdj, rather than the outer shape box.
+      let short_side = width_pt.min(height_pt);
+      let max_adj = 100_000.0 * width_pt / short_side;
+      let adjustment = guide(0, 25_000.0).clamp(0.0, max_adj);
+      let inset_ratio = (1.0 + 5.0 * adjustment / max_adj) / 12.0;
+      let horizontal = width_pt * inset_ratio;
+      let vertical = height_pt * inset_ratio;
+      Some([horizontal, vertical, horizontal, vertical])
+    }
+    a::ShapeTypeValues::RoundRectangle => {
+      // ECMA-376 presetShapeDefinitions.xml defines rect=(il,il,ir,ib),
+      // with il=(ss*a/100000)*29289/100000 and a pinned to 0..50000.
+      // This keeps table/text content clear of the four rounded corners.
+      let short_side = width_pt.min(height_pt);
+      let adjustment = guide(0, 16_667.0).clamp(0.0, 50_000.0);
+      let inset = short_side * adjustment / 100_000.0 * 29_289.0 / 100_000.0;
+      Some([inset, inset, inset, inset])
+    }
     a::ShapeTypeValues::RightTriangle => {
       // presetShapeDefinitions.xml: rect=(wd12, 7h/12, 7w/12, 11h/12).
       // The asymmetric rectangle keeps text inside the triangular face
@@ -10443,8 +11053,12 @@ fn push_drawing_shapes_impl(
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
     return;
   };
-  let is_top_level_picture =
-    drawing_image_properties(graphic_data, &styles.theme_colors, None).is_some();
+  let top_level_picture = drawing_image_properties(graphic_data, &styles.theme_colors, None);
+  let is_top_level_picture = top_level_picture.is_some();
+  let wrap_source_crop = top_level_picture
+    .as_ref()
+    .filter(|properties| properties.source_rectangle_crop)
+    .map(|properties| properties.crop);
 
   let placement = match drawing.drawing_choice.as_ref() {
     Some(w::DrawingChoice::Inline(_)) => ImagePlacement::Inline,
@@ -10455,7 +11069,7 @@ fn push_drawing_shapes_impl(
   };
 
   if let Some(w::DrawingChoice::Anchor(anchor)) = drawing.drawing_choice.as_ref()
-    && let Some(shape) = anchor_wrap_polygon_shape(anchor, placement)
+    && let Some(shape) = anchor_wrap_polygon_shape(anchor, placement, wrap_source_crop)
   {
     inlines.push(InlineItem::Shape(shape));
   }
@@ -10772,7 +11386,19 @@ fn drawingml_generic_shape_shape(
   let fill_pattern =
     drawingml_shape_properties_pattern_fill(&properties, &context.styles.theme_colors);
   let fill_override =
-    drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors);
+    drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors).or_else(
+      || {
+        (!has_explicit_fill).then(|| {
+          shape_style.and_then(|style| {
+            drawingml_fill_reference_common_fill(
+              &style.fill_reference,
+              &context.styles.theme_fills,
+              &context.styles.theme_colors,
+            )
+          })
+        })?
+      },
+    );
   let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
     None
   } else {
@@ -11166,7 +11792,19 @@ fn wordprocessing_shape_shape(
   let fill_pattern =
     drawingml_shape_properties_pattern_fill(&properties, &context.styles.theme_colors);
   let fill_override =
-    drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors);
+    drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors).or_else(
+      || {
+        (!has_explicit_fill).then(|| {
+          shape.shape_style.as_ref().and_then(|style| {
+            drawingml_fill_reference_common_fill(
+              &style.fill_reference,
+              &context.styles.theme_fills,
+              &context.styles.theme_colors,
+            )
+          })
+        })?
+      },
+    );
   let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
     None
   } else {
@@ -11550,7 +12188,19 @@ fn drawingml_diagram_shape_shape(
   let fill_pattern =
     drawingml_shape_properties_pattern_fill(&properties, &context.styles.theme_colors);
   let fill_override =
-    drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors);
+    drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors).or_else(
+      || {
+        (!has_explicit_fill).then(|| {
+          shape.shape_style.as_ref().and_then(|style| {
+            drawingml_fill_reference_common_fill(
+              &style.fill_reference,
+              &context.styles.theme_fills,
+              &context.styles.theme_colors,
+            )
+          })
+        })?
+      },
+    );
   let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
     None
   } else {
@@ -13386,11 +14036,12 @@ impl DrawingMlShapeProperties {
 fn anchor_wrap_polygon_shape(
   anchor: &wp::Anchor,
   placement: ImagePlacement,
+  source_crop: Option<ImageCrop>,
 ) -> Option<InlineShape> {
   let extent = &anchor.extent;
   let width_pt = units::emu_to_points(extent.cx);
   let height_pt = units::emu_to_points(extent.cy);
-  let geometry = anchor_wrap_polygon_geometry(anchor, width_pt, height_pt)?;
+  let geometry = anchor_wrap_polygon_geometry(anchor, width_pt, height_pt, source_crop)?;
 
   Some(InlineShape {
     width_pt,
@@ -13440,6 +14091,7 @@ fn anchor_wrap_polygon_geometry(
   anchor: &wp::Anchor,
   width_pt: f32,
   height_pt: f32,
+  source_crop: Option<ImageCrop>,
 ) -> Option<InlineShapeGeometry> {
   let polygon = match anchor.anchor_choice.as_ref()? {
     wp::AnchorChoice::WrapTight(tight) => tight.wrap_polygon.as_ref(),
@@ -13452,9 +14104,16 @@ fn anchor_wrap_polygon_geometry(
     polygon.start_point.y,
     width_pt,
     height_pt,
+    source_crop,
   ));
   for point in &polygon.line_to {
-    points.push(wrap_polygon_point(point.x, point.y, width_pt, height_pt));
+    points.push(wrap_polygon_point(
+      point.x,
+      point.y,
+      width_pt,
+      height_pt,
+      source_crop,
+    ));
   }
   if points.len() < 3 {
     return None;
@@ -13469,12 +14128,36 @@ fn anchor_wrap_polygon_geometry(
   })
 }
 
-fn wrap_polygon_point(x: i64, y: i64, width_pt: f32, height_pt: f32) -> (f32, f32) {
+fn wrap_polygon_point(
+  x: i64,
+  y: i64,
+  width_pt: f32,
+  height_pt: f32,
+  source_crop: Option<ImageCrop>,
+) -> (f32, f32) {
   const WRAP_POLYGON_COORDINATE_SCALE: f32 = 21_600.0;
-  (
-    x as f32 / WRAP_POLYGON_COORDINATE_SCALE * width_pt,
-    y as f32 / WRAP_POLYGON_COORDINATE_SCALE * height_pt,
-  )
+  let mut x = x as f32 / WRAP_POLYGON_COORDINATE_SCALE;
+  let mut y = y as f32 / WRAP_POLYGON_COORDINATE_SCALE;
+  if let Some(crop) = source_crop {
+    // The wrap polygon is authored in the uncropped source coordinate space.
+    // ECMA-376 `a:srcRect` removes positive source edges before the picture is
+    // fitted into wp:extent, so remap and clip the contour into that remaining
+    // source rectangle. Negative crop values are outsets and do not remove
+    // source coordinates.
+    let remap = |value: f32, leading: f32, trailing: f32| {
+      let leading = leading.max(0.0);
+      let trailing = trailing.max(0.0);
+      let visible = 1.0 - leading - trailing;
+      if visible > f32::EPSILON {
+        ((value - leading) / visible).clamp(0.0, 1.0)
+      } else {
+        value.clamp(0.0, 1.0)
+      }
+    };
+    x = remap(x, crop.left, crop.right);
+    y = remap(y, crop.top, crop.bottom);
+  }
+  (x * width_pt, y * height_pt)
 }
 
 fn drawingml_group_child_placement(
@@ -13608,6 +14291,18 @@ fn drawingml_group_transform_from_model(
   if let Some(child_extents) = &transform.child_extents {
     group.child_width = child_extents.cx.to_emu() as f32;
     group.child_height = child_extents.cy.to_emu() as f32;
+  }
+  if let Some(extents) = &transform.extents {
+    // LibreOffice Transform2DContext applies the OOXML zero/missing chExt
+    // rule per axis: that child extent is the group's own ext, making the
+    // scale factor one.  Keep this value in the native child-coordinate unit;
+    // the top-level group extent above is already converted to points.
+    if group.child_width == 0.0 {
+      group.child_width = extents.cx.to_emu() as f32;
+    }
+    if group.child_height == 0.0 {
+      group.child_height = extents.cy.to_emu() as f32;
+    }
   }
 
   group
@@ -14060,9 +14755,63 @@ fn drawingml_pattern_fill(
   ))
 }
 
+fn drawingml_pattern_fill_with_placeholder(
+  fill: &a::PatternFill,
+  theme_colors: &ThemeColors,
+  placeholder_color: Option<&Color>,
+) -> Option<common::PatternFill> {
+  let foreground = match fill
+    .foreground_color
+    .as_ref()
+    .and_then(|color| color.foreground_color_choice.as_ref())
+  {
+    Some(choice) => docx_image_color_with_placeholder(
+      Color::from_foreground_color_choice(choice)?,
+      theme_colors,
+      placeholder_color,
+    )?,
+    None => common::Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: u8::MAX,
+    },
+  };
+  let background = match fill
+    .background_color
+    .as_ref()
+    .and_then(|color| color.background_color_choice.as_ref())
+  {
+    Some(choice) => docx_image_color_with_placeholder(
+      Color::from_background_color_choice(choice)?,
+      theme_colors,
+      placeholder_color,
+    )?,
+    None => common::Color {
+      r: u8::MAX,
+      g: u8::MAX,
+      b: u8::MAX,
+      a: u8::MAX,
+    },
+  };
+  Some(common::PatternFill::drawingml(
+    common::drawingml_pattern::hatch_style(fill.preset),
+    foreground,
+    background,
+  ))
+}
+
 fn drawingml_gradient_fill(
   fill: &a::GradientFill,
   theme_colors: &ThemeColors,
+) -> Option<common::Fill<'static>> {
+  drawingml_gradient_fill_with_placeholder(fill, theme_colors, None)
+}
+
+fn drawingml_gradient_fill_with_placeholder(
+  fill: &a::GradientFill,
+  theme_colors: &ThemeColors,
+  placeholder_color: Option<&Color>,
 ) -> Option<common::Fill<'static>> {
   let mut stops = fill
     .gradient_stop_list
@@ -14070,13 +14819,16 @@ fn drawingml_gradient_fill(
     .gradient_stop
     .iter()
     .filter_map(|stop| {
-      let color = resolved_docx_drawing_color(
-        Color::from_gradient_stop_choice(stop.gradient_stop_choice.as_ref()?)?,
-        theme_colors,
-      )?;
+      let authored = Color::from_gradient_stop_choice(stop.gradient_stop_choice.as_ref()?)?;
+      let color = if let Some(placeholder_color) = placeholder_color {
+        docx_image_color_with_placeholder(authored, theme_colors, Some(placeholder_color))?
+      } else {
+        let color = resolved_docx_drawing_color(authored, theme_colors)?;
+        common_rgb(color.color, color.opacity)
+      };
       Some(common::GradientStop {
         position: stop.position.as_ratio() as f32,
-        color: common_rgb(color.color, color.opacity),
+        color,
         scheme: None,
       })
     })
@@ -14556,6 +15308,38 @@ fn drawingml_fill_reference_color(
   }
 }
 
+fn drawingml_fill_reference_common_fill(
+  reference: &a::FillReference,
+  theme_fills: &ThemeFillStyles,
+  theme_colors: &ThemeColors,
+) -> Option<common::Fill<'static>> {
+  let index = usize::try_from(reference.index).ok()?;
+  let style = theme_fills.get(index)?;
+  let placeholder_color = reference
+    .fill_reference_choice
+    .as_ref()
+    .and_then(Color::from_fill_reference_choice);
+  match style {
+    ThemeFillStyle::None => Some(common::Fill::None),
+    ThemeFillStyle::Solid(fill) => {
+      let color = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
+      docx_image_color_with_placeholder(color, theme_colors, placeholder_color.as_ref())
+        .map(common::Fill::Solid)
+    }
+    ThemeFillStyle::Gradient(fill) => {
+      drawingml_gradient_fill_with_placeholder(fill, theme_colors, placeholder_color.as_ref())
+    }
+    ThemeFillStyle::Blip(fill) => Some(drawingml_blip_common_fill(fill)),
+    ThemeFillStyle::Pattern(fill) => {
+      drawingml_pattern_fill_with_placeholder(fill, theme_colors, placeholder_color.as_ref())
+        .map(common::Fill::Pattern)
+    }
+    // Group fill requires the enclosing group's resolved paint. Keep that
+    // inheritance distinct from a concrete style-list paint.
+    ThemeFillStyle::Group => None,
+  }
+}
+
 fn drawingml_font_reference_color(
   reference: &a::FontReference,
   theme_colors: &ThemeColors,
@@ -14854,15 +15638,44 @@ fn push_group_child_shapes(
   inherited_shape_types: &[&v::Shapetype],
 ) {
   let transform = VmlGroupTransform::from_group(group);
+  push_group_child_shapes_with_transform(
+    group,
+    group.style.as_deref(),
+    transform,
+    inlines,
+    images,
+    inherited_shape_types,
+  );
+}
+
+fn push_group_child_shapes_with_transform(
+  group: &v::Group,
+  group_style: Option<&str>,
+  transform: Option<VmlGroupTransform>,
+  inlines: &mut Vec<InlineItem>,
+  images: &ImageCatalog,
+  inherited_shape_types: &[&v::Shapetype],
+) {
   for choice in &group.group_choice {
     match choice {
-      v::GroupChoice::Group(group) => {
-        push_group_child_shapes(group, inlines, images, inherited_shape_types)
+      v::GroupChoice::Group(child_group) => {
+        let style = transform.and_then(|transform| {
+          transform.child_group_anchor_style(group_style, child_group.style.as_deref())
+        });
+        let style = style.as_deref().or(child_group.style.as_deref());
+        let child_transform = VmlGroupTransform::from_group_with_style(child_group, style);
+        push_group_child_shapes_with_transform(
+          child_group,
+          style,
+          child_transform,
+          inlines,
+          images,
+          inherited_shape_types,
+        );
       }
       v::GroupChoice::Arc(shape) => {
-        let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
-        });
+        let style = transform
+          .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
         if let Some(shape) = vml_special_shape(
           crate::xlsx::object_resources::vml_arc_model(shape),
           style.as_deref().or(shape.style.as_deref()),
@@ -14871,9 +15684,8 @@ fn push_group_child_shapes(
         }
       }
       v::GroupChoice::Curve(shape) => {
-        let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
-        });
+        let style = transform
+          .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
         if let Some(shape) = vml_special_shape(
           crate::xlsx::object_resources::vml_curve_model(shape),
           style.as_deref().or(shape.style.as_deref()),
@@ -14882,9 +15694,8 @@ fn push_group_child_shapes(
         }
       }
       v::GroupChoice::Line(shape) => {
-        let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
-        });
+        let style = transform
+          .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
         if let Some(shape) = vml_special_shape(
           crate::xlsx::object_resources::vml_line_model(shape),
           style.as_deref().or(shape.style.as_deref()),
@@ -14893,9 +15704,8 @@ fn push_group_child_shapes(
         }
       }
       v::GroupChoice::Oval(shape) => {
-        let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
-        });
+        let style = transform
+          .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
         if let Some(shape) = vml_special_shape(
           crate::xlsx::object_resources::vml_oval_model(shape),
           style.as_deref().or(shape.style.as_deref()),
@@ -14905,7 +15715,7 @@ fn push_group_child_shapes(
       }
       v::GroupChoice::Rectangle(rectangle) => {
         let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), rectangle.style.as_deref())
+          transform.child_anchor_style(group_style, rectangle.style.as_deref())
         });
         if let Some(shape) = vml_rectangle_shape_with_style(rectangle, style.as_deref(), images) {
           inlines.push(InlineItem::Shape(shape));
@@ -14913,7 +15723,7 @@ fn push_group_child_shapes(
       }
       v::GroupChoice::RoundRectangle(round_rectangle) => {
         let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), round_rectangle.style.as_deref())
+          transform.child_anchor_style(group_style, round_rectangle.style.as_deref())
         });
         if let Some(shape) = vml_round_rectangle_shape_with_style(round_rectangle, style.as_deref())
         {
@@ -14921,9 +15731,8 @@ fn push_group_child_shapes(
         }
       }
       v::GroupChoice::Shape(shape) => {
-        let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
-        });
+        let style = transform
+          .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
         if let Some(shape) =
           vml_shape_shape_with_style(shape, style.as_deref(), images, inherited_shape_types)
         {
@@ -16312,9 +17121,10 @@ fn vml_textbox_frame(
   let mut frame = TextBoxFrameContent::new(textbox_blocks(content, styles, images, hyperlinks));
   apply_vml_textbox_properties(shape_style, textbox, &mut frame);
   let auto_fit = vml_textbox_fits_shape_to_text(textbox);
-  let width_pt = if auto_fit {
-    // frames that can grow horizontally instead of wrapping on the narrow
-    // imported shape width.
+  let width_pt = if auto_fit && !frame.writing_mode.is_vertical() {
+    // Horizontal VML frames that fit their shape to text can grow instead of
+    // wrapping on a narrow authored width. Vertical frames keep the authored
+    // logical line length on their physical height axis.
     shape_width_pt.max(DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT)
   } else {
     (shape_width_pt - frame.left_pt - frame.right_pt).max(DEFAULT_TEXTBOX_MIN_WIDTH_PT)
@@ -16352,7 +17162,11 @@ fn vml_textbox_frame(
     text_fill: None,
     effects: None,
     static3d: None,
-    text_upright: false,
+    // Word keeps legacy custom-shape textbox text unrotated unless its
+    // separate RotateText property is set. LibreOffice's WW8/VML bridge
+    // compensates both the object angle and FlipV for this default while
+    // leaving the shape geometry transformed.
+    text_upright: true,
     text_box_writing_mode: frame.writing_mode,
     text_box_blocks: frame.blocks,
     text_inset_left_pt: 0.0,
@@ -16618,21 +17432,6 @@ fn picture_choice_image(choice: &w::PictureChoice, images: &ImageCatalog) -> Opt
 }
 
 fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> Option<InlineImage> {
-  let content_representation = object.embedded_object_choice1.iter().any(|choice| {
-    matches!(
-      choice,
-      w::EmbeddedObjectChoice::OleObject(ole)
-        if ole.draw_aspect == Some(o::OleDrawAspectValues::Content)
-    )
-  }) || matches!(
-    object.embedded_object_choice2.as_ref(),
-    Some(w::EmbeddedObjectChoice2::ObjectEmbed(embed))
-      if embed.draw_aspect == Some(w::ObjectDrawAspect::Content)
-  ) || matches!(
-    object.embedded_object_choice2.as_ref(),
-    Some(w::EmbeddedObjectChoice2::ObjectLink(link))
-      if link.draw_aspect == Some(w::ObjectDrawAspect::Content)
-  );
   let mut image = object
     .embedded_object_choice1
     .iter()
@@ -16650,9 +17449,11 @@ fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> O
   // ECMA-376 Part 1 §17.3.3.19 and Annex L.7.2 require the associated
   // shape/image as the static visual representation when an embedded object
   // is not loaded. Preserve real EMF/WMF TextOut records from that
-  // representation for PDF text semantics regardless of the OLE server.
-  image.semantic_metafile_text |= content_representation
-    && crate::render::emf_wmf::supports_semantic_text(image.content_type.as_deref());
+  // representation for PDF text semantics regardless of the OLE server or
+  // whether DrawAspect selects Content or Icon. Ordinary VML images remain
+  // on the non-semantic path in pict_image_impl().
+  image.semantic_metafile_text |=
+    crate::render::emf_wmf::supports_semantic_text(image.content_type.as_deref());
   Some(image)
 }
 
@@ -16702,6 +17503,9 @@ fn push_picture_choice_textboxes(
     w::PictureChoice::ImageFile(image) => {
       push_image_file_textboxes(image, None, inlines, base_style, styles, images, hyperlinks);
     }
+    w::PictureChoice::Oval(oval) => {
+      push_oval_textboxes(oval, None, inlines, base_style, styles, images, hyperlinks);
+    }
     w::PictureChoice::Rectangle(rectangle) => {
       push_rectangle_textboxes(
         rectangle, None, inlines, base_style, styles, images, hyperlinks,
@@ -16727,30 +17531,44 @@ fn push_picture_choice_textboxes(
 
 fn group_image(group: &v::Group, images: &ImageCatalog) -> Option<InlineImage> {
   let transform = VmlGroupTransform::from_group(group);
+  group_image_with_transform(group, group.style.as_deref(), transform, images)
+}
+
+fn group_image_with_transform(
+  group: &v::Group,
+  group_style: Option<&str>,
+  transform: Option<VmlGroupTransform>,
+  images: &ImageCatalog,
+) -> Option<InlineImage> {
   group.group_choice.iter().find_map(|choice| match choice {
-    v::GroupChoice::Group(group) => group_image(group, images),
-    v::GroupChoice::ImageFile(image) => {
+    v::GroupChoice::Group(child_group) => {
       let style = transform.and_then(|transform| {
-        transform.child_anchor_style(group.style.as_deref(), image.style.as_deref())
+        transform.child_group_anchor_style(group_style, child_group.style.as_deref())
       });
+      let style = style.as_deref().or(child_group.style.as_deref());
+      let child_transform = VmlGroupTransform::from_group_with_style(child_group, style);
+      group_image_with_transform(child_group, style, child_transform, images)
+    }
+    v::GroupChoice::ImageFile(image) => {
+      let style = transform
+        .and_then(|transform| transform.child_anchor_style(group_style, image.style.as_deref()));
       image_file_image_with_style(image, style.as_deref(), images)
     }
     v::GroupChoice::Rectangle(rectangle) => {
       let style = transform.and_then(|transform| {
-        transform.child_anchor_style(group.style.as_deref(), rectangle.style.as_deref())
+        transform.child_anchor_style(group_style, rectangle.style.as_deref())
       });
       rectangle_image_with_style(rectangle, style.as_deref(), images)
     }
     v::GroupChoice::RoundRectangle(round_rectangle) => {
       let style = transform.and_then(|transform| {
-        transform.child_anchor_style(group.style.as_deref(), round_rectangle.style.as_deref())
+        transform.child_anchor_style(group_style, round_rectangle.style.as_deref())
       });
       round_rectangle_image_with_style(round_rectangle, style.as_deref(), images)
     }
     v::GroupChoice::Shape(shape) => {
-      let style = transform.and_then(|transform| {
-        transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
-      });
+      let style = transform
+        .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
       shape_image_with_style(shape, style.as_deref(), images)
     }
     _ => None,
@@ -16783,11 +17601,40 @@ fn push_group_child_textboxes(
   hyperlinks: &HyperlinkCatalog,
 ) {
   let transform = VmlGroupTransform::from_group(group);
+  push_group_child_textboxes_with_transform(
+    group,
+    group.style.as_deref(),
+    transform,
+    inlines,
+    base_style,
+    styles,
+    images,
+    hyperlinks,
+  );
+}
+
+fn push_group_child_textboxes_with_transform(
+  group: &v::Group,
+  group_style: Option<&str>,
+  transform: Option<VmlGroupTransform>,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) {
   for choice in &group.group_choice {
     match choice {
-      v::GroupChoice::Group(group) => {
-        push_group_child_textboxes(
-          group,
+      v::GroupChoice::Group(child_group) => {
+        let style = transform.and_then(|transform| {
+          transform.child_group_anchor_style(group_style, child_group.style.as_deref())
+        });
+        let style = style.as_deref().or(child_group.style.as_deref());
+        let child_transform = VmlGroupTransform::from_group_with_style(child_group, style);
+        push_group_child_textboxes_with_transform(
+          child_group,
+          style,
+          child_transform,
           inlines,
           base_style.clone(),
           styles,
@@ -16796,9 +17643,8 @@ fn push_group_child_textboxes(
         );
       }
       v::GroupChoice::ImageFile(image) => {
-        let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), image.style.as_deref())
-        });
+        let style = transform
+          .and_then(|transform| transform.child_anchor_style(group_style, image.style.as_deref()));
         push_image_file_textboxes(
           image,
           style.as_deref(),
@@ -16809,9 +17655,22 @@ fn push_group_child_textboxes(
           hyperlinks,
         );
       }
+      v::GroupChoice::Oval(oval) => {
+        let style = transform
+          .and_then(|transform| transform.child_anchor_style(group_style, oval.style.as_deref()));
+        push_oval_textboxes(
+          oval,
+          style.as_deref(),
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
+      }
       v::GroupChoice::Rectangle(rectangle) => {
         let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), rectangle.style.as_deref())
+          transform.child_anchor_style(group_style, rectangle.style.as_deref())
         });
         push_rectangle_textboxes(
           rectangle,
@@ -16825,7 +17684,7 @@ fn push_group_child_textboxes(
       }
       v::GroupChoice::RoundRectangle(round_rectangle) => {
         let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), round_rectangle.style.as_deref())
+          transform.child_anchor_style(group_style, round_rectangle.style.as_deref())
         });
         push_round_rectangle_textboxes(
           round_rectangle,
@@ -16838,9 +17697,8 @@ fn push_group_child_textboxes(
         );
       }
       v::GroupChoice::Shape(shape) => {
-        let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
-        });
+        let style = transform
+          .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
         push_shape_textboxes(
           shape,
           style.as_deref(),
@@ -17040,6 +17898,45 @@ fn push_round_rectangle_textboxes(
       if let Some(frame) = vml_textbox_frame(
         style,
         vml_allow_in_cell(round_rectangle.allow_in_cell),
+        textbox,
+        styles,
+        images,
+        hyperlinks,
+      ) {
+        inlines.push(InlineItem::Shape(frame));
+      } else {
+        push_vml_textbox(
+          textbox,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
+      }
+    }
+  }
+}
+
+fn push_oval_textboxes(
+  oval: &v::Oval,
+  style_override: Option<&str>,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) {
+  let style = style_override.or(oval.style.as_deref());
+  if vml_style_is_hidden(style) {
+    return;
+  }
+
+  for choice in &oval.oval_choice {
+    if let v::OvalChoice::TextBox(textbox) = choice {
+      if let Some(frame) = vml_textbox_frame(
+        style,
+        vml_allow_in_cell(oval.allow_in_cell),
         textbox,
         styles,
         images,
@@ -17459,6 +18356,8 @@ struct VmlImageStyle {
 struct VmlGroupTransform {
   affine: Affine,
   inline_leading_pt: f32,
+  ignore_aligned_parent_offsets: bool,
+  mapped_size_pt: Option<(f32, f32)>,
 }
 
 impl VmlGroupTransform {
@@ -17467,11 +18366,14 @@ impl VmlGroupTransform {
       affine: Affine::translate((-f64::from(origin_x), -f64::from(origin_y)))
         .then_scale_non_uniform(f64::from(scale_x), f64::from(scale_y)),
       inline_leading_pt: 0.0,
+      ignore_aligned_parent_offsets: false,
+      mapped_size_pt: None,
     }
   }
 
   fn from_group(group: &v::Group) -> Option<Self> {
-    let mut transform = Self::from_group_with_style(group, group.style.as_deref())?;
+    let mut transform =
+      Self::from_group_with_style_and_anchor(group, group.style.as_deref(), true)?;
     if !vml_group_has_explicit_floating_position(group.style.as_deref())
       && group
         .group_choice
@@ -17484,6 +18386,14 @@ impl VmlGroupTransform {
   }
 
   fn from_group_with_style(group: &v::Group, group_style: Option<&str>) -> Option<Self> {
+    Self::from_group_with_style_and_anchor(group, group_style, false)
+  }
+
+  fn from_group_with_style_and_anchor(
+    group: &v::Group,
+    group_style: Option<&str>,
+    root_anchor: bool,
+  ) -> Option<Self> {
     let style = vml_image_style(group_style);
     let (width_pt, height_pt) = style.size_pt?;
     let (coord_width, coord_height) = vml_coordinate_pair(group.coordinate_size.as_deref())?;
@@ -17493,52 +18403,116 @@ impl VmlGroupTransform {
     let (origin_x, origin_y) =
       vml_coordinate_pair(group.coordinate_origin.as_deref()).unwrap_or((0.0, 0.0));
 
-    Some(Self::new(
+    let mut transform = Self::new(
       origin_x,
       origin_y,
       width_pt / coord_width,
       height_pt / coord_height,
-    ))
+    );
+    // VML authors positive rotation clockwise. The ordinary VML frame path
+    // stores the renderer-facing inverse angle, whereas a root group's child
+    // coordinate system still needs the authored angle. A recursively
+    // flattened group already carries the renderer-facing composed angle.
+    let rotation_deg = if root_anchor {
+      -style.rotation_deg
+    } else {
+      style.rotation_deg
+    };
+    let orientation = vml_orientation_affine(
+      width_pt,
+      height_pt,
+      rotation_deg,
+      style.flip_horizontal,
+      style.flip_vertical,
+    );
+    let (visual_left, visual_top, visual_width, visual_height) =
+      vml_transformed_frame_bounds(width_pt, height_pt, orientation);
+    let normalized_orientation =
+      orientation.then_translate((-f64::from(visual_left), -f64::from(visual_top)).into());
+    transform.affine = normalized_orientation * transform.affine;
+    transform.ignore_aligned_parent_offsets = root_anchor;
+    transform.mapped_size_pt = Some((visual_width, visual_height));
+    Some(transform)
   }
 
   fn child_style(self, style: Option<&str>) -> Option<String> {
+    self.child_style_with_kind(style, false)
+  }
+
+  fn child_group_style(self, style: Option<&str>) -> Option<String> {
+    self.child_style_with_kind(style, true)
+  }
+
+  fn child_style_with_kind(self, style: Option<&str>, child_is_group: bool) -> Option<String> {
     let style = style?;
-    let mut output = Vec::new();
-    for declaration in style.split(';') {
-      let Some((name, value)) = declaration.split_once(':') else {
-        output.push(declaration.to_string());
-        continue;
-      };
-      let name = name.trim();
-      let value = value.trim();
-      let transformed = match name.to_ascii_lowercase().as_str() {
-        "left" => vml_raw_coordinate(value)
-          .map(|coord| (self.affine * kurbo::Point::new(f64::from(coord), 0.0)).x as f32),
-        "top" => vml_raw_coordinate(value)
-          .map(|coord| (self.affine * kurbo::Point::new(0.0, f64::from(coord))).y as f32),
-        "width" => vml_raw_coordinate(value).map(|coord| {
-          common::drawingml_geometry::transform_vector(
-            kurbo::Vec2::new(f64::from(coord), 0.0),
-            self.affine,
-          )
-          .x as f32
-        }),
-        "height" => vml_raw_coordinate(value).map(|coord| {
-          common::drawingml_geometry::transform_vector(
-            kurbo::Vec2::new(0.0, f64::from(coord)),
-            self.affine,
-          )
-          .y as f32
-        }),
-        _ => None,
-      };
-      if let Some(value_pt) = transformed {
-        output.push(format!("{name}:{value_pt}pt"));
-      } else {
-        output.push(declaration.to_string());
-      }
-    }
+    let rect = vml_group_child_rect(style);
+    let child = vml_image_style(Some(style));
+    let mapped = self.map_rect(
+      rect,
+      (
+        if child_is_group {
+          -child.rotation_deg
+        } else {
+          child.rotation_deg
+        },
+        child.flip_horizontal,
+        child.flip_vertical,
+      ),
+    );
+    let flip = match (mapped.flip_horizontal, mapped.flip_vertical) {
+      (true, true) => "x y",
+      (true, false) => "x",
+      (false, true) => "y",
+      (false, false) => "none",
+    };
+    // Keep the authored declarations for all non-geometric VML properties,
+    // then append the flattened geometry. [MS-OE376] specifies that Office
+    // uses the last duplicate style property.
+    let output = vec![
+      style.to_string(),
+      format!("left:{}pt", mapped.x_pt),
+      format!("top:{}pt", mapped.y_pt),
+      format!("width:{}pt", mapped.width_pt),
+      format!("height:{}pt", mapped.height_pt),
+      format!("rotation:{}", -mapped.rotation_deg),
+      format!("flip:{flip}"),
+    ];
     Some(output.join(";"))
+  }
+
+  fn map_rect(
+    self,
+    rect: (f32, f32, f32, f32),
+    orientation: (f32, bool, bool),
+  ) -> DrawingMlMappedRect {
+    let (x, y, width, height) = rect;
+    let (rotation_deg, flip_horizontal, flip_vertical) = orientation;
+    let center = kurbo::Point::new(f64::from(x + width * 0.5), f64::from(y + height * 0.5));
+    let child_orientation = Affine::translate((-center.x, -center.y))
+      .then_scale_non_uniform(
+        if flip_horizontal { -1.0 } else { 1.0 },
+        if flip_vertical { -1.0 } else { 1.0 },
+      )
+      .then_rotate(f64::from(rotation_deg.to_radians()))
+      .then_translate(center.to_vec2());
+    let transform = self.affine * child_orientation;
+    let mapped_center = transform * center;
+    let horizontal =
+      common::drawingml_geometry::transform_vector(kurbo::Vec2::new(1.0, 0.0), transform);
+    let vertical =
+      common::drawingml_geometry::transform_vector(kurbo::Vec2::new(0.0, 1.0), transform);
+    let mapped_width = f64::from(width) * horizontal.hypot();
+    let mapped_height = f64::from(height) * vertical.hypot();
+    let determinant = horizontal.x * vertical.y - horizontal.y * vertical.x;
+    DrawingMlMappedRect {
+      x_pt: (mapped_center.x - mapped_width * 0.5) as f32,
+      y_pt: (mapped_center.y - mapped_height * 0.5) as f32,
+      width_pt: mapped_width as f32,
+      height_pt: mapped_height as f32,
+      rotation_deg: horizontal.y.atan2(horizontal.x).to_degrees() as f32,
+      flip_horizontal: false,
+      flip_vertical: determinant < 0.0,
+    }
   }
 
   fn child_anchor_style(
@@ -17546,7 +18520,28 @@ impl VmlGroupTransform {
     group_style: Option<&str>,
     child_style: Option<&str>,
   ) -> Option<String> {
-    let transformed = self.child_style(child_style)?;
+    self.child_anchor_style_with_kind(group_style, child_style, false)
+  }
+
+  fn child_group_anchor_style(
+    self,
+    group_style: Option<&str>,
+    child_style: Option<&str>,
+  ) -> Option<String> {
+    self.child_anchor_style_with_kind(group_style, child_style, true)
+  }
+
+  fn child_anchor_style_with_kind(
+    self,
+    group_style: Option<&str>,
+    child_style: Option<&str>,
+    child_is_group: bool,
+  ) -> Option<String> {
+    let transformed = if child_is_group {
+      self.child_group_style(child_style)?
+    } else {
+      self.child_style(child_style)?
+    };
     let parent = vml_image_style(group_style);
     let inline_group = !vml_group_has_explicit_floating_position(group_style);
     if !parent.absolute_position && !inline_group {
@@ -17554,13 +18549,57 @@ impl VmlGroupTransform {
     }
 
     let child = vml_image_style(Some(&transformed));
+    let (parent_width, parent_height) = self.mapped_size_pt.or(parent.size_pt).unwrap_or_default();
+    let (child_width, child_height) = child.size_pt.unwrap_or_default();
+    let (child_offset_x, child_offset_y, child_anchor_width, child_anchor_height) =
+      if child_is_group {
+        let orientation = vml_orientation_affine(
+          child_width,
+          child_height,
+          child.rotation_deg,
+          child.flip_horizontal,
+          child.flip_vertical,
+        );
+        let (left, top, width, height) =
+          vml_transformed_frame_bounds(child_width, child_height, orientation);
+        (
+          child.horizontal_offset_pt + left,
+          child.vertical_offset_pt + top,
+          width,
+          height,
+        )
+      } else {
+        (
+          child.horizontal_offset_pt,
+          child.vertical_offset_pt,
+          child_width,
+          child_height,
+        )
+      };
+    let parent_horizontal_offset =
+      if self.ignore_aligned_parent_offsets && parent.horizontal_alignment.is_some() {
+        0.0
+      } else {
+        parent.horizontal_offset_pt
+      };
+    let parent_vertical_offset =
+      if self.ignore_aligned_parent_offsets && parent.vertical_alignment.is_some() {
+        0.0
+      } else {
+        parent.vertical_offset_pt
+      };
     let mut output = vec![
       transformed,
       "position:absolute".to_string(),
       format!(
         "margin-left:{}pt",
-        parent.horizontal_offset_pt
-          + child.horizontal_offset_pt
+        parent_horizontal_offset
+          + vml_group_aligned_child_offset(
+            parent.horizontal_alignment,
+            parent_width,
+            child_offset_x,
+            child_anchor_width,
+          )
           + if inline_group {
             self.inline_leading_pt
           } else {
@@ -17569,7 +18608,13 @@ impl VmlGroupTransform {
       ),
       format!(
         "margin-top:{}pt",
-        parent.vertical_offset_pt + child.vertical_offset_pt
+        parent_vertical_offset
+          + vml_group_aligned_vertical_child_offset(
+            parent.vertical_alignment,
+            parent_height,
+            child_offset_y,
+            child_anchor_height,
+          )
       ),
     ];
     let horizontal_reference = if inline_group {
@@ -17584,10 +18629,146 @@ impl VmlGroupTransform {
     };
     output.push(vml_horizontal_reference_style(horizontal_reference).to_string());
     output.push(vml_vertical_reference_style(vertical_reference).to_string());
+    if let Some(alignment) = parent.horizontal_alignment {
+      output.push(vml_horizontal_alignment_style(alignment).to_string());
+    }
+    if let Some(alignment) = parent.vertical_alignment {
+      output.push(vml_vertical_alignment_style(alignment).to_string());
+    }
     if parent.behind_text {
       output.push("z-index:-1".to_string());
     }
     Some(output.join(";"))
+  }
+}
+
+fn vml_orientation_affine(
+  width_pt: f32,
+  height_pt: f32,
+  rotation_deg: f32,
+  flip_horizontal: bool,
+  flip_vertical: bool,
+) -> Affine {
+  let center_x = width_pt / 2.0;
+  let center_y = height_pt / 2.0;
+  Affine::translate((-f64::from(center_x), -f64::from(center_y)))
+    .then_scale_non_uniform(
+      if flip_horizontal { -1.0 } else { 1.0 },
+      if flip_vertical { -1.0 } else { 1.0 },
+    )
+    .then_rotate(f64::from(rotation_deg.to_radians()))
+    .then_translate((f64::from(center_x), f64::from(center_y)).into())
+}
+
+fn vml_transformed_frame_bounds(
+  width_pt: f32,
+  height_pt: f32,
+  transform: Affine,
+) -> (f32, f32, f32, f32) {
+  let corners = [
+    kurbo::Point::new(0.0, 0.0),
+    kurbo::Point::new(f64::from(width_pt), 0.0),
+    kurbo::Point::new(f64::from(width_pt), f64::from(height_pt)),
+    kurbo::Point::new(0.0, f64::from(height_pt)),
+  ]
+  .map(|point| transform * point);
+  let min_x = corners
+    .iter()
+    .map(|point| point.x)
+    .fold(f64::INFINITY, f64::min);
+  let min_y = corners
+    .iter()
+    .map(|point| point.y)
+    .fold(f64::INFINITY, f64::min);
+  let max_x = corners
+    .iter()
+    .map(|point| point.x)
+    .fold(f64::NEG_INFINITY, f64::max);
+  let max_y = corners
+    .iter()
+    .map(|point| point.y)
+    .fold(f64::NEG_INFINITY, f64::max);
+  (
+    min_x as f32,
+    min_y as f32,
+    (max_x - min_x) as f32,
+    (max_y - min_y) as f32,
+  )
+}
+
+fn vml_group_child_rect(style: &str) -> (f32, f32, f32, f32) {
+  // LibreOffice ShapeType::getRelRectangle() uses zero origins and a one-unit
+  // fallback extent for VML children. Values are coordinates in the parent
+  // group even when an otherwise absolute unit suffix is authored.
+  let mut left = 0.0;
+  let mut top = 0.0;
+  let mut width = 1.0;
+  let mut height = 1.0;
+  for declaration in style.split(';') {
+    let Some((name, value)) = declaration.split_once(':') else {
+      continue;
+    };
+    let target = match name.trim().to_ascii_lowercase().as_str() {
+      "left" => &mut left,
+      "top" => &mut top,
+      "width" => &mut width,
+      "height" => &mut height,
+      _ => continue,
+    };
+    if let Some(value) = vml_raw_coordinate(value) {
+      *target = value;
+    }
+  }
+  (left, top, width, height)
+}
+
+fn vml_group_aligned_child_offset(
+  alignment: Option<HorizontalImageAlignment>,
+  parent_extent: f32,
+  child_offset: f32,
+  child_extent: f32,
+) -> f32 {
+  match alignment {
+    Some(HorizontalImageAlignment::Center) => child_offset + (child_extent - parent_extent) / 2.0,
+    Some(HorizontalImageAlignment::Right | HorizontalImageAlignment::Outside) => {
+      child_offset + child_extent - parent_extent
+    }
+    Some(HorizontalImageAlignment::Left | HorizontalImageAlignment::Inside) | None => child_offset,
+  }
+}
+
+fn vml_group_aligned_vertical_child_offset(
+  alignment: Option<VerticalImageAlignment>,
+  parent_extent: f32,
+  child_offset: f32,
+  child_extent: f32,
+) -> f32 {
+  match alignment {
+    Some(VerticalImageAlignment::Center) => child_offset + (child_extent - parent_extent) / 2.0,
+    Some(VerticalImageAlignment::Bottom | VerticalImageAlignment::Outside) => {
+      child_offset + child_extent - parent_extent
+    }
+    Some(VerticalImageAlignment::Top | VerticalImageAlignment::Inside) | None => child_offset,
+  }
+}
+
+fn vml_horizontal_alignment_style(alignment: HorizontalImageAlignment) -> &'static str {
+  match alignment {
+    HorizontalImageAlignment::Left => "mso-position-horizontal:left",
+    HorizontalImageAlignment::Center => "mso-position-horizontal:center",
+    HorizontalImageAlignment::Right => "mso-position-horizontal:right",
+    HorizontalImageAlignment::Inside => "mso-position-horizontal:inside",
+    HorizontalImageAlignment::Outside => "mso-position-horizontal:outside",
+  }
+}
+
+fn vml_vertical_alignment_style(alignment: VerticalImageAlignment) -> &'static str {
+  match alignment {
+    VerticalImageAlignment::Top => "mso-position-vertical:top",
+    VerticalImageAlignment::Center => "mso-position-vertical:center",
+    VerticalImageAlignment::Bottom => "mso-position-vertical:bottom",
+    VerticalImageAlignment::Inside => "mso-position-vertical:inside",
+    VerticalImageAlignment::Outside => "mso-position-vertical:outside",
   }
 }
 
@@ -17667,9 +18848,16 @@ pub(crate) fn vml_group_child_style(
   group: &v::Group,
   group_style: Option<&str>,
   child_style: Option<&str>,
+  root_anchor: bool,
+  child_is_group: bool,
 ) -> Option<String> {
-  VmlGroupTransform::from_group_with_style(group, group_style)?
-    .child_anchor_style(group_style, child_style)
+  let transform =
+    VmlGroupTransform::from_group_with_style_and_anchor(group, group_style, root_anchor)?;
+  if child_is_group {
+    transform.child_group_anchor_style(group_style, child_style)
+  } else {
+    transform.child_anchor_style(group_style, child_style)
+  }
 }
 
 fn vml_horizontal_reference_style(reference: HorizontalImageReference) -> &'static str {
@@ -17677,11 +18865,11 @@ fn vml_horizontal_reference_style(reference: HorizontalImageReference) -> &'stat
     HorizontalImageReference::Page => "mso-position-horizontal-relative:page",
     HorizontalImageReference::Margin => "mso-position-horizontal-relative:margin",
     HorizontalImageReference::Character => "mso-position-horizontal-relative:char",
-    HorizontalImageReference::Column
-    | HorizontalImageReference::LeftMargin
-    | HorizontalImageReference::RightMargin
-    | HorizontalImageReference::InsideMargin
-    | HorizontalImageReference::OutsideMargin => "mso-position-horizontal-relative:text",
+    HorizontalImageReference::LeftMargin => "mso-position-horizontal-relative:left-margin-area",
+    HorizontalImageReference::RightMargin => "mso-position-horizontal-relative:right-margin-area",
+    HorizontalImageReference::InsideMargin => "mso-position-horizontal-relative:inner-margin-area",
+    HorizontalImageReference::OutsideMargin => "mso-position-horizontal-relative:outer-margin-area",
+    HorizontalImageReference::Column => "mso-position-horizontal-relative:text",
   }
 }
 
@@ -17692,9 +18880,9 @@ fn vml_vertical_reference_style(reference: VerticalImageReference) -> &'static s
     VerticalImageReference::Line => "mso-position-vertical-relative:line",
     VerticalImageReference::TopMargin => "mso-position-vertical-relative:top-margin-area",
     VerticalImageReference::BottomMargin => "mso-position-vertical-relative:bottom-margin-area",
-    VerticalImageReference::Paragraph
-    | VerticalImageReference::InsideMargin
-    | VerticalImageReference::OutsideMargin => "mso-position-vertical-relative:text",
+    VerticalImageReference::InsideMargin => "mso-position-vertical-relative:inner-margin-area",
+    VerticalImageReference::OutsideMargin => "mso-position-vertical-relative:outer-margin-area",
+    VerticalImageReference::Paragraph => "mso-position-vertical-relative:text",
   }
 }
 
@@ -17707,12 +18895,13 @@ fn vml_coordinate_pair(value: Option<&str>) -> Option<(f32, f32)> {
 
 fn vml_raw_coordinate(value: &str) -> Option<f32> {
   let value = value.trim();
-  (!value.is_empty()
-    && value
-      .chars()
-      .all(|c| c.is_ascii_digit() || matches!(c, '-' | '.' | '+')))
-  .then(|| value.parse::<f32>().ok())
-  .flatten()
+  let end = value
+    .char_indices()
+    .find_map(|(index, character)| {
+      (!character.is_ascii_digit() && !matches!(character, '-' | '.' | '+')).then_some(index)
+    })
+    .unwrap_or(value.len());
+  value.get(..end)?.parse::<f32>().ok()
 }
 
 impl Default for VmlImageStyle {
@@ -17752,6 +18941,8 @@ impl VmlImageStyle {
         alignment_extent: None,
         horizontal_offset_pt: self.horizontal_offset_pt,
         vertical_offset_pt: self.vertical_offset_pt,
+        horizontal_offset_pct: None,
+        vertical_offset_pct: None,
         wrap: self.wrap,
         wrap_side: ImageWrapSide::BothSides,
         behind_text: self.behind_text,
@@ -17907,6 +19098,10 @@ fn vml_horizontal_reference(value: &str) -> HorizontalImageReference {
     "page" => HorizontalImageReference::Page,
     "margin" => HorizontalImageReference::Margin,
     "char" | "character" => HorizontalImageReference::Character,
+    "left-margin-area" => HorizontalImageReference::LeftMargin,
+    "right-margin-area" => HorizontalImageReference::RightMargin,
+    "inner-margin-area" => HorizontalImageReference::InsideMargin,
+    "outer-margin-area" => HorizontalImageReference::OutsideMargin,
     _ => HorizontalImageReference::Column,
   }
 }
@@ -17917,6 +19112,8 @@ fn vml_vertical_reference(value: &str) -> VerticalImageReference {
     "margin" => VerticalImageReference::Margin,
     "top-margin-area" => VerticalImageReference::TopMargin,
     "bottom-margin-area" => VerticalImageReference::BottomMargin,
+    "inner-margin-area" => VerticalImageReference::InsideMargin,
+    "outer-margin-area" => VerticalImageReference::OutsideMargin,
     "line" => VerticalImageReference::Line,
     _ => VerticalImageReference::Paragraph,
   }
@@ -18489,6 +19686,7 @@ struct StylesCatalog {
   default_table_style_id: Option<String>,
   theme_fonts: ThemeFonts,
   theme_colors: ThemeColors,
+  theme_fills: ThemeFillStyles,
   theme_lines: ThemeLineStyles,
   theme_effects: ThemeEffectStyles,
   font_substitutions: HashMap<String, FontSubstitution>,
@@ -18506,6 +19704,7 @@ struct FontSubstitution {
 struct ThemeData {
   fonts: ThemeFonts,
   colors: ThemeColors,
+  fills: ThemeFillStyles,
   lines: ThemeLineStyles,
   effects: ThemeEffectStyles,
   cjk_punctuation_compression: bool,
@@ -18529,6 +19728,38 @@ struct ThemeFonts {
 }
 
 type ThemeFontLanguages = (Option<Arc<str>>, Option<Arc<str>>, Option<Arc<str>>);
+
+#[derive(Clone, Debug)]
+enum ThemeFillStyle {
+  None,
+  Solid(a::SolidFill),
+  Gradient(a::GradientFill),
+  Blip(a::BlipFill),
+  Pattern(a::PatternFill),
+  Group,
+}
+
+#[derive(Clone, Debug, Default)]
+struct ThemeFillStyles {
+  styles: Vec<ThemeFillStyle>,
+  background_styles: Vec<ThemeFillStyle>,
+}
+
+impl ThemeFillStyles {
+  fn get(&self, index: usize) -> Option<&ThemeFillStyle> {
+    let (styles, index) = if index >= 1000 {
+      (&self.background_styles, index - 1000)
+    } else {
+      (&self.styles, index)
+    };
+    if styles.is_empty() || index < 1 {
+      return None;
+    }
+    // DrawingML format-scheme indexes are one-based. Match the shared
+    // PresentationML resolver for producer indexes beyond the available list.
+    styles.get((index - 1).min(styles.len() - 1))
+  }
+}
 
 #[derive(Clone, Debug, Default)]
 struct ThemeLineStyles {
@@ -18810,6 +20041,7 @@ impl StylesCatalog {
         simplified_chinese_ui: locales.resource_locale().is_simplified_chinese(),
         theme_fonts: theme.fonts,
         theme_colors: theme.colors,
+        theme_fills: theme.fills,
         theme_lines: theme.lines,
         theme_effects: theme.effects,
         font_substitutions,
@@ -18859,6 +20091,7 @@ impl StylesCatalog {
       doc_default_run: word_doc_default_run_seed(has_default_run_properties),
       theme_fonts: theme.fonts,
       theme_colors: theme.colors,
+      theme_fills: theme.fills,
       theme_lines: theme.lines,
       theme_effects: theme.effects,
       font_substitutions,
@@ -19489,6 +20722,7 @@ impl ThemeData {
     Self {
       fonts: ThemeFonts::from_theme(theme, theme_font_languages),
       colors: ThemeColors::from_theme(theme),
+      fills: ThemeFillStyles::from_theme(theme),
       lines: ThemeLineStyles::from_theme(theme),
       effects: ThemeEffectStyles::from_theme(theme),
       cjk_punctuation_compression,
@@ -19533,7 +20767,13 @@ impl ThemeFonts {
         .or_else(|| self.major_east_asia.clone()),
       w::ThemeFontValues::MajorBidi => self
         .supplemental(&self.major_supplemental, self.bidi_language.as_deref())
-        .or_else(|| self.major_bidi.clone()),
+        .or_else(|| self.major_bidi.clone())
+        // [MS-OI29500] section 2.1.88 supplies Word's application-defined
+        // run-font default when a Bidi theme reference resolves to neither a
+        // language-specific supplemental face nor a nonempty a:cs face.
+        // Keep this on the token resolver so asciiTheme="majorBidi" and
+        // cstheme="majorBidi" have the same theme-slot semantics.
+        .or_else(|| Some(Arc::from("Times New Roman"))),
       w::ThemeFontValues::MinorAscii => self
         .supplemental(&self.minor_supplemental, self.latin_language.as_deref())
         .or_else(|| self.minor_ascii.clone()),
@@ -19545,7 +20785,8 @@ impl ThemeFonts {
         .or_else(|| self.minor_east_asia.clone()),
       w::ThemeFontValues::MinorBidi => self
         .supplemental(&self.minor_supplemental, self.bidi_language.as_deref())
-        .or_else(|| self.minor_bidi.clone()),
+        .or_else(|| self.minor_bidi.clone())
+        .or_else(|| Some(Arc::from("Times New Roman"))),
     }
   }
 
@@ -19638,6 +20879,52 @@ impl ThemeLineStyles {
         .filter_map(|line| line.width.map(|width| units::emu_to_points(width as i64)))
         .collect(),
     }
+  }
+}
+
+impl ThemeFillStyles {
+  fn from_theme(theme: &a::Theme) -> Self {
+    let format = &theme.theme_elements.format_scheme;
+    Self {
+      styles: format
+        .fill_style_list
+        .fill_style_list_choice
+        .iter()
+        .map(theme_fill_style)
+        .collect(),
+      background_styles: format
+        .background_fill_style_list
+        .background_fill_style_list_choice
+        .iter()
+        .map(theme_background_fill_style)
+        .collect(),
+    }
+  }
+}
+
+fn theme_fill_style(choice: &a::FillStyleListChoice) -> ThemeFillStyle {
+  match choice {
+    a::FillStyleListChoice::NoFill(_) => ThemeFillStyle::None,
+    a::FillStyleListChoice::SolidFill(fill) => ThemeFillStyle::Solid((**fill).clone()),
+    a::FillStyleListChoice::GradientFill(fill) => ThemeFillStyle::Gradient((**fill).clone()),
+    a::FillStyleListChoice::BlipFill(fill) => ThemeFillStyle::Blip((**fill).clone()),
+    a::FillStyleListChoice::PatternFill(fill) => ThemeFillStyle::Pattern((**fill).clone()),
+    a::FillStyleListChoice::GroupFill => ThemeFillStyle::Group,
+  }
+}
+
+fn theme_background_fill_style(choice: &a::BackgroundFillStyleListChoice) -> ThemeFillStyle {
+  match choice {
+    a::BackgroundFillStyleListChoice::NoFill(_) => ThemeFillStyle::None,
+    a::BackgroundFillStyleListChoice::SolidFill(fill) => ThemeFillStyle::Solid((**fill).clone()),
+    a::BackgroundFillStyleListChoice::GradientFill(fill) => {
+      ThemeFillStyle::Gradient((**fill).clone())
+    }
+    a::BackgroundFillStyleListChoice::BlipFill(fill) => ThemeFillStyle::Blip((**fill).clone()),
+    a::BackgroundFillStyleListChoice::PatternFill(fill) => {
+      ThemeFillStyle::Pattern((**fill).clone())
+    }
+    a::BackgroundFillStyleListChoice::GroupFill => ThemeFillStyle::Group,
   }
 }
 
@@ -20712,6 +21999,7 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.line_height_pt.is_some() {
     target.line_height_pt = values.line_height_pt;
     target.line_height_rule = values.line_height_rule;
+    target.line_height_set |= values.line_height_set;
   }
   if values.snap_to_grid.is_some() {
     target.snap_to_grid = values.snap_to_grid;
@@ -20748,6 +22036,10 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
     target.alignment = values.justification.alignment();
   } else if values.alignment != ParagraphAlignment::default() {
     target.alignment = values.alignment;
+  }
+  if values.bidi_set {
+    target.bidi = values.bidi;
+    target.bidi_set = true;
   }
   if values.shading.is_some() {
     target.shading = values.shading;
@@ -20915,6 +22207,7 @@ fn merge_numbering_format_values(
   if values.line_height_pt.is_some() {
     target.line_height_pt = values.line_height_pt;
     target.line_height_rule = values.line_height_rule;
+    target.line_height_set |= values.line_height_set;
   }
   if values.snap_to_grid.is_some() {
     target.snap_to_grid = values.snap_to_grid;
@@ -21554,6 +22847,14 @@ impl NumberingCatalog {
     if paragraph_mark_run_properties.is_some() {
       style = properties::paragraph_mark_run_style(paragraph_mark_run_properties, style, styles);
       style.small_caps = false;
+      if matches!(level.format, w::NumberFormatValues::Bullet) {
+        // Writer's NewNumberPortion clears paragraph bold/italic for a
+        // character bullet after resolving the paragraph-mark font metrics.
+        // Do this before the final numbering-level overlay so an explicit
+        // w:lvl/w:rPr/w:b or w:i remains authoritative.
+        style.bold = false;
+        style.italic = false;
+      }
       properties::merge_run_style(
         &mut style,
         level
@@ -21598,6 +22899,19 @@ impl NumberingCatalog {
       level.symbol_run_properties.as_ref(),
       &mut text,
     );
+    // [MS-OI29500] §17.3.2.26 assigns U+2460..U+24FF to the East Asian
+    // numbering repertoire. Word's decimalEnclosedFullstop golden keeps the
+    // ordinary Latin face for its ASCII suffix but uses SimSun when that face
+    // lacks the generated enclosed glyph. Keep any document-scoped substitute
+    // authoritative and leave symbols outside this repertoire on the generic
+    // fallback chain (notably Segoe UI Symbol for checkbox characters).
+    if style.fallback_font_family.is_none()
+      && text
+        .chars()
+        .any(|character| ('\u{2460}'..='\u{24ff}').contains(&character))
+    {
+      style.fallback_font_family = Some(Arc::from("SimSun"));
+    }
     let picture_bullet = level.picture_bullet_id.is_some();
     let image_replacement_text = picture_bullet.then(|| {
       text
@@ -21612,7 +22926,13 @@ impl NumberingCatalog {
       // w:lvlPicBulletId selects the picture representation even when the
       // referenced VML shape has no usable graphic. Word leaves that marker
       // empty; it does not fall back to the textual w:lvlText bullet.
-      text: (!picture_bullet).then_some(text),
+      // Writer's SwTextFormatter::NewNumberPortion creates no numbering
+      // portion when the complete number plus follow text is empty.  This is
+      // distinct from an empty lvlText with the default tab suffix: that
+      // still produces a tab portion.  Without a portion, the paragraph text
+      // starts at the authored hanging first-line origin while its own w:tab
+      // can still advance to the level's left indent.
+      text: (!picture_bullet && !text.is_empty()).then_some(text),
       suppressed_non_numerical_text: (!picture_bullet).then_some(suppressed_non_numerical_text),
       image,
       image_replacement_text,
@@ -23444,6 +24764,16 @@ impl<'a> ParagraphProps<'a> {
     }
   }
 
+  fn text_direction(&self) -> Option<&'a w::TextDirection> {
+    match self {
+      Self::Direct(properties) => properties.text_direction.as_ref(),
+      Self::Extended(properties) => properties.text_direction.as_ref(),
+      Self::Style(properties) => properties.text_direction.as_ref(),
+      Self::BaseStyle(properties) => properties.text_direction.as_ref(),
+      Self::Previous(properties) => properties.text_direction.as_ref(),
+    }
+  }
+
   fn frame_properties(&self) -> Option<&'a w::FrameProperties> {
     match self {
       Self::Direct(properties) => properties.frame_properties.as_ref(),
@@ -23548,6 +24878,11 @@ run_properties_accessor!(
   w::ComplexScript
 );
 run_properties_accessor!(run_properties_languages, Languages, w::Languages);
+run_properties_accessor!(
+  run_properties_east_asian_layout,
+  EastAsianLayout,
+  w::EastAsianLayout
+);
 
 paragraph_mark_run_properties_accessor!(
   paragraph_mark_run_properties_run_style,
@@ -23642,6 +24977,11 @@ paragraph_mark_run_properties_accessor!(
   Languages,
   w::Languages
 );
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_east_asian_layout,
+  EastAsianLayout,
+  w::EastAsianLayout
+);
 
 impl<'a> RunProps<'a> {
   fn run_fonts(&self) -> Option<&'a w::RunFonts> {
@@ -23661,6 +25001,18 @@ impl<'a> RunProps<'a> {
       Self::BaseStyle(properties) => properties.languages.as_ref(),
       Self::Numbering(properties) => properties.languages.as_ref(),
       Self::ParagraphMark(properties) => paragraph_mark_run_properties_languages(properties),
+    }
+  }
+
+  fn east_asian_layout(&self) -> Option<&'a w::EastAsianLayout> {
+    match self {
+      Self::Direct(properties) => run_properties_east_asian_layout(properties),
+      Self::Style(properties) => properties.east_asian_layout.as_ref(),
+      Self::BaseStyle(properties) => properties.east_asian_layout.as_ref(),
+      Self::Numbering(properties) => properties.east_asian_layout.as_ref(),
+      Self::ParagraphMark(properties) => {
+        paragraph_mark_run_properties_east_asian_layout(properties)
+      }
     }
   }
 
@@ -24166,7 +25518,8 @@ fn page_style_field_number_format(format: w::NumberFormatValues) -> FieldNumberF
     w::NumberFormatValues::UpperRoman => FieldNumberFormat::UpperRoman,
     w::NumberFormatValues::LowerLetter => FieldNumberFormat::LowerLetter,
     w::NumberFormatValues::UpperLetter => FieldNumberFormat::UpperLetter,
-    _ => FieldNumberFormat::Decimal,
+    w::NumberFormatValues::Decimal => FieldNumberFormat::Decimal,
+    format => FieldNumberFormat::WordprocessingMl(format),
   }
 }
 
@@ -26181,6 +27534,50 @@ mod tests {
   }
 
   #[test]
+  fn empty_numbering_text_with_no_suffix_keeps_the_hanging_first_line_origin() {
+    let level = w::Level::from_bytes(
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="none"/><w:suff w:val="nothing"/><w:lvlText w:val=""/><w:pPr><w:tabs><w:tab w:val="num" w:pos="2409"/></w:tabs><w:ind w:left="2409" w:hanging="708"/></w:pPr></w:lvl>"#,
+    )
+    .expect("numbering level without a visible portion");
+    let mut numbering = NumberingCatalog {
+      abstract_nums: HashMap::from([(
+        1,
+        AbstractNumbering {
+          levels: HashMap::from([(2, numbering_level_model(&level, ImportSettings::default()))]),
+          ..Default::default()
+        },
+      )]),
+      nums: HashMap::from([(
+        1,
+        NumberingInstance {
+          abstract_num_id: 1,
+          overrides: HashMap::new(),
+        },
+      )]),
+      ..Default::default()
+    };
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:numPr><w:ilvl w:val="2"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Note</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>Body</w:t></w:r></w:p>"#,
+    )
+    .expect("numbered paragraph");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+
+    let model = paragraph_model(
+      &paragraph,
+      &StylesCatalog::default(),
+      &mut numbering,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    assert!(model.list_label.is_none());
+    assert!((model.format.indent_left_pt - 120.45).abs() < 0.001);
+    assert!((model.format.first_line_indent_pt + 35.4).abs() < 0.001);
+  }
+
+  #[test]
   fn numbering_level_bound_to_paragraph_style_owns_the_style_indent() {
     let level = w::Level::from_bytes(
       br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:pStyle w:val="Style1"/><w:lvlText w:val="%1."/><w:pPr><w:ind w:left="360" w:hanging="360"/></w:pPr></w:lvl>"#,
@@ -27519,7 +28916,7 @@ mod tests {
     let ImagePlacement::Floating(placement) = shape.placement else {
       panic!("autofit shape is not floating");
     };
-    assert_eq!(placement.wrap, ImageWrapMode::Through);
+    assert_eq!(placement.wrap, ImageWrapMode::None);
   }
 
   #[test]
@@ -27779,7 +29176,7 @@ mod tests {
       None,
     );
 
-    assert_eq!(inline_text(&inlines), "\u{f0b7}\u{f0fc}●©");
+    assert_eq!(inline_text(&inlines), "\u{f0b7}\u{f0fc}\u{f04c}©");
     let symbol_fonts = inlines
       .iter()
       .filter_map(|inline| match inline {
@@ -27787,7 +29184,7 @@ mod tests {
         _ => None,
       })
       .collect::<Vec<_>>();
-    assert_eq!(symbol_fonts, ["Symbol", "Wingdings"]);
+    assert_eq!(symbol_fonts, ["Symbol", "Wingdings", "Wingdings"]);
   }
 
   #[test]

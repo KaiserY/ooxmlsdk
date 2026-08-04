@@ -196,6 +196,10 @@ pub struct ImageItem<'doc> {
   pub hyperlink_url: Option<Cow<'doc, str>>,
   /// Whether PDF export should recover semantic text from an EMF/WMF OLE preview.
   pub semantic_metafile_text: bool,
+  /// Whether semantic extraction preserves text after destination-reading
+  /// raster records. PowerPoint ActiveX thumbnails keep those native WMF text
+  /// records, while ordinary Office OLE previews are flattened.
+  pub metafile_semantic_text_includes_raster_backdrop: bool,
   /// Whether a DrawingML metafile preview may use its near-native Header.Frame.
   pub metafile_native_size: bool,
   pub floating: bool,
@@ -507,6 +511,9 @@ pub struct TextStyle<'doc> {
   /// preserves the shaping engine defaults for non-Word document models.
   pub ligatures: Option<OpenTypeLigatures>,
   pub horizontal_scale: Option<f32>,
+  /// Explicit distances in points between consecutive input-character
+  /// origins for semantic GDI replacement text.
+  pub semantic_character_advances_pt: Option<Arc<[f32]>>,
   pub character_spacing: Pt,
   pub baseline_shift: Pt,
   /// Original font size used by an automatic WordprocessingML

@@ -14,6 +14,7 @@ use super::drawingml::text_list_style::TextListStyle;
 use super::shape_group_context::PPTShapeGroupContext;
 use super::slide::{
   BackgroundKind, BackgroundProperties, ColorMap, HeaderFooter, ShapeLocation, SlidePersist,
+  active_x_fallback_previews,
 };
 
 #[derive(Debug)]
@@ -39,6 +40,10 @@ impl SlideFragmentHandler {
   ) -> Result<()> {
     // The constructor imports related vmlDrawing/legacyDrawing before XML
     // contexts create shapes; destruction converts and inserts VML drawing.
+    let fallback_previews = slide_part
+      .data_to_vec(package)
+      .map(|data| active_x_fallback_previews(&data))
+      .unwrap_or_default();
     self.slide_persist.import_image_parts(package, slide_part);
     self
       .slide_persist
@@ -66,6 +71,9 @@ impl SlideFragmentHandler {
     }
     self.slide_name = slide.common_slide_data.name.clone();
     self.import_common_slide_data(&slide.common_slide_data);
+    self
+      .slide_persist
+      .import_active_x_fallback_previews(&fallback_previews);
     self
       .slide_persist
       .import_vml_preview_drawings(package, &vml_drawing_parts);

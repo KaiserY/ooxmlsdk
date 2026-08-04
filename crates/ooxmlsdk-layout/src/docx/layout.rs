@@ -532,18 +532,9 @@ fn inline_drawing_line_height(
   if matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
     return object_height_pt;
   }
-  if uses_legacy_chart_only_line
-    && text_frame.compatibility_mode < 15
-    && paragraph_has_only_inline_drawing_content(paragraph)
-  {
-    // SwTextFormatter::CalcRealHeight() enables
-    // MS_WORD_COMP_MIN_LINE_HEIGHT_BY_FLY through compatibility mode 14:
-    // when a fly-content portion is followed only by the implicit paragraph
-    // mark, the fly defines the line's ascent and height. Writer's
-    // LINE_SPACING_AS_GAP_BELOW path then owns only the proportional auto-line
-    // spacing excess below that line. Office fixed output exposes the same
-    // split for consecutive chart-only paragraphs.
-    let proportional_gap = paragraph
+  let only_inline_drawing = paragraph_has_only_inline_drawing_content(paragraph);
+  let mut proportional_gap = || {
+    paragraph
       .format
       .line_height_pt
       .filter(|multiple| *multiple > 1.0)
@@ -553,8 +544,34 @@ fn inline_drawing_line_height(
           &paragraph_base_line_style(paragraph),
           text_metrics,
         ) * (multiple - 1.0)
-      });
-    return object_height_pt + proportional_gap;
+      })
+  };
+  if uses_legacy_chart_only_line && text_frame.compatibility_mode < 15 && only_inline_drawing {
+    // SwTextFormatter::CalcRealHeight() enables
+    // MS_WORD_COMP_MIN_LINE_HEIGHT_BY_FLY through compatibility mode 14:
+    // when a fly-content portion is followed only by the implicit paragraph
+    // mark, the fly defines the line's ascent and height. Writer's
+    // LINE_SPACING_AS_GAP_BELOW path then owns only the proportional auto-line
+    // spacing excess below that line. Office fixed output exposes the same
+    // split for consecutive chart-only paragraphs.
+    return object_height_pt + proportional_gap();
+  }
+  if only_inline_drawing
+    && matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    && paragraph
+      .format
+      .line_height_pt
+      .is_some_and(|multiple| multiple > 1.0)
+  {
+    // Writer's LINE_SPACING_AS_GAP_BELOW path keeps proportional auto
+    // spacing after an as-character-only line. The fly/drawing owns that
+    // line's ascent; the normal text height supplies only the proportional
+    // excess, not an additional full font descent. Office fixed output shows
+    // the same split for compatibility-mode-15 picture and OLE-only
+    // paragraphs in artistic_effects.docx. Text sharing the line, omitted or
+    // <=100% auto spacing, and exact/at-least spacing retain the glyph-like
+    // paragraph-mark descent below.
+    return object_height_pt + proportional_gap();
   }
   // ECMA-376 Part 1 §20.4.2.8 defines an inline drawing as affecting its
   // line like a character glyph of similar size. The object's height is the
@@ -2001,14 +2018,21 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
     PageItem::Image(item) => common::DisplayItem::Image(into_common_image_item(item)),
     PageItem::LegacyFormCheckBox(item) => into_common_legacy_form_check_box(item),
     PageItem::Group(items) => {
+      let isolate_metafile_semantics = items.iter().any(|item| {
+        matches!(
+          item,
+          PageItem::Text(text) if text.style.semantic_character_advances_pt.is_some()
+        )
+      });
       common::DisplayItem::Group(common::CompositingGroup {
         mask: None,
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
         // Word's w14 character-effect fixed output keeps the effect raster and
-        // searchable foreground text in the page stream.
-        flatten_identity: true,
+        // searchable foreground text in the page stream. GDI replacement
+        // text stays in the metafile conversion's Form XObject.
+        flatten_identity: !isolate_metafile_semantics,
         inherit_text_line_owner: true,
         items: items.into_iter().map(into_common_page_item).collect(),
       })
@@ -2188,6 +2212,19 @@ fn push_docx_picture_image(
 ) -> (usize, common::Rect) {
   let content_start = items.len();
   let mut content_bounds = image_effect_content_bounds(&image_item);
+  let active_x_semantic_font = image.semantic_metafile_font_family.clone().filter(|_| {
+    image.semantic_metafile_text
+      && image.rotation_deg.abs() <= f32::EPSILON
+      && !image.flip_horizontal
+      && !image.flip_vertical
+      && image.crop == ImageCrop::default()
+  });
+  if active_x_semantic_font.is_some() {
+    // The typed ActiveX persistence is authoritative for semantic text style;
+    // leave the WMF in charge of visible paint, but do not also expand its
+    // stale LOGFONT in the PDF layer.
+    image_item.semantic_metafile_text = false;
+  }
   if let Some(frame) = image.picture_frame.as_deref() {
     let shape_transform = inline_shape_path_transform(
       frame,
@@ -2256,6 +2293,109 @@ fn push_docx_picture_image(
   }
   items.push(PageItem::Image(image_item));
   finish_docx_image_effects(items, content_start, image, content_bounds);
+  if let Some(font_family) = active_x_semantic_font {
+    let semantic_items = crate::render::emf_wmf::extract_metafile_text_runs(
+      &image.data,
+      image.content_type.as_deref(),
+      false,
+    )
+    .into_iter()
+    .map(|run| {
+      let font_size_pt = run
+        .font_size
+        .map(|size| size * content_bounds.size.height.0)
+        .unwrap_or(11.0)
+        .max(1.0);
+      let mut style = TextStyle {
+        font_family: Some(font_family.clone()),
+        font_size_pt,
+        bold: run.bold,
+        italic: run.italic,
+        semantic_only: true,
+        ..TextStyle::default()
+      };
+      style.semantic_character_advances_pt = run.advances.map(|advances| {
+        advances
+          .into_iter()
+          .map(|advance| advance * content_bounds.size.width.0)
+          .collect::<Arc<[f32]>>()
+      });
+      PageItem::Text(Box::new(TextItem {
+        x_pt: content_bounds.origin.x.0 + run.x * content_bounds.size.width.0,
+        y_pt: content_bounds.origin.y.0 + run.y * content_bounds.size.height.0,
+        line_height_pt: (font_size_pt * 1.15).max(1.0),
+        text: run.text,
+        style,
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        dynamic_field_line_anchor: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      }))
+    })
+    .collect::<Vec<_>>();
+    if !semantic_items.is_empty() {
+      items.push(PageItem::Group(semantic_items));
+    }
+  }
+  if let Some(equation) = image.native_ole_equation.as_ref() {
+    let mut semantic_items = Vec::new();
+    for run in
+      super::math::math_type_semantic_runs(equation, &image.data, image.content_type.as_deref())
+    {
+      let font_size_pt = run
+        .font_size
+        .map(|size| size * content_bounds.size.height.0)
+        .unwrap_or(11.0)
+        .max(1.0);
+      let mut style = TextStyle {
+        font_size_pt,
+        bold: run.bold,
+        italic: run.italic,
+        semantic_only: true,
+        ..TextStyle::default()
+      };
+      style.font_family = run.font_family.map(Arc::from);
+      style.semantic_character_advances_pt = run.advances.map(|advances| {
+        advances
+          .into_iter()
+          .map(|advance| advance * content_bounds.size.width.0)
+          .collect::<Arc<[f32]>>()
+      });
+      let _authored_advance_pt = run.width.map(|width| width * content_bounds.size.width.0);
+      semantic_items.push(PageItem::Text(Box::new(TextItem {
+        x_pt: content_bounds.origin.x.0 + run.x * content_bounds.size.width.0,
+        y_pt: content_bounds.origin.y.0 + run.baseline_y * content_bounds.size.height.0,
+        line_height_pt: font_size_pt * 1.2,
+        text: run.text,
+        style,
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        dynamic_field_line_anchor: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: true,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      })));
+    }
+    if !semantic_items.is_empty() {
+      items.push(PageItem::Group(semantic_items));
+    }
+  }
   (content_start, content_bounds)
 }
 
@@ -3112,6 +3252,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
     semantic_metafile_text: item.semantic_metafile_text,
+    metafile_semantic_text_includes_raster_backdrop: false,
     metafile_native_size: item.metafile_native_size,
     floating: item.floating,
     behind_text: item.behind_text,
@@ -3791,6 +3932,13 @@ impl<'a> RootFrameLayout<'a> {
           transform
         });
       self.y = self.y.max(flow.content_top_pt);
+      if section.columns.count > 1 {
+        // A continuous section starts its column frame at the current flow
+        // position.  The page's body top is only the origin for a section
+        // that begins on an otherwise empty page; using it for every column
+        // lets the second column climb above the section boundary.
+        flow.content_top_pt = self.y;
+      }
       let previous_section = section_index
         .checked_sub(1)
         .and_then(|index| document.sections.get(index));
@@ -3816,6 +3964,43 @@ impl<'a> RootFrameLayout<'a> {
         previous_section_block,
         previous_section.and_then(|section| section.discarded_carrier_spacing_after_pt),
       );
+      if let Some(balance_height_pt) = self.balanced_section_height_pt(
+        section_index,
+        section,
+        item_start.pages_len,
+        item_start.current_items_len,
+        self.y,
+      ) {
+        let checkpoint_index = self.checkpoints.iter().position(|checkpoint| {
+          checkpoint.section_index == section_index
+            && checkpoint.block_index == 0
+            && checkpoint.page_index == item_start.pages_len
+        });
+        if let Some(checkpoint_index) = checkpoint_index
+          && let Some(checkpoint) = self.checkpoints.get(checkpoint_index).copied()
+          && self.restore_layout_checkpoint(&checkpoint).is_some()
+        {
+          self.checkpoints.truncate(checkpoint_index + 1);
+          let mut balanced_columns = section.columns;
+          balanced_columns.balanced_height_pt = Some(balance_height_pt);
+          let mut balanced_flow = self.body_flow(document_page_frame(
+            section.page,
+            section_index,
+            balanced_columns,
+          ));
+          balanced_flow.content_top_pt = self.y.max(balanced_flow.content_top_pt);
+          balanced_flow.content_bottom = (balanced_flow.content_top_pt
+            + balance_height_pt.max(DEFAULT_LINE_HEIGHT_PT))
+          .min(balanced_flow.body_content_bottom_pt);
+          self.y = self.y.max(balanced_flow.content_top_pt);
+          self.format_block_sequence_with_previous(
+            &section.blocks,
+            balanced_flow,
+            previous_section_block,
+            previous_section.and_then(|section| section.discarded_carrier_spacing_after_pt),
+          );
+        }
+      }
       if let Some(transform) = writing_transform {
         self.materialize_section_body_writing_transform(item_start, transform);
       }
@@ -3990,6 +4175,51 @@ impl<'a> RootFrameLayout<'a> {
       return true;
     }
     self.y > body_top + LAYOUT_EPSILON_PT
+  }
+
+  fn balanced_section_height_pt(
+    &self,
+    section_index: usize,
+    section: &crate::docx::ImportedSection,
+    start_page_index: usize,
+    start_items_len: usize,
+    end_y: f32,
+  ) -> Option<f32> {
+    if section.columns.count <= 1
+      || section.columns.unbalanced
+      || section.blocks.is_empty()
+      || self.pages.len() != start_page_index
+      || self.current.items.len() < start_items_len
+    {
+      return None;
+    }
+    let start_y = self
+      .checkpoints
+      .iter()
+      .find(|checkpoint| {
+        checkpoint.section_index == section_index
+          && checkpoint.block_index == 0
+          && checkpoint.page_index == start_page_index
+      })
+      .map(|checkpoint| checkpoint.y)
+      .or_else(|| {
+        page_items_vertical_bounds(&self.current.items[start_items_len..]).map(|(top, _)| top)
+      })
+      .unwrap_or(self.y.min(end_y));
+    let content_height = (end_y - start_y).max(0.0);
+    if content_height <= LAYOUT_EPSILON_PT {
+      return None;
+    }
+    let available_height =
+      (self.current.setup.height_pt - self.current.setup.margin_bottom_pt - start_y)
+        .max(DEFAULT_LINE_HEIGHT_PT);
+    let average_height = content_height / section.columns.count as f32;
+    let height = (average_height / DEFAULT_LINE_HEIGHT_PT).ceil() * DEFAULT_LINE_HEIGHT_PT;
+    if height >= available_height - LAYOUT_EPSILON_PT {
+      return None;
+    }
+    let height = height.max(DEFAULT_LINE_HEIGHT_PT).min(available_height);
+    Some(height)
   }
 
   fn format_block_sequence(&mut self, blocks: &[Block], mut flow: FlowContext) {
@@ -7732,7 +7962,16 @@ fn advance_section_flow(
 ) -> (FlowContext, f32) {
   let next_column = flow.column_index + 1;
   if next_column < flow.columns.count {
-    let next_flow = flow_with_column(flow, next_column);
+    let mut next_flow = flow;
+    if next_column + 1 == flow.columns.count {
+      // A balanced section frame is closed after its final column.  The
+      // final column must still accept the remainder of the section and hand
+      // its actual bottom to the following continuous section; retaining the
+      // provisional upper bound here would turn the section close into a
+      // physical page advance before the next section can reuse the page.
+      next_flow.columns.balanced_height_pt = None;
+    }
+    let next_flow = flow_with_column(next_flow, next_column);
     (next_flow, next_flow.content_top_pt)
   } else {
     let next_page_number = pages.len() + 2;
@@ -7753,6 +7992,10 @@ fn advance_section_flow(
       flow_with_column(
         FlowContext {
           section_page_index: flow.section_page_index + 1,
+          columns: SectionColumns {
+            balanced_height_pt: None,
+            ..flow.columns
+          },
           ..flow
         },
         0,
@@ -9310,7 +9553,13 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
 
 fn restore_body_content_bottom(flow: FlowContext) -> FlowContext {
   FlowContext {
-    content_bottom: flow.body_content_bottom_pt,
+    content_bottom: flow
+      .columns
+      .balanced_height_pt
+      .map(|height| {
+        (flow.content_top_pt + height.max(DEFAULT_LINE_HEIGHT_PT)).min(flow.body_content_bottom_pt)
+      })
+      .unwrap_or(flow.body_content_bottom_pt),
     ..flow
   }
 }
@@ -11752,16 +12001,20 @@ fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: 
 }
 
 fn body_flow_for_page(flow: FlowContext, page_number: usize) -> FlowContext {
-  let (content_top_pt, content_bottom) = body_content_limits_for_page(
+  let (content_top_pt, body_content_bottom_pt) = body_content_limits_for_page(
     flow.setup,
     flow.repeating_slots,
     page_number,
     flow.section_page_index,
   );
+  let mut content_bottom = body_content_bottom_pt;
+  if let Some(height_pt) = flow.columns.balanced_height_pt {
+    content_bottom = content_bottom.min(content_top_pt + height_pt.max(DEFAULT_LINE_HEIGHT_PT));
+  }
   FlowContext {
     content_top_pt,
     content_bottom,
-    body_content_bottom_pt: content_bottom,
+    body_content_bottom_pt,
     ..flow
   }
 }
@@ -16353,7 +16606,39 @@ impl CellFrame<'_, '_> {
   }
 
   fn paint_background(&self, current: &mut Page, row_top: f32, height_pt: f32) {
-    self.paint_cell_background(current, row_top, height_pt, self.cell);
+    // Row backgrounds are emitted before the following row is formatted. A
+    // collapsed horizontal border emitted by the preceding row therefore
+    // would otherwise be covered by this fill. Writer keeps the border above
+    // the cell shading; leave its device-grid band uncovered on the top edge
+    // when there is no inter-cell spacing.
+    let top_border_width = if self.row_index > 0
+      && row_cell_spacing_pt(self.table, self.row) <= 0.0
+      && !self.cell.vertical_merge_continue
+    {
+      self
+        .table
+        .rows
+        .get(self.row_index - 1)
+        .and_then(|previous_row| {
+          let previous_cell = row_cell_at_grid(previous_row, self.grid_start)?;
+          cell_horizontal_border(
+            self.table,
+            self.row_index - 1,
+            self.grid_start,
+            previous_cell,
+            false,
+          )
+        })
+        .map_or(0.0, |border| border.width_pt)
+    } else {
+      0.0
+    };
+    self.paint_cell_background(
+      current,
+      row_top + top_border_width,
+      (height_pt - top_border_width).max(0.0),
+      self.cell,
+    );
   }
 
   fn paint_cell_background(
@@ -16862,7 +17147,11 @@ fn vertical_border(
       resolved
     } else {
       borders.and_then(|borders| {
-        if cell_index == 0 && row.grid_before == 0 {
+        // LibreOffice's DomainMapper creates fake cells for gridBefore, but
+        // assigns the table's outer border to the first real cell as well.
+        // The skipped grids affect the column geometry, not which real cell
+        // owns the table edge (tdf#134609 / ooxmlexport15.cxx).
+        if cell_index == 0 {
           borders.left
         } else {
           borders.inside_vertical
@@ -16874,7 +17163,9 @@ fn vertical_border(
       cell.borders.right
     } else {
       borders.and_then(|borders| {
-        if cell_index + 1 == row.cells.len() && row.grid_after == 0 {
+        // See the leading-edge rule above: gridAfter does not remove the
+        // table border from the last authored cell in the row.
+        if cell_index + 1 == row.cells.len() {
           borders.right
         } else {
           borders.inside_vertical
@@ -17370,6 +17661,10 @@ fn block_content_width_range(
         .rows
         .iter()
         .any(|row| row.layout.unwrap_or(table.layout) == TableLayoutMode::AutoFit);
+      let constrained_fixed_auto_width = !has_autofit
+        && table.placement.is_none()
+        && table.preferred_width_pt.is_none()
+        && table.preferred_width_pct.is_none();
       CellContentWidthRange {
         // An AutoFit nested table's saved grid is a preferred width, not one
         // unbreakable item in its parent cell. Treating that whole grid as a
@@ -17381,9 +17676,16 @@ fn block_content_width_range(
         // parent. An explicit absolute tblW on an inline child remains a
         // constraint. A floating AutoFit child is positioned in its fly and
         // does not widen the containing cell even when the fly has an absolute
-        // width; fixed-layout children retain their resolved grid.
-        minimum_pt: if has_autofit
-          && (table.preferred_width_pt.is_none() || table.placement.is_some())
+        // width. A fixed inline child with auto/nil tblW is likewise
+        // constrained to its containing cell by TableFrameLayout::new(); its
+        // saved grid therefore cannot become an intrinsic minimum of the
+        // parent. LibreOffice's n779627 regression keeps the 264-twip parent
+        // grid column even though its empty nested table was saved at 360
+        // twips. Explicit absolute widths and floating children remain hard
+        // constraints.
+        minimum_pt: if (has_autofit
+          && (table.preferred_width_pt.is_none() || table.placement.is_some()))
+          || constrained_fixed_auto_width
         {
           autofit_table_minimum_content_width(table, column_count, content_width, text_metrics)
         } else {
@@ -24817,6 +25119,10 @@ impl<'a> TextFrameLayout<'a> {
           }
           let page_bottom_break = !advanced_for_hyphenation
             && flow.text_segmentation == TextSegmentation::Body
+            // A framePr paragraph is a separate anchored text flow. Its
+            // cached marker describes the containing story's page split; it
+            // must not create a hidden page follow inside the fixed frame.
+            && !flow.inside_paragraph_frame
             && emitted
             && page_has_body_region_items(current, flow)
             && text_line_is_last_in_flow_slot(
@@ -24829,20 +25135,42 @@ impl<'a> TextFrameLayout<'a> {
               line_has_form_widget,
             );
           if page_bottom_break {
-            // cursor where the previous layout created a page follow. Writer
-            // uses that evidence while laying out body text, so keep the
-            // following portions on the follow page instead of reflowing the
-            // whole paragraph continuously.
+            // The marker is cursor evidence from the producer's previous
+            // pagination, not an authored w:br.  In a balanced multi-column
+            // section the cached page boundary may be the boundary between
+            // column bodies (fdo43573-2-min.docx); replay it through the
+            // section's normal flow so the next column gets the continuation.
+            // LibreOffice's SectionPropertyMap leaves such sections balanced
+            // unless w:noColumnBalance applies.  A non-balanced section keeps
+            // the historical page-follow behavior because its cached page
+            // boundary is the only available pagination constraint.
             text_state.finish_line(y, line_height);
             line_has_form_widget = false;
-            (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
-              flow,
-              current,
-              pages,
-              text_metrics,
-              &mut wrap_exclusions,
-              false,
-            );
+            if flow.columns.count > 1 && !flow.columns.unbalanced {
+              (flow, y) = advance_text_frame_flow(flow, current, pages);
+              text_frame = TextFrame::new(paragraph, flow, text_metrics);
+              reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
+              y = dodge_text_wrap_exclusions(
+                y,
+                text_frame.base_line_height,
+                text_frame.default_line_left,
+                text_frame.default_line_right,
+                &wrap_exclusions,
+              );
+              line_left = text_frame.first_line_left;
+              line_right = text_frame.default_line_right;
+              line_height = text_frame.base_line_height;
+            } else {
+              (flow, text_frame, y, line_left, line_right, line_height) = self
+                .force_text_page_break(
+                  flow,
+                  current,
+                  pages,
+                  text_metrics,
+                  &mut wrap_exclusions,
+                  false,
+                );
+            }
             default_line_right = text_frame.default_line_right;
             paragraph_left = text_frame.paragraph_left;
             base_line_height = text_frame.base_line_height;
@@ -33597,6 +33925,71 @@ mod tests {
       table_column_widths(&table, 3, 523.3, false, &mut text_metrics),
       [82.0, 402.75, 49.35]
     );
+  }
+
+  #[test]
+  fn fixed_auto_width_nested_table_uses_content_not_saved_grid_as_parent_minimum() {
+    let nested = Table {
+      column_widths_pt: vec![18.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      layout: TableLayoutMode::Fixed,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      right_to_left: false,
+      align_leading_cell_content: true,
+      in_header_footer: false,
+      placement: None,
+      allow_overlap: true,
+      split_allowed: false,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![TableRow {
+        cells: vec![TableCell {
+          blocks: Vec::new(),
+          shading: None,
+          borders: CellBordersModel::default(),
+          border_suppressions: CellBorderSuppressions::default(),
+          margins: CellMargins {
+            top_pt: 0.0,
+            right_pt: 5.4,
+            bottom_pt: 0.0,
+            left_pt: 5.4,
+          },
+          preferred_width_pt: Some(18.0),
+          preferred_width_pct: None,
+          grid_span: 1,
+          vertical_merge_continue: false,
+          no_wrap: false,
+          fit_text: false,
+          hide_end_mark: false,
+          vertical_alignment: TableCellVerticalAlignment::Top,
+          text_rotation_deg: None,
+        }],
+        height_pt: None,
+        exact_height: false,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: false,
+        cell_spacing_pt: None,
+        grid_before: 0,
+        grid_after: 0,
+        width_before_pt: None,
+        width_after_pt: None,
+        layout: None,
+        borders: None,
+        spacing_shading: None,
+        redline_color: None,
+      }],
+    };
+    let mut text_metrics = TextMetrics::new();
+    let range = block_content_width_range(&Block::Table(nested), 468.0, &mut text_metrics);
+
+    assert!((range.minimum_pt - 10.8).abs() < 0.001);
+    assert_eq!(range.maximum_pt, 18.0);
   }
 
   #[test]

@@ -80,15 +80,18 @@ impl PPTShapeGroupContext {
     }
     if let Some(picture) = control.picture.as_deref() {
       let mut shape = self.import_picture(slide_persist, picture);
-      if let Some(palette) = active_x_state
-        .as_ref()
-        .and_then(|state| state.preview_palette_override())
-        && let Some(resource) = shape
-          .picture
-          .as_mut()
-          .and_then(|picture| picture.image_resource.as_mut())
+      if let Some(resource) = shape
+        .picture
+        .as_mut()
+        .and_then(|picture| picture.image_resource.as_mut())
       {
-        resource.monochrome_dib_palette_override = Some(palette);
+        if let Some(palette) = active_x_state
+          .as_ref()
+          .and_then(|state| state.preview_palette_override())
+        {
+          resource.monochrome_dib_palette_override = Some(palette);
+        }
+        resource.metafile_semantic_text_includes_raster_backdrop = active_x_state.is_some();
       }
       slide_persist.shapes.push(shape);
     }

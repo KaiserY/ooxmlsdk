@@ -2,12 +2,16 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::sync::{Arc, OnceLock};
 
+use image::codecs::png::PngEncoder;
 use image::metadata::Orientation;
 use image::{
-  DynamicImage, GenericImageView, ImageDecoder, ImageFormat as RasterImageFormat, ImageReader,
-  Rgba, imageops::FilterType,
+  ColorType, DynamicImage, GenericImageView, ImageDecoder, ImageEncoder,
+  ImageFormat as RasterImageFormat, ImageReader, Rgba, imageops::FilterType,
 };
-use jpeg_encoder::{ColorType as JpegColorType, Encoder as JpegEncoder, SamplingFactor};
+use jpeg_encoder::{
+  ColorType as JpegColorType, Encoder as JpegEncoder, ImageBuffer as JpegImageBuffer,
+  JpegColorType as JpegComponentColorType, SamplingFactor, rgb_to_ycbcr,
+};
 use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
 use rustc_hash::FxHashMap as HashMap;
 
@@ -325,6 +329,115 @@ fn encode_jpeg(image: image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
   Ok(jpeg)
 }
 
+struct H2V2BoxRgbImage<'a> {
+  data: &'a [u8],
+  width: u16,
+  height: u16,
+}
+
+impl H2V2BoxRgbImage<'_> {
+  fn ycbcr(&self, x: u16, y: u16) -> (u8, u8, u8) {
+    let index = (usize::from(y) * usize::from(self.width) + usize::from(x)) * 3;
+    rgb_to_ycbcr(self.data[index], self.data[index + 1], self.data[index + 2])
+  }
+
+  fn h2v2_chroma(&self, x: u16, y: u16) -> (u8, u8) {
+    let next_x = x.saturating_add(1).min(self.width - 1);
+    let next_y = y.saturating_add(1).min(self.height - 1);
+    let (_, cb00, cr00) = self.ycbcr(x, y);
+    let (_, cb01, cr01) = self.ycbcr(next_x, y);
+    let (_, cb10, cr10) = self.ycbcr(x, next_y);
+    let (_, cb11, cr11) = self.ycbcr(next_x, next_y);
+    // libjpeg's h2v2_downsample alternates the rounding bias so exact halves
+    // do not introduce a systematic upward bias. The pattern restarts on
+    // each output row. jpeg-encoder samples the even input coordinates for
+    // 4:2:0, so put the filtered value at those coordinates.
+    let bias = if (x / 2).is_multiple_of(2) { 1 } else { 2 };
+    let average = |a: u8, b: u8, c: u8, d: u8| {
+      ((u16::from(a) + u16::from(b) + u16::from(c) + u16::from(d) + bias) >> 2) as u8
+    };
+    (
+      average(cb00, cb01, cb10, cb11),
+      average(cr00, cr01, cr10, cr11),
+    )
+  }
+}
+
+impl JpegImageBuffer for H2V2BoxRgbImage<'_> {
+  fn get_jpeg_color_type(&self) -> JpegComponentColorType {
+    JpegComponentColorType::Ycbcr
+  }
+
+  fn width(&self) -> u16 {
+    self.width
+  }
+
+  fn height(&self) -> u16 {
+    self.height
+  }
+
+  fn fill_buffers(&self, y: u16, buffers: &mut [Vec<u8>; 4]) {
+    for x in 0..self.width {
+      let (luma, mut cb, mut cr) = self.ycbcr(x, y);
+      if x.is_multiple_of(2) && y.is_multiple_of(2) {
+        (cb, cr) = self.h2v2_chroma(x, y);
+      }
+      buffers[0].push(luma);
+      buffers[1].push(cb);
+      buffers[2].push(cr);
+    }
+  }
+}
+
+fn encode_powerpoint_h2v2_jpeg(image: &image::RgbaImage, quality: u8) -> Result<Vec<u8>> {
+  let rgb = DynamicImage::ImageRgba8(image.clone()).to_rgb8();
+  let width = u16::try_from(rgb.width())
+    .map_err(|_| PdfError::Krilla("JPEG width exceeds 65535 pixels".to_string()))?;
+  let height = u16::try_from(rgb.height())
+    .map_err(|_| PdfError::Krilla("JPEG height exceeds 65535 pixels".to_string()))?;
+  let mut jpeg = Vec::new();
+  let mut encoder = JpegEncoder::new(&mut jpeg, quality);
+  encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+  encoder
+    .encode_image(H2V2BoxRgbImage {
+      data: rgb.as_raw(),
+      width,
+      height,
+    })
+    .map_err(|err| PdfError::Krilla(format!("failed to encode PowerPoint JPEG image: {err}")))?;
+  Ok(jpeg)
+}
+
+/// Reproduce PowerPoint's fixed-output treatment of bitmap pixels lifted from
+/// an ActiveX WMF preview: JPEG-compress the WMF DIB color plane while
+/// preserving its alpha plane exactly.
+pub(super) fn powerpoint_activex_bitmap_png(data: &[u8], quality: u8) -> Result<Vec<u8>> {
+  let original = decode_dynamic_image(data, RasterImageFormat::Png)?
+    .image
+    .to_rgba8();
+  let (width, height) = original.dimensions();
+  let jpeg = encode_powerpoint_h2v2_jpeg(&original, quality)?;
+  let recompressed = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)?
+    .image
+    .to_rgb8();
+  let opaque = original.pixels().all(|pixel| pixel[3] == u8::MAX);
+  let mut output = Vec::new();
+  if opaque {
+    PngEncoder::new(&mut output)
+      .write_image(recompressed.as_raw(), width, height, ColorType::Rgb8.into())
+      .map_err(|err| PdfError::Krilla(format!("failed to encode ActiveX bitmap PNG: {err}")))?;
+  } else {
+    let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
+    for (color, source) in recompressed.pixels().zip(original.pixels()) {
+      rgba.extend_from_slice(&[color[0], color[1], color[2], source[3]]);
+    }
+    PngEncoder::new(&mut output)
+      .write_image(&rgba, width, height, ColorType::Rgba8.into())
+      .map_err(|err| PdfError::Krilla(format!("failed to encode ActiveX bitmap PNG: {err}")))?;
+  }
+  Ok(output)
+}
+
 fn decode_png_relaxed(data: &[u8]) -> std::result::Result<PdfRasterImage, String> {
   let mut decoder = png::Decoder::new(Cursor::new(data));
   decoder.ignore_checksums(true);
@@ -487,6 +600,56 @@ mod tests {
       PdfRasterImage::from_dynamic_with_icc(DynamicImage::new_rgb8(1, 1), Some(profile.clone()));
 
     assert_eq!(CustomImage::icc_profile(&image), Some(profile.as_slice()));
+  }
+
+  #[test]
+  fn powerpoint_h2v2_jpeg_averages_each_chroma_block() {
+    let data = [
+      255, 0, 0, 0, 255, 0, // red, green
+      0, 0, 255, 255, 255, 255, // blue, white
+    ];
+    let image = H2V2BoxRgbImage {
+      data: &data,
+      width: 2,
+      height: 2,
+    };
+    let converted = [
+      rgb_to_ycbcr(255, 0, 0),
+      rgb_to_ycbcr(0, 255, 0),
+      rgb_to_ycbcr(0, 0, 255),
+      rgb_to_ycbcr(255, 255, 255),
+    ];
+    let average = |component: usize| {
+      ((converted
+        .iter()
+        .map(|pixel| u16::from([pixel.0, pixel.1, pixel.2][component]))
+        .sum::<u16>()
+        + 1)
+        >> 2) as u8
+    };
+
+    assert_eq!(image.h2v2_chroma(0, 0), (average(1), average(2)));
+  }
+
+  #[test]
+  fn powerpoint_activex_jpeg_round_trip_preserves_binary_alpha() {
+    let source = [
+      240, 20, 10, 255, // opaque red
+      10, 220, 30, 0, // transparent green
+    ];
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(&source, 2, 1, ColorType::Rgba8.into())
+      .unwrap();
+
+    let output = powerpoint_activex_bitmap_png(&png, 75).unwrap();
+    let output = image::load_from_memory_with_format(&output, RasterImageFormat::Png)
+      .unwrap()
+      .to_rgba8();
+
+    assert_eq!(output.dimensions(), (2, 1));
+    assert_eq!(output.get_pixel(0, 0)[3], 255);
+    assert_eq!(output.get_pixel(1, 0)[3], 0);
   }
 
   #[test]

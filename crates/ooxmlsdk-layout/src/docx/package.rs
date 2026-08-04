@@ -1,17 +1,25 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use olecfsdk::{
+  cfb::CompoundFile,
+  forms::{CommandButtonControl, LabelControl, MorphDataControl, TextProps},
+};
 use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
   alternative_format_import_part::AlternativeFormatImportPart, chart_part::ChartPart,
   diagram_colors_part::DiagramColorsPart, diagram_data_part::DiagramDataPart,
-  diagram_persist_layout_part::DiagramPersistLayoutPart, endnotes_part::EndnotesPart,
+  diagram_persist_layout_part::DiagramPersistLayoutPart,
+  embedded_control_persistence_part::EmbeddedControlPersistencePart,
+  embedded_object_part::EmbeddedObjectPart, endnotes_part::EndnotesPart,
   extended_chart_part::ExtendedChartPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
   header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
   numbering_definitions_part::NumberingDefinitionsPart,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
+  schemas_microsoft_com_office_2006_active_x as ax,
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
   schemas_microsoft_com_office_drawing_2012_chart_style as cs,
   schemas_microsoft_com_office_drawing_2014_chartex as cx,
@@ -23,11 +31,20 @@ use ooxmlsdk::sdk::{RelatedPart, SdkPart, SdkType};
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {
   pub(super) by_relationship_id: HashMap<String, ImageResource>,
+  pub(super) active_x_text_style_by_relationship_id: HashMap<String, ActiveXTextStyle>,
+  pub(super) math_type_by_relationship_id: HashMap<String, super::math_type::MathTypeEquation>,
   pub(super) charts_by_relationship_id: HashMap<String, c::ChartSpace>,
   pub(super) extended_charts_by_relationship_id: HashMap<String, ExtendedChartResource>,
   pub(super) diagram_colors_by_relationship_id: HashMap<String, dgm::ColorsDefinition>,
   pub(super) diagram_data_by_relationship_id: HashMap<String, dgm::DataModelRoot>,
   pub(super) diagram_drawings_by_relationship_id: HashMap<String, dsp::Drawing>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct ActiveXTextStyle {
+  /// An explicitly persisted Forms font. `None` means that the Forms
+  /// TextProps record exists but leaves FontName at the host default.
+  pub(super) font_family: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -106,6 +123,117 @@ pub(super) struct ImageResource {
   pub(super) content_type: Option<String>,
 }
 
+fn active_x_text_style(
+  control: &ax::ActiveXControlData,
+  binary: Option<&[u8]>,
+) -> Option<ActiveXTextStyle> {
+  if let Some(font_family) = active_x_property_bag_font(control) {
+    return Some(ActiveXTextStyle {
+      font_family: Some(font_family),
+    });
+  }
+
+  let class_id = control.active_x_control_class_id.as_str();
+  let persistence: Cow<'_, [u8]> = match control.persistence {
+    ax::PersistenceValues::PersistPropertyBag => {
+      // [MS-OI29500] stores explicitly authored font data in ax:ocxPr. A
+      // Word-hosted TextBox without that property delegates the effective
+      // preview font to its host. Other Forms controls retain the authored
+      // preview font: [MS-OFORMS] gives absent TextProps::FontName its own
+      // MS Sans Serif file-format default rather than a Word run default.
+      return is_text_box_class(class_id).then_some(ActiveXTextStyle { font_family: None });
+    }
+    ax::PersistenceValues::PersistStorage => {
+      let compound = CompoundFile::from_bytes(binary?).ok()?;
+      Cow::Owned(
+        compound
+          .stream("contents")
+          .or_else(|| compound.stream("Contents"))?
+          .to_vec(),
+      )
+    }
+    ax::PersistenceValues::PersistStream | ax::PersistenceValues::PersistStreamInit => {
+      Cow::Borrowed(binary?)
+    }
+  };
+
+  let font_family = if class_id.eq_ignore_ascii_case("{D7053240-CE69-11CD-A777-00DD01143C57}") {
+    let control = CommandButtonControl::from_bytes(persistence.as_ref()).ok()?;
+    text_props_font_family(&control.text_props)
+  } else if class_id.eq_ignore_ascii_case("{978C9E23-D4B0-11CE-BF2D-00AA003F40D0}") {
+    let control = LabelControl::from_bytes(persistence.as_ref()).ok()?;
+    text_props_font_family(&control.text_props)
+  } else if is_morph_data_class(class_id) {
+    let control = MorphDataControl::from_bytes(persistence.as_ref()).ok()?;
+    text_props_font_family(&control.text_props)
+  } else {
+    return None;
+  };
+
+  match font_family {
+    Some(font_family) => Some(ActiveXTextStyle {
+      font_family: Some(font_family),
+    }),
+    None if is_text_box_class(class_id) => Some(ActiveXTextStyle { font_family: None }),
+    None => None,
+  }
+}
+
+fn text_props_font_family(text_props: &TextProps) -> Option<String> {
+  let descriptor = text_props.data_block.font_name.as_ref()?.value;
+  let family = text_props
+    .extra_data_block
+    .font_name
+    .as_ref()?
+    .decode(descriptor)
+    .ok()?;
+  let family = family.trim_matches('\0').trim();
+  (!family.is_empty()).then(|| family.to_string())
+}
+
+fn active_x_property_bag_font(control: &ax::ActiveXControlData) -> Option<String> {
+  for property in &control.active_x_object_property {
+    if property.name.as_str().eq_ignore_ascii_case("FontName")
+      && let Some(value) = property.value.as_ref()
+      && !value.as_str().trim().is_empty()
+    {
+      return Some(value.as_str().trim().to_string());
+    }
+    if let Some(ax::ActiveXObjectPropertyChoice::SharedComFont(font)) =
+      property.active_x_object_property_choice.as_ref()
+      && let Some(value) = font.active_x_object_property.iter().find_map(|property| {
+        property
+          .name
+          .as_str()
+          .eq_ignore_ascii_case("Name")
+          .then(|| property.value.as_ref())
+          .flatten()
+      })
+      && !value.as_str().trim().is_empty()
+    {
+      return Some(value.as_str().trim().to_string());
+    }
+  }
+  None
+}
+
+fn is_morph_data_class(class_id: &str) -> bool {
+  [
+    "{8BD21D10-EC42-11CE-9E0D-00AA006002F3}",
+    "{8BD21D20-EC42-11CE-9E0D-00AA006002F3}",
+    "{8BD21D30-EC42-11CE-9E0D-00AA006002F3}",
+    "{8BD21D40-EC42-11CE-9E0D-00AA006002F3}",
+    "{8BD21D50-EC42-11CE-9E0D-00AA006002F3}",
+    "{8BD21D60-EC42-11CE-9E0D-00AA006002F3}",
+  ]
+  .iter()
+  .any(|known| class_id.eq_ignore_ascii_case(known))
+}
+
+fn is_text_box_class(class_id: &str) -> bool {
+  class_id.eq_ignore_ascii_case("{8BD21D10-EC42-11CE-9E0D-00AA006002F3}")
+}
+
 impl ImageCatalog {
   pub(super) fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
     Self::load_from_part(package, main)
@@ -151,6 +279,29 @@ impl ImageCatalog {
     P: SdkPart,
   {
     let mut catalog = Self::from_image_parts(package, part.related_parts_of_type(package));
+    catalog.active_x_text_style_by_relationship_id = part
+      .related_parts_of_type::<_, EmbeddedControlPersistencePart>(package)
+      .filter_map(|related| {
+        let relationship_id = related.relationship_id().to_string();
+        let control_part = related.part();
+        let control_xml = control_part.data_to_vec(package)?;
+        let control = ax::ActiveXControlData::from_bytes(&control_xml).ok()?;
+        let binary = control_part
+          .embedded_control_persistence_binary_data_parts(package)
+          .next()
+          .and_then(|part| part.data_to_vec(package));
+        let style = active_x_text_style(&control, binary.as_deref())?;
+        Some((relationship_id, style))
+      })
+      .collect();
+    catalog.math_type_by_relationship_id = part
+      .related_parts_of_type::<_, EmbeddedObjectPart>(package)
+      .filter_map(|related| {
+        let data = related.part().data_to_vec(package)?;
+        let equation = super::math_type::equation_native(&data)?;
+        Some((related.relationship_id().to_string(), equation))
+      })
+      .collect();
 
     let chart_parts = part
       .related_parts_of_type::<_, ChartPart>(package)
@@ -212,6 +363,8 @@ impl ImageCatalog {
 
     Self {
       by_relationship_id,
+      active_x_text_style_by_relationship_id: HashMap::new(),
+      math_type_by_relationship_id: HashMap::new(),
       charts_by_relationship_id: HashMap::new(),
       extended_charts_by_relationship_id: HashMap::new(),
       diagram_colors_by_relationship_id: HashMap::new(),

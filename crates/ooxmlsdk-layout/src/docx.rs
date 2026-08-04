@@ -4,6 +4,7 @@ mod field_localization;
 mod hyphenation;
 mod layout;
 mod math;
+mod math_type;
 mod model;
 mod package;
 mod properties;
@@ -299,6 +300,21 @@ pub(crate) fn extract(
     section.page.gutter_at_top = gutter_at_top;
     section.page.adjust_table_line_heights_to_grid = adjust_line_height_in_table;
   }
+  if mirror_margins
+    && sections
+      .first()
+      .is_some_and(|section| section.break_kind == SectionBreakKind::EvenPage)
+    && let Some(first_section) = sections.first_mut()
+  {
+    // An initial evenPage sectPr has no preceding filler page, but its first
+    // rendered page is still the logical even page for mirrored margins.
+    // Start the section from the opposite physical margin pair so subsequent
+    // section_page_index parity continues from that logical page.
+    std::mem::swap(
+      &mut first_section.page.margin_left_pt,
+      &mut first_section.page.margin_right_pt,
+    );
+  }
   resolve_section_repeating_blocks(
     package,
     &main,
@@ -506,6 +522,8 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      semantic_metafile_font_family: None,
+      native_ole_equation: None,
       metafile_native_size: false,
       picture_content_control: false,
       placement: ImagePlacement::Floating(FloatingImagePlacement {
@@ -2024,6 +2042,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
         gap_pt,
         separator: columns.separator.is_some_and(|value| value.as_bool()),
         unbalanced: false,
+        balanced_height_pt: None,
         explicit_count,
         explicit_widths_pt: widths,
         explicit_gaps_pt: gaps,
@@ -2040,6 +2059,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
     gap_pt,
     separator: columns.separator.is_some_and(|value| value.as_bool()),
     unbalanced: false,
+    balanced_height_pt: None,
     explicit_count: 0,
     explicit_widths_pt: [0.0; 45],
     explicit_gaps_pt: [0.0; 44],
@@ -3579,6 +3599,44 @@ fn table_model(
     && !(model_context.in_header_footer
       && placement
         .is_some_and(|placement| matches!(placement.vertical_anchor, FrameVerticalAnchor::Page)));
+  let preferred_width_pt = properties
+    .and_then(|properties| properties.table_width.as_ref())
+    .and_then(table_width_to_points);
+  let preferred_width_pct = properties
+    .and_then(|properties| properties.table_width.as_ref())
+    .and_then(table_width_to_percent);
+  let grid_column_count = table
+    .table_grid
+    .as_deref()
+    .map(|grid| grid.grid_column.len())
+    .unwrap_or_default();
+  let complete_grid = grid_column_count > 0
+    && rows.iter().all(|row| {
+      row.grid_before
+        + row
+          .cells
+          .iter()
+          .map(|cell| cell.grid_span.max(1))
+          .sum::<usize>()
+        + row.grid_after
+        == grid_column_count
+    });
+  let layout = properties
+    .and_then(|properties| properties.table_layout.as_ref())
+    .map(table_layout_mode)
+    .or(table_style.layout)
+    .unwrap_or_else(|| {
+      if complete_grid && preferred_width_pt.is_none() && preferred_width_pct.is_none() {
+        // DomainMapperTableManager::endOfRowAction() derives a missing/auto
+        // table width from a complete w:tblGrid and stores it as a fixed
+        // width. Keep that saved grid authoritative; applying the content
+        // redistribution path here moves the shared column separators (for
+        // example tdf#133052/tdf#133363).
+        TableLayoutMode::Fixed
+      } else {
+        TableLayoutMode::AutoFit
+      }
+    });
   let mut model = Table {
     column_widths_pt: table
       .table_grid
@@ -3587,17 +3645,9 @@ fn table_model(
       .flat_map(|grid| &grid.grid_column)
       .filter_map(|column| column.width.as_ref().and_then(twips_measure_to_points))
       .collect(),
-    preferred_width_pt: properties
-      .and_then(|properties| properties.table_width.as_ref())
-      .and_then(table_width_to_points),
-    preferred_width_pct: properties
-      .and_then(|properties| properties.table_width.as_ref())
-      .and_then(table_width_to_percent),
-    layout: properties
-      .and_then(|properties| properties.table_layout.as_ref())
-      .map(table_layout_mode)
-      .or(table_style.layout)
-      .unwrap_or_default(),
+    preferred_width_pt,
+    preferred_width_pct,
+    layout,
     indent_left_pt: properties
       .and_then(|properties| properties.table_indentation.as_ref())
       .and_then(table_indentation_to_points)
@@ -8072,7 +8122,7 @@ fn push_run_with_character_style_policy(
           hyperlink_url,
           &style_ref_keys,
         );
-        if let Some(image) = drawing::pict_image(picture, images) {
+        if let Some(image) = drawing::pict_image(picture, images, style.font_family.as_deref()) {
           inlines.push(InlineItem::Image(image));
         }
         drawing::push_pict_shapes(picture, inlines, images);
@@ -8093,7 +8143,7 @@ fn push_run_with_character_style_policy(
           hyperlink_url,
           &style_ref_keys,
         );
-        if let Some(image) = embedded_object_image(object, images) {
+        if let Some(image) = embedded_object_image(object, images, style.font_family.as_deref()) {
           inlines.push(InlineItem::Image(image));
         }
       }
@@ -9124,14 +9174,19 @@ fn push_note_reference(
 }
 
 fn note_reference_style(style: &TextStyle) -> TextStyle {
-  if style.baseline_shift_pt.abs() > f32::EPSILON {
-    return style.clone();
-  }
   let mut reference_style = style.clone();
-  properties::apply_vertical_text_alignment(
-    &mut reference_style,
-    w::VerticalPositionValues::Superscript,
-  );
+  if reference_style.baseline_shift_pt.abs() <= f32::EPSILON {
+    properties::apply_vertical_text_alignment(
+      &mut reference_style,
+      w::VerticalPositionValues::Superscript,
+    );
+  }
+  // The generated note label is a Common/European-number run.  Keep it in
+  // the Western WordprocessingML font slot even when the surrounding run is
+  // marked w:rtl; the note body and authored Arabic text retain the complex
+  // slot on their own runs.
+  reference_style.complex_script = Some(false);
+  reference_style.right_to_left = Some(false);
   reference_style
 }
 
@@ -9260,6 +9315,8 @@ fn inline_image_impl(
         alt_text: inline.doc_properties.description.clone(),
         hyperlink_url,
         semantic_metafile_text: false,
+        semantic_metafile_font_family: None,
+        native_ole_equation: None,
         metafile_native_size: true,
         picture_content_control: false,
         placement: ImagePlacement::Inline,
@@ -9321,6 +9378,8 @@ fn inline_image_impl(
           .and_then(|properties| properties.description.clone()),
         hyperlink_url,
         semantic_metafile_text: false,
+        semantic_metafile_font_family: None,
+        native_ole_equation: None,
         metafile_native_size: true,
         picture_content_control: false,
         placement: drawing_placement_with_effect_extent(
@@ -14603,6 +14662,8 @@ fn drawingml_picture_image(
     alt_text: drawingml_picture_alt_text(picture),
     hyperlink_url,
     semantic_metafile_text: false,
+    semantic_metafile_font_family: None,
+    native_ole_equation: None,
     metafile_native_size: true,
     picture_content_control: false,
     placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
@@ -17385,7 +17446,11 @@ fn polyline_bounds(points: &[(f32, f32)]) -> Option<(f32, f32, f32, f32)> {
   ))
 }
 
-fn pict_image_impl(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {
+fn pict_image_impl(
+  picture: &w::Picture,
+  images: &ImageCatalog,
+  host_font_family: Option<&str>,
+) -> Option<InlineImage> {
   let mut image = picture
     .picture_choice
     .iter()
@@ -17395,7 +17460,28 @@ fn pict_image_impl(picture: &w::Picture, images: &ImageCatalog) -> Option<Inline
   // content, while strings in an ordinary VML image are not automatically
   // document text.
   image.semantic_metafile_text |= picture.control.is_some();
+  image.semantic_metafile_font_family = picture
+    .control
+    .as_ref()
+    .and_then(|control| active_x_semantic_font(control, images, host_font_family));
   Some(image)
+}
+
+fn active_x_semantic_font(
+  control: &w::Control,
+  images: &ImageCatalog,
+  host_font_family: Option<&str>,
+) -> Option<Arc<str>> {
+  control
+    .id
+    .as_deref()
+    .and_then(|relationship_id| {
+      images
+        .active_x_text_style_by_relationship_id
+        .get(relationship_id)
+    })
+    .and_then(|style| style.font_family.as_deref().or(host_font_family))
+    .map(Arc::from)
 }
 
 fn push_pict_textboxes_impl(
@@ -17431,7 +17517,18 @@ fn picture_choice_image(choice: &w::PictureChoice, images: &ImageCatalog) -> Opt
   }
 }
 
-fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> Option<InlineImage> {
+fn embedded_object_image(
+  object: &w::EmbeddedObject,
+  images: &ImageCatalog,
+  host_font_family: Option<&str>,
+) -> Option<InlineImage> {
+  let native_ole = object
+    .embedded_object_choice1
+    .iter()
+    .find_map(|choice| match choice {
+      w::EmbeddedObjectChoice::OleObject(ole) => Some(ole.as_ref()),
+      _ => None,
+    });
   let mut image = object
     .embedded_object_choice1
     .iter()
@@ -17446,6 +17543,31 @@ fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> O
       _ => None,
     })?;
   image.metafile_background_color = embedded_object_metafile_background_color(object);
+  image.semantic_metafile_font_family =
+    object
+      .embedded_object_choice2
+      .as_ref()
+      .and_then(|choice| match choice {
+        w::EmbeddedObjectChoice2::Control(control) => {
+          active_x_semantic_font(control, images, host_font_family)
+        }
+        _ => None,
+      });
+  image.native_ole_equation = native_ole
+    // The corpus counterexample `2_MathType3.docx` identifies an Equation.3
+    // replacement whose Office PDF intentionally has no native semantic
+    // overlay. `fdo78906.docx` identifies the DSMT4 path: its Equation Native
+    // MTEF5 stream is the authoritative editable formula while the associated
+    // WMF is only a static visual representation.
+    .filter(|ole| {
+      ole
+        .prog_id
+        .as_deref()
+        .is_some_and(|prog_id| prog_id.eq_ignore_ascii_case("Equation.DSMT4"))
+    })
+    .and_then(|ole| ole.id.as_deref())
+    .and_then(|relationship_id| images.math_type_by_relationship_id.get(relationship_id))
+    .cloned();
   // ECMA-376 Part 1 §17.3.3.19 and Annex L.7.2 require the associated
   // shape/image as the static visual representation when an embedded object
   // is not loaded. Preserve real EMF/WMF TextOut records from that
@@ -17454,6 +17576,12 @@ fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> O
   // on the non-semantic path in pict_image_impl().
   image.semantic_metafile_text |=
     crate::render::emf_wmf::supports_semantic_text(image.content_type.as_deref());
+  if image.native_ole_equation.is_some() {
+    // A MathType content OLE has an editable MTEF source.  Its WMF is only a
+    // static replacement image; exposing both streams would duplicate the
+    // formula and reintroduce WMF record order as searchable text.
+    image.semantic_metafile_text = false;
+  }
   Some(image)
 }
 
@@ -18323,6 +18451,8 @@ fn vml_image_data(
     alt_text: alt_text.or_else(|| data.title.clone()),
     hyperlink_url: None,
     semantic_metafile_text: false,
+    semantic_metafile_font_family: None,
+    native_ole_equation: None,
     metafile_native_size: false,
     picture_content_control: false,
     placement: style.placement(),
@@ -22969,6 +23099,31 @@ fn numbering_level_model_with_theme(
     import_settings,
     theme_colors,
   );
+  // LibreOffice's SwLineInfo::InitLineInfo() inserts the numbering-level
+  // w:tab w:val="num" as a left tab, independently of the ordinary paragraph
+  // tab-stop mapping. Keep the generic w:pPr `num` mapping unchanged: only
+  // the w:lvl/w:pPr numbering tab has this list-label contract.
+  if let Some(tabs) = level
+    .previous_paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.tabs.as_ref())
+  {
+    for tab in &tabs.tab_stop {
+      if tab.val != w::TabStopValues::Number {
+        continue;
+      }
+      let Some(position_pt) = signed_twips_measure_to_points(&tab.position) else {
+        continue;
+      };
+      if let Some(stop) = format_properties
+        .tab_stops
+        .iter_mut()
+        .find(|stop| (stop.position_pt - position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT)
+      {
+        stop.alignment = TabStopAlignment::Left;
+      }
+    }
+  }
 
   NumberingLevel {
     start: level
@@ -23184,6 +23339,8 @@ fn numbering_drawing_image(
     alt_text,
     hyperlink_url: None,
     semantic_metafile_text: false,
+    semantic_metafile_font_family: None,
+    native_ole_equation: None,
     metafile_native_size: true,
     picture_content_control: false,
     placement: ImagePlacement::Inline,
@@ -25580,6 +25737,42 @@ fn line_numbering_model(properties: &w::LineNumberType) -> Option<LineNumbering>
 mod tests {
   use super::*;
 
+  #[test]
+  fn activex_semantic_font_prefers_persistence_and_uses_host_for_omitted_name() {
+    let control = w::Control {
+      id: Some("rIdControl".into()),
+      ..w::Control::default()
+    };
+    let mut images = ImageCatalog::default();
+    images.active_x_text_style_by_relationship_id.insert(
+      "rIdControl".to_string(),
+      package::ActiveXTextStyle {
+        font_family: Some("Arial".to_string()),
+      },
+    );
+
+    assert_eq!(
+      active_x_semantic_font(&control, &images, Some("Calibri")).as_deref(),
+      Some("Arial")
+    );
+
+    images.active_x_text_style_by_relationship_id.insert(
+      "rIdControl".to_string(),
+      package::ActiveXTextStyle { font_family: None },
+    );
+    assert_eq!(
+      active_x_semantic_font(&control, &images, Some("Calibri")).as_deref(),
+      Some("Calibri")
+    );
+    assert_eq!(active_x_semantic_font(&control, &images, None), None);
+
+    images.active_x_text_style_by_relationship_id.clear();
+    assert_eq!(
+      active_x_semantic_font(&control, &images, Some("Calibri")),
+      None
+    );
+  }
+
   fn twips(value: u32) -> TwipsMeasureValue {
     TwipsMeasureValue::Twips(value as u64)
   }
@@ -27575,6 +27768,9 @@ mod tests {
     assert!(model.list_label.is_none());
     assert!((model.format.indent_left_pt - 120.45).abs() < 0.001);
     assert!((model.format.first_line_indent_pt + 35.4).abs() < 0.001);
+    assert_eq!(model.format.tab_stops.len(), 1);
+    assert_eq!(model.format.tab_stops[0].alignment, TabStopAlignment::Left);
+    assert!((model.format.tab_stops[0].position_pt - 120.45).abs() < 0.001);
   }
 
   #[test]

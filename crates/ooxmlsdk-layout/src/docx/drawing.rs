@@ -32,8 +32,12 @@ pub(super) fn push_drawing_shapes(
   super::push_drawing_shapes_impl(drawing, inlines, styles, images, hyperlinks);
 }
 
-pub(super) fn pict_image(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {
-  super::pict_image_impl(picture, images)
+pub(super) fn pict_image(
+  picture: &w::Picture,
+  images: &ImageCatalog,
+  host_font_family: Option<&str>,
+) -> Option<InlineImage> {
+  super::pict_image_impl(picture, images, host_font_family)
 }
 
 pub(super) fn push_pict_textboxes(

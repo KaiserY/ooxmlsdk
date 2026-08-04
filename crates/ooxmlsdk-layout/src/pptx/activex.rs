@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use olecfsdk::cfb::CompoundFile;
 use olecfsdk::forms::{
   AlignedValue, CommandButtonControl, CountOfBytesWithCompressionFlag, FmFontEffects, FmString,
-  LabelControl, MorphDataControl, OleColor, OleColorType, ScrollBarControl, SpinButtonControl,
-  TextProps, VariousPropertiesBitfield,
+  ImageControl, LabelControl, MorphDataControl, OleColor, OleColorType, ScrollBarControl,
+  SpinButtonControl, TextProps, VariousPropertiesBitfield,
 };
 use ooxmlsdk::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart;
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
@@ -23,6 +23,7 @@ pub(crate) enum ActiveXControlKind {
   OptionButton,
   ToggleButton,
   CommandButton,
+  Image,
   Label,
   ScrollBar,
   SpinButton,
@@ -90,6 +91,7 @@ fn parse_control_part(
     ActiveXControlKind::CommandButton => {
       state_from_command_button(kind, CommandButtonControl::from_bytes(&contents).ok()?)
     }
+    ActiveXControlKind::Image => state_from_image(kind, ImageControl::from_bytes(&contents).ok()?),
     ActiveXControlKind::Label => state_from_label(kind, LabelControl::from_bytes(&contents).ok()?),
     ActiveXControlKind::ScrollBar => {
       state_from_scroll_bar(kind, ScrollBarControl::from_bytes(&contents).ok()?)
@@ -114,6 +116,7 @@ fn control_kind(class_id: &str) -> Option<ActiveXControlKind> {
     "8BD21D50-EC42-11CE-9E0D-00AA006002F3" => Some(ActiveXControlKind::OptionButton),
     "8BD21D60-EC42-11CE-9E0D-00AA006002F3" => Some(ActiveXControlKind::ToggleButton),
     "D7053240-CE69-11CD-A777-00DD01143C57" => Some(ActiveXControlKind::CommandButton),
+    "4C599241-6926-101B-9992-00000B65C6F9" => Some(ActiveXControlKind::Image),
     "978C9E23-D4B0-11CE-BF2D-00AA003F40D0" => Some(ActiveXControlKind::Label),
     "DFD181E0-5E2F-11CE-A449-00AA004A803D" => Some(ActiveXControlKind::ScrollBar),
     "79176FB0-B7F2-11CE-97EF-00AA006D2776" => Some(ActiveXControlKind::SpinButton),
@@ -138,7 +141,7 @@ fn state_from_morph(
     .various_property_bits
     .as_ref()
     .map(|value| value.value);
-  Some(state(
+  let state = state(
     kind,
     control
       .data_block
@@ -154,7 +157,8 @@ fn state_from_morph(
     caption,
     value,
     Some(&control.text_props),
-  ))
+  );
+  Some(state)
 }
 
 fn state_from_command_button(
@@ -165,7 +169,7 @@ fn state_from_command_button(
     control.data_block.caption.as_ref(),
     control.extra_data_block.caption.as_ref(),
   );
-  Some(state(
+  let state = state(
     kind,
     control
       .data_block
@@ -185,7 +189,34 @@ fn state_from_command_button(
     caption,
     None,
     Some(&control.text_props),
-  ))
+  );
+  Some(state)
+}
+
+fn state_from_image(
+  kind: ActiveXControlKind,
+  control: ImageControl,
+) -> Option<ActiveXControlState> {
+  let back_color = control
+    .data_block
+    .back_color
+    .as_ref()
+    .map(|value| value.value)
+    .or_else(|| OleColor::from_raw(0x8000_000f).ok());
+  let state = state(
+    kind,
+    back_color,
+    None,
+    control
+      .data_block
+      .various_property_bits
+      .as_ref()
+      .map(|value| value.value),
+    None,
+    None,
+    None,
+  );
+  Some(state)
 }
 
 fn state_from_label(
@@ -196,7 +227,7 @@ fn state_from_label(
     control.data_block.caption.as_ref(),
     control.extra_data_block.caption.as_ref(),
   );
-  Some(state(
+  let state = state(
     kind,
     control
       .data_block
@@ -216,7 +247,8 @@ fn state_from_label(
     caption,
     None,
     Some(&control.text_props),
-  ))
+  );
+  Some(state)
 }
 
 fn state_from_scroll_bar(
@@ -353,6 +385,10 @@ mod tests {
     assert_eq!(
       control_kind("D7053240-CE69-11CD-A777-00DD01143C57"),
       Some(ActiveXControlKind::CommandButton)
+    );
+    assert_eq!(
+      control_kind("{4C599241-6926-101B-9992-00000B65C6F9}"),
+      Some(ActiveXControlKind::Image)
     );
     assert_eq!(
       control_kind("{DFD181E0-5E2F-11CE-A449-00AA004A803D}"),

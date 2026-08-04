@@ -23,6 +23,7 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_presentationml_2006_main as p,
 };
 use ooxmlsdk::sdk::SdkPart;
+use quick_xml::events::{BytesStart, Event};
 
 use crate::docx::{ImageCrop, PageSetup};
 use crate::error::Result;
@@ -148,6 +149,16 @@ pub(crate) struct ImageResource {
   pub(crate) data: Arc<[u8]>,
   pub(crate) content_type: Option<String>,
   pub(crate) monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
+  pub(crate) metafile_semantic_text_includes_raster_backdrop: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ActiveXFallbackPreview {
+  control_relationship_id: String,
+  image_relationship_id: String,
+  name: Option<String>,
+  position: super::drawingml::shape::Point,
+  size: super::drawingml::shape::Size,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -450,6 +461,7 @@ where
             .content_type(package)
             .map(str::to_string),
           monochrome_dib_palette_override: None,
+          metafile_semantic_text_includes_raster_backdrop: false,
         },
       ))
     })
@@ -1006,6 +1018,7 @@ impl SlidePersist {
           data: data.into(),
           content_type: image_part.content_type(package).map(str::to_string),
           monochrome_dib_palette_override: None,
+          metafile_semantic_text_includes_raster_backdrop: false,
         },
       );
     }
@@ -1384,6 +1397,11 @@ impl SlidePersist {
           // semantics untouched for every other image.
           resource.monochrome_dib_palette_override = Some(palette);
         }
+        // [MS-OI29500] defines p:control's image as the ActiveX thumbnail.
+        // PowerPoint keeps text records in that native WMF preview searchable
+        // even when an earlier icon bitmap uses a destination-reading ROP.
+        // Ordinary OLE previews retain the raster-backdrop filter.
+        resource.metafile_semantic_text_includes_raster_backdrop = active_x_state.is_some();
         let Some((left_pt, top_pt, width_pt, height_pt)) =
           vml_absolute_rectangle(model.style.as_deref())
         else {
@@ -1423,6 +1441,49 @@ impl SlidePersist {
         );
         self.shapes.push(shape);
       }
+    }
+  }
+
+  pub(crate) fn import_active_x_fallback_previews(&mut self, previews: &[ActiveXFallbackPreview]) {
+    for preview in previews {
+      let Some(mut resource) = self
+        .image_resources
+        .get(&preview.image_relationship_id)
+        .cloned()
+      else {
+        continue;
+      };
+      let active_x_state = self.active_x_controls.get(&preview.control_relationship_id);
+      if let Some(palette) = active_x_state.and_then(ActiveXControlState::preview_palette_override)
+      {
+        resource.monochrome_dib_palette_override = Some(palette);
+      }
+      resource.metafile_semantic_text_includes_raster_backdrop = active_x_state.is_some();
+      if self.shapes.iter().any(|shape| {
+        shape.position == preview.position
+          && shape.size == preview.size
+          && shape
+            .picture
+            .as_ref()
+            .and_then(|picture| picture.image_resource.as_ref())
+            == Some(&resource)
+      }) {
+        continue;
+      }
+
+      let mut shape = Shape::new(super::drawingml::shape::ShapeService::GraphicObject);
+      shape.shape_location = Some(self.shape_location);
+      shape.name = preview.name.clone();
+      shape.position = preview.position;
+      shape.size = preview.size;
+      shape.set_picture(
+        Some(preview.image_relationship_id.clone()),
+        None,
+        ImageCrop::default(),
+        Vec::new(),
+        Some(resource),
+      );
+      self.shapes.push(shape);
     }
   }
 
@@ -1535,6 +1596,137 @@ fn vml_preview_color(value: Option<&str>, fallback: (u8, u8, u8)) -> Color {
   Color::RgbHex(RgbHexColor {
     value: format!("{:02X}{:02X}{:02X}", color.0, color.1, color.2),
     transformations: Vec::new(),
+  })
+}
+
+#[derive(Default)]
+struct ActiveXFallbackPreviewBuilder {
+  control_relationship_id: Option<String>,
+  image_relationship_id: Option<String>,
+  name: Option<String>,
+  x: Option<i64>,
+  y: Option<i64>,
+  cx: Option<i64>,
+  cy: Option<i64>,
+}
+
+impl ActiveXFallbackPreviewBuilder {
+  fn finish(self) -> Option<ActiveXFallbackPreview> {
+    Some(ActiveXFallbackPreview {
+      control_relationship_id: self.control_relationship_id?,
+      image_relationship_id: self.image_relationship_id?,
+      name: self.name,
+      position: super::drawingml::shape::Point {
+        x: self.x?,
+        y: self.y?,
+      },
+      size: super::drawingml::shape::Size {
+        cx: self.cx?,
+        cy: self.cy?,
+      },
+    })
+  }
+}
+
+pub(crate) fn active_x_fallback_previews(xml: &[u8]) -> Vec<ActiveXFallbackPreview> {
+  let mut reader = quick_xml::Reader::from_reader(xml);
+  reader.config_mut().trim_text(true);
+  let mut previews = Vec::new();
+  let mut fallback_depth = 0usize;
+  let mut picture_depth = 0usize;
+  let mut shape_properties_depth = 0usize;
+  let mut transform_depth = 0usize;
+  let mut current = None::<ActiveXFallbackPreviewBuilder>;
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) => match event.local_name().as_ref() {
+        b"Fallback" => fallback_depth = fallback_depth.saturating_add(1),
+        b"control" if fallback_depth > 0 && current.is_none() => {
+          current = Some(ActiveXFallbackPreviewBuilder {
+            control_relationship_id: xml_attribute(&event, b"id"),
+            name: xml_attribute(&event, b"name"),
+            ..ActiveXFallbackPreviewBuilder::default()
+          });
+        }
+        b"pic" if current.is_some() => picture_depth = picture_depth.saturating_add(1),
+        b"spPr" if picture_depth > 0 => {
+          shape_properties_depth = shape_properties_depth.saturating_add(1)
+        }
+        b"xfrm" if shape_properties_depth > 0 => {
+          transform_depth = transform_depth.saturating_add(1)
+        }
+        b"blip" if picture_depth > 0 => {
+          if let Some(current) = current.as_mut() {
+            current.image_relationship_id = xml_attribute(&event, b"embed");
+          }
+        }
+        b"off" if transform_depth > 0 => {
+          update_fallback_offset(current.as_mut(), &event);
+        }
+        b"ext" if transform_depth > 0 => {
+          update_fallback_extent(current.as_mut(), &event);
+        }
+        _ => {}
+      },
+      Ok(Event::Empty(event)) => match event.local_name().as_ref() {
+        b"blip" if picture_depth > 0 => {
+          if let Some(current) = current.as_mut() {
+            current.image_relationship_id = xml_attribute(&event, b"embed");
+          }
+        }
+        b"off" if transform_depth > 0 => update_fallback_offset(current.as_mut(), &event),
+        b"ext" if transform_depth > 0 => update_fallback_extent(current.as_mut(), &event),
+        _ => {}
+      },
+      Ok(Event::End(event)) => match event.local_name().as_ref() {
+        b"xfrm" if transform_depth > 0 => transform_depth -= 1,
+        b"spPr" if shape_properties_depth > 0 => shape_properties_depth -= 1,
+        b"pic" if picture_depth > 0 => picture_depth -= 1,
+        b"control" if current.is_some() => {
+          if let Some(preview) = current
+            .take()
+            .and_then(ActiveXFallbackPreviewBuilder::finish)
+          {
+            previews.push(preview);
+          }
+        }
+        b"Fallback" if fallback_depth > 0 => fallback_depth -= 1,
+        _ => {}
+      },
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+  previews
+}
+
+fn update_fallback_offset(
+  current: Option<&mut ActiveXFallbackPreviewBuilder>,
+  event: &BytesStart<'_>,
+) {
+  let Some(current) = current else {
+    return;
+  };
+  current.x = xml_attribute(event, b"x").and_then(|value| value.parse().ok());
+  current.y = xml_attribute(event, b"y").and_then(|value| value.parse().ok());
+}
+
+fn update_fallback_extent(
+  current: Option<&mut ActiveXFallbackPreviewBuilder>,
+  event: &BytesStart<'_>,
+) {
+  let Some(current) = current else {
+    return;
+  };
+  current.cx = xml_attribute(event, b"cx").and_then(|value| value.parse().ok());
+  current.cy = xml_attribute(event, b"cy").and_then(|value| value.parse().ok());
+}
+
+fn xml_attribute(event: &BytesStart<'_>, local_name: &[u8]) -> Option<String> {
+  event.attributes().flatten().find_map(|attribute| {
+    (attribute.key.as_ref().rsplit(|byte| *byte == b':').next() == Some(local_name))
+      .then(|| String::from_utf8_lossy(attribute.value.as_ref()).into_owned())
   })
 }
 
@@ -1735,6 +1927,40 @@ mod tests {
     assert_eq!(
       slide.get_sub_type_text_list_style(None),
       Some(&default_style)
+    );
+  }
+
+  #[test]
+  fn active_x_fallback_preview_keeps_precise_drawingml_geometry() {
+    let xml = br#"<p:sld xmlns:p="p" xmlns:a="a" xmlns:r="r" xmlns:mc="mc">
+      <p:controls><mc:AlternateContent>
+        <mc:Choice Requires="v"><p:control r:id="rId2" name="coarse"/></mc:Choice>
+        <mc:Fallback><p:control r:id="rId2" name="CommandButton1"><p:pic>
+          <p:nvPicPr><p:cNvPr id="8" name="CommandButton1"><a:extLst>
+            <a:ext uri="ignored"/>
+          </a:extLst></p:cNvPr></p:nvPicPr>
+          <p:blipFill><a:blip r:embed="rId20"/></p:blipFill>
+          <p:spPr><a:xfrm><a:off x="516766" y="463895"/>
+            <a:ext cx="1828869" cy="1086609"/></a:xfrm></p:spPr>
+        </p:pic></p:control></mc:Fallback>
+      </mc:AlternateContent></p:controls>
+    </p:sld>"#;
+
+    assert_eq!(
+      active_x_fallback_previews(xml),
+      vec![ActiveXFallbackPreview {
+        control_relationship_id: "rId2".to_string(),
+        image_relationship_id: "rId20".to_string(),
+        name: Some("CommandButton1".to_string()),
+        position: super::super::drawingml::shape::Point {
+          x: 516_766,
+          y: 463_895,
+        },
+        size: super::super::drawingml::shape::Size {
+          cx: 1_828_869,
+          cy: 1_086_609,
+        },
+      }]
     );
   }
 }

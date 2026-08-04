@@ -515,6 +515,7 @@ struct ImageItem<'doc> {
   alt_text: Option<Cow<'doc, str>>,
   hyperlink_url: Option<Cow<'doc, str>>,
   semantic_metafile_text: bool,
+  metafile_semantic_text_includes_raster_backdrop: bool,
   metafile_native_size: bool,
 }
 
@@ -613,6 +614,7 @@ struct TextStyle<'doc> {
   kerning_minimum_size_pt: Option<f32>,
   ligatures: Option<common::OpenTypeLigatures>,
   horizontal_scale: Option<f32>,
+  semantic_character_advances_pt: Option<Arc<[f32]>>,
   character_spacing_pt: f32,
   baseline_shift_pt: f32,
   automatic_escapement_font_size_pt: Option<f32>,
@@ -633,6 +635,9 @@ struct TextStyle<'doc> {
   small_caps: bool,
   hidden: bool,
   semantic_only: bool,
+  /// The text origin is already the metafile playback baseline rather than a
+  /// document-layout line-box origin.
+  metafile_reference_baseline: bool,
   rotation_deg: f32,
   color: RgbColor,
   opacity: f32,
@@ -1741,9 +1746,78 @@ fn expand_metafile_semantic_text_item<'doc>(
         && !image.flip_vertical
         && image.crop == ImageCrop::default() =>
     {
+      let paint_native_text = image.metafile_semantic_text_includes_raster_backdrop;
+      let solid_rects = paint_native_text
+        .then(|| {
+          ooxmlsdk_layout::render::emf_wmf::extract_metafile_solid_rects(
+            &image.data,
+            image.content_type.as_deref(),
+          )
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .map(|rect| {
+          PageItem::Rect(RectItem {
+            x_pt: image.x_pt + rect.x * image.width_pt,
+            y_pt: image.y_pt + rect.y * image.height_pt,
+            width_pt: rect.width * image.width_pt,
+            height_pt: rect.height * image.height_pt,
+            fill: Some(RectFill::Solid {
+              color: RgbColor {
+                r: rect.color[0],
+                g: rect.color[1],
+                b: rect.color[2],
+              },
+              opacity: 1.0,
+            }),
+            stroke: None,
+            stroke_opacity: 1.0,
+          })
+        })
+        .collect::<Vec<_>>();
+      let bitmap_layers = paint_native_text
+        .then(|| {
+          ooxmlsdk_layout::render::emf_wmf::extract_metafile_bitmap_layers(
+            &image.data,
+            image.content_type.as_deref(),
+          )
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .map(|layer| {
+          // The PowerPoint 365 golden stores every ActiveX preview DIB color
+          // plane as a quality-75 JPEG, including layers whose binary WMF
+          // mask becomes a PDF SMask. Preserve that mask while matching the
+          // fixed-output color samples; ordinary presentation blips do not
+          // enter this ActiveX-only expansion path.
+          let data =
+            super::image::powerpoint_activex_bitmap_png(&layer.data, 75).unwrap_or(layer.data);
+          PageItem::Image(ImageItem {
+            x_pt: image.x_pt + layer.x * image.width_pt,
+            y_pt: image.y_pt + layer.y * image.height_pt,
+            width_pt: layer.width * image.width_pt,
+            height_pt: layer.height * image.height_pt,
+            crop: ImageCrop::default(),
+            clip_path: &[],
+            rotation_deg: 0.0,
+            flip_horizontal: layer.flip_horizontal,
+            flip_vertical: layer.flip_vertical,
+            data: Cow::Owned(data),
+            content_type: Some(Cow::Borrowed(layer.content_type)),
+            metafile_monochrome_dib_palette_override: None,
+            metafile_background_color: None,
+            alt_text: None,
+            hyperlink_url: None,
+            semantic_metafile_text: false,
+            metafile_semantic_text_includes_raster_backdrop: false,
+            metafile_native_size: false,
+          })
+        })
+        .collect::<Vec<_>>();
       let semantic_runs = ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs(
         &image.data,
         image.content_type.as_deref(),
+        image.metafile_semantic_text_includes_raster_backdrop,
       )
       .into_iter()
       .map(|run| {
@@ -1763,7 +1837,15 @@ fn expand_metafile_semantic_text_item<'doc>(
             font_size_pt,
             bold: run.bold,
             italic: run.italic,
-            semantic_only: true,
+            semantic_only: !paint_native_text,
+            metafile_reference_baseline: true,
+            opacity: 1.0,
+            semantic_character_advances_pt: run.advances.map(|advances| {
+              advances
+                .into_iter()
+                .map(|advance| advance * image.width_pt)
+                .collect()
+            }),
             ..TextStyle::default()
           },
           rotation_center_pt: None,
@@ -1780,11 +1862,14 @@ fn expand_metafile_semantic_text_item<'doc>(
         }))
       })
       .collect::<Vec<_>>();
-      if semantic_runs.is_empty() {
+      if semantic_runs.is_empty() && solid_rects.is_empty() && bitmap_layers.is_empty() {
         return PageItem::Image(image);
       }
 
-      let mut items = Vec::with_capacity(semantic_runs.len() + 1);
+      let mut items =
+        Vec::with_capacity(solid_rects.len() + bitmap_layers.len() + semantic_runs.len() + 1);
+      items.extend(solid_rects);
+      items.extend(bitmap_layers);
       items.push(PageItem::Image(image));
       items.extend(semantic_runs);
       // Office emits metafile previews as Form XObjects whose visible
@@ -2063,6 +2148,8 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
       .as_ref()
       .map(|url| Cow::Borrowed(url.as_ref())),
     semantic_metafile_text: image.semantic_metafile_text,
+    metafile_semantic_text_includes_raster_backdrop: image
+      .metafile_semantic_text_includes_raster_backdrop,
     metafile_native_size: image.metafile_native_size,
   }
 }
@@ -2175,6 +2262,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     kerning_minimum_size_pt: style.kerning_minimum_size.map(|size| size.0),
     ligatures: style.ligatures,
     horizontal_scale: style.horizontal_scale,
+    semantic_character_advances_pt: style.semantic_character_advances_pt.clone(),
     character_spacing_pt: style.character_spacing.0,
     baseline_shift_pt: style.baseline_shift.0,
     automatic_escapement_font_size_pt: style.automatic_escapement_font_size.map(|size| size.0),
@@ -2197,6 +2285,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     small_caps: style.small_caps,
     hidden: style.hidden,
     semantic_only: style.semantic_only,
+    metafile_reference_baseline: false,
     rotation_deg: style.rotation_degrees,
     color: rgb(style.color),
     opacity: opacity(style.color),
@@ -2481,7 +2570,7 @@ impl<'doc> PaintText<'doc> {
       .map(|run| run.width_pt)
       .unwrap_or_else(|| text_metrics.measure_text(&text_ref.text, &text_ref.style));
     let vertical_metrics = text_metrics.vertical_metrics_for_text(&text_ref.text, &text_ref.style);
-    let baseline_y = if text_ref.style.semantic_only {
+    let baseline_y = if text_ref.style.semantic_only || text_ref.style.metafile_reference_baseline {
       // EMF text extraction reports the reference point consumed as the
       // baseline by emfsdk's raster replay. Preserve that exact coordinate
       // instead of applying the surrounding document line-box metrics.
@@ -3658,7 +3747,14 @@ fn metafile_render_options_for_image(
       .ceil()
       .clamp(1.0, u32::MAX as f32) as u32
   };
-  let target_size = if options.images.reduce_resolution {
+  let target_size = if image.metafile_semantic_text_includes_raster_backdrop {
+    // PowerPoint ActiveX previews lift WMF vectors and text into the PDF form
+    // while keeping an embedded DIB at its authored sample dimensions. Let
+    // the WMF viewport resolve naturally here so a 57x57 source bitmap is not
+    // first enlarged into a 200-DPI control-sized raster and then resampled a
+    // second time by the PDF image matrix.
+    None
+  } else if options.images.reduce_resolution {
     Some((
       pixels_for_axis(image.width_pt, visible_width),
       pixels_for_axis(image.height_pt, visible_height),
@@ -3684,10 +3780,14 @@ fn metafile_render_options_for_image(
     target_width_px: target_size.map(|size| size.0),
     target_height_px: target_size.map(|size| size.1),
     max_pixels: Some(dpi.saturating_mul(dpi).saturating_mul(64)),
-    transparent_background: image.metafile_background_color.is_some(),
+    transparent_background: image.metafile_background_color.is_some()
+      || image.metafile_semantic_text_includes_raster_backdrop,
     background_color: None,
     monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
     filter_high_frequency_pattern_brushes: true,
+    suppress_text: image.metafile_semantic_text_includes_raster_backdrop,
+    suppress_solid_pattern_rects: image.metafile_semantic_text_includes_raster_backdrop,
+    suppress_bitmap_layers: image.metafile_semantic_text_includes_raster_backdrop,
   }
 }
 
@@ -6617,6 +6717,10 @@ fn shaped_pdf_glyphs(
   text_metrics: &mut TextMetrics,
 ) -> Option<PaintGlyphRun> {
   let shaped = text_metrics.shape_text(text, style)?;
+  let semantic_advances = style
+    .semantic_character_advances_pt
+    .as_deref()
+    .filter(|advances| advances.len() == text.chars().count());
   let horizontal_scale = style.horizontal_scale.unwrap_or(1.0).max(f32::EPSILON);
   let mut font_runs = PaintGlyphFontRuns::new();
   let mut x_offset_pt = 0.0;
@@ -6644,6 +6748,11 @@ fn shaped_pdf_glyphs(
     } else {
       0.0
     };
+    let natural_advance_pt =
+      glyph.x_advance_em * glyph.font_size_pt + word_spacing_em * glyph.font_size_pt;
+    let advance_pt = semantic_advances
+      .and_then(|advances| semantic_advance_for_text_range(text, advances, &glyph.text_range))
+      .unwrap_or(natural_advance_pt);
     font_runs
       .last_mut()
       .expect("font run was just pushed")
@@ -6651,7 +6760,7 @@ fn shaped_pdf_glyphs(
       .push(PaintGlyph {
         glyph_id: GlyphId::new(glyph.glyph_id),
         text_range: glyph.text_range,
-        x_advance: (glyph.x_advance_em + word_spacing_em) / horizontal_scale,
+        x_advance: advance_pt / glyph.font_size_pt / horizontal_scale,
         x_offset: glyph.x_offset_em / horizontal_scale,
         y_offset: glyph.y_offset_em,
         y_advance: glyph.y_advance_em,
@@ -6662,15 +6771,28 @@ fn shaped_pdf_glyphs(
           y_max_em: bounds.y_max_em,
         }),
       });
-    x_offset_pt += glyph.x_advance_em * glyph.font_size_pt;
-    if is_word_space {
-      x_offset_pt += word_spacing_pt;
-    }
+    x_offset_pt += advance_pt;
   }
   Some(PaintGlyphRun {
     width_pt: x_offset_pt,
     font_runs,
   })
+}
+
+fn semantic_advance_for_text_range(
+  text: &str,
+  advances: &[f32],
+  range: &Range<usize>,
+) -> Option<f32> {
+  let mut total = 0.0;
+  let mut matched = false;
+  for ((byte_index, _), advance) in text.char_indices().zip(advances) {
+    if byte_index >= range.start && byte_index < range.end {
+      total += advance;
+      matched = true;
+    }
+  }
+  (matched && total.is_finite()).then_some(total)
 }
 
 fn text_vertical_scale(style: &TextStyle<'_>) -> f32 {
@@ -6847,9 +6969,10 @@ mod tests {
     GlyphId, ImageCrop, ImageItem, PaintDocument, PaintItem, PaintTextPortionKind, TextItem,
     TextMetrics, TextStyle as PaintTextStyle, bidi_mirrored_semantic_text, conversion_font_audit,
     gamma_correct_gradient_color, metafile_render_options_for_image, pdf_metadata,
-    pdf_page_dimension, render, source_range_requires_visible_glyph, stroke_end_dimensions,
-    symbol_font_semantic_text, text_portion_ranges, text_requires_glyph_outlines,
-    text_stroke_with_fill, text_style_from_common, word_small_caps_semantic_text,
+    pdf_page_dimension, render, semantic_advance_for_text_range,
+    source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
+    text_portion_ranges, text_requires_glyph_outlines, text_stroke_with_fill,
+    text_style_from_common, word_small_caps_semantic_text,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -6858,6 +6981,25 @@ mod tests {
   use ooxmlsdk_layout::common::{
     self, Color, DisplayItem, DisplayPage, LayoutDocument, LayoutEngineKind, Pt, TextRun, TextStyle,
   };
+
+  #[test]
+  fn semantic_character_advances_follow_utf8_glyph_clusters() {
+    let text = "Aωfi";
+    let advances = [1.0, 2.0, 3.0, 4.0];
+
+    assert_eq!(
+      semantic_advance_for_text_range(text, &advances, &(1..3)),
+      Some(2.0)
+    );
+    assert_eq!(
+      semantic_advance_for_text_range(text, &advances, &(3..5)),
+      Some(7.0)
+    );
+    assert_eq!(
+      semantic_advance_for_text_range(text, &advances, &(5..6)),
+      None
+    );
+  }
 
   #[test]
   fn drawingml_marker_dimensions_use_libreoffice_mm100_minimum_baseline() {
@@ -6915,6 +7057,7 @@ mod tests {
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
       metafile_native_size: true,
     };
     let fixed_output = metafile_render_options_for_image(&image, &PdfOptions::default());

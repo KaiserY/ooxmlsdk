@@ -1551,6 +1551,7 @@ mod tests {
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
       metafile_native_size: false,
       floating: false,
       behind_text: false,

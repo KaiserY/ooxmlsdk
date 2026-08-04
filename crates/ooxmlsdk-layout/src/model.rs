@@ -117,6 +117,11 @@ pub struct TextStyle {
   /// Horizontal WordprocessingML character scale. `None` means 100% and
   /// preserves explicit 100% overrides in style inheritance.
   pub horizontal_scale: Option<f32>,
+  /// Explicit PDF-semantic distances between consecutive character origins.
+  /// This is populated only for GDI `ExtTextOut` replacement layers whose
+  /// nonuniform `Dx` array cannot be represented by ordinary character
+  /// spacing or a single horizontal scale.
+  pub(crate) semantic_character_advances_pt: Option<Arc<[f32]>>,
   pub character_spacing_pt: f32,
   pub baseline_shift_pt: f32,
   /// Original WordprocessingML font size retained for the line box when
@@ -207,6 +212,7 @@ impl Default for TextStyle {
       kerning_minimum_size_pt: None,
       ligatures: None,
       horizontal_scale: None,
+      semantic_character_advances_pt: None,
       character_spacing_pt: 0.0,
       baseline_shift_pt: 0.0,
       automatic_escapement_font_size_pt: None,
@@ -443,6 +449,7 @@ pub(crate) struct ImageItem {
   pub content_type: Option<String>,
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   pub metafile_background_color: Option<[u8; 3]>,
+  pub metafile_semantic_text_includes_raster_backdrop: bool,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub floating: bool,
@@ -547,6 +554,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     kerning_minimum_size: style.kerning_minimum_size_pt.map(common::Pt),
     ligatures: style.ligatures,
     horizontal_scale: style.horizontal_scale,
+    semantic_character_advances_pt: style.semantic_character_advances_pt,
     character_spacing: common::Pt(style.character_spacing_pt),
     baseline_shift: common::Pt(style.baseline_shift_pt),
     automatic_escapement_font_size: style.automatic_escapement_font_size_pt.map(common::Pt),

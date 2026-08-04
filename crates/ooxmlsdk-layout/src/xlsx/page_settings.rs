@@ -524,7 +524,7 @@ mod tests {
 
   #[test]
   fn worksheet_without_page_margins_uses_excel_application_defaults() {
-    let settings = CalcPageSettings::from_worksheet(&x::Worksheet::default());
+    let settings = CalcPageSettings::from_worksheet(&x::Worksheet::default(), false);
 
     assert!(!settings.has_margins);
     assert_eq!(settings.margin_left_in, 0.7);
@@ -555,7 +555,7 @@ mod tests {
       ..Default::default()
     };
 
-    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet, false).page_size_pt();
 
     assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
     assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
@@ -573,7 +573,7 @@ mod tests {
       ..Default::default()
     };
 
-    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet, false).page_size_pt();
 
     assert!((width - 8.5 * units::POINTS_PER_INCH).abs() < 0.01);
     assert!((height - 11.0 * units::POINTS_PER_INCH).abs() < 0.01);
@@ -590,7 +590,7 @@ mod tests {
       ..Default::default()
     };
 
-    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet, false).page_size_pt();
 
     assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
     assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
@@ -615,7 +615,7 @@ mod tests {
       ..Default::default()
     };
 
-    let (width, height) = CalcPageSettings::from_worksheet(&worksheet).page_size_pt();
+    let (width, height) = CalcPageSettings::from_worksheet(&worksheet, false).page_size_pt();
 
     assert!((width - units::millimeters_to_points(297.0)).abs() < 0.01);
     assert!((height - units::millimeters_to_points(420.0)).abs() < 0.01);

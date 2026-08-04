@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use ooxmlsdk::schemas::{m, schemas_openxmlformats_org_wordprocessingml_2006_main as w};
 
+use super::math_type::MathTypeEquation;
 use super::{
   ImageCrop, ImagePlacement, InlineImage, RgbColor, StylesCatalog, TextStyle, properties,
 };
@@ -11,6 +12,97 @@ use crate::text_metrics::{MathFontMetrics, TextMetrics};
 const OFFICE_MATH_SVG_CONTENT_TYPE: &str = "application/vnd.ooxmlsdk.office-math+xml";
 const MIN_MATH_SIZE_PT: f32 = 1.0;
 const MIN_RULE_WIDTH_PT: f32 = 0.2;
+
+#[derive(Clone, Debug)]
+pub(super) struct MathTypeSemanticRun {
+  pub(super) text: String,
+  pub(super) x: f32,
+  pub(super) baseline_y: f32,
+  pub(super) font_size: Option<f32>,
+  pub(super) font_family: Option<String>,
+  pub(super) bold: bool,
+  pub(super) italic: bool,
+  pub(super) width: Option<f32>,
+  pub(super) advances: Option<Vec<f32>>,
+}
+
+/// Reconstructs MathType's searchable replacement layer from the editable
+/// MTEF tree and the associated WMF text records.
+///
+/// MTEF validates that this is an editable MathType equation and supplies its
+/// logical content. The static WMF owns PDF-facing font encodings, record
+/// order, `MoveTo`/`TA_UPDATECP` positions, and `ExtTextOut` `Dx` advances.
+/// Those authored WMF values must remain authoritative for PDF geometry.
+pub(super) fn math_type_semantic_runs(
+  equation: &MathTypeEquation,
+  preview_data: &[u8],
+  preview_content_type: Option<&str>,
+) -> Vec<MathTypeSemanticRun> {
+  let Some(_document) = equation.mtef5_document() else {
+    let text = equation.semantic_text();
+    return (!text.is_empty())
+      .then_some(MathTypeSemanticRun {
+        text,
+        x: 0.0,
+        baseline_y: 0.5,
+        font_size: None,
+        font_family: Some("Times New Roman".to_string()),
+        bold: false,
+        italic: false,
+        width: None,
+        advances: None,
+      })
+      .into_iter()
+      .collect();
+  };
+  let preview_runs =
+    crate::render::emf_wmf::extract_metafile_text_runs(preview_data, preview_content_type, false);
+  if preview_runs.is_empty() {
+    return Vec::new();
+  }
+
+  let mut output = Vec::new();
+  for preview in preview_runs {
+    let text = if preview
+      .font_family
+      .as_deref()
+      .is_some_and(|family| family.eq_ignore_ascii_case("Symbol"))
+      && !preview.italic
+    {
+      preview
+        .text
+        .chars()
+        .map(|character| {
+          // Keep Symbol's transport code for minus so shaping stays in the
+          // selected Symbol face. The PDF renderer supplies U+2212 through
+          // ToUnicode while retaining the authored F02D glyph. Other ASCII
+          // operators can use their semantic scalar because Symbol transport
+          // shaping maps them back to F0XX before glyph selection.
+          if character == '\u{f02d}' {
+            character
+          } else {
+            crate::render::symbol::font_symbol_code(Some("Symbol"), character as u32)
+              .unwrap_or(character)
+          }
+        })
+        .collect()
+    } else {
+      preview.text
+    };
+    output.push(MathTypeSemanticRun {
+      text,
+      x: preview.x,
+      baseline_y: preview.y,
+      font_size: preview.font_size,
+      font_family: preview.font_family,
+      bold: preview.bold,
+      italic: preview.italic,
+      width: preview.width,
+      advances: preview.advances,
+    });
+  }
+  output
+}
 
 macro_rules! parse_math_choice {
   ($parser:expr, $choice_type:ident, $choice:expr) => {
@@ -94,6 +186,8 @@ pub(super) fn wordprocessing_math_image(
     alt_text: (!semantic_text.is_empty()).then_some(semantic_text),
     hyperlink_url: None,
     semantic_metafile_text: false,
+    semantic_metafile_font_family: None,
+    native_ole_equation: None,
     metafile_native_size: false,
     picture_content_control: false,
     placement: ImagePlacement::Inline,

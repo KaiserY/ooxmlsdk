@@ -109,6 +109,7 @@ pub(crate) struct SectionColumns {
   pub gap_pt: f32,
   pub separator: bool,
   pub unbalanced: bool,
+  pub balanced_height_pt: Option<f32>,
   pub explicit_count: usize,
   pub explicit_widths_pt: [f32; 45],
   pub explicit_gaps_pt: [f32; 44],
@@ -121,6 +122,7 @@ impl Default for SectionColumns {
       gap_pt: 36.0,
       separator: false,
       unbalanced: false,
+      balanced_height_pt: None,
       explicit_count: 0,
       explicit_widths_pt: [0.0; 45],
       explicit_gaps_pt: [0.0; 44],
@@ -823,6 +825,11 @@ pub(crate) struct InlineImage {
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub semantic_metafile_text: bool,
+  /// ActiveX TextProps font resolved from the control persistence. This is
+  /// separate from the static preview LOGFONT because the Office host may
+  /// provide its document font when TextProps omits FontName.
+  pub semantic_metafile_font_family: Option<Arc<str>>,
+  pub native_ole_equation: Option<super::math_type::MathTypeEquation>,
   /// Whether Word should paint a near-native EMF Header.Frame inside the
   /// authored DrawingML extent.
   pub metafile_native_size: bool,

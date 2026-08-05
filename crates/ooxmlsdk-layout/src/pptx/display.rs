@@ -245,6 +245,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     semantic_metafile_text,
     metafile_semantic_text_includes_raster_backdrop: item
       .metafile_semantic_text_includes_raster_backdrop,
+    signature_line: None,
     metafile_native_size: false,
     floating: item.floating,
     behind_text: item.behind_text,

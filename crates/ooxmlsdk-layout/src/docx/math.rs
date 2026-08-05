@@ -186,6 +186,8 @@ pub(super) fn wordprocessing_math_image(
     alt_text: (!semantic_text.is_empty()).then_some(semantic_text),
     hyperlink_url: None,
     semantic_metafile_text: false,
+    metafile_semantic_text_includes_raster_backdrop: false,
+    signature_line: None,
     semantic_metafile_font_family: None,
     native_ole_equation: None,
     metafile_native_size: false,

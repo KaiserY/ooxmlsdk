@@ -1093,8 +1093,7 @@ fn normalize_cached_toc_hyperlink_style(
       continue;
     };
     let base_style = paragraph.base_style.clone();
-    let hyperlink_style =
-      styles.character_run_style(Some("Hyperlink"), paragraph.base_style.clone());
+    let hyperlink_style = styles.synthesized_hyperlink_run_style(paragraph.base_style.clone());
     for inline in &mut paragraph.inlines {
       let InlineItem::Text(run) = inline else {
         continue;
@@ -2530,7 +2529,7 @@ mod tests {
     let InlineItem::Text(run) = &mut cached.inlines[0] else {
       panic!("expected cached text");
     };
-    run.style = styles.character_run_style(Some("Hyperlink"), cached.base_style.clone());
+    run.style = styles.synthesized_hyperlink_run_style(cached.base_style.clone());
     run.hyperlink_url = Some("ooxmlsdk-pdf:bookmark:_Toc1".to_string());
     run.style_ref_keys = vec![Arc::<str>::from("Hyperlink")];
     assert!(run.style.underline);

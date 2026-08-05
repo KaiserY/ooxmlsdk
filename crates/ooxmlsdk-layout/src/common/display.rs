@@ -202,10 +202,38 @@ pub struct ImageItem<'doc> {
   /// raster records. PowerPoint ActiveX thumbnails keep those native WMF text
   /// records, while ordinary Office OLE previews are flattened.
   pub metafile_semantic_text_includes_raster_backdrop: bool,
+  /// Host metadata for a VML `o:signatureline` image. Office regenerates the
+  /// visible unsigned/signed signature-line graphic from these properties;
+  /// the embedded metafile is only a fallback preview.
+  pub signature_line: Option<SignatureLineProperties<'doc>>,
   /// Whether a DrawingML metafile preview may use its near-native Header.Frame.
   pub metafile_native_size: bool,
   pub floating: bool,
   pub behind_text: bool,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct SignatureLineProperties<'doc> {
+  pub state: SignatureLineState,
+  pub id: Option<Cow<'doc, str>>,
+  pub provider_id: Option<Cow<'doc, str>>,
+  pub signing_instructions_set: bool,
+  pub allow_comments: bool,
+  pub show_sign_date: bool,
+  pub suggested_signer: Option<Cow<'doc, str>>,
+  pub suggested_signer_title: Option<Cow<'doc, str>>,
+  pub suggested_signer_email: Option<Cow<'doc, str>>,
+  pub signing_instructions: Option<Cow<'doc, str>>,
+  pub additional_xml: Option<Cow<'doc, str>>,
+  pub signature_provider_url: Option<Cow<'doc, str>>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SignatureLineState {
+  #[default]
+  Unsigned,
+  SignedValid,
+  SignedInvalid,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -512,6 +540,10 @@ pub struct TextStyle<'doc> {
   /// OpenType ligature categories selected by WordprocessingML. `None`
   /// preserves the shaping engine defaults for non-Word document models.
   pub ligatures: Option<OpenTypeLigatures>,
+  /// Word 2010 OpenType controls that inherit independently as run
+  /// properties. Nested options distinguish an absent property from an
+  /// explicit `default`, `false`, or empty stylistic-set override.
+  pub open_type_features: OpenTypeFeatureSettings,
   pub horizontal_scale: Option<f32>,
   /// Explicit distances in points between consecutive input-character
   /// origins for semantic GDI replacement text.
@@ -600,6 +632,50 @@ pub struct OpenTypeLigatures {
   pub contextual: bool,
   pub historical: bool,
   pub discretionary: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum OpenTypeNumberForm {
+  #[default]
+  Default,
+  Lining,
+  OldStyle,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum OpenTypeNumberSpacing {
+  #[default]
+  Default,
+  Proportional,
+  Tabular,
+}
+
+/// Enabled OpenType stylistic sets (`ss01` through `ss20`).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct OpenTypeStylisticSets(u32);
+
+impl OpenTypeStylisticSets {
+  pub fn enable(&mut self, id: u32) {
+    if (1..=20).contains(&id) {
+      self.0 |= 1 << (id - 1);
+    }
+  }
+
+  pub fn contains(self, id: u8) -> bool {
+    (1..=20).contains(&id) && self.0 & (1 << (id - 1)) != 0
+  }
+
+  pub fn enabled_ids(self) -> impl Iterator<Item = u8> {
+    (1_u8..=20).filter(move |&id| self.contains(id))
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct OpenTypeFeatureSettings {
+  pub number_form: Option<OpenTypeNumberForm>,
+  pub number_spacing: Option<OpenTypeNumberSpacing>,
+  pub contextual_alternates: Option<bool>,
+  pub stylistic_sets: Option<OpenTypeStylisticSets>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

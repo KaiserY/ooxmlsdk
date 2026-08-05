@@ -825,6 +825,10 @@ pub(crate) struct InlineImage {
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub semantic_metafile_text: bool,
+  /// Whether the metafile text is the visible fixed-output representation,
+  /// rather than only an invisible semantic overlay over a raster preview.
+  pub metafile_semantic_text_includes_raster_backdrop: bool,
+  pub signature_line: Option<common::SignatureLineProperties<'static>>,
   /// ActiveX TextProps font resolved from the control persistence. This is
   /// separate from the static preview LOGFONT because the Office host may
   /// provide its document font when TextProps omits FontName.

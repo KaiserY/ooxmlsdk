@@ -90,6 +90,13 @@ const LO_PLACEHOLDER_FLOATING_LINE_HEIGHT_PER_FONT_SIZE: f32 = 0.484;
 const WORD_LEGACY_OUTLINE_WIDTH_PT: f32 = 0.14;
 const WORD_LEGACY_RELIEF_OFFSET_PT: f32 = 0.96;
 const WORD_FIXED_OUTPUT_DPI: f32 = 600.0;
+// Word's fixed-output text-effect images retain a transparent 10-DIP guard
+// outside the filter output. The six independent glow/shadow/reflection
+// XObjects in TextEffects_Glow_Shadow_Reflection.docx preserve about 20 pixels
+// at 200 DPI and 10 pixels at 100 DPI, including the two opposite blur-size
+// counterexamples. This guard belongs to raster materialization, not to the
+// authored DrawingML radius or alignment rectangle.
+const WORD_TEXT_EFFECT_RASTER_GUARD_PT: f32 = 10.0 * 72.0 / 96.0;
 // Word fixed output snaps the legacy field glyph to its 600-DPI printer grid.
 // The independent 10-point Arial (checkboxes.docx), 11-point Calibri
 // (n766477.docx), and colored 10-point Open Sans fallback (tdf92472.docx)
@@ -358,6 +365,26 @@ fn paragraph_uses_only_paragraph_mark_baseline_shift(paragraph: &crate::docx::Pa
     match inline {
       InlineItem::Text(run) if text_run_affects_line_height(&run.text) => {
         if (run.style.baseline_shift_pt - paragraph_shift).abs() > LAYOUT_EPSILON_PT {
+          return false;
+        }
+        saw_text = true;
+      }
+      InlineItem::Text(_) | InlineItem::BookmarkStart(_) => {}
+      _ => return false,
+    }
+  }
+  saw_text
+}
+
+fn paragraph_uses_only_translucent_glyph_paths(paragraph: &crate::docx::Paragraph) -> bool {
+  let mut saw_text = false;
+  for inline in &paragraph.inlines {
+    match inline {
+      InlineItem::Text(run) if text_run_affects_line_height(&run.text) => {
+        if run.style.semantic_only
+          || run.style.opacity <= f32::EPSILON
+          || run.style.opacity >= 1.0 - f32::EPSILON
+        {
           return false;
         }
         saw_text = true;
@@ -1275,6 +1302,13 @@ pub(crate) struct TextItem {
   pub x_pt: f32,
   pub y_pt: f32,
   pub line_height_pt: f32,
+  /// Geometry owned by the WPS shape which produced this run.
+  ///
+  /// Run ink, character-cell alignment, reflection ramps, and the text
+  /// shape's 3-D model surface are four distinct coordinate spaces. Keep the
+  /// host here until Word text effects have been materialized instead of
+  /// collapsing it into the run style or an arbitrary raster guard.
+  wordprocessing_effect_host: Option<WordprocessingTextEffectHost>,
   pub text: String,
   pub style: TextStyle,
   pub rotation_center_pt: Option<(f32, f32)>,
@@ -1290,6 +1324,12 @@ pub(crate) struct TextItem {
   pub preserve_text_portion: bool,
   pub decoration_span_start_x_pt: Option<f32>,
   pub pdf_text_segmentation: PdfTextSegmentation,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct WordprocessingTextEffectHost {
+  shape_bounds: FrameBounds,
+  text_frame_bounds: FrameBounds,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1337,6 +1377,8 @@ pub(crate) struct ImageItem {
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
   pub semantic_metafile_text: bool,
+  pub metafile_semantic_text_includes_raster_backdrop: bool,
+  pub signature_line: Option<common::SignatureLineProperties<'static>>,
   pub metafile_native_size: bool,
   pub floating: bool,
   pub behind_text: bool,
@@ -2324,6 +2366,7 @@ fn push_docx_picture_image(
         x_pt: content_bounds.origin.x.0 + run.x * content_bounds.size.width.0,
         y_pt: content_bounds.origin.y.0 + run.y * content_bounds.size.height.0,
         line_height_pt: (font_size_pt * 1.15).max(1.0),
+        wordprocessing_effect_host: None,
         text: run.text,
         style,
         rotation_center_pt: None,
@@ -2375,6 +2418,7 @@ fn push_docx_picture_image(
         x_pt: content_bounds.origin.x.0 + run.x * content_bounds.size.width.0,
         y_pt: content_bounds.origin.y.0 + run.baseline_y * content_bounds.size.height.0,
         line_height_pt: font_size_pt * 1.2,
+        wordprocessing_effect_host: None,
         text: run.text,
         style,
         rotation_center_pt: None,
@@ -2737,6 +2781,8 @@ fn finish_docx_drawing_effects(
     alt_text: None,
     hyperlink_url: None,
     semantic_metafile_text: false,
+    metafile_semantic_text_includes_raster_backdrop: false,
+    signature_line: None,
     metafile_native_size: false,
     floating: matches!(host.placement, crate::docx::ImagePlacement::Floating(_)),
     behind_text: false,
@@ -2896,6 +2942,8 @@ fn finish_docx_group_effects(
     alt_text: None,
     hyperlink_url: None,
     semantic_metafile_text: false,
+    metafile_semantic_text_includes_raster_backdrop: false,
+    signature_line: None,
     metafile_native_size: false,
     // A separable backdrop is an internal layer of the owning floating
     // group, not another independently placeable floating object. Marking it
@@ -3045,6 +3093,8 @@ fn inline_shape_fill_image_items(
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
       metafile_native_size: false,
       floating: matches!(shape.placement, crate::docx::ImagePlacement::Floating(_)),
       behind_text: false,
@@ -3253,7 +3303,9 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
     semantic_metafile_text: item.semantic_metafile_text,
-    metafile_semantic_text_includes_raster_backdrop: false,
+    metafile_semantic_text_includes_raster_backdrop: item
+      .metafile_semantic_text_includes_raster_backdrop,
+    signature_line: item.signature_line,
     metafile_native_size: item.metafile_native_size,
     floating: item.floating,
     behind_text: item.behind_text,
@@ -5353,35 +5405,62 @@ fn materialize_wordprocessing_text_effects_in_items(
     if text.text.trim().is_empty() {
       continue;
     }
+    let static3d = common::drawingml_3d::resolve_static_3d_style(
+      text.style.drawingml_text_static3d.as_ref(),
+      text.style.wordprocessing_text_3d_parts.as_ref(),
+    );
+    let flatten_to_raster = text.style.wordprocessing_text_3d || static3d.is_some();
+    let has_wordprocessing_run_effects = text.style.wordprocessing_text_3d
+      || text.style.text_glow.is_some()
+      || text.style.text_shadow.is_some()
+      || text.style.text_reflection.is_some();
     let drawingml_effects = text.style.drawingml_text_effects.clone();
-    let effects = drawingml_effects.clone().or_else(|| {
-      let font_size_pt = effective_font_size_pt(&text.style, None);
-      let text_effect_scale = wordprocessing_text_effect_render_scale(font_size_pt);
-      let render_glow = text.style.text_glow.map(|mut glow| {
-        // Word keeps the authored glow extent for the fixed-output canvas,
-        // while its text glow kernel is normalized by font size.
-        glow.raster_length_scale = text_effect_scale;
-        glow
+    let effects = drawingml_effects
+      .clone()
+      .or_else(|| {
+        let font_size_pt = effective_font_size_pt(&text.style, None);
+        let text_effect_scale = wordprocessing_text_effect_render_scale(font_size_pt);
+        let render_glow = text.style.text_glow.map(|mut glow| {
+          // Word keeps the authored glow extent for the fixed-output canvas,
+          // while its text glow kernel is normalized by font size.
+          glow.raster_length_scale = text_effect_scale;
+          glow
+        });
+        let render_shadow = text.style.text_shadow.map(|mut shadow| {
+          // Word's fixed-output canvas keeps the authored effect extents, while
+          // its text shadow kernel is normalized by the owning font size.
+          shadow.raster_length_scale = text_effect_scale;
+          shadow
+        });
+        let render_reflection = text.style.text_reflection.map(|reflection| {
+          wordprocessing_text_reflection_for_render(reflection, text_effect_scale)
+        });
+        common::drawingml_image_effects::from_wordprocessing_text_effects(
+          render_glow,
+          render_shadow,
+          render_reflection,
+        )
+      })
+      .or_else(|| {
+        flatten_to_raster.then(|| common::drawingml_image_effects::ImageEffectContainer {
+          kind: common::drawingml_image_effects::ImageEffectContainerKind::Tree,
+          effects: vec![common::drawingml_image_effects::ImageEffect::Identity],
+        })
       });
-      let render_shadow = text.style.text_shadow.map(|mut shadow| {
-        // Word's fixed-output canvas keeps the authored effect extents, while
-        // its text shadow kernel is normalized by the owning font size.
-        shadow.raster_length_scale = text_effect_scale;
-        shadow
-      });
-      common::drawingml_image_effects::from_wordprocessing_text_effects(
-        render_glow,
-        render_shadow,
-        text.style.text_reflection,
-      )
-    });
     let Some(effects) = effects else {
       continue;
     };
-    let Some(mut backdrop_effects) =
-      common::drawingml_image_effects::unchanged_foreground_backdrop(&effects)
-    else {
-      continue;
+    let mut raster_effects = if flatten_to_raster {
+      // Word emits w14:props3d/scene3d text as one full 200-DPI image. Keep
+      // the unchanged source branch inside the effect graph so fill, outline,
+      // glow, shadow, and reflection are flattened into that same image.
+      effects
+    } else {
+      let Some(backdrop) = common::drawingml_image_effects::unchanged_foreground_backdrop(&effects)
+      else {
+        continue;
+      };
+      backdrop
     };
     let width = text_metrics.measure_text(&text.text, &text.style);
     if width <= f32::EPSILON || text.line_height_pt <= f32::EPSILON {
@@ -5398,35 +5477,204 @@ fn materialize_wordprocessing_text_effects_in_items(
       } else {
         text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
       };
-      effect_text.y_pt +=
-        wordprocessing_text_effect_baseline_shift(text.line_height_pt, baseline_offset);
+      effect_text.y_pt += wordprocessing_text_effect_baseline_shift(
+        text.line_height_pt,
+        baseline_offset,
+        static3d.is_some() && !has_wordprocessing_run_effects,
+      );
     }
     let Some((ink_left, ink_top, ink_right, ink_bottom)) =
       text_item_ink_bounds(&effect_text, text_metrics)
     else {
       continue;
     };
+    let (anchor_left, anchor_top, anchor_right, anchor_bottom) =
+      text_item_logical_bounds(&effect_text, width, text_metrics);
     let ink_width = (ink_right - ink_left).max(f32::EPSILON);
     let ink_height = (ink_bottom - ink_top).max(f32::EPSILON);
-    // DrawingML effects consume the alpha of the main shape. For text that
-    // is the glyph ink, not the run advance or paragraph line box.
-    let content_bounds = common_rect(ink_left, ink_top, ink_width, ink_height);
-    let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
-      &backdrop_effects,
-      ink_width,
-      ink_height,
+    let canvas_padding_pt = if drawingml_effects.is_some() {
+      2.0 / (200.0 / 72.0)
+    } else {
+      WORD_TEXT_EFFECT_RASTER_GUARD_PT
+    };
+    // Text-body 3-D is part of the source shape consumed by run-level glow,
+    // shadow, and reflection. Compose those two output ranges rather than
+    // independently unioning both against the original 2-D glyph box. In
+    // particular, a vertically flipped reflection anchors to the projected
+    // 3-D silhouette, not to the pre-extrusion baseline box.
+    // A WPS text body contributes a fourth rectangle in addition to glyph
+    // ink, the character cell, and the reflection ramp: its owning shape.
+    // ECMA-376 Annex L defines scene-coherent text as a planar shape in the
+    // 3-D scene, whose transform box is the shape's `a:xfrm`; bodyPr insets
+    // position text inside that box but do not resize the camera model. Keep
+    // the projected glyph range as the effect input, and the projected host
+    // range as an independent output canvas floor; transforming the
+    // transparent host through reflection or shadow would incorrectly double
+    // its height.
+    let hosted_static_geometry =
+      static3d
+        .as_ref()
+        .zip(text.wordprocessing_effect_host)
+        .map(|(style, host)| {
+          let model = host.shape_bounds;
+          let projection =
+            common::drawingml_3d::camera_projection(&style.scene, text.style.rotation_deg);
+          let projected_ink = common::drawingml_3d::projected_region_output_bounds(
+            projection,
+            &style.shape,
+            model.width_pt,
+            model.height_pt,
+            common::drawingml_3d::Static3dOutputBounds {
+              left_pt: ink_left - model.x_pt,
+              top_pt: ink_top - model.y_pt,
+              right_pt: ink_right - model.x_pt,
+              bottom_pt: ink_bottom - model.y_pt,
+            },
+          );
+          // The fixed-output guard is already transformed by the effect graph
+          // below. The host is only the projected shape floor; padding it here
+          // would allocate the same transparent border twice.
+          let projected_host = common::drawingml_3d::projected_output_bounds(
+            projection,
+            &style.shape,
+            model.width_pt,
+            model.height_pt,
+          );
+          (
+            common::drawingml_image_effects::EffectOutputBounds {
+              left_pt: model.x_pt + projected_ink.left_pt - ink_left,
+              top_pt: model.y_pt + projected_ink.top_pt - ink_top,
+              right_pt: model.x_pt + projected_ink.right_pt - ink_left,
+              bottom_pt: model.y_pt + projected_ink.bottom_pt - ink_top,
+            },
+            common::drawingml_image_effects::EffectOutputBounds {
+              left_pt: model.x_pt + projected_host.left_pt - ink_left,
+              top_pt: model.y_pt + projected_host.top_pt - ink_top,
+              right_pt: model.x_pt + projected_host.right_pt - ink_left,
+              bottom_pt: model.y_pt + projected_host.bottom_pt - ink_top,
+            },
+            model,
+          )
+        });
+    let (source_bounds, static_host_output_bounds, static_model_bounds) =
+      if let Some((source, host, model)) = hosted_static_geometry {
+        (source, Some(host), Some(model))
+      } else {
+        let static_padding = static3d
+          .as_ref()
+          .map(|style| {
+            common::drawingml_3d::output_padding(
+              common::drawingml_3d::camera_projection(&style.scene, text.style.rotation_deg),
+              &style.shape,
+              ink_width,
+              ink_height,
+            )
+          })
+          .unwrap_or_default();
+        (
+          common::drawingml_image_effects::EffectOutputBounds {
+            left_pt: -static_padding.left_pt,
+            top_pt: -static_padding.top_pt,
+            right_pt: ink_width + static_padding.right_pt,
+            bottom_pt: ink_height + static_padding.bottom_pt,
+          },
+          None,
+          None,
+        )
+      };
+    let anchor_bounds = common::drawingml_image_effects::EffectOutputBounds {
+      left_pt: anchor_left - ink_left,
+      top_pt: anchor_top - ink_top,
+      right_pt: anchor_right - ink_left,
+      bottom_pt: anchor_bottom - ink_top,
+    };
+    let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds_with_anchor(
+      &raster_effects,
+      source_bounds,
+      anchor_bounds,
     ) else {
       continue;
     };
-    let drawingml_canvas_padding_pt = if drawingml_effects.is_some() {
-      2.0 / (200.0 / 72.0)
-    } else {
-      0.0
-    };
-    let relative_left = output_bounds.left_pt.min(0.0) - drawingml_canvas_padding_pt;
-    let relative_top = output_bounds.top_pt.min(0.0) - drawingml_canvas_padding_pt;
-    let relative_right = output_bounds.right_pt.max(ink_width) + drawingml_canvas_padding_pt;
-    let relative_bottom = output_bounds.bottom_pt.max(ink_height) + drawingml_canvas_padding_pt;
+    // Direct2D spatial effects transform their input surface, including its
+    // transparent soft border, and expose a separate output rectangle. Word's
+    // fixed-output text effects follow that model: the source still has to be
+    // present on the working surface to seed a flipped reflection or shadow,
+    // but it is not automatically part of the emitted backdrop XObject.
+    // Applying the guard before the effect is also observable for `sy=-30%`:
+    // its vertical guard is scaled while its skew contributes horizontally.
+    let (final_relative_left, final_relative_top, final_relative_right, final_relative_bottom) =
+      if drawingml_effects.is_none() {
+        let padded_source = common::drawingml_image_effects::EffectOutputBounds {
+          left_pt: source_bounds.left_pt - canvas_padding_pt,
+          top_pt: source_bounds.top_pt - canvas_padding_pt,
+          right_pt: source_bounds.right_pt + canvas_padding_pt,
+          bottom_pt: source_bounds.bottom_pt + canvas_padding_pt,
+        };
+        let Some(mut canvas_bounds) =
+          common::drawingml_image_effects::container_output_bounds_with_anchor(
+            &raster_effects,
+            padded_source,
+            anchor_bounds,
+          )
+        else {
+          continue;
+        };
+        if !flatten_to_raster
+          && text.style.text_glow.is_none()
+          && text.style.text_shadow.is_none()
+          && let Some(reflection) = text.style.text_reflection
+        {
+          canvas_bounds = common::drawingml_image_effects::wordprocessing_reflection_canvas_bounds(
+            canvas_bounds,
+            output_bounds,
+            reflection.blur_radius_px,
+            reflection.distance_px,
+            reflection.direction_degrees,
+            reflection.fade_direction_degrees,
+          );
+        }
+        (
+          canvas_bounds.left_pt,
+          canvas_bounds.top_pt,
+          canvas_bounds.right_pt,
+          canvas_bounds.bottom_pt,
+        )
+      } else {
+        (
+          output_bounds.left_pt.min(source_bounds.left_pt) - canvas_padding_pt,
+          output_bounds.top_pt.min(source_bounds.top_pt) - canvas_padding_pt,
+          output_bounds.right_pt.max(source_bounds.right_pt) + canvas_padding_pt,
+          output_bounds.bottom_pt.max(source_bounds.bottom_pt) + canvas_padding_pt,
+        )
+      };
+    let (final_relative_left, final_relative_top, final_relative_right, final_relative_bottom) =
+      static_host_output_bounds.map_or(
+        (
+          final_relative_left,
+          final_relative_top,
+          final_relative_right,
+          final_relative_bottom,
+        ),
+        |host| {
+          (
+            final_relative_left.min(host.left_pt),
+            final_relative_top.min(host.top_pt),
+            final_relative_right.max(host.right_pt),
+            final_relative_bottom.max(host.bottom_pt),
+          )
+        },
+      );
+    // The working surface must retain the original unprojected glyphs long
+    // enough for the 3-D stage to consume them. The exported target is cropped
+    // back to the projected host/effect range below.
+    let relative_left = final_relative_left.min(source_bounds.left_pt).min(0.0);
+    let relative_top = final_relative_top.min(source_bounds.top_pt).min(0.0);
+    let relative_right = final_relative_right
+      .max(source_bounds.right_pt)
+      .max(ink_width);
+    let relative_bottom = final_relative_bottom
+      .max(source_bounds.bottom_pt)
+      .max(ink_height);
     let raster_bounds = common::Rect {
       origin: common::Point {
         x: common::Pt(ink_left + relative_left),
@@ -5438,13 +5686,18 @@ fn materialize_wordprocessing_text_effects_in_items(
       },
     };
     let common_text = common::DisplayItem::Text(into_common_text_run(effect_text.clone()));
+    let automatic_extrusion_color = common::drawingml_3d::automatic_extrusion_color_from_items(
+      std::slice::from_ref(&common_text),
+    );
     if drawingml_effects.is_some() {
       common::drawingml_image_effects::scale_outer_shadow_filter_radius(
-        &mut backdrop_effects,
+        &mut raster_effects,
         wordprocessing_text_effect_render_scale(effective_font_size_pt(&text.style, None)),
       );
     }
-    let max_pixels_per_point = if drawingml_effects.is_some() {
+    let max_pixels_per_point = if flatten_to_raster {
+      200.0 / 72.0
+    } else if drawingml_effects.is_some() {
       // Word's fixed-output ChartEx title shadows are emitted at 200 DPI,
       // while retaining a searchable vector foreground.
       200.0 / 72.0
@@ -5459,23 +5712,116 @@ fn materialize_wordprocessing_text_effects_in_items(
         common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
           std::slice::from_ref(&common_text),
           raster_bounds,
-          &backdrop_effects,
+          &raster_effects,
           max_pixels_per_point,
         )
       else {
         continue;
       };
+    // MS-DOCX extends one rPr with independent glow/shadow/reflection and 3-D
+    // properties. The Office fixed-output reference preserves the flat glyph
+    // counters in all three effect branches; only the unchanged foreground
+    // contains the projected extrusion and contour. Keep that flat branch
+    // before the 3-D renderer replaces the working image.
+    let mut flat_wordprocessing_effect_source = (static3d.is_some()
+      && drawingml_effects.is_none()
+      && (text.style.text_glow.is_some()
+        || text.style.text_shadow.is_some()
+        || text.style.text_reflection.is_some()))
+    .then(|| raster.image.clone());
+    let mut effect_source_left_px = -relative_left * raster.pixels_per_point;
+    let mut effect_source_top_px = -relative_top * raster.pixels_per_point;
+    let mut effect_source_width_px = ink_width * raster.pixels_per_point;
+    let mut effect_source_height_px = ink_height * raster.pixels_per_point;
+    let effect_anchor_left_px = (anchor_left - raster_bounds.origin.x.0) * raster.pixels_per_point;
+    let effect_anchor_top_px = (anchor_top - raster_bounds.origin.y.0) * raster.pixels_per_point;
+    let effect_anchor_width_px = (anchor_right - anchor_left) * raster.pixels_per_point;
+    let effect_anchor_height_px = (anchor_bottom - anchor_top) * raster.pixels_per_point;
+    let effect_ramp_height_px = effective_font_size_pt(&text.style, None) * raster.pixels_per_point;
+    if let Some(style) = static3d.as_ref() {
+      let model = static_model_bounds.unwrap_or(FrameBounds {
+        x_pt: ink_left,
+        y_pt: ink_top,
+        width_pt: ink_width,
+        height_pt: ink_height,
+      });
+      let projection =
+        common::drawingml_3d::camera_projection(&style.scene, text.style.rotation_deg);
+      let model_surface = common::drawingml_3d::Static3dSurface {
+        left_px: (model.x_pt - raster_bounds.origin.x.0) * raster.pixels_per_point,
+        top_px: (model.y_pt - raster_bounds.origin.y.0) * raster.pixels_per_point,
+        width_px: model.width_pt * raster.pixels_per_point,
+        height_px: model.height_pt * raster.pixels_per_point,
+      };
+      if let Some(flat_source) = flat_wordprocessing_effect_source.as_ref() {
+        flat_wordprocessing_effect_source =
+          Some(common::drawingml_3d::project_static_3d_front_face(
+            flat_source,
+            projection,
+            &style.shape,
+            raster.pixels_per_point,
+            Some(model_surface),
+          ));
+      }
+      common::drawingml_3d::apply_static_3d(
+        &mut raster.image,
+        &style.scene,
+        projection,
+        &style.shape,
+        common::drawingml_3d::Static3dRenderOptions {
+          extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
+          contour_color: style.contour_color,
+          pixels_per_point: raster.pixels_per_point,
+          model_surface: Some(model_surface),
+        },
+      );
+      let effect_alpha_bounds = flat_wordprocessing_effect_source
+        .as_ref()
+        .and_then(common::drawingml_3d::alpha_bounds)
+        .or_else(|| common::drawingml_3d::alpha_bounds(&raster.image));
+      if let Some((left, top, right, bottom)) = effect_alpha_bounds {
+        effect_source_left_px = left as f32;
+        effect_source_top_px = top as f32;
+        effect_source_width_px = (right - left + 1) as f32;
+        effect_source_height_px = (bottom - top + 1) as f32;
+      }
+    }
     common::drawingml_image_effects::scale_container_pixel_lengths(
-      &mut backdrop_effects,
+      &mut raster_effects,
       raster.pixels_per_point / (96.0 / 72.0),
     );
-    common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+    let static_foreground = flat_wordprocessing_effect_source
+      .map(|flat_source| std::mem::replace(&mut raster.image, flat_source));
+    let mut rendered_effects = raster_effects.clone();
+    if static_foreground.is_some() {
+      debug_assert_eq!(
+        rendered_effects.kind,
+        common::drawingml_image_effects::ImageEffectContainerKind::Sibling
+      );
+      rendered_effects.effects.retain(|effect| {
+        !matches!(
+          effect,
+          common::drawingml_image_effects::ImageEffect::Identity
+        )
+      });
+    }
+    common::drawingml_image_effects::apply_container_to_padded_image_with_sources_and_anchor(
       &mut raster.image,
-      &backdrop_effects,
-      -relative_left * raster.pixels_per_point,
-      -relative_top * raster.pixels_per_point,
-      content_bounds.size.width.0 * raster.pixels_per_point,
-      content_bounds.size.height.0 * raster.pixels_per_point,
+      &rendered_effects,
+      common::drawingml_image_effects::ImageEffectSourceGeometry {
+        paint_left_px: effect_source_left_px,
+        paint_top_px: effect_source_top_px,
+        paint_width_px: effect_source_width_px,
+        paint_height_px: effect_source_height_px,
+        anchor_left_px: effect_anchor_left_px,
+        anchor_top_px: effect_anchor_top_px,
+        anchor_width_px: effect_anchor_width_px,
+        anchor_height_px: effect_anchor_height_px,
+        ramp_left_px: effect_anchor_left_px,
+        ramp_top_px: effect_anchor_top_px + effect_anchor_height_px - effect_ramp_height_px,
+        ramp_width_px: effect_anchor_width_px,
+        ramp_height_px: effect_ramp_height_px,
+      },
       common::drawingml_image_effects::ImageEffectSourceImages {
         fill: raster.fill_image.as_ref(),
         line: raster.line_image.as_ref(),
@@ -5483,6 +5829,55 @@ fn materialize_wordprocessing_text_effects_in_items(
         children: raster.children_image.as_ref(),
       },
     );
+    if let Some(static_foreground) = static_foreground.as_ref() {
+      common::drawingml_image_effects::composite_source_over(&mut raster.image, static_foreground);
+    }
+    let mut image_bounds = raster_bounds;
+    if drawingml_effects.is_none() {
+      let output_bounds = common::drawingml_image_effects::EffectOutputBounds {
+        left_pt: final_relative_left,
+        top_pt: final_relative_top,
+        right_pt: final_relative_right,
+        bottom_pt: final_relative_bottom,
+      };
+      let working_bounds = common::drawingml_image_effects::EffectOutputBounds {
+        left_pt: relative_left,
+        top_pt: relative_top,
+        right_pt: relative_right,
+        bottom_pt: relative_bottom,
+      };
+      if let Some(target) = wordprocessing_effect_bitmap_target(
+        output_bounds,
+        working_bounds,
+        raster.pixels_per_point,
+        raster.image.width(),
+        raster.image.height(),
+      ) {
+        let crop_left = target.left_px;
+        let crop_top = target.top_px;
+        let crop_width = target.width_px;
+        let crop_height = target.height_px;
+        if crop_left != 0
+          || crop_top != 0
+          || crop_width != raster.image.width()
+          || crop_height != raster.image.height()
+        {
+          raster.image =
+            image::imageops::crop_imm(&raster.image, crop_left, crop_top, crop_width, crop_height)
+              .to_image();
+        }
+        // Keep Direct2D's exact graph-output offset. Its target bitmap has the
+        // truncated integer pixel dimensions below, but it is drawn back at
+        // the unquantized `GetImageLocalBounds().left/top` position.
+        image_bounds.origin.x.0 = ink_left + final_relative_left;
+        image_bounds.origin.y.0 = ink_top + final_relative_top;
+        image_bounds.size.width.0 = crop_width as f32 / raster.pixels_per_point;
+        image_bounds.size.height.0 = crop_height as f32 / raster.pixels_per_point;
+      }
+    }
+    if drawingml_effects.is_none() && has_wordprocessing_run_effects {
+      premultiply_wordprocessing_effect_bitmap(&mut raster.image);
+    }
     let mut png = Cursor::new(Vec::new());
     if PngEncoder::new(&mut png)
       .write_image(
@@ -5495,40 +5890,120 @@ fn materialize_wordprocessing_text_effects_in_items(
     {
       continue;
     }
-    let mut foreground_text = effect_text;
-    foreground_text.style.text_glow = None;
-    foreground_text.style.text_shadow = None;
-    foreground_text.style.text_reflection = None;
-    foreground_text.style.drawingml_text_effects = None;
-    *item = PageItem::Group(vec![
-      PageItem::Image(ImageItem {
-        x_pt: raster_bounds.origin.x.0,
-        y_pt: raster_bounds.origin.y.0,
-        width_pt: raster_bounds.size.width.0,
-        height_pt: raster_bounds.size.height.0,
-        inline_baseline_gap_pt: 0.0,
-        inline_baseline_participant: false,
-        crop: ImageCrop::default(),
-        clip_path: Vec::new(),
-        rotation_deg: 0.0,
-        flip_horizontal: false,
-        flip_vertical: false,
-        data: Arc::from(png.into_inner()),
-        content_type: Some("image/png".to_string()),
-        metafile_background_color: None,
-        alt_text: None,
-        hyperlink_url: text.hyperlink_url.clone(),
-        semantic_metafile_text: false,
-        metafile_native_size: false,
-        floating: false,
-        behind_text: false,
-      }),
-      PageItem::Text(Box::new(foreground_text)),
-    ]);
+    let image = PageItem::Image(ImageItem {
+      x_pt: image_bounds.origin.x.0,
+      y_pt: image_bounds.origin.y.0,
+      width_pt: image_bounds.size.width.0,
+      height_pt: image_bounds.size.height.0,
+      inline_baseline_gap_pt: 0.0,
+      inline_baseline_participant: false,
+      crop: ImageCrop::default(),
+      clip_path: Vec::new(),
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      data: Arc::from(png.into_inner()),
+      content_type: Some("image/png".to_string()),
+      metafile_background_color: None,
+      alt_text: None,
+      hyperlink_url: text.hyperlink_url.clone(),
+      semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
+      metafile_native_size: false,
+      floating: false,
+      behind_text: false,
+    });
+    if flatten_to_raster {
+      *item = image;
+    } else {
+      let mut foreground_text = effect_text;
+      foreground_text.style.text_glow = None;
+      foreground_text.style.text_shadow = None;
+      foreground_text.style.text_reflection = None;
+      foreground_text.style.drawingml_text_effects = None;
+      *item = PageItem::Group(vec![image, PageItem::Text(Box::new(foreground_text))]);
+    }
   }
 }
 
-fn wordprocessing_text_effect_baseline_shift(line_height_pt: f32, baseline_offset_pt: f32) -> f32 {
+fn premultiply_wordprocessing_effect_bitmap(image: &mut image::RgbaImage) {
+  // Microsoft's Direct2D magazine TextFrame renders text effects into
+  // DXGI_FORMAT_B8G8R8A8_UNORM with D2D1_ALPHA_MODE_PREMULTIPLIED. Office's
+  // fixed-output PDF preserves those color components when it separates the
+  // bitmap alpha into an SMask. Keep that observable surface representation
+  // at the final encoding boundary; all effect math above remains straight
+  // alpha so colors are not multiplied more than once while compositing.
+  for pixel in image.pixels_mut() {
+    let alpha = u16::from(pixel.0[3]);
+    for channel in &mut pixel.0[..3] {
+      *channel = ((u16::from(*channel) * alpha + 127) / 255) as u8;
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct WordprocessingEffectBitmapTarget {
+  left_px: u32,
+  top_px: u32,
+  width_px: u32,
+  height_px: u32,
+}
+
+fn wordprocessing_effect_bitmap_target(
+  output_bounds: common::drawingml_image_effects::EffectOutputBounds,
+  working_bounds: common::drawingml_image_effects::EffectOutputBounds,
+  pixels_per_point: f32,
+  working_width_px: u32,
+  working_height_px: u32,
+) -> Option<WordprocessingEffectBitmapTarget> {
+  if !pixels_per_point.is_finite()
+    || pixels_per_point <= 0.0
+    || working_width_px == 0
+    || working_height_px == 0
+  {
+    return None;
+  }
+
+  let output_width_px =
+    ((output_bounds.right_pt - output_bounds.left_pt) * pixels_per_point).max(0.0) as u32;
+  let output_height_px =
+    ((output_bounds.bottom_pt - output_bounds.top_pt) * pixels_per_point).max(0.0) as u32;
+  if output_width_px == 0 || output_height_px == 0 {
+    return None;
+  }
+
+  let left_px = ((output_bounds.left_pt - working_bounds.left_pt) * pixels_per_point)
+    .floor()
+    .clamp(0.0, working_width_px.saturating_sub(1) as f32) as u32;
+  let top_px = ((output_bounds.top_pt - working_bounds.top_pt) * pixels_per_point)
+    .floor()
+    .clamp(0.0, working_height_px.saturating_sub(1) as f32) as u32;
+  let width_px = output_width_px.min(working_width_px - left_px);
+  let height_px = output_height_px.min(working_height_px - top_px);
+  (width_px > 0 && height_px > 0).then_some(WordprocessingEffectBitmapTarget {
+    left_px,
+    top_px,
+    width_px,
+    height_px,
+  })
+}
+
+fn wordprocessing_text_effect_baseline_shift(
+  line_height_pt: f32,
+  baseline_offset_pt: f32,
+  text_body_only_static_3d: bool,
+) -> f32 {
+  if text_body_only_static_3d {
+    // DrawingML bodyPr/scene3d+sp3d consumes the text body's already-laid-out
+    // glyph geometry. ECMA-376 Part 1 L.4.6.3.2.4 calls this scene-coherent
+    // text, and LibreOffice stores it as the custom shape's separate
+    // Text3DEffectProperties. With no w14 run effect, it is not the Word
+    // run-effect backdrop whose source is moved from a line origin to the
+    // line-box baseline below. A run carrying w14 effects still takes that
+    // established path before the body-level 3-D projection is applied.
+    return 0.0;
+  }
   // Word lays out glow/shadow/reflection text like an inline effect object:
   // the effect source and unchanged foreground share the run line-box
   // baseline. This is also the coordinate emitted by Word's fixed-output
@@ -5546,6 +6021,19 @@ fn wordprocessing_text_effect_render_scale(font_size_pt: f32) -> f32 {
   const TEXT_GLOW_FONT_EXPONENT: f32 = -0.575;
   let font_size_twips = font_size_pt * 20.0;
   1.0 / (TEXT_GLOW_SCALE * font_size_twips.powf(TEXT_GLOW_FONT_EXPONENT))
+}
+
+fn wordprocessing_text_reflection_for_render(
+  mut reflection: common::drawingml_image_effects::WordprocessingTextReflection,
+  raster_blur_scale: f32,
+) -> common::drawingml_image_effects::WordprocessingTextReflection {
+  // MS-DOCX CT_Reflection defines blurRad independently from the reflection's
+  // geometric dist/dir/scale/alignment transform. Word's fixed-output masks
+  // for both the 11-point Glow_Shadow_Reflection fixture and the 36-point
+  // Groupshapes fixture normalize that blur kernel by the owning font size,
+  // while retaining the authored transform and output range.
+  reflection.blur_radius_px *= raster_blur_scale;
+  reflection
 }
 
 fn wordprocessing_text_effect_max_pixels_per_point(
@@ -5914,6 +6402,7 @@ fn add_line_numbers_to_page(
         x_pt: (context.content_left_pt - context.numbering.distance_pt - width).max(0.0),
         y_pt: line_box.y_pt,
         line_height_pt: line_box.height_pt,
+        wordprocessing_effect_host: None,
         text,
         style,
         rotation_center_pt: None,
@@ -8780,6 +9269,29 @@ struct ParagraphBorderContext {
   joins_next: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct ParagraphShadingContext {
+  joins_previous: bool,
+  joins_next: bool,
+}
+
+impl ParagraphShadingContext {
+  fn for_blocks(
+    previous: Option<&Block>,
+    paragraph: &crate::docx::Paragraph,
+    next: Option<&Block>,
+  ) -> Self {
+    let Some(shading) = paragraph.format.shading.filter(|paint| paint.is_visible()) else {
+      return Self::default();
+    };
+    Self {
+      joins_previous: block_paragraph(previous)
+        .is_some_and(|previous| previous.format.shading == Some(shading)),
+      joins_next: block_paragraph(next).is_some_and(|next| next.format.shading == Some(shading)),
+    }
+  }
+}
+
 impl ParagraphBorderContext {
   fn for_blocks(
     previous: Option<&Block>,
@@ -8834,6 +9346,7 @@ fn layout_document_block(
   match block {
     Block::Paragraph(paragraph) => {
       let border_context = ParagraphBorderContext::for_blocks(previous, paragraph, next);
+      let shading_context = ParagraphShadingContext::for_blocks(previous, paragraph, next);
       let mut ignore_top_margin_at_page_start = false;
       if let Some(frame) = paragraph_frame(paragraph) {
         note_body_content_frame(target.current, flow);
@@ -8891,11 +9404,16 @@ fn layout_document_block(
       } else {
         y
       };
-      if !ignore_top_margin_after_page_break && !ignore_top_margin_at_page_start {
-        y += paragraph_spacing_before(previous, paragraph, flow, target.text_metrics);
-      }
+      let spacing_before_pt =
+        if !ignore_top_margin_after_page_break && !ignore_top_margin_at_page_start {
+          paragraph_spacing_before(previous, paragraph, flow, target.text_metrics)
+        } else {
+          0.0
+        };
+      y += spacing_before_pt;
       y += paragraph_border_layout_extent(border_context.top(paragraph));
       let ignore_left_indent = paragraph_ignores_left_indent_next_to_floating_table(previous, next);
+      let spacing_after_pt = paragraph_spacing_after(paragraph, next, flow.text_segmentation);
       let (paragraph_flow, y) = layout_paragraph_with_left_indent_compat(
         paragraph,
         flow,
@@ -8907,9 +9425,11 @@ fn layout_document_block(
         },
         y,
         paragraph_anchor_top,
-        paragraph_spacing_after(paragraph, next, flow.text_segmentation),
+        spacing_after_pt,
         ignore_left_indent,
         border_context,
+        shading_context,
+        spacing_before_pt,
         target.paragraph_decoration_outer_bottom_pt,
       );
       let y = y + paragraph_border_layout_extent(border_context.bottom(paragraph));
@@ -13336,6 +13856,12 @@ fn translate_page_item(mut item: PageItem, dx_pt: f32, dy_pt: f32) -> PageItem {
     PageItem::Text(text) => {
       text.x_pt += dx_pt;
       text.y_pt += dy_pt;
+      if let Some(host) = &mut text.wordprocessing_effect_host {
+        host.shape_bounds.x_pt += dx_pt;
+        host.shape_bounds.y_pt += dy_pt;
+        host.text_frame_bounds.x_pt += dx_pt;
+        host.text_frame_bounds.y_pt += dy_pt;
+      }
       if let Some(span_start) = &mut text.decoration_span_start_x_pt {
         *span_start += dx_pt;
       }
@@ -13785,6 +14311,7 @@ fn lower_word_pie_chart(
             - mid_angle.cos() * label_radius_y
             - chart.data_label_style.font_size_pt * 0.99,
           line_height_pt: chart.data_label_style.font_size_pt * 1.2,
+          wordprocessing_effect_host: None,
           text: label.text.clone(),
           style: chart.data_label_style.clone(),
           rotation_center_pt: None,
@@ -13846,6 +14373,7 @@ fn lower_word_pie_chart(
         x_pt: item_x + marker_size + marker_text_gap,
         y_pt: text_y,
         line_height_pt: chart.label_style.font_size_pt * 1.2,
+        wordprocessing_effect_host: None,
         text: text.clone(),
         style: chart.label_style.clone(),
         rotation_center_pt: None,
@@ -13893,6 +14421,7 @@ fn lower_word_pie_chart(
           x_pt: text_x,
           y_pt: first_text_y + row_offset,
           line_height_pt: chart.label_style.font_size_pt * 1.2,
+          wordprocessing_effect_host: None,
           text: text.clone(),
           style: chart.label_style.clone(),
           rotation_center_pt: None,
@@ -14009,6 +14538,7 @@ fn lower_generic_inline_chart(
       x_pt,
       y_pt,
       line_height_pt: style.font_size_pt * 1.2,
+      wordprocessing_effect_host: None,
       text: fixed_text,
       style,
       rotation_center_pt: None,
@@ -14035,6 +14565,7 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
       x_pt: text.x_pt,
       y_pt: text.y_pt,
       line_height_pt: text.line_height_pt,
+      wordprocessing_effect_host: None,
       text: text.text,
       style: text.style,
       rotation_center_pt: text.rotation_center_pt,
@@ -14097,6 +14628,8 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
       alt_text: image.alt_text,
       hyperlink_url: image.hyperlink_url,
       semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
       metafile_native_size: false,
       floating: image.floating,
       behind_text: image.behind_text,
@@ -19677,6 +20210,61 @@ struct ShapeTextBoxWritingTransform {
   rotation_deg: f32,
 }
 
+fn transform_frame_bounds(bounds: FrameBounds, transform: Affine) -> FrameBounds {
+  let bounds = common::drawingml_geometry::transform_rect_bounds(
+    KurboRect::new(
+      f64::from(bounds.x_pt),
+      f64::from(bounds.y_pt),
+      f64::from(bounds.x_pt + bounds.width_pt),
+      f64::from(bounds.y_pt + bounds.height_pt),
+    ),
+    transform,
+  );
+  FrameBounds {
+    x_pt: bounds.x0 as f32,
+    y_pt: bounds.y0 as f32,
+    width_pt: bounds.width() as f32,
+    height_pt: bounds.height() as f32,
+  }
+}
+
+fn rotate_frame_bounds(
+  bounds: FrameBounds,
+  pivot_x: f32,
+  pivot_y: f32,
+  rotation_deg: f32,
+) -> FrameBounds {
+  transform_frame_bounds(
+    bounds,
+    Affine::translate((-f64::from(pivot_x), -f64::from(pivot_y)))
+      .then_rotate(f64::from(rotation_deg.to_radians()))
+      .then_translate((f64::from(pivot_x), f64::from(pivot_y)).into()),
+  )
+}
+
+fn attach_wordprocessing_text_effect_host(
+  items: &mut [PageItem],
+  host: WordprocessingTextEffectHost,
+) {
+  for item in items {
+    match item {
+      PageItem::Text(text) => text.wordprocessing_effect_host = Some(host),
+      PageItem::Group(items)
+      | PageItem::IndependentTextFrame(items)
+      | PageItem::FloatingDrawing { items, .. } => {
+        attach_wordprocessing_text_effect_host(items, host)
+      }
+      PageItem::Image(_)
+      | PageItem::LegacyFormCheckBox(_)
+      | PageItem::Rect(_)
+      | PageItem::Fill(_)
+      | PageItem::Line(_)
+      | PageItem::Path(_)
+      | PageItem::Polyline(_) => {}
+    }
+  }
+}
+
 fn layout_shape_text_box(
   current: &mut Page,
   parent_flow: FlowContext,
@@ -19704,6 +20292,20 @@ fn layout_shape_text_box(
   let physical_top = rect.y + border_inset + shape.text_inset_top_pt;
   let physical_right = physical_left + physical_width;
   let physical_bottom = physical_top + physical_height;
+  let mut effect_host = WordprocessingTextEffectHost {
+    shape_bounds: FrameBounds {
+      x_pt: rect.x,
+      y_pt: rect.y,
+      width_pt: rect.width,
+      height_pt: rect.height,
+    },
+    text_frame_bounds: FrameBounds {
+      x_pt: physical_left,
+      y_pt: physical_top,
+      width_pt: physical_width,
+      height_pt: physical_height,
+    },
+  };
   let (content_left, content_top, bounded_content_width, content_bottom, writing_transform) =
     match shape.text_box_writing_mode {
       TextBoxWritingMode::TopToBottomRightToLeft => (
@@ -19861,6 +20463,18 @@ fn layout_shape_text_box(
       transform.pivot_y,
       transform.rotation_deg,
     );
+    effect_host.shape_bounds = rotate_frame_bounds(
+      effect_host.shape_bounds,
+      transform.pivot_x,
+      transform.pivot_y,
+      transform.rotation_deg,
+    );
+    effect_host.text_frame_bounds = rotate_frame_bounds(
+      effect_host.text_frame_bounds,
+      transform.pivot_x,
+      transform.pivot_y,
+      transform.rotation_deg,
+    );
     if shape.text_box_auto_fit {
       for item in &mut items {
         *item = textbox_item_inside_shape_bounds(
@@ -19878,17 +20492,27 @@ fn layout_shape_text_box(
   let text_rotation_deg =
     inline_shape_text_rotation_degrees(shape.rotation_deg, shape.flip_vertical);
   if !shape.text_upright && text_rotation_deg.abs() > f32::EPSILON {
+    let pivot_x = rect.x + rect.width * 0.5;
+    let pivot_y = rect.y + rect.height * 0.5;
     if writing_transform.is_some() {
-      materialize_shape_text_rotation(
-        &mut items,
-        rect.x + rect.width * 0.5,
-        rect.y + rect.height * 0.5,
-        text_rotation_deg,
-      );
+      materialize_shape_text_rotation(&mut items, pivot_x, pivot_y, text_rotation_deg);
     } else {
       rotate_shape_text_items(&mut items, rect, text_rotation_deg);
     }
+    effect_host.shape_bounds = rotate_frame_bounds(
+      effect_host.shape_bounds,
+      pivot_x,
+      pivot_y,
+      text_rotation_deg,
+    );
+    effect_host.text_frame_bounds = rotate_frame_bounds(
+      effect_host.text_frame_bounds,
+      pivot_x,
+      pivot_y,
+      text_rotation_deg,
+    );
   }
+  attach_wordprocessing_text_effect_host(&mut items, effect_host);
   detach_nested_inline_baseline_participants(&mut items);
   current.items.extend(items);
 }
@@ -20444,6 +21068,30 @@ fn text_items_ink_bounds(
     });
   }
   bounds
+}
+
+fn text_item_logical_bounds(
+  text: &TextItem,
+  advance_width_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> (f32, f32, f32, f32) {
+  let baseline_offset = if text.style.use_windows_font_metrics {
+    text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+      &text.text,
+      &text.style,
+      text.line_height_pt,
+    )
+  } else {
+    text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+  };
+  let baseline = text.y_pt + baseline_offset;
+  let top = baseline - text.line_height_pt;
+  (
+    text.x_pt,
+    top,
+    text.x_pt + advance_width_pt,
+    top + text.line_height_pt,
+  )
 }
 
 fn text_item_ink_bounds(
@@ -21944,6 +22592,8 @@ fn layout_paragraph(
     spacing_after_pt,
     false,
     ParagraphBorderContext::default(),
+    ParagraphShadingContext::default(),
+    0.0,
     None,
   )
 }
@@ -21957,6 +22607,8 @@ fn layout_paragraph_with_left_indent_compat(
   spacing_after_pt: f32,
   ignore_left_indent: bool,
   border_context: ParagraphBorderContext,
+  shading_context: ParagraphShadingContext,
+  spacing_before_pt: f32,
   paragraph_decoration_outer_bottom_pt: Option<f32>,
 ) -> (FlowContext, f32) {
   let compatible_paragraph = ignore_left_indent.then(|| {
@@ -21974,6 +22626,7 @@ fn layout_paragraph_with_left_indent_compat(
   };
   TextFrameLayout::new(paragraph, flow, spacing_after_pt, target.text_metrics)
     .with_border_context(border_context)
+    .with_shading_spacing(shading_context, spacing_before_pt)
     .with_decoration_outer_bottom(paragraph_decoration_outer_bottom_pt)
     .format(
       target.current,
@@ -22084,6 +22737,10 @@ impl TextFrame {
           .line_height_pt
           .is_some_and(|multiple| multiple > 1.0))
       .then(|| paragraph_single_line_height(paragraph, &base_line_style, text_metrics));
+    let translucent_glyph_path_baseline_cap =
+      (matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+        && paragraph_uses_only_translucent_glyph_paths(paragraph))
+      .then(|| paragraph_single_line_height(paragraph, &base_line_style, text_metrics));
     let constrained_frame_baseline_cap = (base_line_height
       > available_frame_height + LAYOUT_EPSILON_PT)
       .then(|| paragraph_auto_baseline_line_height_cap(paragraph, &base_line_style, text_metrics))
@@ -22099,9 +22756,17 @@ impl TextFrame {
       // Writer's LINE_SPACING_AS_GAP_BELOW path places an explicit
       // proportional auto-line increment after the text line, as Word does;
       // it does not split that increment above and below the baseline.
+      // Wine's GDI path driver likewise receives the baseline coordinates
+      // already resolved by NtGdiExtTextOutW and adds glyph outlines at those
+      // coordinates. Office fixed output preserves that natural baseline when
+      // every visible run is translucent and therefore emitted as a path; the
+      // full proportional line height still remains available to following
+      // flow. A mixed opaque/translucent line is the counterexample and keeps
+      // its ordinary text baseline box.
       auto_baseline_line_height_cap: [
         generated_resource_baseline_cap,
         proportional_line_spacing_baseline_cap,
+        translucent_glyph_path_baseline_cap,
         constrained_frame_baseline_cap,
       ]
       .into_iter()
@@ -22749,6 +23414,8 @@ struct TextFrameLayout<'a> {
   frame: TextFrame,
   spacing_after_pt: f32,
   border_context: ParagraphBorderContext,
+  shading_before_pt: f32,
+  shading_after_pt: f32,
   decoration_outer_bottom_pt: Option<f32>,
   widow_rebalance_page_index: Option<usize>,
   hyphenation_bottom_line_slots: Vec<HyphenationBottomSlot>,
@@ -22882,6 +23549,8 @@ impl<'a> TextFrameLayout<'a> {
       frame: TextFrame::new(paragraph, flow, text_metrics),
       spacing_after_pt,
       border_context: ParagraphBorderContext::default(),
+      shading_before_pt: 0.0,
+      shading_after_pt: 0.0,
       decoration_outer_bottom_pt: None,
       widow_rebalance_page_index: None,
       hyphenation_bottom_line_slots: Vec::new(),
@@ -22891,6 +23560,27 @@ impl<'a> TextFrameLayout<'a> {
 
   fn with_border_context(mut self, context: ParagraphBorderContext) -> Self {
     self.border_context = context;
+    self
+  }
+
+  fn with_shading_spacing(
+    mut self,
+    context: ParagraphShadingContext,
+    spacing_before_pt: f32,
+  ) -> Self {
+    // Writer's SwFrame::PaintSwFrameBackground expands the current text
+    // frame into its upper spacing only when the previous frame has exactly
+    // the same background. Our flow cursor assigns the lower portion of a
+    // collapsed paragraph gap to the previous paragraph, so the matching
+    // forward half is painted here as well.
+    self.shading_before_pt = context
+      .joins_previous
+      .then_some(spacing_before_pt)
+      .unwrap_or(0.0);
+    self.shading_after_pt = context
+      .joins_next
+      .then_some(self.spacing_after_pt)
+      .unwrap_or(0.0);
     self
   }
 
@@ -23410,6 +24100,7 @@ impl<'a> TextFrameLayout<'a> {
         x_pt: label_x,
         y_pt: y,
         line_height_pt: text_frame.text_baseline_line_height(line_height),
+        wordprocessing_effect_host: None,
         text: visible_label.to_string(),
         style: list_label_style.clone(),
         rotation_center_pt: None,
@@ -23526,6 +24217,9 @@ impl<'a> TextFrameLayout<'a> {
           alt_text: image.alt_text.clone(),
           hyperlink_url: image.hyperlink_url.clone(),
           semantic_metafile_text: image.semantic_metafile_text,
+          metafile_semantic_text_includes_raster_backdrop: image
+            .metafile_semantic_text_includes_raster_backdrop,
+          signature_line: image.signature_line.clone(),
           metafile_native_size: image.metafile_native_size,
           floating: false,
           behind_text: false,
@@ -25229,6 +25923,9 @@ impl<'a> TextFrameLayout<'a> {
               alt_text: image.alt_text.clone(),
               hyperlink_url: image.hyperlink_url.clone(),
               semantic_metafile_text: image.semantic_metafile_text,
+              metafile_semantic_text_includes_raster_backdrop: image
+                .metafile_semantic_text_includes_raster_backdrop,
+              signature_line: image.signature_line.clone(),
               metafile_native_size: image.metafile_native_size,
               floating: true,
               behind_text: placement.behind_text,
@@ -25488,6 +26185,9 @@ impl<'a> TextFrameLayout<'a> {
             alt_text: image.alt_text.clone(),
             hyperlink_url: image.hyperlink_url.clone(),
             semantic_metafile_text: image.semantic_metafile_text,
+            metafile_semantic_text_includes_raster_backdrop: image
+              .metafile_semantic_text_includes_raster_backdrop,
+            signature_line: image.signature_line.clone(),
             metafile_native_size: image.metafile_native_size,
             floating: false,
             behind_text: false,
@@ -26699,6 +27399,13 @@ impl<'a> TextFrameLayout<'a> {
       }
       return TextFrameLayout::new(paragraph, start_flow, self.spacing_after_pt, text_metrics)
         .with_border_context(self.border_context)
+        .with_shading_spacing(
+          ParagraphShadingContext {
+            joins_previous: self.shading_before_pt > 0.0,
+            joins_next: self.shading_after_pt > 0.0,
+          },
+          self.shading_before_pt,
+        )
         .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
         .with_hyphenation_bottom_line_slots(reserved_slots)
         .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth.saturating_add(1))
@@ -26759,6 +27466,13 @@ impl<'a> TextFrameLayout<'a> {
           let (follow_flow, follow_y) = advance_text_frame_flow(start_flow, current, pages);
           return TextFrameLayout::new(paragraph, follow_flow, self.spacing_after_pt, text_metrics)
             .with_border_context(self.border_context)
+            .with_shading_spacing(
+              ParagraphShadingContext {
+                joins_previous: self.shading_before_pt > 0.0,
+                joins_next: self.shading_after_pt > 0.0,
+              },
+              self.shading_before_pt,
+            )
             .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
             .format_with_reflow(
               current,
@@ -26789,6 +27503,13 @@ impl<'a> TextFrameLayout<'a> {
           }
           return TextFrameLayout::new(paragraph, start_flow, self.spacing_after_pt, text_metrics)
             .with_border_context(self.border_context)
+            .with_shading_spacing(
+              ParagraphShadingContext {
+                joins_previous: self.shading_before_pt > 0.0,
+                joins_next: self.shading_after_pt > 0.0,
+              },
+              self.shading_before_pt,
+            )
             .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
             .with_widow_rebalance_page(page_index)
             .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
@@ -26837,6 +27558,8 @@ impl<'a> TextFrameLayout<'a> {
           y: paragraph_top,
           width: default_line_right - paragraph_left,
           height: paragraph_bottom - paragraph_top,
+          shading_before_pt: self.shading_before_pt,
+          shading_after_pt: self.shading_after_pt,
           outer_bottom_pt: self.decoration_outer_bottom_pt,
         },
       );
@@ -27823,6 +28546,8 @@ struct ParagraphDecoration<'a> {
   y: f32,
   width: f32,
   height: f32,
+  shading_before_pt: f32,
+  shading_after_pt: f32,
   outer_bottom_pt: Option<f32>,
 }
 
@@ -27836,6 +28561,8 @@ fn decorate_paragraph(page: &mut Page, decoration: ParagraphDecoration<'_>) {
     y,
     width,
     height,
+    shading_before_pt,
+    shading_after_pt,
     outer_bottom_pt,
   } = decoration;
   // Word extends the paragraph decoration box horizontally beyond the text
@@ -27868,8 +28595,12 @@ fn decorate_paragraph(page: &mut Page, decoration: ParagraphDecoration<'_>) {
       .borders
       .right
       .map_or(box_right, |border| box_right + border.spacing_pt);
-    let shading_top = top.map_or(box_top, |border| box_top - border.spacing_pt);
-    let shading_bottom = bottom.map_or(box_bottom, |border| box_bottom + border.spacing_pt);
+    let shading_top = top
+      .map_or(box_top, |border| box_top - border.spacing_pt)
+      .min(box_top - shading_before_pt);
+    let shading_bottom = bottom
+      .map_or(box_bottom, |border| box_bottom + border.spacing_pt)
+      .max(box_bottom + shading_after_pt);
     let (x, y, width, height) = table_cell_paragraph_shading_bounds(flow).unwrap_or((
       shading_left,
       shading_top,
@@ -28781,6 +29512,7 @@ fn push_tab_leader(
     x_pt,
     y_pt: placement.y,
     line_height_pt: placement.line_height,
+    wordprocessing_effect_host: None,
     text: fill_char.to_string().repeat(count),
     style: metrics.paint_style,
     rotation_center_pt: None,
@@ -29502,6 +30234,7 @@ fn flush_text(
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
+    wordprocessing_effect_host: None,
     text: std::mem::take(chunk),
     style,
     rotation_center_pt: None,
@@ -29543,6 +30276,7 @@ fn flush_discretionary_hyphen(
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
+    wordprocessing_effect_host: None,
     text: std::mem::take(chunk),
     style,
     rotation_center_pt: None,
@@ -29594,6 +30328,7 @@ fn push_ruby_text(
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
+    wordprocessing_effect_host: None,
     text,
     style,
     rotation_center_pt: None,
@@ -29954,6 +30689,7 @@ mod tests {
       x_pt: 10.0,
       y_pt: 20.0,
       line_height_pt: 14.0,
+      wordprocessing_effect_host: None,
       text: "Effect".to_string(),
       style,
       rotation_center_pt: None,
@@ -30493,12 +31229,70 @@ mod tests {
   }
 
   #[test]
+  fn word_text_effect_target_keeps_exact_origin_and_truncates_pixel_extent() {
+    let target = wordprocessing_effect_bitmap_target(
+      common::drawingml_image_effects::EffectOutputBounds {
+        left_pt: -1.3,
+        top_pt: 2.2,
+        right_pt: 37.2,
+        bottom_pt: 19.95,
+      },
+      common::drawingml_image_effects::EffectOutputBounds {
+        left_pt: -7.5,
+        top_pt: -4.0,
+        right_pt: 45.0,
+        bottom_pt: 25.0,
+      },
+      2.0,
+      105,
+      58,
+    )
+    .expect("positive Direct2D output target");
+
+    // Microsoft's archived DirectX Postcard sample preserves the floating
+    // GetImageLocalBounds origin, but static_cast<uint32> truncates the DIP
+    // width and height after conversion to device pixels. A fractional crop
+    // start therefore must not turn into an independently ceiled far edge.
+    assert_eq!(
+      target,
+      WordprocessingEffectBitmapTarget {
+        left_px: 12,
+        top_px: 12,
+        width_px: 77,
+        height_px: 35,
+      }
+    );
+  }
+
+  #[test]
+  fn word_text_fixed_output_preserves_direct2d_premultiplied_components() {
+    let mut image = image::RgbaImage::from_pixel(1, 1, image::Rgba([146, 208, 80, 92]));
+
+    premultiply_wordprocessing_effect_bitmap(&mut image);
+
+    // This is also an exact sampled Office shadow pixel: 92/255 opacity over
+    // the authored #92D050 color produces #354B1D in the RGB image plane.
+    assert_eq!(image.get_pixel(0, 0).0, [53, 75, 29, 92]);
+  }
+
+  #[test]
   fn word_text_effect_foreground_uses_the_line_box_baseline() {
     let line_height = 14.13;
     let natural_baseline_offset = 9.995;
-    let shift = wordprocessing_text_effect_baseline_shift(line_height, natural_baseline_offset);
+    let shift =
+      wordprocessing_text_effect_baseline_shift(line_height, natural_baseline_offset, false);
 
     assert!((natural_baseline_offset + shift - line_height).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn word_text_body_static_3d_keeps_the_laid_out_glyph_origin() {
+    let line_height = 47.424316;
+    let natural_baseline_offset = 32.71216;
+    let shift =
+      wordprocessing_text_effect_baseline_shift(line_height, natural_baseline_offset, true);
+
+    assert_eq!(shift, 0.0);
   }
 
   #[test]
@@ -30522,6 +31316,33 @@ mod tests {
 
     assert!((blur_radius - 2.8793).abs() < 0.001);
     assert!((distance - blur_radius).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn word_text_reflection_normalizes_only_its_blur_kernel() {
+    let source = common::drawingml_image_effects::WordprocessingTextReflection {
+      blur_radius_px: 139_700.0 / 9_525.0,
+      start_opacity: 0.47,
+      start_position: 0.0,
+      end_opacity: 0.0,
+      end_position: 0.85,
+      distance_px: 63_500.0 / 9_525.0,
+      direction_degrees: 90.0,
+      fade_direction_degrees: 90.0,
+      scale_x: 1.0,
+      scale_y: -1.0,
+      skew_x_degrees: 0.0,
+      skew_y_degrees: 0.0,
+      alignment: (0.0, 1.0),
+    };
+    let scale = wordprocessing_text_effect_render_scale(36.0);
+    let rendered = wordprocessing_text_reflection_for_render(source, scale);
+    let mut expected = source;
+    expected.blur_radius_px *= scale;
+
+    assert_eq!(rendered, expected);
+    assert_eq!(rendered.distance_px, source.distance_px);
+    assert!(rendered.blur_radius_px < source.blur_radius_px);
   }
 
   #[test]
@@ -30696,6 +31517,7 @@ mod tests {
       x_pt: 10.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      wordprocessing_effect_host: None,
       text: " ".to_string(),
       style,
       rotation_center_pt: None,
@@ -30856,6 +31678,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      wordprocessing_effect_host: None,
       text: "word ".to_string(),
       style,
       rotation_center_pt: None,
@@ -31066,6 +31889,7 @@ mod tests {
       x_pt: field_x,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      wordprocessing_effect_host: None,
       text: "S".to_string(),
       style: style.clone(),
       rotation_center_pt: None,
@@ -31086,6 +31910,7 @@ mod tests {
       x_pt: field_x + dot_width,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      wordprocessing_effect_host: None,
       text: "1".to_string(),
       style,
       rotation_center_pt: None,
@@ -31137,6 +31962,7 @@ mod tests {
         x_pt,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        wordprocessing_effect_host: None,
         text: text.to_string(),
         style: TextStyle::default(),
         rotation_center_pt: None,
@@ -31195,6 +32021,8 @@ mod tests {
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
       metafile_native_size: false,
       floating: false,
       behind_text: false,
@@ -31936,6 +32764,62 @@ mod tests {
   }
 
   #[test]
+  fn paragraph_shading_merges_spacing_only_between_identical_backgrounds() {
+    fn paragraph(shading: ShadingPaint) -> Paragraph {
+      Paragraph {
+        inlines: Vec::new(),
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        runs: Vec::new(),
+        format: Box::new(ParagraphFormat {
+          shading: Some(shading),
+          ..Default::default()
+        }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      }
+    }
+
+    let blue = ShadingPaint::Solid(RgbColor {
+      r: 0xc6,
+      g: 0xd9,
+      b: 0xf1,
+    });
+    let red = ShadingPaint::Solid(RgbColor {
+      r: 0xff,
+      g: 0x00,
+      b: 0x00,
+    });
+    let blocks = vec![
+      Block::paragraph(paragraph(blue)),
+      Block::paragraph(paragraph(blue)),
+      Block::paragraph(paragraph(red)),
+    ];
+    let first = block_paragraph(blocks.first()).unwrap();
+    let middle = block_paragraph(blocks.get(1)).unwrap();
+    let last = block_paragraph(blocks.get(2)).unwrap();
+
+    let first_context = ParagraphShadingContext::for_blocks(None, first, blocks.get(1));
+    assert!(!first_context.joins_previous);
+    assert!(first_context.joins_next);
+    let middle_context = ParagraphShadingContext::for_blocks(blocks.first(), middle, blocks.get(2));
+    assert!(middle_context.joins_previous);
+    assert!(!middle_context.joins_next);
+    let last_context = ParagraphShadingContext::for_blocks(blocks.get(1), last, None);
+    assert!(!last_context.joins_previous);
+    assert!(!last_context.joins_next);
+  }
+
+  #[test]
   fn paragraph_shading_fills_border_space_and_exact_frame_remainder() {
     let border = |spacing_pt| BorderStyle {
       width_pt: 3.0,
@@ -32008,6 +32892,8 @@ mod tests {
         y: 90.0,
         width: 238.4,
         height: 50.0,
+        shading_before_pt: 0.0,
+        shading_after_pt: 0.0,
         outer_bottom_pt: Some(275.0),
       },
     );
@@ -32827,6 +33713,104 @@ mod tests {
   }
 
   #[test]
+  fn all_translucent_glyph_path_line_uses_natural_baseline_box() {
+    fn paragraph(opacities: &[f32]) -> Paragraph {
+      Paragraph {
+        inlines: opacities
+          .iter()
+          .enumerate()
+          .map(|(index, opacity)| {
+            InlineItem::Text(TextRun {
+              text: char::from(b'B' + index as u8).to_string(),
+              style: TextStyle {
+                opacity: *opacity,
+                ..Default::default()
+              },
+              hyperlink_url: None,
+              dynamic_field: None,
+              style_ref_keys: Vec::new(),
+              style_ref_text: None,
+              style_ref_numbering_text: None,
+              preserve_text_portion: false,
+            })
+          })
+          .collect(),
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        #[cfg(test)]
+        runs: Vec::new(),
+        format: Box::new(ParagraphFormat {
+          line_height_rule: LineHeightRule::Auto,
+          // A resolved style value: unlike direct paragraph spacing,
+          // `line_height_set` deliberately remains false.
+          line_height_pt: Some(1.15),
+          ..Default::default()
+        }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      }
+    }
+
+    fn frame(paragraph: &Paragraph, text_metrics: &mut TextMetrics) -> TextFrame {
+      TextFrame::new(
+        paragraph,
+        flow_from_block_area(BlockArea {
+          setup: PageSetup::default(),
+          section_index: 0,
+          section_page_index: 0,
+          column_index: 0,
+          columns: SectionColumns::default(),
+          content_top_pt: 72.0,
+          content_left_pt: 72.0,
+          content_bottom: 720.0,
+          body_content_bottom_pt: 720.0,
+          content_width: 468.0,
+          default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+          hyphenation: crate::docx::HyphenationSettings::default(),
+          consecutive_hyphenated_lines: 0,
+          compatibility_mode: 15,
+          justify_lines_with_shrinking: false,
+          do_not_expand_shift_return: false,
+          repeating_slots: RepeatingSlotState::default(),
+        }),
+        text_metrics,
+      )
+    }
+
+    let mut text_metrics = TextMetrics::new();
+    let translucent = paragraph(&[0.26, 0.71]);
+    let natural_height = paragraph_single_line_height(
+      &translucent,
+      &paragraph_base_line_style(&translucent),
+      &mut text_metrics,
+    );
+    let translucent_frame = frame(&translucent, &mut text_metrics);
+    assert!(translucent_frame.base_line_height > natural_height);
+    assert!(
+      (translucent_frame.text_baseline_line_height(translucent_frame.base_line_height)
+        - natural_height)
+        .abs()
+        < 0.001
+    );
+
+    let mixed = paragraph(&[1.0, 0.71]);
+    let mixed_frame = frame(&mixed, &mut text_metrics);
+    assert_eq!(
+      mixed_frame.text_baseline_line_height(mixed_frame.base_line_height),
+      mixed_frame.base_line_height
+    );
+  }
+
+  #[test]
   fn numbering_label_font_contributes_to_the_first_line_height() {
     let label_style = TextStyle {
       font_size_pt: 48.0,
@@ -33212,6 +34196,7 @@ mod tests {
         x_pt: 0.0,
         y_pt,
         line_height_pt: 12.0,
+        wordprocessing_effect_host: None,
         text: "follow".into(),
         style: TextStyle::default(),
         rotation_center_pt: None,
@@ -33264,6 +34249,7 @@ mod tests {
         x_pt: 0.0,
         y_pt,
         line_height_pt: 12.0,
+        wordprocessing_effect_host: None,
         text: "visible".into(),
         style: TextStyle::default(),
         rotation_center_pt: None,
@@ -34651,6 +35637,7 @@ mod tests {
         x_pt,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        wordprocessing_effect_host: None,
         text: text.to_string(),
         style: TextStyle::default(),
         rotation_center_pt: None,
@@ -34715,6 +35702,7 @@ mod tests {
         x_pt,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        wordprocessing_effect_host: None,
         text: "中".to_string(),
         style: style.clone(),
         rotation_center_pt: None,
@@ -34765,6 +35753,8 @@ mod tests {
         alt_text: None,
         hyperlink_url: None,
         semantic_metafile_text: false,
+        metafile_semantic_text_includes_raster_backdrop: false,
+        signature_line: None,
         metafile_native_size: false,
         floating: false,
         behind_text: false,
@@ -34773,6 +35763,7 @@ mod tests {
         x_pt: 120.0,
         y_pt: 0.0,
         line_height_pt: line_height,
+        wordprocessing_effect_host: None,
         text: "label".to_string(),
         style: style.clone(),
         rotation_center_pt: None,
@@ -34834,6 +35825,8 @@ mod tests {
           alt_text: None,
           hyperlink_url: None,
           semantic_metafile_text: false,
+          metafile_semantic_text_includes_raster_backdrop: false,
+          signature_line: None,
           metafile_native_size: false,
           floating: false,
           behind_text: false,
@@ -34893,6 +35886,8 @@ mod tests {
         alt_text: None,
         hyperlink_url: None,
         semantic_metafile_text: false,
+        metafile_semantic_text_includes_raster_backdrop: false,
+        signature_line: None,
         metafile_native_size: false,
         floating: false,
         behind_text: false,
@@ -35129,6 +36124,8 @@ mod tests {
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
       metafile_native_size: false,
       floating: true,
       behind_text: false,
@@ -35248,6 +36245,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 0.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      wordprocessing_effect_host: None,
       text: "1".to_string(),
       style: TextStyle::default(),
       rotation_center_pt: None,
@@ -35325,6 +36323,7 @@ mod tests {
         x_pt,
         y_pt,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        wordprocessing_effect_host: None,
         text: "cached".to_string(),
         style: TextStyle::default(),
         rotation_center_pt: None,
@@ -35417,6 +36416,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      wordprocessing_effect_host: None,
       text: "96".to_string(),
       style: TextStyle::default(),
       rotation_center_pt: None,
@@ -35466,6 +36466,7 @@ mod tests {
           x_pt: x,
           y_pt: 20.0,
           line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+          wordprocessing_effect_host: None,
           text: value.to_string(),
           style: style.clone(),
           rotation_center_pt: None,
@@ -35526,6 +36527,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      wordprocessing_effect_host: None,
       text: "1-".to_string(),
       style,
       rotation_center_pt: None,
@@ -35582,6 +36584,7 @@ mod tests {
       x_pt: 17.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      wordprocessing_effect_host: None,
       text: "also coordinate with your current document look.".to_string(),
       style: TextStyle::default(),
       rotation_center_pt: None,
@@ -35620,6 +36623,7 @@ mod tests {
         x_pt: 0.0,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        wordprocessing_effect_host: None,
         text: "25-12".to_string(),
         style: TextStyle {
           right_to_left: Some(true),
@@ -35686,6 +36690,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      wordprocessing_effect_host: None,
       text: "1-".to_string(),
       style: TextStyle::default(),
       rotation_center_pt: None,
@@ -35722,6 +36727,7 @@ mod tests {
         x_pt: 0.0,
         y_pt: 0.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        wordprocessing_effect_host: None,
         text: text.to_string(),
         style: TextStyle::default(),
         rotation_center_pt: None,

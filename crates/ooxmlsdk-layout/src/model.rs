@@ -114,6 +114,8 @@ pub struct TextStyle {
   /// OpenType ligature categories selected by the source document. `None`
   /// leaves the shaping engine's native defaults unchanged.
   pub ligatures: Option<common::OpenTypeLigatures>,
+  /// Word 2010 numeral, contextual-alternate, and stylistic-set controls.
+  pub open_type_features: common::OpenTypeFeatureSettings,
   /// Horizontal WordprocessingML character scale. `None` means 100% and
   /// preserves explicit 100% overrides in style inheritance.
   pub horizontal_scale: Option<f32>,
@@ -144,6 +146,14 @@ pub struct TextStyle {
   pub(crate) text_glow: Option<common::drawingml_image_effects::WordprocessingTextGlow>,
   pub(crate) text_shadow: Option<common::drawingml_image_effects::WordprocessingTextShadow>,
   pub(crate) text_reflection: Option<common::drawingml_image_effects::WordprocessingTextReflection>,
+  /// A Word 2010 `w14:scene3d` or `w14:props3d` is present in the effective
+  /// run style. Word's fixed-format writer flattens this text together with
+  /// its fill, outline, and 2-D effects instead of retaining a text object.
+  pub(crate) wordprocessing_text_3d: bool,
+  /// Complete `w14:scene3d`/`w14:props3d` run data. The two elements inherit
+  /// independently and are combined with a DrawingML text body's 3-D scene
+  /// only at fixed-output materialization time.
+  pub(crate) wordprocessing_text_3d_parts: Option<common::drawingml_3d::Static3dStyleParts>,
   /// Resolved legacy WordprocessingML `w:outline` toggle. This remains
   /// separate from DrawingML/w14 outlines until fixed-output materialization
   /// because Word uses a distinct one-pixel glyph contour.
@@ -211,6 +221,7 @@ impl Default for TextStyle {
       complex_italic: None,
       kerning_minimum_size_pt: None,
       ligatures: None,
+      open_type_features: common::OpenTypeFeatureSettings::default(),
       horizontal_scale: None,
       semantic_character_advances_pt: None,
       character_spacing_pt: 0.0,
@@ -228,6 +239,8 @@ impl Default for TextStyle {
       text_glow: None,
       text_shadow: None,
       text_reflection: None,
+      wordprocessing_text_3d: false,
+      wordprocessing_text_3d_parts: None,
       legacy_outline: false,
       legacy_shadow: false,
       legacy_relief: LegacyTextRelief::None,
@@ -554,6 +567,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     complex_italic: style.complex_italic,
     kerning_minimum_size: style.kerning_minimum_size_pt.map(common::Pt),
     ligatures: style.ligatures,
+    open_type_features: style.open_type_features,
     horizontal_scale: style.horizontal_scale,
     semantic_character_advances_pt: style.semantic_character_advances_pt,
     character_spacing: common::Pt(style.character_spacing_pt),

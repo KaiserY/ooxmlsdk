@@ -13,6 +13,7 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+base64 = { workspace = true }
 color = { workspace = true }
 emfsdk = { workspace = true }
 encoding_rs = { workspace = true }

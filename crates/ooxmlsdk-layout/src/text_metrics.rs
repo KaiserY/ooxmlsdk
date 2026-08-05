@@ -93,6 +93,10 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
     self.style.ligatures()
   }
 
+  fn open_type_features(&self) -> crate::common::OpenTypeFeatureSettings {
+    self.style.open_type_features()
+  }
+
   fn horizontal_scale(&self) -> f32 {
     self.style.horizontal_scale()
   }

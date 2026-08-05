@@ -120,6 +120,9 @@ pub trait FontStyleRef {
   fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
     None
   }
+  fn open_type_features(&self) -> common::OpenTypeFeatureSettings {
+    common::OpenTypeFeatureSettings::default()
+  }
   fn horizontal_scale(&self) -> f32 {
     1.0
   }
@@ -267,6 +270,10 @@ impl FontStyleRef for TextStyle {
     self.ligatures
   }
 
+  fn open_type_features(&self) -> common::OpenTypeFeatureSettings {
+    self.open_type_features
+  }
+
   fn horizontal_scale(&self) -> f32 {
     self.horizontal_scale.unwrap_or(1.0)
   }
@@ -370,6 +377,10 @@ impl FontStyleRef for common::TextStyle<'_> {
 
   fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
     self.ligatures
+  }
+
+  fn open_type_features(&self) -> common::OpenTypeFeatureSettings {
+    self.open_type_features
   }
 
   fn horizontal_scale(&self) -> f32 {
@@ -805,6 +816,57 @@ fn font_request<'a>(
       },
     ]);
   }
+  let open_type_features = style.open_type_features();
+  if let Some(number_form) = open_type_features.number_form {
+    let tag = match number_form {
+      common::OpenTypeNumberForm::Default => None,
+      common::OpenTypeNumberForm::Lining => Some("lnum"),
+      common::OpenTypeNumberForm::OldStyle => Some("onum"),
+    };
+    if let Some(tag) = tag {
+      features.push(FeatureValue {
+        tag: Cow::Borrowed(tag),
+        value: 1,
+      });
+    }
+  }
+  if let Some(number_spacing) = open_type_features.number_spacing {
+    let tag = match number_spacing {
+      common::OpenTypeNumberSpacing::Default => None,
+      common::OpenTypeNumberSpacing::Proportional => Some("pnum"),
+      common::OpenTypeNumberSpacing::Tabular => Some("tnum"),
+    };
+    if let Some(tag) = tag {
+      features.push(FeatureValue {
+        tag: Cow::Borrowed(tag),
+        value: 1,
+      });
+    }
+  }
+  if let Some(stylistic_sets) = open_type_features.stylistic_sets {
+    const TAGS: [&str; 20] = [
+      "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09", "ss10", "ss11",
+      "ss12", "ss13", "ss14", "ss15", "ss16", "ss17", "ss18", "ss19", "ss20",
+    ];
+    features.extend(stylistic_sets.enabled_ids().map(|id| FeatureValue {
+      tag: Cow::Borrowed(TAGS[usize::from(id - 1)]),
+      value: 1,
+    }));
+  }
+  if let Some(enabled) = open_type_features.contextual_alternates {
+    features.push(FeatureValue {
+      tag: Cow::Borrowed("calt"),
+      value: u32::from(enabled),
+    });
+  } else if style.wordprocessingml_font_slots() {
+    // [MS-DOCX] cntxtAlts specifies that contextual alternates are disabled
+    // when w14:cntxtAlts is absent. HarfBuzz enables `calt` by default, so
+    // WordprocessingML requests must carry the explicit zero.
+    features.push(FeatureValue {
+      tag: Cow::Borrowed("calt"),
+      value: 0,
+    });
+  }
   FontRequest {
     family: script_font_family(style, script)
       .filter(|family| !family.trim().is_empty())
@@ -1037,7 +1099,10 @@ pub fn cached_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFace
 mod tests {
   use std::sync::Arc;
 
-  use crate::common::OpenTypeLigatures;
+  use crate::common::{
+    OpenTypeFeatureSettings, OpenTypeLigatures, OpenTypeNumberForm, OpenTypeNumberSpacing,
+    OpenTypeStylisticSets,
+  };
   use crate::docx::TextStyle;
   use ooxmlsdk_fonts::{
     FontSize, ScriptScanOptions, TextDirection, TextScript, script_direction_runs_with_options,
@@ -1233,6 +1298,54 @@ mod tests {
         ("hlig", 1),
         ("dlig", 0)
       ]
+    );
+  }
+
+  #[test]
+  fn word_2010_typography_maps_to_opentype_features() {
+    let mut stylistic_sets = OpenTypeStylisticSets::default();
+    stylistic_sets.enable(1);
+    stylistic_sets.enable(20);
+    let style = TextStyle {
+      open_type_features: OpenTypeFeatureSettings {
+        number_form: Some(OpenTypeNumberForm::OldStyle),
+        number_spacing: Some(OpenTypeNumberSpacing::Tabular),
+        contextual_alternates: Some(false),
+        stylistic_sets: Some(stylistic_sets),
+      },
+      ..Default::default()
+    };
+
+    let features = font_request(&style, None)
+      .features
+      .into_iter()
+      .map(|feature| (feature.tag.into_owned(), feature.value))
+      .collect::<Vec<_>>();
+    assert_eq!(
+      features,
+      vec![
+        ("kern".to_string(), 1),
+        ("onum".to_string(), 1),
+        ("tnum".to_string(), 1),
+        ("ss01".to_string(), 1),
+        ("ss20".to_string(), 1),
+        ("calt".to_string(), 0),
+      ]
+    );
+  }
+
+  #[test]
+  fn wordprocessingml_disables_contextual_alternates_when_the_extension_is_absent() {
+    let style = TextStyle {
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+
+    assert!(
+      font_request(&style, None)
+        .features
+        .iter()
+        .any(|feature| feature.tag == "calt" && feature.value == 0)
     );
   }
 

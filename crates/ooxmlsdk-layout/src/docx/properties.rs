@@ -2,16 +2,19 @@ use super::{
   LO_SUBSCRIPT_BASELINE_SHIFT_SCALE, LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE, LegacyTextRelief,
   MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat, ParagraphProps, RunProps, RunStyleOverrides,
   StylesCatalog, TextStyle, ThemeColors, ThemeFonts, WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE,
-  apply_w14_scheme_transforms, automatic_text_color_for_background,
+  apply_w14_rgb_transforms, apply_w14_scheme_transforms, automatic_text_color_for_background,
   drawingml_text_effect_common_fill, drawingml_text_outline_effect_common_fill,
   merge_paragraph_format_with_theme, opacity_from_w14_rgb_transforms,
   opacity_from_w14_scheme_transforms, parse_hex_color, resolve_run_color, resolve_text_fill,
-  resolve_text_outline, text_background_shading_fill,
+  resolve_text_outline, text_background_shading_fill, wordprocessing_text_outline_common_stroke,
 };
 use crate::common;
 use crate::units;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_word_2010_wordml as w14;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
+use ooxmlsdk::sdk::SdkEnum;
+use ooxmlsdk::units::CoordinateValue;
 use std::sync::Arc;
 
 pub(super) fn paragraph_format(
@@ -347,14 +350,29 @@ pub(super) fn merge_run_style(
           .as_deref()
           .cloned()
           .unwrap_or_default();
-        options.semantic_text_overlay = true;
+        // Word fixed output emits a painted w14:textOutline as glyph paths.
+        // It keeps a separate semantic layer only when w14:textFill removes
+        // the interior, as in fdo80897's outlined warped text.
+        options.semantic_text_overlay = style.opacity <= f32::EPSILON;
         options.outline_fill = Some(fill);
+        options.outline_stroke =
+          wordprocessing_text_outline_common_stroke(outline_effect, theme_colors);
         style.pdf_glyph_outline_options = Some(Arc::new(options));
       }
       Some(common::Fill::Solid(_)) | None => {
         if let Some(resolved) = resolve_text_outline(outline_effect, theme_colors) {
           style.outline_color = Some(resolved.color);
           style.outline_opacity = resolved.opacity;
+          style.pdf_glyph_outlines = true;
+          let mut options = style
+            .pdf_glyph_outline_options
+            .as_deref()
+            .cloned()
+            .unwrap_or_default();
+          options.semantic_text_overlay = style.opacity <= f32::EPSILON;
+          options.outline_stroke =
+            wordprocessing_text_outline_common_stroke(outline_effect, theme_colors);
+          style.pdf_glyph_outline_options = Some(Arc::new(options));
         }
       }
       Some(common::Fill::Pattern(_))
@@ -411,6 +429,24 @@ pub(super) fn merge_run_style(
         alignment: w14_effect_alignment(reflection.alignment),
       },
     );
+  }
+  if let Some(scene) = properties.text_scene_3d() {
+    style.wordprocessing_text_3d = true;
+    if let Some(scene) = wordprocessing_text_scene_3d(scene) {
+      style
+        .wordprocessing_text_3d_parts
+        .get_or_insert_default()
+        .scene = Some(Box::new(scene));
+    }
+  }
+  if let Some(properties) = properties.text_properties_3d() {
+    style.wordprocessing_text_3d = true;
+    let (shape, extrusion_color, contour_color) =
+      wordprocessing_text_shape_3d(properties, theme_colors);
+    let parts = style.wordprocessing_text_3d_parts.get_or_insert_default();
+    parts.shape = Some(Box::new(shape));
+    parts.extrusion_color = Some(extrusion_color);
+    parts.contour_color = Some(contour_color);
   }
   if let Some(spacing) = properties.spacing() {
     style.character_spacing_pt = units::twips_to_points(spacing.val as f32);
@@ -478,6 +514,38 @@ pub(super) fn merge_run_style(
       ),
     });
   }
+  if let Some(numbering_format) = properties.numbering_format() {
+    style.open_type_features.number_form = Some(match numbering_format.val {
+      w14::NumberFormValues::Default => common::OpenTypeNumberForm::Default,
+      w14::NumberFormValues::Lining => common::OpenTypeNumberForm::Lining,
+      w14::NumberFormValues::OldStyle => common::OpenTypeNumberForm::OldStyle,
+    });
+  }
+  if let Some(number_spacing) = properties.number_spacing() {
+    style.open_type_features.number_spacing = Some(match number_spacing.val {
+      w14::NumberSpacingValues::Default => common::OpenTypeNumberSpacing::Default,
+      w14::NumberSpacingValues::Proportional => common::OpenTypeNumberSpacing::Proportional,
+      w14::NumberSpacingValues::Tabular => common::OpenTypeNumberSpacing::Tabular,
+    });
+  }
+  if let Some(contextual_alternatives) = properties.contextual_alternatives() {
+    style.open_type_features.contextual_alternates = Some(
+      contextual_alternatives
+        .val
+        .is_none_or(wordprocessing_2010_on_off),
+    );
+  }
+  if let Some(stylistic_sets) = properties.stylistic_sets() {
+    let mut enabled = common::OpenTypeStylisticSets::default();
+    for style_set in &stylistic_sets.style_set {
+      // [MS-DOCX] CT_StyleSet limits ids to 1..=20, defaults an omitted
+      // `val` to true, and requires false entries to be ignored.
+      if style_set.val.is_none_or(wordprocessing_2010_on_off) {
+        enabled.enable(style_set.id);
+      }
+    }
+    style.open_type_features.stylistic_sets = Some(enabled);
+  }
   if let Some(position) = properties.position() {
     // ECMA-376 Part 1 §17.3.2.24 defines w:position as a signed half-point
     // displacement from the surrounding text baseline without resizing the
@@ -512,6 +580,10 @@ pub(super) fn merge_run_style(
   if style.color_is_automatic {
     style.color = super::RgbColor { r: 0, g: 0, b: 0 };
   }
+}
+
+fn wordprocessing_2010_on_off(value: w14::OnOffValues) -> bool {
+  matches!(value, w14::OnOffValues::True | w14::OnOffValues::One)
 }
 
 pub(super) fn apply_vertical_text_alignment(
@@ -659,11 +731,123 @@ fn resolve_w14_shadow_color(
   }
 }
 
+fn cast_sdk_enum<S: SdkEnum, T: SdkEnum>(value: &S) -> Option<T> {
+  T::try_from_xml_bytes(value.as_xml_bytes())
+}
+
+fn wordprocessing_text_scene_3d(scene: &w14::Scene3D) -> Option<a::Scene3DType> {
+  Some(a::Scene3DType {
+    xmlns: Vec::new(),
+    camera: Box::new(a::Camera {
+      preset: cast_sdk_enum(&scene.camera.preset_camera_type)?,
+      field_of_view: None,
+      zoom: None,
+      rotation: None,
+    }),
+    light_rig: Box::new(a::LightRig {
+      rig: cast_sdk_enum(&scene.light_rig.light_rig_type)?,
+      direction: cast_sdk_enum(&scene.light_rig.light_direction_type)?,
+      rotation: scene
+        .light_rig
+        .sphere_coordinates
+        .as_ref()
+        .map(|rotation| a::Rotation {
+          latitude: rotation.lattitude,
+          longitude: rotation.longitude,
+          revolution: rotation.revolution,
+        }),
+    }),
+    backdrop: None,
+    extension_list: None,
+  })
+}
+
+fn wordprocessing_text_shape_3d(
+  properties: &w14::Properties3D,
+  theme_colors: &ThemeColors,
+) -> (
+  a::Shape3DType,
+  common::drawingml_3d::Static3dColor,
+  common::drawingml_3d::Static3dColor,
+) {
+  let default_color = common::drawingml_3d::Static3dColor {
+    color: super::RgbColor { r: 0, g: 0, b: 0 },
+    alpha: u8::MAX,
+  };
+  let extrusion_color = properties
+    .extrusion_color
+    .as_deref()
+    .and_then(|color| color.extrusion_color_choice.as_ref())
+    .and_then(|choice| match choice {
+      w14::ExtrusionColorChoice::RgbColorModelHex(color) => resolve_w14_rgb_effect_color(color),
+      w14::ExtrusionColorChoice::SchemeColor(color) => {
+        resolve_w14_scheme_effect_color(color, theme_colors)
+      }
+    })
+    .map(|color| common::drawingml_3d::Static3dColor {
+      color: color.color,
+      alpha: color.alpha,
+    })
+    // [MS-DOCX] §2.6.3.23 specifies black when extrusionClr is absent.
+    .unwrap_or(default_color);
+  let contour_color = properties
+    .contour_color
+    .as_deref()
+    .and_then(|color| color.contour_color_choice.as_ref())
+    .and_then(|choice| match choice {
+      w14::ContourColorChoice::RgbColorModelHex(color) => resolve_w14_rgb_effect_color(color),
+      w14::ContourColorChoice::SchemeColor(color) => {
+        resolve_w14_scheme_effect_color(color, theme_colors)
+      }
+    })
+    .map(|color| common::drawingml_3d::Static3dColor {
+      color: color.color,
+      alpha: color.alpha,
+    })
+    // [MS-DOCX] §2.6.3.23 specifies black when contourClr is absent.
+    .unwrap_or(default_color);
+  let bevel_top = properties.bevel_top.as_ref().map(|bevel| a::BevelTop {
+    width: bevel.width.map(CoordinateValue::Emu),
+    height: bevel.height.map(CoordinateValue::Emu),
+    preset: bevel.preset_profile_type.as_ref().and_then(cast_sdk_enum),
+  });
+  let bevel_bottom = properties
+    .bevel_bottom
+    .as_ref()
+    .map(|bevel| a::BevelBottom {
+      width: bevel.width.map(CoordinateValue::Emu),
+      height: bevel.height.map(CoordinateValue::Emu),
+      preset: bevel.preset_profile_type.as_ref().and_then(cast_sdk_enum),
+    });
+  (
+    a::Shape3DType {
+      xmlns: Vec::new(),
+      z: None,
+      extrusion_height: properties.extrusion_height.map(CoordinateValue::Emu),
+      contour_width: properties.contour_width.map(CoordinateValue::Emu),
+      preset_material: properties
+        .preset_material_type
+        .as_ref()
+        .and_then(cast_sdk_enum),
+      bevel_top,
+      bevel_bottom,
+      extrusion_color: None,
+      contour_color: None,
+      extension_list: None,
+    },
+    extrusion_color,
+    contour_color,
+  )
+}
+
 fn resolve_w14_rgb_effect_color(
   color: &w14::RgbColorModelHex,
 ) -> Option<common::drawingml_image_effects::ResolvedEffectColor> {
   Some(common::drawingml_image_effects::ResolvedEffectColor {
-    color: parse_hex_color(color.val.as_str())?,
+    color: apply_w14_rgb_transforms(
+      parse_hex_color(color.val.as_str())?,
+      &color.rgb_color_model_hex_choice,
+    ),
     alpha: (opacity_from_w14_rgb_transforms(&color.rgb_color_model_hex_choice) * 255.0)
       .round()
       .clamp(0.0, 255.0) as u8,
@@ -686,15 +870,15 @@ fn resolve_w14_scheme_effect_color(
 }
 
 fn w14_effect_alignment(alignment: Option<w14::RectangleAlignmentValues>) -> (f32, f32) {
-  match alignment.unwrap_or(w14::RectangleAlignmentValues::Bottom) {
+  match alignment.unwrap_or(w14::RectangleAlignmentValues::None) {
     w14::RectangleAlignmentValues::TopLeft => (0.0, 0.0),
     w14::RectangleAlignmentValues::Top => (0.5, 0.0),
     w14::RectangleAlignmentValues::TopRight => (1.0, 0.0),
     w14::RectangleAlignmentValues::Left => (0.0, 0.5),
-    w14::RectangleAlignmentValues::Center => (0.5, 0.5),
+    w14::RectangleAlignmentValues::Center | w14::RectangleAlignmentValues::None => (0.5, 0.5),
     w14::RectangleAlignmentValues::Right => (1.0, 0.5),
     w14::RectangleAlignmentValues::BottomLeft => (0.0, 1.0),
-    w14::RectangleAlignmentValues::Bottom | w14::RectangleAlignmentValues::None => (0.5, 1.0),
+    w14::RectangleAlignmentValues::Bottom => (0.5, 1.0),
     w14::RectangleAlignmentValues::BottomRight => (1.0, 1.0),
   }
 }
@@ -762,4 +946,22 @@ fn highlight_color(value: w::HighlightColorValues) -> Option<super::RgbColor> {
     },
     w::HighlightColorValues::None => return None,
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn word_2010_effect_alignment_defaults_none_to_center() {
+    assert_eq!(w14_effect_alignment(None), (0.5, 0.5));
+    assert_eq!(
+      w14_effect_alignment(Some(w14::RectangleAlignmentValues::None)),
+      (0.5, 0.5)
+    );
+    assert_eq!(
+      w14_effect_alignment(Some(w14::RectangleAlignmentValues::Bottom)),
+      (0.5, 1.0)
+    );
+  }
 }

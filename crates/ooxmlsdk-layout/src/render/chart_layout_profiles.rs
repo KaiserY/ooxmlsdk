@@ -233,6 +233,24 @@ pub(crate) const WORD_UNTITLED_NO_LEGEND: CartesianLayoutAdjustment = CartesianL
   ..ZERO_ADJUSTMENT
 };
 
+/// Word's automatic untitled horizontal-bar layout without a legend.
+///
+/// A horizontal bar exchanges the physical category and value axes, so the
+/// ordinary no-legend cartesian reservation cannot be reused.  The ratios are
+/// measured from the immutable Office fixed output for LibreOffice
+/// `tdf132174.docx`: its 408.5 x 242.5pt chart has a
+/// `(226.02, 83.35)-(487.85, 303.85)` plot rectangle.  The ordinary
+/// `tdf139658.docx` cartesian profile above and Word charts with a title or
+/// legend are structural counterexamples selected by the lowering code.
+pub(crate) const WORD_UNTITLED_HORIZONTAL_BAR_NO_LEGEND: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    plot_top_ratio: 0.010_51,
+    plot_bottom_ratio: -0.004_42,
+    plot_left_ratio: -0.016_65,
+    plot_right_ratio: -0.004_41,
+    ..ZERO_ADJUSTMENT
+  };
+
 /// Word's automatic two-dimensional cartesian layout with a non-overlay title
 /// and bottom legend.
 ///

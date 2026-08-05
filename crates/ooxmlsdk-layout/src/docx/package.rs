@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use base64::Engine;
 use olecfsdk::{
   cfb::CompoundFile,
   forms::{CommandButtonControl, LabelControl, MorphDataControl, TextProps},
@@ -27,10 +28,12 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
 };
 use ooxmlsdk::sdk::{RelatedPart, SdkPart, SdkType};
+use quick_xml::events::{BytesStart, Event};
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {
   pub(super) by_relationship_id: HashMap<String, ImageResource>,
+  pub(super) signed_signature_line_images_by_id: HashMap<String, SignatureLineImages>,
   pub(super) active_x_text_style_by_relationship_id: HashMap<String, ActiveXTextStyle>,
   pub(super) math_type_by_relationship_id: HashMap<String, super::math_type::MathTypeEquation>,
   pub(super) charts_by_relationship_id: HashMap<String, c::ChartSpace>,
@@ -121,6 +124,173 @@ impl HyperlinkCatalog {
 pub(super) struct ImageResource {
   pub(super) data: Arc<[u8]>,
   pub(super) content_type: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct SignatureLineImages {
+  pub(super) valid: ImageResource,
+  pub(super) invalid: Option<ImageResource>,
+}
+
+impl SignatureLineImages {
+  pub(super) fn for_validity(&self, valid: bool) -> Option<&ImageResource> {
+    if valid {
+      Some(&self.valid)
+    } else {
+      self.invalid.as_ref()
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SignatureImageObject {
+  Valid,
+  Invalid,
+}
+
+#[derive(Default)]
+struct SignatureLineImagesBuilder {
+  setup_id: String,
+  valid_base64: String,
+  invalid_base64: String,
+  references_office_object: bool,
+  references_valid_image: bool,
+  references_invalid_image: bool,
+  signature_value: String,
+}
+
+fn package_signature_line_images(
+  package: &WordprocessingDocument,
+) -> HashMap<String, SignatureLineImages> {
+  let Some(origin) = package.digital_signature_origin_part() else {
+    return HashMap::new();
+  };
+  origin
+    .xml_signature_parts(package)
+    .filter_map(|part| signature_line_images_from_xml(part.data(package)?))
+    .collect()
+}
+
+fn signature_line_images_from_xml(xml: &[u8]) -> Option<(String, SignatureLineImages)> {
+  let mut reader = quick_xml::Reader::from_reader(xml);
+  reader.config_mut().trim_text(false);
+  let mut builder = SignatureLineImagesBuilder::default();
+  let mut object = None;
+  let mut in_setup_id = false;
+  let mut in_signature_value = false;
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) => match event.local_name().as_ref() {
+        b"Reference" => collect_signature_reference(&event, &mut builder),
+        b"Object" => object = signature_image_object(&event),
+        b"SetupID" => in_setup_id = true,
+        b"SignatureValue" => in_signature_value = true,
+        _ => {}
+      },
+      Ok(Event::Empty(event)) if event.local_name().as_ref() == b"Reference" => {
+        collect_signature_reference(&event, &mut builder)
+      }
+      Ok(Event::Text(text)) => {
+        let Ok(text) = text.xml10_content() else {
+          continue;
+        };
+        if in_setup_id {
+          builder.setup_id.push_str(&text);
+        } else if in_signature_value {
+          builder.signature_value.push_str(&text);
+        } else {
+          match object {
+            Some(SignatureImageObject::Valid) => builder.valid_base64.push_str(&text),
+            Some(SignatureImageObject::Invalid) => builder.invalid_base64.push_str(&text),
+            None => {}
+          }
+        }
+      }
+      Ok(Event::End(event)) => match event.local_name().as_ref() {
+        b"Object" => object = None,
+        b"SetupID" => in_setup_id = false,
+        b"SignatureValue" => in_signature_value = false,
+        _ => {}
+      },
+      Ok(Event::Eof) => break,
+      Err(_) => return None,
+      _ => {}
+    }
+  }
+
+  let setup_id = builder.setup_id.trim();
+  if setup_id.is_empty()
+    || builder.signature_value.trim().is_empty()
+    || !builder.references_office_object
+    || !builder.references_valid_image
+  {
+    return None;
+  }
+  let valid = decode_signature_line_image(&builder.valid_base64)?;
+  let invalid = builder
+    .references_invalid_image
+    .then(|| decode_signature_line_image(&builder.invalid_base64))
+    .flatten();
+  Some((
+    setup_id.to_ascii_lowercase(),
+    SignatureLineImages { valid, invalid },
+  ))
+}
+
+fn collect_signature_reference(event: &BytesStart<'_>, builder: &mut SignatureLineImagesBuilder) {
+  let Some(uri) = signature_xml_attribute(event, b"URI") else {
+    return;
+  };
+  match uri.as_str() {
+    "#idOfficeObject" => builder.references_office_object = true,
+    "#idValidSigLnImg" => builder.references_valid_image = true,
+    "#idInvalidSigLnImg" => builder.references_invalid_image = true,
+    _ => {}
+  }
+}
+
+fn signature_image_object(event: &BytesStart<'_>) -> Option<SignatureImageObject> {
+  match signature_xml_attribute(event, b"Id")?.as_str() {
+    "idValidSigLnImg" => Some(SignatureImageObject::Valid),
+    "idInvalidSigLnImg" => Some(SignatureImageObject::Invalid),
+    _ => None,
+  }
+}
+
+fn signature_xml_attribute(event: &BytesStart<'_>, name: &[u8]) -> Option<String> {
+  event.attributes().flatten().find_map(|attribute| {
+    xml_local_name(attribute.key.as_ref())
+      .eq(name)
+      .then(|| String::from_utf8_lossy(attribute.value.as_ref()).into_owned())
+  })
+}
+
+fn xml_local_name(name: &[u8]) -> &[u8] {
+  name.rsplit(|byte| *byte == b':').next().unwrap_or(name)
+}
+
+fn decode_signature_line_image(encoded: &str) -> Option<ImageResource> {
+  let compact = encoded
+    .bytes()
+    .filter(|byte| !byte.is_ascii_whitespace())
+    .collect::<Vec<_>>();
+  let data = base64::engine::general_purpose::STANDARD
+    .decode(compact)
+    .ok()?;
+  let content_type = if data.len() >= 44 && &data[40..44] == b" EMF" {
+    "image/x-emf"
+  } else if data.starts_with(b"\x89PNG\r\n\x1a\n") {
+    "image/png"
+  } else if data.starts_with(&[0xff, 0xd8, 0xff]) {
+    "image/jpeg"
+  } else {
+    return None;
+  };
+  Some(ImageResource {
+    data: data.into(),
+    content_type: Some(content_type.to_string()),
+  })
 }
 
 fn active_x_text_style(
@@ -338,6 +508,7 @@ impl ImageCatalog {
       .collect::<Vec<_>>();
     catalog.diagram_drawings_by_relationship_id =
       Self::diagram_drawing_parts(package, diagram_drawing_parts);
+    catalog.signed_signature_line_images_by_id = package_signature_line_images(package);
     catalog
   }
 
@@ -363,6 +534,7 @@ impl ImageCatalog {
 
     Self {
       by_relationship_id,
+      signed_signature_line_images_by_id: HashMap::new(),
       active_x_text_style_by_relationship_id: HashMap::new(),
       math_type_by_relationship_id: HashMap::new(),
       charts_by_relationship_id: HashMap::new(),
@@ -486,5 +658,43 @@ impl ImageCatalog {
       by_relationship_id.insert(relationship_id, root.clone());
     }
     by_relationship_id
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use base64::Engine;
+
+  use super::signature_line_images_from_xml;
+
+  #[test]
+  fn signature_line_images_require_signed_references_and_match_the_setup_id() {
+    let mut emf = vec![0u8; 44];
+    emf[40..44].copy_from_slice(b" EMF");
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&emf);
+    let xml = format!(
+      r##"<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+        <SignedInfo>
+          <Reference URI="#idOfficeObject"/>
+          <Reference URI="#idValidSigLnImg"/>
+          <Reference URI="#idInvalidSigLnImg"/>
+        </SignedInfo>
+        <SignatureValue>signed</SignatureValue>
+        <Object Id="idOfficeObject"><SignatureInfoV1 xmlns="http://schemas.microsoft.com/office/2006/digsig"><SetupID>{{ABC}}</SetupID></SignatureInfoV1></Object>
+        <Object Id="idValidSigLnImg">{encoded}</Object>
+        <Object Id="idInvalidSigLnImg">{encoded}</Object>
+      </Signature>"##
+    );
+
+    let (id, images) = signature_line_images_from_xml(xml.as_bytes()).expect("signed images");
+    assert_eq!(id, "{abc}");
+    assert_eq!(images.valid.data.as_ref(), emf);
+    assert_eq!(
+      images.invalid.as_ref().map(|image| image.data.as_ref()),
+      Some(emf.as_slice())
+    );
+
+    let unsigned = xml.replace("<Reference URI=\"#idValidSigLnImg\"/>", "");
+    assert!(signature_line_images_from_xml(unsigned.as_bytes()).is_none());
   }
 }

@@ -56,8 +56,15 @@ pub(crate) enum ImageEffect {
   Glow {
     radius_px: f32,
     /// Scales the radius used by the raster kernel without changing the
-    /// authored effect bounds.
+    /// caller's coordinate system.
     raster_length_scale: f32,
+    /// Scales the authored radius when reserving the filter output range.
+    ///
+    /// Most DrawingML hosts use the authored radius directly. Word's fixed
+    /// text-effect pipeline reserves two raster-kernel radii around the glyph
+    /// alpha, independently of the transparent image guard owned by the PDF
+    /// materializer.
+    bounds_radius_scale: f32,
     spread_ratio: f32,
     spread_kernel: GlowSpreadKernel,
     blur_kernel: GlowBlurKernel,
@@ -73,9 +80,11 @@ pub(crate) enum ImageEffect {
   OuterShadow {
     blur_radius_px: f32,
     distance_px: f32,
-    /// Scales the blur and offset used by the raster kernel without changing
-    /// the authored effect bounds.
+    /// Scales blur and offset in the raster operation.
     raster_length_scale: f32,
+    /// Scales only the blur radius used to reserve output bounds. Offsets must
+    /// use `raster_length_scale` so geometry and pixels remain coincident.
+    bounds_radius_scale: f32,
     direction_degrees: f32,
     transform: ImageEffectTransform,
     alignment: (f32, f32),
@@ -119,6 +128,22 @@ pub(crate) struct ImageEffectSourceImages<'a> {
   pub(crate) line: Option<&'a image::RgbaImage>,
   pub(crate) fill_line: Option<&'a image::RgbaImage>,
   pub(crate) children: Option<&'a image::RgbaImage>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ImageEffectSourceGeometry {
+  pub(crate) paint_left_px: f32,
+  pub(crate) paint_top_px: f32,
+  pub(crate) paint_width_px: f32,
+  pub(crate) paint_height_px: f32,
+  pub(crate) anchor_left_px: f32,
+  pub(crate) anchor_top_px: f32,
+  pub(crate) anchor_width_px: f32,
+  pub(crate) anchor_height_px: f32,
+  pub(crate) ramp_left_px: f32,
+  pub(crate) ramp_top_px: f32,
+  pub(crate) ramp_width_px: f32,
+  pub(crate) ramp_height_px: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -361,6 +386,7 @@ pub(crate) fn from_wordprocessing_text_effects(
     branches.push(ImageEffect::Glow {
       radius_px: glow.radius_px,
       raster_length_scale: glow.raster_length_scale,
+      bounds_radius_scale: glow.raster_length_scale * 2.0,
       // LibreOffice's GlowPrimitive2D uses half of the effective glow radius
       // for both square dilation and Stack Blur. Office's 8-bit text-effect
       // masks are measurably closer to that kernel than the shared Gaussian.
@@ -375,6 +401,7 @@ pub(crate) fn from_wordprocessing_text_effects(
       blur_radius_px: shadow.blur_radius_px,
       distance_px: shadow.distance_px,
       raster_length_scale: shadow.raster_length_scale,
+      bounds_radius_scale: shadow.raster_length_scale * 2.0,
       direction_degrees: shadow.direction_degrees,
       transform: ImageEffectTransform {
         scale_x: shadow.scale_x,
@@ -923,6 +950,7 @@ fn glow(effect: &a::Glow, resolver: &impl ImageEffectColorResolver) -> Option<Im
       .map(|value| value.to_emu() as f32 / 9_525.0)
       .unwrap_or_default(),
     raster_length_scale: 1.0,
+    bounds_radius_scale: 1.0,
     spread_ratio: 1.0 / 3.0,
     spread_kernel: GlowSpreadKernel::Square,
     blur_kernel: GlowBlurKernel::Gaussian,
@@ -962,6 +990,7 @@ fn outer_shadow(
       .map(|value| value.to_emu() as f32 / 9_525.0)
       .unwrap_or_default(),
     raster_length_scale: 1.0,
+    bounds_radius_scale: 1.0,
     direction_degrees: effect.direction.unwrap_or_default() as f32 / 60_000.0,
     transform: ImageEffectTransform {
       scale_x: effect
@@ -1067,6 +1096,7 @@ fn preset_shadow(
     blur_radius_px: 0.0,
     distance_px,
     raster_length_scale: 1.0,
+    bounds_radius_scale: 1.0,
     direction_degrees,
     transform,
     alignment,
@@ -1478,11 +1508,16 @@ pub(crate) fn apply_container_to_padded_image(
     right: content_left_px + content_width_px,
     bottom: content_top_px + content_height_px,
   };
+  let geometry = EffectGeometry {
+    paint: content_bounds,
+    anchor: content_bounds,
+    ramp: content_bounds,
+  };
   *image = apply_container_with_bounds(
     image,
     container,
-    content_bounds,
-    content_bounds,
+    geometry,
+    geometry,
     ImageEffectSourceImages::default(),
   );
 }
@@ -1496,13 +1531,54 @@ pub(crate) fn apply_container_to_padded_image_with_sources(
   content_height_px: f32,
   sources: ImageEffectSourceImages<'_>,
 ) {
-  let content_bounds = PixelBounds {
-    left: content_left_px,
-    top: content_top_px,
-    right: content_left_px + content_width_px,
-    bottom: content_top_px + content_height_px,
+  apply_container_to_padded_image_with_sources_and_anchor(
+    image,
+    container,
+    ImageEffectSourceGeometry {
+      paint_left_px: content_left_px,
+      paint_top_px: content_top_px,
+      paint_width_px: content_width_px,
+      paint_height_px: content_height_px,
+      anchor_left_px: content_left_px,
+      anchor_top_px: content_top_px,
+      anchor_width_px: content_width_px,
+      anchor_height_px: content_height_px,
+      ramp_left_px: content_left_px,
+      ramp_top_px: content_top_px,
+      ramp_width_px: content_width_px,
+      ramp_height_px: content_height_px,
+    },
+    sources,
+  );
+}
+
+pub(crate) fn apply_container_to_padded_image_with_sources_and_anchor(
+  image: &mut image::RgbaImage,
+  container: &ImageEffectContainer,
+  geometry: ImageEffectSourceGeometry,
+  sources: ImageEffectSourceImages<'_>,
+) {
+  let geometry = EffectGeometry {
+    paint: PixelBounds {
+      left: geometry.paint_left_px,
+      top: geometry.paint_top_px,
+      right: geometry.paint_left_px + geometry.paint_width_px,
+      bottom: geometry.paint_top_px + geometry.paint_height_px,
+    },
+    anchor: PixelBounds {
+      left: geometry.anchor_left_px,
+      top: geometry.anchor_top_px,
+      right: geometry.anchor_left_px + geometry.anchor_width_px,
+      bottom: geometry.anchor_top_px + geometry.anchor_height_px,
+    },
+    ramp: PixelBounds {
+      left: geometry.ramp_left_px,
+      top: geometry.ramp_top_px,
+      right: geometry.ramp_left_px + geometry.ramp_width_px,
+      bottom: geometry.ramp_top_px + geometry.ramp_height_px,
+    },
   };
-  *image = apply_container_with_bounds(image, container, content_bounds, content_bounds, sources);
+  *image = apply_container_with_bounds(image, container, geometry, geometry, sources);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1513,7 +1589,99 @@ pub(crate) struct EffectOutputBounds {
   pub(crate) bottom_pt: f32,
 }
 
-#[derive(Clone, Copy)]
+/// Clips the source-facing transparent border of a Word reflection surface.
+///
+/// The reflection alpha ramp starts at the edge nearest the source. A soft
+/// Gaussian border may extend back into the authored `dist` gap, but it must
+/// not cross the source edge. The far edge and both perpendicular borders
+/// retain the fixed-output surface guard. This is expressed as a half-plane
+/// so non-cardinal `dir`/`fadeDir` combinations do not need special cases.
+pub(crate) fn wordprocessing_reflection_canvas_bounds(
+  canvas: EffectOutputBounds,
+  reflection: EffectOutputBounds,
+  blur_radius_px: f32,
+  distance_px: f32,
+  direction_degrees: f32,
+  fade_direction_degrees: f32,
+) -> EffectOutputBounds {
+  let fade = fade_direction_degrees.to_radians();
+  let fade_x = fade.cos();
+  let fade_y = fade.sin();
+  let direction = direction_degrees.to_radians();
+  let css_pixels_to_points = 72.0 / 96.0;
+  let gap_pt =
+    (distance_px * (direction.cos() * fade_x + direction.sin() * fade_y) * css_pixels_to_points)
+      .max(0.0);
+  // Direct2D's soft-border Gaussian output support is three standard
+  // deviations on either side. Word clips the near support to the available
+  // source/reflection gap.
+  let near_support_pt = (blur_radius_px * 3.0 * css_pixels_to_points).min(gap_pt);
+  let reflection_corners = [
+    (reflection.left_pt, reflection.top_pt),
+    (reflection.right_pt, reflection.top_pt),
+    (reflection.right_pt, reflection.bottom_pt),
+    (reflection.left_pt, reflection.bottom_pt),
+  ];
+  let minimum_projection = reflection_corners
+    .iter()
+    .map(|(x, y)| fade_x * *x + fade_y * *y)
+    .fold(f32::INFINITY, f32::min)
+    - near_support_pt;
+  let mut polygon = vec![
+    (canvas.left_pt, canvas.top_pt),
+    (canvas.right_pt, canvas.top_pt),
+    (canvas.right_pt, canvas.bottom_pt),
+    (canvas.left_pt, canvas.bottom_pt),
+  ];
+  let mut clipped = Vec::with_capacity(6);
+  for index in 0..polygon.len() {
+    let current = polygon[index];
+    let previous = polygon[(index + polygon.len() - 1) % polygon.len()];
+    let current_distance = fade_x * current.0 + fade_y * current.1 - minimum_projection;
+    let previous_distance = fade_x * previous.0 + fade_y * previous.1 - minimum_projection;
+    let current_inside = current_distance >= 0.0;
+    let previous_inside = previous_distance >= 0.0;
+    if current_inside != previous_inside {
+      let denominator = previous_distance - current_distance;
+      let ratio = if denominator.abs() <= f32::EPSILON {
+        0.0
+      } else {
+        previous_distance / denominator
+      };
+      clipped.push((
+        previous.0 + (current.0 - previous.0) * ratio,
+        previous.1 + (current.1 - previous.1) * ratio,
+      ));
+    }
+    if current_inside {
+      clipped.push(current);
+    }
+  }
+  if clipped.is_empty() {
+    return reflection;
+  }
+  polygon = clipped;
+  EffectOutputBounds {
+    left_pt: polygon
+      .iter()
+      .map(|point| point.0)
+      .fold(f32::INFINITY, f32::min),
+    top_pt: polygon
+      .iter()
+      .map(|point| point.1)
+      .fold(f32::INFINITY, f32::min),
+    right_pt: polygon
+      .iter()
+      .map(|point| point.0)
+      .fold(f32::NEG_INFINITY, f32::max),
+    bottom_pt: polygon
+      .iter()
+      .map(|point| point.1)
+      .fold(f32::NEG_INFINITY, f32::max),
+  }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct PixelBounds {
   left: f32,
   top: f32,
@@ -1567,6 +1735,29 @@ impl PixelBounds {
   }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct EffectGeometry {
+  /// Bounds of pixels which can contribute alpha to the current branch.
+  paint: PixelBounds,
+  /// Logical shape/text rectangle used by DrawingML alignment and percentage
+  /// offsets. This deliberately does not collapse to the glyph ink box.
+  anchor: PixelBounds,
+  /// Rectangle along which a reflection's alpha ramp is measured. Shapes use
+  /// their anchor box; Word text uses its font em box, which is distinct from
+  /// both tight glyph ink and the paragraph line-height cell.
+  ramp: PixelBounds,
+}
+
+impl EffectGeometry {
+  fn union(self, other: Self) -> Self {
+    Self {
+      paint: self.paint.union(other.paint),
+      anchor: self.anchor.union(other.anchor),
+      ramp: self.ramp.union(other.ramp),
+    }
+  }
+}
+
 /// Computes the authored effect graph's output range relative to the source
 /// shape. Lengths are evaluated at DrawingML's 96-DPI bitmap baseline and
 /// converted back to points for the bounded full-color raster.
@@ -1575,14 +1766,50 @@ pub(crate) fn container_output_bounds(
   width_pt: f32,
   height_pt: f32,
 ) -> Option<EffectOutputBounds> {
-  let css_pixels_per_point = 96.0 / 72.0;
-  let source = PixelBounds {
-    left: 0.0,
-    top: 0.0,
-    right: width_pt * css_pixels_per_point,
-    bottom: height_pt * css_pixels_per_point,
+  let source = EffectOutputBounds {
+    left_pt: 0.0,
+    top_pt: 0.0,
+    right_pt: width_pt,
+    bottom_pt: height_pt,
   };
-  let output = effect_container_output_bounds(container, source, source)?;
+  container_output_bounds_with_anchor(container, source, source)
+}
+
+/// Computes effect output bounds while keeping the painted source and the
+/// logical alignment rectangle independent.
+///
+/// Text is the important counterexample: Win32 text extents describe
+/// character cells while glyph outlines describe ink. DrawingML `algn`,
+/// scale, skew, and relative offsets operate on the former; glow/blur alpha
+/// originates from the latter. Shape callers which have one rectangle can use
+/// [`container_output_bounds`].
+pub(crate) fn container_output_bounds_with_anchor(
+  container: &ImageEffectContainer,
+  source: EffectOutputBounds,
+  anchor: EffectOutputBounds,
+) -> Option<EffectOutputBounds> {
+  let css_pixels_per_point = 96.0 / 72.0;
+  let geometry = EffectGeometry {
+    paint: PixelBounds {
+      left: source.left_pt * css_pixels_per_point,
+      top: source.top_pt * css_pixels_per_point,
+      right: source.right_pt * css_pixels_per_point,
+      bottom: source.bottom_pt * css_pixels_per_point,
+    },
+    anchor: PixelBounds {
+      left: anchor.left_pt * css_pixels_per_point,
+      top: anchor.top_pt * css_pixels_per_point,
+      right: anchor.right_pt * css_pixels_per_point,
+      bottom: anchor.bottom_pt * css_pixels_per_point,
+    },
+    ramp: PixelBounds {
+      left: anchor.left_pt * css_pixels_per_point,
+      top: anchor.top_pt * css_pixels_per_point,
+      right: anchor.right_pt * css_pixels_per_point,
+      bottom: anchor.bottom_pt * css_pixels_per_point,
+    },
+  };
+  let output = effect_container_output_geometry(container, geometry, geometry)?.paint;
   Some(EffectOutputBounds {
     left_pt: output.left / css_pixels_per_point,
     top_pt: output.top / css_pixels_per_point,
@@ -1591,86 +1818,126 @@ pub(crate) fn container_output_bounds(
   })
 }
 
-fn effect_container_output_bounds(
+fn effect_container_output_geometry(
   container: &ImageEffectContainer,
-  source: PixelBounds,
-  root_source: PixelBounds,
-) -> Option<PixelBounds> {
+  source: EffectGeometry,
+  root_source: EffectGeometry,
+) -> Option<EffectGeometry> {
   match container.kind {
     ImageEffectContainerKind::Tree => {
       let mut output = source;
       for effect in &container.effects {
-        output = effect_output_bounds(effect, output, root_source)?;
+        output = effect_output_geometry(effect, output, root_source)?;
       }
       Some(output)
     }
     ImageEffectContainerKind::Sibling => {
       let mut effects = container.effects.iter();
-      let first = effect_output_bounds(effects.next()?, source, root_source)?;
+      let first = effect_output_geometry(effects.next()?, source, root_source)?;
       effects.try_fold(first, |output, effect| {
-        Some(output.union(effect_output_bounds(effect, source, root_source)?))
+        Some(output.union(effect_output_geometry(effect, source, root_source)?))
       })
     }
   }
 }
 
-fn effect_output_bounds(
+fn effect_output_geometry(
   effect: &ImageEffect,
-  source: PixelBounds,
-  root_source: PixelBounds,
-) -> Option<PixelBounds> {
+  source: EffectGeometry,
+  root_source: EffectGeometry,
+) -> Option<EffectGeometry> {
   match effect {
-    ImageEffect::AlphaOutset(radius) => Some(source.outset(*radius)),
+    ImageEffect::AlphaOutset(radius) => Some(EffectGeometry {
+      paint: source.paint.outset(*radius),
+      anchor: source.anchor.outset(*radius),
+      ramp: source.ramp.outset(*radius),
+    }),
     ImageEffect::Blur {
       radius_px,
       grow_bounds,
     } => Some(if *grow_bounds {
-      source.outset(*radius_px)
+      EffectGeometry {
+        paint: source.paint.outset(*radius_px),
+        anchor: source.anchor.outset(*radius_px),
+        ramp: source.ramp.outset(*radius_px),
+      }
     } else {
       source
     }),
-    ImageEffect::Glow { radius_px, .. } => Some(source.outset(*radius_px)),
+    ImageEffect::Glow {
+      radius_px,
+      bounds_radius_scale,
+      ..
+    } => {
+      let radius = *radius_px * *bounds_radius_scale;
+      Some(EffectGeometry {
+        paint: source.paint.outset(radius),
+        anchor: source.anchor.outset(radius),
+        ramp: source.ramp.outset(radius),
+      })
+    }
     ImageEffect::OuterShadow {
       blur_radius_px,
       distance_px,
+      raster_length_scale,
+      bounds_radius_scale,
       direction_degrees,
       transform,
       alignment,
       ..
     } => {
-      let transformed = transformed_effect_bounds(source, *transform, *alignment);
+      let transformed = transformed_effect_geometry(source, *transform, *alignment);
       let direction = direction_degrees.to_radians();
-      Some(
-        transformed
-          .translated(
-            direction.cos() * *distance_px,
-            direction.sin() * *distance_px,
-          )
-          .outset(*blur_radius_px),
-      )
+      let distance = *distance_px * *raster_length_scale;
+      let blur_radius = *blur_radius_px * *bounds_radius_scale;
+      let offset_x = direction.cos() * distance;
+      let offset_y = direction.sin() * distance;
+      Some(EffectGeometry {
+        paint: transformed
+          .paint
+          .translated(offset_x, offset_y)
+          .outset(blur_radius),
+        anchor: transformed
+          .anchor
+          .translated(offset_x, offset_y)
+          .outset(blur_radius),
+        ramp: transformed
+          .ramp
+          .translated(offset_x, offset_y)
+          .outset(blur_radius),
+      })
     }
     ImageEffect::Reflection(reflection) => {
       let transformed =
-        transformed_effect_bounds(source, reflection.transform, reflection.alignment);
+        transformed_effect_geometry(source, reflection.transform, reflection.alignment);
       let direction = reflection.direction_degrees.to_radians();
       // Office fixed output keeps reflection blur inside the transformed
       // reflection surface. Unlike a soft-border standalone blur, `blurRad`
       // does not enlarge the reflection branch's output range.
-      Some(transformed.translated(
-        direction.cos() * reflection.distance_px,
-        direction.sin() * reflection.distance_px,
-      ))
+      let offset_x = direction.cos() * reflection.distance_px;
+      let offset_y = direction.sin() * reflection.distance_px;
+      Some(EffectGeometry {
+        paint: transformed.paint.translated(offset_x, offset_y),
+        anchor: transformed.anchor.translated(offset_x, offset_y),
+        ramp: transformed.ramp.translated(offset_x, offset_y),
+      })
     }
     ImageEffect::RelativeOffset { offset_x, offset_y } => {
-      Some(source.translated(*offset_x * source.width(), *offset_y * source.height()))
+      let x = *offset_x * source.anchor.width();
+      let y = *offset_y * source.anchor.height();
+      Some(EffectGeometry {
+        paint: source.paint.translated(x, y),
+        anchor: source.anchor.translated(x, y),
+        ramp: source.ramp.translated(x, y),
+      })
     }
     ImageEffect::Transform(transform) => {
-      Some(transformed_effect_bounds(source, *transform, (0.0, 0.0)))
+      Some(transformed_effect_geometry(source, *transform, (0.0, 0.0)))
     }
     ImageEffect::Container(container) => {
-      effect_container_output_bounds(container, source, root_source)
+      effect_container_output_geometry(container, source, root_source)
     }
-    ImageEffect::Blend { container, .. } => Some(source.union(effect_container_output_bounds(
+    ImageEffect::Blend { container, .. } => Some(source.union(effect_container_output_geometry(
       container,
       source,
       root_source,
@@ -1703,11 +1970,12 @@ fn effect_output_bounds(
 
 fn transformed_effect_bounds(
   source: PixelBounds,
+  anchor: PixelBounds,
   transform: ImageEffectTransform,
   alignment: (f32, f32),
 ) -> PixelBounds {
-  let anchor_x = source.left + source.width() * alignment.0;
-  let anchor_y = source.top + source.height() * alignment.1;
+  let anchor_x = anchor.left + anchor.width() * alignment.0;
+  let anchor_y = anchor.top + anchor.height() * alignment.1;
   let point = |x: f32, y: f32| {
     let local_x = x - anchor_x;
     let local_y = y - anchor_y;
@@ -1747,6 +2015,18 @@ fn transformed_effect_bounds(
       .iter()
       .map(|point| point.1)
       .fold(f32::NEG_INFINITY, f32::max),
+  }
+}
+
+fn transformed_effect_geometry(
+  source: EffectGeometry,
+  transform: ImageEffectTransform,
+  alignment: (f32, f32),
+) -> EffectGeometry {
+  EffectGeometry {
+    paint: transformed_effect_bounds(source.paint, source.anchor, transform, alignment),
+    anchor: transformed_effect_bounds(source.anchor, source.anchor, transform, alignment),
+    ramp: transformed_effect_bounds(source.ramp, source.anchor, transform, alignment),
   }
 }
 
@@ -2000,21 +2280,26 @@ fn apply_to_image_with_bounds(
     fill_line: Some(&root_image),
     children: None,
   };
-  apply_to_image_with_source_context(image, effects, content_bounds, content_bounds, sources);
+  let geometry = EffectGeometry {
+    paint: content_bounds,
+    anchor: content_bounds,
+    ramp: content_bounds,
+  };
+  apply_to_image_with_source_context(image, effects, geometry, geometry, sources);
 }
 
 fn apply_to_image_with_source_context(
   image: &mut image::RgbaImage,
   effects: &[ImageEffect],
-  content_bounds: PixelBounds,
-  root_bounds: PixelBounds,
+  source_geometry: EffectGeometry,
+  root_geometry: EffectGeometry,
   sources: ImageEffectSourceImages<'_>,
 ) {
-  let mut current_bounds = content_bounds;
+  let mut current_geometry = source_geometry;
   for effect in effects {
-    let effect_source_bounds = current_bounds;
-    if let Some(output_bounds) = effect_output_bounds(effect, effect_source_bounds, root_bounds) {
-      current_bounds = output_bounds;
+    let effect_source = current_geometry;
+    if let Some(output_geometry) = effect_output_geometry(effect, effect_source, root_geometry) {
+      current_geometry = output_geometry;
     }
     if let ImageEffect::Blur { radius_px, .. } = effect {
       if *radius_px > f32::EPSILON {
@@ -2024,7 +2309,7 @@ fn apply_to_image_with_source_context(
     }
     if let ImageEffect::AlphaModulate(container) = effect {
       let modulation =
-        apply_container_with_bounds(image, container, effect_source_bounds, root_bounds, sources);
+        apply_container_with_bounds(image, container, effect_source, root_geometry, sources);
       for (pixel, modulation_pixel) in image.pixels_mut().zip(modulation.pixels()) {
         pixel.0[3] = ((u16::from(pixel.0[3]) * u16::from(modulation_pixel.0[3]) + 127) / 255) as u8;
       }
@@ -2036,23 +2321,22 @@ fn apply_to_image_with_source_context(
     } = effect
     {
       let blended =
-        apply_container_with_bounds(image, container, effect_source_bounds, root_bounds, sources);
+        apply_container_with_bounds(image, container, effect_source, root_geometry, sources);
       for (base, overlay) in image.pixels_mut().zip(blended.pixels()) {
         blend_rgba_pixel(base, overlay, *blend_mode);
       }
       continue;
     }
     if let ImageEffect::Container(container) = effect {
-      *image =
-        apply_container_with_bounds(image, container, effect_source_bounds, root_bounds, sources);
+      *image = apply_container_with_bounds(image, container, effect_source, root_geometry, sources);
       continue;
     }
     if let ImageEffect::FillOverlay { fill, blend_mode } = effect {
-      apply_fill_overlay(image, fill, *blend_mode, effect_source_bounds);
+      apply_fill_overlay(image, fill, *blend_mode, effect_source.anchor);
       continue;
     }
     if let ImageEffect::Fill(fill) = effect {
-      apply_fill(image, fill, effect_source_bounds);
+      apply_fill(image, fill, effect_source.anchor);
       continue;
     }
     if let ImageEffect::Glow {
@@ -2062,6 +2346,7 @@ fn apply_to_image_with_source_context(
       spread_kernel,
       blur_kernel,
       color,
+      ..
     } = effect
     {
       *image = glow_image(
@@ -2129,13 +2414,13 @@ fn apply_to_image_with_source_context(
           transform: *transform,
           alignment: *alignment,
           color: *color,
-          content_bounds: effect_source_bounds,
+          anchor_bounds: effect_source.anchor,
         },
       );
       continue;
     }
     if let ImageEffect::Reflection(effect) = effect {
-      *image = reflection_image(image, *effect, effect_source_bounds);
+      *image = reflection_image(image, *effect, effect_source.ramp, effect_source.anchor);
       continue;
     }
     if let ImageEffect::RelativeOffset { offset_x, offset_y } = effect {
@@ -2146,8 +2431,8 @@ fn apply_to_image_with_source_context(
           scale_y: 1.0,
           skew_x: 0.0,
           skew_y: 0.0,
-          shift_x_px: *offset_x * effect_source_bounds.width(),
-          shift_y_px: *offset_y * effect_source_bounds.height(),
+          shift_x_px: *offset_x * effect_source.anchor.width(),
+          shift_y_px: *offset_y * effect_source.anchor.height(),
         },
       );
       continue;
@@ -2158,12 +2443,12 @@ fn apply_to_image_with_source_context(
     }
     if let ImageEffect::Transform(transform) = effect {
       let mut transform = *transform;
-      transform.shift_x_px += effect_source_bounds.left
-        - transform.scale_x * effect_source_bounds.left
-        - transform.skew_x * effect_source_bounds.top;
-      transform.shift_y_px += effect_source_bounds.top
-        - transform.skew_y * effect_source_bounds.left
-        - transform.scale_y * effect_source_bounds.top;
+      transform.shift_x_px += effect_source.anchor.left
+        - transform.scale_x * effect_source.anchor.left
+        - transform.skew_x * effect_source.anchor.top;
+      transform.shift_y_px += effect_source.anchor.top
+        - transform.skew_y * effect_source.anchor.left
+        - transform.scale_y * effect_source.anchor.top;
       *image = affine_image(image, transform);
       continue;
     }
@@ -2345,11 +2630,16 @@ fn apply_container(
     right: source.width() as f32,
     bottom: source.height() as f32,
   };
+  let geometry = EffectGeometry {
+    paint: bounds,
+    anchor: bounds,
+    ramp: bounds,
+  };
   apply_container_with_bounds(
     source,
     container,
-    bounds,
-    bounds,
+    geometry,
+    geometry,
     ImageEffectSourceImages::default(),
   )
 }
@@ -2357,8 +2647,8 @@ fn apply_container(
 fn apply_container_with_bounds<'a>(
   source: &'a image::RgbaImage,
   container: &ImageEffectContainer,
-  content_bounds: PixelBounds,
-  root_bounds: PixelBounds,
+  source_geometry: EffectGeometry,
+  root_geometry: EffectGeometry,
   sources: ImageEffectSourceImages<'a>,
 ) -> image::RgbaImage {
   let sources = ImageEffectSourceImages {
@@ -2371,8 +2661,8 @@ fn apply_container_with_bounds<'a>(
       apply_to_image_with_source_context(
         &mut output,
         &container.effects,
-        content_bounds,
-        root_bounds,
+        source_geometry,
+        root_geometry,
         sources,
       );
       output
@@ -2386,16 +2676,21 @@ fn apply_container_with_bounds<'a>(
         apply_to_image_with_source_context(
           &mut branch,
           std::slice::from_ref(effect),
-          content_bounds,
-          root_bounds,
+          source_geometry,
+          root_geometry,
           sources,
         );
-        for (destination, source) in output.pixels_mut().zip(branch.pixels()) {
-          source_over(destination, source);
-        }
+        composite_source_over(&mut output, &branch);
       }
       output
     }
+  }
+}
+
+pub(crate) fn composite_source_over(destination: &mut image::RgbaImage, source: &image::RgbaImage) {
+  debug_assert_eq!(destination.dimensions(), source.dimensions());
+  for (destination, source) in destination.pixels_mut().zip(source.pixels()) {
+    source_over(destination, source);
   }
 }
 
@@ -2942,7 +3237,7 @@ struct OuterShadowOptions {
   transform: ImageEffectTransform,
   alignment: (f32, f32),
   color: ResolvedEffectColor,
-  content_bounds: PixelBounds,
+  anchor_bounds: PixelBounds,
 }
 
 fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) -> image::RgbaImage {
@@ -2953,13 +3248,14 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
     mut transform,
     alignment,
     color,
-    content_bounds,
+    anchor_bounds,
   } = options;
   let radians = direction_degrees.to_radians();
-  // The default DrawingML alignment is bottom center. Preserve that point
-  // while applying the authored scale/skew matrix, then apply dist/dir.
-  let anchor_x = content_bounds.left + content_bounds.width() * alignment.0;
-  let anchor_y = content_bounds.top + content_bounds.height() * alignment.1;
+  // Preserve the requested point of the logical shape/text rectangle while
+  // transforming painted pixels. A glyph ink box is not a substitute for the
+  // character-cell rectangle used by DrawingML alignment.
+  let anchor_x = anchor_bounds.left + anchor_bounds.width() * alignment.0;
+  let anchor_y = anchor_bounds.top + anchor_bounds.height() * alignment.1;
   transform.shift_x_px = anchor_x - transform.scale_x * anchor_x - transform.skew_x * anchor_y
     + radians.cos() * distance_px;
   transform.shift_y_px = anchor_y - transform.skew_y * anchor_x - transform.scale_y * anchor_y
@@ -2994,18 +3290,24 @@ fn stack_blur_equivalent_sigma(radius_px: f32) -> f32 {
 fn reflection_image(
   source: &image::RgbaImage,
   effect: ImageReflectionEffect,
-  content_bounds: PixelBounds,
+  ramp_bounds: PixelBounds,
+  anchor_bounds: PixelBounds,
 ) -> image::RgbaImage {
-  let width = content_bounds.width();
-  let height = content_bounds.height();
+  let width = anchor_bounds.width();
+  let height = anchor_bounds.height();
   let direction = effect.direction_degrees.to_radians();
-  let reflected_bounds =
-    transformed_effect_bounds(content_bounds, effect.transform, effect.alignment).translated(
-      direction.cos() * effect.distance_px,
-      direction.sin() * effect.distance_px,
-    );
-  let anchor_x = content_bounds.left + width * effect.alignment.0;
-  let anchor_y = content_bounds.top + height * effect.alignment.1;
+  let reflected_text_bounds = transformed_effect_bounds(
+    ramp_bounds,
+    anchor_bounds,
+    effect.transform,
+    effect.alignment,
+  )
+  .translated(
+    direction.cos() * effect.distance_px,
+    direction.sin() * effect.distance_px,
+  );
+  let anchor_x = anchor_bounds.left + width * effect.alignment.0;
+  let anchor_y = anchor_bounds.top + height * effect.alignment.1;
   let mut transform = effect.transform;
   transform.shift_x_px = anchor_x - transform.scale_x * anchor_x - transform.skew_x * anchor_y
     + direction.cos() * effect.distance_px;
@@ -3018,20 +3320,22 @@ fn reflection_image(
     reflected
   };
 
-  // MS-OI29500 §20.1.8.50 defines fadeDir as the alpha-gradient direction
-  // relative to the shape. Apply that ramp in the transformed reflection
-  // coordinate space: applying it to the source before a negative `sy`
-  // reverses the near-to-far fade. Office fixed output keeps the start alpha
-  // at the edge nearest the source even for the standard vertically flipped
-  // reflection.
+  // MS-DOCX CT_Reflection defines fadeDir relative to the text, and stPos /
+  // endPos as positions along that gradient ramp. Word text supplies its font
+  // em rectangle as the ramp box even when the painted glyph ink is shorter
+  // and its paragraph line-height cell is taller.
+  // Apply it in transformed reflection coordinates: applying the ramp before
+  // a negative `sy` reverses the near-to-far fade. The two 11-point Office
+  // counterexamples have about 21px of ink in a 40px line cell and use the
+  // intermediate 30.56px 11pt em ramp for endPos=60% and endPos=45.5%.
   let fade = effect.fade_direction_degrees.to_radians();
   let fade_x = fade.cos();
   let fade_y = fade.sin();
   let corners = [
-    (reflected_bounds.left, reflected_bounds.top),
-    (reflected_bounds.right, reflected_bounds.top),
-    (reflected_bounds.right, reflected_bounds.bottom),
-    (reflected_bounds.left, reflected_bounds.bottom),
+    (reflected_text_bounds.left, reflected_text_bounds.top),
+    (reflected_text_bounds.right, reflected_text_bounds.top),
+    (reflected_text_bounds.right, reflected_text_bounds.bottom),
+    (reflected_text_bounds.left, reflected_text_bounds.bottom),
   ];
   let minimum = corners
     .iter()
@@ -3297,14 +3601,17 @@ mod tests {
   use image::{Rgba, RgbaImage};
 
   use super::{
-    ImageEffect, ImageEffectBlendMode, ImageEffectColorResolver, ImageEffectContainer,
-    ImageEffectContainerKind, ImageEffectFill, ImageEffectGradientKind, ImageEffectRelativeRect,
-    ImageEffectSourceImages, ImageEffectSourceReference, ImageEffectSourceRequirements,
-    ImageEffectTransform, ImageReflectionEffect, ResolvedEffectColor, WordprocessingTextGlow,
-    apply_container_to_padded_image, apply_container_to_padded_image_with_sources, apply_to_image,
-    container_output_bounds, from_effect_dag, from_effect_list, from_wordprocessing_text_effects,
-    mso_brightness_contrast_component, reflection, rotate_container_with_shape, sample_fill,
-    source_requirements, suppress_soft_edge, unchanged_foreground_backdrop,
+    EffectOutputBounds, ImageEffect, ImageEffectBlendMode, ImageEffectColorResolver,
+    ImageEffectContainer, ImageEffectContainerKind, ImageEffectFill, ImageEffectGradientKind,
+    ImageEffectRelativeRect, ImageEffectSourceGeometry, ImageEffectSourceImages,
+    ImageEffectSourceReference, ImageEffectSourceRequirements, ImageEffectTransform,
+    ImageReflectionEffect, ResolvedEffectColor, WordprocessingTextGlow,
+    apply_container_to_padded_image, apply_container_to_padded_image_with_sources,
+    apply_container_to_padded_image_with_sources_and_anchor, apply_to_image,
+    container_output_bounds, container_output_bounds_with_anchor, from_effect_dag,
+    from_effect_list, from_wordprocessing_text_effects, mso_brightness_contrast_component,
+    reflection, rotate_container_with_shape, sample_fill, source_requirements, suppress_soft_edge,
+    unchanged_foreground_backdrop, wordprocessing_reflection_canvas_bounds,
   };
   use crate::model::RgbColor;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
@@ -3321,6 +3628,7 @@ mod tests {
           blur_radius_px: 0.0,
           distance_px: 2.0,
           raster_length_scale: 1.0,
+          bounds_radius_scale: 1.0,
           direction_degrees: 0.0,
           transform: ImageEffectTransform {
             scale_x: 1.0,
@@ -3360,6 +3668,7 @@ mod tests {
         ImageEffect::Glow {
           radius_px: 2.0,
           raster_length_scale: 1.0,
+          bounds_radius_scale: 1.0,
           spread_ratio: 0.5,
           spread_kernel: super::GlowSpreadKernel::Square,
           blur_kernel: super::GlowBlurKernel::Stack,
@@ -3408,6 +3717,111 @@ mod tests {
       ] if (*spread_ratio - 0.5).abs() <= f32::EPSILON
         && *blur_kernel == super::GlowBlurKernel::Stack
     ));
+  }
+
+  #[test]
+  fn word_text_glow_bounds_follow_the_scaled_filter_support() {
+    let effects = from_wordprocessing_text_effects(
+      Some(WordprocessingTextGlow {
+        radius_px: 12.0,
+        raster_length_scale: 0.25,
+        color: ResolvedEffectColor {
+          color: RgbColor { r: 1, g: 2, b: 3 },
+          alpha: 255,
+        },
+      }),
+      None,
+      None,
+    )
+    .expect("word text glow");
+
+    let bounds = container_output_bounds(&effects, 30.0, 10.0).expect("glow bounds");
+    // The runtime kernel is 12 * 0.25 = 3 CSS pixels. Word fixed output
+    // retains two kernel radii (6 CSS pixels = 4.5 points), independently of
+    // the materializer's transparent image guard.
+    assert!((bounds.left_pt + 4.5).abs() < 0.001);
+    assert!((bounds.top_pt + 4.5).abs() < 0.001);
+    assert!((bounds.right_pt - 34.5).abs() < 0.001);
+    assert!((bounds.bottom_pt - 14.5).abs() < 0.001);
+  }
+
+  #[test]
+  fn text_shadow_affine_alignment_uses_the_character_cell_not_tight_ink() {
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Tree,
+      effects: vec![ImageEffect::OuterShadow {
+        blur_radius_px: 0.0,
+        distance_px: 0.0,
+        raster_length_scale: 1.0,
+        bounds_radius_scale: 1.0,
+        direction_degrees: 0.0,
+        transform: ImageEffectTransform {
+          scale_x: 1.0,
+          scale_y: -0.3,
+          skew_x: 0.0,
+          skew_y: 0.0,
+          shift_x_px: 0.0,
+          shift_y_px: 0.0,
+        },
+        alignment: (0.0, 1.0),
+        rotate_with_shape: false,
+        color: ResolvedEffectColor {
+          color: RgbColor { r: 1, g: 2, b: 3 },
+          alpha: 255,
+        },
+      }],
+    };
+    let ink = EffectOutputBounds {
+      left_pt: 10.0,
+      top_pt: 20.0,
+      right_pt: 30.0,
+      bottom_pt: 40.0,
+    };
+    let character_cell = EffectOutputBounds {
+      left_pt: 0.0,
+      top_pt: 0.0,
+      right_pt: 100.0,
+      bottom_pt: 80.0,
+    };
+
+    let bounds =
+      container_output_bounds_with_anchor(&effects, ink, character_cell).expect("shadow bounds");
+
+    // Bottom alignment fixes the logical line-box y=80. Tight-ink alignment
+    // would instead produce y=40..46 and is the counterexample this API must
+    // reject.
+    assert!((bounds.left_pt - 10.0).abs() < 0.001);
+    assert!((bounds.top_pt - 92.0).abs() < 0.001);
+    assert!((bounds.right_pt - 30.0).abs() < 0.001);
+    assert!((bounds.bottom_pt - 98.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn reflection_canvas_near_support_is_clipped_by_the_source_gap() {
+    let canvas = EffectOutputBounds {
+      left_pt: -10.0,
+      top_pt: -10.0,
+      right_pt: 110.0,
+      bottom_pt: 110.0,
+    };
+    let reflection = EffectOutputBounds {
+      left_pt: 0.0,
+      top_pt: 0.0,
+      right_pt: 100.0,
+      bottom_pt: 100.0,
+    };
+
+    let touching =
+      wordprocessing_reflection_canvas_bounds(canvas, reflection, 2.0, 0.0, 90.0, 90.0);
+    assert!(touching.top_pt.abs() < 0.001);
+    assert!((touching.bottom_pt - 110.0).abs() < 0.001);
+
+    let separated =
+      wordprocessing_reflection_canvas_bounds(canvas, reflection, 2.0, 20.0, 90.0, 90.0);
+    // Two CSS pixels are 1.5pt standard deviation, so the soft border may
+    // consume 4.5pt of the 15pt source/reflection gap.
+    assert!((separated.top_pt + 4.5).abs() < 0.001);
+    assert!((separated.bottom_pt - 110.0).abs() < 0.001);
   }
 
   #[test]
@@ -3703,6 +4117,7 @@ mod tests {
         blur_radius_px: 0.0,
         distance_px: 2.0,
         raster_length_scale: 1.0,
+        bounds_radius_scale: 1.0,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,
@@ -3813,6 +4228,60 @@ mod tests {
   }
 
   #[test]
+  fn reflection_fade_positions_use_explicit_text_em_not_ink_or_line_cell() {
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Tree,
+      effects: vec![ImageEffect::Reflection(ImageReflectionEffect {
+        blur_radius_px: 0.0,
+        start_opacity: 1.0,
+        start_position: 0.0,
+        end_opacity: 0.0,
+        end_position: 0.5,
+        fade_direction_degrees: 90.0,
+        distance_px: 0.0,
+        direction_degrees: 0.0,
+        transform: ImageEffectTransform {
+          scale_x: 1.0,
+          scale_y: 1.0,
+          skew_x: 0.0,
+          skew_y: 0.0,
+          shift_x_px: 0.0,
+          shift_y_px: 0.0,
+        },
+        alignment: (0.0, 0.0),
+        rotate_with_shape: false,
+      })],
+    };
+    let mut image = RgbaImage::from_pixel(1, 10, Rgba([10, 20, 30, 0]));
+    for y in 2..6 {
+      image.get_pixel_mut(0, y).0[3] = 255;
+    }
+
+    apply_container_to_padded_image_with_sources_and_anchor(
+      &mut image,
+      &effects,
+      ImageEffectSourceGeometry {
+        paint_left_px: 0.0,
+        paint_top_px: 2.0,
+        paint_width_px: 1.0,
+        paint_height_px: 4.0,
+        anchor_left_px: 0.0,
+        anchor_top_px: 0.0,
+        anchor_width_px: 1.0,
+        anchor_height_px: 10.0,
+        ramp_left_px: 0.0,
+        ramp_top_px: 1.0,
+        ramp_width_px: 1.0,
+        ramp_height_px: 8.0,
+      },
+      ImageEffectSourceImages::default(),
+    );
+
+    assert!(image.get_pixel(0, 4).0[3] > 0);
+    assert_eq!(image.get_pixel(0, 5).0[3], 0);
+  }
+
+  #[test]
   fn premultiplied_blur_does_not_leak_hidden_rgb() {
     let mut image = RgbaImage::from_pixel(3, 1, Rgba([255, 0, 0, 0]));
     image.get_pixel_mut(1, 0).0 = [0, 0, 255, 255];
@@ -3916,6 +4385,7 @@ mod tests {
         blur_radius_px: 0.0,
         distance_px: 1.0,
         raster_length_scale: 1.0,
+        bounds_radius_scale: 1.0,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 2.0,
@@ -3973,6 +4443,7 @@ mod tests {
         blur_radius_px: 0.0,
         distance_px: 3.0,
         raster_length_scale: 1.0,
+        bounds_radius_scale: 1.0,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,

@@ -1553,6 +1553,7 @@ mod tests {
       hyperlink_url: None,
       semantic_metafile_text: false,
       metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
       metafile_native_size: false,
       floating: false,
       behind_text: false,

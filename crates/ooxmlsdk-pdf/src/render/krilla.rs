@@ -517,6 +517,7 @@ struct ImageItem<'doc> {
   hyperlink_url: Option<Cow<'doc, str>>,
   semantic_metafile_text: bool,
   metafile_semantic_text_includes_raster_backdrop: bool,
+  signature_line: Option<common::SignatureLineProperties<'doc>>,
   metafile_native_size: bool,
 }
 
@@ -1595,7 +1596,7 @@ impl<'doc> PaintDocument<'doc> {
           .collect::<Vec<_>>();
         let (layout_items, line_owners) = coalesced_writer_text_items(page_items, text_metrics);
         let (layout_items, line_owners) =
-          expand_metafile_semantic_text_items(layout_items, line_owners);
+          expand_metafile_semantic_text_items(layout_items, line_owners, ui_language);
         let common_line_baselines =
           common_writer_line_baselines(&layout_items, &line_owners, text_metrics);
         let decoration_metadata = decoration_render_metadata(&layout_items);
@@ -1703,11 +1704,12 @@ fn pdf_page_dimension(engine_kind: common::LayoutEngineKind, dimension_pt: f32) 
 fn expand_metafile_semantic_text_items<'doc>(
   items: Vec<PageItem<'doc>>,
   owners: Vec<Option<PaintLineOwner>>,
+  ui_language: Option<&str>,
 ) -> (Vec<PageItem<'doc>>, Vec<Option<PaintLineOwner>>) {
   let mut expanded_items = Vec::with_capacity(items.len());
   let mut expanded_owners = Vec::with_capacity(owners.len());
   for (item, owner) in items.into_iter().zip(owners) {
-    expanded_items.push(expand_metafile_semantic_text_item(item, owner));
+    expanded_items.push(expand_metafile_semantic_text_item(item, owner, ui_language));
     expanded_owners.push(owner);
   }
   (expanded_items, expanded_owners)
@@ -1716,6 +1718,7 @@ fn expand_metafile_semantic_text_items<'doc>(
 fn expand_metafile_semantic_text_item<'doc>(
   item: PageItem<'doc>,
   owner: Option<PaintLineOwner>,
+  ui_language: Option<&str>,
 ) -> PageItem<'doc> {
   match item {
     PageItem::Group {
@@ -1729,7 +1732,8 @@ fn expand_metafile_semantic_text_item<'doc>(
     } => {
       let child_owner = inherit_text_line_owner.then_some(owner).flatten();
       let child_count = items.len();
-      let (items, _) = expand_metafile_semantic_text_items(items, vec![child_owner; child_count]);
+      let (items, _) =
+        expand_metafile_semantic_text_items(items, vec![child_owner; child_count], ui_language);
       PageItem::Group {
         mask,
         transform,
@@ -1741,17 +1745,52 @@ fn expand_metafile_semantic_text_item<'doc>(
       }
     }
     PageItem::Image(image)
-      if image.semantic_metafile_text
+      if (image.semantic_metafile_text || image.signature_line.is_some())
         && image.rotation_deg.abs() <= f32::EPSILON
         && !image.flip_horizontal
         && !image.flip_vertical
         && image.crop == ImageCrop::default() =>
     {
-      let paint_native_text = image.metafile_semantic_text_includes_raster_backdrop;
       let extraction_options = ooxmlsdk_layout::render::emf_wmf::RenderOptions {
         wmf_external_header: image.metafile_external_header,
         ..ooxmlsdk_layout::render::emf_wmf::RenderOptions::default()
       };
+      if let Some(signature_line) = image
+        .signature_line
+        .as_ref()
+        .filter(|properties| properties.state == common::SignatureLineState::Unsigned)
+      {
+        let preview_runs =
+          ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs_with_options(
+            &image.data,
+            image.content_type.as_deref(),
+            true,
+            extraction_options,
+          );
+        let items = word_unsigned_signature_line_items(
+          image.x_pt,
+          image.y_pt,
+          image.width_pt,
+          image.height_pt,
+          signature_line,
+          &preview_runs,
+          ui_language,
+        );
+        return PageItem::Group {
+          mask: None,
+          transform: None,
+          blend_mode: common::BlendMode::Normal,
+          opacity: 1.0,
+          flatten_identity: true,
+          inherit_text_line_owner: true,
+          items,
+        };
+      }
+      let paint_native_text = image.metafile_semantic_text_includes_raster_backdrop;
+      let localize_signature_ui_text = image
+        .signature_line
+        .as_ref()
+        .is_some_and(|properties| properties.state == common::SignatureLineState::Unsigned);
       let solid_rects = paint_native_text
         .then(|| {
           ooxmlsdk_layout::render::emf_wmf::extract_metafile_solid_rects_with_options(
@@ -1818,6 +1857,7 @@ fn expand_metafile_semantic_text_item<'doc>(
             hyperlink_url: None,
             semantic_metafile_text: false,
             metafile_semantic_text_includes_raster_backdrop: false,
+            signature_line: None,
             metafile_native_size: false,
           })
         })
@@ -1830,7 +1870,12 @@ fn expand_metafile_semantic_text_item<'doc>(
           extraction_options,
         )
         .into_iter()
-        .map(|run| {
+        .map(|mut run| {
+          run.font_family = localized_metafile_ui_font_family(
+            run.font_family,
+            ui_language,
+            localize_signature_ui_text,
+          );
           let font_size_pt = run
             .font_size
             .map(|size| size * image.height_pt)
@@ -1876,29 +1921,210 @@ fn expand_metafile_semantic_text_item<'doc>(
         return PageItem::Image(image);
       }
 
+      let flatten_native_emf_text = paint_native_text
+        && image.content_type.as_deref().is_some_and(|content_type| {
+          matches!(
+            content_type.to_ascii_lowercase().as_str(),
+            "image/emf" | "image/x-emf" | "application/emf" | "application/x-emf"
+          )
+        });
       let mut items =
         Vec::with_capacity(solid_rects.len() + bitmap_layers.len() + semantic_runs.len() + 1);
       items.extend(solid_rects);
       items.extend(bitmap_layers);
       items.push(PageItem::Image(image));
       items.extend(semantic_runs);
-      // Office emits metafile previews as Form XObjects whose visible
-      // graphics and searchable text share one form stream. Keeping the
-      // semantic overlay in the same isolated group preserves text extraction
-      // without exposing producer-specific form text as page-level text style
-      // or geometry.
+      // Ordinary semantic-only previews and PowerPoint's native WMF controls
+      // remain Form XObjects. Word's native unsigned signature-line EMF is a
+      // counterexample: fixed output writes its Arial/localized UI labels in
+      // the page stream, which also makes their real text styles observable.
       PageItem::Group {
         mask: None,
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
-        flatten_identity: false,
+        flatten_identity: flatten_native_emf_text,
         inherit_text_line_owner: true,
         items,
       }
     }
     item => item,
   }
+}
+
+fn localized_metafile_ui_font_family(
+  font_family: Option<String>,
+  ui_language: Option<&str>,
+  localized_ui_text: bool,
+) -> Option<String> {
+  let mut font_family = font_family?;
+  let simplified_chinese_ui = localized_ui_text
+    && ooxmlsdk_layout::localization::canonical_office_locale_tag(ui_language)
+      .is_some_and(|locale| locale.eq_ignore_ascii_case("zh-CN") || locale.starts_with("zh-Hans"));
+  // Microsoft's localized Windows UI guidance replaces Segoe UI with the
+  // locale's UI face; the fixed-output zh-CN signature-line preview uses
+  // Microsoft YaHei UI even for the Latin signer/title stored in the EMF.
+  if simplified_chinese_ui && font_family.eq_ignore_ascii_case("Segoe UI") {
+    font_family = "Microsoft YaHei UI".to_string();
+  }
+  Some(font_family)
+}
+
+fn word_unsigned_signature_line_items<'doc>(
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  properties: &common::SignatureLineProperties<'_>,
+  preview_runs: &[ooxmlsdk_layout::render::emf_wmf::MetafileTextRun],
+  ui_language: Option<&str>,
+) -> Vec<PageItem<'doc>> {
+  // Word does not replay the stored unsigned preview verbatim when producing
+  // fixed output. Office asks the host for a rendered-page EMF, and the
+  // signature provider API separately exposes generated signature-line
+  // images. The normalized positions below are the host-rendered 192 x 96 pt
+  // unsigned Office signature line: a white field, a 0.75 pt rule, a 12 pt X,
+  // and two 9 pt metadata rows. The values scale with the authored VML shape,
+  // rather than with the fallback EMF's pixel LOGFONT.
+  const REFERENCE_WIDTH_PT: f32 = 192.0;
+  const REFERENCE_HEIGHT_PT: f32 = 96.0;
+  const RULE_TOP_PT: f32 = 48.32;
+  const RULE_HEIGHT_PT: f32 = 0.75;
+  const X_OFFSET_PT: f32 = 7.10;
+  const X_BASELINE_PT: f32 = 45.70;
+  const X_FONT_SIZE_PT: f32 = 12.0;
+  const LABEL_OFFSET_PT: f32 = 13.85;
+  const SIGNER_BASELINE_PT: f32 = 61.42;
+  const TITLE_BASELINE_PT: f32 = 76.04;
+  const LABEL_FONT_SIZE_PT: f32 = 9.0;
+
+  let scale_x = width_pt / REFERENCE_WIDTH_PT;
+  let scale_y = height_pt / REFERENCE_HEIGHT_PT;
+  let mut items = Vec::with_capacity(5);
+  items.push(PageItem::Rect(RectItem {
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    fill: Some(RectFill::Solid {
+      color: RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      },
+      opacity: 1.0,
+    }),
+    stroke: None,
+    stroke_opacity: 1.0,
+  }));
+  items.push(PageItem::Rect(RectItem {
+    x_pt,
+    y_pt: y_pt + RULE_TOP_PT * scale_y,
+    width_pt,
+    height_pt: RULE_HEIGHT_PT * scale_y,
+    fill: Some(RectFill::Solid {
+      color: RgbColor { r: 0, g: 0, b: 0 },
+      opacity: 1.0,
+    }),
+    stroke: None,
+    stroke_opacity: 1.0,
+  }));
+
+  let x_preview = preview_runs
+    .iter()
+    .find(|run| run.text.trim().eq_ignore_ascii_case("x"))
+    .or_else(|| preview_runs.first());
+  let label_preview = preview_runs
+    .iter()
+    .find(|run| !run.text.trim().eq_ignore_ascii_case("x"));
+  let x_font_family = x_preview
+    .and_then(|run| run.font_family.clone())
+    .or_else(|| Some("Arial".to_string()));
+  let label_font_family = localized_metafile_ui_font_family(
+    label_preview
+      .and_then(|run| run.font_family.clone())
+      .or_else(|| Some("Segoe UI".to_string())),
+    ui_language,
+    true,
+  );
+  items.push(word_signature_line_text_item(
+    x_pt + X_OFFSET_PT * scale_x,
+    y_pt + X_BASELINE_PT * scale_y,
+    X_FONT_SIZE_PT * scale_y,
+    "X".to_string(),
+    x_font_family,
+    x_preview.is_some_and(|run| run.bold),
+    x_preview.is_some_and(|run| run.italic),
+  ));
+  if let Some(signer) = properties
+    .suggested_signer
+    .as_deref()
+    .filter(|value| !value.is_empty())
+  {
+    items.push(word_signature_line_text_item(
+      x_pt + LABEL_OFFSET_PT * scale_x,
+      y_pt + SIGNER_BASELINE_PT * scale_y,
+      LABEL_FONT_SIZE_PT * scale_y,
+      signer.to_string(),
+      label_font_family.clone(),
+      label_preview.is_some_and(|run| run.bold),
+      label_preview.is_some_and(|run| run.italic),
+    ));
+  }
+  if let Some(title) = properties
+    .suggested_signer_title
+    .as_deref()
+    .filter(|value| !value.is_empty())
+  {
+    items.push(word_signature_line_text_item(
+      x_pt + LABEL_OFFSET_PT * scale_x,
+      y_pt + TITLE_BASELINE_PT * scale_y,
+      LABEL_FONT_SIZE_PT * scale_y,
+      title.to_string(),
+      label_font_family,
+      label_preview.is_some_and(|run| run.bold),
+      label_preview.is_some_and(|run| run.italic),
+    ));
+  }
+  items
+}
+
+fn word_signature_line_text_item<'doc>(
+  x_pt: f32,
+  baseline_y_pt: f32,
+  font_size_pt: f32,
+  text: String,
+  font_family: Option<String>,
+  bold: bool,
+  italic: bool,
+) -> PageItem<'doc> {
+  PageItem::Text(Box::new(TextItem {
+    x_pt,
+    y_pt: baseline_y_pt,
+    line_height_pt: font_size_pt * 1.15,
+    paint_clip: None,
+    text: Cow::Owned(text),
+    style: TextStyle {
+      font_family: font_family.map(Cow::Owned),
+      font_size_pt,
+      bold,
+      italic,
+      metafile_reference_baseline: true,
+      opacity: 1.0,
+      ..TextStyle::default()
+    },
+    rotation_center_pt: None,
+    hyperlink_url: None,
+    dynamic_field: None,
+    form_widget_id: None,
+    paragraph_bidi: false,
+    word_spacing_pt: 0.0,
+    preserve_text_portion: false,
+    decoration_span_start_x_pt: None,
+    pdf_text_segmentation: common::PdfTextSegmentation::Line,
+    source_path: None,
+    semantic_target_width_pt: None,
+  }))
 }
 
 fn page_item_from_common<'doc>(
@@ -2161,7 +2387,54 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
     semantic_metafile_text: image.semantic_metafile_text,
     metafile_semantic_text_includes_raster_backdrop: image
       .metafile_semantic_text_includes_raster_backdrop,
+    signature_line: image
+      .signature_line
+      .as_ref()
+      .map(signature_line_properties_from_common),
     metafile_native_size: image.metafile_native_size,
+  }
+}
+
+fn signature_line_properties_from_common<'doc>(
+  properties: &'doc common::SignatureLineProperties<'static>,
+) -> common::SignatureLineProperties<'doc> {
+  common::SignatureLineProperties {
+    state: properties.state,
+    id: properties
+      .id
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    provider_id: properties
+      .provider_id
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    signing_instructions_set: properties.signing_instructions_set,
+    allow_comments: properties.allow_comments,
+    show_sign_date: properties.show_sign_date,
+    suggested_signer: properties
+      .suggested_signer
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    suggested_signer_title: properties
+      .suggested_signer_title
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    suggested_signer_email: properties
+      .suggested_signer_email
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    signing_instructions: properties
+      .signing_instructions
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    additional_xml: properties
+      .additional_xml
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    signature_provider_url: properties
+      .signature_provider_url
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
   }
 }
 
@@ -3792,7 +4065,12 @@ fn metafile_render_options_for_image(
     target_height_px: target_size.map(|size| size.1),
     max_pixels: Some(dpi.saturating_mul(dpi).saturating_mul(64)),
     transparent_background: image.metafile_background_color.is_some()
-      || image.metafile_semantic_text_includes_raster_backdrop,
+      || image.metafile_semantic_text_includes_raster_backdrop
+      || (image.semantic_metafile_text
+        && ooxmlsdk_layout::render::emf_wmf::metafile_text_requires_raster_backdrop(
+          &image.data,
+          image.content_type.as_deref(),
+        )),
     background_color: None,
     monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
     filter_high_frequency_pattern_brushes: true,
@@ -6978,13 +7256,14 @@ mod tests {
   use std::sync::Arc;
 
   use super::{
-    GlyphId, ImageCrop, ImageItem, PaintDocument, PaintItem, PaintTextPortionKind, TextItem,
-    TextMetrics, TextStyle as PaintTextStyle, bidi_mirrored_semantic_text, conversion_font_audit,
-    gamma_correct_gradient_color, metafile_render_options_for_image, pdf_metadata,
-    pdf_page_dimension, render, semantic_advance_for_text_range,
-    source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
-    text_portion_ranges, text_requires_glyph_outlines, text_stroke_with_fill,
-    text_style_from_common, word_small_caps_semantic_text,
+    GlyphId, ImageCrop, ImageItem, PageItem, PaintDocument, PaintItem, PaintTextPortionKind,
+    TextItem, TextMetrics, TextStyle as PaintTextStyle, bidi_mirrored_semantic_text,
+    conversion_font_audit, gamma_correct_gradient_color, localized_metafile_ui_font_family,
+    metafile_render_options_for_image, pdf_metadata, pdf_page_dimension, render,
+    semantic_advance_for_text_range, source_range_requires_visible_glyph, stroke_end_dimensions,
+    symbol_font_semantic_text, text_portion_ranges, text_requires_glyph_outlines,
+    text_stroke_with_fill, text_style_from_common, word_small_caps_semantic_text,
+    word_unsigned_signature_line_items,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -7011,6 +7290,71 @@ mod tests {
       semantic_advance_for_text_range(text, &advances, &(5..6)),
       None
     );
+  }
+
+  #[test]
+  fn localized_native_metafile_ui_text_uses_the_simplified_chinese_ui_face() {
+    assert_eq!(
+      localized_metafile_ui_font_family(Some("Segoe UI".to_string()), Some("zh-CN"), true),
+      Some("Microsoft YaHei UI".to_string())
+    );
+    assert_eq!(
+      localized_metafile_ui_font_family(Some("Segoe UI".to_string()), Some("en-US"), true),
+      Some("Segoe UI".to_string())
+    );
+    assert_eq!(
+      localized_metafile_ui_font_family(Some("Segoe UI".to_string()), Some("zh-CN"), false),
+      Some("Segoe UI".to_string())
+    );
+    assert_eq!(
+      localized_metafile_ui_font_family(Some("Arial".to_string()), Some("zh-CN"), true),
+      Some("Arial".to_string())
+    );
+  }
+
+  #[test]
+  fn word_unsigned_signature_line_uses_host_geometry_and_ooxml_metadata() {
+    let properties = common::SignatureLineProperties {
+      show_sign_date: true,
+      suggested_signer: Some(Cow::Borrowed("John Doe")),
+      suggested_signer_title: Some(Cow::Borrowed("Farmer")),
+      ..Default::default()
+    };
+
+    let items =
+      word_unsigned_signature_line_items(10.0, 20.0, 192.0, 96.0, &properties, &[], Some("zh-CN"));
+
+    assert_eq!(items.len(), 5);
+    let PageItem::Text(x) = &items[2] else {
+      panic!("signature X text");
+    };
+    assert_eq!(x.text, "X");
+    assert!((x.x_pt - 17.10).abs() < 0.001);
+    assert!((x.y_pt - 65.70).abs() < 0.001);
+    assert!((x.style.font_size_pt - 12.0).abs() < 0.001);
+    assert_eq!(x.style.font_family.as_deref(), Some("Arial"));
+
+    let PageItem::Text(signer) = &items[3] else {
+      panic!("signature signer text");
+    };
+    assert_eq!(signer.text, "John Doe");
+    assert!((signer.x_pt - 23.85).abs() < 0.001);
+    assert!((signer.y_pt - 81.42).abs() < 0.001);
+    assert_eq!(
+      signer.style.font_family.as_deref(),
+      Some("Microsoft YaHei UI")
+    );
+
+    let empty = word_unsigned_signature_line_items(
+      0.0,
+      0.0,
+      192.0,
+      96.0,
+      &common::SignatureLineProperties::default(),
+      &[],
+      Some("en-US"),
+    );
+    assert_eq!(empty.len(), 3, "empty metadata must not emit empty runs");
   }
 
   #[test]
@@ -7071,6 +7415,7 @@ mod tests {
       hyperlink_url: None,
       semantic_metafile_text: false,
       metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
       metafile_native_size: true,
     };
     let fixed_output = metafile_render_options_for_image(&image, &PdfOptions::default());

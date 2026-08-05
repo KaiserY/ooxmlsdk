@@ -85,6 +85,20 @@ pub fn extract_metafile_text_runs_with_options(
     .collect()
 }
 
+/// Whether visible metafile text depends on an earlier destination-reading
+/// raster operation.
+///
+/// OLE replacement previews commonly encode a transparent icon as the
+/// canonical `SRCAND`/`SRCINVERT` pair and then draw its label into the same
+/// destination DC.  Such a preview has to preserve the unpainted destination
+/// when it is flattened; an ordinary EMF whose text follows `AlphaBlend` is
+/// the counterexample and remains independent of a raster backdrop.
+pub fn metafile_text_requires_raster_backdrop(data: &[u8], content_type: Option<&str>) -> bool {
+  emfsdk::render::extract_metafile_text_runs(data, content_type)
+    .iter()
+    .any(|run| run.requires_raster_backdrop)
+}
+
 pub fn extract_metafile_solid_rects(
   data: &[u8],
   content_type: Option<&str>,

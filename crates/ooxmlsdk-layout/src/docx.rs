@@ -25,7 +25,8 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
-  schemas_microsoft_com_office_word as w10, schemas_microsoft_com_office_word_2010_wordml as w14,
+  schemas_microsoft_com_office_office as o, schemas_microsoft_com_office_word as w10,
+  schemas_microsoft_com_office_word_2010_wordml as w14,
   schemas_microsoft_com_office_word_2010_wordprocessing_canvas as wpc,
   schemas_microsoft_com_office_word_2010_wordprocessing_drawing as wp14,
   schemas_microsoft_com_office_word_2010_wordprocessing_group as wpg,
@@ -522,6 +523,8 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
       semantic_metafile_font_family: None,
       native_ole_equation: None,
       metafile_native_size: false,
@@ -9364,6 +9367,8 @@ fn inline_image_impl(
         alt_text: inline.doc_properties.description.clone(),
         hyperlink_url,
         semantic_metafile_text: false,
+        metafile_semantic_text_includes_raster_backdrop: false,
+        signature_line: None,
         semantic_metafile_font_family: None,
         native_ole_equation: None,
         metafile_native_size: true,
@@ -9427,6 +9432,8 @@ fn inline_image_impl(
           .and_then(|properties| properties.description.clone()),
         hyperlink_url,
         semantic_metafile_text: false,
+        metafile_semantic_text_includes_raster_backdrop: false,
+        signature_line: None,
         semantic_metafile_font_family: None,
         native_ole_equation: None,
         metafile_native_size: true,
@@ -10014,7 +10021,10 @@ fn drawingml_w14_gradient_fill_colors(
     .into_iter()
     .flat_map(|list| &list.gradient_stop)
     .filter_map(|stop| match stop.gradient_stop_choice.as_ref()? {
-      w14::GradientStopChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
+      w14::GradientStopChoice::RgbColorModelHex(color) => Some(apply_w14_rgb_transforms(
+        parse_hex_color(color.val.as_str())?,
+        &color.rgb_color_model_hex_choice,
+      )),
       w14::GradientStopChoice::SchemeColor(color) => {
         let mut resolved = theme_colors.resolve_word2010(color.val)?;
         resolved = apply_w14_scheme_transforms(resolved, &color.scheme_color_choice);
@@ -10051,7 +10061,10 @@ fn drawingml_w14_gradient_fill(
     .filter_map(|stop| {
       let resolved = match stop.gradient_stop_choice.as_ref()? {
         w14::GradientStopChoice::RgbColorModelHex(color) => ResolvedColor {
-          color: parse_hex_color(color.val.as_str())?,
+          color: apply_w14_rgb_transforms(
+            parse_hex_color(color.val.as_str())?,
+            &color.rgb_color_model_hex_choice,
+          ),
           opacity: opacity_from_w14_rgb_transforms(&color.rgb_color_model_hex_choice),
         },
         w14::GradientStopChoice::SchemeColor(color) => ResolvedColor {
@@ -10163,6 +10176,70 @@ pub(super) fn drawingml_text_outline_effect_common_fill(
       drawingml_w14_gradient_fill(fill, theme_colors)
     }
   }
+}
+
+pub(super) fn wordprocessing_text_outline_common_stroke(
+  outline: &w14::TextOutlineEffect,
+  theme_colors: &ThemeColors,
+) -> Option<common::Stroke<'static>> {
+  let fill = drawingml_text_outline_effect_common_fill(outline, theme_colors)?;
+  let mut stroke = common::Stroke {
+    width: common::Pt(
+      outline
+        .line_width
+        .map(|width| units::emu_to_points(i64::from(width)))
+        .unwrap_or_default(),
+    ),
+    cap: outline.cap_type.map(|cap| match cap {
+      w14::LineCapValues::Round => common::StrokeCap::Round,
+      w14::LineCapValues::Square => common::StrokeCap::Square,
+      w14::LineCapValues::Flat => common::StrokeCap::Flat,
+    }),
+    compound: outline.compound.map(|compound| match compound {
+      w14::CompoundLineValues::Simple => common::StrokeCompound::Single,
+      w14::CompoundLineValues::Double => common::StrokeCompound::Double,
+      w14::CompoundLineValues::ThickThin => common::StrokeCompound::ThickThin,
+      w14::CompoundLineValues::ThinThick => common::StrokeCompound::ThinThick,
+      w14::CompoundLineValues::Triple => common::StrokeCompound::Triple,
+    }),
+    alignment: outline.alignment.map(|alignment| match alignment {
+      w14::PenAlignmentValues::Center => common::StrokeAlignment::Center,
+      w14::PenAlignmentValues::Inset => common::StrokeAlignment::Inside,
+    }),
+    preset_dash: outline.preset_line_dash_properties.as_ref().map(|dash| {
+      match dash.val.unwrap_or_default() {
+        w14::PresetLineDashValues::Solid => common::StrokeDashPreset::Solid,
+        w14::PresetLineDashValues::Dot => common::StrokeDashPreset::Dot,
+        w14::PresetLineDashValues::SysDot => common::StrokeDashPreset::SystemDot,
+        w14::PresetLineDashValues::Dash => common::StrokeDashPreset::Dash,
+        w14::PresetLineDashValues::SysDash => common::StrokeDashPreset::SystemDash,
+        w14::PresetLineDashValues::LongDash => common::StrokeDashPreset::LargeDash,
+        w14::PresetLineDashValues::DashDot => common::StrokeDashPreset::DashDot,
+        w14::PresetLineDashValues::SystemDashDot => common::StrokeDashPreset::SystemDashDot,
+        w14::PresetLineDashValues::LongDashDot => common::StrokeDashPreset::LargeDashDot,
+        w14::PresetLineDashValues::LongDashDotDot => common::StrokeDashPreset::LargeDashDotDot,
+        w14::PresetLineDashValues::SystemDashDotDot => common::StrokeDashPreset::SystemDashDotDot,
+      }
+    }),
+    join: Some(match outline.text_outline_effect_choice3.as_ref() {
+      Some(w14::TextOutlineEffectChoice2::RoundEmpty) => common::StrokeJoin::Round,
+      Some(w14::TextOutlineEffectChoice2::BevelEmpty) | None => common::StrokeJoin::Bevel,
+      Some(w14::TextOutlineEffectChoice2::LineJoinMiterProperties(miter)) => {
+        common::StrokeJoin::Miter {
+          limit: miter.limit.map(|limit| limit as f32 / 100_000.0),
+        }
+      }
+    }),
+    ..Default::default()
+  };
+  match fill {
+    common::Fill::None => return None,
+    common::Fill::Solid(color) => stroke.color = color,
+    common::Fill::Gradient(gradient) => stroke.gradient = Some(gradient),
+    // The Word 2010 outline schema has no theme, image, or pattern branch.
+    common::Fill::Theme(_) | common::Fill::Image { .. } | common::Fill::Pattern(_) => return None,
+  }
+  Some(stroke)
 }
 
 fn wordprocessing_textbox_common_fill(
@@ -10403,7 +10480,7 @@ impl TextBoxFrameContent {
 fn text_box_frame_from_wordprocessing_shape(
   shape: &wps::WordprocessingShape,
   content: &w::TextBoxContent,
-  base_style: TextStyle,
+  mut base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
@@ -10420,6 +10497,15 @@ fn text_box_frame_from_wordprocessing_shape(
       wordprocessing_shape_fill_color(shape, &styles.theme_colors)
         .map(automatic_text_color_for_background)
     });
+  if let Some(properties) = shape.text_body_properties.as_deref() {
+    // ECMA-376 Part 1 §20.1.2.2.40 makes a:scene3d plus a:sp3d a
+    // text-body property. LibreOffice imports the pair into the custom
+    // shape's Text3DEffectProperties (TextBodyPropertiesContext), separate
+    // from wps:spPr 3-D. Seed every paragraph/run from the body style so the
+    // existing shared DrawingML text rasterizer owns projection and depth.
+    base_style.drawingml_text_static3d =
+      wordprocessing_text_static3d(properties, &styles.theme_colors);
+  }
   let mut frame = TextBoxFrameContent::new(textbox_blocks_with_base(
     content, base_style, styles, images, hyperlinks,
   ));
@@ -10599,6 +10685,19 @@ fn apply_wordprocessing_shape_textbox_body_properties(
     anchor: properties.anchor,
   };
   apply_drawingml_textbox_body_properties_model(body_properties, frame);
+}
+
+fn wordprocessing_text_static3d(
+  properties: &wps::TextBodyProperties,
+  theme_colors: &ThemeColors,
+) -> Option<common::drawingml_3d::Static3dStyle> {
+  let scene = properties.scene3_d_type.as_deref()?;
+  let shape = match properties.text_body_properties_choice2.as_ref()? {
+    wps::TextBodyPropertiesChoice2::Shape3DType(shape) => shape.as_ref(),
+    // ECMA-376 §20.1.5.8 explicitly removes the text from the 3-D scene.
+    wps::TextBodyPropertiesChoice2::FlatText(_) => return None,
+  };
+  Some(drawingml_static3d_style(scene, shape, theme_colors))
 }
 
 fn apply_drawingml_textbox_body_properties_model(
@@ -14090,54 +14189,62 @@ impl DrawingMlShapeProperties {
   fn static3d(&self, theme_colors: &ThemeColors) -> Option<common::drawingml_3d::Static3dStyle> {
     let (scene, shape) = match self {
       Self::Diagram(properties) => (
-        properties.scene3_d_type.as_ref()?,
-        properties.shape3_d_type.as_ref()?,
+        properties.scene3_d_type.as_deref()?,
+        properties.shape3_d_type.as_deref()?,
       ),
       Self::Generic(properties) => (
-        properties.scene3_d_type.as_ref()?,
-        properties.shape3_d_type.as_ref()?,
+        properties.scene3_d_type.as_deref()?,
+        properties.shape3_d_type.as_deref()?,
       ),
       Self::Wordprocessing(properties) => (
-        properties.scene3_d_type.as_ref()?,
-        properties.shape3_d_type.as_ref()?,
+        properties.scene3_d_type.as_deref()?,
+        properties.shape3_d_type.as_deref()?,
       ),
       Self::Picture(properties) => (
-        properties.scene3_d_type.as_ref()?,
-        properties.shape3_d_type.as_ref()?,
+        properties.scene3_d_type.as_deref()?,
+        properties.shape3_d_type.as_deref()?,
       ),
     };
-    let resolver = DocxImageEffectColorResolver {
-      theme_colors,
-      images: None,
-      placeholder_color: None,
-      word_group_glow: false,
-    };
-    let extrusion_color = shape
-      .extrusion_color
-      .as_deref()
-      .and_then(|color| color.extrusion_color_choice.as_ref())
-      .and_then(Color::from_extrusion_color_choice)
-      .and_then(|color| resolver.resolve(Some(color)))
-      .map(|color| common::drawingml_3d::Static3dColor {
-        color: color.color,
-        alpha: color.alpha,
-      });
-    let contour_color = shape
-      .contour_color
-      .as_deref()
-      .and_then(|color| color.contour_color_choice.as_ref())
-      .and_then(Color::from_contour_color_choice)
-      .and_then(|color| resolver.resolve(Some(color)))
-      .map(|color| common::drawingml_3d::Static3dColor {
-        color: color.color,
-        alpha: color.alpha,
-      });
-    Some(common::drawingml_3d::Static3dStyle {
-      scene: scene.clone(),
-      shape: shape.clone(),
-      extrusion_color,
-      contour_color,
-    })
+    Some(drawingml_static3d_style(scene, shape, theme_colors))
+  }
+}
+
+fn drawingml_static3d_style(
+  scene: &a::Scene3DType,
+  shape: &a::Shape3DType,
+  theme_colors: &ThemeColors,
+) -> common::drawingml_3d::Static3dStyle {
+  let resolver = DocxImageEffectColorResolver {
+    theme_colors,
+    images: None,
+    placeholder_color: None,
+    word_group_glow: false,
+  };
+  let extrusion_color = shape
+    .extrusion_color
+    .as_deref()
+    .and_then(|color| color.extrusion_color_choice.as_ref())
+    .and_then(Color::from_extrusion_color_choice)
+    .and_then(|color| resolver.resolve(Some(color)))
+    .map(|color| common::drawingml_3d::Static3dColor {
+      color: color.color,
+      alpha: color.alpha,
+    });
+  let contour_color = shape
+    .contour_color
+    .as_deref()
+    .and_then(|color| color.contour_color_choice.as_ref())
+    .and_then(Color::from_contour_color_choice)
+    .and_then(|color| resolver.resolve(Some(color)))
+    .map(|color| common::drawingml_3d::Static3dColor {
+      color: color.color,
+      alpha: color.alpha,
+    });
+  common::drawingml_3d::Static3dStyle {
+    scene: Box::new(scene.clone()),
+    shape: Box::new(shape.clone()),
+    extrusion_color,
+    contour_color,
   }
 }
 
@@ -14711,6 +14818,8 @@ fn drawingml_picture_image(
     alt_text: drawingml_picture_alt_text(picture),
     hyperlink_url,
     semantic_metafile_text: false,
+    metafile_semantic_text_includes_raster_backdrop: false,
+    signature_line: None,
     semantic_metafile_font_family: None,
     native_ole_equation: None,
     metafile_native_size: true,
@@ -15998,6 +16107,10 @@ fn vml_shape_shape_with_style(
     .and_then(|fill| vml_fill_image(fill, style, images))
     .or_else(|| inherited_fill.and_then(|fill| vml_fill_image(fill, style, images)));
   let has_fill_image = fill_image.is_some();
+  let has_image_data = shape
+    .shape_choice
+    .iter()
+    .any(|choice| matches!(choice, v::ShapeChoice::ImageData(_)));
   let filled = direct_fill
     .and_then(|fill| fill.on.map(|value| value.as_bool()))
     .or_else(|| shape.filled.map(|value| value.as_bool()))
@@ -16026,7 +16139,7 @@ fn vml_shape_shape_with_style(
           .or_else(|| shape_type.and_then(|shape_type| shape_type.fill_color.as_deref()))
           .unwrap_or("white"),
       )
-      .filter(|_| fill_image.is_none()),
+      .filter(|_| fill_image.is_none() && !has_image_data),
     fill_image,
     stroked.then_some(
       direct_stroke
@@ -16046,7 +16159,12 @@ fn vml_shape_shape_with_style(
       .then(|| vml_fontwork_shape_geometry(shape.r#type.as_deref(), shape.id.as_deref()))
       .flatten(),
   )?;
-  if !has_fill_image {
+  // LibreOffice's VML importer lowers a shape with `v:imagedata` to one
+  // GraphicObjectShape (vmlshape.cxx, ComplexShape::implConvertAndInsert).
+  // The fill belongs to that picture object's background; materializing it
+  // as a second shape after the image paints an opaque default-white overlay.
+  // Keep the independent shape only for geometry/stroke/textbox semantics.
+  if !has_fill_image && !has_image_data {
     inline.fill_override = Some(Box::new(crate::xlsx::vml_shape_common_fill(
       &common_model,
       Affine::IDENTITY,
@@ -17904,7 +18022,7 @@ fn image_file_image_with_style(
     return None;
   }
 
-  image
+  let mut inline = image
     .image_file_choice
     .iter()
     .find_map(|choice| match choice {
@@ -17916,7 +18034,16 @@ fn image_file_image_with_style(
         images,
       ),
       _ => None,
-    })
+    })?;
+  let signature_line = image
+    .image_file_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::ImageFileChoice::SignatureLine(signature_line) => Some(signature_line.as_ref()),
+      _ => None,
+    });
+  mark_vml_signature_line_semantics(&mut inline, signature_line, images);
+  Some(inline)
 }
 
 fn push_image_file_textboxes(
@@ -17971,7 +18098,7 @@ fn rectangle_image_with_style(
     return None;
   }
 
-  rectangle
+  let mut image = rectangle
     .rectangle_choice
     .iter()
     .find_map(|choice| match choice {
@@ -17983,7 +18110,16 @@ fn rectangle_image_with_style(
         images,
       ),
       _ => None,
-    })
+    })?;
+  let signature_line = rectangle
+    .rectangle_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::RectangleChoice::SignatureLine(signature_line) => Some(signature_line.as_ref()),
+      _ => None,
+    });
+  mark_vml_signature_line_semantics(&mut image, signature_line, images);
+  Some(image)
 }
 
 fn round_rectangle_image(
@@ -18002,19 +18138,30 @@ fn round_rectangle_image_with_style(
     return None;
   }
 
-  round_rectangle
-    .round_rectangle_choice
-    .iter()
-    .find_map(|choice| match choice {
-      v::RoundRectangleChoice::ImageData(data) => vml_image_data(
-        data,
-        style,
-        vml_allow_in_cell(round_rectangle.allow_in_cell),
-        round_rectangle.alternate.clone(),
-        images,
-      ),
-      _ => None,
-    })
+  let mut image =
+    round_rectangle
+      .round_rectangle_choice
+      .iter()
+      .find_map(|choice| match choice {
+        v::RoundRectangleChoice::ImageData(data) => vml_image_data(
+          data,
+          style,
+          vml_allow_in_cell(round_rectangle.allow_in_cell),
+          round_rectangle.alternate.clone(),
+          images,
+        ),
+        _ => None,
+      })?;
+  let signature_line =
+    round_rectangle
+      .round_rectangle_choice
+      .iter()
+      .find_map(|choice| match choice {
+        v::RoundRectangleChoice::SignatureLine(signature_line) => Some(signature_line.as_ref()),
+        _ => None,
+      });
+  mark_vml_signature_line_semantics(&mut image, signature_line, images);
+  Some(image)
 }
 
 fn push_rectangle_textboxes(
@@ -18147,7 +18294,7 @@ fn shape_image_with_style(
     return None;
   }
 
-  shape.shape_choice.iter().find_map(|choice| match choice {
+  let mut image = shape.shape_choice.iter().find_map(|choice| match choice {
     v::ShapeChoice::ImageData(data) => vml_image_data(
       data,
       style,
@@ -18156,7 +18303,85 @@ fn shape_image_with_style(
       images,
     ),
     _ => None,
-  })
+  })?;
+  let signature_line = shape.shape_choice.iter().find_map(|choice| match choice {
+    v::ShapeChoice::SignatureLine(signature_line) => Some(signature_line.as_ref()),
+    _ => None,
+  });
+  mark_vml_signature_line_semantics(&mut image, signature_line, images);
+  Some(image)
+}
+
+fn mark_vml_signature_line_semantics(
+  image: &mut InlineImage,
+  signature_line: Option<&o::SignatureLine>,
+  images: &ImageCatalog,
+) {
+  // ISO/IEC 29500 defines o:signatureline as the marker that its containing
+  // VML shape/image is the visual representation of a signature line.
+  // LibreOffice's ComplexShape follows that marker and keeps the embedded
+  // graphic as the unsigned representation. Unlike an ordinary VML image,
+  // searchable text painted by that EMF/WMF is therefore document content.
+  let signed_image = signature_line
+    .and_then(|signature_line| signature_line.id.as_deref())
+    .and_then(|id| {
+      images
+        .signed_signature_line_images_by_id
+        .get(&id.to_ascii_lowercase())
+    })
+    // The package signature verifier owns validity. The current OOXML import
+    // surface exposes signed objects but not a trust/status API; signed Office
+    // fixture images are therefore selected from the referenced valid object.
+    // Keeping both resources in the catalog leaves invalid-image selection at
+    // this single boundary when package signature status becomes available.
+    .and_then(|images| images.for_validity(true));
+  if let Some(signed_image) = signed_image {
+    image.data = signed_image.data.clone();
+    image.content_type.clone_from(&signed_image.content_type);
+  }
+  let signature_state = if signed_image.is_some() {
+    common::SignatureLineState::SignedValid
+  } else {
+    common::SignatureLineState::Unsigned
+  };
+  let native_signature_text = signature_line.is_some()
+    && crate::render::emf_wmf::supports_semantic_text(image.content_type.as_deref());
+  image.semantic_metafile_text |= native_signature_text;
+  // Word's fixed PDF writes the unsigned signature-line EMF labels as native
+  // text and no image XObject. Suppress those labels from the raster replay
+  // before lifting them, so the same ink is not painted twice.
+  image.metafile_semantic_text_includes_raster_backdrop |= native_signature_text;
+  image.signature_line = signature_line.map(|signature_line| common::SignatureLineProperties {
+    state: signature_state,
+    id: signature_line.id.clone().map(Cow::Owned),
+    provider_id: signature_line.provider_id.clone().map(Cow::Owned),
+    signing_instructions_set: signature_line
+      .signing_instructions_set
+      .as_ref()
+      .is_some_and(|value| value.as_bool()),
+    allow_comments: signature_line
+      .allow_comments
+      .as_ref()
+      .is_some_and(|value| value.as_bool()),
+    // LibreOffice's VML importer follows Office here: omitted
+    // `showsigndate` is true, while omitted `allowcomments` is false.
+    show_sign_date: signature_line
+      .show_sign_date
+      .as_ref()
+      .is_none_or(|value| value.as_bool()),
+    suggested_signer: signature_line.suggested_signer.clone().map(Cow::Owned),
+    suggested_signer_title: signature_line.suggested_signer2.clone().map(Cow::Owned),
+    suggested_signer_email: signature_line
+      .suggested_signer_email
+      .clone()
+      .map(Cow::Owned),
+    signing_instructions: signature_line.signing_instructions.clone().map(Cow::Owned),
+    additional_xml: signature_line.additional_xml.clone().map(Cow::Owned),
+    signature_provider_url: signature_line
+      .signature_provider_url
+      .clone()
+      .map(Cow::Owned),
+  });
 }
 
 fn push_shape_textboxes(
@@ -18500,6 +18725,8 @@ fn vml_image_data(
     alt_text: alt_text.or_else(|| data.title.clone()),
     hyperlink_url: None,
     semantic_metafile_text: false,
+    metafile_semantic_text_includes_raster_backdrop: false,
+    signature_line: None,
     semantic_metafile_font_family: None,
     native_ole_equation: None,
     metafile_native_size: false,
@@ -20526,11 +20753,9 @@ impl StylesCatalog {
       return base_style;
     };
     let mut style = base_style;
-    let mut matched = false;
     let mut vertical_alignment = None;
     for entry in self.style_chain(Some(style_id)) {
       if matches!(entry.style_type, Some(w::StyleValues::Character)) {
-        matched = true;
         let inherited_style = style.clone();
         merge_style_values(&mut style, &entry.run_style);
         apply_run_style_overrides(&mut style, entry.run_overrides);
@@ -20540,13 +20765,25 @@ impl StylesCatalog {
         }
       }
     }
-    if !matched {
-      merge_builtin_character_style(&mut style, style_id);
-    }
     if let Some(vertical_alignment) = vertical_alignment {
       properties::apply_vertical_text_alignment(&mut style, vertical_alignment);
     }
     self.apply_font_substitution(&mut style);
+    style
+  }
+
+  fn synthesized_hyperlink_run_style(&self, base_style: TextStyle) -> TextStyle {
+    let has_authored_style = self
+      .style_chain(Some("Hyperlink"))
+      .into_iter()
+      .any(|entry| matches!(entry.style_type, Some(w::StyleValues::Character)));
+    let mut style = self.character_run_style(Some("Hyperlink"), base_style);
+    if !has_authored_style {
+      // This is an application-generated TOC hyperlink, not a document
+      // w:rStyle reference. Word supplies its built-in Hyperlink appearance
+      // for generated entries even when no corresponding style is serialized.
+      merge_builtin_hyperlink_style(&mut style);
+    }
     style
   }
 
@@ -21342,7 +21579,10 @@ fn resolve_solid_text_fill(
 ) -> Option<ResolvedColor> {
   match fill.solid_color_fill_properties_choice.as_ref()? {
     w14::SolidColorFillPropertiesChoice::RgbColorModelHex(color) => Some(ResolvedColor {
-      color: parse_hex_color(color.val.as_str())?,
+      color: apply_w14_rgb_transforms(
+        parse_hex_color(color.val.as_str())?,
+        &color.rgb_color_model_hex_choice,
+      ),
       opacity: opacity_from_w14_rgb_transforms(&color.rgb_color_model_hex_choice),
     }),
     w14::SolidColorFillPropertiesChoice::SchemeColor(color) => {
@@ -21357,44 +21597,194 @@ fn resolve_solid_text_fill(
 }
 
 fn opacity_from_w14_rgb_transforms(transforms: &[w14::RgbColorModelHexChoice]) -> f32 {
-  opacity_from_w14_alpha(transforms.iter().find_map(|transform| match transform {
-    w14::RgbColorModelHexChoice::Alpha(value) => Some(value.val),
-    _ => None,
-  }))
+  opacity_from_w14_alpha(
+    transforms
+      .iter()
+      .rev()
+      .find_map(|transform| match transform {
+        w14::RgbColorModelHexChoice::Alpha(value) => Some(value.val),
+        _ => None,
+      }),
+  )
 }
 
 fn opacity_from_w14_scheme_transforms(transforms: &[w14::SchemeColorChoice]) -> f32 {
-  opacity_from_w14_alpha(transforms.iter().find_map(|transform| match transform {
-    w14::SchemeColorChoice::Alpha(value) => Some(value.val),
-    _ => None,
-  }))
+  opacity_from_w14_alpha(
+    transforms
+      .iter()
+      .rev()
+      .find_map(|transform| match transform {
+        w14::SchemeColorChoice::Alpha(value) => Some(value.val),
+        _ => None,
+      }),
+  )
 }
 
 fn opacity_from_w14_alpha(alpha: Option<i32>) -> f32 {
-  let transparency = sdk_units::drawingml_percent_to_ratio(alpha.unwrap_or(0)) as f32;
-  (1.0 - transparency).clamp(0.0, 1.0)
+  // [MS-DOCX] CT_SchemeColor/CT_SRgbColor define `alpha` as the specific
+  // opacity of the input color, not its transparency. With no transform the
+  // color remains fully opaque, matching DrawingML's alpha transform.
+  (sdk_units::drawingml_percent_to_ratio(alpha.unwrap_or(100_000)) as f32).clamp(0.0, 1.0)
+}
+
+#[derive(Clone, Copy)]
+enum W14ColorTransform {
+  Tint(i32),
+  Shade(i32),
+  HueMod(i32),
+  Saturation(i32),
+  SaturationOffset(i32),
+  SaturationMod(i32),
+  Luminance(i32),
+  LuminanceOffset(i32),
+  LuminanceMod(i32),
+}
+
+#[derive(Clone, Copy)]
+enum W14ColorState {
+  Rgb([u8; 3]),
+  Hsl(color_math::HslColor),
+}
+
+impl W14ColorState {
+  fn into_rgb(self) -> [u8; 3] {
+    match self {
+      Self::Rgb(rgb) => rgb,
+      Self::Hsl(hsl) => hsl.to_srgb8(),
+    }
+  }
+
+  fn into_hsl(self) -> color_math::HslColor {
+    match self {
+      Self::Rgb(rgb) => color_math::HslColor::from_srgb8(rgb),
+      Self::Hsl(hsl) => hsl,
+    }
+  }
+}
+
+fn w14_transform_ratio(value: i32) -> f32 {
+  sdk_units::drawingml_percent_to_ratio(value) as f32
+}
+
+fn apply_w14_color_transforms(
+  color: RgbColor,
+  transforms: impl IntoIterator<Item = W14ColorTransform>,
+) -> RgbColor {
+  let mut state = W14ColorState::Rgb([color.r, color.g, color.b]);
+  for transform in transforms {
+    state = match transform {
+      W14ColorTransform::Tint(value) => {
+        W14ColorState::Rgb(color_math::drawingml_tint_srgb8(state.into_rgb(), value))
+      }
+      W14ColorTransform::Shade(value) => {
+        W14ColorState::Rgb(color_math::drawingml_shade_srgb8(state.into_rgb(), value))
+      }
+      W14ColorTransform::HueMod(value) => {
+        let mut hsl = state.into_hsl();
+        hsl.hue_degrees = (hsl.hue_degrees * w14_transform_ratio(value)).clamp(0.0, 360.0);
+        W14ColorState::Hsl(hsl)
+      }
+      W14ColorTransform::Saturation(value) => {
+        let mut hsl = state.into_hsl();
+        hsl.saturation = w14_transform_ratio(value).clamp(0.0, 1.0);
+        W14ColorState::Hsl(hsl)
+      }
+      W14ColorTransform::SaturationOffset(value) => {
+        let mut hsl = state.into_hsl();
+        hsl.saturation = (hsl.saturation + w14_transform_ratio(value)).clamp(0.0, 1.0);
+        W14ColorState::Hsl(hsl)
+      }
+      W14ColorTransform::SaturationMod(value) => {
+        let mut hsl = state.into_hsl();
+        hsl.apply_saturation_mod(w14_transform_ratio(value));
+        W14ColorState::Hsl(hsl)
+      }
+      W14ColorTransform::Luminance(value) => {
+        let mut hsl = state.into_hsl();
+        hsl.lightness = w14_transform_ratio(value).clamp(0.0, 1.0);
+        if hsl.lightness == 0.0 || hsl.lightness == 1.0 {
+          hsl.saturation = 0.0;
+        }
+        W14ColorState::Hsl(hsl)
+      }
+      W14ColorTransform::LuminanceOffset(value) => {
+        let mut hsl = state.into_hsl();
+        hsl.apply_luminance_offset(w14_transform_ratio(value));
+        if hsl.lightness == 0.0 || hsl.lightness == 1.0 {
+          hsl.saturation = 0.0;
+        }
+        W14ColorState::Hsl(hsl)
+      }
+      W14ColorTransform::LuminanceMod(value) => {
+        let mut hsl = state.into_hsl();
+        hsl.apply_luminance_mod(w14_transform_ratio(value));
+        if hsl.lightness == 0.0 || hsl.lightness == 1.0 {
+          hsl.saturation = 0.0;
+        }
+        W14ColorState::Hsl(hsl)
+      }
+    };
+  }
+  let [r, g, b] = state.into_rgb();
+  RgbColor { r, g, b }
+}
+
+fn w14_rgb_color_transform(transform: &w14::RgbColorModelHexChoice) -> Option<W14ColorTransform> {
+  Some(match transform {
+    w14::RgbColorModelHexChoice::Tint(value) => W14ColorTransform::Tint(value.val),
+    w14::RgbColorModelHexChoice::Shade(value) => W14ColorTransform::Shade(value.val),
+    w14::RgbColorModelHexChoice::Alpha(_) => return None,
+    w14::RgbColorModelHexChoice::HueModulation(value) => W14ColorTransform::HueMod(value.val),
+    w14::RgbColorModelHexChoice::Saturation(value) => W14ColorTransform::Saturation(value.val),
+    w14::RgbColorModelHexChoice::SaturationOffset(value) => {
+      W14ColorTransform::SaturationOffset(value.val)
+    }
+    w14::RgbColorModelHexChoice::SaturationModulation(value) => {
+      W14ColorTransform::SaturationMod(value.val)
+    }
+    w14::RgbColorModelHexChoice::Luminance(value) => W14ColorTransform::Luminance(value.val),
+    w14::RgbColorModelHexChoice::LuminanceOffset(value) => {
+      W14ColorTransform::LuminanceOffset(value.val)
+    }
+    w14::RgbColorModelHexChoice::LuminanceModulation(value) => {
+      W14ColorTransform::LuminanceMod(value.val)
+    }
+  })
+}
+
+fn w14_scheme_color_transform(transform: &w14::SchemeColorChoice) -> Option<W14ColorTransform> {
+  Some(match transform {
+    w14::SchemeColorChoice::Tint(value) => W14ColorTransform::Tint(value.val),
+    w14::SchemeColorChoice::Shade(value) => W14ColorTransform::Shade(value.val),
+    w14::SchemeColorChoice::Alpha(_) => return None,
+    w14::SchemeColorChoice::HueModulation(value) => W14ColorTransform::HueMod(value.val),
+    w14::SchemeColorChoice::Saturation(value) => W14ColorTransform::Saturation(value.val),
+    w14::SchemeColorChoice::SaturationOffset(value) => {
+      W14ColorTransform::SaturationOffset(value.val)
+    }
+    w14::SchemeColorChoice::SaturationModulation(value) => {
+      W14ColorTransform::SaturationMod(value.val)
+    }
+    w14::SchemeColorChoice::Luminance(value) => W14ColorTransform::Luminance(value.val),
+    w14::SchemeColorChoice::LuminanceOffset(value) => W14ColorTransform::LuminanceOffset(value.val),
+    w14::SchemeColorChoice::LuminanceModulation(value) => {
+      W14ColorTransform::LuminanceMod(value.val)
+    }
+  })
+}
+
+fn apply_w14_rgb_transforms(
+  color: RgbColor,
+  transforms: &[w14::RgbColorModelHexChoice],
+) -> RgbColor {
+  apply_w14_color_transforms(color, transforms.iter().filter_map(w14_rgb_color_transform))
 }
 
 fn apply_w14_scheme_transforms(color: RgbColor, transforms: &[w14::SchemeColorChoice]) -> RgbColor {
-  let mut hsl = hsl_color(color);
-  for transform in transforms {
-    match transform {
-      w14::SchemeColorChoice::Tint(value) => {
-        hsl.apply_tint(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
-      }
-      w14::SchemeColorChoice::Shade(value) => {
-        hsl.apply_shade(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
-      }
-      w14::SchemeColorChoice::LuminanceModulation(value) => {
-        hsl.apply_luminance_mod(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
-      }
-      w14::SchemeColorChoice::LuminanceOffset(value) => {
-        hsl.apply_luminance_offset(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
-      }
-      _ => {}
-    }
-  }
-  rgb_color(hsl)
+  apply_w14_color_transforms(
+    color,
+    transforms.iter().filter_map(w14_scheme_color_transform),
+  )
 }
 
 fn apply_word_tint(color: RgbColor, tint: &str) -> RgbColor {
@@ -21937,15 +22327,13 @@ fn push_unique_style_ref_key(keys: &mut Vec<Arc<str>>, key: &str) {
   keys.push(Arc::<str>::from(key));
 }
 
-fn merge_builtin_character_style(style: &mut TextStyle, style_id: &str) {
-  if style_id.eq_ignore_ascii_case("Hyperlink") {
-    style.underline = true;
-    style.color = RgbColor {
-      r: 0x05,
-      g: 0x63,
-      b: 0xC1,
-    };
-  }
+fn merge_builtin_hyperlink_style(style: &mut TextStyle) {
+  style.underline = true;
+  style.color = RgbColor {
+    r: 0x05,
+    g: 0x63,
+    b: 0xC1,
+  };
 }
 
 fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
@@ -22519,6 +22907,19 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   if values.ligatures.is_some() {
     target.ligatures = values.ligatures;
   }
+  if values.open_type_features.number_form.is_some() {
+    target.open_type_features.number_form = values.open_type_features.number_form;
+  }
+  if values.open_type_features.number_spacing.is_some() {
+    target.open_type_features.number_spacing = values.open_type_features.number_spacing;
+  }
+  if values.open_type_features.contextual_alternates.is_some() {
+    target.open_type_features.contextual_alternates =
+      values.open_type_features.contextual_alternates;
+  }
+  if values.open_type_features.stylistic_sets.is_some() {
+    target.open_type_features.stylistic_sets = values.open_type_features.stylistic_sets;
+  }
   if values.horizontal_scale.is_some() {
     target.horizontal_scale = values.horizontal_scale;
   }
@@ -22572,6 +22973,56 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   }
   if values.highlight.is_some() {
     target.highlight = values.highlight;
+  }
+  // Word 2010 text effects are ordinary effective run properties
+  // ([MS-DOCX] §2.2.1), including when they originate in a paragraph or
+  // character style. Style entries are resolved once and merged later, so
+  // carry their non-default paint/effect state through that cached boundary.
+  if values.pdf_glyph_outlines {
+    target.pdf_glyph_outlines = true;
+  }
+  if values.pdf_glyph_outline_options.is_some() {
+    target
+      .pdf_glyph_outline_options
+      .clone_from(&values.pdf_glyph_outline_options);
+  }
+  if values.text_glow.is_some() {
+    target.text_glow = values.text_glow;
+  }
+  if values.text_shadow.is_some() {
+    target.text_shadow = values.text_shadow;
+  }
+  if values.text_reflection.is_some() {
+    target.text_reflection = values.text_reflection;
+  }
+  if values.wordprocessing_text_3d {
+    target.wordprocessing_text_3d = true;
+  }
+  if let Some(source) = values.wordprocessing_text_3d_parts.as_ref() {
+    if let Some(target) = target.wordprocessing_text_3d_parts.as_mut() {
+      target.merge_from(source);
+    } else {
+      target
+        .wordprocessing_text_3d_parts
+        .clone_from(&values.wordprocessing_text_3d_parts);
+    }
+  }
+  if values.drawingml_text_static3d.is_some() {
+    target
+      .drawingml_text_static3d
+      .clone_from(&values.drawingml_text_static3d);
+  }
+  if (values.opacity - TextStyle::default().opacity).abs() > f32::EPSILON {
+    target.opacity = values.opacity;
+  }
+  if values.outline_color.is_some() {
+    target.outline_color = values.outline_color;
+  }
+  if (values.outline_opacity - TextStyle::default().outline_opacity).abs() > f32::EPSILON {
+    target.outline_opacity = values.outline_opacity;
+  }
+  if (values.outline_width_pt - TextStyle::default().outline_width_pt).abs() > f32::EPSILON {
+    target.outline_width_pt = values.outline_width_pt;
   }
 }
 
@@ -23388,6 +23839,8 @@ fn numbering_drawing_image(
     alt_text,
     hyperlink_url: None,
     semantic_metafile_text: false,
+    metafile_semantic_text_includes_raster_backdrop: false,
+    signature_line: None,
     semantic_metafile_font_family: None,
     native_ole_equation: None,
     metafile_native_size: true,
@@ -25491,6 +25944,46 @@ impl<'a> RunProps<'a> {
     }
   }
 
+  fn numbering_format(&self) -> Option<&'a w14::NumberingFormat> {
+    match self {
+      Self::Direct(properties) => properties.numbering_format.as_ref(),
+      Self::Style(properties) => properties.numbering_format.as_ref(),
+      Self::BaseStyle(properties) => properties.numbering_format.as_ref(),
+      Self::Numbering(properties) => properties.numbering_format.as_ref(),
+      Self::ParagraphMark(properties) => properties.numbering_format.as_ref(),
+    }
+  }
+
+  fn number_spacing(&self) -> Option<&'a w14::NumberSpacing> {
+    match self {
+      Self::Direct(properties) => properties.number_spacing.as_ref(),
+      Self::Style(properties) => properties.number_spacing.as_ref(),
+      Self::BaseStyle(properties) => properties.number_spacing.as_ref(),
+      Self::Numbering(properties) => properties.number_spacing.as_ref(),
+      Self::ParagraphMark(properties) => properties.number_spacing.as_ref(),
+    }
+  }
+
+  fn stylistic_sets(&self) -> Option<&'a w14::StylisticSets> {
+    match self {
+      Self::Direct(properties) => properties.stylistic_sets.as_ref(),
+      Self::Style(properties) => properties.stylistic_sets.as_ref(),
+      Self::BaseStyle(properties) => properties.stylistic_sets.as_ref(),
+      Self::Numbering(properties) => properties.stylistic_sets.as_ref(),
+      Self::ParagraphMark(properties) => properties.stylistic_sets.as_ref(),
+    }
+  }
+
+  fn contextual_alternatives(&self) -> Option<&'a w14::ContextualAlternatives> {
+    match self {
+      Self::Direct(properties) => properties.contextual_alternatives.as_ref(),
+      Self::Style(properties) => properties.contextual_alternatives.as_ref(),
+      Self::BaseStyle(properties) => properties.contextual_alternatives.as_ref(),
+      Self::Numbering(properties) => properties.contextual_alternatives.as_ref(),
+      Self::ParagraphMark(properties) => properties.contextual_alternatives.as_ref(),
+    }
+  }
+
   fn text_fill(&self) -> Option<&'a w14::FillTextEffect> {
     match self {
       Self::Direct(properties) => properties.fill_text_effect.as_deref(),
@@ -25538,6 +26031,26 @@ impl<'a> RunProps<'a> {
       Self::BaseStyle(_) => None,
       Self::Numbering(properties) => properties.reflection.as_ref(),
       Self::ParagraphMark(properties) => properties.reflection.as_ref(),
+    }
+  }
+
+  fn text_scene_3d(&self) -> Option<&'a w14::Scene3D> {
+    match self {
+      Self::Direct(properties) => properties.scene3_d.as_deref(),
+      Self::Style(properties) => properties.scene3_d.as_deref(),
+      Self::BaseStyle(_) => None,
+      Self::Numbering(properties) => properties.scene3_d.as_deref(),
+      Self::ParagraphMark(properties) => properties.scene3_d.as_deref(),
+    }
+  }
+
+  fn text_properties_3d(&self) -> Option<&'a w14::Properties3D> {
+    match self {
+      Self::Direct(properties) => properties.properties3_d.as_deref(),
+      Self::Style(properties) => properties.properties3_d.as_deref(),
+      Self::BaseStyle(_) => None,
+      Self::Numbering(properties) => properties.properties3_d.as_deref(),
+      Self::ParagraphMark(properties) => properties.properties3_d.as_deref(),
     }
   }
 
@@ -25785,6 +26298,99 @@ fn line_numbering_model(properties: &w::LineNumberType) -> Option<LineNumbering>
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn word_2010_saturation_modulation_matches_drawingml_hsl_examples() {
+    // ECMA-376 Part 1 §20.1.2.3.27 gives this exact 20% saturation example.
+    assert_eq!(
+      apply_w14_scheme_transforms(
+        RgbColor { r: 0, g: 255, b: 0 },
+        &[w14::SchemeColorChoice::SaturationModulation(
+          w14::SaturationModulation { val: 20_000 },
+        )],
+      ),
+      RgbColor {
+        r: 0x66,
+        g: 0x99,
+        b: 0x66,
+      }
+    );
+
+    let transformed = apply_w14_scheme_transforms(
+      RgbColor {
+        r: 0x70,
+        g: 0xad,
+        b: 0x47,
+      },
+      &[w14::SchemeColorChoice::SaturationModulation(
+        w14::SaturationModulation { val: 175_000 },
+      )],
+    );
+
+    // TextEffects_Glow_Shadow_Reflection.docx supplies the non-primary-color
+    // counterexample. Its Office PDF stores a premultiplied RGB plane plus a
+    // separate SMask, so one 8-bit sample cannot uniquely recover the straight
+    // blue channel; keep the portable HSL result authoritative here.
+    assert_eq!(
+      transformed,
+      RgbColor {
+        r: 105,
+        g: 211,
+        b: 33,
+      }
+    );
+  }
+
+  #[test]
+  fn word_2010_color_transforms_cover_rgb_and_hsl_operations_in_order() {
+    let green = RgbColor { r: 0, g: 255, b: 0 };
+    assert_eq!(
+      apply_w14_scheme_transforms(
+        green,
+        &[w14::SchemeColorChoice::Tint(w14::Tint { val: 50_000 })]
+      ),
+      RgbColor {
+        r: 188,
+        g: 255,
+        b: 188,
+      }
+    );
+    assert_eq!(
+      apply_w14_scheme_transforms(
+        green,
+        &[w14::SchemeColorChoice::Shade(w14::Shade { val: 50_000 })]
+      ),
+      RgbColor { r: 0, g: 188, b: 0 }
+    );
+
+    let rgb = apply_w14_rgb_transforms(
+      RgbColor { r: 0, g: 0, b: 255 },
+      &[
+        w14::RgbColorModelHexChoice::HueModulation(w14::HueModulation { val: 50_000 }),
+        w14::RgbColorModelHexChoice::Saturation(w14::Saturation { val: 80_000 }),
+        w14::RgbColorModelHexChoice::SaturationOffset(w14::SaturationOffset { val: -10_000 }),
+        w14::RgbColorModelHexChoice::SaturationModulation(w14::SaturationModulation {
+          val: 50_000,
+        }),
+        w14::RgbColorModelHexChoice::Luminance(w14::Luminance { val: 40_000 }),
+        w14::RgbColorModelHexChoice::LuminanceOffset(w14::LuminanceOffset { val: 10_000 }),
+        w14::RgbColorModelHexChoice::LuminanceModulation(w14::LuminanceModulation { val: 50_000 }),
+      ],
+    );
+    let scheme = apply_w14_scheme_transforms(
+      RgbColor { r: 0, g: 0, b: 255 },
+      &[
+        w14::SchemeColorChoice::HueModulation(w14::HueModulation { val: 50_000 }),
+        w14::SchemeColorChoice::Saturation(w14::Saturation { val: 80_000 }),
+        w14::SchemeColorChoice::SaturationOffset(w14::SaturationOffset { val: -10_000 }),
+        w14::SchemeColorChoice::SaturationModulation(w14::SaturationModulation { val: 50_000 }),
+        w14::SchemeColorChoice::Luminance(w14::Luminance { val: 40_000 }),
+        w14::SchemeColorChoice::LuminanceOffset(w14::LuminanceOffset { val: 10_000 }),
+        w14::SchemeColorChoice::LuminanceModulation(w14::LuminanceModulation { val: 50_000 }),
+      ],
+    );
+    assert_eq!(rgb, scheme);
+  }
 
   #[test]
   fn activex_semantic_font_prefers_persistence_and_uses_host_for_omitted_name() {
@@ -26221,6 +26827,194 @@ mod tests {
     });
 
     assert_eq!(properties.camera_adjusted_rotation_deg(12.0), 12.0);
+  }
+
+  #[test]
+  fn wps_body_static_3d_is_inherited_by_its_text_runs() {
+    let source = wps::WordprocessingShape::from_bytes(
+      br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <wps:cNvSpPr txBox="1"/>
+        <wps:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1828800" cy="914400"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/><a:ln><a:noFill/></a:ln>
+        </wps:spPr>
+        <wps:txbx><w:txbxContent><w:p><w:r><w:t>3-D text</w:t></w:r></w:p></w:txbxContent></wps:txbx>
+        <wps:bodyPr>
+          <a:noAutofit/>
+          <a:scene3d>
+            <a:camera prst="perspectiveLeft"/>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+          <a:sp3d extrusionH="63500" contourW="12700">
+            <a:extrusionClr><a:srgbClr val="CC8844"/></a:extrusionClr>
+            <a:contourClr><a:srgbClr val="336699"/></a:contourClr>
+          </a:sp3d>
+        </wps:bodyPr>
+      </wps:wsp>"#,
+    )
+    .expect("WPS text body with static 3-D");
+    let frame = wordprocessing_shape_textbox_frame(
+      &source,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      DrawingTextBoxImportContext {
+        base_style: TextStyle::default(),
+        styles: &StylesCatalog::default(),
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+      },
+    )
+    .expect("WPS textbox frame");
+
+    let [Block::Paragraph(paragraph)] = frame.text_box_blocks.as_slice() else {
+      panic!("one WPS text paragraph");
+    };
+    let [InlineItem::Text(run)] = paragraph.inlines.as_slice() else {
+      panic!("one WPS text run");
+    };
+    let style = run
+      .style
+      .drawingml_text_static3d
+      .as_ref()
+      .expect("body static 3-D must reach the run");
+    assert_eq!(
+      style.scene.camera.preset,
+      a::PresetCameraValues::PerspectiveLeft
+    );
+    assert_eq!(
+      style.shape.extrusion_height.map(|value| value.to_emu()),
+      Some(63_500)
+    );
+    assert_eq!(
+      style.shape.contour_width.map(|value| value.to_emu()),
+      Some(12_700)
+    );
+    assert_eq!(
+      style.extrusion_color.map(|color| color.color),
+      Some(RgbColor {
+        r: 0xcc,
+        g: 0x88,
+        b: 0x44,
+      })
+    );
+    assert_eq!(
+      style.contour_color.map(|color| color.color),
+      Some(RgbColor {
+        r: 0x33,
+        g: 0x66,
+        b: 0x99,
+      })
+    );
+  }
+
+  #[test]
+  fn wps_flat_text_excludes_the_text_body_from_its_3d_scene() {
+    let properties = wps::TextBodyProperties::from_bytes(
+      br#"<wps:bodyPr xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:scene3d>
+          <a:camera prst="perspectiveLeft"/>
+          <a:lightRig rig="threePt" dir="t"/>
+        </a:scene3d>
+        <a:flatTx z="0"/>
+      </wps:bodyPr>"#,
+    )
+    .expect("WPS flat text body");
+
+    assert!(
+      wordprocessing_text_static3d(&properties, &ThemeColors::default()).is_none(),
+      "a:flatTx is the schema-level counterexample to text-body extrusion"
+    );
+  }
+
+  #[test]
+  fn wps_body_scene_combines_with_complete_word_2010_run_3d_properties() {
+    let source = wps::WordprocessingShape::from_bytes(
+      br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">
+        <wps:cNvSpPr txBox="1"/>
+        <wps:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1828800" cy="914400"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/><a:ln><a:noFill/></a:ln>
+        </wps:spPr>
+        <wps:txbx><w:txbxContent><w:p><w:r>
+          <w:rPr><w14:props3d w14:extrusionH="63500" w14:contourW="12700" w14:prstMaterial="warmMatte">
+            <w14:bevelT w14:w="38100" w14:h="38100" w14:prst="circle"/>
+            <w14:extrusionClr><w14:srgbClr w14:val="CC8844"/></w14:extrusionClr>
+            <w14:contourClr><w14:srgbClr w14:val="336699"/></w14:contourClr>
+          </w14:props3d></w:rPr><w:t>3-D text</w:t>
+        </w:r></w:p></w:txbxContent></wps:txbx>
+        <wps:bodyPr><a:scene3d>
+          <a:camera prst="perspectiveLeft"/>
+          <a:lightRig rig="threePt" dir="t"/>
+        </a:scene3d><a:sp3d extrusionH="12700"/></wps:bodyPr>
+      </wps:wsp>"#,
+    )
+    .expect("WPS body scene and Word 2010 run 3-D");
+    let frame = wordprocessing_shape_textbox_frame(
+      &source,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      DrawingTextBoxImportContext {
+        base_style: TextStyle::default(),
+        styles: &StylesCatalog::default(),
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+      },
+    )
+    .expect("WPS textbox frame");
+    let [Block::Paragraph(paragraph)] = frame.text_box_blocks.as_slice() else {
+      panic!("one WPS text paragraph");
+    };
+    let [InlineItem::Text(run)] = paragraph.inlines.as_slice() else {
+      panic!("one WPS text run");
+    };
+    let style = common::drawingml_3d::resolve_static_3d_style(
+      run.style.drawingml_text_static3d.as_ref(),
+      run.style.wordprocessing_text_3d_parts.as_ref(),
+    )
+    .expect("body scene plus run shape must form one complete 3-D style");
+
+    assert_eq!(
+      style.scene.camera.preset,
+      a::PresetCameraValues::PerspectiveLeft
+    );
+    assert_eq!(
+      style.shape.extrusion_height.map(|value| value.to_emu()),
+      Some(63_500)
+    );
+    assert_eq!(
+      style.shape.contour_width.map(|value| value.to_emu()),
+      Some(12_700)
+    );
+    assert_eq!(
+      style.shape.preset_material,
+      Some(a::PresetMaterialTypeValues::WarmMatte)
+    );
+    assert_eq!(
+      style
+        .shape
+        .bevel_top
+        .as_ref()
+        .and_then(|bevel| bevel.preset),
+      Some(a::BevelPresetValues::Circle)
+    );
+    assert_eq!(
+      style.extrusion_color.map(|color| color.color),
+      Some(RgbColor {
+        r: 0xcc,
+        g: 0x88,
+        b: 0x44,
+      })
+    );
+    assert_eq!(
+      style.contour_color.map(|color| color.color),
+      Some(RgbColor {
+        r: 0x33,
+        g: 0x66,
+        b: 0x99,
+      })
+    );
   }
 
   #[test]
@@ -32107,6 +32901,126 @@ mod tests {
   }
 
   #[test]
+  fn vml_shape_image_data_does_not_materialize_an_overpainting_fill() {
+    let shape_type = v::Shapetype {
+      id: Some("_x0000_t201".into()),
+      filled: Some(true.into()),
+      fill_color: Some("white".into()),
+      stroked: Some(true.into()),
+      stroke_color: Some("red".into()),
+      ..Default::default()
+    };
+    let shape = v::Shape {
+      r#type: Some("#_x0000_t201".into()),
+      style: Some("width:72pt;height:24pt".into()),
+      shape_choice: vec![v::ShapeChoice::ImageData(Box::default())],
+      ..Default::default()
+    };
+
+    let inline = vml_shape_shape(&shape, &ImageCatalog::default(), &[&shape_type])
+      .expect("VML image stroke shape");
+
+    assert_eq!(inline.fill_color, None);
+    assert!(inline.fill_override.is_none());
+    assert_eq!(
+      inline.stroke.as_ref().map(|stroke| stroke.color),
+      Some(RgbColor { r: 255, g: 0, b: 0 })
+    );
+  }
+
+  #[test]
+  fn vml_signature_line_metafile_exposes_semantic_text_only_for_the_marked_shape() {
+    let mut catalog = ImageCatalog::default();
+    catalog.by_relationship_id.insert(
+      "rId1".into(),
+      package::ImageResource {
+        data: vec![1, 2, 3].into(),
+        content_type: Some("image/x-emf".into()),
+      },
+    );
+    let ordinary_shape = v::Shape {
+      style: Some("width:192pt;height:96pt".into()),
+      shape_choice: vec![v::ShapeChoice::ImageData(Box::new(v::ImageData {
+        relationship_id: Some("rId1".into()),
+        ..Default::default()
+      }))],
+      ..Default::default()
+    };
+    let mut signature_shape = ordinary_shape.clone();
+    signature_shape
+      .shape_choice
+      .push(v::ShapeChoice::SignatureLine(Box::new(o::SignatureLine {
+        id: Some("{0EBE47D5-A1BD-4C9E-A52E-6256E5C345E9}".into()),
+        suggested_signer: Some("John Doe".into()),
+        suggested_signer2: Some("Farmer".into()),
+        allow_comments: Some(true.into()),
+        ..Default::default()
+      })));
+
+    let ordinary = shape_image(&ordinary_shape, &catalog).expect("ordinary VML metafile");
+    assert!(!ordinary.semantic_metafile_text);
+    assert!(!ordinary.metafile_semantic_text_includes_raster_backdrop);
+    assert!(ordinary.signature_line.is_none());
+    let signature = shape_image(&signature_shape, &catalog).expect("signature-line VML metafile");
+    assert!(signature.semantic_metafile_text);
+    assert!(signature.metafile_semantic_text_includes_raster_backdrop);
+    let properties = signature.signature_line.expect("signature-line metadata");
+    assert_eq!(properties.suggested_signer.as_deref(), Some("John Doe"));
+    assert_eq!(properties.suggested_signer_title.as_deref(), Some("Farmer"));
+    assert!(properties.show_sign_date);
+    assert!(properties.allow_comments);
+  }
+
+  #[test]
+  fn vml_signed_signature_line_uses_the_matching_package_signature_image() {
+    let signature_id = "{DEE0514B-13E8-4674-A831-46E3CDB18BB4}";
+    let mut catalog = ImageCatalog::default();
+    catalog.by_relationship_id.insert(
+      "rId1".into(),
+      package::ImageResource {
+        data: vec![1, 2, 3].into(),
+        content_type: Some("image/x-emf".into()),
+      },
+    );
+    catalog.signed_signature_line_images_by_id.insert(
+      signature_id.to_ascii_lowercase(),
+      package::SignatureLineImages {
+        valid: package::ImageResource {
+          data: vec![9, 8, 7].into(),
+          content_type: Some("image/x-emf".into()),
+        },
+        invalid: None,
+      },
+    );
+    let shape = v::Shape {
+      style: Some("width:192pt;height:96pt".into()),
+      shape_choice: vec![
+        v::ShapeChoice::ImageData(Box::new(v::ImageData {
+          relationship_id: Some("rId1".into()),
+          ..Default::default()
+        })),
+        v::ShapeChoice::SignatureLine(Box::new(o::SignatureLine {
+          id: Some(signature_id.into()),
+          ..Default::default()
+        })),
+      ],
+      ..Default::default()
+    };
+
+    let image = shape_image(&shape, &catalog).expect("signed signature-line VML image");
+    assert_eq!(image.data.as_ref(), &[9, 8, 7]);
+    assert_eq!(
+      image
+        .signature_line
+        .as_ref()
+        .map(|properties| properties.state),
+      Some(common::SignatureLineState::SignedValid)
+    );
+    assert!(image.semantic_metafile_text);
+    assert!(image.metafile_semantic_text_includes_raster_backdrop);
+  }
+
+  #[test]
   fn vml_style_rotation_accepts_fixed_degrees() {
     let style = vml_image_style(Some("width:20pt;height:10pt;rotation:5898240fd;flip:x"));
 
@@ -32790,6 +33704,34 @@ mod tests {
   }
 
   #[test]
+  fn missing_character_style_reference_does_not_apply_builtin_hyperlink_formatting() {
+    let catalog = StylesCatalog::default();
+    let base = TextStyle {
+      color: RgbColor {
+        r: 0x12,
+        g: 0x34,
+        b: 0x56,
+      },
+      ..Default::default()
+    };
+
+    let referenced = catalog.character_run_style(Some("Hyperlink"), base.clone());
+    assert!(!referenced.underline);
+    assert_eq!(referenced.color, base.color);
+
+    let synthesized = catalog.synthesized_hyperlink_run_style(base);
+    assert!(synthesized.underline);
+    assert_eq!(
+      synthesized.color,
+      RgbColor {
+        r: 0x05,
+        g: 0x63,
+        b: 0xc1,
+      }
+    );
+  }
+
+  #[test]
   fn style_toggle_overrides_preserve_omitted_true_values() {
     let properties = w::StyleRunProperties::from_bytes(
       br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:b/><w:bCs/><w:i/><w:iCs/><w:caps/><w:smallCaps/><w:strike/><w:outline/><w:shadow/><w:emboss/><w:imprint/><w:vanish/></w:rPr>"#,
@@ -32996,6 +33938,93 @@ mod tests {
         discretionary: false,
       })
     );
+  }
+
+  #[test]
+  fn run_style_imports_the_complete_word_2010_opentype_controls() {
+    let properties = w::RunPropertiesBaseStyle {
+      numbering_format: Some(w14::NumberingFormat {
+        val: w14::NumberFormValues::OldStyle,
+      }),
+      number_spacing: Some(w14::NumberSpacing {
+        val: w14::NumberSpacingValues::Tabular,
+      }),
+      contextual_alternatives: Some(w14::ContextualAlternatives {
+        val: Some(w14::OnOffValues::Zero),
+      }),
+      stylistic_sets: Some(w14::StylisticSets {
+        style_set: vec![
+          w14::StyleSet { id: 1, val: None },
+          w14::StyleSet {
+            id: 4,
+            val: Some(w14::OnOffValues::False),
+          },
+          w14::StyleSet {
+            id: 20,
+            val: Some(w14::OnOffValues::One),
+          },
+          w14::StyleSet {
+            id: 21,
+            val: Some(w14::OnOffValues::True),
+          },
+        ],
+      }),
+      ..Default::default()
+    };
+    let mut style = TextStyle::default();
+
+    properties::merge_run_style(
+      &mut style,
+      Some(RunProps::BaseStyle(&properties)),
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+    );
+
+    assert_eq!(
+      style.open_type_features.number_form,
+      Some(common::OpenTypeNumberForm::OldStyle)
+    );
+    assert_eq!(
+      style.open_type_features.number_spacing,
+      Some(common::OpenTypeNumberSpacing::Tabular)
+    );
+    assert_eq!(style.open_type_features.contextual_alternates, Some(false));
+    let stylistic_sets = style
+      .open_type_features
+      .stylistic_sets
+      .expect("explicit stylistic sets");
+    assert!(stylistic_sets.contains(1));
+    assert!(!stylistic_sets.contains(4));
+    assert!(stylistic_sets.contains(20));
+    assert!(!stylistic_sets.contains(21));
+  }
+
+  #[test]
+  fn explicit_word_2010_defaults_clear_inherited_opentype_controls() {
+    let mut inherited_sets = common::OpenTypeStylisticSets::default();
+    inherited_sets.enable(3);
+    let mut style = TextStyle {
+      open_type_features: common::OpenTypeFeatureSettings {
+        number_form: Some(common::OpenTypeNumberForm::OldStyle),
+        number_spacing: Some(common::OpenTypeNumberSpacing::Tabular),
+        contextual_alternates: Some(true),
+        stylistic_sets: Some(inherited_sets),
+      },
+      ..Default::default()
+    };
+    let values = TextStyle {
+      open_type_features: common::OpenTypeFeatureSettings {
+        number_form: Some(common::OpenTypeNumberForm::Default),
+        number_spacing: Some(common::OpenTypeNumberSpacing::Default),
+        contextual_alternates: Some(false),
+        stylistic_sets: Some(common::OpenTypeStylisticSets::default()),
+      },
+      ..Default::default()
+    };
+
+    merge_style_values(&mut style, &values);
+
+    assert_eq!(style.open_type_features, values.open_type_features);
   }
 
   #[test]
@@ -33858,7 +34887,23 @@ mod tests {
         b: 0x35,
       }
     );
-    assert!((resolved.opacity - 0.8).abs() < 0.001);
+    assert!((resolved.opacity - 0.2).abs() < 0.001);
+
+    let stroke = wordprocessing_text_outline_common_stroke(&outline, &theme_colors)
+      .expect("complete Word 2010 outline stroke");
+    assert!((stroke.width.0 - 18.0).abs() < f32::EPSILON);
+    assert_eq!(stroke.color.r, 0x95);
+    assert_eq!(stroke.color.g, 0x37);
+    assert_eq!(stroke.color.b, 0x35);
+    assert_eq!(stroke.color.a, 51);
+    assert_eq!(stroke.cap, Some(common::StrokeCap::Round));
+    assert_eq!(stroke.compound, Some(common::StrokeCompound::Single));
+    assert_eq!(stroke.alignment, Some(common::StrokeAlignment::Center));
+    assert_eq!(
+      stroke.preset_dash,
+      Some(common::StrokeDashPreset::SystemDot)
+    );
+    assert_eq!(stroke.join, Some(common::StrokeJoin::Bevel));
   }
 
   #[test]
@@ -34050,5 +35095,73 @@ mod tests {
       })
     );
     assert!((style.outline_opacity - 0.8).abs() < 0.001);
+    assert!(style.pdf_glyph_outlines);
+    assert!(
+      !style
+        .pdf_glyph_outline_options
+        .as_deref()
+        .expect("painted outline options")
+        .semantic_text_overlay
+    );
+  }
+
+  #[test]
+  fn no_fill_painted_outline_retains_semantic_text_counterexample() {
+    let properties = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:textFill><w14:noFill/></w14:textFill><w14:textOutline w14:w="9004"><w14:solidFill><w14:srgbClr w14:val="C0504D"/></w14:solidFill></w14:textOutline></w:rPr>"#,
+    )
+    .expect("no-fill outlined run properties");
+    let style = properties::run_style(
+      Some(&properties),
+      TextStyle::default(),
+      &StylesCatalog::default(),
+    );
+
+    assert!(style.pdf_glyph_outlines);
+    assert!(style.opacity <= f32::EPSILON);
+    assert!(
+      style
+        .pdf_glyph_outline_options
+        .as_deref()
+        .expect("outlined no-fill options")
+        .semantic_text_overlay
+    );
+  }
+
+  #[test]
+  fn paragraph_style_inherits_word_2010_effects_and_3d_flattening() {
+    let properties = w::StyleRunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:sz w:val="96"/><w14:glow w14:rad="63500"><w14:srgbClr w14:val="00B0F0"/></w14:glow><w14:textOutline w14:w="25400"><w14:solidFill><w14:srgbClr w14:val="0070C0"/></w14:solidFill></w14:textOutline><w14:props3d w14:extrusionH="57150"/></w:rPr>"#,
+    )
+    .expect("style run properties with text effects");
+    let mut catalog = StylesCatalog::default();
+    let mut entry = StyleEntry::default();
+    properties::merge_run_style(
+      &mut entry.run_style,
+      Some(RunProps::Style(&properties)),
+      &catalog.theme_fonts,
+      &catalog.theme_colors,
+    );
+    entry.run_overrides = run_style_overrides(Some(RunProps::Style(&properties)));
+    catalog.styles.insert("TextEffectsStyle".into(), entry);
+
+    let inherited = catalog.run_style_with_base(
+      Some("TextEffectsStyle"),
+      TextStyle::default(),
+      RunStyleOverrides::default(),
+    );
+
+    assert!((inherited.font_size_pt - 48.0).abs() < f32::EPSILON);
+    assert!(inherited.text_glow.is_some());
+    assert!(inherited.pdf_glyph_outlines);
+    assert_eq!(
+      inherited.outline_color,
+      Some(RgbColor {
+        r: 0,
+        g: 112,
+        b: 192
+      })
+    );
+    assert!(inherited.wordprocessing_text_3d);
   }
 }

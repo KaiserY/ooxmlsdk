@@ -335,6 +335,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
     semantic_metafile_text,
     metafile_semantic_text_includes_raster_backdrop: false,
+    signature_line: None,
     metafile_native_size: false,
     floating: item.floating,
     behind_text: item.behind_text,

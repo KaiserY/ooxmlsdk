@@ -21,8 +21,75 @@ pub(crate) struct Static3dStyle {
   pub(crate) contour_color: Option<Static3dColor>,
 }
 
+/// Independently inheritable scene and shape properties attached to a text
+/// run. Word 2010 stores `w14:scene3d` and `w14:props3d` as separate `rPr`
+/// children, so either half can be supplied by a style while the text body's
+/// DrawingML 3-D properties supply the other half.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct Static3dStyleParts {
+  pub(crate) scene: Option<Box<a::Scene3DType>>,
+  pub(crate) shape: Option<Box<a::Shape3DType>>,
+  pub(crate) extrusion_color: Option<Static3dColor>,
+  pub(crate) contour_color: Option<Static3dColor>,
+}
+
+impl Static3dStyleParts {
+  pub(crate) fn merge_from(&mut self, source: &Self) {
+    if source.scene.is_some() {
+      self.scene.clone_from(&source.scene);
+    }
+    if source.shape.is_some() {
+      self.shape.clone_from(&source.shape);
+      self.extrusion_color = source.extrusion_color;
+      self.contour_color = source.contour_color;
+    }
+  }
+}
+
+pub(crate) fn resolve_static_3d_style(
+  body: Option<&Static3dStyle>,
+  run: Option<&Static3dStyleParts>,
+) -> Option<Static3dStyle> {
+  let scene = run
+    .and_then(|run| run.scene.clone())
+    .or_else(|| body.map(|body| body.scene.clone()))?;
+  let run_supplies_shape = run.is_some_and(|run| run.shape.is_some());
+  let shape = run
+    .and_then(|run| run.shape.clone())
+    .or_else(|| body.map(|body| body.shape.clone()))?;
+  let (extrusion_color, contour_color) = if run_supplies_shape {
+    let run = run.expect("run shape source");
+    (run.extrusion_color, run.contour_color)
+  } else {
+    body.map_or((None, None), |body| {
+      (body.extrusion_color, body.contour_color)
+    })
+  };
+  Some(Static3dStyle {
+    scene,
+    shape,
+    extrusion_color,
+    contour_color,
+  })
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct Static3dPadding {
+  pub(crate) left_pt: f32,
+  pub(crate) top_pt: f32,
+  pub(crate) right_pt: f32,
+  pub(crate) bottom_pt: f32,
+}
+
+/// Projected page-plane range of a 3-D surface, expressed relative to the
+/// unprojected model surface's top-left corner.
+///
+/// Unlike [`Static3dPadding`], this preserves translations and contractions.
+/// A perspective camera can move every projected point to one side of the
+/// original rectangle, which cannot be represented by four non-negative
+/// padding values.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Static3dOutputBounds {
   pub(crate) left_pt: f32,
   pub(crate) top_pt: f32,
   pub(crate) right_pt: f32,
@@ -304,6 +371,47 @@ pub(crate) fn output_padding(
   width_pt: f32,
   height_pt: f32,
 ) -> Static3dPadding {
+  let bounds = projected_output_bounds(projection, shape, width_pt, height_pt);
+  Static3dPadding {
+    left_pt: (-bounds.left_pt).max(0.0),
+    top_pt: (-bounds.top_pt).max(0.0),
+    right_pt: (bounds.right_pt - width_pt).max(0.0),
+    bottom_pt: (bounds.bottom_pt - height_pt).max(0.0),
+  }
+}
+
+/// Returns the projected range of the complete model surface.
+pub(crate) fn projected_output_bounds(
+  projection: Static3dProjection,
+  shape: &a::Shape3DType,
+  width_pt: f32,
+  height_pt: f32,
+) -> Static3dOutputBounds {
+  projected_region_output_bounds(
+    projection,
+    shape,
+    width_pt,
+    height_pt,
+    Static3dOutputBounds {
+      left_pt: 0.0,
+      top_pt: 0.0,
+      right_pt: width_pt,
+      bottom_pt: height_pt,
+    },
+  )
+}
+
+/// Returns the projected range of one painted region inside a larger model
+/// surface. Text is the important case: glyph ink occupies only a small part
+/// of its owning text frame, while perspective and lighting are evaluated in
+/// the coordinate system of the complete text frame.
+pub(crate) fn projected_region_output_bounds(
+  projection: Static3dProjection,
+  shape: &a::Shape3DType,
+  model_width_pt: f32,
+  model_height_pt: f32,
+  region: Static3dOutputBounds,
+) -> Static3dOutputBounds {
   let depth_pt = shape
     .extrusion_height
     .map(|value| value.to_emu() as f32 / EMUS_PER_POINT)
@@ -316,6 +424,18 @@ pub(crate) fn output_padding(
     .contour_width
     .map(|value| value.to_emu() as f32 / EMUS_PER_POINT)
     .unwrap_or(0.0);
+  let top_bevel_height_pt = shape.bevel_top.as_ref().map_or(0.0, |bevel| {
+    bevel
+      .height
+      .or(bevel.width)
+      .map_or(0.0, |value| value.to_emu() as f32 / EMUS_PER_POINT)
+  });
+  let bottom_bevel_height_pt = shape.bevel_bottom.as_ref().map_or(0.0, |bevel| {
+    bevel
+      .height
+      .or(bevel.width)
+      .map_or(0.0, |value| value.to_emu() as f32 / EMUS_PER_POINT)
+  });
   // DrawingML's front plane is located at `z`; extrusion extends behind it
   // to `z - extrusionH`. LibreOffice expresses the same interval as
   // forwardDepth=z and backwardDepth=extrusionH-z before translating the
@@ -325,11 +445,22 @@ pub(crate) fn output_padding(
   let mut min_y = f32::INFINITY;
   let mut max_x = f32::NEG_INFINITY;
   let mut max_y = f32::NEG_INFINITY;
-  for depth in [z_pt, z_pt - depth_pt] {
-    for x in [-width_pt * 0.5, width_pt * 0.5] {
-      for y in [-height_pt * 0.5, height_pt * 0.5] {
-        let (projected_x, projected_y) =
-          project_local(projection, x, y, depth, width_pt, height_pt);
+  for depth in [
+    z_pt + top_bevel_height_pt,
+    z_pt,
+    z_pt - depth_pt,
+    z_pt - depth_pt - bottom_bevel_height_pt,
+  ] {
+    for x in [region.left_pt, region.right_pt] {
+      for y in [region.top_pt, region.bottom_pt] {
+        let (projected_x, projected_y) = project_local(
+          projection,
+          x - model_width_pt * 0.5,
+          y - model_height_pt * 0.5,
+          depth,
+          model_width_pt,
+          model_height_pt,
+        );
         min_x = min_x.min(projected_x);
         min_y = min_y.min(projected_y);
         max_x = max_x.max(projected_x);
@@ -340,16 +471,59 @@ pub(crate) fn output_padding(
   // ECMA-376 §20.1.5.3-4 defines bevel width as an inset into the face and
   // MS-OI29500 §20.1.10.9 defines bevel height along the z axis. A bevel
   // therefore does not enlarge the 2-D silhouette for an orthographic-front
-  // camera. Camera-projected z travel is already represented by the
-  // front/back depth bounds above; only a contour grows every edge in screen
-  // space.
+  // camera. For a rotated or perspective camera its authored height does
+  // move the edge in screen space, so the depth bounds above include both
+  // bevel terminal planes. Only a contour grows every edge in screen space.
   let edge = contour_pt;
-  Static3dPadding {
-    left_pt: (-width_pt * 0.5 - min_x).max(0.0) + edge,
-    top_pt: (-height_pt * 0.5 - min_y).max(0.0) + edge,
-    right_pt: (max_x - width_pt * 0.5).max(0.0) + edge,
-    bottom_pt: (max_y - height_pt * 0.5).max(0.0) + edge,
+  Static3dOutputBounds {
+    left_pt: min_x + model_width_pt * 0.5 - edge,
+    top_pt: min_y + model_height_pt * 0.5 - edge,
+    right_pt: max_x + model_width_pt * 0.5 + edge,
+    bottom_pt: max_y + model_height_pt * 0.5 + edge,
   }
+}
+
+/// Projects the authored planar face into the 3-D scene without adding the
+/// extrusion, contour, bevel, material lighting, or back face.
+///
+/// Word text effects consume this front-plane image: their glyph counters
+/// follow the camera, but a shadow, glow, or reflection must not inherit the
+/// solid's side faces. Microsoft's Direct2D 3-D transform has the same bitmap
+/// input boundary; solid construction remains a separate stage below.
+pub(crate) fn project_static_3d_front_face(
+  source: &RgbaImage,
+  projection: Static3dProjection,
+  shape: &a::Shape3DType,
+  pixels_per_point: f32,
+  model_surface: Option<Static3dSurface>,
+) -> RgbaImage {
+  let Some(bounds) = alpha_bounds(source) else {
+    return RgbaImage::new(source.width(), source.height());
+  };
+  let model_surface = model_surface.unwrap_or(Static3dSurface {
+    left_px: bounds.0 as f32,
+    top_px: bounds.1 as f32,
+    width_px: (bounds.2 - bounds.0 + 1).max(1) as f32,
+    height_px: (bounds.3 - bounds.1 + 1).max(1) as f32,
+  });
+  let front_z_px = shape
+    .z
+    .map(|value| value.to_emu() as f32 / EMUS_PER_POINT * pixels_per_point)
+    .unwrap_or(0.0);
+  let mut output = RgbaImage::new(source.width(), source.height());
+  composite_projected_image(
+    &mut output,
+    source,
+    ProjectedImageOptions {
+      projection,
+      z: front_z_px,
+      bounds,
+      model_surface,
+      pixels_per_point,
+      tint: None,
+    },
+  );
+  output
 }
 
 /// Lowers DrawingML static 3-D to a bounded RGBA layer. This follows the
@@ -423,20 +597,6 @@ pub(crate) fn apply_static_3d(
   });
   let bounds_width = model_surface.width_px.max(1.0);
   let bounds_height = model_surface.height_px.max(1.0);
-  if projection_plane_is_identity(
-    projection,
-    front_z_px,
-    bounds_width,
-    bounds_height,
-    pixels_per_point,
-  ) && depth_pt <= f32::EPSILON
-    && contour_px == 0
-    && top_bevel_px == 0
-    && !wireframe
-  {
-    return;
-  }
-
   let front = image.clone();
   image.fill(0);
   if depth_pt > f32::EPSILON {
@@ -474,12 +634,13 @@ pub(crate) fn apply_static_3d(
           .map(|value| value.to_emu() as f32 / EMUS_PER_POINT * pixels_per_point)
           .unwrap_or(bottom_bevel_px as f32);
         let mask = back_face.clone();
-        composite_bevel(
+        let _ = composite_bevel(
           &mut back_face,
           &mask,
           BevelOptions {
             width: bottom_bevel_px,
             height: bevel_height_px,
+            preset: shape.bevel_bottom.as_ref().and_then(|bevel| bevel.preset),
             scene,
             projection,
             model_surface,
@@ -533,6 +694,7 @@ pub(crate) fn apply_static_3d(
     composite_outline(image, &silhouette, contour_px, contour);
   }
   let mut front_face = front.clone();
+  let mut top_bevel = None;
   if top_bevel_px > 0 {
     let bevel_height_px = shape
       .bevel_top
@@ -540,21 +702,33 @@ pub(crate) fn apply_static_3d(
       .and_then(|bevel| bevel.height)
       .map(|value| value.to_emu() as f32 / EMUS_PER_POINT * pixels_per_point)
       .unwrap_or(top_bevel_px as f32);
-    composite_bevel(
-      &mut front_face,
-      &front,
-      BevelOptions {
-        width: top_bevel_px,
-        height: bevel_height_px,
-        scene,
-        projection,
-        model_surface,
-        pixels_per_point,
-        surface_z: front_z_px,
-        material: shape.preset_material,
-        back_face: false,
-      },
-    );
+    let options = BevelOptions {
+      width: top_bevel_px,
+      height: bevel_height_px,
+      preset: shape.bevel_top.as_ref().and_then(|bevel| bevel.preset),
+      scene,
+      projection,
+      model_surface,
+      pixels_per_point,
+      surface_z: front_z_px,
+      material: shape.preset_material,
+      back_face: false,
+    };
+    let mut bevel_layer = RgbaImage::new(image.width(), image.height());
+    let height_offsets = composite_bevel(&mut bevel_layer, &front, options);
+    // A bevel is a separate surface which replaces the boundary band of the
+    // planar front face. Keeping the original pixels underneath duplicates
+    // one physical surface and also prevents the flat face from receiving
+    // its own +z material lighting independently of the bevel normals.
+    for (flat, bevel) in front_face.pixels_mut().zip(bevel_layer.pixels()) {
+      if bevel[3] != 0 {
+        *flat = Rgba([0, 0, 0, 0]);
+      }
+    }
+    let variable_z = (options.preset.unwrap_or(a::BevelPresetValues::Circle)
+      == a::BevelPresetValues::Circle)
+      .then_some(height_offsets);
+    top_bevel = Some((bevel_layer, variable_z));
   }
   if wireframe {
     let mut outline = RgbaImage::new(image.width(), image.height());
@@ -580,6 +754,16 @@ pub(crate) fn apply_static_3d(
       },
     );
   } else {
+    shade_planar_surface(
+      &mut front_face,
+      scene,
+      projection,
+      model_surface,
+      pixels_per_point,
+      front_z_px,
+      [0.0, 0.0, 1.0],
+      shape.preset_material,
+    );
     composite_projected_image(
       image,
       &front_face,
@@ -592,6 +776,34 @@ pub(crate) fn apply_static_3d(
         tint: None,
       },
     );
+    if let Some((bevel_layer, height_offsets)) = top_bevel {
+      if let Some(height_offsets) = height_offsets {
+        composite_projected_variable_z_image(
+          image,
+          &bevel_layer,
+          &height_offsets,
+          VariableZProjectedImageOptions {
+            projection,
+            base_z: front_z_px,
+            model_surface,
+            pixels_per_point,
+          },
+        );
+      } else {
+        composite_projected_image(
+          image,
+          &bevel_layer,
+          ProjectedImageOptions {
+            projection,
+            z: front_z_px,
+            bounds,
+            model_surface,
+            pixels_per_point,
+            tint: None,
+          },
+        );
+      }
+    }
   }
 }
 
@@ -614,6 +826,45 @@ fn bevel_terminal_inset(preset: Option<a::BevelPresetValues>) -> f32 {
     | B::Divot
     | B::Riblet => 1.0,
   }
+}
+
+fn circle_bevel_profile(inward_fraction: f32) -> (f32, f32, f32) {
+  // MS-OI29500 §20.1.10.9 defines `circle` in bevel space as
+  //   M 0,0 C 0,0.55627 0.44373,1 1,1.
+  // The alpha-mask distance starts at the outside edge, while the published
+  // bevel y coordinate starts on the unchanged face, so the two run in
+  // opposite directions. Invert y, solve the monotone cubic, then return its
+  // tangent. The caller stretches dx by bevel height and dy by bevel width.
+  let authored_y = (1.0 - inward_fraction).clamp(0.0, 1.0);
+  let cubic = |p0: f32, p1: f32, p2: f32, p3: f32, t: f32| {
+    let one_minus_t = 1.0 - t;
+    one_minus_t.powi(3) * p0
+      + 3.0 * one_minus_t.powi(2) * t * p1
+      + 3.0 * one_minus_t * t.powi(2) * p2
+      + t.powi(3) * p3
+  };
+  let mut low = 0.0;
+  let mut high = 1.0;
+  for _ in 0..16 {
+    let middle = (low + high) * 0.5;
+    if cubic(0.0, 0.556_27, 1.0, 1.0, middle) < authored_y {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  let t = (low + high) * 0.5;
+  let one_minus_t = 1.0 - t;
+  let derivative = |p0: f32, p1: f32, p2: f32, p3: f32| {
+    3.0 * one_minus_t.powi(2) * (p1 - p0)
+      + 6.0 * one_minus_t * t * (p2 - p1)
+      + 3.0 * t.powi(2) * (p3 - p2)
+  };
+  (
+    cubic(0.0, 0.0, 0.443_73, 1.0, t),
+    derivative(0.0, 0.0, 0.443_73, 1.0),
+    derivative(0.0, 0.556_27, 1.0, 1.0),
+  )
 }
 
 #[derive(Clone, Copy)]
@@ -1276,28 +1527,6 @@ fn map_homogeneous(matrix: [[f32; 3]; 3], x: f32, y: f32) -> (f32, f32) {
   )
 }
 
-fn projection_plane_is_identity(
-  projection: Static3dProjection,
-  z: f32,
-  width: f32,
-  height: f32,
-  pixels_per_point: f32,
-) -> bool {
-  let matrix = plane_homography(projection, z, width, height, pixels_per_point);
-  let normalized = if matrix[2][2].abs() > 1.0e-6 {
-    let scale = matrix[2][2];
-    matrix.map(|row| row.map(|value| value / scale))
-  } else {
-    matrix
-  };
-  let identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
-  normalized
-    .iter()
-    .flatten()
-    .zip(identity.iter().flatten())
-    .all(|(actual, expected)| (actual - expected).abs() < 0.001)
-}
-
 fn projected_depth_steps(
   projection: Static3dProjection,
   front_z: f32,
@@ -1324,6 +1553,51 @@ struct ProjectedImageOptions {
   model_surface: Static3dSurface,
   pixels_per_point: f32,
   tint: Option<(Static3dColor, [f32; 3])>,
+}
+
+/// Applies the selected DrawingML material and light rig to one planar
+/// surface while preserving the source fill as the material's Shape color.
+/// LibreOffice's 3-D processor solves the same color model for every face;
+/// the front face is not an unlit overlay on top of the extruded solid.
+fn shade_planar_surface(
+  image: &mut RgbaImage,
+  scene: &a::Scene3DType,
+  projection: Static3dProjection,
+  model_surface: Static3dSurface,
+  pixels_per_point: f32,
+  z: f32,
+  model_normal: [f32; 3],
+  material: Option<a::PresetMaterialTypeValues>,
+) {
+  let normal = lighting_surface_normal(scene, projection, model_normal);
+  let shade = scale_shade(
+    light_rig_surface_shade(scene, normal),
+    material_diffusion(material),
+  );
+  let center_x = model_surface.left_px + model_surface.width_px * 0.5;
+  let center_y = model_surface.top_px + model_surface.height_px * 0.5;
+  let width = model_surface.width_px.max(1.0);
+  let height = model_surface.height_px.max(1.0);
+  for (x, y, pixel) in image.enumerate_pixels_mut() {
+    if pixel[3] == 0 {
+      continue;
+    }
+    let view_direction = surface_view_direction(
+      scene,
+      projection,
+      [x as f32 + 0.5 - center_x, y as f32 + 0.5 - center_y, z],
+      width,
+      height,
+      pixels_per_point,
+    );
+    let specular = light_rig_surface_specular(scene, normal, view_direction, material);
+    let alpha = pixel[3];
+    for channel in 0..3 {
+      pixel[channel] =
+        shade_gouraud_channel_with_specular(pixel[channel], shade[channel], specular[channel]);
+    }
+    pixel[3] = alpha;
+  }
 }
 
 fn composite_projected_image(
@@ -1420,6 +1694,101 @@ fn composite_projected_image(
         );
       }
     }
+  }
+}
+
+struct VariableZProjectedImageOptions {
+  projection: Static3dProjection,
+  base_z: f32,
+  model_surface: Static3dSurface,
+  pixels_per_point: f32,
+}
+
+fn composite_projected_variable_z_image(
+  destination: &mut RgbaImage,
+  source: &RgbaImage,
+  z_offsets: &[f32],
+  options: VariableZProjectedImageOptions,
+) {
+  if source.dimensions() != destination.dimensions()
+    || z_offsets.len() != source.width() as usize * source.height() as usize
+  {
+    return;
+  }
+  let VariableZProjectedImageOptions {
+    projection,
+    base_z,
+    model_surface,
+    pixels_per_point,
+  } = options;
+  let center_x = model_surface.left_px + model_surface.width_px * 0.5;
+  let center_y = model_surface.top_px + model_surface.height_px * 0.5;
+  let width = model_surface.width_px.max(1.0);
+  let height = model_surface.height_px.max(1.0);
+  let mut accumulated =
+    vec![[0.0_f32; 4]; destination.width() as usize * destination.height() as usize];
+
+  for (x, y, pixel) in source.enumerate_pixels() {
+    let source_alpha = f32::from(pixel[3]) / 255.0;
+    if source_alpha <= f32::EPSILON {
+      continue;
+    }
+    let source_index = y as usize * source.width() as usize + x as usize;
+    let projected = project_local_pixels(
+      projection,
+      x as f32 + 0.5 - center_x,
+      y as f32 + 0.5 - center_y,
+      base_z + z_offsets[source_index],
+      width,
+      height,
+      pixels_per_point,
+    );
+    let target_x = center_x + projected.0 - 0.5;
+    let target_y = center_y + projected.1 - 0.5;
+    let left = target_x.floor() as i32;
+    let top = target_y.floor() as i32;
+    let fraction_x = target_x - left as f32;
+    let fraction_y = target_y - top as f32;
+    for (target_y, weight_y) in [(top, 1.0 - fraction_y), (top + 1, fraction_y)] {
+      if target_y < 0 || target_y >= destination.height() as i32 {
+        continue;
+      }
+      for (target_x, weight_x) in [(left, 1.0 - fraction_x), (left + 1, fraction_x)] {
+        if target_x < 0 || target_x >= destination.width() as i32 {
+          continue;
+        }
+        let weight = weight_x * weight_y;
+        if weight <= f32::EPSILON {
+          continue;
+        }
+        let weighted_alpha = source_alpha * weight;
+        let target_index = target_y as usize * destination.width() as usize + target_x as usize;
+        for channel in 0..3 {
+          accumulated[target_index][channel] += f32::from(pixel[channel]) / 255.0 * weighted_alpha;
+        }
+        accumulated[target_index][3] += weighted_alpha;
+      }
+    }
+  }
+
+  for (target, sample) in destination.pixels_mut().zip(accumulated) {
+    if sample[3] <= f32::EPSILON {
+      continue;
+    }
+    let accumulated_alpha = sample[3];
+    let pixel = Rgba([
+      (sample[0] / accumulated_alpha * 255.0)
+        .round()
+        .clamp(0.0, 255.0) as u8,
+      (sample[1] / accumulated_alpha * 255.0)
+        .round()
+        .clamp(0.0, 255.0) as u8,
+      (sample[2] / accumulated_alpha * 255.0)
+        .round()
+        .clamp(0.0, 255.0) as u8,
+      (accumulated_alpha.clamp(0.0, 1.0) * 255.0).round() as u8,
+    ]);
+    blend_over(target, pixel);
   }
 }
 
@@ -1907,7 +2276,7 @@ fn shade_gouraud_channel_with_specular(channel: u8, shade: f32, specular: f32) -
     .clamp(0.0, 255.0) as u8
 }
 
-fn alpha_bounds(image: &RgbaImage) -> Option<(i32, i32, i32, i32)> {
+pub(crate) fn alpha_bounds(image: &RgbaImage) -> Option<(i32, i32, i32, i32)> {
   let mut left = image.width() as i32;
   let mut top = image.height() as i32;
   let mut right = -1;
@@ -1972,9 +2341,11 @@ fn is_alpha_boundary(image: &RgbaImage, x: i32, y: i32) -> bool {
   })
 }
 
+#[derive(Clone, Copy)]
 struct BevelOptions<'a> {
   width: i32,
   height: f32,
+  preset: Option<a::BevelPresetValues>,
   scene: &'a a::Scene3DType,
   projection: Static3dProjection,
   model_surface: Static3dSurface,
@@ -1984,10 +2355,15 @@ struct BevelOptions<'a> {
   back_face: bool,
 }
 
-fn composite_bevel(destination: &mut RgbaImage, source: &RgbaImage, options: BevelOptions<'_>) {
+fn composite_bevel(
+  destination: &mut RgbaImage,
+  source: &RgbaImage,
+  options: BevelOptions<'_>,
+) -> Vec<f32> {
   let BevelOptions {
     width,
     height,
+    preset,
     scene,
     projection,
     model_surface,
@@ -2013,15 +2389,11 @@ fn composite_bevel(destination: &mut RgbaImage, source: &RgbaImage, options: Bev
   };
   let diffusion = material_diffusion(material);
   let specularity = material_specularity(material);
+  let mut height_offsets = vec![0.0; source.width() as usize * source.height() as usize];
   // OOXML shape coordinates and LibreOffice's Scene3DHelper use +z toward the
   // observer. The front bevel therefore has a positive-z normal; the back
   // bevel uses the opposite orientation. Rig vectors describe the direction
   // in which light travels and are negated separately by the lighting code.
-  let normal_z = if back_face {
-    -width as f32
-  } else {
-    width as f32
-  };
   for y in 0..source.height() as i32 {
     for x in 0..source.width() as i32 {
       let pixel = source.get_pixel(x as u32, y as u32);
@@ -2038,21 +2410,39 @@ fn composite_bevel(destination: &mut RgbaImage, source: &RgbaImage, options: Bev
       if distance >= width {
         continue;
       }
+      let inward_fraction = distance as f32 / width.max(1) as f32;
+      let (profile_height, profile_dx, profile_dy) =
+        if preset.unwrap_or(a::BevelPresetValues::Circle) == a::BevelPresetValues::Circle {
+          circle_bevel_profile(inward_fraction)
+        } else {
+          // The current bounded raster lowering cannot represent the
+          // self-overlapping profiles used by presets such as `divot`. Keep
+          // their established linear tangent until those profiles are
+          // lowered as explicit surfaces rather than guessing one branch.
+          (f32::NAN, 1.0, 1.0)
+        };
+      let normal_xy = height * profile_dx;
+      let normal_z = width as f32 * profile_dy * if back_face { -1.0 } else { 1.0 };
+      if !profile_height.is_nan() {
+        let index = y as usize * source.width() as usize + x as usize;
+        height_offsets[index] = profile_height * height * if back_face { -1.0 } else { 1.0 };
+      }
       let mut normal = [0.0_f32; 3];
       if distances[0] == distance {
-        normal[0] -= height;
+        normal[0] -= normal_xy;
       }
       if distances[1] == distance {
-        normal[0] += height;
+        normal[0] += normal_xy;
       }
       if distances[2] == distance {
-        normal[1] -= height;
+        normal[1] -= normal_xy;
       }
       if distances[3] == distance {
-        normal[1] += height;
+        normal[1] += normal_xy;
       }
       normal[2] = normal_z;
       normalize3(&mut normal);
+      let normal = lighting_surface_normal(scene, projection, normal);
       let view_direction = surface_view_direction(
         scene,
         projection,
@@ -2074,8 +2464,15 @@ fn composite_bevel(destination: &mut RgbaImage, source: &RgbaImage, options: Bev
           diffuse
         }
       });
-      let t = distance as f32 / width.max(1) as f32;
-      let weight = 1.0 - t * t * (3.0 - 2.0 * t);
+      let weight = if profile_height.is_nan() {
+        1.0 - inward_fraction * inward_fraction * (3.0 - 2.0 * inward_fraction)
+      } else {
+        // In Office bevel space x is the distance away from the unchanged
+        // face. Use that authored height as this bounded raster lowering's
+        // material coverage; retaining the old generic smoothstep here makes
+        // a circular side normal recolor the middle of narrow glyph stems.
+        profile_height
+      };
       let target = destination.get_pixel_mut(x as u32, y as u32);
       for channel in 0..3 {
         // MS-OI29500's material table feeds the D3D9 fixed-function
@@ -2090,6 +2487,7 @@ fn composite_bevel(destination: &mut RgbaImage, source: &RgbaImage, options: Bev
       target[3] = pixel[3];
     }
   }
+  height_offsets
 }
 
 fn composite_image(destination: &mut RgbaImage, source: &RgbaImage) {
@@ -2238,7 +2636,8 @@ mod tests {
 
   use super::{
     Static3dColor, Static3dRenderOptions, apply_static_3d, bevel_terminal_inset, camera_projection,
-    light_rig, output_padding,
+    circle_bevel_profile, light_rig, output_padding, project_static_3d_front_face,
+    projected_output_bounds, projected_region_output_bounds,
   };
   use crate::model::RgbColor;
 
@@ -2279,8 +2678,113 @@ mod tests {
   }
 
   #[test]
+  fn projected_bitmap_guard_expands_the_complete_perspective_input() {
+    let scene = scene(a::PresetCameraValues::PerspectiveLeft);
+    let projection = camera_projection(&scene, 0.0);
+    let shape = a::Shape3DType::default();
+    let unguarded = projected_output_bounds(projection, &shape, 210.0, 116.35);
+    let guarded = projected_region_output_bounds(
+      projection,
+      &shape,
+      210.0,
+      116.35,
+      super::Static3dOutputBounds {
+        left_pt: -7.5,
+        top_pt: -7.5,
+        right_pt: 217.5,
+        bottom_pt: 123.85,
+      },
+    );
+    assert!(guarded.left_pt < unguarded.left_pt);
+    assert!(guarded.top_pt < unguarded.top_pt);
+    assert!(guarded.right_pt > unguarded.right_pt);
+    assert!(guarded.bottom_pt > unguarded.bottom_pt);
+  }
+
+  #[test]
+  fn projected_effect_front_excludes_extruded_side_faces() {
+    let scene = scene(a::PresetCameraValues::PerspectiveLeft);
+    let projection = camera_projection(&scene, 0.0);
+    let shape = a::Shape3DType {
+      extrusion_height: Some(CoordinateValue::Emu(127_000)),
+      ..a::Shape3DType::default()
+    };
+    let mut source = RgbaImage::new(120, 80);
+    for y in 24..56 {
+      for x in 30..90 {
+        source.put_pixel(x, y, Rgba([160, 180, 200, 255]));
+      }
+    }
+    let surface = super::Static3dSurface {
+      left_px: 0.0,
+      top_px: 0.0,
+      width_px: 120.0,
+      height_px: 80.0,
+    };
+    let front = project_static_3d_front_face(&source, projection, &shape, 1.0, Some(surface));
+    let mut solid = source;
+    apply_static_3d(
+      &mut solid,
+      &scene,
+      projection,
+      &shape,
+      Static3dRenderOptions {
+        extrusion_color: Some(Static3dColor {
+          color: RgbColor {
+            r: 80,
+            g: 90,
+            b: 100,
+          },
+          alpha: 255,
+        }),
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: Some(surface),
+      },
+    );
+
+    let front_pixels = front.pixels().filter(|pixel| pixel[3] != 0).count();
+    let solid_pixels = solid.pixels().filter(|pixel| pixel[3] != 0).count();
+    assert!(solid_pixels > front_pixels);
+  }
+
+  #[test]
+  fn camera_padding_includes_top_bevel_height() {
+    let scene = scene(a::PresetCameraValues::ObliqueLeft);
+    let projection = camera_projection(&scene, 0.0);
+    let flat = output_padding(projection, &a::Shape3DType::default(), 64.0, 32.0);
+    let shape = a::Shape3DType {
+      bevel_top: Some(a::BevelTop {
+        width: Some(CoordinateValue::Emu(38_100)),
+        height: Some(CoordinateValue::Emu(38_100)),
+        preset: Some(a::BevelPresetValues::Circle),
+      }),
+      ..a::Shape3DType::default()
+    };
+    let beveled = output_padding(projection, &shape, 64.0, 32.0);
+    assert!(
+      beveled.left_pt + beveled.right_pt > flat.left_pt + flat.right_pt,
+      "camera projection must reserve the raised terminal plane"
+    );
+  }
+
+  #[test]
   fn unspecified_bevel_preset_uses_the_ecma_circle_default() {
     assert_eq!(bevel_terminal_inset(None), 1.0);
+  }
+
+  #[test]
+  fn circle_bevel_profile_rotates_from_side_to_front_normal() {
+    let (outer_height, outer_dx, outer_dy) = circle_bevel_profile(0.0);
+    let (middle_height, _, _) = circle_bevel_profile(0.5);
+    let (inner_height, inner_dx, inner_dy) = circle_bevel_profile(1.0);
+    assert!((outer_height - 1.0).abs() < 0.001);
+    assert!((outer_dx - 1.668_81).abs() < 0.001);
+    assert!(outer_dy.abs() < 0.001);
+    assert!(middle_height > 0.1 && middle_height < 0.2);
+    assert!(inner_height.abs() < 0.001);
+    assert!(inner_dx.abs() < 0.001);
+    assert!((inner_dy - 1.668_81).abs() < 0.001);
   }
 
   #[test]
@@ -2446,8 +2950,10 @@ mod tests {
       },
     );
 
-    assert_ne!(image.get_pixel(0, 0), &Rgba([200, 40, 40, 255]));
-    assert_eq!(image.get_pixel(3, 3), &Rgba([200, 40, 40, 255]));
+    let bevel = *image.get_pixel(0, 0);
+    let planar = *image.get_pixel(3, 3);
+    assert_ne!(planar, Rgba([200, 40, 40, 255]));
+    assert_ne!(bevel, planar);
   }
 
   #[test]
@@ -2481,8 +2987,45 @@ mod tests {
       },
     );
 
-    assert!(image.pixels().any(|pixel| pixel[0] > 0));
-    assert_eq!(image.get_pixel(3, 3), &Rgba([0, 0, 0, 255]));
+    let planar = *image.get_pixel(3, 3);
+    assert!(planar[0] > 0);
+    assert!(
+      image
+        .pixels()
+        .any(|pixel| pixel[3] > 0 && pixel[0] != planar[0])
+    );
+  }
+
+  #[test]
+  fn planar_front_face_receives_material_lighting_without_extrusion() {
+    let mut scene = scene(a::PresetCameraValues::OrthographicFront);
+    *scene.light_rig = a::LightRig {
+      rig: a::LightRigValues::ThreePoints,
+      direction: a::LightRigDirectionValues::Top,
+      ..a::LightRig::default()
+    };
+    let shape = a::Shape3DType {
+      preset_material: Some(a::PresetMaterialTypeValues::WarmMatte),
+      ..a::Shape3DType::default()
+    };
+    let mut image = RgbaImage::from_pixel(5, 5, Rgba([0, 0, 0, 255]));
+
+    apply_static_3d(
+      &mut image,
+      &scene,
+      camera_projection(&scene, 0.0),
+      &shape,
+      Static3dRenderOptions {
+        extrusion_color: None,
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: None,
+      },
+    );
+
+    let center = image.get_pixel(2, 2);
+    assert_eq!(center[3], 255);
+    assert!(center[0] > 0 && center[1] > 0 && center[2] > 0);
   }
 
   #[test]

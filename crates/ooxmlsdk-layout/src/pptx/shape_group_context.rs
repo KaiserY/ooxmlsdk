@@ -16,7 +16,10 @@ use super::drawingml::shape_properties::EffectProperties;
 use super::drawingml::text_body::{TextBody, TextRun, TextRunKind};
 use super::shape::PptShape;
 use super::shape_context::PPTShapeContext;
-use super::slide::{ShapeLocation, SlidePersist};
+use super::slide::{
+  ActiveXControlRecord, ShapeLocation, SlidePersist, active_x_wmf_external_header,
+  normalize_vml_shape_id,
+};
 
 #[derive(Debug)]
 pub(crate) struct PPTShapeGroupContext {
@@ -66,17 +69,19 @@ impl PPTShapeGroupContext {
       .as_ref()
       .and_then(|id| slide_persist.active_x_controls.get(id))
       .cloned();
-    if let Some(state) = &active_x_state {
-      if let Some(name) = &control.name {
-        slide_persist
-          .active_x_controls_by_shape
-          .insert(name.clone(), state.clone());
-      }
-      if let Some(shape_id) = &control.shape_id {
-        slide_persist
-          .active_x_controls_by_shape
-          .insert(format!("_x0000_s{shape_id}"), state.clone());
-      }
+    let record = ActiveXControlRecord {
+      control: control.clone(),
+      state: active_x_state.clone(),
+    };
+    if let Some(name) = &control.name {
+      slide_persist
+        .active_x_controls_by_shape
+        .insert(name.clone(), record.clone());
+    }
+    if let Some(shape_id) = &control.shape_id {
+      slide_persist
+        .active_x_controls_by_shape
+        .insert(normalize_vml_shape_id(shape_id), record);
     }
     if let Some(picture) = control.picture.as_deref() {
       let mut shape = self.import_picture(slide_persist, picture);
@@ -91,9 +96,16 @@ impl PPTShapeGroupContext {
         {
           resource.monochrome_dib_palette_override = Some(palette);
         }
-        resource.metafile_semantic_text_includes_raster_backdrop = active_x_state.is_some();
+        resource.metafile_external_header = active_x_wmf_external_header(control);
+        resource.metafile_semantic_text_includes_raster_backdrop = true;
       }
+      let shape_index = slide_persist.shapes.len();
       slide_persist.shapes.push(shape);
+      if let Some(relationship_id) = &control.id {
+        slide_persist
+          .active_x_preview_shapes_by_relationship
+          .insert(relationship_id.clone(), shape_index);
+      }
     }
   }
 

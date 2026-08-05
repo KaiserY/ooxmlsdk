@@ -512,6 +512,7 @@ struct ImageItem<'doc> {
   content_type: Option<Cow<'doc, str>>,
   metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   metafile_background_color: Option<[u8; 3]>,
+  metafile_external_header: Option<ooxmlsdk_layout::render::emf_wmf::WmfExternalHeader>,
   alt_text: Option<Cow<'doc, str>>,
   hyperlink_url: Option<Cow<'doc, str>>,
   semantic_metafile_text: bool,
@@ -1747,11 +1748,16 @@ fn expand_metafile_semantic_text_item<'doc>(
         && image.crop == ImageCrop::default() =>
     {
       let paint_native_text = image.metafile_semantic_text_includes_raster_backdrop;
+      let extraction_options = ooxmlsdk_layout::render::emf_wmf::RenderOptions {
+        wmf_external_header: image.metafile_external_header,
+        ..ooxmlsdk_layout::render::emf_wmf::RenderOptions::default()
+      };
       let solid_rects = paint_native_text
         .then(|| {
-          ooxmlsdk_layout::render::emf_wmf::extract_metafile_solid_rects(
+          ooxmlsdk_layout::render::emf_wmf::extract_metafile_solid_rects_with_options(
             &image.data,
             image.content_type.as_deref(),
+            extraction_options,
           )
         })
         .unwrap_or_default()
@@ -1777,9 +1783,10 @@ fn expand_metafile_semantic_text_item<'doc>(
         .collect::<Vec<_>>();
       let bitmap_layers = paint_native_text
         .then(|| {
-          ooxmlsdk_layout::render::emf_wmf::extract_metafile_bitmap_layers(
+          ooxmlsdk_layout::render::emf_wmf::extract_metafile_bitmap_layers_with_options(
             &image.data,
             image.content_type.as_deref(),
+            extraction_options,
           )
         })
         .unwrap_or_default()
@@ -1806,6 +1813,7 @@ fn expand_metafile_semantic_text_item<'doc>(
             content_type: Some(Cow::Borrowed(layer.content_type)),
             metafile_monochrome_dib_palette_override: None,
             metafile_background_color: None,
+            metafile_external_header: None,
             alt_text: None,
             hyperlink_url: None,
             semantic_metafile_text: false,
@@ -1814,54 +1822,56 @@ fn expand_metafile_semantic_text_item<'doc>(
           })
         })
         .collect::<Vec<_>>();
-      let semantic_runs = ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs(
-        &image.data,
-        image.content_type.as_deref(),
-        image.metafile_semantic_text_includes_raster_backdrop,
-      )
-      .into_iter()
-      .map(|run| {
-        let font_size_pt = run
-          .font_size
-          .map(|size| size * image.height_pt)
-          .unwrap_or(11.0)
-          .max(1.0);
-        PageItem::Text(Box::new(TextItem {
-          x_pt: image.x_pt + run.x * image.width_pt,
-          y_pt: image.y_pt + run.y * image.height_pt,
-          line_height_pt: (font_size_pt * 1.15).max(1.0),
-          paint_clip: None,
-          text: Cow::Owned(run.text),
-          style: TextStyle {
-            font_family: run.font_family.map(Cow::Owned),
-            font_size_pt,
-            bold: run.bold,
-            italic: run.italic,
-            semantic_only: !paint_native_text,
-            metafile_reference_baseline: true,
-            opacity: 1.0,
-            semantic_character_advances_pt: run.advances.map(|advances| {
-              advances
-                .into_iter()
-                .map(|advance| advance * image.width_pt)
-                .collect()
-            }),
-            ..TextStyle::default()
-          },
-          rotation_center_pt: None,
-          hyperlink_url: None,
-          dynamic_field: None,
-          form_widget_id: None,
-          paragraph_bidi: false,
-          word_spacing_pt: 0.0,
-          preserve_text_portion: false,
-          decoration_span_start_x_pt: None,
-          pdf_text_segmentation: common::PdfTextSegmentation::Line,
-          source_path: None,
-          semantic_target_width_pt: run.width.map(|width| width * image.width_pt),
-        }))
-      })
-      .collect::<Vec<_>>();
+      let semantic_runs =
+        ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs_with_options(
+          &image.data,
+          image.content_type.as_deref(),
+          image.metafile_semantic_text_includes_raster_backdrop,
+          extraction_options,
+        )
+        .into_iter()
+        .map(|run| {
+          let font_size_pt = run
+            .font_size
+            .map(|size| size * image.height_pt)
+            .unwrap_or(11.0)
+            .max(1.0);
+          PageItem::Text(Box::new(TextItem {
+            x_pt: image.x_pt + run.x * image.width_pt,
+            y_pt: image.y_pt + run.y * image.height_pt,
+            line_height_pt: (font_size_pt * 1.15).max(1.0),
+            paint_clip: None,
+            text: Cow::Owned(run.text),
+            style: TextStyle {
+              font_family: run.font_family.map(Cow::Owned),
+              font_size_pt,
+              bold: run.bold,
+              italic: run.italic,
+              semantic_only: !paint_native_text,
+              metafile_reference_baseline: true,
+              opacity: 1.0,
+              semantic_character_advances_pt: run.advances.map(|advances| {
+                advances
+                  .into_iter()
+                  .map(|advance| advance * image.width_pt)
+                  .collect()
+              }),
+              ..TextStyle::default()
+            },
+            rotation_center_pt: None,
+            hyperlink_url: None,
+            dynamic_field: None,
+            form_widget_id: None,
+            paragraph_bidi: false,
+            word_spacing_pt: 0.0,
+            preserve_text_portion: false,
+            decoration_span_start_x_pt: None,
+            pdf_text_segmentation: common::PdfTextSegmentation::Line,
+            source_path: None,
+            semantic_target_width_pt: run.width.map(|width| width * image.width_pt),
+          }))
+        })
+        .collect::<Vec<_>>();
       if semantic_runs.is_empty() && solid_rects.is_empty() && bitmap_layers.is_empty() {
         return PageItem::Image(image);
       }
@@ -2139,6 +2149,7 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
     content_type: Some(Cow::Borrowed(image.content_type.as_ref())),
     metafile_monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
     metafile_background_color: image.metafile_background_color,
+    metafile_external_header: image.metafile_external_header,
     alt_text: image
       .alt_text
       .as_ref()
@@ -3788,6 +3799,7 @@ fn metafile_render_options_for_image(
     suppress_text: image.metafile_semantic_text_includes_raster_backdrop,
     suppress_solid_pattern_rects: image.metafile_semantic_text_includes_raster_backdrop,
     suppress_bitmap_layers: image.metafile_semantic_text_includes_raster_backdrop,
+    wmf_external_header: image.metafile_external_header,
   }
 }
 
@@ -7054,6 +7066,7 @@ mod tests {
       content_type: Some(Cow::Borrowed("image/emf")),
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
+      metafile_external_header: None,
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,

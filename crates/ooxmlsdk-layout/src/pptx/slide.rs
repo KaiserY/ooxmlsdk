@@ -141,7 +141,8 @@ pub(crate) struct SlidePersist {
   pub(crate) media_resources: HashMap<String, MediaResource>,
   pub(crate) hyperlink_targets: HashMap<String, String>,
   pub(crate) active_x_controls: HashMap<String, ActiveXControlState>,
-  pub(crate) active_x_controls_by_shape: HashMap<String, ActiveXControlState>,
+  pub(crate) active_x_controls_by_shape: HashMap<String, ActiveXControlRecord>,
+  pub(crate) active_x_preview_shapes_by_relationship: HashMap<String, usize>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -149,6 +150,7 @@ pub(crate) struct ImageResource {
   pub(crate) data: Arc<[u8]>,
   pub(crate) content_type: Option<String>,
   pub(crate) monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
+  pub(crate) metafile_external_header: Option<crate::render::emf_wmf::WmfExternalHeader>,
   pub(crate) metafile_semantic_text_includes_raster_backdrop: bool,
 }
 
@@ -156,9 +158,24 @@ pub(crate) struct ImageResource {
 pub(crate) struct ActiveXFallbackPreview {
   control_relationship_id: String,
   image_relationship_id: String,
+  shape_id: Option<String>,
   name: Option<String>,
+  show_as_icon: Option<bool>,
+  image_width: Option<i32>,
+  image_height: Option<i32>,
   position: super::drawingml::shape::Point,
   size: super::drawingml::shape::Size,
+}
+
+/// The selected `p:control`, kept intact until its VML host shape is imported.
+///
+/// In particular, `spid` identifies the VML shape while `imgW`/`imgH` describe
+/// the thumbnail. Keeping the typed node also preserves `showAsIcon`, `extLst`,
+/// and an inline `p:pic` instead of silently collapsing those representations.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ActiveXControlRecord {
+  pub(crate) control: p::Control,
+  pub(crate) state: Option<ActiveXControlState>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -461,6 +478,7 @@ where
             .content_type(package)
             .map(str::to_string),
           monochrome_dib_palette_override: None,
+          metafile_external_header: None,
           metafile_semantic_text_includes_raster_backdrop: false,
         },
       ))
@@ -958,6 +976,7 @@ impl SlidePersist {
       hyperlink_targets: HashMap::new(),
       active_x_controls: HashMap::new(),
       active_x_controls_by_shape: HashMap::new(),
+      active_x_preview_shapes_by_relationship: HashMap::new(),
     }
   }
 
@@ -1018,6 +1037,7 @@ impl SlidePersist {
           data: data.into(),
           content_type: image_part.content_type(package).map(str::to_string),
           monochrome_dib_palette_override: None,
+          metafile_external_header: None,
           metafile_semantic_text_includes_raster_backdrop: false,
         },
       );
@@ -1379,16 +1399,11 @@ impl SlidePersist {
         let Some(mut resource) = image_resources.get(relationship_id).cloned() else {
           continue;
         };
-        let active_x_state = model
-          .id
+        let active_x_control =
+          active_x_control_for_vml_model(&self.active_x_controls_by_shape, &model).cloned();
+        let active_x_state = active_x_control
           .as_ref()
-          .and_then(|id| self.active_x_controls_by_shape.get(id))
-          .or_else(|| {
-            model
-              .shape_id
-              .as_ref()
-              .and_then(|id| self.active_x_controls_by_shape.get(id))
-          });
+          .and_then(|record| record.state.as_ref());
         if let Some(palette) =
           active_x_state.and_then(ActiveXControlState::preview_palette_override)
         {
@@ -1397,16 +1412,40 @@ impl SlidePersist {
           // semantics untouched for every other image.
           resource.monochrome_dib_palette_override = Some(palette);
         }
+        resource.metafile_external_header = active_x_control
+          .as_ref()
+          .and_then(|record| active_x_wmf_external_header(&record.control));
         // [MS-OI29500] defines p:control's image as the ActiveX thumbnail.
         // PowerPoint keeps text records in that native WMF preview searchable
         // even when an earlier icon bitmap uses a destination-reading ROP.
         // Ordinary OLE previews retain the raster-backdrop filter.
-        resource.metafile_semantic_text_includes_raster_backdrop = active_x_state.is_some();
+        resource.metafile_semantic_text_includes_raster_backdrop = active_x_control.is_some();
+        if attach_vml_ole_preview(&mut self.shapes, &model, relationship_id, resource.clone()) {
+          // ECMA-376 p:oleObj@spid associates this VML replacement graphic
+          // with the already ordered DrawingML graphicFrame. It is not a
+          // second shape at the end of the slide's z-order.
+          continue;
+        }
         let Some((left_pt, top_pt, width_pt, height_pt)) =
           vml_absolute_rectangle(model.style.as_deref())
         else {
           continue;
         };
+        if active_x_control.as_ref().is_some_and(|control| {
+          attach_vml_active_x_preview(
+            &mut self.shapes,
+            &self.active_x_preview_shapes_by_relationship,
+            control,
+            relationship_id,
+            resource.clone(),
+          )
+        }) {
+          // `p:control@spid` binds the selected control to this VML preview.
+          // The fallback/inline picture keeps its authored rectangle. The
+          // control's imgW/imgH remain available as external WMF playback
+          // dimensions; they are not a replacement host transform.
+          continue;
+        }
         if self.shapes.iter().any(|shape| {
           shape
             .picture
@@ -1424,6 +1463,9 @@ impl SlidePersist {
         }
         let mut shape = Shape::new(super::drawingml::shape::ShapeService::GraphicObject);
         shape.shape_location = Some(self.shape_location);
+        shape.name = active_x_control
+          .as_ref()
+          .and_then(|record| record.control.name.clone());
         shape.position = super::drawingml::shape::Point {
           x: points_to_emu(left_pt),
           y: points_to_emu(top_pt),
@@ -1446,6 +1488,37 @@ impl SlidePersist {
 
   pub(crate) fn import_active_x_fallback_previews(&mut self, previews: &[ActiveXFallbackPreview]) {
     for preview in previews {
+      let active_x_state = self
+        .active_x_controls
+        .get(&preview.control_relationship_id)
+        .cloned();
+      let fallback_record = ActiveXControlRecord {
+        control: p::Control {
+          shape_id: preview.shape_id.clone(),
+          name: preview.name.clone(),
+          show_as_icon: preview
+            .show_as_icon
+            .map(ooxmlsdk::simple_type::BooleanValue::from_bool),
+          id: Some(preview.control_relationship_id.clone()),
+          image_width: preview.image_width,
+          image_height: preview.image_height,
+          extension_list: None,
+          picture: None,
+        },
+        state: active_x_state.clone(),
+      };
+      if let Some(name) = &preview.name {
+        self
+          .active_x_controls_by_shape
+          .entry(name.clone())
+          .or_insert_with(|| fallback_record.clone());
+      }
+      if let Some(shape_id) = &preview.shape_id {
+        self
+          .active_x_controls_by_shape
+          .entry(normalize_vml_shape_id(shape_id))
+          .or_insert_with(|| fallback_record.clone());
+      }
       let Some(mut resource) = self
         .image_resources
         .get(&preview.image_relationship_id)
@@ -1453,13 +1526,15 @@ impl SlidePersist {
       else {
         continue;
       };
-      let active_x_state = self.active_x_controls.get(&preview.control_relationship_id);
-      if let Some(palette) = active_x_state.and_then(ActiveXControlState::preview_palette_override)
+      if let Some(palette) = active_x_state
+        .as_ref()
+        .and_then(ActiveXControlState::preview_palette_override)
       {
         resource.monochrome_dib_palette_override = Some(palette);
       }
-      resource.metafile_semantic_text_includes_raster_backdrop = active_x_state.is_some();
-      if self.shapes.iter().any(|shape| {
+      resource.metafile_external_header = active_x_wmf_external_header(&fallback_record.control);
+      resource.metafile_semantic_text_includes_raster_backdrop = true;
+      if let Some(shape_index) = self.shapes.iter().position(|shape| {
         shape.position == preview.position
           && shape.size == preview.size
           && shape
@@ -1468,6 +1543,9 @@ impl SlidePersist {
             .and_then(|picture| picture.image_resource.as_ref())
             == Some(&resource)
       }) {
+        self
+          .active_x_preview_shapes_by_relationship
+          .insert(preview.control_relationship_id.clone(), shape_index);
         continue;
       }
 
@@ -1483,7 +1561,11 @@ impl SlidePersist {
         Vec::new(),
         Some(resource),
       );
+      let shape_index = self.shapes.len();
       self.shapes.push(shape);
+      self
+        .active_x_preview_shapes_by_relationship
+        .insert(preview.control_relationship_id.clone(), shape_index);
     }
   }
 
@@ -1588,6 +1670,134 @@ impl SlidePersist {
   }
 }
 
+pub(crate) fn normalize_vml_shape_id(shape_id: &str) -> String {
+  let shape_id = shape_id.trim();
+  if shape_id.parse::<u32>().is_ok() {
+    format!("_x0000_s{shape_id}")
+  } else {
+    shape_id.to_string()
+  }
+}
+
+fn active_x_control_for_vml_model<'a>(
+  controls_by_shape: &'a HashMap<String, ActiveXControlRecord>,
+  model: &crate::xlsx::object_resources::VmlShapeModel,
+) -> Option<&'a ActiveXControlRecord> {
+  if let Some(shape_id) = model.shape_id.as_ref() {
+    return controls_by_shape.get(shape_id);
+  }
+  model.id.as_ref().and_then(|id| controls_by_shape.get(id))
+}
+
+pub(crate) fn active_x_wmf_external_header(
+  control: &p::Control,
+) -> Option<crate::render::emf_wmf::WmfExternalHeader> {
+  let width_emu = i64::from(control.image_width?);
+  let height_emu = i64::from(control.image_height?);
+  if width_emu <= 0 || height_emu <= 0 {
+    return None;
+  }
+  Some(crate::render::emf_wmf::WmfExternalHeader {
+    width_hundredths_mm: u32::try_from(ooxmlsdk::units::emu_to_mm100(width_emu)).ok()?,
+    height_hundredths_mm: u32::try_from(ooxmlsdk::units::emu_to_mm100(height_emu)).ok()?,
+    // Office ActiveX preview WMFs are screen-compatible 96-DPI metafiles.
+    // Keep the reference-device resolution explicit because Win32 combines
+    // it with METAFILEPICT.xExt/yExt when realizing the playback viewport.
+    reference_device_dpi_x: 96,
+    reference_device_dpi_y: 96,
+  })
+}
+
+fn attach_vml_active_x_preview(
+  shapes: &mut [Shape],
+  preview_shapes_by_relationship: &HashMap<String, usize>,
+  control: &ActiveXControlRecord,
+  relationship_id: &str,
+  mut resource: ImageResource,
+) -> bool {
+  let Some(control_relationship_id) = control.control.id.as_ref() else {
+    return false;
+  };
+  let Some(shape_index) = preview_shapes_by_relationship.get(control_relationship_id) else {
+    return false;
+  };
+  let Some(shape) = shapes.get_mut(*shape_index) else {
+    return false;
+  };
+
+  if shape.name.is_none() {
+    shape.name = control.control.name.clone();
+  }
+  resource.metafile_external_header = active_x_wmf_external_header(&control.control);
+  if let Some(picture) = shape.picture.as_mut() {
+    // Keep the selected/fallback p:pic relationship and structured blip
+    // metadata, but realize the image through the associated VML part.
+    picture.image_resource = Some(resource);
+  } else {
+    shape.set_picture(
+      Some(relationship_id.to_string()),
+      None,
+      ImageCrop::default(),
+      Vec::new(),
+      Some(resource),
+    );
+  }
+  true
+}
+
+fn attach_vml_ole_preview(
+  shapes: &mut [Shape],
+  model: &crate::xlsx::object_resources::VmlShapeModel,
+  relationship_id: &str,
+  resource: ImageResource,
+) -> bool {
+  let Some(shape_id) = model.id.as_deref() else {
+    return false;
+  };
+  let Some(shape) = find_vml_ole_shape(shapes, shape_id) else {
+    return false;
+  };
+
+  // LibreOffice's DrawingML OLE importer resolves the VML shape through
+  // p:oleObj@spid, uses its imagedata as the replacement graphic, and also
+  // transfers the VML fill/stroke. Keep an inline p:pic when one was selected;
+  // the matched VML node still belongs to this OLE shape and must not be
+  // emitted independently.
+  if shape.picture.is_none() {
+    shape.set_picture(
+      Some(relationship_id.to_string()),
+      None,
+      ImageCrop::default(),
+      Vec::new(),
+      Some(resource),
+    );
+  }
+  shape.legacy_vml_fill = Some(crate::xlsx::vml_shape_common_fill(
+    model,
+    kurbo::Affine::IDENTITY,
+  ));
+  shape.legacy_vml_stroke = crate::xlsx::vml_shape_common_stroke(model);
+  true
+}
+
+fn find_vml_ole_shape<'a>(shapes: &'a mut [Shape], shape_id: &str) -> Option<&'a mut Shape> {
+  for shape in shapes {
+    let matches = shape
+      .graphic_data
+      .as_ref()
+      .and_then(|record| record.ole_object.as_ref())
+      .and_then(|ole| ole.shape_id.as_deref())
+      == Some(shape_id);
+    if matches {
+      return Some(shape);
+    }
+    if let Some(found) = find_vml_ole_shape(&mut shape.children, shape_id) {
+      return Some(found);
+    }
+  }
+  None
+}
+
 fn vml_preview_color(value: Option<&str>, fallback: (u8, u8, u8)) -> Color {
   let color = value
     .and_then(crate::docx::parse_vml_color)
@@ -1603,7 +1813,11 @@ fn vml_preview_color(value: Option<&str>, fallback: (u8, u8, u8)) -> Color {
 struct ActiveXFallbackPreviewBuilder {
   control_relationship_id: Option<String>,
   image_relationship_id: Option<String>,
+  shape_id: Option<String>,
   name: Option<String>,
+  show_as_icon: Option<bool>,
+  image_width: Option<i32>,
+  image_height: Option<i32>,
   x: Option<i64>,
   y: Option<i64>,
   cx: Option<i64>,
@@ -1615,7 +1829,11 @@ impl ActiveXFallbackPreviewBuilder {
     Some(ActiveXFallbackPreview {
       control_relationship_id: self.control_relationship_id?,
       image_relationship_id: self.image_relationship_id?,
+      shape_id: self.shape_id,
       name: self.name,
+      show_as_icon: self.show_as_icon,
+      image_width: self.image_width,
+      image_height: self.image_height,
       position: super::drawingml::shape::Point {
         x: self.x?,
         y: self.y?,
@@ -1645,7 +1863,12 @@ pub(crate) fn active_x_fallback_previews(xml: &[u8]) -> Vec<ActiveXFallbackPrevi
         b"control" if fallback_depth > 0 && current.is_none() => {
           current = Some(ActiveXFallbackPreviewBuilder {
             control_relationship_id: xml_attribute(&event, b"id"),
+            shape_id: xml_attribute(&event, b"spid"),
             name: xml_attribute(&event, b"name"),
+            show_as_icon: xml_attribute(&event, b"showAsIcon")
+              .and_then(|value| parse_xml_bool(&value)),
+            image_width: xml_attribute(&event, b"imgW").and_then(|value| value.parse().ok()),
+            image_height: xml_attribute(&event, b"imgH").and_then(|value| value.parse().ok()),
             ..ActiveXFallbackPreviewBuilder::default()
           });
         }
@@ -1728,6 +1951,14 @@ fn xml_attribute(event: &BytesStart<'_>, local_name: &[u8]) -> Option<String> {
     (attribute.key.as_ref().rsplit(|byte| *byte == b':').next() == Some(local_name))
       .then(|| String::from_utf8_lossy(attribute.value.as_ref()).into_owned())
   })
+}
+
+fn parse_xml_bool(value: &str) -> Option<bool> {
+  match value.trim() {
+    "true" | "1" => Some(true),
+    "false" | "0" => Some(false),
+    _ => None,
+  }
 }
 
 fn vml_style_value<'a>(style: &'a str, key: &str) -> Option<&'a str> {
@@ -1888,6 +2119,7 @@ impl ColorMapEntry {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use ooxmlsdk::sdk::SdkType;
 
   #[test]
   fn header_footer_attributes_default_to_enabled_when_element_exists() {
@@ -1931,11 +2163,12 @@ mod tests {
   }
 
   #[test]
-  fn active_x_fallback_preview_keeps_precise_drawingml_geometry() {
+  fn active_x_fallback_preview_preserves_control_metadata_and_picture_geometry() {
     let xml = br#"<p:sld xmlns:p="p" xmlns:a="a" xmlns:r="r" xmlns:mc="mc">
       <p:controls><mc:AlternateContent>
         <mc:Choice Requires="v"><p:control r:id="rId2" name="coarse"/></mc:Choice>
-        <mc:Fallback><p:control r:id="rId2" name="CommandButton1"><p:pic>
+        <mc:Fallback><p:control spid="1140" r:id="rId2" name="CommandButton1"
+          showAsIcon="1" imgW="1828800" imgH="1085760"><p:pic>
           <p:nvPicPr><p:cNvPr id="8" name="CommandButton1"><a:extLst>
             <a:ext uri="ignored"/>
           </a:extLst></p:cNvPr></p:nvPicPr>
@@ -1951,7 +2184,11 @@ mod tests {
       vec![ActiveXFallbackPreview {
         control_relationship_id: "rId2".to_string(),
         image_relationship_id: "rId20".to_string(),
+        shape_id: Some("1140".to_string()),
         name: Some("CommandButton1".to_string()),
+        show_as_icon: Some(true),
+        image_width: Some(1_828_800),
+        image_height: Some(1_085_760),
         position: super::super::drawingml::shape::Point {
           x: 516_766,
           y: 463_895,
@@ -1961,6 +2198,235 @@ mod tests {
           cy: 1_086_609,
         },
       }]
+    );
+  }
+
+  #[test]
+  fn active_x_vml_spid_associates_preview_without_replacing_picture_transform() {
+    let control = p::Control::from_bytes(
+      br#"<p:control
+        xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        spid="1140" name="CommandButton1" showAsIcon="1" r:id="rId2"
+        imgW="500000" imgH="600000">
+        <p:extLst><p:ext uri="urn:control-counterexample"><x:payload
+          xmlns:x="urn:counterexample"/></p:ext></p:extLst>
+      </p:control>"#,
+    )
+    .expect("valid selected control");
+    let mut slide = SlidePersist::new_slide(
+      "ppt/slides/slide1.xml".to_string(),
+      "rId1".to_string(),
+      SlideSize::libreoffice_default(),
+    );
+    let mut group_context =
+      super::super::shape_group_context::PPTShapeGroupContext::new(ShapeLocation::Slide);
+    group_context.import_control_list(
+      &mut slide,
+      &p::ControlList {
+        xml_children: vec![p::ControlListChoice::Control(Box::new(control))],
+      },
+    );
+
+    let fallback_resource = ImageResource {
+      data: Arc::from(&b"fallback"[..]),
+      content_type: Some("image/x-wmf".to_string()),
+      monochrome_dib_palette_override: None,
+      metafile_external_header: None,
+      metafile_semantic_text_includes_raster_backdrop: false,
+    };
+    slide
+      .image_resources
+      .insert("rId20".to_string(), fallback_resource);
+    slide.import_active_x_fallback_previews(&[ActiveXFallbackPreview {
+      control_relationship_id: "rId2".to_string(),
+      image_relationship_id: "rId20".to_string(),
+      shape_id: None,
+      name: Some("CommandButton1".to_string()),
+      show_as_icon: None,
+      image_width: Some(1_828_800),
+      image_height: Some(1_085_760),
+      position: super::super::drawingml::shape::Point { x: 111, y: 222 },
+      size: super::super::drawingml::shape::Size { cx: 333, cy: 444 },
+    }]);
+    assert_eq!(
+      slide.shapes[0]
+        .picture
+        .as_ref()
+        .and_then(|picture| picture.image_resource.as_ref())
+        .and_then(|resource| resource.metafile_external_header),
+      Some(crate::render::emf_wmf::WmfExternalHeader {
+        width_hundredths_mm: 5_080,
+        height_hundredths_mm: 3_016,
+        reference_device_dpi_x: 96,
+        reference_device_dpi_y: 96,
+      })
+    );
+
+    // A matching object name cannot override a conflicting o:spid. This is
+    // the counterexample to image/name/near-rectangle based de-duplication.
+    let wrong_spid = crate::xlsx::object_resources::VmlShapeModel {
+      id: Some("CommandButton1".to_string()),
+      shape_id: Some("_x0000_s9999".to_string()),
+      ..crate::xlsx::object_resources::VmlShapeModel::default()
+    };
+    assert!(
+      active_x_control_for_vml_model(&slide.active_x_controls_by_shape, &wrong_spid).is_none()
+    );
+    assert_eq!(
+      slide.shapes[0].position,
+      super::super::drawingml::shape::Point { x: 111, y: 222 }
+    );
+
+    let model = crate::xlsx::object_resources::VmlShapeModel {
+      id: Some("CommandButton1".to_string()),
+      shape_id: Some("_x0000_s1140".to_string()),
+      ..crate::xlsx::object_resources::VmlShapeModel::default()
+    };
+    let record = active_x_control_for_vml_model(&slide.active_x_controls_by_shape, &model)
+      .expect("spid-associated selected control")
+      .clone();
+    assert_eq!(record.control.image_width, Some(500_000));
+    assert_eq!(record.control.image_height, Some(600_000));
+    assert!(
+      record
+        .control
+        .show_as_icon
+        .is_some_and(|value| value.as_bool())
+    );
+    assert_eq!(
+      record
+        .control
+        .extension_list
+        .as_ref()
+        .map(|extensions| extensions.extension.len()),
+      Some(1)
+    );
+
+    let vml_resource = ImageResource {
+      data: Arc::from(&b"vml"[..]),
+      content_type: Some("image/x-wmf".to_string()),
+      monochrome_dib_palette_override: None,
+      metafile_external_header: None,
+      metafile_semantic_text_includes_raster_backdrop: true,
+    };
+    assert!(attach_vml_active_x_preview(
+      &mut slide.shapes,
+      &slide.active_x_preview_shapes_by_relationship,
+      &record,
+      "rId1",
+      vml_resource.clone(),
+    ));
+    assert_eq!(
+      slide.shapes[0].position,
+      super::super::drawingml::shape::Point { x: 111, y: 222 }
+    );
+    assert_eq!(
+      slide.shapes[0].size,
+      super::super::drawingml::shape::Size { cx: 333, cy: 444 }
+    );
+    let attached = slide.shapes[0]
+      .picture
+      .as_ref()
+      .and_then(|picture| picture.image_resource.as_ref())
+      .expect("VML preview resource");
+    assert_eq!(attached.data, vml_resource.data);
+    assert_eq!(
+      attached.metafile_external_header,
+      Some(crate::render::emf_wmf::WmfExternalHeader {
+        width_hundredths_mm: 1_389,
+        height_hundredths_mm: 1_667,
+        reference_device_dpi_x: 96,
+        reference_device_dpi_y: 96,
+      })
+    );
+  }
+
+  #[test]
+  fn vml_ole_preview_uses_spid_without_changing_shape_tree_z_order() {
+    let xml = br#"<a:graphicData
+      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+      xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+      uri="http://schemas.openxmlformats.org/presentationml/2006/ole">
+      <p:oleObj spid="_x0000_s1027" name="Document" r:id="rId3"
+        imgW="5946064" imgH="903258" progId="Word.Document.12">
+        <p:link updateAutomatic="1"/>
+      </p:oleObj>
+    </a:graphicData>"#;
+    let graphic_data = a::GraphicData::from_bytes(xml).expect("valid OLE graphicData");
+    let slide = SlidePersist::new_slide(
+      "ppt/slides/slide1.xml".to_string(),
+      "rId1".to_string(),
+      SlideSize::libreoffice_default(),
+    );
+    let mut ole_shape = Shape::new(super::super::drawingml::shape::ShapeService::GraphicObject);
+    super::super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext
+      .dispatch_graphic_data(&graphic_data, &slide, &mut ole_shape);
+    ole_shape.name = Some("ole".to_string());
+    ole_shape.position = super::super::drawingml::shape::Point { x: 10, y: 20 };
+    ole_shape.size = super::super::drawingml::shape::Size { cx: 30, cy: 40 };
+
+    let ole = ole_shape
+      .graphic_data
+      .as_ref()
+      .and_then(|record| record.ole_object.as_ref())
+      .expect("typed OLE record");
+    assert_eq!(ole.shape_id.as_deref(), Some("_x0000_s1027"));
+    assert_eq!(ole.image_width, Some(5_946_064));
+    assert_eq!(ole.image_height, Some(903_258));
+    assert!(matches!(
+      ole.ole_object_choice.as_ref(),
+      Some(p::OleObjectChoice::OleObjectLink(link))
+        if link.auto_update.as_ref().is_some_and(|value| value.as_bool())
+    ));
+
+    let mut underlay = Shape::new(super::super::drawingml::shape::ShapeService::Custom);
+    underlay.name = Some("underlay".to_string());
+    let mut overlay = Shape::new(super::super::drawingml::shape::ShapeService::Custom);
+    overlay.name = Some("overlay".to_string());
+    let mut shapes = vec![underlay, ole_shape, overlay];
+    let model = crate::xlsx::object_resources::VmlShapeModel {
+      id: Some("_x0000_s1027".to_string()),
+      image_relationship_id: Some("rId1".to_string()),
+      filled: false,
+      stroked: false,
+      ..crate::xlsx::object_resources::VmlShapeModel::default()
+    };
+    let resource = ImageResource {
+      data: Arc::from(&b"emf"[..]),
+      content_type: Some("image/x-emf".to_string()),
+      monochrome_dib_palette_override: None,
+      metafile_external_header: None,
+      metafile_semantic_text_includes_raster_backdrop: false,
+    };
+
+    assert!(attach_vml_ole_preview(
+      &mut shapes,
+      &model,
+      "rId1",
+      resource.clone(),
+    ));
+    assert_eq!(shapes.len(), 3);
+    assert_eq!(shapes[0].name.as_deref(), Some("underlay"));
+    assert_eq!(shapes[1].name.as_deref(), Some("ole"));
+    assert_eq!(shapes[2].name.as_deref(), Some("overlay"));
+    assert_eq!(
+      shapes[1]
+        .picture
+        .as_ref()
+        .and_then(|picture| picture.image_resource.as_ref()),
+      Some(&resource)
+    );
+    assert!(shapes[0].picture.is_none());
+    assert!(shapes[2].picture.is_none());
+    assert_eq!(
+      shapes[1].position,
+      super::super::drawingml::shape::Point { x: 10, y: 20 }
+    );
+    assert_eq!(
+      shapes[1].size,
+      super::super::drawingml::shape::Size { cx: 30, cy: 40 }
     );
   }
 }

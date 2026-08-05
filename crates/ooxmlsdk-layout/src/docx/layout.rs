@@ -3248,6 +3248,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     bytes: item.data,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: item.metafile_background_color,
+    metafile_external_header: None,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),

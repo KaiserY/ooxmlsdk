@@ -5893,6 +5893,7 @@ fn data_point_effect_backdrop(
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
+    metafile_external_header: None,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: None,

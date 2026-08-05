@@ -139,12 +139,16 @@ pub(crate) struct DiagramRelationshipIds {
   pub(crate) color_part: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct OleObjectRecord {
+  pub(crate) shape_id: Option<String>,
   pub(crate) relationship_id: Option<String>,
   pub(crate) name: Option<String>,
   pub(crate) prog_id: Option<String>,
+  pub(crate) image_width: Option<i32>,
+  pub(crate) image_height: Option<i32>,
   pub(crate) show_as_icon: bool,
+  pub(crate) ole_object_choice: Option<p::OleObjectChoice>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

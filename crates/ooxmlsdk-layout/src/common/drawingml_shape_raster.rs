@@ -1547,6 +1547,7 @@ mod tests {
       bytes: Arc::from(png),
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
+      metafile_external_header: None,
       relationship_id: None,
       alt_text: None,
       hyperlink_url: None,

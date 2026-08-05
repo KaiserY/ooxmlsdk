@@ -191,6 +191,8 @@ pub struct ImageItem<'doc> {
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   /// Solid fill painted by the host shape behind an EMF/WMF preview.
   pub metafile_background_color: Option<[u8; 3]>,
+  /// External physical playback header for a non-placeable WMF preview.
+  pub metafile_external_header: Option<crate::render::emf_wmf::WmfExternalHeader>,
   pub relationship_id: Option<Cow<'doc, str>>,
   pub alt_text: Option<Cow<'doc, str>>,
   pub hyperlink_url: Option<Cow<'doc, str>>,

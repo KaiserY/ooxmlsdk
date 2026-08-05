@@ -149,13 +149,17 @@ fn graphic_data_record(
       }
       a::GraphicDataChoice::POleObject(ole_object) => {
         record.ole_object = Some(OleObjectRecord {
+          shape_id: ole_object.shape_id.clone(),
           relationship_id: ole_object.id.clone(),
           name: ole_object.name.clone(),
           prog_id: ole_object.prog_id.clone(),
+          image_width: ole_object.image_width,
+          image_height: ole_object.image_height,
           show_as_icon: ole_object
             .show_as_icon
             .as_ref()
             .is_some_and(|value| value.as_bool()),
+          ole_object_choice: ole_object.ole_object_choice.clone(),
         });
         if let Some(relationship_id) = &ole_object.id {
           record.ole_binary_resource = slide_persist

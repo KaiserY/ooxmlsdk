@@ -238,6 +238,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     bytes: item.data,
     metafile_monochrome_dib_palette_override: item.metafile_monochrome_dib_palette_override,
     metafile_background_color: item.metafile_background_color,
+    metafile_external_header: item.metafile_external_header,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
@@ -1143,10 +1144,14 @@ fn graphic_data_has_structured_identity(record: &GraphicDataRecord) -> bool {
       .as_ref()
       .is_some_and(|resource| resource.has_payload())
     || record.ole_object.as_ref().is_some_and(|ole| {
-      ole.relationship_id.is_some()
+      ole.shape_id.is_some()
+        || ole.relationship_id.is_some()
         || ole.name.is_some()
         || ole.prog_id.is_some()
+        || ole.image_width.is_some()
+        || ole.image_height.is_some()
         || ole.show_as_icon
+        || ole.ole_object_choice.is_some()
     })
     || record
       .ole_binary_resource
@@ -3748,6 +3753,7 @@ fn diagram_blip_placeholder_image_item(bounds: shared_diagram::DiagramBounds) ->
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
+    metafile_external_header: None,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: None,
@@ -5168,6 +5174,7 @@ fn lower_legacy_vml_fill_image(shape: &Shape, offset: DisplayOffset, items: &mut
       content_type: fill.resource.content_type.clone(),
       metafile_monochrome_dib_palette_override: fill.resource.monochrome_dib_palette_override,
       metafile_background_color: None,
+      metafile_external_header: None,
       metafile_semantic_text_includes_raster_backdrop: false,
       alt_text: shape
         .description
@@ -5385,6 +5392,7 @@ fn lower_picture(
     content_type,
     metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
     metafile_background_color: None,
+    metafile_external_header: resource.metafile_external_header,
     metafile_semantic_text_includes_raster_backdrop: resource
       .metafile_semantic_text_includes_raster_backdrop,
     alt_text: shape
@@ -5468,6 +5476,7 @@ fn lower_empty_blip_fill_placeholder(
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
+    metafile_external_header: None,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: shape
       .description
@@ -7055,6 +7064,7 @@ fn finish_shape_effect_raster(
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
+    metafile_external_header: None,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: None,
@@ -7842,6 +7852,7 @@ fn blip_fill_image_items_from_resource(
     content_type,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
+    metafile_external_header: None,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: placement.alt_text,
     hyperlink_url: placement.hyperlink_url,
@@ -7897,6 +7908,7 @@ fn tiled_blip_fill_image_items(
       content_type: content_type.clone(),
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
+      metafile_external_header: None,
       metafile_semantic_text_includes_raster_backdrop: false,
       alt_text: placement.alt_text.clone(),
       hyperlink_url: placement.hyperlink_url.clone(),
@@ -8739,6 +8751,7 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
       content_type: Some("image/png".to_string()),
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
+      metafile_external_header: None,
       metafile_semantic_text_includes_raster_backdrop: false,
       alt_text: None,
       hyperlink_url: text.hyperlink_url.clone(),
@@ -11253,6 +11266,7 @@ fn bullet_graphic_item(
     content_type: resource.content_type.clone(),
     metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
     metafile_background_color: None,
+    metafile_external_header: None,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: shape_hyperlink_url.map(ToString::to_string),
@@ -11542,6 +11556,7 @@ fn push_math_ole_preview_item(
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
+    metafile_external_header: None,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: None,

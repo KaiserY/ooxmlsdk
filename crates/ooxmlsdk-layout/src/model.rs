@@ -449,6 +449,7 @@ pub(crate) struct ImageItem {
   pub content_type: Option<String>,
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   pub metafile_background_color: Option<[u8; 3]>,
+  pub metafile_external_header: Option<crate::render::emf_wmf::WmfExternalHeader>,
   pub metafile_semantic_text_includes_raster_backdrop: bool,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,

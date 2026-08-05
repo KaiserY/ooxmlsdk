@@ -1,5 +1,6 @@
 pub use emfsdk::render::{
   DecodedMetafile, MetafileBitmapLayer, MetafilePhysicalSize, MetafileSolidRect, RenderOptions,
+  WmfExternalHeader,
 };
 
 #[derive(Clone, Debug)]
@@ -43,7 +44,21 @@ pub fn extract_metafile_text_runs(
   content_type: Option<&str>,
   include_raster_backdrop: bool,
 ) -> Vec<MetafileTextRun> {
-  emfsdk::render::extract_metafile_text_runs(data, content_type)
+  extract_metafile_text_runs_with_options(
+    data,
+    content_type,
+    include_raster_backdrop,
+    RenderOptions::default(),
+  )
+}
+
+pub fn extract_metafile_text_runs_with_options(
+  data: &[u8],
+  content_type: Option<&str>,
+  include_raster_backdrop: bool,
+  options: RenderOptions,
+) -> Vec<MetafileTextRun> {
+  emfsdk::render::extract_metafile_text_runs_with_options(data, content_type, options)
     .into_iter()
     // [MS-EMF] defines ternary ROPs as bitwise combinations of source,
     // pattern, and the existing destination. LibreOffice's MtfTools uses the
@@ -77,11 +92,27 @@ pub fn extract_metafile_solid_rects(
   emfsdk::render::extract_metafile_solid_rects(data, content_type)
 }
 
+pub fn extract_metafile_solid_rects_with_options(
+  data: &[u8],
+  content_type: Option<&str>,
+  options: RenderOptions,
+) -> Vec<MetafileSolidRect> {
+  emfsdk::render::extract_metafile_solid_rects_with_options(data, content_type, options)
+}
+
 pub fn extract_metafile_bitmap_layers(
   data: &[u8],
   content_type: Option<&str>,
 ) -> Vec<MetafileBitmapLayer> {
   emfsdk::render::extract_metafile_bitmap_layers(data, content_type)
+}
+
+pub fn extract_metafile_bitmap_layers_with_options(
+  data: &[u8],
+  content_type: Option<&str>,
+  options: RenderOptions,
+) -> Vec<MetafileBitmapLayer> {
+  emfsdk::render::extract_metafile_bitmap_layers_with_options(data, content_type, options)
 }
 
 fn metafile_semantic_text(text: &str, font_family: Option<&str>) -> String {

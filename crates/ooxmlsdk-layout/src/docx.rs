@@ -3545,7 +3545,7 @@ fn table_model(
   let explicit_no_repeat_header = source_rows.first().is_some_and(|row| {
     direct_table_row_style(row.table_row_properties.as_deref()).repeat_header == Some(false)
   });
-  let rows = {
+  let mut rows = {
     let mut context = TableImportContext {
       styles: env.styles,
       numbering: env.numbering,
@@ -3583,6 +3583,16 @@ fn table_model(
     boundary_bookmarks.finish_at_paragraph(last_table_row_paragraph_mut(&mut rows));
     rows
   };
+  // LibreOffice `ooxmlexport8.cxx::testTablePagebreak` records the table
+  // boundary explicitly: a `w:br w:type="page"` in a table cell is ignored,
+  // while the same break in the body remains a real page break.  Remove only
+  // the cell-contained inline break after import; paragraph-level
+  // `page_break_before` and body-story breaks keep their normal semantics.
+  for row in &mut rows {
+    for cell in &mut row.cells {
+      strip_table_cell_page_breaks(&mut cell.blocks);
+    }
+  }
   let starts_after_last_rendered_page_break = table_starts_after_last_rendered_page_break(&rows);
   let placement = properties
     .and_then(|properties| properties.table_position_properties.as_ref())
@@ -3621,6 +3631,26 @@ fn table_model(
         + row.grid_after
         == grid_column_count
     });
+  let implicit_complete_grid_width = complete_grid
+    && properties
+      .and_then(|properties| properties.table_layout.as_ref())
+      .is_none()
+    && table_style.layout.is_none()
+    && preferred_width_pt.is_none()
+    && preferred_width_pct.is_none();
+  if implicit_complete_grid_width {
+    // LibreOffice testFdo73556 documents the nil/auto-table-width boundary:
+    // a complete w:tblGrid owns both the separators and the table width even
+    // when the first row's tcW values disagree.  Preserve those cell widths
+    // for explicit fixed/autofit tables, but do not let them replace the
+    // authored grid in this implicit complete-grid form.
+    for row in &mut rows {
+      for cell in &mut row.cells {
+        cell.preferred_width_pt = None;
+        cell.preferred_width_pct = None;
+      }
+    }
+  }
   let layout = properties
     .and_then(|properties| properties.table_layout.as_ref())
     .map(table_layout_mode)
@@ -3683,6 +3713,26 @@ fn table_model(
     normalize_right_to_left_table(&mut model);
   }
   model
+}
+
+fn strip_table_cell_page_breaks(blocks: &mut [Block]) {
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => {
+        paragraph
+          .inlines
+          .retain(|inline| !matches!(inline, InlineItem::PageBreak));
+      }
+      Block::Table(table) => {
+        for row in &mut table.rows {
+          for cell in &mut row.cells {
+            strip_table_cell_page_breaks(&mut cell.blocks);
+          }
+        }
+      }
+      Block::Frame(frame) => strip_table_cell_page_breaks(&mut frame.blocks),
+    }
+  }
 }
 
 fn normalize_right_to_left_table(table: &mut Table) {
@@ -6323,7 +6373,6 @@ fn push_run_or_complex_field(
                 hyperlink_url,
               );
             }
-            break;
           }
         }
       }

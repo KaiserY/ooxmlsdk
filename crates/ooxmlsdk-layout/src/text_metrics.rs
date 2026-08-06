@@ -138,6 +138,7 @@ pub struct TextVerticalMetrics {
   pub descent_pt: f32,
   pub line_gap_pt: f32,
   pub baseline_offset_pt: f32,
+  pub directwrite_baseline_offset_pt: f32,
 }
 
 impl TextVerticalMetrics {
@@ -406,6 +407,7 @@ impl TextMetrics {
         descent_pt: metrics.descent_pt,
         line_gap_pt: metrics.line_gap_pt,
         baseline_offset_pt: metrics.baseline_offset_pt,
+        directwrite_baseline_offset_pt: metrics.directwrite_baseline_offset_pt,
       })
       .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
   }
@@ -423,6 +425,7 @@ impl TextMetrics {
         descent_pt: metrics.descent_pt,
         line_gap_pt: metrics.line_gap_pt,
         baseline_offset_pt: metrics.baseline_offset_pt,
+        directwrite_baseline_offset_pt: metrics.directwrite_baseline_offset_pt,
       })
       .unwrap_or_else(|| self.vertical_metrics(style))
   }
@@ -440,6 +443,7 @@ impl TextMetrics {
         descent_pt: metrics.descent_pt,
         line_gap_pt: metrics.line_gap_pt,
         baseline_offset_pt: metrics.baseline_offset_pt,
+        directwrite_baseline_offset_pt: metrics.directwrite_baseline_offset_pt,
       })
       .unwrap_or_else(|| self.vertical_metrics(style))
   }
@@ -778,6 +782,7 @@ fn approximate_vertical_metrics(font_size: f32) -> TextVerticalMetrics {
     descent_pt: font_size * FALLBACK_DESCENT_EM,
     line_gap_pt: font_size * FALLBACK_LINE_GAP_EM,
     baseline_offset_pt: font_size * (FALLBACK_ASCENT_EM + FALLBACK_LINE_GAP_EM / 2.0),
+    directwrite_baseline_offset_pt: font_size * (FALLBACK_ASCENT_EM + FALLBACK_LINE_GAP_EM),
   }
 }
 

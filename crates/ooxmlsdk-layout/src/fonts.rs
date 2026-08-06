@@ -596,6 +596,9 @@ impl FontResolver {
         combined.line_gap_pt = combined.line_gap_pt.max(metrics.line_gap_pt);
         combined.ink_height_pt = combined.ink_height_pt.max(metrics.ink_height_pt);
         combined.baseline_offset_pt = combined.baseline_offset_pt.max(metrics.baseline_offset_pt);
+        combined.directwrite_baseline_offset_pt = combined
+          .directwrite_baseline_offset_pt
+          .max(metrics.directwrite_baseline_offset_pt);
         combined.hanging_baseline_pt = combined
           .hanging_baseline_pt
           .max(metrics.hanging_baseline_pt);

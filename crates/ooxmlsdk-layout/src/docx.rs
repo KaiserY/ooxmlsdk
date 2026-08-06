@@ -21621,10 +21621,15 @@ fn opacity_from_w14_scheme_transforms(transforms: &[w14::SchemeColorChoice]) -> 
 }
 
 fn opacity_from_w14_alpha(alpha: Option<i32>) -> f32 {
-  // [MS-DOCX] CT_SchemeColor/CT_SRgbColor define `alpha` as the specific
-  // opacity of the input color, not its transparency. With no transform the
-  // color remains fully opaque, matching DrawingML's alpha transform.
-  (sdk_units::drawingml_percent_to_ratio(alpha.unwrap_or(100_000)) as f32).clamp(0.0, 1.0)
+  // Keep this Word 2010 color path distinct from DrawingML `a:alpha`.
+  // Word's fixed-format output consumes the w14 child as transparency: in
+  // tdf152884_Char_Transparency.docx, values 74000 and 29000 become PDF
+  // opacities 66/255 and 181/255 respectively. LibreOffice's importer records
+  // the same producer behavior as CharTransparence. An omitted transform still
+  // means a fully opaque color.
+  alpha.map_or(1.0, |alpha| {
+    1.0 - (sdk_units::drawingml_percent_to_ratio(alpha) as f32).clamp(0.0, 1.0)
+  })
 }
 
 #[derive(Clone, Copy)]
@@ -34887,7 +34892,7 @@ mod tests {
         b: 0x35,
       }
     );
-    assert!((resolved.opacity - 0.2).abs() < 0.001);
+    assert!((resolved.opacity - 0.8).abs() < 0.001);
 
     let stroke = wordprocessing_text_outline_common_stroke(&outline, &theme_colors)
       .expect("complete Word 2010 outline stroke");
@@ -34895,7 +34900,7 @@ mod tests {
     assert_eq!(stroke.color.r, 0x95);
     assert_eq!(stroke.color.g, 0x37);
     assert_eq!(stroke.color.b, 0x35);
-    assert_eq!(stroke.color.a, 51);
+    assert_eq!(stroke.color.a, 204);
     assert_eq!(stroke.cap, Some(common::StrokeCap::Round));
     assert_eq!(stroke.compound, Some(common::StrokeCompound::Single));
     assert_eq!(stroke.alignment, Some(common::StrokeAlignment::Center));
@@ -34904,6 +34909,15 @@ mod tests {
       Some(common::StrokeDashPreset::SystemDot)
     );
     assert_eq!(stroke.join, Some(common::StrokeJoin::Bevel));
+  }
+
+  #[test]
+  fn word_2010_color_alpha_matches_fixed_output_transparency() {
+    assert!((opacity_from_w14_alpha(Some(74_000)) - 66.0 / 255.0).abs() < 0.002);
+    assert!((opacity_from_w14_alpha(Some(29_000)) - 181.0 / 255.0).abs() < 0.002);
+    assert!((opacity_from_w14_alpha(Some(60_000)) - 0.4).abs() < f32::EPSILON);
+    assert!((opacity_from_w14_alpha(Some(10_000)) - 0.9).abs() < f32::EPSILON);
+    assert!((opacity_from_w14_alpha(None) - 1.0).abs() < f32::EPSILON);
   }
 
   #[test]

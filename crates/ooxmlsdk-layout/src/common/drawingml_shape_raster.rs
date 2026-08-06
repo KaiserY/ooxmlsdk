@@ -13,7 +13,7 @@ use tiny_skia::{
 
 use super::{
   Color, DisplayItem, Fill, GradientFill, ImageItem, LineItem, PathCommand, PathItem, PatternFill,
-  Rect, RectItem, Stroke, TextRun,
+  Pt, Rect, RectItem, Stroke, TextRun,
 };
 use crate::text_metrics::TextMetrics;
 
@@ -151,6 +151,20 @@ pub(crate) fn rasterize_fill_layer_at_pixels_per_point(
   })
 }
 
+pub(crate) fn static_3d_text_geometry(
+  item: &TextRun<'static>,
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+) -> Option<super::drawingml_3d::Static3dTextGeometry> {
+  let mut text_metrics = TextMetrics::new();
+  let outline = text_outline(item, &mut text_metrics)?;
+  super::drawingml_3d::Static3dTextGeometry::from_page_path(
+    &outline.commands,
+    raster_bounds,
+    pixels_per_point,
+  )
+}
+
 pub(crate) fn rasterize_group_items_for_effects(
   items: &[DisplayItem<'static>],
   raster_bounds: Rect,
@@ -276,6 +290,17 @@ fn collect_source_layer_item(
       rect.stroke = None;
       Some(DisplayItem::Rect(rect))
     }
+    (SourceLayer::Fill, DisplayItem::Text(text)) => {
+      let mut text = text.clone();
+      text.style.outline_color = None;
+      text.style.outline_width = Pt(0.0);
+      if let Some(options) = text.style.pdf_glyph_outline_options.as_mut() {
+        let options = std::sync::Arc::make_mut(options);
+        options.outline_fill = None;
+        options.outline_stroke = None;
+      }
+      Some(DisplayItem::Text(text))
+    }
     (SourceLayer::Line, DisplayItem::Path(path)) => {
       let mut path = path.clone();
       path.fill = Fill::None;
@@ -287,6 +312,15 @@ fn collect_source_layer_item(
       rect.fill = Fill::None;
       rect.stroke.as_ref()?;
       Some(DisplayItem::Rect(rect))
+    }
+    (SourceLayer::Line, DisplayItem::Text(text)) => {
+      let mut text = text.clone();
+      let options = text
+        .style
+        .pdf_glyph_outline_options
+        .get_or_insert_with(|| std::sync::Arc::new(Default::default()));
+      std::sync::Arc::make_mut(options).fill = Some(Fill::None);
+      Some(DisplayItem::Text(text))
     }
     (SourceLayer::Line, DisplayItem::Line(line)) => Some(DisplayItem::Line(line.clone())),
     _ => None,
@@ -446,65 +480,8 @@ fn draw_text(
   page_to_raster: SkTransform,
   text_metrics: &mut TextMetrics,
 ) -> Option<()> {
-  if item.style.semantic_only || item.style.hidden || item.text.is_empty() {
-    return Some(());
-  }
-  let shaped = text_metrics.shape_text(item.text.as_ref(), &item.style)?;
-  let baseline_offset = if item.style.use_windows_font_metrics {
-    text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-      item.text.as_ref(),
-      &item.style,
-      item.line_height.0,
-    )
-  } else {
-    text_metrics.baseline_offset_in_line_for_text(
-      item.text.as_ref(),
-      &item.style,
-      item.line_height.0,
-    )
-  };
-  let baseline_y = item.origin.y.0 + baseline_offset;
-  let horizontal_scale = item.style.horizontal_scale.unwrap_or(1.0);
-  let mut commands = Vec::new();
-  let mut cursor_x = item.origin.x.0;
-  for glyph in &shaped.glyphs {
-    let face_data = shaped.font_faces.get(glyph.font_index)?;
-    let face = FontRef::from_index(face_data.data.as_ref(), face_data.index).ok()?;
-    let units_per_em = face
-      .head()
-      .map(|head| f32::from(head.units_per_em()))
-      .ok()?;
-    if units_per_em <= f32::EPSILON {
-      return None;
-    }
-    let origin_x = cursor_x + glyph.x_offset_em * glyph.font_size_pt;
-    let origin_y = baseline_y - glyph.y_offset_em * glyph.font_size_pt;
-    let mut outline = RasterGlyphOutline {
-      commands: &mut commands,
-      origin_x,
-      origin_y,
-      scale: glyph.font_size_pt / units_per_em,
-      horizontal_scale,
-      synthetic_italic: face_data.synthetic_italic,
-      rotation_degrees: item.style.rotation_degrees,
-      rotation_center: item.rotation_center,
-      current: None,
-    };
-    if let Some(glyph_outline) = face.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
-      let _ = glyph_outline.draw(
-        DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
-        &mut outline,
-      );
-    }
-    cursor_x += glyph.x_advance_em * glyph.font_size_pt;
-    if item
-      .text
-      .get(glyph.text_range.clone())
-      .is_some_and(|cluster| cluster.contains(' '))
-    {
-      cursor_x += item.word_spacing_pt;
-    }
-  }
+  let outline = text_outline(item, text_metrics)?;
+  let commands = outline.commands;
   if commands.is_empty() {
     return Some(());
   }
@@ -515,7 +492,7 @@ fn draw_text(
       y: item.origin.y,
     },
     size: super::Size {
-      width: super::Pt(shaped.width_pt.max(item.style.font_size.0)),
+      width: super::Pt(outline.width_pt.max(item.style.font_size.0)),
       height: super::Pt(item.line_height.0.max(item.style.font_size.0)),
     },
   };
@@ -587,6 +564,83 @@ fn draw_text(
     )?;
   }
   Some(())
+}
+
+struct RasterTextOutline {
+  commands: Vec<PathCommand>,
+  width_pt: f32,
+}
+
+fn text_outline(
+  item: &TextRun<'static>,
+  text_metrics: &mut TextMetrics,
+) -> Option<RasterTextOutline> {
+  if item.style.semantic_only || item.style.hidden || item.text.is_empty() {
+    return Some(RasterTextOutline {
+      commands: Vec::new(),
+      width_pt: 0.0,
+    });
+  }
+  let shaped = text_metrics.shape_text(item.text.as_ref(), &item.style)?;
+  let baseline_offset = if item.style.use_windows_font_metrics {
+    text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+      item.text.as_ref(),
+      &item.style,
+      item.line_height.0,
+    )
+  } else {
+    text_metrics.baseline_offset_in_line_for_text(
+      item.text.as_ref(),
+      &item.style,
+      item.line_height.0,
+    )
+  };
+  let baseline_y = item.origin.y.0 + baseline_offset;
+  let horizontal_scale = item.style.horizontal_scale.unwrap_or(1.0);
+  let mut commands = Vec::new();
+  let mut cursor_x = item.origin.x.0;
+  for glyph in &shaped.glyphs {
+    let face_data = shaped.font_faces.get(glyph.font_index)?;
+    let face = FontRef::from_index(face_data.data.as_ref(), face_data.index).ok()?;
+    let units_per_em = face
+      .head()
+      .map(|head| f32::from(head.units_per_em()))
+      .ok()?;
+    if units_per_em <= f32::EPSILON {
+      return None;
+    }
+    let origin_x = cursor_x + glyph.x_offset_em * glyph.font_size_pt;
+    let origin_y = baseline_y - glyph.y_offset_em * glyph.font_size_pt;
+    let mut outline = RasterGlyphOutline {
+      commands: &mut commands,
+      origin_x,
+      origin_y,
+      scale: glyph.font_size_pt / units_per_em,
+      horizontal_scale,
+      synthetic_italic: face_data.synthetic_italic,
+      rotation_degrees: item.style.rotation_degrees,
+      rotation_center: item.rotation_center,
+      current: None,
+    };
+    if let Some(glyph_outline) = face.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
+      let _ = glyph_outline.draw(
+        DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
+        &mut outline,
+      );
+    }
+    cursor_x += glyph.x_advance_em * glyph.font_size_pt;
+    if item
+      .text
+      .get(glyph.text_range.clone())
+      .is_some_and(|cluster| cluster.contains(' '))
+    {
+      cursor_x += item.word_spacing_pt;
+    }
+  }
+  Some(RasterTextOutline {
+    commands,
+    width_pt: shaped.width_pt,
+  })
 }
 
 fn resolve_text_raster_fill(fill: &mut Fill<'static>, bounds: Rect) {
@@ -1357,8 +1411,9 @@ fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
 #[cfg(test)]
 mod tests {
   use super::{
-    MAX_EFFECT_RASTER_PIXELS, effect_pixels_per_point_with_max, rasterize_group_items_for_effects,
-    rasterize_vector_items, rasterize_vector_items_for_effects,
+    MAX_EFFECT_RASTER_PIXELS, SourceLayer, collect_source_layer_item,
+    effect_pixels_per_point_with_max, rasterize_group_items_for_effects, rasterize_vector_items,
+    rasterize_vector_items_for_effects,
   };
   use image::codecs::png::PngEncoder;
   use image::{ColorType, ImageEncoder, Rgba, RgbaImage};
@@ -1370,8 +1425,8 @@ mod tests {
   };
   use crate::common::{
     Color, DisplayItem, Fill, GradientFill, GradientPath, GradientPathKind, GradientStop,
-    ImageCrop, ImageItem, PathCommand, PathItem, Point, Pt, Rect, RectItem, RelativeRect, Size,
-    Stroke, Transform,
+    ImageCrop, ImageItem, PathCommand, PathItem, PdfGlyphOutlineOptions, Point, Pt, Rect, RectItem,
+    RelativeRect, Size, Stroke, TextRun, TextStyle, Transform,
   };
 
   fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
@@ -1392,6 +1447,80 @@ mod tests {
     let large = effect_pixels_per_point_with_max(500.0, 500.0, 200.0 / 72.0);
     assert!(large < 200.0 / 72.0);
     assert!(500.0 * 500.0 * large * large <= MAX_EFFECT_RASTER_PIXELS + 1.0);
+  }
+
+  #[test]
+  fn text_source_layers_keep_fill_and_outline_independent() {
+    let fill_color = Color {
+      r: 220,
+      g: 80,
+      b: 20,
+      a: 255,
+    };
+    let outline_color = Color {
+      r: 20,
+      g: 80,
+      b: 220,
+      a: 180,
+    };
+    let mut style = TextStyle::default();
+    style.outline_color = Some(outline_color);
+    style.outline_width = Pt(2.0);
+    style.pdf_glyph_outline_options = Some(Arc::new(PdfGlyphOutlineOptions {
+      fill: Some(Fill::Solid(fill_color)),
+      outline_fill: Some(Fill::Solid(outline_color)),
+      outline_stroke: Some(Stroke {
+        width: Pt(2.0),
+        color: outline_color,
+        ..Stroke::default()
+      }),
+      ..PdfGlyphOutlineOptions::default()
+    }));
+    let item = DisplayItem::Text(TextRun {
+      text: Cow::Borrowed("Example"),
+      origin: Point {
+        x: Pt(0.0),
+        y: Pt(0.0),
+      },
+      line_height: Pt(12.0),
+      paint_clip: None,
+      style,
+      font_id: None,
+      color: fill_color,
+      rotation_center: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: false,
+      pdf_text_segmentation: Default::default(),
+      source: None,
+    });
+
+    let mut fill_layer = Vec::new();
+    collect_source_layer_item(&item, SourceLayer::Fill, &mut fill_layer).unwrap();
+    let DisplayItem::Text(fill_text) = &fill_layer[0] else {
+      panic!("text fill source must remain a text item");
+    };
+    assert_eq!(fill_text.style.outline_color, None);
+    assert_eq!(fill_text.style.outline_width, Pt(0.0));
+    let fill_options = fill_text.style.pdf_glyph_outline_options.as_ref().unwrap();
+    assert_eq!(fill_options.fill, Some(Fill::Solid(fill_color)));
+    assert_eq!(fill_options.outline_fill, None);
+    assert_eq!(fill_options.outline_stroke, None);
+
+    let mut line_layer = Vec::new();
+    collect_source_layer_item(&item, SourceLayer::Line, &mut line_layer).unwrap();
+    let DisplayItem::Text(line_text) = &line_layer[0] else {
+      panic!("text line source must remain a text item");
+    };
+    assert_eq!(line_text.style.outline_color, Some(outline_color));
+    assert_eq!(line_text.style.outline_width, Pt(2.0));
+    let line_options = line_text.style.pdf_glyph_outline_options.as_ref().unwrap();
+    assert_eq!(line_options.fill, Some(Fill::None));
+    assert_eq!(line_options.outline_fill, Some(Fill::Solid(outline_color)));
+    assert!(line_options.outline_stroke.is_some());
   }
 
   #[test]

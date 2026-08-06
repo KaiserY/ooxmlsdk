@@ -2321,6 +2321,7 @@ pub struct VerticalMetrics {
   pub line_gap_pt: f32,
   pub ink_height_pt: f32,
   pub baseline_offset_pt: f32,
+  pub directwrite_baseline_offset_pt: f32,
   pub hanging_baseline_pt: f32,
   pub cjk_horizontal_advance_pt: f32,
   pub cjk_vertical_advance_pt: f32,
@@ -2336,6 +2337,7 @@ impl VerticalMetrics {
       line_gap_pt: self.line_gap_pt * scale,
       ink_height_pt: self.ink_height_pt * scale,
       baseline_offset_pt: self.baseline_offset_pt * scale,
+      directwrite_baseline_offset_pt: self.directwrite_baseline_offset_pt * scale,
       hanging_baseline_pt: self.hanging_baseline_pt * scale,
       cjk_horizontal_advance_pt: self.cjk_horizontal_advance_pt * scale,
       cjk_vertical_advance_pt: self.cjk_vertical_advance_pt * scale,
@@ -3733,23 +3735,47 @@ fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetri
   let to_em = |value: i32| value as f32 / units_per_em * em_size;
   let ascender = metrics.ascent.max(0.0);
   let descender = (-metrics.descent).max(0.0);
+  let os2 = face.os2().ok();
+  let uses_typographic_metrics = os2.as_ref().is_some_and(|os2| {
+    use skrifa::raw::tables::os2::SelectionFlags;
+    os2.version() >= 4
+      && os2
+        .fs_selection()
+        .contains(SelectionFlags::USE_TYPO_METRICS)
+  });
   // Windows Office lays out the baseline from OS/2 Windows metrics unless
   // the face explicitly opts into typographic metrics. Keep that baseline
   // separate from the natural line box: usWinAscent was designed as a
   // clipping extent and can be larger than the typographic ascender.
-  let baseline_offset = face.os2().map_or(ascender, |os2| {
-    use skrifa::raw::tables::os2::SelectionFlags;
-    let units = if os2.version() >= 4
-      && os2
-        .fs_selection()
-        .contains(SelectionFlags::USE_TYPO_METRICS)
-    {
+  let baseline_offset = os2.as_ref().map_or(ascender, |os2| {
+    let units = if uses_typographic_metrics {
       i32::from(os2.s_typo_ascender())
     } else {
       i32::from(os2.us_win_ascent())
     };
     let units = units.max(0);
     if units == 0 { ascender } else { to_em(units) }
+  });
+  // IDWriteTextLayout's default DWRITE_LINE_METRICS baseline is not the
+  // typographic baseline used by paragraph layout. DirectWrite starts with
+  // its alignment-box ascent and adds its derived line gap. Wine's
+  // Windows-conformance implementation derives that gap by preserving the
+  // hhea total while substituting OS/2 Windows ascent/descent; fonts opting
+  // into USE_TYPO_METRICS use their typographic ascent and line gap directly.
+  let directwrite_baseline_offset = os2.as_ref().map_or(ascender, |os2| {
+    if uses_typographic_metrics {
+      ascender + metrics.leading
+    } else {
+      let windows_ascent = to_em(i32::from(os2.us_win_ascent()));
+      let windows_descent = to_em(i32::from(os2.us_win_descent()));
+      directwrite_default_baseline_offset(
+        ascender,
+        descender,
+        metrics.leading,
+        windows_ascent,
+        windows_descent,
+      )
+    }
   });
   let line_gap = if metrics.leading > 0.0 {
     metrics.leading
@@ -3785,6 +3811,7 @@ fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetri
       ascent_pt: ascender,
       descent_pt: descender,
       baseline_offset_pt: baseline_offset,
+      directwrite_baseline_offset_pt: directwrite_baseline_offset,
       line_gap_pt: line_gap,
       ink_height_pt: ascender + descender,
       ..VerticalMetrics::default()
@@ -3810,6 +3837,18 @@ fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetri
     script,
     em_size,
   }
+}
+
+fn directwrite_default_baseline_offset(
+  hhea_ascent: f32,
+  hhea_descent: f32,
+  hhea_line_gap: f32,
+  windows_ascent: f32,
+  windows_descent: f32,
+) -> f32 {
+  let hhea_height = hhea_ascent + hhea_descent + hhea_line_gap;
+  let windows_height = windows_ascent + windows_descent;
+  windows_ascent + (hhea_height - windows_height).max(0.0)
 }
 
 fn font_coverage_from_skrifa(face: &SkrifaFontRef<'_>) -> FontCoverage {
@@ -4738,6 +4777,7 @@ mod tests {
         ascent_pt: 1.0,
         descent_pt: 0.25,
         baseline_offset_pt: 1.125,
+        directwrite_baseline_offset_pt: 1.25,
         ..VerticalMetrics::default()
       },
       em_size: 1.0,
@@ -4755,6 +4795,24 @@ mod tests {
     assert_eq!(metrics.vertical.ascent_pt, 12.0);
     assert_eq!(metrics.vertical.descent_pt, 3.0);
     assert_eq!(metrics.vertical.baseline_offset_pt, 13.5);
+    assert_eq!(metrics.vertical.directwrite_baseline_offset_pt, 15.0);
+  }
+
+  #[test]
+  fn directwrite_default_baseline_preserves_hhea_height_with_windows_extents() {
+    // Calibri Bold's hhea box totals 2500 units, exactly matching its
+    // 1950/550 Windows alignment box, so DirectWrite adds no line gap.
+    assert_eq!(
+      directwrite_default_baseline_offset(1536.0, 512.0, 452.0, 1950.0, 550.0),
+      1950.0
+    );
+
+    // A smaller Windows clipping box keeps the hhea total by placing the
+    // residual above the baseline, matching DirectWrite/Wine line metrics.
+    assert_eq!(
+      directwrite_default_baseline_offset(1600.0, 400.0, 400.0, 1800.0, 400.0),
+      2000.0
+    );
   }
 
   #[test]

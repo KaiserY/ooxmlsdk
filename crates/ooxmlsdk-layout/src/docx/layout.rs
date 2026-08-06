@@ -97,6 +97,7 @@ const WORD_FIXED_OUTPUT_DPI: f32 = 600.0;
 // counterexamples. This guard belongs to raster materialization, not to the
 // authored DrawingML radius or alignment rectangle.
 const WORD_TEXT_EFFECT_RASTER_GUARD_PT: f32 = 10.0 * 72.0 / 96.0;
+const WORD_STATIC_3D_RASTER_EDGE_GUARD_PT: f32 = 72.0 / 200.0;
 // Word fixed output snaps the legacy field glyph to its 600-DPI printer grid.
 // The independent 10-point Arial (checkboxes.docx), 11-point Calibri
 // (n766477.docx), and colored 10-point Open Sans fallback (tdf92472.docx)
@@ -5410,8 +5411,7 @@ fn materialize_wordprocessing_text_effects_in_items(
       text.style.wordprocessing_text_3d_parts.as_ref(),
     );
     let flatten_to_raster = text.style.wordprocessing_text_3d || static3d.is_some();
-    let has_wordprocessing_run_effects = text.style.wordprocessing_text_3d
-      || text.style.text_glow.is_some()
+    let has_spatial_wordprocessing_effect = text.style.text_glow.is_some()
       || text.style.text_shadow.is_some()
       || text.style.text_reflection.is_some();
     let drawingml_effects = text.style.drawingml_text_effects.clone();
@@ -5467,6 +5467,7 @@ fn materialize_wordprocessing_text_effects_in_items(
       continue;
     }
     let mut effect_text = (**text).clone();
+    let mut shadow_anchor_text = effect_text.clone();
     if drawingml_effects.is_none() {
       let baseline_offset = if text.style.use_windows_font_metrics {
         text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
@@ -5480,8 +5481,28 @@ fn materialize_wordprocessing_text_effects_in_items(
       effect_text.y_pt += wordprocessing_text_effect_baseline_shift(
         text.line_height_pt,
         baseline_offset,
-        static3d.is_some() && !has_wordprocessing_run_effects,
+        static3d.is_some() && !has_spatial_wordprocessing_effect,
       );
+      let hosted_static_run_effects = static3d.is_some()
+        && has_spatial_wordprocessing_effect
+        && text.wordprocessing_effect_host.is_some();
+      if !hosted_static_run_effects {
+        shadow_anchor_text = effect_text.clone();
+      }
+      if static3d.is_some()
+        && has_spatial_wordprocessing_effect
+        && let Some(host) = text.wordprocessing_effect_host
+      {
+        let directwrite_baseline_offset = text_metrics
+          .vertical_metrics_for_text(&text.text, &text.style)
+          .directwrite_baseline_offset_pt
+          - text.style.baseline_shift_pt;
+        effect_text.y_pt += wordprocessing_hosted_static_3d_baseline_shift(
+          effect_text.y_pt,
+          directwrite_baseline_offset,
+          host.shape_bounds,
+        );
+      }
     }
     let Some((ink_left, ink_top, ink_right, ink_bottom)) =
       text_item_ink_bounds(&effect_text, text_metrics)
@@ -5490,12 +5511,20 @@ fn materialize_wordprocessing_text_effects_in_items(
     };
     let (anchor_left, anchor_top, anchor_right, anchor_bottom) =
       text_item_logical_bounds(&effect_text, width, text_metrics);
+    let (shadow_anchor_left, shadow_anchor_top, shadow_anchor_right, shadow_anchor_bottom) =
+      text_item_logical_bounds(&shadow_anchor_text, width, text_metrics);
     let ink_width = (ink_right - ink_left).max(f32::EPSILON);
     let ink_height = (ink_bottom - ink_top).max(f32::EPSILON);
     let canvas_padding_pt = if drawingml_effects.is_some() {
       2.0 / (200.0 / 72.0)
-    } else {
+    } else if has_spatial_wordprocessing_effect {
       WORD_TEXT_EFFECT_RASTER_GUARD_PT
+    } else {
+      // A props3d-only Word run is emitted as the tight projected solid at
+      // 200 DPI. The Direct2D guard belongs to spatial effect inputs (blur,
+      // shadow, and reflection). Keep only one device pixel for antialiasing
+      // coverage at the projected solid's outer edge.
+      WORD_STATIC_3D_RASTER_EDGE_GUARD_PT
     };
     // Text-body 3-D is part of the source shape consumed by run-level glow,
     // shadow, and reflection. Compose those two output ranges rather than
@@ -5588,10 +5617,17 @@ fn materialize_wordprocessing_text_effects_in_items(
       right_pt: anchor_right - ink_left,
       bottom_pt: anchor_bottom - ink_top,
     };
-    let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds_with_anchor(
+    let shadow_anchor_bounds = common::drawingml_image_effects::EffectOutputBounds {
+      left_pt: shadow_anchor_left - ink_left,
+      top_pt: shadow_anchor_top - ink_top,
+      right_pt: shadow_anchor_right - ink_left,
+      bottom_pt: shadow_anchor_bottom - ink_top,
+    };
+    let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds_with_anchors(
       &raster_effects,
       source_bounds,
       anchor_bounds,
+      shadow_anchor_bounds,
     ) else {
       continue;
     };
@@ -5611,10 +5647,11 @@ fn materialize_wordprocessing_text_effects_in_items(
           bottom_pt: source_bounds.bottom_pt + canvas_padding_pt,
         };
         let Some(mut canvas_bounds) =
-          common::drawingml_image_effects::container_output_bounds_with_anchor(
+          common::drawingml_image_effects::container_output_bounds_with_anchors(
             &raster_effects,
             padded_source,
             anchor_bounds,
+            shadow_anchor_bounds,
           )
         else {
           continue;
@@ -5729,15 +5766,43 @@ fn materialize_wordprocessing_text_effects_in_items(
         || text.style.text_shadow.is_some()
         || text.style.text_reflection.is_some()))
     .then(|| raster.image.clone());
+    let static_3d_text_fill = static3d
+      .is_some()
+      .then(|| {
+        common::drawingml_shape_raster::rasterize_fill_layer_at_pixels_per_point(
+          std::slice::from_ref(&common_text),
+          raster_bounds,
+          raster.pixels_per_point,
+        )
+      })
+      .flatten()
+      .map(|fill| fill.image);
+    let mut static_3d_reflection_source = None;
     let mut effect_source_left_px = -relative_left * raster.pixels_per_point;
     let mut effect_source_top_px = -relative_top * raster.pixels_per_point;
     let mut effect_source_width_px = ink_width * raster.pixels_per_point;
     let mut effect_source_height_px = ink_height * raster.pixels_per_point;
-    let effect_anchor_left_px = (anchor_left - raster_bounds.origin.x.0) * raster.pixels_per_point;
-    let effect_anchor_top_px = (anchor_top - raster_bounds.origin.y.0) * raster.pixels_per_point;
-    let effect_anchor_width_px = (anchor_right - anchor_left) * raster.pixels_per_point;
-    let effect_anchor_height_px = (anchor_bottom - anchor_top) * raster.pixels_per_point;
-    let effect_ramp_height_px = effective_font_size_pt(&text.style, None) * raster.pixels_per_point;
+    let mut effect_shadow_anchor_left_px =
+      (shadow_anchor_left - raster_bounds.origin.x.0) * raster.pixels_per_point;
+    let mut effect_shadow_anchor_top_px =
+      (shadow_anchor_top - raster_bounds.origin.y.0) * raster.pixels_per_point;
+    let mut effect_shadow_anchor_width_px =
+      (shadow_anchor_right - shadow_anchor_left) * raster.pixels_per_point;
+    let mut effect_shadow_anchor_height_px =
+      (shadow_anchor_bottom - shadow_anchor_top) * raster.pixels_per_point;
+    let mut effect_anchor_left_px =
+      (anchor_left - raster_bounds.origin.x.0) * raster.pixels_per_point;
+    let mut effect_anchor_top_px =
+      (anchor_top - raster_bounds.origin.y.0) * raster.pixels_per_point;
+    let mut effect_anchor_width_px = (anchor_right - anchor_left) * raster.pixels_per_point;
+    let mut effect_anchor_height_px = (anchor_bottom - anchor_top) * raster.pixels_per_point;
+    let effect_ramp_top = anchor_bottom - effective_font_size_pt(&text.style, None);
+    let mut effect_ramp_left_px = effect_anchor_left_px;
+    let mut effect_ramp_top_px =
+      (effect_ramp_top - raster_bounds.origin.y.0) * raster.pixels_per_point;
+    let mut effect_ramp_width_px = effect_anchor_width_px;
+    let mut effect_ramp_height_px =
+      effective_font_size_pt(&text.style, None) * raster.pixels_per_point;
     if let Some(style) = static3d.as_ref() {
       let model = static_model_bounds.unwrap_or(FrameBounds {
         x_pt: ink_left,
@@ -5762,19 +5827,135 @@ fn materialize_wordprocessing_text_effects_in_items(
             raster.pixels_per_point,
             Some(model_surface),
           ));
+        let projected_anchor = common::drawingml_3d::projected_front_region_output_bounds(
+          projection,
+          &style.shape,
+          model.width_pt,
+          model.height_pt,
+          common::drawingml_3d::Static3dOutputBounds {
+            left_pt: anchor_left - model.x_pt,
+            top_pt: anchor_top - model.y_pt,
+            right_pt: anchor_right - model.x_pt,
+            bottom_pt: anchor_bottom - model.y_pt,
+          },
+        );
+        effect_anchor_left_px = (model.x_pt + projected_anchor.left_pt - raster_bounds.origin.x.0)
+          * raster.pixels_per_point;
+        effect_anchor_top_px = (model.y_pt + projected_anchor.top_pt - raster_bounds.origin.y.0)
+          * raster.pixels_per_point;
+        effect_anchor_width_px =
+          (projected_anchor.right_pt - projected_anchor.left_pt) * raster.pixels_per_point;
+        effect_anchor_height_px =
+          (projected_anchor.bottom_pt - projected_anchor.top_pt) * raster.pixels_per_point;
+
+        let projected_shadow_anchor = common::drawingml_3d::projected_front_region_output_bounds(
+          projection,
+          &style.shape,
+          model.width_pt,
+          model.height_pt,
+          common::drawingml_3d::Static3dOutputBounds {
+            left_pt: shadow_anchor_left - model.x_pt,
+            top_pt: shadow_anchor_top - model.y_pt,
+            right_pt: shadow_anchor_right - model.x_pt,
+            bottom_pt: shadow_anchor_bottom - model.y_pt,
+          },
+        );
+        effect_shadow_anchor_left_px = (model.x_pt + projected_shadow_anchor.left_pt
+          - raster_bounds.origin.x.0)
+          * raster.pixels_per_point;
+        effect_shadow_anchor_top_px = (model.y_pt + projected_shadow_anchor.top_pt
+          - raster_bounds.origin.y.0)
+          * raster.pixels_per_point;
+        effect_shadow_anchor_width_px = (projected_shadow_anchor.right_pt
+          - projected_shadow_anchor.left_pt)
+          * raster.pixels_per_point;
+        effect_shadow_anchor_height_px = (projected_shadow_anchor.bottom_pt
+          - projected_shadow_anchor.top_pt)
+          * raster.pixels_per_point;
+
+        // W14 reflection's opacity ramp stays in text-em coordinates even
+        // when the source glyph plane is projected by bodyPr 3-D. Projection
+        // moves the reflection anchor, but shrinking the ramp with that plane
+        // makes endPos decay too early. Keep the authored em height and attach
+        // it to the projected character-cell bottom.
+        effect_ramp_left_px = effect_anchor_left_px;
+        effect_ramp_width_px = effect_anchor_width_px;
+        effect_ramp_height_px = effective_font_size_pt(&text.style, None) * raster.pixels_per_point;
+        effect_ramp_top_px = effect_anchor_top_px + effect_anchor_height_px - effect_ramp_height_px;
       }
-      common::drawingml_3d::apply_static_3d(
-        &mut raster.image,
-        &style.scene,
-        projection,
-        &style.shape,
-        common::drawingml_3d::Static3dRenderOptions {
-          extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
-          contour_color: style.contour_color,
-          pixels_per_point: raster.pixels_per_point,
-          model_surface: Some(model_surface),
-        },
-      );
+      let render_options = common::drawingml_3d::Static3dRenderOptions {
+        extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
+        contour_color: style.contour_color,
+        pixels_per_point: raster.pixels_per_point,
+        model_surface: Some(model_surface),
+      };
+      let text_geometry = match &common_text {
+        common::DisplayItem::Text(text) => common::drawingml_shape_raster::static_3d_text_geometry(
+          text,
+          raster_bounds,
+          raster.pixels_per_point,
+        ),
+        _ => None,
+      };
+      if let Some(geometry) = text_geometry.as_ref() {
+        if let Some(fill) = static_3d_text_fill.as_ref() {
+          // The glyph fill owns the physical solid, but the combined
+          // fill-and-line paint is the face material that receives lighting.
+          // Keeping those roles separate preserves counters while preventing
+          // a flat textOutline overlay from hiding the bevel.
+          common::drawingml_3d::mask_static_3d_text_surface_paint(&mut raster.image, fill);
+        }
+        common::drawingml_3d::apply_static_3d_text(
+          &mut raster.image,
+          geometry,
+          &style.scene,
+          projection,
+          &style.shape,
+          render_options,
+        );
+      } else {
+        common::drawingml_3d::apply_static_3d(
+          &mut raster.image,
+          &style.scene,
+          projection,
+          &style.shape,
+          render_options,
+        );
+      }
+      if drawingml_effects.is_none() && text.style.text_reflection.is_some() {
+        // Reflection mirrors the resolved visible object. Glow and shadow
+        // only need the projected front alpha, but reflecting an unlit fill
+        // discards the bevel, contour, extrusion, and material colors that
+        // remain visible in Word's fixed output.
+        static_3d_reflection_source = Some(raster.image.clone());
+        if let (Some(reflection), Some((_, _, _, bottom))) = (
+          text.style.text_reflection,
+          common::drawingml_3d::alpha_bounds(&raster.image),
+        ) && reflection.scale_y < 0.0
+          && (reflection.alignment.1 - 1.0).abs() <= f32::EPSILON
+        {
+          // For bottom-aligned negative scaling, choose the pivot A which
+          // maps the resolved source bottom S onto the logical text bottom L:
+          // L = A + sy * (S - A). The projected character-cell pivot uses L
+          // and overlaps the foreground; pivoting at S leaves twice the 3-D
+          // overhang. Solving the authored affine transform avoids either
+          // compensating translation.
+          let logical_bottom = effect_anchor_top_px + effect_anchor_height_px;
+          let resolved_bottom = (bottom + 1) as f32;
+          let pivot = wordprocessing_reflection_alignment_pivot(
+            logical_bottom,
+            resolved_bottom,
+            reflection.scale_y,
+          );
+          effect_anchor_top_px += pivot - logical_bottom;
+
+          // The opacity ramp remains attached to the resolved source edge;
+          // the affine transform above maps that edge onto the logical bottom.
+          effect_ramp_height_px =
+            effective_font_size_pt(&text.style, None) * raster.pixels_per_point;
+          effect_ramp_top_px = resolved_bottom - effect_ramp_height_px;
+        }
+      }
       let effect_alpha_bounds = flat_wordprocessing_effect_source
         .as_ref()
         .and_then(common::drawingml_3d::alpha_bounds)
@@ -5805,6 +5986,24 @@ fn materialize_wordprocessing_text_effects_in_items(
         )
       });
     }
+    if static_3d_reflection_source.is_some() {
+      for effect in &mut rendered_effects.effects {
+        let common::drawingml_image_effects::ImageEffect::Reflection(reflection) = effect else {
+          continue;
+        };
+        *effect = common::drawingml_image_effects::ImageEffect::Container(
+          common::drawingml_image_effects::ImageEffectContainer {
+            kind: common::drawingml_image_effects::ImageEffectContainerKind::Tree,
+            effects: vec![
+              common::drawingml_image_effects::ImageEffect::SourceReference(
+                common::drawingml_image_effects::ImageEffectSourceReference::Fill,
+              ),
+              common::drawingml_image_effects::ImageEffect::Reflection(*reflection),
+            ],
+          },
+        );
+      }
+    }
     common::drawingml_image_effects::apply_container_to_padded_image_with_sources_and_anchor(
       &mut raster.image,
       &rendered_effects,
@@ -5813,17 +6012,23 @@ fn materialize_wordprocessing_text_effects_in_items(
         paint_top_px: effect_source_top_px,
         paint_width_px: effect_source_width_px,
         paint_height_px: effect_source_height_px,
+        shadow_anchor_left_px: effect_shadow_anchor_left_px,
+        shadow_anchor_top_px: effect_shadow_anchor_top_px,
+        shadow_anchor_width_px: effect_shadow_anchor_width_px,
+        shadow_anchor_height_px: effect_shadow_anchor_height_px,
         anchor_left_px: effect_anchor_left_px,
         anchor_top_px: effect_anchor_top_px,
         anchor_width_px: effect_anchor_width_px,
         anchor_height_px: effect_anchor_height_px,
-        ramp_left_px: effect_anchor_left_px,
-        ramp_top_px: effect_anchor_top_px + effect_anchor_height_px - effect_ramp_height_px,
-        ramp_width_px: effect_anchor_width_px,
+        ramp_left_px: effect_ramp_left_px,
+        ramp_top_px: effect_ramp_top_px,
+        ramp_width_px: effect_ramp_width_px,
         ramp_height_px: effect_ramp_height_px,
       },
       common::drawingml_image_effects::ImageEffectSourceImages {
-        fill: raster.fill_image.as_ref(),
+        fill: static_3d_reflection_source
+          .as_ref()
+          .or(raster.fill_image.as_ref()),
         line: raster.line_image.as_ref(),
         fill_line: raster.fill_line_image.as_ref(),
         children: raster.children_image.as_ref(),
@@ -5875,21 +6080,9 @@ fn materialize_wordprocessing_text_effects_in_items(
         image_bounds.size.height.0 = crop_height as f32 / raster.pixels_per_point;
       }
     }
-    if drawingml_effects.is_none() && has_wordprocessing_run_effects {
-      premultiply_wordprocessing_effect_bitmap(&mut raster.image);
-    }
-    let mut png = Cursor::new(Vec::new());
-    if PngEncoder::new(&mut png)
-      .write_image(
-        raster.image.as_raw(),
-        raster.image.width(),
-        raster.image.height(),
-        ColorType::Rgba8.into(),
-      )
-      .is_err()
-    {
+    let Some(png) = encode_wordprocessing_effect_bitmap_png(&raster.image) else {
       continue;
-    }
+    };
     let image = PageItem::Image(ImageItem {
       x_pt: image_bounds.origin.x.0,
       y_pt: image_bounds.origin.y.0,
@@ -5902,7 +6095,7 @@ fn materialize_wordprocessing_text_effects_in_items(
       rotation_deg: 0.0,
       flip_horizontal: false,
       flip_vertical: false,
-      data: Arc::from(png.into_inner()),
+      data: Arc::from(png),
       content_type: Some("image/png".to_string()),
       metafile_background_color: None,
       alt_text: None,
@@ -5927,19 +6120,17 @@ fn materialize_wordprocessing_text_effects_in_items(
   }
 }
 
-fn premultiply_wordprocessing_effect_bitmap(image: &mut image::RgbaImage) {
-  // Microsoft's Direct2D magazine TextFrame renders text effects into
-  // DXGI_FORMAT_B8G8R8A8_UNORM with D2D1_ALPHA_MODE_PREMULTIPLIED. Office's
-  // fixed-output PDF preserves those color components when it separates the
-  // bitmap alpha into an SMask. Keep that observable surface representation
-  // at the final encoding boundary; all effect math above remains straight
-  // alpha so colors are not multiplied more than once while compositing.
-  for pixel in image.pixels_mut() {
-    let alpha = u16::from(pixel.0[3]);
-    for channel in &mut pixel.0[..3] {
-      *channel = ((u16::from(*channel) * alpha + 127) / 255) as u8;
-    }
-  }
+fn encode_wordprocessing_effect_bitmap_png(image: &image::RgbaImage) -> Option<Vec<u8>> {
+  let mut png = Cursor::new(Vec::new());
+  PngEncoder::new(&mut png)
+    .write_image(
+      image.as_raw(),
+      image.width(),
+      image.height(),
+      ColorType::Rgba8.into(),
+    )
+    .ok()?;
+  Some(png.into_inner())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -5992,16 +6183,14 @@ fn wordprocessing_effect_bitmap_target(
 fn wordprocessing_text_effect_baseline_shift(
   line_height_pt: f32,
   baseline_offset_pt: f32,
-  text_body_only_static_3d: bool,
+  static_3d_without_spatial_effects: bool,
 ) -> f32 {
-  if text_body_only_static_3d {
-    // DrawingML bodyPr/scene3d+sp3d consumes the text body's already-laid-out
-    // glyph geometry. ECMA-376 Part 1 L.4.6.3.2.4 calls this scene-coherent
-    // text, and LibreOffice stores it as the custom shape's separate
-    // Text3DEffectProperties. With no w14 run effect, it is not the Word
-    // run-effect backdrop whose source is moved from a line origin to the
-    // line-box baseline below. A run carrying w14 effects still takes that
-    // established path before the body-level 3-D projection is applied.
+  if static_3d_without_spatial_effects {
+    // Static 3-D consumes the already-laid-out glyph geometry, whether the
+    // shape comes from DrawingML bodyPr or a run-level w14:props3d. Moving a
+    // props-only run to the spatial-effect line-box baseline places Office's
+    // fixed-output solid roughly one descent too low. Glow, shadow, and
+    // reflection still use the effect-surface baseline below.
     return 0.0;
   }
   // Word lays out glow/shadow/reflection text like an inline effect object:
@@ -6009,6 +6198,21 @@ fn wordprocessing_text_effect_baseline_shift(
   // baseline. This is also the coordinate emitted by Word's fixed-output
   // searchable foreground after its raster backdrop.
   (line_height_pt - baseline_offset_pt).max(0.0)
+}
+
+fn wordprocessing_hosted_static_3d_baseline_shift(
+  text_y_pt: f32,
+  directwrite_baseline_offset_pt: f32,
+  model_bounds: FrameBounds,
+) -> f32 {
+  // Microsoft's Interactive3dTextSample translates its DirectWrite outline
+  // by the negative DWRITE_LINE_METRICS baseline before extruding it, so the
+  // model origin is the true DirectWrite baseline rather than Word's
+  // typographic paragraph baseline. WPS still lays the paragraph out in its
+  // inset text frame; align only that vertical model origin here. Paragraph
+  // alignment continues to own horizontal placement.
+  let model_center_y = model_bounds.y_pt + model_bounds.height_pt * 0.5;
+  model_center_y - (text_y_pt + directwrite_baseline_offset_pt)
 }
 
 fn wordprocessing_text_effect_render_scale(font_size_pt: f32) -> f32 {
@@ -6034,6 +6238,15 @@ fn wordprocessing_text_reflection_for_render(
   // while retaining the authored transform and output range.
   reflection.blur_radius_px *= raster_blur_scale;
   reflection
+}
+
+fn wordprocessing_reflection_alignment_pivot(
+  logical_edge: f32,
+  resolved_source_edge: f32,
+  scale: f32,
+) -> f32 {
+  debug_assert!(scale < 0.0);
+  (logical_edge - scale * resolved_source_edge) / (1.0 - scale)
 }
 
 fn wordprocessing_text_effect_max_pixels_per_point(
@@ -31265,14 +31478,17 @@ mod tests {
   }
 
   #[test]
-  fn word_text_fixed_output_preserves_direct2d_premultiplied_components() {
-    let mut image = image::RgbaImage::from_pixel(1, 1, image::Rgba([146, 208, 80, 92]));
+  fn word_text_fixed_output_png_keeps_straight_alpha_components() {
+    let image = image::RgbaImage::from_pixel(1, 1, image::Rgba([146, 208, 80, 92]));
 
-    premultiply_wordprocessing_effect_bitmap(&mut image);
+    let encoded = encode_wordprocessing_effect_bitmap_png(&image).unwrap();
+    let decoded = image::load_from_memory_with_format(&encoded, image::ImageFormat::Png)
+      .unwrap()
+      .into_rgba8();
 
-    // This is also an exact sampled Office shadow pixel: 92/255 opacity over
-    // the authored #92D050 color produces #354B1D in the RGB image plane.
-    assert_eq!(image.get_pixel(0, 0).0, [53, 75, 29, 92]);
+    // Krilla separates these samples into an RGB image and a PDF SMask. With
+    // no `/Matte`, the encoded PNG keeps straight color components.
+    assert_eq!(decoded.get_pixel(0, 0).0, [146, 208, 80, 92]);
   }
 
   #[test]
@@ -31286,13 +31502,30 @@ mod tests {
   }
 
   #[test]
-  fn word_text_body_static_3d_keeps_the_laid_out_glyph_origin() {
+  fn word_text_static_3d_without_spatial_effects_keeps_the_laid_out_glyph_origin() {
     let line_height = 47.424316;
     let natural_baseline_offset = 32.71216;
     let shift =
       wordprocessing_text_effect_baseline_shift(line_height, natural_baseline_offset, true);
 
     assert_eq!(shift, 0.0);
+  }
+
+  #[test]
+  fn hosted_word_text_static_3d_places_the_directwrite_baseline_at_the_model_center() {
+    let model = FrameBounds {
+      x_pt: 40.0,
+      y_pt: 100.0,
+      width_pt: 240.0,
+      height_pt: 80.0,
+    };
+    let text_y = 112.0;
+    let directwrite_baseline_offset = 20.0;
+    let shift =
+      wordprocessing_hosted_static_3d_baseline_shift(text_y, directwrite_baseline_offset, model);
+
+    assert_eq!(shift, 8.0);
+    assert_eq!(text_y + shift + directwrite_baseline_offset, 140.0);
   }
 
   #[test]
@@ -31343,6 +31576,21 @@ mod tests {
     assert_eq!(rendered, expected);
     assert_eq!(rendered.distance_px, source.distance_px);
     assert!(rendered.blur_radius_px < source.blur_radius_px);
+  }
+
+  #[test]
+  fn flipped_reflection_pivot_aligns_the_resolved_edge_to_the_logical_edge() {
+    let logical_bottom = 100.0;
+    let resolved_source_bottom = 112.0;
+    let scale_y = -1.0;
+    let pivot =
+      wordprocessing_reflection_alignment_pivot(logical_bottom, resolved_source_bottom, scale_y);
+
+    assert_eq!(pivot, 106.0);
+    assert_eq!(
+      pivot + scale_y * (resolved_source_bottom - pivot),
+      logical_bottom
+    );
   }
 
   #[test]

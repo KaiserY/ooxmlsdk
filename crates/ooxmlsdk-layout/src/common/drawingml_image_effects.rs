@@ -118,6 +118,7 @@ pub(crate) enum GlowBlurKernel {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ShadowBlurKernel {
   Stack,
+  StackTwice,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -392,30 +393,28 @@ pub(crate) fn from_wordprocessing_text_effects(
   reflection: Option<WordprocessingTextReflection>,
 ) -> Option<ImageEffectContainer> {
   let mut branches = Vec::new();
-  if let Some(glow) = glow {
-    branches.push(ImageEffect::Glow {
-      radius_px: glow.radius_px,
-      raster_length_scale: glow.raster_length_scale,
-      bounds_radius_scale: glow.raster_length_scale * 2.0,
-      // LibreOffice's GlowPrimitive2D uses half of the effective glow radius
-      // for both square dilation and Stack Blur. Office's 8-bit text-effect
-      // masks are measurably closer to that kernel than the shared Gaussian.
-      spread_ratio: 0.5,
-      spread_kernel: GlowSpreadKernel::Square,
-      blur_kernel: GlowBlurKernel::Stack,
-      color: glow.color,
-    });
-  }
+  let glow_effect = glow.map(|glow| ImageEffect::Glow {
+    radius_px: glow.radius_px,
+    raster_length_scale: glow.raster_length_scale,
+    bounds_radius_scale: glow.raster_length_scale * 2.0,
+    // LibreOffice's GlowPrimitive2D uses half of the effective glow radius
+    // for both square dilation and Stack Blur. Office's 8-bit text-effect
+    // masks are measurably closer to that kernel than the shared Gaussian.
+    spread_ratio: 0.5,
+    spread_kernel: GlowSpreadKernel::Square,
+    blur_kernel: GlowBlurKernel::Stack,
+    color: glow.color,
+  });
   if let Some(shadow) = shadow {
-    branches.push(ImageEffect::OuterShadow {
+    let shadow_effect = ImageEffect::OuterShadow {
       blur_radius_px: shadow.blur_radius_px,
       distance_px: shadow.distance_px,
       raster_length_scale: shadow.raster_length_scale,
       bounds_radius_scale: shadow.raster_length_scale * 2.0,
-      // Office fixed-output W14 shadow masks retain finite radius support and
-      // are measurably closer to the same triangular kernel LibreOffice uses
-      // for DrawingML shadows than to treating `blurRad` as a Gaussian sigma.
-      blur_kernel: ShadowBlurKernel::Stack,
+      // The isolated W14 shadow runs retain the finite, ceiled radius support
+      // of the Office/LibreOffice text-shadow mask rather than the much wider
+      // Direct2D Gaussian support used by a standalone blur effect.
+      blur_kernel: ShadowBlurKernel::StackTwice,
       direction_degrees: shadow.direction_degrees,
       transform: ImageEffectTransform {
         scale_x: shadow.scale_x,
@@ -428,7 +427,28 @@ pub(crate) fn from_wordprocessing_text_effects(
       alignment: shadow.alignment,
       rotate_with_shape: true,
       color: shadow.color,
-    });
+    };
+    if let Some(glow_effect) = glow_effect.as_ref() {
+      // W14 orders glow before shadow. The shadow therefore consumes the
+      // composite alpha of the glow and original glyph, producing a finite
+      // core plus the low-opacity diffused tail visible in Office output.
+      // Keep this shadow branch behind the independently visible glow branch.
+      branches.push(ImageEffect::Container(ImageEffectContainer {
+        kind: ImageEffectContainerKind::Tree,
+        effects: vec![
+          ImageEffect::Container(ImageEffectContainer {
+            kind: ImageEffectContainerKind::Sibling,
+            effects: vec![glow_effect.clone(), ImageEffect::Identity],
+          }),
+          shadow_effect,
+        ],
+      }));
+    } else {
+      branches.push(shadow_effect);
+    }
+  }
+  if let Some(glow_effect) = glow_effect {
+    branches.push(glow_effect);
   }
   if let Some(reflection) = reflection {
     branches.push(ImageEffect::Reflection(ImageReflectionEffect {
@@ -1926,9 +1946,12 @@ fn effect_output_geometry(
       let radius = *radius_px * *bounds_radius_scale;
       Some(EffectGeometry {
         paint: source.paint.outset(radius),
-        shadow_anchor: source.shadow_anchor.outset(radius),
-        anchor: source.anchor.outset(radius),
-        ramp: source.ramp.outset(radius),
+        // Glow expands painted alpha, not the owning shape/text alignment
+        // rectangles. A following W14 shadow sees the expanded alpha while
+        // retaining the original character cell for `algn`, scale and skew.
+        shadow_anchor: source.shadow_anchor,
+        anchor: source.anchor,
+        ramp: source.ramp,
       })
     }
     ImageEffect::OuterShadow {
@@ -3349,7 +3372,7 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
   });
   let alpha = if blur_radius_px > f32::EPSILON {
     match blur_kernel {
-      ShadowBlurKernel::Stack => {
+      ShadowBlurKernel::Stack | ShadowBlurKernel::StackTwice => {
         let mut alpha = alpha;
         let width = alpha.width() as usize;
         let height = alpha.height() as usize;
@@ -3361,6 +3384,18 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
           height,
           blur_radius_px.ceil() as usize,
         );
+        if blur_kernel == ShadowBlurKernel::StackTwice {
+          // Office's balanced text-shadow edge is the convolution of two
+          // finite Stack passes. This retains bounded support while adding
+          // the second layer of variance visible in both isolated W14
+          // shadows and glow-fed shadows.
+          stack_blur_alpha(
+            alpha.as_mut(),
+            width,
+            height,
+            blur_radius_px.ceil() as usize,
+          );
+        }
         alpha
       }
     }
@@ -3444,11 +3479,26 @@ fn reflection_image(
   // completed surface instead of multiplying a sharp ramp onto an already
   // blurred copy: the latter clips the soft tail exactly at `endPos`. Office
   // fixed output retains blur energy beyond the authored zero-alpha stop.
+  // The Microsoft effect pipeline expresses this soft border as a Gaussian
+  // standard deviation, so preserve premultiplied color while applying that
+  // kernel rather than substituting LibreOffice's finite Stack Blur radius.
   if effect.blur_radius_px > f32::EPSILON {
-    stack_blur_rgba_premultiplied(&reflected, effect.blur_radius_px)
+    blur_rgba_premultiplied(
+      &reflected,
+      effect_radius_gaussian_sigma(effect.blur_radius_px),
+    )
   } else {
     reflected
   }
+}
+
+/// Converts DrawingML's radial blur radius to a per-axis Gaussian deviation.
+///
+/// For an isotropic two-dimensional Gaussian, `E[x² + y²] = 2σ²`. DrawingML
+/// exposes that radial extent while the Microsoft/image effect kernel consumes
+/// the standard deviation of either separable axis, hence `σ = r / sqrt(2)`.
+fn effect_radius_gaussian_sigma(radius_px: f32) -> f32 {
+  radius_px * std::f32::consts::FRAC_1_SQRT_2
 }
 
 fn effect_ramp(position: f32, first: (f32, f32), second: (f32, f32)) -> f32 {
@@ -3484,55 +3534,6 @@ fn blur_rgba_premultiplied(source: &image::RgbaImage, radius_px: f32) -> image::
   let blurred = image::imageops::blur(&premultiplied, radius_px);
   image::RgbaImage::from_fn(source.width(), source.height(), |x, y| {
     let pixel = blurred.get_pixel(x, y).0;
-    let alpha = u16::from(pixel[3]);
-    let unpremultiply = |value: u8| {
-      (u16::from(value) * 255 + alpha / 2)
-        .checked_div(alpha)
-        .unwrap_or_default()
-        .min(255) as u8
-    };
-    image::Rgba([
-      unpremultiply(pixel[0]),
-      unpremultiply(pixel[1]),
-      unpremultiply(pixel[2]),
-      pixel[3],
-    ])
-  })
-}
-
-/// Blurs straight-alpha RGBA through a premultiplied Stack Blur surface.
-///
-/// DrawingML reflection supplies a blur *radius*. Passing that coordinate
-/// directly to `image::imageops::blur`, whose argument is a Gaussian standard
-/// deviation, makes large reflections substantially softer than the authored
-/// radius. Use the same finite triangular radius kernel as the other
-/// DrawingML soft-mask paths while keeping color fringes premultiplied.
-fn stack_blur_rgba_premultiplied(source: &image::RgbaImage, radius_px: f32) -> image::RgbaImage {
-  let width = source.width() as usize;
-  let height = source.height() as usize;
-  let mut premultiplied = image::RgbaImage::from_fn(source.width(), source.height(), |x, y| {
-    let pixel = source.get_pixel(x, y).0;
-    let alpha = u16::from(pixel[3]);
-    image::Rgba([
-      ((u16::from(pixel[0]) * alpha + 127) / 255) as u8,
-      ((u16::from(pixel[1]) * alpha + 127) / 255) as u8,
-      ((u16::from(pixel[2]) * alpha + 127) / 255) as u8,
-      pixel[3],
-    ])
-  });
-  let radius = radius_px.ceil() as usize;
-  let mut channel = vec![0_u8; width * height];
-  for component in 0..4 {
-    for (value, pixel) in channel.iter_mut().zip(premultiplied.pixels()) {
-      *value = pixel.0[component];
-    }
-    stack_blur_alpha(&mut channel, width, height, radius);
-    for (pixel, value) in premultiplied.pixels_mut().zip(&channel) {
-      pixel.0[component] = *value;
-    }
-  }
-  image::RgbaImage::from_fn(source.width(), source.height(), |x, y| {
-    let pixel = premultiplied.get_pixel(x, y).0;
     let alpha = u16::from(pixel[3]);
     let unpremultiply = |value: u8| {
       (u16::from(value) * 255 + alpha / 2)
@@ -3865,7 +3866,7 @@ mod tests {
   }
 
   #[test]
-  fn word_text_shadow_preserves_the_ooxml_radius_kernel() {
+  fn word_text_shadow_uses_two_finite_stack_passes() {
     let effects = from_wordprocessing_text_effects(
       None,
       Some(super::WordprocessingTextShadow {
@@ -3891,11 +3892,68 @@ mod tests {
       effects.effects.as_slice(),
       [
         ImageEffect::OuterShadow {
-          blur_kernel: ShadowBlurKernel::Stack,
+          blur_kernel: ShadowBlurKernel::StackTwice,
           ..
         },
         ImageEffect::Identity
       ]
+    ));
+  }
+
+  #[test]
+  fn word_text_shadow_consumes_glow_before_the_shadow_filter() {
+    let effects = from_wordprocessing_text_effects(
+      Some(WordprocessingTextGlow {
+        radius_px: 12.0,
+        raster_length_scale: 0.25,
+        color: ResolvedEffectColor {
+          color: RgbColor { r: 1, g: 2, b: 3 },
+          alpha: 153,
+        },
+      }),
+      Some(super::WordprocessingTextShadow {
+        blur_radius_px: 12.0,
+        distance_px: 20.0,
+        raster_length_scale: 0.25,
+        direction_degrees: 180.0,
+        scale_x: 0.7,
+        scale_y: 0.7,
+        skew_x_degrees: 0.0,
+        skew_y_degrees: 0.0,
+        alignment: (0.0, 0.5),
+        color: ResolvedEffectColor {
+          color: RgbColor { r: 4, g: 5, b: 6 },
+          alpha: 102,
+        },
+      }),
+      None,
+    )
+    .expect("word text glow and shadow");
+
+    let [
+      ImageEffect::Container(shadow_branch),
+      ImageEffect::Glow { .. },
+      ImageEffect::Identity,
+    ] = effects.effects.as_slice()
+    else {
+      panic!("expected shadow-of-glow, visible glow and foreground branches");
+    };
+    assert_eq!(shadow_branch.kind, ImageEffectContainerKind::Tree);
+    assert!(matches!(
+      shadow_branch.effects.as_slice(),
+      [
+        ImageEffect::Container(ImageEffectContainer {
+          kind: ImageEffectContainerKind::Sibling,
+          effects: glow_source,
+        }),
+        ImageEffect::OuterShadow {
+          blur_kernel: ShadowBlurKernel::StackTwice,
+          ..
+        }
+      ] if matches!(
+        glow_source.as_slice(),
+        [ImageEffect::Glow { .. }, ImageEffect::Identity]
+      )
     ));
   }
 
@@ -4422,7 +4480,7 @@ mod tests {
   }
 
   #[test]
-  fn reflection_blur_uses_the_finite_radius_kernel() {
+  fn reflection_blur_converts_the_authored_radius_to_gaussian_sigma() {
     let mut source = RgbaImage::from_pixel(11, 11, Rgba([0; 4]));
     source.get_pixel_mut(5, 5).0 = [90, 120, 150, 255];
     let bounds = PixelBounds {
@@ -4457,9 +4515,9 @@ mod tests {
       bounds,
     );
 
-    assert_eq!(reflected.get_pixel(5, 5).0[3], 28);
-    assert_eq!(reflected.get_pixel(7, 5).0[3], 9);
-    assert_eq!(reflected.get_pixel(8, 5).0[3], 0);
+    assert!(reflected.get_pixel(5, 5).0[3] > reflected.get_pixel(7, 5).0[3]);
+    assert!(reflected.get_pixel(7, 5).0[3] > 0);
+    assert_eq!(reflected.get_pixel(9, 5).0[3], 0);
   }
 
   #[test]
@@ -4498,9 +4556,8 @@ mod tests {
     );
 
     // The authored ramp reaches zero at y=4.5. Blurring the completed
-    // reflection surface carries a finite soft tail past that stop.
-    assert_eq!(reflected.get_pixel(0, 5).0[3], 2);
-    assert_eq!(reflected.get_pixel(0, 6).0[3], 0);
+    // reflection surface carries a Gaussian soft tail past that stop.
+    assert!(reflected.get_pixel(0, 5).0[3] > 0);
   }
 
   #[test]

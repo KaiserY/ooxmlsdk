@@ -98,6 +98,11 @@ const WORD_FIXED_OUTPUT_DPI: f32 = 600.0;
 // authored DrawingML radius or alignment rectangle.
 const WORD_TEXT_EFFECT_RASTER_GUARD_PT: f32 = 10.0 * 72.0 / 96.0;
 const WORD_STATIC_3D_RASTER_EDGE_GUARD_PT: f32 = 72.0 / 200.0;
+// Internal transport tag for a Word-generated static-3D/effect render target.
+// The bytes remain PNG so layout consumers can decode them normally; the PDF
+// writer uses the tag to apply Word's fixed-output JPEG color-plane policy.
+const WORD_STATIC_3D_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-static-3d+png";
 // Word fixed output snaps the legacy field glyph to its 600-DPI printer grid.
 // The independent 10-point Arial (checkboxes.docx), 11-point Calibri
 // (n766477.docx), and colored 10-point Open Sans fallback (tdf92472.docx)
@@ -5883,12 +5888,6 @@ fn materialize_wordprocessing_text_effects_in_items(
         effect_ramp_height_px = effective_font_size_pt(&text.style, None) * raster.pixels_per_point;
         effect_ramp_top_px = effect_anchor_top_px + effect_anchor_height_px - effect_ramp_height_px;
       }
-      let render_options = common::drawingml_3d::Static3dRenderOptions {
-        extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
-        contour_color: style.contour_color,
-        pixels_per_point: raster.pixels_per_point,
-        model_surface: Some(model_surface),
-      };
       let text_geometry = match &common_text {
         common::DisplayItem::Text(text) => common::drawingml_shape_raster::static_3d_text_geometry(
           text,
@@ -5911,7 +5910,12 @@ fn materialize_wordprocessing_text_effects_in_items(
           &style.scene,
           projection,
           &style.shape,
-          render_options,
+          common::drawingml_3d::Static3dRenderOptions {
+            extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
+            contour_color: style.contour_color,
+            pixels_per_point: raster.pixels_per_point,
+            model_surface: Some(model_surface),
+          },
         );
       } else {
         common::drawingml_3d::apply_static_3d(
@@ -5919,7 +5923,12 @@ fn materialize_wordprocessing_text_effects_in_items(
           &style.scene,
           projection,
           &style.shape,
-          render_options,
+          common::drawingml_3d::Static3dRenderOptions {
+            extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
+            contour_color: style.contour_color,
+            pixels_per_point: raster.pixels_per_point,
+            model_surface: Some(model_surface),
+          },
         );
       }
       if drawingml_effects.is_none() && text.style.text_reflection.is_some() {
@@ -6083,6 +6092,11 @@ fn materialize_wordprocessing_text_effects_in_items(
     let Some(png) = encode_wordprocessing_effect_bitmap_png(&raster.image) else {
       continue;
     };
+    let content_type = if static3d.is_some() && !has_spatial_wordprocessing_effect {
+      WORD_STATIC_3D_BITMAP_CONTENT_TYPE
+    } else {
+      "image/png"
+    };
     let image = PageItem::Image(ImageItem {
       x_pt: image_bounds.origin.x.0,
       y_pt: image_bounds.origin.y.0,
@@ -6096,7 +6110,7 @@ fn materialize_wordprocessing_text_effects_in_items(
       flip_horizontal: false,
       flip_vertical: false,
       data: Arc::from(png),
-      content_type: Some("image/png".to_string()),
+      content_type: Some(content_type.to_string()),
       metafile_background_color: None,
       alt_text: None,
       hyperlink_url: text.hyperlink_url.clone(),
@@ -6121,6 +6135,11 @@ fn materialize_wordprocessing_text_effects_in_items(
 }
 
 fn encode_wordprocessing_effect_bitmap_png(image: &image::RgbaImage) -> Option<Vec<u8>> {
+  // Keep the layout transport in straight RGBA. Word's static-3D PDF path
+  // converts this to a Direct2D-style premultiplied target before JPEG
+  // compression, then applies the black `/Matte` correction associated with
+  // its separate soft mask. Keeping that PDF-only contract out of the layout
+  // bitmap also preserves lossless non-3D effect surfaces.
   let mut png = Cursor::new(Vec::new());
   PngEncoder::new(&mut png)
     .write_image(
@@ -31478,7 +31497,7 @@ mod tests {
   }
 
   #[test]
-  fn word_text_fixed_output_png_keeps_straight_alpha_components() {
+  fn word_text_effect_transport_keeps_straight_alpha_components() {
     let image = image::RgbaImage::from_pixel(1, 1, image::Rgba([146, 208, 80, 92]));
 
     let encoded = encode_wordprocessing_effect_bitmap_png(&image).unwrap();
@@ -31486,8 +31505,8 @@ mod tests {
       .unwrap()
       .into_rgba8();
 
-    // Krilla separates these samples into an RGB image and a PDF SMask. With
-    // no `/Matte`, the encoded PNG keeps straight color components.
+    // The PDF exporter owns the Direct2D premultiply/JPEG/black-Matte chain;
+    // layout consumers receive the ordinary straight-alpha source.
     assert_eq!(decoded.get_pixel(0, 0).0, [146, 208, 80, 92]);
   }
 

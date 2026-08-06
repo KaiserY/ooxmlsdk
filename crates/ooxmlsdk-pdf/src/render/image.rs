@@ -19,6 +19,9 @@ use crate::error::{PdfError, Result};
 use crate::options::PdfOptions;
 use ooxmlsdk_layout::render::emf_wmf;
 
+const WORD_STATIC_3D_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-static-3d+png";
+
 #[derive(Default)]
 pub(super) struct ImageSet {
   rasters: HashMap<(usize, usize), Vec<CachedRaster>>,
@@ -133,6 +136,15 @@ fn decode_image(
   export_options: RasterExportOptions,
   metafile_render_options: Option<emf_wmf::RenderOptions>,
 ) -> Result<Image> {
+  if content_type.is_some_and(|content_type| {
+    content_type.eq_ignore_ascii_case(WORD_STATIC_3D_BITMAP_CONTENT_TYPE)
+  }) {
+    return export_wordprocessing_static_3d_image(
+      decode_dynamic_image(data, RasterImageFormat::Png)?,
+      export_options,
+    );
+  }
+
   let metafile_raster = match metafile_render_options {
     Some(render_options) => {
       emf_wmf::decode_metafile_as_raster_with_options(data, content_type, render_options)
@@ -291,6 +303,76 @@ fn export_decoded_image(
   .map_err(PdfError::Krilla)
 }
 
+fn export_wordprocessing_static_3d_image(
+  mut raster: DecodedRasterImage,
+  export_options: RasterExportOptions,
+) -> Result<Image> {
+  if let Some(max_size) = export_options.max_size_px
+    && let Some(target_size) = downsample_size(raster.image.dimensions(), max_size)
+  {
+    raster.image = raster
+      .image
+      .resize_exact(target_size.0, target_size.1, FilterType::Lanczos3);
+  }
+
+  if export_options.use_lossless_compression {
+    return Image::from_custom(
+      PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile),
+      true,
+    )
+    .map_err(PdfError::Krilla);
+  }
+
+  let rgba = raster.image.to_rgba8();
+  let premultiplied = apply_black_matte(&rgba);
+  let quality = export_options.jpeg_quality.unwrap_or(75);
+  let jpeg = encode_office_h2v2_jpeg(&premultiplied, quality)?;
+  let compressed_rgb = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)?
+    .image
+    .to_rgb8();
+  // Office attaches `/Matte [0 0 0]` to the separate SMask. Krilla does not
+  // currently expose that image-dictionary entry, so bake the mathematically
+  // equivalent black-matte removal into the decoded color samples before the
+  // backend writes its ordinary RGB+SMask image.
+  let rgb = remove_black_matte(compressed_rgb, &rgba);
+  Image::from_custom(
+    PdfRasterImage::from_rgb_with_alpha(rgb, &rgba, raster.icc_profile),
+    true,
+  )
+  .map_err(PdfError::Krilla)
+}
+
+fn apply_black_matte(image: &image::RgbaImage) -> image::RgbaImage {
+  image::RgbaImage::from_fn(image.width(), image.height(), |x, y| {
+    let pixel = image.get_pixel(x, y);
+    let alpha = u16::from(pixel[3]);
+    Rgba([
+      ((u16::from(pixel[0]) * alpha + 127) / 255) as u8,
+      ((u16::from(pixel[1]) * alpha + 127) / 255) as u8,
+      ((u16::from(pixel[2]) * alpha + 127) / 255) as u8,
+      pixel[3],
+    ])
+  })
+}
+
+fn remove_black_matte(
+  mut image: image::RgbImage,
+  alpha_source: &image::RgbaImage,
+) -> image::RgbImage {
+  debug_assert_eq!(image.dimensions(), alpha_source.dimensions());
+  for (pixel, source) in image.pixels_mut().zip(alpha_source.pixels()) {
+    let alpha = u16::from(source[3]);
+    for channel in &mut pixel.0 {
+      *channel = if alpha == 0 {
+        0
+      } else {
+        ((u16::from(*channel) * 255 + alpha / 2) / alpha).min(255) as u8
+      };
+    }
+  }
+  image
+}
+
 fn downsample_size(size: (u32, u32), max_size: (u32, u32)) -> Option<(u32, u32)> {
   let (width, height) = size;
   let (max_width, max_height) = max_size;
@@ -389,7 +471,7 @@ impl JpegImageBuffer for H2V2BoxRgbImage<'_> {
   }
 }
 
-fn encode_powerpoint_h2v2_jpeg(image: &image::RgbaImage, quality: u8) -> Result<Vec<u8>> {
+fn encode_office_h2v2_jpeg(image: &image::RgbaImage, quality: u8) -> Result<Vec<u8>> {
   let rgb = DynamicImage::ImageRgba8(image.clone()).to_rgb8();
   let width = u16::try_from(rgb.width())
     .map_err(|_| PdfError::Krilla("JPEG width exceeds 65535 pixels".to_string()))?;
@@ -404,7 +486,7 @@ fn encode_powerpoint_h2v2_jpeg(image: &image::RgbaImage, quality: u8) -> Result<
       width,
       height,
     })
-    .map_err(|err| PdfError::Krilla(format!("failed to encode PowerPoint JPEG image: {err}")))?;
+    .map_err(|err| PdfError::Krilla(format!("failed to encode Office JPEG image: {err}")))?;
   Ok(jpeg)
 }
 
@@ -416,7 +498,7 @@ pub(super) fn powerpoint_activex_bitmap_png(data: &[u8], quality: u8) -> Result<
     .image
     .to_rgba8();
   let (width, height) = original.dimensions();
-  let jpeg = encode_powerpoint_h2v2_jpeg(&original, quality)?;
+  let jpeg = encode_office_h2v2_jpeg(&original, quality)?;
   let recompressed = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)?
     .image
     .to_rgb8();
@@ -550,6 +632,29 @@ impl PdfRasterImage {
       }),
     }
   }
+
+  fn from_rgb_with_alpha(
+    rgb: image::RgbImage,
+    alpha_source: &image::RgbaImage,
+    icc_profile: Option<Vec<u8>>,
+  ) -> Self {
+    debug_assert_eq!(rgb.dimensions(), alpha_source.dimensions());
+    let (width, height) = rgb.dimensions();
+    let alpha = alpha_source
+      .pixels()
+      .map(|pixel| pixel[3])
+      .collect::<Vec<_>>();
+    let opaque = alpha.iter().all(|alpha| *alpha == u8::MAX);
+    Self {
+      pixels: Arc::new(PdfRasterPixels {
+        width,
+        height,
+        rgb: rgb.into_raw(),
+        alpha: (!opaque).then_some(alpha),
+        icc_profile,
+      }),
+    }
+  }
 }
 
 impl Hash for PdfRasterImage {
@@ -603,7 +708,7 @@ mod tests {
   }
 
   #[test]
-  fn powerpoint_h2v2_jpeg_averages_each_chroma_block() {
+  fn office_h2v2_jpeg_averages_each_chroma_block() {
     let data = [
       255, 0, 0, 0, 255, 0, // red, green
       0, 0, 255, 255, 255, 255, // blue, white
@@ -629,6 +734,25 @@ mod tests {
     };
 
     assert_eq!(image.h2v2_chroma(0, 0), (average(1), average(2)));
+  }
+
+  #[test]
+  fn word_static_3d_black_matte_round_trip_preserves_alpha_contract() {
+    let source = image::RgbaImage::from_raw(2, 1, vec![146, 208, 80, 92, 255, 127, 64, 0]).unwrap();
+
+    let premultiplied = apply_black_matte(&source);
+    assert_eq!(premultiplied.get_pixel(0, 0).0, [53, 75, 29, 92]);
+    assert_eq!(premultiplied.get_pixel(1, 0).0, [0, 0, 0, 0]);
+
+    let restored = remove_black_matte(
+      image::RgbImage::from_fn(2, 1, |x, _| {
+        let pixel = premultiplied.get_pixel(x, 0);
+        image::Rgb([pixel[0], pixel[1], pixel[2]])
+      }),
+      &source,
+    );
+    assert_eq!(restored.get_pixel(0, 0).0, [147, 208, 80]);
+    assert_eq!(restored.get_pixel(1, 0).0, [0, 0, 0]);
   }
 
   #[test]

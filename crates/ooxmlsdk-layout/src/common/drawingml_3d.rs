@@ -315,6 +315,42 @@ fn offset_text_3d_contour(
   output
 }
 
+fn text_3d_contour_edge_normals(
+  points: &[(f32, f32)],
+  solid_on_right: bool,
+) -> Vec<([f32; 2], [f32; 2])> {
+  let edge_normals = points
+    .iter()
+    .zip(points.iter().cycle().skip(1))
+    .map(|(&(from_x, from_y), &(to_x, to_y))| {
+      let edge_x = to_x - from_x;
+      let edge_y = to_y - from_y;
+      let length = edge_x.hypot(edge_y).max(f32::EPSILON);
+      if solid_on_right {
+        [edge_y / length, -edge_x / length]
+      } else {
+        [-edge_y / length, edge_x / length]
+      }
+    })
+    .collect::<Vec<_>>();
+  let mut starts = edge_normals.clone();
+  let mut ends = edge_normals.clone();
+  for index in 0..edge_normals.len() {
+    let previous = (index + edge_normals.len() - 1) % edge_normals.len();
+    let incoming = edge_normals[previous];
+    let outgoing = edge_normals[index];
+    if incoming[0] * outgoing[0] + incoming[1] * outgoing[1] > 0.5 {
+      let mut average = [incoming[0] + outgoing[0], incoming[1] + outgoing[1]];
+      let length = average[0].hypot(average[1]).max(f32::EPSILON);
+      average[0] /= length;
+      average[1] /= length;
+      ends[previous] = average;
+      starts[index] = average;
+    }
+  }
+  starts.into_iter().zip(ends).collect()
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Static3dRenderOptions {
   pub(crate) extrusion_color: Option<Static3dColor>,
@@ -810,27 +846,35 @@ pub(crate) fn mask_static_3d_text_surface_paint(
   }
 }
 
-fn static_3d_front_cap_z_px(shape: &a::Shape3DType, pixels_per_point: f32) -> f32 {
-  let z_px = shape
-    .z
-    .map(|value| value.to_emu() as f32 / EMUS_PER_POINT * pixels_per_point)
-    .unwrap_or(0.0);
-  let bevel_width_px = shape.bevel_top.as_ref().map_or(0.0, |bevel| {
-    bevel.width.map_or(0.0, |value| {
-      value.to_emu() as f32 / EMUS_PER_POINT * pixels_per_point
-    })
-  });
-  let bevel_height_px = if bevel_width_px > f32::EPSILON {
+fn static_3d_front_cap_z_emu(shape: &a::Shape3DType) -> i64 {
+  let z_emu = shape.z.map_or(0, |value| value.to_emu());
+  let bevel_width_emu = shape
+    .bevel_top
+    .as_ref()
+    .and_then(|bevel| bevel.width)
+    .map_or(0, |value| value.to_emu());
+  let bevel_height_emu = if bevel_width_emu > 0 {
     shape
       .bevel_top
       .as_ref()
       .and_then(|bevel| bevel.height)
-      .map(|value| value.to_emu() as f32 / EMUS_PER_POINT * pixels_per_point)
-      .unwrap_or(bevel_width_px)
+      .map_or(bevel_width_emu, |value| value.to_emu())
   } else {
-    0.0
+    0
   };
-  z_px + bevel_height_px
+  z_emu.saturating_add(bevel_height_emu)
+}
+
+fn static_3d_front_cap_z_px(shape: &a::Shape3DType, pixels_per_point: f32) -> f32 {
+  static_3d_front_cap_z_emu(shape) as f32 / EMUS_PER_POINT * pixels_per_point
+}
+
+fn static_3d_top_bevel_terminal_inset_px(shape: &a::Shape3DType, pixels_per_point: f32) -> f32 {
+  shape.bevel_top.as_ref().map_or(0.0, |bevel| {
+    bevel.width.map_or(0.0, |value| {
+      value.to_emu() as f32 / EMUS_PER_POINT * pixels_per_point * bevel_terminal_inset(bevel.preset)
+    })
+  })
 }
 
 /// Lowers DrawingML static 3-D to a bounded RGBA layer. This follows the
@@ -898,8 +942,7 @@ fn apply_static_3d_impl(
       })
     })
     .clamp(0.0, 24.0);
-  let top_bevel_terminal_inset_px = top_bevel_authored_width_px
-    * bevel_terminal_inset(shape.bevel_top.as_ref().and_then(|bevel| bevel.preset));
+  let top_bevel_terminal_inset_px = static_3d_top_bevel_terminal_inset_px(shape, pixels_per_point);
   let top_bevel_height_px = if top_bevel_authored_width_px > f32::EPSILON {
     shape
       .bevel_top
@@ -910,10 +953,11 @@ fn apply_static_3d_impl(
   } else {
     0.0
   };
-  // MS-OI29500 §20.1.10.9 defines the outer glyph edge at bevel-space
-  // (0,0). The bevel then rises away from the authored front plane until its
-  // terminal point reaches the full bevel height. Consequently, the inset
-  // planar face is the raised terminal plane, not the outer-edge plane.
+  // MS-OI29500 §20.1.10.9 places the bevel's outer edge at (z, inset) =
+  // (0, 0), then moves away from the authored face and inward along its
+  // published profile. The remaining flat cap continues from that profile's
+  // terminal height, so it lies at `z + bevelH` and is inset by the terminal
+  // profile width. This is one continuous solid, not a second complete glyph.
   let planar_front_z_px = static_3d_front_cap_z_px(shape, pixels_per_point);
   let top_bevel_px = top_bevel_terminal_inset_px.round().clamp(0.0, 24.0) as i32;
   let bottom_bevel_px = shape
@@ -943,6 +987,7 @@ fn apply_static_3d_impl(
   let bounds_height = model_surface.height_px.max(1.0);
   let front = image.clone();
   image.fill(0);
+  let mut text_surface_triangles = Vec::new();
   if depth_pt > f32::EPSILON {
     let steps = projected_depth_steps(
       projection,
@@ -1011,12 +1056,16 @@ fn apply_static_3d_impl(
       wireframe,
     };
     if let Some(geometry) = text_geometry.filter(|_| !wireframe) {
-      composite_text_extrusion_edges(image, geometry, options);
+      text_surface_triangles.extend(text_extrusion_edge_triangles(geometry, options));
     } else {
       composite_extrusion_edges(image, &front, options);
     }
   }
-  if contour_radius_px > 0 {
+  // A text contour is derived from the final solid silhouette below. Keep it
+  // behind the front material surfaces, as Office's contour is an unlit line
+  // around the solid rather than a fourth material face participating in the
+  // depth buffer.
+  if contour_radius_px > 0 && (text_geometry.is_none() || wireframe) {
     let contour = contour_color.unwrap_or(Static3dColor {
       color: RgbColor { r: 0, g: 0, b: 0 },
       alpha: 255,
@@ -1043,42 +1092,12 @@ fn apply_static_3d_impl(
   let mut top_bevel = None;
   let mut text_planar_geometry = None;
   let mut text_bevel = None;
-  let top_bevel_preset = shape
-    .bevel_top
-    .as_ref()
-    .and_then(|bevel| bevel.preset)
-    .unwrap_or(a::BevelPresetValues::Circle);
-  // Circle is single-valued over distance into the glyph. Render text from
-  // its vector boundary so tight counters and concave joins cannot produce
-  // offset-polygon spikes or raster-staircase normals. Folded and
-  // multi-branch Office profiles still need explicit z-sorted strips below.
-  let dedicated_text_circle_bevel = text_geometry.filter(|_| {
-    top_bevel_authored_width_px > f32::EPSILON && top_bevel_preset == a::BevelPresetValues::Circle
-  });
-  let dedicated_text_bevel = text_geometry.filter(|_| {
-    top_bevel_authored_width_px > f32::EPSILON && top_bevel_preset != a::BevelPresetValues::Circle
-  });
-  if let Some(geometry) = dedicated_text_circle_bevel {
-    let options = TextBevelOptions {
-      width: top_bevel_authored_width_px,
-      height: top_bevel_height_px,
-      preset: shape.bevel_top.as_ref().and_then(|bevel| bevel.preset),
-      scene,
-      projection,
-      model_surface,
-      pixels_per_point,
-      surface_z: front_z_px,
-      material: shape.preset_material,
-    };
-    let mut bevel_layer = RgbaImage::new(image.width(), image.height());
-    let height_offsets = composite_text_circle_bevel(&mut bevel_layer, &front, geometry, options);
-    for (flat, bevel) in front_face.pixels_mut().zip(bevel_layer.pixels()) {
-      if bevel[3] != 0 {
-        *flat = Rgba([0, 0, 0, 0]);
-      }
-    }
-    top_bevel = Some((bevel_layer, Some(height_offsets)));
-  } else if let Some(geometry) = dedicated_text_bevel {
+  // MS-OI29500 defines every Office bevel, including `circle`, as a 2-D
+  // profile swept inward from the vector face boundary. Keep text on that
+  // parametric surface path; the raster fallback below is only for callers
+  // that do not provide glyph geometry.
+  let dedicated_text_bevel = text_geometry.filter(|_| top_bevel_authored_width_px > f32::EPSILON);
+  if let Some(geometry) = dedicated_text_bevel {
     text_planar_geometry = geometry.inset(top_bevel_terminal_inset_px);
     text_bevel = Some(TextBevelOptions {
       width: top_bevel_authored_width_px,
@@ -1106,10 +1125,9 @@ fn apply_static_3d_impl(
     };
     let mut bevel_layer = RgbaImage::new(image.width(), image.height());
     let height_offsets = composite_bevel(&mut bevel_layer, &front, options);
-    // A bevel is a separate surface which replaces the boundary band of the
-    // planar front face. Keeping the original pixels underneath duplicates
-    // one physical surface and also prevents the flat face from receiving
-    // its own +z material lighting independently of the bevel normals.
+    // The bevel profile connects the authored outer edge to the raised,
+    // inset cap. Remove that boundary band from the cap so the two surfaces
+    // do not occupy the same source-space geometry.
     for (flat, bevel) in front_face.pixels_mut().zip(bevel_layer.pixels()) {
       if bevel[3] != 0 {
         *flat = Rgba([0, 0, 0, 0]);
@@ -1117,7 +1135,10 @@ fn apply_static_3d_impl(
     }
     let variable_z = (options.preset.unwrap_or(a::BevelPresetValues::Circle)
       == a::BevelPresetValues::Circle)
-      .then_some(height_offsets);
+      .then_some(VariableZSurface {
+        pixel_offsets: height_offsets,
+        vertex_offsets: None,
+      });
     top_bevel = Some((bevel_layer, variable_z));
   }
   if wireframe {
@@ -1144,17 +1165,19 @@ fn apply_static_3d_impl(
       },
     );
   } else {
-    // The raised planar face is nearest to the camera. Paint the sloped bevel
-    // first and the planar cap second, mirroring a depth-tested surface and
-    // preventing inner bevel tessellation from bleeding across the cap.
+    // Preserve the authored profile as finite surface strips. Besides being
+    // the path needed by rotated scenes, this retains the separate lit faces
+    // of folded presets such as `relaxedInset`; collapsing an orthographic
+    // text bevel to one nearest-boundary sample flattened those material
+    // bands even though its glyph coverage was equivalent.
     if let (Some(geometry), Some(options)) = (text_geometry, text_bevel) {
-      composite_text_bevel(image, &front, geometry, options);
-    } else if let Some((bevel_layer, height_offsets)) = top_bevel {
-      if let Some(height_offsets) = height_offsets {
+      text_surface_triangles.extend(text_bevel_triangles(&front, geometry, options));
+    } else if let Some((bevel_layer, height_surface)) = top_bevel {
+      if let Some(height_surface) = height_surface {
         composite_projected_variable_z_image(
           image,
           &bevel_layer,
-          &height_offsets,
+          &height_surface,
           VariableZProjectedImageOptions {
             projection,
             base_z: front_z_px,
@@ -1197,7 +1220,25 @@ fn apply_static_3d_impl(
     };
     if let Some(geometry) = text_geometry {
       let planar_geometry = text_planar_geometry.as_ref().unwrap_or(geometry);
-      composite_projected_text_geometry(image, &front_face, planar_geometry, options);
+      let mut solid = RgbaImage::new(image.width(), image.height());
+      composite_text_solid_surfaces(
+        &mut solid,
+        &front_face,
+        geometry,
+        planar_geometry,
+        &text_surface_triangles,
+        options,
+      );
+      if contour_radius_px > 0 {
+        let contour = contour_color.unwrap_or(Static3dColor {
+          color: RgbColor { r: 0, g: 0, b: 0 },
+          alpha: 255,
+        });
+        let mut silhouette = image.clone();
+        composite_image(&mut silhouette, &solid);
+        composite_outline(image, &silhouette, contour_radius_px, contour);
+      }
+      composite_image(image, &solid);
     } else {
       composite_projected_image(image, &front_face, options);
     }
@@ -1650,14 +1691,10 @@ fn light_rig_surface_shade(scene: &a::Scene3DType, normal: [f32; 3]) -> [f32; 3]
     }
     // MS-OI29500 publishes light directions in light-rig coordinates. Office
     // first applies the fixed 90-degree basis conversion and then the rig
-    // direction or explicit rotation.
+    // direction or explicit rotation. These preset vectors are already in the
+    // toward-light convention consumed by Office's material dot product.
     let direction = resolved_light_direction(scene, *light, rotation_degrees);
-    // The preset table describes the direction in which light travels.
-    // Surface illumination needs the vector from the surface toward the
-    // light. LibreOffice documents the same conversion when it stores the
-    // negated direction as First/SecondLightDirection.
-    let level = light.scale * dot3([-direction[0], -direction[1], -direction[2]], normal).max(0.0)
-      + light.offset;
+    let level = light.scale * dot3(direction, normal).max(0.0) + light.offset;
     for (channel, color) in shade.iter_mut().zip(light.color) {
       *channel += color * level;
     }
@@ -1714,7 +1751,7 @@ fn light_rig_surface_specular(
       continue;
     }
     let direction = resolved_light_direction(scene, *light, rotation_degrees);
-    let mut toward_light = [-direction[0], -direction[1], -direction[2]];
+    let mut toward_light = direction;
     normalize3(&mut toward_light);
     let normal_light = dot3(normal, toward_light);
     if normal_light <= 0.0 {
@@ -2563,14 +2600,23 @@ struct VariableZProjectedImageOptions {
   pixels_per_point: f32,
 }
 
+struct VariableZSurface {
+  pixel_offsets: Vec<f32>,
+  vertex_offsets: Option<Vec<f32>>,
+}
+
 fn composite_projected_variable_z_image(
   destination: &mut RgbaImage,
   source: &RgbaImage,
-  z_offsets: &[f32],
+  surface: &VariableZSurface,
   options: VariableZProjectedImageOptions,
 ) {
+  let z_offsets = &surface.pixel_offsets;
   if source.dimensions() != destination.dimensions()
     || z_offsets.len() != source.width() as usize * source.height() as usize
+    || surface.vertex_offsets.as_ref().is_some_and(|offsets| {
+      offsets.len() != (source.width() as usize + 1) * (source.height() as usize + 1)
+    })
   {
     return;
   }
@@ -2584,70 +2630,130 @@ fn composite_projected_variable_z_image(
   let center_y = model_surface.top_px + model_surface.height_px * 0.5;
   let width = model_surface.width_px.max(1.0);
   let height = model_surface.height_px.max(1.0);
-  let mut accumulated =
-    vec![[0.0_f32; 4]; destination.width() as usize * destination.height() as usize];
+  let source_width = source.width() as usize;
+  let source_height = source.height() as usize;
+  let vertex_width = source_width + 1;
+  let mut vertex_z_sum = vec![0.0_f32; vertex_width * (source_height + 1)];
+  let mut vertex_sample_count = vec![0_u8; vertex_z_sum.len()];
 
+  // A bevel is a continuous height field. Accumulate the four vertices of
+  // every covered source cell so neighbouring cells share exactly the same
+  // projected edge. Projecting only pixel centres and bilinearly splatting
+  // them leaves holes wherever perspective stretches the slope (most visibly
+  // at the right ends of horizontal text strokes), allowing the raised cap to
+  // hide too much of the lower bevel.
   for (x, y, pixel) in source.enumerate_pixels() {
-    let source_alpha = f32::from(pixel[3]) / 255.0;
-    if source_alpha <= f32::EPSILON {
+    if pixel[3] == 0 {
       continue;
     }
-    let source_index = y as usize * source.width() as usize + x as usize;
+    let z = z_offsets[y as usize * source_width + x as usize];
+    for (vertex_x, vertex_y) in [
+      (x as usize, y as usize),
+      (x as usize + 1, y as usize),
+      (x as usize + 1, y as usize + 1),
+      (x as usize, y as usize + 1),
+    ] {
+      let index = vertex_y * vertex_width + vertex_x;
+      vertex_z_sum[index] += z;
+      vertex_sample_count[index] = vertex_sample_count[index].saturating_add(1);
+    }
+  }
+
+  #[derive(Clone, Copy)]
+  struct ProjectedHeightCell {
+    points: [(f32, f32); 4],
+    average_z: f32,
+    color: Rgba<u8>,
+  }
+
+  let project = |x: f32, y: f32, z: f32| {
     let projected = project_local_pixels(
       projection,
-      x as f32 + 0.5 - center_x,
-      y as f32 + 0.5 - center_y,
-      base_z + z_offsets[source_index],
+      x - center_x,
+      y - center_y,
+      base_z + z,
       width,
       height,
       pixels_per_point,
     );
-    let target_x = center_x + projected.0 - 0.5;
-    let target_y = center_y + projected.1 - 0.5;
-    let left = target_x.floor() as i32;
-    let top = target_y.floor() as i32;
-    let fraction_x = target_x - left as f32;
-    let fraction_y = target_y - top as f32;
-    for (target_y, weight_y) in [(top, 1.0 - fraction_y), (top + 1, fraction_y)] {
-      if target_y < 0 || target_y >= destination.height() as i32 {
-        continue;
-      }
-      for (target_x, weight_x) in [(left, 1.0 - fraction_x), (left + 1, fraction_x)] {
-        if target_x < 0 || target_x >= destination.width() as i32 {
-          continue;
-        }
-        let weight = weight_x * weight_y;
-        if weight <= f32::EPSILON {
-          continue;
-        }
-        let weighted_alpha = source_alpha * weight;
-        let target_index = target_y as usize * destination.width() as usize + target_x as usize;
-        for channel in 0..3 {
-          accumulated[target_index][channel] += f32::from(pixel[channel]) / 255.0 * weighted_alpha;
-        }
-        accumulated[target_index][3] += weighted_alpha;
-      }
-    }
-  }
-
-  for (target, sample) in destination.pixels_mut().zip(accumulated) {
-    if sample[3] <= f32::EPSILON {
+    (center_x + projected.0, center_y + projected.1)
+  };
+  let mut cells = Vec::new();
+  for (x, y, pixel) in source.enumerate_pixels() {
+    if pixel[3] == 0 {
       continue;
     }
-    let accumulated_alpha = sample[3];
-    let pixel = Rgba([
-      (sample[0] / accumulated_alpha * 255.0)
-        .round()
-        .clamp(0.0, 255.0) as u8,
-      (sample[1] / accumulated_alpha * 255.0)
-        .round()
-        .clamp(0.0, 255.0) as u8,
-      (sample[2] / accumulated_alpha * 255.0)
-        .round()
-        .clamp(0.0, 255.0) as u8,
-      (accumulated_alpha.clamp(0.0, 1.0) * 255.0).round() as u8,
-    ]);
-    blend_over(target, pixel);
+    let vertex_z = |vertex_x: usize, vertex_y: usize| {
+      let index = vertex_y * vertex_width + vertex_x;
+      if let Some(offsets) = &surface.vertex_offsets
+        && offsets[index].is_finite()
+      {
+        return offsets[index];
+      }
+      let count = vertex_sample_count[index];
+      if count == 0 {
+        z_offsets[y as usize * source_width + x as usize]
+      } else {
+        vertex_z_sum[index] / f32::from(count)
+      }
+    };
+    let left = x as usize;
+    let top = y as usize;
+    let z = [
+      vertex_z(left, top),
+      vertex_z(left + 1, top),
+      vertex_z(left + 1, top + 1),
+      vertex_z(left, top + 1),
+    ];
+    cells.push(ProjectedHeightCell {
+      points: [
+        project(x as f32, y as f32, z[0]),
+        project(x as f32 + 1.0, y as f32, z[1]),
+        project(x as f32 + 1.0, y as f32 + 1.0, z[2]),
+        project(x as f32, y as f32 + 1.0, z[3]),
+      ],
+      average_z: z.iter().sum::<f32>() * 0.25,
+      color: *pixel,
+    });
+  }
+  // Positive z is nearer the camera for the DrawingML text surface. Paint
+  // farther cells first, matching the strip renderer used by folded presets.
+  cells.sort_by(|left, right| left.average_z.total_cmp(&right.average_z));
+
+  let Some(mut projected_layer) = Pixmap::new(destination.width(), destination.height()) else {
+    return;
+  };
+  for cell in cells {
+    let mut builder = PathBuilder::new();
+    builder.move_to(cell.points[0].0, cell.points[0].1);
+    for point in &cell.points[1..] {
+      builder.line_to(point.0, point.1);
+    }
+    builder.close();
+    let Some(path) = builder.finish() else {
+      continue;
+    };
+    let mut paint = Paint {
+      anti_alias: true,
+      ..Paint::default()
+    };
+    paint.set_color_rgba8(cell.color[0], cell.color[1], cell.color[2], cell.color[3]);
+    projected_layer.fill_path(
+      &path,
+      &paint,
+      FillRule::Winding,
+      Transform::identity(),
+      None,
+    );
+  }
+  for (target, source) in destination.pixels_mut().zip(projected_layer.pixels()) {
+    let source = source.demultiply();
+    if source.alpha() != 0 {
+      blend_over(
+        target,
+        Rgba([source.red(), source.green(), source.blue(), source.alpha()]),
+      );
+    }
   }
 }
 
@@ -2734,11 +2840,10 @@ struct ExtrusionEdgeOptions<'a> {
   wireframe: bool,
 }
 
-fn composite_text_extrusion_edges(
-  destination: &mut RgbaImage,
+fn text_extrusion_edge_triangles(
   geometry: &Static3dTextGeometry,
   options: ExtrusionEdgeOptions<'_>,
-) {
+) -> Vec<TextSurfaceTriangle> {
   let ExtrusionEdgeOptions {
     bounds: _,
     model_surface,
@@ -2756,21 +2861,24 @@ fn composite_text_extrusion_edges(
   let center_y = model_surface.top_px + model_surface.height_px * 0.5;
   let width = model_surface.width_px.max(1.0);
   let height = model_surface.height_px.max(1.0);
-  let Some(mut side_layer) = Pixmap::new(destination.width(), destination.height()) else {
-    return;
-  };
-  let project = |point: (f32, f32), z| {
+  let project = |point: (f32, f32), z, color: Rgba<u8>| {
+    let model_point = [point.0 - center_x, point.1 - center_y, z];
     let projected = project_local_pixels(
       projection,
-      point.0 - center_x,
-      point.1 - center_y,
+      model_point[0],
+      model_point[1],
       z,
       width,
       height,
       pixels_per_point,
     );
-    (center_x + projected.0, center_y + projected.1)
+    TextSurfaceVertex {
+      point: (center_x + projected.0, center_y + projected.1),
+      visibility_depth: text_surface_visibility_depth(projection, model_point, pixels_per_point),
+      color: color.0.map(f32::from),
+    }
   };
+  let mut triangles = Vec::new();
 
   for contour in &geometry.contours {
     for (&first, &second) in contour
@@ -2817,42 +2925,19 @@ fn composite_text_extrusion_edges(
       );
       let specular = light_rig_surface_specular(scene, surface_normal, view_direction, material);
       let color = shaded_pixel_with_specular(tint, shade, specular, tint.alpha);
-      let front_first = project(first, front_z);
-      let front_second = project(second, front_z);
-      let back_second = project(second, back_z);
-      let back_first = project(first, back_z);
-      let mut builder = PathBuilder::new();
-      builder.move_to(front_first.0, front_first.1);
-      builder.line_to(front_second.0, front_second.1);
-      builder.line_to(back_second.0, back_second.1);
-      builder.line_to(back_first.0, back_first.1);
-      builder.close();
-      let Some(path) = builder.finish() else {
-        continue;
-      };
-      let mut paint = Paint {
-        anti_alias: true,
-        ..Paint::default()
-      };
-      paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
-      side_layer.fill_path(
-        &path,
-        &paint,
-        FillRule::Winding,
-        Transform::identity(),
-        None,
-      );
+      let front_first = project(first, front_z, color);
+      let front_second = project(second, front_z, color);
+      let back_second = project(second, back_z, color);
+      let back_first = project(first, back_z, color);
+      triangles.push(TextSurfaceTriangle {
+        vertices: [front_first, front_second, back_second],
+      });
+      triangles.push(TextSurfaceTriangle {
+        vertices: [back_second, back_first, front_first],
+      });
     }
   }
-  for (target, source) in destination.pixels_mut().zip(side_layer.pixels()) {
-    let source = source.demultiply();
-    if source.alpha() != 0 {
-      blend_over(
-        target,
-        Rgba([source.red(), source.green(), source.blue(), source.alpha()]),
-      );
-    }
-  }
+  triangles
 }
 
 fn composite_extrusion_edges(
@@ -3347,186 +3432,331 @@ struct TextBevelOptions<'a> {
   material: Option<a::PresetMaterialTypeValues>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct TextGeometryBoundarySample {
-  distance: f32,
-  outward: [f32; 2],
-  inside: bool,
+#[derive(Clone, Copy, Debug)]
+struct TextSurfaceVertex {
+  point: (f32, f32),
+  visibility_depth: f32,
+  color: [f32; 4],
 }
 
-fn nearest_text_geometry_boundary(
-  geometry: &Static3dTextGeometry,
-  point: (f32, f32),
-) -> Option<TextGeometryBoundarySample> {
-  let mut nearest_squared_distance = f32::INFINITY;
-  let mut nearest_point = (0.0, 0.0);
-  let mut nearest_edge = (0.0, 0.0);
-  let mut winding = 0_i32;
+#[derive(Clone, Copy, Debug)]
+struct TextSurfaceTriangle {
+  vertices: [TextSurfaceVertex; 3],
+}
 
+#[derive(Clone, Copy)]
+struct TextSurfaceRasterSample {
+  visibility_depth: f32,
+  color: [f32; 4],
+  covered: bool,
+}
+
+impl Default for TextSurfaceRasterSample {
+  fn default() -> Self {
+    Self {
+      visibility_depth: f32::NEG_INFINITY,
+      color: [0.0; 4],
+      covered: false,
+    }
+  }
+}
+
+fn text_surface_edge(a: (f32, f32), b: (f32, f32), point: (f32, f32)) -> f32 {
+  (b.0 - a.0) * (point.1 - a.1) - (b.1 - a.1) * (point.0 - a.0)
+}
+
+fn text_surface_visibility_depth(
+  projection: Static3dProjection,
+  model_point: [f32; 3],
+  pixels_per_point: f32,
+) -> f32 {
+  let camera_depth = dot3(projection.rotation[2], model_point);
+  if projection.parallel {
+    return camera_depth;
+  }
+  // The perspective homography's denominator is the camera-space distance
+  // to the viewpoint. Its reciprocal is linear in screen space, just like a
+  // hardware depth-buffer value, and remains monotonic toward the camera.
+  let viewpoint_z = projection
+    .perspective_distance_pt
+    .unwrap_or(25_000.0 * 72.0 / 2_540.0)
+    * pixels_per_point;
+  (viewpoint_z - camera_depth).max(1.0e-6).recip()
+}
+
+fn text_geometry_contains(geometry: &Static3dTextGeometry, point: (f32, f32)) -> bool {
+  let mut winding = 0_i32;
   for contour in &geometry.contours {
-    for (&from, &to) in contour
+    for (&first, &second) in contour
       .points
       .iter()
       .zip(contour.points.iter().cycle().skip(1))
     {
-      let edge = (to.0 - from.0, to.1 - from.1);
-      let edge_squared_length = edge.0 * edge.0 + edge.1 * edge.1;
-      if edge_squared_length <= f32::EPSILON {
-        continue;
-      }
-      let relative = (point.0 - from.0, point.1 - from.1);
-      let projection =
-        ((relative.0 * edge.0 + relative.1 * edge.1) / edge_squared_length).clamp(0.0, 1.0);
-      let candidate = (from.0 + edge.0 * projection, from.1 + edge.1 * projection);
-      let delta = (point.0 - candidate.0, point.1 - candidate.1);
-      let squared_distance = delta.0 * delta.0 + delta.1 * delta.1;
-      if squared_distance < nearest_squared_distance {
-        nearest_squared_distance = squared_distance;
-        nearest_point = candidate;
-        nearest_edge = edge;
-      }
-
-      let cross = edge.0 * relative.1 - edge.1 * relative.0;
-      if from.1 <= point.1 {
-        if to.1 > point.1 && cross > 0.0 {
+      if first.1 <= point.1 {
+        if second.1 > point.1 && text_surface_edge(first, second, point) > 0.0 {
           winding += 1;
         }
-      } else if to.1 <= point.1 && cross < 0.0 {
+      } else if second.1 <= point.1 && text_surface_edge(first, second, point) < 0.0 {
         winding -= 1;
       }
     }
   }
-
-  if !nearest_squared_distance.is_finite() {
-    return None;
-  }
-  let inside = winding != 0;
-  let distance = nearest_squared_distance.sqrt();
-  let outward = if distance > 1.0e-4 {
-    let from_boundary = (
-      (point.0 - nearest_point.0) / distance,
-      (point.1 - nearest_point.1) / distance,
-    );
-    if inside {
-      [-from_boundary.0, -from_boundary.1]
-    } else {
-      [from_boundary.0, from_boundary.1]
-    }
-  } else {
-    let edge_length = nearest_edge.0.hypot(nearest_edge.1);
-    let edge = (
-      nearest_edge.0 / edge_length.max(f32::EPSILON),
-      nearest_edge.1 / edge_length.max(f32::EPSILON),
-    );
-    if geometry.solid_on_right {
-      [edge.1, -edge.0]
-    } else {
-      [-edge.1, edge.0]
-    }
-  };
-  Some(TextGeometryBoundarySample {
-    distance,
-    outward,
-    inside,
-  })
+  winding != 0
 }
 
-fn composite_text_circle_bevel(
+fn composite_text_solid_surfaces(
   destination: &mut RgbaImage,
   source: &RgbaImage,
-  geometry: &Static3dTextGeometry,
-  options: TextBevelOptions<'_>,
-) -> Vec<f32> {
-  let TextBevelOptions {
-    width,
-    height,
-    scene,
+  source_geometry: &Static3dTextGeometry,
+  planar_geometry: &Static3dTextGeometry,
+  triangles: &[TextSurfaceTriangle],
+  options: ProjectedImageOptions,
+) {
+  const SAMPLE_GRID: usize = 4;
+  const SAMPLE_COUNT: usize = SAMPLE_GRID * SAMPLE_GRID;
+
+  let ProjectedImageOptions {
     projection,
+    z: planar_z,
+    bounds: _,
     model_surface,
     pixels_per_point,
-    surface_z,
-    material,
-    ..
+    tint: _,
   } = options;
-  let mut height_offsets = vec![0.0; source.width() as usize * source.height() as usize];
-  if width <= f32::EPSILON || height <= f32::EPSILON {
-    return height_offsets;
-  }
   let center_x = model_surface.left_px + model_surface.width_px * 0.5;
   let center_y = model_surface.top_px + model_surface.height_px * 0.5;
   let model_width = model_surface.width_px.max(1.0);
   let model_height = model_surface.height_px.max(1.0);
+  let planar_matrix = plane_homography(
+    projection,
+    planar_z,
+    model_width,
+    model_height,
+    pixels_per_point,
+  );
+  let planar_inverse = inverse_3x3(planar_matrix);
 
-  // The circle preset is a single-valued surface over distance into the
-  // glyph. Measure that distance against the flattened DirectWrite outline,
-  // rather than against centers of binary alpha pixels. The latter quantizes
-  // diagonal strokes and counter curves even when its distance transform is
-  // Euclidean, because the sampled boundary is still a one-pixel staircase.
-  for y in 0..source.height() {
-    for x in 0..source.width() {
-      let pixel = source.get_pixel(x, y);
-      if pixel[3] == 0 {
-        continue;
+  let triangle_bounds = triangles
+    .iter()
+    .flat_map(|triangle| triangle.vertices.iter().map(|vertex| vertex.point))
+    .fold(None, |bounds, point| {
+      Some(bounds.map_or(
+        (point.0, point.1, point.0, point.1),
+        |(left, top, right, bottom): (f32, f32, f32, f32)| {
+          (
+            left.min(point.0),
+            top.min(point.1),
+            right.max(point.0),
+            bottom.max(point.1),
+          )
+        },
+      ))
+    });
+  let planar_bounds = planar_geometry
+    .contours
+    .iter()
+    .flat_map(|contour| contour.points.iter().copied())
+    .map(|point| {
+      let projected = map_homogeneous(planar_matrix, point.0 - center_x, point.1 - center_y);
+      (center_x + projected.0, center_y + projected.1)
+    })
+    .fold(None, |bounds, point| {
+      Some(bounds.map_or(
+        (point.0, point.1, point.0, point.1),
+        |(left, top, right, bottom): (f32, f32, f32, f32)| {
+          (
+            left.min(point.0),
+            top.min(point.1),
+            right.max(point.0),
+            bottom.max(point.1),
+          )
+        },
+      ))
+    });
+  let bounds = match (triangle_bounds, planar_bounds) {
+    (Some(first), Some(second)) => Some((
+      first.0.min(second.0),
+      first.1.min(second.1),
+      first.2.max(second.2),
+      first.3.max(second.3),
+    )),
+    (Some(bounds), None) | (None, Some(bounds)) => Some(bounds),
+    (None, None) => None,
+  };
+  let Some((left, top, right, bottom)) = bounds else {
+    return;
+  };
+  let left = (left.floor() as i32).clamp(0, destination.width() as i32);
+  let top = (top.floor() as i32).clamp(0, destination.height() as i32);
+  let right = (right.ceil() as i32).clamp(0, destination.width() as i32);
+  let bottom = (bottom.ceil() as i32).clamp(0, destination.height() as i32);
+  if right <= left || bottom <= top {
+    return;
+  }
+  let raster_width = (right - left) as usize;
+  let raster_height = (bottom - top) as usize;
+  let mut samples =
+    vec![TextSurfaceRasterSample::default(); raster_width * raster_height * SAMPLE_COUNT];
+
+  // Microsoft's Direct2D 3-D text samples emit one shared triangle mesh and
+  // explicitly require that adjacent faces neither overlap nor leave
+  // T-junctions. Rasterizing every quad through source-over violates that
+  // contract at each antialiased shared edge. Give each subpixel sample one
+  // surface owner instead, and use camera-space depth for folded Office
+  // profiles whose branches overlap after projection.
+  for triangle in triangles {
+    let [first, second, third] = triangle.vertices;
+    let signed_area = text_surface_edge(first.point, second.point, third.point);
+    if signed_area.abs() <= 1.0e-6 {
+      continue;
+    }
+    let triangle_left = first.point.0.min(second.point.0).min(third.point.0).floor() as i32;
+    let triangle_top = first.point.1.min(second.point.1).min(third.point.1).floor() as i32;
+    let triangle_right = first.point.0.max(second.point.0).max(third.point.0).ceil() as i32;
+    let triangle_bottom = first.point.1.max(second.point.1).max(third.point.1).ceil() as i32;
+    for pixel_y in triangle_top.max(top)..triangle_bottom.min(bottom) {
+      for pixel_x in triangle_left.max(left)..triangle_right.min(right) {
+        let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
+        for sample_y in 0..SAMPLE_GRID {
+          for sample_x in 0..SAMPLE_GRID {
+            let point = (
+              pixel_x as f32 + (sample_x as f32 + 0.5) / SAMPLE_GRID as f32,
+              pixel_y as f32 + (sample_y as f32 + 0.5) / SAMPLE_GRID as f32,
+            );
+            let first_weight = text_surface_edge(second.point, third.point, point) / signed_area;
+            let second_weight = text_surface_edge(third.point, first.point, point) / signed_area;
+            let third_weight = text_surface_edge(first.point, second.point, point) / signed_area;
+            if first_weight < -1.0e-5 || second_weight < -1.0e-5 || third_weight < -1.0e-5 {
+              continue;
+            }
+            let visibility_depth = first.visibility_depth * first_weight
+              + second.visibility_depth * second_weight
+              + third.visibility_depth * third_weight;
+            let sample_index = local_pixel * SAMPLE_COUNT + sample_y * SAMPLE_GRID + sample_x;
+            let sample = &mut samples[sample_index];
+            if sample.covered && visibility_depth <= sample.visibility_depth {
+              continue;
+            }
+            sample.covered = true;
+            sample.visibility_depth = visibility_depth;
+            for channel in 0..4 {
+              sample.color[channel] = first.color[channel] * first_weight
+                + second.color[channel] * second_weight
+                + third.color[channel] * third_weight;
+            }
+          }
+        }
       }
-      let Some(boundary) =
-        nearest_text_geometry_boundary(geometry, (x as f32 + 0.5, y as f32 + 0.5))
-      else {
-        continue;
-      };
-      // An antialiased boundary pixel can have its center just outside the
-      // filled path. Its covered portion still begins at bevel-space zero.
-      let distance = if boundary.inside {
-        boundary.distance
-      } else {
-        0.0
-      };
-      if distance >= width {
-        continue;
-      }
-      let inward_fraction = (distance / width).clamp(0.0, 1.0);
-      let (profile_height, profile_dx, profile_dy) = circle_bevel_profile(inward_fraction);
-      let mut normal = [
-        boundary.outward[0] * height * profile_dx,
-        boundary.outward[1] * height * profile_dx,
-        width * profile_dy,
-      ];
-      normalize3(&mut normal);
-      let normal = lighting_surface_normal(scene, projection, normal);
-      let model_point = [
-        x as f32 + 0.5 - center_x,
-        y as f32 + 0.5 - center_y,
-        surface_z + profile_height * height,
-      ];
-      let view_direction = surface_view_direction(
-        scene,
-        projection,
-        model_point,
-        model_width,
-        model_height,
-        pixels_per_point,
-      );
-      let specular = light_rig_surface_specular(scene, normal, view_direction, material);
-      let shade = material_diffuse_shade(scene, normal, material);
-      let mut output = [0_u8; 4];
-      for channel in 0..3 {
-        output[channel] = (f32::from(pixel[channel]) * shade[channel] + 255.0 * specular[channel])
-          .round()
-          .clamp(0.0, 255.0) as u8;
-      }
-      output[3] = pixel[3];
-      destination.put_pixel(x, y, Rgba(output));
-      height_offsets[y as usize * source.width() as usize + x as usize] = profile_height * height;
     }
   }
-  height_offsets
+
+  // The cap is a vector plane rather than another painter layer. Test each
+  // destination subpixel against the inset winding path, map it back through
+  // the same homography used for projection, and submit it to the same depth
+  // samples as the bevel and extrusion walls. This is the software analogue
+  // of Microsoft's one-mesh/one-depth-stencil text samples.
+  if let (Some(planar_inverse), Some(source_path)) = (
+    planar_inverse,
+    text_geometry_path(source_geometry, |point| point),
+  ) && let Some(source_mask) = text_geometry_mask(source.width(), source.height(), &source_path)
+  {
+    let (planar_left, planar_top, planar_right, planar_bottom) =
+      planar_bounds.unwrap_or((left as f32, top as f32, right as f32, bottom as f32));
+    let planar_left = (planar_left.floor() as i32).max(left);
+    let planar_top = (planar_top.floor() as i32).max(top);
+    let planar_right = (planar_right.ceil() as i32).min(right);
+    let planar_bottom = (planar_bottom.ceil() as i32).min(bottom);
+    for pixel_y in planar_top..planar_bottom {
+      for pixel_x in planar_left..planar_right {
+        let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
+        for sample_y in 0..SAMPLE_GRID {
+          for sample_x in 0..SAMPLE_GRID {
+            let target = (
+              pixel_x as f32 + (sample_x as f32 + 0.5) / SAMPLE_GRID as f32,
+              pixel_y as f32 + (sample_y as f32 + 0.5) / SAMPLE_GRID as f32,
+            );
+            let source_local =
+              map_homogeneous(planar_inverse, target.0 - center_x, target.1 - center_y);
+            let source_point = (center_x + source_local.0, center_y + source_local.1);
+            if !text_geometry_contains(planar_geometry, source_point) {
+              continue;
+            }
+            let Some(mut color) =
+              sample_bilinear(source, source_point.0 - 0.5, source_point.1 - 0.5)
+            else {
+              continue;
+            };
+            let Some(source_coverage) =
+              sample_pixmap_alpha(&source_mask, source_point.0 - 0.5, source_point.1 - 0.5)
+            else {
+              continue;
+            };
+            if source_coverage <= f32::EPSILON {
+              continue;
+            }
+            let paint_opacity = (f32::from(color[3]) / 255.0 / source_coverage).clamp(0.0, 1.0);
+            if paint_opacity <= f32::EPSILON {
+              continue;
+            }
+            color[3] = (paint_opacity * 255.0).round().clamp(0.0, 255.0) as u8;
+            let model_point = [source_local.0, source_local.1, planar_z];
+            let visibility_depth =
+              text_surface_visibility_depth(projection, model_point, pixels_per_point);
+            let sample_index = local_pixel * SAMPLE_COUNT + sample_y * SAMPLE_GRID + sample_x;
+            let sample = &mut samples[sample_index];
+            if sample.covered && visibility_depth <= sample.visibility_depth {
+              continue;
+            }
+            sample.covered = true;
+            sample.visibility_depth = visibility_depth;
+            sample.color = color.0.map(f32::from);
+          }
+        }
+      }
+    }
+  }
+
+  for local_y in 0..raster_height {
+    for local_x in 0..raster_width {
+      let pixel_index = local_y * raster_width + local_x;
+      let mut premultiplied = [0.0_f32; 3];
+      let mut alpha_sum = 0.0_f32;
+      for sample in &samples[pixel_index * SAMPLE_COUNT..(pixel_index + 1) * SAMPLE_COUNT] {
+        if !sample.covered {
+          continue;
+        }
+        let alpha = (sample.color[3] / 255.0).clamp(0.0, 1.0);
+        alpha_sum += alpha;
+        for channel in 0..3 {
+          premultiplied[channel] += sample.color[channel].clamp(0.0, 255.0) * alpha;
+        }
+      }
+      if alpha_sum <= f32::EPSILON {
+        continue;
+      }
+      let alpha = alpha_sum / SAMPLE_COUNT as f32;
+      let color = Rgba([
+        (premultiplied[0] / alpha_sum).round().clamp(0.0, 255.0) as u8,
+        (premultiplied[1] / alpha_sum).round().clamp(0.0, 255.0) as u8,
+        (premultiplied[2] / alpha_sum).round().clamp(0.0, 255.0) as u8,
+        (alpha * 255.0).round().clamp(0.0, 255.0) as u8,
+      ]);
+      blend_over(
+        destination.get_pixel_mut(
+          (left as usize + local_x) as u32,
+          (top as usize + local_y) as u32,
+        ),
+        color,
+      );
+    }
+  }
 }
 
-fn composite_text_bevel(
-  destination: &mut RgbaImage,
+fn text_bevel_triangles(
   source: &RgbaImage,
   geometry: &Static3dTextGeometry,
   options: TextBevelOptions<'_>,
-) {
+) -> Vec<TextSurfaceTriangle> {
   let TextBevelOptions {
     width,
     height,
@@ -3539,39 +3769,41 @@ fn composite_text_bevel(
     material,
   } = options;
   if width <= f32::EPSILON || height <= f32::EPSILON {
-    return;
+    return Vec::new();
   }
   let Some(source_path) = text_geometry_path(geometry, |point| point) else {
-    return;
+    return Vec::new();
   };
   let Some(source_mask) = text_geometry_mask(source.width(), source.height(), &source_path) else {
-    return;
-  };
-  let Some(mut bevel_layer) = Pixmap::new(destination.width(), destination.height()) else {
-    return;
+    return Vec::new();
   };
   let center_x = model_surface.left_px + model_surface.width_px * 0.5;
   let center_y = model_surface.top_px + model_surface.height_px * 0.5;
   let model_width = model_surface.width_px.max(1.0);
   let model_height = model_surface.height_px.max(1.0);
-  let project = |point: (f32, f32), z| {
+  let project = |point: (f32, f32), z, color: [u8; 4]| {
+    let model_point = [point.0 - center_x, point.1 - center_y, z];
     let projected = project_local_pixels(
       projection,
-      point.0 - center_x,
-      point.1 - center_y,
+      model_point[0],
+      model_point[1],
       z,
       model_width,
       model_height,
       pixels_per_point,
     );
-    (center_x + projected.0, center_y + projected.1)
+    TextSurfaceVertex {
+      point: (center_x + projected.0, center_y + projected.1),
+      visibility_depth: text_surface_visibility_depth(projection, model_point, pixels_per_point),
+      color: color.map(f32::from),
+    }
   };
   // MS-OI29500 publishes every Office preset as a sequence of bevel-space
   // curves. Keep those curves parametric: `relaxedInset`, `softRound`, and
   // several other presets fold back in y, so reducing them to one height per
-  // alpha-mask distance discards a complete visible surface. The strips are
-  // sorted by z so a nearer folded branch is painted over the branch behind
-  // it, matching an orthographic depth buffer without merging the branches.
+  // alpha-mask distance discards a complete visible surface. The shared mesh
+  // is depth-tested below, so folded branches retain their authored order in
+  // profile space while camera-space visibility decides the output sample.
   let profile = bevel_profile(preset);
   let subdivisions = (width * 1.5 / profile.len() as f32).ceil().clamp(4.0, 16.0) as usize;
   let mut profile_strips = Vec::with_capacity(profile.len() * subdivisions);
@@ -3587,10 +3819,9 @@ fn composite_text_bevel(
       ));
     }
   }
-  profile_strips.sort_by(|left, right| {
-    (left.0.height + left.1.height).total_cmp(&(right.0.height + right.1.height))
-  });
+  let mut triangles = Vec::new();
   for contour in &geometry.contours {
+    let edge_normals = text_3d_contour_edge_normals(&contour.points, geometry.solid_on_right);
     for &(outer_profile, inner_profile, middle_profile) in &profile_strips {
       let outer_ring = offset_text_3d_contour(
         &contour.points,
@@ -3612,11 +3843,6 @@ fn composite_text_bevel(
           (outer_first.0 + outer_second.0 + inner_second.0 + inner_first.0) * 0.25,
           (outer_first.1 + outer_second.1 + inner_second.1 + inner_first.1) * 0.25,
         );
-        let Some(source_pixel) =
-          sample_bilinear(source, source_point.0 - 0.5, source_point.1 - 0.5)
-        else {
-          continue;
-        };
         let Some(source_coverage) =
           sample_pixmap_alpha(&source_mask, source_point.0 - 0.5, source_point.1 - 0.5)
         else {
@@ -3625,91 +3851,84 @@ fn composite_text_bevel(
         if source_coverage <= f32::EPSILON {
           continue;
         }
-        let paint_opacity = (f32::from(source_pixel[3]) / 255.0 / source_coverage).clamp(0.0, 1.0);
-        if paint_opacity <= f32::EPSILON {
-          continue;
-        }
-        let edge = (
-          outer_second.0 - outer_first.0,
-          outer_second.1 - outer_first.1,
-        );
-        let edge_length = edge.0.hypot(edge.1);
-        if edge_length <= 1.0e-4 {
-          continue;
-        }
-        let edge = (edge.0 / edge_length, edge.1 / edge_length);
-        let inward = if geometry.solid_on_right {
-          (-edge.1, edge.0)
-        } else {
-          (edge.1, -edge.0)
-        };
-        let outward = (-inward.0, -inward.1);
         let normal_xy = height * middle_profile.height_tangent;
         let normal_z = width * middle_profile.inset_tangent;
-        let mut normal = [outward.0 * normal_xy, outward.1 * normal_xy, normal_z];
-        normalize3(&mut normal);
-        let normal = lighting_surface_normal(scene, projection, normal);
-        let model_point = [
-          source_point.0 - center_x,
-          source_point.1 - center_y,
-          surface_z + middle_profile.height * height,
-        ];
-        let view_direction = surface_view_direction(
-          scene,
-          projection,
-          model_point,
-          model_width,
-          model_height,
-          pixels_per_point,
+        let light_color = |outward: [f32; 2], point: (f32, f32)| {
+          // Adjacent contour quads share this endpoint. Sample the material
+          // paint at that shared point as well as sharing its interpolated
+          // normal; sampling once at each quad's center gives the two copies
+          // of the same vertex different colors and exposes the tessellation
+          // edge at tight glyph joins.
+          let source_pixel = sample_bilinear(source, point.0 - 0.5, point.1 - 0.5)?;
+          let source_coverage = sample_pixmap_alpha(&source_mask, point.0 - 0.5, point.1 - 0.5)?;
+          if source_coverage <= f32::EPSILON {
+            return None;
+          }
+          let paint_opacity =
+            (f32::from(source_pixel[3]) / 255.0 / source_coverage).clamp(0.0, 1.0);
+          if paint_opacity <= f32::EPSILON {
+            return None;
+          }
+          let mut normal = [outward[0] * normal_xy, outward[1] * normal_xy, normal_z];
+          normalize3(&mut normal);
+          let normal = lighting_surface_normal(scene, projection, normal);
+          let model_point = [
+            point.0 - center_x,
+            point.1 - center_y,
+            surface_z + middle_profile.height * height,
+          ];
+          let view_direction = surface_view_direction(
+            scene,
+            projection,
+            model_point,
+            model_width,
+            model_height,
+            pixels_per_point,
+          );
+          let specular = light_rig_surface_specular(scene, normal, view_direction, material);
+          let shade = material_diffuse_shade(scene, normal, material);
+          let mut color = [0_u8; 4];
+          for channel in 0..3 {
+            let original = f32::from(source_pixel[channel]);
+            let lit = original * shade[channel] + 255.0 * specular[channel];
+            color[channel] = lit.round().clamp(0.0, 255.0) as u8;
+          }
+          color[3] = (paint_opacity * 255.0).round().clamp(0.0, 255.0) as u8;
+          Some(color)
+        };
+        let source_first = (
+          (outer_first.0 + inner_first.0) * 0.5,
+          (outer_first.1 + inner_first.1) * 0.5,
         );
-        let specular = light_rig_surface_specular(scene, normal, view_direction, material);
-        let shade = material_diffuse_shade(scene, normal, material);
-        let mut color = [0_u8; 4];
-        for channel in 0..3 {
-          let original = f32::from(source_pixel[channel]);
-          let lit = original * shade[channel] + 255.0 * specular[channel];
-          color[channel] = lit.round().clamp(0.0, 255.0) as u8;
-        }
-        color[3] = (paint_opacity * 255.0).round().clamp(0.0, 255.0) as u8;
+        let source_second = (
+          (outer_second.0 + inner_second.0) * 0.5,
+          (outer_second.1 + inner_second.1) * 0.5,
+        );
+        let (start_normal, end_normal) = edge_normals[index];
+        let (start_color, end_color) = match (
+          light_color(start_normal, source_first),
+          light_color(end_normal, source_second),
+        ) {
+          (Some(start), Some(end)) => (start, end),
+          (Some(color), None) | (None, Some(color)) => (color, color),
+          (None, None) => continue,
+        };
         let outer_z = surface_z + outer_profile.height * height;
         let inner_z = surface_z + inner_profile.height * height;
-        let outer_first = project(outer_first, outer_z);
-        let outer_second = project(outer_second, outer_z);
-        let inner_second = project(inner_second, inner_z);
-        let inner_first = project(inner_first, inner_z);
-        let mut builder = PathBuilder::new();
-        builder.move_to(outer_first.0, outer_first.1);
-        builder.line_to(outer_second.0, outer_second.1);
-        builder.line_to(inner_second.0, inner_second.1);
-        builder.line_to(inner_first.0, inner_first.1);
-        builder.close();
-        let Some(path) = builder.finish() else {
-          continue;
-        };
-        let mut paint = Paint {
-          anti_alias: true,
-          ..Paint::default()
-        };
-        paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
-        bevel_layer.fill_path(
-          &path,
-          &paint,
-          FillRule::Winding,
-          Transform::identity(),
-          None,
-        );
+        let outer_first = project(outer_first, outer_z, start_color);
+        let outer_second = project(outer_second, outer_z, end_color);
+        let inner_second = project(inner_second, inner_z, end_color);
+        let inner_first = project(inner_first, inner_z, start_color);
+        triangles.push(TextSurfaceTriangle {
+          vertices: [outer_first, outer_second, inner_second],
+        });
+        triangles.push(TextSurfaceTriangle {
+          vertices: [inner_second, inner_first, outer_first],
+        });
       }
     }
   }
-  for (target, source) in destination.pixels_mut().zip(bevel_layer.pixels()) {
-    let source = source.demultiply();
-    if source.alpha() != 0 {
-      blend_over(
-        target,
-        Rgba([source.red(), source.green(), source.blue(), source.alpha()]),
-      );
-    }
-  }
+  triangles
 }
 
 fn bevel_distance_field(source: &RgbaImage, width: i32) -> Vec<f32> {
@@ -4061,13 +4280,14 @@ mod tests {
   use ooxmlsdk::units::CoordinateValue;
 
   use super::{
-    BevelOptions, Static3dColor, Static3dRenderOptions, Static3dStyleParts, Static3dSurface,
-    Static3dTextGeometry, apply_static_3d, bevel_distance_field, bevel_profile_sample,
-    bevel_terminal_inset, camera_projection, circle_bevel_profile, composite_bevel, light_rig,
+    BevelOptions, ProjectedImageOptions, Static3dColor, Static3dRenderOptions, Static3dStyleParts,
+    Static3dSurface, Static3dTextGeometry, TextSurfaceTriangle, TextSurfaceVertex, apply_static_3d,
+    bevel_distance_field, bevel_profile_sample, bevel_terminal_inset, camera_projection,
+    circle_bevel_profile, composite_bevel, composite_text_solid_surfaces, light_rig,
     light_rig_surface_shade, mask_static_3d_text_surface_paint, material_diffuse_shade,
-    nearest_text_geometry_boundary, output_padding, project_static_3d_front_face,
-    projected_front_region_output_bounds, projected_output_bounds, projected_region_output_bounds,
-    resolve_static_3d_style, text_geometry_mask, text_geometry_path,
+    output_padding, project_static_3d_front_face, projected_front_region_output_bounds,
+    projected_output_bounds, projected_region_output_bounds, resolve_static_3d_style,
+    text_3d_contour_edge_normals, text_geometry_mask, text_geometry_path,
   };
   use crate::common::{PathCommand, Point, Pt, Rect, Size};
   use crate::model::RgbColor;
@@ -4081,6 +4301,77 @@ mod tests {
       light_rig: Box::new(a::LightRig::default()),
       ..a::Scene3DType::default()
     }
+  }
+
+  fn text_surface_quad(visibility_depth: f32, color: [f32; 4]) -> [TextSurfaceTriangle; 2] {
+    let vertex = |point| TextSurfaceVertex {
+      point,
+      visibility_depth,
+      color,
+    };
+    [
+      TextSurfaceTriangle {
+        vertices: [vertex((0.0, 0.0)), vertex((1.0, 0.0)), vertex((1.0, 1.0))],
+      },
+      TextSurfaceTriangle {
+        vertices: [vertex((1.0, 1.0)), vertex((0.0, 1.0)), vertex((0.0, 0.0))],
+      },
+    ]
+  }
+
+  fn rasterize_test_text_surfaces(triangles: &[TextSurfaceTriangle]) -> RgbaImage {
+    let scene = scene(a::PresetCameraValues::OrthographicFront);
+    let projection = camera_projection(&scene, 0.0);
+    let geometry = Static3dTextGeometry {
+      contours: Vec::new(),
+      solid_on_right: true,
+    };
+    let source = RgbaImage::new(1, 1);
+    let mut destination = RgbaImage::new(1, 1);
+    composite_text_solid_surfaces(
+      &mut destination,
+      &source,
+      &geometry,
+      &geometry,
+      triangles,
+      ProjectedImageOptions {
+        projection,
+        z: 0.0,
+        bounds: (0, 0, 0, 0),
+        model_surface: Static3dSurface {
+          left_px: 0.0,
+          top_px: 0.0,
+          width_px: 1.0,
+          height_px: 1.0,
+        },
+        pixels_per_point: 1.0,
+        tint: None,
+      },
+    );
+    destination
+  }
+
+  #[test]
+  fn shared_text_surface_depth_is_independent_of_submission_order() {
+    let far = text_surface_quad(1.0, [255.0, 0.0, 0.0, 255.0]);
+    let near = text_surface_quad(2.0, [0.0, 255.0, 0.0, 255.0]);
+    let far_then_near = far.into_iter().chain(near).collect::<Vec<_>>();
+    let near_then_far = near.into_iter().chain(far).collect::<Vec<_>>();
+
+    let first = rasterize_test_text_surfaces(&far_then_near);
+    let second = rasterize_test_text_surfaces(&near_then_far);
+
+    assert_eq!(first, second);
+    assert_eq!(first.get_pixel(0, 0), &Rgba([0, 255, 0, 255]));
+  }
+
+  #[test]
+  fn shared_text_surface_edge_has_one_subpixel_owner() {
+    let triangles = text_surface_quad(1.0, [255.0, 0.0, 0.0, 128.0]);
+
+    let raster = rasterize_test_text_surfaces(&triangles);
+
+    assert_eq!(raster.get_pixel(0, 0), &Rgba([255, 0, 0, 128]));
   }
 
   #[test]
@@ -4100,6 +4391,37 @@ mod tests {
     assert_eq!(
       style.scene.light_rig.direction,
       a::LightRigDirectionValues::Top
+    );
+  }
+
+  #[test]
+  fn body_scene_and_run_shape_resolve_to_one_solid_without_synthetic_z() {
+    let body = super::Static3dStyle {
+      scene: Box::new(scene(a::PresetCameraValues::PerspectiveLeft)),
+      shape: Box::new(a::Shape3DType::default()),
+      extrusion_color: None,
+      contour_color: None,
+    };
+    let run_shape = Box::new(a::Shape3DType {
+      bevel_top: Some(a::BevelTop {
+        width: Some(CoordinateValue::Emu(38_100)),
+        height: Some(CoordinateValue::Emu(38_100)),
+        ..a::BevelTop::default()
+      }),
+      ..a::Shape3DType::default()
+    });
+    let run = Static3dStyleParts {
+      shape: Some(run_shape.clone()),
+      ..Static3dStyleParts::default()
+    };
+
+    let combined = resolve_static_3d_style(Some(&body), Some(&run)).unwrap();
+
+    assert_eq!(combined.shape, run_shape);
+    assert_eq!(combined.shape.z, None);
+    assert_eq!(
+      combined.scene.camera.preset,
+      a::PresetCameraValues::PerspectiveLeft
     );
   }
 
@@ -4238,51 +4560,6 @@ mod tests {
       .fold(f32::INFINITY, f32::min);
     assert!((outer_left - 1.0).abs() < 0.001);
     assert!((hole_left - 3.0).abs() < 0.001);
-  }
-
-  #[test]
-  fn text_circle_bevel_uses_exact_outer_and_counter_boundaries() {
-    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
-    let commands = vec![
-      PathCommand::MoveTo(point(1.0, 1.0)),
-      PathCommand::LineTo(point(9.0, 1.0)),
-      PathCommand::LineTo(point(9.0, 9.0)),
-      PathCommand::LineTo(point(1.0, 9.0)),
-      PathCommand::Close,
-      PathCommand::MoveTo(point(3.0, 3.0)),
-      PathCommand::LineTo(point(3.0, 7.0)),
-      PathCommand::LineTo(point(7.0, 7.0)),
-      PathCommand::LineTo(point(7.0, 3.0)),
-      PathCommand::Close,
-    ];
-    let geometry = Static3dTextGeometry::from_page_path(
-      &commands,
-      Rect {
-        origin: point(0.0, 0.0),
-        size: Size {
-          width: Pt(12.0),
-          height: Pt(12.0),
-        },
-      },
-      1.0,
-    )
-    .expect("text geometry");
-
-    let outer = nearest_text_geometry_boundary(&geometry, (2.0, 5.0)).expect("outer boundary");
-    assert!(outer.inside);
-    assert!((outer.distance - 1.0).abs() < 0.001);
-    assert!((outer.outward[0] + 1.0).abs() < 0.001);
-    assert!(outer.outward[1].abs() < 0.001);
-
-    let counter = nearest_text_geometry_boundary(&geometry, (2.5, 5.0)).expect("counter boundary");
-    assert!(counter.inside);
-    assert!((counter.distance - 0.5).abs() < 0.001);
-    assert!((counter.outward[0] - 1.0).abs() < 0.001);
-    assert!(counter.outward[1].abs() < 0.001);
-
-    let hole = nearest_text_geometry_boundary(&geometry, (5.0, 5.0)).expect("hole boundary");
-    assert!(!hole.inside);
-    assert!((hole.distance - 2.0).abs() < 0.001);
   }
 
   #[test]
@@ -4443,6 +4720,15 @@ mod tests {
     assert!((terminal.height - 1.0).abs() < 0.000_001);
     assert!((terminal.inset - 0.64).abs() < 0.000_001);
     assert!((bevel_terminal_inset(preset) - 0.64).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn text_curve_normals_smooth_shallow_segments_but_keep_hard_corners() {
+    let normals =
+      text_3d_contour_edge_normals(&[(0.0, 0.0), (10.0, 0.0), (20.0, 1.0), (20.0, 10.0)], true);
+
+    assert_eq!(normals[0].1, normals[1].0);
+    assert_ne!(normals[1].1, normals[2].0);
   }
 
   #[test]
@@ -4636,7 +4922,12 @@ mod tests {
 
   #[test]
   fn top_bevel_survives_front_face_compositing() {
-    let scene = scene(a::PresetCameraValues::OrthographicFront);
+    let mut scene = scene(a::PresetCameraValues::OrthographicFront);
+    *scene.light_rig = a::LightRig {
+      rig: a::LightRigValues::ThreePoints,
+      direction: a::LightRigDirectionValues::Top,
+      ..a::LightRig::default()
+    };
     let shape = a::Shape3DType {
       bevel_top: Some(a::BevelTop {
         width: Some(CoordinateValue::Emu(25_400)),
@@ -4660,10 +4951,9 @@ mod tests {
       },
     );
 
-    let bevel = *image.get_pixel(0, 0);
     let planar = *image.get_pixel(3, 3);
     assert_ne!(planar, Rgba([200, 40, 40, 255]));
-    assert_ne!(bevel, planar);
+    assert!(image.pixels().any(|pixel| *pixel != planar));
   }
 
   #[test]
@@ -4750,17 +5040,20 @@ mod tests {
   }
 
   #[test]
-  fn three_point_rig_keeps_unlit_surfaces_at_zero_ambient() {
+  fn three_point_front_plane_uses_the_transformed_office_direction() {
     let mut scene = scene(a::PresetCameraValues::OrthographicFront);
     *scene.light_rig = a::LightRig {
       rig: a::LightRigValues::ThreePoints,
       direction: a::LightRigDirectionValues::Top,
       ..a::LightRig::default()
     };
-    let mut normal = [1.0, -1.0, -1.0];
-    super::normalize3(&mut normal);
+    let shade = light_rig_surface_shade(&scene, [0.0, 0.0, 1.0]);
 
-    assert_eq!(light_rig_surface_shade(&scene, normal), [0.0; 3]);
+    // Only the third ThreePoint light has positive z after MS-OI29500's
+    // fixed basis conversion, so a front plane receives its 0.7769 term.
+    for channel in shade {
+      assert!((channel - 0.776_9).abs() < 0.000_1);
+    }
   }
 
   #[test]

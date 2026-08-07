@@ -832,15 +832,17 @@ fn vml_shape_rect_pt(
   sheet: &CalcSheet,
   shape: &super::object_resources::VmlShapeModel,
 ) -> Option<(f32, f32, f32, f32)> {
-  shape
-    .style
-    .as_deref()
-    .and_then(vml_style_rect_pt)
-    .or_else(|| {
-      shape
-        .anchor
-        .and_then(|anchor| vml_anchor_rect_pt(sheet, anchor))
-    })
+  sheet.object_anchor_rect_pt(shape).or_else(|| {
+    shape
+      .style
+      .as_deref()
+      .and_then(vml_style_rect_pt)
+      .or_else(|| {
+        shape
+          .anchor
+          .and_then(|anchor| vml_anchor_rect_pt(sheet, anchor))
+      })
+  })
 }
 
 fn vml_anchor_rect_pt(
@@ -871,7 +873,8 @@ fn vml_anchor_x_pt(sheet: &CalcSheet, zero_based_col: u32, offset_px: i32) -> f3
   });
   // ShapeAnchor::importVmlAnchor marks offsets as CellAnchorType::Pixel, and
   // calcCellAnchorEmu clamps them to the next cell minus one twip.
-  (cell.x_pt + vml_screen_pixel_to_pt(offset_px)).min(next_cell.x_pt - units::twips_to_points(1.0))
+  (cell.x_pt + sheet.vml_anchor_offset_pt(offset_px))
+    .min(next_cell.x_pt - units::twips_to_points(1.0))
 }
 
 fn vml_anchor_y_pt(sheet: &CalcSheet, zero_based_row: u32, offset_px: i32) -> f32 {
@@ -881,11 +884,8 @@ fn vml_anchor_y_pt(sheet: &CalcSheet, zero_based_row: u32, offset_px: i32) -> f3
     col: 1,
     row: row.saturating_add(1),
   });
-  (cell.y_pt + vml_screen_pixel_to_pt(offset_px)).min(next_cell.y_pt - units::twips_to_points(1.0))
-}
-
-fn vml_screen_pixel_to_pt(value: i32) -> f32 {
-  value as f32 * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH
+  (cell.y_pt + sheet.vml_anchor_offset_pt(offset_px))
+    .min(next_cell.y_pt - units::twips_to_points(1.0))
 }
 
 fn vml_style_rect_pt(style: &str) -> Option<(f32, f32, f32, f32)> {
@@ -1426,20 +1426,12 @@ fn split_range_by_page_metrics(
       sheet.column_width_pt(current)
     };
     if used > 0.0 && used + size > available {
-      let previous = axis_slice(area, split.by_row, current_start, current - 1);
-      slices.push(previous);
-      if !split.by_row
-        && !sheet_area_has_print_data(sheet, previous)
-        && column_has_print_data(sheet, current)
-      {
-        // keeps the overflowing column as the visible page when all previous
-        // columns in the automatic slice are empty.
-        slices.push(axis_slice(area, split.by_row, current, current));
-        current += 1;
-        current_start = current;
-        used = 0.0;
-        continue;
-      }
+      // CalcPages first derives every page boundary from the sheet metrics;
+      // lcl_SetHidden/IsPrintEmpty then decides whether each complete slice
+      // is printable.  Content in the first column after a break therefore
+      // does not turn that column into a one-column page: it remains the first
+      // column of the next metric-derived slice.
+      slices.push(axis_slice(area, split.by_row, current_start, current - 1));
       current_start = current;
       used = 0.0;
     }
@@ -1561,53 +1553,6 @@ fn axis_slice(area: CellRange, by_row: bool, start: u32, end: u32) -> CellRange 
       },
     )
   }
-}
-
-fn sheet_area_has_print_data(sheet: &CalcSheet, area: CellRange) -> bool {
-  sheet
-    .resources
-    .tables
-    .iter()
-    .any(|table| table.range.is_some_and(|range| range.intersects(area)))
-    || sheet.rows.iter().enumerate().any(|(row_position, row)| {
-      let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
-      if row_index < area.start.row || row_index > area.end.row || row.hidden {
-        return false;
-      }
-      row.cells.iter().enumerate().any(|(cell_position, cell)| {
-        let address = cell.address().unwrap_or(CellAddress {
-          col: cell_position as u32 + 1,
-          row: row_index,
-        });
-        area.contains(address) && cell_has_print_data(cell)
-      })
-    })
-}
-
-fn column_has_print_data(sheet: &CalcSheet, column: u32) -> bool {
-  sheet.resources.tables.iter().any(|table| {
-    table
-      .range
-      .is_some_and(|range| column >= range.start.col && column <= range.end.col)
-  }) || sheet.rows.iter().enumerate().any(|(row_position, row)| {
-    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
-    !row.hidden
-      && row.cells.iter().enumerate().any(|(cell_position, cell)| {
-        let address = cell.address().unwrap_or(CellAddress {
-          col: cell_position as u32 + 1,
-          row: row_index,
-        });
-        address.col == column && cell_has_print_data(cell)
-      })
-  })
-}
-
-fn cell_has_print_data(cell: &super::worksheet::CalcCell) -> bool {
-  !cell.display_text.is_empty()
-    || !cell.rich_text_runs.is_empty()
-    || cell.formula.is_some()
-    || cell.cached_value.is_some()
-    || cell.data_type.is_some()
 }
 
 fn print_cell_intersects_area(

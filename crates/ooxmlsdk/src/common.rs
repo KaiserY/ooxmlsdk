@@ -65,6 +65,9 @@ const REL_CORE_PROPERTIES: &[u8] =
 const REL_EXTENDED_PROPERTIES: &[u8] =
   b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties";
 #[cfg(feature = "parts")]
+const REL_THUMBNAIL: &[u8] =
+  b"http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail";
+#[cfg(feature = "parts")]
 pub(crate) const REL_HYPERLINK: &[u8] =
   b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
 #[cfg(feature = "parts")]
@@ -83,6 +86,9 @@ const TRANSITIONAL_OFFICE_REL_PREFIX: &[u8] =
   b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
 #[cfg(feature = "parts")]
 const STRICT_OFFICE_REL_PREFIX: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships/";
+#[cfg(feature = "parts")]
+const STRICT_REL_THUMBNAIL: &[u8] =
+  b"http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail";
 
 #[cfg(feature = "parts")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -220,6 +226,7 @@ pub(crate) fn write_mc_attr<W: std::io::Write>(
 pub(crate) fn relationship_type_matches_bytes(actual: &[u8], canonical: &[u8]) -> bool {
   actual == canonical
     || strict_office_relationship_type_matches(actual, canonical)
+    || strict_thumbnail_relationship_type_matches(actual, canonical)
     || o12_relationship_type_matches(actual, canonical)
 }
 
@@ -229,7 +236,25 @@ fn strict_office_relationship_type_matches(left: &[u8], right: &[u8]) -> bool {
   let Some(left_suffix) = office_relationship_type_suffix(left) else {
     return false;
   };
-  office_relationship_type_suffix(right).is_some_and(|right_suffix| left_suffix == right_suffix)
+  office_relationship_type_suffix(right).is_some_and(|right_suffix| {
+    left_suffix == right_suffix
+      || matches!(
+        (left_suffix, right_suffix),
+        (b"customProperties", b"custom-properties")
+          | (b"custom-properties", b"customProperties")
+          | (b"extendedProperties", b"extended-properties")
+          | (b"extended-properties", b"extendedProperties")
+      )
+  })
+}
+
+#[inline]
+#[cfg(feature = "parts")]
+fn strict_thumbnail_relationship_type_matches(left: &[u8], right: &[u8]) -> bool {
+  matches!(
+    (left, right),
+    (STRICT_REL_THUMBNAIL, REL_THUMBNAIL) | (REL_THUMBNAIL, STRICT_REL_THUMBNAIL)
+  )
 }
 
 #[inline]
@@ -455,6 +480,31 @@ mod tests {
     assert!(!relationship_type_matches_bytes(
       b"http://schemas.microsoft.com/office/2006/relationships/vbaProject",
       b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/vbaProject",
+    ));
+  }
+
+  #[cfg(feature = "parts")]
+  #[test]
+  fn strict_relationship_aliases_cover_non_identical_standard_suffixes() {
+    assert!(relationship_type_matches_bytes(
+      b"http://purl.oclc.org/ooxml/officeDocument/relationships/extendedProperties",
+      REL_EXTENDED_PROPERTIES,
+    ));
+    assert!(relationship_type_matches_bytes(
+      b"http://purl.oclc.org/ooxml/officeDocument/relationships/customProperties",
+      b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties",
+    ));
+    assert!(relationship_type_matches_bytes(
+      STRICT_REL_THUMBNAIL,
+      REL_THUMBNAIL,
+    ));
+    assert!(relationship_type_matches_bytes(
+      b"http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet",
+      b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+    ));
+    assert!(!relationship_type_matches_bytes(
+      b"http://purl.oclc.org/ooxml/officeDocument/relationships/extendedProperty",
+      REL_EXTENDED_PROPERTIES,
     ));
   }
 }

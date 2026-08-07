@@ -536,6 +536,14 @@ pub(crate) fn lower_clustered_column_chart(
     && chart.legend_position.is_none();
   let has_modern_single_series_title_layout =
     has_legacy_single_series_title_layout && style.modern_excel_profile;
+  let has_legacy_styleless_single_series_device_layout = has_legacy_single_series_title_layout
+    && !style.modern_excel_profile
+    && chart.plot_layout.is_none();
+  let legacy_styleless_device_adjustment = if has_legacy_styleless_single_series_device_layout {
+    profiles::EXCEL_LEGACY_STYLELESS_SINGLE_SERIES_DEVICE
+  } else {
+    profiles::CartesianDeviceAdjustment::default()
+  };
   let has_modern_single_series_scatter_title_layout =
     has_modern_single_series_title_layout && scatter_only;
   let modern_single_series_title_adjustment = if has_modern_single_series_title_layout {
@@ -942,8 +950,9 @@ pub(crate) fn lower_clustered_column_chart(
       0.0
     }
     + frame.height_pt * powerpoint_generated_title_bottom_adjustment.title_top_ratio;
-  let title_top =
+  let mut title_top =
     title_top + frame.height_pt * powerpoint_generated_title_no_legend_adjustment.title_top_ratio;
+  title_top += legacy_styleless_device_adjustment.title_top_pt * style.stroke_scale;
   let legend_bottom_margin = style.legend.font_size_pt * 0.81;
   let legend_top = frame.y_pt + frame.height_pt - legend_bottom_margin - legend_line_height;
   let category_bottom_ratio = host_defaults.category_bottom_ratio;
@@ -1542,6 +1551,20 @@ pub(crate) fn lower_clustered_column_chart(
     plot_top += frame.height_pt * adjustment.plot_top_ratio;
     plot_bottom += frame.height_pt * adjustment.plot_bottom_ratio;
   }
+  if has_legacy_styleless_single_series_device_layout {
+    // A style-less Excel 12 chart uses a distinct automatic inner-plot
+    // rectangle inside the unchanged chart-area frame. Microsoft ChartArea's
+    // Position/InnerPlotPosition contract and the archived Chart Controls
+    // samples preserve that ownership split. Apply the named fixed-device
+    // profile only after automatic semantic bands have been resolved; modern
+    // c:style charts and authored manual plot rectangles bypass it.
+    let scale = style.stroke_scale;
+    category_top += legacy_styleless_device_adjustment.category_top_pt * scale;
+    plot_top += legacy_styleless_device_adjustment.plot_top_pt * scale;
+    plot_bottom += legacy_styleless_device_adjustment.plot_bottom_pt * scale;
+    plot_left += legacy_styleless_device_adjustment.plot_x_pt * scale;
+    plot_right += legacy_styleless_device_adjustment.plot_x_pt * scale;
+  }
   if horizontal_bar_only {
     let category_width = chart
       .categories
@@ -1960,12 +1983,15 @@ pub(crate) fn lower_clustered_column_chart(
   );
 
   let mut items = Vec::new();
+  let chart_area_height = (frame.height_pt
+    + legacy_styleless_device_adjustment.chart_area_height_pt * style.stroke_scale)
+    .max(0.0);
   push_chart_shape_rect(
     &mut items,
     frame.x_pt,
     frame.y_pt,
     frame.width_pt,
-    frame.height_pt,
+    chart_area_height,
     Some(&style.chart_area_style.fill),
     None,
     None,
@@ -1986,7 +2012,7 @@ pub(crate) fn lower_clustered_column_chart(
       frame.height_pt + frame.height_pt * 0.004_31,
     )
   } else {
-    (frame.x_pt, frame.y_pt, frame.width_pt, frame.height_pt)
+    (frame.x_pt, frame.y_pt, frame.width_pt, chart_area_height)
   };
   push_chart_shape_rect(
     &mut items,

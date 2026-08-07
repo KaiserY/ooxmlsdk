@@ -2074,6 +2074,7 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
       });
       common::DisplayItem::Group(common::CompositingGroup {
         mask: None,
+        clip: None,
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
@@ -2088,6 +2089,7 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
     PageItem::IndependentTextFrame(items) => {
       common::DisplayItem::Group(common::CompositingGroup {
         mask: None,
+        clip: None,
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
@@ -2102,6 +2104,7 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
     PageItem::FloatingDrawing { items, .. } => {
       common::DisplayItem::Group(common::CompositingGroup {
         mask: None,
+        clip: None,
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
@@ -2204,6 +2207,7 @@ fn into_common_legacy_form_check_box(item: LegacyFormCheckBoxItem) -> common::Di
     });
   common::DisplayItem::Group(common::CompositingGroup {
     mask: None,
+    clip: None,
     transform,
     blend_mode: common::BlendMode::Normal,
     opacity: 1.0,

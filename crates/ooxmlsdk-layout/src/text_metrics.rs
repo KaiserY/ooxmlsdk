@@ -398,6 +398,65 @@ impl TextMetrics {
     shaped_text_from_runs(runs, |font_id| self.fonts.font_face_data(font_id))
   }
 
+  /// Returns the integer device advances used by classic GDI for a simple
+  /// one-glyph-per-character text run.
+  ///
+  /// TrueType `hdmx` records contain the hinted advance of every glyph at an
+  /// exact integer ppem. This is observably different from scaling `hmtx`
+  /// widths and then applying OpenType kerning: legacy Forms controls printed
+  /// through GDI use the former. Complex clusters and fonts without a matching
+  /// device record deliberately fall back to the normal shaping path.
+  pub(crate) fn gdi_device_character_advances_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    device_dpi: f32,
+  ) -> Option<Arc<[f32]>> {
+    if text.is_empty()
+      || !device_dpi.is_finite()
+      || device_dpi <= 0.0
+      || style.character_spacing_pt().abs() > f32::EPSILON
+      || (style.horizontal_scale() - 1.0).abs() > f32::EPSILON
+    {
+      return None;
+    }
+
+    let character_ranges = text
+      .char_indices()
+      .map(|(start, character)| start..start + character.len_utf8())
+      .collect::<Vec<_>>();
+    let shaped = self.shape_text(text, style)?;
+    if shaped.glyphs.len() != character_ranges.len() {
+      return None;
+    }
+
+    let mut advances = vec![None; character_ranges.len()];
+    for glyph in &shaped.glyphs {
+      let character_index = character_ranges
+        .iter()
+        .position(|range| *range == glyph.text_range)?;
+      if advances[character_index].is_some() {
+        return None;
+      }
+      let face = shaped.font_faces.get(glyph.font_index)?;
+      let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
+      let ppem = gdi_device_ppem(glyph.font_size_pt, device_dpi)?;
+      let width_px = font
+        .hdmx()
+        .ok()?
+        .record_for_size(ppem)?
+        .widths()
+        .get(usize::try_from(glyph.glyph_id).ok()?)
+        .copied()?;
+      advances[character_index] = Some(gdi_device_advance_pt(width_px, device_dpi));
+    }
+
+    advances
+      .into_iter()
+      .collect::<Option<Vec<_>>>()
+      .map(Arc::from)
+  }
+
   pub fn vertical_metrics(&mut self, style: &(impl FontStyleRef + ?Sized)) -> TextVerticalMetrics {
     self
       .fonts
@@ -601,6 +660,15 @@ impl TextMetrics {
       .max_text_line_height(text, &metrics_style)
       .unwrap_or_else(|| self.vertical_metrics(&metrics_style).line_height_pt())
   }
+}
+
+fn gdi_device_ppem(font_size_pt: f32, device_dpi: f32) -> Option<u8> {
+  let ppem = (font_size_pt * device_dpi / crate::units::POINTS_PER_INCH).round();
+  (ppem.is_finite() && (1.0..=f32::from(u8::MAX)).contains(&ppem)).then(|| ppem as u8)
+}
+
+fn gdi_device_advance_pt(width_px: u8, device_dpi: f32) -> f32 {
+  f32::from(width_px) * crate::units::POINTS_PER_INCH / device_dpi
 }
 
 fn math_font_metrics_from_face(face: &FontFaceData, font_size_pt: f32) -> Option<MathFontMetrics> {
@@ -888,6 +956,14 @@ mod tests {
     assert_eq!(first, second);
     assert_eq!(metrics.measure_styles.len(), 1);
     assert_eq!(metrics.measure_widths[0].len(), 1);
+  }
+
+  #[test]
+  fn gdi_device_metrics_use_integer_ppem_and_device_pixel_advances() {
+    assert_eq!(gdi_device_ppem(8.04, 600.0), Some(67));
+    assert_eq!(gdi_device_ppem(8.0, 0.0), None);
+    assert_eq!(gdi_device_ppem(72.0, 300.0), None);
+    assert!((gdi_device_advance_pt(36, 600.0) - 4.32).abs() < 0.0001);
   }
 
   #[test]

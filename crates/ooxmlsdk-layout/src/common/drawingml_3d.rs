@@ -999,7 +999,11 @@ fn apply_static_3d_impl(
     );
     let extrusion = extrusion_color.unwrap_or_else(|| average_extrusion_color(&front));
     let back_normal = lighting_surface_normal(scene, projection, [0.0, 0.0, -1.0]);
-    let back_shade = material_diffuse_shade(scene, back_normal, shape.preset_material);
+    let back_shade = if text_geometry.is_some() {
+      material_diffuse_shade(scene, back_normal, shape.preset_material)
+    } else {
+      legacy_material_diffuse_shade(scene, back_normal, shape.preset_material)
+    };
     if !wireframe {
       let mut back_face = RgbaImage::new(image.width(), image.height());
       let options = ProjectedImageOptions {
@@ -1209,6 +1213,7 @@ fn apply_static_3d_impl(
       planar_front_z_px,
       [0.0, 0.0, 1.0],
       shape.preset_material,
+      text_geometry.is_some(),
     );
     let options = ProjectedImageOptions {
       projection,
@@ -1783,6 +1788,83 @@ fn light_rig_surface_specular(
   specular.map(|channel| channel.clamp(0.0, 1.0))
 }
 
+/// PowerPoint's established fixed-output path interprets the published rig
+/// vectors as the direction in which light travels. W14 text uses the newer
+/// toward-light convention above; keep the two host contracts explicit.
+fn legacy_light_rig_surface_shade(scene: &a::Scene3DType, normal: [f32; 3]) -> [f32; 3] {
+  let preset = light_rig(scene.light_rig.rig);
+  let rotation_degrees = scene.light_rig.rotation.as_ref().map_or_else(
+    || light_rig_direction_degrees(scene.light_rig.direction),
+    |rotation| rotation.revolution as f32 / 60_000.0,
+  );
+  let mut shade = preset.ambient;
+  for light in &preset.lights[..preset.count] {
+    if !light.diffuse {
+      continue;
+    }
+    let direction = resolved_light_direction(scene, *light, rotation_degrees);
+    let level = light.scale * dot3([-direction[0], -direction[1], -direction[2]], normal).max(0.0)
+      + light.offset;
+    for (channel, color) in shade.iter_mut().zip(light.color) {
+      *channel += color * level;
+    }
+  }
+  shade.map(|channel| channel.clamp(0.12, 2.5))
+}
+
+fn legacy_light_rig_surface_specular(
+  scene: &a::Scene3DType,
+  normal: [f32; 3],
+  view_direction: [f32; 3],
+  material: Option<a::PresetMaterialTypeValues>,
+) -> [f32; 3] {
+  let amount = material_specularity(material);
+  let power = material_specular_power(material);
+  let blinn_highlight = material_blinn_highlight(material);
+  if amount <= f32::EPSILON || power <= f32::EPSILON {
+    return [0.0; 3];
+  }
+  let preset = light_rig(scene.light_rig.rig);
+  let rotation_degrees = scene.light_rig.rotation.as_ref().map_or_else(
+    || light_rig_direction_degrees(scene.light_rig.direction),
+    |rotation| rotation.revolution as f32 / 60_000.0,
+  );
+  let mut specular = [0.0; 3];
+  for light in &preset.lights[..preset.count] {
+    if !light.specular {
+      continue;
+    }
+    let direction = resolved_light_direction(scene, *light, rotation_degrees);
+    let mut toward_light = [-direction[0], -direction[1], -direction[2]];
+    normalize3(&mut toward_light);
+    let normal_light = dot3(normal, toward_light);
+    if normal_light <= 0.0 {
+      continue;
+    }
+    let highlight = if blinn_highlight {
+      let mut halfway = [
+        toward_light[0] + view_direction[0],
+        toward_light[1] + view_direction[1],
+        toward_light[2] + view_direction[2],
+      ];
+      normalize3(&mut halfway);
+      dot3(normal, halfway).max(0.0)
+    } else {
+      let reflected = [
+        2.0 * normal_light * normal[0] - toward_light[0],
+        2.0 * normal_light * normal[1] - toward_light[1],
+        2.0 * normal_light * normal[2] - toward_light[2],
+      ];
+      dot3(reflected, view_direction).max(0.0)
+    };
+    let level = highlight.powf(power) * amount;
+    for (channel, light_color) in specular.iter_mut().zip(light.color) {
+      *channel += light_color * level;
+    }
+  }
+  specular.map(|channel| channel.clamp(0.0, 1.0))
+}
+
 fn light_rig(rig: a::LightRigValues) -> LightRigPreset {
   use a::LightRigValues as R;
   const D1: [f32; 3] = [0.6574, -0.7316, -0.1806];
@@ -2002,6 +2084,17 @@ fn material_diffuse_shade(
 ) -> [f32; 3] {
   scale_shade(
     light_rig_surface_shade(scene, normal),
+    material_diffusion(material),
+  )
+}
+
+fn legacy_material_diffuse_shade(
+  scene: &a::Scene3DType,
+  normal: [f32; 3],
+  material: Option<a::PresetMaterialTypeValues>,
+) -> [f32; 3] {
+  scale_shade(
+    legacy_light_rig_surface_shade(scene, normal),
     material_diffusion(material),
   )
 }
@@ -2320,9 +2413,14 @@ fn shade_planar_surface(
   z: f32,
   model_normal: [f32; 3],
   material: Option<a::PresetMaterialTypeValues>,
+  word_text_lighting: bool,
 ) {
   let normal = lighting_surface_normal(scene, projection, model_normal);
-  let shade = material_diffuse_shade(scene, normal, material);
+  let shade = if word_text_lighting {
+    material_diffuse_shade(scene, normal, material)
+  } else {
+    legacy_material_diffuse_shade(scene, normal, material)
+  };
   let center_x = model_surface.left_px + model_surface.width_px * 0.5;
   let center_y = model_surface.top_px + model_surface.height_px * 0.5;
   let width = model_surface.width_px.max(1.0);
@@ -2339,7 +2437,11 @@ fn shade_planar_surface(
       height,
       pixels_per_point,
     );
-    let specular = light_rig_surface_specular(scene, normal, view_direction, material);
+    let specular = if word_text_lighting {
+      light_rig_surface_specular(scene, normal, view_direction, material)
+    } else {
+      legacy_light_rig_surface_specular(scene, normal, view_direction, material)
+    };
     let alpha = pixel[3];
     for channel in 0..3 {
       pixel[channel] =
@@ -3005,7 +3107,7 @@ fn composite_extrusion_edges(
       });
       let surface_normal =
         lighting_surface_normal(scene, projection, [model_normal[0], model_normal[1], 0.0]);
-      let shade = material_diffuse_shade(scene, surface_normal, material);
+      let shade = legacy_material_diffuse_shade(scene, surface_normal, material);
       let view_direction = surface_view_direction(
         scene,
         projection,
@@ -3018,7 +3120,8 @@ fn composite_extrusion_edges(
         height,
         pixels_per_point,
       );
-      let specular = light_rig_surface_specular(scene, surface_normal, view_direction, material);
+      let specular =
+        legacy_light_rig_surface_specular(scene, surface_normal, view_direction, material);
       // This mesh is reconstructed from the rasterized glyph boundary. Keep
       // the source pixel's antialias coverage on its swept side face;
       // promoting every fringe pixel to an opaque quad turns adjacent glyph
@@ -3138,7 +3241,7 @@ fn composite_extrusion_edges(
     let model_normal = alpha_boundary_normal(source, x as i32, y as i32);
     let surface_normal =
       lighting_surface_normal(scene, projection, [model_normal[0], model_normal[1], 0.0]);
-    let mut shade = material_diffuse_shade(scene, surface_normal, material);
+    let mut shade = legacy_material_diffuse_shade(scene, surface_normal, material);
     if wireframe {
       shade = clamp_shade_min(shade, 0.35);
     }
@@ -4105,8 +4208,8 @@ fn composite_bevel(
         model_surface.height_px.max(1.0),
         pixels_per_point,
       );
-      let specular = light_rig_surface_specular(scene, normal, view_direction, material);
-      let shade = material_diffuse_shade(scene, normal, material);
+      let specular = legacy_light_rig_surface_specular(scene, normal, view_direction, material);
+      let shade = legacy_material_diffuse_shade(scene, normal, material);
       let weight = if profile_height.is_nan() {
         1.0 - inward_fraction * inward_fraction * (3.0 - 2.0 * inward_fraction)
       } else {

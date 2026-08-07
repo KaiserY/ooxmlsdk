@@ -828,6 +828,11 @@ impl StylesCatalog {
     self.missing_theme_minor_from_document_language
   }
 
+  pub(crate) fn column_width_uses_application_default_minor_theme(&self) -> bool {
+    self.uses_application_default_minor_theme()
+      && (self.font_records.is_empty() || self.default_font_uses_theme())
+  }
+
   pub(crate) fn default_font_uses_theme(&self) -> bool {
     self
       .font_records
@@ -1733,6 +1738,37 @@ mod tests {
       missing_theme_minor_font(None, OfficeResourceLocale::English),
       None
     );
+  }
+
+  #[test]
+  fn missing_theme_replaces_only_theme_backed_normal_font_column_metrics() {
+    let missing_normal = StylesCatalog {
+      missing_theme_minor_from_document_language: true,
+      ..StylesCatalog::default()
+    };
+    assert!(missing_normal.column_width_uses_application_default_minor_theme());
+
+    let explicit = StylesCatalog {
+      font_records: vec![FontRecord {
+        name: Some(Arc::from("Calibri")),
+        size_pt: Some(OrderedF64::new(11.0)),
+        ..FontRecord::default()
+      }],
+      missing_theme_minor_from_document_language: true,
+      ..StylesCatalog::default()
+    };
+    assert!(!explicit.column_width_uses_application_default_minor_theme());
+
+    let themed = StylesCatalog {
+      font_records: vec![FontRecord {
+        name: Some(Arc::from("Calibri")),
+        size_pt: Some(OrderedF64::new(11.0)),
+        scheme: x::FontSchemeValues::Minor,
+        ..FontRecord::default()
+      }],
+      ..explicit
+    };
+    assert!(themed.column_width_uses_application_default_minor_theme());
   }
 
   #[test]

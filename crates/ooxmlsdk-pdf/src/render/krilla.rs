@@ -459,6 +459,7 @@ enum PageItem<'doc> {
   Image(ImageItem<'doc>),
   Group {
     mask: Option<ImageItem<'doc>>,
+    clip: Option<PaintClipRect>,
     transform: Option<common::Transform>,
     blend_mode: common::BlendMode,
     opacity: f32,
@@ -778,6 +779,7 @@ enum PaintItem<'doc> {
   Image(ImageItem<'doc>),
   Group {
     mask: Option<ImageItem<'doc>>,
+    clip: Option<PaintClipRect>,
     transform: Option<common::Transform>,
     blend_mode: common::BlendMode,
     opacity: f32,
@@ -1361,6 +1363,15 @@ struct PaintClipRect {
   height_pt: f32,
 }
 
+fn paint_clip_from_common(rect: common::Rect) -> PaintClipRect {
+  PaintClipRect {
+    x_pt: rect.origin.x.0,
+    y_pt: rect.origin.y.0,
+    width_pt: rect.size.width.0,
+    height_pt: rect.size.height.0,
+  }
+}
+
 fn intersect_paint_clips(
   left: Option<PaintClipRect>,
   right: Option<PaintClipRect>,
@@ -1625,19 +1636,15 @@ impl<'doc> PaintDocument<'doc> {
               PageItem::Image(image) => PaintItem::Image(image),
               PageItem::Group {
                 mask,
+                clip,
                 transform,
                 blend_mode,
                 opacity,
                 flatten_identity,
                 inherit_text_line_owner,
                 items,
-              } => PaintItem::Group {
-                mask,
-                transform,
-                blend_mode,
-                opacity,
-                flatten_identity,
-                items: {
+              } => {
+                let mut items = {
                   let child_owner = inherit_text_line_owner.then_some(owner).flatten();
                   let child_line_baseline = inherit_text_line_owner
                     .then_some(common_line_baseline)
@@ -1653,9 +1660,32 @@ impl<'doc> PaintDocument<'doc> {
                         text_metrics,
                       )
                     })
-                    .collect()
-                },
-              },
+                    .collect::<Vec<_>>()
+                };
+                if clip.is_some() && flatten_identity {
+                  // A clip-only worksheet wrapper replaces several former
+                  // top-level drawing items. Preserve their original
+                  // physical-page culling before emitting text operators;
+                  // clipping alone still leaves invisible text extractable
+                  // from a PDF content stream.
+                  items.retain(|item| {
+                    paint_item_intersects_page(
+                      item,
+                      page.setup.size.width.0,
+                      page.setup.size.height.0,
+                    )
+                  });
+                }
+                PaintItem::Group {
+                  mask,
+                  clip,
+                  transform,
+                  blend_mode,
+                  opacity,
+                  flatten_identity,
+                  items,
+                }
+              }
               PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area),
               PageItem::Rect(rect) => PaintItem::Rect(rect),
               PageItem::Line(line) => PaintItem::Line(line),
@@ -1723,6 +1753,7 @@ fn expand_metafile_semantic_text_item<'doc>(
   match item {
     PageItem::Group {
       mask,
+      clip,
       transform,
       blend_mode,
       opacity,
@@ -1736,6 +1767,7 @@ fn expand_metafile_semantic_text_item<'doc>(
         expand_metafile_semantic_text_items(items, vec![child_owner; child_count], ui_language);
       PageItem::Group {
         mask,
+        clip,
         transform,
         blend_mode,
         opacity,
@@ -1778,6 +1810,7 @@ fn expand_metafile_semantic_text_item<'doc>(
         );
         return PageItem::Group {
           mask: None,
+          clip: None,
           transform: None,
           blend_mode: common::BlendMode::Normal,
           opacity: 1.0,
@@ -1791,77 +1824,77 @@ fn expand_metafile_semantic_text_item<'doc>(
         .signature_line
         .as_ref()
         .is_some_and(|properties| properties.state == common::SignatureLineState::Unsigned);
-      let solid_rects = paint_native_text
-        .then(|| {
-          ooxmlsdk_layout::render::emf_wmf::extract_metafile_solid_rects_with_options(
-            &image.data,
-            image.content_type.as_deref(),
-            extraction_options,
-          )
+      let solid_rects = if paint_native_text {
+        ooxmlsdk_layout::render::emf_wmf::extract_metafile_solid_rects_with_options(
+          &image.data,
+          image.content_type.as_deref(),
+          extraction_options,
+        )
+      } else {
+        Vec::new()
+      }
+      .into_iter()
+      .map(|rect| {
+        PageItem::Rect(RectItem {
+          x_pt: image.x_pt + rect.x * image.width_pt,
+          y_pt: image.y_pt + rect.y * image.height_pt,
+          width_pt: rect.width * image.width_pt,
+          height_pt: rect.height * image.height_pt,
+          fill: Some(RectFill::Solid {
+            color: RgbColor {
+              r: rect.color[0],
+              g: rect.color[1],
+              b: rect.color[2],
+            },
+            opacity: 1.0,
+          }),
+          stroke: None,
+          stroke_opacity: 1.0,
         })
-        .unwrap_or_default()
-        .into_iter()
-        .map(|rect| {
-          PageItem::Rect(RectItem {
-            x_pt: image.x_pt + rect.x * image.width_pt,
-            y_pt: image.y_pt + rect.y * image.height_pt,
-            width_pt: rect.width * image.width_pt,
-            height_pt: rect.height * image.height_pt,
-            fill: Some(RectFill::Solid {
-              color: RgbColor {
-                r: rect.color[0],
-                g: rect.color[1],
-                b: rect.color[2],
-              },
-              opacity: 1.0,
-            }),
-            stroke: None,
-            stroke_opacity: 1.0,
-          })
+      })
+      .collect::<Vec<_>>();
+      let bitmap_layers = if paint_native_text {
+        ooxmlsdk_layout::render::emf_wmf::extract_metafile_bitmap_layers_with_options(
+          &image.data,
+          image.content_type.as_deref(),
+          extraction_options,
+        )
+      } else {
+        Vec::new()
+      }
+      .into_iter()
+      .map(|layer| {
+        // The PowerPoint 365 golden stores every ActiveX preview DIB color
+        // plane as a quality-75 JPEG, including layers whose binary WMF
+        // mask becomes a PDF SMask. Preserve that mask while matching the
+        // fixed-output color samples; ordinary presentation blips do not
+        // enter this ActiveX-only expansion path.
+        let data =
+          super::image::powerpoint_activex_bitmap_png(&layer.data, 75).unwrap_or(layer.data);
+        PageItem::Image(ImageItem {
+          x_pt: image.x_pt + layer.x * image.width_pt,
+          y_pt: image.y_pt + layer.y * image.height_pt,
+          width_pt: layer.width * image.width_pt,
+          height_pt: layer.height * image.height_pt,
+          crop: ImageCrop::default(),
+          clip_path: &[],
+          rotation_deg: 0.0,
+          flip_horizontal: layer.flip_horizontal,
+          flip_vertical: layer.flip_vertical,
+          data: Cow::Owned(data),
+          content_type: Some(Cow::Borrowed(layer.content_type)),
+          metafile_monochrome_dib_palette_override: None,
+          metafile_background_color: None,
+          metafile_external_header: None,
+          alt_text: None,
+          hyperlink_url: None,
+          semantic_metafile_text: false,
+          metafile_semantic_text_includes_raster_backdrop: false,
+          signature_line: None,
+          metafile_native_size: false,
         })
-        .collect::<Vec<_>>();
-      let bitmap_layers = paint_native_text
-        .then(|| {
-          ooxmlsdk_layout::render::emf_wmf::extract_metafile_bitmap_layers_with_options(
-            &image.data,
-            image.content_type.as_deref(),
-            extraction_options,
-          )
-        })
-        .unwrap_or_default()
-        .into_iter()
-        .map(|layer| {
-          // The PowerPoint 365 golden stores every ActiveX preview DIB color
-          // plane as a quality-75 JPEG, including layers whose binary WMF
-          // mask becomes a PDF SMask. Preserve that mask while matching the
-          // fixed-output color samples; ordinary presentation blips do not
-          // enter this ActiveX-only expansion path.
-          let data =
-            super::image::powerpoint_activex_bitmap_png(&layer.data, 75).unwrap_or(layer.data);
-          PageItem::Image(ImageItem {
-            x_pt: image.x_pt + layer.x * image.width_pt,
-            y_pt: image.y_pt + layer.y * image.height_pt,
-            width_pt: layer.width * image.width_pt,
-            height_pt: layer.height * image.height_pt,
-            crop: ImageCrop::default(),
-            clip_path: &[],
-            rotation_deg: 0.0,
-            flip_horizontal: layer.flip_horizontal,
-            flip_vertical: layer.flip_vertical,
-            data: Cow::Owned(data),
-            content_type: Some(Cow::Borrowed(layer.content_type)),
-            metafile_monochrome_dib_palette_override: None,
-            metafile_background_color: None,
-            metafile_external_header: None,
-            alt_text: None,
-            hyperlink_url: None,
-            semantic_metafile_text: false,
-            metafile_semantic_text_includes_raster_backdrop: false,
-            signature_line: None,
-            metafile_native_size: false,
-          })
-        })
-        .collect::<Vec<_>>();
+      })
+      .collect::<Vec<_>>();
       let semantic_runs =
         ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs_with_options(
           &image.data,
@@ -1940,6 +1973,7 @@ fn expand_metafile_semantic_text_item<'doc>(
       // the page stream, which also makes their real text styles observable.
       PageItem::Group {
         mask: None,
+        clip: None,
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
@@ -2141,6 +2175,7 @@ fn page_item_from_common<'doc>(
     )),
     common::DisplayItem::Group(group) => Some(PageItem::Group {
       mask: group.mask.as_ref().map(image_item_from_common),
+      clip: group.clip.map(paint_clip_from_common),
       transform: group.transform,
       blend_mode: group.blend_mode,
       opacity: group.opacity,
@@ -2214,6 +2249,7 @@ fn image_page_item_from_common<'doc>(
   );
   PageItem::Group {
     mask: None,
+    clip: None,
     transform: None,
     blend_mode: common::BlendMode::Normal,
     opacity: 1.0,
@@ -2288,6 +2324,7 @@ fn paint_group_item<'doc>(
     PageItem::Image(image) => PaintItem::Image(image),
     PageItem::Group {
       mask,
+      clip,
       transform,
       blend_mode,
       opacity,
@@ -2296,6 +2333,7 @@ fn paint_group_item<'doc>(
       items,
     } => PaintItem::Group {
       mask,
+      clip,
       transform,
       blend_mode,
       opacity,
@@ -2331,12 +2369,7 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
     x_pt: text.origin.x.0,
     y_pt: text.origin.y.0,
     line_height_pt: text.line_height.0,
-    paint_clip: text.paint_clip.map(|rect| PaintClipRect {
-      x_pt: rect.origin.x.0,
-      y_pt: rect.origin.y.0,
-      width_pt: rect.size.width.0,
-      height_pt: rect.size.height.0,
-    }),
+    paint_clip: text.paint_clip.map(paint_clip_from_common),
     text: Cow::Borrowed(text.text.as_ref()),
     style: text_style_from_common(&text.style),
     rotation_center_pt: text.rotation_center.map(|point| (point.x.0, point.y.0)),
@@ -2680,6 +2713,7 @@ fn coalesced_writer_text_items<'doc>(
       PageItem::Image(image) => output.push(PageItem::Image(image)),
       PageItem::Group {
         mask,
+        clip,
         transform,
         blend_mode,
         opacity,
@@ -2689,6 +2723,7 @@ fn coalesced_writer_text_items<'doc>(
       } => {
         output.push(PageItem::Group {
           mask,
+          clip,
           transform,
           blend_mode,
           opacity,
@@ -3159,7 +3194,7 @@ fn office_tab_leader_portion_ranges(text: &TextItem<'_>) -> Option<PaintTextPort
   let mut characters = text.text.chars();
   let fill = characters.next()?;
   if !matches!(fill, '.' | '-' | '_' | '·')
-    || characters.clone().count() + 1 <= OFFICE_TAB_LEADER_PORTION_CHARACTERS
+    || characters.clone().count() < OFFICE_TAB_LEADER_PORTION_CHARACTERS
     || !characters.all(|character| character == fill)
   {
     return None;
@@ -3836,16 +3871,24 @@ fn draw_paint_item(
           draw_missing_image(surface, image);
         }
       } else {
-        match images.raster(
+        let metafile_options = metafile_render_options_for_image(image, options);
+        match ooxmlsdk_layout::render::emf_wmf::extract_metafile_vector_scene_with_options(
           &image.data,
           image.content_type.as_deref(),
-          options,
-          Some(metafile_render_options_for_image(image, options)),
-          image.width_pt,
-          image.height_pt,
+          metafile_options,
         ) {
-          Ok(pdf_image) => draw_image_item(surface, image, pdf_image),
-          Err(_) => draw_missing_image(surface, image),
+          Ok(Some(scene)) => draw_metafile_vector_item(surface, image, &scene),
+          Ok(None) | Err(_) => match images.raster(
+            &image.data,
+            image.content_type.as_deref(),
+            options,
+            Some(metafile_options),
+            image.width_pt,
+            image.height_pt,
+          ) {
+            Ok(pdf_image) => draw_image_item(surface, image, pdf_image),
+            Err(_) => draw_missing_image(surface, image),
+          },
         }
       }
       if let Some(url) = image.hyperlink_url.as_deref()
@@ -3863,6 +3906,7 @@ fn draw_paint_item(
     }
     PaintItem::Group {
       mask,
+      clip,
       transform,
       blend_mode,
       opacity,
@@ -3873,6 +3917,7 @@ fn draw_paint_item(
         surface,
         CompositingGroup {
           mask: mask.as_ref(),
+          clip: clip.as_ref(),
           transform: transform.as_ref(),
           blend_mode: *blend_mode,
           opacity: *opacity,
@@ -3894,6 +3939,7 @@ fn draw_paint_item(
 
 struct CompositingGroup<'borrow, 'paint> {
   mask: Option<&'borrow ImageItem<'paint>>,
+  clip: Option<&'borrow PaintClipRect>,
   transform: Option<&'borrow common::Transform>,
   blend_mode: common::BlendMode,
   opacity: f32,
@@ -3915,17 +3961,20 @@ fn draw_compositing_group(
     && group.transform.is_none()
     && group.blend_mode == common::BlendMode::Normal
     && (group.opacity - 1.0).abs() <= f32::EPSILON
-    && group
-      .items
-      .iter()
-      .all(|item| !matches!(item, PaintItem::Group { .. }))
+    && (group.clip.is_some()
+      || group
+        .items
+        .iter()
+        .all(|item| !matches!(item, PaintItem::Group { .. })))
   {
     // Source-over leaf paint is associative, so an identity wrapper does not
     // need an isolated Form XObject. Keeping it flat also preserves Word's
     // fixed-output sequence for w14 character effects: raster backdrop first,
     // then ordinary PDF text in the page content stream.
+    let pushed_clip = push_paint_clip(surface, group.clip);
+    let mut result = Ok(());
     for item in group.items {
-      draw_paint_item(
+      if let Err(error) = draw_paint_item(
         surface,
         item,
         fonts,
@@ -3933,9 +3982,15 @@ fn draw_compositing_group(
         internal_links,
         link_annotations,
         options,
-      )?;
+      ) {
+        result = Err(error);
+        break;
+      }
     }
-    return Ok(());
+    if pushed_clip {
+      surface.pop();
+    }
+    return result;
   }
 
   let decoded_mask = group.mask.and_then(|mask| {
@@ -3957,6 +4012,12 @@ fn draw_compositing_group(
   });
 
   let mut pushed_states = 0;
+  // The clip is authored in the parent coordinate space. Establish it before
+  // applying the group's child-to-parent transform so transformed drawing ink
+  // cannot escape the host's printable/page-frame boundary.
+  if push_paint_clip(surface, group.clip) {
+    pushed_states += 1;
+  }
   if let Some(transform) = group.transform {
     surface.push_transform(&Transform::from_row(
       transform.m11,
@@ -6698,6 +6759,53 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, pdf_image: 
   });
 }
 
+fn draw_metafile_vector_item(
+  surface: &mut Surface<'_>,
+  image: &ImageItem<'_>,
+  scene: &ooxmlsdk_layout::render::emf_wmf::MetafileVectorScene,
+) {
+  let adjusted;
+  let image = if let Some((width_pt, height_pt)) = metafile_native_paint_size(image) {
+    adjusted = {
+      let mut adjusted = image.clone();
+      adjusted.width_pt = width_pt;
+      adjusted.height_pt = height_pt;
+      adjusted
+    };
+    &adjusted
+  } else {
+    image
+  };
+  draw_transformed_image_content(surface, image, |surface, size| {
+    surface.set_stroke(None);
+    for fill in &scene.fills {
+      let mut path = PathBuilder::new();
+      for subpath in &fill.subpaths {
+        let Some(first) = subpath.first() else {
+          continue;
+        };
+        path.move_to(first.x * size.width(), first.y * size.height());
+        for point in &subpath[1..] {
+          path.line_to(point.x * size.width(), point.y * size.height());
+        }
+        path.close();
+      }
+      let Some(path) = path.finish() else {
+        continue;
+      };
+      surface.set_fill(Some(Fill {
+        paint: rgb::Color::new(fill.color[0], fill.color[1], fill.color[2]).into(),
+        opacity: NormalizedF32::ONE,
+        rule: match fill.fill_rule {
+          ooxmlsdk_layout::render::emf_wmf::MetafileVectorFillRule::Alternate => FillRule::EvenOdd,
+          ooxmlsdk_layout::render::emf_wmf::MetafileVectorFillRule::Winding => FillRule::NonZero,
+        },
+      }));
+      surface.draw_path(&path);
+    }
+  });
+}
+
 fn metafile_native_paint_size(image: &ImageItem<'_>) -> Option<(f32, f32)> {
   if !image.metafile_native_size
     || image.metafile_background_color.is_some()
@@ -7767,6 +7875,7 @@ mod tests {
       .items
       .push(DisplayItem::Group(common::CompositingGroup {
         mask: None,
+        clip: None,
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
@@ -7792,6 +7901,7 @@ mod tests {
       .items
       .push(DisplayItem::Group(common::CompositingGroup {
         mask: None,
+        clip: None,
         transform: None,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,

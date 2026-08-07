@@ -90,6 +90,9 @@ pub enum DisplayItem<'doc> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompositingGroup<'doc> {
   pub mask: Option<ImageItem<'doc>>,
+  /// Parent-coordinate clip applied to the complete group before any group
+  /// transform or compositing state.
+  pub clip: Option<Rect>,
   pub transform: Option<Transform>,
   pub blend_mode: BlendMode,
   pub opacity: f32,
@@ -108,6 +111,7 @@ impl<'doc> CompositingGroup<'doc> {
   pub fn masked(mask: ImageItem<'doc>, items: Vec<DisplayItem<'doc>>) -> Self {
     Self {
       mask: Some(mask),
+      clip: None,
       transform: None,
       blend_mode: BlendMode::Normal,
       opacity: 1.0,

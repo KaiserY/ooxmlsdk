@@ -8,7 +8,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use super::comments::CommentsCatalog;
 use super::drawing::DrawingResourceCatalog;
 use super::object_resources::WorksheetObjectResourceCatalog;
-use super::page_settings::CalcPageSettings;
+use super::page_settings::{CalcPageSettings, WindowsPrinterSettings};
 use super::pivot::PivotTableCatalog;
 use super::query::QueryTableCatalog;
 use super::sheet_conditions::SheetConditionCatalog;
@@ -35,6 +35,28 @@ const OFFICE_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT: f32 = 52.306_667;
 // repeated icon grid in complex_icon_set and POI's NewStyleConditional-
 // Formattings independently expose the same boundary sequence.
 const OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT: f32 = 50.05;
+// Excel 12's Calibri 11 worksheet drawing layer keeps its horizontal anchor
+// offsets in the legacy screen-device coordinate space while fixed output
+// paints the cell grid on the printer device. Apache POI and EPPlus both
+// expose 9,525 EMU as one worksheet pixel; the Office 16 reference exporter
+// maps that older horizontal pixel through a 26 mm100 device increment before
+// snapping it to its 600dpi output grid. Keep this separate from ordinary EMU
+// extents and from the 50.05pt cell grid: WithChart.xlsx independently exposes
+// eight printer-grid columns plus a 26-pixel marker as 419.40pt.
+const OFFICE_EXCEL12_DRAWING_HORIZONTAL_PIXEL_MM100: f64 = 26.0;
+// The same Excel 12 Calibri profile resolves an automatic default row to 113
+// dots on the 600dpi fixed-output device. Unlike horizontal drawing offsets,
+// row offsets remain ordinary EMUs.
+const OFFICE_EXCEL12_CALIBRI_11_AUTOMATIC_ROW_HEIGHT_PT: f32 =
+  113.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+// MS-XLSX §2.5.3 defines x14ac:dyDescent as the baseline distance from
+// the bottom of a cell in worksheet pixels. It is not extra row leading. The
+// Excel 16 Calibri 11 minor-theme .55 profile rebuilds its automatic row on
+// the 600dpi fixed-output device as 104 dots; treating .55 as points instead
+// advances its drawing anchors on a 12.72pt grid. Excel 14's .25 profile is a
+// counterexample and retains the font-metric path below.
+const OFFICE_EXCEL16_CALIBRI_11_HALF_PIXEL_DESCENT_ROW_HEIGHT_PT: f32 =
+  104.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
 // Excel 14+ fixed output resolves the explicit Calibri 11 Normal-font maximum
 // digit width to 47 dots on its 600dpi printer device. ECMA-376 Part 1
 // §18.3.1.13 defines authored column widths in terms of that maximum digit
@@ -52,6 +74,11 @@ const OFFICE_ARIAL_10_EXPLICIT_DIGIT_WIDTH_PT: f32 =
 // screen pixels including the five pixels required by ECMA-376
 // §18.3.1.81; Office's PDF coordinate grid resolves that to 68.82pt.
 const OFFICE_MAC_EXCEL12_VERDANA10_BASE10_COLUMN_WIDTH_PT: f32 = 68.82;
+// Excel 12 VML-only Forms hosts retain the pre-controlPr application grid for
+// implicit columns. The repeated Radio/GBox anchors in tdf111980 expose a
+// 50.1pt column before the host rectangle is snapped to fixed-output device
+// dots. Explicit base/default widths remain authoritative.
+const OFFICE_EXCEL12_VML_FORMS_IMPLICIT_COLUMN_WIDTH_PT: f32 = 50.1;
 // Fixed-format printer leading measured after the 96dpi pixel and dyDescent
 // terms for the Calibri 11 automatic-row profile.
 const OFFICE_AUTOMATIC_ROW_PRINTER_LEADING_PT: f32 = 0.018;
@@ -139,6 +166,7 @@ pub(crate) enum SheetType {
 pub(crate) struct SheetResourceCatalog {
   pub(crate) drawings: Vec<DrawingResourceCatalog>,
   pub(crate) object_resources: WorksheetObjectResourceCatalog,
+  pub(crate) printer_settings: Option<WindowsPrinterSettings>,
   pub(crate) comments: CommentsCatalog,
   pub(crate) tables: Vec<TableResourceCatalog>,
   pub(crate) pivot_tables: PivotTableCatalog,
@@ -159,7 +187,9 @@ pub(crate) struct SheetMetrics {
   modern_excel_implicit_columns: bool,
   legacy_calibri_implicit_columns: bool,
   compatibility_mode_implicit_columns: bool,
+  legacy_excel12_calibri_fixed_output_grid: bool,
   legacy_mac_excel12_verdana10_grid: bool,
+  legacy_excel12_vml_control_snapshot_grid: bool,
   pub(crate) columns: Vec<ColumnModel>,
   pub(crate) merged_ranges: Vec<String>,
   pub(crate) hyperlinks: Vec<HyperlinkModel>,
@@ -289,8 +319,46 @@ impl CalcSheet {
     styles: &StylesCatalog,
     producer: SpreadsheetProducerProfile,
   ) -> Self {
-    let page_settings = CalcPageSettings::from_worksheet(&worksheet, producer.mso_document);
+    let producer = worksheet_excel_extension_producer_profile(&worksheet, styles, producer);
+    let page_settings = CalcPageSettings::from_worksheet(
+      &worksheet,
+      producer.mso_document,
+      resources.printer_settings.as_ref(),
+    );
     let mut metrics = SheetMetrics::from_worksheet(&worksheet, styles, producer);
+    let has_legacy_form_controls = resources
+      .object_resources
+      .vml_drawings
+      .iter()
+      .flat_map(|drawing| &drawing.shapes)
+      .any(|shape| {
+        shape
+          .object_type
+          .as_deref()
+          .is_some_and(|object_type| matches!(object_type, "Checkbox" | "Radio" | "GBox"))
+      });
+    let has_modern_control_anchors = metrics
+      .objects
+      .controls
+      .iter()
+      .any(|control| control.has_control_properties && control.anchor.is_some());
+    metrics.legacy_excel12_vml_control_snapshot_grid = legacy_excel12_vml_control_snapshot_grid(
+      producer,
+      has_legacy_form_controls,
+      has_modern_control_anchors,
+    );
+    if metrics.legacy_excel12_vml_control_snapshot_grid
+      && styles.normal_style_uses_explicit_arial_10()
+      && !metrics.format.custom_height
+    {
+      // Excel 12 stores a cached 12.75pt default row for this legacy Arial 10
+      // control profile, but Office fixed output rebuilds the automatic row
+      // grid from the Normal font. The old VML-only Radio/GBox fixture exposes
+      // 12.36pt rows in every nonzero control anchor. Modern controlPr anchors
+      // and authored/custom row heights are the unchanged counterexamples.
+      metrics.format.default_row_height =
+        f64::from(automatic_explicit_font_row_height_pt(styles, None));
+    }
     metrics.indexed_scatter_print_grid = resources_have_indexed_scatter_print_grid(&resources);
     let has_sheet_drawing = resources
       .drawings
@@ -360,7 +428,8 @@ impl CalcSheet {
     chartsheet: x::Chartsheet,
     resources: SheetResourceCatalog,
   ) -> Self {
-    let page_settings = CalcPageSettings::from_chartsheet(&chartsheet);
+    let page_settings =
+      CalcPageSettings::from_chartsheet(&chartsheet, resources.printer_settings.as_ref());
     let metrics = SheetMetrics::default();
     let rows = Vec::new();
     let geometry = SheetGeometry::new(&metrics, &rows, None, None);
@@ -573,10 +642,37 @@ impl CalcSheet {
     let column = u32::try_from(marker.column).unwrap_or(0).saturating_add(1);
     let row = u32::try_from(marker.row).unwrap_or(0).saturating_add(1);
     let base = self.cell_rect(CellAddress { col: column, row });
+    let x_pt = if self.metrics.legacy_excel12_calibri_fixed_output_grid {
+      legacy_excel12_calibri_marker_x_pt(marker.column, marker.column_offset_emu)
+    } else {
+      base.x_pt + units::emu_to_points(marker.column_offset_emu)
+    };
     (
-      base.x_pt + units::emu_to_points(marker.column_offset_emu),
+      x_pt,
       base.y_pt + units::emu_to_points(marker.row_offset_emu),
     )
+  }
+
+  pub(crate) fn object_anchor_rect_pt(
+    &self,
+    shape: &super::object_resources::VmlShapeModel,
+  ) -> Option<(f32, f32, f32, f32)> {
+    let anchor = self.metrics.objects.anchor_for_vml_shape(shape)?;
+    let from = super::drawing::DrawingMarkerModel {
+      column: anchor.from_column,
+      column_offset_emu: anchor.from_column_offset_emu,
+      row: anchor.from_row,
+      row_offset_emu: anchor.from_row_offset_emu,
+    };
+    let to = super::drawing::DrawingMarkerModel {
+      column: anchor.to_column,
+      column_offset_emu: anchor.to_column_offset_emu,
+      row: anchor.to_row,
+      row_offset_emu: anchor.to_row_offset_emu,
+    };
+    let (x1, y1) = self.marker_position_pt(&from);
+    let (x2, y2) = self.marker_position_pt(&to);
+    Some((x1.min(x2), y1.min(y2), (x2 - x1).abs(), (y2 - y1).abs()))
   }
 
   pub(crate) fn column_width_pt(&self, column: u32) -> f32 {
@@ -593,6 +689,19 @@ impl CalcSheet {
 
   pub(crate) fn default_row_height_pt(&self) -> f32 {
     self.geometry.default_row_height_pt
+  }
+
+  pub(crate) fn vml_anchor_offset_pt(&self, value: i32) -> f32 {
+    let dpi = if self.metrics.legacy_excel12_vml_control_snapshot_grid {
+      200.0
+    } else {
+      units::CSS_PIXELS_PER_INCH
+    };
+    value as f32 * units::POINTS_PER_INCH / dpi
+  }
+
+  pub(crate) fn uses_legacy_excel12_vml_control_snapshot_grid(&self) -> bool {
+    self.metrics.legacy_excel12_vml_control_snapshot_grid
   }
 
   pub(crate) fn cell_at(&self, address: CellAddress) -> Option<&CalcCell> {
@@ -656,6 +765,47 @@ impl CalcSheet {
   }
 }
 
+fn worksheet_excel_extension_producer_profile(
+  worksheet: &x::Worksheet,
+  styles: &StylesCatalog,
+  mut producer: SpreadsheetProducerProfile,
+) -> SpreadsheetProducerProfile {
+  let has_excel14_cell_grid = worksheet
+    .sheet_format_properties
+    .as_ref()
+    .and_then(|format| format.dy_descent)
+    .is_some();
+  if should_infer_excel14_worksheet_profile(
+    producer,
+    has_excel14_cell_grid,
+    styles.normal_style_uses_explicit_calibri_11(),
+  ) {
+    // [MS-XLSX] 2.5.3 defines x14ac:dyDescent as an Excel worksheet-pixel
+    // grid extension and requires it to be carried through MCE.  Some OOXML
+    // transformations retain that authored worksheet/styles pair while
+    // dropping both docProps/app.xml and workbook/fileVersion.  Treat the
+    // surviving extension as the missing Excel 14 producer boundary so the
+    // Normal-font MDW still owns explicit and implicit column geometry.
+    // A declared LibreOffice producer and every package with an explicit
+    // Excel AppVersion remain counterexamples and keep their own profiles.
+    producer.mso_document = true;
+    producer.excel_major_version = Some(14);
+  }
+  producer
+}
+
+fn should_infer_excel14_worksheet_profile(
+  producer: SpreadsheetProducerProfile,
+  has_excel14_cell_grid: bool,
+  normal_style_uses_explicit_calibri_11: bool,
+) -> bool {
+  !producer.mso_document
+    && !producer.libreoffice_document
+    && producer.excel_major_version.is_none()
+    && has_excel14_cell_grid
+    && normal_style_uses_explicit_calibri_11
+}
+
 impl SheetGeometry {
   fn new(
     metrics: &SheetMetrics,
@@ -687,6 +837,25 @@ impl SheetGeometry {
       // Explicit base/default widths and explicit document fonts retain the
       // established font-dependent conversion.
       OFFICE_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT
+    } else if metrics.legacy_excel12_vml_control_snapshot_grid
+      && metrics.format.default_column_width.is_none()
+      && metrics.format.base_column_width.is_none()
+    {
+      // VML-only Excel 12 Forms controls predate controlPr/xdr anchors. Their
+      // cached Arial 10 sheet uses the legacy application column grid in
+      // fixed output; modern anchors and any authored sheet width bypass it.
+      OFFICE_EXCEL12_VML_FORMS_IMPLICIT_COLUMN_WIDTH_PT
+    } else if metrics.legacy_excel12_calibri_fixed_output_grid
+      && metrics.format.default_column_width.is_none()
+      && metrics.format.base_column_width.is_none()
+    {
+      // The Excel 12 Calibri drawing profile paints implicit columns on the
+      // 600dpi printer grid. Keep the sheet range origin on the same 417-dot
+      // boundary used by marker_position_pt; leaving the logical 50.05pt
+      // width unquantized makes every continuation page disagree with its
+      // otherwise-correct drawing anchor by one device dot per preceding
+      // column.
+      units::quantize_points_to_office_print_grid(OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT)
     } else if metrics.legacy_mac_excel12_verdana10_grid {
       // ECMA-376 Part 1 §18.3.1.81 defines baseColWidth through the Normal
       // font's maximum digit width plus five screen pixels. Excel 12 for Mac
@@ -1220,11 +1389,17 @@ impl SheetMetrics {
     } else {
       raw_digit_width_pt
     };
-    let default_digit_width_pt = if styles.uses_application_default_minor_theme() {
+    let default_digit_width_pt = if styles.column_width_uses_application_default_minor_theme() {
       quantize_digit_width_to_screen_pixel(measured_digit_width_pt(
         &styles.default_font_text_style(),
       ))
     } else {
+      // A missing theme part does not replace an explicit Normal-font
+      // snapshot.  ECMA-376 18.3.1.13 defines both authored and default
+      // column widths through that Normal font's maximum digit width; POI's
+      // XSSFSheet contract and LibreOffice UnitConverter::finalizeImport keep
+      // the same owner.  A missing or theme-backed Normal font uses the
+      // installed application theme metric when theme1.xml is absent.
       digit_width_pt
     };
     let legacy_mac_excel12_verdana10_grid = producer.macintosh_excel
@@ -1260,6 +1435,18 @@ impl SheetMetrics {
         });
     }
     format.mso_document = mso_document;
+    let legacy_excel12_calibri_fixed_output_grid = mso_document
+      && producer.excel_major_version == Some(12)
+      && styles.normal_style_uses_calibri_11_minor_theme()
+      && format.base_column_width.is_none()
+      && format.default_column_width.is_none()
+      && !format.custom_height
+      && format.dy_descent_pt.is_none()
+      && (format.default_row_height - 15.0).abs() <= f64::EPSILON
+      && worksheet
+        .columns
+        .iter()
+        .all(|columns| columns.column.is_empty());
     format.recalculate_uncalibrated_letter_rows =
       worksheet.page_setup.as_ref().is_some_and(|setup| {
         setup.id.is_none()
@@ -1268,7 +1455,15 @@ impl SheetMetrics {
     format.recalculate_explicit_font_rows =
       libreoffice_arial10_1161_printer_grid || producer.excel_online && !format.custom_height;
     if !format.custom_height {
-      format.default_row_height = if styles.default_font_uses_theme() {
+      format.default_row_height = if legacy_excel12_calibri_fixed_output_grid {
+        OFFICE_EXCEL12_CALIBRI_11_AUTOMATIC_ROW_HEIGHT_PT
+      } else if excel16_calibri_half_pixel_descent_row_profile(
+        producer,
+        styles.normal_style_uses_calibri_11_minor_theme(),
+        &format,
+      ) {
+        OFFICE_EXCEL16_CALIBRI_11_HALF_PIXEL_DESCENT_ROW_HEIGHT_PT
+      } else if styles.default_font_uses_theme() {
         automatic_default_row_height_pt(styles, format.dy_descent_pt)
       } else if mso_document
         && producer
@@ -1321,7 +1516,9 @@ impl SheetMetrics {
         && producer
           .lowest_edited_version
           .is_some_and(|version| version < 7),
+      legacy_excel12_calibri_fixed_output_grid,
       legacy_mac_excel12_verdana10_grid,
+      legacy_excel12_vml_control_snapshot_grid: false,
       columns: worksheet
         .columns
         .iter()
@@ -1383,6 +1580,58 @@ impl SheetMetrics {
         .map_or(0, |scenarios| scenarios.scenario.len()),
     }
   }
+}
+
+fn legacy_excel12_calibri_marker_x_pt(column: i32, column_offset_emu: i64) -> f32 {
+  let column = u32::try_from(column).unwrap_or(0);
+  let printer_column_width_pt =
+    units::quantize_points_to_office_print_grid(OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT);
+  let screen_pixels = column_offset_emu.max(0) as f64 / ooxmlsdk::units::EMUS_PER_CSS_PIXEL as f64;
+  let offset_pt = screen_pixels * OFFICE_EXCEL12_DRAWING_HORIZONTAL_PIXEL_MM100
+    / ooxmlsdk::units::MM100_PER_MILLIMETER as f64
+    * units::POINTS_PER_INCH as f64
+    / units::MILLIMETERS_PER_INCH as f64;
+  let printer_offset_pt =
+    (offset_pt * units::OFFICE_FIXED_OUTPUT_DPI as f64 / units::POINTS_PER_INCH as f64).floor()
+      * units::POINTS_PER_INCH as f64
+      / units::OFFICE_FIXED_OUTPUT_DPI as f64;
+  column as f32 * printer_column_width_pt + printer_offset_pt as f32
+}
+
+fn excel16_calibri_half_pixel_descent_row_profile(
+  producer: SpreadsheetProducerProfile,
+  calibri_11_minor_theme: bool,
+  format: &SheetFormatModel,
+) -> bool {
+  producer.mso_document
+    && producer
+      .excel_major_version
+      .is_some_and(|version| version >= 16)
+    && calibri_11_minor_theme
+    && !format.custom_height
+    && format
+      .dy_descent_pt
+      .is_some_and(|value| (value - 0.55).abs() <= 1.0e-6)
+}
+
+fn legacy_excel12_vml_control_snapshot_grid(
+  producer: SpreadsheetProducerProfile,
+  has_legacy_form_controls: bool,
+  has_modern_control_anchors: bool,
+) -> bool {
+  // Excel 14+ writes an explicit controlPr/xdr anchor whose EMU offsets keep
+  // the 96dpi worksheet-pixel contract. Excel 12 VML-only Forms controls do
+  // not have that second geometry owner. Office 16 fixed output rasterizes
+  // those legacy control hosts on the same 200dpi grid as their snapshots;
+  // tdf111980 independently exposes the conversion on both horizontal pages
+  // and on its ActiveX Pict fallbacks. Keep the profile structural and
+  // producer-scoped so modern checkbox/radio controlPr packages stay on EMU.
+  producer.mso_document
+    && producer
+      .excel_major_version
+      .is_some_and(|version| version <= 12)
+    && has_legacy_form_controls
+    && !has_modern_control_anchors
 }
 
 impl SheetFormatModel {
@@ -1488,6 +1737,13 @@ impl SheetResourceCatalog {
     part: &WorksheetPart,
     context: WorksheetResourceImportContext<'_>,
   ) -> Result<Self> {
+    let printer_settings = part
+      .spreadsheet_printer_settings_parts(package)
+      .find_map(|part| {
+        part
+          .data(package)
+          .and_then(WindowsPrinterSettings::from_bytes)
+      });
     let drawings = part
       .drawings_part(package)
       .map(|drawing| {
@@ -1530,6 +1786,7 @@ impl SheetResourceCatalog {
     Ok(Self {
       drawings,
       object_resources,
+      printer_settings,
       comments,
       tables,
       pivot_tables,
@@ -1543,6 +1800,13 @@ impl SheetResourceCatalog {
     part: &ChartsheetPart,
     styles: &StylesCatalog,
   ) -> Result<Self> {
+    let printer_settings = part
+      .spreadsheet_printer_settings_parts(package)
+      .find_map(|part| {
+        part
+          .data(package)
+          .and_then(WindowsPrinterSettings::from_bytes)
+      });
     let drawings = part
       .drawings_part(package)
       .map(|drawing| {
@@ -1554,6 +1818,7 @@ impl SheetResourceCatalog {
     Ok(Self {
       drawings,
       object_resources: WorksheetObjectResourceCatalog::from_chartsheet_part(package, part),
+      printer_settings,
       ..Self::default()
     })
   }
@@ -1955,6 +2220,38 @@ mod tests {
   }
 
   #[test]
+  fn excel14_worksheet_extension_recovers_only_missing_producer_metadata() {
+    let unknown = SpreadsheetProducerProfile::default();
+    assert!(should_infer_excel14_worksheet_profile(unknown, true, true));
+    assert!(!should_infer_excel14_worksheet_profile(
+      unknown, false, true
+    ));
+    assert!(!should_infer_excel14_worksheet_profile(
+      unknown, true, false
+    ));
+
+    let declared_excel = SpreadsheetProducerProfile {
+      mso_document: true,
+      excel_major_version: Some(16),
+      ..unknown
+    };
+    assert!(!should_infer_excel14_worksheet_profile(
+      declared_excel,
+      true,
+      true
+    ));
+    let declared_libreoffice = SpreadsheetProducerProfile {
+      libreoffice_document: true,
+      ..unknown
+    };
+    assert!(!should_infer_excel14_worksheet_profile(
+      declared_libreoffice,
+      true,
+      true
+    ));
+  }
+
+  #[test]
   fn automatic_wrapped_row_uses_one_default_height_per_explicit_line() {
     let metrics = SheetMetrics::default();
     let mut row = empty_row(Some(2));
@@ -1977,6 +2274,81 @@ mod tests {
     };
 
     assert_eq!(format.default_column_width_points(6.0), 54.35);
+  }
+
+  #[test]
+  fn excel12_calibri_drawing_markers_use_the_horizontal_fixed_output_grid() {
+    let px = ooxmlsdk::units::EMUS_PER_CSS_PIXEL;
+    let cases = [
+      (3, 0, 150.12),
+      (4, 9 * px, 206.76),
+      (8, 31 * px, 423.12),
+      (0, 15 * px, 11.04),
+      (3, 59 * px, 193.56),
+      (8, 25 * px, 418.68),
+      (8, 26 * px, 419.40),
+    ];
+
+    for (column, offset_emu, expected) in cases {
+      let actual = legacy_excel12_calibri_marker_x_pt(column, offset_emu);
+      assert!(
+        (actual - expected).abs() <= 1.0e-4,
+        "column={column} offset={offset_emu}: expected {expected}, got {actual}"
+      );
+    }
+    let mut metrics = SheetMetrics::default();
+    metrics.format.mso_document = true;
+    metrics.legacy_excel12_calibri_fixed_output_grid = true;
+    let geometry = SheetGeometry::new(&metrics, &[], None, None);
+    assert_eq!(geometry.column_width_pt(1), 50.04);
+    assert_eq!(OFFICE_EXCEL12_CALIBRI_11_AUTOMATIC_ROW_HEIGHT_PT, 13.56);
+  }
+
+  #[test]
+  fn excel12_vml_only_forms_use_the_legacy_snapshot_anchor_grid() {
+    let excel12 = SpreadsheetProducerProfile {
+      mso_document: true,
+      excel_major_version: Some(12),
+      ..SpreadsheetProducerProfile::default()
+    };
+    assert!(legacy_excel12_vml_control_snapshot_grid(
+      excel12, true, false
+    ));
+    assert!(!legacy_excel12_vml_control_snapshot_grid(
+      excel12, true, true
+    ));
+
+    let excel15 = SpreadsheetProducerProfile {
+      excel_major_version: Some(15),
+      ..excel12
+    };
+    assert!(!legacy_excel12_vml_control_snapshot_grid(
+      excel15, true, false
+    ));
+    assert!(!legacy_excel12_vml_control_snapshot_grid(
+      excel12, false, false
+    ));
+  }
+
+  #[test]
+  fn excel12_vml_only_forms_keep_the_legacy_implicit_column_grid() {
+    let mut metrics = SheetMetrics::default();
+    metrics.format.mso_document = true;
+    metrics.legacy_excel12_vml_control_snapshot_grid = true;
+
+    let geometry = SheetGeometry::new(&metrics, &[], None, None);
+
+    assert_eq!(
+      geometry.column_width_pt(1),
+      OFFICE_EXCEL12_VML_FORMS_IMPLICIT_COLUMN_WIDTH_PT
+    );
+
+    metrics.format.default_column_width = Some(9.0);
+    let authored = SheetGeometry::new(&metrics, &[], None, None);
+    assert_ne!(
+      authored.column_width_pt(1),
+      OFFICE_EXCEL12_VML_FORMS_IMPLICIT_COLUMN_WIDTH_PT
+    );
   }
 
   #[test]
@@ -2139,5 +2511,40 @@ mod tests {
     metrics.format.custom_height = true;
     apply_excel16_quarter_descent_row_printer_grid(&mut metrics, false);
     assert!((metrics.format.default_row_height - 12.36).abs() <= 1.0e-6);
+  }
+
+  #[test]
+  fn excel16_half_pixel_descent_profile_excludes_excel14_and_quarter_descent() {
+    let excel16 = SpreadsheetProducerProfile {
+      mso_document: true,
+      excel_major_version: Some(16),
+      ..SpreadsheetProducerProfile::default()
+    };
+    let mut format = SheetFormatModel {
+      dy_descent_pt: Some(0.55),
+      ..SheetFormatModel::default()
+    };
+
+    assert!(excel16_calibri_half_pixel_descent_row_profile(
+      excel16, true, &format
+    ));
+    assert!(!excel16_calibri_half_pixel_descent_row_profile(
+      SpreadsheetProducerProfile {
+        excel_major_version: Some(14),
+        ..excel16
+      },
+      true,
+      &format
+    ));
+
+    format.dy_descent_pt = Some(0.25);
+    assert!(!excel16_calibri_half_pixel_descent_row_profile(
+      excel16, true, &format
+    ));
+    format.dy_descent_pt = Some(0.55);
+    format.custom_height = true;
+    assert!(!excel16_calibri_half_pixel_descent_row_profile(
+      excel16, true, &format
+    ));
   }
 }

@@ -1,6 +1,7 @@
 pub use emfsdk::render::{
-  DecodedMetafile, MetafileBitmapLayer, MetafilePhysicalSize, MetafileSolidRect, RenderOptions,
-  WmfExternalHeader,
+  DecodedMetafile, MetafileBitmapLayer, MetafilePhysicalSize, MetafileSolidRect,
+  MetafileVectorFill, MetafileVectorFillRule, MetafileVectorPoint, MetafileVectorScene,
+  RenderOptions, WmfExternalHeader,
 };
 
 #[derive(Clone, Debug)]
@@ -29,6 +30,22 @@ pub fn decode_metafile_as_raster_with_options(
   options: RenderOptions,
 ) -> Result<Option<DecodedMetafile>, String> {
   emfsdk::render::decode_metafile_as_raster_with_options(data, content_type, options)
+    .map_err(|err| err.to_string())
+}
+
+pub fn extract_metafile_vector_scene(
+  data: &[u8],
+  content_type: Option<&str>,
+) -> Result<Option<MetafileVectorScene>, String> {
+  emfsdk::render::extract_metafile_vector_scene(data, content_type).map_err(|err| err.to_string())
+}
+
+pub fn extract_metafile_vector_scene_with_options(
+  data: &[u8],
+  content_type: Option<&str>,
+  options: RenderOptions,
+) -> Result<Option<MetafileVectorScene>, String> {
+  emfsdk::render::extract_metafile_vector_scene_with_options(data, content_type, options)
     .map_err(|err| err.to_string())
 }
 

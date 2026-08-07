@@ -117,7 +117,9 @@ pub(crate) enum GlowBlurKernel {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ShadowBlurKernel {
-  Stack,
+  /// DrawingML shape shadows historically match Office through a Gaussian
+  /// whose variance is equivalent to the authored Stack Blur radius.
+  GaussianEquivalent,
   StackTwice,
 }
 
@@ -1025,7 +1027,7 @@ fn outer_shadow(
       .unwrap_or_default(),
     raster_length_scale: 1.0,
     bounds_radius_scale: 1.0,
-    blur_kernel: ShadowBlurKernel::Stack,
+    blur_kernel: ShadowBlurKernel::GaussianEquivalent,
     direction_degrees: effect.direction.unwrap_or_default() as f32 / 60_000.0,
     transform: ImageEffectTransform {
       scale_x: effect
@@ -1132,7 +1134,7 @@ fn preset_shadow(
     distance_px,
     raster_length_scale: 1.0,
     bounds_radius_scale: 1.0,
-    blur_kernel: ShadowBlurKernel::Stack,
+    blur_kernel: ShadowBlurKernel::GaussianEquivalent,
     direction_degrees,
     transform,
     alignment,
@@ -3372,7 +3374,10 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
   });
   let alpha = if blur_radius_px > f32::EPSILON {
     match blur_kernel {
-      ShadowBlurKernel::Stack | ShadowBlurKernel::StackTwice => {
+      ShadowBlurKernel::GaussianEquivalent => {
+        image::imageops::blur(&alpha, stack_blur_equivalent_sigma(blur_radius_px))
+      }
+      ShadowBlurKernel::StackTwice => {
         let mut alpha = alpha;
         let width = alpha.width() as usize;
         let height = alpha.height() as usize;
@@ -3384,18 +3389,16 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
           height,
           blur_radius_px.ceil() as usize,
         );
-        if blur_kernel == ShadowBlurKernel::StackTwice {
-          // Office's balanced text-shadow edge is the convolution of two
-          // finite Stack passes. This retains bounded support while adding
-          // the second layer of variance visible in both isolated W14
-          // shadows and glow-fed shadows.
-          stack_blur_alpha(
-            alpha.as_mut(),
-            width,
-            height,
-            blur_radius_px.ceil() as usize,
-          );
-        }
+        // Office's balanced text-shadow edge is the convolution of two
+        // finite Stack passes. This retains bounded support while adding the
+        // second layer of variance visible in both isolated W14 shadows and
+        // glow-fed shadows.
+        stack_blur_alpha(
+          alpha.as_mut(),
+          width,
+          height,
+          blur_radius_px.ceil() as usize,
+        );
         alpha
       }
     }
@@ -3410,6 +3413,13 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
       ((u16::from(alpha.get_pixel(x, y).0[0]) * u16::from(color.alpha) + 127) / 255) as u8,
     ])
   })
+}
+
+/// Converts the authored Stack Blur radius to the Gaussian standard deviation
+/// used by the established DrawingML shape-shadow path. A triangular kernel
+/// has variance `radius * (radius + 2) / 6`.
+fn stack_blur_equivalent_sigma(radius_px: f32) -> f32 {
+  (radius_px * (radius_px + 2.0) / 6.0).sqrt()
 }
 
 fn reflection_image(
@@ -3748,14 +3758,14 @@ mod tests {
     ImageEffectContainer, ImageEffectContainerKind, ImageEffectFill, ImageEffectGradientKind,
     ImageEffectRelativeRect, ImageEffectSourceGeometry, ImageEffectSourceImages,
     ImageEffectSourceReference, ImageEffectSourceRequirements, ImageEffectTransform,
-    ImageReflectionEffect, OuterShadowOptions, PixelBounds, ResolvedEffectColor, ShadowBlurKernel,
+    ImageReflectionEffect, PixelBounds, ResolvedEffectColor, ShadowBlurKernel,
     WordprocessingTextGlow, apply_container_to_padded_image,
     apply_container_to_padded_image_with_sources,
     apply_container_to_padded_image_with_sources_and_anchor, apply_to_image,
     container_output_bounds, container_output_bounds_with_anchor,
     container_output_bounds_with_anchors, from_effect_dag, from_effect_list,
-    from_wordprocessing_text_effects, mso_brightness_contrast_component, outer_shadow_image,
-    reflection, reflection_image, rotate_container_with_shape, sample_fill, source_requirements,
+    from_wordprocessing_text_effects, mso_brightness_contrast_component, reflection,
+    reflection_image, rotate_container_with_shape, sample_fill, source_requirements,
     suppress_soft_edge, unchanged_foreground_backdrop, wordprocessing_reflection_canvas_bounds,
   };
   use crate::model::RgbColor;
@@ -3774,7 +3784,7 @@ mod tests {
           distance_px: 2.0,
           raster_length_scale: 1.0,
           bounds_radius_scale: 1.0,
-          blur_kernel: ShadowBlurKernel::Stack,
+          blur_kernel: ShadowBlurKernel::GaussianEquivalent,
           direction_degrees: 0.0,
           transform: ImageEffectTransform {
             scale_x: 1.0,
@@ -3958,45 +3968,18 @@ mod tests {
   }
 
   #[test]
-  fn outer_shadow_stack_blur_uses_the_finite_triangular_kernel() {
-    let mut source = RgbaImage::from_pixel(11, 11, Rgba([0; 4]));
-    source.get_pixel_mut(5, 5).0[3] = 255;
-    let shadow = outer_shadow_image(
-      &source,
-      OuterShadowOptions {
-        blur_radius_px: 2.0,
-        blur_kernel: ShadowBlurKernel::Stack,
-        distance_px: 0.0,
-        direction_degrees: 0.0,
-        transform: ImageEffectTransform {
-          scale_x: 1.0,
-          scale_y: 1.0,
-          skew_x: 0.0,
-          skew_y: 0.0,
-          shift_x_px: 0.0,
-          shift_y_px: 0.0,
-        },
-        alignment: (0.5, 0.5),
-        color: ResolvedEffectColor {
-          color: RgbColor { r: 1, g: 2, b: 3 },
-          alpha: 255,
-        },
-        anchor_bounds: PixelBounds {
-          left: 0.0,
-          top: 0.0,
-          right: 11.0,
-          bottom: 11.0,
-        },
-      },
-    );
+  fn stack_blur_alpha_uses_the_finite_triangular_kernel() {
+    let mut alpha = vec![0; 11 * 11];
+    alpha[5 * 11 + 5] = 255;
+    super::stack_blur_alpha(&mut alpha, 11, 11, 2);
 
     // A radius-two Stack Blur is the separable [1, 2, 3, 2, 1] / 9
     // triangle. Unlike a Gaussian approximation, it is exactly zero beyond
     // two pixels from this impulse.
-    assert_eq!(shadow.get_pixel(5, 5).0, [1, 2, 3, 28]);
-    assert_eq!(shadow.get_pixel(6, 5).0[3], 18);
-    assert_eq!(shadow.get_pixel(7, 5).0[3], 9);
-    assert_eq!(shadow.get_pixel(8, 5).0[3], 0);
+    assert_eq!(alpha[5 * 11 + 5], 28);
+    assert_eq!(alpha[5 * 11 + 6], 18);
+    assert_eq!(alpha[5 * 11 + 7], 9);
+    assert_eq!(alpha[5 * 11 + 8], 0);
   }
 
   #[test]
@@ -4034,7 +4017,7 @@ mod tests {
         distance_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::Stack,
+        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,
@@ -4399,7 +4382,7 @@ mod tests {
         distance_px: 2.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::Stack,
+        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,
@@ -4753,7 +4736,7 @@ mod tests {
         distance_px: 1.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::Stack,
+        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 2.0,
@@ -4812,7 +4795,7 @@ mod tests {
         distance_px: 3.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::Stack,
+        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,
@@ -4849,7 +4832,7 @@ mod tests {
         distance_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::Stack,
+        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,

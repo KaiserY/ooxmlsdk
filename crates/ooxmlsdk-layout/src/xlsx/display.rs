@@ -45,6 +45,14 @@ const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 // side plus one gridline pixel. Use the two 96dpi pixels as the text inset;
 // this is distinct from Calc's 20-twip SvxMarginItem implementation detail.
 const XLSX_CELL_TEXT_INSET_PT: f32 = 2.0 * crate::units::POINTS_PER_CSS_PIXEL;
+// When a printable VML preview starts exactly on a horizontal page boundary,
+// Excel fixed output keeps a tagged text operator for the first scan-context
+// cell after that boundary when the operator starts at the normal cell-text
+// inset. The page clip still hides all of its ink. Allow one 600dpi device
+// pixel beyond that inset for fixed-output edge rounding; text placed farther
+// inside the following column belongs only to its own page.
+const XLSX_SCAN_CONTEXT_TEXT_EDGE_SLACK_PT: f32 =
+  XLSX_CELL_TEXT_INSET_PT + crate::units::POINTS_PER_INCH / crate::units::OFFICE_FIXED_OUTPUT_DPI;
 const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
 // Excel emits an authored DrawingML `a:ln w="0"` as a printable hairline
 // rather than suppressing the line. The Office reference PDF records that
@@ -255,16 +263,18 @@ fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
     PageItem::Image(item) => common::DisplayItem::Image(common_image_item(item)),
     PageItem::Group {
       mask,
+      clip,
       transform,
       blend_mode,
       opacity,
       items,
     } => common::DisplayItem::Group(common::CompositingGroup {
       mask: mask.map(common_image_item),
+      clip,
       transform,
       blend_mode,
       opacity,
-      flatten_identity: false,
+      flatten_identity: clip.is_some(),
       inherit_text_line_owner: true,
       items: items.into_iter().map(common_display_item).collect(),
     }),
@@ -520,46 +530,60 @@ fn print_page_items(
     }
   }
 
-  items.extend(print_page_image_items(
-    import,
-    page,
-    body_origin_x + repeat_width,
-    body_origin_y + repeat_height,
-    zoom_scale,
-  ));
-  items.extend(print_page_shape_items(
-    import,
-    page,
-    body_origin_x + repeat_width,
-    body_origin_y + repeat_height,
-    zoom_scale,
-  ));
-  items.extend(print_page_diagram_items(
-    page,
-    body_origin_x + repeat_width,
-    body_origin_y + repeat_height,
-    zoom_scale,
-  ));
-  items.extend(print_page_drawing_text_items(
+  if let Some(area) = repeat_corner_for_page(page) {
+    push_print_drawing_area(
+      &mut items,
+      import,
+      page,
+      setup,
+      DrawingAreaRenderLayout {
+        area: Some(area),
+        origin_x_pt: body_origin_x,
+        origin_y_pt: body_origin_y,
+        zoom_scale,
+      },
+    );
+  }
+  if let Some(area) = repeat_columns_for_page(page) {
+    push_print_drawing_area(
+      &mut items,
+      import,
+      page,
+      setup,
+      DrawingAreaRenderLayout {
+        area: Some(area),
+        origin_x_pt: body_origin_x,
+        origin_y_pt: body_origin_y + repeat_height,
+        zoom_scale,
+      },
+    );
+  }
+  if let Some(area) = repeat_rows_for_page(page) {
+    push_print_drawing_area(
+      &mut items,
+      import,
+      page,
+      setup,
+      DrawingAreaRenderLayout {
+        area: Some(area),
+        origin_x_pt: body_origin_x + repeat_width,
+        origin_y_pt: body_origin_y,
+        zoom_scale,
+      },
+    );
+  }
+  push_print_drawing_area(
+    &mut items,
     import,
     page,
     setup,
-    body_origin_x + repeat_width,
-    body_origin_y + repeat_height,
-    zoom_scale,
-  ));
-  items.extend(print_page_vml_shape_items(
-    page,
-    body_origin_x + repeat_width,
-    body_origin_y + repeat_height,
-    zoom_scale,
-  ));
-  items.extend(print_page_vml_text_items(
-    page,
-    body_origin_x + repeat_width,
-    body_origin_y + repeat_height,
-    zoom_scale,
-  ));
+    DrawingAreaRenderLayout {
+      area: page.area,
+      origin_x_pt: body_origin_x + repeat_width,
+      origin_y_pt: body_origin_y + repeat_height,
+      zoom_scale,
+    },
+  );
   render_header_or_footer(
     &mut items,
     page,
@@ -571,14 +595,83 @@ fn print_page_items(
   items
 }
 
-fn print_page_vml_shape_items(
-  page: &CalcPrintPage<'_>,
+#[derive(Clone, Copy, Debug)]
+struct DrawingAreaRenderLayout {
+  area: Option<CellRange>,
   origin_x_pt: f32,
   origin_y_pt: f32,
   zoom_scale: f32,
+}
+
+impl DrawingAreaRenderLayout {
+  fn page_transform(self, page: &CalcPrintPage<'_>) -> SheetPageTransform {
+    let source = self
+      .area
+      .map(|area| page.sheet.range_rect(area))
+      .unwrap_or_default();
+    SheetPageTransform::new(self.origin_x_pt, self.origin_y_pt, self.zoom_scale, source)
+  }
+
+  fn clip_rect(self, page: &CalcPrintPage<'_>, setup: PageSetup) -> CellRect {
+    self.area.map_or(
+      CellRect {
+        x_pt: setup.margin_left_pt,
+        y_pt: setup.margin_top_pt,
+        width_pt: (setup.width_pt - setup.margin_left_pt - setup.margin_right_pt).max(0.0),
+        height_pt: (setup.height_pt - setup.margin_top_pt - setup.margin_bottom_pt).max(0.0),
+      },
+      |area| {
+        let source = page.sheet.range_rect(area);
+        self.page_transform(page).rect(source)
+      },
+    )
+  }
+}
+
+fn push_print_drawing_area(
+  items: &mut Vec<PageItem>,
+  import: &ExcelImport,
+  page: &CalcPrintPage<'_>,
+  setup: PageSetup,
+  layout: DrawingAreaRenderLayout,
+) {
+  let mut drawing_items = print_page_image_items(import, page, layout);
+  drawing_items.extend(print_page_shape_items(import, page, layout));
+  drawing_items.extend(print_page_diagram_items(page, layout));
+  drawing_items.extend(print_page_drawing_text_items(import, page, setup, layout));
+  drawing_items.extend(print_page_vml_shape_items(page, layout));
+  drawing_items.extend(print_page_vml_text_items(page, layout));
+  if drawing_items.is_empty() {
+    return;
+  }
+
+  // Calc invokes PrintArea independently for the repeated corner, title
+  // columns, title rows, and main body. PrePrintDrawingLayer derives both its
+  // map offset and paint region from that exact cell area, so each drawing
+  // pass has parent-space clipping distinct from the printable page margins.
+  // Header/footer paint remains outside these groups.
+  let clip = layout.clip_rect(page, setup);
+  items.push(PageItem::Group {
+    mask: None,
+    clip: Some(common_rect(
+      clip.x_pt,
+      clip.y_pt,
+      clip.width_pt,
+      clip.height_pt,
+    )),
+    transform: None,
+    blend_mode: common::BlendMode::Normal,
+    opacity: 1.0,
+    items: drawing_items,
+  });
+}
+
+fn print_page_vml_shape_items(
+  page: &CalcPrintPage<'_>,
+  layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
+  let page_transform = layout.page_transform(page);
   for shape in page
     .sheet
     .resources
@@ -591,7 +684,7 @@ fn print_page_vml_shape_items(
       || !shape.print_object
       || shape.image_relationship_id.is_some()
       || shape.kind == super::object_resources::VmlShapeKind::Group
-      || !vml_shape_intersects_page(page, shape)
+      || !vml_shape_intersects_area(page.sheet, layout.area, shape)
     {
       continue;
     }
@@ -602,13 +695,30 @@ fn print_page_vml_shape_items(
       continue;
     }
     let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
-    if shape
-      .object_type
-      .as_deref()
-      .is_some_and(|value| value.eq_ignore_ascii_case("Checkbox"))
-    {
-      push_vml_checkbox_items(&mut items, shape, rect);
-      continue;
+    match legacy_vml_form_control_kind(shape) {
+      Some(LegacyVmlFormControlKind::Checkbox) => {
+        push_vml_checkbox_items(&mut items, shape, rect);
+        continue;
+      }
+      Some(LegacyVmlFormControlKind::OptionButton) => {
+        let rect = legacy_vml_form_control_snapshot_rect(
+          page.sheet.uses_legacy_excel12_vml_control_snapshot_grid(),
+          LegacyVmlFormControlKind::OptionButton,
+          rect,
+        );
+        push_vml_option_button_items(&mut items, shape, LegacyVmlControlHost::new(rect, 19, 15));
+        continue;
+      }
+      Some(LegacyVmlFormControlKind::GroupBox) => {
+        let rect = legacy_vml_form_control_snapshot_rect(
+          page.sheet.uses_legacy_excel12_vml_control_snapshot_grid(),
+          LegacyVmlFormControlKind::GroupBox,
+          rect,
+        );
+        push_vml_group_box_items(&mut items, shape, LegacyVmlControlHost::new(rect, 5, 5));
+        continue;
+      }
+      None => {}
     }
     if let Some(paths) = vml_shape_drawing_paths(shape, rect.width_pt, rect.height_pt) {
       let transform = vml_shape_path_transform(shape.style.as_deref(), rect);
@@ -637,6 +747,85 @@ fn print_page_vml_shape_items(
   items
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LegacyVmlFormControlKind {
+  Checkbox,
+  OptionButton,
+  GroupBox,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LegacyVmlControlHost {
+  rect: CellRect,
+  width_px: u32,
+  height_px: u32,
+}
+
+impl LegacyVmlControlHost {
+  fn new(rect: CellRect, minimum_width_px: u32, minimum_height_px: u32) -> Self {
+    Self {
+      rect,
+      width_px: vml_control_snapshot_pixels(rect.width_pt, minimum_width_px),
+      height_px: vml_control_snapshot_pixels(rect.height_pt, minimum_height_px),
+    }
+  }
+
+  fn sample_point_pt(self, x: f32, y: f32) -> (f32, f32) {
+    (
+      x * self.rect.width_pt / self.width_px as f32,
+      y * self.rect.height_pt / self.height_px as f32,
+    )
+  }
+}
+
+fn legacy_vml_form_control_kind(
+  shape: &super::object_resources::VmlShapeModel,
+) -> Option<LegacyVmlFormControlKind> {
+  let object_type = shape.object_type.as_deref()?;
+  if object_type.eq_ignore_ascii_case("Checkbox") {
+    Some(LegacyVmlFormControlKind::Checkbox)
+  } else if object_type.eq_ignore_ascii_case("Radio") {
+    Some(LegacyVmlFormControlKind::OptionButton)
+  } else if object_type.eq_ignore_ascii_case("GBox") {
+    Some(LegacyVmlFormControlKind::GroupBox)
+  } else {
+    None
+  }
+}
+
+fn legacy_vml_form_control_snapshot_rect(
+  uses_legacy_snapshot_grid: bool,
+  kind: LegacyVmlFormControlKind,
+  rect: CellRect,
+) -> CellRect {
+  if !uses_legacy_snapshot_grid {
+    return rect;
+  }
+
+  // Excel 12 first maps the VML host into its native Forms window and then
+  // records that window on the 600dpi fixed-output device. Vertical edges
+  // enclose the anchor (floor top, ceil bottom). Horizontally the native
+  // OptionButton content origin advances two device dots, while the Frame
+  // edge advances one. These are host-window alignment rules; the transparent
+  // bitmap dimensions still come from the untrimmed anchor width.
+  let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let floor_to_device = |value: f32| ((value / printer_dot_pt) + 1.0e-3).floor() * printer_dot_pt;
+  let ceil_to_device = |value: f32| ((value / printer_dot_pt) - 1.0e-3).ceil() * printer_dot_pt;
+  let x_inset_dots = match kind {
+    LegacyVmlFormControlKind::OptionButton => 2.0,
+    LegacyVmlFormControlKind::GroupBox => 1.0,
+    LegacyVmlFormControlKind::Checkbox => 0.0,
+  };
+  let y_pt = floor_to_device(rect.y_pt);
+  let bottom_pt = ceil_to_device(rect.y_pt + rect.height_pt);
+  CellRect {
+    x_pt: floor_to_device(rect.x_pt) + x_inset_dots * printer_dot_pt,
+    y_pt,
+    width_pt: rect.width_pt,
+    height_pt: (bottom_pt - y_pt).max(0.0),
+  }
+}
+
 fn push_vml_checkbox_items(
   items: &mut Vec<PageItem>,
   shape: &super::object_resources::VmlShapeModel,
@@ -657,11 +846,16 @@ fn push_vml_checkbox_items(
     return;
   };
   let image_rect = vml_checkbox_image_rect(rect, compact_indicator_only);
+  push_vml_control_snapshot_image(items, image_rect, data);
+  push_vml_checkable_control_text_item(items, shape, rect, false);
+}
+
+fn push_vml_control_snapshot_image(items: &mut Vec<PageItem>, rect: CellRect, data: Arc<[u8]>) {
   items.push(PageItem::Image(ImageItem {
-    x_pt: image_rect.x_pt,
-    y_pt: image_rect.y_pt,
-    width_pt: image_rect.width_pt,
-    height_pt: image_rect.height_pt,
+    x_pt: rect.x_pt,
+    y_pt: rect.y_pt,
+    width_pt: rect.width_pt,
+    height_pt: rect.height_pt,
     crop: ImageCrop::default(),
     clip_path: Vec::new(),
     rotation_deg: 0.0,
@@ -678,7 +872,251 @@ fn push_vml_checkbox_items(
     floating: false,
     behind_text: false,
   }));
-  push_vml_checkbox_text_item(items, shape, rect);
+}
+
+fn push_vml_option_button_items(
+  items: &mut Vec<PageItem>,
+  shape: &super::object_resources::VmlShapeModel,
+  host: LegacyVmlControlHost,
+) {
+  // MS-OFORMS models an OptionButton as a checkable MorphData control, and
+  // Office fixed output materializes the legacy Forms host as a transparent
+  // 200ppi snapshot plus a semantic caption. Keeping those two layers
+  // separate matches the existing Checkbox contract and, unlike the generic
+  // VML shapetype, preserves both the indicator and searchable text.
+  if let Some(data) =
+    vml_option_button_snapshot_png(host, shape.checked.unwrap_or(0), shape.disable_3d)
+  {
+    push_vml_control_snapshot_image(items, host.rect, data);
+  }
+  push_vml_checkable_control_text_item(items, shape, host.rect, true);
+}
+
+fn push_vml_group_box_items(
+  items: &mut Vec<PageItem>,
+  shape: &super::object_resources::VmlShapeModel,
+  host: LegacyVmlControlHost,
+) {
+  let mut style = vml_shape_text_style(shape, 10.0);
+  let mut text_metrics = TextMetrics::new();
+  apply_legacy_vml_gdi_text_metrics(&mut text_metrics, &shape.text, &mut style);
+  let caption_width_pt = style
+    .semantic_character_advances_pt
+    .as_deref()
+    .map(|advances| advances.iter().sum())
+    .unwrap_or_else(|| text_metrics.measure_text(&shape.text, &style));
+  if let Some(data) = vml_group_box_snapshot_png(host, caption_width_pt, shape.disable_3d) {
+    push_vml_control_snapshot_image(items, host.rect, data);
+  }
+  push_vml_group_box_text_item(items, shape, host.rect, style);
+}
+
+fn push_vml_group_box_text_item(
+  items: &mut Vec<PageItem>,
+  shape: &super::object_resources::VmlShapeModel,
+  rect: CellRect,
+  style: TextStyle,
+) {
+  if shape.text.trim().is_empty() {
+    return;
+  }
+  let line_height = TextMetrics::new()
+    .vertical_metrics_for_text(&shape.text, &style)
+    .line_height_pt()
+    .max(1.0);
+  let leading_inset = vml_checkable_control_caption_inset_pt();
+  // A Frame caption straddles the top border. LibreOffice's Excel importer
+  // documents the same ownership by moving the GroupBox top up by half the
+  // font height before creating the native control. The regular drawing-text
+  // inset then places the glyph box on the Office fixed-output baseline.
+  let text_top = rect.y_pt - line_height / 2.0 + XLSX_CELL_TEXT_INSET_PT;
+  items.push(PageItem::Text(TextItem {
+    x_pt: rect.x_pt + leading_inset,
+    y_pt: text_top,
+    line_height_pt: line_height,
+    paint_clip: None,
+    discard_if_horizontally_clipped: false,
+    text: shape.text.clone(),
+    style,
+    rotation_center_pt: None,
+    hyperlink_url: None,
+    form_widget_id: None,
+    paragraph_bidi: false,
+    preserve_text_portion: false,
+    pdf_text_segmentation: PdfTextSegmentation::Line,
+    source_path: Vec::new(),
+  }));
+}
+
+fn vml_option_button_snapshot_png(
+  host: LegacyVmlControlHost,
+  checked: i64,
+  flat: bool,
+) -> Option<Arc<[u8]>> {
+  let mut image = image::RgbaImage::new(host.width_px, host.height_px);
+  draw_vml_option_button_indicator(&mut image, host, checked, flat);
+  encode_vml_control_snapshot_png(image)
+}
+
+fn draw_vml_option_button_indicator(
+  image: &mut image::RgbaImage,
+  host: LegacyVmlControlHost,
+  checked: i64,
+  flat: bool,
+) {
+  const SAMPLES: u32 = 8;
+  // Windows paints the real radio with a hinted Marlett glyph. Its half-open
+  // GDI footprint occupies the fourteen source samples x=5..18: a 13.5px
+  // physical contour centered at x=12. This phase is stable across controls
+  // with different host widths and heights, unlike a centered vector ellipse.
+  const INDICATOR_CENTER_X_PX: f32 = 12.0;
+  const OUTER_RADIUS_PX: f32 = 6.75;
+  // Wine's geometric fallback uses a 10/16 inner ellipse, but explicitly
+  // records that Windows paints the real control with the hinted Marlett
+  // TrueType glyph. Across the unchecked Office snapshots that glyph leaves
+  // an eleven-sample white window inside the same fourteen-sample exterior.
+  const INNER_RADIUS_PX: f32 = 5.5;
+  // MSForms' flat checked glyph fills the inner window more than the classic
+  // user32 radio dot; the Office snapshot exposes an eight-pixel diameter.
+  const DOT_RADIUS_PX: f32 = 4.0;
+  let raster_pixel_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_RASTER_DPI;
+  let center_x_pt = INDICATOR_CENTER_X_PX * raster_pixel_pt;
+  let center_y_pt = host.rect.height_pt / 2.0;
+  let outer_radius_pt = OUTER_RADIUS_PX * raster_pixel_pt;
+  let inner_radius_pt = INNER_RADIUS_PX * raster_pixel_pt;
+  let dot_radius_pt = DOT_RADIUS_PX * raster_pixel_pt;
+  let max_x = ((center_x_pt + outer_radius_pt) * host.width_px as f32 / host.rect.width_pt)
+    .ceil()
+    .min(host.width_px as f32) as u32;
+  let min_y = ((center_y_pt - outer_radius_pt) * host.height_px as f32 / host.rect.height_pt)
+    .floor()
+    .max(0.0) as u32;
+  let max_y = ((center_y_pt + outer_radius_pt) * host.height_px as f32 / host.rect.height_pt)
+    .ceil()
+    .min(host.height_px as f32) as u32;
+  for y in min_y..max_y {
+    for x in 0..max_x {
+      let mut alpha_samples = 0u32;
+      let mut value_samples = 0u32;
+      for sample_y in 0..SAMPLES {
+        for sample_x in 0..SAMPLES {
+          let (sample_x_pt, sample_y_pt) = host.sample_point_pt(
+            x as f32 + (sample_x as f32 + 0.5) / SAMPLES as f32,
+            y as f32 + (sample_y as f32 + 0.5) / SAMPLES as f32,
+          );
+          let dx = sample_x_pt - center_x_pt;
+          let dy = sample_y_pt - center_y_pt;
+          let distance = dx.hypot(dy);
+          if distance > outer_radius_pt {
+            continue;
+          }
+          alpha_samples += 1;
+          let value = if checked == 1 && distance <= dot_radius_pt {
+            0
+          } else if checked == 2 && distance <= dot_radius_pt {
+            0x80
+          } else if distance <= inner_radius_pt {
+            u8::MAX
+          } else if flat {
+            0
+          } else if dx + dy < 0.0 {
+            0xb0
+          } else {
+            0x40
+          };
+          value_samples += u32::from(value);
+        }
+      }
+      if alpha_samples == 0 {
+        continue;
+      }
+      let alpha = ((alpha_samples * u32::from(u8::MAX)) / (SAMPLES * SAMPLES)) as u8;
+      let value = (value_samples / alpha_samples) as u8;
+      image.put_pixel(x, y, image::Rgba([value, value, value, alpha]));
+    }
+  }
+}
+
+fn vml_group_box_snapshot_png(
+  host: LegacyVmlControlHost,
+  caption_width_pt: f32,
+  flat: bool,
+) -> Option<Arc<[u8]>> {
+  let width = host.width_px;
+  let height = host.height_px;
+  let mut image = image::RgbaImage::new(width, height);
+  let right = width.saturating_sub(1);
+  let bottom = height.saturating_sub(1);
+  let caption_x = (vml_checkable_control_caption_inset_pt() * units::OFFICE_FIXED_OUTPUT_RASTER_DPI
+    / units::POINTS_PER_INCH)
+    .round() as u32;
+  let caption_width = (caption_width_pt * units::OFFICE_FIXED_OUTPUT_RASTER_DPI
+    / units::POINTS_PER_INCH)
+    .ceil() as u32;
+  let has_caption_gap = caption_width_pt > f32::EPSILON;
+  let gap_start = caption_x.saturating_sub(12).clamp(0, right);
+  let gap_end = caption_x
+    .saturating_add(caption_width)
+    .saturating_add(12)
+    .clamp(gap_start, right);
+  if flat {
+    // Office snapshots the one-device-pixel flat Frame edge into the 200ppi
+    // host as two opaque samples and one partially covered inner sample. The
+    // soft edge is observable on every side and must remain in the bitmap;
+    // replacing it with a PDF hairline makes the frame visibly too light.
+    for (inset, alpha) in [(0, u8::MAX), (1, u8::MAX), (2, 168)] {
+      let layer_right = right.saturating_sub(inset);
+      let layer_bottom = bottom.saturating_sub(inset);
+      for x in inset..=layer_right {
+        if !has_caption_gap || x < gap_start || x > gap_end {
+          image.put_pixel(x, inset, image::Rgba([0, 0, 0, alpha]));
+        }
+        image.put_pixel(x, layer_bottom, image::Rgba([0, 0, 0, alpha]));
+      }
+      for y in inset..=layer_bottom {
+        image.put_pixel(inset, y, image::Rgba([0, 0, 0, alpha]));
+        image.put_pixel(layer_right, y, image::Rgba([0, 0, 0, alpha]));
+      }
+    }
+  } else {
+    for x in 0..=right {
+      if !has_caption_gap || x < gap_start || x > gap_end {
+        image.put_pixel(x, 0, image::Rgba([0xb0, 0xb0, 0xb0, u8::MAX]));
+      }
+      image.put_pixel(x, bottom, image::Rgba([0x40, 0x40, 0x40, u8::MAX]));
+    }
+    for y in 0..=bottom {
+      image.put_pixel(0, y, image::Rgba([0xb0, 0xb0, 0xb0, u8::MAX]));
+      image.put_pixel(right, y, image::Rgba([0x40, 0x40, 0x40, u8::MAX]));
+    }
+  }
+  encode_vml_control_snapshot_png(image)
+}
+
+fn vml_control_snapshot_pixels(length_pt: f32, minimum: u32) -> u32 {
+  // The host rectangle is emitted on Office's 600dpi PDF grid while its
+  // transparent control bitmap is allocated on a 200dpi integer grid. When
+  // the conversion lands exactly on a bitmap edge, Office retains the last
+  // in-bounds pixel rather than allocating a new transparent column/row.
+  (length_pt.mul_add(
+    units::OFFICE_FIXED_OUTPUT_RASTER_DPI / units::POINTS_PER_INCH,
+    -1.0e-4,
+  ))
+  .floor()
+  .max(minimum as f32) as u32
+}
+
+fn encode_vml_control_snapshot_png(image: image::RgbaImage) -> Option<Arc<[u8]>> {
+  let mut png = Cursor::new(Vec::new());
+  PngEncoder::new(&mut png)
+    .write_image(
+      image.as_raw(),
+      image.width(),
+      image.height(),
+      ColorType::Rgba8.into(),
+    )
+    .ok()?;
+  Some(Arc::from(png.into_inner()))
 }
 
 fn vml_checkbox_image_rect(rect: CellRect, compact_indicator_only: bool) -> CellRect {
@@ -711,44 +1149,30 @@ fn vml_checkbox_image_rect(rect: CellRect, compact_indicator_only: bool) -> Cell
   }
 }
 
-fn push_vml_checkbox_text_item(
+fn push_vml_checkable_control_text_item(
   items: &mut Vec<PageItem>,
   shape: &super::object_resources::VmlShapeModel,
   rect: CellRect,
+  legacy_gdi_host: bool,
 ) {
   if shape.text.trim().is_empty() {
     return;
   }
 
-  // VML control font sizes are twips. LibreOffice's VmlDrawing control
-  // conversion (`drawingfragment.cxx::convertControlFontData`) applies the
-  // same twips/20 conversion and uses the first textbox font for the caption.
-  let mut style = TextStyle {
-    font_family: shape
-      .text_style
-      .font_family
-      .as_deref()
-      .map(Arc::<str>::from),
-    font_size_pt: units::quantize_points_to_office_print_grid(
-      shape.text_style.font_size_twips.unwrap_or(200) as f32 / 20.0,
-    ),
-    bold: shape.text_style.bold,
-    italic: shape.text_style.italic,
-    underline: shape.text_style.underline,
-    strikethrough: shape.text_style.strikethrough,
-    use_windows_font_metrics: true,
-    ..TextStyle::default()
-  };
-  if let Some(color) = shape
-    .text_style
-    .color
-    .as_deref()
-    .and_then(crate::docx::parse_vml_color)
-  {
-    style.color = color;
+  let mut style = vml_shape_text_style(shape, 10.0);
+  let mut text_metrics = TextMetrics::new();
+  if legacy_gdi_host {
+    apply_legacy_vml_gdi_text_metrics(&mut text_metrics, &shape.text, &mut style);
   }
 
-  let line_height = (style.font_size_pt * 1.15).max(1.0);
+  let line_height = if legacy_gdi_host {
+    text_metrics
+      .vertical_metrics_for_text(&shape.text, &style)
+      .line_height_pt()
+      .max(1.0)
+  } else {
+    (style.font_size_pt * 1.15).max(1.0)
+  };
   let text_top = match shape
     .text_vertical_alignment
     .as_deref()
@@ -760,15 +1184,17 @@ fn push_vml_checkbox_text_item(
     _ => rect.y_pt,
   };
 
-  // Office's fixed output uses the native Forms checkbox content rectangle:
-  // its label begins 14 logical screen pixels from the control's leading
-  // edge. The independent checkbox fixture exposes this as 10.56pt after
-  // Excel's 600dpi print-device quantization.
-  let leading_inset =
-    units::quantize_points_to_office_print_grid(14.0 * units::POINTS_PER_CSS_PIXEL);
+  // Office's fixed output uses the native Forms checkable-control content
+  // rectangle: its label begins 14 logical screen pixels from the leading
+  // edge. Independent Checkbox and OptionButton fixtures expose the same
+  // physical caption inset after Excel's print-device quantization.
+  let leading_inset = vml_checkable_control_caption_inset_pt();
   let available_width = (rect.width_pt - leading_inset).max(0.0);
-  let mut text_metrics = TextMetrics::new();
-  let text_width = text_metrics.measure_text(&shape.text, &style);
+  let text_width = style
+    .semantic_character_advances_pt
+    .as_deref()
+    .map(|advances| advances.iter().sum())
+    .unwrap_or_else(|| text_metrics.measure_text(&shape.text, &style));
   let aligned_x = match shape
     .text_horizontal_alignment
     .as_deref()
@@ -796,6 +1222,61 @@ fn push_vml_checkbox_text_item(
     pdf_text_segmentation: PdfTextSegmentation::Line,
     source_path: Vec::new(),
   }));
+}
+
+fn vml_checkable_control_caption_inset_pt() -> f32 {
+  units::quantize_points_to_office_print_grid(14.0 * units::POINTS_PER_CSS_PIXEL)
+}
+
+fn apply_legacy_vml_gdi_text_metrics(
+  text_metrics: &mut TextMetrics,
+  text: &str,
+  style: &mut TextStyle,
+) {
+  // Classic GDI obtains each control-caption advance from the hinted device
+  // width. It does not then apply an OpenType pair adjustment to those Dx
+  // positions. In particular, Tahoma's `Fo` kern pair is absent from Office's
+  // fixed-output TJ array, while every rounded hdmx width is retained.
+  style.kerning_minimum_size_pt = Some(f32::INFINITY);
+  style.semantic_character_advances_pt =
+    text_metrics.gdi_device_character_advances_pt(text, style, units::OFFICE_FIXED_OUTPUT_DPI);
+}
+
+fn vml_shape_text_style(
+  shape: &super::object_resources::VmlShapeModel,
+  default_font_size_pt: f32,
+) -> TextStyle {
+  // VML control font sizes are twips. LibreOffice's VmlDrawing control
+  // conversion (`drawingfragment.cxx::convertControlFontData`) applies the
+  // same twips/20 conversion and uses the first textbox font for the caption.
+  let mut style = TextStyle {
+    font_family: shape
+      .text_style
+      .font_family
+      .as_deref()
+      .map(Arc::<str>::from),
+    font_size_pt: units::quantize_points_to_office_print_grid(
+      shape
+        .text_style
+        .font_size_twips
+        .map_or(default_font_size_pt, |twips| twips as f32 / 20.0),
+    ),
+    bold: shape.text_style.bold,
+    italic: shape.text_style.italic,
+    underline: shape.text_style.underline,
+    strikethrough: shape.text_style.strikethrough,
+    use_windows_font_metrics: true,
+    ..TextStyle::default()
+  };
+  if let Some(color) = shape
+    .text_style
+    .color
+    .as_deref()
+    .and_then(crate::docx::parse_vml_color)
+  {
+    style.color = color;
+  }
+  style
 }
 
 fn vml_checkbox_snapshot_png(
@@ -1869,19 +2350,6 @@ impl SheetPageTransform {
     )
   }
 
-  fn for_page(
-    page: &CalcPrintPage<'_>,
-    origin_x_pt: f32,
-    origin_y_pt: f32,
-    zoom_scale: f32,
-  ) -> Self {
-    let source = page
-      .area
-      .map(|area| page.sheet.range_rect(area))
-      .unwrap_or_default();
-    Self::new(origin_x_pt, origin_y_pt, zoom_scale, source)
-  }
-
   fn rect(self, rect: CellRect) -> CellRect {
     let bounds = common::drawingml_geometry::transform_rect_bounds(
       KurboRect::new(
@@ -1927,6 +2395,8 @@ fn render_cell_area(
     area_rect,
   );
   let page_clip_rect = page_transform.rect(area_rect);
+  let keep_following_cell_boundary_semantics =
+    page_area_has_vml_preview_on_following_column_edge(page, area);
   let occupied_cells = calc_occupied_text_cells(cells);
   for cell in cells {
     if page.sheet.is_covered_merged_cell(cell.address) {
@@ -2151,8 +2621,11 @@ fn render_cell_area(
       ];
       if scan_context_only {
         let (left, right) = text_item_horizontal_bounds(text, text_metrics);
-        let clip_right = page_clip_rect.x_pt + page_clip_rect.width_pt;
-        if left >= clip_right || right <= page_clip_rect.x_pt {
+        let intersects_paint_clip =
+          left < page_clip_rect.x_pt + page_clip_rect.width_pt && right > page_clip_rect.x_pt;
+        let retains_clipped_boundary_semantics = keep_following_cell_boundary_semantics
+          && scan_context_text_intersects_semantic_clip(left, right, page_clip_rect);
+        if !intersects_paint_clip && !retains_clipped_boundary_semantics {
           return false;
         }
         text.paint_clip = Some(common_rect(
@@ -2212,6 +2685,34 @@ fn text_item_horizontal_bounds(text: &TextItem, text_metrics: &mut TextMetrics) 
     right = right.max(x);
   }
   (left, right)
+}
+
+fn scan_context_text_intersects_semantic_clip(left: f32, right: f32, clip: CellRect) -> bool {
+  let clip_right = clip.x_pt + clip.width_pt;
+  left <= clip_right + XLSX_SCAN_CONTEXT_TEXT_EDGE_SLACK_PT && right > clip.x_pt
+}
+
+fn page_area_has_vml_preview_on_following_column_edge(
+  page: &CalcPrintPage<'_>,
+  area: CellRange,
+) -> bool {
+  let area_rect = page.sheet.range_rect(area);
+  let right_edge = area_rect.x_pt + area_rect.width_pt;
+  let edge_slack = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  page
+    .sheet
+    .resources
+    .object_resources
+    .vml_drawings
+    .iter()
+    .flat_map(|drawing| drawing.shapes.iter())
+    .filter(|shape| !shape.hidden && shape.print_object && shape.image_relationship_id.is_some())
+    .filter_map(|shape| vml_shape_rect(page.sheet, shape))
+    .any(|(x, y, _width, height)| {
+      (x - right_edge).abs() <= edge_slack
+        && y < area_rect.y_pt + area_rect.height_pt
+        && y + height > area_rect.y_pt
+    })
 }
 
 fn render_cell_icon_set(
@@ -3230,18 +3731,16 @@ fn column_label(mut col: u32) -> String {
 fn print_page_image_items(
   import: &ExcelImport,
   page: &CalcPrintPage<'_>,
-  origin_x_pt: f32,
-  origin_y_pt: f32,
-  zoom_scale: f32,
+  layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
+  let page_transform = layout.page_transform(page);
   for drawing in &page.sheet.resources.drawings {
     for anchor in &drawing.anchors {
       if anchor.object.hidden || !anchor.print_with_sheet {
         continue;
       }
-      if !drawing_anchor_intersects_page(page, anchor) {
+      if !drawing_anchor_intersects_area(page.sheet, layout.area, anchor) {
         continue;
       }
       let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
@@ -3264,14 +3763,14 @@ fn print_page_image_items(
         let Some(placeholder_data) = web_extension_placeholder_png(resource) else {
           continue;
         };
-        let placeholder_size = XLSX_WEB_EXTENSION_PLACEHOLDER_SIZE_PT * zoom_scale;
+        let placeholder_size = XLSX_WEB_EXTENSION_PLACEHOLDER_SIZE_PT * layout.zoom_scale;
         let placeholder = ImageItem {
           x_pt: rect.x_pt
             + (rect.width_pt - placeholder_size) / 2.0
-            + XLSX_WEB_EXTENSION_HOST_OFFSET_X_PT * zoom_scale,
+            + XLSX_WEB_EXTENSION_HOST_OFFSET_X_PT * layout.zoom_scale,
           y_pt: rect.y_pt
             + (rect.height_pt - placeholder_size) / 2.0
-            + XLSX_WEB_EXTENSION_HOST_OFFSET_Y_PT * zoom_scale,
+            + XLSX_WEB_EXTENSION_HOST_OFFSET_Y_PT * layout.zoom_scale,
           width_pt: placeholder_size,
           height_pt: placeholder_size,
           crop: ImageCrop::default(),
@@ -3355,7 +3854,7 @@ fn print_page_image_items(
       if shape.hidden || !shape.print_object {
         continue;
       }
-      if !vml_shape_intersects_page(page, shape) {
+      if !vml_shape_intersects_area(page.sheet, layout.area, shape) {
         continue;
       }
       let Some(relationship_id) = shape
@@ -3837,12 +4336,10 @@ fn parse_vml_fill_image_size(value: &str, rect: CellRect) -> Option<(f32, f32)> 
 fn print_page_shape_items(
   import: &ExcelImport,
   page: &CalcPrintPage<'_>,
-  origin_x_pt: f32,
-  origin_y_pt: f32,
-  zoom_scale: f32,
+  layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
+  let page_transform = layout.page_transform(page);
   for (drawing, anchor) in page
     .sheet
     .resources
@@ -3853,7 +4350,7 @@ fn print_page_shape_items(
     if anchor.object.hidden || !anchor.print_with_sheet {
       continue;
     }
-    if !drawing_anchor_intersects_page(page, anchor) {
+    if !drawing_anchor_intersects_area(page.sheet, layout.area, anchor) {
       continue;
     }
     if !matches!(
@@ -4622,12 +5119,10 @@ fn drawing_object_visual_rotation_degrees(object: &super::drawing::DrawingObject
 
 fn print_page_diagram_items(
   page: &CalcPrintPage<'_>,
-  origin_x_pt: f32,
-  origin_y_pt: f32,
-  zoom_scale: f32,
+  layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
+  let page_transform = layout.page_transform(page);
   for drawing in &page.sheet.resources.drawings {
     for anchor in &drawing.anchors {
       if anchor.object.hidden
@@ -4636,7 +5131,7 @@ fn print_page_diagram_items(
       {
         continue;
       }
-      if !drawing_anchor_intersects_page(page, anchor) {
+      if !drawing_anchor_intersects_area(page.sheet, layout.area, anchor) {
         continue;
       }
       let Some(relationship_id) = anchor.object.relationship_id.as_deref() else {
@@ -5125,22 +5620,11 @@ fn print_page_drawing_text_items(
   import: &ExcelImport,
   page: &CalcPrintPage<'_>,
   setup: PageSetup,
-  origin_x_pt: f32,
-  origin_y_pt: f32,
-  zoom_scale: f32,
+  layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
-  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
-  let mut page_clip_rect = page_area_rect.map_or(
-    CellRect {
-      x_pt: 0.0,
-      y_pt: 0.0,
-      width_pt: setup.width_pt,
-      height_pt: setup.height_pt,
-    },
-    |rect| page_transform.rect(rect),
-  );
+  let page_transform = layout.page_transform(page);
+  let mut page_clip_rect = layout.clip_rect(page, setup);
   if page.sheet.uses_indexed_scatter_print_grid() {
     page_clip_rect.width_pt += super::print::INDEXED_SCATTER_HORIZONTAL_CLIP_EXTENSION_PT;
   }
@@ -5149,7 +5633,7 @@ fn print_page_drawing_text_items(
       if anchor.object.hidden || !anchor.print_with_sheet {
         continue;
       }
-      if !drawing_anchor_intersects_page(page, anchor) {
+      if !drawing_anchor_intersects_area(page.sheet, layout.area, anchor) {
         continue;
       }
       let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
@@ -5187,7 +5671,7 @@ fn print_page_drawing_text_items(
         anchor,
         drawing_rect,
         page_clip_rect,
-        zoom_scale,
+        layout.zoom_scale,
       ) && !chart_items.is_empty()
       {
         items.extend(chart_items);
@@ -6978,35 +7462,33 @@ fn clip_chart_item_to_rect(
       }
       retained
     }
-    PageItem::Rect(rect) => {
-      let left = rect.x_pt.max(clip.x_pt);
-      let top = rect.y_pt.max(clip.y_pt);
-      let right = (rect.x_pt + rect.width_pt).min(clip.x_pt + clip.width_pt);
-      let bottom = (rect.y_pt + rect.height_pt).min(clip.y_pt + clip.height_pt);
-      if right <= left || bottom <= top {
-        return false;
-      }
-      rect.x_pt = left;
-      rect.y_pt = top;
-      rect.width_pt = right - left;
-      rect.height_pt = bottom - top;
-      true
-    }
+    // The surrounding worksheet drawing group owns the output-device clip.
+    // Keep the authored geometry intact here: intersecting a filled/stroked
+    // rectangle with the page would manufacture a new border on the page
+    // boundary, while shortening a line or polygon would similarly change its
+    // cap/join. LibreOffice's ScOutputData::PrePrintDrawingLayer passes the
+    // complete drawing layer plus a paint region, and the archived Microsoft
+    // MSPLOT sample's SetClipWindow leaves objects unchanged while the target
+    // device suppresses out-of-window ink. This pass only removes objects that
+    // cannot contribute and retains the text-object rules above.
+    PageItem::Rect(rect) => rect_intersects_clip(
+      rect.x_pt,
+      rect.y_pt,
+      rect.x_pt + rect.width_pt,
+      rect.y_pt + rect.height_pt,
+      clip,
+    ),
     PageItem::Line(line) if line.y1_pt == line.y2_pt => {
-      if line.y1_pt < clip.y_pt || line.y1_pt > clip.y_pt + clip.height_pt {
-        return false;
-      }
-      line.x1_pt = line.x1_pt.clamp(clip.x_pt, clip.x_pt + clip.width_pt);
-      line.x2_pt = line.x2_pt.clamp(clip.x_pt, clip.x_pt + clip.width_pt);
-      line.x1_pt != line.x2_pt
+      line.y1_pt >= clip.y_pt
+        && line.y1_pt <= clip.y_pt + clip.height_pt
+        && line.x1_pt.max(line.x2_pt) > clip.x_pt
+        && line.x1_pt.min(line.x2_pt) < clip.x_pt + clip.width_pt
     }
     PageItem::Line(line) if line.x1_pt == line.x2_pt => {
-      if line.x1_pt < clip.x_pt || line.x1_pt > clip.x_pt + clip.width_pt {
-        return false;
-      }
-      line.y1_pt = line.y1_pt.clamp(clip.y_pt, clip.y_pt + clip.height_pt);
-      line.y2_pt = line.y2_pt.clamp(clip.y_pt, clip.y_pt + clip.height_pt);
-      line.y1_pt != line.y2_pt
+      line.x1_pt >= clip.x_pt
+        && line.x1_pt <= clip.x_pt + clip.width_pt
+        && line.y1_pt.max(line.y2_pt) > clip.y_pt
+        && line.y1_pt.min(line.y2_pt) < clip.y_pt + clip.height_pt
     }
     PageItem::Line(line) => rect_intersects_clip(
       line.x1_pt.min(line.x2_pt),
@@ -7015,9 +7497,6 @@ fn clip_chart_item_to_rect(
       line.y1_pt.max(line.y2_pt),
       clip,
     ),
-    PageItem::Path(path) if path.closed && path.commands.is_empty() => {
-      clip_closed_polygon_to_rect(path, clip)
-    }
     PageItem::Path(path) => rect_intersects_clip(
       path.bounds.origin.x.0,
       path.bounds.origin.y.0,
@@ -7081,106 +7560,6 @@ fn truncate_text_to_width(
     end = boundary;
   }
   text.truncate(end);
-}
-
-#[derive(Clone, Copy)]
-enum PolygonClipEdge {
-  Left,
-  Right,
-  Top,
-  Bottom,
-}
-
-fn clip_closed_polygon_to_rect(path: &mut common::PathItem<'static>, clip: CellRect) -> bool {
-  let mut points = path.points.clone();
-  for (edge, boundary) in [
-    (PolygonClipEdge::Left, clip.x_pt),
-    (PolygonClipEdge::Right, clip.x_pt + clip.width_pt),
-    (PolygonClipEdge::Top, clip.y_pt),
-    (PolygonClipEdge::Bottom, clip.y_pt + clip.height_pt),
-  ] {
-    points = clip_polygon_edge(&points, edge, boundary);
-    if points.len() < 3 {
-      return false;
-    }
-  }
-
-  let Some(bounds) = common::drawingml_geometry::point_bounds(
-    points
-      .iter()
-      .map(|point| kurbo::Point::new(f64::from(point.x.0), f64::from(point.y.0))),
-  ) else {
-    return false;
-  };
-  path.points = points;
-  path.bounds = common_rect(
-    bounds.x0 as f32,
-    bounds.y0 as f32,
-    bounds.width() as f32,
-    bounds.height() as f32,
-  );
-  true
-}
-
-fn clip_polygon_edge(
-  points: &[common::Point],
-  edge: PolygonClipEdge,
-  boundary: f32,
-) -> Vec<common::Point> {
-  let Some(mut previous) = points.last().copied() else {
-    return Vec::new();
-  };
-  let mut previous_inside = polygon_point_inside(previous, edge, boundary);
-  let mut output = Vec::with_capacity(points.len() + 2);
-  for current in points.iter().copied() {
-    let current_inside = polygon_point_inside(current, edge, boundary);
-    if current_inside != previous_inside {
-      output.push(polygon_edge_intersection(previous, current, edge, boundary));
-    }
-    if current_inside {
-      output.push(current);
-    }
-    previous = current;
-    previous_inside = current_inside;
-  }
-  output
-}
-
-fn polygon_point_inside(point: common::Point, edge: PolygonClipEdge, boundary: f32) -> bool {
-  match edge {
-    PolygonClipEdge::Left => point.x.0 >= boundary,
-    PolygonClipEdge::Right => point.x.0 <= boundary,
-    PolygonClipEdge::Top => point.y.0 >= boundary,
-    PolygonClipEdge::Bottom => point.y.0 <= boundary,
-  }
-}
-
-fn polygon_edge_intersection(
-  start: common::Point,
-  end: common::Point,
-  edge: PolygonClipEdge,
-  boundary: f32,
-) -> common::Point {
-  match edge {
-    PolygonClipEdge::Left | PolygonClipEdge::Right => {
-      let delta = end.x.0 - start.x.0;
-      let ratio = if delta.abs() <= f32::EPSILON {
-        0.0
-      } else {
-        (boundary - start.x.0) / delta
-      };
-      common_point(boundary, start.y.0 + (end.y.0 - start.y.0) * ratio)
-    }
-    PolygonClipEdge::Top | PolygonClipEdge::Bottom => {
-      let delta = end.y.0 - start.y.0;
-      let ratio = if delta.abs() <= f32::EPSILON {
-        0.0
-      } else {
-        (boundary - start.y.0) / delta
-      };
-      common_point(start.x.0 + (end.x.0 - start.x.0) * ratio, boundary)
-    }
-  }
 }
 
 fn rect_intersects_clip(left: f32, top: f32, right: f32, bottom: f32, clip: CellRect) -> bool {
@@ -7808,12 +8187,10 @@ fn drawing_object_text_style(
 
 fn print_page_vml_text_items(
   page: &CalcPrintPage<'_>,
-  origin_x_pt: f32,
-  origin_y_pt: f32,
-  zoom_scale: f32,
+  layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_transform = SheetPageTransform::for_page(page, origin_x_pt, origin_y_pt, zoom_scale);
+  let page_transform = layout.page_transform(page);
   for shape in page
     .sheet
     .resources
@@ -7825,16 +8202,14 @@ fn print_page_vml_text_items(
     if shape.hidden || !shape.print_object {
       continue;
     }
-    if shape
-      .object_type
-      .as_deref()
-      .is_some_and(|value| value.eq_ignore_ascii_case("Checkbox"))
-    {
-      // Checkbox captions are laid out by the Forms control renderer beside
-      // the native indicator, not as a generic VML textbox.
+    if legacy_vml_form_control_kind(shape).is_some() {
+      // Legacy Forms captions are owned by their native control renderer:
+      // checkable labels sit beside an indicator and a GroupBox label cuts a
+      // gap through the top frame. A generic VML textbox would duplicate the
+      // semantic text and lose those content-rectangle rules.
       continue;
     }
-    if !vml_shape_intersects_page(page, shape) {
+    if !vml_shape_intersects_area(page.sheet, layout.area, shape) {
       continue;
     }
     let text = vml_shape_visible_text(page.sheet, shape);
@@ -7845,7 +8220,18 @@ fn print_page_vml_text_items(
       continue;
     };
     let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
-    render_drawing_text(&mut items, text, rect, None, None, None, None);
+    render_drawing_text(
+      &mut items,
+      text,
+      rect,
+      Some(vml_shape_text_style(
+        shape,
+        TextStyle::default().font_size_pt,
+      )),
+      None,
+      None,
+      None,
+    );
   }
   items
 }
@@ -7913,6 +8299,13 @@ fn vml_shape_rect(
   sheet: &CalcSheet,
   shape: &super::object_resources::VmlShapeModel,
 ) -> Option<(f32, f32, f32, f32)> {
+  // Modern worksheet OLE/control records pair their Choice objectPr anchor
+  // with the VML preview by shapeId. Apache POI deliberately prefers that
+  // copy over the anchorless AlternateContent fallback. Only when no modern
+  // object anchor exists does the VML ClientData/CSS snapshot own placement.
+  if let Some(rect) = sheet.object_anchor_rect_pt(shape) {
+    return Some(rect);
+  }
   // Spreadsheet VML ClientData anchors are the cell-relative placement
   // authority. The CSS margin box is a cached absolute snapshot and can
   // disagree after Excel has recalculated column/row geometry. LibreOffice's
@@ -7945,7 +8338,7 @@ fn vml_anchor_x(sheet: &CalcSheet, zero_based_col: u32, offset_px: i32) -> f32 {
     col: col.saturating_add(1),
     row: 1,
   });
-  let x = cell.x_pt + vml_screen_pixel_to_pt(offset_px);
+  let x = cell.x_pt + sheet.vml_anchor_offset_pt(offset_px);
   x.min(next_cell.x_pt - units::twips_to_points(1.0))
 }
 
@@ -7956,12 +8349,8 @@ fn vml_anchor_y(sheet: &CalcSheet, zero_based_row: u32, offset_px: i32) -> f32 {
     col: 1,
     row: row.saturating_add(1),
   });
-  let y = cell.y_pt + vml_screen_pixel_to_pt(offset_px);
+  let y = cell.y_pt + sheet.vml_anchor_offset_pt(offset_px);
   y.min(next_cell.y_pt - units::twips_to_points(1.0))
-}
-
-fn vml_screen_pixel_to_pt(value: i32) -> f32 {
-  value as f32 * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH
 }
 
 fn vml_style_rect(style: &str) -> Option<(f32, f32, f32, f32)> {
@@ -8731,14 +9120,15 @@ fn excel_unrotated_anchor_rect(
   }
 }
 
-fn drawing_anchor_intersects_page(
-  page: &CalcPrintPage<'_>,
+fn drawing_anchor_intersects_area(
+  sheet: &CalcSheet,
+  area: Option<CellRange>,
   anchor: &super::drawing::DrawingAnchorModel,
 ) -> bool {
-  let Some(area) = page.area else {
+  let Some(area) = area else {
     return true;
   };
-  let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
+  let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(sheet, anchor) else {
     return false;
   };
   let bounds = drawing_object_visual_bounds(
@@ -8752,21 +9142,22 @@ fn drawing_anchor_intersects_page(
   );
   tuple_rect_intersects_cell_rect(
     (bounds.x_pt, bounds.y_pt, bounds.width_pt, bounds.height_pt),
-    page.sheet.range_rect(area),
+    sheet.range_rect(area),
   )
 }
 
-fn vml_shape_intersects_page(
-  page: &CalcPrintPage<'_>,
+fn vml_shape_intersects_area(
+  sheet: &CalcSheet,
+  area: Option<CellRange>,
   shape: &super::object_resources::VmlShapeModel,
 ) -> bool {
-  let Some(area) = page.area else {
+  let Some(area) = area else {
     return true;
   };
-  let Some(shape_rect) = vml_shape_rect(page.sheet, shape) else {
+  let Some(shape_rect) = vml_shape_rect(sheet, shape) else {
     return false;
   };
-  tuple_rect_intersects_cell_rect(shape_rect, page.sheet.range_rect(area))
+  tuple_rect_intersects_cell_rect(shape_rect, sheet.range_rect(area))
 }
 
 fn tuple_rect_intersects_cell_rect(
@@ -9175,6 +9566,40 @@ mod drawing_page_tests {
   use super::*;
 
   #[test]
+  fn generic_vml_caption_uses_its_authored_control_font() {
+    let shape = super::super::object_resources::VmlShapeModel {
+      text_style: super::super::object_resources::VmlTextStyle {
+        font_family: Some("Tahoma".to_string()),
+        font_size_twips: Some(160),
+        color: Some("#123456".to_string()),
+        bold: true,
+        italic: true,
+        underline: true,
+        strikethrough: true,
+      },
+      ..super::super::object_resources::VmlShapeModel::default()
+    };
+
+    let style = vml_shape_text_style(&shape, 11.0);
+
+    assert_eq!(style.font_family.as_deref(), Some("Tahoma"));
+    assert!((style.font_size_pt - 8.04).abs() < 0.001);
+    assert_eq!(
+      style.color,
+      RgbColor {
+        r: 0x12,
+        g: 0x34,
+        b: 0x56
+      }
+    );
+    assert!(style.bold);
+    assert!(style.italic);
+    assert!(style.underline);
+    assert!(style.strikethrough);
+    assert!(style.use_windows_font_metrics);
+  }
+
+  #[test]
   fn date_axis_page_clip_keeps_only_the_prefix_that_fits() {
     let mut text = "2019-02-01".to_string();
     truncate_text_to_width(&mut text, 6.0, |prefix| prefix.chars().count() as f32);
@@ -9227,6 +9652,85 @@ mod drawing_page_tests {
   }
 
   #[test]
+  fn option_button_snapshot_keeps_native_host_metrics_and_checked_state() {
+    let rect = CellRect {
+      x_pt: 324.12,
+      y_pt: 77.40,
+      width_pt: 141.0,
+      height_pt: 20.88,
+    };
+    let host = LegacyVmlControlHost::new(rect, 19, 15);
+    let unchecked =
+      vml_option_button_snapshot_png(host, 0, true).expect("unchecked option snapshot");
+    let unchecked = image::load_from_memory(&unchecked)
+      .expect("option snapshot PNG")
+      .to_rgba8();
+    assert_eq!(unchecked.dimensions(), (391, 57));
+    assert_eq!(unchecked.get_pixel(0, 0).0[3], 0);
+    assert!(unchecked.get_pixel(11, 28).0[0] > 240);
+    assert_eq!(unchecked.get_pixel(11, 28).0[3], u8::MAX);
+
+    let checked = vml_option_button_snapshot_png(host, 1, true).expect("checked option snapshot");
+    let checked = image::load_from_memory(&checked)
+      .expect("option snapshot PNG")
+      .to_rgba8();
+    assert!(checked.get_pixel(11, 28).0[0] < 16);
+    assert_eq!(checked.get_pixel(11, 28).0[3], u8::MAX);
+  }
+
+  #[test]
+  fn legacy_forms_snapshot_rect_uses_native_device_edges() {
+    let raw = CellRect {
+      x_pt: 63.359_987,
+      y_pt: 87.974_03,
+      width_pt: 148.5,
+      height_pt: 14.534_023,
+    };
+
+    let option =
+      legacy_vml_form_control_snapshot_rect(true, LegacyVmlFormControlKind::OptionButton, raw);
+    assert!((option.x_pt - 63.6).abs() < 0.001);
+    assert!((option.y_pt - 87.96).abs() < 0.001);
+    assert!((option.width_pt - raw.width_pt).abs() < 0.001);
+    assert!((option.height_pt - 14.64).abs() < 0.001);
+
+    let group = legacy_vml_form_control_snapshot_rect(
+      true,
+      LegacyVmlFormControlKind::GroupBox,
+      CellRect {
+        x_pt: 58.320_009,
+        y_pt: 75.600_009,
+        width_pt: 208.679_93,
+        height_pt: 85.898_16,
+      },
+    );
+    assert!((group.x_pt - 58.44).abs() < 0.001);
+    assert!((group.y_pt - 75.6).abs() < 0.001);
+    assert!((group.height_pt - 85.92).abs() < 0.001);
+  }
+
+  #[test]
+  fn group_box_snapshot_reserves_its_native_caption_gap() {
+    let rect = CellRect {
+      x_pt: 58.44,
+      y_pt: 75.60,
+      width_pt: 208.68,
+      height_pt: 85.92,
+    };
+    let snapshot = vml_group_box_snapshot_png(LegacyVmlControlHost::new(rect, 5, 5), 43.5, true)
+      .expect("group box snapshot");
+    let snapshot = image::load_from_memory(&snapshot)
+      .expect("group box snapshot PNG")
+      .to_rgba8();
+    assert_eq!(snapshot.dimensions(), (579, 238));
+    assert_eq!(snapshot.get_pixel(0, 0).0, [0, 0, 0, 255]);
+    assert_eq!(snapshot.get_pixel(2, 3).0, [0, 0, 0, 168]);
+    assert_eq!(snapshot.get_pixel(29, 0).0[3], 0);
+    assert_eq!(snapshot.get_pixel(578, 0).0, [0, 0, 0, 255]);
+    assert_eq!(snapshot.get_pixel(0, 237).0, [0, 0, 0, 255]);
+  }
+
+  #[test]
   fn drawing_page_intersection_includes_the_following_column_edge() {
     let page = CellRect {
       x_pt: 100.0,
@@ -9250,6 +9754,33 @@ mod drawing_page_tests {
     assert!(!tuple_rect_intersects_cell_rect(
       (400.01, 250.0, 100.0, 100.0),
       page
+    ));
+  }
+
+  #[test]
+  fn following_cell_text_keeps_only_the_clipped_boundary_semantics() {
+    let clip = CellRect {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      width_pt: 100.0,
+      height_pt: 200.0,
+    };
+    let edge = clip.x_pt + clip.width_pt;
+
+    assert!(scan_context_text_intersects_semantic_clip(
+      edge + XLSX_CELL_TEXT_INSET_PT,
+      edge + 40.0,
+      clip,
+    ));
+    assert!(!scan_context_text_intersects_semantic_clip(
+      edge + XLSX_SCAN_CONTEXT_TEXT_EDGE_SLACK_PT + 0.01,
+      edge + 40.0,
+      clip,
+    ));
+    assert!(!scan_context_text_intersects_semantic_clip(
+      clip.x_pt - 40.0,
+      clip.x_pt,
+      clip,
     ));
   }
 
@@ -9282,6 +9813,52 @@ mod drawing_page_tests {
     assert_eq!(text.paint_clip.map(|clip| clip.size.width.0), Some(100.0));
     assert!(!text.style.semantic_only);
     assert_eq!(text.y_pt, 20.0);
+  }
+
+  #[test]
+  fn chart_page_clip_preserves_the_complete_stroked_background_geometry() {
+    let clip = CellRect {
+      x_pt: 50.0,
+      y_pt: 0.0,
+      width_pt: 100.0,
+      height_pt: 100.0,
+    };
+    let original = RectItem {
+      x_pt: 40.0,
+      y_pt: 10.0,
+      width_pt: 80.0,
+      height_pt: 60.0,
+      fill_color: Some(RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      }),
+      fill_opacity: 1.0,
+      stroke: Some(BorderStyle {
+        width_pt: 0.75,
+        color: RgbColor { r: 0, g: 0, b: 0 },
+        ..BorderStyle::default()
+      }),
+      stroke_opacity: 1.0,
+    };
+    let mut item = PageItem::Rect(original.clone());
+    let mut metrics = TextMetrics::new();
+
+    assert!(clip_chart_item_to_rect(
+      &mut item,
+      clip,
+      &mut metrics,
+      DEFAULT_CHART_TEXT_CLIP_SLACK,
+      &[],
+    ));
+
+    let PageItem::Rect(rect) = item else {
+      panic!("expected chart background rectangle");
+    };
+    assert_eq!(rect.x_pt, original.x_pt);
+    assert_eq!(rect.y_pt, original.y_pt);
+    assert_eq!(rect.width_pt, original.width_pt);
+    assert_eq!(rect.height_pt, original.height_pt);
   }
 
   #[test]

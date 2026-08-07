@@ -164,12 +164,14 @@ fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
     PageItem::Image(item) => common::DisplayItem::Image(common_image_item(item)),
     PageItem::Group {
       mask,
+      clip,
       transform,
       blend_mode,
       opacity,
       items,
     } => common::DisplayItem::Group(common::CompositingGroup {
       mask: mask.map(common_image_item),
+      clip,
       transform,
       blend_mode,
       opacity,
@@ -6783,6 +6785,7 @@ fn finish_shape_effects(
   if let Some((blend_mode, overlay_items)) = fill_overlay {
     items.push(PageItem::Group {
       mask: None,
+      clip: None,
       transform: None,
       blend_mode,
       opacity: 1.0,
@@ -6799,6 +6802,7 @@ fn finish_shape_effects(
   if soft_edge_mask.is_some() || has_fill_overlay {
     content = vec![PageItem::Group {
       mask: soft_edge_mask,
+      clip: None,
       transform: None,
       blend_mode: common::BlendMode::Normal,
       opacity: 1.0,
@@ -6810,6 +6814,7 @@ fn finish_shape_effects(
     if !reflected_items.is_empty() {
       items.push(PageItem::Group {
         mask: Some(mask),
+        clip: None,
         transform: Some(transform),
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
@@ -7155,12 +7160,14 @@ fn effect_copy_item(item: &PageItem) -> Option<PageItem> {
     }
     PageItem::Group {
       mask,
+      clip,
       transform,
       blend_mode,
       opacity,
       items,
     } => PageItem::Group {
       mask: mask.clone(),
+      clip: *clip,
       transform: *transform,
       blend_mode: *blend_mode,
       opacity: *opacity,
@@ -8785,6 +8792,7 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
     }
     *item = PageItem::Group {
       mask: None,
+      clip: None,
       transform: None,
       blend_mode: common::BlendMode::Normal,
       opacity: 1.0,
@@ -8850,6 +8858,7 @@ fn lift_pptx_semantic_text_overlays(items: &mut Vec<PageItem>) {
   for mut item in source {
     let lift = if let PageItem::Group {
       mask,
+      clip,
       transform,
       blend_mode,
       opacity,
@@ -8858,6 +8867,7 @@ fn lift_pptx_semantic_text_overlays(items: &mut Vec<PageItem>) {
     {
       lift_pptx_semantic_text_overlays(children);
       mask.is_none()
+        && clip.is_none()
         && transform.is_none()
         && *blend_mode == common::BlendMode::Normal
         && (*opacity - 1.0).abs() <= f32::EPSILON

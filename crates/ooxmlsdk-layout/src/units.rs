@@ -8,6 +8,11 @@ pub const POINTS_PER_CSS_PIXEL: f32 = POINTS_PER_INCH / CSS_PIXELS_PER_INCH;
 // Word, Excel, and PowerPoint fixed-output geometry is quantized on the
 // 600dpi printer-device grid used by the reference Office environment.
 pub const OFFICE_FIXED_OUTPUT_DPI: f32 = 600.0;
+// Office materializes bitmap-backed fixed-output effects and legacy control
+// hosts at 200 pixels per inch, then positions those images on the 600dpi
+// printer-device grid above. Keep the two grids distinct: one owns raster
+// allocation and sampling, the other owns PDF coordinates.
+pub const OFFICE_FIXED_OUTPUT_RASTER_DPI: f32 = 200.0;
 pub const TWIPS_PER_POINT: f32 = sdk_units::TWIPS_PER_POINT as f32;
 pub const MM100_PER_MILLIMETER: f32 = sdk_units::MM100_PER_MILLIMETER as f32;
 pub const DRAWINGML_MAX_FRACTION_BELOW_ONE: f32 = 0.999;

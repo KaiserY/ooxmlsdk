@@ -102,6 +102,7 @@ pub(crate) struct VmlShapeModel {
   pub(crate) arc_size: Option<String>,
   pub(crate) anchor: Option<VmlClientAnchor>,
   pub(crate) checked: Option<i64>,
+  pub(crate) disable_3d: bool,
   pub(crate) note_row: Option<u32>,
   pub(crate) note_column: Option<u32>,
   pub(crate) print_object: bool,
@@ -229,6 +230,7 @@ impl Default for VmlShapeModel {
       arc_size: None,
       anchor: None,
       checked: None,
+      disable_3d: false,
       note_row: None,
       note_column: None,
       print_object: true,
@@ -1418,6 +1420,12 @@ fn collect_typed_vml_client_data(model: &mut VmlShapeModel, client_data: &xvml::
         // mixed. Preserve the tri-state value instead of reducing it to bool.
         model.checked = Some(*value);
       }
+      xvml::ClientDataChoice::Disable3D(value) => {
+        // A blank NoThreeD element is the normal true spelling emitted by
+        // Excel. Preserve it as control semantics instead of falling back to
+        // the inherited VML shapetype appearance.
+        model.disable_3d = typed_vml_bool(*value, true);
+      }
       xvml::ClientDataChoice::HorizontalTextAlignment(value) => {
         model.text_horizontal_alignment = Some(value.to_string());
       }
@@ -1718,7 +1726,7 @@ mod tests {
   }
 
   #[test]
-  fn checkbox_preserves_first_vml_font_alignment_and_tristate() {
+  fn checkbox_preserves_first_vml_font_alignment_tristate_and_flat_style() {
     let shapes = vml_shapes(
       br##"<xml xmlns:v="urn:schemas-microsoft-com:vml"
           xmlns:x="urn:schemas-microsoft-com:office:excel">
@@ -1729,6 +1737,7 @@ mod tests {
             <x:TextHAlign>Right</x:TextHAlign>
             <x:TextVAlign>Center</x:TextVAlign>
             <x:Checked>2</x:Checked>
+            <x:NoThreeD/>
           </x:ClientData>
         </v:shape>
       </xml>"##,
@@ -1744,6 +1753,7 @@ mod tests {
     assert_eq!(shape.text_horizontal_alignment.as_deref(), Some("Right"));
     assert_eq!(shape.text_vertical_alignment.as_deref(), Some("Center"));
     assert_eq!(shape.checked, Some(2));
+    assert!(shape.disable_3d);
   }
 
   #[test]

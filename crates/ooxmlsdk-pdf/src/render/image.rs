@@ -363,11 +363,10 @@ fn remove_black_matte(
   for (pixel, source) in image.pixels_mut().zip(alpha_source.pixels()) {
     let alpha = u16::from(source[3]);
     for channel in &mut pixel.0 {
-      *channel = if alpha == 0 {
-        0
-      } else {
-        ((u16::from(*channel) * 255 + alpha / 2) / alpha).min(255) as u8
-      };
+      *channel = (u16::from(*channel) * 255 + alpha / 2)
+        .checked_div(alpha)
+        .unwrap_or_default()
+        .min(255) as u8;
     }
   }
   image

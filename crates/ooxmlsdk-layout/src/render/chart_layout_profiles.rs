@@ -71,6 +71,32 @@ pub(crate) struct CartesianLayoutAdjustment {
   pub plot_right_ratio: f32,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct CartesianDeviceAdjustment {
+  pub chart_area_height_pt: f32,
+  pub title_top_pt: f32,
+  pub category_top_pt: f32,
+  pub plot_top_pt: f32,
+  pub plot_bottom_pt: f32,
+  pub plot_x_pt: f32,
+}
+
+// Excel 12's style-less automatic chart layout is resolved on the fixed-
+// output reference device after the outer worksheet graphic frame has been
+// placed. The values are 600dpi device-dot bands at 100% drawing scale. Keep
+// them as physical offsets rather than folding them into frame ratios: a
+// modern chart carrying c:style uses the later automatic-layout profile, and
+// a manual c:layout remains the authored inner-plot authority.
+pub(crate) const EXCEL_LEGACY_STYLELESS_SINGLE_SERIES_DEVICE: CartesianDeviceAdjustment =
+  CartesianDeviceAdjustment {
+    chart_area_height_pt: -0.36,
+    title_top_pt: -0.60,
+    category_top_pt: -1.44,
+    plot_top_pt: -0.90,
+    plot_bottom_pt: -1.68,
+    plot_x_pt: 0.72,
+  };
+
 /// PowerPoint's legacy empty-title container resolved from the sole series.
 ///
 /// Apache POI's bar/line/radar/scatter fixtures share the same 480x320pt

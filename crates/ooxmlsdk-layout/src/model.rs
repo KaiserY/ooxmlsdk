@@ -411,6 +411,7 @@ pub(crate) enum PageItem {
   Image(ImageItem),
   Group {
     mask: Option<ImageItem>,
+    clip: Option<common::Rect>,
     transform: Option<common::Transform>,
     blend_mode: common::BlendMode,
     opacity: f32,

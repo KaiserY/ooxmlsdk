@@ -701,9 +701,29 @@ fn relationship_type_match_patterns(relationship_type: &str) -> Vec<LitByteStr> 
       format!("{STRICT_PREFIX}{suffix}").as_bytes(),
       Span::call_site(),
     ));
+    let strict_suffix = match suffix {
+      "custom-properties" => Some("customProperties"),
+      "extended-properties" => Some("extendedProperties"),
+      _ => None,
+    };
+    if let Some(strict_suffix) = strict_suffix {
+      patterns.push(LitByteStr::new(
+        format!("{STRICT_PREFIX}{strict_suffix}").as_bytes(),
+        Span::call_site(),
+      ));
+    }
   } else if let Some(suffix) = relationship_type.strip_prefix(STRICT_PREFIX) {
     patterns.push(LitByteStr::new(
       format!("{TRANSITIONAL_PREFIX}{suffix}").as_bytes(),
+      Span::call_site(),
+    ));
+  }
+
+  if relationship_type
+    == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
+  {
+    patterns.push(LitByteStr::new(
+      b"http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail",
       Span::call_site(),
     ));
   }

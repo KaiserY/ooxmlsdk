@@ -34,12 +34,21 @@ pub(crate) struct SharedStringModel {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SharedStringRun {
   pub(crate) text: String,
+  /// A run without `rPr` inherits the cell font. Once `rPr` is present,
+  /// SpreadsheetML supplies a run-font state whose omitted boolean and
+  /// escapement properties return to their ordinary defaults.
+  pub(crate) has_properties: bool,
+  pub(crate) font_family: Option<String>,
   pub(crate) font_size_pt: Option<f32>,
   pub(crate) color: Option<RgbColor>,
-  pub(crate) bold: bool,
-  pub(crate) italic: bool,
-  pub(crate) underline: bool,
-  pub(crate) strikethrough: bool,
+  /// `None` preserves whether the corresponding element was absent. The
+  /// renderer combines that fact with `has_properties` to distinguish a run
+  /// that inherits the cell font from a regular property omitted from `rPr`.
+  pub(crate) bold: Option<bool>,
+  pub(crate) italic: Option<bool>,
+  pub(crate) underline: Option<bool>,
+  pub(crate) strikethrough: Option<bool>,
+  pub(crate) vertical_alignment: Option<x::VerticalAlignmentRunValues>,
 }
 
 impl WorkbookFragment {
@@ -232,7 +241,7 @@ fn shared_string_item_model(item: &x::SharedStringItem) -> SharedStringModel {
   SharedStringModel { text, runs }
 }
 
-fn shared_string_run(run: &x::Run) -> SharedStringRun {
+pub(crate) fn shared_string_run(run: &x::Run) -> SharedStringRun {
   let mut model = SharedStringRun {
     text: run
       .text
@@ -240,28 +249,35 @@ fn shared_string_run(run: &x::Run) -> SharedStringRun {
       .as_deref()
       .map(decode_excel_escaped_text)
       .unwrap_or_default(),
+    has_properties: run.run_properties.is_some(),
     ..SharedStringRun::default()
   };
   if let Some(properties) = &run.run_properties {
     for choice in &properties.run_properties_choice {
       match choice {
         x::RunPropertiesChoice::Bold(value) => {
-          model.bold = value.val.is_none_or(|value| value.as_bool());
+          model.bold = Some(value.val.is_none_or(|value| value.as_bool()));
         }
         x::RunPropertiesChoice::Italic(value) => {
-          model.italic = value.val.is_none_or(|value| value.as_bool());
+          model.italic = Some(value.val.is_none_or(|value| value.as_bool()));
         }
         x::RunPropertiesChoice::Strike(value) => {
-          model.strikethrough = value.val.is_none_or(|value| value.as_bool());
+          model.strikethrough = Some(value.val.is_none_or(|value| value.as_bool()));
         }
         x::RunPropertiesChoice::Underline(value) => {
-          model.underline = !matches!(value.val, Some(x::UnderlineValues::None));
+          model.underline = Some(!matches!(value.val, Some(x::UnderlineValues::None)));
+        }
+        x::RunPropertiesChoice::VerticalTextAlignment(value) => {
+          model.vertical_alignment = Some(value.val);
         }
         x::RunPropertiesChoice::FontSize(value) => {
           model.font_size_pt = Some(value.val as f32);
         }
         x::RunPropertiesChoice::Color(value) => {
           model.color = run_color(value);
+        }
+        x::RunPropertiesChoice::RunFont(value) => {
+          model.font_family = Some(value.val.clone());
         }
         _ => {}
       }
@@ -291,4 +307,73 @@ fn active_workbook_sheet(workbook: &x::Workbook) -> Option<usize> {
       .map(|index| index as usize)
       .unwrap_or(0),
   )
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use ooxmlsdk::simple_type::BooleanValue;
+
+  #[test]
+  fn rich_text_run_preserves_property_presence_and_vertical_alignment() {
+    let run = x::Run {
+      run_properties: Some(x::RunProperties {
+        run_properties_choice: vec![
+          x::RunPropertiesChoice::Bold(x::Bold {
+            val: Some(BooleanValue::Zero),
+          }),
+          x::RunPropertiesChoice::Italic(x::Italic { val: None }),
+          x::RunPropertiesChoice::Underline(x::Underline {
+            val: Some(x::UnderlineValues::None),
+          }),
+          x::RunPropertiesChoice::VerticalTextAlignment(x::VerticalTextAlignment {
+            val: x::VerticalAlignmentRunValues::Superscript,
+          }),
+          x::RunPropertiesChoice::FontSize(x::FontSize { val: 10.0 }),
+          x::RunPropertiesChoice::RunFont(x::RunFont {
+            val: "Arial".to_string(),
+          }),
+        ],
+      }),
+      text: Box::new(x::Text(x::XstringType {
+        xml_content: Some("(1)".to_string()),
+        ..Default::default()
+      })),
+    };
+
+    let parsed = shared_string_run(&run);
+    assert_eq!(parsed.text, "(1)");
+    assert!(parsed.has_properties);
+    assert_eq!(parsed.font_family.as_deref(), Some("Arial"));
+    assert_eq!(parsed.font_size_pt, Some(10.0));
+    assert_eq!(parsed.bold, Some(false));
+    assert_eq!(parsed.italic, Some(true));
+    assert_eq!(parsed.underline, Some(false));
+    assert_eq!(parsed.strikethrough, None);
+    assert_eq!(
+      parsed.vertical_alignment,
+      Some(x::VerticalAlignmentRunValues::Superscript)
+    );
+  }
+
+  #[test]
+  fn rich_text_run_without_properties_keeps_every_cell_style_slot_unspecified() {
+    let parsed = shared_string_run(&x::Run {
+      text: Box::new(x::Text(x::XstringType {
+        xml_content: Some("inherits cell style".to_string()),
+        ..Default::default()
+      })),
+      ..Default::default()
+    });
+
+    assert!(!parsed.has_properties);
+    assert_eq!(parsed.font_family, None);
+    assert_eq!(parsed.font_size_pt, None);
+    assert_eq!(parsed.color, None);
+    assert_eq!(parsed.bold, None);
+    assert_eq!(parsed.italic, None);
+    assert_eq!(parsed.underline, None);
+    assert_eq!(parsed.strikethrough, None);
+    assert_eq!(parsed.vertical_alignment, None);
+  }
 }

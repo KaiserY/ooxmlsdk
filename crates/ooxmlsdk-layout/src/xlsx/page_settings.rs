@@ -265,8 +265,7 @@ pub(crate) struct CalcPageSettings {
   pub(crate) explicit_paper_size: bool,
   requested_custom_paper_size_pt: Option<(f32, f32)>,
   implicit_microsoft_letter_canvas: bool,
-  related_printer_canvas: bool,
-  explicit_page_scale: bool,
+  related_printer_letter_canvas: bool,
   pub(crate) valid_printer_settings: bool,
   pub(crate) fit_to_page: bool,
   pub(crate) scale: u32,
@@ -319,8 +318,7 @@ impl Default for CalcPageSettings {
       explicit_paper_size: false,
       requested_custom_paper_size_pt: None,
       implicit_microsoft_letter_canvas: false,
-      related_printer_canvas: false,
-      explicit_page_scale: false,
+      related_printer_letter_canvas: false,
       valid_printer_settings: true,
       fit_to_page: false,
       scale: DEFAULT_PRINT_SCALE_PERCENT,
@@ -456,7 +454,6 @@ impl CalcPageSettings {
         .is_some_and(|value| value.as_bool());
     if let Some(scale) = page_setup.scale.filter(|scale| *scale > 0) {
       self.scale = scale;
-      self.explicit_page_scale = true;
     }
     self.fit_to_width = page_setup.fit_to_width.unwrap_or(self.fit_to_width);
     self.fit_to_height = page_setup.fit_to_height.unwrap_or(self.fit_to_height);
@@ -469,7 +466,7 @@ impl CalcPageSettings {
   fn apply_windows_printer_settings(
     &mut self,
     printer_settings: &WindowsPrinterSettings,
-    explicit_paper_size: bool,
+    page_setup_has_paper_size: bool,
     explicit_orientation: bool,
     explicit_scale: bool,
     explicit_horizontal_dpi: bool,
@@ -478,17 +475,14 @@ impl CalcPageSettings {
     // SpreadsheetML owns any field it serializes explicitly. The related
     // Printer Settings part fills only omitted device defaults; [MS-RPRN]
     // requires receivers to ignore DEVMODE fields whose dmFields bit is clear.
-    if !explicit_paper_size {
+    if !page_setup_has_paper_size {
       if let Some(custom_size) = printer_settings.custom_paper_size_pt() {
         self.requested_custom_paper_size_pt = Some(custom_size);
         self.explicit_paper_size = true;
-        self.related_printer_canvas = true;
       } else if let Some(paper_size) = printer_settings.paper_size {
         self.paper_size = paper_size;
-        // This flag means that a concrete print canvas was requested, whether
-        // by pageSetup@paperSize or by the related DEVMODE.
         self.explicit_paper_size = true;
-        self.related_printer_canvas = true;
+        self.related_printer_letter_canvas = paper_size == MsPaperSize::Letter as u32;
       }
     }
     if !explicit_orientation {
@@ -572,9 +566,9 @@ impl CalcPageSettings {
 
   pub(crate) fn printer_default_paper_scale_percent(&self) -> u32 {
     // Office fixed-format export keeps the active default A4 page when an
-    // explicit Letter setup has no printer-settings relationship. Excel maps
-    // the Letter worksheet canvas onto that default page at 95%; documents
-    // without an explicit paper request remain native A4 at 100%.
+    // requested Letter canvas resolves onto that default page. Excel maps the
+    // worksheet canvas at 95% for the chart fixed-output profile, whether the
+    // concrete Letter request came from pageSetup or its related DEVMODE.
     if (self.explicit_paper_size || self.implicit_microsoft_letter_canvas)
       && self.paper_size == MsPaperSize::Letter as u32
       && self.valid_printer_settings
@@ -586,16 +580,31 @@ impl CalcPageSettings {
   }
 
   pub(crate) fn fixed_output_paper_scale_percent(&self, has_chart: bool) -> u32 {
-    // pageSetup@scale is the worksheet print scale itself. LibreOffice's
-    // PageSettingsConverter writes it directly to PageScale, independently
-    // of the related printer-settings bytes. The Letter-to-default-paper
-    // fallback is only needed when that worksheet scale is implicit; applying
-    // both would compound an explicit scale (for example, 83% into 78.85%).
-    if has_chart
-      || self.implicit_microsoft_letter_canvas
-      || self.related_printer_canvas && !self.explicit_page_scale
-    {
+    // Frozen Office fixed-output profile, backed by independent Golden states:
+    // 45540_classic_{Footer,Header}.xlsx require 95% for a related Letter
+    // printer canvas, while 56295.xlsx keeps an unrelated explicit Letter
+    // setup at 100%. barOfPieChart.xlsx and Microsoft's implicit Letter canvas
+    // are the other positive profiles. tdf105272.xlsx is the fit-to-page
+    // counterexample: fit owns the worksheet scale and must not gain 95%.
+    if self.fit_to_page {
+      return DEFAULT_PRINT_SCALE_PERCENT;
+    }
+    if has_chart || self.implicit_microsoft_letter_canvas || self.related_printer_letter_canvas {
       self.printer_default_paper_scale_percent()
+    } else {
+      DEFAULT_PRINT_SCALE_PERCENT
+    }
+  }
+
+  pub(crate) fn fixed_output_pagination_paper_scale_percent(&self, has_chart: bool) -> u32 {
+    // Office's two opposite states occur in the same 45540 workbook. The
+    // ordinary Profile sheet keeps worksheet-zoom automatic column breaks
+    // while its visible content is transformed to 95%. The Top Five
+    // Industries chart sheet instead needs the transformed drawing footprint
+    // to determine its single-page extent. Keep this pagination selector
+    // independent from the frozen visible-output selector above.
+    if has_chart {
+      self.fixed_output_paper_scale_percent(true)
     } else {
       DEFAULT_PRINT_SCALE_PERCENT
     }
@@ -802,7 +811,7 @@ mod tests {
   }
 
   #[test]
-  fn related_devmode_fills_omitted_page_setup_without_overriding_output_paper() {
+  fn related_letter_devmode_keeps_device_and_paper_scales_separate() {
     let printer = WindowsPrinterSettings::from_bytes(&sample_windows_devmode(
       DM_ORIENTATION | DM_PAPER_SIZE | DM_SCALE | DM_PRINT_QUALITY | DM_Y_RESOLUTION,
     ))
@@ -823,7 +832,9 @@ mod tests {
     assert_eq!(settings.scale, 75);
     assert_eq!(settings.horizontal_dpi, 600);
     assert_eq!(settings.vertical_dpi, 300);
+    assert_eq!(settings.printer_default_paper_scale_percent(), 95);
     assert_eq!(settings.fixed_output_paper_scale_percent(false), 95);
+    assert_eq!(settings.fixed_output_paper_scale_percent(true), 95);
     assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
     assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
   }
@@ -858,12 +869,20 @@ mod tests {
   }
 
   #[test]
-  fn explicit_page_scale_is_not_compounded_by_related_printer_canvas_fallback() {
-    let printer = WindowsPrinterSettings::from_bytes(&sample_windows_devmode(
+  fn fit_to_page_suppresses_the_related_letter_paper_transform() {
+    let mut printer = WindowsPrinterSettings::from_bytes(&sample_windows_devmode(
       DM_ORIENTATION | DM_PAPER_SIZE | DM_SCALE | DM_PRINT_QUALITY | DM_Y_RESOLUTION,
     ))
     .unwrap();
+    printer.scale_percent = Some(83);
     let worksheet = x::Worksheet {
+      sheet_properties: Some(Box::new(x::SheetProperties {
+        page_setup_properties: Some(x::PageSetupProperties {
+          fit_to_page: Some(ooxmlsdk::simple_type::BooleanValue::One),
+          ..Default::default()
+        }),
+        ..Default::default()
+      })),
       page_setup: Some(x::PageSetup {
         scale: Some(83),
         orientation: Some(x::OrientationValues::Landscape),
@@ -876,7 +895,129 @@ mod tests {
     let settings = CalcPageSettings::from_worksheet(&worksheet, false, Some(&printer));
 
     assert_eq!(settings.scale, 83);
+    assert!(settings.fit_to_page);
     assert_eq!(settings.fixed_output_paper_scale_percent(false), 100);
+  }
+
+  #[test]
+  fn authored_scale_and_related_letter_paper_transform_remain_independent() {
+    let printer = WindowsPrinterSettings::from_bytes(&sample_windows_devmode(
+      DM_ORIENTATION | DM_PAPER_SIZE | DM_PRINT_QUALITY | DM_Y_RESOLUTION,
+    ))
+    .unwrap();
+    assert_eq!(printer.scale_percent, None);
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        scale: Some(47),
+        orientation: Some(x::OrientationValues::Portrait),
+        id: Some("rId1".to_string()),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+
+    let settings = CalcPageSettings::from_worksheet(&worksheet, true, Some(&printer));
+    assert_eq!(settings.scale, 47);
+    assert_eq!(settings.printer_default_paper_scale_percent(), 95);
+    assert_eq!(settings.fixed_output_paper_scale_percent(false), 95);
+    assert_eq!(settings.fixed_output_paper_scale_percent(true), 95);
+  }
+
+  #[test]
+  fn letter_to_a4_fixed_output_selector_is_frozen_by_state_matrix() {
+    let native = CalcPageSettings::default();
+
+    let mut unrelated_explicit_letter = native.clone();
+    unrelated_explicit_letter.explicit_paper_size = true;
+
+    let mut related_letter = unrelated_explicit_letter.clone();
+    related_letter.related_printer_letter_canvas = true;
+
+    let mut implicit_microsoft_letter = native.clone();
+    implicit_microsoft_letter.implicit_microsoft_letter_canvas = true;
+
+    let mut fit_related_letter = related_letter.clone();
+    fit_related_letter.fit_to_page = true;
+
+    let mut native_a4 = native.clone();
+    native_a4.paper_size = MsPaperSize::A4 as u32;
+    native_a4.explicit_paper_size = true;
+
+    for (profile, settings, has_chart, expected_output, expected_pagination) in [
+      ("native-default", native, false, 100, 100),
+      (
+        "unrelated-explicit-letter-56295",
+        unrelated_explicit_letter.clone(),
+        false,
+        100,
+        100,
+      ),
+      (
+        "related-letter-45540-profile-sheet",
+        related_letter.clone(),
+        false,
+        95,
+        100,
+      ),
+      (
+        "related-letter-45540-chart-sheet",
+        related_letter,
+        true,
+        95,
+        95,
+      ),
+      (
+        "implicit-microsoft-letter",
+        implicit_microsoft_letter,
+        false,
+        95,
+        100,
+      ),
+      (
+        "fit-related-letter-tdf105272",
+        fit_related_letter,
+        false,
+        100,
+        100,
+      ),
+      (
+        "chart-letter-barOfPieChart",
+        unrelated_explicit_letter,
+        true,
+        95,
+        95,
+      ),
+      ("native-a4", native_a4, true, 100, 100),
+    ] {
+      assert_eq!(
+        settings.fixed_output_paper_scale_percent(has_chart),
+        expected_output,
+        "fixed-output visible paper-scale profile changed: {profile}"
+      );
+      assert_eq!(
+        settings.fixed_output_pagination_paper_scale_percent(has_chart),
+        expected_pagination,
+        "fixed-output pagination paper-scale profile changed: {profile}"
+      );
+    }
+  }
+
+  #[test]
+  fn explicit_letter_chart_keeps_the_independent_fixed_output_canvas_scale() {
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        paper_size: Some(MsPaperSize::Letter as u32),
+        scale: Some(100),
+        orientation: Some(x::OrientationValues::Portrait),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+
+    let settings = CalcPageSettings::from_worksheet(&worksheet, false, None);
+    assert_eq!(settings.scale, 100);
+    assert_eq!(settings.fixed_output_paper_scale_percent(false), 100);
+    assert_eq!(settings.fixed_output_paper_scale_percent(true), 95);
   }
 
   #[test]

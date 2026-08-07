@@ -19,12 +19,18 @@ pub(super) const INDEXED_SCATTER_HORIZONTAL_CLIP_EXTENSION_PT: f32 = 0.96;
 const XLSX_MAX_COLUMN: u32 = 16_384;
 const XLSX_MAX_ROW: u32 = 1_048_576;
 const CALC_CELL_TEXT_MARGIN_PT: f32 = 4.0;
-const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 // LibreOffice sc/source/ui/view/printfun.cxx::ScPrintFunc::CalcZoom applies
 // this interoperability adjustment for width-only fit-to-page output.
 const LIBREOFFICE_FIT_TO_WIDTH_ZOOM_FACTOR: f32 = 0.98;
 // LibreOffice sc/source/core/data/attarray.cxx::SC_VISATTR_STOP.
 const SC_VISATTR_STOP: u32 = 84;
+
+pub(super) fn fixed_output_content_scale(
+  worksheet_scale_percent: u32,
+  paper_scale_percent: u32,
+) -> f32 {
+  worksheet_scale_percent as f32 * paper_scale_percent as f32 / 10_000.0
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalcPrintDocument<'a> {
@@ -35,9 +41,13 @@ pub(crate) struct CalcPrintDocument<'a> {
 pub(crate) struct CalcPrintPage<'a> {
   pub(crate) sheet: &'a CalcSheet,
   pub(crate) sheet_page_index: usize,
+  pub(crate) starts_print_area_row: bool,
   pub(crate) page_number: usize,
   pub(crate) total_pages: usize,
+  /// Worksheet print zoom before the fixed-output paper transform.
   pub(crate) zoom: u32,
+  pub(crate) paper_scale_percent: u32,
+  pub(crate) pagination_paper_scale_percent: u32,
   pub(crate) page_settings: &'a CalcPageSettings,
   pub(crate) area: Option<CellRange>,
   pub(crate) repeated_rows: Option<CellRange>,
@@ -117,8 +127,11 @@ impl<'a> CalcPrintDocument<'a> {
     for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
       let mut conditional_eval_cache = ConditionalFormatEvalCache::default();
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
+      let ordinary_used_range = sheet.used_range(&import.styles);
       let areas = print_areas_for_sheet(import, sheet, &named_ranges, &mut text_metrics);
       let scale = print_scale_state(import, sheet, &areas, &named_ranges, &mut text_metrics);
+      let uses_formatted_implicit_header_footer_extent =
+        implicit_header_footer_uses_formatted_cell_extent(import, sheet, &named_ranges);
       let keep_header_footer_only_page = visible_sheets_with_body == 0
         && sheet.page_settings.header_footer.has_print_content()
         && sheet_body_is_empty(import, sheet);
@@ -127,7 +140,7 @@ impl<'a> CalcPrintDocument<'a> {
         sheet,
         &areas,
         &named_ranges,
-        scale.zoom,
+        fixed_output_content_scale(scale.zoom, scale.pagination_paper_scale_percent) * 100.0,
         scale.top_down,
         &mut text_metrics,
       );
@@ -153,6 +166,11 @@ impl<'a> CalcPrintDocument<'a> {
         .zip(page_states.into_iter())
         .enumerate()
       {
+        let starts_print_area_row = area.is_some_and(|page_area| {
+          areas.iter().any(|print_area| {
+            print_area.contains(page_area.start) && page_area.start.row == print_area.start.row
+          })
+        });
         let cells = area
           .map(|area| {
             print_cells_for_area(
@@ -179,25 +197,43 @@ impl<'a> CalcPrintDocument<'a> {
         // workbook made entirely of header/footer-only empty visible sheets
         // still emits one page; otherwise later empty sheets keep being hidden.
         // Excel fixed output retains blank pages ahead of later printable
-        // cells or drawings in the actual page order. The implicit range has
-        // already excluded invisible blank-cell XF metadata, so this does not
-        // turn a font/alignment-only tail such as tdf131536 into empty pages.
-        // Empty trailing pages and independent empty sheets remain hidden.
+        // cells or drawings in the actual page order. Ordinary implicit
+        // ranges exclude invisible blank-cell XF metadata, so a style-only
+        // tail such as tdf131536 does not create pages. A nonempty sheet with
+        // a configured header/footer uses the separately selected formatted-
+        // cell extent, but Office does not retain every empty rectangle in
+        // that Cartesian extent. Its fixed output keeps a horizontal
+        // continuation only when that page contains a directly authored XF
+        // delta. Vertical style tails, cross-product holes, and default-
+        // equivalent XFs remain hidden.
         let implicit_page_before_content = last_implicit_printable_page
           .is_some_and(|last_printable| page_area_index < last_printable);
-        if scale.skip_empty
-          && empty
-          && !implicit_page_before_content
-          && !(keep_header_footer_only_page && sheet_page_index == 0)
-        {
+        let keep_formatted_horizontal_header_footer_page = area.is_some_and(|area| {
+          keep_formatted_horizontal_header_footer_page(
+            uses_formatted_implicit_header_footer_extent,
+            ordinary_used_range,
+            area,
+            sheet.has_nondefault_direct_cell_formatting_in_range(&import.styles, area),
+          )
+        });
+        if should_skip_empty_print_page(
+          scale.skip_empty,
+          empty,
+          implicit_page_before_content,
+          keep_formatted_horizontal_header_footer_page,
+          keep_header_footer_only_page && sheet_page_index == 0,
+        ) {
           continue;
         }
         pages.push(CalcPrintPage {
           sheet,
           sheet_page_index,
+          starts_print_area_row,
           page_number: pages.len() + 1,
           total_pages: 0,
           zoom: scale.zoom,
+          paper_scale_percent: scale.paper_scale_percent,
+          pagination_paper_scale_percent: scale.pagination_paper_scale_percent,
           page_settings: &sheet.page_settings,
           repeated_rows: named_ranges.repeat_rows,
           repeated_columns: named_ranges.repeat_columns,
@@ -220,6 +256,31 @@ impl<'a> CalcPrintDocument<'a> {
   }
 }
 
+fn should_skip_empty_print_page(
+  skip_empty: bool,
+  empty: bool,
+  implicit_page_before_content: bool,
+  keep_implicit_header_footer_page: bool,
+  keep_header_footer_only_page: bool,
+) -> bool {
+  skip_empty
+    && empty
+    && !implicit_page_before_content
+    && !keep_implicit_header_footer_page
+    && !keep_header_footer_only_page
+}
+
+fn keep_formatted_horizontal_header_footer_page(
+  uses_formatted_extent: bool,
+  ordinary_used_range: Option<CellRange>,
+  page_area: CellRange,
+  has_nondefault_direct_cell_formatting: bool,
+) -> bool {
+  uses_formatted_extent
+    && has_nondefault_direct_cell_formatting
+    && ordinary_used_range.is_some_and(|used| page_area.start.col > used.end.col)
+}
+
 fn page_cell_scan_area(area: CellRange) -> CellRange {
   // Calc's FillInfo builds ScCellInfo through nCol2 + 1 so the logical page
   // can resolve occupied neighbours and text overflowing back from the first
@@ -237,6 +298,8 @@ fn page_cell_scan_area(area: CellRange) -> CellRange {
 #[derive(Clone, Copy, Debug)]
 struct CalcPrintScaleState {
   zoom: u32,
+  paper_scale_percent: u32,
+  pagination_paper_scale_percent: u32,
   skip_empty: bool,
   top_down: bool,
 }
@@ -264,10 +327,14 @@ fn print_scale_state(
     .filter(|br| br.manual)
     .count()
     + 1;
-  let fit_to_page = sheet.page_settings.fit_to_page
-    || sheet.metrics.settings.properties.page_setup.fit_to_page
-    || sheet.page_settings.fit_to_width != 1
-    || sheet.page_settings.fit_to_height != 1;
+  // ECMA-376 keeps the fit-to-pages mode bit in sheetPr/pageSetUpPr,
+  // separately from pageSetup's width/height operands. LibreOffice mirrors
+  // that split in PageSettingsModel::mbFitToPages and uses PageScale whenever
+  // the mode bit is false. Do not infer the mode from stale or inactive
+  // fitToWidth/fitToHeight values: Excel's 49156.xlsx is the counterexample,
+  // with scale="47", fitToHeight="2", and no pageSetUpPr.
+  let fit_to_page =
+    sheet.page_settings.fit_to_page || sheet.metrics.settings.properties.page_setup.fit_to_page;
   let (fit_to_width, fit_to_height) = if fit_to_page
     && sheet.page_settings.fit_to_width == 0
     && sheet.page_settings.fit_to_height == 0
@@ -339,23 +406,28 @@ fn print_scale_state(
   } else if sheet.page_settings.scale > 0 {
     zoom = sheet.page_settings.scale.max(ZOOM_MIN);
   }
-  // Excel's fixed output applies the observed Letter-to-default-A4 canvas
-  // scale to sheets with chart drawings. Ordinary cell-only sheets retain
-  // their native column and row geometry on the same A4 fallback page.
+  // Paper conversion is an output-device transform, not the serialized
+  // worksheet zoom. Keep it sheet-level so continuation pages preserve a
+  // chart/printer canvas even when that individual page has no chart anchor.
+  // The page splitter consumes the composed float because the transformed
+  // content footprint determines page boundaries, but `zoom` remains the
+  // authored/fit-derived worksheet value.
   let has_chart = sheet
     .resources
     .drawings
     .iter()
     .any(|drawing| !drawing.charts.is_empty() || !drawing.extended_charts.is_empty());
-  let paper_scale = sheet
+  let paper_scale_percent = sheet
     .page_settings
     .fixed_output_paper_scale_percent(has_chart);
-  if paper_scale < 100 {
-    zoom = (zoom * paper_scale / 100).max(ZOOM_MIN);
-  }
+  let pagination_paper_scale_percent = sheet
+    .page_settings
+    .fixed_output_pagination_paper_scale_percent(has_chart);
 
   CalcPrintScaleState {
     zoom,
+    paper_scale_percent,
+    pagination_paper_scale_percent,
     skip_empty: true,
     top_down: matches!(
       sheet.page_settings.page_order,
@@ -384,7 +456,7 @@ fn actual_row_page_count(
           breaks: &sheet.metrics.row_breaks,
           by_row: true,
           repeat: named_ranges.repeat_rows,
-          zoom,
+          zoom_percent: zoom as f32,
           text_metrics,
         },
       )
@@ -405,7 +477,7 @@ fn fit_zoom_to_pages(
   let Some(area) = areas.first().copied() else {
     return 100;
   };
-  let content = print_content_size_pt(sheet);
+  let content = print_content_size_pt(&sheet.page_settings);
   let repeat_width = named_ranges
     .repeat_columns
     .map(|range| sheet.range_rect(range).width_pt)
@@ -444,23 +516,25 @@ fn fit_scale_area(
   if !named_ranges.resolved_print_areas.is_empty() {
     return area;
   }
-  sheet.used_range(&import.styles).map_or(area, |used| {
+  implicit_used_range(import, sheet, named_ranges).map_or(area, |used| {
     let range = CellRange::new(CellAddress { col: 1, row: 1 }, used.end);
     extend_print_area_for_merges(sheet, range)
   })
 }
 
-fn print_content_size_pt(sheet: &CalcSheet) -> (f32, f32) {
-  let (mut width, mut height) = sheet.page_settings.page_size_pt();
-  width -= (sheet.page_settings.margin_left_in + sheet.page_settings.margin_right_in) as f32
+fn print_content_size_pt(page_settings: &CalcPageSettings) -> (f32, f32) {
+  let (mut width, mut height) = page_settings.page_size_pt();
+  width -= (page_settings.margin_left_in + page_settings.margin_right_in) as f32
     * crate::units::POINTS_PER_INCH;
-  height -= (sheet.page_settings.margin_top_in + sheet.page_settings.margin_bottom_in) as f32
+  height -= (page_settings.margin_top_in + page_settings.margin_bottom_in) as f32
     * crate::units::POINTS_PER_INCH;
-  if sheet.page_settings.scale != 100 && sheet.page_settings.header_footer.has_print_content() {
-    height -= (sheet.page_settings.margin_header_in + sheet.page_settings.margin_footer_in) as f32
-      * crate::units::POINTS_PER_INCH
-      + 2.0 * XLSX_HEADER_FOOTER_LINE_HEIGHT_PT;
-  }
+  // ECMA-376 Part 1 §18.3.1.62 defines top/bottom as page margins and
+  // header/footer as positions within those margins. LibreOffice's OOXML
+  // PageSettingsConverter makes the same ownership explicit: with a header,
+  // Calc TopMargin is the OOXML header margin and HeaderHeight is
+  // top - header, so ScPrintFunc::GetDocPageSize subtracts exactly `top`.
+  // Footer geometry is symmetric. Scaling changes worksheet content, not
+  // these physical margins; subtracting header/footer again shrinks the body.
   (width.max(1.0), height.max(1.0))
 }
 
@@ -574,7 +648,7 @@ fn print_areas_for_sheet(
       .map(|range| extend_print_area_for_merges(sheet, range))
       .collect();
   }
-  match sheet.used_range(&import.styles) {
+  match implicit_used_range(import, sheet, named_ranges) {
     // Implicit print ranges start at A1; ScDocument::GetPrintArea() only
     // supplies the lower-right used cell. Empty leading rows/columns still
     // participate in page-break calculation and are skipped later by
@@ -612,6 +686,44 @@ fn print_areas_for_sheet(
       vec![drawing_print_area(sheet).unwrap_or(CellRange::single(CellAddress { col: 1, row: 1 }))]
     }
   }
+}
+
+fn implicit_used_range(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  named_ranges: &CalcPrintNamedRanges,
+) -> Option<CellRange> {
+  if implicit_header_footer_uses_formatted_cell_extent(import, sheet, named_ranges) {
+    sheet.used_range_including_direct_cell_formatting(&import.styles)
+  } else {
+    sheet.used_range(&import.styles)
+  }
+}
+
+fn implicit_header_footer_uses_formatted_cell_extent(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  named_ranges: &CalcPrintNamedRanges,
+) -> bool {
+  use_formatted_cell_extent_for_implicit_header_footer(
+    !named_ranges.resolved_print_areas.is_empty(),
+    sheet.page_settings.header_footer.has_print_content(),
+    sheet_body_is_empty(import, sheet),
+  )
+}
+
+fn use_formatted_cell_extent_for_implicit_header_footer(
+  has_explicit_print_area: bool,
+  has_header_footer: bool,
+  body_empty: bool,
+) -> bool {
+  // ECMA-376 Part 1 section 18.3.1.35 and Microsoft's binary Dimensions
+  // records include directly formatted cells in the worksheet used range.
+  // Office paints a configured header/footer on every resulting page, even
+  // when that page's cell body has no ink. Keep this extent separate from the
+  // ordinary visible-body range: tdf131536 has thousands of style-only cells
+  // but no header/footer and must not acquire those trailing pages.
+  !has_explicit_print_area && has_header_footer && !body_empty
 }
 
 fn pivot_tabular_page_field_area_uses_dimension(sheet: &CalcSheet) -> bool {
@@ -840,19 +952,20 @@ fn vml_shape_rect_pt(
       .or_else(|| {
         shape
           .anchor
-          .and_then(|anchor| vml_anchor_rect_pt(sheet, anchor))
+          .and_then(|anchor| vml_anchor_rect_pt(sheet, shape, anchor))
       })
   })
 }
 
 fn vml_anchor_rect_pt(
   sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
   anchor: super::object_resources::VmlClientAnchor,
 ) -> Option<(f32, f32, f32, f32)> {
-  let x1 = vml_anchor_x_pt(sheet, anchor.from_col, anchor.from_col_offset_px);
-  let y1 = vml_anchor_y_pt(sheet, anchor.from_row, anchor.from_row_offset_px);
-  let x2 = vml_anchor_x_pt(sheet, anchor.to_col, anchor.to_col_offset_px);
-  let y2 = vml_anchor_y_pt(sheet, anchor.to_row, anchor.to_row_offset_px);
+  let x1 = vml_anchor_x_pt(sheet, shape, anchor.from_col, anchor.from_col_offset_px);
+  let y1 = vml_anchor_y_pt(sheet, shape, anchor.from_row, anchor.from_row_offset_px);
+  let x2 = vml_anchor_x_pt(sheet, shape, anchor.to_col, anchor.to_col_offset_px);
+  let y2 = vml_anchor_y_pt(sheet, shape, anchor.to_row, anchor.to_row_offset_px);
   if x2 < x1 || y2 < y1 {
     return None;
   }
@@ -864,7 +977,12 @@ fn vml_anchor_rect_pt(
   ))
 }
 
-fn vml_anchor_x_pt(sheet: &CalcSheet, zero_based_col: u32, offset_px: i32) -> f32 {
+fn vml_anchor_x_pt(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+  zero_based_col: u32,
+  offset_px: i32,
+) -> f32 {
   let col = zero_based_col.saturating_add(1);
   let cell = sheet.cell_rect(CellAddress { col, row: 1 });
   let next_cell = sheet.cell_rect(CellAddress {
@@ -873,18 +991,23 @@ fn vml_anchor_x_pt(sheet: &CalcSheet, zero_based_col: u32, offset_px: i32) -> f3
   });
   // ShapeAnchor::importVmlAnchor marks offsets as CellAnchorType::Pixel, and
   // calcCellAnchorEmu clamps them to the next cell minus one twip.
-  (cell.x_pt + sheet.vml_anchor_offset_pt(offset_px))
+  (cell.x_pt + sheet.vml_anchor_offset_pt(shape, offset_px))
     .min(next_cell.x_pt - units::twips_to_points(1.0))
 }
 
-fn vml_anchor_y_pt(sheet: &CalcSheet, zero_based_row: u32, offset_px: i32) -> f32 {
+fn vml_anchor_y_pt(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+  zero_based_row: u32,
+  offset_px: i32,
+) -> f32 {
   let row = zero_based_row.saturating_add(1);
   let cell = sheet.cell_rect(CellAddress { col: 1, row });
   let next_cell = sheet.cell_rect(CellAddress {
     col: 1,
     row: row.saturating_add(1),
   });
-  (cell.y_pt + sheet.vml_anchor_offset_pt(offset_px))
+  (cell.y_pt + sheet.vml_anchor_offset_pt(shape, offset_px))
     .min(next_cell.y_pt - units::twips_to_points(1.0))
 }
 
@@ -1299,7 +1422,7 @@ fn page_areas_for_sheet(
   sheet: &CalcSheet,
   print_areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges,
-  zoom: u32,
+  zoom_percent: f32,
   top_down: bool,
   text_metrics: &mut TextMetrics,
 ) -> Vec<Option<CellRange>> {
@@ -1316,7 +1439,7 @@ fn page_areas_for_sheet(
         breaks: &sheet.metrics.row_breaks,
         by_row: true,
         repeat: named_ranges.repeat_rows,
-        zoom,
+        zoom_percent,
         text_metrics,
       },
     );
@@ -1328,7 +1451,7 @@ fn page_areas_for_sheet(
         breaks: &sheet.metrics.column_breaks,
         by_row: false,
         repeat: named_ranges.repeat_columns,
-        zoom,
+        zoom_percent,
         text_metrics,
       },
     );
@@ -1367,7 +1490,7 @@ struct PageMetricSplit<'a> {
   breaks: &'a [super::worksheet::PageBreakModel],
   by_row: bool,
   repeat: Option<CellRange>,
-  zoom: u32,
+  zoom_percent: f32,
   text_metrics: &'a mut TextMetrics,
 }
 
@@ -1388,7 +1511,7 @@ fn split_range_by_page_metrics(
     area.end.col
   };
   let mut slices = Vec::new();
-  let content_size = print_content_size_pt(sheet);
+  let content_size = print_content_size_pt(&sheet.page_settings);
   let repeat_size = split
     .repeat
     .map(|range| {
@@ -1406,7 +1529,7 @@ fn split_range_by_page_metrics(
   } - repeat_size)
     .max(1.0)
     * 100.0
-    / split.zoom.max(ZOOM_MIN) as f32;
+    / split.zoom_percent.max(ZOOM_MIN as f32);
   let mut current_start = start;
   let mut current = start;
   let mut used = 0.0f32;
@@ -1414,7 +1537,7 @@ fn split_range_by_page_metrics(
     if split
       .breaks
       .iter()
-      .any(|page_break| page_break.manual && page_break.id == current && current > current_start)
+      .any(|page_break| manual_page_break_starts_at(page_break, current, current_start))
     {
       slices.push(axis_slice(area, split.by_row, current_start, current - 1));
       current_start = current;
@@ -1442,6 +1565,19 @@ fn split_range_by_page_metrics(
     slices.push(axis_slice(area, split.by_row, current_start, end));
   }
   slices
+}
+
+fn manual_page_break_starts_at(
+  page_break: &super::worksheet::PageBreakModel,
+  current: u32,
+  current_start: u32,
+) -> bool {
+  // ECMA-376 Part 1 §18.3.1.3 stores brk@id as a zero-based row or
+  // column index and places the break above/left of that position. CalcSheet
+  // addresses are one-based, so id=51 starts the next page at row 52. POI's
+  // XSSFSheet::setBreak independently serializes its zero-based API index as
+  // id + 1, which is the same boundary viewed from the caller side.
+  page_break.manual && page_break.id.checked_add(1) == Some(current) && current > current_start
 }
 
 fn print_row_height_pt(
@@ -4233,6 +4369,99 @@ mod tests {
   use super::*;
 
   #[test]
+  fn implicit_header_footer_uses_directly_formatted_cell_extent() {
+    assert!(use_formatted_cell_extent_for_implicit_header_footer(
+      false, true, false
+    ));
+    assert!(!use_formatted_cell_extent_for_implicit_header_footer(
+      false, false, false
+    ));
+    assert!(!use_formatted_cell_extent_for_implicit_header_footer(
+      true, true, false
+    ));
+    assert!(!use_formatted_cell_extent_for_implicit_header_footer(
+      false, true, true
+    ));
+  }
+
+  #[test]
+  fn implicit_header_footer_keeps_only_formatted_horizontal_continuations() {
+    let visible = CellRange::new(
+      CellAddress { col: 1, row: 1 },
+      CellAddress { col: 4, row: 49 },
+    );
+    let horizontal_continuation = CellRange::new(
+      CellAddress { col: 5, row: 1 },
+      CellAddress { col: 9, row: 49 },
+    );
+    assert!(keep_formatted_horizontal_header_footer_page(
+      true,
+      Some(visible),
+      horizontal_continuation,
+      true,
+    ));
+
+    // Profile: the empty page is the bottom-right Cartesian hole, not a new
+    // horizontal band beyond the visible E column.
+    assert!(!keep_formatted_horizontal_header_footer_page(
+      true,
+      Some(CellRange::new(
+        CellAddress { col: 1, row: 1 },
+        CellAddress { col: 5, row: 54 },
+      )),
+      CellRange::new(
+        CellAddress { col: 5, row: 54 },
+        CellAddress { col: 5, row: 54 },
+      ),
+      true,
+    ));
+    // Top Five: a vertical centered-format tail is not a horizontal page.
+    assert!(!keep_formatted_horizontal_header_footer_page(
+      true,
+      Some(visible),
+      CellRange::new(
+        CellAddress { col: 1, row: 45 },
+        CellAddress { col: 8, row: 49 },
+      ),
+      true,
+    ));
+    // Job Source: an explicit but default-equivalent XF does not qualify.
+    assert!(!keep_formatted_horizontal_header_footer_page(
+      true,
+      Some(visible),
+      horizontal_continuation,
+      false,
+    ));
+
+    assert!(!should_skip_empty_print_page(
+      true, true, false, true, false
+    ));
+    assert!(should_skip_empty_print_page(
+      true, true, false, false, false
+    ));
+  }
+
+  #[test]
+  fn scaled_header_footer_stays_inside_authored_page_margins() {
+    let mut settings = CalcPageSettings::default();
+    settings.margin_left_in = 0.5;
+    settings.margin_right_in = 0.5;
+    settings.margin_top_in = 1.0;
+    settings.margin_bottom_in = 0.5;
+    settings.margin_header_in = 0.5;
+    settings.margin_footer_in = 0.25;
+    settings.scale = 90;
+    let without_footer = print_content_size_pt(&settings);
+    settings.header_footer.odd_footer = Some("&L&F".to_string());
+    let with_footer = print_content_size_pt(&settings);
+    let (page_width, page_height) = settings.page_size_pt();
+
+    assert_eq!(with_footer, without_footer);
+    assert!((with_footer.0 - (page_width - 72.0)).abs() <= f32::EPSILON);
+    assert!((with_footer.1 - (page_height - 108.0)).abs() <= f32::EPSILON);
+  }
+
+  #[test]
   fn page_cell_scan_includes_one_following_column_without_changing_rows() {
     let page = CellRange::new(
       CellAddress { col: 2, row: 3 },
@@ -4246,6 +4475,20 @@ mod tests {
         CellAddress { col: 8, row: 19 },
       )
     );
+  }
+
+  #[test]
+  fn raw_zero_based_manual_break_starts_the_next_one_based_row() {
+    let page_break = crate::xlsx::worksheet::PageBreakModel {
+      id: 51,
+      min: 0,
+      max: 9,
+      manual: true,
+      pivot: false,
+    };
+
+    assert!(!manual_page_break_starts_at(&page_break, 51, 1));
+    assert!(manual_page_break_starts_at(&page_break, 52, 1));
   }
 
   #[test]

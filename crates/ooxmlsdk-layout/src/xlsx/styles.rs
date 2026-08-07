@@ -122,6 +122,7 @@ pub(crate) struct FontRecord {
   pub(crate) italic: bool,
   pub(crate) underline: bool,
   pub(crate) strikethrough: bool,
+  pub(crate) vertical_alignment: Option<x::VerticalAlignmentRunValues>,
   pub(crate) scheme: x::FontSchemeValues,
 }
 
@@ -528,6 +529,10 @@ impl StylesCatalog {
     else {
       return style;
     };
+    // A cell XF font is a complete font record. Clear any escapement inherited
+    // from the Normal font before applying its size, then apply this font's
+    // authored alignment (whose omitted state is baseline).
+    super::text::apply_vertical_text_alignment(&mut style, x::VerticalAlignmentRunValues::Baseline);
     self.apply_font_family(font, &mut style);
     if let Some(size_pt) = font.size_pt {
       style.font_size_pt = size_pt.get() as f32;
@@ -539,6 +544,12 @@ impl StylesCatalog {
     style.italic = font.italic;
     style.underline = font.underline;
     style.strikethrough = font.strikethrough;
+    super::text::apply_vertical_text_alignment(
+      &mut style,
+      font
+        .vertical_alignment
+        .unwrap_or(x::VerticalAlignmentRunValues::Baseline),
+    );
     style
   }
 
@@ -583,6 +594,12 @@ impl StylesCatalog {
     style.italic = font.italic;
     style.underline = font.underline;
     style.strikethrough = font.strikethrough;
+    super::text::apply_vertical_text_alignment(
+      &mut style,
+      font
+        .vertical_alignment
+        .unwrap_or(x::VerticalAlignmentRunValues::Baseline),
+    );
     style
   }
 
@@ -703,6 +720,12 @@ impl StylesCatalog {
     else {
       return;
     };
+    if font.vertical_alignment.is_some() {
+      // Unlike a normal font record, DXF is sparse. Reset first only when the
+      // DXF explicitly owns vertical alignment so a following size is applied
+      // to the unescaped font.
+      super::text::apply_vertical_text_alignment(style, x::VerticalAlignmentRunValues::Baseline);
+    }
     self.apply_font_family(font, style);
     if let Some(size_pt) = font.size_pt {
       style.font_size_pt = size_pt.get() as f32;
@@ -721,6 +744,9 @@ impl StylesCatalog {
     }
     if font.strikethrough {
       style.strikethrough = true;
+    }
+    if let Some(vertical_alignment) = font.vertical_alignment {
+      super::text::apply_vertical_text_alignment(style, vertical_alignment);
     }
   }
 
@@ -769,6 +795,40 @@ impl StylesCatalog {
       .fill_id
       .and_then(|id| self.fill_records.get(id as usize).cloned())
       .unwrap_or_default()
+  }
+
+  pub(crate) fn direct_cell_format_differs_from_parent(&self, style_index: u32) -> bool {
+    let Some(format) = self.cell_xfs.get(style_index as usize) else {
+      return false;
+    };
+    let parent = format
+      .style_xf_id
+      .and_then(|id| self.style_xfs.get(id as usize));
+    let Some(effective) = self.effective_cell_format(Some(style_index)) else {
+      return false;
+    };
+    let normalized_id = |id: Option<u32>| id.unwrap_or(0);
+    let parent_number_format = parent.and_then(|format| format.number_format_id);
+    let parent_font = parent.and_then(|format| format.font_id);
+    let parent_fill = parent.and_then(|format| format.fill_id);
+    let parent_border = parent.and_then(|format| format.border_id);
+    let parent_alignment = parent
+      .and_then(|format| format.alignment)
+      .unwrap_or_default();
+
+    // ECMA-376 Part 1 section 18.3.1.35 and Microsoft's Dimensions records
+    // include directly formatted cells in a worksheet's used extent. Compare
+    // the cell XF with its parent style XF property by property: an explicit
+    // applyFill="1" with fillId="0" is still default-equivalent, while an
+    // authored alignment such as wrapText is a real format delta even though
+    // a blank cell paints no ink of its own.
+    (effective.apply_number_format
+      && normalized_id(format.number_format_id) != normalized_id(parent_number_format))
+      || (effective.apply_font && normalized_id(format.font_id) != normalized_id(parent_font))
+      || (effective.apply_fill && normalized_id(format.fill_id) != normalized_id(parent_fill))
+      || (effective.apply_border && normalized_id(format.border_id) != normalized_id(parent_border))
+      || ((effective.apply_alignment || format.has_alignment)
+        && format.alignment.unwrap_or_default() != parent_alignment)
   }
 
   fn effective_cell_format(&self, style_index: Option<u32>) -> Option<CellFormatRecord> {
@@ -1051,6 +1111,9 @@ impl FontRecord {
         }
         x::FontChoice::Underline(value) => {
           record.underline = !matches!(value.val, Some(x::UnderlineValues::None));
+        }
+        x::FontChoice::VerticalTextAlignment(value) => {
+          record.vertical_alignment = Some(value.val);
         }
         x::FontChoice::FontSize(value) => {
           record.size_pt = Some(OrderedF64::new(value.val));
@@ -1398,7 +1461,7 @@ fn color_from_components(
   let base = theme
     .and_then(|index| theme_colors.get(index))
     .or_else(|| color_from_ooxml(rgb))
-    .or_else(|| indexed.and_then(|index| indexed_colors.get(index as usize).copied()))?;
+    .or_else(|| indexed.and_then(|index| indexed_color(indexed_colors, index)))?;
   Some(match tint {
     Some(tint) if tint != 0.0 => rgb_from_resolved(apply_excel_tint(
       ResolvedColor::new(base.r, base.g, base.b),
@@ -1406,6 +1469,92 @@ fn color_from_components(
     )),
     _ => base,
   })
+}
+
+fn indexed_color(custom_colors: &[RgbColor], index: u32) -> Option<RgbColor> {
+  if custom_colors.is_empty() {
+    return DEFAULT_INDEXED_COLORS.get(index as usize).copied();
+  }
+  custom_colors.get(index as usize).copied()
+}
+
+// ECMA-376 Part 1 §18.8.27: the default indexed palette is implied and is
+// therefore normally absent from styles.xml. LibreOffice's spnDefColors8 and
+// Apache POI's DefaultIndexedColorMap carry the same 64-entry table. Indexes
+// 64 and 65 are system foreground/background colors rather than fixed RGB.
+const DEFAULT_INDEXED_COLORS: [RgbColor; 64] = [
+  indexed_rgb(0x000000),
+  indexed_rgb(0xFFFFFF),
+  indexed_rgb(0xFF0000),
+  indexed_rgb(0x00FF00),
+  indexed_rgb(0x0000FF),
+  indexed_rgb(0xFFFF00),
+  indexed_rgb(0xFF00FF),
+  indexed_rgb(0x00FFFF),
+  indexed_rgb(0x000000),
+  indexed_rgb(0xFFFFFF),
+  indexed_rgb(0xFF0000),
+  indexed_rgb(0x00FF00),
+  indexed_rgb(0x0000FF),
+  indexed_rgb(0xFFFF00),
+  indexed_rgb(0xFF00FF),
+  indexed_rgb(0x00FFFF),
+  indexed_rgb(0x800000),
+  indexed_rgb(0x008000),
+  indexed_rgb(0x000080),
+  indexed_rgb(0x808000),
+  indexed_rgb(0x800080),
+  indexed_rgb(0x008080),
+  indexed_rgb(0xC0C0C0),
+  indexed_rgb(0x808080),
+  indexed_rgb(0x9999FF),
+  indexed_rgb(0x993366),
+  indexed_rgb(0xFFFFCC),
+  indexed_rgb(0xCCFFFF),
+  indexed_rgb(0x660066),
+  indexed_rgb(0xFF8080),
+  indexed_rgb(0x0066CC),
+  indexed_rgb(0xCCCCFF),
+  indexed_rgb(0x000080),
+  indexed_rgb(0xFF00FF),
+  indexed_rgb(0xFFFF00),
+  indexed_rgb(0x00FFFF),
+  indexed_rgb(0x800080),
+  indexed_rgb(0x800000),
+  indexed_rgb(0x008080),
+  indexed_rgb(0x0000FF),
+  indexed_rgb(0x00CCFF),
+  indexed_rgb(0xCCFFFF),
+  indexed_rgb(0xCCFFCC),
+  indexed_rgb(0xFFFF99),
+  indexed_rgb(0x99CCFF),
+  indexed_rgb(0xFF99CC),
+  indexed_rgb(0xCC99FF),
+  indexed_rgb(0xFFCC99),
+  indexed_rgb(0x3366FF),
+  indexed_rgb(0x33CCCC),
+  indexed_rgb(0x99CC00),
+  indexed_rgb(0xFFCC00),
+  indexed_rgb(0xFF9900),
+  indexed_rgb(0xFF6600),
+  indexed_rgb(0x666699),
+  indexed_rgb(0x969696),
+  indexed_rgb(0x003366),
+  indexed_rgb(0x339966),
+  indexed_rgb(0x003300),
+  indexed_rgb(0x333300),
+  indexed_rgb(0x993300),
+  indexed_rgb(0x993366),
+  indexed_rgb(0x333399),
+  indexed_rgb(0x333333),
+];
+
+const fn indexed_rgb(rgb: u32) -> RgbColor {
+  RgbColor {
+    r: ((rgb >> 16) & 0xFF) as u8,
+    g: ((rgb >> 8) & 0xFF) as u8,
+    b: (rgb & 0xFF) as u8,
+  }
 }
 
 fn rgb_from_resolved(color: ResolvedColor) -> RgbColor {
@@ -1531,6 +1680,85 @@ fn defined_name_builtin(name: &str) -> Option<DefinedNameBuiltin> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn rich_text_cell_font_vertical_alignment_parses_with_baseline_opposite_state() {
+    let superscript = FontRecord::from_font_with_colors(
+      &x::Font {
+        font_choice: vec![
+          x::FontChoice::VerticalTextAlignment(x::VerticalTextAlignment {
+            val: x::VerticalAlignmentRunValues::Superscript,
+          }),
+          x::FontChoice::FontSize(x::FontSize { val: 10.0 }),
+          x::FontChoice::FontName(x::FontName {
+            val: "Arial".to_string(),
+          }),
+        ],
+      },
+      &[],
+      &ThemeColorPalette::default(),
+    );
+    assert_eq!(
+      superscript.vertical_alignment,
+      Some(x::VerticalAlignmentRunValues::Superscript)
+    );
+
+    let regular = FontRecord {
+      name: Some(Arc::from("Arial")),
+      size_pt: Some(OrderedF64::new(10.0)),
+      ..FontRecord::default()
+    };
+    let catalog = StylesCatalog {
+      font_records: vec![superscript, regular],
+      cell_xfs: vec![CellFormatRecord::from_cell_format(
+        &x::CellFormat {
+          font_id: Some(1),
+          ..x::CellFormat::default()
+        },
+        false,
+      )],
+      ..StylesCatalog::default()
+    };
+
+    let default_style = catalog.default_font_text_style();
+    assert_eq!(default_style.automatic_escapement_font_size_pt, Some(10.0));
+    assert!((default_style.font_size_pt - 20.0 / 3.0).abs() < 1.0e-5);
+    assert_eq!(default_style.baseline_shift_pt, 5.0);
+
+    let regular_style = catalog.text_style_for_cell(Some(0));
+    assert_eq!(regular_style.font_size_pt, 10.0);
+    assert_eq!(regular_style.baseline_shift_pt, 0.0);
+    assert_eq!(regular_style.automatic_escapement_font_size_pt, None);
+  }
+
+  #[test]
+  fn omitted_indexed_color_table_uses_the_implied_ecma_palette() {
+    assert_eq!(
+      indexed_color(&[], 22),
+      Some(RgbColor {
+        r: 0xC0,
+        g: 0xC0,
+        b: 0xC0,
+      })
+    );
+    assert_eq!(
+      indexed_color(&[], 45),
+      Some(RgbColor {
+        r: 0xFF,
+        g: 0x99,
+        b: 0xCC,
+      })
+    );
+    assert_eq!(indexed_color(&[], 64), None);
+  }
+
+  #[test]
+  fn custom_indexed_color_table_replaces_the_implied_palette() {
+    let custom = [RgbColor { r: 1, g: 2, b: 3 }];
+
+    assert_eq!(indexed_color(&custom, 0), Some(custom[0]));
+    assert_eq!(indexed_color(&custom, 22), None);
+  }
 
   #[test]
   fn office_border_weights_follow_fixed_output_point_grid() {
@@ -1704,6 +1932,67 @@ mod tests {
       catalog.direct_nondefault_font_color_for_cell(Some(1)),
       Some(dark_gray)
     );
+  }
+
+  #[test]
+  fn direct_cell_format_delta_distinguishes_default_ids_from_alignment() {
+    let baseline = CellFormatRecord {
+      number_format_id: None,
+      font_id: None,
+      fill_id: None,
+      border_id: None,
+      style_xf_id: None,
+      quote_prefix: false,
+      pivot_button: false,
+      apply_number_format: true,
+      apply_font: true,
+      apply_fill: true,
+      apply_border: true,
+      apply_alignment: true,
+      apply_protection: true,
+      has_alignment: false,
+      alignment: None,
+    };
+    let direct_format = |alignment: Option<AlignmentRecord>| CellFormatRecord {
+      number_format_id: Some(0),
+      font_id: Some(0),
+      fill_id: Some(0),
+      border_id: Some(0),
+      style_xf_id: Some(0),
+      quote_prefix: false,
+      pivot_button: false,
+      apply_number_format: false,
+      apply_font: false,
+      apply_fill: true,
+      apply_border: false,
+      apply_alignment: alignment.is_some(),
+      apply_protection: false,
+      has_alignment: alignment.is_some(),
+      alignment,
+    };
+    let catalog = StylesCatalog {
+      style_xfs: vec![baseline],
+      cell_xfs: vec![
+        // Job Source style 16: explicit zero ids and applyFill are equivalent
+        // to the parent Normal XF.
+        direct_format(None),
+        // Location style 120 and Top Five style 19 each own a real alignment
+        // delta. The page-axis selector decides which one can retain a page.
+        direct_format(Some(AlignmentRecord {
+          wrap_text: true,
+          ..AlignmentRecord::default()
+        })),
+        direct_format(Some(AlignmentRecord {
+          horizontal: Some(x::HorizontalAlignmentValues::Center),
+          ..AlignmentRecord::default()
+        })),
+      ],
+      ..StylesCatalog::default()
+    };
+
+    assert!(!catalog.direct_cell_format_differs_from_parent(0));
+    assert!(catalog.direct_cell_format_differs_from_parent(1));
+    assert!(catalog.direct_cell_format_differs_from_parent(2));
   }
 
   #[test]

@@ -182,8 +182,10 @@ pub(crate) struct SheetMetrics {
   pub(crate) format: SheetFormatModel,
   pub(crate) digit_width_pt: f32,
   printer_digit_width_pt: f32,
+  screen_digit_width_px: u32,
   pub(crate) default_digit_width_pt: f32,
   indexed_scatter_print_grid: bool,
+  legacy_excel12_arial_screen_column_grid: bool,
   modern_excel_implicit_columns: bool,
   legacy_calibri_implicit_columns: bool,
   compatibility_mode_implicit_columns: bool,
@@ -373,7 +375,7 @@ impl CalcSheet {
       has_sheet_drawing && !has_extended_chart,
     );
     apply_excel16_chartex_implicit_row_printer_grid(&mut metrics, has_extended_chart);
-    let rows = worksheet_rows(&worksheet, shared_strings, styles, producer.mso_document);
+    let rows = worksheet_rows(&worksheet, shared_strings, styles);
     let authored_date_chart_printer_grid = resources
       .drawings
       .iter()
@@ -478,6 +480,42 @@ impl CalcSheet {
   }
 
   pub(crate) fn used_range(&self, styles: &StylesCatalog) -> Option<CellRange> {
+    self.used_range_with_direct_cell_formatting(styles, false)
+  }
+
+  pub(crate) fn used_range_including_direct_cell_formatting(
+    &self,
+    styles: &StylesCatalog,
+  ) -> Option<CellRange> {
+    self.used_range_with_direct_cell_formatting(styles, true)
+  }
+
+  pub(crate) fn has_nondefault_direct_cell_formatting_in_range(
+    &self,
+    styles: &StylesCatalog,
+    range: CellRange,
+  ) -> bool {
+    self
+      .rows_intersecting_print_area(range)
+      .any(|(row_index, row)| {
+        row.cells.iter().enumerate().any(|(cell_position, cell)| {
+          let Some(style_index) = cell.style_index else {
+            return false;
+          };
+          let address = cell.address().unwrap_or(CellAddress {
+            col: cell_position as u32 + 1,
+            row: row_index,
+          });
+          range.contains(address) && styles.direct_cell_format_differs_from_parent(style_index)
+        })
+      })
+  }
+
+  fn used_range_with_direct_cell_formatting(
+    &self,
+    styles: &StylesCatalog,
+    include_direct_cell_formatting: bool,
+  ) -> Option<CellRange> {
     let mut used: Option<CellRange> = None;
     for (row_position, row) in self.rows.iter().enumerate() {
       let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
@@ -487,7 +525,7 @@ impl CalcSheet {
           row: row_index,
         });
         let style_index = self.effective_cell_style_index(row, cell, address);
-        if !cell.has_print_data(styles, style_index) {
+        if !cell.contributes_to_used_range(styles, style_index, include_direct_cell_formatting) {
           continue;
         }
         let Some(print_address) = super::pivot::pivot_print_address(self, address) else {
@@ -620,6 +658,10 @@ impl CalcSheet {
       .is_some_and(|range| range.start != address)
   }
 
+  pub(crate) fn uses_legacy_excel12_cell_text_print_grid(&self) -> bool {
+    self.metrics.legacy_excel12_calibri_fixed_output_grid
+  }
+
   pub(crate) fn range_rect(&self, range: CellRange) -> CellRect {
     let start = self.cell_rect_with_merge(range.start, false);
     let width_pt = self
@@ -691,8 +733,14 @@ impl CalcSheet {
     self.geometry.default_row_height_pt
   }
 
-  pub(crate) fn vml_anchor_offset_pt(&self, value: i32) -> f32 {
-    let dpi = if self.metrics.legacy_excel12_vml_control_snapshot_grid {
+  pub(crate) fn vml_anchor_offset_pt(
+    &self,
+    shape: &super::object_resources::VmlShapeModel,
+    value: i32,
+  ) -> f32 {
+    let dpi = if self.metrics.legacy_excel12_vml_control_snapshot_grid
+      || self.uses_legacy_excel12_vml_picture_snapshot_grid(shape)
+    {
       200.0
     } else {
       units::CSS_PIXELS_PER_INCH
@@ -702,6 +750,19 @@ impl CalcSheet {
 
   pub(crate) fn uses_legacy_excel12_vml_control_snapshot_grid(&self) -> bool {
     self.metrics.legacy_excel12_vml_control_snapshot_grid
+  }
+
+  pub(crate) fn uses_legacy_excel12_vml_picture_snapshot_grid(
+    &self,
+    shape: &super::object_resources::VmlShapeModel,
+  ) -> bool {
+    self.metrics.legacy_excel12_calibri_fixed_output_grid
+      && shape.auto_size_picture
+      && shape
+        .object_type
+        .as_deref()
+        .is_some_and(|object_type| object_type.eq_ignore_ascii_case("Pict"))
+      && self.metrics.objects.anchor_for_vml_shape(shape).is_none()
   }
 
   pub(crate) fn cell_at(&self, address: CellAddress) -> Option<&CalcCell> {
@@ -1072,6 +1133,9 @@ fn column_width_from_metrics(metrics: &SheetMetrics, column: u32, default_width_
       return 0.0;
     }
     if let Some(width) = model.width {
+      if metrics.legacy_excel12_arial_screen_column_grid {
+        return stored_column_width_to_screen_points(width, metrics.screen_digit_width_px);
+      }
       let digit_width_pt = if metrics.indexed_scatter_print_grid {
         metrics.printer_digit_width_pt
       } else {
@@ -1218,6 +1282,16 @@ fn apply_excel16_chartex_implicit_row_printer_grid(
 }
 
 impl CalcCell {
+  fn contributes_to_used_range(
+    &self,
+    styles: &StylesCatalog,
+    style_index: Option<u32>,
+    include_direct_cell_formatting: bool,
+  ) -> bool {
+    self.has_print_data(styles, style_index)
+      || include_direct_cell_formatting && self.style_index.is_some()
+  }
+
   fn has_print_data(&self, styles: &StylesCatalog, style_index: Option<u32>) -> bool {
     if self.formula.is_some()
       || self.cached_value.is_some()
@@ -1359,6 +1433,9 @@ impl SheetMetrics {
       // UnitConverter starts with 1 digit = 2mm. finalizeImport() only
       // replaces it when StylesBuffer::getDefaultFont() finds an XF/font.
       .unwrap_or_else(|| units::millimeters_to_points(CALC_DIGIT_WIDTH_MM));
+    let screen_digit_width_px = (raw_digit_width_pt / screen_pixel_width_pt())
+      .round()
+      .max(1.0) as u32;
     let libreoffice_arial10_1161_printer_grid = producer.libreoffice_document
       && styles.normal_style_uses_explicit_arial_10()
       && worksheet
@@ -1500,8 +1577,13 @@ impl SheetMetrics {
       // amount for fonts such as Arial 10.
       printer_digit_width_pt: (raw_digit_width_pt * units::TWIPS_PER_POINT).round()
         / units::TWIPS_PER_POINT,
+      screen_digit_width_px,
       default_digit_width_pt,
       indexed_scatter_print_grid: false,
+      legacy_excel12_arial_screen_column_grid: legacy_excel12_arial_screen_column_grid(
+        producer,
+        styles.normal_style_uses_explicit_arial_10(),
+      ),
       modern_excel_implicit_columns: mso_document
         && producer
           .excel_major_version
@@ -1598,6 +1680,23 @@ fn legacy_excel12_calibri_marker_x_pt(column: i32, column_offset_emu: i64) -> f3
   column as f32 * printer_column_width_pt + printer_offset_pt as f32
 }
 
+fn legacy_excel12_arial_screen_column_grid(
+  producer: SpreadsheetProducerProfile,
+  normal_style_uses_explicit_arial_10: bool,
+) -> bool {
+  // MS-OI29500 18.3.1.13(f) defines col@width through the Normal font's
+  // maximum digit width. Excel 12's explicit Arial 10 workbooks retain that
+  // 96dpi integer-pixel worksheet grid in Office fixed output. EPPlus
+  // ExcelColumn::ColumnWidthToPixels and ClosedXML XLHelper::WidthToPixels
+  // independently preserve the same storage-to-screen boundary. Keep the
+  // path separate from Excel 14+ Calibri printer metrics, Mac Excel's
+  // Verdana compatibility grid, and third-party producer measurements.
+  producer.mso_document
+    && !producer.macintosh_excel
+    && producer.excel_major_version == Some(12)
+    && normal_style_uses_explicit_arial_10
+}
+
 fn excel16_calibri_half_pixel_descent_row_profile(
   producer: SpreadsheetProducerProfile,
   calibri_11_minor_theme: bool,
@@ -1646,11 +1745,13 @@ impl SheetFormatModel {
     Self {
       base_column_width: format.base_column_width,
       default_column_width: format.default_column_width,
-      default_row_height: if mso_document {
-        mso_row_height_pt(format.default_row_height)
-      } else {
-        format.default_row_height
-      },
+      // ECMA-376 Part 1 §18.3.1.81 defines defaultRowHeight in points.
+      // Keep the serialized measurement intact; producer-specific screen or
+      // printer grids belong to the later geometry/output stages. In
+      // particular, Excel 12's 49156.xlsx contains both 18pt and 20.1pt
+      // custom rows, and its Office PDF disproves a shared 0.75pt import-time
+      // truncation for those values.
+      default_row_height: format.default_row_height,
       custom_height: format.custom_height.is_some_and(|value| value.as_bool()),
       zero_height: format.zero_height.is_some_and(|value| value.as_bool()),
       thick_top: format.thick_top.is_some_and(|value| value.as_bool()),
@@ -1836,7 +1937,6 @@ fn worksheet_rows(
   worksheet: &x::Worksheet,
   shared_strings: &[SharedStringModel],
   styles: &StylesCatalog,
-  mso_document: bool,
 ) -> Vec<CalcRow> {
   worksheet
     .sheet_data
@@ -1885,13 +1985,11 @@ fn worksheet_rows(
         .flatten();
       CalcRow {
         row_index: Some(row_index),
-        height: row.height.map(|height| {
-          if mso_document {
-            mso_row_height_pt(height)
-          } else {
-            height
-          }
-        }),
+        // ECMA-376 Part 1 §18.3.1.73 defines ht in points. Do not replace
+        // authored XML with LibreOffice's supplemental 0.75pt compatibility
+        // import grid; fixed-output scaling and device quantization happen
+        // after the worksheet geometry has retained this value.
+        height: row.height,
         dy_descent_pt: row
           .dy_descent
           .filter(|value| value.is_finite() && *value >= 0.0)
@@ -1908,15 +2006,6 @@ fn worksheet_rows(
     .collect()
 }
 
-fn mso_row_height_pt(height: f64) -> f64 {
-  if height > 0.0 {
-    // worksheetfragment.cxx round MSO OOXML row heights down to 0.75pt.
-    height - height % 0.75
-  } else {
-    height
-  }
-}
-
 fn digit_width_to_points(value: f32, digit_width_pt: f32) -> f32 {
   // UnitConverter::scaleValue(value, Unit::Digit, Unit::Twip).
   value * digit_width_pt
@@ -1925,6 +2014,17 @@ fn digit_width_to_points(value: f32, digit_width_pt: f32) -> f32 {
 fn digit_width_to_lo_points(value: f32, digit_width_pt: f32) -> f32 {
   (digit_width_to_points(value, digit_width_pt) * units::TWIPS_PER_POINT).round()
     / units::TWIPS_PER_POINT
+}
+
+fn stored_column_width_to_screen_points(width: f64, maximum_digit_width_px: u32) -> f32 {
+  let maximum_digit_width_px = f64::from(maximum_digit_width_px.max(1));
+  // Restore the stored 1/256-character width to Excel's whole 96dpi
+  // worksheet pixels before any print transform. The half-MDW term is the
+  // inverse storage correction used by EPPlus for authored column widths.
+  let width_px = (((256.0 * width + (128.0 / maximum_digit_width_px).trunc()) / 256.0)
+    * maximum_digit_width_px)
+    .trunc();
+  width_px as f32 * screen_pixel_width_pt()
 }
 
 fn measured_digit_width_pt(style: &crate::model::TextStyle) -> f32 {
@@ -2160,15 +2260,10 @@ fn cell_rich_text_runs(
         inline
           .run
           .iter()
-          .map(|run| SharedStringRun {
-            text: run
-              .text
-              .xml_content
-              .as_deref()
-              .map(decode_excel_escaped_text)
-              .unwrap_or_default(),
-            ..SharedStringRun::default()
-          })
+          // CT_Rst owns both shared-string and inline-string rich runs. Keep
+          // one parser so inline rPr does not silently lose the same font and
+          // vertical-alignment properties.
+          .map(super::workbook::shared_string_run)
           .collect()
       })
       .unwrap_or_default(),
@@ -2217,6 +2312,65 @@ mod tests {
       SheetFormatModel::default().default_column_width_points(6.0),
       51.75
     );
+  }
+
+  #[test]
+  fn excel_stored_column_width_restores_integer_screen_pixels() {
+    assert_eq!(stored_column_width_to_screen_points(5.0, 7), 26.25);
+    assert_eq!(stored_column_width_to_screen_points(4.570_312_5, 7), 24.0);
+    assert_eq!(
+      stored_column_width_to_screen_points(33.570_312_5, 7),
+      176.25
+    );
+  }
+
+  #[test]
+  fn excel12_arial_explicit_columns_use_the_screen_grid() {
+    let excel12 = SpreadsheetProducerProfile {
+      mso_document: true,
+      excel_major_version: Some(12),
+      ..SpreadsheetProducerProfile::default()
+    };
+    assert!(legacy_excel12_arial_screen_column_grid(excel12, true));
+    assert!(!legacy_excel12_arial_screen_column_grid(
+      SpreadsheetProducerProfile {
+        excel_major_version: Some(14),
+        ..excel12
+      },
+      true
+    ));
+    assert!(!legacy_excel12_arial_screen_column_grid(
+      SpreadsheetProducerProfile {
+        macintosh_excel: true,
+        ..excel12
+      },
+      true
+    ));
+    assert!(!legacy_excel12_arial_screen_column_grid(excel12, false));
+
+    let mut metrics = SheetMetrics {
+      digit_width_pt: 5.52,
+      screen_digit_width_px: 7,
+      default_digit_width_pt: 5.52,
+      legacy_excel12_arial_screen_column_grid: true,
+      ..SheetMetrics::default()
+    };
+    metrics.columns.push(ColumnModel {
+      first: 1,
+      last: 1,
+      width: Some(5.0),
+      style_index: None,
+      hidden: false,
+      best_fit: false,
+      custom_width: true,
+      phonetic: false,
+      outline_level: 0,
+      collapsed: false,
+    });
+
+    let geometry = SheetGeometry::new(&metrics, &[], None, None);
+
+    assert_eq!(geometry.column_width_pt(1), 26.25);
   }
 
   #[test]
@@ -2443,6 +2597,8 @@ mod tests {
 
     let styles = StylesCatalog::default();
     assert!(!cell.has_print_data(&styles, cell.style_index));
+    assert!(!cell.contributes_to_used_range(&styles, cell.style_index, false));
+    assert!(cell.contributes_to_used_range(&styles, cell.style_index, true));
   }
 
   #[test]
@@ -2459,17 +2615,55 @@ mod tests {
   }
 
   #[test]
-  fn date_chart_printer_grid_preserves_dy_descent_after_mso_rounding() {
+  fn authored_custom_row_height_reaches_the_printer_grid_without_import_rounding() {
     let mut metrics = SheetMetrics::default();
     metrics.format.default_row_height = 12.0;
     let mut row = empty_row(Some(3));
-    row.height = Some(mso_row_height_pt(14.15));
+    row.height = Some(14.15);
     row.dy_descent_pt = Some(0.25 * screen_pixel_width_pt());
     row.custom_height = true;
 
     let geometry = SheetGeometry::new(&metrics, &[row], None, Some(300));
 
-    assert_eq!(geometry.row_height_pt(3), 13.68);
+    assert_eq!(geometry.row_height_pt(3), 14.4);
+  }
+
+  #[test]
+  fn worksheet_row_and_default_height_keep_authored_point_values() {
+    let worksheet = x::Worksheet {
+      sheet_format_properties: Some(x::SheetFormatProperties {
+        default_row_height: 12.75,
+        ..Default::default()
+      }),
+      sheet_data: x::SheetData {
+        row: vec![
+          x::Row {
+            row_index: Some(1),
+            height: Some(20.1),
+            custom_height: Some(true.into()),
+            ..Default::default()
+          },
+          x::Row {
+            row_index: Some(2),
+            height: Some(18.0),
+            custom_height: Some(true.into()),
+            ..Default::default()
+          },
+        ],
+      },
+      ..Default::default()
+    };
+    let styles = StylesCatalog::default();
+
+    let rows = worksheet_rows(&worksheet, &[], &styles);
+    let format = SheetFormatModel::from_sheet_format_properties(
+      worksheet.sheet_format_properties.as_ref().unwrap(),
+      true,
+    );
+
+    assert_eq!(format.default_row_height, 12.75);
+    assert_eq!(rows[0].height, Some(20.1));
+    assert_eq!(rows[1].height, Some(18.0));
   }
 
   #[test]

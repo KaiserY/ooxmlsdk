@@ -402,10 +402,11 @@ impl TextMetrics {
   /// one-glyph-per-character text run.
   ///
   /// TrueType `hdmx` records contain the hinted advance of every glyph at an
-  /// exact integer ppem. This is observably different from scaling `hmtx`
-  /// widths and then applying OpenType kerning: legacy Forms controls printed
-  /// through GDI use the former. Complex clusters and fonts without a matching
-  /// device record deliberately fall back to the normal shaping path.
+  /// exact integer ppem. When that optional table is absent, classic GDI still
+  /// exposes an integer device width: Wine's `get_advance_metric` rounds the
+  /// scaled advance up to the next 26.6 pixel boundary before
+  /// `GetTextExtentExPoint` accumulates it. Complex clusters deliberately fall
+  /// back to the normal shaping path.
   pub(crate) fn gdi_device_character_advances_pt(
     &mut self,
     text: &str,
@@ -441,20 +442,53 @@ impl TextMetrics {
       let face = shaped.font_faces.get(glyph.font_index)?;
       let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
       let ppem = gdi_device_ppem(glyph.font_size_pt, device_dpi)?;
-      let width_px = font
+      let glyph_index = usize::try_from(glyph.glyph_id).ok()?;
+      let advance_pt = font
         .hdmx()
-        .ok()?
-        .record_for_size(ppem)?
-        .widths()
-        .get(usize::try_from(glyph.glyph_id).ok()?)
-        .copied()?;
-      advances[character_index] = Some(gdi_device_advance_pt(width_px, device_dpi));
+        .ok()
+        .and_then(|table| table.record_for_size(ppem))
+        .and_then(|record| record.widths().get(glyph_index).copied())
+        .map(|width_px| gdi_device_advance_pt(width_px, device_dpi))
+        .or_else(|| {
+          gdi_scaled_device_advance_pt(glyph.x_advance_em * glyph.font_size_pt, device_dpi)
+        })?;
+      advances[character_index] = Some(advance_pt);
     }
 
     advances
       .into_iter()
       .collect::<Option<Vec<_>>>()
       .map(Arc::from)
+  }
+
+  /// Returns a uniform spacing adjustment when classic GDI's hinted device
+  /// advances differ from the shaped advances by the same amount for every
+  /// character. Proportional differences, clusters, and fonts without an
+  /// exact `hdmx` record deliberately remain on the normal shaping path.
+  pub(crate) fn gdi_uniform_device_character_spacing_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    device_dpi: f32,
+  ) -> Option<f32> {
+    let device_advances = self.gdi_device_character_advances_pt(text, style, device_dpi)?;
+    let character_ranges = text
+      .char_indices()
+      .map(|(start, character)| start..start + character.len_utf8())
+      .collect::<Vec<_>>();
+    let shaped = self.shape_text(text, style)?;
+    let mut natural_advances = vec![None; character_ranges.len()];
+    for glyph in &shaped.glyphs {
+      let character_index = character_ranges
+        .iter()
+        .position(|range| *range == glyph.text_range)?;
+      if natural_advances[character_index].is_some() {
+        return None;
+      }
+      natural_advances[character_index] = Some(glyph.x_advance_em * glyph.font_size_pt);
+    }
+    let natural_advances = natural_advances.into_iter().collect::<Option<Vec<_>>>()?;
+    uniform_character_spacing_from_advances(&natural_advances, &device_advances)
   }
 
   pub fn vertical_metrics(&mut self, style: &(impl FontStyleRef + ?Sized)) -> TextVerticalMetrics {
@@ -669,6 +703,44 @@ fn gdi_device_ppem(font_size_pt: f32, device_dpi: f32) -> Option<u8> {
 
 fn gdi_device_advance_pt(width_px: u8, device_dpi: f32) -> f32 {
   f32::from(width_px) * crate::units::POINTS_PER_INCH / device_dpi
+}
+
+fn gdi_scaled_device_advance_pt(natural_advance_pt: f32, device_dpi: f32) -> Option<f32> {
+  let device_advance = natural_advance_pt * device_dpi / crate::units::POINTS_PER_INCH;
+  if !device_advance.is_finite() || device_advance < 0.0 {
+    return None;
+  }
+  let nearest_device_pixel = device_advance.round();
+  let integer_device_advance = if (device_advance - nearest_device_pixel).abs() <= 1.0e-4 {
+    nearest_device_pixel
+  } else {
+    device_advance.ceil()
+  };
+  Some(integer_device_advance * crate::units::POINTS_PER_INCH / device_dpi)
+}
+
+fn uniform_character_spacing_from_advances(
+  natural_advances: &[f32],
+  device_advances: &[f32],
+) -> Option<f32> {
+  const UNIFORM_SPACING_EPSILON_PT: f32 = 1.0e-4;
+
+  if natural_advances.len() < 2 || natural_advances.len() != device_advances.len() {
+    return None;
+  }
+  let spacing = device_advances[0] - natural_advances[0];
+  if !spacing.is_finite() || spacing.abs() <= UNIFORM_SPACING_EPSILON_PT {
+    return None;
+  }
+  natural_advances
+    .iter()
+    .zip(device_advances)
+    .all(|(natural, device)| {
+      natural.is_finite()
+        && device.is_finite()
+        && ((device - natural) - spacing).abs() <= UNIFORM_SPACING_EPSILON_PT
+    })
+    .then_some(spacing)
 }
 
 fn math_font_metrics_from_face(face: &FontFaceData, font_size_pt: f32) -> Option<MathFontMetrics> {
@@ -964,6 +1036,17 @@ mod tests {
     assert_eq!(gdi_device_ppem(8.0, 0.0), None);
     assert_eq!(gdi_device_ppem(72.0, 300.0), None);
     assert!((gdi_device_advance_pt(36, 600.0) - 4.32).abs() < 0.0001);
+    assert!((gdi_scaled_device_advance_pt(5.22, 600.0).unwrap() - 5.28).abs() < 0.0001);
+    assert!((gdi_scaled_device_advance_pt(5.28, 600.0).unwrap() - 5.28).abs() < 0.0001);
+  }
+
+  #[test]
+  fn gdi_uniform_device_spacing_rejects_nonuniform_advance_changes() {
+    let spacing = uniform_character_spacing_from_advances(&[5.22, 5.22, 5.22], &[5.28, 5.28, 5.28])
+      .expect("uniform spacing");
+    assert!((spacing - 0.06).abs() < 0.0001);
+    assert!(uniform_character_spacing_from_advances(&[5.22, 5.22], &[5.28, 5.16]).is_none());
+    assert!(uniform_character_spacing_from_advances(&[5.22], &[5.28]).is_none());
   }
 
   #[test]

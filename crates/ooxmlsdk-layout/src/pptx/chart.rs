@@ -4010,25 +4010,6 @@ pub(crate) fn lower_radial_chart(
     }
   });
   let projected_scene_scale = scene_fit_scale * exploded_geometry_scale;
-  let radius_x = if let Some(profile) = powerpoint_pie_3d {
-    radius_basis * profile.radius_x_scale * projected_scene_scale
-  } else {
-    radius_basis * radius_scale
-  };
-  let radius_y = if let Some(profile) = powerpoint_pie_3d {
-    radius_x
-      * view_3d
-        .rotate_x_deg
-        .abs()
-        .to_radians()
-        .sin()
-        .clamp(0.05, 1.0)
-      * profile.vertical_tilt_scale
-  } else if chart.kind == RadialChartKind::Pie3D {
-    radius_x * 0.62
-  } else {
-    radius_x
-  };
   let unfitted_depth = if let Some(profile) = powerpoint_pie_3d {
     let rotation_scale = (view_3d.rotate_x_deg.to_radians().cos() / 30.0_f32.to_radians().cos())
       .abs()
@@ -4041,6 +4022,36 @@ pub(crate) fn lower_radial_chart(
     plot.height * 0.09
   } else {
     0.0
+  };
+  let fixed_inner_radii = excel_fixed_inner_pie_3d_radii(
+    chart.kind,
+    style.layout_profile,
+    chart.plot_layout,
+    plot,
+    unfitted_depth,
+  );
+  let radius_x = if let Some((radius_x, _)) = fixed_inner_radii {
+    radius_x
+  } else if let Some(profile) = powerpoint_pie_3d {
+    radius_basis * profile.radius_x_scale * projected_scene_scale
+  } else {
+    radius_basis * radius_scale
+  };
+  let radius_y = if let Some((_, radius_y)) = fixed_inner_radii {
+    radius_y
+  } else if let Some(profile) = powerpoint_pie_3d {
+    radius_x
+      * view_3d
+        .rotate_x_deg
+        .abs()
+        .to_radians()
+        .sin()
+        .clamp(0.05, 1.0)
+      * profile.vertical_tilt_scale
+  } else if chart.kind == RadialChartKind::Pie3D {
+    radius_x * 0.62
+  } else {
+    radius_x
   };
   let depth = unfitted_depth * projected_scene_scale;
   let center_x = plot.left + plot.width * 0.5;
@@ -4253,7 +4264,7 @@ pub(crate) fn lower_radial_chart(
       .get(label_index)
       .map(Vec::as_slice)
       .unwrap_or_default();
-    let text_frame = resolved_data_label_text_frame(frame, label);
+    let text_frame = resolved_radial_data_label_text_frame(frame, label);
     let (width, label_height) = data_label_text_dimensions(
       &mut metrics,
       label,
@@ -4465,6 +4476,28 @@ pub(crate) fn lower_radial_chart(
     legend_height,
   );
   items
+}
+
+fn excel_fixed_inner_pie_3d_radii(
+  kind: RadialChartKind,
+  profile: ChartLayoutProfile,
+  layout: Option<crate::render::chart::ChartManualLayout>,
+  plot: PlotRect,
+  depth: f32,
+) -> Option<(f32, f32)> {
+  (kind == RadialChartKind::Pie3D
+    && profile == ChartLayoutProfile::Excel
+    && layout.is_some_and(|layout| layout.targets_inner_plot))
+  .then(|| {
+    // ECMA-376 Part 1 section 21.2.2.89 defines an inner layout as the
+    // authored plot-area rectangle. LibreOffice's PlotAreaConverter maps it
+    // to setDiagramPositionExcludingAxes, and ChartView deliberately skips
+    // its automatic minimum-size reduction for fixed inner diagrams. Use the
+    // complete rectangle for the 3-D pie body instead of applying the
+    // automatic Excel radius profile a second time. The top ellipse occupies
+    // height - depth and the side wall completes the authored height.
+    (plot.width * 0.5, (plot.height - depth).max(0.0) * 0.5)
+  })
 }
 
 fn excel_best_fit_pie_label_position(
@@ -4756,6 +4789,7 @@ struct ChartTextBodyInsets {
 struct ResolvedDataLabelTextFrame {
   outer_width: Option<f32>,
   outer_height: Option<f32>,
+  maximum_inner_width: Option<f32>,
   insets: ChartTextBodyInsets,
 }
 
@@ -4775,6 +4809,44 @@ impl ResolvedDataLabelTextFrame {
       .outer_height
       .map(|height| (height - self.insets.top - self.insets.bottom).max(0.0))
   }
+
+  fn wrapping_width(self) -> Option<f32> {
+    self.inner_width().or(self.maximum_inner_width)
+  }
+}
+
+fn resolved_radial_data_label_text_frame(
+  frame: ChartFrame,
+  label: &crate::render::chart::ClusteredColumnDataLabel<'_>,
+) -> ResolvedDataLabelTextFrame {
+  let mut text_frame = resolved_data_label_text_frame(frame, label);
+  text_frame.maximum_inner_width = pie_custom_label_maximum_width(
+    frame.width_pt,
+    label.layout.is_some(),
+    label.rich_text_runs.is_empty(),
+    text_frame.outer_width,
+  );
+  text_frame
+}
+
+fn pie_custom_label_maximum_width(
+  chart_width: f32,
+  has_custom_position: bool,
+  has_plain_text: bool,
+  explicit_outer_width: Option<f32>,
+) -> Option<f32> {
+  // LibreOffice PieChart::createTextLabelShape records the Office-compatible
+  // rule observed from Microsoft: a custom-position pie label without a
+  // custom width wraps at one fifth of the complete chart space. A fixed
+  // inner plot still exposes the complete chart frame as its available outer
+  // rectangle, so this limit is intentionally based on `ChartFrame`, not the
+  // authored pie rectangle. Explicit c15 w/h remains authoritative.
+  (has_custom_position
+    && has_plain_text
+    && explicit_outer_width.is_none()
+    && chart_width.is_finite()
+    && chart_width > 0.0)
+    .then_some(chart_width / 5.0)
 }
 
 fn resolved_data_label_text_frame(
@@ -4805,6 +4877,7 @@ fn resolved_data_label_text_frame(
   ResolvedDataLabelTextFrame {
     outer_width,
     outer_height,
+    maximum_inner_width: None,
     insets,
   }
 }
@@ -12984,7 +13057,7 @@ fn push_data_label_text_components(
     return;
   }
 
-  let lines = plain_data_label_lines(metrics, label, style, text_frame.inner_width());
+  let lines = plain_data_label_lines(metrics, label, style, text_frame.wrapping_width());
   let content_width = lines
     .iter()
     .map(|line| metrics.measure_text(line, style))
@@ -13079,7 +13152,7 @@ fn data_label_text_dimensions(
       text_frame.outer_height.unwrap_or(content_height),
     );
   }
-  let lines = plain_data_label_lines(metrics, label, style, text_frame.inner_width());
+  let lines = plain_data_label_lines(metrics, label, style, text_frame.wrapping_width());
   let content_width = lines
     .iter()
     .map(|line| metrics.measure_text(line, style))
@@ -13297,23 +13370,121 @@ mod tests {
 
   use super::{
     Chart3DView, ChartLayoutProfile, ChartPointAnchor, ChartTextBodyInsets, PlotRect,
-    SurfaceVertex, bind_chart_gradient_to_bounds, cardinal_cubic_controls, cartesian_3d_projection,
-    cartesian_legend_reverses_series, category_axis_text_rotation_degrees,
-    category_axis_text_rotation_degrees_for_layout, category_axis_text_rotation_is_supported,
-    clip_surface_polygon, data_label_pdf_text_segmentation, format_axis_value,
+    RadialChartKind, ResolvedDataLabelTextFrame, SurfaceVertex, bind_chart_gradient_to_bounds,
+    cardinal_cubic_controls, cartesian_3d_projection, cartesian_legend_reverses_series,
+    category_axis_text_rotation_degrees, category_axis_text_rotation_degrees_for_layout,
+    category_axis_text_rotation_is_supported, clip_surface_polygon,
+    data_label_pdf_text_segmentation, excel_fixed_inner_pie_3d_radii, format_axis_value,
     horizontal_bar_data_label_origin, lower_3d_extruded_polygon, lower_3d_line_stripes,
-    maximum_auto_main_increment_count, push_chart_data_rect, sample_cardinal_chart_line,
-    series_axis_label_rhythm, series_category_display_index, single_line_vertical_anchor_offset,
-    word_fixed_chart_data_edge, word_fixed_chart_value_edge,
+    maximum_auto_main_increment_count, pie_custom_label_maximum_width, push_chart_data_rect,
+    sample_cardinal_chart_line, series_axis_label_rhythm, series_category_display_index,
+    single_line_vertical_anchor_offset, word_fixed_chart_data_edge, word_fixed_chart_value_edge,
   };
   use crate::model::{PageItem, PdfTextSegmentation, RgbColor, common_rect};
-  use crate::render::chart::ChartSeriesKind;
+  use crate::render::chart::{ChartManualLayout, ChartSeriesKind};
 
   #[test]
   fn axis_values_do_not_expose_binary_float_artifacts() {
     let value_with_binary_artifact = f64::from_bits(4.4_f64.to_bits() + 1);
     assert_eq!(format_axis_value(value_with_binary_artifact, 0.2), "4.4");
     assert_eq!(format_axis_value(6.0, 1.0), "6");
+  }
+
+  #[test]
+  fn excel_pie_3d_fixed_inner_layout_owns_the_complete_plot_rectangle() {
+    let plot = PlotRect {
+      left: 333.094,
+      top: 391.980,
+      width: 177.626,
+      height: 70.538,
+    };
+    let inner = ChartManualLayout {
+      targets_inner_plot: true,
+      ..ChartManualLayout::default()
+    };
+    let (radius_x, radius_y) = excel_fixed_inner_pie_3d_radii(
+      RadialChartKind::Pie3D,
+      ChartLayoutProfile::Excel,
+      Some(inner),
+      plot,
+      plot.height * 0.09,
+    )
+    .expect("Excel manual inner Pie3D uses fixed plot geometry");
+
+    assert!((radius_x - 88.813).abs() < 0.001);
+    assert!((radius_y - 32.095).abs() < 0.001);
+
+    // Automatic Excel pies retain the calibrated automatic radius profile;
+    // outer layouts and other hosts do not enter this fixed-inner branch.
+    assert!(
+      excel_fixed_inner_pie_3d_radii(
+        RadialChartKind::Pie3D,
+        ChartLayoutProfile::Excel,
+        None,
+        plot,
+        plot.height * 0.09,
+      )
+      .is_none()
+    );
+    assert!(
+      excel_fixed_inner_pie_3d_radii(
+        RadialChartKind::Pie3D,
+        ChartLayoutProfile::Excel,
+        Some(ChartManualLayout::default()),
+        plot,
+        plot.height * 0.09,
+      )
+      .is_none()
+    );
+    assert!(
+      excel_fixed_inner_pie_3d_radii(
+        RadialChartKind::Pie3D,
+        ChartLayoutProfile::PowerPoint,
+        Some(inner),
+        plot,
+        plot.height * 0.09,
+      )
+      .is_none()
+    );
+  }
+
+  #[test]
+  fn custom_pie_label_without_width_uses_the_office_one_fifth_wrap_limit() {
+    let maximum = pie_custom_label_maximum_width(477.731_26, true, true, None)
+      .expect("custom plain label without width gets a compatibility limit");
+    assert!((maximum - 95.546_25).abs() < 0.001);
+
+    let text_frame = ResolvedDataLabelTextFrame {
+      maximum_inner_width: Some(maximum),
+      ..ResolvedDataLabelTextFrame::default()
+    };
+    assert_eq!(text_frame.wrapping_width(), Some(maximum));
+
+    // Automatic labels, rich labels that retain authored runs, and a c15
+    // explicit width keep their existing layout paths.
+    assert_eq!(
+      pie_custom_label_maximum_width(477.731_26, false, true, None),
+      None
+    );
+    assert_eq!(
+      pie_custom_label_maximum_width(477.731_26, true, false, None),
+      None
+    );
+    assert_eq!(
+      pie_custom_label_maximum_width(477.731_26, true, true, Some(80.0)),
+      None
+    );
+    let explicit = ResolvedDataLabelTextFrame {
+      outer_width: Some(80.0),
+      maximum_inner_width: Some(maximum),
+      insets: ChartTextBodyInsets {
+        left: 7.2,
+        right: 7.2,
+        ..ChartTextBodyInsets::default()
+      },
+      ..ResolvedDataLabelTextFrame::default()
+    };
+    assert!((explicit.wrapping_width().unwrap_or_default() - 65.6).abs() < 0.001);
   }
 
   #[test]

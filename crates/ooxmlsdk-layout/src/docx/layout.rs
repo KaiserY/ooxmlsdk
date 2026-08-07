@@ -30223,19 +30223,16 @@ fn image_frame_height(image: &crate::docx::InlineImage) -> f32 {
 }
 
 fn inline_shape_frame_width(shape: &InlineShape) -> f32 {
-  if shape.chart.is_some() {
-    (shape.width_pt + shape.effect_left_pt + shape.effect_right_pt).max(0.0)
-  } else {
-    shape.width_pt.max(0.0)
-  }
+  // ECMA-376 Part 1 §20.4.2.6 makes wp:effectExtent part of an inline
+  // DrawingML object's actual bounds. Keep the line frame and the visible
+  // shape separate: the effect extents enlarge the former, while the shape
+  // path remains authored at wp:extent. Charts used to be the only path that
+  // did this, which dropped the bottom effect extent for ordinary WPS shapes.
+  (shape.width_pt + shape.effect_left_pt + shape.effect_right_pt).max(0.0)
 }
 
 fn inline_shape_frame_height(shape: &InlineShape) -> f32 {
-  if shape.chart.is_some() {
-    (shape.height_pt + shape.effect_top_pt + shape.effect_bottom_pt).max(0.0)
-  } else {
-    shape.height_pt.max(0.0)
-  }
+  (shape.height_pt + shape.effect_top_pt + shape.effect_bottom_pt).max(0.0)
 }
 
 fn inline_shape_content_offset_x(shape: &InlineShape) -> f32 {

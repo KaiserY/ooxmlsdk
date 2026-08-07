@@ -101,6 +101,7 @@ pub(crate) struct VmlShapeModel {
   pub(crate) end_angle: Option<String>,
   pub(crate) arc_size: Option<String>,
   pub(crate) anchor: Option<VmlClientAnchor>,
+  pub(crate) auto_size_picture: bool,
   pub(crate) checked: Option<i64>,
   pub(crate) disable_3d: bool,
   pub(crate) note_row: Option<u32>,
@@ -229,6 +230,7 @@ impl Default for VmlShapeModel {
       end_angle: None,
       arc_size: None,
       anchor: None,
+      auto_size_picture: false,
       checked: None,
       disable_3d: false,
       note_row: None,
@@ -1409,6 +1411,9 @@ fn collect_typed_vml_client_data(model: &mut VmlShapeModel, client_data: &xvml::
   for child in &client_data.client_data_choice {
     match child {
       xvml::ClientDataChoice::Anchor(value) => model.anchor = parse_vml_client_anchor(value),
+      xvml::ClientDataChoice::AutoSizePicture(value) => {
+        model.auto_size_picture = typed_vml_bool(*value, true);
+      }
       xvml::ClientDataChoice::PrintObject(value) => {
         model.print_object = typed_vml_bool(*value, true);
       }
@@ -1687,7 +1692,7 @@ mod tests {
       </v:roundrect>
       <v:line style="position:absolute;width:12pt;height:12pt" from="0,0" to="12,12">
         <v:imagedata r:id="rId7"/>
-        <x:ClientData ObjectType="Pict"><x:Visible/></x:ClientData>
+        <x:ClientData ObjectType="Pict"><x:AutoPict/><x:Visible/></x:ClientData>
       </v:line>
       <v:group>
         <v:shape id="ToggleButton2" o:spid="_x0000_s1028"
@@ -1719,6 +1724,7 @@ mod tests {
 
     assert_eq!(shapes[1].image_relationship_id.as_deref(), Some("rId7"));
     assert_eq!(shapes[1].object_type.as_deref(), Some("Pict"));
+    assert!(shapes[1].auto_size_picture);
     assert!(shapes[1].visible);
     assert_eq!(shapes[2].text, "Nested");
     assert_eq!(shapes[2].id.as_deref(), Some("ToggleButton2"));

@@ -29,7 +29,7 @@ use crate::text_metrics::TextMetrics;
 use crate::units;
 
 use super::import::ExcelImport;
-use super::print::{CalcPrintDocument, CalcPrintPage};
+use super::print::{CalcPrintDocument, CalcPrintPage, fixed_output_content_scale};
 use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect};
 use crate::pptx::chart::{
   CartesianChartGroupDecorationStyle, ChartFrame, ChartLayoutProfile, ClusteredColumnStyle,
@@ -40,19 +40,17 @@ use crate::pptx::drawingml::fill::FillKind;
 use crate::pptx::drawingml::line::LineFill;
 
 const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
+// Excel's fixed-output frame for header/footer sections whose
+// alignWithMargins flag is false. The immutable 45540 classic/form PDFs keep
+// this 0.75in frame across sheet margins of 0, 0.25, 0.5, and 0.75in; the
+// default-true WithVariousData.xlsx PDF is the opposite-state guard and uses
+// its authored 0.7in page margins.
+const XLSX_UNALIGNED_HEADER_FOOTER_INSET_PT: f32 = 0.75 * crate::units::POINTS_PER_INCH;
 // ECMA-376 Part 4 §3.3.1.12 and POI XSSFSheet#getColumnWidthInPixels:
 // a worksheet column includes two screen pixels of margin padding on each
 // side plus one gridline pixel. Use the two 96dpi pixels as the text inset;
 // this is distinct from Calc's 20-twip SvxMarginItem implementation detail.
 const XLSX_CELL_TEXT_INSET_PT: f32 = 2.0 * crate::units::POINTS_PER_CSS_PIXEL;
-// When a printable VML preview starts exactly on a horizontal page boundary,
-// Excel fixed output keeps a tagged text operator for the first scan-context
-// cell after that boundary when the operator starts at the normal cell-text
-// inset. The page clip still hides all of its ink. Allow one 600dpi device
-// pixel beyond that inset for fixed-output edge rounding; text placed farther
-// inside the following column belongs only to its own page.
-const XLSX_SCAN_CONTEXT_TEXT_EDGE_SLACK_PT: f32 =
-  XLSX_CELL_TEXT_INSET_PT + crate::units::POINTS_PER_INCH / crate::units::OFFICE_FIXED_OUTPUT_DPI;
 const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
 // Excel emits an authored DrawingML `a:ln w="0"` as a printable hairline
 // rather than suppressing the line. The Office reference PDF records that
@@ -210,6 +208,14 @@ fn xlsx_print_page_debug_record(
     common::DebugProperty {
       name: "zoom".into(),
       value: common::DebugValue::Integer(i64::from(page.zoom)),
+    },
+    common::DebugProperty {
+      name: "paper_scale_percent".into(),
+      value: common::DebugValue::Integer(i64::from(page.paper_scale_percent)),
+    },
+    common::DebugProperty {
+      name: "pagination_paper_scale_percent".into(),
+      value: common::DebugValue::Integer(i64::from(page.pagination_paper_scale_percent)),
     },
     common::DebugProperty {
       name: "drawing_anchors".into(),
@@ -388,7 +394,11 @@ fn print_page_items(
   setup: PageSetup,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let zoom_scale = page.zoom as f32 / 100.0;
+  let paper_scale = page.paper_scale_percent as f32 / 100.0;
+  // The render layouts retain their historical `zoom_scale` field name, but
+  // fixed output composes worksheet zoom and the paper transform as floats.
+  // Keeping the stages separate avoids rounding 90% × 95% to 86%.
+  let zoom_scale = fixed_output_content_scale(page.zoom, page.paper_scale_percent);
   let heading_width = if page.page_settings.print_headings {
     page.sheet.column_width_pt(1) * zoom_scale
   } else {
@@ -422,25 +432,28 @@ fn print_page_items(
     heading_height + repeat_height + area_size.1,
   );
   let body_origin_x = setup.margin_left_pt + horizontal_centering + heading_width;
-  let paper_fallback_scale = page
-    .page_settings
-    .fixed_output_paper_scale_percent(page.chart_count > 0);
   let body_margin_top =
-    if paper_fallback_scale < 100 && page.page_settings.header_footer.has_print_content() {
-      setup.margin_top_pt * zoom_scale
+    if page.paper_scale_percent < 100 && page.page_settings.header_footer.has_print_content() {
+      setup.margin_top_pt * paper_scale
     } else {
       setup.margin_top_pt
     };
   let body_origin_y = body_margin_top
-    + if paper_fallback_scale < 100 {
+    + if page.paper_scale_percent < 100 {
       page
         .page_settings
-        .printer_default_paper_body_offset_y_pt(zoom_scale)
+        .printer_default_paper_body_offset_y_pt(paper_scale)
     } else {
       0.0
     }
     + vertical_centering
     + heading_height;
+  let physical_page = CellRect {
+    x_pt: 0.0,
+    y_pt: 0.0,
+    width_pt: setup.width_pt,
+    height_pt: setup.height_pt,
+  };
   let mut text_metrics = TextMetrics::new();
 
   // ECMA-376 §18.3.1.46 defines these as the printed page header and
@@ -450,8 +463,10 @@ fn print_page_items(
     &mut items,
     page,
     setup,
+    zoom_scale,
     true,
     &import.styles,
+    import.source_file_name.as_deref(),
     &mut text_metrics,
   );
 
@@ -466,6 +481,7 @@ fn print_page_items(
         origin_x_pt: body_origin_x,
         origin_y_pt: body_origin_y,
         zoom_scale,
+        physical_page,
       },
       &mut text_metrics,
     );
@@ -481,6 +497,7 @@ fn print_page_items(
         origin_x_pt: body_origin_x + repeat_width,
         origin_y_pt: body_origin_y,
         zoom_scale,
+        physical_page,
       },
       &mut text_metrics,
     );
@@ -496,6 +513,7 @@ fn print_page_items(
         origin_x_pt: body_origin_x,
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
+        physical_page,
       },
       &mut text_metrics,
     );
@@ -511,6 +529,7 @@ fn print_page_items(
         origin_x_pt: body_origin_x + repeat_width,
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
+        physical_page,
       },
       &mut text_metrics,
     );
@@ -588,8 +607,10 @@ fn print_page_items(
     &mut items,
     page,
     setup,
+    zoom_scale,
     false,
     &import.styles,
+    import.source_file_name.as_deref(),
     &mut text_metrics,
   );
   items
@@ -2336,6 +2357,7 @@ struct CellAreaRenderLayout {
   origin_x_pt: f32,
   origin_y_pt: f32,
   zoom_scale: f32,
+  physical_page: CellRect,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2395,9 +2417,8 @@ fn render_cell_area(
     area_rect,
   );
   let page_clip_rect = page_transform.rect(area_rect);
-  let keep_following_cell_boundary_semantics =
-    page_area_has_vml_preview_on_following_column_edge(page, area);
   let occupied_cells = calc_occupied_text_cells(cells);
+  let mut deferred_edit_text_items = Vec::new();
   for cell in cells {
     if page.sheet.is_covered_merged_cell(cell.address) {
       continue;
@@ -2461,6 +2482,7 @@ fn render_cell_area(
           height_pt,
         },
         borders,
+        layout.zoom_scale,
       );
     }
     if cell.rendered_text.is_empty() && cell.icon_set.is_none() {
@@ -2501,9 +2523,22 @@ fn render_cell_area(
     // Excel fixed output creates the print font on its 600dpi device. The
     // 11pt legacy workbook font is consequently emitted and measured as
     // 11.04pt (92/600in), which also decides borderline wrap opportunities.
-    measurement_style.font_size_pt = units::quantize_points_to_office_print_grid(
-      measurement_style.font_size_pt * layout.zoom_scale,
-    );
+    super::text::scale_text_style_for_fixed_output(&mut measurement_style, layout.zoom_scale);
+    if page.sheet.uses_legacy_excel12_cell_text_print_grid()
+      && let Some(spacing_pt) = text_metrics.gdi_uniform_device_character_spacing_pt(
+        &cell.rendered_text,
+        &measurement_style,
+        units::OFFICE_FIXED_OUTPUT_DPI,
+      )
+    {
+      // Excel 12 creates ordinary worksheet text on the same 600dpi printer
+      // device that owns this profile's rows, columns, and drawing markers.
+      // A fixed-pitch hdmx run can therefore differ from its scaled hmtx
+      // advances by one uniform fractional device dot. Preserve that derived
+      // spacing; proportional fonts and nonuniform hinted runs stay on the
+      // normal shaping path above.
+      measurement_style.character_spacing_pt = spacing_pt;
+    }
     if !scan_context_only {
       render_cell_icon_set(
         items,
@@ -2591,8 +2626,14 @@ fn render_cell_area(
         cell.rich_text_runs,
         output_area.align_rect,
         render_style,
-        horizontal_alignment,
-        hyperlink_url.clone(),
+        CellTextRenderOptions {
+          alignment,
+          horizontal_alignment,
+          hyperlink_url: hyperlink_url.clone(),
+          formula: cell.formula,
+          default_line_height_pt: page.sheet.default_row_height_pt() * layout.zoom_scale,
+        },
+        layout.zoom_scale,
         text_metrics,
       );
     } else {
@@ -2620,12 +2661,19 @@ fn render_cell_area(
         cell.address.col.saturating_sub(1) as usize,
       ];
       if scan_context_only {
-        let (left, right) = text_item_horizontal_bounds(text, text_metrics);
-        let intersects_paint_clip =
-          left < page_clip_rect.x_pt + page_clip_rect.width_pt && right > page_clip_rect.x_pt;
-        let retains_clipped_boundary_semantics = keep_following_cell_boundary_semantics
-          && scan_context_text_intersects_semantic_clip(left, right, page_clip_rect);
-        if !intersects_paint_clip && !retains_clipped_boundary_semantics {
+        // Office fixed output keeps physical-page culling independent from
+        // the logical worksheet print clip. Apache POI 49156.xlsx proves both
+        // boundaries: its first vertical page band owns searchable K-column
+        // operators whose ink is wholly hidden by the A1:J78 clip, while the
+        // next band omits its K-column values. Text that actually overflows
+        // into a page band remains owned by that band on every page.
+        if !scan_context_text_belongs_to_page(
+          text,
+          page_clip_rect,
+          layout.physical_page,
+          page.starts_print_area_row,
+          text_metrics,
+        ) {
           return false;
         }
         text.paint_clip = Some(common_rect(
@@ -2637,7 +2685,17 @@ fn render_cell_area(
       }
       true
     });
-    items.extend(rendered_text_items);
+    if page.sheet.merged_range_for_cell(cell.address).is_some() {
+      // Spreadsheet fixed output has a direct-string pass followed by an
+      // edit-layout pass. LibreOffice's LayoutStrings marks edit-engine cells
+      // and PrintArea calls DrawEdit only after DrawStrings; the immutable
+      // 49156.xlsx PDF independently places centered merged F58:H58 after all
+      // ordinary worksheet strings. Keep that pass boundary in the display
+      // list so PDF semantic text order matches its visual-layout owner.
+      deferred_edit_text_items.extend(rendered_text_items);
+    } else {
+      items.extend(rendered_text_items);
+    }
     if !scan_context_only && let Some(hyperlink_url) = hyperlink_url {
       items.push(PageItem::LinkArea(LinkAreaItem {
         x_pt,
@@ -2648,6 +2706,7 @@ fn render_cell_area(
       }));
     }
   }
+  items.append(&mut deferred_edit_text_items);
   if page.page_settings.print_grid_lines {
     render_grid(
       items,
@@ -2660,10 +2719,15 @@ fn render_cell_area(
   }
 }
 
-fn text_item_horizontal_bounds(text: &TextItem, text_metrics: &mut TextMetrics) -> (f32, f32) {
+fn text_item_bounds(text: &TextItem, text_metrics: &mut TextMetrics) -> (f32, f32, f32, f32) {
   let width = text_metrics.measure_text(&text.text, &text.style);
   if text.style.rotation_deg.abs() <= f32::EPSILON {
-    return (text.x_pt, text.x_pt + width);
+    return (
+      text.x_pt,
+      text.y_pt,
+      text.x_pt + width,
+      text.y_pt + text.line_height_pt,
+    );
   }
   let (center_x, center_y) = text.rotation_center_pt.unwrap_or((
     text.x_pt + width * 0.5,
@@ -2671,48 +2735,46 @@ fn text_item_horizontal_bounds(text: &TextItem, text_metrics: &mut TextMetrics) 
   ));
   let radians = text.style.rotation_deg.to_radians();
   let (sin, cos) = radians.sin_cos();
-  let rotated_x = |x: f32, y: f32| center_x + (x - center_x) * cos - (y - center_y) * sin;
   let mut left = f32::INFINITY;
+  let mut top = f32::INFINITY;
   let mut right = f32::NEG_INFINITY;
+  let mut bottom = f32::NEG_INFINITY;
   for (x, y) in [
     (text.x_pt, text.y_pt),
     (text.x_pt + width, text.y_pt),
     (text.x_pt, text.y_pt + text.line_height_pt),
     (text.x_pt + width, text.y_pt + text.line_height_pt),
   ] {
-    let x = rotated_x(x, y);
+    let dx = x - center_x;
+    let dy = y - center_y;
+    let x = center_x + dx * cos - dy * sin;
+    let y = center_y + dx * sin + dy * cos;
     left = left.min(x);
+    top = top.min(y);
     right = right.max(x);
+    bottom = bottom.max(y);
   }
-  (left, right)
+  (left, top, right, bottom)
 }
 
-fn scan_context_text_intersects_semantic_clip(left: f32, right: f32, clip: CellRect) -> bool {
-  let clip_right = clip.x_pt + clip.width_pt;
-  left <= clip_right + XLSX_SCAN_CONTEXT_TEXT_EDGE_SLACK_PT && right > clip.x_pt
-}
-
-fn page_area_has_vml_preview_on_following_column_edge(
-  page: &CalcPrintPage<'_>,
-  area: CellRange,
+fn text_item_intersects_rect(
+  text: &TextItem,
+  rect: CellRect,
+  text_metrics: &mut TextMetrics,
 ) -> bool {
-  let area_rect = page.sheet.range_rect(area);
-  let right_edge = area_rect.x_pt + area_rect.width_pt;
-  let edge_slack = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
-  page
-    .sheet
-    .resources
-    .object_resources
-    .vml_drawings
-    .iter()
-    .flat_map(|drawing| drawing.shapes.iter())
-    .filter(|shape| !shape.hidden && shape.print_object && shape.image_relationship_id.is_some())
-    .filter_map(|shape| vml_shape_rect(page.sheet, shape))
-    .any(|(x, y, _width, height)| {
-      (x - right_edge).abs() <= edge_slack
-        && y < area_rect.y_pt + area_rect.height_pt
-        && y + height > area_rect.y_pt
-    })
+  let (left, top, right, bottom) = text_item_bounds(text, text_metrics);
+  rect_intersects_clip(left, top, right, bottom, rect)
+}
+
+fn scan_context_text_belongs_to_page(
+  text: &TextItem,
+  print_clip: CellRect,
+  physical_page: CellRect,
+  starts_print_area_row: bool,
+  text_metrics: &mut TextMetrics,
+) -> bool {
+  text_item_intersects_rect(text, print_clip, text_metrics)
+    || (starts_print_area_row && text_item_intersects_rect(text, physical_page, text_metrics))
 }
 
 fn render_cell_icon_set(
@@ -3098,57 +3160,161 @@ fn render_cell_rich_text(
   runs: &[super::workbook::SharedStringRun],
   rect: CellRect,
   base_style: TextStyle,
-  horizontal_alignment: x::HorizontalAlignmentValues,
-  hyperlink_url: Option<String>,
+  options: CellTextRenderOptions,
+  print_scale: f32,
   text_metrics: &mut TextMetrics,
 ) {
-  let mut text = String::new();
-  let mut style = base_style;
-  let mut style_initialized = false;
-  for run in runs.iter().filter(|run| !run.text.is_empty()) {
-    if !style_initialized {
-      if let Some(font_size_pt) = run.font_size_pt {
-        style.font_size_pt = font_size_pt;
+  let mut rendered_runs = runs
+    .iter()
+    .filter_map(|run| {
+      let text = run.text.replace(['\r', '\n'], "");
+      if text.is_empty() {
+        return None;
       }
-      if let Some(color) = run.color {
-        style.color = color;
+      let mut style = xlsx_rich_text_run_style(&base_style, run, print_scale);
+      if let Some(rotation) = options
+        .alignment
+        .and_then(|alignment| alignment.text_rotation)
+      {
+        style.rotation_deg = match rotation {
+          1..=90 => rotation as f32,
+          91..=180 => 90.0 - rotation as f32,
+          255 => 90.0,
+          _ => 0.0,
+        };
       }
-      style.bold = run.bold;
-      style.italic = run.italic;
-      style.underline = run.underline;
-      style.strikethrough = run.strikethrough;
-      style_initialized = true;
-    }
-    text.push_str(&run.text.replace(['\r', '\n'], ""));
-  }
-  if text.is_empty() {
+      let width_pt = text_metrics.measure_text(&text, &style);
+      Some((text, style, width_pt))
+    })
+    .collect::<Vec<_>>();
+  if rendered_runs.is_empty() {
     return;
   }
-  let y_pt = rect.y_pt + XLSX_CELL_TEXT_INSET_PT;
-  let line_height = (style.font_size_pt * 1.15).max(1.0);
-  let text_width_pt = text_metrics.measure_text(&text, &style);
-  let x_pt = cell_text_x_pt(rect, text_width_pt, horizontal_alignment, 0.0);
-  let preserve_text_portion = !text.is_ascii() && !calc_text_can_shape_as_line(&text);
-  items.push(PageItem::Text(TextItem {
-    x_pt,
-    y_pt,
-    line_height_pt: line_height,
-    paint_clip: None,
-    discard_if_horizontally_clipped: false,
-    text,
-    style,
-    rotation_center_pt: None,
-    hyperlink_url,
-    form_widget_id: None,
-    paragraph_bidi: false,
-    preserve_text_portion,
-    pdf_text_segmentation: if preserve_text_portion {
-      PdfTextSegmentation::Portion
-    } else {
-      PdfTextSegmentation::Line
-    },
-    source_path: Vec::new(),
-  }));
+
+  let line_height = rendered_runs
+    .iter()
+    .map(|(_, style, _)| {
+      style
+        .automatic_escapement_font_size_pt
+        .unwrap_or(style.font_size_pt)
+        * 1.15
+    })
+    .fold(options.default_line_height_pt.max(1.0), f32::max);
+  // Rich portions of one cell share a logical baseline. The text metrics
+  // helper already subtracts superscript/subscript's painted shift, so add it
+  // back while finding the common unescaped baseline and retain the shift when
+  // each TextItem is painted.
+  let common_baseline_offset_pt = rendered_runs
+    .iter()
+    .map(|(text, style, _)| {
+      text_metrics.baseline_offset_in_line_for_text(text, style, line_height)
+        + style.baseline_shift_pt
+    })
+    .fold(0.0_f32, f32::max);
+  let vertical_alignment = options.alignment.and_then(|alignment| alignment.vertical);
+  let y_pt = match vertical_alignment {
+    Some(x::VerticalAlignmentValues::Center) => rect.y_pt + (rect.height_pt - line_height) / 2.0,
+    Some(x::VerticalAlignmentValues::Top) => rect.y_pt,
+    Some(x::VerticalAlignmentValues::Bottom) | None => rect.y_pt + rect.height_pt - line_height,
+    Some(x::VerticalAlignmentValues::Justify | x::VerticalAlignmentValues::Distributed) => {
+      rect.y_pt
+    }
+  };
+  let total_width_pt = rendered_runs
+    .iter()
+    .map(|(_, _, width_pt)| *width_pt)
+    .sum::<f32>();
+  let mut x_pt = cell_text_x_pt(rect, total_width_pt, options.horizontal_alignment, 0.0);
+  let rotation_center_pt = rendered_runs
+    .iter()
+    .any(|(_, style, _)| style.rotation_deg != 0.0)
+    .then_some((
+      rect.x_pt + rect.width_pt / 2.0,
+      rect.y_pt + rect.height_pt / 2.0,
+    ));
+
+  for (text, style, width_pt) in rendered_runs.drain(..) {
+    let preserve_text_portion = !text.is_ascii() && !calc_text_can_shape_as_line(&text);
+    let run_baseline_offset_pt =
+      text_metrics.baseline_offset_in_line_for_text(&text, &style, line_height)
+        + style.baseline_shift_pt;
+    items.push(PageItem::Text(TextItem {
+      x_pt,
+      y_pt: y_pt + common_baseline_offset_pt - run_baseline_offset_pt,
+      line_height_pt: line_height,
+      paint_clip: None,
+      discard_if_horizontally_clipped: false,
+      text,
+      style,
+      rotation_center_pt,
+      hyperlink_url: options.hyperlink_url.clone(),
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion,
+      pdf_text_segmentation: if preserve_text_portion {
+        PdfTextSegmentation::Portion
+      } else {
+        PdfTextSegmentation::Line
+      },
+      source_path: Vec::new(),
+    }));
+    x_pt += width_pt;
+  }
+}
+
+fn xlsx_rich_text_run_style(
+  base_style: &TextStyle,
+  run: &super::workbook::SharedStringRun,
+  print_scale: f32,
+) -> TextStyle {
+  let mut style = base_style.clone();
+  if run.has_properties {
+    // A missing rPr inherits the cell font; a present rPr is a run-font state.
+    // In particular, omitted boolean properties are false and omitted
+    // vertAlign is baseline. This distinction is visible in 45540's footnote:
+    // its first no-rPr portion inherits a superscript cell font, while the
+    // following rPr portion returns to ordinary text.
+    super::text::apply_fixed_output_vertical_text_alignment(
+      &mut style,
+      x::VerticalAlignmentRunValues::Baseline,
+    );
+    style.bold = run.bold.unwrap_or(false);
+    style.italic = run.italic.unwrap_or(false);
+    style.underline = run.underline.unwrap_or(false);
+    style.strikethrough = run.strikethrough.unwrap_or(false);
+  }
+  if let Some(font_family) = run.font_family.as_deref() {
+    style.font_family = Some(Arc::from(font_family));
+  }
+  if let Some(font_size_pt) = run.font_size_pt {
+    style.font_size_pt = units::quantize_points_to_office_print_grid(font_size_pt * print_scale);
+  }
+  if let Some(color) = run.color {
+    style.color = color;
+  }
+  if let Some(bold) = run.bold {
+    style.bold = bold;
+  }
+  if let Some(italic) = run.italic {
+    style.italic = italic;
+  }
+  if let Some(underline) = run.underline {
+    style.underline = underline;
+  }
+  if let Some(strikethrough) = run.strikethrough {
+    style.strikethrough = strikethrough;
+  }
+  if run.has_properties {
+    super::text::apply_fixed_output_vertical_text_alignment(
+      &mut style,
+      run
+        .vertical_alignment
+        .unwrap_or(x::VerticalAlignmentRunValues::Baseline),
+    );
+  } else if let Some(vertical_alignment) = run.vertical_alignment {
+    super::text::apply_fixed_output_vertical_text_alignment(&mut style, vertical_alignment);
+  }
+  style
 }
 
 fn conditional_fill_color(
@@ -3548,13 +3714,15 @@ fn render_cell_borders(
   items: &mut Vec<PageItem>,
   rect: CellRect,
   borders: super::styles::BorderRecord,
+  print_scale: f32,
 ) {
   let mut push_vertical_border = |x_pt: f32, border: BorderStyle| {
+    let width_pt = fixed_output_cell_border_width_pt(border.width_pt, print_scale);
     items.push(PageItem::Rect(RectItem {
-      x_pt: x_pt - border.width_pt / 2.0,
-      y_pt: rect.y_pt - border.width_pt / 2.0,
-      width_pt: border.width_pt,
-      height_pt: rect.height_pt + border.width_pt,
+      x_pt: x_pt - width_pt / 2.0,
+      y_pt: rect.y_pt - width_pt / 2.0,
+      width_pt,
+      height_pt: rect.height_pt + width_pt,
       fill_color: Some(border.color),
       fill_opacity: 1.0,
       stroke: None,
@@ -3568,11 +3736,12 @@ fn render_cell_borders(
     push_vertical_border(rect.x_pt + rect.width_pt, border);
   }
   let mut push_horizontal_border = |y_pt: f32, border: BorderStyle| {
+    let width_pt = fixed_output_cell_border_width_pt(border.width_pt, print_scale);
     items.push(PageItem::Rect(RectItem {
-      x_pt: rect.x_pt - border.width_pt / 2.0,
-      y_pt: y_pt - border.width_pt / 2.0,
-      width_pt: rect.width_pt + border.width_pt,
-      height_pt: border.width_pt,
+      x_pt: rect.x_pt - width_pt / 2.0,
+      y_pt: y_pt - width_pt / 2.0,
+      width_pt: rect.width_pt + width_pt,
+      height_pt: width_pt,
       fill_color: Some(border.color),
       fill_opacity: 1.0,
       stroke: None,
@@ -3585,6 +3754,24 @@ fn render_cell_borders(
   if let Some(border) = borders.bottom {
     push_horizontal_border(rect.y_pt + rect.height_pt, border);
   }
+}
+
+fn fixed_output_cell_border_width_pt(authored_width_pt: f32, print_scale: f32) -> f32 {
+  if !authored_width_pt.is_finite()
+    || !print_scale.is_finite()
+    || authored_width_pt <= 0.0
+    || print_scale <= 0.0
+  {
+    return 0.0;
+  }
+  // Calc's print path passes the same nScaleX/nScaleY into ScOutputData for
+  // cell geometry and DrawFrame. The Windows GDI counterexample converts a
+  // geometric pen through the logical-to-device transform and preserves at
+  // least one device pixel. Mirror both stages on Office's 600dpi fixed-
+  // output grid. In 49156.xlsx this maps a 1pt thin border at the worksheet
+  // print scale to the four-dot (0.48pt) rectangles in the Office PDF.
+  let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  units::quantize_points_to_office_print_grid(authored_width_pt * print_scale).max(printer_dot_pt)
 }
 
 fn merge_cell_borders(
@@ -3874,7 +4061,14 @@ fn print_page_image_items(
         continue;
       }
       let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
-      items.extend(vml_image_items(shape, resource, rect));
+      items.extend(vml_image_items(
+        shape,
+        resource,
+        rect,
+        page
+          .sheet
+          .uses_legacy_excel12_vml_picture_snapshot_grid(shape),
+      ));
     }
   }
   items
@@ -4087,6 +4281,7 @@ fn vml_image_items(
   shape: &super::object_resources::VmlShapeModel,
   resource: &super::drawing::ImageResource,
   mut rect: CellRect,
+  legacy_excel12_snapshot_grid: bool,
 ) -> Vec<PageItem> {
   let is_fill = shape.image_relationship_id.is_none() && shape.fill_image_relationship_id.is_some();
   let is_embedded_picture = !is_fill
@@ -4095,7 +4290,7 @@ fn vml_image_items(
       .as_deref()
       .is_some_and(|value| value.eq_ignore_ascii_case("Pict"));
   if is_embedded_picture {
-    rect = excel_vml_picture_fixed_output_rect(rect);
+    rect = excel_vml_picture_fixed_output_rect(rect, legacy_excel12_snapshot_grid);
   }
   let recolored_pattern = is_fill
     .then(|| recolor_vml_pattern_image(shape, &resource.data))
@@ -4302,8 +4497,25 @@ fn vml_image_items(
   }
 }
 
-fn excel_vml_picture_fixed_output_rect(rect: CellRect) -> CellRect {
+fn excel_vml_picture_fixed_output_rect(
+  rect: CellRect,
+  legacy_excel12_snapshot_grid: bool,
+) -> CellRect {
   let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  if legacy_excel12_snapshot_grid {
+    // ECMA-376 Part 4 §19.4.2.6 and [MS-XLS] FtPioGrbit define AutoPict
+    // as preserving a Pict object's aspect across views, including printing.
+    // Excel 12's VML-only snapshot has no objectPr/xdr geometry owner: the
+    // immutable WithEmbeded PDF resolves its ClientData offsets on the 200dpi
+    // preview device, then keeps the resulting height on the 600dpi printer
+    // grid. The modern 58325_db objectPr anchor is the opposite-state guard.
+    return CellRect {
+      x_pt: units::quantize_points_to_office_print_grid(rect.x_pt),
+      y_pt: units::quantize_points_to_office_print_grid(rect.y_pt),
+      width_pt: units::quantize_points_to_office_print_grid(rect.width_pt) + 3.0 * printer_dot_pt,
+      height_pt: units::quantize_points_to_office_print_grid(rect.height_pt),
+    };
+  }
   // Excel fixed output maps an embedded VML Pict host separately from its
   // 96dpi ClientAnchor box. The immutable 58325_db Office PDF records the
   // authored 1in × 54pt host as 603 × 460 dots on the 600dpi printer device;
@@ -8313,43 +8525,54 @@ fn vml_shape_rect(
   // for ANCHOR_VML and falls back only when no client anchor is available.
   shape
     .anchor
-    .and_then(|anchor| vml_anchor_rect(sheet, anchor))
+    .and_then(|anchor| vml_anchor_rect(sheet, shape, anchor))
     .or_else(|| shape.style.as_deref().and_then(vml_style_rect))
 }
 
 fn vml_anchor_rect(
   sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
   anchor: super::object_resources::VmlClientAnchor,
 ) -> Option<(f32, f32, f32, f32)> {
-  let x1 = vml_anchor_x(sheet, anchor.from_col, anchor.from_col_offset_px);
-  let y1 = vml_anchor_y(sheet, anchor.from_row, anchor.from_row_offset_px);
-  let x2 = vml_anchor_x(sheet, anchor.to_col, anchor.to_col_offset_px);
-  let y2 = vml_anchor_y(sheet, anchor.to_row, anchor.to_row_offset_px);
+  let x1 = vml_anchor_x(sheet, shape, anchor.from_col, anchor.from_col_offset_px);
+  let y1 = vml_anchor_y(sheet, shape, anchor.from_row, anchor.from_row_offset_px);
+  let x2 = vml_anchor_x(sheet, shape, anchor.to_col, anchor.to_col_offset_px);
+  let y2 = vml_anchor_y(sheet, shape, anchor.to_row, anchor.to_row_offset_px);
   if x2 < x1 || y2 < y1 {
     return None;
   }
   Some((x1, y1, x2 - x1, y2 - y1))
 }
 
-fn vml_anchor_x(sheet: &CalcSheet, zero_based_col: u32, offset_px: i32) -> f32 {
+fn vml_anchor_x(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+  zero_based_col: u32,
+  offset_px: i32,
+) -> f32 {
   let col = zero_based_col.saturating_add(1);
   let cell = sheet.cell_rect(super::worksheet::CellAddress { col, row: 1 });
   let next_cell = sheet.cell_rect(super::worksheet::CellAddress {
     col: col.saturating_add(1),
     row: 1,
   });
-  let x = cell.x_pt + sheet.vml_anchor_offset_pt(offset_px);
+  let x = cell.x_pt + sheet.vml_anchor_offset_pt(shape, offset_px);
   x.min(next_cell.x_pt - units::twips_to_points(1.0))
 }
 
-fn vml_anchor_y(sheet: &CalcSheet, zero_based_row: u32, offset_px: i32) -> f32 {
+fn vml_anchor_y(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+  zero_based_row: u32,
+  offset_px: i32,
+) -> f32 {
   let row = zero_based_row.saturating_add(1);
   let cell = sheet.cell_rect(super::worksheet::CellAddress { col: 1, row });
   let next_cell = sheet.cell_rect(super::worksheet::CellAddress {
     col: 1,
     row: row.saturating_add(1),
   });
-  let y = cell.y_pt + sheet.vml_anchor_offset_pt(offset_px);
+  let y = cell.y_pt + sheet.vml_anchor_offset_pt(shape, offset_px);
   y.min(next_cell.y_pt - units::twips_to_points(1.0))
 }
 
@@ -9271,14 +9494,26 @@ fn render_header_or_footer(
   items: &mut Vec<PageItem>,
   page: &CalcPrintPage<'_>,
   setup: PageSetup,
+  content_scale: f32,
   header: bool,
   styles: &super::styles::StylesCatalog,
+  source_file_name: Option<&str>,
   text_metrics: &mut TextMetrics,
 ) {
   let Some(text) = header_footer_text(page, header) else {
     return;
   };
-  render_header_footer_line(items, header, page, setup, text, styles, text_metrics);
+  render_header_footer_line(
+    items,
+    header,
+    page,
+    setup,
+    content_scale,
+    text,
+    styles,
+    source_file_name,
+    text_metrics,
+  );
 }
 
 fn header_footer_text<'a>(page: &CalcPrintPage<'a>, header: bool) -> Option<&'a str> {
@@ -9307,8 +9542,10 @@ fn render_header_footer_line(
   header: bool,
   page: &CalcPrintPage<'_>,
   setup: PageSetup,
+  content_scale: f32,
   text: &str,
   styles: &super::styles::StylesCatalog,
+  source_file_name: Option<&str>,
   text_metrics: &mut TextMetrics,
 ) {
   for (align, value) in split_header_footer_sections(text) {
@@ -9322,15 +9559,15 @@ fn render_header_footer_line(
         page_number: page.page_number,
         total_pages: page.total_pages,
         sheet_name: &page.sheet.name,
+        file_name: source_file_name.unwrap_or(""),
       },
     );
     if runs.is_empty() {
       continue;
     }
     if page.page_settings.header_footer.scale_with_doc {
-      let print_scale = page.zoom as f32 / 100.0;
       for run in &mut runs {
-        run.style.font_size_pt *= print_scale;
+        run.style.font_size_pt *= content_scale;
       }
     }
     // OOXML pageMargins.header/footer is the distance from the page edge to
@@ -9353,10 +9590,12 @@ fn render_header_footer_line(
       .iter()
       .map(|run| text_metrics.measure_text(&run.text, &run.style))
       .sum::<f32>();
+    let (left_edge_pt, right_edge_pt) =
+      header_footer_horizontal_edges(setup, page.page_settings.header_footer.align_with_margins);
     let mut x = match align {
-      HeaderFooterAlign::Left => setup.margin_left_pt,
+      HeaderFooterAlign::Left => left_edge_pt,
       HeaderFooterAlign::Center => (setup.width_pt - total_width) / 2.0,
-      HeaderFooterAlign::Right => setup.width_pt - setup.margin_right_pt - total_width,
+      HeaderFooterAlign::Right => right_edge_pt - total_width,
     };
     for run in runs {
       let width = text_metrics.measure_text(&run.text, &run.style);
@@ -9369,6 +9608,15 @@ fn render_header_footer_line(
       ));
       x += width;
     }
+  }
+}
+
+fn header_footer_horizontal_edges(setup: PageSetup, align_with_margins: bool) -> (f32, f32) {
+  if align_with_margins {
+    (setup.margin_left_pt, setup.width_pt - setup.margin_right_pt)
+  } else {
+    let left = XLSX_UNALIGNED_HEADER_FOOTER_INSET_PT.min(setup.width_pt / 2.0);
+    (left, setup.width_pt - left)
   }
 }
 
@@ -9430,6 +9678,7 @@ struct HeaderFooterFieldValues<'a> {
   page_number: usize,
   total_pages: usize,
   sheet_name: &'a str,
+  file_name: &'a str,
 }
 
 #[derive(Clone, Debug)]
@@ -9458,6 +9707,7 @@ fn parse_header_footer_runs(
       Some('P' | 'p') => output.push_str(&fields.page_number.to_string()),
       Some('N' | 'n') => output.push_str(&fields.total_pages.to_string()),
       Some('A' | 'a') => output.push_str(fields.sheet_name),
+      Some('F' | 'f') => output.push_str(fields.file_name),
       Some('&') => output.push('&'),
       Some('L' | 'l' | 'C' | 'c' | 'R' | 'r') => {}
       Some('"') => {
@@ -9758,29 +10008,57 @@ mod drawing_page_tests {
   }
 
   #[test]
-  fn following_cell_text_keeps_only_the_clipped_boundary_semantics() {
-    let clip = CellRect {
-      x_pt: 10.0,
-      y_pt: 20.0,
-      width_pt: 100.0,
-      height_pt: 200.0,
+  fn following_cell_text_uses_first_band_physical_culling_and_later_clip_intersection() {
+    let physical_page = CellRect {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 595.0,
+      height_pt: 842.0,
     };
-    let edge = clip.x_pt + clip.width_pt;
+    let print_clip = CellRect {
+      x_pt: 36.0,
+      y_pt: 270.0,
+      width_pt: 480.0,
+      height_pt: 511.0,
+    };
+    let PageItem::Text(mut text) =
+      styled_header_text(564.0, 300.0, "55".to_string(), TextStyle::default())
+    else {
+      unreachable!();
+    };
+    let mut metrics = TextMetrics::new();
 
-    assert!(scan_context_text_intersects_semantic_clip(
-      edge + XLSX_CELL_TEXT_INSET_PT,
-      edge + 40.0,
-      clip,
+    assert!(!scan_context_text_belongs_to_page(
+      &text,
+      print_clip,
+      physical_page,
+      false,
+      &mut metrics,
     ));
-    assert!(!scan_context_text_intersects_semantic_clip(
-      edge + XLSX_SCAN_CONTEXT_TEXT_EDGE_SLACK_PT + 0.01,
-      edge + 40.0,
-      clip,
+    assert!(scan_context_text_belongs_to_page(
+      &text,
+      print_clip,
+      physical_page,
+      true,
+      &mut metrics,
     ));
-    assert!(!scan_context_text_intersects_semantic_clip(
-      clip.x_pt - 40.0,
-      clip.x_pt,
-      clip,
+
+    text.x_pt = physical_page.width_pt + 0.01;
+    assert!(!scan_context_text_belongs_to_page(
+      &text,
+      print_clip,
+      physical_page,
+      true,
+      &mut metrics,
+    ));
+
+    text.x_pt = print_clip.x_pt + print_clip.width_pt - 1.0;
+    assert!(scan_context_text_belongs_to_page(
+      &text,
+      print_clip,
+      physical_page,
+      false,
+      &mut metrics,
     ));
   }
 
@@ -10216,6 +10494,207 @@ mod cell_alignment_tests {
   }
 
   #[test]
+  fn rich_text_rpr_uses_excel_superscript_metrics_and_resets_omitted_booleans() {
+    let base_style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 9.48,
+      bold: true,
+      italic: true,
+      ..TextStyle::default()
+    };
+    let run = super::super::workbook::SharedStringRun {
+      text: "(1)".to_string(),
+      has_properties: true,
+      font_family: Some("Arial".to_string()),
+      font_size_pt: Some(10.0),
+      bold: Some(true),
+      vertical_alignment: Some(x::VerticalAlignmentRunValues::Superscript),
+      ..Default::default()
+    };
+
+    let style = xlsx_rich_text_run_style(&base_style, &run, 0.95);
+
+    assert_eq!(style.font_family.as_deref(), Some("Arial"));
+    assert!(style.bold);
+    assert!(
+      !style.italic,
+      "a present rPr owns the ordinary italic state"
+    );
+    assert!((style.font_size_pt - 6.36).abs() < 1.0e-5);
+    assert_eq!(style.automatic_escapement_font_size_pt, Some(9.48));
+    assert!((style.baseline_shift_pt - 4.68).abs() < 1.0e-5);
+  }
+
+  #[test]
+  fn rich_text_renderer_keeps_runs_separate_on_one_shared_line() {
+    let runs = [
+      super::super::workbook::SharedStringRun {
+        text: "Job Offers".to_string(),
+        ..Default::default()
+      },
+      super::super::workbook::SharedStringRun {
+        text: "(1)".to_string(),
+        has_properties: true,
+        font_family: Some("Arial".to_string()),
+        font_size_pt: Some(10.0),
+        bold: Some(true),
+        vertical_alignment: Some(x::VerticalAlignmentRunValues::Superscript),
+        ..Default::default()
+      },
+    ];
+    let base_style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 9.48,
+      bold: true,
+      ..TextStyle::default()
+    };
+    let mut items = Vec::new();
+    let mut metrics = TextMetrics::new();
+    render_cell_rich_text(
+      &mut items,
+      &runs,
+      CellRect {
+        x_pt: 100.0,
+        y_pt: 200.0,
+        width_pt: 200.0,
+        height_pt: 14.0,
+      },
+      base_style,
+      CellTextRenderOptions {
+        alignment: None,
+        horizontal_alignment: x::HorizontalAlignmentValues::Left,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 12.0,
+      },
+      0.95,
+      &mut metrics,
+    );
+
+    assert_eq!(items.len(), 2);
+    let [PageItem::Text(base), PageItem::Text(marker)] = items.as_slice() else {
+      panic!("expected two rich-text portions");
+    };
+    assert_eq!(base.text, "Job Offers");
+    assert_eq!(marker.text, "(1)");
+    assert!(base.style.bold);
+    assert!(marker.style.bold);
+    assert!(marker.x_pt > base.x_pt);
+    assert!((marker.style.font_size_pt - 6.36).abs() < 1.0e-5);
+    assert!((marker.style.baseline_shift_pt - 4.68).abs() < 1.0e-5);
+    let base_baseline_offset =
+      metrics.baseline_offset_in_line_for_text(&base.text, &base.style, base.line_height_pt);
+    let marker_baseline_offset =
+      metrics.baseline_offset_in_line_for_text(&marker.text, &marker.style, marker.line_height_pt);
+    let base_logical_baseline = base.y_pt + base_baseline_offset + base.style.baseline_shift_pt;
+    let marker_logical_baseline =
+      marker.y_pt + marker_baseline_offset + marker.style.baseline_shift_pt;
+    assert!((base_logical_baseline - marker_logical_baseline).abs() < 1.0e-5);
+    let base_painted_baseline = base.y_pt + base_baseline_offset;
+    let marker_painted_baseline = marker.y_pt + marker_baseline_offset;
+    assert!((base_painted_baseline - marker_painted_baseline - 4.68).abs() < 1.0e-5);
+  }
+
+  #[test]
+  fn rich_text_rpr_presence_separates_cell_superscript_inheritance_from_baseline() {
+    let mut superscript_cell_style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 10.0,
+      ..TextStyle::default()
+    };
+    super::super::text::apply_vertical_text_alignment(
+      &mut superscript_cell_style,
+      x::VerticalAlignmentRunValues::Superscript,
+    );
+    super::super::text::scale_text_style_for_fixed_output(&mut superscript_cell_style, 0.95);
+
+    let inherited = xlsx_rich_text_run_style(
+      &superscript_cell_style,
+      &super::super::workbook::SharedStringRun {
+        text: "(1)  ".to_string(),
+        ..Default::default()
+      },
+      0.95,
+    );
+    let baseline = xlsx_rich_text_run_style(
+      &superscript_cell_style,
+      &super::super::workbook::SharedStringRun {
+        text: "Represents percent".to_string(),
+        has_properties: true,
+        font_family: Some("Arial".to_string()),
+        font_size_pt: Some(10.0),
+        ..Default::default()
+      },
+      0.95,
+    );
+
+    assert!((inherited.font_size_pt - 6.36).abs() < 1.0e-5);
+    assert!((inherited.baseline_shift_pt - 4.68).abs() < 1.0e-5);
+    assert_eq!(inherited.automatic_escapement_font_size_pt, Some(9.48));
+    assert!((baseline.font_size_pt - 9.48).abs() < 1.0e-5);
+    assert_eq!(baseline.baseline_shift_pt, 0.0);
+    assert_eq!(baseline.automatic_escapement_font_size_pt, None);
+  }
+
+  #[test]
+  fn rich_text_mixed_sizes_share_one_logical_baseline() {
+    let runs = [
+      super::super::workbook::SharedStringRun {
+        text: "Class Profile for First-Year Full-Time MBA, Joint Degree, and ".to_string(),
+        ..Default::default()
+      },
+      super::super::workbook::SharedStringRun {
+        text: "IMBA Students".to_string(),
+        has_properties: true,
+        font_family: Some("Arial".to_string()),
+        font_size_pt: Some(11.0),
+        italic: Some(true),
+        ..Default::default()
+      },
+    ];
+    let mut items = Vec::new();
+    let mut metrics = TextMetrics::new();
+    render_cell_rich_text(
+      &mut items,
+      &runs,
+      CellRect {
+        x_pt: 100.0,
+        y_pt: 200.0,
+        width_pt: 400.0,
+        height_pt: 14.0,
+      },
+      TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        font_size_pt: 9.48,
+        italic: true,
+        ..TextStyle::default()
+      },
+      CellTextRenderOptions {
+        alignment: None,
+        horizontal_alignment: x::HorizontalAlignmentValues::Left,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 12.0,
+      },
+      0.95,
+      &mut metrics,
+    );
+
+    let [PageItem::Text(first), PageItem::Text(second)] = items.as_slice() else {
+      panic!("expected the two title portions");
+    };
+    let first_baseline = first.y_pt
+      + metrics.baseline_offset_in_line_for_text(&first.text, &first.style, first.line_height_pt);
+    let second_baseline = second.y_pt
+      + metrics.baseline_offset_in_line_for_text(
+        &second.text,
+        &second.style,
+        second.line_height_pt,
+      );
+    assert!((first_baseline - second_baseline).abs() < 1.0e-5);
+  }
+
+  #[test]
   fn overflow_hashes_fill_the_available_cell_width() {
     assert_eq!(calc_cell_overflow_hash_count(90.0, 6.0), 15);
     assert_eq!(calc_cell_overflow_hash_count(5.0, 6.0), 1);
@@ -10229,18 +10708,47 @@ mod cell_alignment_tests {
   }
 
   #[test]
+  fn cell_border_weight_uses_the_print_transform_and_device_grid() {
+    assert_eq!(fixed_output_cell_border_width_pt(1.0, 0.45), 0.48);
+    assert_eq!(fixed_output_cell_border_width_pt(1.0, 1.0), 0.96);
+    assert_eq!(fixed_output_cell_border_width_pt(0.5, 0.10), 0.12);
+    assert_eq!(fixed_output_cell_border_width_pt(0.0, 0.45), 0.0);
+  }
+
+  #[test]
   fn embedded_vml_picture_uses_excel_printer_host_bounds() {
-    let rect = excel_vml_picture_fixed_output_rect(CellRect {
-      x_pt: 36.850_395,
-      y_pt: 297.442_9,
-      width_pt: 72.0,
-      height_pt: 54.0,
-    });
+    let rect = excel_vml_picture_fixed_output_rect(
+      CellRect {
+        x_pt: 36.850_395,
+        y_pt: 297.442_9,
+        width_pt: 72.0,
+        height_pt: 54.0,
+      },
+      false,
+    );
 
     assert_eq!(rect.x_pt, 36.84);
     assert_eq!(rect.y_pt, 297.48);
     assert_eq!(rect.width_pt, 72.36);
     assert_eq!(rect.height_pt, 55.2);
+  }
+
+  #[test]
+  fn legacy_auto_picture_keeps_the_snapshot_height_without_modern_host_padding() {
+    let rect = excel_vml_picture_fixed_output_rect(
+      CellRect {
+        x_pt: 50.4,
+        y_pt: 237.72,
+        width_pt: 14.36,
+        height_pt: 26.79,
+      },
+      true,
+    );
+
+    assert_eq!(rect.x_pt, 50.4);
+    assert_eq!(rect.y_pt, 237.72);
+    assert!((rect.width_pt - 14.76).abs() < 1.0e-5);
+    assert!((rect.height_pt - 26.76).abs() < 1.0e-5);
   }
 
   #[test]
@@ -10307,6 +10815,31 @@ mod header_footer_tests {
   use super::*;
 
   #[test]
+  fn fixed_output_content_scale_preserves_separate_fractional_stages() {
+    assert!((fixed_output_content_scale(100, 95) - 0.95).abs() < f32::EPSILON);
+    assert!((fixed_output_content_scale(80, 95) - 0.76).abs() < f32::EPSILON);
+    assert!((fixed_output_content_scale(90, 95) - 0.855).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn header_footer_horizontal_frame_separates_aligned_and_unaligned_margins() {
+    let setup = PageSetup {
+      width_pt: 595.32,
+      margin_left_pt: 0.7 * units::POINTS_PER_INCH,
+      margin_right_pt: 1.0 * units::POINTS_PER_INCH,
+      ..PageSetup::default()
+    };
+
+    let aligned = header_footer_horizontal_edges(setup, true);
+    assert!((aligned.0 - 50.4).abs() < 0.001);
+    assert!((aligned.1 - 523.32).abs() < 0.001);
+
+    let unaligned = header_footer_horizontal_edges(setup, false);
+    assert!((unaligned.0 - 54.0).abs() < 0.001);
+    assert!((unaligned.1 - 541.32).abs() < 0.001);
+  }
+
+  #[test]
   fn header_footer_font_descriptor_and_size_apply_to_fields() {
     let runs = parse_header_footer_runs(
       "&\"Times New Roman,Regular\"&12&A",
@@ -10315,6 +10848,7 @@ mod header_footer_tests {
         page_number: 2,
         total_pages: 3,
         sheet_name: "Sheet1",
+        file_name: "book.xlsx",
       },
     );
 
@@ -10336,6 +10870,7 @@ mod header_footer_tests {
         page_number: 2,
         total_pages: 3,
         sheet_name: "Sheet1",
+        file_name: "book.xlsx",
       },
     );
 
@@ -10346,5 +10881,24 @@ mod header_footer_tests {
     assert!(runs[1].style.bold);
     assert_eq!(runs[2].text, "2/3");
     assert!(!runs[2].style.bold);
+  }
+
+  #[test]
+  fn header_footer_file_field_uses_the_callers_workbook_name() {
+    let fields = HeaderFooterFieldValues {
+      page_number: 1,
+      total_pages: 1,
+      sheet_name: "Sheet1",
+      file_name: "45540_classic_Footer.xlsx",
+    };
+    let runs = parse_header_footer_runs("&F", TextStyle::default(), fields);
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].text, "45540_classic_Footer.xlsx");
+
+    let unavailable = HeaderFooterFieldValues {
+      file_name: "",
+      ..fields
+    };
+    assert!(parse_header_footer_runs("&F", TextStyle::default(), unavailable).is_empty());
   }
 }

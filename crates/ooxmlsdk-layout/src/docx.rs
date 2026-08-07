@@ -6383,15 +6383,21 @@ fn push_run_or_complex_field(
         if let Some(field) = fields.last_mut()
           && field.in_result
         {
+          // A WordprocessingML run may contain both the field-code portion
+          // and the persisted result (including nested fields). Re-importing
+          // the whole run here would replay ordinary choices that preceded
+          // this field's separator, such as a tab in an IF instruction. Keep
+          // the result import scoped to the current choice.
+          let mut result_run = run.clone();
+          result_run.run_choice = vec![choice.clone()];
           push_run_with_character_style_policy(
-            run,
+            &result_run,
             &mut field.result,
             base_style.clone(),
             context,
             hyperlink_url,
             !suppress_toc_hyperlink_style,
           );
-          break;
         }
       }
     }
@@ -32719,6 +32725,29 @@ mod tests {
           _ => None,
         })
         .all(|run| run.hyperlink_url.as_deref() == Some("ooxmlsdk-pdf:bookmark:md_intro"))
+    );
+  }
+
+  #[test]
+  fn same_run_nested_field_result_does_not_replay_field_code_choices() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve"> IF </w:instrText><w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve"> MERGEFIELD Phone_Numbers </w:instrText><w:fldChar w:fldCharType="separate"/><w:instrText>result1</w:instrText><w:fldChar w:fldCharType="end"/><w:instrText xml:space="preserve"> = "" "" "phone: </w:instrText><w:tab/><w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve"> MERGEFIELD Phone_Numbers </w:instrText><w:fldChar w:fldCharType="separate"/><w:instrText>result2</w:instrText><w:fldChar w:fldCharType="end"/><w:instrText xml:space="preserve">" </w:instrText><w:fldChar w:fldCharType="separate"/><w:t xml:space="preserve">phone: </w:t><w:tab/><w:t>1234567890</w:t><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+    )
+    .expect("nested fields sharing one run");
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    );
+
+    assert_eq!(
+      field_result_text(&inlines).as_deref(),
+      Some("phone: \t1234567890")
     );
   }
 

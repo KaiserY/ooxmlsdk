@@ -55,9 +55,9 @@ use crate::{
   PdfGlyphDiagnostics, PdfGlyphRunDiagnostics, PdfPageDiagnostics, PdfTextPortionDiagnostics,
   PdfTextPortionKind, PdfTextRunDiagnostics,
 };
-use ooxmlsdk_layout::common;
 use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef};
 use ooxmlsdk_layout::text_metrics::TextMetrics;
+use ooxmlsdk_layout::{common, units};
 
 const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
 // Historical fixed-output calibration retained from the DOCX numbering/font
@@ -4076,6 +4076,25 @@ fn krilla_blend_mode(mode: common::BlendMode) -> BlendMode {
   }
 }
 
+fn office_fixed_output_raster_pixels(points: f32, visible_fraction: f32) -> u32 {
+  let print_dots =
+    (points.max(0.0) / visible_fraction) * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH;
+  let nearest_print_dot = print_dots.round();
+  let print_grid_slack = f32::EPSILON * print_dots.abs().max(1.0) * 8.0;
+  // Office's raster target is allocated from an integer printer-device
+  // rectangle. Recover an authored 600dpi grid point before converting to
+  // the 200dpi image grid so, for example, 123 printer dots remain exactly
+  // 41 pixels instead of becoming 40 through f32 representation error.
+  let print_dots = if (print_dots - nearest_print_dot).abs() <= print_grid_slack {
+    nearest_print_dot
+  } else {
+    print_dots
+  };
+  (print_dots * units::OFFICE_FIXED_OUTPUT_RASTER_DPI / units::OFFICE_FIXED_OUTPUT_DPI)
+    .floor()
+    .clamp(1.0, u32::MAX as f32) as u32
+}
+
 fn metafile_render_options_for_image(
   image: &ImageItem<'_>,
   options: &PdfOptions,
@@ -4111,14 +4130,9 @@ fn metafile_render_options_for_image(
     // Word's PDF contains a 157x157 image for the 56.8pt frame. VML-hosted
     // tdf135653.docx follows the same rule and emits 214x137 pixels. Both use
     // the floor of the uncropped viewport dimensions.
-    let pixels = |points: f32, visible_fraction: f32| {
-      ((points.max(0.0) / visible_fraction) * 200.0 / 72.0)
-        .floor()
-        .clamp(1.0, u32::MAX as f32) as u32
-    };
     Some((
-      pixels(image.width_pt, visible_width),
-      pixels(image.height_pt, visible_height),
+      office_fixed_output_raster_pixels(image.width_pt, visible_width),
+      office_fixed_output_raster_pixels(image.height_pt, visible_height),
     ))
   };
   ooxmlsdk_layout::render::emf_wmf::RenderOptions {
@@ -7548,6 +7562,17 @@ mod tests {
     assert_eq!(vml.target_height_px, Some(137));
     assert!(vml.transparent_background);
     assert_eq!(vml.background_color, None);
+
+    vml_preview.width_pt = 14.76;
+    vml_preview.height_pt = 26.76;
+    let printer_grid_vml = metafile_render_options_for_image(&vml_preview, &PdfOptions::default());
+    assert_eq!(printer_grid_vml.target_width_px, Some(41));
+    assert_eq!(printer_grid_vml.target_height_px, Some(74));
+
+    vml_preview.width_pt = 14.759;
+    let below_printer_grid =
+      metafile_render_options_for_image(&vml_preview, &PdfOptions::default());
+    assert_eq!(below_printer_grid.target_width_px, Some(40));
   }
 
   #[test]

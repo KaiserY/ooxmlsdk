@@ -19,6 +19,7 @@ pub(crate) struct ExcelImport {
   pub(crate) styles: StylesCatalog,
   pub(crate) defined_names: DefinedNamesCatalog,
   pub(crate) workbook_catalog: WorkbookCatalog,
+  pub(crate) source_file_name: Option<String>,
   relative_formula_context: OnceLock<RelativeFormulaEvaluationContext>,
 }
 
@@ -56,6 +57,7 @@ impl ExcelImport {
       styles: fragment.styles,
       defined_names: fragment.defined_names,
       workbook_catalog,
+      source_file_name: options.source_file_name.clone(),
       relative_formula_context: OnceLock::new(),
     })
   }

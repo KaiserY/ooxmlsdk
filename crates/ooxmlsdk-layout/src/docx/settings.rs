@@ -171,7 +171,7 @@ pub(super) fn do_not_break_wrapped_tables(
   main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
-    .is_some_and(|settings| do_not_break_wrapped_tables_value(&settings))
+    .is_some_and(do_not_break_wrapped_tables_value)
 }
 
 pub(super) fn do_not_expand_shift_return(
@@ -181,7 +181,7 @@ pub(super) fn do_not_expand_shift_return(
   main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
-    .is_some_and(|settings| do_not_expand_shift_return_value(&settings))
+    .is_some_and(do_not_expand_shift_return_value)
 }
 
 fn do_not_break_wrapped_tables_value(settings: &w::Settings) -> bool {

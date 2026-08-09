@@ -4931,7 +4931,7 @@ fn linear_layout_tree(
       let value = properties
         .get("")
         .and_then(|properties| layout_property_value(properties, constraint.target))
-        .unwrap_or_else(|| {
+        .unwrap_or({
           if horizontal {
             node.width * constraint.factor
           } else {

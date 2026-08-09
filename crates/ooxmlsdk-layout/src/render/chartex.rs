@@ -137,7 +137,7 @@ impl FormulaMatrix {
 
 pub(crate) type FormulaResolver<'a> = dyn FnMut(&str) -> Option<FormulaMatrix> + 'a;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub(crate) struct ChartExStyleResources<'a> {
   pub(crate) chart_styles: &'a [cs::ChartStyle],
   pub(crate) color_styles: &'a [cs::ColorStyle],
@@ -148,15 +148,6 @@ pub(crate) enum ChartExHost {
   Word,
   PowerPoint,
   Excel,
-}
-
-impl Default for ChartExStyleResources<'_> {
-  fn default() -> Self {
-    Self {
-      chart_styles: &[],
-      color_styles: &[],
-    }
-  }
 }
 
 pub(crate) struct ChartExRenderOptions<'a> {
@@ -2169,14 +2160,16 @@ fn cartesian_plot(
 ) -> PlotRect {
   cartesian_plot_with_top_inset(
     plot,
-    has_value_title,
-    has_category_title,
-    has_out_end_labels,
-    scale,
-    axis,
-    appearance,
-    None,
-    true,
+    CartesianPlotOptions {
+      has_value_title,
+      has_category_title,
+      has_out_end_labels,
+      scale,
+      axis,
+      appearance,
+      top_inset: None,
+      use_excel_minimum_gutter: true,
+    },
   )
 }
 
@@ -2191,28 +2184,41 @@ fn cartesian_plot_without_excel_label_floor(
 ) -> PlotRect {
   cartesian_plot_with_top_inset(
     plot,
+    CartesianPlotOptions {
+      has_value_title,
+      has_category_title,
+      has_out_end_labels,
+      scale,
+      axis,
+      appearance,
+      top_inset: None,
+      use_excel_minimum_gutter: false,
+    },
+  )
+}
+
+struct CartesianPlotOptions<'a> {
+  has_value_title: bool,
+  has_category_title: bool,
+  has_out_end_labels: bool,
+  scale: AxisScale,
+  axis: Option<&'a cx::Axis>,
+  appearance: &'a Appearance,
+  top_inset: Option<f32>,
+  use_excel_minimum_gutter: bool,
+}
+
+fn cartesian_plot_with_top_inset(plot: PlotRect, options: CartesianPlotOptions<'_>) -> PlotRect {
+  let CartesianPlotOptions {
     has_value_title,
     has_category_title,
     has_out_end_labels,
     scale,
     axis,
     appearance,
-    None,
-    false,
-  )
-}
-
-fn cartesian_plot_with_top_inset(
-  plot: PlotRect,
-  has_value_title: bool,
-  has_category_title: bool,
-  has_out_end_labels: bool,
-  scale: AxisScale,
-  axis: Option<&cx::Axis>,
-  appearance: &Appearance,
-  top_inset: Option<f32>,
-  use_excel_minimum_gutter: bool,
-) -> PlotRect {
+    top_inset,
+    use_excel_minimum_gutter,
+  } = options;
   let style = &appearance.label_style;
   let format = axis
     .and_then(|axis| axis.number_format.as_ref())
@@ -2539,6 +2545,13 @@ enum CategoryAxisCrossing {
   Minimum,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct AxisPaintOptions<'a> {
+  ui_language: Option<&'a str>,
+  pass: AxisPaintPass,
+  category_crossing: CategoryAxisCrossing,
+}
+
 fn lower_axes(
   items: &mut Vec<PageItem>,
   data_plot: PlotRect,
@@ -2546,33 +2559,13 @@ fn lower_axes(
   categories: &[String],
   chart_space: &cx::ChartSpace,
   appearance: &Appearance,
-  ui_language: Option<&str>,
-  pass: AxisPaintPass,
+  options: AxisPaintOptions<'_>,
 ) {
-  lower_axes_with_crossing(
-    items,
-    data_plot,
-    scale,
-    categories,
-    chart_space,
-    appearance,
+  let AxisPaintOptions {
     ui_language,
     pass,
-    CategoryAxisCrossing::Zero,
-  );
-}
-
-fn lower_axes_with_crossing(
-  items: &mut Vec<PageItem>,
-  data_plot: PlotRect,
-  scale: AxisScale,
-  categories: &[String],
-  chart_space: &cx::ChartSpace,
-  appearance: &Appearance,
-  ui_language: Option<&str>,
-  pass: AxisPaintPass,
-  category_crossing: CategoryAxisCrossing,
-) {
+    category_crossing,
+  } = options;
   let value_axis = value_axis(chart_space);
   let category_axis = category_axis(chart_space);
   let value_hidden = value_axis
@@ -2875,8 +2868,11 @@ fn lower_waterfall_chart(
     &categories,
     chart_space,
     appearance,
-    ui_language,
-    AxisPaintPass::BackgroundGrid,
+    AxisPaintOptions {
+      ui_language,
+      pass: AxisPaintPass::BackgroundGrid,
+      category_crossing: CategoryAxisCrossing::Zero,
+    },
   );
   let count = bars.len().max(1);
   let gap = category_axis(chart_space)
@@ -3038,8 +3034,11 @@ fn lower_waterfall_chart(
     &categories,
     chart_space,
     appearance,
-    ui_language,
-    AxisPaintPass::Foreground,
+    AxisPaintOptions {
+      ui_language,
+      pass: AxisPaintPass::Foreground,
+      category_crossing: CategoryAxisCrossing::Zero,
+    },
   );
 }
 
@@ -3321,14 +3320,16 @@ fn lower_funnel(
       }
     })
     .collect::<Vec<_>>();
-  let widest_category = show_tick_labels
-    .then(|| {
+  let widest_category = if show_tick_labels {
+    {
       categories
         .iter()
         .map(|category| text_width(category, &appearance.label_style))
         .fold(0.0_f32, f32::max)
-    })
-    .unwrap_or(0.0);
+    }
+  } else {
+    0.0
+  };
   let left = if show_tick_labels {
     widest_category + 12.05
   } else {
@@ -3497,8 +3498,11 @@ fn lower_clustered_columns(
     &categories,
     chart_space,
     appearance,
-    None,
-    AxisPaintPass::BackgroundGrid,
+    AxisPaintOptions {
+      ui_language: None,
+      pass: AxisPaintPass::BackgroundGrid,
+      category_crossing: CategoryAxisCrossing::Zero,
+    },
   );
   let slot = data_plot.width / count as f32;
   let gap = category_axis(chart_space)
@@ -3557,8 +3561,11 @@ fn lower_clustered_columns(
     &categories,
     chart_space,
     appearance,
-    None,
-    AxisPaintPass::Foreground,
+    AxisPaintOptions {
+      ui_language: None,
+      pass: AxisPaintPass::Foreground,
+      category_crossing: CategoryAxisCrossing::Zero,
+    },
   );
 }
 
@@ -3700,25 +3707,29 @@ fn lower_box_whisker_chart(
   };
   let data_plot = cartesian_plot_with_top_inset(
     plot,
-    value_title,
-    category_title,
-    series.iter().any(has_out_end_labels),
-    scale,
-    value_axis(chart_space),
-    appearance,
-    Some(top_inset),
-    false,
+    CartesianPlotOptions {
+      has_value_title: value_title,
+      has_category_title: category_title,
+      has_out_end_labels: series.iter().any(has_out_end_labels),
+      scale,
+      axis: value_axis(chart_space),
+      appearance,
+      top_inset: Some(top_inset),
+      use_excel_minimum_gutter: false,
+    },
   );
-  lower_axes_with_crossing(
+  lower_axes(
     items,
     data_plot,
     scale,
     &categories,
     chart_space,
     appearance,
-    None,
-    AxisPaintPass::BackgroundGrid,
-    CategoryAxisCrossing::Minimum,
+    AxisPaintOptions {
+      ui_language: None,
+      pass: AxisPaintPass::BackgroundGrid,
+      category_crossing: CategoryAxisCrossing::Minimum,
+    },
   );
 
   let category_slot = data_plot.width / categories.len() as f32;
@@ -3790,40 +3801,32 @@ fn lower_box_whisker_chart(
       let (outline, outline_width, outline_source) = appearance.box_whisker_stroke(color);
       push_box_whisker_line(
         items,
-        x,
-        y_max,
-        x,
-        y_q3,
+        (x, y_max),
+        (x, y_q3),
         outline,
         outline_width,
         outline_source,
       );
       push_box_whisker_line(
         items,
-        x,
-        y_q1,
-        x,
-        y_min,
+        (x, y_q1),
+        (x, y_min),
         outline,
         outline_width,
         outline_source,
       );
       push_box_whisker_line(
         items,
-        x - box_width * 0.15,
-        y_max,
-        x + box_width * 0.15,
-        y_max,
+        (x - box_width * 0.15, y_max),
+        (x + box_width * 0.15, y_max),
         outline,
         outline_width,
         outline_source,
       );
       push_box_whisker_line(
         items,
-        x - box_width * 0.15,
-        y_min,
-        x + box_width * 0.15,
-        y_min,
+        (x - box_width * 0.15, y_min),
+        (x + box_width * 0.15, y_min),
         outline,
         outline_width,
         outline_source,
@@ -3838,10 +3841,8 @@ fn lower_box_whisker_chart(
       ));
       push_box_whisker_line(
         items,
-        x - box_width * 0.5,
-        y_median,
-        x + box_width * 0.5,
-        y_median,
+        (x - box_width * 0.5, y_median),
+        (x + box_width * 0.5, y_median),
         outline,
         outline_width,
         outline_source,
@@ -3850,20 +3851,16 @@ fn lower_box_whisker_chart(
         let size = 3.0_f32.min(box_width * 0.25);
         push_box_whisker_line(
           items,
-          x - size,
-          y_mean - size,
-          x + size,
-          y_mean + size,
+          (x - size, y_mean - size),
+          (x + size, y_mean + size),
           outline,
           outline_width,
           outline_source,
         );
         push_box_whisker_line(
           items,
-          x - size,
-          y_mean + size,
-          x + size,
-          y_mean - size,
+          (x - size, y_mean + size),
+          (x + size, y_mean - size),
           outline,
           outline_width,
           outline_source,
@@ -3918,29 +3915,31 @@ fn lower_box_whisker_chart(
       );
     }
   }
-  lower_axes_with_crossing(
+  lower_axes(
     items,
     data_plot,
     scale,
     &categories,
     chart_space,
     appearance,
-    None,
-    AxisPaintPass::Foreground,
-    CategoryAxisCrossing::Minimum,
+    AxisPaintOptions {
+      ui_language: None,
+      pass: AxisPaintPass::Foreground,
+      category_crossing: CategoryAxisCrossing::Minimum,
+    },
   );
 }
 
 fn push_box_whisker_line(
   items: &mut Vec<PageItem>,
-  x1: f32,
-  y1: f32,
-  x2: f32,
-  y2: f32,
+  start: (f32, f32),
+  end: (f32, f32),
   color: RgbColor,
   width: f32,
   outline: Option<&a::Outline>,
 ) {
+  let (x1, y1) = start;
+  let (x2, y2) = end;
   let mut stroke = crate::common::Stroke {
     width: crate::common::Pt(width),
     color: common_rgb(color, 1.0),
@@ -4337,8 +4336,11 @@ fn lower_histogram_chart(
     &categories,
     chart_space,
     appearance,
-    None,
-    AxisPaintPass::BackgroundGrid,
+    AxisPaintOptions {
+      ui_language: None,
+      pass: AxisPaintPass::BackgroundGrid,
+      category_crossing: CategoryAxisCrossing::Zero,
+    },
   );
   let slot = data_plot.width / bins.len() as f32;
   let zero = scale.y(data_plot, 0.0);
@@ -4361,8 +4363,11 @@ fn lower_histogram_chart(
     &categories,
     chart_space,
     appearance,
-    None,
-    AxisPaintPass::Foreground,
+    AxisPaintOptions {
+      ui_language: None,
+      pass: AxisPaintPass::Foreground,
+      category_crossing: CategoryAxisCrossing::Zero,
+    },
   );
 }
 
@@ -4569,27 +4574,42 @@ fn lower_treemap(
       items,
       tile.node,
       tile.rect,
-      color,
-      0,
-      parent_layout,
-      show_labels,
-      label_position,
-      appearance,
+      TreemapRenderContext {
+        base: color,
+        depth: 0,
+        parent_layout,
+        show_labels,
+        label_position,
+        appearance,
+      },
     );
   }
+}
+
+#[derive(Clone, Copy)]
+struct TreemapRenderContext<'a> {
+  base: RgbColor,
+  depth: usize,
+  parent_layout: cx::ParentLabelLayoutVal,
+  show_labels: bool,
+  label_position: cx::DataLabelPos,
+  appearance: &'a Appearance,
 }
 
 fn lower_treemap_node(
   items: &mut Vec<PageItem>,
   node: &HierarchyNode,
   rect: PlotRect,
-  base: RgbColor,
-  depth: usize,
-  parent_layout: cx::ParentLabelLayoutVal,
-  show_labels: bool,
-  label_position: cx::DataLabelPos,
-  appearance: &Appearance,
+  context: TreemapRenderContext<'_>,
 ) {
+  let TreemapRenderContext {
+    base,
+    depth,
+    parent_layout,
+    show_labels,
+    label_position,
+    appearance,
+  } = context;
   items.push(rect_item(
     rect,
     Some(base),
@@ -4650,12 +4670,14 @@ fn lower_treemap_node(
       items,
       tile.node,
       tile.rect,
-      base,
-      depth + 1,
-      parent_layout,
-      show_labels,
-      label_position,
-      appearance,
+      TreemapRenderContext {
+        base,
+        depth: depth + 1,
+        parent_layout,
+        show_labels,
+        label_position,
+        appearance,
+      },
     );
   }
 }
@@ -4931,8 +4953,11 @@ fn lower_pareto_chart(
     &categories,
     chart_space,
     appearance,
-    None,
-    AxisPaintPass::BackgroundGrid,
+    AxisPaintOptions {
+      ui_language: None,
+      pass: AxisPaintPass::BackgroundGrid,
+      category_crossing: CategoryAxisCrossing::Zero,
+    },
   );
   let slot = data_plot.width / aggregate.len() as f32;
   let gap = category_axis(chart_space)
@@ -5007,8 +5032,11 @@ fn lower_pareto_chart(
     &categories,
     chart_space,
     appearance,
-    None,
-    AxisPaintPass::Foreground,
+    AxisPaintOptions {
+      ui_language: None,
+      pass: AxisPaintPass::Foreground,
+      category_crossing: CategoryAxisCrossing::Zero,
+    },
   );
   if let Some(line) = line {
     lower_pareto_percentage_axis(items, data_plot, line, chart_space, appearance);
@@ -5510,7 +5538,7 @@ fn reorder_chartex_text_items(
             .into_iter()
             .zip(bins.iter().map(|bin| bin.count))
             .collect::<Vec<_>>();
-          paired.sort_by(|left, right| right.1.cmp(&left.1));
+          paired.sort_by_key(|item| std::cmp::Reverse(item.1));
           for (index, (_, count)) in paired.iter().enumerate() {
             if let Some(label) = data_label_text(column, index, *count as f64)
               && let Some(text) = take_matching_text(&mut pool, &label, false)
@@ -6097,7 +6125,7 @@ fn push_centered_rotated_text(
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text,
-    style,
+    style: Box::new(style),
     rotation_center_pt: Some(center),
     hyperlink_url: None,
     form_widget_id: None,
@@ -6129,7 +6157,7 @@ fn push_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: Tex
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text,
-    style,
+    style: Box::new(style),
     rotation_center_pt: None,
     hyperlink_url: None,
     form_widget_id: None,

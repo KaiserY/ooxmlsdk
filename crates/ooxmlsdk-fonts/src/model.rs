@@ -1256,6 +1256,10 @@ impl<'a> FontFaceInfo<'a> {
       FontPitch::Variable
     };
     let flags = FontFlags {
+      // OpenType `cmap` platform 3 / encoding 0 identifies a Windows symbol
+      // font.  Keep the parser's selected cmap classification on the face so
+      // a charset-only request can distinguish it from an ordinary text face.
+      symbolic: face.charmap().is_symbol(),
       monospace: metrics.is_monospace,
       color_glyphs: face.colr().is_ok() || face.sbix().is_ok(),
       vertical: face.vhea().is_ok() || face.vmtx().is_ok(),
@@ -1823,7 +1827,7 @@ impl<'book> ResolvedFont<'book> {
     if let Some(direction) = harf_direction(options.direction) {
       buffer.set_direction(direction);
     }
-    if let Some(script) = options.script.and_then(harf_script) {
+    if let Some(script) = harf_script_for_shape_options(options) {
       buffer.set_script(script);
     }
     if let Some(language) = options
@@ -1934,9 +1938,36 @@ impl<'book> ResolvedFont<'book> {
 pub struct FontScriptRun {
   pub text_range: Range<usize>,
   pub script: TextScript,
+  /// WordprocessingML font slot selected independently from the Unicode
+  /// shaping script. A Greek character can, for example, keep Greek shaping
+  /// while `w:hint="eastAsia"` selects the East Asian font face.
+  pub wordprocessingml_font_slot: Option<WordprocessingFontSlot>,
   pub direction: TextDirection,
   pub size_pt: FontSize,
   pub small_caps: bool,
+}
+
+/// Effective WordprocessingML run-font slot from [MS-OI29500] section 2.1.88
+/// (Part 1 section 17.3.2.26).
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum WordprocessingFontSlot {
+  Ascii,
+  HighAnsi,
+  EastAsia,
+  ComplexScript,
+}
+
+/// WordprocessingML `w:rFonts/@w:hint` selection for characters whose font
+/// slot is otherwise ambiguous.
+///
+/// The names follow ECMA-376 Part 1 §17.18.41. `Ascii` is the transitional
+/// extension accepted by Office and selects the Latin/ASCII slot explicitly.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum WordprocessingFontTypeHint {
+  Default,
+  Ascii,
+  EastAsia,
+  ComplexScript,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1946,6 +1977,20 @@ pub struct ScriptScanOptions {
   /// Apply the explicit WordprocessingML rFonts slot classification before
   /// falling back to Unicode Script for Common characters.
   pub wordprocessingml_font_slots: bool,
+  /// Resolve weak and ECMA-376 conditionally classified characters through
+  /// the effective `w:rFonts/@w:hint` slot.
+  pub wordprocessingml_font_hint: Option<WordprocessingFontTypeHint>,
+  /// Whether effective `w:lang/@w:eastAsia` has a `zh` language component.
+  pub wordprocessingml_east_asia_language_is_chinese: bool,
+  /// Character set declared for the effective East Asian font-table entry.
+  pub wordprocessingml_east_asia_font_charset: Option<FontCharset>,
+  /// A run-level `w:cs` or `w:rtl` forces Word's complex-script font for the
+  /// complete run, independently from its Unicode scripts.
+  pub wordprocessingml_complex_font_override: bool,
+  /// Word uses the ASCII face for East Asian-classified characters when the
+  /// effective East Asian face is Times New Roman and ASCII and High ANSI
+  /// resolve to the same face.
+  pub wordprocessingml_east_asia_uses_ascii: bool,
 }
 
 impl Default for ScriptScanOptions {
@@ -1954,6 +1999,11 @@ impl Default for ScriptScanOptions {
       app_script: TextScript::Common,
       small_caps: false,
       wordprocessingml_font_slots: false,
+      wordprocessingml_font_hint: None,
+      wordprocessingml_east_asia_language_is_chinese: false,
+      wordprocessingml_east_asia_font_charset: None,
+      wordprocessingml_complex_font_override: false,
+      wordprocessingml_east_asia_uses_ascii: false,
     }
   }
 }
@@ -1979,29 +2029,16 @@ pub fn script_direction_runs_with_options(
   options: ScriptScanOptions,
 ) -> Vec<FontScriptRun> {
   if options.small_caps {
-    small_caps_script_direction_runs(
-      text,
-      size_pt,
-      options.app_script,
-      options.wordprocessingml_font_slots,
-    )
+    small_caps_script_direction_runs(text, size_pt, options)
   } else {
-    script_direction_runs_for_segment(
-      text,
-      0,
-      size_pt,
-      false,
-      options.app_script,
-      options.wordprocessingml_font_slots,
-    )
+    script_direction_runs_for_segment(text, 0, size_pt, false, options)
   }
 }
 
 fn small_caps_script_direction_runs(
   text: &str,
   size_pt: FontSize,
-  app_script: TextScript,
-  wordprocessingml_font_slots: bool,
+  options: ScriptScanOptions,
 ) -> Vec<FontScriptRun> {
   let mut runs = Vec::new();
   let mut start = 0usize;
@@ -2024,8 +2061,7 @@ fn small_caps_script_direction_runs(
         start..range.start,
         active,
         size_pt,
-        app_script,
-        wordprocessingml_font_slots,
+        options,
         &mut runs,
       );
       start = range.start;
@@ -2038,8 +2074,7 @@ fn small_caps_script_direction_runs(
       start..text.len(),
       active_reduced.unwrap_or(false),
       size_pt,
-      app_script,
-      wordprocessingml_font_slots,
+      options,
       &mut runs,
     );
   }
@@ -2051,8 +2086,7 @@ fn push_small_caps_case_run(
   range: Range<usize>,
   reduced_run: bool,
   size_pt: FontSize,
-  app_script: TextScript,
-  wordprocessingml_font_slots: bool,
+  options: ScriptScanOptions,
   runs: &mut Vec<FontScriptRun>,
 ) {
   let mut segment_runs = script_direction_runs_for_segment(
@@ -2060,8 +2094,7 @@ fn push_small_caps_case_run(
     range.start,
     size_pt,
     reduced_run,
-    app_script,
-    wordprocessingml_font_slots,
+    options,
   );
   runs.append(&mut segment_runs);
 }
@@ -2071,36 +2104,80 @@ fn script_direction_runs_for_segment(
   range_offset: usize,
   size_pt: FontSize,
   small_caps: bool,
-  app_script: TextScript,
-  wordprocessingml_font_slots: bool,
+  options: ScriptScanOptions,
 ) -> Vec<FontScriptRun> {
   let mut runs = Vec::new();
-  script_direction_runs_for_segment_into(
-    text,
-    range_offset,
-    size_pt,
-    small_caps,
-    app_script,
-    wordprocessingml_font_slots,
-    &mut runs,
-  );
+  if !options.wordprocessingml_font_slots {
+    script_direction_runs_for_slot_segment_into(
+      text,
+      range_offset,
+      size_pt,
+      small_caps,
+      options,
+      None,
+      &mut runs,
+    );
+    return runs;
+  }
+
+  let mut start = 0usize;
+  let mut active_slot = None;
+  for (index, ch) in text.char_indices() {
+    let slot = wordprocessing_font_slot(ch, options);
+    if let Some(active) = active_slot
+      && slot != active
+    {
+      script_direction_runs_for_slot_segment_into(
+        &text[start..index],
+        range_offset + start,
+        size_pt,
+        small_caps,
+        options,
+        Some(active),
+        &mut runs,
+      );
+      start = index;
+    }
+    active_slot = Some(slot);
+  }
+  if start < text.len() {
+    script_direction_runs_for_slot_segment_into(
+      &text[start..],
+      range_offset + start,
+      size_pt,
+      small_caps,
+      options,
+      active_slot,
+      &mut runs,
+    );
+  }
   runs
 }
 
-fn script_direction_runs_for_segment_into(
+fn script_direction_runs_for_slot_segment_into(
   text: &str,
   range_offset: usize,
   size_pt: FontSize,
   small_caps: bool,
-  app_script: TextScript,
-  wordprocessingml_font_slots: bool,
+  options: ScriptScanOptions,
+  wordprocessingml_font_slot: Option<WordprocessingFontSlot>,
   runs: &mut Vec<FontScriptRun>,
 ) {
   if text.is_empty() {
     return;
   }
-  let leading_script =
-    first_strong_text_script(text, wordprocessingml_font_slots).unwrap_or(app_script);
+  let mut push_run = |range: Range<usize>, script: TextScript| {
+    let value = &text[range.clone()];
+    runs.push(FontScriptRun {
+      text_range: (range.start + range_offset)..(range.end + range_offset),
+      script,
+      wordprocessingml_font_slot,
+      direction: text_direction_from_bidi(get_base_direction(value)),
+      size_pt,
+      small_caps: small_caps && small_caps_supported_for_script(script),
+    });
+  };
+  let leading_script = first_strong_text_script(text, options).unwrap_or(options.app_script);
   let mut start = 0usize;
   let mut active = None::<TextScript>;
   let mut pending_weak_start = None::<usize>;
@@ -2113,7 +2190,7 @@ fn script_direction_runs_for_segment_into(
       pending_weak_has_inherited = true;
       continue;
     }
-    let Some(script) = strong_text_script(ch, wordprocessingml_font_slots) else {
+    let Some(script) = strong_text_script(ch, options) else {
       active.get_or_insert(leading_script);
       pending_weak_start.get_or_insert(index);
       pending_weak_has_inherited |= unicode_script == UnicodeScriptValue::Inherited;
@@ -2131,15 +2208,7 @@ fn script_direction_runs_for_segment_into(
           index
         };
         if start < split {
-          push_script_direction_run(
-            text,
-            start..split,
-            active_script,
-            range_offset,
-            size_pt,
-            small_caps,
-            runs,
-          );
+          push_run(start..split, active_script);
         }
         start = split;
         active = Some(script);
@@ -2150,35 +2219,8 @@ fn script_direction_runs_for_segment_into(
     pending_weak_has_inherited = false;
   }
   if start < text.len() {
-    push_script_direction_run(
-      text,
-      start..text.len(),
-      active.unwrap_or(leading_script),
-      range_offset,
-      size_pt,
-      small_caps,
-      runs,
-    );
+    push_run(start..text.len(), active.unwrap_or(leading_script));
   }
-}
-
-fn push_script_direction_run(
-  source: &str,
-  range: Range<usize>,
-  script: TextScript,
-  range_offset: usize,
-  size_pt: FontSize,
-  small_caps: bool,
-  runs: &mut Vec<FontScriptRun>,
-) {
-  let value = &source[range.clone()];
-  runs.push(FontScriptRun {
-    text_range: (range.start + range_offset)..(range.end + range_offset),
-    script,
-    direction: text_direction_from_bidi(get_base_direction(value)),
-    size_pt,
-    small_caps: small_caps && small_caps_supported_for_script(script),
-  });
 }
 
 fn small_caps_supported_for_script(script: TextScript) -> bool {
@@ -2632,7 +2674,7 @@ pub enum FontFamilyClass {
   Schoolbook,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum FontCharset {
   Ansi,
   Symbol,
@@ -4044,22 +4086,22 @@ fn tag_to_string(tag: skrifa::Tag) -> String {
     .to_string()
 }
 
-fn first_strong_text_script(text: &str, wordprocessingml_font_slots: bool) -> Option<TextScript> {
+fn first_strong_text_script(text: &str, options: ScriptScanOptions) -> Option<TextScript> {
   text.chars().find_map(|ch| {
     (!is_nonspacing_mark(ch))
-      .then(|| strong_text_script(ch, wordprocessingml_font_slots))
+      .then(|| strong_text_script(ch, options))
       .flatten()
   })
 }
 
-fn strong_text_script(ch: char, wordprocessingml_font_slots: bool) -> Option<TextScript> {
+fn strong_text_script(ch: char, options: ScriptScanOptions) -> Option<TextScript> {
   // ECMA-376 Part 1 §17.3.2.26 assigns Basic Latin text to the ASCII font
   // slot. Unicode Script marks digits and punctuation as Common; leaving
   // printable characters weak would incorrectly attach a trailing
   // chart/shape number to a preceding East Asian run instead of selecting the
   // Latin face. Layout controls and spaces remain weak so they stay with an
   // adjacent painted run and do not create empty PDF font subsets.
-  if wordprocessingml_font_slots && matches!(ch as u32, 0x0021..=0x007E) {
+  if options.wordprocessingml_font_slots && matches!(ch as u32, 0x0021..=0x007E) {
     return Some(TextScript::Latin);
   }
   // ECMA-376 Part 1 §17.3.2.26 assigns the Latin-1 Supplement to the High
@@ -4067,7 +4109,7 @@ fn strong_text_script(ch: char, wordprocessingml_font_slots: bool) -> Option<Tex
   // exceptions. Treat its Common punctuation as Latin for the default case;
   // Unicode Script alone would incorrectly attach a trailing guillemet to a
   // preceding Han run.
-  if wordprocessingml_font_slots && matches!(ch as u32, 0x00A0..=0x00FF) {
+  if options.wordprocessingml_font_slots && matches!(ch as u32, 0x00A0..=0x00FF) {
     return Some(TextScript::Latin);
   }
   // Unicode assigns Mathematical Alphanumeric Symbols to Common, but the
@@ -4078,6 +4120,138 @@ fn strong_text_script(ch: char, wordprocessingml_font_slots: bool) -> Option<Tex
     return Some(TextScript::Greek);
   }
   strong_text_script_from_unicode(ch.script())
+}
+
+fn wordprocessing_font_slot(ch: char, options: ScriptScanOptions) -> WordprocessingFontSlot {
+  use WordprocessingFontSlot::{Ascii, ComplexScript, HighAnsi};
+
+  // [MS-OI29500] section 2.1.88: either run-level property forces the cs
+  // face for every Unicode value. This precedes all table classifications.
+  if options.wordprocessingml_complex_font_override {
+    return ComplexScript;
+  }
+
+  // ST_Hint resolves otherwise ambiguous glyphs, but `eastAsia` is already
+  // part of the code-point table below. In particular, ECMA-376 Part 1
+  // §17.3.2.26 and [MS-OI29500] §2.1.88 classify all of Basic Latin,
+  // including U+0020, as ASCII. Applying the East Asian hint before that
+  // table would incorrectly move ordinary spaces to the East Asian face.
+  // The `ascii` extension and the standard `cs` hint remain relevant only to
+  // characters whose slot is otherwise ambiguous.
+  if wordprocessing_ambiguous_character(ch) {
+    match options.wordprocessingml_font_hint {
+      Some(WordprocessingFontTypeHint::Ascii) => return Ascii,
+      Some(WordprocessingFontTypeHint::ComplexScript) => return ComplexScript,
+      Some(WordprocessingFontTypeHint::Default | WordprocessingFontTypeHint::EastAsia) | None => {}
+    }
+  }
+
+  let code = ch as u32;
+  let east_asia_hint = matches!(
+    options.wordprocessingml_font_hint,
+    Some(WordprocessingFontTypeHint::EastAsia)
+  );
+  let chinese = options.wordprocessingml_east_asia_language_is_chinese;
+  let chinese_charset = matches!(
+    options.wordprocessingml_east_asia_font_charset,
+    Some(FontCharset::Gb2312 | FontCharset::ChineseBig5)
+  );
+  let east_asia = || wordprocessing_east_asia_slot(options);
+
+  match code {
+    // Explicit Word table rows.
+    0x0000..=0x007F => Ascii,
+    0x00A1
+    | 0x00A4
+    | 0x00A7..=0x00A8
+    | 0x00AA
+    | 0x00AD
+    | 0x00AF
+    | 0x00B0..=0x00B4
+    | 0x00B6..=0x00BA
+    | 0x00BC..=0x00BF
+    | 0x00D7
+    | 0x00F7
+      if east_asia_hint =>
+    {
+      east_asia()
+    }
+    0x00E0..=0x00E1
+    | 0x00E8..=0x00EA
+    | 0x00EC..=0x00ED
+    | 0x00F2..=0x00F3
+    | 0x00F9..=0x00FA
+    | 0x00FC
+      if east_asia_hint && chinese =>
+    {
+      east_asia()
+    }
+    0x00A0..=0x02AF => {
+      if east_asia_hint && code >= 0x0100 && (chinese || chinese_charset) {
+        east_asia()
+      } else {
+        HighAnsi
+      }
+    }
+    0x02B0..=0x04FF | 0x2000..=0x27BF => {
+      if east_asia_hint {
+        east_asia()
+      } else {
+        HighAnsi
+      }
+    }
+    0x0590..=0x07BF => Ascii,
+    0x1100..=0x11FF => east_asia(),
+    0x1E00..=0x1EFF => {
+      if east_asia_hint && chinese {
+        east_asia()
+      } else {
+        HighAnsi
+      }
+    }
+    0x2E80..=0x2EFF => {
+      if east_asia_hint {
+        east_asia()
+      } else {
+        HighAnsi
+      }
+    }
+    0x2F00..=0x2FDF
+    | 0x2FF0..=0x4DBF
+    | 0x4E00..=0x9FAF
+    | 0xA000..=0xA4CF
+    | 0xAC00..=0xD7AF
+    | 0xF900..=0xFAFF
+    | 0xFE30..=0xFE6F
+    | 0xFF00..=0xFFEF => east_asia(),
+    // Word applies the UTF-16 surrogate table rows to supplementary scalar
+    // values. Rust exposes the decoded scalar, so retain that effective slot.
+    0x10000..=0x10FFFF => east_asia(),
+    0xE000..=0xF8FF | 0xFB00..=0xFB1C if east_asia_hint => east_asia(),
+    0xFB1D..=0xFDFF | 0xFE70..=0xFEFE => Ascii,
+    // [MS-OI29500] explicitly assigns all unlisted ranges to hAnsi.
+    _ => HighAnsi,
+  }
+}
+
+fn wordprocessing_east_asia_slot(options: ScriptScanOptions) -> WordprocessingFontSlot {
+  if options.wordprocessingml_east_asia_uses_ascii {
+    WordprocessingFontSlot::Ascii
+  } else {
+    WordprocessingFontSlot::EastAsia
+  }
+}
+
+fn wordprocessing_ambiguous_character(ch: char) -> bool {
+  // Basic Latin has an unconditional ASCII classification in both the
+  // standard and Word's documented implementation. Only Common/Inherited
+  // characters outside that range can require the `ascii`/`cs` hint path;
+  // `eastAsia` continues through the complete block table above.
+  !matches!(ch as u32, 0x0000..=0x007F)
+    && matches!(
+      ch.script(),
+      UnicodeScriptValue::Common | UnicodeScriptValue::Inherited
+    )
 }
 
 fn strong_text_script_from_unicode(script: UnicodeScriptValue) -> Option<TextScript> {
@@ -4375,6 +4549,23 @@ fn harf_script(script: TextScript) -> Option<HarfScript> {
     TextScript::Devanagari => Some(script::DEVANAGARI),
     TextScript::Thai => Some(script::THAI),
     TextScript::Other => None,
+  }
+}
+
+fn harf_script_for_shape_options(options: &ShapeOptions<'_>) -> Option<HarfScript> {
+  // OpenType MATH specifies the `math` OpenType script tag, with only its
+  // default language system, for math-engine features. HarfRust represents
+  // that tag through ISO 15924 Zmth (`script::MATH`). Unicode script scanning
+  // still owns font-slot selection, but an explicit math-only feature must
+  // shape through the font's math Script table rather than Latn/Greek/DFLT.
+  if options
+    .features
+    .iter()
+    .any(|feature| matches!(feature.tag.as_ref(), "ssty" | "flac" | "dtls"))
+  {
+    Some(script::MATH)
+  } else {
+    options.script.and_then(harf_script)
   }
 }
 
@@ -5146,13 +5337,31 @@ mod tests {
       },
     );
 
-    assert_eq!(runs.len(), 3);
+    assert_eq!(runs.len(), 4);
     assert_eq!(runs[0].script, TextScript::Latin);
-    assert_eq!(&"Junzha«问候语»"[runs[0].text_range.clone()], "Junzha«");
-    assert_eq!(runs[1].script, TextScript::Han);
-    assert_eq!(&"Junzha«问候语»"[runs[1].text_range.clone()], "问候语");
-    assert_eq!(runs[2].script, TextScript::Latin);
-    assert_eq!(&"Junzha«问候语»"[runs[2].text_range.clone()], "»");
+    assert_eq!(&"Junzha«问候语»"[runs[0].text_range.clone()], "Junzha");
+    assert_eq!(
+      runs[0].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+    assert_eq!(runs[1].script, TextScript::Latin);
+    assert_eq!(&"Junzha«问候语»"[runs[1].text_range.clone()], "«");
+    assert_eq!(
+      runs[1].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::HighAnsi)
+    );
+    assert_eq!(runs[2].script, TextScript::Han);
+    assert_eq!(&"Junzha«问候语»"[runs[2].text_range.clone()], "问候语");
+    assert_eq!(
+      runs[2].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::EastAsia)
+    );
+    assert_eq!(runs[3].script, TextScript::Latin);
+    assert_eq!(&"Junzha«问候语»"[runs[3].text_range.clone()], "»");
+    assert_eq!(
+      runs[3].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::HighAnsi)
+    );
   }
 
   #[test]
@@ -5174,6 +5383,183 @@ mod tests {
   }
 
   #[test]
+  fn wordprocessingml_east_asia_hint_routes_weak_text_without_changing_scripts() {
+    let text = "Before “水” After";
+    let runs = script_direction_runs_with_options(
+      text,
+      FontSize(11.0),
+      ScriptScanOptions {
+        wordprocessingml_font_slots: true,
+        wordprocessingml_font_hint: Some(WordprocessingFontTypeHint::EastAsia),
+        ..ScriptScanOptions::default()
+      },
+    );
+
+    assert_eq!(runs.len(), 3);
+    assert_eq!(&text[runs[0].text_range.clone()], "Before");
+    assert_eq!(runs[0].script, TextScript::Latin);
+    assert_eq!(
+      runs[0].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+    assert_eq!(&text[runs[1].text_range.clone()], " “水” ");
+    assert_eq!(runs[1].script, TextScript::Han);
+    assert_eq!(
+      runs[1].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::EastAsia)
+    );
+    assert_eq!(&text[runs[2].text_range.clone()], "After");
+    assert_eq!(runs[2].script, TextScript::Latin);
+    assert_eq!(
+      runs[2].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+  }
+
+  #[test]
+  fn wordprocessingml_east_asia_hint_preserves_code_point_table_for_spaces() {
+    let options = ScriptScanOptions {
+      wordprocessingml_font_slots: true,
+      wordprocessingml_font_hint: Some(WordprocessingFontTypeHint::EastAsia),
+      ..ScriptScanOptions::default()
+    };
+    let text = "1    ";
+    let runs = script_direction_runs_with_options(text, FontSize(11.0), options);
+
+    // ECMA-376 Part 1 §17.3.2.26 and [MS-OI29500] §2.1.88 assign the
+    // complete Basic Latin range, including stored leading/trailing spaces,
+    // to the ASCII slot even when w:hint="eastAsia".
+    assert_eq!(runs.len(), 1);
+    assert_eq!(&text[runs[0].text_range.clone()], text);
+    assert_eq!(
+      runs[0].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+
+    let text = " (ctrl + I)";
+    let runs = script_direction_runs_with_options(text, FontSize(11.0), options);
+    assert_eq!(runs.len(), 1);
+    assert_eq!(&text[runs[0].text_range.clone()], text);
+    assert_eq!(
+      runs[0].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+
+    // U+00A0 is High ANSI with no eastAsia exception, while U+2026 belongs
+    // to General Punctuation and therefore follows the eastAsia hint. Pin
+    // both sides so whitespace heuristics cannot replace the block table.
+    let text = "A\u{00a0}A\u{2026}";
+    let runs = script_direction_runs_with_options(text, FontSize(11.0), options);
+    assert_eq!(runs.len(), 4);
+    assert_eq!(&text[runs[0].text_range.clone()], "A");
+    assert_eq!(
+      runs[0].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+    assert_eq!(&text[runs[1].text_range.clone()], "\u{00a0}");
+    assert_eq!(
+      runs[1].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::HighAnsi)
+    );
+    assert_eq!(&text[runs[2].text_range.clone()], "A");
+    assert_eq!(
+      runs[2].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+    assert_eq!(&text[runs[3].text_range.clone()], "\u{2026}");
+    assert_eq!(
+      runs[3].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::EastAsia)
+    );
+  }
+
+  #[test]
+  fn wordprocessingml_font_slots_follow_word_ranges_and_preserve_unicode_script() {
+    let scan = |text, options| {
+      script_direction_runs_with_options(text, FontSize(11.0), options)
+        .into_iter()
+        .next()
+        .expect("font run")
+    };
+    let base = ScriptScanOptions {
+      wordprocessingml_font_slots: true,
+      ..ScriptScanOptions::default()
+    };
+
+    let latin1 = scan("é", base);
+    assert_eq!(latin1.script, TextScript::Latin);
+    assert_eq!(
+      latin1.wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::HighAnsi)
+    );
+
+    let arabic = scan("ع", base);
+    assert_eq!(arabic.script, TextScript::Arabic);
+    assert_eq!(
+      arabic.wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+
+    let greek = scan(
+      "α",
+      ScriptScanOptions {
+        wordprocessingml_font_hint: Some(WordprocessingFontTypeHint::EastAsia),
+        ..base
+      },
+    );
+    assert_eq!(greek.script, TextScript::Greek);
+    assert_eq!(
+      greek.wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::EastAsia)
+    );
+
+    let latin_extended = scan(
+      "Ā",
+      ScriptScanOptions {
+        wordprocessingml_font_hint: Some(WordprocessingFontTypeHint::EastAsia),
+        wordprocessingml_east_asia_font_charset: Some(FontCharset::Gb2312),
+        ..base
+      },
+    );
+    assert_eq!(latin_extended.script, TextScript::Latin);
+    assert_eq!(
+      latin_extended.wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::EastAsia)
+    );
+  }
+
+  #[test]
+  fn wordprocessingml_run_overrides_precede_the_unicode_font_table() {
+    let complex = script_direction_runs_with_options(
+      "A水",
+      FontSize(11.0),
+      ScriptScanOptions {
+        wordprocessingml_font_slots: true,
+        wordprocessingml_font_hint: Some(WordprocessingFontTypeHint::EastAsia),
+        wordprocessingml_complex_font_override: true,
+        ..ScriptScanOptions::default()
+      },
+    );
+    assert!(complex.iter().all(|run| {
+      run.wordprocessingml_font_slot == Some(WordprocessingFontSlot::ComplexScript)
+    }));
+
+    let east_asia_as_ascii = script_direction_runs_with_options(
+      "水",
+      FontSize(11.0),
+      ScriptScanOptions {
+        wordprocessingml_font_slots: true,
+        wordprocessingml_east_asia_uses_ascii: true,
+        ..ScriptScanOptions::default()
+      },
+    );
+    assert_eq!(
+      east_asia_as_ascii[0].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+  }
+
+  #[test]
   fn maps_ooxml_text_context_to_harfrust_context() {
     assert_eq!(
       harf_direction(TextDirection::RightToLeft),
@@ -5181,5 +5567,29 @@ mod tests {
     );
     assert_eq!(harf_script(TextScript::Arabic), Some(script::ARABIC));
     assert_eq!(harf_script(TextScript::Other), None);
+  }
+
+  #[test]
+  fn math_engine_features_select_the_opentype_math_script_system() {
+    let ordinary = ShapeOptions {
+      script: Some(TextScript::Latin),
+      ..ShapeOptions::default()
+    };
+    assert_eq!(
+      harf_script_for_shape_options(&ordinary),
+      Some(script::LATIN)
+    );
+
+    for tag in ["ssty", "flac", "dtls"] {
+      let math = ShapeOptions {
+        script: Some(TextScript::Latin),
+        features: vec![FeatureValue {
+          tag: Cow::Borrowed(tag),
+          value: 1,
+        }],
+        ..ShapeOptions::default()
+      };
+      assert_eq!(harf_script_for_shape_options(&math), Some(script::MATH));
+    }
   }
 }

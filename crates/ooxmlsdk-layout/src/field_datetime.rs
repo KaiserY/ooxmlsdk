@@ -581,12 +581,7 @@ fn field_locale(language: Option<&str>) -> Option<icu_locale::Locale> {
 
 fn field_date(value: FieldUpdateDateTime) -> Option<Date<Gregorian>> {
   valid_date_time(value).then_some(())?;
-  Date::try_new_gregorian(
-    i32::from(value.year),
-    u8::from(value.month),
-    u8::from(value.day),
-  )
-  .ok()
+  Date::try_new_gregorian(i32::from(value.year), value.month, value.day).ok()
 }
 
 fn field_time(value: FieldUpdateDateTime) -> Option<Time> {

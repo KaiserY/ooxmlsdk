@@ -76,10 +76,9 @@ impl PresetPivotStyle {
       ("light", number.parse::<u8>().ok()?)
     } else if let Some(number) = name.strip_prefix("PivotStyleMedium") {
       ("medium", number.parse::<u8>().ok()?)
-    } else if let Some(number) = name.strip_prefix("PivotStyleDark") {
-      ("dark", number.parse::<u8>().ok()?)
     } else {
-      return None;
+      let number = name.strip_prefix("PivotStyleDark")?;
+      ("dark", number.parse::<u8>().ok()?)
     };
     let kind = match (family, number) {
       ("light", 1) => PresetPivotStyleKind::Light1,
@@ -847,7 +846,7 @@ fn medium_grid_differential(
       PresetPivotDifferential::new().top(1, 0.0).bottom(1, 0.0)
     }
     x::TableStyleValues::PageFieldValues => {
-      let (fill_theme, fill_tint) = accent.map_or((0, -0.049_989_318_521_683_403), |accent| {
+      let (fill_theme, fill_tint) = accent.map_or((0, -0.049_989_318_521_683_4), |accent| {
         (accent, 0.799_981_688_894_314_4)
       });
       PresetPivotDifferential::new()

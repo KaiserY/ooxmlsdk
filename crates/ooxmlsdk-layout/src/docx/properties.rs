@@ -82,13 +82,7 @@ fn run_style_with_character_style_policy(
     &styles.theme_fonts,
     &styles.theme_colors,
   );
-  styles.apply_mapped_reserved_font(
-    &mut style,
-    RunProps::Direct(properties)
-      .run_fonts()
-      .and_then(|fonts| fonts.ascii.as_deref()),
-  );
-  styles.apply_font_substitution(&mut style);
+  styles.apply_word_font_table_mappings(&mut style, RunProps::Direct(properties).run_fonts());
   style
 }
 
@@ -113,13 +107,8 @@ pub(super) fn paragraph_mark_run_style(
     &styles.theme_fonts,
     &styles.theme_colors,
   );
-  styles.apply_mapped_reserved_font(
-    &mut style,
-    RunProps::ParagraphMark(properties)
-      .run_fonts()
-      .and_then(|fonts| fonts.ascii.as_deref()),
-  );
-  styles.apply_font_substitution(&mut style);
+  styles
+    .apply_word_font_table_mappings(&mut style, RunProps::ParagraphMark(properties).run_fonts());
   style
 }
 
@@ -142,43 +131,53 @@ pub(super) fn merge_run_style(
   );
 
   if let Some(fonts) = properties.run_fonts() {
-    // LibreOffice maps DOCX rFonts into separate Writer character properties:
-    // ascii -> CharFontName, eastAsia -> CharFontNameAsian, cs -> CharFontNameComplex.
-    // hAnsi is kept only as interop metadata in writerfilter/dmapper/DomainMapper.cxx.
-    if let Some(font_family) = fonts
-      .ascii
-      .as_deref()
-      .filter(|value| is_explicit_font_family(value))
-      .map(std::sync::Arc::<str>::from)
-      .or_else(|| theme_fonts.resolve(fonts.ascii_theme))
+    // [MS-OI29500] section 2.1.88 preserves four independent effective font
+    // slots. A theme attribute overrides its direct counterpart only within
+    // this rFonts element; inheritance has already supplied earlier values.
+    if let Some(font_family) =
+      resolve_word_run_font(fonts.ascii.as_deref(), fonts.ascii_theme, theme_fonts)
     {
       style.font_family = Some(font_family);
+      style.fallback_font_family = None;
+      style.font_family_class = None;
     }
-    if let Some(font_family) = fonts
-      .east_asia
-      .as_deref()
-      .filter(|value| is_explicit_font_family(value))
-      .map(std::sync::Arc::<str>::from)
-      .or_else(|| theme_fonts.resolve(fonts.east_asia_theme))
-    {
+    if let Some(font_family) = resolve_word_run_font(
+      fonts.high_ansi.as_deref(),
+      fonts.high_ansi_theme,
+      theme_fonts,
+    ) {
+      style.high_ansi_font_family = Some(font_family);
+      style.high_ansi_fallback_font_family = None;
+      style.high_ansi_font_family_class = None;
+    }
+    if let Some(font_family) = resolve_word_run_font(
+      fonts.east_asia.as_deref(),
+      fonts.east_asia_theme,
+      theme_fonts,
+    ) {
       style.east_asia_font_family = Some(font_family);
+      style.east_asia_fallback_font_family = None;
+      style.east_asia_font_family_class = None;
+      style.east_asia_font_charset = None;
     }
-    let has_complex_theme_reference = fonts.complex_script_theme.is_some();
-    if let Some(font_family) = fonts
-      .complex_script
-      .as_deref()
-      .filter(|value| is_explicit_font_family(value))
-      .map(std::sync::Arc::<str>::from)
-      .or_else(|| theme_fonts.resolve(fonts.complex_script_theme))
-    {
+    if let Some(font_family) = resolve_word_run_font(
+      fonts.complex_script.as_deref(),
+      fonts.complex_script_theme,
+      theme_fonts,
+    ) {
       style.complex_font_family = Some(font_family);
-    } else if has_complex_theme_reference {
-      // ECMA-376 Part 1 §17.15.1.88 resolves a bidi theme token through
-      // w:themeFontLang/@w:bidi and otherwise through the theme's a:cs face.
-      // If that lookup is empty, [MS-OI29500] §2.1.87(c) supplies Word's
-      // application-defined rFonts default instead of retaining another
-      // slot's face or an inherited complex-script face.
-      style.complex_font_family = Some(Arc::from("Times New Roman"));
+      style.complex_fallback_font_family = None;
+      style.complex_font_family_class = None;
+    }
+    if let Some(hint) = fonts.hint {
+      style.wordprocessingml_font_hint = Some(match hint {
+        w::FontTypeHintValues::Default => ooxmlsdk_fonts::WordprocessingFontTypeHint::Default,
+        w::FontTypeHintValues::Ascii => ooxmlsdk_fonts::WordprocessingFontTypeHint::Ascii,
+        w::FontTypeHintValues::EastAsia => ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia,
+        w::FontTypeHintValues::ComplexScript => {
+          ooxmlsdk_fonts::WordprocessingFontTypeHint::ComplexScript
+        }
+      });
     }
   }
   if let Some(languages) = properties.languages() {
@@ -888,6 +887,25 @@ fn is_explicit_font_family(value: &str) -> bool {
   !value.is_empty()
     && !value.eq_ignore_ascii_case("default")
     && !value.eq_ignore_ascii_case("inherit")
+}
+
+fn resolve_word_run_font(
+  direct: Option<&str>,
+  theme: Option<w::ThemeFontValues>,
+  theme_fonts: &ThemeFonts,
+) -> Option<Arc<str>> {
+  if theme.is_some() {
+    return theme_fonts
+      .resolve(theme)
+      // [MS-OI29500] section 2.1.88(c) applies Times New Roman only after an
+      // actual Theme part or the recovered Office application theme cannot
+      // resolve the authored token. It must not replace that missing-package-
+      // theme recovery itself.
+      .or_else(|| Some(Arc::from("Times New Roman")));
+  }
+  direct
+    .filter(|value| is_explicit_font_family(value))
+    .map(Arc::from)
 }
 
 fn highlight_color(value: w::HighlightColorValues) -> Option<super::RgbColor> {

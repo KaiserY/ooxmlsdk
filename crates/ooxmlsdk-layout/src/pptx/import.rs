@@ -104,28 +104,15 @@ impl PowerPointImport {
       .or_else(|| self.get_current_theme_ptr())
   }
 
-  pub(crate) fn ensure_theme(
-    &mut self,
-    path: String,
-    name: Option<String>,
-    theme_id: Option<String>,
-    color_scheme: ThemeColorScheme,
-    font_scheme: ThemeFontScheme,
-    format_scheme: ThemeFormatScheme,
-    text_body_defaults: Option<TextBody>,
-  ) -> &ThemeFragmentRecord {
-    if let Some(index) = self.themes.iter().position(|theme| theme.path == path) {
+  pub(crate) fn ensure_theme(&mut self, theme: ThemeFragmentRecord) -> &ThemeFragmentRecord {
+    if let Some(index) = self
+      .themes
+      .iter()
+      .position(|existing| existing.path == theme.path)
+    {
       return &self.themes[index];
     }
-    self.themes.push(ThemeFragmentRecord {
-      path,
-      name,
-      theme_id,
-      color_scheme,
-      font_scheme,
-      format_scheme,
-      text_body_defaults,
-    });
+    self.themes.push(theme);
     self.themes.last().expect("theme inserted")
   }
 

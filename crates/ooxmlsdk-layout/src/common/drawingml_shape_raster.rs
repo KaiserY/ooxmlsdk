@@ -1463,19 +1463,21 @@ mod tests {
       b: 220,
       a: 180,
     };
-    let mut style = TextStyle::default();
-    style.outline_color = Some(outline_color);
-    style.outline_width = Pt(2.0);
-    style.pdf_glyph_outline_options = Some(Arc::new(PdfGlyphOutlineOptions {
-      fill: Some(Fill::Solid(fill_color)),
-      outline_fill: Some(Fill::Solid(outline_color)),
-      outline_stroke: Some(Stroke {
-        width: Pt(2.0),
-        color: outline_color,
-        ..Stroke::default()
-      }),
-      ..PdfGlyphOutlineOptions::default()
-    }));
+    let style = TextStyle {
+      outline_color: Some(outline_color),
+      outline_width: Pt(2.0),
+      pdf_glyph_outline_options: Some(Arc::new(PdfGlyphOutlineOptions {
+        fill: Some(Fill::Solid(fill_color)),
+        outline_fill: Some(Fill::Solid(outline_color)),
+        outline_stroke: Some(Stroke {
+          width: Pt(2.0),
+          color: outline_color,
+          ..Stroke::default()
+        }),
+        ..PdfGlyphOutlineOptions::default()
+      })),
+      ..TextStyle::default()
+    };
     let item = DisplayItem::Text(TextRun {
       text: Cow::Borrowed("Example"),
       origin: Point {

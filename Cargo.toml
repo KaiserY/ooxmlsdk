@@ -100,6 +100,7 @@ statrs = { version = "0.18.0", default-features = false }
 skrifa = "0.43.2"
 unicode-bidi = "0.3.18"
 unicode-bidi-mirroring = "0.4.0"
+unicode-math-class = "0.1.0"
 unicode-script = "0.5.8"
 usvg = { version = "0.47.0", default-features = false, features = ["text"] }
 winnow = "1.0.4"

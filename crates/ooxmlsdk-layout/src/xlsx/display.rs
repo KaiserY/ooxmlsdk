@@ -301,7 +301,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
     paint_clip: item.paint_clip,
-    style: common_text_style(item.style),
+    style: common_text_style(*item.style),
     font_id: None,
     color,
     rotation_center: item.rotation_center_pt.map(|(x, y)| common_point(x, y)),
@@ -461,12 +461,14 @@ fn print_page_items(
   // by Microsoft Office fixed output: header, sheet body, then footer.
   render_header_or_footer(
     &mut items,
-    page,
-    setup,
-    zoom_scale,
-    true,
-    &import.styles,
-    import.source_file_name.as_deref(),
+    HeaderFooterRenderContext {
+      page,
+      setup,
+      content_scale: zoom_scale,
+      header: true,
+      styles: &import.styles,
+      source_file_name: import.source_file_name.as_deref(),
+    },
     &mut text_metrics,
   );
 
@@ -605,12 +607,14 @@ fn print_page_items(
   );
   render_header_or_footer(
     &mut items,
-    page,
-    setup,
-    zoom_scale,
-    false,
-    &import.styles,
-    import.source_file_name.as_deref(),
+    HeaderFooterRenderContext {
+      page,
+      setup,
+      content_scale: zoom_scale,
+      header: false,
+      styles: &import.styles,
+      source_file_name: import.source_file_name.as_deref(),
+    },
     &mut text_metrics,
   );
   items
@@ -958,7 +962,7 @@ fn push_vml_group_box_text_item(
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text: shape.text.clone(),
-    style,
+    style: Box::new(style),
     rotation_center_pt: None,
     hyperlink_url: None,
     form_widget_id: None,
@@ -1234,7 +1238,7 @@ fn push_vml_checkable_control_text_item(
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text: shape.text.clone(),
-    style,
+    style: Box::new(style),
     rotation_center_pt: None,
     hyperlink_url: None,
     form_widget_id: None,
@@ -2037,6 +2041,14 @@ pub(crate) fn vml_shape_drawing_paths(
         height_pt,
         adjustment: None,
         formulas: None,
+        limo: None,
+        filled: shape.filled,
+        stroked: shape.stroked,
+        stroke_width_pt: shape
+          .stroke_weight
+          .as_deref()
+          .and_then(crate::docx::vml_measure_to_points)
+          .unwrap_or(0.75),
         allow_fill: shape.filled,
         allow_stroke: shape.stroked,
         allow_extrusion: true,
@@ -3245,7 +3257,7 @@ fn render_cell_rich_text(
       paint_clip: None,
       discard_if_horizontally_clipped: false,
       text,
-      style,
+      style: Box::new(style),
       rotation_center_pt,
       hyperlink_url: options.hyperlink_url.clone(),
       form_widget_id: None,
@@ -3571,7 +3583,7 @@ fn render_cell_text(
       paint_clip: None,
       discard_if_horizontally_clipped: false,
       text: line.to_string(),
-      style: style.clone(),
+      style: Box::new(style.clone()),
       rotation_center_pt: (style.rotation_deg != 0.0).then_some((
         rect.x_pt + rect.width_pt / 2.0,
         rect.y_pt + rect.height_pt / 2.0,
@@ -3894,7 +3906,7 @@ fn styled_header_text_with_line_height(
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text,
-    style,
+    style: Box::new(style),
     rotation_center_pt: None,
     hyperlink_url: None,
     form_widget_id: None,
@@ -6186,6 +6198,15 @@ fn lower_drawing_chart(
           import,
           common::ShapeStyle::default(),
         ),
+        legend_frame_style: xlsx_chart_shape_style(
+          chart_space
+            .chart
+            .legend
+            .as_deref()
+            .and_then(|legend| legend.chart_shape_properties.as_deref()),
+          import,
+          common::ShapeStyle::default(),
+        ),
         chart_area_style: xlsx_shape_style(
           chart_space.shape_properties.as_deref(),
           import,
@@ -6837,6 +6858,15 @@ fn lower_drawing_chart(
             .collect()
         })
         .collect(),
+      legend_frame_style: xlsx_chart_shape_style(
+        chart_space
+          .chart
+          .legend
+          .as_deref()
+          .and_then(|legend| legend.chart_shape_properties.as_deref()),
+        import,
+        common::ShapeStyle::default(),
+      ),
       chart_area_style,
       plot_area_style,
       floor_style: xlsx_shape_style(
@@ -8267,7 +8297,7 @@ fn render_drawing_text(
       paint_clip: None,
       discard_if_horizontally_clipped: false,
       text: line.to_string(),
-      style: style.clone(),
+      style: Box::new(style.clone()),
       rotation_center_pt: (style.rotation_deg != 0.0).then_some((
         rect.x_pt + rect.width_pt / 2.0,
         rect.y_pt + rect.height_pt / 2.0,
@@ -9490,30 +9520,25 @@ fn hyperlink_for_cell(
     })
 }
 
-fn render_header_or_footer(
-  items: &mut Vec<PageItem>,
-  page: &CalcPrintPage<'_>,
+#[derive(Clone, Copy)]
+struct HeaderFooterRenderContext<'a, 'data> {
+  page: &'a CalcPrintPage<'data>,
   setup: PageSetup,
   content_scale: f32,
   header: bool,
-  styles: &super::styles::StylesCatalog,
-  source_file_name: Option<&str>,
+  styles: &'a super::styles::StylesCatalog,
+  source_file_name: Option<&'a str>,
+}
+
+fn render_header_or_footer(
+  items: &mut Vec<PageItem>,
+  context: HeaderFooterRenderContext<'_, '_>,
   text_metrics: &mut TextMetrics,
 ) {
-  let Some(text) = header_footer_text(page, header) else {
+  let Some(text) = header_footer_text(context.page, context.header) else {
     return;
   };
-  render_header_footer_line(
-    items,
-    header,
-    page,
-    setup,
-    content_scale,
-    text,
-    styles,
-    source_file_name,
-    text_metrics,
-  );
+  render_header_footer_line(items, context, text, text_metrics);
 }
 
 fn header_footer_text<'a>(page: &CalcPrintPage<'a>, header: bool) -> Option<&'a str> {
@@ -9539,15 +9564,18 @@ fn header_footer_text<'a>(page: &CalcPrintPage<'a>, header: bool) -> Option<&'a 
 
 fn render_header_footer_line(
   items: &mut Vec<PageItem>,
-  header: bool,
-  page: &CalcPrintPage<'_>,
-  setup: PageSetup,
-  content_scale: f32,
+  context: HeaderFooterRenderContext<'_, '_>,
   text: &str,
-  styles: &super::styles::StylesCatalog,
-  source_file_name: Option<&str>,
   text_metrics: &mut TextMetrics,
 ) {
+  let HeaderFooterRenderContext {
+    page,
+    setup,
+    content_scale,
+    header,
+    styles,
+    source_file_name,
+  } = context;
   for (align, value) in split_header_footer_sections(text) {
     if value.is_empty() {
       continue;
@@ -10119,7 +10147,7 @@ mod drawing_page_tests {
       }),
       stroke_opacity: 1.0,
     };
-    let mut item = PageItem::Rect(original.clone());
+    let mut item = PageItem::Rect(original);
     let mut metrics = TextMetrics::new();
 
     assert!(clip_chart_item_to_rect(

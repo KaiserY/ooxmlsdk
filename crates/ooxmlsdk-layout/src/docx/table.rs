@@ -58,7 +58,7 @@ impl TableConditionalStyleMask {
       // ECMA-376 Part 1 §17.7.6.7 groups the remaining rows into authored-size
       // bands; [MS-OI29500] makes size zero mean no row band formatting.
       let band_position = row_index.saturating_sub(usize::from(look.first_row));
-      if (band_position / row_band_size) % 2 == 0 {
+      if (band_position / row_band_size).is_multiple_of(2) {
         mask.odd_horizontal_band = true;
       } else {
         mask.even_horizontal_band = true;
@@ -84,7 +84,7 @@ impl TableConditionalStyleMask {
       // first authored band. A zero width disables column band formatting in
       // Word instead of falling back to one-column alternation.
       let band_position = cell_index.saturating_sub(usize::from(look.first_column));
-      if (band_position / column_band_size) % 2 == 0 {
+      if (band_position / column_band_size).is_multiple_of(2) {
         mask.odd_vertical_band = true;
       } else {
         mask.even_vertical_band = true;
@@ -174,29 +174,34 @@ pub(super) fn row_style_condition_applies(
   .row_condition_applies(condition)
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(super) struct CellStyleConditionContext {
+  pub look: TableLookModel,
+  pub row_index: usize,
+  pub row_count: usize,
+  pub cell_index: usize,
+  pub cell_count: usize,
+  pub row_band_size: usize,
+  pub column_band_size: usize,
+  pub is_header_row: bool,
+}
+
 pub(super) fn cell_style_condition_applies(
   condition: w::TableStyleOverrideValues,
-  look: TableLookModel,
-  row_index: usize,
-  row_count: usize,
-  cell_index: usize,
-  cell_count: usize,
-  row_band_size: usize,
-  column_band_size: usize,
-  is_header_row: bool,
+  context: CellStyleConditionContext,
 ) -> bool {
   TableConditionalStyleMask::from_row_position(
-    look,
-    row_index,
-    row_count,
-    row_band_size,
-    is_header_row,
+    context.look,
+    context.row_index,
+    context.row_count,
+    context.row_band_size,
+    context.is_header_row,
   )
   .with_cell_mask(TableConditionalStyleMask::from_cell_position(
-    look,
-    cell_index,
-    cell_count,
-    column_band_size,
+    context.look,
+    context.cell_index,
+    context.cell_count,
+    context.column_band_size,
   ))
   .cell_condition_applies(condition)
 }

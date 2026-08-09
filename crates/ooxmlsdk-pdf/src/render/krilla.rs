@@ -30,7 +30,7 @@ use krilla::tagging::{
   Artifact, ArtifactType, BBox, ContentTag, Identifier, Node, SpanTag, TableHeaderScope, Tag,
   TagGroup, TagTree,
 };
-use krilla::text::{Glyph, GlyphId};
+use krilla::text::{Font, Glyph, GlyphId, KrillaGlyph};
 use krilla_svg::{SurfaceExt, SvgSettings};
 use kurbo::{BezPath, PathEl, flatten};
 use rustc_hash::FxHashMap as HashMap;
@@ -605,10 +605,19 @@ struct RgbColor {
 #[derive(Clone, Debug, Default, PartialEq)]
 struct TextStyle<'doc> {
   font_family: Option<Cow<'doc, str>>,
+  high_ansi_font_family: Option<Cow<'doc, str>>,
   fallback_font_family: Option<Cow<'doc, str>>,
+  high_ansi_fallback_font_family: Option<Cow<'doc, str>>,
+  east_asia_fallback_font_family: Option<Cow<'doc, str>>,
+  complex_fallback_font_family: Option<Cow<'doc, str>>,
+  font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  high_ansi_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  east_asia_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  complex_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   east_asia_font_family: Option<Cow<'doc, str>>,
   complex_font_family: Option<Cow<'doc, str>>,
   symbol_font_family: Option<Cow<'doc, str>>,
+  explicit_symbol_character: bool,
   font_size_pt: f32,
   complex_font_size_pt: Option<f32>,
   complex_script: Option<bool>,
@@ -625,6 +634,9 @@ struct TextStyle<'doc> {
   line_vertical_alignment: common::LineVerticalAlignment,
   use_windows_font_metrics: bool,
   wordprocessingml_font_slots: bool,
+  wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
+  wordprocessingml_east_asia_language_is_chinese: bool,
+  wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   cjk_punctuation_compression_ratio: f32,
   pdf_glyph_outlines: bool,
   pdf_glyph_outline_options: Option<common::PdfGlyphOutlineOptions>,
@@ -656,8 +668,47 @@ impl FontStyleRef for TextStyle<'_> {
     self.font_family.as_deref()
   }
 
+  fn symbol_font_family(&self) -> Option<&str> {
+    self.symbol_font_family.as_deref()
+  }
+
+  fn high_ansi_font_family(&self) -> Option<&str> {
+    self
+      .high_ansi_font_family
+      .as_deref()
+      .or_else(|| self.font_family())
+  }
+
   fn fallback_font_family(&self) -> Option<&str> {
     self.fallback_font_family.as_deref()
+  }
+
+  fn high_ansi_fallback_font_family(&self) -> Option<&str> {
+    self.high_ansi_fallback_font_family.as_deref()
+  }
+
+  fn east_asia_fallback_font_family(&self) -> Option<&str> {
+    self.east_asia_fallback_font_family.as_deref()
+  }
+
+  fn complex_fallback_font_family(&self) -> Option<&str> {
+    self.complex_fallback_font_family.as_deref()
+  }
+
+  fn font_family_class(&self) -> Option<ooxmlsdk_fonts::FontFamilyClass> {
+    self.font_family_class
+  }
+
+  fn high_ansi_font_family_class(&self) -> Option<ooxmlsdk_fonts::FontFamilyClass> {
+    self.high_ansi_font_family_class
+  }
+
+  fn east_asia_font_family_class(&self) -> Option<ooxmlsdk_fonts::FontFamilyClass> {
+    self.east_asia_font_family_class
+  }
+
+  fn complex_font_family_class(&self) -> Option<ooxmlsdk_fonts::FontFamilyClass> {
+    self.complex_font_family_class
   }
 
   fn east_asia_font_family(&self) -> Option<&str> {
@@ -734,6 +785,18 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn wordprocessingml_font_slots(&self) -> bool {
     self.wordprocessingml_font_slots
+  }
+
+  fn wordprocessingml_font_hint(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontTypeHint> {
+    self.wordprocessingml_font_hint
+  }
+
+  fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
+    self.wordprocessingml_east_asia_language_is_chinese
+  }
+
+  fn wordprocessingml_east_asia_font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
+    self.wordprocessingml_east_asia_font_charset
   }
 
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
@@ -1060,18 +1123,22 @@ fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
               && glyph.glyph_id.to_u32() == 0
               && source_range_requires_visible_glyph(&text.item.text, &glyph.text_range)
             {
-              let mut issue = location();
-              issue.kind = PdfFontAuditIssueKind::MissingGlyph;
-              let source_text = text
-                .item
-                .text
-                .get(glyph.text_range.clone())
-                .unwrap_or("<invalid-range>");
-              issue.detail = format!(
-                "font_index={font_index}, requested_family={:?}, resolved_family={:?}, text={source_text:?}, range={:?}",
-                text.item.style.font_family, resolved_family, glyph.text_range
-              );
-              push_font_audit_issue(&mut audit, issue);
+              if text.item.style.explicit_symbol_character {
+                audit.explicit_symbol_notdef_glyph_count += 1;
+              } else {
+                let mut issue = location();
+                issue.kind = PdfFontAuditIssueKind::MissingGlyph;
+                let source_text = text
+                  .item
+                  .text
+                  .get(glyph.text_range.clone())
+                  .unwrap_or("<invalid-range>");
+                issue.detail = format!(
+                  "font_index={font_index}, requested_family={:?}, resolved_family={:?}, text={source_text:?}, range={:?}",
+                  text.item.style.font_family, resolved_family, glyph.text_range
+                );
+                push_font_audit_issue(&mut audit, issue);
+              }
             }
             if ![
               glyph.x_advance,
@@ -2555,10 +2622,30 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
       .font_family
       .as_ref()
       .map(|value| Cow::Borrowed(value.as_ref())),
+    high_ansi_font_family: style
+      .high_ansi_font_family
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
     fallback_font_family: style
       .fallback_font_family
       .as_ref()
       .map(|value| Cow::Borrowed(value.as_ref())),
+    high_ansi_fallback_font_family: style
+      .high_ansi_fallback_font_family
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    east_asia_fallback_font_family: style
+      .east_asia_fallback_font_family
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    complex_fallback_font_family: style
+      .complex_fallback_font_family
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
+    font_family_class: style.font_family_class,
+    high_ansi_font_family_class: style.high_ansi_font_family_class,
+    east_asia_font_family_class: style.east_asia_font_family_class,
+    complex_font_family_class: style.complex_font_family_class,
     east_asia_font_family: style
       .east_asia_font_family
       .as_ref()
@@ -2571,6 +2658,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
       .symbol_font_family
       .as_ref()
       .map(|value| Cow::Borrowed(value.as_ref())),
+    explicit_symbol_character: style.explicit_symbol_character,
     font_size_pt: style.font_size.0,
     complex_font_size_pt: style.complex_font_size.map(|size| size.0),
     complex_script: style.complex_script,
@@ -2589,6 +2677,10 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     line_vertical_alignment: style.line_vertical_alignment,
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
+    wordprocessingml_font_hint: style.wordprocessingml_font_hint,
+    wordprocessingml_east_asia_language_is_chinese: style
+      .wordprocessingml_east_asia_language_is_chinese,
+    wordprocessingml_east_asia_font_charset: style.wordprocessingml_east_asia_font_charset,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
     pdf_glyph_outlines: style.pdf_glyph_outlines,
     pdf_glyph_outline_options: style.pdf_glyph_outline_options.as_deref().cloned(),
@@ -6876,7 +6968,7 @@ fn is_svg_image(image: &ImageItem<'_>) -> bool {
 
 fn draw_svg_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, tree: &usvg::Tree) {
   draw_transformed_image_content(surface, image, |surface, size| {
-    let embeds_text = image.content_type.as_deref().is_some_and(|content_type| {
+    let office_math = image.content_type.as_deref().is_some_and(|content_type| {
       content_type.eq_ignore_ascii_case("application/vnd.ooxmlsdk.office-math+xml")
     });
     surface.draw_svg(
@@ -6884,14 +6976,427 @@ fn draw_svg_item(surface: &mut Surface<'_>, image: &ImageItem<'_>, tree: &usvg::
       size,
       SvgSettings {
         // An OOXML picture is one semantic image. Keeping SVG text as paths
-        // avoids leaking decorative image text into PDF text extraction. The
-        // internal Office Math surface is document content, so retain its
-        // searchable text while preserving two-dimensional placement.
-        embed_text: embeds_text,
+        // avoids leaking decorative image text into PDF text extraction.
+        // OfficeMath carries its visible and semantic glyphs in marked text
+        // nodes and lowers them in source order immediately below.
+        embed_text: false,
         ..SvgSettings::default()
       },
     );
+    if office_math {
+      draw_office_math_text(surface, tree, size);
+    }
   });
+}
+
+const OFFICE_MATH_VISIBLE_GLYPH_PREFIX: &str = "ooxmlsdk-math-visible-";
+const OFFICE_MATH_SEMANTIC_GLYPH_PREFIX: &str = "ooxmlsdk-math-semantic-";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum OfficeMathSvgTextMarker {
+  Visible,
+  Semantic { exact_glyph_id: Option<u32> },
+}
+
+fn office_math_svg_text_marker(id: &str) -> Option<OfficeMathSvgTextMarker> {
+  if let Some(item_index) = id.strip_prefix(OFFICE_MATH_VISIBLE_GLYPH_PREFIX) {
+    item_index.parse::<usize>().ok()?;
+    return Some(OfficeMathSvgTextMarker::Visible);
+  }
+
+  let marker = id.strip_prefix(OFFICE_MATH_SEMANTIC_GLYPH_PREFIX)?;
+  if let Ok(_item_index) = marker.parse::<usize>() {
+    return Some(OfficeMathSvgTextMarker::Semantic {
+      exact_glyph_id: None,
+    });
+  }
+  let (item_index, glyph_id) = marker.rsplit_once("-gid-")?;
+  item_index.parse::<usize>().ok()?;
+  Some(OfficeMathSvgTextMarker::Semantic {
+    exact_glyph_id: Some(glyph_id.parse::<u32>().ok()?),
+  })
+}
+
+#[cfg(test)]
+fn office_math_semantic_glyph_id(id: &str) -> Option<u32> {
+  match office_math_svg_text_marker(id)? {
+    OfficeMathSvgTextMarker::Semantic {
+      exact_glyph_id: Some(glyph_id),
+    } => Some(glyph_id),
+    OfficeMathSvgTextMarker::Visible
+    | OfficeMathSvgTextMarker::Semantic {
+      exact_glyph_id: None,
+    } => None,
+  }
+}
+
+type OfficeMathSvgFontVariations = SmallVec<[usvg::FontVariation; 2]>;
+type OfficeMathSvgFontInstance = (usvg::fontdb::ID, OfficeMathSvgFontVariations);
+
+struct OfficeMathSvgFonts {
+  database: Arc<usvg::fontdb::Database>,
+  fonts: HashMap<OfficeMathSvgFontInstance, Option<Font>>,
+  supported_axes: HashMap<usvg::fontdb::ID, SmallVec<[[u8; 4]; 2]>>,
+}
+
+impl OfficeMathSvgFonts {
+  fn new(database: Arc<usvg::fontdb::Database>) -> Self {
+    Self {
+      database,
+      fonts: HashMap::default(),
+      supported_axes: HashMap::default(),
+    }
+  }
+
+  fn retrieve(&mut self, span: &usvg::layout::Span, id: usvg::fontdb::ID) -> Option<Font> {
+    let variations = self.resolve_variations(span, id);
+    let key = (id, variations);
+    if let Some(font) = self.fonts.get(&key) {
+      return font.clone();
+    }
+
+    // This is the same font-data handoff used by krilla-svg. Cloning the
+    // database on write keeps the usvg tree immutable, while shared face data
+    // lets Krilla embed the exact font instance that usvg selected.
+    let font = unsafe { Arc::make_mut(&mut self.database).make_shared_face_data(id) }.and_then(
+      |(font_data, index)| {
+        let coordinates = key
+          .1
+          .iter()
+          .map(|variation| (krilla::text::Tag::new(&variation.tag), variation.value))
+          .collect::<SmallVec<[_; 2]>>();
+        Font::new_variable(font_data.into(), index, &coordinates)
+      },
+    );
+    self.fonts.insert(key, font.clone());
+    font
+  }
+
+  fn resolve_variations(
+    &mut self,
+    span: &usvg::layout::Span,
+    id: usvg::fontdb::ID,
+  ) -> OfficeMathSvgFontVariations {
+    let supported_axes = self.supported_axes.entry(id).or_insert_with(|| {
+      self
+        .database
+        .with_face_data(id, |data, index| {
+          SkrifaFontRef::from_index(data, index)
+            .into_iter()
+            .flat_map(|font| font.axes().iter())
+            .map(|axis| axis.tag().to_be_bytes())
+            .collect()
+        })
+        .unwrap_or_default()
+    });
+    let supports = |tag| supported_axes.contains(tag);
+    let mut variations = span
+      .variations
+      .iter()
+      .filter(|variation| supports(&variation.tag))
+      .copied()
+      .collect::<OfficeMathSvgFontVariations>();
+
+    const OPTICAL_SIZE_TAG: &[u8; 4] = b"opsz";
+    if span.font_optical_sizing == usvg::FontOpticalSizing::Auto
+      && supports(OPTICAL_SIZE_TAG)
+      && !variations
+        .iter()
+        .any(|variation| variation.tag == *OPTICAL_SIZE_TAG)
+    {
+      variations.push(usvg::FontVariation {
+        tag: *OPTICAL_SIZE_TAG,
+        value: span.font_size.get(),
+      });
+    }
+    variations
+  }
+}
+
+fn draw_office_math_text(surface: &mut Surface<'_>, tree: &usvg::Tree, size: Size) {
+  let old_fill = surface.get_fill().cloned();
+  let old_stroke = surface.get_stroke().cloned();
+  surface.push_transform(&Transform::from_scale(
+    size.width() / tree.size().width(),
+    size.height() / tree.size().height(),
+  ));
+  let mut pop_count = 1;
+  if let Some(viewport) = rect_path(0.0, 0.0, tree.size().width(), tree.size().height()) {
+    surface.push_clip_path(&viewport, &FillRule::NonZero);
+    pop_count += 1;
+  }
+
+  let mut fonts = OfficeMathSvgFonts::new(tree.fontdb().clone());
+  draw_office_math_text_in_group(surface, tree.root(), &mut fonts, false);
+
+  for _ in 0..pop_count {
+    surface.pop();
+  }
+  surface.set_fill(old_fill);
+  surface.set_stroke(old_stroke);
+}
+
+fn draw_office_math_text_in_group(
+  surface: &mut Surface<'_>,
+  group: &usvg::Group,
+  fonts: &mut OfficeMathSvgFonts,
+  parent_clipped: bool,
+) {
+  let clip_count = group.clip_path().map_or(0, |clip_path| {
+    push_office_math_text_clip_path(surface, group, clip_path)
+  });
+  let clipped = parent_clipped || clip_count > 0;
+  for child in group.children() {
+    match child {
+      usvg::Node::Group(group) => {
+        draw_office_math_text_in_group(surface, group, fonts, clipped);
+      }
+      usvg::Node::Text(text) => {
+        let Some(marker) = office_math_svg_text_marker(text.id()) else {
+          continue;
+        };
+        draw_office_math_text_node(surface, text, marker, fonts, clipped);
+      }
+      usvg::Node::Path(_) | usvg::Node::Image(_) => {}
+    }
+  }
+  for _ in 0..clip_count {
+    surface.pop();
+  }
+}
+
+fn push_office_math_text_clip_path(
+  surface: &mut Surface<'_>,
+  group: &usvg::Group,
+  clip_path: &usvg::ClipPath,
+) -> usize {
+  let mut clip_paths = Vec::new();
+  collect_office_math_text_clip_paths(group.abs_transform(), clip_path, &mut clip_paths);
+  let count = clip_paths.len();
+  for (path, rule) in clip_paths {
+    surface.push_clip_path(&path, &rule);
+  }
+  count
+}
+
+fn collect_office_math_text_clip_paths(
+  group_transform: usvg::Transform,
+  clip_path: &usvg::ClipPath,
+  paths: &mut Vec<(krilla::geom::Path, FillRule)>,
+) {
+  if let Some(parent) = clip_path.clip_path() {
+    collect_office_math_text_clip_paths(group_transform, parent, paths);
+  }
+
+  let Some(rule) = office_math_text_clip_fill_rule(clip_path.root()) else {
+    return;
+  };
+  let mut builder = PathBuilder::new();
+  // A clip containing no drawable segment still clips all paint. Keeping a
+  // degenerate subpath mirrors krilla-svg's PDF clip conversion instead of
+  // silently dropping the OfficeMath semantic clip.
+  builder.move_to(0.0, 0.0);
+  let transform = group_transform.pre_concat(clip_path.transform());
+  extend_office_math_text_clip_segments(clip_path.root(), transform, &mut builder);
+  let path = builder.finish().or_else(|| {
+    let mut fallback = PathBuilder::new();
+    fallback.move_to(0.0, 0.0);
+    fallback.line_to(0.0, 0.0);
+    fallback.finish()
+  });
+  if let Some(path) = path {
+    paths.push((path, rule));
+  }
+}
+
+fn office_math_text_clip_fill_rule(group: &usvg::Group) -> Option<FillRule> {
+  let mut rules = Vec::new();
+  collect_office_math_text_clip_fill_rules(group, &mut rules);
+  let rule = rules.first().copied().unwrap_or(usvg::FillRule::NonZero);
+  if rules.iter().any(|candidate| *candidate != rule) {
+    return None;
+  }
+  Some(match rule {
+    usvg::FillRule::NonZero => FillRule::NonZero,
+    usvg::FillRule::EvenOdd => FillRule::EvenOdd,
+  })
+}
+
+fn collect_office_math_text_clip_fill_rules(group: &usvg::Group, rules: &mut Vec<usvg::FillRule>) {
+  for child in group.children() {
+    match child {
+      usvg::Node::Path(path) => {
+        if let Some(fill) = path.fill() {
+          rules.push(fill.rule());
+        }
+      }
+      usvg::Node::Group(group) => collect_office_math_text_clip_fill_rules(group, rules),
+      usvg::Node::Text(text) => {
+        collect_office_math_text_clip_fill_rules(text.flattened(), rules);
+      }
+      usvg::Node::Image(_) => {}
+    }
+  }
+}
+
+fn extend_office_math_text_clip_segments(
+  group: &usvg::Group,
+  transform: usvg::Transform,
+  builder: &mut PathBuilder,
+) {
+  use usvg::tiny_skia_path::PathSegment;
+
+  for child in group.children() {
+    match child {
+      usvg::Node::Path(path) if path.is_visible() => {
+        for segment in path.data().segments() {
+          match segment {
+            PathSegment::MoveTo(mut point) => {
+              transform.map_point(&mut point);
+              builder.move_to(point.x, point.y);
+            }
+            PathSegment::LineTo(mut point) => {
+              transform.map_point(&mut point);
+              builder.line_to(point.x, point.y);
+            }
+            PathSegment::QuadTo(first, last) => {
+              let mut points = [first, last];
+              transform.map_points(&mut points);
+              builder.quad_to(points[0].x, points[0].y, points[1].x, points[1].y);
+            }
+            PathSegment::CubicTo(first, second, last) => {
+              let mut points = [first, second, last];
+              transform.map_points(&mut points);
+              builder.cubic_to(
+                points[0].x,
+                points[0].y,
+                points[1].x,
+                points[1].y,
+                points[2].x,
+                points[2].y,
+              );
+            }
+            PathSegment::Close => builder.close(),
+          }
+        }
+      }
+      usvg::Node::Group(group) => extend_office_math_text_clip_segments(
+        group,
+        transform.pre_concat(group.transform()),
+        builder,
+      ),
+      usvg::Node::Text(text) => {
+        extend_office_math_text_clip_segments(text.flattened(), transform, builder);
+      }
+      usvg::Node::Path(_) | usvg::Node::Image(_) => {}
+    }
+  }
+}
+
+fn draw_office_math_text_node(
+  surface: &mut Surface<'_>,
+  text: &usvg::Text,
+  marker: OfficeMathSvgTextMarker,
+  fonts: &mut OfficeMathSvgFonts,
+  clipped: bool,
+) {
+  // A semantic carrier is deliberately non-painting, but it must keep the
+  // authored text paint. The internal SVG supplies an empty clip for that
+  // purpose; never substitute a transparent style or let malformed unclipped
+  // semantic text duplicate the visible MATH outline.
+  if matches!(marker, OfficeMathSvgTextMarker::Semantic { .. }) && !clipped {
+    return;
+  }
+  for span in text.layouted() {
+    for positioned in &span.positioned_glyphs {
+      let Some(font) = fonts.retrieve(span, positioned.font) else {
+        continue;
+      };
+      let glyph_id = match marker {
+        OfficeMathSvgTextMarker::Visible
+        | OfficeMathSvgTextMarker::Semantic {
+          exact_glyph_id: None,
+        } => GlyphId::new(u32::from(positioned.id.0)),
+        OfficeMathSvgTextMarker::Semantic {
+          exact_glyph_id: Some(glyph_id),
+        } => GlyphId::new(glyph_id),
+      };
+      let units_per_em = font.units_per_em();
+      let transform =
+        positioned
+          .transform()
+          .pre_concat(usvg::tiny_skia_path::Transform::from_scale(
+            units_per_em / span.font_size.get(),
+            units_per_em / span.font_size.get(),
+          ));
+      let text_transform = text.abs_transform();
+      surface.push_transform(&Transform::from_row(
+        text_transform.sx,
+        text_transform.ky,
+        text_transform.kx,
+        text_transform.sy,
+        text_transform.tx,
+        text_transform.ty,
+      ));
+      surface.push_transform(&Transform::from_row(
+        transform.sx,
+        transform.ky,
+        transform.kx,
+        transform.sy,
+        transform.tx,
+        transform.ty,
+      ));
+      let Some(fill) = span.fill.as_ref() else {
+        surface.pop();
+        surface.pop();
+        continue;
+      };
+      // The generated OfficeMath SVG has a closed solid-RGB paint domain.
+      // Both visible and clipped semantic text retain the authored color and
+      // opacity; the clip, not a paint mutation, controls semantic ink.
+      let usvg::Paint::Color(color) = fill.paint() else {
+        surface.pop();
+        surface.pop();
+        continue;
+      };
+      let fill = Fill {
+        paint: rgb::Color::new(color.red, color.green, color.blue).into(),
+        opacity: NormalizedF32::new(fill.opacity().get()).unwrap_or(NormalizedF32::ZERO),
+        rule: match fill.rule() {
+          usvg::FillRule::NonZero => FillRule::NonZero,
+          usvg::FillRule::EvenOdd => FillRule::EvenOdd,
+        },
+      };
+      surface.set_fill(Some(fill));
+      surface.set_stroke(None);
+      surface.draw_glyphs(
+        Point::from_xy(0.0, 0.0),
+        &[KrillaGlyph::new(
+          glyph_id,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0..positioned.text.len(),
+          None,
+        )],
+        font,
+        &positioned.text,
+        span.font_size.get(),
+        false,
+      );
+      surface.pop();
+      surface.pop();
+      if matches!(
+        marker,
+        OfficeMathSvgTextMarker::Semantic {
+          exact_glyph_id: Some(_)
+        }
+      ) {
+        return;
+      }
+    }
+  }
 }
 
 fn draw_transformed_image_content(
@@ -7378,14 +7883,15 @@ mod tests {
   use std::sync::Arc;
 
   use super::{
-    GlyphId, ImageCrop, ImageItem, PageItem, PaintDocument, PaintItem, PaintTextPortionKind,
-    TextItem, TextMetrics, TextStyle as PaintTextStyle, bidi_mirrored_semantic_text,
-    conversion_font_audit, gamma_correct_gradient_color, localized_metafile_ui_font_family,
-    metafile_render_options_for_image, pdf_metadata, pdf_page_dimension, render,
-    semantic_advance_for_text_range, source_range_requires_visible_glyph, stroke_end_dimensions,
-    symbol_font_semantic_text, text_portion_ranges, text_requires_glyph_outlines,
-    text_stroke_with_fill, text_style_from_common, word_small_caps_semantic_text,
-    word_unsigned_signature_line_items,
+    GlyphId, ImageCrop, ImageItem, OfficeMathSvgTextMarker, PageItem, PaintDocument, PaintItem,
+    PaintTextPortionKind, TextItem, TextMetrics, TextStyle as PaintTextStyle,
+    bidi_mirrored_semantic_text, conversion_font_audit, draw_office_math_text,
+    gamma_correct_gradient_color, localized_metafile_ui_font_family,
+    metafile_render_options_for_image, office_math_semantic_glyph_id, office_math_svg_text_marker,
+    pdf_metadata, pdf_page_dimension, render, semantic_advance_for_text_range,
+    source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
+    text_portion_ranges, text_requires_glyph_outlines, text_stroke_with_fill,
+    text_style_from_common, word_small_caps_semantic_text, word_unsigned_signature_line_items,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -7394,6 +7900,94 @@ mod tests {
   use ooxmlsdk_layout::common::{
     self, Color, DisplayItem, DisplayPage, LayoutDocument, LayoutEngineKind, Pt, TextRun, TextStyle,
   };
+
+  #[test]
+  fn office_math_semantic_marker_carries_an_exact_glyph_id() {
+    assert_eq!(
+      office_math_svg_text_marker("ooxmlsdk-math-visible-16"),
+      Some(OfficeMathSvgTextMarker::Visible)
+    );
+    assert_eq!(
+      office_math_svg_text_marker("ooxmlsdk-math-semantic-17"),
+      Some(OfficeMathSvgTextMarker::Semantic {
+        exact_glyph_id: None
+      })
+    );
+    assert_eq!(
+      office_math_semantic_glyph_id("ooxmlsdk-math-semantic-17-gid-3542"),
+      Some(3542)
+    );
+    assert_eq!(
+      office_math_semantic_glyph_id("ooxmlsdk-math-semantic-x-gid-3542"),
+      None
+    );
+    assert_eq!(
+      office_math_semantic_glyph_id("ooxmlsdk-math-semantic-17-gid-x"),
+      None
+    );
+    assert_eq!(office_math_semantic_glyph_id("unrelated-gid-3542"), None);
+  }
+
+  #[test]
+  fn office_math_semantic_text_keeps_authored_paint_beneath_its_clip() {
+    let svg = br##"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+      <defs><clipPath id="math-semantic-clip" clipPathUnits="userSpaceOnUse"><path d="M0 0L0 0"/></clipPath></defs>
+      <g clip-path="url(#math-semantic-clip)"><text id="ooxmlsdk-math-semantic-1" visibility="hidden" x="2" y="14" font-family="DejaVu Sans" font-size="12" fill="#00000a" fill-opacity="1">x</text></g>
+    </svg>"##;
+    let mut svg_options = usvg::Options::default();
+    svg_options.fontdb_mut().load_system_fonts();
+    let tree = usvg::Tree::from_data(svg, &svg_options).unwrap();
+
+    let page_size = Size::from_wh(20.0, 20.0).unwrap();
+    let mut document = Document::new();
+    let mut page = document.start_page_with(PageSettings::new(page_size));
+    let mut surface = page.surface();
+    draw_office_math_text(&mut surface, &tree, page_size);
+    surface.finish();
+    page.finish();
+
+    let bytes = document.finish().unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let page_id = pdf.get_pages()[&1];
+    let page = pdf.get_dictionary(page_id).unwrap();
+    let resources = resolved_dictionary(&pdf, page.get(b"Resources").unwrap());
+    assert!(resources.get(b"ExtGState").is_err());
+
+    let content = pdf.get_page_content(page_id);
+    let operations = lopdf::content::Content::decode(&content)
+      .unwrap()
+      .operations;
+    assert!(operations.iter().any(|operation| operation.operator == "W"));
+    assert!(operations.iter().any(|operation| operation.operator == "n"));
+    assert!(
+      operations
+        .iter()
+        .any(|operation| operation.operator == "BT")
+    );
+    assert!(
+      operations
+        .iter()
+        .any(|operation| operation.operator == "Tj")
+    );
+    assert!(
+      !operations
+        .iter()
+        .any(|operation| operation.operator == "gs")
+    );
+    assert!(operations.iter().any(|operation| {
+      operation.operator == "rg"
+        && operation.operands.len() == 3
+        && operation.operands[0]
+          .as_float()
+          .is_ok_and(|value| value.abs() < 0.000_001)
+        && operation.operands[1]
+          .as_float()
+          .is_ok_and(|value| value.abs() < 0.000_001)
+        && operation.operands[2]
+          .as_float()
+          .is_ok_and(|value| (value - 10.0 / 255.0).abs() < 0.000_001)
+    }));
+  }
 
   #[test]
   fn semantic_character_advances_follow_utf8_glyph_clusters() {
@@ -7781,7 +8375,7 @@ mod tests {
   }
 
   #[test]
-  fn font_audit_reports_notdef_glyph_with_requested_family_and_text() {
+  fn font_audit_distinguishes_missing_text_from_explicit_symbol_notdef() {
     let mut document = tagged_test_document();
     let DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
       unreachable!();
@@ -7815,6 +8409,44 @@ mod tests {
 
     assert!(issue.detail.contains("requested_family=Some(\"Arial\")"));
     assert!(issue.detail.contains("text=\"T\""));
+
+    let mut symbol_document = tagged_test_document();
+    let DisplayItem::Text(symbol_text) = &mut symbol_document.pages[0].items[0] else {
+      unreachable!();
+    };
+    symbol_text.text = "\u{f081}".into();
+    symbol_text.style.font_family = Some("UniversalMath1 BT".into());
+    symbol_text.style.symbol_font_family = Some("UniversalMath1 BT".into());
+    symbol_text.style.explicit_symbol_character = true;
+    symbol_text.style.wordprocessingml_font_slots = false;
+    symbol_text.style.color = Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: 255,
+    };
+
+    let mut text_metrics = TextMetrics::new();
+    let mut symbol_paint = PaintDocument::from_layout(&symbol_document, &mut text_metrics, None);
+    let PaintItem::Text(symbol_text) = &mut symbol_paint.pages[0].items[0] else {
+      unreachable!();
+    };
+    symbol_text.portions[0]
+      .glyphs
+      .as_mut()
+      .expect("shaped explicit symbol text")[0]
+      .glyphs[0]
+      .glyph_id = GlyphId::new(0);
+
+    let symbol_audit = conversion_font_audit(&symbol_paint);
+    assert_eq!(symbol_audit.explicit_symbol_notdef_glyph_count, 1);
+    assert!(
+      symbol_audit
+        .issues
+        .iter()
+        .all(|issue| issue.kind != crate::PdfFontAuditIssueKind::MissingGlyph),
+      "explicit symbol .notdef must remain visible without becoming a font-integrity failure: {symbol_audit:#?}"
+    );
   }
 
   #[test]

@@ -1,11 +1,13 @@
 mod custom_xml;
 mod drawing;
 mod field_localization;
+mod html;
 mod hyphenation;
 mod layout;
 mod math;
 mod math_type;
 mod model;
+mod ograph;
 mod package;
 mod properties;
 mod settings;
@@ -133,7 +135,9 @@ const DEFAULT_TEXTBOX_TOP_BOTTOM_INSET_PT: f32 = 45_720.0 / sdk_units::EMUS_PER_
 const WML_DEFAULT_BORDER_WIDTH_PT: f32 = 0.5;
 const WML_MIN_BORDER_WIDTH_PT: f32 = 0.25;
 const DRAWINGML_DEFAULT_LINE_WIDTH_EMU: i64 = 0;
-const VML_DEFAULT_STROKE_WEIGHT_EMU: i64 = 1;
+// [MS-OI29500] §19.1.2.19(c) overrides the ECMA one-point default for
+// Office: an omitted VML strokeweight is 0.75 points.
+const VML_DEFAULT_STROKE_WEIGHT_PT: f32 = 0.75;
 // Writer exposes an inline legacy VML group through the drawing-layer snap
 // rectangle used by SwFlyCntPortion, not just the authored CSS width. A
 // stroked child which reaches the group's leading edge expands that snap
@@ -217,6 +221,14 @@ pub(crate) fn extract(
   let mut styles = StylesCatalog::load(package, &main, import_settings, &locales)?;
   styles.display_math_alignment = document_math_settings.display_alignment;
   styles.math_font_family = document_math_settings.font_family;
+  styles.math_break_binary = Some(document_math_settings.break_binary);
+  styles.math_break_binary_subtraction = Some(document_math_settings.break_binary_subtraction);
+  styles.display_math_left_margin_pt = document_math_settings.display_left_margin_pt;
+  styles.display_math_right_margin_pt = document_math_settings.display_right_margin_pt;
+  styles.display_math_wrap = document_math_settings.display_wrap;
+  styles.small_math_fractions = document_math_settings.small_fraction;
+  styles.integral_limit_location = document_math_settings.integral_limit_location;
+  styles.nary_limit_location = document_math_settings.nary_limit_location;
   styles.literal_text_tabs_use_default_stops = explicit_default_tab_stop_pt.is_some();
   let mut numbering = NumberingCatalog::load(package, &main, import_settings, &styles)?;
   styles.numbering_template = Some(numbering.fresh_for_story());
@@ -266,6 +278,7 @@ pub(crate) fn extract(
           custom_xml_bindings: &custom_xml_bindings,
           form_widget_ids: &mut form_widget_ids,
           no_column_balance,
+          fixed_html_paragraph_auto_spacing,
         },
       )
     })
@@ -281,7 +294,7 @@ pub(crate) fn extract(
     for section in &mut sections {
       if section.page.doc_grid_line_pitch_pt.is_none()
         && section.blocks.iter().any(|block| {
-          matches!(block, Block::Paragraph(paragraph) if paragraph.format.style_id.is_none() && paragraph_has_recoverable_main_story_text(paragraph))
+          matches!(block, Block::Paragraph(paragraph) if paragraph.format.style_id.is_none() && paragraph_has_recoverable_main_story_content(paragraph))
         })
       {
         section.page.doc_grid_line_pitch_pt = Some(OFFICE_RECOVERED_DOCUMENT_GRID_LINE_PITCH_PT);
@@ -504,6 +517,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       data: image.data,
       content_type: image.content_type,
       picture_frame: None,
+      picture_frame_clips_image: false,
       effects: None,
       static3d: None,
       width_pt: page.width_pt,
@@ -515,6 +529,9 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       effect_right_pt: 0.0,
       effect_bottom_pt: 0.0,
       inline_baseline_gap_pt: None,
+      line_box: InlineImageLineBox::CharacterLike,
+      office_math_line_layout: None,
+      office_math_display_layout: None,
       crop: image.crop,
       rotation_deg: image.rotation_deg,
       flip_horizontal: image.flip_horizontal,
@@ -652,8 +669,33 @@ fn gutter_at_top(package: &mut WordprocessingDocument, main: &MainDocumentPart) 
 
 #[derive(Clone, Debug)]
 struct DocumentMathSettings {
-  display_alignment: Option<ParagraphAlignment>,
+  display_alignment: Option<OfficeMathDisplayAlignment>,
   font_family: Option<Arc<str>>,
+  break_binary: ooxmlsdk::schemas::m::BreakBinaryOperatorValues,
+  break_binary_subtraction: ooxmlsdk::schemas::m::BreakBinarySubtractionValues,
+  display_left_margin_pt: Option<f32>,
+  display_right_margin_pt: Option<f32>,
+  display_wrap: Option<MathWrapContinuation>,
+  small_fraction: bool,
+  integral_limit_location: Option<ooxmlsdk::schemas::m::LimitLocationValues>,
+  nary_limit_location: Option<ooxmlsdk::schemas::m::LimitLocationValues>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum MathWrapContinuation {
+  Indent(f32),
+  Right,
+}
+
+fn math_boolean_on(value: Option<ooxmlsdk::schemas::m::BooleanValues>) -> bool {
+  value.is_none_or(|value| {
+    matches!(
+      value,
+      ooxmlsdk::schemas::m::BooleanValues::True
+        | ooxmlsdk::schemas::m::BooleanValues::On
+        | ooxmlsdk::schemas::m::BooleanValues::One
+    )
+  })
 }
 
 fn document_math_settings(
@@ -668,6 +710,43 @@ fn document_math_settings(
     .as_ref()
     .and_then(|properties| properties.math_font.as_ref())
     .map(|font| Arc::<str>::from(font.val.as_str()));
+  let integral_limit_location = math_properties
+    .as_ref()
+    .and_then(|properties| properties.integral_limit_location.as_ref())
+    .map(|location| location.val);
+  let nary_limit_location = math_properties
+    .as_ref()
+    .and_then(|properties| properties.nary_limit_location.as_ref())
+    .map(|location| location.val);
+  // [MS-DOC] DopMth is the Office rendering contract for the otherwise
+  // ambiguous wording in ECMA-376 §22.1.2.16: `before` puts the operator
+  // before the line-wrapping break, while `after` puts it at the beginning of
+  // the continuation. The serialized defaults are before and --.
+  let break_binary = math_properties
+    .as_ref()
+    .and_then(|properties| properties.break_binary.as_ref())
+    .and_then(|value| value.val)
+    .unwrap_or_default();
+  let break_binary_subtraction = math_properties
+    .as_ref()
+    .and_then(|properties| properties.break_binary_subtraction.as_ref())
+    .map(|value| value.val)
+    .unwrap_or_default();
+  // ECMA-376 Part 1 §22.1.2.98: an omitted m:smallFrac is off, while a
+  // present element whose m:val is omitted is on.
+  let small_fraction = math_properties
+    .as_ref()
+    .and_then(|properties| properties.small_fraction.as_ref())
+    .is_some_and(|small_fraction| {
+      small_fraction.val.is_none_or(|value| {
+        matches!(
+          value,
+          ooxmlsdk::schemas::m::BooleanValues::True
+            | ooxmlsdk::schemas::m::BooleanValues::On
+            | ooxmlsdk::schemas::m::BooleanValues::One
+        )
+      })
+    });
   let display_defaults = math_properties
     .as_ref()
     .and_then(|properties| properties.display_defaults.as_ref())
@@ -684,6 +763,14 @@ fn document_math_settings(
     return DocumentMathSettings {
       display_alignment: None,
       font_family,
+      break_binary,
+      break_binary_subtraction,
+      display_left_margin_pt: None,
+      display_right_margin_pt: None,
+      display_wrap: None,
+      small_fraction,
+      integral_limit_location,
+      nary_limit_location,
     };
   }
   let justification = math_properties
@@ -691,9 +778,44 @@ fn document_math_settings(
     .and_then(|properties| properties.default_justification.as_ref())
     .map(|justification| justification.val)
     .unwrap_or(ooxmlsdk::schemas::m::JustificationValues::CenterGroup);
+  let display_left_margin_pt = math_properties
+    .as_ref()
+    .and_then(|properties| properties.left_margin.as_ref())
+    .and_then(|margin| twips_measure_to_points(&margin.val))
+    .or(Some(0.0));
+  let display_right_margin_pt = math_properties
+    .as_ref()
+    .and_then(|properties| properties.right_margin.as_ref())
+    .and_then(|margin| twips_measure_to_points(&margin.val))
+    .or(Some(0.0));
+  let display_wrap = math_properties
+    .as_ref()
+    .and_then(|properties| properties.math_properties_choice.as_ref())
+    .and_then(|choice| match choice {
+      ooxmlsdk::schemas::m::MathPropertiesChoice::WrapIndent(indent) => {
+        twips_measure_to_points(&indent.val).map(MathWrapContinuation::Indent)
+      }
+      ooxmlsdk::schemas::m::MathPropertiesChoice::WrapRight(right)
+        if math_boolean_on(right.val) =>
+      {
+        Some(MathWrapContinuation::Right)
+      }
+      ooxmlsdk::schemas::m::MathPropertiesChoice::WrapRight(_) => None,
+    })
+    // ECMA-376 §22.1.2.120 and [MS-DOC] DopMth both specify a one-inch
+    // continuation indent when neither active wrapping choice overrides it.
+    .or(Some(MathWrapContinuation::Indent(72.0)));
   DocumentMathSettings {
-    display_alignment: Some(math_justification_alignment(justification)),
+    display_alignment: Some(office_math_display_alignment(justification)),
     font_family,
+    break_binary,
+    break_binary_subtraction,
+    display_left_margin_pt,
+    display_right_margin_pt,
+    display_wrap,
+    small_fraction,
+    integral_limit_location,
+    nary_limit_location,
   }
 }
 
@@ -806,6 +928,7 @@ struct BodySectionEnv<'a> {
   custom_xml_bindings: &'a CustomXmlBindings,
   form_widget_ids: &'a mut FormWidgetIdAllocator,
   no_column_balance: bool,
+  fixed_html_paragraph_auto_spacing: bool,
 }
 
 /// WordprocessingML range markers are legal at both inline and block-content
@@ -1016,6 +1139,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
     custom_xml_bindings,
     form_widget_ids,
     no_column_balance,
+    fixed_html_paragraph_auto_spacing,
   } = env;
 
   for choice in &body.body_choice {
@@ -1180,7 +1304,11 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           continue;
         };
         let block_start = current_blocks.len();
-        current_blocks.extend(alt_chunk_blocks(resource, styles.doc_default_run.clone()));
+        current_blocks.extend(alt_chunk_blocks(
+          resource,
+          styles.doc_default_run.clone(),
+          fixed_html_paragraph_auto_spacing,
+        ));
         boundary_bookmarks.attach_to_new_blocks(&mut current_blocks[block_start..]);
       }
       w::BodyChoice::SdtBlock(sdt) => {
@@ -1278,7 +1406,11 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
   sections
 }
 
-fn alt_chunk_blocks(resource: &AltChunkResource, style: TextStyle) -> Vec<Block> {
+fn alt_chunk_blocks(
+  resource: &AltChunkResource,
+  style: TextStyle,
+  fixed_html_paragraph_auto_spacing: bool,
+) -> Vec<Block> {
   let content_type = resource
     .content_type
     .as_deref()
@@ -1288,10 +1420,11 @@ fn alt_chunk_blocks(resource: &AltChunkResource, style: TextStyle) -> Vec<Block>
     .unwrap_or_default()
     .trim()
     .to_ascii_lowercase();
+  if matches!(content_type.as_str(), "text/html" | "application/xhtml+xml") {
+    let decoded = decode_html_alt_chunk(&resource.data, resource.content_type.as_deref());
+    return html::import_blocks(&decoded, fixed_html_paragraph_auto_spacing);
+  }
   let paragraphs = match content_type.as_str() {
-    "text/html" | "application/xhtml+xml" => {
-      html_alt_chunk_paragraphs(&resource.data, resource.content_type.as_deref())
-    }
     "text/plain" => String::from_utf8_lossy(&resource.data)
       .lines()
       .map(str::trim)
@@ -1306,77 +1439,10 @@ fn alt_chunk_blocks(resource: &AltChunkResource, style: TextStyle) -> Vec<Block>
     .collect()
 }
 
+#[cfg(test)]
 fn html_alt_chunk_paragraphs(data: &[u8], content_type: Option<&str>) -> Vec<String> {
-  use std::cell::RefCell;
-
-  use html5ever::tendril::StrTendril;
-  use html5ever::tokenizer::{
-    BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
-  };
-
-  #[derive(Default)]
-  struct HtmlTextState {
-    paragraphs: Vec<String>,
-    text: String,
-    hidden_depth: usize,
-  }
-
-  #[derive(Default)]
-  struct HtmlTextSink {
-    state: RefCell<HtmlTextState>,
-  }
-
-  impl TokenSink for HtmlTextSink {
-    type Handle = ();
-
-    fn process_token(&self, token: Token, _line_number: u64) -> TokenSinkResult<Self::Handle> {
-      let mut state = self.state.borrow_mut();
-      match token {
-        Token::TagToken(tag) => {
-          let name = tag.name.as_ref().as_bytes();
-          let hidden = html_hidden_tag(name);
-          match tag.kind {
-            TagKind::StartTag if state.hidden_depth > 0 => {
-              state.hidden_depth += usize::from(hidden);
-            }
-            TagKind::StartTag if hidden => state.hidden_depth = 1,
-            TagKind::StartTag if html_block_tag(name) => {
-              let HtmlTextState {
-                paragraphs, text, ..
-              } = &mut *state;
-              push_alt_chunk_paragraph(paragraphs, text);
-            }
-            TagKind::StartTag if name.eq_ignore_ascii_case(b"br") => state.text.push('\n'),
-            TagKind::EndTag if state.hidden_depth > 0 => {
-              if hidden {
-                state.hidden_depth -= 1;
-              }
-            }
-            TagKind::EndTag if html_block_tag(name) => {
-              let HtmlTextState {
-                paragraphs, text, ..
-              } = &mut *state;
-              push_alt_chunk_paragraph(paragraphs, text);
-            }
-            _ => {}
-          }
-        }
-        Token::CharacterTokens(value) if state.hidden_depth == 0 => state.text.push_str(&value),
-        _ => {}
-      }
-      TokenSinkResult::Continue
-    }
-  }
-
   let decoded = decode_html_alt_chunk(data, content_type);
-  let input = BufferQueue::default();
-  input.push_back(StrTendril::from_slice(&decoded));
-  let tokenizer = Tokenizer::new(HtmlTextSink::default(), TokenizerOpts::default());
-  let _ = tokenizer.feed(&input);
-  tokenizer.end();
-  let mut state = tokenizer.sink.state.into_inner();
-  push_alt_chunk_paragraph(&mut state.paragraphs, &mut state.text);
-  state.paragraphs
+  html::visible_paragraph_texts(&html::import_blocks(&decoded, false))
 }
 
 fn decode_html_alt_chunk<'a>(data: &'a [u8], content_type: Option<&str>) -> Cow<'a, str> {
@@ -1403,67 +1469,6 @@ fn html_content_type_charset(content_type: &str) -> Option<&str> {
       .eq_ignore_ascii_case("charset")
       .then(|| value.trim().trim_matches(['"', '\'']))
   })
-}
-
-fn html_block_tag(name: &[u8]) -> bool {
-  [
-    b"address".as_slice(),
-    b"article".as_slice(),
-    b"aside".as_slice(),
-    b"blockquote".as_slice(),
-    b"dd".as_slice(),
-    b"p".as_slice(),
-    b"div".as_slice(),
-    b"dl".as_slice(),
-    b"dt".as_slice(),
-    b"figcaption".as_slice(),
-    b"figure".as_slice(),
-    b"footer".as_slice(),
-    b"form".as_slice(),
-    b"li".as_slice(),
-    b"main".as_slice(),
-    b"nav".as_slice(),
-    b"ol".as_slice(),
-    b"pre".as_slice(),
-    b"section".as_slice(),
-    b"table".as_slice(),
-    b"tbody".as_slice(),
-    b"td".as_slice(),
-    b"tfoot".as_slice(),
-    b"th".as_slice(),
-    b"thead".as_slice(),
-    b"tr".as_slice(),
-    b"ul".as_slice(),
-    b"h1".as_slice(),
-    b"h2".as_slice(),
-    b"h3".as_slice(),
-    b"h4".as_slice(),
-    b"h5".as_slice(),
-    b"h6".as_slice(),
-  ]
-  .iter()
-  .any(|tag| name.eq_ignore_ascii_case(tag))
-}
-
-fn html_hidden_tag(name: &[u8]) -> bool {
-  [
-    b"head".as_slice(),
-    b"noscript".as_slice(),
-    b"script".as_slice(),
-    b"style".as_slice(),
-    b"template".as_slice(),
-    b"title".as_slice(),
-  ]
-  .iter()
-  .any(|tag| name.eq_ignore_ascii_case(tag))
-}
-
-fn push_alt_chunk_paragraph(paragraphs: &mut Vec<String>, text: &mut String) {
-  let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
-  text.clear();
-  if !normalized.is_empty() {
-    paragraphs.push(normalized);
-  }
 }
 
 fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
@@ -1519,6 +1524,10 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     previous.inlines.append(&mut paragraph.inlines);
     return;
   }
+  push_story_paragraph(blocks, paragraph);
+}
+
+fn push_story_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   if let Some(frame) = paragraph.format.frame {
     let suppress_overlap = paragraph.format.suppress_overlap == Some(true);
     let vertical_text_flow = paragraph.format.vertical_text_flow;
@@ -1543,6 +1552,22 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     return;
   }
   blocks.push(Block::paragraph(paragraph));
+}
+
+fn normalize_repeating_story_frames(blocks: &mut Vec<Block>) {
+  // ECMA-376 Part 1 §17.3.1.11 makes the presence of framePr sufficient
+  // to put a paragraph in a text frame, regardless of which WordprocessingML
+  // story owns it. Header/footer import flattens block content controls before
+  // this point, so normalize the completed story to retain the same adjacent-
+  // paragraph grouping used by the main story.
+  let mut normalized = Vec::with_capacity(blocks.len());
+  for block in std::mem::take(blocks) {
+    match block {
+      Block::Paragraph(paragraph) => push_story_paragraph(&mut normalized, *paragraph),
+      block => normalized.push(block),
+    }
+  }
+  *blocks = normalized;
 }
 
 fn prepend_out_of_place_breaks_to_paragraph(
@@ -2420,7 +2445,7 @@ fn apply_recovered_body_paragraph_defaults(
   if !styles.uses_office_recovered_paragraph_defaults() {
     return;
   }
-  if !paragraph_has_recoverable_main_story_text(model)
+  if !paragraph_has_recoverable_main_story_content(model)
     && model
       .inlines
       .iter()
@@ -2460,12 +2485,13 @@ fn apply_recovered_table_cell_paragraph_defaults(
   }
 }
 
-fn paragraph_has_recoverable_main_story_text(paragraph: &Paragraph) -> bool {
+fn paragraph_has_recoverable_main_story_content(paragraph: &Paragraph) -> bool {
   paragraph.list_label.is_some()
-    || paragraph
-      .inlines
-      .iter()
-      .any(|inline| matches!(inline, InlineItem::Text(run) if !run.text.is_empty()))
+    || paragraph.inlines.iter().any(|inline| match inline {
+      InlineItem::Text(run) => !run.text.is_empty(),
+      InlineItem::Image(image) => math::is_office_math_content_type(image.content_type.as_deref()),
+      _ => false,
+    })
 }
 
 fn header_blocks(
@@ -2566,6 +2592,7 @@ fn header_blocks(
     boundary_bookmarks.attach_to_new_blocks(&mut blocks[block_start..]);
   }
   boundary_bookmarks.finish(&mut blocks);
+  normalize_repeating_story_frames(&mut blocks);
   Some(blocks)
 }
 
@@ -2686,6 +2713,7 @@ fn footer_blocks(
     boundary_bookmarks.attach_to_new_blocks(&mut blocks[block_start..]);
   }
   boundary_bookmarks.finish(&mut blocks);
+  normalize_repeating_story_frames(&mut blocks);
   Some(blocks)
 }
 
@@ -4250,14 +4278,16 @@ fn table_cell_style_for(
   for (condition, conditional_style) in &table_style.conditional {
     if table::cell_style_condition_applies(
       *condition,
-      context.look,
-      context.row_index,
-      context.row_count,
-      context.cell_index,
-      context.cell_count,
-      table_style.row_band_size.unwrap_or(0),
-      table_style.column_band_size.unwrap_or(0),
-      context.is_header_row,
+      table::CellStyleConditionContext {
+        look: context.look,
+        row_index: context.row_index,
+        row_count: context.row_count,
+        cell_index: context.cell_index,
+        cell_count: context.cell_count,
+        row_band_size: table_style.row_band_size.unwrap_or(0),
+        column_band_size: table_style.column_band_size.unwrap_or(0),
+        is_header_row: context.is_header_row,
+      },
     ) {
       let mut conditional_style = conditional_style.clone();
       if let Some(table_borders) = conditional_style.conditional_table_borders.take() {
@@ -5457,14 +5487,15 @@ fn merge_paragraph_format_with_theme(
   }
 
   if let Some(spacing) = properties.spacing_between_lines() {
+    // Keep absolute and line-unit values in separate hierarchy slots. Word's
+    // [MS-OI29500] §17.3.1.33(a) behavior is not a simple last-attribute
+    // choice: any final nonzero beforeLines/afterLines value wins over the
+    // related absolute value, while zero exposes that absolute fallback.
     if let Some(before) = spacing.before.as_ref() {
       format.spacing_before_set = true;
       format.spacing_before_pt = signed_twips_measure_to_points(before).unwrap_or(0.0);
-      format.spacing_before_lines = None;
     }
     if let Some(before_lines) = spacing.before_lines {
-      format.spacing_before_set = true;
-      format.spacing_before_pt = 0.0;
       format.spacing_before_lines = Some((before_lines as f32 / 100.0).max(0.0));
     }
     if let Some(before_auto_spacing) = spacing.before_auto_spacing {
@@ -5483,6 +5514,9 @@ fn merge_paragraph_format_with_theme(
     if let Some(after) = spacing.after.as_ref() {
       format.spacing_after_set = true;
       format.spacing_after_pt = signed_twips_measure_to_points(after).unwrap_or(0.0);
+    }
+    if let Some(after_lines) = spacing.after_lines {
+      format.spacing_after_lines = Some((after_lines as f32 / 100.0).max(0.0));
     }
     if let Some(after_auto_spacing) = spacing.after_auto_spacing {
       // Preserve explicit false independently from the resolved ordinary
@@ -6047,6 +6081,26 @@ fn paragraph_inlines_with_policy(
     suppress_toc_hyperlink_style,
   };
   let mut complex_fields = Vec::new();
+  let display_math = paragraph_is_display_math(paragraph, styles.preserve_word_text_whitespace);
+  let has_explicit_math_paragraph = paragraph
+    .paragraph_choice
+    .iter()
+    .any(|choice| matches!(choice, w::ParagraphChoice::Paragraph(_)));
+  // Adjacent top-level m:oMath zones can form one implicit display zone, but
+  // each explicit m:oMathPara is already a complete display zone. Combining
+  // multiple explicit containers would erase their independent properties and
+  // equation-group boundaries.
+  let mut merged_display_math_image = (display_math && !has_explicit_math_paragraph)
+    .then(|| {
+      math::wordprocessing_math_zone_image(
+        paragraph.paragraph_choice.iter(),
+        &base_style,
+        styles,
+        true,
+      )
+    })
+    .flatten();
+  let merge_display_math = merged_display_math_image.is_some();
 
   for choice in &paragraph.paragraph_choice {
     match choice {
@@ -6169,7 +6223,18 @@ fn paragraph_inlines_with_policy(
         );
       }
       choice => {
-        if let Some(image) = math::wordprocessing_math_image(choice, &base_style, styles) {
+        if merge_display_math && shared_math::wordprocessing_math_text(choice).is_some() {
+          if let Some(image) = merged_display_math_image.take() {
+            inlines.push(InlineItem::Image(image));
+          }
+          continue;
+        }
+        if let Some(image) = math::wordprocessing_math_zone_image(
+          std::iter::once(choice),
+          &base_style,
+          styles,
+          display_math,
+        ) {
           inlines.push(InlineItem::Image(image));
           continue;
         }
@@ -6182,16 +6247,15 @@ fn paragraph_inlines_with_policy(
             style,
             styles,
           );
-          // ECMA-376 Part 1 §22.1.2.61 makes m:mathFont the document-wide
-          // typeface for mathematical text. Per-run w:rPr still supplies
-          // size, color, and other character properties, but its ordinary
-          // rFonts slot does not replace the math font.
-          style.font_family = Some(
-            styles
-              .math_font_family
-              .clone()
-              .unwrap_or_else(|| Arc::from("Cambria Math")),
-          );
+          // One-dimensional OfficeMath still uses the same complete math-font
+          // binding as built-up objects. Per-run w:rPr supplies the remaining
+          // character properties, but no inherited Word font slot can redirect
+          // a covered math character to the paragraph face.
+          let math_font_family = styles
+            .math_font_family
+            .clone()
+            .unwrap_or_else(|| Arc::from("Cambria Math"));
+          math::apply_office_math_font_family(&mut style, styles, &math_font_family);
           inlines.push(InlineItem::Text(TextRun {
             text,
             style,
@@ -6211,44 +6275,99 @@ fn paragraph_inlines_with_policy(
   inlines
 }
 
-fn math_paragraph_alignment(
+/// Match OfficeMath's math-zone boundary. Microsoft's OfficeMath description
+/// says that a display zone begins at a document/paragraph boundary and that
+/// adjacent math zones merge; ECMA-376 Part 1 §22.1.2.51 likewise defines a
+/// math paragraph as adjacent instances of mathematical text. Zero-width range
+/// metadata and runs with no effective content do not interrupt adjacency;
+/// any ordinary run content or other paragraph object does.
+fn paragraph_is_display_math(
   paragraph: &w::Paragraph,
-  display_math_alignment: Option<ParagraphAlignment>,
-) -> Option<ParagraphAlignment> {
-  let explicit = paragraph.paragraph_choice.iter().find_map(|choice| {
-    let w::ParagraphChoice::Paragraph(math_paragraph) = choice else {
-      return None;
-    };
-    let justification = math_paragraph
-      .paragraph_properties
-      .as_deref()
-      .and_then(|properties| properties.justification.as_ref())
-      .map(|justification| justification.val)
-      .unwrap_or(ooxmlsdk::schemas::m::JustificationValues::CenterGroup);
-    Some(math_justification_alignment(justification))
-  });
-  explicit.or_else(|| {
-    (paragraph
-      .paragraph_choice
-      .iter()
-      .any(|choice| shared_math::wordprocessing_math_text(choice).is_some())
-      && paragraph.paragraph_choice.iter().all(|choice| {
-        shared_math::wordprocessing_math_text(choice).is_some()
-          || matches!(choice, w::ParagraphChoice::WRun(run) if run.run_choice.is_empty())
-      }))
-    .then_some(display_math_alignment)
-    .flatten()
+  preserve_word_text_whitespace: bool,
+) -> bool {
+  if paragraph
+    .paragraph_choice
+    .iter()
+    .any(|choice| matches!(choice, w::ParagraphChoice::Paragraph(_)))
+  {
+    return true;
+  }
+
+  let mut has_formula = false;
+  for choice in &paragraph.paragraph_choice {
+    if shared_math::wordprocessing_math_text(choice).is_some() {
+      has_formula = true;
+    } else if !paragraph_choice_is_math_zone_neutral(choice, preserve_word_text_whitespace) {
+      return false;
+    }
+  }
+  has_formula
+}
+
+fn paragraph_choice_is_math_zone_neutral(
+  choice: &w::ParagraphChoice,
+  preserve_word_text_whitespace: bool,
+) -> bool {
+  match choice {
+    w::ParagraphChoice::WRun(run) => {
+      word_run_is_effectively_empty(run, preserve_word_text_whitespace)
+    }
+    w::ParagraphChoice::ProofError(_)
+    | w::ParagraphChoice::PermStart(_)
+    | w::ParagraphChoice::PermEnd(_)
+    | w::ParagraphChoice::BookmarkStart(_)
+    | w::ParagraphChoice::BookmarkEnd(_)
+    | w::ParagraphChoice::CommentRangeStart(_)
+    | w::ParagraphChoice::CommentRangeEnd(_)
+    | w::ParagraphChoice::MoveFromRangeStart(_)
+    | w::ParagraphChoice::MoveFromRangeEnd(_)
+    | w::ParagraphChoice::MoveToRangeStart(_)
+    | w::ParagraphChoice::MoveToRangeEnd(_)
+    | w::ParagraphChoice::CustomXmlInsRangeStart(_)
+    | w::ParagraphChoice::CustomXmlInsRangeEnd(_)
+    | w::ParagraphChoice::CustomXmlDelRangeStart(_)
+    | w::ParagraphChoice::CustomXmlDelRangeEnd(_)
+    | w::ParagraphChoice::CustomXmlMoveFromRangeStart(_)
+    | w::ParagraphChoice::CustomXmlMoveFromRangeEnd(_)
+    | w::ParagraphChoice::CustomXmlMoveToRangeStart(_)
+    | w::ParagraphChoice::CustomXmlMoveToRangeEnd(_)
+    | w::ParagraphChoice::CustomXmlConflictInsertionRangeStart(_)
+    | w::ParagraphChoice::CustomXmlConflictInsertionRangeEnd(_)
+    | w::ParagraphChoice::CustomXmlConflictDeletionRangeStart(_)
+    | w::ParagraphChoice::CustomXmlConflictDeletionRangeEnd(_)
+    | w::ParagraphChoice::AlternateContent(_) => true,
+    _ => false,
+  }
+}
+
+fn word_run_is_effectively_empty(run: &w::Run, preserve_word_text_whitespace: bool) -> bool {
+  run.run_choice.iter().all(|choice| match choice {
+    w::RunChoice::Text(text) => {
+      word_text_value(text, preserve_word_text_whitespace).is_none_or(str::is_empty)
+    }
+    w::RunChoice::DeletedText(text) => {
+      word_text_value(text, preserve_word_text_whitespace).is_none_or(str::is_empty)
+    }
+    w::RunChoice::Run(nested) => {
+      word_run_is_effectively_empty(nested, preserve_word_text_whitespace)
+    }
+    // MCE branch selection has already populated the selected typed content;
+    // the retained wrapper is not a second run payload.
+    w::RunChoice::AlternateContent(_) => true,
+    _ => false,
   })
 }
 
-fn math_justification_alignment(
+fn office_math_display_alignment(
   justification: ooxmlsdk::schemas::m::JustificationValues,
-) -> ParagraphAlignment {
+) -> OfficeMathDisplayAlignment {
   match justification {
-    ooxmlsdk::schemas::m::JustificationValues::Left => ParagraphAlignment::Left,
-    ooxmlsdk::schemas::m::JustificationValues::Right => ParagraphAlignment::Right,
-    ooxmlsdk::schemas::m::JustificationValues::Center
-    | ooxmlsdk::schemas::m::JustificationValues::CenterGroup => ParagraphAlignment::Center,
+    ooxmlsdk::schemas::m::JustificationValues::Left => OfficeMathDisplayAlignment::Left,
+    ooxmlsdk::schemas::m::JustificationValues::Center => OfficeMathDisplayAlignment::Center,
+    ooxmlsdk::schemas::m::JustificationValues::CenterGroup => {
+      OfficeMathDisplayAlignment::CenterGroup
+    }
+    ooxmlsdk::schemas::m::JustificationValues::Right => OfficeMathDisplayAlignment::Right,
   }
 }
 
@@ -6766,6 +6885,7 @@ fn symbol_field_run(
     style.east_asia_font_family = Some(font.clone());
     style.complex_font_family = Some(font.clone());
     style.symbol_font_family = Some(font);
+    style.explicit_symbol_character = true;
   }
 
   Some(TextRun {
@@ -6785,7 +6905,10 @@ fn symbol_transport_font(font: &str) -> bool {
     || font
       .get(font.len().saturating_sub(" symbol".len())..)
       .is_some_and(|suffix| suffix.eq_ignore_ascii_case(" symbol"))
-    || font.to_ascii_lowercase().contains("wingdings")
+    || {
+      let font = font.to_ascii_lowercase();
+      font.contains("wingdings") || font.contains("webdings")
+    }
 }
 
 fn parse_symbol_field_code(value: &str) -> Option<u32> {
@@ -6887,7 +7010,7 @@ fn legacy_form_check_box(
     .map(|checked| {
       checked
         .val
-        .map_or(true, ooxmlsdk::simple_type::OnOffValue::as_bool)
+        .is_none_or(ooxmlsdk::simple_type::OnOffValue::as_bool)
     })
     .or_else(|| {
       check_box
@@ -6896,7 +7019,7 @@ fn legacy_form_check_box(
         .map(|default| {
           default
             .val
-            .map_or(true, ooxmlsdk::simple_type::OnOffValue::as_bool)
+            .is_none_or(ooxmlsdk::simple_type::OnOffValue::as_bool)
         })
     })
     .unwrap_or(false);
@@ -7148,10 +7271,8 @@ fn split_eq_top_level_pair(arguments: &str) -> Option<(&str, &str)> {
     match character {
       '(' => depth += 1,
       ')' => depth = depth.checked_sub(1)?,
-      ',' | ';' if depth == 0 => {
-        if separator.replace((index, character.len_utf8())).is_some() {
-          return None;
-        }
+      ',' | ';' if depth == 0 && separator.replace((index, character.len_utf8())).is_some() => {
+        return None;
       }
       _ => {}
     }
@@ -8070,7 +8191,13 @@ fn push_run_with_character_style_policy(
         inlines.push(InlineItem::LastRenderedPageBreak);
       }
       w::RunChoice::SymbolChar(symbol) => {
-        if let Some(symbol_char) = symbol_transport_char(symbol) {
+        let declared_symbol_charset = symbol
+          .font
+          .as_deref()
+          .is_some_and(|font| styles.font_uses_symbol_charset(font));
+        if let Some((symbol_char, uses_declared_font)) =
+          symbol_transport_char(symbol, declared_symbol_charset)
+        {
           flush_run_text(
             inlines,
             &mut text,
@@ -8079,16 +8206,10 @@ fn push_run_with_character_style_policy(
             &style_ref_keys,
           );
           let mut symbol_style = style.clone();
-          let uses_declared_font_transport = symbol
-            .char
-            .as_deref()
-            .and_then(|code| u32::from_str_radix(code, 16).ok())
-            == Some(symbol_char as u32);
-          if uses_declared_font_transport
+          if uses_declared_font
             && let Some(font) = symbol.font.as_deref().filter(|font| !font.is_empty())
           {
-            symbol_style.font_family = Some(Arc::from(font));
-            symbol_style.symbol_font_family = Some(Arc::from(font));
+            styles.apply_symbol_character_font(&mut symbol_style, font);
           }
           let mut symbol_text = symbol_char.to_string();
           flush_run_text(
@@ -8201,7 +8322,19 @@ fn push_run_with_character_style_policy(
           hyperlink_url,
           &style_ref_keys,
         );
-        if let Some(image) = embedded_object_image(object, images, style.font_family.as_deref()) {
+        if let Some(mut image) =
+          embedded_object_refreshed_graph_image(object, images, style.font_family.as_deref())
+        {
+          apply_embedded_object_run_position(&mut image, style.baseline_shift_pt);
+          inlines.push(InlineItem::Image(image));
+        } else if let Some(shapes) =
+          embedded_object_chart_shapes(object, images, style.font_family.as_deref(), styles)
+        {
+          inlines.extend(shapes.into_iter().map(InlineItem::Shape));
+        } else if let Some(mut image) =
+          embedded_object_image(object, images, style.font_family.as_deref())
+        {
+          apply_embedded_object_run_position(&mut image, style.baseline_shift_pt);
           inlines.push(InlineItem::Image(image));
         }
       }
@@ -9292,25 +9425,29 @@ fn symbol_text(symbol: &w::SymbolChar) -> Option<char> {
   shared_symbol::font_symbol_code(symbol.font.as_deref(), code)
 }
 
-fn symbol_transport_char(symbol: &w::SymbolChar) -> Option<char> {
+fn symbol_transport_char(
+  symbol: &w::SymbolChar,
+  declared_symbol_charset: bool,
+) -> Option<(char, bool)> {
   let code = u32::from_str_radix(symbol.char.as_deref()?, 16).ok()?;
   let font = symbol.font.as_deref().unwrap_or("");
-  let is_wingdings = font.to_ascii_lowercase().contains("wingdings");
-  let is_symbol_font = font.eq_ignore_ascii_case("Symbol")
-    || font
-      .get(font.len().saturating_sub(" symbol".len())..)
-      .is_some_and(|suffix| suffix.eq_ignore_ascii_case(" symbol"))
-    || is_wingdings;
   let mapped = shared_symbol::font_symbol_code(symbol.font.as_deref(), code)?;
   if font.eq_ignore_ascii_case("Symbol") && code & 0xFF == 0x94 {
-    Some(mapped)
-  } else if is_symbol_font {
-    // ECMA-376 CT_Sym stores the character code within the declared symbol
-    // font. Keep that transport code here; the PDF backend supplies
-    // standardized ToUnicode values only for the Office-confirmed mappings.
-    char::from_u32(code).or(Some(mapped))
+    // Microsoft's Symbol cmap has no F094 entry. This producer-specific
+    // legacy value is the existing opposite-state counterexample: paint the
+    // Unicode black square with the inherited text fallback instead.
+    Some((mapped, false))
+  } else if declared_symbol_charset {
+    // §17.3.3.30 permits either the raw byte value or that value plus F000.
+    // Windows symbol cmaps use the latter form, so normalize a font-table
+    // charset=02 byte before shaping. Already-normalized PUA values remain
+    // unchanged.
+    let transport = if code <= 0xFF { 0xF000 | code } else { code };
+    char::from_u32(transport)
+      .or(Some(mapped))
+      .map(|character| (character, true))
   } else {
-    Some(mapped)
+    Some((mapped, true))
   }
 }
 
@@ -9354,6 +9491,7 @@ fn inline_image_impl(
         data: image_data.data,
         content_type: image_data.content_type,
         picture_frame: properties.picture_frame,
+        picture_frame_clips_image: true,
         effects: properties.shape_effects,
         static3d: properties.static3d,
         width_pt: units::emu_to_points(inline.extent.cx),
@@ -9365,6 +9503,9 @@ fn inline_image_impl(
         effect_right_pt: effect_extent_right(inline.effect_extent.as_ref()),
         effect_bottom_pt: effect_extent_bottom(inline.effect_extent.as_ref()),
         inline_baseline_gap_pt: None,
+        line_box: InlineImageLineBox::CharacterLike,
+        office_math_line_layout: None,
+        office_math_display_layout: None,
         crop,
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
@@ -9416,6 +9557,7 @@ fn inline_image_impl(
         data: image_data.data,
         content_type: image_data.content_type,
         picture_frame: properties.picture_frame,
+        picture_frame_clips_image: true,
         effects: properties.shape_effects,
         static3d: properties.static3d,
         width_pt: units::emu_to_points(extent.cx),
@@ -9427,6 +9569,9 @@ fn inline_image_impl(
         effect_right_pt: effect_extent.right_pt,
         effect_bottom_pt: effect_extent.bottom_pt,
         inline_baseline_gap_pt: None,
+        line_box: InlineImageLineBox::CharacterLike,
+        office_math_line_layout: None,
+        office_math_display_layout: None,
         crop,
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
@@ -12682,6 +12827,24 @@ fn drawing_chart_shapes(
   let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
   let effect_extent = drawing_effect_extent(drawing);
   let placement = drawing_placement_with_effect_extent(placement, effect_extent);
+  chart_space_shapes(
+    chart_space,
+    width_pt,
+    height_pt,
+    placement,
+    effect_extent,
+    styles,
+  )
+}
+
+fn chart_space_shapes(
+  chart_space: &c::ChartSpace,
+  width_pt: f32,
+  height_pt: f32,
+  placement: ImagePlacement,
+  effect_extent: DrawingEffectExtent,
+  styles: &StylesCatalog,
+) -> Option<Vec<InlineShape>> {
   let chart_style_id = shared_chart::chart_style_id(chart_space).unwrap_or(2);
   let default_theme_colors = ThemeColors::default();
   let cartesian = shared_chart::cartesian_chart_for_host_locales(
@@ -12952,6 +13115,14 @@ fn drawing_chart_shapes(
       drawingml_chart_shape_common_style(pie.leader_line_shape_properties, &styles.theme_colors)
     })
     .unwrap_or_default();
+  let legend_frame_style = drawingml_chart_shape_common_style(
+    chart_space
+      .chart
+      .legend
+      .as_deref()
+      .and_then(|legend| legend.chart_shape_properties.as_deref()),
+    &styles.theme_colors,
+  );
   let chart_area_style = drawingml_chart_area_common_style(
     chart_space.shape_properties.as_deref(),
     &styles.theme_colors,
@@ -13282,6 +13453,7 @@ fn drawing_chart_shapes(
     pie_point_styles,
     leader_line_style,
     title_fill_color,
+    legend_frame_style,
     chart_area_style,
     plot_area_style,
     floor_style,
@@ -13434,6 +13606,7 @@ fn drawing_extended_chart_shapes(
     pie_point_styles: Vec::new(),
     leader_line_style: common::ShapeStyle::default(),
     title_fill_color: None,
+    legend_frame_style: common::ShapeStyle::default(),
     chart_area_style: common::ShapeStyle::default(),
     plot_area_style: common::ShapeStyle::default(),
     floor_style: common::ShapeStyle::default(),
@@ -14797,6 +14970,7 @@ fn drawingml_picture_image(
     content_type: image_data.content_type,
     picture_frame: drawingml_picture_frame(picture, placement, transform, &styles.theme_colors)
       .map(Box::new),
+    picture_frame_clips_image: true,
     effects: properties.shape_effects,
     static3d: properties.static3d,
     width_pt,
@@ -14816,6 +14990,9 @@ fn drawingml_picture_image(
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
     inline_baseline_gap_pt: None,
+    line_box: InlineImageLineBox::CharacterLike,
+    office_math_line_layout: None,
+    office_math_display_layout: None,
     crop,
     rotation_deg: shape_properties.camera_adjusted_rotation_deg(mapped.rotation_deg),
     flip_horizontal: mapped.flip_horizontal,
@@ -15824,17 +16001,23 @@ fn push_picture_choice_shapes(
       }
     }
     w::PictureChoice::Rectangle(rectangle) => {
-      if let Some(shape) = vml_rectangle_shape(rectangle, images) {
+      if !vml_rectangle_has_resolved_image(rectangle, images)
+        && let Some(shape) = vml_rectangle_shape(rectangle, images)
+      {
         inlines.push(InlineItem::Shape(shape));
       }
     }
     w::PictureChoice::RoundRectangle(round_rectangle) => {
-      if let Some(shape) = vml_round_rectangle_shape(round_rectangle) {
+      if !vml_round_rectangle_has_resolved_image(round_rectangle, images)
+        && let Some(shape) = vml_round_rectangle_shape(round_rectangle)
+      {
         inlines.push(InlineItem::Shape(shape));
       }
     }
     w::PictureChoice::Shape(shape) => {
-      if let Some(shape) = vml_shape_shape(shape, images, shape_types) {
+      if !vml_shape_has_resolved_image(shape, images)
+        && let Some(shape) = vml_shape_shape(shape, images, shape_types)
+      {
         inlines.push(InlineItem::Shape(shape));
       }
     }
@@ -15942,7 +16125,9 @@ fn push_group_child_shapes_with_transform(
         let style = transform.and_then(|transform| {
           transform.child_anchor_style(group_style, rectangle.style.as_deref())
         });
-        if let Some(shape) = vml_rectangle_shape_with_style(rectangle, style.as_deref(), images) {
+        if !vml_rectangle_has_resolved_image(rectangle, images)
+          && let Some(shape) = vml_rectangle_shape_with_style(rectangle, style.as_deref(), images)
+        {
           inlines.push(InlineItem::Shape(shape));
         }
       }
@@ -15950,7 +16135,9 @@ fn push_group_child_shapes_with_transform(
         let style = transform.and_then(|transform| {
           transform.child_anchor_style(group_style, round_rectangle.style.as_deref())
         });
-        if let Some(shape) = vml_round_rectangle_shape_with_style(round_rectangle, style.as_deref())
+        if !vml_round_rectangle_has_resolved_image(round_rectangle, images)
+          && let Some(shape) =
+            vml_round_rectangle_shape_with_style(round_rectangle, style.as_deref())
         {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -15958,8 +16145,9 @@ fn push_group_child_shapes_with_transform(
       v::GroupChoice::Shape(shape) => {
         let style = transform
           .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
-        if let Some(shape) =
-          vml_shape_shape_with_style(shape, style.as_deref(), images, inherited_shape_types)
+        if !vml_shape_has_resolved_image(shape, images)
+          && let Some(shape) =
+            vml_shape_shape_with_style(shape, style.as_deref(), images, inherited_shape_types)
         {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -16003,6 +16191,32 @@ fn vml_special_shape(
   if !model.text.is_empty() {
     shape.text_box_blocks = vec![simple_text_block(model.text, TextStyle::default())];
   }
+  Some(shape)
+}
+
+fn vml_image_file_shape_with_style(
+  image: &v::ImageFile,
+  style: Option<&str>,
+) -> Option<InlineShape> {
+  let model = crate::xlsx::object_resources::vml_image_file_model(image);
+  let mut shape = vml_inline_shape(
+    style.or(model.style.as_deref()),
+    model.allow_in_cell,
+    model
+      .filled
+      .then_some(model.fill_color.as_deref().unwrap_or("white")),
+    None,
+    model
+      .stroked
+      .then_some(model.stroke_color.as_deref().unwrap_or("black")),
+    model.stroke_weight.as_deref(),
+    None,
+  )?;
+  shape.fill_override = model
+    .filled
+    .then(|| Box::new(crate::xlsx::vml_shape_common_fill(&model, Affine::IDENTITY)));
+  shape.stroke_override = crate::xlsx::vml_shape_common_stroke(&model).map(Box::new);
+  apply_vml_model_wrap(&mut shape, &model);
   Some(shape)
 }
 
@@ -16113,10 +16327,6 @@ fn vml_shape_shape_with_style(
     .and_then(|fill| vml_fill_image(fill, style, images))
     .or_else(|| inherited_fill.and_then(|fill| vml_fill_image(fill, style, images)));
   let has_fill_image = fill_image.is_some();
-  let has_image_data = shape
-    .shape_choice
-    .iter()
-    .any(|choice| matches!(choice, v::ShapeChoice::ImageData(_)));
   let filled = direct_fill
     .and_then(|fill| fill.on.map(|value| value.as_bool()))
     .or_else(|| shape.filled.map(|value| value.as_bool()))
@@ -16145,7 +16355,7 @@ fn vml_shape_shape_with_style(
           .or_else(|| shape_type.and_then(|shape_type| shape_type.fill_color.as_deref()))
           .unwrap_or("white"),
       )
-      .filter(|_| fill_image.is_none() && !has_image_data),
+      .filter(|_| fill_image.is_none()),
     fill_image,
     stroked.then_some(
       direct_stroke
@@ -16165,12 +16375,7 @@ fn vml_shape_shape_with_style(
       .then(|| vml_fontwork_shape_geometry(shape.r#type.as_deref(), shape.id.as_deref()))
       .flatten(),
   )?;
-  // LibreOffice's VML importer lowers a shape with `v:imagedata` to one
-  // GraphicObjectShape (vmlshape.cxx, ComplexShape::implConvertAndInsert).
-  // The fill belongs to that picture object's background; materializing it
-  // as a second shape after the image paints an opaque default-white overlay.
-  // Keep the independent shape only for geometry/stroke/textbox semantics.
-  if !has_fill_image && !has_image_data {
+  if !has_fill_image {
     inline.fill_override = Some(Box::new(crate::xlsx::vml_shape_common_fill(
       &common_model,
       Affine::IDENTITY,
@@ -16196,6 +16401,15 @@ fn vml_shape_shape_with_style(
           .as_deref()
           .or_else(|| shape_type.and_then(|shape_type| shape_type.adjustment.as_deref())),
         formulas: vml_shape_formulas(shape).or_else(|| shape_type.and_then(vml_shapetype_formulas)),
+        limo: path_properties.and_then(|path| path.limo.as_deref()),
+        filled,
+        stroked,
+        stroke_width_pt: inline
+          .stroke_override
+          .as_deref()
+          .map(|stroke| stroke.width.0)
+          .or_else(|| inline.stroke.as_ref().map(|stroke| stroke.width_pt))
+          .unwrap_or(VML_DEFAULT_STROKE_WEIGHT_PT),
         allow_fill: path_properties
           .and_then(|path| path.allow_fill)
           .is_none_or(|value| value.as_bool()),
@@ -16474,6 +16688,10 @@ pub(crate) struct VmlPathGeometryOptions<'a> {
   pub(crate) height_pt: f32,
   pub(crate) adjustment: Option<&'a str>,
   pub(crate) formulas: Option<&'a v::Formulas>,
+  pub(crate) limo: Option<&'a str>,
+  pub(crate) filled: bool,
+  pub(crate) stroked: bool,
+  pub(crate) stroke_width_pt: f32,
   pub(crate) allow_fill: bool,
   pub(crate) allow_stroke: bool,
   pub(crate) allow_extrusion: bool,
@@ -16495,25 +16713,44 @@ pub(crate) fn vml_path_geometry(
   if coordinate_width.abs() <= f32::EPSILON || coordinate_height.abs() <= f32::EPSILON {
     return None;
   }
-  let adjustments = options
-    .adjustment
-    .into_iter()
-    .flat_map(|values| values.split([',', ' ']))
-    .filter(|value| !value.is_empty())
-    .map(str::parse::<f64>)
-    .collect::<std::result::Result<Vec<_>, _>>()
-    .ok()?;
+  let adjustments = vml_adjustment_values(options.adjustment)?;
+  let (limo_x, limo_y) = options
+    .limo
+    .and_then(vml_path_coordinate_pair)
+    .unwrap_or((0.0, 0.0));
   let formula_values = vml_formula_values(
     options.formulas,
     &adjustments,
-    f64::from(coordinate_width),
-    f64::from(coordinate_height),
+    VmlFormulaContext {
+      coordinate_origin_x: vml_formula_integer(f64::from(origin_x))?,
+      coordinate_origin_y: vml_formula_integer(f64::from(origin_y))?,
+      coordinate_width: vml_formula_integer(f64::from(coordinate_width))?,
+      coordinate_height: vml_formula_integer(f64::from(coordinate_height))?,
+      limo_x: vml_formula_integer(f64::from(limo_x))?,
+      limo_y: vml_formula_integer(f64::from(limo_y))?,
+      has_fill: options.filled,
+      has_stroke: options.stroked,
+      pixel_line_width: vml_formula_integer(
+        f64::from(options.stroke_width_pt) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+          / f64::from(units::POINTS_PER_INCH),
+      )?,
+      pixel_width: vml_formula_integer(
+        f64::from(options.width_pt) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+          / f64::from(units::POINTS_PER_INCH),
+      )?,
+      pixel_height: vml_formula_integer(
+        f64::from(options.height_pt) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+          / f64::from(units::POINTS_PER_INCH),
+      )?,
+      emu_width: vml_formula_integer(f64::from(options.width_pt) * 12_700.0)?,
+      emu_height: vml_formula_integer(f64::from(options.height_pt) * 12_700.0)?,
+    },
   )?;
   let resolve = |value: VmlFormulaValue| -> Option<f32> {
     Some(match value {
       VmlFormulaValue::Number(value) => value,
-      VmlFormulaValue::Adjustment(index) => *adjustments.get(index)?,
-      VmlFormulaValue::Formula(index) => *formula_values.get(index)?,
+      VmlFormulaValue::Adjustment(index) => f64::from(*adjustments.get(index)?.as_ref()?),
+      VmlFormulaValue::Formula(index) => f64::from(*formula_values.get(index)?),
     } as f32)
   };
   let map = |x: f32, y: f32| common::Point {
@@ -16948,94 +17185,181 @@ fn vml_path_tokens(source: &str) -> Option<Vec<VmlPathToken<'_>>> {
   Some(tokens)
 }
 
+#[derive(Clone, Copy)]
+struct VmlFormulaContext {
+  coordinate_origin_x: i32,
+  coordinate_origin_y: i32,
+  coordinate_width: i32,
+  coordinate_height: i32,
+  limo_x: i32,
+  limo_y: i32,
+  has_fill: bool,
+  has_stroke: bool,
+  pixel_line_width: i32,
+  pixel_width: i32,
+  pixel_height: i32,
+  emu_width: i32,
+  emu_height: i32,
+}
+
+fn vml_adjustment_values(source: Option<&str>) -> Option<Vec<Option<i32>>> {
+  let Some(source) = source.map(str::trim).filter(|source| !source.is_empty()) else {
+    return Some(Vec::new());
+  };
+  if source.contains(',') {
+    source
+      .split(',')
+      .map(|value| {
+        let value = value.trim();
+        if value.is_empty() {
+          Some(None)
+        } else {
+          Some(Some(value.parse().ok()?))
+        }
+      })
+      .collect()
+  } else {
+    source
+      .split_ascii_whitespace()
+      .map(|value| Some(Some(value.parse().ok()?)))
+      .collect()
+  }
+}
+
+fn vml_formula_integer(value: f64) -> Option<i32> {
+  if !value.is_finite() {
+    return None;
+  }
+  let value = value.round();
+  (value >= f64::from(i32::MIN) && value <= f64::from(i32::MAX)).then_some(value as i32)
+}
+
 fn vml_formula_values(
   formulas: Option<&v::Formulas>,
-  adjustments: &[f64],
-  width: f64,
-  height: f64,
-) -> Option<Vec<f64>> {
+  adjustments: &[Option<i32>],
+  context: VmlFormulaContext,
+) -> Option<Vec<i32>> {
   let mut values = Vec::new();
   for formula in formulas.into_iter().flat_map(|formulas| &formulas.formula) {
     let equation = formula.equation.as_deref()?;
-    values.push(vml_formula(equation, adjustments, &values, width, height)?);
+    values.push(vml_formula(equation, adjustments, &values, context)?);
   }
   Some(values)
 }
 
 fn vml_formula(
   equation: &str,
-  adjustments: &[f64],
-  formulas: &[f64],
-  width: f64,
-  height: f64,
-) -> Option<f64> {
+  adjustments: &[Option<i32>],
+  formulas: &[i32],
+  context: VmlFormulaContext,
+) -> Option<i32> {
   let mut tokens = equation.split_ascii_whitespace();
-  let operation = tokens.next()?;
+  let operation = tokens.next()?.to_ascii_lowercase();
   let operands = tokens
-    .map(|token| vml_formula_operand(token, adjustments, formulas, width, height))
+    .map(|token| vml_formula_operand(token, adjustments, formulas, context))
     .collect::<Option<Vec<_>>>()?;
-  let operand = |index: usize, default: f64| operands.get(index).copied().unwrap_or(default);
-  let v = operand(0, 0.0);
-  let p1 = operand(1, 0.0);
-  let p2 = operand(2, 0.0);
-  Some(match operation {
-    "val" => v,
-    "sum" => v + p1 - p2,
-    "prod" | "product" => {
-      if p2.abs() <= f64::EPSILON {
-        return None;
-      }
-      v * p1 / p2
+  let operand = |index: usize, default: i32| operands.get(index).copied().unwrap_or(default);
+  let v = operand(0, 0);
+  let p1 = operand(1, 0);
+  let p2 = operand(2, 0);
+  let checked_i32 = |value: i64| i32::try_from(value).ok();
+  let inexact = |value: f64| {
+    if !value.is_finite() {
+      return None;
     }
-    "mid" => (v + p1) / 2.0,
-    "abs" => v.abs(),
-    "min" => v.min(p1),
-    "max" => v.max(p1),
+    let value = value.floor();
+    (value >= f64::from(i32::MIN) && value <= f64::from(i32::MAX)).then_some(value as i32)
+  };
+  match operation.as_str() {
+    "val" => Some(v),
+    "sum" => checked_i32(i64::from(v) + i64::from(p1) - i64::from(p2)),
+    "prod" | "product" => vml_formula_product(v, p1, p2),
+    "mid" => checked_i32((i64::from(v) + i64::from(p1)) / 2),
+    "abs" => v.checked_abs(),
+    "min" => Some(v.min(p1)),
+    "max" => Some(v.max(p1)),
     "if" => {
-      if v > 0.0 {
-        p1
+      if v > 0 {
+        Some(p1)
       } else {
-        p2
+        Some(p2)
       }
     }
-    "mod" => (v * v + p1 * p1 + p2 * p2).sqrt(),
-    "atan2" => p1.atan2(v).to_degrees() * 65_536.0,
-    "sin" => v * (p1 / 65_536.0).to_radians().sin(),
-    "cos" => v * (p1 / 65_536.0).to_radians().cos(),
-    "cosatan2" => v * p2.atan2(p1).cos(),
-    "sinatan2" => v * p2.atan2(p1).sin(),
-    "sqrt" => v.max(0.0).sqrt(),
-    "sumangle" => v + (p1 + p2) * 65_536.0,
+    "mod" => inexact((f64::from(v).powi(2) + f64::from(p1).powi(2) + f64::from(p2).powi(2)).sqrt()),
+    "atan2" => inexact(f64::from(p1).atan2(f64::from(v)).to_degrees() * 65_536.0),
+    "sin" => inexact(f64::from(v) * (f64::from(p1) / 65_536.0).to_radians().sin()),
+    "cos" => inexact(f64::from(v) * (f64::from(p1) / 65_536.0).to_radians().cos()),
+    "cosatan2" => inexact(f64::from(v) * f64::from(p2).atan2(f64::from(p1)).cos()),
+    "sinatan2" => inexact(f64::from(v) * f64::from(p2).atan2(f64::from(p1)).sin()),
+    "sqrt" => (v >= 0).then(|| inexact(f64::from(v).sqrt())).flatten(),
+    "sumangle" => checked_i32(i64::from(v) + i64::from(p1) * 65_536 - i64::from(p2) * 65_536),
     "ellipse" => {
-      if p1.abs() <= f64::EPSILON {
+      if p1 == 0 {
         return None;
       }
-      p2 * (1.0 - (v / p1).powi(2)).max(0.0).sqrt()
+      let radicand = 1.0 - (f64::from(v) / f64::from(p1)).powi(2);
+      (radicand >= 0.0)
+        .then(|| inexact(f64::from(p2) * radicand.sqrt()))
+        .flatten()
     }
-    "tan" => v * (p1 / 65_536.0).to_radians().tan(),
-    _ => return None,
-  })
+    "tan" => inexact(f64::from(v) * (f64::from(p1) / 65_536.0).to_radians().tan()),
+    _ => None,
+  }
+}
+
+fn vml_formula_product(v: i32, p1: i32, p2: i32) -> Option<i32> {
+  if p2 == 0 {
+    return None;
+  }
+  let numerator = i64::from(v) * i64::from(p1);
+  let denominator = i64::from(p2);
+  let quotient = numerator / denominator;
+  let remainder = numerator % denominator;
+  let twice_remainder = i128::from(remainder.abs()) * 2;
+  let denominator_magnitude = i128::from(denominator.abs());
+  let direction = numerator.signum() * denominator.signum();
+  let rounded = match twice_remainder.cmp(&denominator_magnitude) {
+    std::cmp::Ordering::Less => quotient,
+    std::cmp::Ordering::Greater => quotient.checked_add(direction)?,
+    // VML rounds an exact half to the next numerically greater integer.
+    std::cmp::Ordering::Equal if direction > 0 => quotient.checked_add(1)?,
+    std::cmp::Ordering::Equal => quotient,
+  };
+  i32::try_from(rounded).ok()
 }
 
 fn vml_formula_operand(
   token: &str,
-  adjustments: &[f64],
-  formulas: &[f64],
-  width: f64,
-  height: f64,
-) -> Option<f64> {
+  adjustments: &[Option<i32>],
+  formulas: &[i32],
+  context: VmlFormulaContext,
+) -> Option<i32> {
   if let Some(index) = token.strip_prefix('#') {
-    return adjustments.get(index.parse::<usize>().ok()?).copied();
+    return *adjustments.get(index.parse::<usize>().ok()?)?;
   }
   if let Some(index) = token.strip_prefix('@') {
     return formulas.get(index.parse::<usize>().ok()?).copied();
   }
-  Some(match token {
-    "width" | "pixelWidth" => width,
-    "height" | "pixelHeight" => height,
-    "xcenter" => width / 2.0,
-    "ycenter" => height / 2.0,
-    "pixelLineWidth" | "lineDrawn" => 1.0,
+  Some(match token.to_ascii_lowercase().as_str() {
+    "width" => context.coordinate_width,
+    "height" => context.coordinate_height,
+    "xcenter" => context
+      .coordinate_origin_x
+      .checked_add(context.coordinate_width / 2)?,
+    "ycenter" => context
+      .coordinate_origin_y
+      .checked_add(context.coordinate_height / 2)?,
+    "xlimo" => context.limo_x,
+    "ylimo" => context.limo_y,
+    "hasstroke" | "linedrawn" => i32::from(context.has_stroke),
+    "hasfill" => i32::from(context.has_fill),
+    "pixellinewidth" => context.pixel_line_width,
+    "pixelwidth" => context.pixel_width,
+    "pixelheight" => context.pixel_height,
+    "emuwidth" => context.emu_width,
+    "emuheight" => context.emu_height,
+    "emuwidth2" => context.emu_width / 2,
+    "emuheight2" => context.emu_height / 2,
     _ => token.parse().ok()?,
   })
 }
@@ -17076,7 +17400,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
         .stroke_weight
         .as_deref()
         .and_then(vml_measure_to_points)
-        .unwrap_or_else(|| units::emu_to_points(VML_DEFAULT_STROKE_WEIGHT_EMU)),
+        .unwrap_or(VML_DEFAULT_STROKE_WEIGHT_PT),
       spacing_pt: 0.0,
       color: polyline
         .stroke_color
@@ -17215,7 +17539,7 @@ fn vml_inline_shape(
     .map(|color| BorderStyle {
       width_pt: stroke_weight
         .and_then(vml_measure_to_points)
-        .unwrap_or_else(|| units::emu_to_points(VML_DEFAULT_STROKE_WEIGHT_EMU)),
+        .unwrap_or(VML_DEFAULT_STROKE_WEIGHT_PT),
       spacing_pt: 0.0,
       color,
       compound: false,
@@ -17624,10 +17948,15 @@ fn pict_image_impl(
   images: &ImageCatalog,
   host_font_family: Option<&str>,
 ) -> Option<InlineImage> {
+  let shape_types = picture
+    .picture_choice
+    .iter()
+    .flat_map(vml_picture_choice_shape_types)
+    .collect::<Vec<_>>();
   let mut image = picture
     .picture_choice
     .iter()
-    .find_map(|choice| picture_choice_image(choice, images))?;
+    .find_map(|choice| picture_choice_image(choice, images, &shape_types))?;
   // Word controls use the VML picture as their static fixed-output
   // representation. TextOut records in that metafile are real control
   // content, while strings in an ordinary VML image are not automatically
@@ -17677,17 +18006,129 @@ fn push_pict_textboxes_impl(
   }
 }
 
-fn picture_choice_image(choice: &w::PictureChoice, images: &ImageCatalog) -> Option<InlineImage> {
+fn picture_choice_image(
+  choice: &w::PictureChoice,
+  images: &ImageCatalog,
+  shape_types: &[&v::Shapetype],
+) -> Option<InlineImage> {
   match choice {
-    w::PictureChoice::Group(group) => group_image(group, images),
+    w::PictureChoice::Group(group) => group_image_with_shape_types(group, images, shape_types),
     w::PictureChoice::ImageFile(image) => image_file_image(image, images),
     w::PictureChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
     w::PictureChoice::RoundRectangle(round_rectangle) => {
       round_rectangle_image(round_rectangle, images)
     }
-    w::PictureChoice::Shape(shape) => shape_image(shape, images),
+    w::PictureChoice::Shape(shape) => {
+      shape_image_with_style_and_shape_types(shape, shape.style.as_deref(), images, shape_types)
+    }
     _ => None,
   }
+}
+
+fn embedded_object_chart_shapes(
+  object: &w::EmbeddedObject,
+  images: &ImageCatalog,
+  host_font_family: Option<&str>,
+  styles: &StylesCatalog,
+) -> Option<Vec<InlineShape>> {
+  let relationship_id = embedded_ms_graph_relationship_id(object)?;
+  let chart_space = &images
+    .ograph_charts_by_relationship_id
+    .get(relationship_id)?
+    .chart_space;
+  let preview = embedded_object_image(object, images, host_font_family)?;
+  let effect_extent = DrawingEffectExtent {
+    left_pt: preview.effect_left_pt,
+    top_pt: preview.effect_top_pt,
+    right_pt: preview.effect_right_pt,
+    bottom_pt: preview.effect_bottom_pt,
+  };
+  let placement = drawing_placement_with_effect_extent(preview.placement, effect_extent);
+  let mut shapes = chart_space_shapes(
+    chart_space,
+    preview.width_pt,
+    preview.height_pt,
+    placement,
+    effect_extent,
+    styles,
+  )?;
+  for shape in &mut shapes {
+    shape.offset_x_pt += preview.inline_offset_x_pt;
+    shape.offset_y_pt += preview.inline_offset_y_pt;
+    shape.rotation_deg = preview.rotation_deg;
+    shape.flip_horizontal = preview.flip_horizontal;
+    shape.flip_vertical = preview.flip_vertical;
+  }
+  Some(shapes)
+}
+
+fn embedded_ms_graph_relationship_id(object: &w::EmbeddedObject) -> Option<&str> {
+  let native_ole = object
+    .embedded_object_choice1
+    .iter()
+    .find_map(|choice| match choice {
+      w::EmbeddedObjectChoice::OleObject(ole) => Some(ole.as_ref()),
+      _ => None,
+    })?;
+  if native_ole.draw_aspect == Some(o::OleDrawAspectValues::Icon)
+    || !native_ole.prog_id.as_deref().is_some_and(|prog_id| {
+      ["MSGraph.Chart.8", "MSGraph.Chart", "MSGraph"]
+        .iter()
+        .any(|known| prog_id.eq_ignore_ascii_case(known))
+    })
+  {
+    return None;
+  }
+  native_ole.id.as_deref()
+}
+
+fn embedded_object_refreshed_graph_image(
+  object: &w::EmbeddedObject,
+  images: &ImageCatalog,
+  host_font_family: Option<&str>,
+) -> Option<InlineImage> {
+  let relationship_id = embedded_ms_graph_relationship_id(object)?;
+  let graph = images
+    .ograph_charts_by_relationship_id
+    .get(relationship_id)?;
+  let mut preview = embedded_object_image(object, images, host_font_family)?;
+  let refreshed =
+    ograph::refresh_cached_preview(&graph.chart, &preview.data, preview.content_type.as_deref())?;
+  preview.data = refreshed.into();
+  preview.semantic_metafile_text = true;
+  preview.metafile_semantic_text_includes_raster_backdrop = true;
+  Some(preview)
+}
+
+fn apply_embedded_object_run_position(image: &mut InlineImage, baseline_shift_pt: f32) {
+  if baseline_shift_pt.abs() <= f32::EPSILON || !matches!(image.placement, ImagePlacement::Inline) {
+    return;
+  }
+
+  // ECMA-376 Part 1 §17.3.3.19 locates an embedded object in its parent
+  // run, where §17.3.2.24 applies w:position to that run's contents. Legacy
+  // Equation.3 producers use the signed half-point value as the cached
+  // presentation's baseline: a negative value leaves part of the preview
+  // below the surrounding text baseline. Keep any intrinsic Math/effect
+  // gap, then carry the resolved run displacement into the shared inline
+  // baseline instead of moving the WMF independently from its line.
+  image.inline_baseline_gap_pt = embedded_object_run_baseline_gap(
+    image.inline_baseline_gap_pt,
+    image.effect_bottom_pt,
+    baseline_shift_pt,
+  );
+  image.line_box = InlineImageLineBox::EmbeddedObjectRunPosition;
+}
+
+fn embedded_object_run_baseline_gap(
+  intrinsic_gap_pt: Option<f32>,
+  effect_bottom_pt: f32,
+  baseline_shift_pt: f32,
+) -> Option<f32> {
+  if baseline_shift_pt.abs() <= f32::EPSILON {
+    return intrinsic_gap_pt;
+  }
+  Some(intrinsic_gap_pt.unwrap_or_else(|| effect_bottom_pt.max(0.0)) + baseline_shift_pt)
 }
 
 fn embedded_object_image(
@@ -17702,17 +18143,30 @@ fn embedded_object_image(
       w::EmbeddedObjectChoice::OleObject(ole) => Some(ole.as_ref()),
       _ => None,
     });
+  let shape_types = object
+    .embedded_object_choice1
+    .iter()
+    .flat_map(|choice| match choice {
+      w::EmbeddedObjectChoice::Shapetype(shape_type) => vec![shape_type.as_ref()],
+      w::EmbeddedObjectChoice::Group(group) => vml_group_shape_types(group),
+      _ => Vec::new(),
+    })
+    .collect::<Vec<_>>();
   let mut image = object
     .embedded_object_choice1
     .iter()
     .find_map(|choice| match choice {
-      w::EmbeddedObjectChoice::Group(group) => group_image(group, images),
+      w::EmbeddedObjectChoice::Group(group) => {
+        group_image_with_shape_types(group, images, &shape_types)
+      }
       w::EmbeddedObjectChoice::ImageFile(image) => image_file_image(image, images),
       w::EmbeddedObjectChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
       w::EmbeddedObjectChoice::RoundRectangle(round_rectangle) => {
         round_rectangle_image(round_rectangle, images)
       }
-      w::EmbeddedObjectChoice::Shape(shape) => shape_image(shape, images),
+      w::EmbeddedObjectChoice::Shape(shape) => {
+        shape_image_with_style_and_shape_types(shape, shape.style.as_deref(), images, &shape_types)
+      }
       _ => None,
     })?;
   image.metafile_background_color = embedded_object_metafile_background_color(object);
@@ -17830,9 +18284,19 @@ fn push_picture_choice_textboxes(
   }
 }
 
-fn group_image(group: &v::Group, images: &ImageCatalog) -> Option<InlineImage> {
+fn group_image_with_shape_types(
+  group: &v::Group,
+  images: &ImageCatalog,
+  shape_types: &[&v::Shapetype],
+) -> Option<InlineImage> {
   let transform = VmlGroupTransform::from_group(group);
-  group_image_with_transform(group, group.style.as_deref(), transform, images)
+  group_image_with_transform(
+    group,
+    group.style.as_deref(),
+    transform,
+    images,
+    shape_types,
+  )
 }
 
 fn group_image_with_transform(
@@ -17840,6 +18304,7 @@ fn group_image_with_transform(
   group_style: Option<&str>,
   transform: Option<VmlGroupTransform>,
   images: &ImageCatalog,
+  shape_types: &[&v::Shapetype],
 ) -> Option<InlineImage> {
   group.group_choice.iter().find_map(|choice| match choice {
     v::GroupChoice::Group(child_group) => {
@@ -17848,7 +18313,7 @@ fn group_image_with_transform(
       });
       let style = style.as_deref().or(child_group.style.as_deref());
       let child_transform = VmlGroupTransform::from_group_with_style(child_group, style);
-      group_image_with_transform(child_group, style, child_transform, images)
+      group_image_with_transform(child_group, style, child_transform, images, shape_types)
     }
     v::GroupChoice::ImageFile(image) => {
       let style = transform
@@ -17870,7 +18335,7 @@ fn group_image_with_transform(
     v::GroupChoice::Shape(shape) => {
       let style = transform
         .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
-      shape_image_with_style(shape, style.as_deref(), images)
+      shape_image_with_style_and_shape_types(shape, style.as_deref(), images, shape_types)
     }
     _ => None,
   })
@@ -17904,8 +18369,10 @@ fn push_group_child_textboxes(
   let transform = VmlGroupTransform::from_group(group);
   push_group_child_textboxes_with_transform(
     group,
-    group.style.as_deref(),
-    transform,
+    VmlGroupTextContext {
+      style: group.style.as_deref(),
+      transform,
+    },
     inlines,
     base_style,
     styles,
@@ -17914,10 +18381,15 @@ fn push_group_child_textboxes(
   );
 }
 
+#[derive(Clone, Copy, Debug)]
+struct VmlGroupTextContext<'a> {
+  style: Option<&'a str>,
+  transform: Option<VmlGroupTransform>,
+}
+
 fn push_group_child_textboxes_with_transform(
   group: &v::Group,
-  group_style: Option<&str>,
-  transform: Option<VmlGroupTransform>,
+  context: VmlGroupTextContext<'_>,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
   styles: &StylesCatalog,
@@ -17927,15 +18399,17 @@ fn push_group_child_textboxes_with_transform(
   for choice in &group.group_choice {
     match choice {
       v::GroupChoice::Group(child_group) => {
-        let style = transform.and_then(|transform| {
-          transform.child_group_anchor_style(group_style, child_group.style.as_deref())
+        let style = context.transform.and_then(|transform| {
+          transform.child_group_anchor_style(context.style, child_group.style.as_deref())
         });
         let style = style.as_deref().or(child_group.style.as_deref());
         let child_transform = VmlGroupTransform::from_group_with_style(child_group, style);
         push_group_child_textboxes_with_transform(
           child_group,
-          style,
-          child_transform,
+          VmlGroupTextContext {
+            style,
+            transform: child_transform,
+          },
           inlines,
           base_style.clone(),
           styles,
@@ -17944,8 +18418,9 @@ fn push_group_child_textboxes_with_transform(
         );
       }
       v::GroupChoice::ImageFile(image) => {
-        let style = transform
-          .and_then(|transform| transform.child_anchor_style(group_style, image.style.as_deref()));
+        let style = context.transform.and_then(|transform| {
+          transform.child_anchor_style(context.style, image.style.as_deref())
+        });
         push_image_file_textboxes(
           image,
           style.as_deref(),
@@ -17957,8 +18432,9 @@ fn push_group_child_textboxes_with_transform(
         );
       }
       v::GroupChoice::Oval(oval) => {
-        let style = transform
-          .and_then(|transform| transform.child_anchor_style(group_style, oval.style.as_deref()));
+        let style = context
+          .transform
+          .and_then(|transform| transform.child_anchor_style(context.style, oval.style.as_deref()));
         push_oval_textboxes(
           oval,
           style.as_deref(),
@@ -17970,8 +18446,8 @@ fn push_group_child_textboxes_with_transform(
         );
       }
       v::GroupChoice::Rectangle(rectangle) => {
-        let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group_style, rectangle.style.as_deref())
+        let style = context.transform.and_then(|transform| {
+          transform.child_anchor_style(context.style, rectangle.style.as_deref())
         });
         push_rectangle_textboxes(
           rectangle,
@@ -17984,8 +18460,8 @@ fn push_group_child_textboxes_with_transform(
         );
       }
       v::GroupChoice::RoundRectangle(round_rectangle) => {
-        let style = transform.and_then(|transform| {
-          transform.child_anchor_style(group_style, round_rectangle.style.as_deref())
+        let style = context.transform.and_then(|transform| {
+          transform.child_anchor_style(context.style, round_rectangle.style.as_deref())
         });
         push_round_rectangle_textboxes(
           round_rectangle,
@@ -17998,8 +18474,9 @@ fn push_group_child_textboxes_with_transform(
         );
       }
       v::GroupChoice::Shape(shape) => {
-        let style = transform
-          .and_then(|transform| transform.child_anchor_style(group_style, shape.style.as_deref()));
+        let style = context.transform.and_then(|transform| {
+          transform.child_anchor_style(context.style, shape.style.as_deref())
+        });
         push_shape_textboxes(
           shape,
           style.as_deref(),
@@ -18017,6 +18494,44 @@ fn push_group_child_textboxes_with_transform(
 
 fn image_file_image(image: &v::ImageFile, images: &ImageCatalog) -> Option<InlineImage> {
   image_file_image_with_style(image, image.style.as_deref(), images)
+}
+
+fn vml_image_data_is_resolved(data: &v::ImageData, images: &ImageCatalog) -> bool {
+  data
+    .relationship_id
+    .as_ref()
+    .or(data.rel_id.as_ref())
+    .is_some_and(|relationship_id| images.by_relationship_id.contains_key(relationship_id))
+}
+
+fn vml_rectangle_has_resolved_image(rectangle: &v::Rectangle, images: &ImageCatalog) -> bool {
+  rectangle
+    .rectangle_choice
+    .iter()
+    .any(|choice| match choice {
+      v::RectangleChoice::ImageData(data) => vml_image_data_is_resolved(data, images),
+      _ => false,
+    })
+}
+
+fn vml_round_rectangle_has_resolved_image(
+  round_rectangle: &v::RoundRectangle,
+  images: &ImageCatalog,
+) -> bool {
+  round_rectangle
+    .round_rectangle_choice
+    .iter()
+    .any(|choice| match choice {
+      v::RoundRectangleChoice::ImageData(data) => vml_image_data_is_resolved(data, images),
+      _ => false,
+    })
+}
+
+fn vml_shape_has_resolved_image(shape: &v::Shape, images: &ImageCatalog) -> bool {
+  shape.shape_choice.iter().any(|choice| match choice {
+    v::ShapeChoice::ImageData(data) => vml_image_data_is_resolved(data, images),
+    _ => false,
+  })
 }
 
 fn image_file_image_with_style(
@@ -18041,6 +18556,7 @@ fn image_file_image_with_style(
       ),
       _ => None,
     })?;
+  attach_vml_image_host(&mut inline, vml_image_file_shape_with_style(image, style));
   let signature_line = image
     .image_file_choice
     .iter()
@@ -18117,6 +18633,10 @@ fn rectangle_image_with_style(
       ),
       _ => None,
     })?;
+  attach_vml_image_host(
+    &mut image,
+    vml_rectangle_shape_with_style(rectangle, style, images),
+  );
   let signature_line = rectangle
     .rectangle_choice
     .iter()
@@ -18158,6 +18678,10 @@ fn round_rectangle_image_with_style(
         ),
         _ => None,
       })?;
+  attach_vml_image_host(
+    &mut image,
+    vml_round_rectangle_shape_with_style(round_rectangle, style),
+  );
   let signature_line =
     round_rectangle
       .round_rectangle_choice
@@ -18287,14 +18811,11 @@ fn push_oval_textboxes(
   }
 }
 
-fn shape_image(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineImage> {
-  shape_image_with_style(shape, shape.style.as_deref(), images)
-}
-
-fn shape_image_with_style(
+fn shape_image_with_style_and_shape_types(
   shape: &v::Shape,
   style: Option<&str>,
   images: &ImageCatalog,
+  shape_types: &[&v::Shapetype],
 ) -> Option<InlineImage> {
   if vml_style_is_hidden(style) {
     return None;
@@ -18310,12 +18831,21 @@ fn shape_image_with_style(
     ),
     _ => None,
   })?;
+  attach_vml_image_host(
+    &mut image,
+    vml_shape_shape_with_style(shape, style, images, shape_types),
+  );
   let signature_line = shape.shape_choice.iter().find_map(|choice| match choice {
     v::ShapeChoice::SignatureLine(signature_line) => Some(signature_line.as_ref()),
     _ => None,
   });
   mark_vml_signature_line_semantics(&mut image, signature_line, images);
   Some(image)
+}
+
+fn attach_vml_image_host(image: &mut InlineImage, host: Option<InlineShape>) {
+  image.picture_frame = host.map(Box::new);
+  image.picture_frame_clips_image = false;
 }
 
 fn mark_vml_signature_line_semantics(
@@ -18712,6 +19242,7 @@ fn vml_image_data(
     data: resource.data.clone(),
     content_type: resource.content_type.clone(),
     picture_frame: None,
+    picture_frame_clips_image: false,
     effects: None,
     static3d: None,
     width_pt,
@@ -18723,6 +19254,9 @@ fn vml_image_data(
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
     inline_baseline_gap_pt: None,
+    line_box: InlineImageLineBox::CharacterLike,
+    office_math_line_layout: None,
+    office_math_display_layout: None,
     crop: vml_image_crop(data),
     rotation_deg: style.rotation_deg,
     flip_horizontal: style.flip_horizontal,
@@ -18880,7 +19414,7 @@ impl VmlGroupTransform {
     // Keep the authored declarations for all non-geometric VML properties,
     // then append the flattened geometry. [MS-OE376] specifies that Office
     // uses the last duplicate style property.
-    let output = vec![
+    let output = [
       style.to_string(),
       format!("left:{}pt", mapped.x_pt),
       format!("top:{}pt", mapped.y_pt),
@@ -20084,8 +20618,16 @@ fn drawingml_preset_color_value(value: a::PresetColorValues) -> Option<RgbColor>
 #[derive(Clone, Debug, Default)]
 struct StylesCatalog {
   import_settings: ImportSettings,
-  display_math_alignment: Option<ParagraphAlignment>,
+  display_math_alignment: Option<OfficeMathDisplayAlignment>,
   math_font_family: Option<Arc<str>>,
+  math_break_binary: Option<ooxmlsdk::schemas::m::BreakBinaryOperatorValues>,
+  math_break_binary_subtraction: Option<ooxmlsdk::schemas::m::BreakBinarySubtractionValues>,
+  display_math_left_margin_pt: Option<f32>,
+  display_math_right_margin_pt: Option<f32>,
+  display_math_wrap: Option<MathWrapContinuation>,
+  small_math_fractions: bool,
+  integral_limit_location: Option<ooxmlsdk::schemas::m::LimitLocationValues>,
+  nary_limit_location: Option<ooxmlsdk::schemas::m::LimitLocationValues>,
   locales: OfficeLocaleContext,
   simplified_chinese_ui: bool,
   preserve_word_text_whitespace: bool,
@@ -20110,6 +20652,7 @@ struct StylesCatalog {
 struct FontSubstitution {
   alternate_family: Option<Arc<str>>,
   family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  charset: Option<ooxmlsdk_fonts::FontCharset>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -20443,7 +20986,7 @@ impl StylesCatalog {
     import_settings: ImportSettings,
     locales: &OfficeLocaleContext,
   ) -> Result<Self> {
-    let theme = ThemeData::load(package, main);
+    let theme = ThemeData::load(package, main, locales.default_document_resource_locale());
     let font_substitutions = load_font_substitutions(package, main);
     let cjk_punctuation_compression = theme.cjk_punctuation_compression;
     let Some(styles_part) = main.style_definitions_part(package) else {
@@ -20519,6 +21062,10 @@ impl StylesCatalog {
     catalog.doc_default_run.ligatures = Some(common::OpenTypeLigatures::default());
 
     if let Some(defaults) = styles.doc_defaults.as_deref() {
+      let default_run_properties = defaults
+        .run_properties_default
+        .as_deref()
+        .and_then(|default| default.run_properties_base_style.as_deref());
       merge_paragraph_format_with_theme(
         &mut catalog.doc_default_paragraph,
         defaults
@@ -20531,12 +21078,14 @@ impl StylesCatalog {
       );
       properties::merge_doc_default_run_style(
         &mut catalog.doc_default_run,
-        defaults
-          .run_properties_default
-          .as_deref()
-          .and_then(|default| default.run_properties_base_style.as_deref()),
+        default_run_properties,
         &catalog.theme_fonts,
         &catalog.theme_colors,
+      );
+      apply_word_font_table_mappings(
+        &catalog.font_substitutions,
+        &mut catalog.doc_default_run,
+        default_run_properties.and_then(|properties| properties.run_fonts.as_ref()),
       );
     }
 
@@ -20592,6 +21141,13 @@ impl StylesCatalog {
         &catalog.theme_fonts,
         &catalog.theme_colors,
       );
+      catalog.apply_word_font_table_mappings(
+        &mut entry.run_style,
+        style
+          .style_run_properties
+          .as_deref()
+          .and_then(|properties| properties.run_fonts.as_ref()),
+      );
       entry.run_overrides =
         run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
       normalize_relative_run_style(&mut entry.run_style, entry.run_overrides);
@@ -20599,31 +21155,19 @@ impl StylesCatalog {
         style,
         &catalog.theme_fonts,
         &catalog.theme_colors,
+        &catalog.font_substitutions,
         catalog.import_settings,
       );
       catalog.styles.insert(style_id.to_string(), entry);
     }
 
     if catalog.doc_default_run.font_family.is_none() {
-      catalog.doc_default_run.font_family = catalog
-        .theme_fonts
-        .minor_high_ansi
-        .clone()
-        .or_else(|| catalog.theme_fonts.minor_ascii.clone())
-        // [MS-OI29500] §2.1.87(c) specifies Word's application default for
-        // every missing slot in an existing w:rFonts context as Times New
-        // Roman. Office applies that legacy default when rPrDefault exists
-        // but supplies no font; if the entire run-default context is absent,
-        // modern Word recovers the UI-specific default instead.
-        .or_else(|| {
-          Some(if has_default_run_properties && !has_default_run_fonts {
-            Arc::from("Times New Roman")
-          } else {
-            office_default_font_family_for_resource_locale(
-              catalog.locales.default_document_resource_locale(),
-            )
-          })
-        });
+      catalog.doc_default_run.font_family = Some(word_doc_default_font_family(
+        &catalog.theme_fonts,
+        catalog.locales.default_document_resource_locale(),
+        has_default_run_properties,
+        has_default_run_fonts,
+      ));
     }
 
     Ok(catalog)
@@ -20827,38 +21371,56 @@ impl StylesCatalog {
   }
 
   fn apply_font_substitution(&self, style: &mut TextStyle) {
-    let Some(family) = style.font_family.as_deref() else {
-      return;
-    };
-    let Some(substitution) = self.font_substitutions.get(&family.to_ascii_lowercase()) else {
-      return;
-    };
-    if let Some(substitute) = &substitution.alternate_family
-      && !family.eq_ignore_ascii_case(substitute)
-    {
-      style.fallback_font_family = Some(substitute.clone());
-    }
-    style.font_family_class = substitution.family_class;
+    apply_font_substitution_from_table(&self.font_substitutions, style);
   }
 
-  fn apply_mapped_reserved_font(&self, style: &mut TextStyle, declared_family: Option<&str>) {
-    let Some(family) = declared_family.map(str::trim) else {
-      return;
-    };
-    // Some producers use the otherwise non-typeface token "Default" as a
-    // document-scoped font-table key. Honor it only when that exact key has
-    // authored w:altName/w:family metadata. Without the entry, retain the
-    // inherited run face instead of turning "Default" into a global alias.
-    if !family.eq_ignore_ascii_case("default")
-      || !self
+  fn font_uses_symbol_charset(&self, family: &str) -> bool {
+    symbol_transport_font(family)
+      || self
         .font_substitutions
-        .contains_key(&family.to_ascii_lowercase())
-    {
+        .get(&family.trim().to_ascii_lowercase())
+        .is_some_and(|substitution| {
+          substitution.charset == Some(ooxmlsdk_fonts::FontCharset::Symbol)
+        })
+  }
+
+  fn apply_symbol_character_font(&self, style: &mut TextStyle, declared_family: &str) {
+    let declared_family = declared_family.trim();
+    if declared_family.is_empty() {
       return;
     }
-    style.font_family = Some(Arc::from(family));
-    style.fallback_font_family = None;
+    let alternate = self
+      .font_substitutions
+      .get(&declared_family.to_ascii_lowercase())
+      .and_then(|substitution| substitution.alternate_family.as_ref())
+      .filter(|alternate| !declared_family.eq_ignore_ascii_case(alternate))
+      .cloned();
+    let family = Arc::<str>::from(declared_family);
+
+    // ECMA-376 Part 1 §17.3.3.30 says w:sym does not use the run's rFonts
+    // hierarchy. LibreOffice materializes the declared face into Western,
+    // Asian, and complex-script font properties and assigns SYMBOL charset.
+    // Preserve only the document-authored w:altName as a substitute: generic
+    // PUA font matching is explicitly undesirable in the ECMA contract.
+    style.font_family = Some(family.clone());
+    style.high_ansi_font_family = Some(family.clone());
+    style.east_asia_font_family = Some(family.clone());
+    style.complex_font_family = Some(family.clone());
+    style.symbol_font_family = Some(family);
+    style.explicit_symbol_character = true;
+    style.fallback_font_family = alternate.clone();
+    style.high_ansi_fallback_font_family = alternate.clone();
+    style.east_asia_fallback_font_family = alternate.clone();
+    style.complex_fallback_font_family = alternate;
     style.font_family_class = None;
+    style.high_ansi_font_family_class = None;
+    style.east_asia_font_family_class = None;
+    style.complex_font_family_class = None;
+    style.wordprocessingml_font_slots = false;
+  }
+
+  fn apply_word_font_table_mappings(&self, style: &mut TextStyle, fonts: Option<&w::RunFonts>) {
+    apply_word_font_table_mappings(&self.font_substitutions, style, fonts);
   }
 
   fn style_ref_name_requires_localized_error(&self, style_name: &str) -> bool {
@@ -20938,6 +21500,99 @@ impl StylesCatalog {
   }
 }
 
+fn apply_font_substitution_from_table(
+  font_substitutions: &HashMap<String, FontSubstitution>,
+  style: &mut TextStyle,
+) {
+  let resolve = |family: Option<&str>| {
+    family.and_then(|family| {
+      font_substitutions
+        .get(&family.to_ascii_lowercase())
+        .map(|substitution| {
+          let alternate = substitution
+            .alternate_family
+            .as_ref()
+            .filter(|alternate| !family.eq_ignore_ascii_case(alternate))
+            .cloned();
+          (alternate, substitution.family_class, substitution.charset)
+        })
+    })
+  };
+
+  if let Some((alternate, family_class, _)) = resolve(style.font_family.as_deref()) {
+    style.fallback_font_family = alternate;
+    style.font_family_class = family_class;
+  }
+  if let Some((alternate, family_class, _)) = resolve(style.high_ansi_font_family.as_deref()) {
+    style.high_ansi_fallback_font_family = alternate;
+    style.high_ansi_font_family_class = family_class;
+  }
+  if let Some((alternate, family_class, charset)) = resolve(style.east_asia_font_family.as_deref())
+  {
+    style.east_asia_fallback_font_family = alternate;
+    style.east_asia_font_family_class = family_class;
+    style.east_asia_font_charset = charset;
+  }
+  if let Some((alternate, family_class, _)) = resolve(style.complex_font_family.as_deref()) {
+    style.complex_fallback_font_family = alternate;
+    style.complex_font_family_class = family_class;
+  }
+}
+
+fn apply_word_font_table_mappings(
+  font_substitutions: &HashMap<String, FontSubstitution>,
+  style: &mut TextStyle,
+  fonts: Option<&w::RunFonts>,
+) {
+  let mapped_reserved_family =
+    |direct: Option<&str>, theme: Option<w::ThemeFontValues>| -> Option<Arc<str>> {
+      if theme.is_some() {
+        return None;
+      }
+      let family = direct?.trim();
+      // Some producers use the otherwise non-typeface token "Default" as a
+      // document-scoped font-table key. Honor it only when that exact key has
+      // authored substitution metadata. Without the entry, retain the
+      // inherited slot instead of turning "Default" into a global alias.
+      (family.eq_ignore_ascii_case("default")
+        && font_substitutions.contains_key(&family.to_ascii_lowercase()))
+      .then(|| Arc::from(family))
+    };
+
+  if let Some(fonts) = fonts {
+    // ECMA-376 Part 1 §17.3.2.26 and [MS-OI29500] §2.1.88 define four
+    // independent rFonts slots. A theme attribute wins only in its own slot;
+    // otherwise a document-scoped font-table key must reach that same slot.
+    if let Some(family) = mapped_reserved_family(fonts.ascii.as_deref(), fonts.ascii_theme) {
+      style.font_family = Some(family);
+      style.fallback_font_family = None;
+      style.font_family_class = None;
+    }
+    if let Some(family) = mapped_reserved_family(fonts.high_ansi.as_deref(), fonts.high_ansi_theme)
+    {
+      style.high_ansi_font_family = Some(family);
+      style.high_ansi_fallback_font_family = None;
+      style.high_ansi_font_family_class = None;
+    }
+    if let Some(family) = mapped_reserved_family(fonts.east_asia.as_deref(), fonts.east_asia_theme)
+    {
+      style.east_asia_font_family = Some(family);
+      style.east_asia_fallback_font_family = None;
+      style.east_asia_font_family_class = None;
+      style.east_asia_font_charset = None;
+    }
+    if let Some(family) =
+      mapped_reserved_family(fonts.complex_script.as_deref(), fonts.complex_script_theme)
+    {
+      style.complex_font_family = Some(family);
+      style.complex_fallback_font_family = None;
+      style.complex_font_family_class = None;
+    }
+  }
+
+  apply_font_substitution_from_table(font_substitutions, style);
+}
+
 const CUSTOM_STYLE_REF_KEY_PREFIX: &str = "\0custom:";
 const WORD_ZH_STYLE_REF_ERROR_LINE_HEIGHT_PER_FONT_SIZE: f32 = 34.0 / 25.0;
 
@@ -20973,21 +21628,14 @@ fn load_font_substitutions(
 }
 
 fn font_substitution_from_table_entry(font: &w::Font) -> Option<(String, FontSubstitution)> {
-  // ECMA-376 Part 1 §17.8.3.1 defines w:altName as a prioritized,
-  // comma-delimited set used when the primary font is unavailable. The
-  // current font request model accepts one document-scoped substitute, so
-  // preserve the specified priority by selecting the first name.
+  // ECMA-376 Part 1 §17.8.3.1 defines w:altName as a comma-delimited list,
+  // but [MS-OI29500] §17.8.3.1(a) records Word's fixed behavior: Word does
+  // not split the value and treats the complete string as one alternate name.
   let authored_alternate_family = font
     .alt_name
     .as_ref()
-    .and_then(|alternate| {
-      alternate
-        .val
-        .as_str()
-        .split(',')
-        .map(str::trim)
-        .find(|name| !name.is_empty())
-    })
+    .map(|alternate| alternate.val.as_str().trim())
+    .filter(|name| !name.is_empty())
     .map(Arc::from);
   let unclassified_legacy_font = authored_alternate_family.is_none()
     && font
@@ -21020,15 +21668,68 @@ fn font_substitution_from_table_entry(font: &w::Font) -> Option<(String, FontSub
       w::FontFamilyValues::Script => Some(ooxmlsdk_fonts::FontFamilyClass::BrushScript),
       w::FontFamilyValues::Auto => None,
     });
+  let charset = word_font_table_charset(font.font_char_set.as_ref());
   let family = font.name.as_str().trim();
-  (!family.is_empty() && (alternate_family.is_some() || family_class.is_some())).then(|| {
+  (!family.is_empty()
+    && (alternate_family.is_some() || family_class.is_some() || charset.is_some()))
+  .then(|| {
     (
       family.to_ascii_lowercase(),
       FontSubstitution {
         alternate_family,
         family_class,
+        charset,
       },
     )
+  })
+}
+
+fn word_font_table_charset(
+  charset: Option<&w::FontCharSet>,
+) -> Option<ooxmlsdk_fonts::FontCharset> {
+  use ooxmlsdk_fonts::FontCharset;
+  let charset = charset?;
+  if let Some(value) = charset.val.as_deref()
+    && let Ok(value) = u8::from_str_radix(value, 16)
+  {
+    return Some(match value {
+      0x00 => FontCharset::Ansi,
+      0x02 => FontCharset::Symbol,
+      0x80 => FontCharset::ShiftJis,
+      0x81 => FontCharset::Hangul,
+      0x86 => FontCharset::Gb2312,
+      0x88 => FontCharset::ChineseBig5,
+      0xA1 => FontCharset::Greek,
+      0xA2 => FontCharset::Turkish,
+      0xA3 => FontCharset::Vietnamese,
+      0xB1 => FontCharset::Hebrew,
+      0xB2 => FontCharset::Arabic,
+      0xBA => FontCharset::Baltic,
+      0xCC => FontCharset::Russian,
+      0xDE => FontCharset::Thai,
+      0xEE => FontCharset::EastEurope,
+      0xFF => FontCharset::Oem,
+      value => FontCharset::Other(value),
+    });
+  }
+  charset.strict_character_set.map(|value| match value {
+    w::StrictCharacterSet::ChsAnsi | w::StrictCharacterSet::ChsWindows1252 => FontCharset::Ansi,
+    w::StrictCharacterSet::ChsShiftJis => FontCharset::ShiftJis,
+    w::StrictCharacterSet::ChsHangeul | w::StrictCharacterSet::ChsJohab => FontCharset::Hangul,
+    w::StrictCharacterSet::ChsGb2312 => FontCharset::Gb2312,
+    w::StrictCharacterSet::ChsChinese5 => FontCharset::ChineseBig5,
+    w::StrictCharacterSet::ChsGreek => FontCharset::Greek,
+    w::StrictCharacterSet::ChsTurkish => FontCharset::Turkish,
+    w::StrictCharacterSet::ChsVietnamese => FontCharset::Vietnamese,
+    w::StrictCharacterSet::ChsHebrew => FontCharset::Hebrew,
+    w::StrictCharacterSet::ChsArabic => FontCharset::Arabic,
+    w::StrictCharacterSet::ChsBaltic => FontCharset::Baltic,
+    w::StrictCharacterSet::ChsRussian => FontCharset::Russian,
+    w::StrictCharacterSet::ChsThai => FontCharset::Thai,
+    w::StrictCharacterSet::ChsEastEurope | w::StrictCharacterSet::ChsIso88592 => {
+      FontCharset::EastEurope
+    }
+    w::StrictCharacterSet::ChsMacFfn | w::StrictCharacterSet::ChsUtf8 => FontCharset::Other(0),
   })
 }
 
@@ -21055,6 +21756,28 @@ fn word_doc_default_run_seed(has_default_run_properties: bool) -> TextStyle {
     style.complex_font_size_pt = Some(10.0);
   }
   style
+}
+
+fn word_doc_default_font_family(
+  theme_fonts: &ThemeFonts,
+  resource_locale: OfficeResourceLocale,
+  has_default_run_properties: bool,
+  has_default_run_fonts: bool,
+) -> Arc<str> {
+  // [MS-OI29500] §17.3.2.26(c) specifies Times New Roman for an omitted
+  // ascii/hAnsi value. An existing rPrDefault with no rFonts element reaches
+  // that application default before any recovered theme scheme. If rFonts is
+  // present, its theme token resolves through the real or recovered scheme;
+  // if the complete run-default context is absent, modern Word supplies the
+  // resource-locale default instead.
+  if has_default_run_properties && !has_default_run_fonts {
+    return Arc::from("Times New Roman");
+  }
+  theme_fonts
+    .minor_high_ansi
+    .clone()
+    .or_else(|| theme_fonts.minor_ascii.clone())
+    .unwrap_or_else(|| office_default_font_family_for_resource_locale(resource_locale))
 }
 
 fn is_simplified_chinese_ui_language(ui_language: Option<&str>) -> bool {
@@ -21099,7 +21822,11 @@ impl<'a> Iterator for StyleChainIter<'a> {
 }
 
 impl ThemeData {
-  fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
+  fn load(
+    package: &mut WordprocessingDocument,
+    main: &MainDocumentPart,
+    default_document_resource_locale: OfficeResourceLocale,
+  ) -> Self {
     let settings = main
       .document_settings_part(package)
       .and_then(|part| part.root_element(package).ok());
@@ -21137,6 +21864,7 @@ impl ThemeData {
       .and_then(|part| part.root_element(package).ok())
     else {
       return Self {
+        fonts: ThemeFonts::from_office_default(default_document_resource_locale),
         cjk_punctuation_compression,
         ..Self::default()
       };
@@ -21153,6 +21881,43 @@ impl ThemeData {
 }
 
 impl ThemeFonts {
+  fn from_office_default(resource_locale: OfficeResourceLocale) -> Self {
+    // A missing Theme part does not turn an authored Word/DrawingML theme
+    // reference into a missing rFonts attribute. Office recovers its
+    // application theme first. Microsoft documents DengXian as the Office
+    // 2016+ default for Simplified Chinese, and Office-authored Chinese theme
+    // parts use DengXian Light/DengXian for heading/body text. The remaining
+    // slot families follow the same Office font scheme: East Asian text uses
+    // the localized heading/body pair, while major/minor Bidi use Times New
+    // Roman/Arial. Keep the legacy English heading/body pair for the other
+    // resource packs already supported by OfficeLocaleContext.
+    //
+    // ECMA-376 Part 1 §17.15.1.88 defines the major/minor slot mapping.
+    // https://support.microsoft.com/en-us/office/fonts/add-east-asian-fonts-in-windows-10-for-use-with-office-documents
+    let (major_latin, minor_latin, major_east_asia, minor_east_asia) =
+      if resource_locale.is_simplified_chinese() {
+        ("DengXian Light", "DengXian", "DengXian Light", "DengXian")
+      } else {
+        (
+          "Calibri Light",
+          "Calibri",
+          "Times New Roman",
+          "Times New Roman",
+        )
+      };
+    Self {
+      major_ascii: Some(Arc::from(major_latin)),
+      major_high_ansi: Some(Arc::from(major_latin)),
+      major_east_asia: Some(Arc::from(major_east_asia)),
+      major_bidi: Some(Arc::from("Times New Roman")),
+      minor_ascii: Some(Arc::from(minor_latin)),
+      minor_high_ansi: Some(Arc::from(minor_latin)),
+      minor_east_asia: Some(Arc::from(minor_east_asia)),
+      minor_bidi: Some(Arc::from("Arial")),
+      ..Self::default()
+    }
+  }
+
   fn from_theme(theme: &a::Theme, languages: Option<ThemeFontLanguages>) -> Self {
     let scheme = &theme.theme_elements.font_scheme;
     let (latin_language, east_asia_language, bidi_language) = languages.unwrap_or_default();
@@ -21829,30 +22594,14 @@ fn table_style_model(
   style: &w::Style,
   theme_fonts: &ThemeFonts,
   theme_colors: &ThemeColors,
+  font_substitutions: &HashMap<String, FontSubstitution>,
   import_settings: ImportSettings,
 ) -> TableStyleModel {
   let mut model = TableStyleModel::default();
   if let Some(properties) = style.style_table_properties.as_deref() {
     merge_table_level_style(
       &mut model,
-      &style_table_level_style(
-        properties
-          .table_style_row_band_size
-          .as_ref()
-          .and_then(|size| word_table_style_band_size(size.val)),
-        properties
-          .table_style_column_band_size
-          .as_ref()
-          .and_then(|size| word_table_style_band_size(size.val)),
-        properties.table_borders.as_deref(),
-        properties.table_cell_margin_default.as_deref(),
-        properties.table_cell_spacing.as_ref(),
-        properties.table_indentation.as_ref(),
-        properties.table_justification.as_ref(),
-        properties.table_layout.as_ref(),
-        properties.shading.as_ref(),
-        theme_colors,
-      ),
+      &style_table_level_style(properties, theme_colors),
     );
   }
   if let Some(properties) = style.style_table_cell_properties.as_deref() {
@@ -21878,6 +22627,14 @@ fn table_style_model(
     style.style_run_properties.as_deref().map(RunProps::Style),
     theme_fonts,
     theme_colors,
+  );
+  apply_word_font_table_mappings(
+    font_substitutions,
+    &mut model.whole_table.run_style,
+    style
+      .style_run_properties
+      .as_deref()
+      .and_then(|properties| properties.run_fonts.as_ref()),
   );
   model.whole_table.run_overrides =
     run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
@@ -21912,6 +22669,14 @@ fn table_style_model(
         .map(RunProps::BaseStyle),
       theme_fonts,
       theme_colors,
+    );
+    apply_word_font_table_mappings(
+      font_substitutions,
+      &mut cell_style.run_style,
+      conditional
+        .run_properties_base_style
+        .as_deref()
+        .and_then(|properties| properties.run_fonts.as_ref()),
     );
     cell_style.run_overrides = run_style_overrides(
       conditional
@@ -22035,27 +22800,37 @@ fn merge_table_style_model(target: &mut TableStyleModel, source: &TableStyleMode
 }
 
 fn style_table_level_style(
-  row_band_size: Option<usize>,
-  column_band_size: Option<usize>,
-  borders: Option<&w::TableBorders>,
-  margins: Option<&w::TableCellMarginDefault>,
-  spacing: Option<&w::TableCellSpacing>,
-  indentation: Option<&w::TableIndentation>,
-  justification: Option<&w::TableJustification>,
-  layout: Option<&w::TableLayout>,
-  shading: Option<&w::Shading>,
+  properties: &w::StyleTableProperties,
   theme_colors: &ThemeColors,
 ) -> TableStyleModel {
   TableStyleModel {
-    row_band_size,
-    column_band_size,
-    table_borders: borders.map(table_borders_model),
-    table_shading: shading.map(|shading| shading_fill(shading, theme_colors)),
-    cell_margins: margins.map(table_cell_margin_default),
-    cell_spacing_pt: spacing.and_then(table_cell_spacing_to_points),
-    indent_left_pt: indentation.and_then(table_indentation_to_points),
-    alignment: justification.map(table_alignment),
-    layout: layout.map(table_layout_mode),
+    row_band_size: properties
+      .table_style_row_band_size
+      .as_ref()
+      .and_then(|size| word_table_style_band_size(size.val)),
+    column_band_size: properties
+      .table_style_column_band_size
+      .as_ref()
+      .and_then(|size| word_table_style_band_size(size.val)),
+    table_borders: properties.table_borders.as_deref().map(table_borders_model),
+    table_shading: properties
+      .shading
+      .as_ref()
+      .map(|shading| shading_fill(shading, theme_colors)),
+    cell_margins: properties
+      .table_cell_margin_default
+      .as_deref()
+      .map(table_cell_margin_default),
+    cell_spacing_pt: properties
+      .table_cell_spacing
+      .as_ref()
+      .and_then(table_cell_spacing_to_points),
+    indent_left_pt: properties
+      .table_indentation
+      .as_ref()
+      .and_then(table_indentation_to_points),
+    alignment: properties.table_justification.as_ref().map(table_alignment),
+    layout: properties.table_layout.as_ref().map(table_layout_mode),
     ..Default::default()
   }
 }
@@ -22559,8 +23334,10 @@ fn apply_character_style_toggle_overrides(
 fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.spacing_before_set || values.spacing_before_pt != 0.0 {
     target.spacing_before_pt = values.spacing_before_pt;
-    target.spacing_before_lines = values.spacing_before_lines;
     target.spacing_before_set = values.spacing_before_set;
+  }
+  if values.spacing_before_lines.is_some() {
+    target.spacing_before_lines = values.spacing_before_lines;
   }
   if values.spacing_before_auto.is_some() {
     target.spacing_before_auto = values.spacing_before_auto;
@@ -22569,6 +23346,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.spacing_after_set || values.spacing_after_pt != 0.0 {
     target.spacing_after_pt = values.spacing_after_pt;
     target.spacing_after_set = values.spacing_after_set;
+  }
+  if values.spacing_after_lines.is_some() {
+    target.spacing_after_lines = values.spacing_after_lines;
   }
   if values.spacing_after_auto.is_some() {
     target.spacing_after_auto = values.spacing_after_auto;
@@ -22770,6 +23550,9 @@ fn merge_numbering_format_values(
     target.spacing_before_pt = values.spacing_before_pt;
     target.spacing_before_set = values.spacing_before_set;
   }
+  if values.spacing_before_lines.is_some() {
+    target.spacing_before_lines = values.spacing_before_lines;
+  }
   if values.spacing_before_auto.is_some() {
     target.spacing_before_auto = values.spacing_before_auto;
     target.spacing_before_auto_pt = values.spacing_before_auto_pt;
@@ -22777,6 +23560,9 @@ fn merge_numbering_format_values(
   if values.spacing_after_set || values.spacing_after_pt != 0.0 {
     target.spacing_after_pt = values.spacing_after_pt;
     target.spacing_after_set = values.spacing_after_set;
+  }
+  if values.spacing_after_lines.is_some() {
+    target.spacing_after_lines = values.spacing_after_lines;
   }
   if values.spacing_after_auto.is_some() {
     target.spacing_after_auto = values.spacing_after_auto;
@@ -22885,6 +23671,42 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   if values.font_family.is_some() {
     target.font_family = values.font_family.clone();
   }
+  if values.high_ansi_font_family.is_some() {
+    target.high_ansi_font_family = values.high_ansi_font_family.clone();
+  }
+  if values.east_asia_font_family.is_some() {
+    target.east_asia_font_family = values.east_asia_font_family.clone();
+  }
+  if values.complex_font_family.is_some() {
+    target.complex_font_family = values.complex_font_family.clone();
+  }
+  if values.symbol_font_family.is_some() {
+    target.symbol_font_family = values.symbol_font_family.clone();
+  }
+  if values.fallback_font_family.is_some() {
+    target.fallback_font_family = values.fallback_font_family.clone();
+  }
+  if values.high_ansi_fallback_font_family.is_some() {
+    target.high_ansi_fallback_font_family = values.high_ansi_fallback_font_family.clone();
+  }
+  if values.east_asia_fallback_font_family.is_some() {
+    target.east_asia_fallback_font_family = values.east_asia_fallback_font_family.clone();
+  }
+  if values.complex_fallback_font_family.is_some() {
+    target.complex_fallback_font_family = values.complex_fallback_font_family.clone();
+  }
+  if values.font_family_class.is_some() {
+    target.font_family_class = values.font_family_class;
+  }
+  if values.high_ansi_font_family_class.is_some() {
+    target.high_ansi_font_family_class = values.high_ansi_font_family_class;
+  }
+  if values.east_asia_font_family_class.is_some() {
+    target.east_asia_font_family_class = values.east_asia_font_family_class;
+  }
+  if values.complex_font_family_class.is_some() {
+    target.complex_font_family_class = values.complex_font_family_class;
+  }
   if values.language.is_some() {
     target.language = values.language.clone();
   }
@@ -22893,6 +23715,12 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   }
   if values.bidi_language.is_some() {
     target.bidi_language = values.bidi_language.clone();
+  }
+  if values.wordprocessingml_font_hint.is_some() {
+    target.wordprocessingml_font_hint = values.wordprocessingml_font_hint;
+  }
+  if values.east_asia_font_charset.is_some() {
+    target.east_asia_font_charset = values.east_asia_font_charset;
   }
   if (values.font_size_pt - TextStyle::default().font_size_pt).abs() > f32::EPSILON {
     target.font_size_pt = values.font_size_pt;
@@ -23156,6 +23984,7 @@ fn finalize_numbering_symbol_transport_style(
     style.font_family = Some(font.clone());
     style.complex_font_family = Some(font.clone());
     style.symbol_font_family = Some(font);
+    style.explicit_symbol_character = true;
   }
 
   if style
@@ -23172,6 +24001,7 @@ fn finalize_numbering_symbol_transport_style(
     style.fallback_font_family = inherited_style.fallback_font_family.clone();
     style.complex_font_family = inherited_style.complex_font_family.clone();
     style.symbol_font_family = None;
+    style.explicit_symbol_character = false;
   }
 }
 
@@ -23485,6 +24315,13 @@ impl NumberingCatalog {
       &styles.theme_fonts,
       &styles.theme_colors,
     );
+    styles.apply_word_font_table_mappings(
+      &mut style,
+      level
+        .symbol_run_properties
+        .as_ref()
+        .and_then(|properties| properties.run_fonts.first()),
+    );
     if paragraph_mark_run_properties.is_some() {
       style = properties::paragraph_mark_run_style(paragraph_mark_run_properties, style, styles);
       style.small_caps = false;
@@ -23505,6 +24342,13 @@ impl NumberingCatalog {
         &styles.theme_fonts,
         &styles.theme_colors,
       );
+      styles.apply_word_font_table_mappings(
+        &mut style,
+        level
+          .symbol_run_properties
+          .as_ref()
+          .and_then(|properties| properties.run_fonts.first()),
+      );
     }
     let numbering_language = style
       .language
@@ -23512,27 +24356,18 @@ impl NumberingCatalog {
       .or_else(|| style.east_asia_language.clone())
       .or_else(|| style.bidi_language.clone())
       .or_else(|| styles.locales.format_locale().map(Arc::from));
-    let mut text = format_numbering_label_with_language(
-      level,
-      abstract_num_id,
+    let format_context = NumberingLabelFormatContext {
+      counter_id: abstract_num_id,
       level_index,
-      counter,
+      current_value: counter,
       abstract_num,
-      &instance.overrides,
-      &self.counters,
-      numbering_language.as_deref(),
-    );
+      overrides: &instance.overrides,
+      counters: &self.counters,
+      language: numbering_language.as_deref(),
+    };
+    let mut text = format_numbering_label_with_context(level, format_context);
     let suppressed_non_numerical_text =
-      format_numbering_label_suppressing_non_numerical_with_language(
-        level,
-        abstract_num_id,
-        level_index,
-        counter,
-        abstract_num,
-        &instance.overrides,
-        &self.counters,
-        numbering_language.as_deref(),
-      );
+      format_numbering_label_suppressing_non_numerical_with_context(level, format_context);
     finalize_numbering_symbol_transport_style(
       &mut style,
       &inherited_bullet_style,
@@ -23831,6 +24666,7 @@ fn numbering_drawing_image(
     data: image_data.data,
     content_type: image_data.content_type,
     picture_frame: properties.picture_frame,
+    picture_frame_clips_image: true,
     effects: properties.shape_effects,
     static3d: properties.static3d,
     width_pt,
@@ -23842,6 +24678,9 @@ fn numbering_drawing_image(
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
     inline_baseline_gap_pt: None,
+    line_box: InlineImageLineBox::CharacterLike,
+    office_math_line_layout: None,
+    office_math_display_layout: None,
     crop: properties.crop,
     rotation_deg: properties.rotation_deg,
     flip_horizontal: properties.flip_horizontal,
@@ -23864,17 +24703,30 @@ fn picture_bullet_base_image(
   picture: &w::PictureBulletBase,
   images: &ImageCatalog,
 ) -> Option<InlineImage> {
+  let shape_types = picture
+    .picture_bullet_base_choice
+    .iter()
+    .flat_map(|choice| match choice {
+      w::PictureBulletBaseChoice::Shapetype(shape_type) => vec![shape_type.as_ref()],
+      w::PictureBulletBaseChoice::Group(group) => vml_group_shape_types(group),
+      _ => Vec::new(),
+    })
+    .collect::<Vec<_>>();
   picture
     .picture_bullet_base_choice
     .iter()
     .find_map(|choice| match choice {
-      w::PictureBulletBaseChoice::Group(group) => group_image(group, images),
+      w::PictureBulletBaseChoice::Group(group) => {
+        group_image_with_shape_types(group, images, &shape_types)
+      }
       w::PictureBulletBaseChoice::ImageFile(image) => image_file_image(image, images),
       w::PictureBulletBaseChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
       w::PictureBulletBaseChoice::RoundRectangle(round_rectangle) => {
         round_rectangle_image(round_rectangle, images)
       }
-      w::PictureBulletBaseChoice::Shape(shape) => shape_image(shape, images),
+      w::PictureBulletBaseChoice::Shape(shape) => {
+        shape_image_with_style_and_shape_types(shape, shape.style.as_deref(), images, &shape_types)
+      }
       _ => None,
     })
 }
@@ -23898,33 +24750,7 @@ fn format_numbering_label(
   overrides: &HashMap<i32, LevelOverride>,
   counters: &HashMap<(i32, i32), i32>,
 ) -> String {
-  format_numbering_label_with_language(
-    level,
-    counter_id,
-    level_index,
-    value,
-    abstract_num,
-    overrides,
-    counters,
-    None,
-  )
-}
-
-fn format_numbering_label_with_language(
-  level: &NumberingLevel,
-  counter_id: i32,
-  level_index: i32,
-  value: i32,
-  abstract_num: &AbstractNumbering,
-  overrides: &HashMap<i32, LevelOverride>,
-  counters: &HashMap<(i32, i32), i32>,
-  language: Option<&str>,
-) -> String {
-  if matches!(level.format, w::NumberFormatValues::Bullet) {
-    return format!("{}{}", level.text, numbering_suffix_text(level.suffix));
-  }
-
-  let text = format_numbering_level_text(
+  format_numbering_label_with_context(
     level,
     NumberingLabelFormatContext {
       counter_id,
@@ -23933,10 +24759,20 @@ fn format_numbering_label_with_language(
       abstract_num,
       overrides,
       counters,
-      language,
+      language: None,
     },
-    true,
-  );
+  )
+}
+
+fn format_numbering_label_with_context(
+  level: &NumberingLevel,
+  context: NumberingLabelFormatContext<'_>,
+) -> String {
+  if matches!(level.format, w::NumberFormatValues::Bullet) {
+    return format!("{}{}", level.text, numbering_suffix_text(level.suffix));
+  }
+
+  let text = format_numbering_level_text(level, context, true);
   format!("{text}{}", numbering_suffix_text(level.suffix))
 }
 
@@ -23950,27 +24786,23 @@ fn format_numbering_label_suppressing_non_numerical(
   overrides: &HashMap<i32, LevelOverride>,
   counters: &HashMap<(i32, i32), i32>,
 ) -> String {
-  format_numbering_label_suppressing_non_numerical_with_language(
+  format_numbering_label_suppressing_non_numerical_with_context(
     level,
-    counter_id,
-    level_index,
-    value,
-    abstract_num,
-    overrides,
-    counters,
-    None,
+    NumberingLabelFormatContext {
+      counter_id,
+      level_index,
+      current_value: value,
+      abstract_num,
+      overrides,
+      counters,
+      language: None,
+    },
   )
 }
 
-fn format_numbering_label_suppressing_non_numerical_with_language(
+fn format_numbering_label_suppressing_non_numerical_with_context(
   level: &NumberingLevel,
-  counter_id: i32,
-  level_index: i32,
-  value: i32,
-  abstract_num: &AbstractNumbering,
-  overrides: &HashMap<i32, LevelOverride>,
-  counters: &HashMap<(i32, i32), i32>,
-  language: Option<&str>,
+  context: NumberingLabelFormatContext<'_>,
 ) -> String {
   if matches!(level.format, w::NumberFormatValues::Bullet) {
     return level
@@ -23980,19 +24812,7 @@ fn format_numbering_label_suppressing_non_numerical_with_language(
       .collect();
   }
 
-  format_numbering_level_text(
-    level,
-    NumberingLabelFormatContext {
-      counter_id,
-      level_index,
-      current_value: value,
-      abstract_num,
-      overrides,
-      counters,
-      language,
-    },
-    false,
-  )
+  format_numbering_level_text(level, context, false)
 }
 
 #[derive(Clone, Copy)]
@@ -24862,7 +25682,7 @@ fn cjk_counting_group(
   for (position, divisor) in [1_000_u16, 100, 10, 1].into_iter().enumerate() {
     let digit = usize::from(value / divisor % 10);
     if digit == 0 {
-      if !output.is_empty() && value % divisor != 0 {
+      if !output.is_empty() && !value.is_multiple_of(divisor) {
         pending_zero = true;
       }
       continue;
@@ -26739,6 +27559,43 @@ mod tests {
   }
 
   #[test]
+  fn repeating_story_framepr_paragraphs_become_one_floating_frame() {
+    let frame = ParagraphFrameProperties {
+      width_pt: None,
+      height_pt: None,
+      height_rule: FrameHeightRule::Auto,
+      placement: FloatingFramePlacement {
+        horizontal_anchor: FrameHorizontalAnchor::Margin,
+        vertical_anchor: FrameVerticalAnchor::Text,
+        horizontal_alignment: Some(FrameHorizontalAlignment::Right),
+        vertical_offset_pt: 0.05,
+        vertical_offset_explicit: true,
+        wrap: FrameWrapMode::Around,
+        ..Default::default()
+      },
+      drop_cap: false,
+    };
+    let mut page_field = merge_test_paragraph("1");
+    page_field.format.frame = Some(frame);
+    let mut adjacent = merge_test_paragraph("same frame");
+    adjacent.format.frame = Some(frame);
+    let ordinary = merge_test_paragraph("following header text");
+    let mut blocks = vec![
+      Block::paragraph(page_field),
+      Block::paragraph(adjacent),
+      Block::paragraph(ordinary),
+    ];
+
+    normalize_repeating_story_frames(&mut blocks);
+
+    let [Block::Frame(frame), Block::Paragraph(paragraph)] = blocks.as_slice() else {
+      panic!("framePr paragraphs in a repeating story must become a floating frame");
+    };
+    assert_eq!(frame.blocks.len(), 2);
+    assert_eq!(inline_text(&paragraph.inlines), "following header text");
+  }
+
+  #[test]
   fn omitted_framepr_wrap_defaults_to_around_while_explicit_auto_is_retained() {
     assert_eq!(frame_wrap_mode(None), FrameWrapMode::Around);
     assert_eq!(
@@ -27046,6 +27903,24 @@ mod tests {
   }
 
   #[test]
+  fn embedded_object_run_position_preserves_intrinsic_and_effect_baselines() {
+    // No authored w:position is the stopping counterexample: keep None so
+    // ordinary OLE previews continue to derive their baseline from the frame.
+    assert_eq!(embedded_object_run_baseline_gap(None, 2.0, 0.0), None);
+
+    // A run displacement is relative to the already resolved object
+    // baseline, including DrawingML/VML effect space or a native formula gap.
+    assert_eq!(
+      embedded_object_run_baseline_gap(None, 2.0, -5.0),
+      Some(-3.0)
+    );
+    assert_eq!(
+      embedded_object_run_baseline_gap(Some(-1.0), 2.0, 4.0),
+      Some(3.0)
+    );
+  }
+
+  #[test]
   fn vml_named_colors_match_the_office_basic_palette() {
     for (name, rgb) in [
       ("aqua", [0, 255, 255]),
@@ -27129,6 +28004,10 @@ mod tests {
         height_pt: 216.0,
         adjustment: Some("17520"),
         formulas: Some(&formulas),
+        limo: None,
+        filled: true,
+        stroked: true,
+        stroke_width_pt: 0.75,
         allow_fill: true,
         allow_stroke: true,
         allow_extrusion: false,
@@ -27155,6 +28034,44 @@ mod tests {
   }
 
   #[test]
+  fn vml_formulas_follow_integer_rounding_and_named_shape_environment() {
+    let context = VmlFormulaContext {
+      coordinate_origin_x: 10,
+      coordinate_origin_y: 20,
+      coordinate_width: 21_600,
+      coordinate_height: 10_800,
+      limo_x: 30,
+      limo_y: 40,
+      has_fill: true,
+      has_stroke: false,
+      pixel_line_width: 6,
+      pixel_width: 600,
+      pixel_height: 300,
+      emu_width: 914_400,
+      emu_height: 457_200,
+    };
+    let eval = |equation| vml_formula(equation, &[], &[], context).expect(equation);
+
+    assert_eq!(eval("prod 3 1 2"), 2);
+    assert_eq!(eval("prod -3 1 2"), -1);
+    assert_eq!(eval("mid 1 2"), 1);
+    assert_eq!(eval("mid -1 -2"), -1);
+    assert_eq!(eval("sqrt 2"), 1);
+    assert_eq!(eval("sumangle 100 2 1"), 65_636);
+    assert_eq!(eval("val xcenter"), 10_810);
+    assert_eq!(eval("val ycenter"), 5_420);
+    assert_eq!(eval("val xlimo"), 30);
+    assert_eq!(eval("val ylimo"), 40);
+    assert_eq!(eval("val hasfill"), 1);
+    assert_eq!(eval("val lineDrawn"), 0);
+    assert_eq!(eval("val pixelLineWidth"), 6);
+    assert_eq!(eval("val pixelWidth"), 600);
+    assert_eq!(eval("val pixelHeight"), 300);
+    assert_eq!(eval("val emuWidth"), 914_400);
+    assert_eq!(eval("val emuHeight2"), 228_600);
+  }
+
+  #[test]
   fn vml_canonical_line_path_defaults_omitted_moveto_to_origin() {
     let geometry = vml_path_geometry(
       "m,l21600,21600e",
@@ -27165,6 +28082,10 @@ mod tests {
         height_pt: 0.0,
         adjustment: None,
         formulas: None,
+        limo: None,
+        filled: false,
+        stroked: true,
+        stroke_width_pt: 0.75,
         allow_fill: false,
         allow_stroke: true,
         allow_extrusion: false,
@@ -27200,6 +28121,10 @@ mod tests {
         height_pt: 13.0,
         adjustment: None,
         formulas: None,
+        limo: None,
+        filled: true,
+        stroked: true,
+        stroke_width_pt: 0.75,
         allow_fill: true,
         allow_stroke: true,
         allow_extrusion: false,
@@ -27272,6 +28197,10 @@ mod tests {
         height_pt: 100.0,
         adjustment: None,
         formulas: None,
+        limo: None,
+        filled: true,
+        stroked: true,
+        stroke_width_pt: 0.75,
         allow_fill: true,
         allow_stroke: true,
         allow_extrusion: false,
@@ -27701,7 +28630,8 @@ mod tests {
       },
     );
 
-    let image = group_image(&group, &images).expect("transformed group image");
+    let image =
+      group_image_with_shape_types(&group, &images, &[]).expect("transformed group image");
     assert!((image.width_pt - 20.0).abs() < 0.001);
     assert!((image.height_pt - 10.0).abs() < 0.001);
     let ImagePlacement::Floating(placement) = image.placement else {
@@ -27795,7 +28725,7 @@ mod tests {
         b"<html><body><p>first &amp; second<br/>line</p><div>third</div></body></html>",
         Some("text/html; charset=utf-8"),
       ),
-      vec!["first & second line", "third"]
+      vec!["first & second\nline", "third"]
     );
   }
 
@@ -27840,16 +28770,89 @@ mod tests {
     assert_eq!(visible_text, "John Smith");
   }
 
+  fn imported_office_math_image(paragraph: &w::Paragraph, styles: &StylesCatalog) -> InlineImage {
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    paragraph_inlines(
+      paragraph,
+      TextStyle::default(),
+      styles,
+      &images,
+      &hyperlinks,
+      &CustomXmlBindings::default(),
+      &mut form_widget_ids,
+    )
+    .into_iter()
+    .find_map(|inline| match inline {
+      InlineItem::Image(image)
+        if math::is_office_math_content_type(image.content_type.as_deref()) =>
+      {
+        Some(image)
+      }
+      _ => None,
+    })
+    .expect("realized OfficeMath image")
+  }
+
   #[test]
-  fn office_math_paragraph_defaults_to_center_group_alignment() {
-    let paragraph = w::Paragraph::from_bytes(
+  fn office_math_paragraph_preserves_word_justification_precedence() {
+    let omitted = w::Paragraph::from_bytes(
       br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMathPara><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></m:oMathPara></w:p>"#,
     )
-    .expect("math paragraph");
+    .expect("math paragraph with inherited justification");
+    let explicit = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMathPara><m:oMathParaPr><m:jc m:val="centerGroup"/></m:oMathParaPr><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></m:oMathPara></w:p>"#,
+    )
+    .expect("math paragraph with explicit justification");
+    let styles = StylesCatalog {
+      display_math_alignment: Some(OfficeMathDisplayAlignment::Right),
+      ..StylesCatalog::default()
+    };
 
     assert_eq!(
-      math_paragraph_alignment(&paragraph, None),
-      Some(ParagraphAlignment::Center)
+      imported_office_math_image(&omitted, &styles)
+        .office_math_display_layout
+        .expect("display layout")
+        .alignment,
+      Some(OfficeMathDisplayAlignment::Right)
+    );
+    assert_eq!(
+      imported_office_math_image(&explicit, &styles)
+        .office_math_display_layout
+        .expect("display layout")
+        .alignment,
+      Some(OfficeMathDisplayAlignment::CenterGroup)
+    );
+    assert_eq!(
+      imported_office_math_image(&omitted, &StylesCatalog::default())
+        .office_math_display_layout
+        .expect("display zone using paragraph settings")
+        .alignment,
+      None
+    );
+  }
+
+  #[test]
+  fn office_math_paragraph_keeps_equations_as_distinct_physical_lines() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMathPara><m:oMath><m:r><m:t>x=1</m:t></m:r></m:oMath><m:oMath><m:r><m:t>longer=2</m:t></m:r></m:oMath></m:oMathPara></w:p>"#,
+    )
+    .expect("multi-equation math paragraph");
+    let styles = StylesCatalog {
+      display_math_alignment: Some(OfficeMathDisplayAlignment::CenterGroup),
+      ..StylesCatalog::default()
+    };
+    let image = imported_office_math_image(&paragraph, &styles);
+    let line_layout = image.office_math_line_layout.expect("display line layout");
+
+    assert_eq!(
+      line_layout
+        .fragments
+        .iter()
+        .filter(|fragment| { matches!(fragment.break_before, Some(OfficeMathBreakKind::Equation)) })
+        .count(),
+      1
     );
   }
 
@@ -27910,11 +28913,61 @@ mod tests {
       br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p>"#,
     )
     .expect("display math");
+    let styles = StylesCatalog {
+      display_math_alignment: Some(OfficeMathDisplayAlignment::Right),
+      ..StylesCatalog::default()
+    };
 
     assert_eq!(
-      math_paragraph_alignment(&paragraph, Some(ParagraphAlignment::Right)),
-      Some(ParagraphAlignment::Right)
+      imported_office_math_image(&paragraph, &styles)
+        .office_math_display_layout
+        .expect("display layout")
+        .alignment,
+      Some(OfficeMathDisplayAlignment::Right)
     );
+  }
+
+  #[test]
+  fn office_math_zone_boundary_merges_adjacent_zones_but_stops_at_effective_text() {
+    fn math_image_count(paragraph: &w::Paragraph) -> usize {
+      let styles = StylesCatalog::default();
+      let images = ImageCatalog::default();
+      let hyperlinks = HyperlinkCatalog::default();
+      let mut form_widget_ids = FormWidgetIdAllocator::default();
+      paragraph_inlines(
+        paragraph,
+        TextStyle::default(),
+        &styles,
+        &images,
+        &hyperlinks,
+        &CustomXmlBindings::default(),
+        &mut form_widget_ids,
+      )
+      .iter()
+      .filter(|inline| {
+        matches!(inline, InlineItem::Image(image) if math::is_office_math_content_type(image.content_type.as_deref()))
+      })
+      .count()
+    }
+
+    let adjacent = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:bookmarkStart w:id="1" w:name="math"/><w:r><w:rPr/><w:t> </w:t></w:r><m:oMath><m:sSup><m:e><m:r><m:t>x</m:t></m:r></m:e><m:sup><m:r><m:t>a</m:t></m:r></m:sup></m:sSup></m:oMath><w:proofErr w:type="spellStart"/><w:r><w:rPr/></w:r><m:oMath><m:sSub><m:e><m:r><m:t>y</m:t></m:r></m:e><m:sub><m:r><m:t>b</m:t></m:r></m:sub></m:sSub></m:oMath><w:bookmarkEnd w:id="1"/></w:p>"#,
+    )
+    .expect("adjacent math zones with zero-width metadata");
+
+    assert!(paragraph_is_display_math(&adjacent, false));
+    assert_eq!(math_image_count(&adjacent), 1);
+    // A document-level xml:space="preserve" makes the same whitespace an
+    // effective ordinary-text character, so the equations are inline.
+    assert!(!paragraph_is_display_math(&adjacent, true));
+
+    let preserved_space = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:sSup><m:e><m:r><m:t>x</m:t></m:r></m:e><m:sup><m:r><m:t>a</m:t></m:r></m:sup></m:sSup></m:oMath><w:r><w:t xml:space="preserve"> </w:t></w:r><m:oMath><m:sSub><m:e><m:r><m:t>y</m:t></m:r></m:e><m:sub><m:r><m:t>b</m:t></m:r></m:sub></m:sSub></m:oMath></w:p>"#,
+    )
+    .expect("math zones separated by ordinary text");
+
+    assert!(!paragraph_is_display_math(&preserved_space, false));
+    assert_eq!(math_image_count(&preserved_space), 2);
   }
 
   #[test]
@@ -27924,10 +28977,7 @@ mod tests {
     )
     .expect("inline math");
 
-    assert_eq!(
-      math_paragraph_alignment(&paragraph, Some(ParagraphAlignment::Center)),
-      None
-    );
+    assert!(!paragraph_is_display_math(&paragraph, false));
   }
 
   #[test]
@@ -27937,10 +28987,7 @@ mod tests {
     )
     .expect("display math after empty word run");
 
-    assert_eq!(
-      math_paragraph_alignment(&paragraph, Some(ParagraphAlignment::Center)),
-      Some(ParagraphAlignment::Center)
-    );
+    assert!(paragraph_is_display_math(&paragraph, false));
   }
 
   #[test]
@@ -27950,10 +28997,7 @@ mod tests {
     )
     .expect("empty word run");
 
-    assert_eq!(
-      math_paragraph_alignment(&paragraph, Some(ParagraphAlignment::Center)),
-      None
-    );
+    assert!(!paragraph_is_display_math(&paragraph, false));
   }
 
   #[test]
@@ -29144,6 +30188,7 @@ mod tests {
     assert_eq!(style.font_family.as_deref(), Some("Symbol"));
     assert_eq!(style.complex_font_family.as_deref(), Some("Symbol"));
     assert_eq!(style.symbol_font_family.as_deref(), Some("Symbol"));
+    assert!(style.explicit_symbol_character);
     assert_eq!(style.right_to_left, Some(true));
     assert_eq!(text, "\u{f0b7}");
   }
@@ -29204,6 +30249,7 @@ mod tests {
         Some("Times New Roman")
       );
       assert_eq!(style.symbol_font_family, None);
+      assert!(!style.explicit_symbol_character);
     }
 
     let mut style = TextStyle {
@@ -29226,6 +30272,7 @@ mod tests {
       Some("Times New Roman")
     );
     assert_eq!(style.symbol_font_family, None);
+    assert!(!style.explicit_symbol_character);
   }
 
   #[test]
@@ -29247,6 +30294,78 @@ mod tests {
   }
 
   #[test]
+  fn word_doc_default_font_distinguishes_omitted_rfonts_from_omitted_defaults() {
+    let simplified_chinese =
+      ThemeFonts::from_office_default(OfficeResourceLocale::SimplifiedChinese);
+
+    assert_eq!(
+      word_doc_default_font_family(
+        &simplified_chinese,
+        OfficeResourceLocale::SimplifiedChinese,
+        true,
+        false,
+      )
+      .as_ref(),
+      "Times New Roman"
+    );
+    assert_eq!(
+      word_doc_default_font_family(
+        &simplified_chinese,
+        OfficeResourceLocale::SimplifiedChinese,
+        true,
+        true,
+      )
+      .as_ref(),
+      "DengXian"
+    );
+    assert_eq!(
+      word_doc_default_font_family(
+        &simplified_chinese,
+        OfficeResourceLocale::SimplifiedChinese,
+        false,
+        false,
+      )
+      .as_ref(),
+      "DengXian"
+    );
+  }
+
+  #[test]
+  fn missing_theme_recovers_the_complete_office_font_scheme() {
+    let simplified_chinese =
+      ThemeFonts::from_office_default(OfficeResourceLocale::SimplifiedChinese);
+    for (token, expected) in [
+      (w::ThemeFontValues::MajorAscii, "DengXian Light"),
+      (w::ThemeFontValues::MajorHighAnsi, "DengXian Light"),
+      (w::ThemeFontValues::MajorEastAsia, "DengXian Light"),
+      (w::ThemeFontValues::MajorBidi, "Times New Roman"),
+      (w::ThemeFontValues::MinorAscii, "DengXian"),
+      (w::ThemeFontValues::MinorHighAnsi, "DengXian"),
+      (w::ThemeFontValues::MinorEastAsia, "DengXian"),
+      (w::ThemeFontValues::MinorBidi, "Arial"),
+    ] {
+      assert_eq!(
+        simplified_chinese.resolve(Some(token)).as_deref(),
+        Some(expected)
+      );
+    }
+
+    let english = ThemeFonts::from_office_default(OfficeResourceLocale::English);
+    for (token, expected) in [
+      (w::ThemeFontValues::MajorAscii, "Calibri Light"),
+      (w::ThemeFontValues::MajorHighAnsi, "Calibri Light"),
+      (w::ThemeFontValues::MajorEastAsia, "Times New Roman"),
+      (w::ThemeFontValues::MajorBidi, "Times New Roman"),
+      (w::ThemeFontValues::MinorAscii, "Calibri"),
+      (w::ThemeFontValues::MinorHighAnsi, "Calibri"),
+      (w::ThemeFontValues::MinorEastAsia, "Times New Roman"),
+      (w::ThemeFontValues::MinorBidi, "Arial"),
+    ] {
+      assert_eq!(english.resolve(Some(token)).as_deref(), Some(expected));
+    }
+  }
+
+  #[test]
   fn unclassified_legacy_latin_font_uses_calibri_as_its_document_fallback() {
     let legacy = w::Font::from_bytes(
       br#"<w:font xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:name="Legacy Sans"><w:panose1 w:val="00000000000000000000"/><w:family w:val="auto"/><w:notTrueType/></w:font>"#,
@@ -29259,14 +30378,120 @@ mod tests {
   }
 
   #[test]
-  fn authored_font_alternate_precedes_legacy_latin_recovery() {
+  fn word_font_alternate_uses_office_single_name_semantics() {
     let legacy = w::Font::from_bytes(
       br#"<w:font xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:name="Legacy Sans"><w:altName w:val="Arial, Helvetica"/><w:panose1 w:val="00000000000000000000"/><w:family w:val="auto"/><w:notTrueType/></w:font>"#,
     )
     .expect("legacy font table entry");
     let (_, substitution) = font_substitution_from_table_entry(&legacy).expect("substitution");
 
-    assert_eq!(substitution.alternate_family.as_deref(), Some("Arial"));
+    assert_eq!(
+      substitution.alternate_family.as_deref(),
+      Some("Arial, Helvetica")
+    );
+  }
+
+  #[test]
+  fn word_font_table_preserves_east_asian_charset_and_alternate() {
+    let simsun = w::Font::from_bytes(
+      r#"<w:font xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:name="宋体"><w:altName w:val="SimSun"/><w:charset w:val="86"/><w:family w:val="auto"/></w:font>"#
+        .as_bytes(),
+    )
+    .expect("East Asian font table entry");
+    let (_, substitution) = font_substitution_from_table_entry(&simsun).expect("substitution");
+
+    assert_eq!(substitution.alternate_family.as_deref(), Some("SimSun"));
+    assert_eq!(
+      substitution.charset,
+      Some(ooxmlsdk_fonts::FontCharset::Gb2312)
+    );
+  }
+
+  #[test]
+  fn word_font_table_metadata_applies_to_each_effective_run_font_slot() {
+    let styles = StylesCatalog {
+      font_substitutions: HashMap::from([
+        (
+          "western".to_string(),
+          FontSubstitution {
+            alternate_family: Some(Arc::from("Western Alternate")),
+            family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+            charset: Some(ooxmlsdk_fonts::FontCharset::Ansi),
+          },
+        ),
+        (
+          "宋体".to_string(),
+          FontSubstitution {
+            alternate_family: Some(Arc::from("SimSun")),
+            family_class: None,
+            charset: Some(ooxmlsdk_fonts::FontCharset::Gb2312),
+          },
+        ),
+      ]),
+      ..StylesCatalog::default()
+    };
+    let mut style = TextStyle {
+      font_family: Some(Arc::from("Western")),
+      high_ansi_font_family: Some(Arc::from("Western")),
+      east_asia_font_family: Some(Arc::from("宋体")),
+      complex_font_family: Some(Arc::from("Western")),
+      ..TextStyle::default()
+    };
+
+    styles.apply_font_substitution(&mut style);
+
+    assert_eq!(
+      style.fallback_font_family.as_deref(),
+      Some("Western Alternate")
+    );
+    assert_eq!(
+      style.high_ansi_fallback_font_family.as_deref(),
+      Some("Western Alternate")
+    );
+    assert_eq!(
+      style.east_asia_fallback_font_family.as_deref(),
+      Some("SimSun")
+    );
+    assert_eq!(
+      style.complex_fallback_font_family.as_deref(),
+      Some("Western Alternate")
+    );
+    assert_eq!(
+      style.high_ansi_font_family_class,
+      Some(ooxmlsdk_fonts::FontFamilyClass::Serif)
+    );
+    assert_eq!(
+      style.east_asia_font_charset,
+      Some(ooxmlsdk_fonts::FontCharset::Gb2312)
+    );
+  }
+
+  #[test]
+  fn word_run_fonts_keep_four_slots_and_theme_overrides_direct_face() {
+    let properties = w::RunProperties::from_bytes(
+      r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:ascii="Ignored ASCII" w:asciiTheme="minorAscii" w:hAnsi="Ignored High ANSI" w:hAnsiTheme="majorHAnsi" w:eastAsia="宋体" w:cs="Complex Face" w:hint="eastAsia"/></w:rPr>"#
+        .as_bytes(),
+    )
+    .expect("run properties");
+    let styles = StylesCatalog {
+      theme_fonts: ThemeFonts {
+        minor_ascii: Some(Arc::from("Calibri")),
+        major_high_ansi: Some(Arc::from("Cambria")),
+        ..ThemeFonts::default()
+      },
+      ..StylesCatalog::default()
+    };
+
+    let style = properties::run_style(Some(&properties), TextStyle::default(), &styles);
+
+    assert_eq!(style.font_family.as_deref(), Some("Calibri"));
+    assert_eq!(style.high_ansi_font_family.as_deref(), Some("Cambria"));
+    assert_eq!(style.east_asia_font_family.as_deref(), Some("宋体"));
+    assert_eq!(style.complex_font_family.as_deref(), Some("Complex Face"));
+    assert_eq!(
+      style.wordprocessingml_font_hint,
+      Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia)
+    );
   }
 
   #[test]
@@ -29364,6 +30589,7 @@ mod tests {
         FontSubstitution {
           alternate_family: None,
           family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+          charset: None,
         },
       )]),
       ..StylesCatalog::default()
@@ -29385,11 +30611,14 @@ mod tests {
   #[test]
   fn reserved_default_font_uses_only_its_authored_font_table_mapping() {
     let properties = w::RunProperties::from_bytes(
-      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:ascii="Default" w:hAnsi="Default"/></w:rPr>"#,
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:ascii="Default" w:hAnsi="Default" w:eastAsia="Default" w:cs="Default"/></w:rPr>"#,
     )
     .expect("run properties");
     let base = TextStyle {
       font_family: Some(Arc::from("Calibri")),
+      high_ansi_font_family: Some(Arc::from("High ANSI Inherited")),
+      east_asia_font_family: Some(Arc::from("East Asia Inherited")),
+      complex_font_family: Some(Arc::from("Complex Inherited")),
       ..TextStyle::default()
     };
     let mapped = StylesCatalog {
@@ -29398,8 +30627,16 @@ mod tests {
         FontSubstitution {
           alternate_family: Some(Arc::from("Cambria")),
           family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+          charset: Some(ooxmlsdk_fonts::FontCharset::Ansi),
         },
       )]),
+      theme_fonts: ThemeFonts {
+        minor_ascii: Some(Arc::from("Theme ASCII")),
+        major_high_ansi: Some(Arc::from("Theme High ANSI")),
+        minor_east_asia: Some(Arc::from("Theme East Asia")),
+        minor_bidi: Some(Arc::from("Theme Complex")),
+        ..ThemeFonts::default()
+      },
       ..StylesCatalog::default()
     };
 
@@ -29414,11 +30651,73 @@ mod tests {
       mapped_style.font_family_class,
       Some(ooxmlsdk_fonts::FontFamilyClass::Serif)
     );
+    for family in [
+      mapped_style.high_ansi_font_family.as_deref(),
+      mapped_style.east_asia_font_family.as_deref(),
+      mapped_style.complex_font_family.as_deref(),
+    ] {
+      assert_eq!(family, Some("Default"));
+    }
+    for fallback in [
+      mapped_style.high_ansi_fallback_font_family.as_deref(),
+      mapped_style.east_asia_fallback_font_family.as_deref(),
+      mapped_style.complex_fallback_font_family.as_deref(),
+    ] {
+      assert_eq!(fallback, Some("Cambria"));
+    }
+    assert_eq!(
+      mapped_style.high_ansi_font_family_class,
+      Some(ooxmlsdk_fonts::FontFamilyClass::Serif)
+    );
+    assert_eq!(
+      mapped_style.east_asia_font_family_class,
+      Some(ooxmlsdk_fonts::FontFamilyClass::Serif)
+    );
+    assert_eq!(
+      mapped_style.complex_font_family_class,
+      Some(ooxmlsdk_fonts::FontFamilyClass::Serif)
+    );
+    assert_eq!(
+      mapped_style.east_asia_font_charset,
+      Some(ooxmlsdk_fonts::FontCharset::Ansi)
+    );
 
-    let unmapped_style = properties::run_style(Some(&properties), base, &StylesCatalog::default());
+    let unmapped_style =
+      properties::run_style(Some(&properties), base.clone(), &StylesCatalog::default());
     assert_eq!(unmapped_style.font_family.as_deref(), Some("Calibri"));
+    assert_eq!(
+      unmapped_style.high_ansi_font_family.as_deref(),
+      Some("High ANSI Inherited")
+    );
+    assert_eq!(
+      unmapped_style.east_asia_font_family.as_deref(),
+      Some("East Asia Inherited")
+    );
+    assert_eq!(
+      unmapped_style.complex_font_family.as_deref(),
+      Some("Complex Inherited")
+    );
     assert_eq!(unmapped_style.fallback_font_family, None);
     assert_eq!(unmapped_style.font_family_class, None);
+
+    let themed_properties = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:ascii="Default" w:asciiTheme="minorAscii" w:hAnsi="Default" w:hAnsiTheme="majorHAnsi" w:eastAsia="Default" w:eastAsiaTheme="minorEastAsia" w:cs="Default" w:cstheme="minorBidi"/></w:rPr>"#,
+    )
+    .expect("theme-overridden reserved run fonts");
+    let themed_style = properties::run_style(Some(&themed_properties), base, &mapped);
+    assert_eq!(themed_style.font_family.as_deref(), Some("Theme ASCII"));
+    assert_eq!(
+      themed_style.high_ansi_font_family.as_deref(),
+      Some("Theme High ANSI")
+    );
+    assert_eq!(
+      themed_style.east_asia_font_family.as_deref(),
+      Some("Theme East Asia")
+    );
+    assert_eq!(
+      themed_style.complex_font_family.as_deref(),
+      Some("Theme Complex")
+    );
   }
 
   #[test]
@@ -30194,6 +31493,17 @@ mod tests {
   #[test]
   fn symbol_runs_preserve_declared_symbol_font_transport_codes() {
     let mut inlines = Vec::new();
+    let styles = StylesCatalog {
+      font_substitutions: HashMap::from([(
+        "universalmath1 bt".to_string(),
+        FontSubstitution {
+          alternate_family: Some(Arc::from("Symbol")),
+          family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+          charset: Some(ooxmlsdk_fonts::FontCharset::Symbol),
+        },
+      )]),
+      ..StylesCatalog::default()
+    };
     let run = w::Run {
       run_choice: vec![
         w::RunChoice::SymbolChar(w::SymbolChar {
@@ -30209,6 +31519,14 @@ mod tests {
           char: Some("F04C".into()),
         }),
         w::RunChoice::SymbolChar(w::SymbolChar {
+          font: Some("UniversalMath1 BT".into()),
+          char: Some("0081".into()),
+        }),
+        w::RunChoice::SymbolChar(w::SymbolChar {
+          font: Some("Symbol".into()),
+          char: Some("F094".into()),
+        }),
+        w::RunChoice::SymbolChar(w::SymbolChar {
           font: None,
           char: Some("00A9".into()),
         }),
@@ -30219,22 +31537,78 @@ mod tests {
     push_run(
       &run,
       &mut inlines,
-      TextStyle::default(),
-      &StylesCatalog::default(),
+      TextStyle {
+        font_family: Some(Arc::from("Times New Roman")),
+        high_ansi_font_family: Some(Arc::from("High ANSI Face")),
+        east_asia_font_family: Some(Arc::from("East Asian Face")),
+        complex_font_family: Some(Arc::from("Complex Face")),
+        font_family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+        high_ansi_font_family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+        east_asia_font_family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+        complex_font_family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Serif),
+        wordprocessingml_font_slots: true,
+        ..TextStyle::default()
+      },
+      &styles,
       &ImageCatalog::default(),
       &HyperlinkCatalog::default(),
       None,
     );
 
-    assert_eq!(inline_text(&inlines), "\u{f0b7}\u{f0fc}\u{f04c}©");
-    let symbol_fonts = inlines
+    assert_eq!(inline_text(&inlines), "\u{f0b7}\u{f0fc}\u{f04c}\u{f081}■©");
+    let runs = inlines
       .iter()
       .filter_map(|inline| match inline {
-        InlineItem::Text(run) => run.style.font_family.as_deref(),
+        InlineItem::Text(run) => Some(run),
         _ => None,
       })
       .collect::<Vec<_>>();
-    assert_eq!(symbol_fonts, ["Symbol", "Wingdings", "Wingdings"]);
+    assert_eq!(runs.len(), 6);
+
+    let symbol = &runs[0].style;
+    assert_eq!(symbol.font_family.as_deref(), Some("Symbol"));
+    assert_eq!(symbol.high_ansi_font_family.as_deref(), Some("Symbol"));
+    assert_eq!(symbol.east_asia_font_family.as_deref(), Some("Symbol"));
+    assert_eq!(symbol.complex_font_family.as_deref(), Some("Symbol"));
+    assert_eq!(symbol.symbol_font_family.as_deref(), Some("Symbol"));
+    assert!(symbol.explicit_symbol_character);
+    assert_eq!(symbol.font_family_class, None);
+    assert!(!symbol.wordprocessingml_font_slots);
+
+    let alternate = &runs[3].style;
+    assert_eq!(runs[3].text, "\u{f081}");
+    assert_eq!(alternate.font_family.as_deref(), Some("UniversalMath1 BT"));
+    assert_eq!(
+      alternate.high_ansi_font_family.as_deref(),
+      Some("UniversalMath1 BT")
+    );
+    assert_eq!(
+      alternate.east_asia_font_family.as_deref(),
+      Some("UniversalMath1 BT")
+    );
+    assert_eq!(
+      alternate.complex_font_family.as_deref(),
+      Some("UniversalMath1 BT")
+    );
+    assert_eq!(alternate.fallback_font_family.as_deref(), Some("Symbol"));
+    assert_eq!(
+      alternate.high_ansi_fallback_font_family.as_deref(),
+      Some("Symbol")
+    );
+    assert_eq!(alternate.font_family_class, None);
+    assert!(alternate.explicit_symbol_character);
+    assert!(!alternate.wordprocessingml_font_slots);
+
+    // Microsoft's Symbol cmap lacks F094, so this one established legacy
+    // code remains the opposite state and uses the inherited Unicode face.
+    assert_eq!(runs[4].text, "■");
+    assert_eq!(
+      runs[4].style.font_family.as_deref(),
+      Some("Times New Roman")
+    );
+    assert_eq!(runs[4].style.symbol_font_family, None);
+    assert!(!runs[4].style.explicit_symbol_character);
+    assert!(runs[4].style.wordprocessingml_font_slots);
   }
 
   #[test]
@@ -30684,6 +32058,7 @@ mod tests {
       },
       &ThemeFonts::default(),
       &ThemeColors::default(),
+      &HashMap::new(),
       ImportSettings::default(),
     );
 
@@ -30841,27 +32216,31 @@ mod tests {
     for cell_index in [1, 2] {
       assert!(table::cell_style_condition_applies(
         w::TableStyleOverrideValues::Band1Vertical,
-        look,
-        1,
-        2,
-        cell_index,
-        5,
-        1,
-        2,
-        false,
+        table::CellStyleConditionContext {
+          look,
+          row_index: 1,
+          row_count: 2,
+          cell_index,
+          cell_count: 5,
+          row_band_size: 1,
+          column_band_size: 2,
+          is_header_row: false,
+        },
       ));
     }
     for cell_index in [3, 4] {
       assert!(table::cell_style_condition_applies(
         w::TableStyleOverrideValues::Band2Vertical,
-        look,
-        1,
-        2,
-        cell_index,
-        5,
-        1,
-        2,
-        false,
+        table::CellStyleConditionContext {
+          look,
+          row_index: 1,
+          row_count: 2,
+          cell_index,
+          cell_count: 5,
+          row_band_size: 1,
+          column_band_size: 2,
+          is_header_row: false,
+        },
       ));
     }
   }
@@ -30997,6 +32376,7 @@ mod tests {
       },
       &ThemeFonts::default(),
       &ThemeColors::default(),
+      &HashMap::new(),
       ImportSettings::default(),
     );
 
@@ -31073,6 +32453,7 @@ mod tests {
       },
       &ThemeFonts::default(),
       &ThemeColors::default(),
+      &HashMap::new(),
       ImportSettings::default(),
     );
 
@@ -31214,6 +32595,59 @@ mod tests {
     assert!(model.format.spacing_after_set);
     assert_eq!(model.format.line_height_pt, Some(276.0 / 240.0));
     assert_eq!(model.format.line_height_rule, LineHeightRule::Auto);
+  }
+
+  #[test]
+  fn missing_doc_defaults_recovers_formula_only_content_but_not_picture_only_content() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:f><m:num><m:r><m:t>a</m:t></m:r></m:num><m:den><m:r><m:t>b</m:t></m:r></m:den></m:f></m:oMath></w:p>"#,
+    )
+    .expect("formula-only paragraph");
+    let styles = StylesCatalog::default();
+    let mut model = paragraph_model(
+      &paragraph,
+      &styles,
+      &mut NumberingCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut FormWidgetIdAllocator::default(),
+    );
+
+    let InlineItem::Image(formula) = model
+      .inlines
+      .iter_mut()
+      .find(|inline| matches!(inline, InlineItem::Image(_)))
+      .expect("two-dimensional Office Math image")
+    else {
+      unreachable!()
+    };
+    assert!(math::is_office_math_content_type(
+      formula.content_type.as_deref()
+    ));
+
+    apply_recovered_body_paragraph_defaults(&paragraph, &styles, &mut model);
+    assert_eq!(model.format.spacing_after_pt, 8.0);
+    assert_eq!(model.format.line_height_pt, Some(276.0 / 240.0));
+
+    let InlineItem::Image(formula) = model
+      .inlines
+      .iter_mut()
+      .find(|inline| matches!(inline, InlineItem::Image(_)))
+      .expect("formula image retained")
+    else {
+      unreachable!()
+    };
+    formula.content_type = Some("image/png".to_string());
+    model.format.spacing_after_pt = 0.0;
+    model.format.spacing_after_set = false;
+    model.format.line_height_pt = None;
+    model.format.line_height_rule = LineHeightRule::Auto;
+
+    apply_recovered_body_paragraph_defaults(&paragraph, &styles, &mut model);
+    assert_eq!(model.format.spacing_after_pt, 0.0);
+    assert!(!model.format.spacing_after_set);
+    assert_eq!(model.format.line_height_pt, None);
   }
 
   #[test]
@@ -31406,6 +32840,51 @@ mod tests {
       format.spacing_after_auto_pt,
       Some(OFFICE_FIXED_AUTOMATIC_PARAGRAPH_AFTER_PT)
     );
+  }
+
+  #[test]
+  fn line_unit_paragraph_spacing_preserves_the_absolute_hierarchy_fallback() {
+    let absolute_default = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:before="80" w:after="200"/></w:pPr>"#,
+    )
+    .expect("absolute paragraph spacing");
+    let nonzero_line_units = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:beforeLines="200" w:afterLines="100"/></w:pPr>"#,
+    )
+    .expect("line-unit paragraph spacing");
+    let later_absolute = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:before="40" w:after="60"/></w:pPr>"#,
+    )
+    .expect("later absolute paragraph spacing");
+    let zero_line_units = w::ParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:spacing w:beforeLines="0" w:afterLines="0"/></w:pPr>"#,
+    )
+    .expect("zero line-unit paragraph spacing");
+    let mut format = ParagraphFormat::default();
+
+    for properties in [&absolute_default, &nonzero_line_units, &later_absolute] {
+      merge_paragraph_format(
+        &mut format,
+        Some(ParagraphProps::Direct(properties)),
+        ImportSettings::default(),
+      );
+    }
+
+    assert_eq!(format.spacing_before_pt, 2.0);
+    assert_eq!(format.spacing_before_lines, Some(2.0));
+    assert_eq!(format.spacing_after_pt, 3.0);
+    assert_eq!(format.spacing_after_lines, Some(1.0));
+
+    merge_paragraph_format(
+      &mut format,
+      Some(ParagraphProps::Direct(&zero_line_units)),
+      ImportSettings::default(),
+    );
+
+    assert_eq!(format.spacing_before_pt, 2.0);
+    assert_eq!(format.spacing_before_lines, Some(0.0));
+    assert_eq!(format.spacing_after_pt, 3.0);
+    assert_eq!(format.spacing_after_lines, Some(0.0));
   }
 
   #[test]
@@ -31836,6 +33315,7 @@ mod tests {
     assert_eq!(run.text, "\u{f05e}");
     assert_eq!(run.style.font_family.as_deref(), Some("Symbol"));
     assert_eq!(run.style.symbol_font_family.as_deref(), Some("Symbol"));
+    assert!(run.style.explicit_symbol_character);
     assert_eq!(run.style.font_size_pt, 12.0);
   }
 
@@ -31845,6 +33325,7 @@ mod tests {
       .expect("supported Unicode symbol field");
 
     assert_eq!(run.text, "€");
+    assert!(!run.style.explicit_symbol_character);
     assert_eq!(run.style.font_size_pt, 18.0);
     assert_eq!(run.style.complex_font_size_pt, Some(18.0));
     assert!(symbol_field_run(r"SYMBOL 65 \h", TextStyle::default(), None).is_none());
@@ -32935,7 +34416,7 @@ mod tests {
   }
 
   #[test]
-  fn vml_shape_image_data_does_not_materialize_an_overpainting_fill() {
+  fn vml_shape_image_data_preserves_host_fill_and_stroke_layers() {
     let shape_type = v::Shapetype {
       id: Some("_x0000_t201".into()),
       filled: Some(true.into()),
@@ -32954,12 +34435,87 @@ mod tests {
     let inline = vml_shape_shape(&shape, &ImageCatalog::default(), &[&shape_type])
       .expect("VML image stroke shape");
 
-    assert_eq!(inline.fill_color, None);
-    assert!(inline.fill_override.is_none());
+    assert_eq!(
+      inline.fill_color,
+      Some(RgbColor {
+        r: u8::MAX,
+        g: u8::MAX,
+        b: u8::MAX,
+      })
+    );
+    assert!(matches!(
+      inline.fill_override.as_deref(),
+      Some(common::Fill::Solid(_))
+    ));
     assert_eq!(
       inline.stroke.as_ref().map(|stroke| stroke.color),
       Some(RgbColor { r: 255, g: 0, b: 0 })
     );
+  }
+
+  #[test]
+  fn vml_image_data_inherits_shapetype_geometry_without_duplicate_shape() {
+    let mut catalog = ImageCatalog::default();
+    catalog.by_relationship_id.insert(
+      "rId1".into(),
+      package::ImageResource {
+        data: vec![1, 2, 3].into(),
+        content_type: Some("image/png".into()),
+      },
+    );
+    let picture = w::Picture::from_bytes(
+      br##"<w:pict xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:v="urn:schemas-microsoft-com:vml"
+        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <v:shapetype id="_x0000_t75" coordsize="21600,21600" filled="t" stroked="t">
+          <v:formulas><v:f eqn="sum width 0 10800"/></v:formulas>
+          <v:path v="m0,0l@0,0,21600,21600,0,21600xe"/>
+        </v:shapetype>
+        <v:shape type="#_x0000_t75" style="width:72pt;height:36pt"
+          fillcolor="red" strokecolor="blue">
+          <v:imagedata r:id="rId1"/>
+        </v:shape>
+      </w:pict>"##,
+    )
+    .expect("VML picture with inherited host path");
+    let run = w::Run {
+      run_choice: vec![w::RunChoice::Picture(Box::new(picture))],
+      ..Default::default()
+    };
+    let mut inlines = Vec::new();
+
+    push_run(
+      &run,
+      &mut inlines,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &catalog,
+      &HyperlinkCatalog::default(),
+      None,
+    );
+
+    let [InlineItem::Image(image)] = inlines.as_slice() else {
+      panic!("resolved VML image must own its host shape instead of duplicating it");
+    };
+    assert!(!image.picture_frame_clips_image);
+    let frame = image.picture_frame.as_deref().expect("VML host shape");
+    assert_eq!(frame.fill_color, Some(RgbColor { r: 255, g: 0, b: 0 }));
+    assert_eq!(
+      frame.stroke.map(|stroke| stroke.color),
+      Some(RgbColor { r: 0, g: 0, b: 255 })
+    );
+    let InlineShapeGeometry::Path { paths, .. } = &frame.geometry else {
+      panic!("inherited shapetype path");
+    };
+    assert!(paths.iter().flat_map(|path| &path.commands).any(|command| {
+      matches!(
+        command,
+        common::PathCommand::LineTo(common::Point {
+          x: common::Pt(36.0),
+          y: common::Pt(0.0)
+        })
+      )
+    }));
   }
 
   #[test]
@@ -32991,11 +34547,23 @@ mod tests {
         ..Default::default()
       })));
 
-    let ordinary = shape_image(&ordinary_shape, &catalog).expect("ordinary VML metafile");
+    let ordinary = shape_image_with_style_and_shape_types(
+      &ordinary_shape,
+      ordinary_shape.style.as_deref(),
+      &catalog,
+      &[],
+    )
+    .expect("ordinary VML metafile");
     assert!(!ordinary.semantic_metafile_text);
     assert!(!ordinary.metafile_semantic_text_includes_raster_backdrop);
     assert!(ordinary.signature_line.is_none());
-    let signature = shape_image(&signature_shape, &catalog).expect("signature-line VML metafile");
+    let signature = shape_image_with_style_and_shape_types(
+      &signature_shape,
+      signature_shape.style.as_deref(),
+      &catalog,
+      &[],
+    )
+    .expect("signature-line VML metafile");
     assert!(signature.semantic_metafile_text);
     assert!(signature.metafile_semantic_text_includes_raster_backdrop);
     let properties = signature.signature_line.expect("signature-line metadata");
@@ -33041,7 +34609,9 @@ mod tests {
       ..Default::default()
     };
 
-    let image = shape_image(&shape, &catalog).expect("signed signature-line VML image");
+    let image =
+      shape_image_with_style_and_shape_types(&shape, shape.style.as_deref(), &catalog, &[])
+        .expect("signed signature-line VML image");
     assert_eq!(image.data.as_ref(), &[9, 8, 7]);
     assert_eq!(
       image
@@ -34155,6 +35725,7 @@ mod tests {
         custom_xml_bindings: &CustomXmlBindings::default(),
         form_widget_ids: &mut FormWidgetIdAllocator::default(),
         no_column_balance: false,
+        fixed_html_paragraph_auto_spacing: false,
       },
     );
 
@@ -34219,6 +35790,7 @@ mod tests {
         custom_xml_bindings: &CustomXmlBindings::default(),
         form_widget_ids: &mut FormWidgetIdAllocator::default(),
         no_column_balance: false,
+        fixed_html_paragraph_auto_spacing: false,
       },
     );
 
@@ -34285,6 +35857,7 @@ mod tests {
         custom_xml_bindings: &CustomXmlBindings::default(),
         form_widget_ids: &mut FormWidgetIdAllocator::default(),
         no_column_balance: false,
+        fixed_html_paragraph_auto_spacing: false,
       },
     );
 
@@ -34364,6 +35937,7 @@ mod tests {
         custom_xml_bindings: &CustomXmlBindings::default(),
         form_widget_ids: &mut FormWidgetIdAllocator::default(),
         no_column_balance: false,
+        fixed_html_paragraph_auto_spacing: false,
       },
     );
 
@@ -34768,6 +36342,7 @@ mod tests {
         custom_xml_bindings: &bindings,
         form_widget_ids: &mut form_widget_ids,
         no_column_balance: false,
+        fixed_html_paragraph_auto_spacing: false,
       },
     );
     let table = sections[0]
@@ -34816,6 +36391,7 @@ mod tests {
         custom_xml_bindings: &bindings,
         form_widget_ids: &mut form_widget_ids,
         no_column_balance: false,
+        fixed_html_paragraph_auto_spacing: false,
       },
     );
     let paragraphs = sections[0]
@@ -34861,6 +36437,7 @@ mod tests {
         custom_xml_bindings: &bindings,
         form_widget_ids: &mut form_widget_ids,
         no_column_balance: false,
+        fixed_html_paragraph_auto_spacing: false,
       },
     );
 

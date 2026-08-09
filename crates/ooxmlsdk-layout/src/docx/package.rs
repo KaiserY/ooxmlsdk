@@ -6,6 +6,7 @@ use base64::Engine;
 use olecfsdk::{
   cfb::CompoundFile,
   forms::{CommandButtonControl, LabelControl, MorphDataControl, TextProps},
+  ograph::{OgraphChart, OgraphFile},
 };
 use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
@@ -36,11 +37,18 @@ pub(super) struct ImageCatalog {
   pub(super) signed_signature_line_images_by_id: HashMap<String, SignatureLineImages>,
   pub(super) active_x_text_style_by_relationship_id: HashMap<String, ActiveXTextStyle>,
   pub(super) math_type_by_relationship_id: HashMap<String, super::math_type::MathTypeEquation>,
+  pub(super) ograph_charts_by_relationship_id: HashMap<String, OgraphChartResource>,
   pub(super) charts_by_relationship_id: HashMap<String, c::ChartSpace>,
   pub(super) extended_charts_by_relationship_id: HashMap<String, ExtendedChartResource>,
   pub(super) diagram_colors_by_relationship_id: HashMap<String, dgm::ColorsDefinition>,
   pub(super) diagram_data_by_relationship_id: HashMap<String, dgm::DataModelRoot>,
   pub(super) diagram_drawings_by_relationship_id: HashMap<String, dsp::Drawing>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct OgraphChartResource {
+  pub(super) chart: OgraphChart,
+  pub(super) chart_space: c::ChartSpace,
 }
 
 #[derive(Clone, Debug)]
@@ -376,7 +384,7 @@ fn active_x_property_bag_font(control: &ax::ActiveXControlData) -> Option<String
           .name
           .as_str()
           .eq_ignore_ascii_case("Name")
-          .then(|| property.value.as_ref())
+          .then_some(property.value.as_ref())
           .flatten()
       })
       && !value.as_str().trim().is_empty()
@@ -472,6 +480,21 @@ impl ImageCatalog {
         Some((related.relationship_id().to_string(), equation))
       })
       .collect();
+    catalog.ograph_charts_by_relationship_id = part
+      .related_parts_of_type::<_, EmbeddedObjectPart>(package)
+      .filter_map(|related| {
+        let data = related.part().data_to_vec(package)?;
+        let file = OgraphFile::from_bytes_compatible(&data).ok()?.value;
+        let chart = file.workbook.chart().ok()?;
+        Some((
+          related.relationship_id().to_string(),
+          OgraphChartResource {
+            chart_space: super::ograph::chart_space(&chart),
+            chart,
+          },
+        ))
+      })
+      .collect();
 
     let chart_parts = part
       .related_parts_of_type::<_, ChartPart>(package)
@@ -537,6 +560,7 @@ impl ImageCatalog {
       signed_signature_line_images_by_id: HashMap::new(),
       active_x_text_style_by_relationship_id: HashMap::new(),
       math_type_by_relationship_id: HashMap::new(),
+      ograph_charts_by_relationship_id: HashMap::new(),
       charts_by_relationship_id: HashMap::new(),
       extended_charts_by_relationship_id: HashMap::new(),
       diagram_colors_by_relationship_id: HashMap::new(),

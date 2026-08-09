@@ -81,19 +81,38 @@ pub(crate) enum LegacyTextRelief {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
   pub font_family: Option<Arc<str>>,
+  /// Effective WordprocessingML `w:rFonts/@w:hAnsi` face. Word classifies
+  /// this slot independently from ASCII even when both usually resolve to
+  /// the same theme face.
+  pub high_ansi_font_family: Option<Arc<str>>,
   pub fallback_font_family: Option<Arc<str>>,
+  pub high_ansi_fallback_font_family: Option<Arc<str>>,
+  pub east_asia_fallback_font_family: Option<Arc<str>>,
+  pub complex_fallback_font_family: Option<Arc<str>>,
   /// OOXML font-table family classification used when the named face and its
   /// explicit alternate names are unavailable.
   pub font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  pub high_ansi_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  pub east_asia_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  pub complex_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   pub east_asia_font_family: Option<Arc<str>>,
   pub complex_font_family: Option<Arc<str>>,
   pub symbol_font_family: Option<Arc<str>>,
+  /// This text was authored through an explicit OOXML symbol-character
+  /// transport (`w:sym`, a Word SYMBOL field, a symbol numbering level, or a
+  /// DrawingML symbol segment). A resolved symbol face may therefore retain
+  /// its visible `.notdef` glyph when the requested legacy code is absent.
+  pub explicit_symbol_character: bool,
   /// Resolved WordprocessingML `w:lang/@w:val` language tag.
   pub language: Option<Arc<str>>,
   /// Resolved WordprocessingML `w:lang/@w:eastAsia` language tag.
   pub east_asia_language: Option<Arc<str>>,
   /// Resolved WordprocessingML `w:lang/@w:bidi` language tag.
   pub bidi_language: Option<Arc<str>>,
+  /// Effective WordprocessingML `w:rFonts/@w:hint` for ambiguous font slots.
+  pub wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
+  /// Character set declared by the effective East Asian font-table entry.
+  pub east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   pub font_size_pt: f32,
   pub complex_font_size_pt: Option<f32>,
   /// Complex-script formatting selected by WordprocessingML `w:cs`.
@@ -204,14 +223,24 @@ impl Default for TextStyle {
   fn default() -> Self {
     Self {
       font_family: None,
+      high_ansi_font_family: None,
       fallback_font_family: None,
+      high_ansi_fallback_font_family: None,
+      east_asia_fallback_font_family: None,
+      complex_fallback_font_family: None,
       font_family_class: None,
+      high_ansi_font_family_class: None,
+      east_asia_font_family_class: None,
+      complex_font_family_class: None,
       east_asia_font_family: None,
       complex_font_family: None,
       symbol_font_family: None,
+      explicit_symbol_character: false,
       language: None,
       east_asia_language: None,
       bidi_language: None,
+      wordprocessingml_font_hint: None,
+      east_asia_font_charset: None,
       font_size_pt: 11.0,
       complex_font_size_pt: None,
       complex_script: None,
@@ -431,7 +460,7 @@ pub(crate) struct TextItem {
   pub paint_clip: Option<common::Rect>,
   pub discard_if_horizontally_clipped: bool,
   pub text: String,
-  pub style: TextStyle,
+  pub style: Box<TextStyle>,
   pub rotation_center_pt: Option<(f32, f32)>,
   pub hyperlink_url: Option<String>,
   pub form_widget_id: Option<u32>,
@@ -547,9 +576,25 @@ pub(crate) fn common_page_setup(setup: PageSetup) -> common::PageSetup {
 pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> {
   common::TextStyle {
     font_family: style.font_family.map(|value| Cow::Owned(value.to_string())),
+    high_ansi_font_family: style
+      .high_ansi_font_family
+      .map(|value| Cow::Owned(value.to_string())),
     fallback_font_family: style
       .fallback_font_family
       .map(|value| Cow::Owned(value.to_string())),
+    high_ansi_fallback_font_family: style
+      .high_ansi_fallback_font_family
+      .map(|value| Cow::Owned(value.to_string())),
+    east_asia_fallback_font_family: style
+      .east_asia_fallback_font_family
+      .map(|value| Cow::Owned(value.to_string())),
+    complex_fallback_font_family: style
+      .complex_fallback_font_family
+      .map(|value| Cow::Owned(value.to_string())),
+    font_family_class: style.font_family_class,
+    high_ansi_font_family_class: style.high_ansi_font_family_class,
+    east_asia_font_family_class: style.east_asia_font_family_class,
+    complex_font_family_class: style.complex_font_family_class,
     east_asia_font_family: style
       .east_asia_font_family
       .map(|value| Cow::Owned(value.to_string())),
@@ -559,6 +604,14 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     symbol_font_family: style
       .symbol_font_family
       .map(|value| Cow::Owned(value.to_string())),
+    explicit_symbol_character: style.explicit_symbol_character,
+    wordprocessingml_font_hint: style.wordprocessingml_font_hint,
+    wordprocessingml_east_asia_language_is_chinese: style
+      .east_asia_language
+      .as_deref()
+      .and_then(|language| language.split(['-', '_']).next())
+      .is_some_and(|language| language.eq_ignore_ascii_case("zh")),
+    wordprocessingml_east_asia_font_charset: style.east_asia_font_charset,
     font_size: common::Pt(style.font_size_pt),
     complex_font_size: style.complex_font_size_pt.map(common::Pt),
     complex_script: style.complex_script,

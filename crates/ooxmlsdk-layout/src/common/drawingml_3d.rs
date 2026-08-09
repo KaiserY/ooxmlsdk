@@ -1204,17 +1204,6 @@ fn apply_static_3d_impl(
         );
       }
     }
-    shade_planar_surface(
-      &mut front_face,
-      scene,
-      projection,
-      model_surface,
-      pixels_per_point,
-      planar_front_z_px,
-      [0.0, 0.0, 1.0],
-      shape.preset_material,
-      text_geometry.is_some(),
-    );
     let options = ProjectedImageOptions {
       projection,
       z: planar_front_z_px,
@@ -1223,6 +1212,14 @@ fn apply_static_3d_impl(
       pixels_per_point,
       tint: None,
     };
+    shade_planar_surface(
+      &mut front_face,
+      scene,
+      &options,
+      [0.0, 0.0, 1.0],
+      shape.preset_material,
+      text_geometry.is_some(),
+    );
     if let Some(geometry) = text_geometry {
       let planar_geometry = text_planar_geometry.as_ref().unwrap_or(geometry);
       let mut solid = RgbaImage::new(image.width(), image.height());
@@ -2407,35 +2404,36 @@ struct ProjectedImageOptions {
 fn shade_planar_surface(
   image: &mut RgbaImage,
   scene: &a::Scene3DType,
-  projection: Static3dProjection,
-  model_surface: Static3dSurface,
-  pixels_per_point: f32,
-  z: f32,
+  options: &ProjectedImageOptions,
   model_normal: [f32; 3],
   material: Option<a::PresetMaterialTypeValues>,
   word_text_lighting: bool,
 ) {
-  let normal = lighting_surface_normal(scene, projection, model_normal);
+  let normal = lighting_surface_normal(scene, options.projection, model_normal);
   let shade = if word_text_lighting {
     material_diffuse_shade(scene, normal, material)
   } else {
     legacy_material_diffuse_shade(scene, normal, material)
   };
-  let center_x = model_surface.left_px + model_surface.width_px * 0.5;
-  let center_y = model_surface.top_px + model_surface.height_px * 0.5;
-  let width = model_surface.width_px.max(1.0);
-  let height = model_surface.height_px.max(1.0);
+  let center_x = options.model_surface.left_px + options.model_surface.width_px * 0.5;
+  let center_y = options.model_surface.top_px + options.model_surface.height_px * 0.5;
+  let width = options.model_surface.width_px.max(1.0);
+  let height = options.model_surface.height_px.max(1.0);
   for (x, y, pixel) in image.enumerate_pixels_mut() {
     if pixel[3] == 0 {
       continue;
     }
     let view_direction = surface_view_direction(
       scene,
-      projection,
-      [x as f32 + 0.5 - center_x, y as f32 + 0.5 - center_y, z],
+      options.projection,
+      [
+        x as f32 + 0.5 - center_x,
+        y as f32 + 0.5 - center_y,
+        options.z,
+      ],
       width,
       height,
-      pixels_per_point,
+      options.pixels_per_point,
     );
     let specular = if word_text_lighting {
       light_rig_surface_specular(scene, normal, view_direction, material)
@@ -3830,8 +3828,8 @@ fn composite_text_solid_surfaces(
         }
         let alpha = (sample.color[3] / 255.0).clamp(0.0, 1.0);
         alpha_sum += alpha;
-        for channel in 0..3 {
-          premultiplied[channel] += sample.color[channel].clamp(0.0, 255.0) * alpha;
+        for (accumulator, channel) in premultiplied.iter_mut().zip(&sample.color) {
+          *accumulator += channel.clamp(0.0, 255.0) * alpha;
         }
       }
       if alpha_sum <= f32::EPSILON {
@@ -4052,9 +4050,12 @@ fn bevel_distance_field(source: &RgbaImage, width: i32) -> Vec<f32> {
 
   for y in 0..padded_height {
     for (x, value) in input[..padded_width].iter_mut().enumerate() {
-      *value = if x == 0 || y == 0 || x + 1 == padded_width || y + 1 == padded_height {
-        0.0
-      } else if source.get_pixel((x - 1) as u32, (y - 1) as u32)[3] == 0 {
+      *value = if x == 0
+        || y == 0
+        || x + 1 == padded_width
+        || y + 1 == padded_height
+        || source.get_pixel((x - 1) as u32, (y - 1) as u32)[3] == 0
+      {
         0.0
       } else {
         maximum_squared_distance
@@ -4754,11 +4755,11 @@ mod tests {
   #[test]
   fn circle_bevel_outer_edge_receives_full_material_lighting() {
     let mut scene = scene(a::PresetCameraValues::OrthographicFront);
-    scene.light_rig = Box::new(a::LightRig {
+    *scene.light_rig = a::LightRig {
       rig: a::LightRigValues::Harsh,
       direction: a::LightRigDirectionValues::Top,
       ..a::LightRig::default()
-    });
+    };
     let source = RgbaImage::from_pixel(9, 9, Rgba([200, 200, 200, 255]));
     let mut bevel = RgbaImage::new(9, 9);
     let projection = camera_projection(&scene, 0.0);

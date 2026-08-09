@@ -1003,6 +1003,10 @@ pub(crate) fn vml_line_model(shape: &vml::Line) -> VmlShapeModel {
   model
 }
 
+pub(crate) fn vml_image_file_model(shape: &vml::ImageFile) -> VmlShapeModel {
+  vml_shape_from_typed(shape, VmlShapeKind::Image)
+}
+
 pub(crate) fn vml_oval_model(shape: &vml::Oval) -> VmlShapeModel {
   let mut model = vml_shape_from_typed(shape, VmlShapeKind::Oval);
   model.coordinate_origin.clone_from(&shape.coordinate_origin);

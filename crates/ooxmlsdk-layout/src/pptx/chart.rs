@@ -101,6 +101,7 @@ pub(crate) struct ClusteredColumnStyle {
   /// per surface plot-area group.
   pub surface_band_colors: Vec<Vec<(u32, RgbColor)>>,
   pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,
+  pub legend_frame_style: crate::common::ShapeStyle<'static>,
   pub chart_area_style: crate::common::ShapeStyle<'static>,
   pub plot_area_style: crate::common::ShapeStyle<'static>,
   /// Host-resolved formatting for the three authored c:chart 3-D planes.
@@ -260,6 +261,7 @@ pub(crate) struct RadialChartStyle {
   pub point_styles: Vec<crate::common::ShapeStyle<'static>>,
   pub data_label_fill_colors: Vec<Option<RgbColor>>,
   pub leader_line_style: crate::common::ShapeStyle<'static>,
+  pub legend_frame_style: crate::common::ShapeStyle<'static>,
   pub chart_area_style: crate::common::ShapeStyle<'static>,
   pub plot_area_style: crate::common::ShapeStyle<'static>,
 }
@@ -1799,9 +1801,9 @@ pub(crate) fn lower_clustered_column_chart(
   let maximum_auto_value_increment_count =
     if style.layout_profile == ChartLayoutProfile::PowerPoint && radar_only {
       5
-    } else if style.layout_profile == ChartLayoutProfile::PowerPoint && horizontal_bar_only {
-      maximum_auto_increment_count.min(5)
-    } else if radar_only {
+    } else if (style.layout_profile == ChartLayoutProfile::PowerPoint && horizontal_bar_only)
+      || radar_only
+    {
       maximum_auto_increment_count.min(5)
     } else {
       maximum_auto_increment_count
@@ -1988,14 +1990,18 @@ pub(crate) fn lower_clustered_column_chart(
     .max(0.0);
   push_chart_shape_rect(
     &mut items,
-    frame.x_pt,
-    frame.y_pt,
-    frame.width_pt,
-    chart_area_height,
-    Some(&style.chart_area_style.fill),
-    None,
-    None,
-    1.0,
+    PlotRect {
+      left: frame.x_pt,
+      top: frame.y_pt,
+      width: frame.width_pt,
+      height: chart_area_height,
+    },
+    ChartShapePaint {
+      fill: Some(&style.chart_area_style.fill),
+      stroke: None,
+      fallback_fill_color: None,
+      stroke_width_scale: 1.0,
+    },
   );
   let (outline_x, outline_y, outline_width, outline_height) = if style.layout_profile
     == ChartLayoutProfile::Excel
@@ -2016,14 +2022,18 @@ pub(crate) fn lower_clustered_column_chart(
   };
   push_chart_shape_rect(
     &mut items,
-    outline_x,
-    outline_y,
-    outline_width,
-    outline_height,
-    None,
-    Some(&style.chart_area_style.stroke),
-    None,
-    1.0,
+    PlotRect {
+      left: outline_x,
+      top: outline_y,
+      width: outline_width,
+      height: outline_height,
+    },
+    ChartShapePaint {
+      fill: None,
+      stroke: Some(&style.chart_area_style.stroke),
+      fallback_fill_color: None,
+      stroke_width_scale: 1.0,
+    },
   );
   if let Some(projection) = projection_3d {
     lower_cartesian_3d_walls(
@@ -2040,14 +2050,18 @@ pub(crate) fn lower_clustered_column_chart(
   } else {
     push_chart_shape_rect(
       &mut items,
-      plot_left,
-      plot_top,
-      plot_width,
-      plot_height,
-      Some(&style.plot_area_style.fill),
-      Some(&style.plot_area_style.stroke),
-      None,
-      1.0,
+      PlotRect {
+        left: plot_left,
+        top: plot_top,
+        width: plot_width,
+        height: plot_height,
+      },
+      ChartShapePaint {
+        fill: Some(&style.plot_area_style.fill),
+        stroke: Some(&style.plot_area_style.stroke),
+        fallback_fill_color: None,
+        stroke_width_scale: 1.0,
+      },
     );
   }
   if value_gridlines_visible {
@@ -2211,17 +2225,19 @@ pub(crate) fn lower_clustered_column_chart(
     lower_scatter_x_axis(
       &mut items,
       chart,
-      PlotRect {
-        left: plot_left,
-        top: plot_top,
-        width: plot_width,
-        height: plot_height,
+      ScatterAxisGeometry {
+        plot: PlotRect {
+          left: plot_left,
+          top: plot_top,
+          width: plot_width,
+          height: plot_height,
+        },
+        scale: horizontal_scale,
+        draw_gridlines: true,
+        draw_labels: false,
       },
-      horizontal_scale,
       style,
       &mut metrics,
-      true,
-      false,
     );
   }
 
@@ -2668,12 +2684,13 @@ pub(crate) fn lower_clustered_column_chart(
       push_data_label_text_components(
         target,
         &mut metrics,
-        x,
-        y,
-        label,
-        data_label_style,
-        rich_text_styles,
-        text_frame,
+        DataLabelTextLayout {
+          origin: (x, y),
+          label,
+          style: data_label_style,
+          rich_text_styles,
+          text_frame,
+        },
       );
     }
   }
@@ -2785,17 +2802,19 @@ pub(crate) fn lower_clustered_column_chart(
     lower_scatter_x_axis(
       &mut items,
       chart,
-      PlotRect {
-        left: plot_left,
-        top: plot_top,
-        width: plot_width,
-        height: plot_height,
+      ScatterAxisGeometry {
+        plot: PlotRect {
+          left: plot_left,
+          top: plot_top,
+          width: plot_width,
+          height: plot_height,
+        },
+        scale: horizontal_scale,
+        draw_gridlines: false,
+        draw_labels: true,
       },
-      horizontal_scale,
       style,
       &mut metrics,
-      false,
-      true,
     );
   }
   let mut painted_category_label_style = style.category_label.clone();
@@ -3200,28 +3219,32 @@ pub(crate) fn lower_clustered_column_chart(
     match legend_position {
       Some(ChartLegendPosition::Bottom) => lower_horizontal_legend(
         &mut items,
-        frame,
-        tick_left,
-        legend_top,
         chart,
         style,
-        scale,
+        HorizontalLegendGeometry {
+          frame,
+          available_left: tick_left,
+          y: legend_top,
+          scale,
+        },
         &mut metrics,
       ),
       Some(ChartLegendPosition::Top) => lower_horizontal_legend(
         &mut items,
-        frame,
-        frame.x_pt + frame.height_pt * profiles::TOP_LEGEND_LEFT_INSET_RATIO,
-        if has_layout_title {
-          title_top
-            + title_line_height
-            + frame.height_pt * host_defaults.titled_top_legend_gap_ratio
-        } else {
-          frame.y_pt + frame.height_pt * profiles::UNTITLED_TOP_LEGEND_TOP_RATIO
-        },
         chart,
         style,
-        scale,
+        HorizontalLegendGeometry {
+          frame,
+          available_left: frame.x_pt + frame.height_pt * profiles::TOP_LEGEND_LEFT_INSET_RATIO,
+          y: if has_layout_title {
+            title_top
+              + title_line_height
+              + frame.height_pt * host_defaults.titled_top_legend_gap_ratio
+          } else {
+            frame.y_pt + frame.height_pt * profiles::UNTITLED_TOP_LEGEND_TOP_RATIO
+          },
+          scale,
+        },
         &mut metrics,
       ),
       Some(ChartLegendPosition::Left) => lower_vertical_legend(
@@ -3601,33 +3624,83 @@ fn chart_style_stroke_fallback(style: &crate::common::ShapeStyle<'_>) -> Option<
   }
 }
 
-fn push_chart_shape_rect(
+#[derive(Clone, Copy)]
+struct LegendFrameMetrics {
+  horizontal_padding: f32,
+  vertical_padding: f32,
+  horizontal_entry_offset: f32,
+  vertical_entry_offset: f32,
+  symbol_to_text: f32,
+  symbol_height: f32,
+}
+
+fn legend_frame_metrics(font_size_pt: f32) -> LegendFrameMetrics {
+  // LibreOffice chart2/source/view/main/VLegend.cxx derives automatic legend
+  // geometry from these font-relative values, each with a 1 mm interop floor.
+  let millimeter_pt: f32 = 72.0 / 25.4;
+  LegendFrameMetrics {
+    horizontal_padding: millimeter_pt.max(font_size_pt * 0.33),
+    vertical_padding: millimeter_pt.max(font_size_pt * 0.2),
+    horizontal_entry_offset: millimeter_pt.max(font_size_pt * 0.66),
+    vertical_entry_offset: millimeter_pt.max(font_size_pt * 0.2),
+    symbol_to_text: millimeter_pt.max(font_size_pt * 0.22),
+    symbol_height: font_size_pt * 0.6,
+  }
+}
+
+fn legend_frame_has_paint(style: &crate::common::ShapeStyle<'_>) -> bool {
+  matches!(style.fill, crate::common::ShapeStyleValue::Paint(_))
+    || matches!(style.stroke, crate::common::ShapeStyleValue::Paint(_))
+}
+
+fn push_legend_frame(
   items: &mut Vec<PageItem>,
-  x_pt: f32,
-  y_pt: f32,
-  width_pt: f32,
-  height_pt: f32,
-  fill: Option<&crate::common::ShapeStyleValue<crate::common::Fill<'static>>>,
-  stroke: Option<&crate::common::ShapeStyleValue<crate::common::Stroke<'static>>>,
-  fallback_fill_color: Option<RgbColor>,
+  bounds: PlotRect,
+  style: &crate::common::ShapeStyle<'static>,
   stroke_width_scale: f32,
 ) {
-  if width_pt <= 0.0 || height_pt <= 0.0 {
+  if !legend_frame_has_paint(style) {
     return;
   }
-  let bounds = common_rect(x_pt, y_pt, width_pt, height_pt);
-  let fill = match fill {
-    Some(crate::common::ShapeStyleValue::Paint(fill)) => bind_chart_fill_to_bounds(fill, bounds),
+  push_chart_shape_rect(
+    items,
+    bounds,
+    ChartShapePaint {
+      fill: Some(&style.fill),
+      stroke: Some(&style.stroke),
+      fallback_fill_color: None,
+      stroke_width_scale,
+    },
+  );
+}
+
+struct ChartShapePaint<'a> {
+  fill: Option<&'a crate::common::ShapeStyleValue<crate::common::Fill<'static>>>,
+  stroke: Option<&'a crate::common::ShapeStyleValue<crate::common::Stroke<'static>>>,
+  fallback_fill_color: Option<RgbColor>,
+  stroke_width_scale: f32,
+}
+
+fn push_chart_shape_rect(items: &mut Vec<PageItem>, bounds: PlotRect, paint: ChartShapePaint<'_>) {
+  if bounds.width <= 0.0 || bounds.height <= 0.0 {
+    return;
+  }
+  let path_bounds = common_rect(bounds.left, bounds.top, bounds.width, bounds.height);
+  let fill = match paint.fill {
+    Some(crate::common::ShapeStyleValue::Paint(fill)) => {
+      bind_chart_fill_to_bounds(fill, path_bounds)
+    }
     Some(crate::common::ShapeStyleValue::NoPaint) => crate::common::Fill::None,
-    Some(crate::common::ShapeStyleValue::Unspecified) | None => fallback_fill_color
+    Some(crate::common::ShapeStyleValue::Unspecified) | None => paint
+      .fallback_fill_color
       .map(|color| crate::common::Fill::Solid(common_rgb(color, 1.0)))
       .unwrap_or(crate::common::Fill::None),
   };
-  let stroke = match stroke {
+  let stroke = match paint.stroke {
     Some(crate::common::ShapeStyleValue::Paint(stroke)) => Some(bind_chart_stroke_to_bounds(
       stroke,
-      bounds,
-      stroke_width_scale,
+      path_bounds,
+      paint.stroke_width_scale,
     )),
     Some(crate::common::ShapeStyleValue::NoPaint | crate::common::ShapeStyleValue::Unspecified)
     | None => None,
@@ -3636,12 +3709,12 @@ fn push_chart_shape_rect(
     return;
   }
   items.push(PageItem::Path(crate::common::PathItem {
-    bounds,
+    bounds: path_bounds,
     points: vec![
-      common_point(x_pt, y_pt),
-      common_point(x_pt + width_pt, y_pt),
-      common_point(x_pt + width_pt, y_pt + height_pt),
-      common_point(x_pt, y_pt + height_pt),
+      common_point(bounds.left, bounds.top),
+      common_point(bounds.left + bounds.width, bounds.top),
+      common_point(bounds.left + bounds.width, bounds.top + bounds.height),
+      common_point(bounds.left, bounds.top + bounds.height),
     ],
     commands: Vec::new(),
     closed: true,
@@ -3652,32 +3725,30 @@ fn push_chart_shape_rect(
 
 fn push_chart_shape_ellipse(
   items: &mut Vec<PageItem>,
-  center_x_pt: f32,
-  center_y_pt: f32,
+  center: (f32, f32),
   diameter_pt: f32,
-  fill: Option<&crate::common::ShapeStyleValue<crate::common::Fill<'static>>>,
-  stroke: Option<&crate::common::ShapeStyleValue<crate::common::Stroke<'static>>>,
-  fallback_fill_color: Option<RgbColor>,
-  stroke_width_scale: f32,
+  paint: ChartShapePaint<'_>,
 ) {
   if diameter_pt <= 0.0 {
     return;
   }
+  let (center_x_pt, center_y_pt) = center;
   let left = center_x_pt - diameter_pt * 0.5;
   let top = center_y_pt - diameter_pt * 0.5;
   let bounds = common_rect(left, top, diameter_pt, diameter_pt);
-  let fill = match fill {
+  let fill = match paint.fill {
     Some(crate::common::ShapeStyleValue::Paint(fill)) => bind_chart_fill_to_bounds(fill, bounds),
     Some(crate::common::ShapeStyleValue::NoPaint) => crate::common::Fill::None,
-    Some(crate::common::ShapeStyleValue::Unspecified) | None => fallback_fill_color
+    Some(crate::common::ShapeStyleValue::Unspecified) | None => paint
+      .fallback_fill_color
       .map(|color| crate::common::Fill::Solid(common_rgb(color, 1.0)))
       .unwrap_or(crate::common::Fill::None),
   };
-  let stroke = match stroke {
+  let stroke = match paint.stroke {
     Some(crate::common::ShapeStyleValue::Paint(stroke)) => Some(bind_chart_stroke_to_bounds(
       stroke,
       bounds,
-      stroke_width_scale,
+      paint.stroke_width_scale,
     )),
     Some(crate::common::ShapeStyleValue::NoPaint | crate::common::ShapeStyleValue::Unspecified)
     | None => None,
@@ -4068,25 +4139,28 @@ pub(crate) fn lower_radial_chart(
   let mut items = Vec::new();
   push_chart_shape_rect(
     &mut items,
-    frame.x_pt,
-    frame.y_pt,
-    frame.width_pt,
-    frame.height_pt,
-    Some(&style.chart_area_style.fill),
-    Some(&style.chart_area_style.stroke),
-    None,
-    1.0,
+    PlotRect {
+      left: frame.x_pt,
+      top: frame.y_pt,
+      width: frame.width_pt,
+      height: frame.height_pt,
+    },
+    ChartShapePaint {
+      fill: Some(&style.chart_area_style.fill),
+      stroke: Some(&style.chart_area_style.stroke),
+      fallback_fill_color: None,
+      stroke_width_scale: 1.0,
+    },
   );
   push_chart_shape_rect(
     &mut items,
-    plot.left,
-    plot.top,
-    plot.width,
-    plot.height,
-    Some(&style.plot_area_style.fill),
-    Some(&style.plot_area_style.stroke),
-    None,
-    1.0,
+    plot,
+    ChartShapePaint {
+      fill: Some(&style.plot_area_style.fill),
+      stroke: Some(&style.plot_area_style.stroke),
+      fallback_fill_color: None,
+      stroke_width_scale: 1.0,
+    },
   );
   let mut start_angle = chart.first_slice_angle_deg.to_radians() as f32;
 
@@ -4212,20 +4286,20 @@ pub(crate) fn lower_radial_chart(
       }
     }
     for slice in slices {
-      items.push(radial_segment_path(
-        slice.center,
-        (radius_x, radius_y),
+      items.push(radial_segment_path(RadialSegmentSpec {
+        center: slice.center,
+        radii: (radius_x, radius_y),
         hole_ratio,
-        (slice.start_angle, slice.sweep),
-        (slice.color, 1.0),
-        chart.kind != RadialChartKind::Pie3D,
-        style.point_styles.get(slice.index),
-        (chart.kind == RadialChartKind::Pie3D).then(|| {
+        angles: (slice.start_angle, slice.sweep),
+        paint: (slice.color, 1.0),
+        stroke_outline: chart.kind != RadialChartKind::Pie3D,
+        style: style.point_styles.get(slice.index),
+        perspective: (chart.kind == RadialChartKind::Pie3D).then(|| {
           RadialPerspectiveProjection::new(slice.center, (radius_x, radius_y), view_3d)
             .with_strength_scale(projected_scene_scale)
             .with_plane_offset(slice.perspective_plane_offset)
         }),
-      ));
+      }));
     }
   }
 
@@ -4418,12 +4492,13 @@ pub(crate) fn lower_radial_chart(
     push_data_label_text_components(
       &mut items,
       &mut metrics,
-      label_x,
-      label_y,
-      label,
-      data_label_style,
-      rich_text_styles,
-      text_frame,
+      DataLabelTextLayout {
+        origin: (label_x, label_y),
+        label,
+        style: data_label_style,
+        rich_text_styles,
+        text_frame,
+      },
     );
   }
 
@@ -5002,16 +5077,16 @@ fn lower_of_pie_geometry(
   let mut angle = initial_angle;
   for (index, value) in primary {
     let sweep = (value / primary_total * std::f64::consts::TAU) as f32;
-    items.push(radial_segment_path(
-      primary_center,
-      (primary_radius, primary_radius),
-      0.0,
-      (angle, sweep),
-      (style.point_colors[index % style.point_colors.len()], 1.0),
-      style.layout_profile != ChartLayoutProfile::Excel,
-      style.point_styles.get(index),
-      None,
-    ));
+    items.push(radial_segment_path(RadialSegmentSpec {
+      center: primary_center,
+      radii: (primary_radius, primary_radius),
+      hole_ratio: 0.0,
+      angles: (angle, sweep),
+      paint: (style.point_colors[index % style.point_colors.len()], 1.0),
+      stroke_outline: style.layout_profile != ChartLayoutProfile::Excel,
+      style: style.point_styles.get(index),
+      perspective: None,
+    }));
     angle += sweep;
   }
 
@@ -5035,16 +5110,16 @@ fn lower_of_pie_geometry(
         continue;
       };
       let sweep = (value / secondary * std::f64::consts::TAU) as f32;
-      items.push(radial_segment_path(
-        secondary_center,
-        (secondary_radius, secondary_radius),
-        0.0,
-        (angle, sweep),
-        (style.point_colors[index % style.point_colors.len()], 1.0),
-        style.layout_profile != ChartLayoutProfile::Excel,
-        style.point_styles.get(index),
-        None,
-      ));
+      items.push(radial_segment_path(RadialSegmentSpec {
+        center: secondary_center,
+        radii: (secondary_radius, secondary_radius),
+        hole_ratio: 0.0,
+        angles: (angle, sweep),
+        paint: (style.point_colors[index % style.point_colors.len()], 1.0),
+        stroke_outline: style.layout_profile != ChartLayoutProfile::Excel,
+        style: style.point_styles.get(index),
+        perspective: None,
+      }));
       angle += sweep;
     }
   } else {
@@ -5063,14 +5138,18 @@ fn lower_of_pie_geometry(
       let point_style = style.point_styles.get(index);
       push_chart_shape_rect(
         items,
-        secondary_center.0 - secondary_radius * 0.45,
-        y,
-        secondary_radius,
-        height,
-        point_style.map(|style| &style.fill),
-        point_style.map(|style| &style.stroke),
-        Some(style.point_colors[index % style.point_colors.len()]),
-        1.0,
+        PlotRect {
+          left: secondary_center.0 - secondary_radius * 0.45,
+          top: y,
+          width: secondary_radius,
+          height,
+        },
+        ChartShapePaint {
+          fill: point_style.map(|style| &style.fill),
+          stroke: point_style.map(|style| &style.stroke),
+          fallback_fill_color: Some(style.point_colors[index % style.point_colors.len()]),
+          stroke_width_scale: 1.0,
+        },
       );
       y += height;
     }
@@ -5165,16 +5244,28 @@ impl RadialPerspectiveProjection {
   }
 }
 
-fn radial_segment_path(
+struct RadialSegmentSpec<'a> {
   center: (f32, f32),
   radii: (f32, f32),
   hole_ratio: f32,
   angles: (f32, f32),
   paint: (RgbColor, f32),
   stroke_outline: bool,
-  style: Option<&crate::common::ShapeStyle<'static>>,
+  style: Option<&'a crate::common::ShapeStyle<'static>>,
   perspective: Option<RadialPerspectiveProjection>,
-) -> PageItem {
+}
+
+fn radial_segment_path(spec: RadialSegmentSpec<'_>) -> PageItem {
+  let RadialSegmentSpec {
+    center,
+    radii,
+    hole_ratio,
+    angles,
+    paint,
+    stroke_outline,
+    style,
+    perspective,
+  } = spec;
   let (center_x, center_y) = center;
   let (radius_x, radius_y) = radii;
   let (start_angle, sweep) = angles;
@@ -5414,8 +5505,18 @@ fn lower_radial_legend(
     return;
   };
   let host_defaults = radial_host_defaults(style.layout_profile);
-  let marker = style.legend.font_size_pt * host_defaults.legend_marker_em;
-  let gap = style.legend.font_size_pt * host_defaults.legend_marker_gap_em;
+  let framed = legend_frame_has_paint(&style.legend_frame_style);
+  let frame_metrics = legend_frame_metrics(style.legend.font_size_pt);
+  let marker = if framed {
+    frame_metrics.symbol_height
+  } else {
+    style.legend.font_size_pt * host_defaults.legend_marker_em
+  };
+  let gap = if framed {
+    frame_metrics.symbol_to_text
+  } else {
+    style.legend.font_size_pt * host_defaults.legend_marker_gap_em
+  };
   if let Some(layout) = chart.legend_layout {
     let automatic = PlotRect {
       left: if position == ChartLegendPosition::Left {
@@ -5433,6 +5534,17 @@ fn lower_radial_legend(
     }
 
     if layout.width.is_some() && layout.height.is_some() {
+      push_legend_frame(items, bounds, &style.legend_frame_style, 1.0);
+      let bounds = if framed {
+        PlotRect {
+          left: bounds.left + frame_metrics.horizontal_padding,
+          top: bounds.top + frame_metrics.vertical_padding,
+          width: (bounds.width - frame_metrics.horizontal_padding * 2.0).max(0.0),
+          height: (bounds.height - frame_metrics.vertical_padding * 2.0).max(0.0),
+        }
+      } else {
+        bounds
+      };
       // LibreOffice VLegend::lcl_placeLegendEntries treats an authored-size
       // legend as a custom grid: the legend text owns a maximum frame width,
       // words wrap inside its DrawingML body insets, overflowing rows are
@@ -5501,20 +5613,59 @@ fn lower_radial_legend(
       return;
     }
 
-    let mut y = bounds.top;
+    let visible_entries = chart
+      .visible_legend_indices
+      .iter()
+      .filter_map(|index| chart.categories.get(*index))
+      .collect::<Vec<_>>();
+    let automatic_width = visible_entries
+      .iter()
+      .map(|text| marker + gap + metrics.measure_text(text, &style.legend))
+      .fold(0.0_f32, f32::max);
+    let automatic_height = line_height(&style.legend) * visible_entries.len() as f32
+      + frame_metrics.vertical_entry_offset * visible_entries.len().saturating_sub(1) as f32;
+    let frame_bounds = PlotRect {
+      left: bounds.left,
+      top: bounds.top,
+      width: layout.width.map_or(
+        automatic_width + frame_metrics.horizontal_padding * 2.0,
+        |_| bounds.width,
+      ),
+      height: layout.height.map_or(
+        automatic_height + frame_metrics.vertical_padding * 2.0,
+        |_| bounds.height,
+      ),
+    };
+    push_legend_frame(items, frame_bounds, &style.legend_frame_style, 1.0);
+    let content_left = frame_bounds.left
+      + if framed {
+        frame_metrics.horizontal_padding
+      } else {
+        0.0
+      };
+    let mut y = frame_bounds.top
+      + if framed {
+        frame_metrics.vertical_padding
+      } else {
+        0.0
+      };
     for index in chart.visible_legend_indices.iter().copied() {
       let Some(text) = chart.categories.get(index) else {
         continue;
       };
-      push_radial_legend_key(items, bounds.left, y, marker, index, style);
+      push_radial_legend_key(items, content_left, y, marker, index, style);
       push_text(
         items,
-        bounds.left + marker + gap,
+        content_left + marker + gap,
         y - (line_height(&style.legend) - marker) * 0.5,
         text.clone(),
         style.legend.clone(),
       );
-      y += line_height(&style.legend) * 1.25;
+      y += if framed {
+        line_height(&style.legend) + frame_metrics.vertical_entry_offset
+      } else {
+        line_height(&style.legend) * 1.25
+      };
     }
     return;
   }
@@ -5569,6 +5720,17 @@ fn lower_radial_legend(
         horizontal_height,
         legend_line_height,
       );
+    push_legend_frame(
+      items,
+      PlotRect {
+        left: x - frame_metrics.horizontal_padding,
+        top: y - frame_metrics.vertical_padding,
+        width: total + frame_metrics.horizontal_padding * 2.0,
+        height: legend_line_height + frame_metrics.vertical_padding * 2.0,
+      },
+      &style.legend_frame_style,
+      1.0,
+    );
     for ((index, text), width) in chart
       .visible_legend_indices
       .iter()
@@ -5607,6 +5769,23 @@ fn lower_radial_legend(
       + frame.height_pt * 0.5
       + style.legend.font_size_pt * host_defaults.side_legend_center_offset_em;
     let mut y = center_y - total_height * 0.5;
+    let maximum_width = chart
+      .visible_legend_indices
+      .iter()
+      .filter_map(|index| chart.categories.get(*index))
+      .map(|text| marker + gap + metrics.measure_text(text, &style.legend))
+      .fold(0.0_f32, f32::max);
+    push_legend_frame(
+      items,
+      PlotRect {
+        left: x - frame_metrics.horizontal_padding,
+        top: y - frame_metrics.vertical_padding,
+        width: maximum_width + frame_metrics.horizontal_padding * 2.0,
+        height: total_height + frame_metrics.vertical_padding * 2.0,
+      },
+      &style.legend_frame_style,
+      1.0,
+    );
     for index in chart.visible_legend_indices.iter().copied() {
       let Some(text) = chart.categories.get(index) else {
         continue;
@@ -5642,14 +5821,18 @@ fn push_radial_legend_key(
   let point_style = style.point_styles.get(point_index);
   push_chart_shape_rect(
     items,
-    x_pt,
-    y_pt,
-    size_pt,
-    size_pt,
-    point_style.map(|style| &style.fill),
-    point_style.map(|style| &style.stroke),
-    Some(style.point_colors[point_index % style.point_colors.len()]),
-    1.0,
+    PlotRect {
+      left: x_pt,
+      top: y_pt,
+      width: size_pt,
+      height: size_pt,
+    },
+    ChartShapePaint {
+      fill: point_style.map(|style| &style.fill),
+      stroke: point_style.map(|style| &style.stroke),
+      fallback_fill_color: Some(style.point_colors[point_index % style.point_colors.len()]),
+      stroke_width_scale: 1.0,
+    },
   );
 }
 
@@ -6317,8 +6500,8 @@ fn axis_set_count(chart: &ClusteredColumnChart<'_>) -> usize {
     .max(1)
 }
 
-fn axis_set_value_axis<'chart, 'data>(
-  chart: &'chart ClusteredColumnChart<'data>,
+fn axis_set_value_axis<'data>(
+  chart: &ClusteredColumnChart<'data>,
   axis_set_index: usize,
 ) -> Option<&'data c::ValueAxis> {
   chart
@@ -6328,8 +6511,8 @@ fn axis_set_value_axis<'chart, 'data>(
     .or_else(|| (axis_set_index == 0).then_some(chart.value_axis).flatten())
 }
 
-fn axis_set_horizontal_value_axis<'chart, 'data>(
-  chart: &'chart ClusteredColumnChart<'data>,
+fn axis_set_horizontal_value_axis<'data>(
+  chart: &ClusteredColumnChart<'data>,
   axis_set_index: usize,
 ) -> Option<&'data c::ValueAxis> {
   chart
@@ -6390,14 +6573,16 @@ fn cartesian_axis_scales(
       };
       bubble_aware_chart_linear_axis_scale(
         chart,
-        axis_set_index,
-        BubbleAxisDimension::Vertical,
-        values,
-        value_axis,
-        vertical_axis_number_format_code(chart, axis_set_index),
-        maximum_auto_value_increment_count,
-        options,
-        bubble_plot_size,
+        BubbleAxisScaleRequest {
+          axis_set_index,
+          dimension: BubbleAxisDimension::Vertical,
+          source_values: values,
+          axis: value_axis,
+          format_code: vertical_axis_number_format_code(chart, axis_set_index),
+          maximum_auto_increment_count: maximum_auto_value_increment_count,
+          options,
+          plot_size: bubble_plot_size,
+        },
       )
     };
     let y = y.unwrap_or_else(|| crate::render::chart::LinearAxisScale {
@@ -6429,24 +6614,26 @@ fn cartesian_axis_scales(
         let ordinal_x_axis = axis_set_scatter_uses_index_x_values(chart, axis_set_index);
         bubble_aware_chart_linear_axis_scale(
           chart,
-          axis_set_index,
-          BubbleAxisDimension::Horizontal,
-          values,
-          axis_set_horizontal_value_axis(chart, axis_set_index),
-          horizontal_axis_number_format_code(chart, axis_set_index),
-          maximum_auto_horizontal_increment_count,
-          LinearAxisScaleOptions {
-            // Word and PowerPoint serialize textual scatter X values as an
-            // ordinal value axis with whole-number major units. Excel retains
-            // an ordinary automatic numeric scale for the same cached string
-            // sequence (`ser_labels.xlsx` uses half steps), so this host
-            // policy must not leak into the workbook renderer.
-            minimum_automatic_major_unit: (layout_profile != ChartLayoutProfile::Excel
-              && ordinal_x_axis)
-              .then_some(1.0),
-            ..LinearAxisScaleOptions::default()
+          BubbleAxisScaleRequest {
+            axis_set_index,
+            dimension: BubbleAxisDimension::Horizontal,
+            source_values: values,
+            axis: axis_set_horizontal_value_axis(chart, axis_set_index),
+            format_code: horizontal_axis_number_format_code(chart, axis_set_index),
+            maximum_auto_increment_count: maximum_auto_horizontal_increment_count,
+            options: LinearAxisScaleOptions {
+              // Word and PowerPoint serialize textual scatter X values as an
+              // ordinal value axis with whole-number major units. Excel retains
+              // an ordinary automatic numeric scale for the same cached string
+              // sequence (`ser_labels.xlsx` uses half steps), so this host
+              // policy must not leak into the workbook renderer.
+              minimum_automatic_major_unit: (layout_profile != ChartLayoutProfile::Excel
+                && ordinal_x_axis)
+                .then_some(1.0),
+              ..LinearAxisScaleOptions::default()
+            },
+            plot_size: bubble_plot_size,
           },
-          bubble_plot_size,
         )
       })
       .flatten();
@@ -6461,17 +6648,31 @@ enum BubbleAxisDimension {
   Vertical,
 }
 
-fn bubble_aware_chart_linear_axis_scale(
-  chart: &ClusteredColumnChart<'_>,
+struct BubbleAxisScaleRequest<'a> {
   axis_set_index: usize,
   dimension: BubbleAxisDimension,
   source_values: Vec<f64>,
-  axis: Option<&c::ValueAxis>,
-  format_code: Option<&str>,
+  axis: Option<&'a c::ValueAxis>,
+  format_code: Option<&'a str>,
   maximum_auto_increment_count: usize,
   options: LinearAxisScaleOptions,
   plot_size: Option<(f32, f32)>,
+}
+
+fn bubble_aware_chart_linear_axis_scale(
+  chart: &ClusteredColumnChart<'_>,
+  request: BubbleAxisScaleRequest<'_>,
 ) -> Option<crate::render::chart::LinearAxisScale> {
+  let BubbleAxisScaleRequest {
+    axis_set_index,
+    dimension,
+    source_values,
+    axis,
+    format_code,
+    maximum_auto_increment_count,
+    options,
+    plot_size,
+  } = request;
   let mut scale = chart_linear_axis_scale(
     source_values.clone(),
     axis,
@@ -7344,9 +7545,7 @@ fn chart_3d_series_slot_context(
   chart: &ClusteredColumnChart<'_>,
   series_index: usize,
 ) -> Option<(bool, usize, usize, f32)> {
-  let Some(series) = chart.series.get(series_index) else {
-    return None;
-  };
+  let series = chart.series.get(series_index)?;
   if !series.is_3d {
     return None;
   }
@@ -7446,6 +7645,17 @@ struct SurfaceVertex {
   depth_ratio: f32,
 }
 
+#[derive(Clone, Copy)]
+struct SurfaceRenderContext<'a, 'data> {
+  chart: &'a ClusteredColumnChart<'data>,
+  style: &'a ClusteredColumnStyle,
+  group: &'a SurfaceChartGroup<'data>,
+  plot: PlotRect,
+  scale: crate::render::chart::LinearAxisScale,
+  category_count: usize,
+  projection_3d: Option<Chart3DProjection>,
+}
+
 fn lower_surface_groups(
   items: &mut Vec<PageItem>,
   chart: &ClusteredColumnChart<'_>,
@@ -7462,29 +7672,19 @@ fn lower_surface_groups(
     else {
       continue;
     };
+    let context = SurfaceRenderContext {
+      chart,
+      style,
+      group,
+      plot,
+      scale: axes.y,
+      category_count,
+      projection_3d,
+    };
     if group.wireframe {
-      lower_surface_wireframe(
-        items,
-        chart,
-        style,
-        group,
-        plot,
-        axes.y,
-        category_count,
-        projection_3d,
-      );
+      lower_surface_wireframe(items, context);
     } else {
-      lower_filled_surface(
-        items,
-        chart,
-        style,
-        group_index,
-        group,
-        plot,
-        axes.y,
-        category_count,
-        projection_3d,
-      );
+      lower_filled_surface(items, group_index, context);
     }
   }
 }
@@ -7535,16 +7735,16 @@ fn surface_vertex_point(
   }
 }
 
-fn lower_surface_wireframe(
-  items: &mut Vec<PageItem>,
-  chart: &ClusteredColumnChart<'_>,
-  style: &ClusteredColumnStyle,
-  group: &SurfaceChartGroup<'_>,
-  plot: PlotRect,
-  scale: crate::render::chart::LinearAxisScale,
-  category_count: usize,
-  projection_3d: Option<Chart3DProjection>,
-) {
+fn lower_surface_wireframe(items: &mut Vec<PageItem>, context: SurfaceRenderContext<'_, '_>) {
+  let SurfaceRenderContext {
+    chart,
+    style,
+    group,
+    plot,
+    scale,
+    category_count,
+    projection_3d,
+  } = context;
   let series_range =
     group.first_series_index..group.first_series_index.saturating_add(group.series_count);
   for (row_index, series_index) in series_range.clone().enumerate() {
@@ -7624,15 +7824,18 @@ fn lower_surface_wireframe(
 
 fn lower_filled_surface(
   items: &mut Vec<PageItem>,
-  chart: &ClusteredColumnChart<'_>,
-  style: &ClusteredColumnStyle,
   group_index: usize,
-  group: &SurfaceChartGroup<'_>,
-  plot: PlotRect,
-  scale: crate::render::chart::LinearAxisScale,
-  category_count: usize,
-  projection_3d: Option<Chart3DProjection>,
+  context: SurfaceRenderContext<'_, '_>,
 ) {
+  let SurfaceRenderContext {
+    chart,
+    style,
+    group,
+    plot,
+    scale,
+    category_count,
+    projection_3d,
+  } = context;
   if group.series_count < 2 || category_count < 2 {
     return;
   }
@@ -8753,10 +8956,12 @@ fn lower_column_series(
     let end_y = word_fixed_chart_value_edge(end_y, end_value, style.layout_profile);
     push_chart_data_rect(
       items,
-      left,
-      end_y.min(start_y),
-      (right - left).abs(),
-      (start_y - end_y).abs(),
+      PlotRect {
+        left,
+        top: end_y.min(start_y),
+        width: (right - left).abs(),
+        height: (start_y - end_y).abs(),
+      },
       point_color,
       chart_series_fill_style(style, series_index, Some(category_index)),
       chart_series_stroke_style(style, series_index, Some(category_index)),
@@ -9414,10 +9619,12 @@ fn lower_bar_series(
     let bottom = word_fixed_chart_data_edge(y + height, style.layout_profile);
     push_chart_data_rect(
       items,
-      start_x.min(end_x),
-      top,
-      (end_x - start_x).abs(),
-      (bottom - top).abs(),
+      PlotRect {
+        left: start_x.min(end_x),
+        top,
+        width: (end_x - start_x).abs(),
+        height: (bottom - top).abs(),
+      },
       point_color,
       chart_series_fill_style(style, series_index, Some(category_index)),
       chart_series_stroke_style(style, series_index, Some(category_index)),
@@ -9490,10 +9697,7 @@ fn chart_series_area_fill(
 
 fn push_chart_data_rect(
   items: &mut Vec<PageItem>,
-  x_pt: f32,
-  y_pt: f32,
-  width_pt: f32,
-  height_pt: f32,
+  bounds: PlotRect,
   fallback_color: RgbColor,
   fill: Option<&crate::common::ShapeStyleValue<crate::common::Fill<'static>>>,
   stroke: Option<&crate::common::ShapeStyleValue<crate::common::Stroke<'static>>>,
@@ -9501,14 +9705,13 @@ fn push_chart_data_rect(
 ) {
   push_chart_shape_rect(
     items,
-    x_pt,
-    y_pt,
-    width_pt,
-    height_pt,
-    fill,
-    stroke,
-    Some(fallback_color),
-    stroke_width_scale,
+    bounds,
+    ChartShapePaint {
+      fill,
+      stroke,
+      fallback_fill_color: Some(fallback_color),
+      stroke_width_scale,
+    },
   );
 }
 
@@ -10226,13 +10429,14 @@ fn lower_scatter_series(
     if bubbles {
       push_chart_shape_ellipse(
         items,
-        x,
-        y,
+        (x, y),
         size,
-        chart_series_fill_style(style, series_index, Some(index)),
-        chart_series_stroke_style(style, series_index, Some(index)),
-        Some(point_color),
-        style.stroke_scale,
+        ChartShapePaint {
+          fill: chart_series_fill_style(style, series_index, Some(index)),
+          stroke: chart_series_stroke_style(style, series_index, Some(index)),
+          fallback_fill_color: Some(point_color),
+          stroke_width_scale: style.stroke_scale,
+        },
       );
     } else {
       lower_chart_marker(
@@ -10900,16 +11104,27 @@ fn lower_horizontal_bar_axes(
   }
 }
 
+#[derive(Clone, Copy)]
+struct ScatterAxisGeometry {
+  plot: PlotRect,
+  scale: crate::render::chart::LinearAxisScale,
+  draw_gridlines: bool,
+  draw_labels: bool,
+}
+
 fn lower_scatter_x_axis(
   items: &mut Vec<PageItem>,
   chart: &ClusteredColumnChart<'_>,
-  plot: PlotRect,
-  scale: crate::render::chart::LinearAxisScale,
+  geometry: ScatterAxisGeometry,
   style: &ClusteredColumnStyle,
   metrics: &mut TextMetrics,
-  draw_gridlines: bool,
-  draw_labels: bool,
 ) {
+  let ScatterAxisGeometry {
+    plot,
+    scale,
+    draw_gridlines,
+    draw_labels,
+  } = geometry;
   let axis_visible = chart
     .horizontal_value_axis
     .is_none_or(value_axis_is_visible);
@@ -11456,15 +11671,14 @@ fn category_point_x(
       .get(source_index)
       .copied()
       .flatten()
+      && let Some(ratio) = date_axis_data_position(chart, value)
     {
-      if let Some(ratio) = date_axis_data_position(chart, value) {
-        let ratio = if chart.category_axis_reversed {
-          1.0 - ratio
-        } else {
-          ratio
-        };
-        return plot.left + ratio as f32 * plot.width;
-      }
+      let ratio = if chart.category_axis_reversed {
+        1.0 - ratio
+      } else {
+        ratio
+      };
+      return plot.left + ratio as f32 * plot.width;
     }
   }
   category_value_x(chart, display_index as f32 + 1.0, category_count, plot)
@@ -12376,7 +12590,7 @@ fn lower_manual_legend(
   style: &ClusteredColumnStyle,
   scale: crate::render::chart::LinearAxisScale,
 ) {
-  let bounds = apply_manual_layout(
+  let automatic_bounds = apply_manual_layout(
     frame,
     PlotRect {
       left: frame.x_pt + frame.width_pt * 0.8,
@@ -12386,12 +12600,22 @@ fn lower_manual_legend(
     },
     layout,
   );
-  let marker_size = style.legend.font_size_pt * 0.55;
-  let marker_gap = style.legend.font_size_pt * 0.26;
   let entries = cartesian_legend_entries(chart, style, scale);
-  if entries.is_empty() || bounds.width <= 0.0 || bounds.height <= 0.0 {
+  if entries.is_empty() {
     return;
   }
+  let framed = legend_frame_has_paint(&style.legend_frame_style);
+  let frame_metrics = legend_frame_metrics(style.legend.font_size_pt);
+  let marker_size = if framed {
+    frame_metrics.symbol_height
+  } else {
+    style.legend.font_size_pt * 0.55
+  };
+  let marker_gap = if framed {
+    frame_metrics.symbol_to_text
+  } else {
+    style.legend.font_size_pt * 0.26
+  };
   let mut metrics = TextMetrics::new();
   let entry_widths = entries
     .iter()
@@ -12400,18 +12624,69 @@ fn lower_manual_legend(
     })
     .collect::<Vec<_>>();
   let maximum_entry_width = entry_widths.iter().copied().fold(0.0_f32, f32::max);
-  let column_count =
-    ((bounds.width / maximum_entry_width.max(1.0)).floor() as usize).clamp(1, entries.len());
-  let row_count = entries.len().div_ceil(column_count);
-  let cell_width = bounds.width / column_count as f32;
-  let cell_height = bounds.height / row_count as f32;
   let label_line_height = line_height(&style.legend);
+  let vertical = matches!(
+    chart.legend_position,
+    Some(ChartLegendPosition::Left | ChartLegendPosition::Right | ChartLegendPosition::TopRight)
+  );
+  let automatic_content_width = if vertical {
+    maximum_entry_width
+  } else {
+    entry_widths.iter().sum::<f32>()
+      + frame_metrics.horizontal_entry_offset * entries.len().saturating_sub(1) as f32
+  };
+  let automatic_content_height = if vertical {
+    label_line_height * entries.len() as f32
+      + frame_metrics.vertical_entry_offset * entries.len().saturating_sub(1) as f32
+  } else {
+    label_line_height
+  };
+  let bounds = if framed {
+    PlotRect {
+      left: automatic_bounds.left,
+      top: automatic_bounds.top,
+      width: layout.width.map_or(
+        automatic_content_width + frame_metrics.horizontal_padding * 2.0,
+        |_| automatic_bounds.width,
+      ),
+      height: layout.height.map_or(
+        automatic_content_height + frame_metrics.vertical_padding * 2.0,
+        |_| automatic_bounds.height,
+      ),
+    }
+  } else {
+    automatic_bounds
+  };
+  if bounds.width <= 0.0 || bounds.height <= 0.0 {
+    return;
+  }
+  push_legend_frame(items, bounds, &style.legend_frame_style, style.stroke_scale);
+  let content_bounds = if framed {
+    PlotRect {
+      left: bounds.left + frame_metrics.horizontal_padding,
+      top: bounds.top + frame_metrics.vertical_padding,
+      width: (bounds.width - frame_metrics.horizontal_padding * 2.0).max(0.0),
+      height: (bounds.height - frame_metrics.vertical_padding * 2.0).max(0.0),
+    }
+  } else {
+    bounds
+  };
+  let column_count = if framed && layout.width.is_none() && layout.height.is_none() {
+    if vertical { 1 } else { entries.len() }
+  } else {
+    ((content_bounds.width / maximum_entry_width.max(1.0)).floor() as usize).clamp(1, entries.len())
+  };
+  let row_count = entries.len().div_ceil(column_count);
+  let cell_width = content_bounds.width / column_count as f32;
+  let cell_height = content_bounds.height / row_count as f32;
   for (index, (entry, entry_width)) in entries.into_iter().zip(entry_widths).enumerate() {
     let column = index % column_count;
     let row = index / column_count;
-    let x = bounds.left + column as f32 * cell_width + (cell_width - entry_width).max(0.0) * 0.5;
-    let y =
-      bounds.top + row as f32 * cell_height + (cell_height - label_line_height).max(0.0) * 0.5;
+    let x =
+      content_bounds.left + column as f32 * cell_width + (cell_width - entry_width).max(0.0) * 0.5;
+    let y = content_bounds.top
+      + row as f32 * cell_height
+      + (cell_height - label_line_height).max(0.0) * 0.5;
     push_cartesian_legend_key(
       items,
       x,
@@ -12431,16 +12706,27 @@ fn lower_manual_legend(
   }
 }
 
-fn lower_horizontal_legend(
-  items: &mut Vec<PageItem>,
+#[derive(Clone, Copy)]
+struct HorizontalLegendGeometry {
   frame: ChartFrame,
   available_left: f32,
   y: f32,
+  scale: crate::render::chart::LinearAxisScale,
+}
+
+fn lower_horizontal_legend(
+  items: &mut Vec<PageItem>,
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
-  scale: crate::render::chart::LinearAxisScale,
+  geometry: HorizontalLegendGeometry,
   metrics: &mut TextMetrics,
 ) {
+  let HorizontalLegendGeometry {
+    frame,
+    available_left,
+    y,
+    scale,
+  } = geometry;
   let titled_indexed_scatter = style.layout_profile == ChartLayoutProfile::Excel
     && !chart.title_overlay
     && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic))
@@ -12469,7 +12755,13 @@ fn lower_horizontal_legend(
   } else {
     profiles::DEFAULT_HORIZONTAL_CARTESIAN_LEGEND
   };
-  let marker_gap = style.legend.font_size_pt * legend_profile.marker_gap_em;
+  let framed = legend_frame_has_paint(&style.legend_frame_style);
+  let frame_metrics = legend_frame_metrics(style.legend.font_size_pt);
+  let marker_gap = if framed {
+    frame_metrics.symbol_to_text
+  } else {
+    style.legend.font_size_pt * legend_profile.marker_gap_em
+  };
   let entries = cartesian_legend_entries(chart, style, scale);
   let base_entry_gap =
     style.legend.font_size_pt * profiles::DEFAULT_HORIZONTAL_CARTESIAN_LEGEND.entry_gap_em;
@@ -12497,6 +12789,17 @@ fn lower_horizontal_legend(
   }
   x += frame.height_pt * legend_profile.x_offset_height_ratio;
   let y = y + frame.height_pt * legend_profile.y_offset_height_ratio;
+  push_legend_frame(
+    items,
+    PlotRect {
+      left: x - frame_metrics.horizontal_padding,
+      top: y - frame_metrics.vertical_padding,
+      width: total_width + frame_metrics.horizontal_padding * 2.0,
+      height: line_height(&style.legend) + frame_metrics.vertical_padding * 2.0,
+    },
+    &style.legend_frame_style,
+    style.stroke_scale,
+  );
   for (entry, width) in entries.into_iter().zip(widths) {
     let line_key = cartesian_legend_entry_uses_line_key(chart, &entry);
     let key_width = horizontal_legend_key_width(line_key, style, legend_profile.line_key_width_em);
@@ -12555,24 +12858,38 @@ fn lower_vertical_legend(
   style: &ClusteredColumnStyle,
   scale: crate::render::chart::LinearAxisScale,
 ) {
-  let marker_size = style.legend.font_size_pt
-    * if excel_vary_colors_data_table_layout(chart, style) {
-      profiles::EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_MARKER_EM
-    } else {
-      0.55
-    };
-  let marker_gap = style.legend.font_size_pt * 0.26;
-  let entry_gap = style.legend.font_size_pt
-    * if excel_vary_colors_data_table_layout(chart, style) {
-      profiles::EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_ENTRY_GAP_EM
-    } else if matches!(
-      style.layout_profile,
-      ChartLayoutProfile::Excel | ChartLayoutProfile::Word
-    ) {
-      profiles::OFFICE_VERTICAL_LEGEND_ENTRY_GAP_EM
-    } else {
-      profiles::POWERPOINT_VERTICAL_LEGEND_ENTRY_GAP_EM
-    };
+  let framed = legend_frame_has_paint(&style.legend_frame_style);
+  let frame_metrics = legend_frame_metrics(style.legend.font_size_pt);
+  let marker_size = if framed {
+    frame_metrics.symbol_height
+  } else {
+    style.legend.font_size_pt
+      * if excel_vary_colors_data_table_layout(chart, style) {
+        profiles::EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_MARKER_EM
+      } else {
+        0.55
+      }
+  };
+  let marker_gap = if framed {
+    frame_metrics.symbol_to_text
+  } else {
+    style.legend.font_size_pt * 0.26
+  };
+  let entry_gap = if framed {
+    frame_metrics.vertical_entry_offset
+  } else {
+    style.legend.font_size_pt
+      * if excel_vary_colors_data_table_layout(chart, style) {
+        profiles::EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_ENTRY_GAP_EM
+      } else if matches!(
+        style.layout_profile,
+        ChartLayoutProfile::Excel | ChartLayoutProfile::Word
+      ) {
+        profiles::OFFICE_VERTICAL_LEGEND_ENTRY_GAP_EM
+      } else {
+        profiles::POWERPOINT_VERTICAL_LEGEND_ENTRY_GAP_EM
+      }
+  };
   let line_height = line_height(&style.legend);
   let entries = cartesian_legend_entries(chart, style, scale);
   let total_height =
@@ -12638,6 +12955,24 @@ fn lower_vertical_legend(
   if excel_vary_colors_data_table_layout(chart, style) && !align_top {
     y += frame.height_pt * profiles::EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_Y_RATIO;
   }
+  let mut metrics = TextMetrics::new();
+  let maximum_entry_width = entries
+    .iter()
+    .map(|entry| {
+      marker_size + marker_gap + metrics.measure_text(entry.label.as_ref(), &style.legend)
+    })
+    .fold(0.0_f32, f32::max);
+  push_legend_frame(
+    items,
+    PlotRect {
+      left: x - frame_metrics.horizontal_padding,
+      top: y - frame_metrics.vertical_padding,
+      width: maximum_entry_width + frame_metrics.horizontal_padding * 2.0,
+      height: total_height + frame_metrics.vertical_padding * 2.0,
+    },
+    &style.legend_frame_style,
+    style.stroke_scale,
+  );
   for entry in entries {
     let line_key = cartesian_legend_entry_uses_line_key(chart, &entry);
     push_cartesian_legend_key(
@@ -12736,25 +13071,30 @@ fn push_cartesian_legend_key(
     // key incorrectly describes a filled bar/area series.
     push_chart_shape_ellipse(
       items,
-      x_pt + size_pt * 0.5,
-      y_pt + size_pt * 0.5,
+      (x_pt + size_pt * 0.5, y_pt + size_pt * 0.5),
       size_pt,
-      fill,
-      stroke,
-      entry.color,
-      style.stroke_scale,
+      ChartShapePaint {
+        fill,
+        stroke,
+        fallback_fill_color: entry.color,
+        stroke_width_scale: style.stroke_scale,
+      },
     );
   } else {
     push_chart_shape_rect(
       items,
-      x_pt,
-      y_pt,
-      size_pt,
-      size_pt,
-      fill,
-      stroke,
-      entry.color,
-      style.stroke_scale,
+      PlotRect {
+        left: x_pt,
+        top: y_pt,
+        width: size_pt,
+        height: size_pt,
+      },
+      ChartShapePaint {
+        fill,
+        stroke,
+        fallback_fill_color: entry.color,
+        stroke_width_scale: style.stroke_scale,
+      },
     );
   }
 }
@@ -12996,16 +13336,26 @@ fn line_height(style: &TextStyle) -> f32 {
   style.font_size_pt * TEXT_LINE_HEIGHT_SCALE
 }
 
+struct DataLabelTextLayout<'a, 'data> {
+  origin: (f32, f32),
+  label: &'a crate::render::chart::ClusteredColumnDataLabel<'data>,
+  style: &'a TextStyle,
+  rich_text_styles: &'a [TextStyle],
+  text_frame: ResolvedDataLabelTextFrame,
+}
+
 fn push_data_label_text_components(
   items: &mut Vec<PageItem>,
   metrics: &mut TextMetrics,
-  x: f32,
-  y: f32,
-  label: &crate::render::chart::ClusteredColumnDataLabel<'_>,
-  style: &TextStyle,
-  rich_text_styles: &[TextStyle],
-  text_frame: ResolvedDataLabelTextFrame,
+  layout: DataLabelTextLayout<'_, '_>,
 ) {
+  let DataLabelTextLayout {
+    origin: (x, y),
+    label,
+    style,
+    rich_text_styles,
+    text_frame,
+  } = layout;
   if !label.rich_text_runs.is_empty() {
     let line_dimensions =
       data_label_rich_text_line_dimensions(metrics, label, style, rich_text_styles);
@@ -13322,7 +13672,7 @@ fn push_text_with_segmentation_and_rotation_center(
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text,
-    style,
+    style: Box::new(style),
     rotation_center_pt,
     hyperlink_url: None,
     form_widget_id: None,
@@ -13351,7 +13701,7 @@ fn push_data_table_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String,
     paint_clip: None,
     discard_if_horizontally_clipped: true,
     text,
-    style,
+    style: Box::new(style),
     rotation_center_pt: None,
     hyperlink_url: None,
     form_widget_id: None,
@@ -13607,10 +13957,12 @@ mod tests {
 
     push_chart_data_rect(
       &mut items,
-      10.0,
-      20.0,
-      30.0,
-      40.0,
+      PlotRect {
+        left: 10.0,
+        top: 20.0,
+        width: 30.0,
+        height: 40.0,
+      },
       RgbColor::default(),
       Some(&fill),
       Some(&stroke),

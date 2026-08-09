@@ -676,11 +676,13 @@ pub fn clustered_column_chart_for_ui_language<'a>(
     let data_labels = resolved_data_labels(
       source.data_labels.as_deref(),
       bar_chart.data_labels.as_deref(),
-      &name,
-      &label_categories,
-      &values,
-      None,
-      &data_labels_range_values(series_ref.data_labels_range),
+      DataLabelSeriesData {
+        series_name: &name,
+        categories: &label_categories,
+        values: &values,
+        bubble_sizes: None,
+        data_labels_range: &data_labels_range_values(series_ref.data_labels_range),
+      },
       DataLabelDefaults {
         value_format_code: series_number_format_code(series_ref),
         position: c::DataLabelPositionValues::OutsideEnd,
@@ -2024,11 +2026,13 @@ fn append_cartesian_series<'a>(
       data_labels: resolved_data_labels(
         source.data_labels,
         chart_group_labels,
-        &name,
-        &label_categories,
-        &values,
-        (!bubble_sizes.is_empty()).then_some(bubble_sizes.as_slice()),
-        &data_labels_range_values(source.data_labels_range),
+        DataLabelSeriesData {
+          series_name: &name,
+          categories: &label_categories,
+          values: &values,
+          bubble_sizes: (!bubble_sizes.is_empty()).then_some(bubble_sizes.as_slice()),
+          data_labels_range: &data_labels_range_values(source.data_labels_range),
+        },
         DataLabelDefaults {
           value_format_code: series_number_format_code(source),
           position: default_data_label_position(kind, grouping),
@@ -2421,9 +2425,7 @@ fn data_label_text_layout(
   // percentage-number-formats.pptx, and its fixed output follows the empty
   // c15 form rather than applying the stale legacy offset.
   if let Some(layout) = data_label_extension_layout(label) {
-    let Some(manual) = layout.manual_layout.as_deref() else {
-      return None;
-    };
+    let manual = layout.manual_layout.as_deref()?;
     if manual.left.is_some() || manual.top.is_some() {
       return chart_manual_text_layout(manual);
     }
@@ -2622,11 +2624,13 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
       series.data_labels.as_deref()
     },
     chart_group_labels,
-    &series_name,
-    &categories,
-    &values,
-    None,
-    &data_labels_range_values(series_ref.data_labels_range),
+    DataLabelSeriesData {
+      series_name: &series_name,
+      categories: &categories,
+      values: &values,
+      bubble_sizes: None,
+      data_labels_range: &data_labels_range_values(series_ref.data_labels_range),
+    },
     DataLabelDefaults {
       value_format_code: series_number_format_code(series_ref),
       position: if radial_kind == RadialChartKind::Doughnut {
@@ -2949,16 +2953,27 @@ struct DataLabelDefaults<'a> {
   separator: &'a str,
 }
 
+struct DataLabelSeriesData<'a> {
+  series_name: &'a str,
+  categories: &'a [String],
+  values: &'a [Option<f64>],
+  bubble_sizes: Option<&'a [Option<f64>]>,
+  data_labels_range: &'a [String],
+}
+
 fn resolved_data_labels<'a>(
   series_labels: Option<&'a c::DataLabels>,
   chart_group_labels: Option<&'a c::DataLabels>,
-  series_name: &str,
-  categories: &[String],
-  values: &[Option<f64>],
-  bubble_sizes: Option<&[Option<f64>]>,
-  data_labels_range: &[String],
+  data: DataLabelSeriesData<'_>,
   defaults: DataLabelDefaults<'a>,
 ) -> Vec<ClusteredColumnDataLabel<'a>> {
+  let DataLabelSeriesData {
+    series_name,
+    categories,
+    values,
+    bubble_sizes,
+    data_labels_range,
+  } = data;
   // ECMA-376 Part 1 §21.2.2.49 defines c:dLbls as the settings for an
   // entire series or chart. MS-OI29500 §21.2.2.49 adds the Office override
   // hierarchy: chart-group dLbls < series dLbls < individual dLbl. Expand the
@@ -3092,20 +3107,23 @@ fn resolved_data_labels<'a>(
       } else {
         None
       };
+      let point_context = DataLabelPointContext {
+        series_name,
+        category_name: categories.get(point_index).map(String::as_str),
+        value,
+        value_format_code: point_settings.value_format_code,
+        bubble_size: bubble_sizes
+          .and_then(|sizes| sizes.get(point_index))
+          .copied()
+          .flatten(),
+        data_labels_range: range_text,
+      };
       let custom_text = custom_chart_text.map(|chart_text| {
         data_label_chart_text(
           chart_text,
           point_labels[point_index],
-          series_name,
-          categories.get(point_index).map(String::as_str),
-          value,
-          point_settings.value_format_code,
+          point_context,
           percentage_text.as_deref(),
-          bubble_sizes
-            .and_then(|sizes| sizes.get(point_index))
-            .copied()
-            .flatten(),
-          range_text,
         )
       });
       let value_component_index = (custom_text.is_none() && point_settings.show_value).then(|| {
@@ -3126,19 +3144,11 @@ fn resolved_data_labels<'a>(
         None => {
           let (text, components, separator) = compose_clustered_column_data_label(
             point_settings,
-            series_name,
-            categories.get(point_index).map(String::as_str),
-            value,
-            point_settings.value_format_code,
-            bubble_sizes
-              .and_then(|sizes| sizes.get(point_index))
-              .copied()
-              .flatten(),
+            point_context,
             point_settings
               .show_percent
               .then_some(percentage_text.clone())
               .flatten(),
-            range_text,
           )?;
           (text, components, separator, Vec::new())
         }
@@ -3426,16 +3436,29 @@ fn apply_data_label_sequence_presentation_settings<'a>(
   }
 }
 
+#[derive(Clone, Copy)]
+struct DataLabelPointContext<'a> {
+  series_name: &'a str,
+  category_name: Option<&'a str>,
+  value: f64,
+  value_format_code: Option<&'a str>,
+  bubble_size: Option<f64>,
+  data_labels_range: Option<&'a str>,
+}
+
 fn compose_clustered_column_data_label<'a>(
   settings: ClusteredColumnDataLabelSettings<'a>,
-  series_name: &str,
-  category: Option<&str>,
-  value: f64,
-  value_format_code: Option<&str>,
-  bubble_size: Option<f64>,
+  context: DataLabelPointContext<'_>,
   percentage: Option<String>,
-  data_labels_range: Option<&str>,
 ) -> Option<(String, Vec<String>, &'a str)> {
+  let DataLabelPointContext {
+    series_name,
+    category_name: category,
+    value,
+    value_format_code,
+    bubble_size,
+    data_labels_range,
+  } = context;
   let mut components = Vec::with_capacity(5);
   // [MS-ODRAWXML] §2.3.58 requires the value-from-cells field to be the
   // first field in the visible label, ahead of the classic series/category/
@@ -3534,14 +3557,17 @@ struct ResolvedDataLabelChartText<'a> {
 fn data_label_chart_text<'a>(
   chart_text: &'a c::ChartText,
   data_label: Option<&'a c::DataLabel>,
-  series_name: &str,
-  category_name: Option<&str>,
-  value: f64,
-  value_format_code: Option<&str>,
+  context: DataLabelPointContext<'_>,
   percentage: Option<&str>,
-  bubble_size: Option<f64>,
-  data_labels_range: Option<&str>,
 ) -> ResolvedDataLabelChartText<'a> {
+  let DataLabelPointContext {
+    series_name,
+    category_name,
+    value,
+    value_format_code,
+    bubble_size,
+    data_labels_range,
+  } = context;
   let Some(c::ChartTextChoice::RichText(rich)) = chart_text.chart_text_choice.as_ref() else {
     let mut values = Vec::new();
     push_chart_text(&mut values, chart_text);
@@ -4854,8 +4880,8 @@ pub(crate) fn value_axis_display_unit(axis: &c::ValueAxis) -> f64 {
 /// LibreOffice `AxisHelper::getExplicitNumberFormatKeyForAxis` selects the
 /// most frequent attached sequence format and has a separate percent-scale
 /// branch; keeping that decision here makes every OOXML host use one rule.
-pub(crate) fn vertical_axis_number_format_code<'chart, 'data>(
-  chart: &'chart ClusteredColumnChart<'data>,
+pub(crate) fn vertical_axis_number_format_code<'data>(
+  chart: &ClusteredColumnChart<'data>,
   axis_set_index: usize,
 ) -> Option<&'data str> {
   let axis = chart
@@ -4884,8 +4910,8 @@ pub(crate) fn vertical_axis_number_format_code<'chart, 'data>(
 }
 
 /// Resolves the source-linked format for a scatter/bubble X value axis.
-pub(crate) fn horizontal_axis_number_format_code<'chart, 'data>(
-  chart: &'chart ClusteredColumnChart<'data>,
+pub(crate) fn horizontal_axis_number_format_code<'data>(
+  chart: &ClusteredColumnChart<'data>,
   axis_set_index: usize,
 ) -> Option<&'data str> {
   let axis = chart

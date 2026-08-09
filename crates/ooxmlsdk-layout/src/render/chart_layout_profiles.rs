@@ -334,7 +334,6 @@ pub(crate) const EXCEL_EXPLICIT_DATE_LINE_TOP_RIGHT_OVERLAY: CartesianLayoutAdju
 /// Leftward residual for the vertical value-axis title in the matching
 /// date-line profile. The title occupies its own band outside the tick-label
 /// ink; applying this separately avoids moving the value ticks themselves.
-
 pub(crate) const EXCEL_TITLE_ONLY: CartesianLayoutAdjustment = CartesianLayoutAdjustment {
   category_top_ratio: 0.020_87,
   plot_top_ratio: 0.018_42,

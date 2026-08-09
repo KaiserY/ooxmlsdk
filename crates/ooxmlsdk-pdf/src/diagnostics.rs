@@ -29,6 +29,9 @@ pub struct PdfFontAudit {
   pub explicit_glyph_portion_count: usize,
   pub glyph_run_count: usize,
   pub glyph_count: usize,
+  /// Visible `.notdef` glyphs retained for explicit OOXML symbol-character
+  /// transport. These are evidence-bearing output, not font-integrity errors.
+  pub explicit_symbol_notdef_glyph_count: usize,
   /// Consecutive multi-glyph clusters that require PDF ActualText spans.
   pub actual_text_cluster_count: usize,
   /// A bounded set of integrity failures. An empty set is required to pass.

@@ -525,11 +525,26 @@ pub enum LineVerticalAlignment {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextStyle<'doc> {
   pub font_family: Option<Cow<'doc, str>>,
+  pub high_ansi_font_family: Option<Cow<'doc, str>>,
   /// Document-scoped substitute preferred before generic system fallbacks.
   pub fallback_font_family: Option<Cow<'doc, str>>,
+  pub high_ansi_fallback_font_family: Option<Cow<'doc, str>>,
+  pub east_asia_fallback_font_family: Option<Cow<'doc, str>>,
+  pub complex_fallback_font_family: Option<Cow<'doc, str>>,
+  pub font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  pub high_ansi_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  pub east_asia_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  pub complex_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   pub east_asia_font_family: Option<Cow<'doc, str>>,
   pub complex_font_family: Option<Cow<'doc, str>>,
   pub symbol_font_family: Option<Cow<'doc, str>>,
+  /// The owning OOXML construct explicitly transports one legacy symbol
+  /// character rather than applying a symbol face as an ordinary fallback.
+  pub explicit_symbol_character: bool,
+  /// Effective WordprocessingML `w:rFonts/@w:hint` for ambiguous font slots.
+  pub wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
+  pub wordprocessingml_east_asia_language_is_chinese: bool,
+  pub wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   pub font_size: Pt,
   pub complex_font_size: Option<Pt>,
   pub complex_script: Option<bool>,

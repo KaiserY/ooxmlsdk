@@ -326,13 +326,23 @@ fn append_superscript_text(value: &m::Superscript, text: &mut String) {
   append_super_argument_text(&value.super_argument, text);
 }
 
-pub(crate) fn math_run_text(run: &m::Run) -> String {
-  let mut text = String::new();
-  append_run_text(run, &mut text);
-  text
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct MathRunCharacter {
+  pub(crate) source: char,
+  pub(crate) rendered: char,
+}
+
+pub(crate) fn math_run_characters(run: &m::Run) -> Vec<MathRunCharacter> {
+  let mut characters = Vec::new();
+  visit_run_characters(run, |character| characters.push(character));
+  characters
 }
 
 fn append_run_text(run: &m::Run, text: &mut String) {
+  visit_run_characters(run, |character| text.push(character.rendered));
+}
+
+fn visit_run_characters(run: &m::Run, mut visit: impl FnMut(MathRunCharacter)) {
   let (script, style, normal_text) = math_run_variant(run.math_run_properties.as_deref());
   for choice in &run.run_choice {
     let content = match choice {
@@ -341,19 +351,28 @@ fn append_run_text(run: &m::Run, text: &mut String) {
       _ => None,
     };
     if let Some(content) = content {
-      if normal_text {
-        text.push_str(content);
-      } else {
-        append_math_variant_text(content, script, style, text);
+      for source in content.chars() {
+        let rendered = if normal_text {
+          source
+        } else {
+          math_variant_character(source, script, style).unwrap_or(source)
+        };
+        visit(MathRunCharacter { source, rendered });
       }
       continue;
     }
-    match choice {
-      m::RunChoice::TabChar => text.push('\t'),
-      m::RunChoice::CarriageReturn | m::RunChoice::Break(_) => text.push('\n'),
-      m::RunChoice::NoBreakHyphen => text.push('\u{2011}'),
-      m::RunChoice::SoftHyphen => text.push('\u{00ad}'),
-      _ => {}
+    let character = match choice {
+      m::RunChoice::TabChar => Some('\t'),
+      m::RunChoice::CarriageReturn | m::RunChoice::Break(_) => Some('\n'),
+      m::RunChoice::NoBreakHyphen => Some('\u{2011}'),
+      m::RunChoice::SoftHyphen => Some('\u{00ad}'),
+      _ => None,
+    };
+    if let Some(character) = character {
+      visit(MathRunCharacter {
+        source: character,
+        rendered: character,
+      });
     }
   }
 }
@@ -394,64 +413,143 @@ fn math_on_off(value: m::BooleanValues) -> bool {
   )
 }
 
-fn append_math_variant_text(
-  value: &str,
-  script: m::ScriptValues,
-  style: m::StyleValues,
-  text: &mut String,
-) {
-  for character in value.chars() {
-    text.push(math_variant_character(character, script, style).unwrap_or(character));
-  }
-}
-
 fn math_variant_character(
   character: char,
   script: m::ScriptValues,
   style: m::StyleValues,
 ) -> Option<char> {
-  if script == m::ScriptValues::DoubleStruck {
-    return double_struck_variant_character(character);
+  // ECMA-376 Part 1 §§22.1.2.94 and 22.1.2.111 require m:scr and
+  // m:sty to map the serialized base character into the corresponding
+  // Unicode mathematical alphabet. Unicode 16 §22.2.3 Table 22-2 defines
+  // the complete repertoire. Script, Fraktur, double-struck, and monospace
+  // intentionally have fewer style axes than Roman or sans-serif, so the
+  // unsupported italic axis preserves the same semantic alphabet rather
+  // than falling back to an ordinary ASCII character.
+  match script {
+    m::ScriptValues::Roman => roman_variant_character(character, style),
+    m::ScriptValues::Script => script_variant_character(character, style),
+    m::ScriptValues::Fraktur => fraktur_variant_character(character, style),
+    m::ScriptValues::DoubleStruck => double_struck_variant_character(character),
+    m::ScriptValues::SansSerif => sans_serif_variant_character(character, style),
+    m::ScriptValues::Monospace => monospace_variant_character(character),
   }
-  if script != m::ScriptValues::Roman || style == m::StyleValues::Plain {
+}
+
+fn roman_variant_character(character: char, style: m::StyleValues) -> Option<char> {
+  if style == m::StyleValues::Plain {
     return None;
   }
   if let Some(character) = roman_greek_variant_character(character, style) {
     return Some(character);
   }
-  let offset = match character {
-    'A'..='Z' => character as u32 - 'A' as u32,
-    'a'..='z' => character as u32 - 'a' as u32,
-    '0'..='9' => character as u32 - '0' as u32,
-    _ => return None,
+  if style == m::StyleValues::Italic && character == 'h' {
+    // U+1D455 is the historical hole occupied by PLANCK CONSTANT U+210E.
+    return Some('\u{210e}');
+  }
+  match style {
+    m::StyleValues::Plain => None,
+    m::StyleValues::Bold => {
+      ascii_math_variant_character(character, 0x1d400, 0x1d41a, Some(0x1d7ce))
+    }
+    m::StyleValues::Italic => ascii_math_variant_character(character, 0x1d434, 0x1d44e, None),
+    m::StyleValues::BoldItalic => {
+      // Unicode has no bold-italic digit alphabet; Office uses bold digits.
+      ascii_math_variant_character(character, 0x1d468, 0x1d482, Some(0x1d7ce))
+    }
+  }
+}
+
+fn script_variant_character(character: char, style: m::StyleValues) -> Option<char> {
+  if matches!(style, m::StyleValues::Bold | m::StyleValues::BoldItalic) {
+    return ascii_math_variant_character(character, 0x1d4d0, 0x1d4ea, None);
+  }
+  // Unicode unified these pre-existing Letterlike Symbols with the regular
+  // mathematical script alphabet and left holes in U+1D49C..U+1D4CF.
+  // Word 12 fixed output additionally realizes script small l as U+2113;
+  // equation.docx is the local serialized/fixed-output counterexample.
+  let letterlike = match character {
+    'B' => '\u{212c}',
+    'E' => '\u{2130}',
+    'F' => '\u{2131}',
+    'H' => '\u{210b}',
+    'I' => '\u{2110}',
+    'L' => '\u{2112}',
+    'M' => '\u{2133}',
+    'R' => '\u{211b}',
+    'e' => '\u{212f}',
+    'g' => '\u{210a}',
+    'l' => '\u{2113}',
+    'o' => '\u{2134}',
+    _ => return ascii_math_variant_character(character, 0x1d49c, 0x1d4b6, None),
   };
-  let codepoint = match (style, character) {
-    (m::StyleValues::Italic, 'A'..='Z') => 0x1d434 + offset,
-    (m::StyleValues::Italic, 'h') => return Some('\u{210e}'),
-    (m::StyleValues::Italic, 'a'..='z') => 0x1d44e + offset,
-    (m::StyleValues::Bold, 'A'..='Z') => 0x1d400 + offset,
-    (m::StyleValues::Bold, 'a'..='z') => 0x1d41a + offset,
-    (m::StyleValues::Bold, '0'..='9') => 0x1d7ce + offset,
-    (m::StyleValues::BoldItalic, 'A'..='Z') => 0x1d468 + offset,
-    (m::StyleValues::BoldItalic, 'a'..='z') => 0x1d482 + offset,
-    (m::StyleValues::BoldItalic, '0'..='9') => 0x1d7ce + offset,
-    _ => return None,
+  Some(letterlike)
+}
+
+fn fraktur_variant_character(character: char, style: m::StyleValues) -> Option<char> {
+  if matches!(style, m::StyleValues::Bold | m::StyleValues::BoldItalic) {
+    return ascii_math_variant_character(character, 0x1d56c, 0x1d586, None);
+  }
+  let letterlike = match character {
+    'C' => '\u{212d}',
+    'H' => '\u{210c}',
+    'I' => '\u{2111}',
+    'R' => '\u{211c}',
+    'Z' => '\u{2128}',
+    _ => return ascii_math_variant_character(character, 0x1d504, 0x1d51e, None),
   };
-  char::from_u32(codepoint)
+  Some(letterlike)
 }
 
 fn double_struck_variant_character(character: char) -> Option<char> {
+  let letterlike = match character {
+    'C' => '\u{2102}',
+    'H' => '\u{210d}',
+    'N' => '\u{2115}',
+    'P' => '\u{2119}',
+    'Q' => '\u{211a}',
+    'R' => '\u{211d}',
+    'Z' => '\u{2124}',
+    _ => return ascii_math_variant_character(character, 0x1d538, 0x1d552, Some(0x1d7d8)),
+  };
+  Some(letterlike)
+}
+
+fn sans_serif_variant_character(character: char, style: m::StyleValues) -> Option<char> {
+  let (capital_base, small_base, digit_base) = match style {
+    m::StyleValues::Plain => (0x1d5a0, 0x1d5ba, 0x1d7e2),
+    m::StyleValues::Bold => {
+      if let Some(character) = greek_variant_character(character, 0x1d756, 0x1d770, 0x1d78a) {
+        return Some(character);
+      }
+      (0x1d5d4, 0x1d5ee, 0x1d7ec)
+    }
+    m::StyleValues::Italic => (0x1d608, 0x1d622, 0x1d7e2),
+    m::StyleValues::BoldItalic => {
+      if let Some(character) = greek_variant_character(character, 0x1d790, 0x1d7aa, 0x1d7c4) {
+        return Some(character);
+      }
+      (0x1d63c, 0x1d656, 0x1d7ec)
+    }
+  };
+  // Unicode has upright and bold sans-serif digit alphabets, but no italic
+  // digit alphabets. Preserve the requested family and select its boldness.
+  ascii_math_variant_character(character, capital_base, small_base, Some(digit_base))
+}
+
+fn monospace_variant_character(character: char) -> Option<char> {
+  ascii_math_variant_character(character, 0x1d670, 0x1d68a, Some(0x1d7f6))
+}
+
+fn ascii_math_variant_character(
+  character: char,
+  capital_base: u32,
+  small_base: u32,
+  digit_base: Option<u32>,
+) -> Option<char> {
   let codepoint = match character {
-    'C' => 0x2102,
-    'H' => 0x210d,
-    'N' => 0x2115,
-    'P' => 0x2119,
-    'Q' => 0x211a,
-    'R' => 0x211d,
-    'Z' => 0x2124,
-    'A'..='Z' => 0x1d538 + (character as u32 - 'A' as u32),
-    'a'..='z' => 0x1d552 + (character as u32 - 'a' as u32),
-    '0'..='9' => 0x1d7d8 + (character as u32 - '0' as u32),
+    'A'..='Z' => capital_base + (character as u32 - 'A' as u32),
+    'a'..='z' => small_base + (character as u32 - 'a' as u32),
+    '0'..='9' => digit_base? + (character as u32 - '0' as u32),
     _ => return None,
   };
   char::from_u32(codepoint)
@@ -464,6 +562,15 @@ fn roman_greek_variant_character(character: char, style: m::StyleValues) -> Opti
     m::StyleValues::BoldItalic => (0x1d71c, 0x1d736, 0x1d750),
     m::StyleValues::Plain => return None,
   };
+  greek_variant_character(character, capital_base, small_base, variant_base)
+}
+
+fn greek_variant_character(
+  character: char,
+  capital_base: u32,
+  small_base: u32,
+  variant_base: u32,
+) -> Option<char> {
   const CAPITALS: &str = "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡϴΣΤΥΦΧΨΩ";
   const SMALLS: &str = "αβγδεζηθικλμνξοπρςστυφχψω";
   const VARIANTS: &str = "ϵϑϰϕϱϖ";
@@ -484,9 +591,12 @@ fn roman_greek_variant_character(character: char, style: m::StyleValues) -> Opti
 
 #[cfg(test)]
 mod tests {
-  use super::{text_math_text, wordprocessing_math_run_properties, wordprocessing_math_text};
+  use super::{
+    math_run_characters, math_variant_character, text_math_text,
+    wordprocessing_math_run_properties, wordprocessing_math_text,
+  };
   use ooxmlsdk::schemas::{
-    schemas_microsoft_com_office_drawing_2010_main::TextMath,
+    m, schemas_microsoft_com_office_drawing_2010_main::TextMath,
     schemas_openxmlformats_org_wordprocessingml_2006_main as w,
   };
   use ooxmlsdk::sdk::SdkType;
@@ -525,12 +635,160 @@ mod tests {
 
   #[test]
   fn wordprocessing_double_struck_math_maps_ascii_to_unicode() {
-    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:rPr><m:scr m:val="double-struck"/><m:sty m:val="bi"/></m:rPr><m:t>R C z 3</m:t></m:r></m:oMath></w:p>"#;
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:rPr><m:scr m:val="double-struck"/><m:sty m:val="bi"/></m:rPr><m:t>R C z 3〔</m:t></m:r></m:oMath></w:p>"#;
     let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
 
     assert_eq!(
       wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
-      Some("ℝ ℂ 𝕫 𝟛")
+      Some("ℝ ℂ 𝕫 𝟛〔")
+    );
+
+    let w::ParagraphChoice::OfficeMath(math) = &paragraph.paragraph_choice[0] else {
+      panic!("expected OfficeMath");
+    };
+    let m::OfficeMathChoice::Run(run) = &math.office_math_choice[0] else {
+      panic!("expected direct math run");
+    };
+    assert_eq!(
+      math_run_characters(run)
+        .into_iter()
+        .map(|character| (character.source, character.rendered))
+        .collect::<Vec<_>>(),
+      [
+        ('R', 'ℝ'),
+        (' ', ' '),
+        ('C', 'ℂ'),
+        (' ', ' '),
+        ('z', '𝕫'),
+        (' ', ' '),
+        ('3', '𝟛'),
+        ('〔', '〔'),
+      ]
+    );
+  }
+
+  #[test]
+  fn omml_script_style_mapping_covers_unicode_families_and_letterlike_holes() {
+    use ooxmlsdk::schemas::m::{ScriptValues as Script, StyleValues as Style};
+
+    let roman_and_family_matrix = [
+      ('A', Script::Roman, Style::Plain, None),
+      ('A', Script::Roman, Style::Bold, Some('\u{1d400}')),
+      ('A', Script::Roman, Style::Italic, Some('\u{1d434}')),
+      ('A', Script::Roman, Style::BoldItalic, Some('\u{1d468}')),
+      ('h', Script::Roman, Style::Italic, Some('\u{210e}')),
+      ('0', Script::Roman, Style::Bold, Some('\u{1d7ce}')),
+      ('0', Script::Roman, Style::Italic, None),
+      ('0', Script::Roman, Style::BoldItalic, Some('\u{1d7ce}')),
+      ('α', Script::Roman, Style::Bold, Some('\u{1d6c2}')),
+      ('α', Script::Roman, Style::Italic, Some('\u{1d6fc}')),
+      ('α', Script::Roman, Style::BoldItalic, Some('\u{1d736}')),
+      ('A', Script::Script, Style::Plain, Some('\u{1d49c}')),
+      ('A', Script::Script, Style::Italic, Some('\u{1d49c}')),
+      ('A', Script::Script, Style::Bold, Some('\u{1d4d0}')),
+      ('A', Script::Script, Style::BoldItalic, Some('\u{1d4d0}')),
+      ('z', Script::Script, Style::Bold, Some('\u{1d503}')),
+      ('A', Script::Fraktur, Style::Plain, Some('\u{1d504}')),
+      ('A', Script::Fraktur, Style::Italic, Some('\u{1d504}')),
+      ('A', Script::Fraktur, Style::Bold, Some('\u{1d56c}')),
+      ('A', Script::Fraktur, Style::BoldItalic, Some('\u{1d56c}')),
+      ('z', Script::Fraktur, Style::Bold, Some('\u{1d59f}')),
+      ('e', Script::DoubleStruck, Style::Plain, Some('\u{1d556}')),
+      (
+        'e',
+        Script::DoubleStruck,
+        Style::BoldItalic,
+        Some('\u{1d556}'),
+      ),
+      ('0', Script::DoubleStruck, Style::Italic, Some('\u{1d7d8}')),
+      ('A', Script::SansSerif, Style::Plain, Some('\u{1d5a0}')),
+      ('z', Script::SansSerif, Style::Plain, Some('\u{1d5d3}')),
+      ('0', Script::SansSerif, Style::Plain, Some('\u{1d7e2}')),
+      ('A', Script::SansSerif, Style::Italic, Some('\u{1d608}')),
+      ('z', Script::SansSerif, Style::Italic, Some('\u{1d63b}')),
+      ('0', Script::SansSerif, Style::Italic, Some('\u{1d7e2}')),
+      ('A', Script::SansSerif, Style::Bold, Some('\u{1d5d4}')),
+      ('z', Script::SansSerif, Style::Bold, Some('\u{1d607}')),
+      ('0', Script::SansSerif, Style::Bold, Some('\u{1d7ec}')),
+      ('α', Script::SansSerif, Style::Bold, Some('\u{1d770}')),
+      ('A', Script::SansSerif, Style::BoldItalic, Some('\u{1d63c}')),
+      ('z', Script::SansSerif, Style::BoldItalic, Some('\u{1d66f}')),
+      ('0', Script::SansSerif, Style::BoldItalic, Some('\u{1d7ec}')),
+      ('α', Script::SansSerif, Style::BoldItalic, Some('\u{1d7aa}')),
+      ('A', Script::Monospace, Style::Plain, Some('\u{1d670}')),
+      ('z', Script::Monospace, Style::BoldItalic, Some('\u{1d6a3}')),
+      ('0', Script::Monospace, Style::Italic, Some('\u{1d7f6}')),
+      ('α', Script::Monospace, Style::Plain, None),
+      ('+', Script::Script, Style::Plain, None),
+    ];
+    for (source, script, style, expected) in roman_and_family_matrix {
+      assert_eq!(
+        math_variant_character(source, script, style),
+        expected,
+        "source={source:?} script={script:?} style={style:?}"
+      );
+    }
+
+    let script_holes = [
+      ('B', '\u{212c}'),
+      ('E', '\u{2130}'),
+      ('F', '\u{2131}'),
+      ('H', '\u{210b}'),
+      ('I', '\u{2110}'),
+      ('L', '\u{2112}'),
+      ('M', '\u{2133}'),
+      ('R', '\u{211b}'),
+      ('e', '\u{212f}'),
+      ('g', '\u{210a}'),
+      ('l', '\u{2113}'),
+      ('o', '\u{2134}'),
+    ];
+    for (source, expected) in script_holes {
+      assert_eq!(
+        math_variant_character(source, Script::Script, Style::Plain),
+        Some(expected)
+      );
+    }
+
+    let fraktur_holes = [
+      ('C', '\u{212d}'),
+      ('H', '\u{210c}'),
+      ('I', '\u{2111}'),
+      ('R', '\u{211c}'),
+      ('Z', '\u{2128}'),
+    ];
+    for (source, expected) in fraktur_holes {
+      assert_eq!(
+        math_variant_character(source, Script::Fraktur, Style::Plain),
+        Some(expected)
+      );
+    }
+
+    let double_struck_holes = [
+      ('C', '\u{2102}'),
+      ('H', '\u{210d}'),
+      ('N', '\u{2115}'),
+      ('P', '\u{2119}'),
+      ('Q', '\u{211a}'),
+      ('R', '\u{211d}'),
+      ('Z', '\u{2124}'),
+    ];
+    for (source, expected) in double_struck_holes {
+      assert_eq!(
+        math_variant_character(source, Script::DoubleStruck, Style::Plain),
+        Some(expected)
+      );
+    }
+  }
+
+  #[test]
+  fn wordprocessing_math_run_applies_script_fraktur_and_double_struck_in_one_chain() {
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:rPr><m:scr m:val="script"/><m:sty m:val="p"/></m:rPr><m:t>l</m:t></m:r><m:r><m:rPr><m:scr m:val="fraktur"/><m:sty m:val="p"/></m:rPr><m:t>⇏↻⋩e</m:t></m:r><m:r><m:rPr><m:scr m:val="script"/><m:sty m:val="p"/></m:rPr><m:t>T</m:t></m:r><m:r><m:rPr><m:scr m:val="double-struck"/><m:sty m:val="p"/></m:rPr><m:t>e</m:t></m:r></m:oMath></w:p>"#;
+    let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+
+    assert_eq!(
+      wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
+      Some("ℓ⇏↻⋩𝔢𝒯𝕖")
     );
   }
 

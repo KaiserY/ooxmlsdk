@@ -416,11 +416,16 @@ impl ParagraphBordersModel {
 pub(crate) struct ParagraphFormat {
   pub style_id: Option<Arc<str>>,
   pub numbering_id: Option<i32>,
+  /// Absolute and line-unit spacing remain independent through the style
+  /// hierarchy. Word gives a nonzero line-unit value precedence at final
+  /// resolution, while a later zero line-unit value exposes the inherited or
+  /// authored absolute fallback ([MS-OI29500] Part 1 §17.3.1.33(a)).
   pub spacing_before_pt: f32,
   pub spacing_before_lines: Option<f32>,
   pub spacing_before_auto: Option<bool>,
   pub spacing_before_auto_pt: Option<f32>,
   pub spacing_after_pt: f32,
+  pub spacing_after_lines: Option<f32>,
   pub spacing_after_auto: Option<bool>,
   pub spacing_after_auto_pt: Option<f32>,
   pub spacing_before_set: bool,
@@ -796,11 +801,89 @@ pub(crate) struct InlineDrawingGroupEffect {
   pub placement: ImagePlacement,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum InlineImageLineBox {
+  /// The host paragraph computes the line box around an ordinary inline
+  /// picture, shape, OLE preview, or metafile.
+  #[default]
+  CharacterLike,
+  /// A legacy embedded-object preview remains a character-like frame for
+  /// line measurement, while its parent run's w:position supplies the shared
+  /// inline baseline. This is distinct from an object's intrinsic baseline:
+  /// the run displacement must not shrink a grid line around the cached
+  /// presentation.
+  EmbeddedObjectRunPosition,
+  /// The OfficeMath renderer has already expanded the ink bounds with the
+  /// OpenType MATH `MathLeading` contract. The host must not add the ordinary
+  /// paragraph auto-line-spacing excess a second time.
+  OfficeMathExternal,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum OfficeMathBreakKind {
+  Automatic,
+  Manual {
+    align_at: Option<u8>,
+  },
+  /// Boundary between adjacent `m:oMath` instances in one `m:oMathPara`.
+  /// Each instance is a separate display equation rather than a wrapping
+  /// continuation of the preceding equation.
+  Equation,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct OfficeMathLineFragment {
+  pub image: InlineImage,
+  /// Discardable OfficeMath atom spacing between the preceding fragment and
+  /// this fragment when both remain on the same physical line.
+  pub same_line_gap_pt: f32,
+  pub break_before: Option<OfficeMathBreakKind>,
+  /// `brkBin=repeat` realizes a second operator only after an actual wrap.
+  pub wrapped_prefix: Option<InlineImage>,
+  /// Alternate previous-fragment paint used only when a repeated subtraction
+  /// changes the sign at the physical end of the line.
+  pub line_end_variant: Option<InlineImage>,
+  /// Offset of the first binary/relation operator from this fragment's frame
+  /// origin, used by m:brk/@alnAt continuation alignment.
+  pub first_operator_offset_pt: Option<f32>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct OfficeMathLineLayout {
+  pub fragments: Vec<OfficeMathLineFragment>,
+  pub has_manual_break: bool,
+  pub display_wrap_indent_pt: Option<f32>,
+  pub display_wrap_right: bool,
+  /// Operator offsets in the unwrapped zone, counted from its frame origin.
+  pub operator_offsets_pt: Vec<f32>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum OfficeMathDisplayAlignment {
+  Left,
+  Center,
+  CenterGroup,
+  Right,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct OfficeMathDisplayLayout {
+  /// `None` means that Word's `m:dispDef=off` path delegates horizontal
+  /// adjustment to the owning WordprocessingML paragraph.
+  pub alignment: Option<OfficeMathDisplayAlignment>,
+  pub left_margin_pt: f32,
+  pub right_margin_pt: f32,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct InlineImage {
   pub data: Arc<[u8]>,
   pub content_type: Option<String>,
   pub picture_frame: Option<Box<InlineShape>>,
+  /// Whether the picture frame geometry clips the image surface. DrawingML
+  /// picture geometry does; VML `imagedata` is painted on top of its host
+  /// shape and therefore keeps the image's implied rectangle un-clipped.
+  pub picture_frame_clips_image: bool,
   pub effects: Option<common::DrawingEffectSource>,
   pub static3d: Option<common::drawingml_3d::Static3dStyle>,
   pub width_pt: f32,
@@ -817,6 +900,15 @@ pub(crate) struct InlineImage {
   /// Ordinary pictures derive this from `effectExtent`; Office Math uses a
   /// negative value because its baseline lies above scripts below the axis.
   pub inline_baseline_gap_pt: Option<f32>,
+  pub line_box: InlineImageLineBox,
+  /// Natural OfficeMath is retained as this image. When it cannot fit a line,
+  /// the host lays out these source-backed break fragments without scaling the
+  /// complete formula as though it were an ordinary picture.
+  pub office_math_line_layout: Option<Arc<OfficeMathLineLayout>>,
+  /// Display-zone alignment is independent of the owning `w:p` alignment.
+  /// Keep it on the realized OfficeMath object so only its physical lines are
+  /// adjusted; ordinary text lines in the same `w:p` remain untouched.
+  pub office_math_display_layout: Option<OfficeMathDisplayLayout>,
   pub crop: ImageCrop,
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
@@ -944,6 +1036,7 @@ pub(crate) struct InlineChart {
   pub pie_point_styles: Vec<common::ShapeStyle<'static>>,
   pub leader_line_style: common::ShapeStyle<'static>,
   pub title_fill_color: Option<RgbColor>,
+  pub legend_frame_style: common::ShapeStyle<'static>,
   pub chart_area_style: common::ShapeStyle<'static>,
   pub plot_area_style: common::ShapeStyle<'static>,
   pub floor_style: common::ShapeStyle<'static>,

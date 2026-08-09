@@ -161,10 +161,8 @@ impl<'a> CalcPrintDocument<'a> {
         .then(|| page_states.iter().rposition(|(_, empty)| !empty))
         .flatten();
       let mut sheet_page_index = 0usize;
-      for (page_area_index, (area, (drawing_summary, empty))) in page_areas
-        .into_iter()
-        .zip(page_states.into_iter())
-        .enumerate()
+      for (page_area_index, (area, (drawing_summary, empty))) in
+        page_areas.into_iter().zip(page_states).enumerate()
       {
         let starts_print_area_row = area.is_some_and(|page_area| {
           areas.iter().any(|print_area| {

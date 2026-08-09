@@ -169,61 +169,6 @@ fn alternate_content_child_xml(content: &mc::AlternateContent) -> impl Iterator<
     .map(AsRef::as_ref)
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn alternate_content_prefers_ole_object_properties_anchor() {
-    let worksheet = x::Worksheet::from_bytes(
-      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-          xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
-          xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
-          xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
-        <sheetData/>
-        <oleObjects>
-          <mc:AlternateContent>
-            <mc:Choice Requires="x14">
-              <oleObject progId="Package" shapeId="1025" r:id="rId4">
-                <objectPr defaultSize="0" r:id="rId5">
-                  <anchor moveWithCells="1">
-                    <from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></from>
-                    <to><xdr:col>4</xdr:col><xdr:colOff>384810</xdr:colOff><xdr:row>3</xdr:row><xdr:rowOff>156210</xdr:rowOff></to>
-                  </anchor>
-                </objectPr>
-              </oleObject>
-            </mc:Choice>
-            <mc:Fallback><oleObject progId="Package" shapeId="1025" r:id="rId4"/></mc:Fallback>
-          </mc:AlternateContent>
-        </oleObjects>
-      </worksheet>"#,
-    )
-    .expect("worksheet");
-
-    let catalog = SheetObjectCatalog::from_worksheet(&worksheet);
-    assert_eq!(catalog.ole_objects.len(), 1);
-    let object = &catalog.ole_objects[0];
-    assert_eq!(object.shape_id, 1025);
-    assert!(object.has_embedded_properties);
-    let anchor = object.anchor.as_ref().expect("objectPr anchor");
-    assert_eq!(anchor.from_column, 1);
-    assert_eq!(anchor.from_row, 1);
-    assert_eq!(anchor.to_column, 4);
-    assert_eq!(anchor.to_row, 3);
-    assert_eq!(anchor.from_column_offset_emu, 0);
-    assert_eq!(anchor.from_row_offset_emu, 0);
-    assert_eq!(anchor.to_column_offset_emu, 384_810);
-    assert_eq!(anchor.to_row_offset_emu, 156_210);
-
-    let vml_shape = super::super::object_resources::VmlShapeModel {
-      id: Some("_x0000_s1025".into()),
-      ..Default::default()
-    };
-    assert_eq!(catalog.anchor_for_vml_shape(&vml_shape), Some(anchor));
-  }
-}
-
 impl OleObjectModel {
   fn from_ole_object(object: &x::OleObject) -> Self {
     let properties = object.embedded_object_properties.as_ref();
@@ -329,4 +274,59 @@ fn bool_attr_count<const N: usize>(
     .into_iter()
     .filter(|value| value.is_some_and(|value| value.as_bool()))
     .count()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn alternate_content_prefers_ole_object_properties_anchor() {
+    let worksheet = x::Worksheet::from_bytes(
+      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+          xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+          xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+        <sheetData/>
+        <oleObjects>
+          <mc:AlternateContent>
+            <mc:Choice Requires="x14">
+              <oleObject progId="Package" shapeId="1025" r:id="rId4">
+                <objectPr defaultSize="0" r:id="rId5">
+                  <anchor moveWithCells="1">
+                    <from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></from>
+                    <to><xdr:col>4</xdr:col><xdr:colOff>384810</xdr:colOff><xdr:row>3</xdr:row><xdr:rowOff>156210</xdr:rowOff></to>
+                  </anchor>
+                </objectPr>
+              </oleObject>
+            </mc:Choice>
+            <mc:Fallback><oleObject progId="Package" shapeId="1025" r:id="rId4"/></mc:Fallback>
+          </mc:AlternateContent>
+        </oleObjects>
+      </worksheet>"#,
+    )
+    .expect("worksheet");
+
+    let catalog = SheetObjectCatalog::from_worksheet(&worksheet);
+    assert_eq!(catalog.ole_objects.len(), 1);
+    let object = &catalog.ole_objects[0];
+    assert_eq!(object.shape_id, 1025);
+    assert!(object.has_embedded_properties);
+    let anchor = object.anchor.as_ref().expect("objectPr anchor");
+    assert_eq!(anchor.from_column, 1);
+    assert_eq!(anchor.from_row, 1);
+    assert_eq!(anchor.to_column, 4);
+    assert_eq!(anchor.to_row, 3);
+    assert_eq!(anchor.from_column_offset_emu, 0);
+    assert_eq!(anchor.from_row_offset_emu, 0);
+    assert_eq!(anchor.to_column_offset_emu, 384_810);
+    assert_eq!(anchor.to_row_offset_emu, 156_210);
+
+    let vml_shape = super::super::object_resources::VmlShapeModel {
+      id: Some("_x0000_s1025".into()),
+      ..Default::default()
+    };
+    assert_eq!(catalog.anchor_for_vml_shape(&vml_shape), Some(anchor));
+  }
 }

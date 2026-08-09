@@ -11,7 +11,7 @@ Read first:
 3. `../ooxmlsdk-test-suite/AGENTS.md` before changing or running integration,
    corpus, rendering, or benchmark tests.
 4. `../ooxmlsdk-test-suite/docs/` for current upstream coverage matrices.
-5. `docs/specs/` for user-facing format and behavior notes.
+5. `../ooxmlsdk-test-suite/docs/ooxmlsdk-pdf-test/corpus_pdf_conv.md` for golden pdf test.
 
 ## Repository Boundary
 

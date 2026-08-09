@@ -196,7 +196,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
     paint_clip: None,
-    style: common_text_style(item.style),
+    style: common_text_style(*item.style),
     font_id: None,
     color,
     rotation_center: item.rotation_center_pt.map(|(x, y)| common_point(x, y)),
@@ -1347,6 +1347,17 @@ fn lower_chart(
           chart_resource,
           chart.leader_line_shape_properties,
         ),
+        legend_frame_style: pptx_chart_shape_style(
+          import,
+          slide,
+          chart_resource,
+          chart_resource
+            .chart_space
+            .chart
+            .legend
+            .as_deref()
+            .and_then(|legend| legend.chart_shape_properties.as_deref()),
+        ),
         chart_area_style: pptx_chart_area_shape_style(
           import,
           slide,
@@ -1803,6 +1814,17 @@ fn lower_chart(
                 .collect()
             })
             .collect(),
+          legend_frame_style: pptx_chart_shape_style(
+            import,
+            slide,
+            chart_resource,
+            chart_resource
+              .chart_space
+              .chart
+              .legend
+              .as_deref()
+              .and_then(|legend| legend.chart_shape_properties.as_deref()),
+          ),
           chart_area_style: pptx_chart_area_shape_style(
             import,
             slide,
@@ -10006,8 +10028,10 @@ fn lower_paragraph(
                 &line_run.text,
                 style,
                 hyperlink_url,
-                extra_per_gap,
-                &mut remaining_distributed_graphemes,
+                GraphemeDistribution {
+                  extra_per_gap,
+                  remaining: &mut remaining_distributed_graphemes,
+                },
                 text_metrics,
               ))
             }
@@ -11060,7 +11084,7 @@ fn push_text_item(
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text,
-    style,
+    style: Box::new(style),
     rotation_center_pt: placement.rotation_center_pt,
     hyperlink_url,
     form_widget_id: None,
@@ -11175,14 +11199,18 @@ fn push_word_spaced_text_items(
   x_pt
 }
 
+struct GraphemeDistribution<'a> {
+  extra_per_gap: f32,
+  remaining: &'a mut usize,
+}
+
 fn push_grapheme_distributed_text_items(
   items: &mut Vec<PageItem>,
   placement: TextItemPlacement,
   text: &str,
   style: &TextStyle,
   hyperlink_url: Option<String>,
-  extra_per_gap: f32,
-  remaining_graphemes: &mut usize,
+  distribution: GraphemeDistribution<'_>,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
   let mut x_pt = placement.x_pt;
@@ -11198,9 +11226,9 @@ fn push_grapheme_distributed_text_items(
       text_metrics,
     );
     x_pt += text_metrics.measure_text(segment, style);
-    *remaining_graphemes = (*remaining_graphemes).saturating_sub(1);
-    if *remaining_graphemes > 0 {
-      x_pt += extra_per_gap;
+    *distribution.remaining = (*distribution.remaining).saturating_sub(1);
+    if *distribution.remaining > 0 {
+      x_pt += distribution.extra_per_gap;
     }
     start = end;
   }
@@ -11226,6 +11254,7 @@ fn push_text_segment(
   if segment.use_symbol_font {
     segment_style.font_family = Some(Arc::from(segment.symbol_font));
   }
+  segment_style.explicit_symbol_character = segment.use_symbol_font;
   push_text_item(
     items,
     placement,

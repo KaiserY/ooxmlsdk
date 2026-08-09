@@ -5,10 +5,9 @@ use crate::fonts::effective_font_size_pt;
 
 use super::{
   CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, ListLabelImage,
-  NumberingCatalog, NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphAdjust,
-  ParagraphAlignment, ParagraphFormat, ParagraphInlineImport, ParagraphProps, RunStyleOverrides,
-  StylesCatalog, TextRun, TextStyle, math_paragraph_alignment, paragraph_field_events,
-  paragraph_inlines_with_policy, paragraph_note_reference_ids, properties,
+  NumberingCatalog, NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphFormat,
+  ParagraphInlineImport, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
+  paragraph_field_events, paragraph_inlines_with_policy, paragraph_note_reference_ids, properties,
   select_paragraph_numbering,
 };
 
@@ -118,18 +117,6 @@ pub(super) fn paragraph_model_with_base<'a>(
     // while rPrDefault is 10.5pt; Microsoft's fixed PDF uses the 10.5pt unit.
     // Writer also models FONT_CJK_ADVANCE as the bound CJK font height.
     format.character_indent_unit_pt = Some(effective_font_size_pt(&styles.doc_default_run, None));
-  }
-  if let Some(alignment) = math_paragraph_alignment(paragraph, styles.display_math_alignment) {
-    format.alignment = alignment;
-    let adjust = match alignment {
-      ParagraphAlignment::Center => ParagraphAdjust::Center,
-      ParagraphAlignment::Right => ParagraphAdjust::Right,
-      ParagraphAlignment::Justify => ParagraphAdjust::Block,
-      ParagraphAlignment::Left => ParagraphAdjust::Left,
-    };
-    format.justification.adjust = adjust;
-    format.justification.one_word_adjust = adjust;
-    format.justification.last_line_adjust = adjust;
   }
   let run_style =
     properties::paragraph_run_style(styles, style_id, base.run_style.clone(), base.run_overrides);

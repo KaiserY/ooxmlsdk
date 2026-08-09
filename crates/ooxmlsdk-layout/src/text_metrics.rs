@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
-use ooxmlsdk_fonts::TextScript;
+use ooxmlsdk_fonts::{FeatureValue, TextScript};
 use rustc_hash::FxHashMap as HashMap;
-use skrifa::raw::{FontRef, TableProvider, types::Tag};
+use skrifa::{
+  MetadataProvider,
+  instance::{LocationRef, Size},
+  raw::{FontRef, TableProvider, types::Tag},
+};
 
 use crate::fonts::{FontFaceData, FontResolver, FontStyleRef};
 
@@ -174,23 +178,47 @@ pub(crate) struct MathFontMetrics {
   pub script_scale: f32,
   pub script_script_scale: f32,
   pub display_operator_min_height_pt: f32,
+  pub math_leading_pt: f32,
   pub axis_height_pt: f32,
+  pub accent_base_height_pt: f32,
+  pub flattened_accent_base_height_pt: f32,
   pub subscript_shift_down_pt: f32,
+  pub subscript_top_max_pt: f32,
+  pub subscript_baseline_drop_min_pt: f32,
   pub superscript_shift_up_pt: f32,
+  pub superscript_shift_up_cramped_pt: f32,
+  pub superscript_bottom_min_pt: f32,
+  pub superscript_baseline_drop_max_pt: f32,
   pub sub_superscript_gap_min_pt: f32,
+  pub superscript_bottom_max_with_subscript_pt: f32,
   pub space_after_script_pt: f32,
   pub upper_limit_gap_min_pt: f32,
+  pub upper_limit_baseline_rise_min_pt: f32,
   pub lower_limit_gap_min_pt: f32,
+  pub lower_limit_baseline_drop_min_pt: f32,
+  pub stack_top_shift_up_pt: f32,
+  pub stack_top_display_style_shift_up_pt: f32,
+  pub stack_bottom_shift_down_pt: f32,
+  pub stack_bottom_display_style_shift_down_pt: f32,
+  pub stack_gap_min_pt: f32,
+  pub stack_display_style_gap_min_pt: f32,
   pub fraction_numerator_shift_up_pt: f32,
+  pub fraction_numerator_display_style_shift_up_pt: f32,
   pub fraction_denominator_shift_down_pt: f32,
+  pub fraction_denominator_display_style_shift_down_pt: f32,
   pub fraction_numerator_gap_min_pt: f32,
+  pub fraction_num_display_style_gap_min_pt: f32,
   pub fraction_rule_thickness_pt: f32,
   pub fraction_denominator_gap_min_pt: f32,
+  pub fraction_denom_display_style_gap_min_pt: f32,
+  pub skewed_fraction_horizontal_gap_pt: f32,
+  pub skewed_fraction_vertical_gap_pt: f32,
   pub overbar_vertical_gap_pt: f32,
   pub overbar_rule_thickness_pt: f32,
   pub underbar_vertical_gap_pt: f32,
   pub underbar_rule_thickness_pt: f32,
   pub radical_vertical_gap_pt: f32,
+  pub radical_display_style_vertical_gap_pt: f32,
   pub radical_rule_thickness_pt: f32,
   pub radical_extra_ascender_pt: f32,
   pub radical_kern_before_degree_pt: f32,
@@ -201,27 +229,66 @@ pub(crate) struct MathFontMetrics {
 impl MathFontMetrics {
   fn recommended(font_size_pt: f32) -> Self {
     let em = font_size_pt.max(1.0);
+    let rule = (em * 0.04).max(0.4);
     Self {
       script_scale: 0.8,
       script_script_scale: 0.6,
       display_operator_min_height_pt: em * 1.3,
+      // OpenType defines MathLeading as font-authored whitespace between
+      // formulas. A face without a usable MATH table has no such authored
+      // whitespace; its ordinary text line metrics remain authoritative.
+      math_leading_pt: 0.0,
       axis_height_pt: em * 0.25,
+      // OpenType recommends the face's x-height and cap height. These ratios
+      // are used only when no face can be resolved at all; a resolved
+      // MATH-less face is completed from its actual OS/2 metrics below.
+      accent_base_height_pt: em * 0.45,
+      flattened_accent_base_height_pt: em * 0.7,
       subscript_shift_down_pt: em * 0.2,
+      subscript_top_max_pt: em * 0.36,
+      subscript_baseline_drop_min_pt: 0.0,
       superscript_shift_up_pt: em * 0.36,
+      superscript_shift_up_cramped_pt: 0.0,
+      superscript_bottom_min_pt: em * 0.1125,
+      superscript_baseline_drop_max_pt: 0.0,
       sub_superscript_gap_min_pt: em * 0.2,
+      superscript_bottom_max_with_subscript_pt: em * 0.36,
       space_after_script_pt: em * 0.05,
       upper_limit_gap_min_pt: em * 0.12,
+      upper_limit_baseline_rise_min_pt: 0.0,
       lower_limit_gap_min_pt: em * 0.12,
+      lower_limit_baseline_drop_min_pt: 0.0,
+      // MathML Core's MATH-less fallback uses zero preferred stack shifts;
+      // the minimum gaps below then determine a non-overlapping placement.
+      stack_top_shift_up_pt: 0.0,
+      stack_top_display_style_shift_up_pt: 0.0,
+      stack_bottom_shift_down_pt: 0.0,
+      stack_bottom_display_style_shift_down_pt: 0.0,
+      stack_gap_min_pt: rule * 3.0,
+      stack_display_style_gap_min_pt: rule * 7.0,
       fraction_numerator_shift_up_pt: em * 0.4,
+      fraction_numerator_display_style_shift_up_pt: em * 0.4,
       fraction_denominator_shift_down_pt: em * 0.4,
+      fraction_denominator_display_style_shift_down_pt: em * 0.4,
       fraction_numerator_gap_min_pt: em * 0.12,
-      fraction_rule_thickness_pt: (em * 0.04).max(0.4),
+      fraction_num_display_style_gap_min_pt: rule * 3.0,
+      fraction_rule_thickness_pt: rule,
       fraction_denominator_gap_min_pt: em * 0.12,
+      fraction_denom_display_style_gap_min_pt: rule * 3.0,
+      // MathML Core does not supply skewed-fraction fallback constants;
+      // Typst's documented MATH-less fallback keeps zero vertical gap and a
+      // half-em horizontal gap.
+      skewed_fraction_horizontal_gap_pt: em * 0.5,
+      skewed_fraction_vertical_gap_pt: 0.0,
       overbar_vertical_gap_pt: em * 0.08,
       overbar_rule_thickness_pt: (em * 0.04).max(0.4),
       underbar_vertical_gap_pt: em * 0.08,
       underbar_rule_thickness_pt: (em * 0.04).max(0.4),
       radical_vertical_gap_pt: em * 0.08,
+      // OpenType recommends the default rule thickness plus one quarter of
+      // the face's x-height. The resolved face path below replaces this
+      // provisional x-height ratio with the actual OS/2 metric.
+      radical_display_style_vertical_gap_pt: rule + em * 0.45 * 0.25,
       radical_rule_thickness_pt: (em * 0.04).max(0.4),
       radical_extra_ascender_pt: em * 0.08,
       radical_kern_before_degree_pt: em * 0.04,
@@ -255,8 +322,15 @@ pub struct ShapedGlyphBounds {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct MeasureStyleKey {
   font_family: Option<Box<str>>,
+  high_ansi_font_family: Option<Box<str>>,
   fallback_font_family: Option<Box<str>>,
+  high_ansi_fallback_font_family: Option<Box<str>>,
+  east_asia_fallback_font_family: Option<Box<str>>,
+  complex_fallback_font_family: Option<Box<str>>,
   font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  high_ansi_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  east_asia_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
+  complex_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   east_asia_font_family: Option<Box<str>>,
   complex_font_family: Option<Box<str>>,
   font_size_bits: u32,
@@ -273,6 +347,9 @@ struct MeasureStyleKey {
   small_caps: bool,
   kerning_enabled: bool,
   wordprocessingml_font_slots: bool,
+  wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
+  wordprocessingml_east_asia_language_is_chinese: bool,
+  wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   cjk_punctuation_compression_ratio_bits: u32,
 }
 
@@ -280,8 +357,15 @@ impl MeasureStyleKey {
   fn from_style(style: &(impl FontStyleRef + ?Sized)) -> Self {
     Self {
       font_family: style.font_family().map(Into::into),
+      high_ansi_font_family: style.high_ansi_font_family().map(Into::into),
       fallback_font_family: style.fallback_font_family().map(Into::into),
+      high_ansi_fallback_font_family: style.high_ansi_fallback_font_family().map(Into::into),
+      east_asia_fallback_font_family: style.east_asia_fallback_font_family().map(Into::into),
+      complex_fallback_font_family: style.complex_fallback_font_family().map(Into::into),
       font_family_class: style.font_family_class(),
+      high_ansi_font_family_class: style.high_ansi_font_family_class(),
+      east_asia_font_family_class: style.east_asia_font_family_class(),
+      complex_font_family_class: style.complex_font_family_class(),
       east_asia_font_family: style.east_asia_font_family().map(Into::into),
       complex_font_family: style.complex_font_family().map(Into::into),
       font_size_bits: style.font_size_pt().to_bits(),
@@ -298,14 +382,25 @@ impl MeasureStyleKey {
       small_caps: style.small_caps(),
       kerning_enabled: style.kerning_enabled(),
       wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
+      wordprocessingml_font_hint: style.wordprocessingml_font_hint(),
+      wordprocessingml_east_asia_language_is_chinese: style
+        .wordprocessingml_east_asia_language_is_chinese(),
+      wordprocessingml_east_asia_font_charset: style.wordprocessingml_east_asia_font_charset(),
       cjk_punctuation_compression_ratio_bits: style.cjk_punctuation_compression_ratio().to_bits(),
     }
   }
 
   fn matches(&self, style: &(impl FontStyleRef + ?Sized)) -> bool {
     self.font_family.as_deref() == style.font_family()
+      && self.high_ansi_font_family.as_deref() == style.high_ansi_font_family()
       && self.fallback_font_family.as_deref() == style.fallback_font_family()
+      && self.high_ansi_fallback_font_family.as_deref() == style.high_ansi_fallback_font_family()
+      && self.east_asia_fallback_font_family.as_deref() == style.east_asia_fallback_font_family()
+      && self.complex_fallback_font_family.as_deref() == style.complex_fallback_font_family()
       && self.font_family_class == style.font_family_class()
+      && self.high_ansi_font_family_class == style.high_ansi_font_family_class()
+      && self.east_asia_font_family_class == style.east_asia_font_family_class()
+      && self.complex_font_family_class == style.complex_font_family_class()
       && self.east_asia_font_family.as_deref() == style.east_asia_font_family()
       && self.complex_font_family.as_deref() == style.complex_font_family()
       && self.font_size_bits == style.font_size_pt().to_bits()
@@ -322,6 +417,11 @@ impl MeasureStyleKey {
       && self.small_caps == style.small_caps()
       && self.kerning_enabled == style.kerning_enabled()
       && self.wordprocessingml_font_slots == style.wordprocessingml_font_slots()
+      && self.wordprocessingml_font_hint == style.wordprocessingml_font_hint()
+      && self.wordprocessingml_east_asia_language_is_chinese
+        == style.wordprocessingml_east_asia_language_is_chinese()
+      && self.wordprocessingml_east_asia_font_charset
+        == style.wordprocessingml_east_asia_font_charset()
       && self.cjk_punctuation_compression_ratio_bits
         == style.cjk_punctuation_compression_ratio().to_bits()
   }
@@ -395,6 +495,26 @@ impl TextMetrics {
     }
 
     let runs = self.fonts.shape_text_runs(text, style)?;
+    shaped_text_from_runs(runs, |font_id| self.fonts.font_face_data(font_id))
+  }
+
+  pub(crate) fn shape_text_with_features(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    features: &[FeatureValue<'_>],
+  ) -> Option<ShapedText> {
+    if text.is_empty() {
+      return Some(ShapedText {
+        glyphs: Vec::new(),
+        font_faces: Vec::new(),
+        width_pt: 0.0,
+      });
+    }
+
+    let runs = self
+      .fonts
+      .shape_text_runs_with_features(text, style, features)?;
     shaped_text_from_runs(runs, |font_id| self.fonts.font_face_data(font_id))
   }
 
@@ -698,7 +818,7 @@ impl TextMetrics {
 
 fn gdi_device_ppem(font_size_pt: f32, device_dpi: f32) -> Option<u8> {
   let ppem = (font_size_pt * device_dpi / crate::units::POINTS_PER_INCH).round();
-  (ppem.is_finite() && (1.0..=f32::from(u8::MAX)).contains(&ppem)).then(|| ppem as u8)
+  (ppem.is_finite() && (1.0..=f32::from(u8::MAX)).contains(&ppem)).then_some(ppem as u8)
 }
 
 fn gdi_device_advance_pt(width_px: u8, device_dpi: f32) -> f32 {
@@ -746,10 +866,32 @@ fn uniform_character_spacing_from_advances(
 fn math_font_metrics_from_face(face: &FontFaceData, font_size_pt: f32) -> Option<MathFontMetrics> {
   let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
   let units_per_em = f32::from(font.head().ok()?.units_per_em()).max(1.0);
-  let table = font.table_data(Tag::new(b"MATH"))?;
+  let font_size_pt = font_size_pt.max(1.0);
+  let mut fallback = MathFontMetrics::recommended(font_size_pt);
+  let global_metrics = font.metrics(Size::new(font_size_pt), LocationRef::default());
+  let x_height_pt = global_metrics
+    .x_height
+    .filter(|value| *value > 0.0)
+    .unwrap_or(fallback.accent_base_height_pt);
+  fallback.accent_base_height_pt = x_height_pt;
+  fallback.flattened_accent_base_height_pt = global_metrics
+    .cap_height
+    .filter(|value| *value > 0.0)
+    .unwrap_or(fallback.flattened_accent_base_height_pt);
+  // OpenType's recommendations for the side-script ink constraints are
+  // expressed in terms of the selected face's x-height. Complete a MATH-less
+  // face from that authored metric rather than from the requested em size.
+  fallback.subscript_top_max_pt = x_height_pt * 0.8;
+  fallback.superscript_bottom_min_pt = x_height_pt * 0.25;
+  fallback.superscript_bottom_max_with_subscript_pt = x_height_pt * 0.8;
+  fallback.radical_display_style_vertical_gap_pt =
+    fallback.radical_rule_thickness_pt + x_height_pt * 0.25;
+  let Some(table) = font.table_data(Tag::new(b"MATH")) else {
+    return Some(fallback);
+  };
   let bytes = table.as_bytes();
   let constants_offset = usize::from(be_u16(bytes, 4)?);
-  let scale = font_size_pt.max(1.0) / units_per_em;
+  let scale = font_size_pt / units_per_em;
   let value = |index: usize| -> Option<f32> {
     be_i16(
       bytes,
@@ -767,23 +909,47 @@ fn math_font_metrics_from_face(face: &FontFaceData, font_size_pt: f32) -> Option
     script_scale: percentage(0).unwrap_or(0.8),
     script_script_scale: percentage(2).unwrap_or(0.6),
     display_operator_min_height_pt: f32::from(be_u16(bytes, constants_offset + 6)?) * scale,
+    math_leading_pt: value(0)?,
     axis_height_pt: value(1)?,
+    accent_base_height_pt: value(2)?,
+    flattened_accent_base_height_pt: value(3)?,
     subscript_shift_down_pt: value(4)?,
+    subscript_top_max_pt: value(5)?,
+    subscript_baseline_drop_min_pt: value(6)?,
     superscript_shift_up_pt: value(7)?,
+    superscript_shift_up_cramped_pt: value(8)?,
+    superscript_bottom_min_pt: value(9)?,
+    superscript_baseline_drop_max_pt: value(10)?,
     sub_superscript_gap_min_pt: value(11)?,
+    superscript_bottom_max_with_subscript_pt: value(12)?,
     space_after_script_pt: value(13)?,
     upper_limit_gap_min_pt: value(14)?,
+    upper_limit_baseline_rise_min_pt: value(15)?,
     lower_limit_gap_min_pt: value(16)?,
+    lower_limit_baseline_drop_min_pt: value(17)?,
+    stack_top_shift_up_pt: value(18)?,
+    stack_top_display_style_shift_up_pt: value(19)?,
+    stack_bottom_shift_down_pt: value(20)?,
+    stack_bottom_display_style_shift_down_pt: value(21)?,
+    stack_gap_min_pt: value(22)?,
+    stack_display_style_gap_min_pt: value(23)?,
     fraction_numerator_shift_up_pt: value(28)?,
+    fraction_numerator_display_style_shift_up_pt: value(29)?,
     fraction_denominator_shift_down_pt: value(30)?,
+    fraction_denominator_display_style_shift_down_pt: value(31)?,
     fraction_numerator_gap_min_pt: value(32)?,
+    fraction_num_display_style_gap_min_pt: value(33)?,
     fraction_rule_thickness_pt: value(34)?.max(0.2),
     fraction_denominator_gap_min_pt: value(35)?,
+    fraction_denom_display_style_gap_min_pt: value(36)?,
+    skewed_fraction_horizontal_gap_pt: value(37)?,
+    skewed_fraction_vertical_gap_pt: value(38)?,
     overbar_vertical_gap_pt: value(39)?,
     overbar_rule_thickness_pt: value(40)?.max(0.2),
     underbar_vertical_gap_pt: value(42)?,
     underbar_rule_thickness_pt: value(43)?.max(0.2),
     radical_vertical_gap_pt: value(45)?,
+    radical_display_style_vertical_gap_pt: value(46)?,
     radical_rule_thickness_pt: value(47)?.max(0.2),
     radical_extra_ascender_pt: value(48)?,
     radical_kern_before_degree_pt: value(49)?,

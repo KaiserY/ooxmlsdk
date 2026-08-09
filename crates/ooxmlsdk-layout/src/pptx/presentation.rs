@@ -11,7 +11,7 @@ use crate::error::Result;
 use super::drawingml::text_body::TextBody;
 use super::drawingml::text_list_style::TextListStyle;
 use super::drawingml::theme::{ThemeColorScheme, ThemeFontScheme, ThemeFormatScheme};
-use super::import::PowerPointImport;
+use super::import::{PowerPointImport, ThemeFragmentRecord};
 use super::slide::{
   ColorMap, HeaderFooter, ShapeLocation, SlideCommentAuthor, SlidePersist, SlideSize,
 };
@@ -486,15 +486,15 @@ impl PresentationFragmentHandler {
       .map(str::to_string)
       .unwrap_or_else(|| "<theme>".to_string());
     let theme = theme_part.root_element(package)?;
-    import.ensure_theme(
-      path.clone(),
-      theme.name.clone(),
-      theme.theme_id.clone(),
-      ThemeColorScheme::from_dml(&theme.theme_elements.color_scheme),
-      ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme),
-      ThemeFormatScheme::from_dml(&theme.theme_elements.format_scheme),
-      TextBody::from_theme_object_defaults(theme.object_defaults.as_deref()),
-    );
+    import.ensure_theme(ThemeFragmentRecord {
+      path: path.clone(),
+      name: theme.name.clone(),
+      theme_id: theme.theme_id.clone(),
+      color_scheme: ThemeColorScheme::from_dml(&theme.theme_elements.color_scheme),
+      font_scheme: ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme),
+      format_scheme: ThemeFormatScheme::from_dml(&theme.theme_elements.format_scheme),
+      text_body_defaults: TextBody::from_theme_object_defaults(theme.object_defaults.as_deref()),
+    });
     Ok(Some(path))
   }
 
@@ -514,15 +514,15 @@ impl PresentationFragmentHandler {
       .map(str::to_string)
       .unwrap_or_else(|| "<theme>".to_string());
     let theme = theme_part.root_element(package)?;
-    import.ensure_theme(
-      path.clone(),
-      theme.name.clone(),
-      theme.theme_id.clone(),
-      ThemeColorScheme::from_dml(&theme.theme_elements.color_scheme),
-      ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme),
-      ThemeFormatScheme::from_dml(&theme.theme_elements.format_scheme),
-      TextBody::from_theme_object_defaults(theme.object_defaults.as_deref()),
-    );
+    import.ensure_theme(ThemeFragmentRecord {
+      path: path.clone(),
+      name: theme.name.clone(),
+      theme_id: theme.theme_id.clone(),
+      color_scheme: ThemeColorScheme::from_dml(&theme.theme_elements.color_scheme),
+      font_scheme: ThemeFontScheme::from_dml(&theme.theme_elements.font_scheme),
+      format_scheme: ThemeFormatScheme::from_dml(&theme.theme_elements.format_scheme),
+      text_body_defaults: TextBody::from_theme_object_defaults(theme.object_defaults.as_deref()),
+    });
     Ok(Some(path))
   }
 

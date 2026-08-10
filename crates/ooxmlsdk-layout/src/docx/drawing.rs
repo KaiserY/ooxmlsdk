@@ -14,12 +14,11 @@ pub(super) fn inline_image(
 pub(super) fn push_drawing_textboxes(
   drawing: &w::Drawing,
   inlines: &mut Vec<InlineItem>,
-  style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) {
-  super::push_drawing_textboxes_impl(drawing, inlines, style, styles, images, hyperlinks);
+  super::push_drawing_textboxes_impl(drawing, inlines, styles, images, hyperlinks);
 }
 
 pub(super) fn push_drawing_shapes(

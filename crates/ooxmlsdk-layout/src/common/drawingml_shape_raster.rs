@@ -1171,9 +1171,7 @@ fn composite_path_gradient_mask(
   page_to_raster: SkTransform,
 ) -> Option<()> {
   let gradient_path = gradient.path?;
-  let focus_width = 1.0 - gradient_path.fill_to.left - gradient_path.fill_to.right;
-  let focus_height = 1.0 - gradient_path.fill_to.top - gradient_path.fill_to.bottom;
-  if focus_width < 0.0 || focus_height < 0.0 || gradient.stops.is_empty() {
+  if gradient.stops.is_empty() {
     return None;
   }
   let default_shape = vec![vec![

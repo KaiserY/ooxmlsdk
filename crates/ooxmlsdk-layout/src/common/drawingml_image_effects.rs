@@ -2996,6 +2996,7 @@ fn path_gradient_contains(
   outer_ratio: f32,
   circle: bool,
 ) -> bool {
+  let focus = normalize_image_effect_focus_rect(focus);
   let focus_width = 1.0 - focus.left - focus.right;
   let focus_height = 1.0 - focus.top - focus.bottom;
   let scale_x = focus_width + (1.0 - focus_width) * outer_ratio;
@@ -3013,6 +3014,21 @@ fn path_gradient_contains(
     x.mul_add(x, y * y) <= 1.0
   } else {
     (0.0..=1.0).contains(&base_x) && (0.0..=1.0).contains(&base_y)
+  }
+}
+
+fn normalize_image_effect_focus_rect(rect: ImageEffectRelativeRect) -> ImageEffectRelativeRect {
+  let authored_right = 1.0 - rect.right;
+  let authored_bottom = 1.0 - rect.bottom;
+  let left = rect.left.min(authored_right);
+  let top = rect.top.min(authored_bottom);
+  let right = rect.left.max(authored_right);
+  let bottom = rect.top.max(authored_bottom);
+  ImageEffectRelativeRect {
+    left,
+    top,
+    right: 1.0 - right,
+    bottom: 1.0 - bottom,
   }
 }
 

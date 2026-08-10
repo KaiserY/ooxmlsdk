@@ -27,18 +27,20 @@ pub(crate) fn resolve_path_gradient(
   path: &a::PathGradientFill,
   shape_transform: Transform,
 ) -> GradientPath {
-  let fill_to_shape = path
-    .fill_to_rectangle
-    .as_ref()
-    .map(|rect| {
-      drawingml_relative_rect(
-        rect.left.as_ref(),
-        rect.top.as_ref(),
-        rect.right.as_ref(),
-        rect.bottom.as_ref(),
-      )
-    })
-    .unwrap_or(OFFICE_DEFAULT_PATH_FOCUS);
+  let fill_to_shape = normalize_focus_rect(
+    path
+      .fill_to_rectangle
+      .as_ref()
+      .map(|rect| {
+        drawingml_relative_rect(
+          rect.left.as_ref(),
+          rect.top.as_ref(),
+          rect.right.as_ref(),
+          rect.bottom.as_ref(),
+        )
+      })
+      .unwrap_or(OFFICE_DEFAULT_PATH_FOCUS),
+  );
   let tile = source.tile_rectangle.as_ref().map(|rect| {
     drawingml_relative_rect(
       rect.left.as_ref(),
@@ -90,6 +92,31 @@ fn drawingml_relative_rect(
     top: ratio(top),
     right: ratio(right),
     bottom: ratio(bottom),
+  }
+}
+
+/// Converts the two authored edge positions into geometric focus bounds.
+///
+/// ISO/IEC 29500-1 §20.1.8.31 defines `fillToRect` as a rectangle whose
+/// edges are offsets from the corresponding shape edges. Office-authored
+/// content can place the nominal left edge to the right of the nominal right
+/// edge (the equivalent VML uses a negative `focussize`). A rectangle is
+/// orientation-independent, so retain its covered region while putting the
+/// edges back into the monotonic form used by the path-gradient sampler.
+pub(crate) fn normalize_focus_rect(rect: RelativeRect) -> RelativeRect {
+  let authored_left = rect.left;
+  let authored_top = rect.top;
+  let authored_right = 1.0 - rect.right;
+  let authored_bottom = 1.0 - rect.bottom;
+  let left = authored_left.min(authored_right);
+  let top = authored_top.min(authored_bottom);
+  let right = authored_left.max(authored_right);
+  let bottom = authored_top.max(authored_bottom);
+  RelativeRect {
+    left,
+    top,
+    right: 1.0 - right,
+    bottom: 1.0 - bottom,
   }
 }
 
@@ -307,12 +334,13 @@ fn contains(
   outer_ratio: f64,
   shape: Option<&[Vec<KurboPoint>]>,
 ) -> Option<bool> {
-  let focus_width = 1.0 - f64::from(path.fill_to.left) - f64::from(path.fill_to.right);
-  let focus_height = 1.0 - f64::from(path.fill_to.top) - f64::from(path.fill_to.bottom);
+  let focus = normalize_focus_rect(path.fill_to);
+  let focus_width = 1.0 - f64::from(focus.left) - f64::from(focus.right);
+  let focus_height = 1.0 - f64::from(focus.top) - f64::from(focus.bottom);
   let scale_x = focus_width + (1.0 - focus_width) * outer_ratio;
   let scale_y = focus_height + (1.0 - focus_height) * outer_ratio;
-  let offset_x = f64::from(path.fill_to.left) * (1.0 - outer_ratio);
-  let offset_y = f64::from(path.fill_to.top) * (1.0 - outer_ratio);
+  let offset_x = f64::from(focus.left) * (1.0 - outer_ratio);
+  let offset_y = f64::from(focus.top) * (1.0 - outer_ratio);
   if scale_x.abs() <= f64::EPSILON || scale_y.abs() <= f64::EPSILON {
     return Some(
       (point.x - offset_x).abs() <= f64::EPSILON && (point.y - offset_y).abs() <= f64::EPSILON,
@@ -426,5 +454,31 @@ mod tests {
     );
 
     assert_eq!(resolved.fill_to, OFFICE_DEFAULT_PATH_FOCUS);
+  }
+
+  #[test]
+  fn inverted_authored_edges_keep_the_same_geometric_focus_rectangle() {
+    let source = a::GradientFill::default();
+    let path = a::PathGradientFill {
+      path: Some(a::PathShadeValues::Circle),
+      fill_to_rectangle: Some(a::FillToRectangle {
+        left: Some(DrawingmlPercentageValue::Decimal(20_000)),
+        top: Some(DrawingmlPercentageValue::Decimal(50_000)),
+        right: Some(DrawingmlPercentageValue::Decimal(100_000)),
+        bottom: Some(DrawingmlPercentageValue::Decimal(50_000)),
+      }),
+    };
+
+    let resolved = resolve_path_gradient(&source, &path, Transform::default());
+
+    assert_eq!(
+      resolved.fill_to,
+      RelativeRect {
+        left: 0.0,
+        top: 0.5,
+        right: 0.8,
+        bottom: 0.5,
+      }
+    );
   }
 }

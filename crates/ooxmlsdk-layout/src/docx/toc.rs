@@ -669,6 +669,8 @@ fn scan_story_paragraph(
           bookmark_scopes.insert(name);
         }
       }
+      ParagraphFieldEvent::SuppressParagraphBreak { .. }
+      | ParagraphFieldEvent::DeferredParagraphBreak { .. } => {}
     }
   }
 

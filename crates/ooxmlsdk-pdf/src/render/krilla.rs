@@ -433,6 +433,7 @@ fn render_inner(
   let pdf = pdf
     .finish()
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))?;
+  let pdf = fonts.restore_office_font_descriptor_metrics(pdf)?;
   let pdf = inject_form_widget_annotations(pdf, form_widget_annotations)?;
   Ok(RenderOutput {
     pdf,
@@ -6351,11 +6352,12 @@ fn pattern_color_fill(color: common::Color) -> Fill {
 
 fn path_gradient_paint(
   gradient: &common::GradientFill<'static>,
-  path: common::GradientPath,
+  mut path: common::GradientPath,
 ) -> Option<krilla::paint::Paint> {
   if path.kind != common::GradientPathKind::Circle || path.mirror_tile {
     return None;
   }
+  path.fill_to = normalized_path_gradient_focus(path.fill_to);
   let focus_width = 1.0 - path.fill_to.left - path.fill_to.right;
   let focus_height = 1.0 - path.fill_to.top - path.fill_to.bottom;
   // A PDF type-3 radial shading can represent two circles under one affine.
@@ -6412,12 +6414,6 @@ fn draw_path_gradient_raster(
   {
     return false;
   }
-  let focus_width = 1.0 - path.fill_to.left - path.fill_to.right;
-  let focus_height = 1.0 - path.fill_to.top - path.fill_to.bottom;
-  if focus_width < 0.0 || focus_height < 0.0 {
-    return false;
-  }
-
   let mut pixels_per_point =
     (MAX_PATH_GRADIENT_RASTER_PIXELS / (polyline.width_pt * polyline.height_pt)).sqrt();
   pixels_per_point = pixels_per_point.clamp(0.25, MAX_PATH_GRADIENT_PIXELS_PER_POINT);
@@ -6537,12 +6533,13 @@ fn path_gradient_contains(
   outer_ratio: f64,
   shape: Option<&[Vec<kurbo::Point>]>,
 ) -> Option<bool> {
-  let focus_width = 1.0 - f64::from(path.fill_to.left) - f64::from(path.fill_to.right);
-  let focus_height = 1.0 - f64::from(path.fill_to.top) - f64::from(path.fill_to.bottom);
+  let focus = normalized_path_gradient_focus(path.fill_to);
+  let focus_width = 1.0 - f64::from(focus.left) - f64::from(focus.right);
+  let focus_height = 1.0 - f64::from(focus.top) - f64::from(focus.bottom);
   let scale_x = focus_width + (1.0 - focus_width) * outer_ratio;
   let scale_y = focus_height + (1.0 - focus_height) * outer_ratio;
-  let offset_x = f64::from(path.fill_to.left) * (1.0 - outer_ratio);
-  let offset_y = f64::from(path.fill_to.top) * (1.0 - outer_ratio);
+  let offset_x = f64::from(focus.left) * (1.0 - outer_ratio);
+  let offset_y = f64::from(focus.top) * (1.0 - outer_ratio);
   if scale_x.abs() <= f64::EPSILON || scale_y.abs() <= f64::EPSILON {
     return Some(
       (point.x - offset_x).abs() <= f64::EPSILON && (point.y - offset_y).abs() <= f64::EPSILON,
@@ -6563,6 +6560,21 @@ fn path_gradient_contains(
     }
     common::GradientPathKind::Shape => point_in_polygons(base, shape?),
   })
+}
+
+fn normalized_path_gradient_focus(rect: common::RelativeRect) -> common::RelativeRect {
+  let authored_right = 1.0 - rect.right;
+  let authored_bottom = 1.0 - rect.bottom;
+  let left = rect.left.min(authored_right);
+  let top = rect.top.min(authored_bottom);
+  let right = rect.left.max(authored_right);
+  let bottom = rect.top.max(authored_bottom);
+  common::RelativeRect {
+    left,
+    top,
+    right: 1.0 - right,
+    bottom: 1.0 - bottom,
+  }
 }
 
 fn path_polygons_in_gradient_space(

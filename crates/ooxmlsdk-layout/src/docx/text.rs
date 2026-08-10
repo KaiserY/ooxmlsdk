@@ -4,11 +4,11 @@ use std::sync::Arc;
 use crate::fonts::effective_font_size_pt;
 
 use super::{
-  CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, ListLabelImage,
-  NumberingCatalog, NumberingFormatMergeContext, NumberingReference, Paragraph, ParagraphFormat,
-  ParagraphInlineImport, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
-  paragraph_field_events, paragraph_inlines_with_policy, paragraph_note_reference_ids, properties,
-  select_paragraph_numbering,
+  ComplexFieldImportState, CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog,
+  ImageCatalog, ListLabelImage, NumberingCatalog, NumberingFormatMergeContext, NumberingReference,
+  Paragraph, ParagraphFormat, ParagraphInlineImport, ParagraphProps, RunStyleOverrides,
+  StylesCatalog, TextRun, TextStyle, paragraph_field_events, paragraph_inlines_with_policy,
+  paragraph_note_reference_ids, properties, select_paragraph_numbering,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -19,6 +19,36 @@ pub(super) struct ParagraphImportBase<'a> {
   pub(super) custom_xml_bindings: Option<&'a CustomXmlBindings>,
 }
 
+pub(super) struct ParagraphImportState<'a> {
+  pub(super) form_widget_ids: &'a mut FormWidgetIdAllocator,
+  pub(super) complex_fields: Option<&'a mut ComplexFieldImportState>,
+  pub(super) table_depth: usize,
+}
+
+impl<'a> ParagraphImportState<'a> {
+  #[cfg(test)]
+  fn isolated(form_widget_ids: &'a mut FormWidgetIdAllocator) -> Self {
+    Self {
+      form_widget_ids,
+      complex_fields: None,
+      table_depth: 0,
+    }
+  }
+
+  pub(super) fn in_story(
+    form_widget_ids: &'a mut FormWidgetIdAllocator,
+    complex_fields: &'a mut ComplexFieldImportState,
+    table_depth: usize,
+  ) -> Self {
+    Self {
+      form_widget_ids,
+      complex_fields: Some(complex_fields),
+      table_depth,
+    }
+  }
+}
+
+#[cfg(test)]
 pub(super) fn paragraph_model(
   paragraph: &w::Paragraph,
   styles: &StylesCatalog,
@@ -42,6 +72,30 @@ pub(super) fn paragraph_model(
   )
 }
 
+pub(super) fn paragraph_model_in_story(
+  paragraph: &w::Paragraph,
+  styles: &StylesCatalog,
+  numbering: &mut NumberingCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
+  state: ParagraphImportState<'_>,
+) -> Paragraph {
+  paragraph_model_with_base_in_story(
+    paragraph,
+    styles,
+    numbering,
+    images,
+    hyperlinks,
+    ParagraphImportBase {
+      custom_xml_bindings: Some(custom_xml_bindings),
+      ..Default::default()
+    },
+    state,
+  )
+}
+
+#[cfg(test)]
 pub(super) fn paragraph_model_with_base<'a>(
   paragraph: &w::Paragraph,
   styles: &StylesCatalog,
@@ -51,6 +105,45 @@ pub(super) fn paragraph_model_with_base<'a>(
   form_widget_ids: &mut FormWidgetIdAllocator,
   base: ParagraphImportBase<'a>,
 ) -> Paragraph {
+  paragraph_model_with_base_impl(
+    paragraph,
+    styles,
+    numbering,
+    images,
+    hyperlinks,
+    base,
+    ParagraphImportState::isolated(form_widget_ids),
+  )
+}
+
+pub(super) fn paragraph_model_with_base_in_story<'a>(
+  paragraph: &w::Paragraph,
+  styles: &StylesCatalog,
+  numbering: &mut NumberingCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  base: ParagraphImportBase<'a>,
+  state: ParagraphImportState<'_>,
+) -> Paragraph {
+  paragraph_model_with_base_impl(
+    paragraph, styles, numbering, images, hyperlinks, base, state,
+  )
+}
+
+fn paragraph_model_with_base_impl<'a>(
+  paragraph: &w::Paragraph,
+  styles: &StylesCatalog,
+  numbering: &mut NumberingCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  base: ParagraphImportBase<'a>,
+  state: ParagraphImportState<'_>,
+) -> Paragraph {
+  let ParagraphImportState {
+    form_widget_ids,
+    mut complex_fields,
+    table_depth,
+  } = state;
   let default_custom_xml_bindings;
   let custom_xml_bindings = if let Some(custom_xml_bindings) = base.custom_xml_bindings {
     custom_xml_bindings
@@ -264,8 +357,14 @@ pub(super) fn paragraph_model_with_base<'a>(
       custom_xml_bindings,
       form_widget_ids,
       suppress_toc_hyperlink_style: styles.is_toc_entry_paragraph_style(style_id),
+      complex_fields: complex_fields.as_deref_mut(),
+      table_depth,
     },
   );
+  let mut field_events = paragraph_field_events(paragraph);
+  if let Some(complex_fields) = complex_fields {
+    complex_fields.finish_paragraph(&mut inlines, &mut field_events);
+  }
   if let Some(bold_override) = paragraph_mark_style.wordprocessingml_field_bold_override {
     for inline in &mut inlines {
       let super::InlineItem::Text(run) = inline else {
@@ -332,8 +431,14 @@ pub(super) fn paragraph_model_with_base<'a>(
     // label-alignment margin model handled by `list_label_image`; an explicit
     // zero character-unit indent still counts because it clears the inherited
     // character indent under MS-OI29500 section 2.1.87.
-    for _ in 0..legacy_image.replacement_text.chars().count() {
+    let image_count = legacy_image.replacement_text.chars().count();
+    for _ in 0..image_count {
       inlines.insert(0, super::InlineItem::Image(legacy_image.image.clone()));
+    }
+    for event in &mut field_events {
+      if let super::ParagraphFieldEvent::DeferredParagraphBreak { inline_offset } = event {
+        *inline_offset += image_count;
+      }
     }
   }
   let starts_after_last_rendered_page_break =
@@ -343,6 +448,8 @@ pub(super) fn paragraph_model_with_base<'a>(
     .iter()
     .filter_map(|item| match item {
       super::InlineItem::Text(run) => Some(run.clone()),
+      super::InlineItem::NoteReferenceMark(_) => None,
+      super::InlineItem::NoteSeparatorMark(_) => None,
       super::InlineItem::PositionalTab(_) => None,
       super::InlineItem::Ruby(_) => None,
       super::InlineItem::LegacyFormCheckBox(_) => None,
@@ -359,7 +466,7 @@ pub(super) fn paragraph_model_with_base<'a>(
 
   Paragraph {
     inlines,
-    field_events: paragraph_field_events(paragraph),
+    field_events,
     footnote_reference_ids,
     endnote_reference_ids,
     starts_after_last_rendered_page_break,

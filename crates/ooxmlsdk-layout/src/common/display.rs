@@ -695,6 +695,18 @@ pub struct OpenTypeFeatureSettings {
   pub number_spacing: Option<OpenTypeNumberSpacing>,
   pub contextual_alternates: Option<bool>,
   pub stylistic_sets: Option<OpenTypeStylisticSets>,
+  /// Font-owned glyph substitution used while lowering mixed-orientation
+  /// vertical text. This is an implementation transport rather than an
+  /// authored DrawingML switch: UAX #50 decides which grapheme needs a
+  /// vertical form, then the selected OpenType feature must survive into the
+  /// PDF shaper for that individual grapheme.
+  pub(crate) vertical_feature: Option<OpenTypeVerticalFeature>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum OpenTypeVerticalFeature {
+  VerticalAlternates,
+  VerticalAlternatesAndRotation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

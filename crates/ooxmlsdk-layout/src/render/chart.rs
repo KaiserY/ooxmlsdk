@@ -467,6 +467,11 @@ pub struct ClusteredColumnChart<'a> {
   pub view_3d: Option<Chart3DView>,
   pub legend_position: Option<ChartLegendPosition>,
   pub legend_overlay: bool,
+  /// DrawingML text-body geometry and overflow policy authored for the
+  /// legend. Cartesian legends are lowered as generated entry text shapes,
+  /// so retaining the source `a:bodyPr` is the only way to preserve wrapping,
+  /// clipping, ellipsis, insets, and anchoring through that generated layer.
+  pub legend_text_body_properties: Option<&'a a::BodyProperties>,
   /// A single cartesian series with c:varyColors enabled exposes one legend
   /// entry per data point. Office ignores varyColors when multiple series are
   /// present (MS-OI29500 §21.2.2.227).
@@ -906,6 +911,12 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       .as_deref()
       .and_then(|legend| legend.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
+    legend_text_body_properties: chart_space
+      .chart
+      .legend
+      .as_deref()
+      .and_then(|legend| legend.text_properties.as_deref())
+      .map(|properties| properties.body_properties.as_ref()),
     vary_colors_by_point,
     visible_legend_indices: visible_series_legend_indices(
       chart_space.chart.legend.as_deref(),
@@ -1786,6 +1797,12 @@ pub fn cartesian_chart_for_host_locales<'a>(
       .as_deref()
       .and_then(|legend| legend.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
+    legend_text_body_properties: chart_space
+      .chart
+      .legend
+      .as_deref()
+      .and_then(|legend| legend.text_properties.as_deref())
+      .map(|properties| properties.body_properties.as_ref()),
     vary_colors_by_point,
     visible_legend_indices: visible_series_legend_indices(
       chart_space.chart.legend.as_deref(),

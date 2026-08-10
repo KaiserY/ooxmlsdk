@@ -22,6 +22,8 @@ pub(crate) struct DocxDocument {
   pub page: PageSetup,
   pub line_number_style: TextStyle,
   pub note_separator_style: TextStyle,
+  pub footnote_separator_stories: NoteSeparatorStories,
+  pub endnote_separator_stories: NoteSeparatorStories,
   pub has_styles_part: bool,
   pub default_tab_stop_pt: f32,
   pub hyphenation: HyphenationSettings,
@@ -40,11 +42,18 @@ pub(crate) struct DocxDocument {
   pub footnotes: BTreeMap<i64, Vec<Block>>,
   pub footnote_numbering: Vec<NoteNumberingSpec>,
   pub footnote_positions: Vec<w::FootnotePositionValues>,
-  pub endnote_blocks: Vec<Block>,
   pub endnotes: BTreeMap<i64, Vec<Block>>,
   pub endnote_numbering: Vec<NoteNumberingSpec>,
+  pub endnote_position: w::EndnotePositionValues,
   pub title_page: bool,
   pub blocks: Vec<Block>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct NoteSeparatorStories {
+  pub separator: Vec<Block>,
+  pub continuation_separator: Vec<Block>,
+  pub continuation_notice: Vec<Block>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -241,6 +250,21 @@ pub(crate) enum ParagraphFieldEvent {
   },
   BookmarkEnd {
     id: String,
+  },
+  /// The source paragraph delimiter is not part of the imported story.
+  ///
+  /// Word IF instructions can span source paragraphs even though the
+  /// resulting conditional text is a single paragraph.  A completed IF/REF
+  /// result uses the same suppression until its field closes, but remembers
+  /// the delimiter so it can be materialized at that exact close position.
+  SuppressParagraphBreak {
+    deferred: bool,
+  },
+  /// Materialize a paragraph delimiter that was deferred by an open IF/REF
+  /// field. `inline_offset` is measured in the paragraph's imported inline
+  /// sequence, immediately after the closing field result.
+  DeferredParagraphBreak {
+    inline_offset: usize,
   },
 }
 
@@ -475,6 +499,11 @@ pub(crate) struct ParagraphFormat {
   pub suppress_overlap: Option<bool>,
   pub auto_space_de: Option<bool>,
   pub auto_space_dn: Option<bool>,
+  /// Effective `w:overflowPunct` value. ECMA-376 Part 1 §17.3.1.21
+  /// defines omission as true, so `None` is resolved at line layout rather
+  /// than collapsed here; an inherited or direct explicit false must remain
+  /// distinguishable from omission while paragraph styles are merged.
+  pub overflow_punctuation: Option<bool>,
   pub hidden_separator: bool,
   pub deleted_separator: bool,
   pub outline_text_inlines: Option<usize>,
@@ -764,6 +793,8 @@ impl FormWidgetIdAllocator {
 #[derive(Clone, Debug)]
 pub(crate) enum InlineItem {
   Text(TextRun),
+  NoteReferenceMark(NoteReferenceMark),
+  NoteSeparatorMark(NoteSeparatorMark),
   ClearLineBreak(LineBreakClear),
   PositionalTab(PositionalTab),
   Ruby(RubyInline),
@@ -778,6 +809,25 @@ pub(crate) enum InlineItem {
   LastRenderedPageBreak,
   PageBreak,
   ColumnBreak,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum NoteReferenceKind {
+  Footnote,
+  Endnote,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct NoteReferenceMark {
+  pub kind: NoteReferenceKind,
+  pub style: TextStyle,
+  pub style_ref_keys: Vec<Arc<str>>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct NoteSeparatorMark {
+  pub continuation: bool,
+  pub style: TextStyle,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

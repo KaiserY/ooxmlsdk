@@ -711,8 +711,14 @@ pub(crate) fn lower_clustered_column_chart(
       + category_label_unrotated_height * rotation.cos().abs()
   };
   let legend_position = chart.legend_position;
+  // ECMA-376 Part 1 §21.2.2.132 allows other chart elements to overlap an
+  // overlay legend. LibreOffice's VLegend::changePosition mirrors that
+  // contract by subtracting a legend from the remaining plot space only when
+  // Overlay is false. Keep that ownership decision shared by every automatic
+  // plot band instead of letting legendPos alone reserve one side.
+  let has_layout_reserving_legend = legend_position.is_some() && !chart.legend_overlay;
   let has_bottom_legend =
-    legend_position == Some(ChartLegendPosition::Bottom) && !chart.legend_overlay;
+    has_layout_reserving_legend && legend_position == Some(ChartLegendPosition::Bottom);
   let has_untitled_bottom_column_layout = excel_untitled_bottom_column_layout(chart, style);
   let has_untitled_bottom_line_no_marker_layout =
     excel_untitled_bottom_line_no_marker_layout(chart, style);
@@ -738,11 +744,13 @@ pub(crate) fn lower_clustered_column_chart(
     && !radar_only
     && !horizontal_bar_only
     && !scatter_only;
-  let has_top_legend = legend_position == Some(ChartLegendPosition::Top) && !chart.legend_overlay;
-  let has_side_legend = matches!(
-    legend_position,
-    Some(ChartLegendPosition::Left | ChartLegendPosition::Right | ChartLegendPosition::TopRight)
-  ) && !chart.legend_overlay;
+  let has_top_legend =
+    has_layout_reserving_legend && legend_position == Some(ChartLegendPosition::Top);
+  let has_side_legend = has_layout_reserving_legend
+    && matches!(
+      legend_position,
+      Some(ChartLegendPosition::Left | ChartLegendPosition::Right | ChartLegendPosition::TopRight)
+    );
   let has_excel_explicit_title_side_legend_layout = style.layout_profile
     == ChartLayoutProfile::Excel
     && has_side_legend
@@ -834,7 +842,7 @@ pub(crate) fn lower_clustered_column_chart(
     profiles::CartesianLayoutAdjustment::default()
   };
   let word_no_legend_adjustment = if style.layout_profile == ChartLayoutProfile::Word
-    && legend_position.is_none()
+    && !has_layout_reserving_legend
     && !has_layout_title
     && chart.plot_layout.is_none()
   {
@@ -1375,7 +1383,7 @@ pub(crate) fn lower_clustered_column_chart(
     } else {
       0.0
     }
-    + if legend_position == Some(ChartLegendPosition::Left) {
+    + if has_side_legend && legend_position == Some(ChartLegendPosition::Left) {
       side_legend_width + side_plot_outer_margin + side_plot_gap
     } else {
       0.0
@@ -1435,10 +1443,7 @@ pub(crate) fn lower_clustered_column_chart(
     };
   let mut plot_left = tick_left + left_value_axis_band_width;
   let mut plot_right = frame.x_pt + frame.width_pt
-    - if matches!(
-      legend_position,
-      Some(ChartLegendPosition::Right | ChartLegendPosition::TopRight)
-    ) {
+    - if has_side_legend {
       side_legend_width + side_plot_outer_margin + side_plot_gap
     } else {
       frame.height_pt
@@ -4860,6 +4865,40 @@ struct ChartTextBodyInsets {
   bottom: f32,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct ChartLegendTextBody {
+  insets: ChartTextBodyInsets,
+  wrap: a::TextWrappingValues,
+  vertical_overflow: a::TextVerticalOverflowValues,
+  horizontal_overflow: a::TextHorizontalOverflowValues,
+  vertical_anchor: a::TextAnchoringTypeValues,
+  anchor_center: bool,
+}
+
+fn chart_legend_text_body(properties: Option<&a::BodyProperties>) -> ChartLegendTextBody {
+  ChartLegendTextBody {
+    insets: chart_text_body_insets(properties),
+    // ECMA-376 Part 1 §20.1.7.1 assigns these defaults to a:bodyPr. A
+    // generated chart legend still uses the same wrapping and overflow
+    // defaults when c:txPr is absent, but has no authored body insets.
+    wrap: properties
+      .and_then(|properties| properties.wrap)
+      .unwrap_or(a::TextWrappingValues::Square),
+    vertical_overflow: properties
+      .and_then(|properties| properties.vertical_overflow)
+      .unwrap_or(a::TextVerticalOverflowValues::Overflow),
+    horizontal_overflow: properties
+      .and_then(|properties| properties.horizontal_overflow)
+      .unwrap_or(a::TextHorizontalOverflowValues::Overflow),
+    vertical_anchor: properties
+      .and_then(|properties| properties.anchor)
+      .unwrap_or(a::TextAnchoringTypeValues::Top),
+    anchor_center: properties
+      .and_then(|properties| properties.anchor_center)
+      .is_some_and(|value| value.as_bool()),
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct ResolvedDataLabelTextFrame {
   outer_width: Option<f32>,
@@ -5552,7 +5591,8 @@ fn lower_radial_legend(
       // Retaining those four stages is important: a narrow legend can wrap
       // its first entry and therefore expose fewer later entries even though
       // the unwrapped strings would fit vertically.
-      let insets = chart_text_body_insets(chart.legend_text_body_properties);
+      let text_body = chart_legend_text_body(chart.legend_text_body_properties);
+      let insets = text_body.insets;
       let millimeter_pt: f32 = 72.0 / 25.4;
       let marker_gap = millimeter_pt.max(style.legend.font_size_pt * 0.22);
       let maximum_text_width =
@@ -5565,7 +5605,13 @@ fn lower_radial_legend(
         let Some(text) = chart.categories.get(index) else {
           continue;
         };
-        let lines = wrap_chart_label(text, maximum_text_width, &style.legend, metrics);
+        let lines = wrap_chart_legend_label(
+          text,
+          maximum_text_width,
+          text_body.wrap,
+          &style.legend,
+          metrics,
+        );
         let outer_height = lines.len() as f32 * legend_line_height + insets.top + insets.bottom;
         let next_count = entries.len() + 1;
         let required_height =
@@ -5582,31 +5628,75 @@ fn lower_radial_legend(
         return;
       }
 
+      let cell_height = bounds.height / entries.len() as f32;
+      let inner_height = (cell_height - insets.top - insets.bottom).max(0.0);
+      for (_, lines) in &mut entries {
+        apply_chart_legend_vertical_overflow(
+          lines,
+          inner_height,
+          legend_line_height,
+          text_body.vertical_overflow,
+          maximum_text_width,
+          &style.legend,
+          metrics,
+        );
+      }
       let maximum_line_width = entries
         .iter()
         .flat_map(|(_, lines)| lines)
         .map(|line| metrics.measure_text(line, &style.legend))
         .fold(0.0_f32, f32::max);
-      let column_width = marker + marker_gap + maximum_line_width;
+      let anchored_text_width = if text_body.anchor_center {
+        maximum_text_width
+      } else {
+        maximum_line_width
+      };
+      let column_width = marker + marker_gap + insets.left + anchored_text_width + insets.right;
       let x = bounds.left + (bounds.width - column_width).max(0.0) * 0.5;
-      let cell_height = bounds.height / entries.len() as f32;
+      let text_x = x
+        + marker
+        + marker_gap
+        + insets.left
+        + if text_body.anchor_center {
+          (maximum_text_width - maximum_line_width).max(0.0) * 0.5
+        } else {
+          0.0
+        };
       for (row, (index, lines)) in entries.into_iter().enumerate() {
-        let y = bounds.top + row as f32 * cell_height;
+        let cell_bounds = PlotRect {
+          left: bounds.left,
+          top: bounds.top + row as f32 * cell_height,
+          width: bounds.width,
+          height: cell_height,
+        };
+        let (vertical_offset, line_step) = chart_legend_vertical_line_layout(
+          text_body.vertical_anchor,
+          inner_height,
+          lines.len(),
+          legend_line_height,
+        );
+        let y = cell_bounds.top + insets.top + vertical_offset;
         push_radial_legend_key(
           items,
           x,
-          y + (legend_line_height - marker) * 0.5,
+          if lines.is_empty() {
+            cell_bounds.top + (cell_height - marker).max(0.0) * 0.5
+          } else {
+            y + (legend_line_height - marker) * 0.5
+          },
           marker,
           index,
           style,
         );
+        let paint_clip = chart_legend_text_paint_clip(frame, cell_bounds, text_body);
         for (line_index, line) in lines.into_iter().enumerate() {
-          push_text(
+          push_text_with_paint_clip(
             items,
-            x + marker + marker_gap,
-            y + line_index as f32 * legend_line_height,
+            text_x,
+            y + line_index as f32 * line_step,
             line,
             style.legend.clone(),
+            paint_clip,
           );
         }
       }
@@ -12127,6 +12217,169 @@ fn wrap_chart_label(
   lines
 }
 
+fn wrap_chart_legend_label(
+  text: &str,
+  maximum_width: f32,
+  wrap: a::TextWrappingValues,
+  style: &TextStyle,
+  metrics: &mut TextMetrics,
+) -> Vec<String> {
+  text
+    .split('\n')
+    .flat_map(|line| match wrap {
+      a::TextWrappingValues::None => vec![line.to_string()],
+      a::TextWrappingValues::Square => wrap_chart_label(line, maximum_width, style, metrics),
+    })
+    .collect()
+}
+
+fn apply_chart_legend_vertical_overflow(
+  lines: &mut Vec<String>,
+  available_height: f32,
+  line_height: f32,
+  overflow: a::TextVerticalOverflowValues,
+  maximum_width: f32,
+  style: &TextStyle,
+  metrics: &mut TextMetrics,
+) {
+  if overflow != a::TextVerticalOverflowValues::Ellipsis
+    || lines.is_empty()
+    || !available_height.is_finite()
+    || available_height < 0.0
+    || !line_height.is_finite()
+    || line_height <= 0.0
+  {
+    return;
+  }
+  let capacity = (available_height / line_height).floor() as usize;
+  if lines.len() <= capacity {
+    return;
+  }
+  if capacity == 0 {
+    lines.clear();
+    return;
+  }
+  lines.truncate(capacity);
+  let last = lines.last_mut().expect("nonzero legend line capacity");
+  *last = ellipsize_chart_legend_line(last, maximum_width, style, metrics);
+}
+
+fn ellipsize_chart_legend_line(
+  line: &str,
+  maximum_width: f32,
+  style: &TextStyle,
+  metrics: &mut TextMetrics,
+) -> String {
+  const ELLIPSIS: char = '\u{2026}';
+  if maximum_width <= 0.0 {
+    return String::new();
+  }
+  let mut prefix = line.trim_end().to_string();
+  let candidate = |prefix: &str| {
+    let mut candidate = String::with_capacity(prefix.len() + ELLIPSIS.len_utf8());
+    candidate.push_str(prefix);
+    candidate.push(ELLIPSIS);
+    candidate
+  };
+  let mut output = candidate(&prefix);
+  if metrics.measure_text(&output, style) <= maximum_width {
+    return output;
+  }
+
+  // Wrapping establishes word boundaries before vertical overflow is known.
+  // When the ellipsis no longer fits on the final visible line, remove the
+  // last complete word first. This preserves Office's `with a…` boundary for
+  // a hidden continuation instead of exposing a misleading partial word.
+  while let Some(index) = prefix
+    .char_indices()
+    .rev()
+    .find_map(|(index, character)| character.is_whitespace().then_some(index))
+  {
+    prefix.truncate(index);
+    while prefix.ends_with(char::is_whitespace) {
+      prefix.pop();
+    }
+    output = candidate(&prefix);
+    if metrics.measure_text(&output, style) <= maximum_width {
+      return output;
+    }
+  }
+
+  // A single unbreakable word has no word boundary to remove. Fall back to
+  // Unicode-scalar boundaries so UTF-8 is never truncated in the middle of a
+  // character while still guaranteeing that the ellipsis itself fits.
+  while !prefix.is_empty() {
+    prefix.pop();
+    output = candidate(&prefix);
+    if metrics.measure_text(&output, style) <= maximum_width {
+      return output;
+    }
+  }
+  if metrics.measure_text("\u{2026}", style) <= maximum_width {
+    "\u{2026}".to_string()
+  } else {
+    String::new()
+  }
+}
+
+fn chart_legend_vertical_line_layout(
+  anchor: a::TextAnchoringTypeValues,
+  available_height: f32,
+  line_count: usize,
+  line_height: f32,
+) -> (f32, f32) {
+  let text_height = line_count as f32 * line_height;
+  let extra = available_height - text_height;
+  match anchor {
+    a::TextAnchoringTypeValues::Top => (0.0, line_height),
+    a::TextAnchoringTypeValues::Center => (extra / 2.0, line_height),
+    a::TextAnchoringTypeValues::Bottom => (extra, line_height),
+    a::TextAnchoringTypeValues::Justified if line_count > 1 && extra > 0.0 => {
+      (0.0, line_height + extra / (line_count - 1) as f32)
+    }
+    a::TextAnchoringTypeValues::Distributed if line_count == 1 => (extra / 2.0, line_height),
+    a::TextAnchoringTypeValues::Distributed if line_count > 1 && extra > 0.0 => {
+      (0.0, line_height + extra / (line_count - 1) as f32)
+    }
+    a::TextAnchoringTypeValues::Justified | a::TextAnchoringTypeValues::Distributed => {
+      (0.0, line_height)
+    }
+  }
+}
+
+fn chart_legend_text_paint_clip(
+  frame: ChartFrame,
+  text_bounds: PlotRect,
+  body: ChartLegendTextBody,
+) -> Option<crate::common::Rect> {
+  let clip_horizontal = body.horizontal_overflow == a::TextHorizontalOverflowValues::Clip;
+  let clip_vertical = body.vertical_overflow != a::TextVerticalOverflowValues::Overflow;
+  (clip_horizontal || clip_vertical).then(|| {
+    common_rect(
+      if clip_horizontal {
+        text_bounds.left
+      } else {
+        frame.x_pt
+      },
+      if clip_vertical {
+        text_bounds.top
+      } else {
+        frame.y_pt
+      },
+      if clip_horizontal {
+        text_bounds.width
+      } else {
+        frame.width_pt
+      },
+      if clip_vertical {
+        text_bounds.height
+      } else {
+        frame.height_pt
+      },
+    )
+  })
+}
+
 fn apply_manual_layout(
   frame: ChartFrame,
   automatic: PlotRect,
@@ -12616,11 +12869,16 @@ fn lower_manual_legend(
   } else {
     style.legend.font_size_pt * 0.26
   };
+  let text_body = chart_legend_text_body(chart.legend_text_body_properties);
   let mut metrics = TextMetrics::new();
   let entry_widths = entries
     .iter()
     .map(|entry| {
-      marker_size + marker_gap + metrics.measure_text(entry.label.as_ref(), &style.legend)
+      marker_size
+        + marker_gap
+        + text_body.insets.left
+        + metrics.measure_text(entry.label.as_ref(), &style.legend)
+        + text_body.insets.right
     })
     .collect::<Vec<_>>();
   let maximum_entry_width = entry_widths.iter().copied().fold(0.0_f32, f32::max);
@@ -12636,10 +12894,10 @@ fn lower_manual_legend(
       + frame_metrics.horizontal_entry_offset * entries.len().saturating_sub(1) as f32
   };
   let automatic_content_height = if vertical {
-    label_line_height * entries.len() as f32
+    (label_line_height + text_body.insets.top + text_body.insets.bottom) * entries.len() as f32
       + frame_metrics.vertical_entry_offset * entries.len().saturating_sub(1) as f32
   } else {
-    label_line_height
+    label_line_height + text_body.insets.top + text_body.insets.bottom
   };
   let bounds = if framed {
     PlotRect {
@@ -12679,30 +12937,90 @@ fn lower_manual_legend(
   let row_count = entries.len().div_ceil(column_count);
   let cell_width = content_bounds.width / column_count as f32;
   let cell_height = content_bounds.height / row_count as f32;
-  for (index, (entry, entry_width)) in entries.into_iter().zip(entry_widths).enumerate() {
+  for (index, entry) in entries.into_iter().enumerate() {
     let column = index % column_count;
     let row = index / column_count;
-    let x =
-      content_bounds.left + column as f32 * cell_width + (cell_width - entry_width).max(0.0) * 0.5;
-    let y = content_bounds.top
-      + row as f32 * cell_height
-      + (cell_height - label_line_height).max(0.0) * 0.5;
+    let cell_bounds = PlotRect {
+      left: content_bounds.left + column as f32 * cell_width,
+      top: content_bounds.top + row as f32 * cell_height,
+      width: cell_width,
+      height: cell_height,
+    };
+    let maximum_text_width =
+      (cell_width - marker_size - marker_gap - text_body.insets.left - text_body.insets.right)
+        .max(0.0);
+    let inner_height = (cell_height - text_body.insets.top - text_body.insets.bottom).max(0.0);
+    let mut lines = wrap_chart_legend_label(
+      entry.label.as_ref(),
+      maximum_text_width,
+      text_body.wrap,
+      &style.legend,
+      &mut metrics,
+    );
+    apply_chart_legend_vertical_overflow(
+      &mut lines,
+      inner_height,
+      label_line_height,
+      text_body.vertical_overflow,
+      maximum_text_width,
+      &style.legend,
+      &mut metrics,
+    );
+    let maximum_line_width = lines
+      .iter()
+      .map(|line| metrics.measure_text(line, &style.legend))
+      .fold(0.0_f32, f32::max);
+    let anchored_text_width = if text_body.anchor_center {
+      maximum_text_width
+    } else {
+      maximum_line_width
+    };
+    let entry_width = marker_size
+      + marker_gap
+      + text_body.insets.left
+      + anchored_text_width
+      + text_body.insets.right;
+    let x = cell_bounds.left + (cell_width - entry_width).max(0.0) * 0.5;
+    let text_x = x
+      + marker_size
+      + marker_gap
+      + text_body.insets.left
+      + if text_body.anchor_center {
+        (maximum_text_width - maximum_line_width).max(0.0) * 0.5
+      } else {
+        0.0
+      };
+    let (vertical_offset, line_step) = chart_legend_vertical_line_layout(
+      text_body.vertical_anchor,
+      inner_height,
+      lines.len(),
+      label_line_height,
+    );
+    let y = cell_bounds.top + text_body.insets.top + vertical_offset;
     push_cartesian_legend_key(
       items,
       x,
-      y + (line_height(&style.legend) - marker_size) * 0.5,
+      if lines.is_empty() {
+        cell_bounds.top + (cell_height - marker_size).max(0.0) * 0.5
+      } else {
+        y + (label_line_height - marker_size) * 0.5
+      },
       marker_size,
       cartesian_legend_entry_uses_line_key(chart, &entry),
       &entry,
       style,
     );
-    push_text(
-      items,
-      x + marker_size + marker_gap,
-      y,
-      entry.label.into_owned(),
-      style.legend.clone(),
-    );
+    let paint_clip = chart_legend_text_paint_clip(frame, cell_bounds, text_body);
+    for (line_index, line) in lines.into_iter().enumerate() {
+      push_text_with_paint_clip(
+        items,
+        text_x,
+        y + line_index as f32 * line_step,
+        line,
+        style.legend.clone(),
+        paint_clip,
+      );
+    }
   }
 }
 
@@ -13618,6 +13936,25 @@ fn push_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String, style: Tex
   push_text_with_rotation_center(items, x, y, text, style, None);
 }
 
+fn push_text_with_paint_clip(
+  items: &mut Vec<PageItem>,
+  x: f32,
+  y: f32,
+  text: String,
+  style: TextStyle,
+  paint_clip: Option<crate::common::Rect>,
+) {
+  push_text_with_segmentation_rotation_center_and_paint_clip(
+    items,
+    (x, y),
+    text,
+    style,
+    PdfTextSegmentation::Line,
+    None,
+    paint_clip,
+  );
+}
+
 fn push_text_with_rotation_center(
   items: &mut Vec<PageItem>,
   x: f32,
@@ -13665,11 +14002,32 @@ fn push_text_with_segmentation_and_rotation_center(
   pdf_text_segmentation: PdfTextSegmentation,
   rotation_center_pt: Option<(f32, f32)>,
 ) {
+  push_text_with_segmentation_rotation_center_and_paint_clip(
+    items,
+    (x, y),
+    text,
+    style,
+    pdf_text_segmentation,
+    rotation_center_pt,
+    None,
+  );
+}
+
+fn push_text_with_segmentation_rotation_center_and_paint_clip(
+  items: &mut Vec<PageItem>,
+  position_pt: (f32, f32),
+  text: String,
+  style: TextStyle,
+  pdf_text_segmentation: PdfTextSegmentation,
+  rotation_center_pt: Option<(f32, f32)>,
+  paint_clip: Option<crate::common::Rect>,
+) {
+  let (x, y) = position_pt;
   items.push(PageItem::Text(TextItem {
     x_pt: x,
     y_pt: y,
     line_height_pt: line_height(&style),
-    paint_clip: None,
+    paint_clip,
     discard_if_horizontally_clipped: false,
     text,
     style: Box::new(style),
@@ -13720,18 +14078,20 @@ mod tests {
 
   use super::{
     Chart3DView, ChartLayoutProfile, ChartPointAnchor, ChartTextBodyInsets, PlotRect,
-    RadialChartKind, ResolvedDataLabelTextFrame, SurfaceVertex, bind_chart_gradient_to_bounds,
-    cardinal_cubic_controls, cartesian_3d_projection, cartesian_legend_reverses_series,
-    category_axis_text_rotation_degrees, category_axis_text_rotation_degrees_for_layout,
-    category_axis_text_rotation_is_supported, clip_surface_polygon,
-    data_label_pdf_text_segmentation, excel_fixed_inner_pie_3d_radii, format_axis_value,
-    horizontal_bar_data_label_origin, lower_3d_extruded_polygon, lower_3d_line_stripes,
-    maximum_auto_main_increment_count, pie_custom_label_maximum_width, push_chart_data_rect,
-    sample_cardinal_chart_line, series_axis_label_rhythm, series_category_display_index,
-    single_line_vertical_anchor_offset, word_fixed_chart_data_edge, word_fixed_chart_value_edge,
+    RadialChartKind, ResolvedDataLabelTextFrame, SurfaceVertex,
+    apply_chart_legend_vertical_overflow, bind_chart_gradient_to_bounds, cardinal_cubic_controls,
+    cartesian_3d_projection, cartesian_legend_reverses_series, category_axis_text_rotation_degrees,
+    category_axis_text_rotation_degrees_for_layout, category_axis_text_rotation_is_supported,
+    clip_surface_polygon, data_label_pdf_text_segmentation, excel_fixed_inner_pie_3d_radii,
+    format_axis_value, horizontal_bar_data_label_origin, lower_3d_extruded_polygon,
+    lower_3d_line_stripes, maximum_auto_main_increment_count, pie_custom_label_maximum_width,
+    push_chart_data_rect, sample_cardinal_chart_line, series_axis_label_rhythm,
+    series_category_display_index, single_line_vertical_anchor_offset, word_fixed_chart_data_edge,
+    word_fixed_chart_value_edge,
   };
-  use crate::model::{PageItem, PdfTextSegmentation, RgbColor, common_rect};
+  use crate::model::{PageItem, PdfTextSegmentation, RgbColor, TextStyle, common_rect};
   use crate::render::chart::{ChartManualLayout, ChartSeriesKind};
+  use crate::text_metrics::TextMetrics;
 
   #[test]
   fn axis_values_do_not_expose_binary_float_artifacts() {
@@ -14358,5 +14718,51 @@ mod tests {
       ),
       0.0
     );
+  }
+
+  #[test]
+  fn chart_legend_vertical_overflow_keeps_all_three_schema_states_distinct() {
+    let style = TextStyle {
+      font_family: Some("DejaVu Sans".into()),
+      font_size_pt: 18.0,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    let maximum_width = metrics.measure_text("Data series", &style) + 0.01;
+    let line_height = 21.6;
+    let source = vec![
+      "Data series".to_string(),
+      "with a long".to_string(),
+      "long title".to_string(),
+    ];
+
+    for overflow in [
+      a::TextVerticalOverflowValues::Overflow,
+      a::TextVerticalOverflowValues::Clip,
+    ] {
+      let mut lines = source.clone();
+      apply_chart_legend_vertical_overflow(
+        &mut lines,
+        line_height * 2.01,
+        line_height,
+        overflow,
+        maximum_width,
+        &style,
+        &mut metrics,
+      );
+      assert_eq!(lines, source);
+    }
+
+    let mut lines = source;
+    apply_chart_legend_vertical_overflow(
+      &mut lines,
+      line_height * 2.01,
+      line_height,
+      a::TextVerticalOverflowValues::Ellipsis,
+      maximum_width,
+      &style,
+      &mut metrics,
+    );
+    assert_eq!(lines, ["Data series", "with a…"]);
   }
 }

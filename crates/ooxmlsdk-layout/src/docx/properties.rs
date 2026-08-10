@@ -261,7 +261,10 @@ pub(super) fn merge_run_style(
     );
   }
   if let Some(color) = properties.color() {
-    if color
+    if let Some(rgb) = resolve_run_color(color, theme_colors) {
+      style.color = rgb;
+      style.color_is_automatic = false;
+    } else if color
       .val
       .as_deref()
       .is_some_and(|value| value.eq_ignore_ascii_case("auto"))
@@ -276,9 +279,6 @@ pub(super) fn merge_run_style(
       } else {
         style.color_is_automatic = true;
       }
-    } else if let Some(rgb) = resolve_run_color(color, theme_colors) {
-      style.color = rgb;
-      style.color_is_automatic = false;
     }
   }
   if let Some(shading) = properties.shading()

@@ -332,7 +332,8 @@ A gradient blending between two or more colour stops. The schema type is
 **`<a:path>`** — path-based gradient (radial, circular, or shape-based):
 - `path` attribute: `shape`, `circle`, or `rect`.
 - The optional `<a:fillToRect>` child defines the focus rectangle using
-  `l`, `t`, `r`, `b` as `ST_Percentage` values (0 to 100000).
+  `l`, `t`, `r`, `b` as signed `ST_Percentage` values. Positive values inset
+  the corresponding edge and negative values outset it.
 
 **Example — horizontal two-stop gradient:**
 

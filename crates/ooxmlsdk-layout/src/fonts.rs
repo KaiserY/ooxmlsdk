@@ -1221,6 +1221,15 @@ fn font_request_for_slot<'a>(
     ]);
   }
   let open_type_features = style.open_type_features();
+  if let Some(vertical_feature) = open_type_features.vertical_feature {
+    features.push(FeatureValue {
+      tag: Cow::Borrowed(match vertical_feature {
+        common::OpenTypeVerticalFeature::VerticalAlternates => "vert",
+        common::OpenTypeVerticalFeature::VerticalAlternatesAndRotation => "vrt2",
+      }),
+      value: 1,
+    });
+  }
   if let Some(number_form) = open_type_features.number_form {
     let tag = match number_form {
       common::OpenTypeNumberForm::Default => None,
@@ -1953,6 +1962,7 @@ mod tests {
         number_spacing: Some(OpenTypeNumberSpacing::Tabular),
         contextual_alternates: Some(false),
         stylistic_sets: Some(stylistic_sets),
+        vertical_feature: None,
       },
       ..Default::default()
     };

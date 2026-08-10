@@ -582,6 +582,7 @@ fn include_text_height(
   let text_height =
     document_grid_line_metrics(text_height, paragraph, flow.setup, flow.text_segmentation)
       .map_or(text_height, |metrics| metrics.height_pt);
+  let text_height = proportional_auto_text_line_height(text_height, paragraph, flow);
   match text_frame.line_height_rule {
     LineHeightRule::Exact => line_height,
     LineHeightRule::Auto | LineHeightRule::AtLeast => line_height.max(text_height),
@@ -622,6 +623,52 @@ fn proportional_auto_line_spacing_gap_below(
   // non-grid split.
   let natural_line_height = paragraph_single_line_height(paragraph, base_line_style, text_metrics);
   (base_line_height - natural_line_height).max(0.0)
+}
+
+fn proportional_auto_text_line_spacing_multiple(
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+) -> Option<f32> {
+  if !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    || document_grid_line_metrics(1.0, paragraph, flow.setup, flow.text_segmentation).is_some()
+    || !paragraph_line_spacing_base_covers_line_height(paragraph)
+  {
+    return None;
+  }
+  paragraph
+    .format
+    .line_height_pt
+    .filter(|multiple| *multiple > 1.0)
+}
+
+fn paragraph_line_spacing_base_covers_line_height(paragraph: &crate::docx::Paragraph) -> bool {
+  if paragraph.list_label.is_some() || paragraph.list_label_image.is_some() {
+    return false;
+  }
+  paragraph.inlines.iter().all(|inline| {
+    matches!(
+      inline,
+      InlineItem::Text(_)
+        | InlineItem::ClearLineBreak(_)
+        | InlineItem::PositionalTab(_)
+        | InlineItem::Ruby(_)
+        | InlineItem::BookmarkStart(_)
+        | InlineItem::FormWidgetStart(_)
+        | InlineItem::FormWidgetEnd(_)
+        | InlineItem::LastRenderedPageBreak
+        | InlineItem::PageBreak
+        | InlineItem::ColumnBreak
+    )
+  })
+}
+
+fn proportional_auto_text_line_height(
+  natural_height: f32,
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+) -> f32 {
+  proportional_auto_text_line_spacing_multiple(paragraph, flow)
+    .map_or(natural_height, |multiple| natural_height * multiple)
 }
 
 fn include_text_content_height(
@@ -1551,6 +1598,7 @@ struct RepeatingAdornment {
   items: Vec<PageItem>,
   frame_fragments: Vec<FrameFragment>,
   frame_influences: Vec<FrameInfluence>,
+  frames: Vec<LayoutFrame>,
 }
 
 #[derive(Clone, Debug)]
@@ -4365,10 +4413,15 @@ impl<'a> RootFrameLayout<'a> {
         .iter()
         .map(|page| page.items.len())
         .collect::<Vec<_>>();
-      apply_page_backgrounds(&mut self.pages);
+      apply_page_backgrounds(self.document, &mut self.pages);
       place_floating_images(&mut self.pages, &mut self.frames);
       apply_column_separators(self.document, &mut self.pages, &self.frames);
-      apply_headers_and_footers(self.document, &mut self.pages, &mut self.text_metrics);
+      apply_headers_and_footers(
+        self.document,
+        &mut self.pages,
+        self.collect_frame_items,
+        &mut self.text_metrics,
+      );
       apply_page_borders(&mut self.pages);
       resolve_dynamic_fields(
         &mut self.pages,
@@ -9565,6 +9618,11 @@ fn estimated_paragraph_content_extents(
     base_line_height,
     base_content_height: base_line_height,
     proportional_auto_gap_below_pt,
+    proportional_auto_text_line_spacing_multiple: proportional_auto_text_line_spacing_multiple(
+      paragraph, flow,
+    ),
+    proportional_auto_baseline_uses_text_line_spacing: paragraph.format.line_height_set
+      && !(paragraph.format.justification_set && paragraph.format.justification.is_block()),
     auto_baseline_line_height_cap: None,
     line_height_rule: paragraph.format.line_height_rule,
     grid_auto_following_line_height_pt,
@@ -9762,7 +9820,11 @@ fn estimated_paragraph_content_extents(
       }
       InlineItem::Ruby(ruby) => {
         let metrics = ruby_inline_metrics(ruby, text_metrics);
-        let ruby_height = ruby_line_height_for_flow(metrics, paragraph, flow);
+        let ruby_height = proportional_auto_text_line_height(
+          ruby_line_height_for_flow(metrics, paragraph, flow),
+          paragraph,
+          flow,
+        );
         has_flow_content = true;
         if x + metrics.width_pt > content_width && x > 0.0 {
           finish_line(&mut content_height, &mut line_height);
@@ -10500,7 +10562,7 @@ fn nested_table_preceding_paragraph_spacing(
         flow.text_segmentation,
         text_metrics,
       );
-      table_cell_initial_baseline_offset(false, &style, line_height, text_metrics)
+      table_cell_initial_baseline_offset(&style, line_height, text_metrics)
     };
   let lower_space = paragraph_lower_space(previous);
   // A break-only paragraph uses its line box to start the nested table on the
@@ -10515,7 +10577,6 @@ fn nested_table_preceding_paragraph_spacing(
 fn inline_nested_table_empty_predecessor_baseline_carry(
   blocks: &[Block],
   index: usize,
-  in_header_footer: bool,
   flow: FlowContext,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
@@ -10550,7 +10611,7 @@ fn inline_nested_table_empty_predecessor_baseline_carry(
     flow.text_segmentation,
     text_metrics,
   );
-  table_cell_initial_baseline_offset(in_header_footer, &style, line_height, text_metrics)
+  table_cell_initial_baseline_offset(&style, line_height, text_metrics)
 }
 
 fn paragraph_has_text_wrapping_break(paragraph: &crate::docx::Paragraph) -> bool {
@@ -10592,7 +10653,7 @@ fn following_text_flow_table_anchor_lift(
   // A text-relative tblpY is measured from the anchor line frame. The block
   // cursor returned by paragraph layout is already at the next baseline;
   // move back to the preceding line's lower edge before applying tblpY.
-  table_cell_initial_baseline_offset(false, &style, line_height, text_metrics)
+  table_cell_initial_baseline_offset(&style, line_height, text_metrics)
 }
 
 fn paragraph_border_layout_extent(border: Option<BorderStyle>) -> f32 {
@@ -12398,6 +12459,81 @@ fn layout_repeating_blocks_into_page(
   y
 }
 
+fn layout_repeating_blocks_with_frames_into_page(
+  blocks: &[Block],
+  page: &mut Page,
+  discarded_pages: &mut Vec<Page>,
+  text_metrics: &mut TextMetrics,
+  mut y: f32,
+  flow: FlowContext,
+  page_index: usize,
+  collect_frame_items: bool,
+  frames: &mut Vec<LayoutFrame>,
+) -> f32 {
+  for (block_index, block) in blocks.iter().enumerate() {
+    let item_start = page.items.len();
+    let fragment_start = page.frame_fragments.len();
+    let influence_start = page.frame_influences.len();
+    y = layout_repeating_block(
+      block,
+      page,
+      discarded_pages,
+      text_metrics,
+      y,
+      flow,
+      (block_index + 1 == blocks.len(), true),
+    );
+
+    let item_end = page.items.len();
+    let kind = follow_kind_for_block(block);
+    let lines = line_boxes_for_items(&page.items, item_start, item_end, text_metrics);
+    let mut fragments = page_frame_fragments(
+      kind,
+      &page.frame_fragments[fragment_start..],
+      item_start,
+      item_end,
+    );
+    if item_start >= item_end && fragments.is_empty() {
+      continue;
+    }
+    if fragments.is_empty() {
+      fragments = frame_fragments_for(kind, &lines);
+    }
+    let bounds = frame_bounds_for_items(&page.items[item_start..item_end], text_metrics);
+    let frame_influences = page_frame_influences(
+      &page.frame_influences[influence_start..],
+      item_start,
+      item_end,
+      Some(block_index),
+    );
+    frames.push(LayoutFrame {
+      kind,
+      block_index: Some(block_index),
+      split_start: frame_cursor(Some(block_index), kind, item_start, &lines, true),
+      split_end: frame_cursor(Some(block_index), kind, item_end, &lines, false),
+      page_index,
+      section_index: page.section_index,
+      section_page_index: page.section_page_index,
+      column_index: flow.column_index,
+      item_count: item_end.saturating_sub(item_start),
+      items: if collect_frame_items {
+        page.items[item_start..item_end].to_vec()
+      } else {
+        Vec::new()
+      },
+      item_start,
+      item_end,
+      bounds,
+      lines,
+      flow_bottom_pt: Some(y),
+      fragments,
+      influences: frame_influences,
+      invalidation: FrameInvalidation::Clean,
+    });
+  }
+  y
+}
+
 fn extend_wrap_exclusions_unique(target: &mut Vec<WrapExclusion>, exclusions: &[WrapExclusion]) {
   for exclusion in exclusions {
     if !target.contains(exclusion) {
@@ -12446,6 +12582,7 @@ fn append_vertical_wrap_exclusion(
 fn apply_headers_and_footers(
   document: &DocxDocument,
   pages: &mut [Page],
+  collect_frame_items: bool,
   text_metrics: &mut TextMetrics,
 ) {
   let document_repeating_blocks_empty = document.header_blocks.is_empty()
@@ -12483,9 +12620,10 @@ fn apply_headers_and_footers(
         .max(DEFAULT_FONT_SIZE_PT);
     let mut adornment = empty_section_page(page.setup, page.section_index, page.section_page_index);
     let mut discarded_pages = Vec::new();
+    let mut adornment_frames = Vec::new();
     let header_top = page.setup.header_distance_pt.max(0.0);
     let header_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
-    layout_repeating_blocks_into_page(
+    layout_repeating_blocks_with_frames_into_page(
       header_blocks,
       &mut adornment,
       &mut discarded_pages,
@@ -12521,6 +12659,9 @@ fn apply_headers_and_footers(
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
       },
+      index,
+      collect_frame_items,
+      &mut adornment_frames,
     );
 
     let footer_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
@@ -12530,7 +12671,7 @@ fn apply_headers_and_footers(
       page.section_page_index,
     );
     let footer_top = footer_content_top(page.setup, footer_height, !document.has_styles_part);
-    layout_repeating_blocks_into_page(
+    layout_repeating_blocks_with_frames_into_page(
       footer_blocks,
       &mut adornment,
       &mut discarded_pages,
@@ -12566,19 +12707,29 @@ fn apply_headers_and_footers(
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
       },
+      index,
+      collect_frame_items,
+      &mut adornment_frames,
     );
 
     extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &adornment.wrap_exclusions);
-    order_floating_page_items(&mut adornment.items, None, false);
+    let order = order_floating_page_items(&mut adornment.items, None, false);
+    if !order.is_identity() {
+      remap_page_item_records(&mut adornment, &order);
+      for frame in &mut adornment_frames {
+        remap_layout_frame_item_records(frame, &order);
+      }
+    }
     page.repeating_adornment = Some(RepeatingAdornment {
       items: adornment.items,
       frame_fragments: adornment.frame_fragments,
       frame_influences: adornment.frame_influences,
+      frames: adornment_frames,
     });
   }
 }
 
-fn materialize_repeating_adornments(pages: &mut [Page], frames: &mut [LayoutFrame]) {
+fn materialize_repeating_adornments(pages: &mut [Page], frames: &mut Vec<LayoutFrame>) {
   for (page_index, page) in pages.iter_mut().enumerate() {
     let insertion_index = usize::from(page.items.first().is_some_and(|item| {
       matches!(item, PageItem::Fill(fill) if fill.x_pt == 0.0
@@ -12602,12 +12753,24 @@ fn materialize_repeating_adornments(pages: &mut [Page], frames: &mut [LayoutFram
       &mut adornment.frame_influences,
       insertion_index,
     );
+    for frame in &mut adornment.frames {
+      offset_layout_frame_records_for_prefix(frame, insertion_index);
+    }
     page
       .items
       .splice(insertion_index..insertion_index, adornment.items);
     page.frame_fragments.extend(adornment.frame_fragments);
     page.frame_influences.extend(adornment.frame_influences);
+    frames.append(&mut adornment.frames);
   }
+  // Repeating-story frames are built against their private adornment display
+  // list and appended only after the body frames have already been
+  // normalized. Floating drawings can detach from an anchor line while that
+  // private list is ordered, leaving a paragraph fragment outside the
+  // remapped frame range. Normalize the combined, page-relative frame list
+  // after materialization so every appended header/footer line and fragment
+  // satisfies the same ownership invariants as a body frame.
+  normalize_layout_frames(frames, pages);
 }
 
 fn offset_body_frame_records_for_prefix(
@@ -12624,20 +12787,24 @@ fn offset_body_frame_records_for_prefix(
     .iter_mut()
     .filter(|frame| frame.page_index == page_index)
   {
-    frame.item_start = frame.item_start.saturating_add(item_offset);
-    frame.item_end = frame.item_end.saturating_add(item_offset);
-    for line in &mut frame.lines {
-      line.item_start = line.item_start.saturating_add(item_offset);
-      line.item_end = line.item_end.saturating_add(item_offset);
-    }
-    for fragment in &mut frame.fragments {
-      fragment.item_start = fragment.item_start.saturating_add(item_offset);
-      fragment.item_end = fragment.item_end.saturating_add(item_offset);
-    }
-    for influence in &mut frame.influences {
-      influence.item_start = influence.item_start.saturating_add(item_offset);
-      influence.item_end = influence.item_end.saturating_add(item_offset);
-    }
+    offset_layout_frame_records_for_prefix(frame, item_offset);
+  }
+}
+
+fn offset_layout_frame_records_for_prefix(frame: &mut LayoutFrame, item_offset: usize) {
+  frame.item_start = frame.item_start.saturating_add(item_offset);
+  frame.item_end = frame.item_end.saturating_add(item_offset);
+  for line in &mut frame.lines {
+    line.item_start = line.item_start.saturating_add(item_offset);
+    line.item_end = line.item_end.saturating_add(item_offset);
+  }
+  for fragment in &mut frame.fragments {
+    fragment.item_start = fragment.item_start.saturating_add(item_offset);
+    fragment.item_end = fragment.item_end.saturating_add(item_offset);
+  }
+  for influence in &mut frame.influences {
+    influence.item_start = influence.item_start.saturating_add(item_offset);
+    influence.item_end = influence.item_end.saturating_add(item_offset);
   }
 }
 
@@ -12696,12 +12863,16 @@ fn block_has_visible_body_content(block: &Block) -> bool {
   }
 }
 
-fn apply_page_backgrounds(pages: &mut [Page]) {
+fn apply_page_backgrounds(document: &DocxDocument, pages: &mut [Page]) {
   for page in pages {
     if page.explicit_empty_page {
       continue;
     }
-    let Some(color) = page.setup.background else {
+    let Some(paint) = document
+      .page_background_pattern
+      .map(ShadingPaint::Pattern)
+      .or_else(|| page.setup.background.map(ShadingPaint::Solid))
+    else {
       continue;
     };
     page.items.insert(
@@ -12711,7 +12882,7 @@ fn apply_page_backgrounds(pages: &mut [Page]) {
         y_pt: 0.0,
         width_pt: page.setup.width_pt,
         height_pt: page.setup.height_pt,
-        paint: ShadingPaint::Solid(color),
+        paint,
       }),
     );
   }
@@ -18410,7 +18581,6 @@ impl CellFrame<'_, '_> {
     layout_table_cell(TableCellLayout {
       cell: self.cell,
       table_following_text_flow: self.table.following_text_flow,
-      in_header_footer: self.table.in_header_footer,
       word_floating_table_cell: self.table.placement.is_some(),
       ancestor_floating_table_cell_follow_top_inset_pt: self
         .table_frame
@@ -19675,6 +19845,7 @@ fn paragraph_content_width_range(
               &segment.text,
               text_metrics,
             )
+            .map_or(0.0, |continuation| continuation.fit_width_pt)
           } else {
             0.0
           };
@@ -19682,7 +19853,21 @@ fn paragraph_content_width_range(
             line_fit_width(
               &segment.text,
               &run.style,
-              paragraph.format.overflow_punctuation.unwrap_or(true),
+              WordprocessingOverflowPunctuationPolicy {
+                enabled: paragraph.format.overflow_punctuation.unwrap_or(true),
+                // This width range sizes table-cell content. Writer's
+                // SwTextGuess disables hanging punctuation in a table, and
+                // Office fixed output independently keeps legacy Latin
+                // punctuation inside the cell extent.
+                allow_legacy_western: false,
+                inside_field_group: run.style.wordprocessingml_field_group,
+                preceding_language: preceding_wordprocessing_text_language(
+                  paragraph,
+                  inline_index,
+                  segment.start,
+                )
+                .unwrap_or(WordprocessingTextLanguage::Unknown),
+              },
               text_metrics,
             ) + continuation,
           );
@@ -20251,7 +20436,6 @@ fn spanned_cell_width(cell: &TableCell, column_widths: &[f32], grid_index: &mut 
 struct TableCellLayout<'a> {
   cell: &'a TableCell,
   table_following_text_flow: bool,
-  in_header_footer: bool,
   word_floating_table_cell: bool,
   ancestor_floating_table_cell_follow_top_inset_pt: f32,
   escape_following_text_flow_pages: bool,
@@ -20390,19 +20574,17 @@ fn future_floating_table_wrap_exclusions(
 }
 
 fn table_cell_initial_baseline_offset(
-  in_header_footer: bool,
   style: &TextStyle,
   line_height: f32,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
-  if in_header_footer {
-    // Repeating-slot layout already positions the header/footer stream at
-    // w:header/w:footer. Word starts a table cell's line box at that edge;
-    // pre-adding the ascent here would apply the first baseline twice.
-    0.0
-  } else {
-    text_metrics.baseline_offset_in_line_with_windows_metrics(style, line_height)
-  }
+  // A table frame owns its text items, so the PDF renderer consumes their y
+  // coordinate as an already-resolved baseline instead of adding the line
+  // ascent used for ordinary paragraph items. Repeating header/footer stories
+  // preserve that same frame ownership after materialization; the cell print
+  // edge therefore needs the Windows-metrics ascent in every story and for
+  // both inline and floating tables.
+  text_metrics.baseline_offset_in_line_with_windows_metrics(style, line_height)
 }
 
 fn table_cell_empty_prefix_precedes_inline_table(blocks: &[Block]) -> bool {
@@ -20426,7 +20608,6 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
   let TableCellLayout {
     cell,
     table_following_text_flow,
-    in_header_footer,
     word_floating_table_cell,
     ancestor_floating_table_cell_follow_top_inset_pt,
     escape_following_text_flow_pages,
@@ -20481,12 +20662,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
   let first_line_baseline_offset = if matches!(cell.blocks.first(), Some(Block::Paragraph(_)))
     && !table_cell_empty_prefix_precedes_inline_table(&cell.blocks)
   {
-    table_cell_initial_baseline_offset(
-      in_header_footer,
-      &first_line_style,
-      first_line_height,
-      text_metrics,
-    )
+    table_cell_initial_baseline_offset(&first_line_style, first_line_height, text_metrics)
   } else {
     // An inline nested table owns a top edge, not a text baseline. This also
     // applies when one or more genuinely empty anchor paragraphs precede it:
@@ -20654,12 +20830,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
     blocks_to_layout,
     flow,
     text_y,
-    table_cell_initial_baseline_offset(
-      in_header_footer,
-      &first_line_style,
-      first_line_height,
-      text_metrics,
-    ),
+    table_cell_initial_baseline_offset(&first_line_style, first_line_height, text_metrics),
     text_metrics,
   );
   let mut nested_page =
@@ -20736,7 +20907,6 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
         // paragraphs retain their logical advance, and a cell which already
         // had visible text keeps its established cut-line cursor.
         let baseline_offset = table_cell_initial_baseline_offset(
-          in_header_footer,
           &first_line_style,
           first_line_height,
           text_metrics,
@@ -20804,7 +20974,6 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
       let empty_predecessor_baseline_carry = inline_nested_table_empty_predecessor_baseline_carry(
         blocks_to_layout,
         index,
-        in_header_footer,
         block_flow,
         text_metrics,
       );
@@ -20896,12 +21065,8 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
         matches!(earlier, Block::Paragraph(paragraph) if !paragraph_is_effectively_empty(paragraph))
       })
     {
-      text_y += table_cell_initial_baseline_offset(
-        in_header_footer,
-        &first_line_style,
-        first_line_height,
-        text_metrics,
-      );
+      text_y +=
+        table_cell_initial_baseline_offset(&first_line_style, first_line_height, text_metrics);
     }
     let block_flow = match block {
       Block::Table(table) if table.placement.is_some() && table.following_text_flow => {
@@ -20916,7 +21081,6 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
     let empty_predecessor_baseline_carry = inline_nested_table_empty_predecessor_baseline_carry(
       blocks_to_layout,
       index,
-      in_header_footer,
       block_flow,
       text_metrics,
     );
@@ -23188,7 +23352,7 @@ fn suppress_overlap_reflow_content_height(
   let first_line_style = table_cell_first_line_style(cell);
   let first_line_height = table_cell_first_inline_text_height(cell, true, text_metrics);
   let baseline_offset =
-    table_cell_initial_baseline_offset(false, &first_line_style, first_line_height, text_metrics);
+    table_cell_initial_baseline_offset(&first_line_style, first_line_height, text_metrics);
   let start_y = content_top
     + if matches!(cell.blocks.first(), Some(Block::Paragraph(_)))
       && !table_cell_empty_prefix_precedes_inline_table(&cell.blocks)
@@ -24408,6 +24572,8 @@ struct TextFrame {
   base_line_height: f32,
   base_content_height: f32,
   proportional_auto_gap_below_pt: f32,
+  proportional_auto_text_line_spacing_multiple: Option<f32>,
+  proportional_auto_baseline_uses_text_line_spacing: bool,
   auto_baseline_line_height_cap: Option<f32>,
   line_height_rule: LineHeightRule,
   grid_auto_following_line_height_pt: Option<f32>,
@@ -24465,15 +24631,10 @@ impl TextFrame {
         natural_style.line_height_override_pt = None;
         inline_text_height(&natural_style, text_metrics)
       });
-    let proportional_line_spacing_baseline_cap =
-      (matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
-        && paragraph.format.line_height_set
-        && !(paragraph.format.justification_set && paragraph.format.justification.is_block())
-        && paragraph
-          .format
-          .line_height_pt
-          .is_some_and(|multiple| multiple > 1.0))
-      .then(|| paragraph_single_line_height(paragraph, &base_line_style, text_metrics));
+    let proportional_auto_text_line_spacing_multiple =
+      proportional_auto_text_line_spacing_multiple(paragraph, flow);
+    let proportional_auto_baseline_uses_text_line_spacing = paragraph.format.line_height_set
+      && !(paragraph.format.justification_set && paragraph.format.justification.is_block());
     let translucent_glyph_path_baseline_cap =
       (matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
         && paragraph_uses_only_translucent_glyph_paths(paragraph))
@@ -24492,6 +24653,8 @@ impl TextFrame {
       base_line_height,
       base_content_height,
       proportional_auto_gap_below_pt,
+      proportional_auto_text_line_spacing_multiple,
+      proportional_auto_baseline_uses_text_line_spacing,
       // Writer's LINE_SPACING_AS_GAP_BELOW path places an explicit
       // proportional auto-line increment after the text line, as Word does;
       // it does not split that increment above and below the baseline.
@@ -24504,7 +24667,6 @@ impl TextFrame {
       // its ordinary text baseline box.
       auto_baseline_line_height_cap: [
         generated_resource_baseline_cap,
-        proportional_line_spacing_baseline_cap,
         translucent_glyph_path_baseline_cap,
         constrained_frame_baseline_cap,
       ]
@@ -24531,9 +24693,18 @@ impl TextFrame {
   }
 
   fn text_baseline_line_height(self, line_height: f32) -> f32 {
-    self
-      .auto_baseline_line_height_cap
-      .map_or(line_height, |cap| line_height.min(cap))
+    let proportional_cap = self
+      .proportional_auto_baseline_uses_text_line_spacing
+      .then(|| {
+        self
+          .proportional_auto_text_line_spacing_multiple
+          .map(|multiple| line_height / multiple)
+      })
+      .flatten();
+    [self.auto_baseline_line_height_cap, proportional_cap]
+      .into_iter()
+      .flatten()
+      .fold(line_height, f32::min)
   }
 
   fn page_fit_height(self, line_height: f32) -> f32 {
@@ -24541,7 +24712,12 @@ impl TextFrame {
     // cursor advances over the proportional gap afterwards. Writer represents
     // the same Word rule with that gap above the following internal line box.
     // Therefore a last visible line only has to fit without its trailing gap.
-    (line_height - self.proportional_auto_gap_below_pt).max(LAYOUT_EPSILON_PT)
+    let trailing_gap_pt = self
+      .proportional_auto_text_line_spacing_multiple
+      .map_or(self.proportional_auto_gap_below_pt, |multiple| {
+        line_height - line_height / multiple
+      });
+    (line_height - trailing_gap_pt).max(LAYOUT_EPSILON_PT)
   }
 
   fn paragraph_indents(self) -> ParagraphIndents {
@@ -24704,6 +24880,7 @@ struct TextFrameState {
   line_content_item_start_index: usize,
   line_content_height: f32,
   line_has_note_separator_mark: bool,
+  smart_justify_terminal_overhang_pt: f32,
 }
 
 impl TextFrameState {
@@ -24716,6 +24893,7 @@ impl TextFrameState {
       line_content_item_start_index: 0,
       line_content_height: 0.0,
       line_has_note_separator_mark: false,
+      smart_justify_terminal_overhang_pt: 0.0,
     }
   }
 
@@ -24732,6 +24910,7 @@ impl TextFrameState {
     });
     self.current_line_start = self.current_position;
     self.line_has_note_separator_mark = false;
+    self.smart_justify_terminal_overhang_pt = 0.0;
   }
 
   fn note_page_follow(&mut self, page_index: usize, y_pt: f32) {
@@ -25411,6 +25590,7 @@ impl<'a> TextFrameLayout<'a> {
         y,
         advance.line_left,
         advance.line_right,
+        advance.state.smart_justify_terminal_overhang_pt,
         advance.text_metrics,
       );
     }
@@ -25820,7 +26000,6 @@ impl<'a> TextFrameLayout<'a> {
       // first-line baseline offset after the dodge. Inline parent tables keep
       // their cut-line baseline semantics (floattable-nested-3tables.docx).
       y += table_cell_initial_baseline_offset(
-        false,
         &paragraph_base_line_style(paragraph),
         line_height,
         text_metrics,
@@ -26073,11 +26252,21 @@ impl<'a> TextFrameLayout<'a> {
       && flow.justify_lines_with_shrinking
       && justification.can_shrink_word_spacing();
     let mut line_used_shrink_fit = false;
+    let mut pending_smart_justify_continuation = None;
     let mut line_used_punctuation_fit = false;
-    // ECMA-376 Part 1 §17.3.1.21 makes omission equivalent to true.
-    // Keep this effective paragraph value beside the line state so every
-    // normal and emergency break path uses the same authored/style result.
-    let allow_overflow_punctuation = paragraph.format.overflow_punctuation.unwrap_or(true);
+    // ECMA-376 Part 1 §17.3.1.21 makes omission equivalent to true. Modern
+    // Word applies [MS-OE376]'s exact CJK lists, while compatibility modes 11
+    // and 12 retain the legacy [MS-DOC] western-punctuation behavior. Office
+    // fixed output and Writer's SwTextGuess both keep that legacy behavior
+    // out of table cells. The per-segment language is attached below after
+    // resolving the last real character's Word language slot.
+    let overflow_punctuation_policy = WordprocessingOverflowPunctuationPolicy {
+      enabled: paragraph.format.overflow_punctuation.unwrap_or(true),
+      allow_legacy_western: flow.compatibility_mode < 14
+        && flow.text_segmentation != TextSegmentation::TableCell,
+      inside_field_group: false,
+      preceding_language: WordprocessingTextLanguage::Unknown,
+    };
     let mut line_has_tab = false;
     let mut active_form_widget_ids = Vec::new();
     let mut line_has_form_widget = false;
@@ -26474,7 +26663,11 @@ impl<'a> TextFrameLayout<'a> {
               text_state.line_content_height =
                 text_state.line_content_height.max(metrics.height_pt);
             }
-            line_height = line_height.max(ruby_line_height_for_flow(metrics, paragraph, flow));
+            line_height = line_height.max(proportional_auto_text_line_height(
+              ruby_line_height_for_flow(metrics, paragraph, flow),
+              paragraph,
+              flow,
+            ));
           }
           push_ruby_items(
             current,
@@ -26936,20 +27129,26 @@ impl<'a> TextFrameLayout<'a> {
             );
             let grid_width =
               grid_character_segment_width(&segment.text, text_frame.grid_character_pitch_pt);
+            let overflow_punctuation = WordprocessingOverflowPunctuationPolicy {
+              inside_field_group: run.style.wordprocessingml_field_group,
+              preceding_language: preceding_wordprocessing_text_language(
+                paragraph,
+                inline_index,
+                source_segment.start,
+              )
+              .unwrap_or(WordprocessingTextLanguage::Unknown),
+              ..overflow_punctuation_policy
+            };
             let mut text_width = grid_width.unwrap_or_else(|| {
               appended_text_width(&chunk, &segment.text, &run.style, text_metrics)
             });
+            let current_fit_text =
+              wordprocessing_line_fit_text(&chunk, &segment.text, &run.style, overflow_punctuation);
             let mut fit_width = leading_script_spacing
               + grid_width.unwrap_or_else(|| {
-                appended_line_fit_width(
-                  &chunk,
-                  &segment.text,
-                  &run.style,
-                  allow_overflow_punctuation,
-                  text_metrics,
-                )
+                appended_text_width(&chunk, current_fit_text, &run.style, text_metrics)
               });
-            let continuation_fit_width =
+            let continuation =
               if flow.text_segmentation != TextSegmentation::DrawingLayer && segments.is_empty() {
                 cross_run_unbreakable_continuation_width(
                   &paragraph.inlines,
@@ -26958,8 +27157,11 @@ impl<'a> TextFrameLayout<'a> {
                   text_metrics,
                 )
               } else {
-                0.0
+                None
               };
+            let continuation_fit_width = continuation
+              .as_ref()
+              .map_or(0.0, |continuation| continuation.fit_width_pt);
             let fit_width_with_continuation = fit_width + continuation_fit_width;
             let fit_line_right =
               aligned_tab_provisional_line_right(pending_tab.as_ref(), line_right);
@@ -26986,31 +27188,133 @@ impl<'a> TextFrameLayout<'a> {
             let blocks_second_extra_character = natural_overflow
               && line_used_punctuation_fit
               && only_char.is_none_or(|ch| !cjk_cannot_start_line(ch));
-            let overflows_line =
+            let natural_overflows_line =
               text_overflows_line(x, fit_width_with_continuation, fit_line_right)
                 || blocks_second_extra_character;
-            let fits_with_shrink = overflows_line
+            let segment_start = InlineCursor {
+              inline_index,
+              text_offset: segment.start,
+            };
+            let segment_end = InlineCursor {
+              inline_index,
+              text_offset: segment.end,
+            };
+            let fits_pending_smart_justify_continuation = pending_smart_justify_continuation
+              .is_some_and(|pending: PendingSmartJustifyContinuation| {
+                pending.line_start == text_state.current_line_start
+                  && segment_start >= pending.source_start
+                  && segment_end <= pending.source_end
+              });
+            let smart_justify_continuation = continuation.filter(|continuation| {
+              overflow_punctuation_policy.enabled
+                && flow.text_segmentation != TextSegmentation::TableCell
+                && !paragraph.format.bidi
+                && !run.style.wordprocessingml_field_group
+                && continuation.outside_field_group
+                && continuation.western_forbidden_line_start_only
+            });
+            let smart_justify_current_overhang = if overflow_punctuation_policy.enabled
+              && flow.text_segmentation != TextSegmentation::TableCell
+              && !paragraph.format.bidi
+              && !run.style.wordprocessingml_field_group
+              && continuation_fit_width <= LAYOUT_EPSILON_PT
+            {
+              smart_justify_western_terminal_punctuation(
+                &chunk,
+                &segment.text,
+                &run.style,
+                overflow_punctuation,
+                text_metrics,
+              )
+            } else {
+              None
+            };
+            let smart_justify_overhang = smart_justify_continuation
+              .as_ref()
+              .map_or(0.0, |continuation| continuation.fit_width_pt)
+              + smart_justify_current_overhang.map_or(0.0, |punctuation| punctuation.width_pt);
+            // Writer enters its second, device-measured Guess() only for a
+            // full block-justified line whose word spacing is allowed to
+            // shrink (SwTextPortion::Format in portxt.cxx). Running the GDI
+            // compatibility measurement for every ordinary segment is both
+            // outside that semantic boundary and prohibitively expensive:
+            // TrueType hint programs would be executed throughout unrelated
+            // paragraphs before a shrink candidate even exists.
+            let smart_justify_device_fit = if !shrink_justified_lines
+              || flow.text_segmentation == TextSegmentation::DrawingLayer
+              || grid_width.is_some()
+              || leading_script_spacing > LAYOUT_EPSILON_PT
+            {
+              None
+            } else {
+              smart_justify_device_fit(
+                SmartJustifyDeviceFitInput {
+                  items: &current.items,
+                  item_start: line_item_start_index,
+                  chunk: &chunk,
+                  current_fit_text,
+                  retry_current_fit_text: smart_justify_current_overhang
+                    .map_or(current_fit_text, |punctuation| {
+                      punctuation.fit_text_without_punctuation
+                    }),
+                  style: &run.style,
+                  continuation_fit_width_pt: continuation_fit_width,
+                  continuation_hinted_fit_width_pt: continuation
+                    .as_ref()
+                    .map_or(Some(0.0), |continuation| {
+                      continuation.gdi_hinted_fit_width_pt
+                    }),
+                },
+                text_metrics,
+              )
+            };
+            let device_overflows_line = smart_justify_device_fit.is_some_and(|device_fit| {
+              x + fit_width_with_continuation + device_fit.candidate_right_adjustment_pt
+                > fit_line_right
+            });
+            let overflows_line = natural_overflows_line || device_overflows_line;
+            let can_fit_with_shrink = !fits_pending_smart_justify_continuation
+              && overflows_line
               && shrink_justified_lines
               && !line_used_shrink_fit
               && !line_has_tab
               && pending_tab.is_none()
-              && !tab_over_margin_active
-              && line_fits_with_word_space_shrink(
-                LineShrinkFit {
-                  x,
-                  width: fit_width_with_continuation,
-                  text: &segment.text,
-                  line_right: fit_line_right,
-                  items: &current.items,
-                  item_start: line_item_start_index,
-                  chunk: &chunk,
-                  style: &run.style,
-                  word_spacing: justification.word_spacing,
-                },
-                text_metrics,
-              );
+              && !tab_over_margin_active;
+            let fitted_smart_justify_overhang = can_fit_with_shrink
+              .then(|| {
+                smart_justify_fit_terminal_overhang(
+                  LineShrinkFit {
+                    x,
+                    width: fit_width_with_continuation,
+                    text: &segment.text,
+                    line_right: fit_line_right,
+                    device_fit: smart_justify_device_fit,
+                    items: &current.items,
+                    item_start: line_item_start_index,
+                    chunk: &chunk,
+                    style: &run.style,
+                    word_spacing: justification.word_spacing,
+                  },
+                  smart_justify_overhang,
+                  text_metrics,
+                )
+              })
+              .flatten();
+            let fits_with_shrink = fitted_smart_justify_overhang.is_some();
             if fits_with_shrink {
               line_used_shrink_fit = true;
+              if let Some(continuation) = smart_justify_continuation {
+                pending_smart_justify_continuation = Some(PendingSmartJustifyContinuation {
+                  line_start: text_state.current_line_start,
+                  source_start: continuation.source_start,
+                  source_end: continuation.source_end,
+                });
+              }
+              if let Some(overhang) = fitted_smart_justify_overhang
+                && overhang > LAYOUT_EPSILON_PT
+              {
+                text_state.smart_justify_terminal_overhang_pt = overhang;
+              }
             }
 
             let allow_automatic_hyphenation = continuation_fit_width <= LAYOUT_EPSILON_PT
@@ -27024,6 +27328,7 @@ impl<'a> TextFrameLayout<'a> {
             let allow_discretionary_hyphenation = !consecutive_hyphenation_limit_reached(flow);
             let selected_hyphenation = (overflows_line
               && !fits_with_shrink
+              && !fits_pending_smart_justify_continuation
               && pending_tab.is_none()
               && !tab_over_margin_active)
               .then(|| {
@@ -27172,7 +27477,12 @@ impl<'a> TextFrameLayout<'a> {
             }
 
             let mut started_new_line = false;
-            if overflows_line && !fits_with_shrink && x > line_left && !tab_over_margin_active {
+            if overflows_line
+              && !fits_with_shrink
+              && !fits_pending_smart_justify_continuation
+              && x > line_left
+              && !tab_over_margin_active
+            {
               let next_wrap_segment = next_wrap_line_segment_for_y(
                 text_frame.default_line_left,
                 text_frame.default_line_right,
@@ -27215,9 +27525,12 @@ impl<'a> TextFrameLayout<'a> {
                     y,
                     line_left,
                     line_right,
+                    text_state.smart_justify_terminal_overhang_pt,
                     text_metrics,
                   );
                 }
+                text_state.smart_justify_terminal_overhang_pt = 0.0;
+                pending_smart_justify_continuation = None;
                 line_left = next_left;
                 line_right = next_right;
                 x = next_left;
@@ -27270,7 +27583,7 @@ impl<'a> TextFrameLayout<'a> {
                   &chunk,
                   &segment.text,
                   &run.style,
-                  allow_overflow_punctuation,
+                  overflow_punctuation,
                   text_metrics,
                 )
               });
@@ -27304,7 +27617,7 @@ impl<'a> TextFrameLayout<'a> {
                   &chunk,
                   &text,
                   &run.style,
-                  allow_overflow_punctuation,
+                  overflow_punctuation,
                   text_metrics,
                 );
                 if fit_width > line_capacity && text.chars().count() > 1 {
@@ -27316,7 +27629,7 @@ impl<'a> TextFrameLayout<'a> {
                       &chunk,
                       text,
                       &run.style,
-                      allow_overflow_punctuation,
+                      overflow_punctuation,
                       text_metrics,
                     );
                     let natural_overflow = cjk_line_character(ch)
@@ -29657,6 +29970,7 @@ impl<'a> TextFrameLayout<'a> {
         y,
         line_left,
         line_right,
+        text_state.smart_justify_terminal_overhang_pt,
         text_metrics,
       );
       align_line_items_to_inline_object_baseline(
@@ -30079,24 +30393,45 @@ fn split_auto_script_spacing_segments(
   output
 }
 
+#[derive(Clone, Copy, Debug)]
+struct CrossRunContinuation {
+  fit_width_pt: f32,
+  gdi_hinted_fit_width_pt: Option<f32>,
+  source_start: InlineCursor,
+  source_end: InlineCursor,
+  western_forbidden_line_start_only: bool,
+  outside_field_group: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PendingSmartJustifyContinuation {
+  line_start: InlineCursor,
+  source_start: InlineCursor,
+  source_end: InlineCursor,
+}
+
 fn cross_run_unbreakable_continuation_width(
   inlines: &[InlineItem],
   inline_index: usize,
   current_segment: &str,
   text_metrics: &mut TextMetrics,
-) -> f32 {
+) -> Option<CrossRunContinuation> {
   if current_segment.is_empty()
     || current_segment
       .chars()
       .last()
       .is_some_and(char::is_whitespace)
   {
-    return 0.0;
+    return None;
   }
 
   let mut combined = current_segment.to_string();
   let mut following_text = Vec::new();
-  for inline in &inlines[inline_index.saturating_add(1)..] {
+  for (following_inline_index, inline) in inlines
+    .iter()
+    .enumerate()
+    .skip(inline_index.saturating_add(1))
+  {
     let InlineItem::Text(run) = inline else {
       break;
     };
@@ -30104,7 +30439,7 @@ fn cross_run_unbreakable_continuation_width(
       continue;
     }
     combined.push_str(&run.text);
-    following_text.push(run);
+    following_text.push((following_inline_index, run));
     let first_segment_len = text_segments(&combined).first().map_or(0, String::len);
     if first_segment_len < combined.len() {
       break;
@@ -30112,23 +30447,70 @@ fn cross_run_unbreakable_continuation_width(
   }
 
   let first_segment_len = text_segments(&combined).first().map_or(0, String::len);
-  let continuation_len = combined
+  let continuation = combined
     .get(current_segment.len()..first_segment_len)
-    .unwrap_or_default()
-    .trim_end_matches(libreoffice_line_end_elidable_blank)
-    .len();
-  let mut remaining = continuation_len;
+    .unwrap_or_default();
+  let visible_continuation = continuation.trim_end_matches(libreoffice_line_end_elidable_blank);
+  if visible_continuation.is_empty() {
+    return None;
+  }
+
+  let mut remaining_fit = visible_continuation.len();
+  let mut remaining_source = continuation.len();
   let mut width = 0.0;
-  for run in following_text {
-    if remaining == 0 {
+  let mut gdi_hinted_width = Some(0.0);
+  let mut source_start = None;
+  let mut source_end = None;
+  let mut outside_field_group = true;
+  for (following_inline_index, run) in following_text {
+    if remaining_source == 0 {
       break;
     }
-    let take = remaining.min(run.text.len());
-    debug_assert!(run.text.is_char_boundary(take));
-    width += text_metrics.measure_text(&run.text[..take], &run.style);
-    remaining -= take;
+    let source_take = remaining_source.min(run.text.len());
+    debug_assert!(run.text.is_char_boundary(source_take));
+    source_start.get_or_insert(InlineCursor {
+      inline_index: following_inline_index,
+      text_offset: 0,
+    });
+    let fit_take = remaining_fit.min(source_take);
+    debug_assert!(run.text.is_char_boundary(fit_take));
+    if fit_take > 0 {
+      let fit_text = &run.text[..fit_take];
+      width += text_metrics.measure_text(fit_text, &run.style);
+      gdi_hinted_width = gdi_hinted_width.and_then(|width| {
+        text_metrics
+          .gdi_hinted_text_extent_pt(fit_text, &run.style, units::OFFICE_FIXED_OUTPUT_DPI)
+          .map(|hinted_width| width + hinted_width)
+      });
+      outside_field_group &= !run.style.wordprocessingml_field_group;
+      remaining_fit -= fit_take;
+    }
+    remaining_source -= source_take;
+    if remaining_source == 0 {
+      source_end = Some(InlineCursor {
+        inline_index: following_inline_index,
+        text_offset: source_take,
+      });
+    }
   }
-  width
+  let (Some(source_start), Some(source_end)) = (source_start, source_end) else {
+    return None;
+  };
+  Some(CrossRunContinuation {
+    fit_width_pt: width,
+    gdi_hinted_fit_width_pt: gdi_hinted_width,
+    source_start,
+    source_end,
+    // This is deliberately distinct from w:overflowPunct. Writer's second
+    // Guess() is capped at the current formatting portion; Office fixed
+    // output likewise lets a following western no-line-start punctuation
+    // portion stay attached after smart word-space shrinking. CJK hanging
+    // punctuation remains governed by the language-specific Office lists.
+    western_forbidden_line_start_only: visible_continuation.chars().all(|character| {
+      libreoffice_forbidden_line_start_after_text(character) && !cjk_line_character(character)
+    }),
+    outside_field_group,
+  })
 }
 
 fn drawing_layer_text_segments_with_offsets(text: &str) -> Vec<TextSegment> {
@@ -30194,16 +30576,93 @@ fn emergency_character_segments(text: &str) -> Vec<String> {
     .collect()
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WordprocessingTextLanguage {
+  Unknown,
+  Other,
+  SimplifiedChinese,
+  TraditionalChinese,
+  Japanese,
+  Korean,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct WordprocessingOverflowPunctuationPolicy {
+  enabled: bool,
+  allow_legacy_western: bool,
+  inside_field_group: bool,
+  preceding_language: WordprocessingTextLanguage,
+}
+
+fn preceding_wordprocessing_text_language(
+  paragraph: &crate::docx::Paragraph,
+  inline_index: usize,
+  text_offset: usize,
+) -> Option<WordprocessingTextLanguage> {
+  if let Some(InlineItem::Text(run)) = paragraph.inlines.get(inline_index)
+    && let Some(prefix) = run.text.get(..text_offset)
+    && let Some(language) = wordprocessing_text_language(prefix, &run.style)
+  {
+    return Some(language);
+  }
+  paragraph.inlines[..inline_index.min(paragraph.inlines.len())]
+    .iter()
+    .rev()
+    .find_map(|inline| {
+      let InlineItem::Text(run) = inline else {
+        return None;
+      };
+      wordprocessing_text_language(&run.text, &run.style)
+    })
+}
+
+fn wordprocessing_text_language(
+  text: &str,
+  style: &TextStyle,
+) -> Option<WordprocessingTextLanguage> {
+  // ECMA-376 Part 1 §17.3.2.20 selects w:lang/@val for Latin text and
+  // @eastAsia for East Asian text from the Unicode character values. Match
+  // Writer's SwTextGuess by walking back over punctuation to the last
+  // letter/number instead of assigning a Common-script punctuation mark to
+  // @eastAsia merely because that slot is present on the run.
+  let character = text
+    .chars()
+    .rev()
+    .find(|character| character.is_alphanumeric())?;
+  let language = if matches!(
+    character.script(),
+    Script::Han
+      | Script::Hiragana
+      | Script::Katakana
+      | Script::Hangul
+      | Script::Bopomofo
+      | Script::Yi
+  ) {
+    style
+      .east_asia_language
+      .as_deref()
+      .or(style.language.as_deref())
+  } else {
+    style.language.as_deref()
+  };
+  Some(
+    language
+      .filter(|language| is_cjk_language(language))
+      .map(wordprocessing_cjk_language)
+      .unwrap_or(WordprocessingTextLanguage::Other),
+  )
+}
+
 fn line_fit_width(
   text: &str,
   style: &TextStyle,
-  allow_overflow_punctuation: bool,
+  overflow_punctuation: WordprocessingOverflowPunctuationPolicy,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
   // Spaces from UAX #14 SP/BA classes are elided at line end for line-break
   // fitting. Keep the original segment width for painting and following text
   // advance; only the fit test ignores trailing collapsible blanks.
-  let fit_text = wordprocessing_line_fit_text(text, style, allow_overflow_punctuation);
+  let fit_text = wordprocessing_line_fit_text("", text, style, overflow_punctuation);
   if fit_text.len() == text.len() {
     text_metrics.measure_text(text, style)
   } else {
@@ -30240,63 +30699,121 @@ fn appended_line_fit_width(
   chunk: &str,
   text: &str,
   style: &TextStyle,
-  allow_overflow_punctuation: bool,
+  overflow_punctuation: WordprocessingOverflowPunctuationPolicy,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
-  let fit_text = wordprocessing_line_fit_text(text, style, allow_overflow_punctuation);
+  let fit_text = wordprocessing_line_fit_text(chunk, text, style, overflow_punctuation);
   appended_text_width(chunk, fit_text, style, text_metrics)
 }
 
-fn wordprocessing_line_fit_text<'a>(
+#[derive(Clone, Copy, Debug)]
+struct SmartJustifyTerminalPunctuation<'a> {
+  width_pt: f32,
+  fit_text_without_punctuation: &'a str,
+}
+
+fn smart_justify_western_terminal_punctuation<'a>(
+  preceding_text: &str,
   text: &'a str,
   style: &TextStyle,
-  allow_overflow_punctuation: bool,
+  overflow_punctuation: WordprocessingOverflowPunctuationPolicy,
+  text_metrics: &mut TextMetrics,
+) -> Option<SmartJustifyTerminalPunctuation<'a>> {
+  let visible_text = text.trim_end_matches(libreoffice_line_end_elidable_blank);
+  let mut punctuation_start = visible_text.len();
+  for (index, character) in visible_text.char_indices().rev() {
+    if libreoffice_forbidden_line_start_after_text(character) && !cjk_line_character(character) {
+      punctuation_start = index;
+    } else {
+      break;
+    }
+  }
+  if punctuation_start == visible_text.len()
+    || wordprocessing_line_fit_text(preceding_text, text, style, overflow_punctuation).len()
+      < visible_text.len()
+  {
+    return None;
+  }
+
+  let visible_width = appended_text_width(preceding_text, visible_text, style, text_metrics);
+  let fitted_width = appended_text_width(
+    preceding_text,
+    &visible_text[..punctuation_start],
+    style,
+    text_metrics,
+  );
+  Some(SmartJustifyTerminalPunctuation {
+    width_pt: (visible_width - fitted_width).max(0.0),
+    fit_text_without_punctuation: &visible_text[..punctuation_start],
+  })
+}
+
+fn wordprocessing_line_fit_text<'a>(
+  preceding_text: &str,
+  text: &'a str,
+  style: &TextStyle,
+  overflow_punctuation: WordprocessingOverflowPunctuationPolicy,
 ) -> &'a str {
   // UAX #14 SP/BA blanks are elided at line end. ECMA-376 Part 1
   // §17.3.1.21 independently permits exactly one following punctuation
   // character outside the paragraph extents. Keep both characters in the
   // painted run and remove them only from the width used to select a break.
   let fit_text = text.trim_end_matches(libreoffice_line_end_elidable_blank);
-  if !allow_overflow_punctuation {
+  // Writer's SwTextGuess::Guess() requires `!rPor.InFieldGrp()` before it
+  // asks the break iterator for a hanging portion. A field result therefore
+  // keeps its terminal punctuation inside the line even when the paragraph's
+  // effective w:overflowPunct value is true.
+  if !overflow_punctuation.enabled || overflow_punctuation.inside_field_group {
     return fit_text;
   }
   let Some((index, character)) = fit_text.char_indices().next_back() else {
     return fit_text;
   };
-  if is_wordprocessing_overflow_punctuation(character, style) {
+  if is_wordprocessing_overflow_punctuation(
+    character,
+    preceding_text,
+    &fit_text[..index],
+    style,
+    overflow_punctuation,
+  ) {
     &fit_text[..index]
   } else {
     fit_text
   }
 }
 
-fn is_wordprocessing_overflow_punctuation(character: char, style: &TextStyle) -> bool {
-  // [MS-OI29500] Part 1 §17.3.1.21(a) narrows Word's CJK behavior to
-  // locale-specific sets, including several symbols that Unicode does not
-  // classify as punctuation. For other run languages, the normative ECMA
-  // wording applies, so use Unicode General_Category=P*.
-  let language = style
-    .east_asia_language
-    .as_deref()
-    .filter(|language| is_cjk_language(language))
+fn is_wordprocessing_overflow_punctuation(
+  character: char,
+  preceding_text: &str,
+  text_before_punctuation: &str,
+  style: &TextStyle,
+  policy: WordprocessingOverflowPunctuationPolicy,
+) -> bool {
+  // [MS-OE376] Part 4 §2.3.1.21(a) defines Word's modern behavior in terms
+  // of four East Asian parent-text languages and exact character sets. The
+  // language belongs to the last real character, not to the Common-script
+  // punctuation itself. Current-segment text wins, then the accumulated
+  // same-style chunk, then the preceding run resolved by the caller.
+  let language = wordprocessing_text_language(text_before_punctuation, style)
+    .or_else(|| wordprocessing_text_language(preceding_text, style))
     .or_else(|| {
-      style
-        .language
-        .as_deref()
-        .filter(|language| is_cjk_language(language))
+      (policy.preceding_language != WordprocessingTextLanguage::Unknown)
+        .then_some(policy.preceding_language)
     });
-  match language.map(wordprocessing_cjk_language) {
-    Some(WordprocessingCjkLanguage::SimplifiedChinese) => {
+  match language {
+    Some(WordprocessingTextLanguage::SimplifiedChinese) => {
       WORD_SIMPLIFIED_CHINESE_OVERFLOW_PUNCTUATION.contains(character)
     }
-    Some(WordprocessingCjkLanguage::TraditionalChinese) => {
+    Some(WordprocessingTextLanguage::TraditionalChinese) => {
       WORD_TRADITIONAL_CHINESE_OVERFLOW_PUNCTUATION.contains(character)
     }
-    Some(WordprocessingCjkLanguage::Japanese) => {
+    Some(WordprocessingTextLanguage::Japanese) => {
       WORD_JAPANESE_OVERFLOW_PUNCTUATION.contains(character)
     }
-    Some(WordprocessingCjkLanguage::Korean) => WORD_KOREAN_OVERFLOW_PUNCTUATION.contains(character),
-    None => matches!(
+    Some(WordprocessingTextLanguage::Korean) => {
+      WORD_KOREAN_OVERFLOW_PUNCTUATION.contains(character)
+    }
+    _ if policy.allow_legacy_western => matches!(
       CodePointMapData::<GeneralCategory>::new().get(character),
       GeneralCategory::DashPunctuation
         | GeneralCategory::OpenPunctuation
@@ -30306,15 +30823,8 @@ fn is_wordprocessing_overflow_punctuation(character: char, style: &TextStyle) ->
         | GeneralCategory::FinalPunctuation
         | GeneralCategory::OtherPunctuation
     ),
+    _ => false,
   }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum WordprocessingCjkLanguage {
-  SimplifiedChinese,
-  TraditionalChinese,
-  Japanese,
-  Korean,
 }
 
 fn is_cjk_language(language: &str) -> bool {
@@ -30324,20 +30834,20 @@ fn is_cjk_language(language: &str) -> bool {
     || primary.eq_ignore_ascii_case("ko")
 }
 
-fn wordprocessing_cjk_language(language: &str) -> WordprocessingCjkLanguage {
+fn wordprocessing_cjk_language(language: &str) -> WordprocessingTextLanguage {
   let normalized = language.to_ascii_lowercase().replace('_', "-");
   if normalized == "ja" || normalized.starts_with("ja-") {
-    WordprocessingCjkLanguage::Japanese
+    WordprocessingTextLanguage::Japanese
   } else if normalized == "ko" || normalized.starts_with("ko-") {
-    WordprocessingCjkLanguage::Korean
+    WordprocessingTextLanguage::Korean
   } else if normalized.contains("-hant")
     || normalized.contains("-tw")
     || normalized.contains("-hk")
     || normalized.contains("-mo")
   {
-    WordprocessingCjkLanguage::TraditionalChinese
+    WordprocessingTextLanguage::TraditionalChinese
   } else {
-    WordprocessingCjkLanguage::SimplifiedChinese
+    WordprocessingTextLanguage::SimplifiedChinese
   }
 }
 
@@ -30458,16 +30968,36 @@ fn text_overflows_line(x: f32, width: f32, line_right: f32) -> bool {
   x + width > line_right
 }
 
+#[derive(Clone, Copy)]
 struct LineShrinkFit<'a> {
   x: f32,
   width: f32,
   text: &'a str,
   line_right: f32,
+  device_fit: Option<SmartJustifyDeviceFit>,
   items: &'a [PageItem],
   item_start: usize,
   chunk: &'a str,
   style: &'a TextStyle,
   word_spacing: crate::docx::JustificationWordSpacing,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SmartJustifyDeviceFit {
+  original_x_adjustment_pt: f32,
+  candidate_right_adjustment_pt: f32,
+  retry_candidate_right_adjustment_pt: f32,
+}
+
+struct SmartJustifyDeviceFitInput<'a> {
+  items: &'a [PageItem],
+  item_start: usize,
+  chunk: &'a str,
+  current_fit_text: &'a str,
+  retry_current_fit_text: &'a str,
+  style: &'a TextStyle,
+  continuation_fit_width_pt: f32,
+  continuation_hinted_fit_width_pt: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -30479,8 +31009,78 @@ struct SmartJustifyComparison {
   terminal_space_count: usize,
   shrink_space_count: usize,
   space_width_pt: f32,
-  minimum_ratio: f32,
   maximum_ratio: f32,
+}
+
+fn smart_justify_gdi_text_width_adjustment(
+  text: &str,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  let natural_width_pt = text_metrics.measure_text(text, style);
+  text_metrics
+    .gdi_hinted_text_extent_pt(text, style, units::OFFICE_FIXED_OUTPUT_DPI)
+    .map(|hinted_width_pt| hinted_width_pt - natural_width_pt)
+}
+
+fn smart_justify_gdi_appended_text_width_adjustment(
+  preceding_text: &str,
+  text: &str,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  if preceding_text.is_empty() {
+    return smart_justify_gdi_text_width_adjustment(text, style, text_metrics);
+  }
+  if text.is_empty() {
+    return smart_justify_gdi_text_width_adjustment(preceding_text, style, text_metrics);
+  }
+  let mut combined = String::with_capacity(preceding_text.len() + text.len());
+  combined.push_str(preceding_text);
+  combined.push_str(text);
+  smart_justify_gdi_text_width_adjustment(&combined, style, text_metrics)
+}
+
+fn smart_justify_device_fit(
+  input: SmartJustifyDeviceFitInput<'_>,
+  text_metrics: &mut TextMetrics,
+) -> Option<SmartJustifyDeviceFit> {
+  let mut item_adjustment_pt = 0.0;
+  for item in input.items.iter().skip(input.item_start) {
+    let PageItem::Text(text) = item else {
+      return None;
+    };
+    if text.word_spacing_pt.abs() > LAYOUT_EPSILON_PT {
+      return None;
+    }
+    item_adjustment_pt +=
+      smart_justify_gdi_text_width_adjustment(&text.text, &text.style, text_metrics)?;
+  }
+
+  let original_x_adjustment_pt = item_adjustment_pt
+    + smart_justify_gdi_text_width_adjustment(input.chunk, input.style, text_metrics)?;
+  let current_adjustment_pt = smart_justify_gdi_appended_text_width_adjustment(
+    input.chunk,
+    input.current_fit_text,
+    input.style,
+    text_metrics,
+  )?;
+  let retry_current_adjustment_pt = smart_justify_gdi_appended_text_width_adjustment(
+    input.chunk,
+    input.retry_current_fit_text,
+    input.style,
+    text_metrics,
+  )?;
+  let continuation_adjustment_pt =
+    input.continuation_hinted_fit_width_pt? - input.continuation_fit_width_pt;
+
+  Some(SmartJustifyDeviceFit {
+    original_x_adjustment_pt,
+    candidate_right_adjustment_pt: item_adjustment_pt
+      + current_adjustment_pt
+      + continuation_adjustment_pt,
+    retry_candidate_right_adjustment_pt: item_adjustment_pt + retry_current_adjustment_pt,
+  })
 }
 
 fn smart_justify_prefers_shrinking(comparison: SmartJustifyComparison) -> bool {
@@ -30499,24 +31099,32 @@ fn smart_justify_prefers_shrinking(comparison: SmartJustifyComparison) -> bool {
     + (comparison.line_right_pt - original_printable_right).max(0.0)
       / comparison.normal_space_count as f32;
   let shrunk_space = comparison.space_width_pt - overflow / comparison.shrink_space_count as f32;
-  if shrunk_space <= comparison.space_width_pt * comparison.minimum_ratio {
+  if shrunk_space <= 0.0 {
     return false;
   }
 
+  // LibreOffice's compatibility implementation compares the original
+  // break's expanded spaces with the candidate break's shrunk spaces and
+  // discounts expansion by 1/1.7. Office fixed-output positive and negative
+  // corpus states establish the same choice boundary; OOXML does not expose
+  // this layout policy as a serialized paragraph property.
   let expansion_weight = 1.0 / 1.7;
-  let z0 = comparison.space_width_pt / shrunk_space;
-  let z1 = (comparison.space_width_pt
+  let shrink_distance = comparison.space_width_pt / shrunk_space;
+  let weighted_expansion_distance = (comparison.space_width_pt
     + (normal_space - comparison.space_width_pt) * expansion_weight)
     / comparison.space_width_pt;
   let normal_ratio = normal_space / comparison.space_width_pt;
-  normal_ratio > comparison.maximum_ratio || z1 >= z0
+  normal_ratio > comparison.maximum_ratio || weighted_expansion_distance >= shrink_distance
 }
 
 fn line_fits_with_word_space_shrink(
   fit: LineShrinkFit<'_>,
   text_metrics: &mut TextMetrics,
 ) -> bool {
-  let candidate_right = fit.x + fit.width;
+  let candidate_right_adjustment_pt = fit
+    .device_fit
+    .map_or(0.0, |device_fit| device_fit.candidate_right_adjustment_pt);
+  let candidate_right = fit.x + fit.width + candidate_right_adjustment_pt;
   let overflow = candidate_right - fit.line_right;
   if overflow <= 0.0 {
     return true;
@@ -30548,7 +31156,14 @@ fn line_fits_with_word_space_shrink(
 
   let mut print_grid_style = fit.style.clone();
   round_style_to_word_print_grid(&mut print_grid_style);
-  let space_width = text_metrics.measure_text(" ", &print_grid_style);
+  let natural_space_width = text_metrics.measure_text(" ", &print_grid_style);
+  let space_width = if fit.device_fit.is_some() {
+    text_metrics
+      .gdi_hinted_text_extent_pt(" ", &print_grid_style, units::OFFICE_FIXED_OUTPUT_DPI)
+      .unwrap_or(natural_space_width)
+  } else {
+    natural_space_width
+  };
   if space_width <= f32::EPSILON {
     return false;
   }
@@ -30556,26 +31171,54 @@ fn line_fits_with_word_space_shrink(
   let word_spacing = fit.word_spacing;
   let minimum_ratio = word_spacing.minimum_pct as f32 / PERCENT_SCALE;
   let shrinkability = shrink_space_count as f32 * space_width * (1.0 - minimum_ratio);
-  if overflow > shrinkability {
+  // Each GDI formatting run has already accumulated and rounded its hinted
+  // extent. Word applies the fractional word-space shrink to those run
+  // widths, then compares the result with the authored line width. Do not
+  // independently snap the page geometry or the post-shrink candidate.
+  let fits_at_minimum = overflow <= shrinkability;
+  if !fits_at_minimum {
     return false;
   }
 
-  let maximum_ratio = word_spacing.maximum_pct as f32 / PERCENT_SCALE;
-  // SwTextPortion::Format_() first avoids an original break whose expanded
-  // spaces exceed the paragraph's maximum, then falls back to its weighted
-  // expanded-vs-shrunk comparison. Both decisions are part of the same
-  // compatibility-mode-15 line-break policy.
   smart_justify_prefers_shrinking(SmartJustifyComparison {
-    original_x_pt: fit.x,
+    original_x_pt: fit.x
+      + fit
+        .device_fit
+        .map_or(0.0, |device_fit| device_fit.original_x_adjustment_pt),
     candidate_right_pt: candidate_right,
     line_right_pt: fit.line_right,
     normal_space_count,
     terminal_space_count,
     shrink_space_count,
     space_width_pt: space_width,
-    minimum_ratio,
-    maximum_ratio,
+    maximum_ratio: word_spacing.maximum_pct as f32 / PERCENT_SCALE,
   })
+}
+
+fn smart_justify_fit_terminal_overhang(
+  fit: LineShrinkFit<'_>,
+  terminal_overhang_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  if line_fits_with_word_space_shrink(fit, text_metrics) {
+    return Some(0.0);
+  }
+  if terminal_overhang_pt <= LAYOUT_EPSILON_PT {
+    return None;
+  }
+
+  line_fits_with_word_space_shrink(
+    LineShrinkFit {
+      width: (fit.width - terminal_overhang_pt).max(0.0),
+      device_fit: fit.device_fit.map(|device_fit| SmartJustifyDeviceFit {
+        candidate_right_adjustment_pt: device_fit.retry_candidate_right_adjustment_pt,
+        ..device_fit
+      }),
+      ..fit
+    },
+    text_metrics,
+  )
+  .then_some(terminal_overhang_pt)
 }
 
 #[derive(Clone, Copy, Default)]
@@ -32123,6 +32766,7 @@ fn justify_line_items(
   y: f32,
   line_left: f32,
   line_right: f32,
+  terminal_overhang_pt: f32,
   text_metrics: &mut TextMetrics,
 ) {
   let mut last_text_index = None;
@@ -32156,8 +32800,19 @@ fn justify_line_items(
     } else {
       &text.text
     };
-    natural_right =
-      natural_right.max(text.x_pt + text_metrics.measure_text(visible_text, &text.style));
+    let visible_width = text_metrics.measure_text(visible_text, &text.style);
+    let terminal_overhang = if Some(index) == last_text_index {
+      terminal_overhang_pt.clamp(0.0, visible_width)
+    } else {
+      0.0
+    };
+    // SwTextGuess's compatibility-mode smart-shrink retry can leave a
+    // forbidden line-start punctuation suffix in a hanging portion. The
+    // suffix may be at the end of the fitted formatting portion or in the
+    // immediately following punctuation-only portion. Exclude only that
+    // marked suffix from the glue target without treating arbitrary Latin
+    // punctuation as ordinary w:overflowPunct hanging punctuation.
+    natural_right = natural_right.max(text.x_pt + visible_width - terminal_overhang);
     space_count += visible_text.matches(' ').count();
   }
   if space_count == 0 {
@@ -32246,10 +32901,19 @@ fn justify_paragraph_last_line(
   y: f32,
   line_left: f32,
   line_right: f32,
+  terminal_overhang_pt: f32,
   text_metrics: &mut TextMetrics,
 ) {
   if justification.last_line_adjust == crate::docx::ParagraphAdjust::Block {
-    justify_line_items(items, start_index, y, line_left, line_right, text_metrics);
+    justify_line_items(
+      items,
+      start_index,
+      y,
+      line_left,
+      line_right,
+      terminal_overhang_pt,
+      text_metrics,
+    );
   }
 }
 
@@ -33396,27 +34060,99 @@ mod tests {
   use ooxmlsdk::schemas::schemas_microsoft_com_vml as v;
 
   #[test]
-  fn wordprocessing_overflow_punctuation_fit_honors_property_and_run_language() {
+  fn wordprocessing_overflow_punctuation_fit_honors_compatibility_story_and_script_language() {
     let mut style = TextStyle {
       language: Some(Arc::from("es-ES_tradnl")),
       ..TextStyle::default()
     };
+    let legacy_body = WordprocessingOverflowPunctuationPolicy {
+      enabled: true,
+      allow_legacy_western: true,
+      inside_field_group: false,
+      preceding_language: WordprocessingTextLanguage::Unknown,
+    };
+    let modern_or_table = WordprocessingOverflowPunctuationPolicy {
+      allow_legacy_western: false,
+      ..legacy_body
+    };
     assert_eq!(
-      wordprocessing_line_fit_text("author, ", &style, true),
+      wordprocessing_line_fit_text("", "author, ", &style, legacy_body),
       "author"
     );
     assert_eq!(
-      wordprocessing_line_fit_text("author, ", &style, false),
+      wordprocessing_line_fit_text("", "author, ", &style, modern_or_table),
+      "author,"
+    );
+    assert_eq!(
+      wordprocessing_line_fit_text(
+        "",
+        "author, ",
+        &style,
+        WordprocessingOverflowPunctuationPolicy {
+          enabled: false,
+          ..legacy_body
+        },
+      ),
       "author,"
     );
 
-    // [MS-OI29500] records '%' for Simplified Chinese but not Traditional
+    // ECMA-376 §17.3.2.20 assigns the Latin and East Asian language slots by
+    // actual character script. A Latin URL therefore does not inherit zh-CN
+    // merely because @eastAsia is present, while Chinese text does.
+    style.language = Some(Arc::from("en-US"));
+    style.east_asia_language = Some(Arc::from("zh-CN"));
+    assert_eq!(
+      wordprocessing_line_fit_text("", "text.", &style, modern_or_table),
+      "text."
+    );
+    assert_eq!(
+      wordprocessing_line_fit_text("", "文字%", &style, modern_or_table),
+      "文字"
+    );
+
+    // [MS-OE376] records '%' for Simplified Chinese but not Traditional
     // Chinese, so this pair guards the locale-specific Word lists rather than
     // merely accepting every symbol at the margin.
-    style.east_asia_language = Some(Arc::from("zh-CN"));
-    assert_eq!(wordprocessing_line_fit_text("text%", &style, true), "text");
     style.east_asia_language = Some(Arc::from("zh-TW"));
-    assert_eq!(wordprocessing_line_fit_text("text%", &style, true), "text%");
+    assert_eq!(
+      wordprocessing_line_fit_text("", "文字%", &style, modern_or_table),
+      "文字%"
+    );
+
+    // SwTextGuess excludes field portions from hanging punctuation. This is
+    // independent of the paragraph default and the CJK locale character set.
+    style.east_asia_language = Some(Arc::from("zh-CN"));
+    assert_eq!(
+      wordprocessing_line_fit_text("", "文字。", &style, modern_or_table),
+      "文字"
+    );
+    assert_eq!(
+      wordprocessing_line_fit_text(
+        "",
+        "文字。",
+        &style,
+        WordprocessingOverflowPunctuationPolicy {
+          inside_field_group: true,
+          ..modern_or_table
+        },
+      ),
+      "文字。"
+    );
+
+    // A punctuation-only run inherits the last real character's language
+    // resolved by the paragraph walker, including across a run boundary.
+    assert_eq!(
+      wordprocessing_line_fit_text(
+        "",
+        "%",
+        &style,
+        WordprocessingOverflowPunctuationPolicy {
+          preceding_language: WordprocessingTextLanguage::SimplifiedChinese,
+          ..modern_or_table
+        },
+      ),
+      ""
+    );
   }
 
   fn legacy_effect_test_text(style: TextStyle) -> TextItem {
@@ -33707,15 +34443,181 @@ mod tests {
   }
 
   #[test]
-  fn header_footer_table_cell_does_not_preapply_the_first_baseline() {
+  fn table_cell_first_line_origin_is_a_resolved_windows_baseline_in_every_story() {
     let style = TextStyle::default();
     let mut text_metrics = TextMetrics::new();
 
-    assert_eq!(
-      table_cell_initial_baseline_offset(true, &style, 14.0, &mut text_metrics),
-      0.0
-    );
-    assert!(table_cell_initial_baseline_offset(false, &style, 14.0, &mut text_metrics) > 0.0);
+    assert!(table_cell_initial_baseline_offset(&style, 14.0, &mut text_metrics) > 0.0);
+  }
+
+  #[test]
+  fn repeating_story_lines_retain_frame_ownership_after_materialization() {
+    let run = |text: &str, font_family: &str| TextRun {
+      text: text.into(),
+      style: TextStyle {
+        font_family: Some(Arc::from(font_family)),
+        ..TextStyle::default()
+      },
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    };
+    let paragraph = |runs: Vec<TextRun>| {
+      Block::paragraph(Paragraph {
+        inlines: runs.iter().cloned().map(InlineItem::Text).collect(),
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        runs,
+        format: Box::new(ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      })
+    };
+    let document = DocxDocument {
+      page: PageSetup::default(),
+      page_background_pattern: None,
+      line_number_style: TextStyle::default(),
+      note_separator_style: TextStyle::default(),
+      footnote_separator_stories: Default::default(),
+      endnote_separator_stories: Default::default(),
+      has_styles_part: true,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      compatibility_mode: 15,
+      justify_lines_with_shrinking: false,
+      do_not_expand_shift_return: false,
+      even_and_odd_headers: false,
+      split_page_break_and_paragraph_mark: false,
+      form_widgets: Vec::new(),
+      sections: Vec::new(),
+      header_blocks: Vec::new(),
+      footer_blocks: vec![paragraph(vec![
+        run("Latin ", "Calibri"),
+        run("中文", "DengXian"),
+      ])],
+      first_header_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      footnote_numbering: Vec::new(),
+      footnote_positions: Vec::new(),
+      endnotes: Default::default(),
+      endnote_numbering: Vec::new(),
+      endnote_position: w::EndnotePositionValues::DocumentEnd,
+      title_page: false,
+      blocks: vec![paragraph(vec![run("body", "Calibri")])],
+    };
+
+    let laid_out = layout(&document, &LayoutOptions::default()).expect("layout");
+    let page = &laid_out.pages[0];
+    let footer_items = page
+      .items
+      .iter()
+      .enumerate()
+      .filter_map(|(index, item)| {
+        matches!(item, PageItem::Text(text) if text.text == "Latin " || text.text == "中文")
+          .then_some(index)
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(footer_items.len(), 2);
+    assert!(laid_out.frames.iter().any(|frame| {
+      frame.page_index == 0
+        && frame.kind == FollowFrameKind::Paragraph
+        && frame.lines.iter().any(|line| {
+          footer_items
+            .iter()
+            .all(|index| line.item_start <= *index && *index < line.item_end)
+        })
+    }));
+  }
+
+  #[test]
+  fn repeating_story_frames_normalize_detached_anchor_fragments_after_materialization() {
+    let rect = || {
+      PageItem::Rect(RectItem {
+        x_pt: 10.0,
+        y_pt: 10.0,
+        width_pt: 20.0,
+        height_pt: 20.0,
+        fill_color: None,
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      })
+    };
+    let mut page = empty_section_page(PageSetup::default(), 0, 0);
+    page.items.push(rect());
+    let kind = FollowFrameKind::Paragraph;
+    page.repeating_adornment = Some(RepeatingAdornment {
+      items: vec![rect()],
+      frame_fragments: Vec::new(),
+      frame_influences: Vec::new(),
+      frames: vec![LayoutFrame {
+        kind,
+        block_index: Some(0),
+        split_start: frame_cursor(Some(0), kind, 0, &[], true),
+        split_end: frame_cursor(Some(0), kind, 1, &[], false),
+        page_index: 0,
+        section_index: 0,
+        section_page_index: 0,
+        column_index: 0,
+        item_count: 1,
+        items: Vec::new(),
+        item_start: 0,
+        item_end: 1,
+        bounds: Some(FrameBounds {
+          x_pt: 10.0,
+          y_pt: 10.0,
+          width_pt: 20.0,
+          height_pt: 20.0,
+        }),
+        lines: Vec::new(),
+        flow_bottom_pt: Some(30.0),
+        // A floating drawing detached during adornment ordering can leave
+        // the old anchor fragment at a page-relative range no longer owned
+        // by the remapped frame.
+        fragments: vec![FrameFragment {
+          kind: FrameFragmentKind::ParagraphLine,
+          split: FragmentSplitKind::Complete,
+          index: 0,
+          row_index: 0,
+          cell_index: None,
+          item_start: 2,
+          item_end: 3,
+          bounds: Some(FrameBounds {
+            x_pt: 10.0,
+            y_pt: 10.0,
+            width_pt: 20.0,
+            height_pt: 20.0,
+          }),
+        }],
+        influences: Vec::new(),
+        invalidation: FrameInvalidation::Clean,
+      }],
+    });
+    let mut pages = vec![page];
+    let mut frames = Vec::new();
+
+    materialize_repeating_adornments(&mut pages, &mut frames);
+
+    let [frame] = frames.as_slice() else {
+      panic!("one repeating-story frame");
+    };
+    assert_eq!((frame.item_start, frame.item_end), (0, 1));
+    assert!(frame.fragments.is_empty());
+    assert!(frame.lines.is_empty());
   }
 
   #[test]
@@ -33757,6 +34659,7 @@ mod tests {
     };
     let document = DocxDocument {
       page: PageSetup::default(),
+      page_background_pattern: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -36815,6 +37718,91 @@ mod tests {
   }
 
   #[test]
+  fn proportional_auto_line_spacing_uses_the_tallest_text_portion() {
+    fn run(text: &str, font_size_pt: f32) -> InlineItem {
+      InlineItem::Text(TextRun {
+        text: text.into(),
+        style: TextStyle {
+          font_size_pt,
+          ..Default::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    }
+
+    let paragraph = Paragraph {
+      inlines: vec![run("short", 8.0), run("tall", 20.0)],
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        line_height_rule: LineHeightRule::Auto,
+        line_height_pt: Some(1.5),
+        line_height_set: true,
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let flow = flow_from_block_area(BlockArea {
+      setup: PageSetup::default(),
+      section_index: 0,
+      section_page_index: 0,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: 72.0,
+      content_left_pt: 72.0,
+      content_bottom: 720.0,
+      body_content_bottom_pt: 720.0,
+      content_width: 468.0,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
+      compatibility_mode: 15,
+      justify_lines_with_shrinking: false,
+      do_not_expand_shift_return: false,
+      repeating_slots: RepeatingSlotState::default(),
+    });
+    let mut text_metrics = TextMetrics::new();
+    let frame = TextFrame::new(&paragraph, flow, &mut text_metrics);
+    let InlineItem::Text(tall_run) = &paragraph.inlines[1] else {
+      unreachable!();
+    };
+    let tall_natural_height =
+      inline_text_height_for_text(&tall_run.style, &tall_run.text, &mut text_metrics);
+    let resolved_height = include_text_height(
+      frame.base_line_height,
+      &paragraph,
+      flow,
+      frame,
+      &tall_run.style,
+      &tall_run.text,
+      &mut text_metrics,
+    );
+
+    // ECMA-376 defines auto spacing as a multiple of the line, and Writer's
+    // Word-compatible LineSpacingBaseHeight is the tallest eligible text
+    // portion in that line. The shorter first run must not freeze the basis.
+    assert!((resolved_height - tall_natural_height * 1.5).abs() < 0.001);
+    assert!((frame.text_baseline_line_height(resolved_height) - tall_natural_height).abs() < 0.001);
+    assert!((frame.page_fit_height(resolved_height) - tall_natural_height).abs() < 0.001);
+  }
+
+  #[test]
   fn all_translucent_glyph_path_line_uses_natural_baseline_box() {
     fn paragraph(opacities: &[f32]) -> Paragraph {
       Paragraph {
@@ -36956,6 +37944,8 @@ mod tests {
       base_line_height: DEFAULT_LINE_HEIGHT_PT,
       base_content_height: DEFAULT_LINE_HEIGHT_PT,
       proportional_auto_gap_below_pt: 0.0,
+      proportional_auto_text_line_spacing_multiple: None,
+      proportional_auto_baseline_uses_text_line_spacing: false,
       auto_baseline_line_height_cap: None,
       line_height_rule: LineHeightRule::Auto,
       grid_auto_following_line_height_pt: None,
@@ -37444,7 +38434,7 @@ mod tests {
   }
 
   #[test]
-  fn table_cell_empty_paragraph_min_height_applies_to_whole_frame() {
+  fn table_cell_empty_paragraph_keeps_spacing_around_the_minimum_line() {
     let flow = FlowContext {
       setup: PageSetup::default(),
       section_index: 0,
@@ -37523,7 +38513,10 @@ mod tests {
       &mut text_metrics,
     );
 
-    assert!((height - min_height).abs() < 0.01);
+    // Paragraph spacing surrounds the minimum empty-line frame; it is not
+    // absorbed into that minimum. This is also the counterexample exercised
+    // by Writer's tdf132807 table-cell list-ending coverage.
+    assert!((height - (2.0 + min_height + 3.0)).abs() < 0.01);
     assert_eq!(hidden_end_mark_height, 0.0);
   }
 
@@ -38853,51 +39846,403 @@ mod tests {
   }
 
   #[test]
-  fn justified_line_shrink_counts_separator_before_candidate_word() {
-    let mut text_metrics = TextMetrics::new();
-    let style = TextStyle::default();
-    let space_width = text_metrics.measure_text(" ", &style);
-    let line_right = 100.0;
-    let overflow = space_width * 0.4;
+  fn smart_justify_cross_run_continuation_distinguishes_punctuation_words_and_fields() {
+    fn run(text: &str, field_group: bool) -> InlineItem {
+      InlineItem::Text(TextRun {
+        text: text.to_string(),
+        style: TextStyle {
+          wordprocessingml_field_group: field_group,
+          ..TextStyle::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    }
 
-    assert!(smart_justify_prefers_shrinking(SmartJustifyComparison {
-      original_x_pt: 90.0,
-      candidate_right_pt: line_right + overflow,
-      line_right_pt: line_right,
-      normal_space_count: 1,
-      terminal_space_count: 1,
-      shrink_space_count: 2,
-      space_width_pt: space_width,
-      minimum_ratio: 0.75,
-      maximum_ratio: 1.33,
-    }));
+    let mut text_metrics = TextMetrics::new();
+    let punctuation_runs = vec![
+      run("Hathaway", false),
+      run(", ", false),
+      run("haziness", false),
+    ];
+    let punctuation =
+      cross_run_unbreakable_continuation_width(&punctuation_runs, 0, "Hathaway", &mut text_metrics)
+        .expect("following comma portion");
+    assert!(punctuation.western_forbidden_line_start_only);
+    assert!(punctuation.outside_field_group);
+    assert_eq!(
+      punctuation.source_start,
+      InlineCursor {
+        inline_index: 1,
+        text_offset: 0,
+      }
+    );
+    assert_eq!(
+      punctuation.source_end,
+      InlineCursor {
+        inline_index: 1,
+        text_offset: 2,
+      }
+    );
+    assert!(
+      (punctuation.fit_width_pt - text_metrics.measure_text(",", &TextStyle::default())).abs()
+        < LAYOUT_EPSILON_PT
+    );
+
+    let split_word_runs = vec![
+      run("Hatha", false),
+      run("way ", false),
+      run("haziness", false),
+    ];
+    let split_word =
+      cross_run_unbreakable_continuation_width(&split_word_runs, 0, "Hatha", &mut text_metrics)
+        .expect("alphabetic continuation");
+    assert!(!split_word.western_forbidden_line_start_only);
+
+    let field_runs = vec![
+      run("Hathaway", false),
+      run(", ", true),
+      run("haziness", false),
+    ];
+    let field_punctuation =
+      cross_run_unbreakable_continuation_width(&field_runs, 0, "Hathaway", &mut text_metrics)
+        .expect("field punctuation continuation");
+    assert!(!field_punctuation.outside_field_group);
   }
 
   #[test]
-  fn justified_line_shrink_avoids_exceeding_maximum_expanded_word_spacing() {
+  fn smart_justify_fits_the_current_portion_before_its_terminal_punctuation_portion() {
+    fn text_item(x_pt: f32, text: &str, style: &TextStyle) -> PageItem {
+      PageItem::Text(Box::new(TextItem {
+        x_pt,
+        y_pt: 20.0,
+        line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        wordprocessing_effect_host: None,
+        text: text.to_string(),
+        style: style.clone(),
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        dynamic_field_line_anchor: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      }))
+    }
+
     let mut text_metrics = TextMetrics::new();
     let style = TextStyle::default();
+    let prefix = "one two three four ";
+    let candidate = "Hathaway";
+    let prefix_width = text_metrics.measure_text(prefix, &style);
+    let candidate_width = text_metrics.measure_text(candidate, &style);
+    let punctuation_width = text_metrics.measure_text(",", &style);
+    let space_width = text_metrics.measure_text(" ", &style);
+    let line_right = prefix_width + candidate_width - space_width * 0.8;
+    let word_spacing = crate::docx::JustificationWordSpacing {
+      desired_pct: 100,
+      minimum_pct: 75,
+      maximum_pct: 150,
+    };
+
+    assert!(line_fits_with_word_space_shrink(
+      LineShrinkFit {
+        x: prefix_width,
+        width: candidate_width,
+        text: candidate,
+        line_right,
+        device_fit: None,
+        items: &[],
+        item_start: 0,
+        chunk: prefix,
+        style: &style,
+        word_spacing,
+      },
+      &mut text_metrics,
+    ));
+    assert!(!line_fits_with_word_space_shrink(
+      LineShrinkFit {
+        x: prefix_width,
+        width: candidate_width + punctuation_width,
+        text: candidate,
+        line_right,
+        device_fit: None,
+        items: &[],
+        item_start: 0,
+        chunk: prefix,
+        style: &style,
+        word_spacing,
+      },
+      &mut text_metrics,
+    ));
+    assert_eq!(
+      smart_justify_fit_terminal_overhang(
+        LineShrinkFit {
+          x: prefix_width,
+          width: candidate_width + punctuation_width,
+          text: candidate,
+          line_right,
+          device_fit: None,
+          items: &[],
+          item_start: 0,
+          chunk: prefix,
+          style: &style,
+          word_spacing,
+        },
+        punctuation_width,
+        &mut text_metrics,
+      ),
+      Some(punctuation_width)
+    );
+
+    let full_candidate_line_right = line_right + punctuation_width;
+    assert_eq!(
+      smart_justify_fit_terminal_overhang(
+        LineShrinkFit {
+          x: prefix_width,
+          width: candidate_width + punctuation_width,
+          text: candidate,
+          line_right: full_candidate_line_right,
+          device_fit: None,
+          items: &[],
+          item_start: 0,
+          chunk: prefix,
+          style: &style,
+          word_spacing,
+        },
+        punctuation_width,
+        &mut text_metrics,
+      ),
+      Some(0.0)
+    );
+
+    let mut items = vec![
+      text_item(0.0, prefix, &style),
+      text_item(prefix_width, candidate, &style),
+      text_item(prefix_width + candidate_width, ", ", &style),
+    ];
+    justify_line_items(
+      &mut items,
+      0,
+      20.0,
+      0.0,
+      line_right,
+      punctuation_width,
+      &mut text_metrics,
+    );
+    let PageItem::Text(word) = &items[1] else {
+      panic!("candidate word item");
+    };
+    let PageItem::Text(punctuation) = &items[2] else {
+      panic!("terminal punctuation item");
+    };
+    assert!((word.x_pt + candidate_width - line_right).abs() < LAYOUT_EPSILON_PT);
+    assert!((punctuation.x_pt - line_right).abs() < LAYOUT_EPSILON_PT);
+  }
+
+  #[test]
+  fn smart_justify_hangs_current_portion_terminal_punctuation_after_shrinking() {
+    let mut text_metrics = TextMetrics::new();
+    let style = TextStyle::default();
+    let prefix = "one two three four five six seven ";
+    let candidate = "vel. ";
+    let overflow_punctuation = WordprocessingOverflowPunctuationPolicy {
+      enabled: true,
+      allow_legacy_western: false,
+      inside_field_group: false,
+      preceding_language: WordprocessingTextLanguage::Unknown,
+    };
+    let prefix_width = text_metrics.measure_text(prefix, &style);
+    let candidate_width = appended_line_fit_width(
+      prefix,
+      candidate,
+      &style,
+      overflow_punctuation,
+      &mut text_metrics,
+    );
+    let punctuation = smart_justify_western_terminal_punctuation(
+      prefix,
+      candidate,
+      &style,
+      overflow_punctuation,
+      &mut text_metrics,
+    )
+    .expect("terminal punctuation");
+    let punctuation_width = punctuation.width_pt;
+    let space_width = text_metrics.measure_text(" ", &style);
+    assert!((punctuation_width - text_metrics.measure_text(".", &style)).abs() < 0.01);
+    assert!(
+      smart_justify_western_terminal_punctuation(
+        prefix,
+        "velocity ",
+        &style,
+        overflow_punctuation,
+        &mut text_metrics,
+      )
+      .is_none()
+    );
+
+    let word_spacing = crate::docx::JustificationWordSpacing {
+      desired_pct: 100,
+      minimum_pct: 75,
+      maximum_pct: 150,
+    };
+    let shrink_capacity = 7.0 * space_width * 0.25;
+    let full_overflow = shrink_capacity + punctuation_width * 0.5;
+    let line_right = prefix_width + candidate_width - full_overflow;
+    assert!(!line_fits_with_word_space_shrink(
+      LineShrinkFit {
+        x: prefix_width,
+        width: candidate_width,
+        text: candidate,
+        line_right,
+        device_fit: None,
+        items: &[],
+        item_start: 0,
+        chunk: prefix,
+        style: &style,
+        word_spacing,
+      },
+      &mut text_metrics,
+    ));
+    assert!(line_fits_with_word_space_shrink(
+      LineShrinkFit {
+        x: prefix_width,
+        width: candidate_width - punctuation_width,
+        text: candidate,
+        line_right,
+        device_fit: None,
+        items: &[],
+        item_start: 0,
+        chunk: prefix,
+        style: &style,
+        word_spacing,
+      },
+      &mut text_metrics,
+    ));
+  }
+
+  #[test]
+  fn smart_justify_compares_normal_expansion_with_candidate_shrink() {
+    let line_right = 100.0;
+    let space_width = 10.0;
+    let normal_space_count = 7;
+    let terminal_space_count = 1;
+    let shrink_space_count = 8;
+    let comparison = |normal_ratio: f32, shrink_ratio: f32| {
+      let original_printable_right =
+        line_right - normal_space_count as f32 * space_width * (normal_ratio - 1.0);
+      SmartJustifyComparison {
+        original_x_pt: original_printable_right + terminal_space_count as f32 * space_width,
+        candidate_right_pt: line_right
+          + shrink_space_count as f32 * space_width * (1.0 - shrink_ratio),
+        line_right_pt: line_right,
+        normal_space_count,
+        terminal_space_count,
+        shrink_space_count,
+        space_width_pt: space_width,
+        maximum_ratio: 1.5,
+      }
+    };
+
+    // Keeping the old break at 120% spacing is closer to normal than taking
+    // the next word at 84%, after applying the sourced expansion weight.
+    assert!(!smart_justify_prefers_shrinking(comparison(1.2, 0.84)));
+    // A 140% old break is worse than the same 84% candidate shrink.
+    assert!(smart_justify_prefers_shrinking(comparison(1.4, 0.84)));
+  }
+
+  #[test]
+  fn justified_line_shrink_counts_separator_and_stops_at_twenty_five_percent() {
+    let mut text_metrics = TextMetrics::new();
+    let mut style = TextStyle::default();
+    round_style_to_word_print_grid(&mut style);
     let space_width = text_metrics.measure_text(" ", &style);
     let line_right = 100.0;
-    let original_internal_spaces = 4.0;
-    let terminal_separator_width = space_width;
-    let expanded_space = space_width * 1.34;
-    let original_printable_right =
-      line_right - original_internal_spaces * (expanded_space - space_width);
-    let x = original_printable_right + terminal_separator_width;
-    let overflow = space_width;
+    let shrink_capacity = 2.0 * space_width * 0.25;
+    let word_spacing = crate::docx::JustificationWordSpacing {
+      desired_pct: 100,
+      minimum_pct: 75,
+      maximum_pct: 150,
+    };
+    let fit = |overflow| LineShrinkFit {
+      x: 0.0,
+      width: line_right + overflow,
+      text: "three",
+      line_right,
+      device_fit: None,
+      items: &[],
+      item_start: 0,
+      chunk: "one two ",
+      style: &style,
+      word_spacing,
+    };
 
-    assert!(smart_justify_prefers_shrinking(SmartJustifyComparison {
-      original_x_pt: x,
-      candidate_right_pt: line_right + overflow,
-      line_right_pt: line_right,
-      normal_space_count: original_internal_spaces as usize,
-      terminal_space_count: 1,
-      shrink_space_count: 5,
-      space_width_pt: space_width,
-      minimum_ratio: 0.75,
-      maximum_ratio: 1.33,
-    }));
+    assert!(line_fits_with_word_space_shrink(
+      fit(shrink_capacity * 0.999),
+      &mut text_metrics,
+    ));
+    assert!(!line_fits_with_word_space_shrink(
+      fit(shrink_capacity * 1.001),
+      &mut text_metrics,
+    ));
+  }
+
+  #[test]
+  fn smart_justify_compares_hinted_runs_with_the_authored_line_width() {
+    let mut text_metrics = TextMetrics::new();
+    let mut style = TextStyle::default();
+    style.font_size_pt = 24.0;
+    round_style_to_word_print_grid(&mut style);
+    let space_width = text_metrics
+      .gdi_hinted_text_extent_pt(" ", &style, units::OFFICE_FIXED_OUTPUT_DPI)
+      .expect("hinted device space");
+    let line_right = 481.9;
+    let x = 400.0;
+    let shrink_capacity = 4.0 * space_width * 0.25;
+    let word_spacing = crate::docx::JustificationWordSpacing {
+      desired_pct: 100,
+      minimum_pct: 75,
+      maximum_pct: 150,
+    };
+    let fit = |minimum_candidate_right_pt| LineShrinkFit {
+      x,
+      width: minimum_candidate_right_pt + shrink_capacity - x,
+      text: "candidate",
+      line_right,
+      device_fit: Some(SmartJustifyDeviceFit {
+        original_x_adjustment_pt: 0.0,
+        candidate_right_adjustment_pt: 0.0,
+        retry_candidate_right_adjustment_pt: 0.0,
+      }),
+      items: &[],
+      item_start: 0,
+      chunk: "one two three four ",
+      style: &style,
+      word_spacing,
+    };
+
+    // Run-level hinted extents can differ by less than one 600 dpi dot. Word
+    // applies the fractional space shrink before comparing them with the
+    // authored line width; snapping either side again erases this boundary.
+    assert!(line_fits_with_word_space_shrink(
+      fit(481.86),
+      &mut text_metrics
+    ));
+    assert!(!line_fits_with_word_space_shrink(
+      fit(481.92),
+      &mut text_metrics,
+    ));
   }
 
   #[test]
@@ -38948,6 +40293,7 @@ mod tests {
       20.0,
       0.0,
       line_right,
+      0.0,
       &mut text_metrics,
     );
 
@@ -38992,7 +40338,7 @@ mod tests {
     };
     let mut items = vec![item(0.0), item(24.0), item(48.0)];
 
-    justify_line_items(&mut items, 0, 20.0, 0.0, 100.0, &mut text_metrics);
+    justify_line_items(&mut items, 0, 20.0, 0.0, 100.0, 0.0, &mut text_metrics);
 
     let PageItem::Text(last) = &items[2] else {
       panic!("expected text item");

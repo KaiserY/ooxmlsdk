@@ -35,7 +35,8 @@ use import::ExcelImport;
 
 pub(crate) use display::{
   common_transform_from_affine, recolor_typed_vml_pattern_image, recolor_vml_pattern_image,
-  vml_shape_common_fill, vml_shape_common_stroke, vml_shape_drawing_paths, vml_tile_phase,
+  vml_common_color, vml_shape_common_fill, vml_shape_common_stroke, vml_shape_drawing_paths,
+  vml_tile_phase,
 };
 pub use model::*;
 

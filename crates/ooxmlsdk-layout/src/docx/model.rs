@@ -20,6 +20,7 @@ use crate::{common, units};
 #[derive(Clone, Debug)]
 pub(crate) struct DocxDocument {
   pub page: PageSetup,
+  pub page_background_pattern: Option<common::PatternFill>,
   pub line_number_style: TextStyle,
   pub note_separator_style: TextStyle,
   pub footnote_separator_stories: NoteSeparatorStories,

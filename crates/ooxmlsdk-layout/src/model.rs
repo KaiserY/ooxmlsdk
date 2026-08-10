@@ -199,6 +199,12 @@ pub struct TextStyle {
   /// advance before repeating a leader; persisted numeric results do not use
   /// that diagnostic boundary policy.
   pub(crate) wordprocessingml_generated_field_diagnostic: bool,
+  /// The run is displayed as part of a Word field result.
+  ///
+  /// This is layout context rather than authored character formatting.
+  /// Writer's `SwTextGuess` excludes every field portion from hanging
+  /// punctuation even when `w:overflowPunct` is otherwise enabled.
+  pub(crate) wordprocessingml_field_group: bool,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
@@ -277,6 +283,7 @@ impl Default for TextStyle {
       drawingml_text_static3d: None,
       wordprocessingml_field_bold_override: None,
       wordprocessingml_generated_field_diagnostic: false,
+      wordprocessingml_field_group: false,
       bold: false,
       italic: false,
       underline: false,

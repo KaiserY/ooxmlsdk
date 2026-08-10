@@ -1666,7 +1666,7 @@ pub(crate) fn vml_shape_common_stroke(
   })
 }
 
-fn vml_common_color(
+pub(crate) fn vml_common_color(
   value: Option<&str>,
   opacity: Option<&str>,
   default: RgbColor,
@@ -1693,9 +1693,9 @@ pub(crate) fn recolor_vml_pattern_image(
       shape.fill_color.as_deref(),
       shape.fill_opacity.as_deref(),
       RgbColor {
-        r: 0xd3,
-        g: 0xd3,
-        b: 0xd3,
+        r: 0xc0,
+        g: 0xc0,
+        b: 0xc0,
       },
     ),
     vml_common_color(
@@ -1720,9 +1720,9 @@ pub(crate) fn recolor_typed_vml_pattern_image(fill: &vml::Fill, data: &[u8]) -> 
       fill.color.as_deref(),
       fill.opacity.as_deref(),
       RgbColor {
-        r: 0xd3,
-        g: 0xd3,
-        b: 0xd3,
+        r: 0xc0,
+        g: 0xc0,
+        b: 0xc0,
       },
     ),
     vml_common_color(

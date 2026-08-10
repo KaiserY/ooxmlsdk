@@ -3,12 +3,13 @@ use std::sync::Arc;
 use ooxmlsdk_fonts::{FeatureValue, TextScript};
 use rustc_hash::FxHashMap as HashMap;
 use skrifa::{
-  MetadataProvider,
+  GlyphId, MetadataProvider,
   instance::{LocationRef, Size},
+  outline::{DrawSettings, HintingInstance, HintingOptions, pen::NullPen},
   raw::{FontRef, TableProvider, types::Tag},
 };
 
-use crate::fonts::{FontFaceData, FontResolver, FontStyleRef};
+use crate::fonts::{FontFaceCacheKey, FontFaceData, FontResolver, FontStyleRef};
 
 /// Font-style view used only for automatic WordprocessingML escapement line
 /// metrics. Shaping and painting keep the reduced size on the underlying
@@ -432,7 +433,23 @@ pub struct TextMetrics {
   fonts: FontResolver,
   measure_styles: Vec<MeasureStyleKey>,
   measure_widths: Vec<HashMap<Arc<str>, f32>>,
+  gdi_hinted_extents: Vec<HashMap<u32, HashMap<Arc<str>, Option<f32>>>>,
+  gdi_hinting_instances: GdiHintingInstanceCache,
   last_measure_style: Option<usize>,
+}
+
+#[derive(Default)]
+struct GdiHintingInstanceCache {
+  instances: HashMap<(FontFaceCacheKey, u8), HintingInstance>,
+}
+
+impl std::fmt::Debug for GdiHintingInstanceCache {
+  fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    formatter
+      .debug_struct("GdiHintingInstanceCache")
+      .field("len", &self.instances.len())
+      .finish()
+  }
 }
 
 impl TextMetrics {
@@ -477,6 +494,7 @@ impl TextMetrics {
     let index = self.measure_styles.len();
     self.measure_styles.push(MeasureStyleKey::from_style(style));
     self.measure_widths.push(HashMap::default());
+    self.gdi_hinted_extents.push(HashMap::default());
     self.last_measure_style = Some(index);
     index
   }
@@ -542,23 +560,11 @@ impl TextMetrics {
       return None;
     }
 
-    let character_ranges = text
-      .char_indices()
-      .map(|(start, character)| start..start + character.len_utf8())
-      .collect::<Vec<_>>();
     let shaped = self.shape_text(text, style)?;
-    if shaped.glyphs.len() != character_ranges.len() {
-      return None;
-    }
+    let character_indices = one_glyph_per_character_indices(text, &shaped.glyphs)?;
 
-    let mut advances = vec![None; character_ranges.len()];
-    for glyph in &shaped.glyphs {
-      let character_index = character_ranges
-        .iter()
-        .position(|range| *range == glyph.text_range)?;
-      if advances[character_index].is_some() {
-        return None;
-      }
+    let mut advances = vec![None; character_indices.len()];
+    for (glyph, character_index) in shaped.glyphs.iter().zip(character_indices) {
       let face = shaped.font_faces.get(glyph.font_index)?;
       let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
       let ppem = gdi_device_ppem(glyph.font_size_pt, device_dpi)?;
@@ -581,6 +587,113 @@ impl TextMetrics {
       .map(Arc::from)
   }
 
+  /// Returns the cumulative FreeType-compatible hinted extent for a simple
+  /// text run while preserving shaping adjustments such as kerning.
+  ///
+  /// Classic GDI loads each glyph with `FT_LOAD_DEFAULT`, accumulates its
+  /// hinted 26.6 advance, and rounds the complete extent for
+  /// `GetTextExtentExPoint`. Skrifa exposes the same adjusted advance through
+  /// its embedded TrueType hinter. Unsupported clusters and synthesized bold
+  /// faces stay on the ordinary shaping path.
+  pub(crate) fn gdi_hinted_text_extent_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    device_dpi: f32,
+  ) -> Option<f32> {
+    if text.is_empty() {
+      return Some(0.0);
+    }
+    if !device_dpi.is_finite()
+      || device_dpi <= 0.0
+      || style.character_spacing_pt().abs() > f32::EPSILON
+      || (style.horizontal_scale() - 1.0).abs() > f32::EPSILON
+    {
+      return None;
+    }
+
+    let style_index = self.measure_style_index(style);
+    let device_dpi_bits = device_dpi.to_bits();
+    if let Some(cached) = self.gdi_hinted_extents[style_index]
+      .get(&device_dpi_bits)
+      .and_then(|extents| extents.get(text))
+    {
+      return *cached;
+    }
+
+    let extent = self.compute_gdi_hinted_text_extent_pt(text, style, device_dpi);
+    let text_key = self.measure_widths[style_index]
+      .get_key_value(text)
+      .map_or_else(|| Arc::from(text), |(text, _)| text.clone());
+    self.gdi_hinted_extents[style_index]
+      .entry(device_dpi_bits)
+      .or_default()
+      .insert(text_key, extent);
+    extent
+  }
+
+  fn compute_gdi_hinted_text_extent_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    device_dpi: f32,
+  ) -> Option<f32> {
+    let shaped = self.shape_text(text, style)?;
+    if shaped.font_faces.iter().any(|face| face.synthetic_bold) {
+      return None;
+    }
+    one_glyph_per_character_indices(text, &shaped.glyphs)?;
+
+    for glyph in &shaped.glyphs {
+      let ppem = gdi_device_ppem(glyph.font_size_pt, device_dpi)?;
+      let face = shaped.font_faces.get(glyph.font_index)?;
+      let key = (face.cache_key(), ppem);
+      if self.gdi_hinting_instances.instances.contains_key(&key) {
+        continue;
+      }
+      let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
+      let outlines = font.outline_glyphs();
+      let instance = HintingInstance::new(
+        &outlines,
+        Size::new(f32::from(ppem)),
+        LocationRef::default(),
+        HintingOptions::default(),
+      )
+      .ok()?;
+      // A configured TrueType hinter owns the font-level fpgm/prep state and
+      // can hint any number of glyphs for the same face and ppem. Recreating
+      // it per run repeats those programs for every line-fit probe.
+      self.gdi_hinting_instances.instances.insert(key, instance);
+    }
+
+    let points_per_device_pixel = crate::units::POINTS_PER_INCH / device_dpi;
+    let mut width_pt = shaped.width_pt;
+    for glyph in &shaped.glyphs {
+      let ppem = gdi_device_ppem(glyph.font_size_pt, device_dpi)?;
+      let face = shaped.font_faces.get(glyph.font_index)?;
+      let key = (face.cache_key(), ppem);
+      let instance = self.gdi_hinting_instances.instances.get(&key)?;
+      let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
+      let outline = font.outline_glyphs().get(GlyphId::new(glyph.glyph_id))?;
+      let unhinted_advance = outline
+        .draw(
+          DrawSettings::unhinted(Size::new(f32::from(ppem)), LocationRef::default()),
+          &mut NullPen,
+        )
+        .ok()?
+        .advance_width?;
+      let hinted_advance = outline
+        .draw(DrawSettings::hinted(instance, false), &mut NullPen)
+        .ok()?
+        .advance_width?;
+      width_pt += (hinted_advance - unhinted_advance) * points_per_device_pixel;
+    }
+    let width_device_pixels = width_pt / points_per_device_pixel;
+    width_device_pixels
+      .is_finite()
+      .then_some(width_device_pixels.round() * points_per_device_pixel)
+  }
+
   /// Returns a uniform spacing adjustment when classic GDI's hinted device
   /// advances differ from the shaped advances by the same amount for every
   /// character. Proportional differences, clusters, and fonts without an
@@ -592,19 +705,10 @@ impl TextMetrics {
     device_dpi: f32,
   ) -> Option<f32> {
     let device_advances = self.gdi_device_character_advances_pt(text, style, device_dpi)?;
-    let character_ranges = text
-      .char_indices()
-      .map(|(start, character)| start..start + character.len_utf8())
-      .collect::<Vec<_>>();
     let shaped = self.shape_text(text, style)?;
-    let mut natural_advances = vec![None; character_ranges.len()];
-    for glyph in &shaped.glyphs {
-      let character_index = character_ranges
-        .iter()
-        .position(|range| *range == glyph.text_range)?;
-      if natural_advances[character_index].is_some() {
-        return None;
-      }
+    let character_indices = one_glyph_per_character_indices(text, &shaped.glyphs)?;
+    let mut natural_advances = vec![None; character_indices.len()];
+    for (glyph, character_index) in shaped.glyphs.iter().zip(character_indices) {
       natural_advances[character_index] = Some(glyph.x_advance_em * glyph.font_size_pt);
     }
     let natural_advances = natural_advances.into_iter().collect::<Option<Vec<_>>>()?;
@@ -1016,6 +1120,21 @@ fn fit_windows_baseline_to_line(
   }
 }
 
+fn one_glyph_per_character_indices(text: &str, glyphs: &[ShapedGlyph]) -> Option<Vec<usize>> {
+  let mut characters = text
+    .char_indices()
+    .enumerate()
+    .map(|(index, (start, character))| ((start, start + character.len_utf8()), index))
+    .collect::<HashMap<_, _>>();
+  if glyphs.len() != characters.len() {
+    return None;
+  }
+  glyphs
+    .iter()
+    .map(|glyph| characters.remove(&(glyph.text_range.start, glyph.text_range.end)))
+    .collect()
+}
+
 pub fn measure_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
   TextMetrics::new().measure_text(text, style)
 }
@@ -1204,6 +1323,40 @@ mod tests {
     assert!((gdi_device_advance_pt(36, 600.0) - 4.32).abs() < 0.0001);
     assert!((gdi_scaled_device_advance_pt(5.22, 600.0).unwrap() - 5.28).abs() < 0.0001);
     assert!((gdi_scaled_device_advance_pt(5.28, 600.0).unwrap() - 5.28).abs() < 0.0001);
+  }
+
+  #[test]
+  fn gdi_hinted_extent_rounds_the_complete_run_to_a_device_pixel() {
+    let style = test_style();
+    let mut metrics = TextMetrics::new();
+    let device_dpi = 600.0;
+    let extent_pt = metrics
+      .gdi_hinted_text_extent_pt("iiii", &style, device_dpi)
+      .expect("simple hinted run");
+    let extent_px = extent_pt * device_dpi / crate::units::POINTS_PER_INCH;
+
+    assert!((extent_px - extent_px.round()).abs() < 0.0001);
+  }
+
+  #[test]
+  fn gdi_hinting_instance_is_reused_across_text_runs() {
+    let style = test_style();
+    let mut metrics = TextMetrics::new();
+    let device_dpi = 600.0;
+
+    metrics
+      .gdi_hinted_text_extent_pt("iiii", &style, device_dpi)
+      .expect("first simple hinted run");
+    let instance_count = metrics.gdi_hinting_instances.instances.len();
+    assert!(instance_count > 0);
+
+    metrics
+      .gdi_hinted_text_extent_pt("WWWW", &style, device_dpi)
+      .expect("second simple hinted run");
+    assert_eq!(
+      metrics.gdi_hinting_instances.instances.len(),
+      instance_count
+    );
   }
 
   #[test]

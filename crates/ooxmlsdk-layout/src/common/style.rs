@@ -257,15 +257,55 @@ pub enum Fill<'doc> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PatternFill {
   pub mask: PatternMask,
-  /// Physical width and height of one 8×8 tile, in thousandths of a point.
+  /// Physical width and height of one semantic 8×8 period, in thousandths of a point.
   ///
   /// DrawingML preset patterns and WordprocessingML shading use different
   /// host brushes even when their names look similar. Keeping the authored
   /// mask and tile size together prevents one host's scale from leaking into
   /// the other.
   pub tile_size_milli_points: u16,
+  /// Lossless bitmap sampling topology for renderers that preserve the
+  /// source application's fixed-output lattice.
+  ///
+  /// This is separate from the semantic period above. For example, Word may
+  /// repeat an 8×8 mask four times in one 32×32 encoded tile, or reduce a
+  /// block-constant 8×8 mask to a 2×2 encoded tile. Both representations have
+  /// the same ideal brush but rasterize differently at device boundaries.
+  pub bitmap_sampling: PatternBitmapSampling,
   pub foreground: Color,
   pub background: Color,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PatternBitmapSampling {
+  image_size_px: u8,
+  tile_repetitions: u8,
+}
+
+impl PatternBitmapSampling {
+  pub const NATIVE_8X8: Self = Self {
+    image_size_px: 8,
+    tile_repetitions: 1,
+  };
+
+  pub(crate) const fn from_lattice(image_size_px: u8, tile_repetitions: u8) -> Self {
+    Self {
+      image_size_px: if image_size_px == 0 { 1 } else { image_size_px },
+      tile_repetitions: if tile_repetitions == 0 {
+        1
+      } else {
+        tile_repetitions
+      },
+    }
+  }
+
+  pub const fn image_size_px(self) -> u8 {
+    self.image_size_px
+  }
+
+  pub const fn tile_repetitions(self) -> u8 {
+    self.tile_repetitions
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -285,6 +325,7 @@ impl PatternFill {
     Self {
       mask: PatternMask::EmfPlusHatch(hatch_style),
       tile_size_milli_points: Self::DRAWINGML_TILE_SIZE_MILLI_POINTS,
+      bitmap_sampling: PatternBitmapSampling::NATIVE_8X8,
       foreground,
       background,
     }
@@ -296,9 +337,26 @@ impl PatternFill {
     foreground: Color,
     background: Color,
   ) -> Self {
+    Self::bitmap8_sampled(
+      rows,
+      tile_size_milli_points,
+      PatternBitmapSampling::NATIVE_8X8,
+      foreground,
+      background,
+    )
+  }
+
+  pub(crate) const fn bitmap8_sampled(
+    rows: [u8; 8],
+    tile_size_milli_points: u16,
+    bitmap_sampling: PatternBitmapSampling,
+    foreground: Color,
+    background: Color,
+  ) -> Self {
     Self {
       mask: PatternMask::Bitmap8(rows),
       tile_size_milli_points,
+      bitmap_sampling,
       foreground,
       background,
     }
@@ -306,6 +364,10 @@ impl PatternFill {
 
   pub fn tile_size_points(self) -> f32 {
     f32::from(self.tile_size_milli_points) / 1_000.0
+  }
+
+  pub fn bitmap_tile_size_points(self) -> f32 {
+    self.tile_size_points() * f32::from(self.bitmap_sampling.tile_repetitions())
   }
 
   pub const fn pattern_rows(&self) -> &[u8; 8] {
@@ -319,6 +381,14 @@ impl PatternFill {
     let column = x.rem_euclid(8) as usize;
     let row = y.rem_euclid(8) as usize;
     self.pattern_rows()[row] & (0x80_u8 >> column) != 0
+  }
+
+  pub fn bitmap_sample_is_foreground(self, x: u32, y: u32) -> bool {
+    let image_size = u32::from(self.bitmap_sampling.image_size_px());
+    let mask_scale = 8 * u32::from(self.bitmap_sampling.tile_repetitions());
+    let column = x.saturating_mul(mask_scale) / image_size;
+    let row = y.saturating_mul(mask_scale) / image_size;
+    self.is_foreground(column as i32, row as i32)
   }
 }
 

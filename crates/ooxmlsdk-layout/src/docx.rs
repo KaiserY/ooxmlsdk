@@ -265,6 +265,10 @@ pub(crate) fn extract(
     .document_background
     .as_deref()
     .and_then(|background| document_background_image(background, &images));
+  let page_background_pattern = document
+    .document_background
+    .as_deref()
+    .and_then(|background| document_background_pattern(background, &images));
   let mut sections = document
     .body
     .as_deref()
@@ -402,6 +406,7 @@ pub(crate) fn extract(
 
   Ok(DocxDocument {
     page,
+    page_background_pattern,
     line_number_style: styles
       .character_run_style(Some("LineNumber"), styles.doc_default_run.clone()),
     note_separator_style,
@@ -5719,16 +5724,108 @@ fn document_background_image(
   vml_fill_image(fill, None, images)
 }
 
-fn vml_background_pattern_color(background: &v::Background) -> Option<RgbColor> {
-  let fill = background.fill.as_deref()?;
+fn document_background_pattern(
+  background: &w::DocumentBackground,
+  images: &ImageCatalog,
+) -> Option<common::PatternFill> {
+  // Word does not activate the VML page brush without the WordprocessingML
+  // background color carrier (tdf126533_noPageBitmap).
+  background.color.as_ref()?;
+  let shape = background.background.as_deref()?;
+  if shape.filled.is_some_and(|value| !value.as_bool()) {
+    return None;
+  }
+  let fill = shape.fill.as_deref()?;
+  if fill.r#type != Some(v::FillTypeValues::Pattern)
+    || fill.on.is_some_and(|value| !value.as_bool())
+  {
+    return None;
+  }
+  let relationship_id = fill.relationship_id.as_ref().or(fill.id.as_ref())?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  vml_typed_pattern_fill(fill, shape.fillcolor.as_deref(), resource.data.as_ref())
+}
+
+fn vml_typed_pattern_fill(
+  fill: &v::Fill,
+  host_fill_color: Option<&str>,
+  data: &[u8],
+) -> Option<common::PatternFill> {
   if fill.r#type != Some(v::FillTypeValues::Pattern) {
     return None;
   }
+  vml_pattern_fill_from_data(
+    fill.color.as_deref().or(host_fill_color),
+    fill.opacity.as_deref(),
+    fill.color2.as_deref(),
+    fill.opacity2.as_deref(),
+    data,
+  )
+}
+
+fn vml_model_pattern_fill(
+  model: &crate::xlsx::object_resources::VmlShapeModel,
+  images: &ImageCatalog,
+) -> Option<common::PatternFill> {
+  if !model.filled || model.fill_type != Some(v::FillTypeValues::Pattern) {
+    return None;
+  }
+  let relationship_id = model.fill_image_relationship_id.as_ref()?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  vml_pattern_fill_from_data(
+    model.fill_color.as_deref(),
+    model.fill_opacity.as_deref(),
+    model.fill_color2.as_deref(),
+    model.fill_opacity2.as_deref(),
+    resource.data.as_ref(),
+  )
+}
+
+fn vml_pattern_fill_from_data(
+  foreground: Option<&str>,
+  foreground_opacity: Option<&str>,
+  background: Option<&str>,
+  background_opacity: Option<&str>,
+  data: &[u8],
+) -> Option<common::PatternFill> {
+  // ECMA-376 says white when the primary color is wholly absent. Office's
+  // historical pattern brush instead uses 25% gray (C0C0C0), independently
+  // observed by Word 2003 and LibreOffice's tdf#159626 compatibility fix.
+  let foreground = crate::xlsx::vml_common_color(
+    foreground,
+    foreground_opacity,
+    RgbColor {
+      r: 0xc0,
+      g: 0xc0,
+      b: 0xc0,
+    },
+  );
+  let background = crate::xlsx::vml_common_color(
+    background,
+    background_opacity,
+    RgbColor {
+      r: u8::MAX,
+      g: u8::MAX,
+      b: u8::MAX,
+    },
+  );
+  common::drawingml_pattern::vml_historical_pattern_fill(data, foreground, background)
+}
+
+fn vml_background_pattern_color(background: &v::Background) -> Option<RgbColor> {
+  if background.filled.is_some_and(|value| !value.as_bool()) {
+    return None;
+  }
+  let fill = background.fill.as_deref()?;
+  if fill.r#type != Some(v::FillTypeValues::Pattern)
+    || fill.on.is_some_and(|value| !value.as_bool())
+  {
+    return None;
+  }
   fill
-    .color2
+    .color
     .as_deref()
     .and_then(parse_vml_color)
-    .or_else(|| fill.color.as_deref().and_then(parse_vml_color))
     .or_else(|| background.fillcolor.as_deref().and_then(parse_vml_color))
 }
 
@@ -6037,14 +6134,14 @@ fn paragraph_justification(
       justification.adjust = ParagraphAdjust::Block;
       if import_settings.justify_lines_with_shrinking {
         justification.word_spacing.minimum_pct = 75;
-        justification.word_spacing.maximum_pct = 133;
+        justification.word_spacing.maximum_pct = 150;
       }
     }
     w::JustificationValues::Both | w::JustificationValues::ThaiDistribute => {
       justification.adjust = ParagraphAdjust::Block;
       if import_settings.justify_lines_with_shrinking {
         justification.word_spacing.minimum_pct = 75;
-        justification.word_spacing.maximum_pct = 133;
+        justification.word_spacing.maximum_pct = 150;
       }
     }
     w::JustificationValues::LowKashida => {
@@ -6547,10 +6644,16 @@ fn paragraph_inlines_with_policy(
         );
       }
       choice => {
-        if merge_display_math && shared_math::wordprocessing_math_text(choice).is_some() {
-          if let Some(image) = merged_display_math_image.take() {
+        if merge_display_math {
+          if !paragraph_choice_is_math_zone_neutral(choice, styles.preserve_word_text_whitespace)
+            && let Some(image) = merged_display_math_image.take()
+          {
             inlines.push(InlineItem::Image(image));
           }
+          // `paragraph_is_display_math()` already proved that every other
+          // choice is either OfficeMath or zero-width math-zone metadata.
+          // Keep the metadata from becoming an empty standalone math image,
+          // and keep later built-up objects inside the one merged zone.
           continue;
         }
         if let Some(image) = math::wordprocessing_math_zone_image(
@@ -7150,6 +7253,9 @@ fn flush_complex_field(
     }));
   } else {
     resolved = state.result;
+  }
+  if closed {
+    mark_wordprocessing_field_result(&mut resolved);
   }
   if let Some(url) = field_hyperlink_url.as_deref() {
     apply_field_hyperlink_url(&mut resolved, url);
@@ -7921,10 +8027,11 @@ fn field_instruction_tokens(instr: &str) -> Vec<String> {
 fn push_dynamic_field(
   inlines: &mut Vec<InlineItem>,
   kind: DynamicFieldKind,
-  style: TextStyle,
+  mut style: TextStyle,
   hyperlink_url: Option<&str>,
   result_text: Option<String>,
 ) {
+  style.wordprocessingml_field_group = true;
   inlines.push(InlineItem::Text(TextRun {
     text: result_text
       .filter(|text| !text.is_empty())
@@ -7942,9 +8049,10 @@ fn push_dynamic_field(
 fn push_resolved_field_text(
   inlines: &mut Vec<InlineItem>,
   text: String,
-  style: TextStyle,
+  mut style: TextStyle,
   hyperlink_url: Option<&str>,
 ) {
+  style.wordprocessingml_field_group = true;
   inlines.push(InlineItem::Text(TextRun {
     text,
     style,
@@ -7966,6 +8074,7 @@ fn push_localized_missing_style_ref(
 ) {
   let message = FieldMessage::MissingStyle(style_name);
   apply_generated_field_message_style(&mut style, message, ui_language);
+  style.wordprocessingml_field_group = true;
   inlines.push(InlineItem::Text(TextRun {
     text: localized_field_message(message, ui_language),
     style,
@@ -7976,6 +8085,34 @@ fn push_localized_missing_style_ref(
     style_ref_numbering_text: None,
     preserve_text_portion: false,
   }));
+}
+
+fn mark_wordprocessing_field_result(inlines: &mut [InlineItem]) {
+  for inline in inlines {
+    match inline {
+      InlineItem::Text(run) => run.style.wordprocessingml_field_group = true,
+      InlineItem::Ruby(ruby) => {
+        for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
+          run.style.wordprocessingml_field_group = true;
+        }
+      }
+      InlineItem::NoteReferenceMark(_)
+      | InlineItem::NoteSeparatorMark(_)
+      | InlineItem::PositionalTab(_)
+      | InlineItem::LegacyFormCheckBox(_)
+      | InlineItem::Image(_)
+      | InlineItem::Shape(_)
+      | InlineItem::BookmarkStart(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd
+      | InlineItem::LastRenderedPageBreak
+      | InlineItem::ClearLineBreak(_)
+      | InlineItem::PageBreak
+      | InlineItem::ColumnBreak => {}
+    }
+  }
 }
 
 fn field_result_text(result: &[InlineItem]) -> Option<String> {
@@ -8449,6 +8586,7 @@ fn push_simple_field(
     }
   }
 
+  let result_start = inlines.len();
   for choice in &field.simple_field_choice {
     match choice {
       w::SimpleFieldChoice::WRun(run) => push_run(
@@ -8481,6 +8619,7 @@ fn push_simple_field(
       _ => {}
     }
   }
+  mark_wordprocessing_field_result(&mut inlines[result_start..]);
 }
 
 fn simple_field_result_text_and_style(
@@ -16550,6 +16689,7 @@ fn push_picture_choice_shapes(
       if let Some(shape) = vml_special_shape(
         crate::xlsx::object_resources::vml_arc_model(shape),
         shape.style.as_deref(),
+        Some(images),
       ) {
         inlines.push(InlineItem::Shape(shape));
       }
@@ -16558,6 +16698,7 @@ fn push_picture_choice_shapes(
       if let Some(shape) = vml_special_shape(
         crate::xlsx::object_resources::vml_curve_model(shape),
         shape.style.as_deref(),
+        Some(images),
       ) {
         inlines.push(InlineItem::Shape(shape));
       }
@@ -16566,6 +16707,7 @@ fn push_picture_choice_shapes(
       if let Some(shape) = vml_special_shape(
         crate::xlsx::object_resources::vml_line_model(shape),
         shape.style.as_deref(),
+        Some(images),
       ) {
         inlines.push(InlineItem::Shape(shape));
       }
@@ -16574,6 +16716,7 @@ fn push_picture_choice_shapes(
       if let Some(shape) = vml_special_shape(
         crate::xlsx::object_resources::vml_oval_model(shape),
         shape.style.as_deref(),
+        Some(images),
       ) {
         inlines.push(InlineItem::Shape(shape));
       }
@@ -16587,7 +16730,7 @@ fn push_picture_choice_shapes(
     }
     w::PictureChoice::RoundRectangle(round_rectangle) => {
       if !vml_round_rectangle_has_resolved_image(round_rectangle, images)
-        && let Some(shape) = vml_round_rectangle_shape(round_rectangle)
+        && let Some(shape) = vml_round_rectangle_shape(round_rectangle, images)
       {
         inlines.push(InlineItem::Shape(shape));
       }
@@ -16600,7 +16743,7 @@ fn push_picture_choice_shapes(
       }
     }
     w::PictureChoice::PolyLine(polyline) => {
-      if let Some(shape) = vml_polyline_shape(polyline) {
+      if let Some(shape) = vml_polyline_shape(polyline, images) {
         inlines.push(InlineItem::Shape(shape));
       }
     }
@@ -16665,6 +16808,7 @@ fn push_group_child_shapes_with_transform(
         if let Some(shape) = vml_special_shape(
           crate::xlsx::object_resources::vml_arc_model(shape),
           style.as_deref().or(shape.style.as_deref()),
+          Some(images),
         ) {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -16675,6 +16819,7 @@ fn push_group_child_shapes_with_transform(
         if let Some(shape) = vml_special_shape(
           crate::xlsx::object_resources::vml_curve_model(shape),
           style.as_deref().or(shape.style.as_deref()),
+          Some(images),
         ) {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -16685,6 +16830,7 @@ fn push_group_child_shapes_with_transform(
         if let Some(shape) = vml_special_shape(
           crate::xlsx::object_resources::vml_line_model(shape),
           style.as_deref().or(shape.style.as_deref()),
+          Some(images),
         ) {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -16695,6 +16841,7 @@ fn push_group_child_shapes_with_transform(
         if let Some(shape) = vml_special_shape(
           crate::xlsx::object_resources::vml_oval_model(shape),
           style.as_deref().or(shape.style.as_deref()),
+          Some(images),
         ) {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -16715,7 +16862,7 @@ fn push_group_child_shapes_with_transform(
         });
         if !vml_round_rectangle_has_resolved_image(round_rectangle, images)
           && let Some(shape) =
-            vml_round_rectangle_shape_with_style(round_rectangle, style.as_deref())
+            vml_round_rectangle_shape_with_style(round_rectangle, style.as_deref(), images)
         {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -16731,7 +16878,7 @@ fn push_group_child_shapes_with_transform(
         }
       }
       v::GroupChoice::PolyLine(polyline) => {
-        if let Some(shape) = vml_polyline_shape(polyline) {
+        if let Some(shape) = vml_polyline_shape(polyline, images) {
           inlines.push(InlineItem::Shape(shape));
         }
       }
@@ -16743,8 +16890,12 @@ fn push_group_child_shapes_with_transform(
 fn vml_special_shape(
   model: crate::xlsx::object_resources::VmlShapeModel,
   style: Option<&str>,
+  images: Option<&ImageCatalog>,
 ) -> Option<InlineShape> {
-  let fill_override = crate::xlsx::vml_shape_common_fill(&model, Affine::IDENTITY);
+  let fill_override = images
+    .and_then(|images| vml_model_pattern_fill(&model, images))
+    .map(common::Fill::Pattern)
+    .unwrap_or_else(|| crate::xlsx::vml_shape_common_fill(&model, Affine::IDENTITY));
   let stroke_override = crate::xlsx::vml_shape_common_stroke(&model);
   let mut shape = vml_inline_shape(
     style.or(model.style.as_deref()),
@@ -16808,7 +16959,11 @@ fn vml_rectangle_shape_with_style(
   images: &ImageCatalog,
 ) -> Option<InlineShape> {
   let model = crate::xlsx::object_resources::vml_rectangle_model(rectangle);
-  let fill_image = vml_rectangle_fill_image(rectangle, images);
+  let pattern_fill = vml_model_pattern_fill(&model, images);
+  let fill_image = pattern_fill
+    .is_none()
+    .then(|| vml_rectangle_fill_image(rectangle, images))
+    .flatten();
   let has_fill_image = fill_image.is_some();
   let mut shape = vml_inline_shape(
     style,
@@ -16824,24 +16979,33 @@ fn vml_rectangle_shape_with_style(
     model.stroke_weight.as_deref(),
     None,
   )?;
-  shape.fill_override = (model.filled && !has_fill_image)
-    .then(|| Box::new(crate::xlsx::vml_shape_common_fill(&model, Affine::IDENTITY)));
+  shape.fill_override = (model.filled && !has_fill_image).then(|| {
+    Box::new(pattern_fill.map_or_else(
+      || crate::xlsx::vml_shape_common_fill(&model, Affine::IDENTITY),
+      common::Fill::Pattern,
+    ))
+  });
   shape.stroke_override = crate::xlsx::vml_shape_common_stroke(&model).map(Box::new);
   apply_vml_model_wrap(&mut shape, &model);
   Some(shape)
 }
 
-fn vml_round_rectangle_shape(round_rectangle: &v::RoundRectangle) -> Option<InlineShape> {
-  vml_round_rectangle_shape_with_style(round_rectangle, round_rectangle.style.as_deref())
+fn vml_round_rectangle_shape(
+  round_rectangle: &v::RoundRectangle,
+  images: &ImageCatalog,
+) -> Option<InlineShape> {
+  vml_round_rectangle_shape_with_style(round_rectangle, round_rectangle.style.as_deref(), images)
 }
 
 fn vml_round_rectangle_shape_with_style(
   round_rectangle: &v::RoundRectangle,
   style: Option<&str>,
+  images: &ImageCatalog,
 ) -> Option<InlineShape> {
   vml_special_shape(
     crate::xlsx::object_resources::vml_round_rectangle_model(round_rectangle),
     style,
+    Some(images),
   )
 }
 
@@ -16901,9 +17065,15 @@ fn vml_shape_shape_with_style(
   let inherited_fill = shape_type.and_then(vml_shapetype_fill);
   let direct_stroke = vml_shape_stroke(shape);
   let inherited_stroke = shape_type.and_then(vml_shapetype_stroke);
-  let fill_image = direct_fill
-    .and_then(|fill| vml_fill_image(fill, style, images))
-    .or_else(|| inherited_fill.and_then(|fill| vml_fill_image(fill, style, images)));
+  let pattern_fill = vml_model_pattern_fill(&common_model, images);
+  let fill_image = pattern_fill
+    .is_none()
+    .then(|| {
+      direct_fill
+        .and_then(|fill| vml_fill_image(fill, style, images))
+        .or_else(|| inherited_fill.and_then(|fill| vml_fill_image(fill, style, images)))
+    })
+    .flatten();
   let has_fill_image = fill_image.is_some();
   let filled = direct_fill
     .and_then(|fill| fill.on.map(|value| value.as_bool()))
@@ -16954,9 +17124,9 @@ fn vml_shape_shape_with_style(
       .flatten(),
   )?;
   if !has_fill_image {
-    inline.fill_override = Some(Box::new(crate::xlsx::vml_shape_common_fill(
-      &common_model,
-      Affine::IDENTITY,
+    inline.fill_override = Some(Box::new(pattern_fill.map_or_else(
+      || crate::xlsx::vml_shape_common_fill(&common_model, Affine::IDENTITY),
+      common::Fill::Pattern,
     )));
   }
   inline.stroke_override = crate::xlsx::vml_shape_common_stroke(&common_model).map(Box::new);
@@ -17003,6 +17173,12 @@ fn vml_shape_shape_with_style(
     inline.geometry = geometry;
   }
   if let Some((preset, text_path)) = vml_fontwork_text_path(shape, shape_type) {
+    // ECMA-376 Part 4, 19.1.2.23 defines textpath as the vector path produced
+    // from the shape's text, and its example applies v:fill to that same
+    // shape. Carry the resolved shape brush to the warped glyph path instead
+    // of leaving it on the outer geometry, which is not painted for WordArt.
+    // This deliberately carries Fill::None too, preserving `filled="f"`.
+    inline.text_fill = inline.fill_override.clone();
     inline.text_warp = Some(Box::new(a::PresetTextWarp {
       preset,
       ..a::PresetTextWarp::default()
@@ -17942,7 +18118,7 @@ fn vml_formula_operand(
   })
 }
 
-fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
+fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<InlineShape> {
   if vml_style_is_hidden(polyline.style.as_deref()) {
     return None;
   }
@@ -17967,7 +18143,9 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
   let stroked = polyline.stroked.is_none_or(|value| value.as_bool());
   let closed = filled || repeated_endpoint;
   let common_model = crate::xlsx::object_resources::vml_polyline_model(polyline);
-  let fill_override = crate::xlsx::vml_shape_common_fill(&common_model, Affine::IDENTITY);
+  let fill_override = vml_model_pattern_fill(&common_model, images)
+    .map(common::Fill::Pattern)
+    .unwrap_or_else(|| crate::xlsx::vml_shape_common_fill(&common_model, Affine::IDENTITY));
   let stroke_override = crate::xlsx::vml_shape_common_stroke(&common_model);
   let fill_color = filled
     .then(|| polyline.fill_color.as_deref().and_then(parse_vml_color))
@@ -19260,7 +19438,7 @@ fn round_rectangle_image_with_style(
       })?;
   attach_vml_image_host(
     &mut image,
-    vml_round_rectangle_shape_with_style(round_rectangle, style),
+    vml_round_rectangle_shape_with_style(round_rectangle, style, images),
   );
   let signature_line =
     round_rectangle
@@ -28665,6 +28843,203 @@ mod tests {
     }
   }
 
+  fn office_vml_pattern_images() -> ImageCatalog {
+    // Office's historical 8x8 GIF: no global table, a local white/black table,
+    // and white foreground bits at (0,0) and (4,4).
+    let data: Arc<[u8]> = vec![
+      0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x08, 0x00, 0x08, 0x00, 0x77, 0x01, 0x00, 0x2c, 0x00,
+      0x00, 0x00, 0x00, 0x08, 0x00, 0x08, 0x00, 0x80, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x02,
+      0x08, 0x44, 0x8e, 0xa9, 0xcb, 0x6c, 0x0d, 0x61, 0x01, 0x00, 0x3b,
+    ]
+    .into();
+    let mut images = ImageCatalog::default();
+    images.by_relationship_id.insert(
+      "rIdPattern".into(),
+      package::ImageResource {
+        data,
+        content_type: Some("image/gif".into()),
+      },
+    );
+    images
+  }
+
+  #[test]
+  fn vml_document_pattern_inherits_the_background_fill_color() {
+    let background = w::DocumentBackground::from_bytes(
+      br##"<w:background xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          xmlns:v="urn:schemas-microsoft-com:vml"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          w:color="C0C0C0">
+        <v:background fillcolor="silver">
+          <v:fill r:id="rIdPattern" color2="yellow" type="pattern"/>
+        </v:background>
+      </w:background>"##,
+    )
+    .expect("VML document background");
+    let pattern = document_background_pattern(&background, &office_vml_pattern_images())
+      .expect("document pattern");
+
+    assert_eq!(pattern.tile_size_milli_points, 8_000);
+    assert_eq!(
+      [
+        pattern.foreground.r,
+        pattern.foreground.g,
+        pattern.foreground.b,
+        pattern.foreground.a,
+      ],
+      [192, 192, 192, 255]
+    );
+    assert_eq!(
+      [
+        pattern.background.r,
+        pattern.background.g,
+        pattern.background.b,
+        pattern.background.a,
+      ],
+      [255, 255, 0, 255]
+    );
+    assert_eq!(
+      pattern.mask,
+      common::PatternMask::Bitmap8([0x80, 0, 0, 0, 0x08, 0, 0, 0])
+    );
+  }
+
+  #[test]
+  fn vml_pattern_fill_color_overrides_its_host_and_keeps_color_opacity() {
+    let fill = v::Fill::from_bytes(
+      br##"<v:fill xmlns:v="urn:schemas-microsoft-com:vml"
+          type="pattern" color="#112233" opacity=".5"
+          color2="#445566" o:opacity2="32768f"
+          xmlns:o="urn:schemas-microsoft-com:office:office"/>"##,
+    )
+    .expect("VML fill");
+    let images = office_vml_pattern_images();
+    let data = images
+      .by_relationship_id
+      .get("rIdPattern")
+      .expect("pattern image")
+      .data
+      .as_ref();
+    let pattern = vml_typed_pattern_fill(&fill, Some("red"), data).expect("pattern");
+
+    assert_eq!(
+      [
+        pattern.foreground.r,
+        pattern.foreground.g,
+        pattern.foreground.b,
+        pattern.foreground.a,
+      ],
+      [0x11, 0x22, 0x33, 128]
+    );
+    assert_eq!(
+      [
+        pattern.background.r,
+        pattern.background.g,
+        pattern.background.b,
+        pattern.background.a,
+      ],
+      [0x44, 0x55, 0x66, 128]
+    );
+  }
+
+  #[test]
+  fn vml_shape_pattern_uses_its_host_fill_instead_of_an_image_tile() {
+    let shape = v::Shape::from_bytes(
+      br##"<v:shape xmlns:v="urn:schemas-microsoft-com:vml"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          style="width:60pt;height:40pt" type="#_x0000_t152"
+          fillcolor="gray" stroked="f">
+        <v:fill type="pattern" color2="yellow" r:id="rIdPattern"/>
+        <v:textpath string="pattern text" fitpath="t"/>
+      </v:shape>"##,
+    )
+    .expect("VML shape");
+    let shape = vml_shape_shape(&shape, &office_vml_pattern_images(), &[]).expect("pattern shape");
+    let Some(common::Fill::Pattern(pattern)) = shape.fill_override.as_deref() else {
+      panic!("VML pattern fill");
+    };
+
+    assert!(shape.fill_image.is_none());
+    assert_eq!(
+      [
+        pattern.foreground.r,
+        pattern.foreground.g,
+        pattern.foreground.b,
+      ],
+      [128, 128, 128]
+    );
+    assert_eq!(
+      [
+        pattern.background.r,
+        pattern.background.g,
+        pattern.background.b,
+      ],
+      [255, 255, 0]
+    );
+    assert_eq!(shape.text_fill.as_deref(), shape.fill_override.as_deref());
+    assert!(shape.text_warp.is_some());
+  }
+
+  #[test]
+  fn vml_textpath_carries_solid_gradient_and_disabled_shape_fills() {
+    for (fill_attributes, fill_markup, expected) in [
+      (
+        r##"fillcolor="#b2b2b2""##,
+        r#"<v:fill opacity=".5"/>"#,
+        "solid",
+      ),
+      (
+        r##"fillcolor="yellow""##,
+        r##"<v:fill type="gradientRadial" color2="#ff9933"/>"##,
+        "gradient",
+      ),
+      (r#"filled="f""#, "", "none"),
+    ] {
+      let xml = format!(
+        r##"<v:shape xmlns:v="urn:schemas-microsoft-com:vml"
+            style="width:60pt;height:40pt" type="#_x0000_t152"
+            {fill_attributes}>
+          {fill_markup}<v:textpath string="text" fitpath="t"/>
+        </v:shape>"##,
+      );
+      let shape = v::Shape::from_bytes(xml.as_bytes()).expect("VML WordArt shape");
+      let shape = vml_shape_shape(&shape, &ImageCatalog::default(), &[]).expect("VML WordArt");
+
+      assert_eq!(shape.text_fill.as_deref(), shape.fill_override.as_deref());
+      assert!(match (expected, shape.text_fill.as_deref()) {
+        ("solid", Some(common::Fill::Solid(color))) => color.a == 128,
+        ("gradient", Some(common::Fill::Gradient(_))) => true,
+        ("none", Some(common::Fill::None)) => true,
+        _ => false,
+      });
+    }
+  }
+
+  #[test]
+  fn disabled_vml_document_pattern_falls_back_to_the_word_background_color() {
+    for disabled in ["fill=\"f\"", ""] {
+      let fill_on = if disabled.is_empty() { "on=\"f\"" } else { "" };
+      let xml = format!(
+        r#"<w:background xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:v="urn:schemas-microsoft-com:vml"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            w:color="112233"><v:background {disabled} fillcolor="silver">
+          <v:fill {fill_on} r:id="rIdPattern" color2="yellow" type="pattern"/>
+        </v:background></w:background>"#,
+      );
+      let background = w::DocumentBackground::from_bytes(xml.as_bytes()).expect("background");
+      assert!(document_background_pattern(&background, &office_vml_pattern_images()).is_none());
+      assert_eq!(
+        document_background_color(&background),
+        Some(RgbColor {
+          r: 0x11,
+          g: 0x22,
+          b: 0x33,
+        })
+      );
+    }
+  }
+
   #[test]
   fn vml_rectangle_uses_default_white_fill_and_black_stroke() {
     let rectangle = v::Rectangle::from_bytes(
@@ -28891,6 +29266,7 @@ mod tests {
     let shape = vml_special_shape(
       crate::xlsx::object_resources::vml_curve_model(&curve),
       curve.style.as_deref(),
+      None,
     )
     .expect("VML curve shape");
     let InlineShapeGeometry::Path { paths, .. } = shape.geometry else {
@@ -34158,6 +34534,7 @@ mod tests {
         number_format: FieldNumberFormat::PageStyle,
       })
     );
+    assert!(run.style.wordprocessingml_field_group);
   }
 
   #[test]
@@ -34539,6 +34916,7 @@ mod tests {
     };
     assert_eq!(run.text, "27");
     assert_eq!(run.dynamic_field, None);
+    assert!(run.style.wordprocessingml_field_group);
   }
 
   #[test]
@@ -34611,6 +34989,7 @@ mod tests {
         relative_position: false,
       })
     );
+    assert!(run.style.wordprocessingml_field_group);
   }
 
   #[test]

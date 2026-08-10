@@ -7,7 +7,6 @@ use std::sync::{Arc, OnceLock};
 
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
-use krilla::Document;
 use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::blend::BlendMode;
@@ -31,6 +30,7 @@ use krilla::tagging::{
   TagGroup, TagTree,
 };
 use krilla::text::{Font, Glyph, GlyphId, KrillaGlyph};
+use krilla::{Data, Document};
 use krilla_svg::{SurfaceExt, SvgSettings};
 use kurbo::{BezPath, PathEl, flatten};
 use rustc_hash::FxHashMap as HashMap;
@@ -6249,14 +6249,35 @@ fn drawingml_pattern_paint(
   origin_x: f32,
   origin_y: f32,
 ) -> krilla::paint::Paint {
-  let tile_size_pt = pattern.tile_size_points();
-  let cell_size_pt = tile_size_pt / 8.0;
+  let tile_image = pattern_tile_image(pattern);
+  let tile_size_pt = if tile_image.is_some() {
+    pattern.bitmap_tile_size_points()
+  } else {
+    pattern.tile_size_points()
+  };
+  let pattern_units = if tile_image.is_some() {
+    f32::from(pattern.bitmap_sampling.image_size_px())
+  } else {
+    tile_size_pt
+  };
+  let pattern_scale = tile_size_pt / pattern_units;
+  let cell_size = pattern_units / 8.0;
   let mut stream_builder = surface.stream_builder();
   let mut pattern_surface = stream_builder.surface();
-  if let (Some(image), Some(size)) = (
-    pattern_tile_image(pattern),
-    Size::from_wh(tile_size_pt, tile_size_pt),
-  ) {
+  // Krilla serializes its y-down page space through a y-reflected PDF root
+  // transform. Office instead keeps tiling-pattern matrices in PDF's y-up
+  // user space. Reflect both the pattern stream and its outer transform: the
+  // two reflections preserve the logical brush, while matching Office's
+  // sampling direction at device-pixel boundaries.
+  pattern_surface.push_transform(&Transform::from_row(
+    1.0,
+    0.0,
+    0.0,
+    -1.0,
+    0.0,
+    pattern_units,
+  ));
+  if let (Some(image), Some(size)) = (tile_image, Size::from_wh(pattern_units, pattern_units)) {
     // Office fixed output embeds the authored 8×8 mask as a non-interpolated
     // bitmap inside the tiling pattern. Vectorizing its 0.12pt cells lets PDF
     // antialiasing blend away the foreground color and changes the apparent
@@ -6265,7 +6286,7 @@ fn drawingml_pattern_paint(
   } else {
     pattern_surface.set_stroke(None);
     pattern_surface.set_fill(Some(pattern_color_fill(pattern.background)));
-    if let Some(background) = rect_path(0.0, 0.0, tile_size_pt, tile_size_pt) {
+    if let Some(background) = rect_path(0.0, 0.0, pattern_units, pattern_units) {
       pattern_surface.draw_path(&background);
     }
 
@@ -6275,12 +6296,12 @@ fn drawingml_pattern_paint(
         if mask & (0x80_u8 >> column) == 0 {
           continue;
         }
-        let x = column as f32 * cell_size_pt;
-        let y = row as f32 * cell_size_pt;
+        let x = column as f32 * cell_size;
+        let y = row as f32 * cell_size;
         foreground.move_to(x, y);
-        foreground.line_to(x + cell_size_pt, y);
-        foreground.line_to(x + cell_size_pt, y + cell_size_pt);
-        foreground.line_to(x, y + cell_size_pt);
+        foreground.line_to(x + cell_size, y);
+        foreground.line_to(x + cell_size, y + cell_size);
+        foreground.line_to(x, y + cell_size);
         foreground.close();
       }
     }
@@ -6289,6 +6310,7 @@ fn drawingml_pattern_paint(
       pattern_surface.draw_path(&foreground);
     }
   }
+  pattern_surface.pop();
   pattern_surface.finish();
 
   Pattern {
@@ -6296,12 +6318,16 @@ fn drawingml_pattern_paint(
     // Office keeps the preset hatch brush in page/world coordinates. Snap to
     // an equivalent global tile boundary near the path so separate shapes do
     // not restart the 8x8 mask at their own top-left corners.
-    transform: Transform::from_translate(
+    transform: Transform::from_row(
+      pattern_scale,
+      0.0,
+      0.0,
+      -pattern_scale,
       pattern_origin(origin_x, tile_size_pt),
       pattern_origin(origin_y, tile_size_pt),
     ),
-    width: tile_size_pt,
-    height: tile_size_pt,
+    width: pattern_units,
+    height: pattern_units,
   }
   .into()
 }
@@ -6310,12 +6336,13 @@ fn pattern_tile_image(pattern: common::PatternFill) -> Option<Image> {
   if !matches!(pattern.mask, common::PatternMask::Bitmap8(_)) {
     return None;
   }
+  let image_size = u32::from(pattern.bitmap_sampling.image_size_px());
   let has_alpha = pattern.foreground.a != u8::MAX || pattern.background.a != u8::MAX;
   let component_count = if has_alpha { 4 } else { 3 };
-  let mut pixels = Vec::with_capacity(8 * 8 * component_count);
-  for y in 0..8 {
-    for x in 0..8 {
-      let color = if pattern.is_foreground(x, y) {
+  let mut pixels = Vec::with_capacity(image_size as usize * image_size as usize * component_count);
+  for y in 0..image_size {
+    for x in 0..image_size {
+      let color = if pattern.bitmap_sample_is_foreground(x, y) {
         pattern.foreground
       } else {
         pattern.background
@@ -6333,7 +6360,7 @@ fn pattern_tile_image(pattern: common::PatternFill) -> Option<Image> {
   };
   let mut encoded = Cursor::new(Vec::new());
   PngEncoder::new(&mut encoded)
-    .write_image(&pixels, 8, 8, color_type.into())
+    .write_image(&pixels, image_size, image_size, color_type.into())
     .ok()?;
   Image::from_png(encoded.into_inner().into(), false).ok()
 }
@@ -7047,6 +7074,7 @@ type OfficeMathSvgFontInstance = (usvg::fontdb::ID, OfficeMathSvgFontVariations)
 
 struct OfficeMathSvgFonts {
   database: Arc<usvg::fontdb::Database>,
+  font_data: HashMap<usvg::fontdb::ID, Option<(Data, u32)>>,
   fonts: HashMap<OfficeMathSvgFontInstance, Option<Font>>,
   supported_axes: HashMap<usvg::fontdb::ID, SmallVec<[[u8; 4]; 2]>>,
 }
@@ -7055,6 +7083,7 @@ impl OfficeMathSvgFonts {
   fn new(database: Arc<usvg::fontdb::Database>) -> Self {
     Self {
       database,
+      font_data: HashMap::default(),
       fonts: HashMap::default(),
       supported_axes: HashMap::default(),
     }
@@ -7067,21 +7096,37 @@ impl OfficeMathSvgFonts {
       return font.clone();
     }
 
-    // This is the same font-data handoff used by krilla-svg. Cloning the
-    // database on write keeps the usvg tree immutable, while shared face data
-    // lets Krilla embed the exact font instance that usvg selected.
-    let font = unsafe { Arc::make_mut(&mut self.database).make_shared_face_data(id) }.and_then(
-      |(font_data, index)| {
-        let coordinates = key
-          .1
-          .iter()
-          .map(|variation| (krilla::text::Tag::new(&variation.tag), variation.value))
-          .collect::<SmallVec<[_; 2]>>();
-        Font::new_variable(font_data.into(), index, &coordinates)
-      },
-    );
+    let font = self.data_for_face(id).and_then(|(font_data, index)| {
+      let coordinates = key
+        .1
+        .iter()
+        .map(|variation| (krilla::text::Tag::new(&variation.tag), variation.value))
+        .collect::<SmallVec<[_; 2]>>();
+      Font::new_variable(font_data.into(), index, &coordinates)
+    });
     self.fonts.insert(key, font.clone());
     font
+  }
+
+  fn data_for_face(&mut self, id: usvg::fontdb::ID) -> Option<(Data, u32)> {
+    if let Some(data) = self.font_data.get(&id) {
+      return data.clone();
+    }
+
+    let data = match self.database.face_source(id) {
+      // In-memory font data already has stable shared ownership and can stay
+      // zero-copy. File-backed data is read through fontdb's safe scoped API
+      // and copied once: Krilla then yokes its parsed FontRef to these owned
+      // bytes. This avoids both a persistent unsafe mmap and cloning the whole
+      // usvg database through Arc::make_mut.
+      Some((usvg::fontdb::Source::Binary(data), index)) => Some((data.into(), index)),
+      Some(_) => self
+        .database
+        .with_face_data(id, |data, index| (data.to_vec().into(), index)),
+      None => None,
+    };
+    self.font_data.insert(id, data.clone());
+    data
   }
 
   fn resolve_variations(

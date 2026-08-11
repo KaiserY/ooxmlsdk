@@ -458,6 +458,11 @@ pub(crate) struct ParagraphFormat {
   pub line_height_pt: Option<f32>,
   pub line_height_set: bool,
   pub line_height_rule: LineHeightRule,
+  /// WPS `bodyPr@compatLnSpc` is a text-body compatibility switch, not a
+  /// paragraph-style property. The importer annotates every paragraph in the
+  /// completed textbox story so line layout can keep the state scoped to that
+  /// shape; omission and an explicit false both remain the default here.
+  pub wordprocessing_shape_compatible_line_spacing: bool,
   pub snap_to_grid: Option<bool>,
   pub line_vertical_alignment: Option<common::LineVerticalAlignment>,
   pub indent_left_pt: f32,

@@ -30,32 +30,6 @@ pub(crate) struct DrawingRaster {
   pub(crate) pixels_per_point: f32,
 }
 
-pub(crate) fn rescale_drawing_raster(raster: &mut DrawingRaster, pixels_per_point: f32) {
-  if !pixels_per_point.is_finite()
-    || pixels_per_point <= 0.0
-    || pixels_per_point >= raster.pixels_per_point
-  {
-    return;
-  }
-  let scale = pixels_per_point / raster.pixels_per_point;
-  let width = ((raster.image.width() as f32 * scale).round() as u32).max(1);
-  let height = ((raster.image.height() as f32 * scale).round() as u32).max(1);
-  raster.image = image::imageops::resize(
-    &raster.image,
-    width,
-    height,
-    image::imageops::FilterType::Lanczos3,
-  );
-  let resize = |image: &RgbaImage| {
-    image::imageops::resize(image, width, height, image::imageops::FilterType::Lanczos3)
-  };
-  raster.fill_image = raster.fill_image.as_ref().map(resize);
-  raster.line_image = raster.line_image.as_ref().map(resize);
-  raster.fill_line_image = raster.fill_line_image.as_ref().map(resize);
-  raster.children_image = raster.children_image.as_ref().map(resize);
-  raster.pixels_per_point = pixels_per_point;
-}
-
 /// Rasterizes one already-resolved 2-D Drawing shape for effects that require
 /// full-color pixels.
 ///
@@ -92,23 +66,13 @@ pub(crate) fn rasterize_vector_items_for_effects_at_pixels_per_point(
   effects: &super::drawingml_image_effects::ImageEffectContainer,
   pixels_per_point: f32,
 ) -> Option<DrawingRaster> {
-  if super::drawingml_image_effects::source_requirements(effects)
-    != super::drawingml_image_effects::ImageEffectSourceRequirements::default()
-  {
-    let mut raster = rasterize_vector_items_for_effects(items, raster_bounds, effects)?;
-    rescale_drawing_raster(&mut raster, pixels_per_point);
-    return Some(raster);
-  }
-  let (image, pixels_per_point) =
-    rasterize_vector_items_impl_at_pixels_per_point(items, raster_bounds, pixels_per_point)?;
-  Some(DrawingRaster {
-    image,
-    fill_image: None,
-    line_image: None,
-    fill_line_image: None,
-    children_image: None,
+  rasterize_vector_items_for_effects_impl_at_pixels_per_point(
+    items,
+    raster_bounds,
+    effects,
+    false,
     pixels_per_point,
-  })
+  )
 }
 
 pub(crate) fn rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
@@ -179,23 +143,13 @@ pub(crate) fn rasterize_group_items_for_effects_at_pixels_per_point(
   effects: &super::drawingml_image_effects::ImageEffectContainer,
   pixels_per_point: f32,
 ) -> Option<DrawingRaster> {
-  if super::drawingml_image_effects::source_requirements(effects)
-    == super::drawingml_image_effects::ImageEffectSourceRequirements::default()
-  {
-    let (image, pixels_per_point) =
-      rasterize_vector_items_impl_at_pixels_per_point(items, raster_bounds, pixels_per_point)?;
-    return Some(DrawingRaster {
-      image,
-      fill_image: None,
-      line_image: None,
-      fill_line_image: None,
-      children_image: None,
-      pixels_per_point,
-    });
-  }
-  let mut raster = rasterize_group_items_for_effects(items, raster_bounds, effects)?;
-  rescale_drawing_raster(&mut raster, pixels_per_point);
-  Some(raster)
+  rasterize_vector_items_for_effects_impl_at_pixels_per_point(
+    items,
+    raster_bounds,
+    effects,
+    true,
+    pixels_per_point,
+  )
 }
 
 fn rasterize_vector_items_for_effects_impl(
@@ -203,6 +157,24 @@ fn rasterize_vector_items_for_effects_impl(
   raster_bounds: Rect,
   effects: &super::drawingml_image_effects::ImageEffectContainer,
   items_are_children_source: bool,
+) -> Option<DrawingRaster> {
+  let pixels_per_point =
+    effect_pixels_per_point(raster_bounds.size.width.0, raster_bounds.size.height.0);
+  rasterize_vector_items_for_effects_impl_at_pixels_per_point(
+    items,
+    raster_bounds,
+    effects,
+    items_are_children_source,
+    pixels_per_point,
+  )
+}
+
+fn rasterize_vector_items_for_effects_impl_at_pixels_per_point(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  items_are_children_source: bool,
+  pixels_per_point: f32,
 ) -> Option<DrawingRaster> {
   let requirements = super::drawingml_image_effects::source_requirements(effects);
   // A logical children source can only be produced while retaining the host
@@ -212,26 +184,29 @@ fn rasterize_vector_items_for_effects_impl(
   if requirements.children && !items_are_children_source {
     return None;
   }
-  let (image, pixels_per_point) = rasterize_vector_items_impl(items, raster_bounds)?;
+  let (image, pixels_per_point) =
+    rasterize_vector_items_impl_at_pixels_per_point(items, raster_bounds, pixels_per_point)?;
   let fill_image = if requirements.fill && items_are_children_source {
-    Some(empty_raster(raster_bounds)?.0)
+    Some(empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point)?.0)
   } else if requirements.fill {
-    Some(rasterize_source_layer(
+    Some(rasterize_source_layer_at_pixels_per_point(
       items,
       raster_bounds,
       SourceLayer::Fill,
+      pixels_per_point,
     )?)
     .map(|layer| layer.0)
   } else {
     None
   };
   let line_image = if requirements.line && items_are_children_source {
-    Some(empty_raster(raster_bounds)?.0)
+    Some(empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point)?.0)
   } else if requirements.line {
-    Some(rasterize_source_layer(
+    Some(rasterize_source_layer_at_pixels_per_point(
       items,
       raster_bounds,
       SourceLayer::Line,
+      pixels_per_point,
     )?)
     .map(|layer| layer.0)
   } else {
@@ -240,7 +215,7 @@ fn rasterize_vector_items_for_effects_impl(
   Some(DrawingRaster {
     children_image: (requirements.children && items_are_children_source).then(|| image.clone()),
     fill_line_image: if requirements.fill_line && items_are_children_source {
-      Some(empty_raster(raster_bounds)?.0)
+      Some(empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point)?.0)
     } else {
       None
     },
@@ -257,20 +232,22 @@ enum SourceLayer {
   Line,
 }
 
-fn rasterize_source_layer(
+fn rasterize_source_layer_at_pixels_per_point(
   items: &[DisplayItem<'static>],
   raster_bounds: Rect,
   layer: SourceLayer,
+  pixels_per_point: f32,
 ) -> Option<(RgbaImage, f32)> {
   let mut layer_items = Vec::new();
   for item in items {
     collect_source_layer_item(item, layer, &mut layer_items)?;
   }
   if layer_items.is_empty() {
-    let (image, pixels_per_point) = empty_raster(raster_bounds)?;
+    let (image, pixels_per_point) =
+      empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point)?;
     return Some((image, pixels_per_point));
   }
-  rasterize_vector_items_impl(&layer_items, raster_bounds)
+  rasterize_vector_items_impl_at_pixels_per_point(&layer_items, raster_bounds, pixels_per_point)
 }
 
 fn collect_source_layer_item(
@@ -337,13 +314,16 @@ fn collect_source_layer_item(
   Some(())
 }
 
-fn empty_raster(raster_bounds: Rect) -> Option<(RgbaImage, f32)> {
+fn empty_raster_at_pixels_per_point(
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+) -> Option<(RgbaImage, f32)> {
   let width_pt = raster_bounds.size.width.0;
   let height_pt = raster_bounds.size.height.0;
-  if width_pt <= 0.0 || height_pt <= 0.0 {
+  if width_pt <= 0.0 || height_pt <= 0.0 || !pixels_per_point.is_finite() || pixels_per_point <= 0.0
+  {
     return None;
   }
-  let pixels_per_point = effect_pixels_per_point(width_pt, height_pt);
   Some((
     RgbaImage::new(
       (width_pt * pixels_per_point).ceil().max(1.0) as u32,
@@ -367,6 +347,60 @@ fn effect_pixels_per_point_with_max(
     .clamp(0.25, max_pixels_per_point.max(0.25))
 }
 
+/// Selects the bounded effect density and encloses a logical output rectangle
+/// on that device-pixel grid.
+///
+/// Microsoft's Direct2D geometry-realization sample applies `floor` to the
+/// left/top widened bounds and `ceil` to right/bottom before allocating an
+/// opacity bitmap.  Doing this after density selection preserves the logical
+/// effect range while ensuring fractional strokes and antialiasing are not
+/// clipped at the source edge.  The density is rechecked after alignment so
+/// the shared 250,000-pixel budget remains an actual upper bound.
+pub(crate) fn bounded_effect_raster_grid(bounds: Rect, max_pixels_per_point: f32) -> (Rect, f32) {
+  let mut pixels_per_point = effect_pixels_per_point_with_max(
+    bounds.size.width.0,
+    bounds.size.height.0,
+    max_pixels_per_point,
+  );
+  for _ in 0..3 {
+    let aligned = align_rect_to_pixel_grid(bounds, pixels_per_point);
+    let bounded = effect_pixels_per_point_with_max(
+      aligned.size.width.0,
+      aligned.size.height.0,
+      max_pixels_per_point,
+    )
+    .min(pixels_per_point);
+    if (bounded - pixels_per_point).abs() <= f32::EPSILON {
+      return (aligned, pixels_per_point);
+    }
+    pixels_per_point = bounded;
+  }
+  (
+    align_rect_to_pixel_grid(bounds, pixels_per_point),
+    pixels_per_point,
+  )
+}
+
+fn align_rect_to_pixel_grid(bounds: Rect, pixels_per_point: f32) -> Rect {
+  let left = (bounds.origin.x.0 * pixels_per_point).floor() / pixels_per_point;
+  let top = (bounds.origin.y.0 * pixels_per_point).floor() / pixels_per_point;
+  let right =
+    ((bounds.origin.x.0 + bounds.size.width.0) * pixels_per_point).ceil() / pixels_per_point;
+  let bottom =
+    ((bounds.origin.y.0 + bounds.size.height.0) * pixels_per_point).ceil() / pixels_per_point;
+  Rect {
+    origin: super::Point {
+      x: Pt(left),
+      y: Pt(top),
+    },
+    size: super::Size {
+      width: Pt(right - left),
+      height: Pt(bottom - top),
+    },
+  }
+}
+
+#[cfg(test)]
 fn rasterize_vector_items_impl(
   items: &[DisplayItem<'static>],
   raster_bounds: Rect,
@@ -1409,8 +1443,9 @@ fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
 #[cfg(test)]
 mod tests {
   use super::{
-    MAX_EFFECT_RASTER_PIXELS, SourceLayer, collect_source_layer_item,
-    effect_pixels_per_point_with_max, rasterize_group_items_for_effects, rasterize_vector_items,
+    MAX_EFFECT_RASTER_PIXELS, SourceLayer, bounded_effect_raster_grid, collect_source_layer_item,
+    effect_pixels_per_point_with_max, rasterize_group_items_for_effects,
+    rasterize_group_items_for_effects_at_pixels_per_point, rasterize_vector_items,
     rasterize_vector_items_for_effects,
   };
   use image::codecs::png::PngEncoder;
@@ -1445,6 +1480,18 @@ mod tests {
     let large = effect_pixels_per_point_with_max(500.0, 500.0, 200.0 / 72.0);
     assert!(large < 200.0 / 72.0);
     assert!(500.0 * 500.0 * large * large <= MAX_EFFECT_RASTER_PIXELS + 1.0);
+  }
+
+  #[test]
+  fn effect_grid_encloses_fractional_and_negative_logical_bounds() {
+    let (aligned, pixels_per_point) = bounded_effect_raster_grid(rect(10.3, -2.1, 5.2, 3.0), 2.0);
+
+    assert!((pixels_per_point - 2.0).abs() < f32::EPSILON);
+    assert_eq!(aligned, rect(10.0, -2.5, 5.5, 3.5));
+    assert!(aligned.origin.x.0 <= 10.3);
+    assert!(aligned.origin.y.0 <= -2.1);
+    assert!(aligned.origin.x.0 + aligned.size.width.0 >= 15.5);
+    assert!(aligned.origin.y.0 + aligned.size.height.0 >= 0.9);
   }
 
   #[test]
@@ -1640,11 +1687,35 @@ mod tests {
     assert!(
       rasterize_vector_items_for_effects(std::slice::from_ref(&item), bounds, &effects).is_none()
     );
-    let raster = rasterize_group_items_for_effects(&[item], bounds, &effects).unwrap();
+    let raster =
+      rasterize_group_items_for_effects(std::slice::from_ref(&item), bounds, &effects).unwrap();
     assert_eq!(raster.fill_image.unwrap().get_pixel(5, 5).0, [0, 0, 0, 0]);
     assert_eq!(
       raster.children_image.unwrap().get_pixel(5, 5).0,
       [255, 0, 0, 255]
+    );
+
+    let raster = rasterize_group_items_for_effects_at_pixels_per_point(
+      std::slice::from_ref(&item),
+      bounds,
+      &effects,
+      3.0,
+    )
+    .unwrap();
+    assert_eq!((raster.image.width(), raster.image.height()), (30, 30));
+    assert_eq!(
+      raster
+        .fill_image
+        .as_ref()
+        .map(|image| (image.width(), image.height())),
+      Some((30, 30))
+    );
+    assert_eq!(
+      raster
+        .children_image
+        .as_ref()
+        .map(|image| (image.width(), image.height())),
+      Some((30, 30))
     );
   }
 

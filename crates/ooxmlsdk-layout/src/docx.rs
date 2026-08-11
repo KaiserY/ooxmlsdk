@@ -407,7 +407,7 @@ pub(crate) fn extract(
   let note_separator_style =
     styles.run_style_with_base(None, TextStyle::default(), RunStyleOverrides::default());
 
-  let mut document = DocxDocument {
+  Ok(DocxDocument {
     page,
     page_background_pattern,
     line_number_style: styles
@@ -438,153 +438,21 @@ pub(crate) fn extract(
     endnote_position,
     title_page,
     blocks,
-  };
-  quantize_word_fixed_output_text_styles(&mut document);
-  Ok(document)
+  })
 }
 
-/// Materialize Word's logical point sizes on the 600-DPI fixed-output device.
+/// Snap a cloned Word text style for a fixed-output device measurement.
 ///
-/// [MS-WMF] section 2.2.1.2 gives the GDI font-height conversion in terms of
-/// `LOGPIXELSY`. The Office PDFs paired with `Indent_Spacing.docx` preserve
-/// that integer device height in their text matrices: 11.5pt becomes 11.52pt,
-/// 20pt becomes 20.04pt, while the exactly representable 9pt remains 9pt.
-/// Keep authored sizes during the style cascade, then snap the complete DOCX
-/// model once so measurement, pagination, and emitted PDF text use one value.
+/// Do not apply this to the imported document model. Word lays out ordinary
+/// text with its authored half-point size, then creates the PDF font on the
+/// integer 600-DPI device grid. `tdf137742.docx` and `NoDocProps.docx` are
+/// counterexamples to using the snapped paint size for line fitting, while
+/// `Indent_Spacing.docx` preserves the snapped size in the Office PDF matrix.
 pub(crate) fn quantize_word_fixed_output_text_style(style: &mut TextStyle) {
   style.font_size_pt = units::quantize_points_to_office_print_grid(style.font_size_pt);
   style.complex_font_size_pt = style
     .complex_font_size_pt
     .map(units::quantize_points_to_office_print_grid);
-}
-
-fn quantize_word_fixed_output_text_styles(document: &mut DocxDocument) {
-  quantize_word_fixed_output_text_style(&mut document.line_number_style);
-  quantize_word_fixed_output_text_style(&mut document.note_separator_style);
-  quantize_note_separator_stories(&mut document.footnote_separator_stories);
-  quantize_note_separator_stories(&mut document.endnote_separator_stories);
-
-  for section in &mut document.sections {
-    quantize_blocks(&mut section.header_blocks);
-    quantize_blocks(&mut section.footer_blocks);
-    quantize_blocks(&mut section.first_header_blocks);
-    quantize_blocks(&mut section.first_footer_blocks);
-    quantize_blocks(&mut section.even_header_blocks);
-    quantize_blocks(&mut section.even_footer_blocks);
-    quantize_blocks(&mut section.blocks);
-  }
-  quantize_blocks(&mut document.header_blocks);
-  quantize_blocks(&mut document.footer_blocks);
-  quantize_blocks(&mut document.first_header_blocks);
-  quantize_blocks(&mut document.first_footer_blocks);
-  quantize_blocks(&mut document.footnote_blocks);
-  for blocks in document.footnotes.values_mut() {
-    quantize_blocks(blocks);
-  }
-  for blocks in document.endnotes.values_mut() {
-    quantize_blocks(blocks);
-  }
-  quantize_blocks(&mut document.blocks);
-}
-
-fn quantize_note_separator_stories(stories: &mut NoteSeparatorStories) {
-  quantize_blocks(&mut stories.separator);
-  quantize_blocks(&mut stories.continuation_separator);
-  quantize_blocks(&mut stories.continuation_notice);
-}
-
-fn quantize_blocks(blocks: &mut [Block]) {
-  for block in blocks {
-    match block {
-      Block::Paragraph(paragraph) => quantize_paragraph(paragraph),
-      Block::Table(table) => {
-        for row in &mut table.rows {
-          for cell in &mut row.cells {
-            quantize_blocks(&mut cell.blocks);
-          }
-        }
-      }
-      Block::Frame(frame) => quantize_blocks(&mut frame.blocks),
-    }
-  }
-}
-
-fn quantize_paragraph(paragraph: &mut Paragraph) {
-  quantize_word_fixed_output_text_style(&mut paragraph.base_style);
-  quantize_word_fixed_output_text_style(&mut paragraph.list_label_style);
-  if let Some(label) = &mut paragraph.list_label_image {
-    quantize_inline_image(&mut label.image);
-  }
-  #[cfg(test)]
-  for run in &mut paragraph.runs {
-    quantize_word_fixed_output_text_style(&mut run.style);
-  }
-  for inline in &mut paragraph.inlines {
-    match inline {
-      InlineItem::Text(run) => quantize_word_fixed_output_text_style(&mut run.style),
-      InlineItem::NoteReferenceMark(mark) => quantize_word_fixed_output_text_style(&mut mark.style),
-      InlineItem::NoteSeparatorMark(mark) => quantize_word_fixed_output_text_style(&mut mark.style),
-      InlineItem::PositionalTab(tab) => quantize_word_fixed_output_text_style(&mut tab.style),
-      InlineItem::Ruby(ruby) => {
-        for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
-          quantize_word_fixed_output_text_style(&mut run.style);
-        }
-      }
-      InlineItem::LegacyFormCheckBox(check_box) => {
-        quantize_word_fixed_output_text_style(&mut check_box.style)
-      }
-      InlineItem::Image(image) => quantize_inline_image(image),
-      InlineItem::Shape(shape) => quantize_inline_shape(shape),
-      InlineItem::ClearLineBreak(_)
-      | InlineItem::DrawingGroupStart(_)
-      | InlineItem::DrawingGroupEnd
-      | InlineItem::BookmarkStart(_)
-      | InlineItem::FormWidgetStart(_)
-      | InlineItem::FormWidgetEnd(_)
-      | InlineItem::LastRenderedPageBreak
-      | InlineItem::PageBreak
-      | InlineItem::ColumnBreak => {}
-    }
-  }
-}
-
-fn quantize_inline_image(image: &mut InlineImage) {
-  if let Some(frame) = &mut image.picture_frame {
-    quantize_inline_shape(frame);
-  }
-}
-
-fn quantize_inline_shape(shape: &mut InlineShape) {
-  quantize_blocks(&mut shape.text_box_blocks);
-  if let Some(chart) = &mut shape.chart {
-    quantize_inline_chart(chart);
-  }
-}
-
-fn quantize_inline_chart(chart: &mut InlineChart) {
-  quantize_word_fixed_output_text_style(&mut chart.title_style);
-  quantize_word_fixed_output_text_style(&mut chart.label_style);
-  quantize_word_fixed_output_text_style(&mut chart.category_axis_title_style);
-  quantize_word_fixed_output_text_style(&mut chart.value_axis_title_style);
-  for style in &mut chart.additional_axis_title_styles {
-    quantize_word_fixed_output_text_style(style);
-  }
-  quantize_word_fixed_output_text_style(&mut chart.category_label_style);
-  quantize_word_fixed_output_text_style(&mut chart.value_label_style);
-  quantize_word_fixed_output_text_style(&mut chart.series_label_style);
-  quantize_word_fixed_output_text_style(&mut chart.data_label_style);
-  for series in &mut chart.data_label_styles {
-    for style in series.iter_mut().flatten() {
-      quantize_word_fixed_output_text_style(style);
-    }
-  }
-  for series in &mut chart.data_label_rich_text_styles {
-    for label in series {
-      for style in label {
-        quantize_word_fixed_output_text_style(style);
-      }
-    }
-  }
 }
 
 pub fn layout(
@@ -7398,6 +7266,7 @@ fn flush_complex_field(
       &state.instr,
       state.style.clone(),
       state.hyperlink_url.as_deref(),
+      styles,
     )
   {
     resolved.push(InlineItem::Text(run));
@@ -7577,6 +7446,7 @@ fn symbol_field_run(
   instr: &str,
   mut style: TextStyle,
   hyperlink_url: Option<&str>,
+  styles: &StylesCatalog,
 ) -> Option<TextRun> {
   let tokens = field_instruction_tokens(instr);
   let name = tokens.first()?.trim_start_matches('\\');
@@ -7617,6 +7487,12 @@ fn symbol_field_run(
     index += 1;
   }
 
+  let symbol_encoded_font = !ansi
+    && !shift_jis
+    && !unicode
+    && font
+      .as_deref()
+      .is_some_and(|font| styles.font_uses_symbol_charset(font));
   let character = if unicode {
     // [MS-OI29500] §2.1.489: Word truncates values outside plane zero.
     char::from_u32(code & 0xFFFF)?
@@ -7626,7 +7502,7 @@ fn symbol_field_run(
     decode_symbol_field_character(encoding_rs::WINDOWS_1252, code)?
   } else {
     let character = shared_symbol::font_symbol_code(font.as_deref(), code)?;
-    if font.as_deref().is_some_and(symbol_transport_font) && code <= u32::from(u8::MAX) {
+    if symbol_encoded_font && code <= u32::from(u8::MAX) {
       char::from_u32(0xF000 | code)?
     } else {
       character
@@ -7634,12 +7510,36 @@ fn symbol_field_run(
   };
 
   if let Some(font) = font {
-    let font = Arc::<str>::from(font);
-    style.font_family = Some(font.clone());
-    style.east_asia_font_family = Some(font.clone());
-    style.complex_font_family = Some(font.clone());
-    style.symbol_font_family = Some(font);
-    style.explicit_symbol_character = true;
+    if symbol_encoded_font {
+      // ECMA-376 Part 1 §17.16.5.61 makes \f override direct result
+      // formatting. A legacy symbol-encoded face also needs the same isolated
+      // SYMBOL charset boundary as w:sym; otherwise its U+F0XX transport code
+      // is routed through the inherited WordprocessingML slot and generic
+      // fallback replaces the declared face.
+      styles.apply_symbol_character_font(&mut style, &font);
+    } else {
+      // \f is one field-level font selection, not a four-slot w:rFonts
+      // cascade. Materialize it across the style only for this generated
+      // field result, while retaining ordinary Unicode shaping for a
+      // non-symbol face or an explicit \a/\j/\u encoding switch.
+      let family = Arc::<str>::from(font);
+      style.font_family = Some(family.clone());
+      style.high_ansi_font_family = Some(family.clone());
+      style.east_asia_font_family = Some(family.clone());
+      style.complex_font_family = Some(family);
+      style.fallback_font_family = None;
+      style.high_ansi_fallback_font_family = None;
+      style.east_asia_fallback_font_family = None;
+      style.complex_fallback_font_family = None;
+      style.font_family_class = None;
+      style.high_ansi_font_family_class = None;
+      style.east_asia_font_family_class = None;
+      style.complex_font_family_class = None;
+      style.symbol_font_family = None;
+      style.explicit_symbol_character = false;
+      style.wordprocessingml_font_slots = false;
+      styles.apply_font_substitution(&mut style);
+    }
   }
 
   Some(TextRun {
@@ -11568,20 +11468,47 @@ fn text_box_frame_from_wordprocessing_shape(
   }
   apply_wordprocessing_shape_outline_inset(
     &mut frame,
-    wordprocessing_shape_outline_half_width_pt(shape),
+    wordprocessing_shape_actual_line_outline(shape, styles)
+      .and_then(|outline| outline.width)
+      .map(i64::from)
+      .map(units::emu_to_points)
+      .map(|width| width / 2.0),
   );
   frame
 }
 
-fn wordprocessing_shape_outline_half_width_pt(shape: &wps::WordprocessingShape) -> Option<f32> {
-  let outline = shape.shape_properties.as_deref()?.outline.as_deref()?;
-  Some(
-    outline
-      .width
-      .map(i64::from)
-      .map(units::emu_to_points)
-      .unwrap_or_else(|| units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU))
-      / 2.0,
+fn wordprocessing_shape_actual_line_outline(
+  shape: &wps::WordprocessingShape,
+  styles: &StylesCatalog,
+) -> Option<a::Outline> {
+  drawingml_actual_line_outline(
+    shape
+      .shape_properties
+      .as_deref()
+      .and_then(|properties| properties.outline.as_deref()),
+    shape
+      .shape_style
+      .as_ref()
+      .map(|style| style.line_reference.as_ref()),
+    &styles.theme_lines,
+  )
+}
+
+fn wordprocessing_shape_actual_line_stroke(
+  shape: &wps::WordprocessingShape,
+  styles: &StylesCatalog,
+) -> Option<common::Stroke<'static>> {
+  drawingml_actual_line_stroke(
+    shape
+      .shape_properties
+      .as_deref()
+      .and_then(|properties| properties.outline.as_deref()),
+    shape
+      .shape_style
+      .as_ref()
+      .map(|style| style.line_reference.as_ref()),
+    &styles.theme_lines,
+    &styles.theme_colors,
   )
 }
 
@@ -11635,6 +11562,33 @@ fn rotate_paragraph_text(paragraph: &mut Paragraph, rotation_deg: f32) {
   paragraph.list_label_style.rotation_deg = rotation_deg;
 }
 
+fn apply_wordprocessing_shape_compatible_line_spacing(
+  blocks: &mut [Block],
+  compatible_line_spacing: bool,
+) {
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => {
+        paragraph
+          .format
+          .wordprocessing_shape_compatible_line_spacing = compatible_line_spacing;
+      }
+      Block::Table(table) => {
+        for cell in table.rows.iter_mut().flat_map(|row| &mut row.cells) {
+          apply_wordprocessing_shape_compatible_line_spacing(
+            &mut cell.blocks,
+            compatible_line_spacing,
+          );
+        }
+      }
+      Block::Frame(frame) => apply_wordprocessing_shape_compatible_line_spacing(
+        &mut frame.blocks,
+        compatible_line_spacing,
+      ),
+    }
+  }
+}
+
 fn apply_wordprocessing_shape_outline_inset(
   frame: &mut TextBoxFrameContent,
   outline_inset_pt: Option<f32>,
@@ -11677,6 +11631,17 @@ fn apply_wordprocessing_shape_textbox_body_properties(
   properties: &wps::TextBodyProperties,
   frame: &mut TextBoxFrameContent,
 ) {
+  // ECMA-376 Part 1 §20.4.2.22 scopes compatLnSpc to this text body.
+  // Word fixed output and Writer's LINE_SPACING_AS_GAP_BELOW path place an
+  // expanded inherited auto-line increment below the visible line. Preserve
+  // the authored true/false distinction through the rich WML textbox story;
+  // ordinary body paragraphs and an omitted attribute are counterexamples.
+  apply_wordprocessing_shape_compatible_line_spacing(
+    &mut frame.blocks,
+    properties
+      .compatible_line_spacing
+      .is_some_and(|value| value.as_bool()),
+  );
   // oox/source/shape/WpsContext.cxx maps bodyPr@wrap=square to
   // TextWordWrap=true and every other authored value to false. Preserve the
   // schema default (square) when the attribute is absent.
@@ -12663,30 +12628,16 @@ fn drawingml_generic_shape_shape(
     })
   };
   let fill_image = drawingml_generic_shape_image_fill(shape_properties, context.images);
-  let stroke_override = shape_properties
-    .outline
-    .as_deref()
-    .and_then(|outline| drawingml_outline_common_stroke(outline, &context.styles.theme_colors));
+  let stroke_override = drawingml_actual_line_stroke(
+    shape_properties.outline.as_deref(),
+    shape_style.map(|style| style.line_reference.as_ref()),
+    &context.styles.theme_lines,
+    &context.styles.theme_colors,
+  );
   let stroke = stroke_override
     .as_ref()
-    .map(drawingml_border_style_from_common_stroke)
-    .or_else(|| {
-      shape_style.map(|style| {
-        drawingml_line_reference_stroke(
-          &style.line_reference,
-          &context.styles.theme_colors,
-          &context.styles.theme_lines,
-        )
-      })?
-    });
-  let stroke_pattern = shape_properties.outline.as_deref().and_then(|outline| {
-    match outline.outline_choice1.as_ref()? {
-      a::OutlineChoice::PatternFill(fill) => {
-        drawingml_pattern_fill(fill, &context.styles.theme_colors)
-      }
-      _ => None,
-    }
-  });
+    .map(drawingml_border_style_from_common_stroke);
+  let stroke_pattern = stroke_override.as_ref().and_then(|stroke| stroke.pattern);
   // Generic a:txSp content has independent DrawingML run properties, text
   // warp, and effects. Word commonly emits it as non-semantic vector
   // outlines, so it must not be downgraded to default WordprocessingML text.
@@ -13070,34 +13021,11 @@ fn wordprocessing_shape_shape(
     })
   };
   let fill_image = wordprocessing_shape_image_fill(&shape_properties, context.images);
-  let stroke = if wordprocessing_shape_has_no_line(shape) {
-    None
-  } else {
-    wordprocessing_shape_stroke(shape, &context.styles.theme_colors).or_else(|| {
-      shape.shape_style.as_ref().and_then(|style| {
-        drawingml_line_reference_stroke(
-          &style.line_reference,
-          &context.styles.theme_colors,
-          &context.styles.theme_lines,
-        )
-      })
-    })
-  };
-  let stroke_pattern = shape
-    .shape_properties
-    .as_deref()
-    .and_then(|properties| properties.outline.as_deref())
-    .and_then(|outline| match outline.outline_choice1.as_ref()? {
-      a::OutlineChoice::PatternFill(fill) => {
-        drawingml_pattern_fill(fill, &context.styles.theme_colors)
-      }
-      _ => None,
-    });
-  let stroke_override = shape
-    .shape_properties
-    .as_deref()
-    .and_then(|properties| properties.outline.as_deref())
-    .and_then(|outline| drawingml_outline_common_stroke(outline, &context.styles.theme_colors));
+  let stroke_override = wordprocessing_shape_actual_line_stroke(shape, context.styles);
+  let stroke = stroke_override
+    .as_ref()
+    .map(drawingml_border_style_from_common_stroke);
+  let stroke_pattern = stroke_override.as_ref().and_then(|stroke| stroke.pattern);
   if fill_color.is_none()
     && fill_pattern.is_none()
     && fill_override
@@ -13463,34 +13391,19 @@ fn drawingml_diagram_shape_shape(
     })
   };
   let fill_image = drawingml_diagram_shape_image_fill(&shape.shape_properties, context.images);
-  let stroke = if drawingml_diagram_shape_has_no_line(shape) {
-    None
-  } else {
-    drawingml_diagram_shape_stroke(shape, &context.styles.theme_colors).or_else(|| {
-      shape.shape_style.as_ref().and_then(|style| {
-        drawingml_line_reference_stroke(
-          &style.line_reference,
-          &context.styles.theme_colors,
-          &context.styles.theme_lines,
-        )
-      })
-    })
-  };
-  let stroke_pattern = shape
-    .shape_properties
-    .outline
-    .as_deref()
-    .and_then(|outline| match outline.outline_choice1.as_ref()? {
-      a::OutlineChoice::PatternFill(fill) => {
-        drawingml_pattern_fill(fill, &context.styles.theme_colors)
-      }
-      _ => None,
-    });
-  let stroke_override = shape
-    .shape_properties
-    .outline
-    .as_deref()
-    .and_then(|outline| drawingml_outline_common_stroke(outline, &context.styles.theme_colors));
+  let stroke_override = drawingml_actual_line_stroke(
+    shape.shape_properties.outline.as_deref(),
+    shape
+      .shape_style
+      .as_ref()
+      .map(|style| style.line_reference.as_ref()),
+    &context.styles.theme_lines,
+    &context.styles.theme_colors,
+  );
+  let stroke = stroke_override
+    .as_ref()
+    .map(drawingml_border_style_from_common_stroke);
+  let stroke_pattern = stroke_override.as_ref().and_then(|stroke| stroke.pattern);
   let smartart_text_color = context
     .smartart_text_colors_by_model_id
     .and_then(|colors| colors.get(shape.model_id.as_str()).copied());
@@ -16595,22 +16508,32 @@ fn drawingml_shape_properties_has_no_fill(properties: &DrawingMlShapeProperties)
     .is_some_and(|fill| matches!(fill, DrawingMlFillProperties::NoFill))
 }
 
-fn drawingml_line_reference_stroke(
-  reference: &a::LineReference,
-  theme_colors: &ThemeColors,
+fn drawingml_actual_line_stroke(
+  direct: Option<&a::Outline>,
+  reference: Option<&a::LineReference>,
   theme_lines: &ThemeLineStyles,
-) -> Option<BorderStyle> {
-  let index = usize::try_from(reference.index).ok()?;
-  let width_pt = theme_lines.width_pt(index)?;
-  let color = drawingml_line_reference_color(reference, theme_colors)?;
-  Some(BorderStyle {
-    width_pt,
-    spacing_pt: 0.0,
-    color,
-    compound: false,
-    dash_pattern: BorderDashPattern::Solid,
-    shadow: false,
-  })
+  theme_colors: &ThemeColors,
+) -> Option<common::Stroke<'static>> {
+  let actual = drawingml_actual_line_outline(direct, reference, theme_lines)?;
+  let placeholder_color = reference
+    .and_then(|reference| reference.line_reference_choice.as_ref())
+    .and_then(Color::from_line_reference_choice);
+  drawingml_outline_common_stroke_with_placeholder(
+    &actual,
+    theme_colors,
+    placeholder_color.as_ref(),
+  )
+}
+
+fn drawingml_actual_line_outline(
+  direct: Option<&a::Outline>,
+  reference: Option<&a::LineReference>,
+  theme_lines: &ThemeLineStyles,
+) -> Option<a::Outline> {
+  let theme = reference
+    .and_then(|reference| usize::try_from(reference.index).ok())
+    .and_then(|index| theme_lines.get(index));
+  common::drawingml_stroke::merge_outlines(theme, direct)
 }
 
 fn drawingml_effect_reference_effects(
@@ -16716,64 +16639,17 @@ fn drawingml_font_reference_color(
   }
 }
 
-fn drawingml_line_reference_color(
-  reference: &a::LineReference,
-  theme_colors: &ThemeColors,
-) -> Option<RgbColor> {
-  match reference.line_reference_choice.as_ref()? {
-    a::LineReferenceChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
-    a::LineReferenceChoice::SystemColor(color) => {
-      color.last_color.as_deref().and_then(parse_hex_color)
-    }
-    a::LineReferenceChoice::SchemeColor(color) => {
-      resolve_drawingml_scheme_color(color, theme_colors)
-    }
-    a::LineReferenceChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
-    _ => None,
-  }
-}
-
-fn wordprocessing_shape_stroke(
-  shape: &wps::WordprocessingShape,
-  theme_colors: &ThemeColors,
-) -> Option<BorderStyle> {
-  let line = shape.shape_properties.as_ref()?.outline.as_ref()?;
-  let color = match line.outline_choice1.as_ref()? {
-    a::OutlineChoice::NoFill(_) => return None,
-    a::OutlineChoice::SolidFill(fill) => {
-      resolve_drawingml_solid_fill(fill.as_ref(), theme_colors)?.color
-    }
-    a::OutlineChoice::GradientFill(fill) => {
-      drawingml_first_gradient_fill_color(fill.as_ref(), theme_colors)?
-    }
-    a::OutlineChoice::PatternFill(fill) => {
-      let pattern = drawingml_pattern_fill(fill, theme_colors)?;
-      RgbColor {
-        r: pattern.foreground.r,
-        g: pattern.foreground.g,
-        b: pattern.foreground.b,
-      }
-    }
-  };
-  let width_pt = line
-    .width
-    .map(i64::from)
-    .map(units::emu_to_points)
-    .unwrap_or_else(|| units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU));
-
-  Some(BorderStyle {
-    width_pt,
-    spacing_pt: 0.0,
-    color,
-    compound: false,
-    dash_pattern: BorderDashPattern::Solid,
-    shadow: false,
-  })
-}
-
 fn drawingml_outline_common_stroke(
   outline: &a::Outline,
   theme_colors: &ThemeColors,
+) -> Option<common::Stroke<'static>> {
+  drawingml_outline_common_stroke_with_placeholder(outline, theme_colors, None)
+}
+
+fn drawingml_outline_common_stroke_with_placeholder(
+  outline: &a::Outline,
+  theme_colors: &ThemeColors,
+  placeholder_color: Option<&Color>,
 ) -> Option<common::Stroke<'static>> {
   let width_pt = outline
     .width
@@ -16783,15 +16659,18 @@ fn drawingml_outline_common_stroke(
   let (color, pattern, gradient) = match outline.outline_choice1.as_ref()? {
     a::OutlineChoice::NoFill(_) => return None,
     a::OutlineChoice::SolidFill(fill) => {
-      let color = resolve_drawingml_solid_fill(fill, theme_colors)?;
-      (common_rgb(color.color, color.opacity), None, None)
+      let authored = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
+      let color = docx_image_color_with_placeholder(authored, theme_colors, placeholder_color)?;
+      (color, None, None)
     }
     a::OutlineChoice::PatternFill(fill) => {
-      let pattern = drawingml_pattern_fill(fill, theme_colors)?;
+      let pattern = drawingml_pattern_fill_with_placeholder(fill, theme_colors, placeholder_color)?;
       (pattern.foreground, Some(pattern), None)
     }
     a::OutlineChoice::GradientFill(fill) => {
-      let common::Fill::Gradient(gradient) = drawingml_gradient_fill(fill, theme_colors)? else {
+      let common::Fill::Gradient(gradient) =
+        drawingml_gradient_fill_with_placeholder(fill, theme_colors, placeholder_color)?
+      else {
         return None;
       };
       let color = gradient
@@ -16828,56 +16707,11 @@ fn drawingml_border_style_from_common_stroke(stroke: &common::Stroke<'_>) -> Bor
   }
 }
 
-fn drawingml_diagram_shape_stroke(
-  shape: &dsp::Shape,
-  theme_colors: &ThemeColors,
-) -> Option<BorderStyle> {
-  let line = shape.shape_properties.outline.as_ref()?;
-  let color = match line.outline_choice1.as_ref()? {
-    a::OutlineChoice::NoFill(_) => return None,
-    a::OutlineChoice::SolidFill(fill) => resolve_drawingml_solid_fill(fill, theme_colors)?.color,
-    a::OutlineChoice::GradientFill(fill) => {
-      drawingml_first_gradient_fill_color(fill, theme_colors)?
-    }
-    a::OutlineChoice::PatternFill(fill) => {
-      let pattern = drawingml_pattern_fill(fill, theme_colors)?;
-      RgbColor {
-        r: pattern.foreground.r,
-        g: pattern.foreground.g,
-        b: pattern.foreground.b,
-      }
-    }
-  };
-  let width_pt = line
-    .width
-    .map(i64::from)
-    .map(units::emu_to_points)
-    .unwrap_or_else(|| units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU));
-
-  Some(BorderStyle {
-    width_pt,
-    spacing_pt: 0.0,
-    color,
-    compound: false,
-    dash_pattern: BorderDashPattern::Solid,
-    shadow: false,
-  })
-}
-
 fn wordprocessing_shape_has_no_line(shape: &wps::WordprocessingShape) -> bool {
   shape
     .shape_properties
     .as_deref()
     .and_then(|properties| properties.outline.as_ref())
-    .and_then(|line| line.outline_choice1.as_ref())
-    .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)))
-}
-
-fn drawingml_diagram_shape_has_no_line(shape: &dsp::Shape) -> bool {
-  shape
-    .shape_properties
-    .outline
-    .as_ref()
     .and_then(|line| line.outline_choice1.as_ref())
     .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)))
 }
@@ -17370,6 +17204,9 @@ fn vml_shape_shape_with_style(
     )));
   }
   inline.stroke_override = crate::xlsx::vml_shape_common_stroke(&common_model).map(Box::new);
+  inline.effects = vml_shape_shadow(shape)
+    .or_else(|| shape_type.and_then(vml_shapetype_shadow))
+    .and_then(vml_single_shadow_effect);
   if let Some(path) = path
     && let Some(geometry) = vml_path_geometry(
       path,
@@ -17475,6 +17312,80 @@ fn vml_shape_stroke(shape: &v::Shape) -> Option<&v::Stroke> {
     v::ShapeChoice::Stroke(stroke) => Some(stroke.as_ref()),
     _ => None,
   })
+}
+
+fn vml_shape_shadow(shape: &v::Shape) -> Option<&v::Shadow> {
+  shape.shape_choice.iter().find_map(|choice| match choice {
+    v::ShapeChoice::Shadow(shadow) => Some(shadow.as_ref()),
+    _ => None,
+  })
+}
+
+fn vml_shapetype_shadow(shape_type: &v::Shapetype) -> Option<&v::Shadow> {
+  shape_type
+    .shapetype_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::ShapetypeChoice::Shadow(shadow) => Some(shadow.as_ref()),
+      _ => None,
+    })
+}
+
+fn vml_single_shadow_effect(shadow: &v::Shadow) -> Option<common::DrawingEffectSource> {
+  // VML `shadow@on` defaults to false. Keep non-single shadow types out of
+  // this normalization: double, perspective, and emboss have independent
+  // color/offset/matrix semantics and must not be approximated as one box.
+  if !shadow.on.is_some_and(|value| value.as_bool())
+    || !matches!(shadow.r#type, None | Some(v::ShadowValues::Single))
+  {
+    return None;
+  }
+
+  let (offset_x_pt, offset_y_pt) = vml_shadow_offset_points(shadow.offset.as_deref())?;
+  let color = crate::xlsx::vml_common_color(
+    shadow.color.as_deref(),
+    shadow.opacity.as_deref(),
+    RgbColor {
+      r: 0x80,
+      g: 0x80,
+      b: 0x80,
+    },
+  );
+  let resolved = common::drawingml_image_effects::offset_outer_shadow_with_identity(
+    offset_x_pt / units::POINTS_PER_CSS_PIXEL,
+    offset_y_pt / units::POINTS_PER_CSS_PIXEL,
+    ResolvedEffectColor {
+      color: RgbColor {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+      },
+      alpha: color.a,
+    },
+  );
+  Some(common::DrawingEffectSource::Resolved(resolved))
+}
+
+fn vml_shadow_offset_points(value: Option<&str>) -> Option<(f32, f32)> {
+  // The archived Microsoft VML reference defines 2pt independently for both
+  // omitted vector components. LibreOffice likewise preserves a component's
+  // default when the other side of the comma is empty.
+  const DEFAULT_OFFSET_PT: f32 = 2.0;
+  let Some(value) = value else {
+    return Some((DEFAULT_OFFSET_PT, DEFAULT_OFFSET_PT));
+  };
+  let mut components = value.splitn(2, ',');
+  let parse_component = |component: Option<&str>| {
+    component
+      .map(str::trim)
+      .filter(|component| !component.is_empty())
+      .map(vml_measure_to_points)
+      .unwrap_or(Some(DEFAULT_OFFSET_PT))
+  };
+  Some((
+    parse_component(components.next())?,
+    parse_component(components.next())?,
+  ))
 }
 
 fn vml_shapetype_stroke(shape_type: &v::Shapetype) -> Option<&v::Stroke> {
@@ -18403,7 +18314,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<I
       width_pt: polyline
         .stroke_weight
         .as_deref()
-        .and_then(vml_measure_to_points)
+        .and_then(units::vml_stroke_weight_to_points)
         .unwrap_or(VML_DEFAULT_STROKE_WEIGHT_PT),
       spacing_pt: 0.0,
       color: polyline
@@ -18543,7 +18454,7 @@ fn vml_inline_shape(
     .and_then(parse_vml_color)
     .map(|color| BorderStyle {
       width_pt: stroke_weight
-        .and_then(vml_measure_to_points)
+        .and_then(units::vml_stroke_weight_to_points)
         .unwrap_or(VML_DEFAULT_STROKE_WEIGHT_PT),
       spacing_pt: 0.0,
       color,
@@ -20947,7 +20858,7 @@ fn vml_group_stroked_child_touches_leading_edge(
     || model
       .stroke_weight
       .as_deref()
-      .and_then(vml_measure_to_points)
+      .and_then(units::vml_stroke_weight_to_points)
       .is_some_and(|width| width <= f32::EPSILON)
   {
     return false;
@@ -22015,15 +21926,25 @@ impl ThemeFillStyles {
 
 #[derive(Clone, Debug, Default)]
 struct ThemeLineStyles {
-  widths_pt: Vec<f32>,
+  outlines: Vec<a::Outline>,
 }
 
 impl ThemeLineStyles {
+  fn get(&self, index: usize) -> Option<&a::Outline> {
+    if self.outlines.is_empty() || index < 1 {
+      return None;
+    }
+    // DrawingML format-scheme indexes are one-based. LibreOffice saturates
+    // producer indexes beyond the available list to its final style entry.
+    self.outlines.get((index - 1).min(self.outlines.len() - 1))
+  }
+
   fn width_pt(&self, index: usize) -> Option<f32> {
-    index
-      .checked_sub(1)
-      .and_then(|index| self.widths_pt.get(index))
-      .copied()
+    self
+      .get(index)?
+      .width
+      .map(i64::from)
+      .map(units::emu_to_points)
       .filter(|width| *width > 0.0)
   }
 }
@@ -23429,14 +23350,12 @@ fn theme_language_script(language: &str) -> Option<Arc<str>> {
 impl ThemeLineStyles {
   fn from_theme(theme: &a::Theme) -> Self {
     Self {
-      widths_pt: theme
+      outlines: theme
         .theme_elements
         .format_scheme
         .line_style_list
         .outline
-        .iter()
-        .filter_map(|line| line.width.map(|width| units::emu_to_points(width as i64)))
-        .collect(),
+        .clone(),
     }
   }
 }
@@ -28532,6 +28451,23 @@ mod tests {
   use super::*;
 
   #[test]
+  fn vml_inline_shape_uses_markup_emu_default_for_stroke_weight() {
+    let shape = vml_inline_shape(
+      Some("position:absolute;left:0pt;top:0pt;width:10pt;height:10pt"),
+      true,
+      None,
+      None,
+      Some("#003150"),
+      Some("28440"),
+      None,
+    )
+    .expect("VML shape");
+
+    let stroke = shape.stroke.expect("VML border stroke");
+    assert!((stroke.width_pt - 28440.0 / 12700.0).abs() < 0.000_01);
+  }
+
+  #[test]
   fn word_2010_saturation_modulation_matches_drawingml_hsl_examples() {
     // ECMA-376 Part 1 §20.1.2.3.27 gives this exact 20% saturation example.
     assert_eq!(
@@ -29667,6 +29603,67 @@ mod tests {
     )
     .expect("unpainted VML rectangle");
     assert!(vml_rectangle_shape(&unpainted, &ImageCatalog::default()).is_none());
+  }
+
+  #[test]
+  fn vml_single_shadow_retains_offset_color_opacity_and_vector_foreground() {
+    let source = v::Shape::from_bytes(
+      br##"<v:shape xmlns:v="urn:schemas-microsoft-com:vml"
+          style="width:100pt;height:50pt" fillcolor="#00b050">
+        <v:shadow on="t" color="#123456" opacity="32768f" offset="-3pt,4pt"/>
+      </v:shape>"##,
+    )
+    .expect("VML shape");
+    let shape = vml_shape_shape(&source, &ImageCatalog::default(), &[]).expect("painted shape");
+    let Some(common::DrawingEffectSource::Resolved(effects)) = shape.effects else {
+      panic!("normalized VML shadow");
+    };
+    assert_eq!(
+      effects.kind,
+      common::drawingml_image_effects::ImageEffectContainerKind::Sibling
+    );
+    let [
+      common::drawingml_image_effects::ImageEffect::OuterShadow {
+        blur_radius_px,
+        distance_px,
+        direction_degrees,
+        color,
+        ..
+      },
+      common::drawingml_image_effects::ImageEffect::Identity,
+    ] = effects.effects.as_slice()
+    else {
+      panic!("shadow followed by unchanged foreground");
+    };
+    assert_eq!(*blur_radius_px, 0.0);
+    assert!((*distance_px - 5.0 / units::POINTS_PER_CSS_PIXEL).abs() < 0.001);
+    assert!((*direction_degrees - 126.869_896).abs() < 0.001);
+    assert_eq!(
+      [color.color.r, color.color.g, color.color.b],
+      [0x12, 0x34, 0x56]
+    );
+    assert_eq!(color.alpha, 128);
+  }
+
+  #[test]
+  fn vml_shadow_toggle_and_type_guard_single_shadow_normalization() {
+    for xml in [
+      br#"<v:shadow xmlns:v="urn:schemas-microsoft-com:vml" on="f" offset="3pt,3pt"/>"#
+        .as_slice(),
+      br#"<v:shadow xmlns:v="urn:schemas-microsoft-com:vml" offset="3pt,3pt"/>"#.as_slice(),
+      br#"<v:shadow xmlns:v="urn:schemas-microsoft-com:vml" on="t" type="perspective" offset="3pt,3pt"/>"#.as_slice(),
+    ] {
+      let shadow = v::Shadow::from_bytes(xml).expect("VML shadow");
+      assert!(vml_single_shadow_effect(&shadow).is_none());
+    }
+  }
+
+  #[test]
+  fn vml_shadow_offset_defaults_each_omitted_vector_component() {
+    assert_eq!(vml_shadow_offset_points(None), Some((2.0, 2.0)));
+    assert_eq!(vml_shadow_offset_points(Some(",3pt")), Some((2.0, 3.0)));
+    assert_eq!(vml_shadow_offset_points(Some("1pt,")), Some((1.0, 2.0)));
+    assert_eq!(vml_shadow_offset_points(Some("bogus,2pt")), None);
   }
 
   #[test]
@@ -33419,7 +33416,7 @@ mod tests {
     assert!(shape.text_box_auto_fit);
     assert!(shape.text_box_resizes_to_fit);
     assert!(!shape.text_box_word_wrap);
-    assert!((shape.text_inset_left_pt - 7.2).abs() < 0.001);
+    assert!((shape.text_inset_left_pt - (7.2 + 0.75 / 2.0)).abs() < 0.001);
     assert!((shape.stroke.expect("authored outline").width_pt - 0.75).abs() < 0.001);
     let ImagePlacement::Floating(placement) = shape.placement else {
       panic!("autofit shape is not floating");
@@ -33455,6 +33452,127 @@ mod tests {
   }
 
   #[test]
+  fn wps_actual_line_properties_merge_theme_and_direct_fields() {
+    let xml =
+      br##"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm>
+        <a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom><a:noFill/>
+        <a:ln cap="rnd"><a:solidFill><a:srgbClr val="112233"/></a:solidFill>
+          <a:headEnd w="sm"/>
+        </a:ln>
+      </wps:spPr>
+      <wps:style><a:lnRef idx="2"><a:schemeClr val="accent1"/></a:lnRef>
+        <a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef>
+        <a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef>
+        <a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef>
+      </wps:style>
+    </wps:wsp>"##;
+    let shape = wps::WordprocessingShape::from_bytes(xml).expect("typed WPS shape");
+    let themed = a::Outline::from_bytes(
+      br##"<a:ln xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+          w="25400" cap="flat" cmpd="dbl" algn="in">
+        <a:solidFill><a:schemeClr val="phClr"><a:shade val="50000"/></a:schemeClr></a:solidFill>
+        <a:prstDash val="dash"/><a:miter lim="400000"/>
+        <a:headEnd type="triangle" w="lg" len="lg"/>
+        <a:tailEnd type="diamond" w="med" len="sm"/>
+      </a:ln>"##,
+    )
+    .expect("theme line style");
+    let styles = StylesCatalog {
+      theme_colors: ThemeColors {
+        accent1: Some(RgbColor {
+          r: 100,
+          g: 120,
+          b: 140,
+        }),
+        ..Default::default()
+      },
+      theme_lines: ThemeLineStyles {
+        outlines: vec![a::Outline::default(), themed],
+      },
+      ..Default::default()
+    };
+    let actual =
+      wordprocessing_shape_actual_line_stroke(&shape, &styles).expect("actual line stroke");
+
+    assert!((actual.width.0 - 2.0).abs() < 0.001);
+    assert_eq!(
+      [actual.color.r, actual.color.g, actual.color.b],
+      [0x11, 0x22, 0x33]
+    );
+    assert_eq!(actual.cap, Some(common::StrokeCap::Round));
+    assert_eq!(actual.compound, Some(common::StrokeCompound::Double));
+    assert_eq!(actual.alignment, Some(common::StrokeAlignment::Inside));
+    assert_eq!(actual.preset_dash, Some(common::StrokeDashPreset::Dash));
+    assert!(matches!(
+      actual.join,
+      Some(common::StrokeJoin::Miter { .. })
+    ));
+    assert_eq!(
+      actual.head_end,
+      Some(common::StrokeEnd {
+        kind: common::StrokeEndKind::Triangle,
+        width: common::StrokeEndSize::Small,
+        length: common::StrokeEndSize::Large,
+      })
+    );
+    assert_eq!(
+      actual.tail_end,
+      Some(common::StrokeEnd {
+        kind: common::StrokeEndKind::Diamond,
+        width: common::StrokeEndSize::Medium,
+        length: common::StrokeEndSize::Small,
+      })
+    );
+  }
+
+  #[test]
+  fn wps_direct_width_and_no_fill_override_theme_independently() {
+    let themed = a::Outline::from_bytes(
+      br##"<a:ln xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="25400">
+        <a:solidFill><a:schemeClr val="phClr"><a:shade val="50000"/></a:schemeClr></a:solidFill>
+      </a:ln>"##,
+    )
+    .expect("theme line style");
+    let styles = StylesCatalog {
+      theme_colors: ThemeColors {
+        accent1: Some(RgbColor {
+          r: 100,
+          g: 120,
+          b: 140,
+        }),
+        ..Default::default()
+      },
+      theme_lines: ThemeLineStyles {
+        outlines: vec![a::Outline::default(), themed],
+      },
+      ..Default::default()
+    };
+    let shape_xml = |line: &str| {
+      format!(
+        r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:spPr>{line}</wps:spPr><wps:style><a:lnRef idx="2"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef><a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></wps:style></wps:wsp>"#,
+      )
+    };
+
+    let width_only =
+      wps::WordprocessingShape::from_bytes(shape_xml(r#"<a:ln w="38100"/>"#).as_bytes())
+        .expect("width-only direct line");
+    let actual = wordprocessing_shape_actual_line_stroke(&width_only, &styles)
+      .expect("theme paint with direct width");
+    assert!((actual.width.0 - 3.0).abs() < 0.001);
+    assert_eq!(
+      [actual.color.r, actual.color.g, actual.color.b],
+      [71, 86, 101]
+    );
+
+    let no_fill =
+      wps::WordprocessingShape::from_bytes(shape_xml(r#"<a:ln><a:noFill/></a:ln>"#).as_bytes())
+        .expect("direct no-fill line");
+    assert!(wordprocessing_shape_actual_line_stroke(&no_fill, &styles).is_none());
+  }
+
+  #[test]
   fn wps_zero_width_straight_connector_retains_its_stroked_path() {
     let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:cNvCnPr/><wps:spPr><a:xfrm flipV="1"><a:off x="0" y="0"/><a:ext cx="0" cy="1356910"/></a:xfrm><a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom><a:ln><a:tailEnd type="arrow"/></a:ln></wps:spPr><wps:style><a:lnRef idx="2"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef><a:effectRef idx="1"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></wps:style></wps:wsp>"#;
     let wordprocessing_shape =
@@ -33473,7 +33591,16 @@ mod tests {
         ..Default::default()
       },
       theme_lines: ThemeLineStyles {
-        widths_pt: vec![0.75, 2.0],
+        outlines: vec![
+          a::Outline::from_bytes(
+            br#"<a:ln xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>"#,
+          )
+          .expect("fine theme line"),
+          a::Outline::from_bytes(
+            br#"<a:ln xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="25400"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>"#,
+          )
+          .expect("medium theme line"),
+        ],
       },
       theme_effects: ThemeEffectStyles {
         styles: effect_styles.effect_style,
@@ -35464,6 +35591,7 @@ mod tests {
 
   #[test]
   fn symbol_field_without_cached_result_uses_declared_symbol_font_encoding() {
+    let styles = StylesCatalog::default();
     let run = symbol_field_run(
       r#"\SYMBOL 94 \f "Symbol""#,
       TextStyle {
@@ -35472,26 +35600,66 @@ mod tests {
         ..TextStyle::default()
       },
       None,
+      &styles,
     )
     .expect("supported symbol field");
 
     assert_eq!(run.text, "\u{f05e}");
     assert_eq!(run.style.font_family.as_deref(), Some("Symbol"));
+    assert_eq!(run.style.high_ansi_font_family.as_deref(), Some("Symbol"));
+    assert_eq!(run.style.east_asia_font_family.as_deref(), Some("Symbol"));
+    assert_eq!(run.style.complex_font_family.as_deref(), Some("Symbol"));
     assert_eq!(run.style.symbol_font_family.as_deref(), Some("Symbol"));
     assert!(run.style.explicit_symbol_character);
+    assert!(!run.style.wordprocessingml_font_slots);
+    assert_eq!(run.style.font_family_class, None);
     assert_eq!(run.style.font_size_pt, 12.0);
   }
 
   #[test]
   fn symbol_field_unicode_and_size_switches_override_direct_formatting() {
-    let run = symbol_field_run(r"SYMBOL 0x20ac \u \s 18", TextStyle::default(), None)
-      .expect("supported Unicode symbol field");
+    let styles = StylesCatalog::default();
+    let run = symbol_field_run(
+      r"SYMBOL 0x20ac \u \s 18",
+      TextStyle::default(),
+      None,
+      &styles,
+    )
+    .expect("supported Unicode symbol field");
 
     assert_eq!(run.text, "€");
     assert!(!run.style.explicit_symbol_character);
     assert_eq!(run.style.font_size_pt, 18.0);
     assert_eq!(run.style.complex_font_size_pt, Some(18.0));
-    assert!(symbol_field_run(r"SYMBOL 65 \h", TextStyle::default(), None).is_none());
+    assert!(symbol_field_run(r"SYMBOL 65 \h", TextStyle::default(), None, &styles).is_none());
+  }
+
+  #[test]
+  fn symbol_field_ordinary_font_does_not_enable_legacy_symbol_charset() {
+    let styles = StylesCatalog::default();
+    let run = symbol_field_run(
+      r#"SYMBOL 68 \f "Arial""#,
+      TextStyle {
+        font_family: Some(Arc::from("Times New Roman")),
+        high_ansi_font_family: Some(Arc::from("Times New Roman")),
+        symbol_font_family: Some(Arc::from("Inherited Symbol")),
+        explicit_symbol_character: true,
+        wordprocessingml_font_slots: true,
+        ..TextStyle::default()
+      },
+      None,
+      &styles,
+    )
+    .expect("ordinary-font symbol field");
+
+    assert_eq!(run.text, "D");
+    assert_eq!(run.style.font_family.as_deref(), Some("Arial"));
+    assert_eq!(run.style.high_ansi_font_family.as_deref(), Some("Arial"));
+    assert_eq!(run.style.east_asia_font_family.as_deref(), Some("Arial"));
+    assert_eq!(run.style.complex_font_family.as_deref(), Some("Arial"));
+    assert_eq!(run.style.symbol_font_family, None);
+    assert!(!run.style.explicit_symbol_character);
+    assert!(!run.style.wordprocessingml_font_slots);
   }
 
   #[test]
@@ -37211,6 +37379,55 @@ mod tests {
     assert_eq!(
       vertical_270_frame.writing_mode,
       TextBoxWritingMode::BottomToTopLeftToRight
+    );
+  }
+
+  #[test]
+  fn wordprocessing_shape_compatible_line_spacing_is_scoped_to_its_text_body() {
+    for (attribute, expected) in [(" compatLnSpc=\"1\"", true), ("", false)] {
+      let properties = wps::TextBodyProperties::from_bytes(
+        format!(
+          "<wps:bodyPr xmlns:wps=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\"{attribute}/>"
+        )
+        .as_bytes(),
+      )
+      .expect("WPS text body properties");
+      let mut frame =
+        TextBoxFrameContent::new(vec![Block::paragraph(merge_test_paragraph("shape text"))]);
+
+      apply_wordprocessing_shape_textbox_body_properties(&properties, &mut frame);
+
+      let Block::Paragraph(paragraph) = &frame.blocks[0] else {
+        unreachable!();
+      };
+      assert_eq!(
+        paragraph
+          .format
+          .wordprocessing_shape_compatible_line_spacing,
+        expected
+      );
+    }
+
+    let properties = wps::TextBodyProperties::from_bytes(
+      br#"<wps:bodyPr xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" compatLnSpc="0"/>"#,
+    )
+    .expect("explicit-false WPS text body properties");
+    let mut paragraph = merge_test_paragraph("shape text");
+    paragraph
+      .format
+      .wordprocessing_shape_compatible_line_spacing = true;
+    let mut frame = TextBoxFrameContent::new(vec![Block::paragraph(paragraph)]);
+
+    apply_wordprocessing_shape_textbox_body_properties(&properties, &mut frame);
+
+    let Block::Paragraph(paragraph) = &frame.blocks[0] else {
+      unreachable!();
+    };
+    assert!(
+      !paragraph
+        .format
+        .wordprocessing_shape_compatible_line_spacing,
+      "an authored false must clear rather than inherit the text-body switch"
     );
   }
 

@@ -6,12 +6,14 @@ use ooxmlsdk_fonts::{FontRequest, TextScript, ThemeFontKind};
 
 use crate::common::Pt;
 
-/// Typed DrawingML effect source retained across all host lowerers.
+/// Drawing effect source retained across all host lowerers.
 ///
 /// DOCX, PPTX, XLSX, charts, and diagrams use host-specific `spPr` wrapper
 /// types, but the effect payload itself is always the shared DrawingML type.
 /// Keeping this enum in the common model prevents non-Presentation hosts from
-/// silently dropping ordered DAGs before paint.
+/// silently dropping ordered DAGs before paint. Legacy formats which have no
+/// DrawingML source node retain their source-backed, normalized effect graph
+/// in `Resolved` instead of manufacturing a misleading schema object.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum DrawingEffectSource {
   List {
@@ -22,6 +24,7 @@ pub(crate) enum DrawingEffectSource {
     source: Box<a::EffectDag>,
     resolved: Option<super::drawingml_image_effects::ImageEffectContainer>,
   },
+  Resolved(super::drawingml_image_effects::ImageEffectContainer),
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -316,6 +319,8 @@ pub enum PatternMask {
 
 impl PatternFill {
   pub const DRAWINGML_TILE_SIZE_MILLI_POINTS: u16 = 6_000;
+  const DRAWINGML_BITMAP_SAMPLING: PatternBitmapSampling =
+    PatternBitmapSampling::from_lattice(16, 1);
 
   pub const fn drawingml(
     hatch_style: EmfPlusHatchStyle,
@@ -325,7 +330,14 @@ impl PatternFill {
     Self {
       mask: PatternMask::EmfPlusHatch(hatch_style),
       tile_size_milli_points: Self::DRAWINGML_TILE_SIZE_MILLI_POINTS,
-      bitmap_sampling: PatternBitmapSampling::NATIVE_8X8,
+      // Word fixed output preserves the canonical 8×8 EMF+ mask as a
+      // non-interpolated 16×16 image over one 6pt period. This 2× sampling
+      // lattice is visible independently in relorientation.docx, dkvert.docx,
+      // tdf167527_title_letters_cut_from_below.docx, and
+      // dml-shape-fillpattern.docx PDFs: /BBox and /XStep are 16 while the
+      // pattern matrix scales by 0.375pt. Retaining the lattice avoids device
+      // antialiasing differences from vectorized 0.75pt mask cells.
+      bitmap_sampling: Self::DRAWINGML_BITMAP_SAMPLING,
       foreground,
       background,
     }

@@ -715,3 +715,24 @@ pub(crate) fn common_rgb(color: RgbColor, opacity: f32) -> common::Color {
     a: (opacity.clamp(0.0, 1.0) * 255.0).round() as u8,
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::{TextStyle, common_text_style};
+
+  #[test]
+  fn common_text_style_preserves_layout_font_size() {
+    let layout_style = TextStyle {
+      font_size_pt: 11.0,
+      complex_font_size_pt: Some(20.0),
+      ..TextStyle::default()
+    };
+
+    let paint_style = common_text_style(layout_style.clone());
+
+    assert_eq!(layout_style.font_size_pt, 11.0);
+    assert_eq!(layout_style.complex_font_size_pt, Some(20.0));
+    assert_eq!(paint_style.font_size.0, 11.0);
+    assert_eq!(paint_style.complex_font_size.expect("complex size").0, 20.0);
+  }
+}

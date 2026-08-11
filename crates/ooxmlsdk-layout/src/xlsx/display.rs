@@ -1609,7 +1609,7 @@ pub(crate) fn vml_shape_common_stroke(
   let width = shape
     .stroke_weight
     .as_deref()
-    .and_then(parse_vml_length_pt)
+    .and_then(units::vml_stroke_weight_to_points)
     .unwrap_or(0.75);
   let color = vml_common_color(
     shape.stroke_color.as_deref(),
@@ -2047,7 +2047,7 @@ pub(crate) fn vml_shape_drawing_paths(
         stroke_width_pt: shape
           .stroke_weight
           .as_deref()
-          .and_then(crate::docx::vml_measure_to_points)
+          .and_then(units::vml_stroke_weight_to_points)
           .unwrap_or(0.75),
         allow_fill: shape.filled,
         allow_stroke: shape.stroked,
@@ -5034,6 +5034,7 @@ fn finish_xlsx_shape_effects(
     Some(common::DrawingEffectSource::Dag { source, .. }) => {
       common::drawingml_image_effects::from_effect_dag(source, None, &resolver)
     }
+    Some(common::DrawingEffectSource::Resolved(effects)) => effects.clone(),
     None => match theme_effects {
       Some((properties, _)) if properties.effect_list.is_some() => {
         common::drawingml_image_effects::from_effect_list(
@@ -10368,6 +10369,7 @@ mod drawing_page_tests {
       fill_focus_position: Some("25%,20%".into()),
       fill_focus_size: Some("50%,60%".into()),
       stroke_dash_style: Some("dashdot".into()),
+      stroke_weight: Some("28440".into()),
       stroke_end_cap: Some(vml::StrokeEndCapValues::Flat),
       stroke_end_arrow: Some(vml::StrokeArrowValues::Classic),
       stroke_end_arrow_width: Some(vml::StrokeArrowWidthValues::Wide),
@@ -10391,6 +10393,7 @@ mod drawing_page_tests {
     assert_eq!(path.transform.m22, 20.0);
 
     let stroke = vml_shape_common_stroke(&shape).expect("stroke");
+    assert!((stroke.width.0 - 28440.0 / 12700.0).abs() < 0.000_01);
     assert_eq!(stroke.cap, Some(common::StrokeCap::Flat));
     assert_eq!(
       stroke.tail_end,

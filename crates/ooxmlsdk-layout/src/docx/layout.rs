@@ -160,6 +160,9 @@ fn inline_text_height(style: &TextStyle, text_metrics: &mut TextMetrics) -> f32 
 struct WordLineTextExtents {
   ascent_pt: f32,
   descent_pt: f32,
+  minimum_height_pt: f32,
+  has_text: bool,
+  has_intrinsic_leading_above: bool,
 }
 
 impl WordLineTextExtents {
@@ -175,6 +178,18 @@ impl WordLineTextExtents {
     } else {
       text_metrics.line_vertical_metrics(style)
     };
+    self.has_text = true;
+    self.has_intrinsic_leading_above |= metrics.leading_above_pt() > LAYOUT_EPSILON_PT;
+    // Application-generated resource text can carry a line box which is
+    // taller than the selected face's intrinsic ascent/descent. Preserve that
+    // per-portion minimum while combining a mixed line: DirectWrite's default
+    // line-spacing mode and Writer's SwLineLayout::CalcLine both let the
+    // tallest item determine the line height. Keeping it separate from the
+    // natural ascent/descent also leaves baseline ownership to TextFrame's
+    // generated-resource cap.
+    self.minimum_height_pt = self
+      .minimum_height_pt
+      .max(style.line_height_override_pt.unwrap_or_default());
     // ECMA-376 Part 1 §17.3.2.24 positions the run relative to the
     // surrounding unpositioned baseline. IDWriteTextLayout's default line
     // metrics place that baseline at ascent + derived line gap and retain the
@@ -203,7 +218,11 @@ impl WordLineTextExtents {
   }
 
   fn height_pt(self) -> f32 {
-    self.ascent_pt + self.descent_pt
+    (self.ascent_pt + self.descent_pt).max(self.minimum_height_pt)
+  }
+
+  fn uses_typographic_gap_below_baseline(self) -> bool {
+    self.has_text && !self.has_intrinsic_leading_above
   }
 }
 
@@ -694,6 +713,21 @@ fn proportional_auto_text_line_spacing_multiple(
     .format
     .line_height_pt
     .filter(|multiple| multiple.is_finite() && *multiple > 0.0)
+}
+
+fn proportional_auto_baseline_uses_text_line_spacing(
+  paragraph: &crate::docx::Paragraph,
+  multiple: Option<f32>,
+  allows_gap_below: bool,
+) -> bool {
+  allows_gap_below
+    && (paragraph.format.line_height_set
+      || (paragraph
+        .format
+        .wordprocessing_shape_compatible_line_spacing
+        && multiple.is_some_and(|multiple| {
+          multiple > LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE
+        })))
 }
 
 fn paragraph_line_spacing_base_covers_line_height(paragraph: &crate::docx::Paragraph) -> bool {
@@ -3126,6 +3160,7 @@ fn inline_image_contains_reflection(image: &crate::docx::InlineImage) -> bool {
       resolved: Some(effects),
       ..
     } => Some(effects),
+    common::DrawingEffectSource::Resolved(effects) => Some(effects),
     _ => None,
   });
   effects.is_some_and(common::drawingml_image_effects::contains_reflection)
@@ -3194,26 +3229,72 @@ fn drawing_effect_content_bounds_with_markers(
   mut bounds: common::Rect,
 ) -> common::Rect {
   for item in items {
-    let PageItem::Path(path) = item else {
-      continue;
-    };
-    let Some(stroke) = path.stroke.as_ref() else {
-      continue;
-    };
-    let Some(marker_bounds) =
-      common::drawingml_stroke::stroke_end_marker_bounds(path.as_ref(), stroke)
-    else {
-      continue;
-    };
-    let left = bounds.origin.x.0.min(marker_bounds.origin.x.0);
-    let top = bounds.origin.y.0.min(marker_bounds.origin.y.0);
-    let right = (bounds.origin.x.0 + bounds.size.width.0)
-      .max(marker_bounds.origin.x.0 + marker_bounds.size.width.0);
-    let bottom = (bounds.origin.y.0 + bounds.size.height.0)
-      .max(marker_bounds.origin.y.0 + marker_bounds.size.height.0);
-    bounds = common_rect(left, top, right - left, bottom - top);
+    match item {
+      PageItem::Path(path) => {
+        if let Some(marker_bounds) = path.stroke.as_ref().and_then(|stroke| {
+          common::drawingml_stroke::stroke_end_marker_bounds(path.as_ref(), stroke)
+        }) {
+          bounds = union_common_rect(bounds, marker_bounds);
+        }
+      }
+      PageItem::Group(children)
+      | PageItem::IndependentTextFrame(children)
+      | PageItem::FloatingDrawing {
+        items: children, ..
+      } => {
+        bounds = drawing_effect_content_bounds_with_markers(children, bounds);
+      }
+      PageItem::Text(_)
+      | PageItem::Image(_)
+      | PageItem::LegacyFormCheckBox(_)
+      | PageItem::Rect(_)
+      | PageItem::Fill(_)
+      | PageItem::Line(_)
+      | PageItem::Polyline(_) => {}
+    }
   }
   bounds
+}
+
+fn union_common_rect(first: common::Rect, second: common::Rect) -> common::Rect {
+  let left = first.origin.x.0.min(second.origin.x.0);
+  let top = first.origin.y.0.min(second.origin.y.0);
+  let right = (first.origin.x.0 + first.size.width.0).max(second.origin.x.0 + second.size.width.0);
+  let bottom =
+    (first.origin.y.0 + first.size.height.0).max(second.origin.y.0 + second.size.height.0);
+  common_rect(left, top, right - left, bottom - top)
+}
+
+fn wordprocessing_drawing_effect_max_pixels_per_point(
+  backdrop_effects: Option<&common::drawingml_image_effects::ImageEffectContainer>,
+) -> f32 {
+  let Some(backdrop_effects) = backdrop_effects else {
+    // Inner shadow, soft edge, authored blur, and static 3-D modify the
+    // foreground itself. Word's fixed output materializes those complete
+    // surfaces at 200 DPI; shape-effect-preservation.docx supplies independent
+    // inner-shadow and soft-edge counterexamples to the separated shadows.
+    return wordprocessing_drawing_backdrop_pixels_per_point(0.0);
+  };
+  let effective_blur_radius_px =
+    common::drawingml_image_effects::effective_backdrop_blur_radius_px(backdrop_effects);
+
+  wordprocessing_drawing_backdrop_pixels_per_point(effective_blur_radius_px)
+}
+
+fn wordprocessing_drawing_backdrop_pixels_per_point(effective_blur_radius_px: f32) -> f32 {
+  const WORD_EFFECT_BASE_DPI: f32 = 200.0;
+  const DIRECT2D_BACKDROP_BLUR_PRESCALE_STEP_PX: f32 = 4.0;
+
+  // Direct2D's balanced Gaussian/shadow effects pre-scale their working image
+  // at small blur radii. Word exposes that internal boundary in fixed-output
+  // PDFs: sharp shadows use 200 DPI, while 4/5, 6/8, and 9-point shape-shadow
+  // radii use 100, 200/3, and 50 DPI respectively. In DrawingML's 96-DPI
+  // coordinate space those samples are exactly successive four-pixel bands.
+  // Glow uses half its authored radius as the filter radius, matching
+  // LibreOffice GlowPrimitive2D and Word's 8-point-glow 100-DPI counterexample.
+  let prescale_divisor =
+    1.0 + (effective_blur_radius_px / DIRECT2D_BACKDROP_BLUR_PRESCALE_STEP_PX).floor();
+  WORD_EFFECT_BASE_DPI / prescale_divisor.max(1.0) / units::POINTS_PER_INCH
 }
 
 fn finish_docx_drawing_effects(
@@ -3231,6 +3312,7 @@ fn finish_docx_drawing_effects(
       resolved: Some(effects),
       ..
     } => Some(effects),
+    common::DrawingEffectSource::Resolved(effects) => Some(effects),
     _ => None,
   });
   if effects.is_none_or(|effects| effects.effects.is_empty()) && host.static3d.is_none() {
@@ -3239,7 +3321,7 @@ fn finish_docx_drawing_effects(
   if items.len() <= content_start {
     return;
   }
-  let content_bounds =
+  let mut content_bounds =
     drawing_effect_content_bounds_with_markers(&items[content_start..], content_bounds);
   let mut effects =
     effects
@@ -3264,6 +3346,22 @@ fn finish_docx_drawing_effects(
     .then(|| common::drawingml_image_effects::unchanged_foreground_backdrop(&effects))
     .flatten();
   let raster_effects = backdrop_effects.as_ref().unwrap_or(&effects);
+  let mut display_items = items[content_start..]
+    .iter()
+    .cloned()
+    .map(into_common_page_item)
+    .collect::<Vec<_>>();
+  if backdrop_effects.is_some()
+    && let Some(stroke_bounds) =
+      common::drawingml_stroke::display_items_stroke_bounds(&display_items)
+  {
+    // Direct2D shadows and glows consume the alpha of the fully painted
+    // primitive.  Their logical source therefore uses widened stroke bounds;
+    // blur pre-scaling changes only bitmap density, never this page-space
+    // range.  Foreground-modifying effects keep their host geometry boundary,
+    // which is independently exercised by inner-shadow counterexamples.
+    content_bounds = union_common_rect(content_bounds, stroke_bounds);
+  }
   let backdrop_output_bounds = backdrop_effects.as_ref().and_then(|effects| {
     common::drawingml_image_effects::container_output_bounds(
       effects,
@@ -3295,7 +3393,7 @@ fn finish_docx_drawing_effects(
     output_bounds.right_pt.max(content_bounds.size.width.0) + static_padding.right_pt;
   let relative_bottom =
     output_bounds.bottom_pt.max(content_bounds.size.height.0) + static_padding.bottom_pt;
-  let raster_bounds = common::Rect {
+  let raw_raster_bounds = common::Rect {
     origin: common::Point {
       x: common::Pt(content_bounds.origin.x.0 + relative_left),
       y: common::Pt(content_bounds.origin.y.0 + relative_top),
@@ -3305,11 +3403,6 @@ fn finish_docx_drawing_effects(
       height: common::Pt(relative_bottom - relative_top),
     },
   };
-  let mut display_items = items[content_start..]
-    .iter()
-    .cloned()
-    .map(into_common_page_item)
-    .collect::<Vec<_>>();
   let shape_clip = display_items
     .iter()
     .filter_map(|item| match item {
@@ -3330,26 +3423,20 @@ fn finish_docx_drawing_effects(
   }
   let automatic_extrusion_color =
     common::drawingml_3d::automatic_extrusion_color_from_items(&display_items);
-  let raster = if backdrop_effects.is_some()
-    && common::drawingml_image_effects::contains_reflection(raster_effects)
-  {
-    // The Office fixed-output reflection in effect-extent.docx is a separate
-    // 200-DPI XObject, while the unchanged source picture remains at its
-    // native 90 DPI. Keep the shared pixel budget, but do not force a
-    // reflection backdrop through the ordinary 144-DPI effect cap.
-    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
+  let max_pixels_per_point =
+    wordprocessing_drawing_effect_max_pixels_per_point(backdrop_effects.as_ref());
+  let (raster_bounds, pixels_per_point) =
+    common::drawingml_shape_raster::bounded_effect_raster_grid(
+      raw_raster_bounds,
+      max_pixels_per_point,
+    );
+  let raster =
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_pixels_per_point(
       &display_items,
       raster_bounds,
       raster_effects,
-      200.0 / 72.0,
-    )
-  } else {
-    common::drawingml_shape_raster::rasterize_vector_items_for_effects(
-      &display_items,
-      raster_bounds,
-      raster_effects,
-    )
-  };
+      pixels_per_point,
+    );
   let Some(mut raster) = raster else {
     return;
   };
@@ -3380,8 +3467,8 @@ fn finish_docx_drawing_effects(
   common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
     &mut raster.image,
     &scaled_effects,
-    -relative_left * raster.pixels_per_point,
-    -relative_top * raster.pixels_per_point,
+    (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+    (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
     content_bounds.size.width.0 * raster.pixels_per_point,
     content_bounds.size.height.0 * raster.pixels_per_point,
     common::drawingml_image_effects::ImageEffectSourceImages {
@@ -3495,6 +3582,7 @@ fn finish_docx_group_effects(
       resolved: Some(value),
       ..
     } => value.clone(),
+    common::DrawingEffectSource::Resolved(value) => value.clone(),
     _ => return,
   };
   if effects.effects.is_empty() {
@@ -3934,7 +4022,7 @@ fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
     paint_clip: None,
-    style: common_text_style(item.style),
+    style: word_fixed_output_common_text_style(item.style),
     font_id: None,
     color,
     rotation_center: item.rotation_center_pt.map(|(x, y)| common_point(x, y)),
@@ -3952,6 +4040,13 @@ fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
     },
     source: None,
   }
+}
+
+fn word_fixed_output_common_text_style(mut style: TextStyle) -> common::TextStyle<'static> {
+  // Keep the imported half-point size in the Word layout model. Only the
+  // completed text item is realized on Office's integer 600-DPI output grid.
+  crate::docx::quantize_word_fixed_output_text_style(&mut style);
+  common_text_style(style)
 }
 
 fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
@@ -4530,7 +4625,11 @@ impl<'a> RootFrameLayout<'a> {
         .map(|page| page.items.len())
         .collect::<Vec<_>>();
       apply_page_backgrounds(self.document, &mut self.pages);
-      place_floating_images(&mut self.pages, &mut self.frames);
+      place_floating_images(
+        &mut self.pages,
+        &mut self.frames,
+        self.document.compatibility_mode,
+      );
       apply_column_separators(self.document, &mut self.pages, &self.frames);
       apply_headers_and_footers(
         self.document,
@@ -9735,6 +9834,10 @@ fn estimated_paragraph_content_extents(
     text_metrics,
   )
   .map(|heights| heights.following_line_pt);
+  let proportional_auto_baseline_allows_zero_leading_text =
+    !(paragraph.format.justification_set && paragraph.format.justification.is_block());
+  let proportional_auto_text_line_spacing_multiple =
+    proportional_auto_text_line_spacing_multiple(paragraph, flow);
   let text_frame = TextFrame {
     default_line_left: 0.0,
     first_line_left: 0.0,
@@ -9745,11 +9848,14 @@ fn estimated_paragraph_content_extents(
     base_line_height,
     base_content_height: base_line_height,
     proportional_auto_gap_below_pt,
-    proportional_auto_text_line_spacing_multiple: proportional_auto_text_line_spacing_multiple(
-      paragraph, flow,
-    ),
-    proportional_auto_baseline_uses_text_line_spacing: paragraph.format.line_height_set
-      && !(paragraph.format.justification_set && paragraph.format.justification.is_block()),
+    proportional_auto_text_line_spacing_multiple,
+    proportional_auto_baseline_uses_text_line_spacing:
+      proportional_auto_baseline_uses_text_line_spacing(
+        paragraph,
+        proportional_auto_text_line_spacing_multiple,
+        proportional_auto_baseline_allows_zero_leading_text,
+      ),
+    proportional_auto_baseline_allows_zero_leading_text,
     auto_baseline_line_height_cap: None,
     line_height_rule: paragraph.format.line_height_rule,
     grid_auto_following_line_height_pt,
@@ -12908,7 +13014,12 @@ fn apply_headers_and_footers(
     );
 
     extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &adornment.wrap_exclusions);
-    let order = order_floating_page_items(&mut adornment.items, None, false);
+    let order = order_floating_page_items(
+      &mut adornment.items,
+      None,
+      false,
+      document.compatibility_mode,
+    );
     if !order.is_identity() {
       remap_page_item_records(&mut adornment, &order);
       for frame in &mut adornment_frames {
@@ -13112,9 +13223,10 @@ fn wrap_floating_page_item_range(
   (item_start, item_start + 1)
 }
 
-fn place_floating_images(pages: &mut [Page], frames: &mut [LayoutFrame]) {
+fn place_floating_images(pages: &mut [Page], frames: &mut [LayoutFrame], compatibility_mode: u16) {
   for (page_index, page) in pages.iter_mut().enumerate() {
-    let order = order_floating_page_items(&mut page.items, Some(page.setup), false);
+    let order =
+      order_floating_page_items(&mut page.items, Some(page.setup), false, compatibility_mode);
     if order.is_identity() {
       continue;
     }
@@ -13212,6 +13324,7 @@ fn order_floating_page_items(
   items: &mut Vec<PageItem>,
   page_setup: Option<PageSetup>,
   inside_floating_drawing: bool,
+  compatibility_mode: u16,
 ) -> PageItemOrder {
   for item in items.iter_mut() {
     match item {
@@ -13219,10 +13332,10 @@ fn order_floating_page_items(
       // an effect backdrop nested under a FloatingDrawing remains an internal
       // layer and must not be hoisted as an independently floating image.
       PageItem::Group(items) | PageItem::IndependentTextFrame(items) => {
-        let _ = order_floating_page_items(items, None, inside_floating_drawing);
+        let _ = order_floating_page_items(items, None, inside_floating_drawing, compatibility_mode);
       }
       PageItem::FloatingDrawing { items, .. } => {
-        let _ = order_floating_page_items(items, None, true);
+        let _ = order_floating_page_items(items, None, true, compatibility_mode);
       }
       PageItem::Text(_)
       | PageItem::Image(_)
@@ -13282,8 +13395,8 @@ fn order_floating_page_items(
     };
   }
 
-  behind.sort_by_key(|(order, _, _)| floating_paint_order_key(*order));
-  foreground.sort_by_key(|(order, _, _)| floating_paint_order_key(*order));
+  behind.sort_by_key(|(order, _, _)| floating_paint_order_key(*order, compatibility_mode));
+  foreground.sort_by_key(|(order, _, _)| floating_paint_order_key(*order, compatibility_mode));
   let mut ordered = Vec::with_capacity(body.len() + behind.len() + foreground.len());
   ordered.extend(body.drain(..background_count));
   ordered.extend(
@@ -13308,15 +13421,19 @@ fn order_floating_page_items(
   }
 }
 
-fn floating_paint_order_key(order: FloatingPaintOrder) -> (u8, i64) {
+fn floating_paint_order_key(order: FloatingPaintOrder, compatibility_mode: u16) -> (u8, i64) {
   match order {
     FloatingPaintOrder::DrawingMlRelativeHeight(value) => {
-      // GraphicImport.cxx normalizes 0, 1, and values above 0x1dff_ffff
-      // to Word's maximum relativeHeight. Equal values retain document
-      // order, so the later object is painted on top.
-      const MAX_DRAWINGML_RELATIVE_HEIGHT: u32 = 0x1dff_ffff;
-      let value = if !(2..=MAX_DRAWINGML_RELATIVE_HEIGHT).contains(&value) {
-        MAX_DRAWINGML_RELATIVE_HEIGHT
+      // ECMA-376 Part 1 §20.4.2.3 orders modern DrawingML anchors by their
+      // unsigned relativeHeight value. Word 2010 and older compatibility
+      // modes retain the observed 0/1/out-of-range sentinel behavior frozen
+      // by the tdf159158 legacy corpus. Mode 15 must keep raw zero distinct:
+      // zOrder_zIndexWins combines it with 0x0f00_0000 and a VML z-index.
+      const LEGACY_MAX_DRAWINGML_RELATIVE_HEIGHT: u32 = 0x1dff_ffff;
+      let value = if compatibility_mode < 15
+        && !(2..=LEGACY_MAX_DRAWINGML_RELATIVE_HEIGHT).contains(&value)
+      {
+        LEGACY_MAX_DRAWINGML_RELATIVE_HEIGHT
       } else {
         value
       };
@@ -22280,16 +22397,19 @@ fn layout_shape_text_box(
     }
   };
   // LibreOffice's Sdr text decomposition uses the actual Outliner text
-  // height for center/bottom anchoring, including a negative translation
-  // when the text is taller than its frame. SDRATTR_TEXT_CLIPVERTOVERFLOW
-  // defaults to false; DrawingML bodyPr opts into clipping with
-  // vertOverflow="clip" or "ellipsis".
+  // height for center/bottom anchoring. Word fixed output differs for a
+  // centered WPS text body which is taller than its text rectangle: it starts
+  // the overflowing block at the top instead of translating it upward by half
+  // the overflow (tdf113258, tdf113258_noBeforeAutospacing, rot180-flipv).
+  // Keep the non-clipping bottom-anchor behavior distinct: Writer applies the
+  // full negative translation there, while DrawingML bodyPr opts into
+  // clipping with vertOverflow="clip" or "ellipsis".
   let free_vertical_space = content_bottom - content_top - content_height;
-  let vertical_adjustment = if shape.text_box_clip_vertical_overflow && free_vertical_space < 0.0 {
-    0.0
-  } else {
-    free_vertical_space
-  };
+  let vertical_adjustment = shape_text_box_vertical_adjustment(
+    shape.text_vertical_alignment,
+    shape.text_box_clip_vertical_overflow,
+    free_vertical_space,
+  );
   let text_y = match shape.text_vertical_alignment {
     TextBoxVerticalAlignment::Top => content_top,
     TextBoxVerticalAlignment::Center => content_top + vertical_adjustment / 2.0,
@@ -22441,6 +22561,20 @@ fn layout_shape_text_box(
   attach_wordprocessing_text_effect_host(&mut items, effect_host);
   detach_nested_inline_baseline_participants(&mut items);
   current.items.extend(items);
+}
+
+fn shape_text_box_vertical_adjustment(
+  alignment: TextBoxVerticalAlignment,
+  clip_vertical_overflow: bool,
+  free_vertical_space: f32,
+) -> f32 {
+  if free_vertical_space < 0.0
+    && (clip_vertical_overflow || alignment == TextBoxVerticalAlignment::Center)
+  {
+    0.0
+  } else {
+    free_vertical_space
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -23474,11 +23608,15 @@ fn inline_shape_common_stroke(
     .as_deref()
     .cloned()
     .unwrap_or_else(|| common_stroke_from_border(border, 1.0));
-  stroke.pattern = shape.stroke_pattern;
+  if let Some(pattern) = shape.stroke_pattern {
+    stroke.pattern = Some(pattern);
+  }
   if let (Some(gradient), Some(transform)) = (&mut stroke.gradient, gradient_transform) {
     resolve_inline_shape_gradient_transform(gradient, transform);
   }
-  if let Some(outline) = outline {
+  if shape.stroke_override.is_none()
+    && let Some(outline) = outline
+  {
     common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
   }
   stroke
@@ -24924,6 +25062,7 @@ struct TextFrame {
   proportional_auto_gap_below_pt: f32,
   proportional_auto_text_line_spacing_multiple: Option<f32>,
   proportional_auto_baseline_uses_text_line_spacing: bool,
+  proportional_auto_baseline_allows_zero_leading_text: bool,
   auto_baseline_line_height_cap: Option<f32>,
   line_height_rule: LineHeightRule,
   grid_auto_following_line_height_pt: Option<f32>,
@@ -24983,8 +25122,14 @@ impl TextFrame {
       });
     let proportional_auto_text_line_spacing_multiple =
       proportional_auto_text_line_spacing_multiple(paragraph, flow);
-    let proportional_auto_baseline_uses_text_line_spacing = paragraph.format.line_height_set
-      && !(paragraph.format.justification_set && paragraph.format.justification.is_block());
+    let proportional_auto_baseline_allows_zero_leading_text =
+      !(paragraph.format.justification_set && paragraph.format.justification.is_block());
+    let proportional_auto_baseline_uses_text_line_spacing =
+      proportional_auto_baseline_uses_text_line_spacing(
+        paragraph,
+        proportional_auto_text_line_spacing_multiple,
+        proportional_auto_baseline_allows_zero_leading_text,
+      );
     let translucent_glyph_path_baseline_cap =
       (matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
         && paragraph_uses_only_translucent_glyph_paths(paragraph))
@@ -25005,6 +25150,7 @@ impl TextFrame {
       proportional_auto_gap_below_pt,
       proportional_auto_text_line_spacing_multiple,
       proportional_auto_baseline_uses_text_line_spacing,
+      proportional_auto_baseline_allows_zero_leading_text,
       // Writer's LINE_SPACING_AS_GAP_BELOW path places an explicit
       // proportional auto-line increment after the text line, as Word does;
       // it does not split that increment above and below the baseline.
@@ -25043,8 +25189,36 @@ impl TextFrame {
   }
 
   fn text_baseline_line_height(self, line_height: f32) -> f32 {
-    let proportional_cap = self
-      .proportional_auto_baseline_uses_text_line_spacing
+    self.text_baseline_line_height_with_proportional_gap_below(
+      line_height,
+      self.proportional_auto_baseline_uses_text_line_spacing,
+    )
+  }
+
+  fn text_baseline_line_height_for_text(
+    self,
+    line_height: f32,
+    line_text_extents: WordLineTextExtents,
+  ) -> f32 {
+    // A USE_TYPO_METRICS face such as Aptos can expose no intrinsic leading
+    // above its natural text box. For inherited proportional auto spacing,
+    // the remaining height is therefore paragraph line-spacing, which Word
+    // owns below the line. Legacy faces such as Calibri carry intrinsic
+    // leading above the baseline and deliberately retain the centered box.
+    let zero_leading_text_uses_gap_below = self.proportional_auto_baseline_allows_zero_leading_text
+      && line_text_extents.uses_typographic_gap_below_baseline();
+    self.text_baseline_line_height_with_proportional_gap_below(
+      line_height,
+      self.proportional_auto_baseline_uses_text_line_spacing || zero_leading_text_uses_gap_below,
+    )
+  }
+
+  fn text_baseline_line_height_with_proportional_gap_below(
+    self,
+    line_height: f32,
+    uses_gap_below: bool,
+  ) -> f32 {
+    let proportional_cap = uses_gap_below
       .then(|| {
         self
           .proportional_auto_text_line_spacing_multiple
@@ -25213,6 +25387,7 @@ struct TextFrameFollow {
   start: InlineCursor,
   page_index: usize,
   y_pt: f32,
+  item_start: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -25269,12 +25444,30 @@ impl TextFrameState {
     self.smart_justify_terminal_overhang_pt = 0.0;
   }
 
-  fn note_page_follow(&mut self, page_index: usize, y_pt: f32) {
+  fn note_page_follow(&mut self, page_index: usize, y_pt: f32, item_start: usize) {
     self.page_follows.push(TextFrameFollow {
       start: self.current_line_start,
       page_index,
       y_pt,
+      item_start,
     });
+  }
+
+  fn current_page_item_start(
+    &self,
+    initial_item_start: usize,
+    initial_page_index: usize,
+    current_page_index: usize,
+  ) -> usize {
+    if current_page_index == initial_page_index {
+      return initial_item_start;
+    }
+    self
+      .page_follows
+      .iter()
+      .rev()
+      .find(|follow| follow.page_index == current_page_index)
+      .map_or(initial_item_start, |follow| follow.item_start)
   }
 
   fn finish_paragraph(&mut self, y_pt: f32, height_pt: f32, emitted: bool) {
@@ -26067,7 +26260,9 @@ impl<'a> TextFrameLayout<'a> {
       next_frame = TextFrame::new(self.paragraph, next_flow, advance.text_metrics);
       *line_height = next_frame.base_line_height;
       advance.state.line_content_height = next_frame.base_content_height;
-      advance.state.note_page_follow(advance.pages.len(), next_y);
+      advance
+        .state
+        .note_page_follow(advance.pages.len(), next_y, advance.current.items.len());
       reset_wrap_exclusions_for_y(advance.current, next_y, advance.wrap_exclusions);
     }
     next_y = dodge_text_wrap_exclusions(
@@ -26135,7 +26330,9 @@ impl<'a> TextFrameLayout<'a> {
     }
     let (next_flow, y) = advance_text_frame_flow(advance.flow, advance.current, advance.pages);
     let next_frame = TextFrame::new(self.paragraph, next_flow, advance.text_metrics);
-    advance.state.note_page_follow(advance.pages.len(), y);
+    advance
+      .state
+      .note_page_follow(advance.pages.len(), y, advance.current.items.len());
     reset_wrap_exclusions_for_y(advance.current, y, advance.wrap_exclusions);
     let y = dodge_text_wrap_exclusions(
       y,
@@ -26764,7 +26961,7 @@ impl<'a> TextFrameLayout<'a> {
                   {
                     (flow, y) = advance_section_flow(flow, current, pages);
                     text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
-                    text_state.note_page_follow(pages.len(), y);
+                    text_state.note_page_follow(pages.len(), y, current.items.len());
                     reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
                     default_line_right = text_frame.default_line_right;
                     paragraph_left = text_frame.paragraph_left;
@@ -27253,7 +27450,8 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                  line_height_pt: text_frame
+                    .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
                 },
                 &mut chunk,
                 &run.style,
@@ -27263,7 +27461,8 @@ impl<'a> TextFrameLayout<'a> {
                 &mut current.items,
                 start_item_index,
                 y,
-                text_frame.text_baseline_line_height(line_height),
+                text_frame
+                  .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
               );
               apply_pending_aligned_tab(
                 current,
@@ -27323,7 +27522,8 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                  line_height_pt: text_frame
+                    .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
                 },
                 &mut chunk,
                 &run.style,
@@ -27470,7 +27670,8 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                  line_height_pt: text_frame
+                    .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
                 },
                 &mut chunk,
                 &run.style,
@@ -27737,7 +27938,10 @@ impl<'a> TextFrameLayout<'a> {
                   TextPlacement {
                     x_pt: chunk_x,
                     y_pt: y,
-                    line_height_pt: text_frame.text_baseline_line_height(line_height),
+                    line_height_pt: text_frame.text_baseline_line_height_for_text(
+                      line_height,
+                      text_state.line_text_extents,
+                    ),
                   },
                   &mut chunk,
                   &run.style,
@@ -27792,7 +27996,8 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                  line_height_pt: text_frame
+                    .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
                 },
                 &mut chunk,
                 &run.style,
@@ -27885,7 +28090,8 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                  line_height_pt: text_frame
+                    .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
                 },
                 &mut chunk,
                 &run.style,
@@ -27990,7 +28196,10 @@ impl<'a> TextFrameLayout<'a> {
                   TextPlacement {
                     x_pt: chunk_x,
                     y_pt: y,
-                    line_height_pt: text_frame.text_baseline_line_height(line_height),
+                    line_height_pt: text_frame.text_baseline_line_height_for_text(
+                      line_height,
+                      text_state.line_text_extents,
+                    ),
                   },
                   &mut chunk,
                   &run.style,
@@ -28056,7 +28265,10 @@ impl<'a> TextFrameLayout<'a> {
                         TextPlacement {
                           x_pt: chunk_x,
                           y_pt: y,
-                          line_height_pt: text_frame.text_baseline_line_height(line_height),
+                          line_height_pt: text_frame.text_baseline_line_height_for_text(
+                            line_height,
+                            text_state.line_text_extents,
+                          ),
                         },
                         &mut chunk,
                         &run.style,
@@ -28188,7 +28400,10 @@ impl<'a> TextFrameLayout<'a> {
                     TextPlacement {
                       x_pt: chunk_x,
                       y_pt: y,
-                      line_height_pt: text_frame.text_baseline_line_height(line_height),
+                      line_height_pt: text_frame.text_baseline_line_height_for_text(
+                        line_height,
+                        text_state.line_text_extents,
+                      ),
                     },
                     &mut chunk,
                     &run.style,
@@ -28291,7 +28506,8 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                  line_height_pt: text_frame
+                    .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
                 },
                 &mut chunk,
                 &run.style,
@@ -28357,7 +28573,8 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                  line_height_pt: text_frame
+                    .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
                 },
                 &mut chunk,
                 &run.style,
@@ -28371,7 +28588,8 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: chunk_x,
                   y_pt: y,
-                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                  line_height_pt: text_frame
+                    .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
                 },
                 &mut chunk,
                 &run.style,
@@ -28385,7 +28603,8 @@ impl<'a> TextFrameLayout<'a> {
             TextPlacement {
               x_pt: chunk_x,
               y_pt: y,
-              line_height_pt: text_frame.text_baseline_line_height(line_height),
+              line_height_pt: text_frame
+                .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
             },
             &mut chunk,
             &run.style,
@@ -28472,7 +28691,8 @@ impl<'a> TextFrameLayout<'a> {
                 TextPlacement {
                   x_pt: x,
                   y_pt: y,
-                  line_height_pt: text_frame.text_baseline_line_height(line_height),
+                  line_height_pt: text_frame
+                    .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
                 },
                 &mut hyphen,
                 &boundary.left.style,
@@ -28707,7 +28927,7 @@ impl<'a> TextFrameLayout<'a> {
                   {
                     (flow, y) = advance_section_flow(flow, current, pages);
                     text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
-                    text_state.note_page_follow(pages.len(), y);
+                    text_state.note_page_follow(pages.len(), y, current.items.len());
                     reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
                     default_line_right = text_frame.default_line_right;
                     paragraph_left = text_frame.paragraph_left;
@@ -29847,7 +30067,7 @@ impl<'a> TextFrameLayout<'a> {
                     {
                       (flow, y) = advance_section_flow(flow, current, pages);
                       text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
-                      text_state.note_page_follow(pages.len(), y);
+                      text_state.note_page_follow(pages.len(), y, current.items.len());
                       reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
                       default_line_right = text_frame.default_line_right;
                       paragraph_left = text_frame.paragraph_left;
@@ -29889,7 +30109,7 @@ impl<'a> TextFrameLayout<'a> {
                     {
                       (flow, y) = advance_section_flow(flow, current, pages);
                       text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
-                      text_state.note_page_follow(pages.len(), y);
+                      text_state.note_page_follow(pages.len(), y, current.items.len());
                       reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
                       default_line_right = text_frame.default_line_right;
                       paragraph_left = text_frame.paragraph_left;
@@ -30002,7 +30222,7 @@ impl<'a> TextFrameLayout<'a> {
                       {
                         (flow, y) = advance_section_flow(flow, current, pages);
                         text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
-                        text_state.note_page_follow(pages.len(), y);
+                        text_state.note_page_follow(pages.len(), y, current.items.len());
                         reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
                         default_line_right = text_frame.default_line_right;
                         paragraph_left = text_frame.paragraph_left;
@@ -30225,7 +30445,7 @@ impl<'a> TextFrameLayout<'a> {
               (flow, y) = advance_text_frame_flow(flow, current, pages);
               text_frame = TextFrame::new(paragraph, flow, text_metrics);
               line_height = text_frame.base_line_height;
-              text_state.note_page_follow(pages.len(), y);
+              text_state.note_page_follow(pages.len(), y, current.items.len());
             }
             reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
             y = dodge_text_wrap_exclusions(
@@ -30352,7 +30572,7 @@ impl<'a> TextFrameLayout<'a> {
           &mut current.items,
           line_item_start_index,
           y,
-          text_frame.text_baseline_line_height(line_height),
+          text_frame.text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
         );
       }
       if paragraph.format.bidi {
@@ -30646,14 +30866,16 @@ impl<'a> TextFrameLayout<'a> {
       }
     }
 
-    if start_item_index <= current.items.len() {
+    let alignment_start_item_index =
+      text_state.current_page_item_start(start_item_index, start_pages_len, pages.len());
+    if alignment_start_item_index <= current.items.len() {
       trim_word_compatible_trailing_blanks(
-        &mut current.items[start_item_index..],
+        &mut current.items[alignment_start_item_index..],
         paragraph,
         text_metrics,
       );
       align_paragraph_items(
-        &mut current.items[start_item_index..],
+        &mut current.items[alignment_start_item_index..],
         effective_paragraph_alignment(paragraph),
         text_metrics,
         default_line_right,
@@ -32353,6 +32575,40 @@ fn align_paragraph_items(
     }
   }
 
+  if line_ys.is_empty()
+    && items.iter().all(|item| {
+      matches!(
+        item,
+        PageItem::Rect(_)
+          | PageItem::Fill(_)
+          | PageItem::Line(_)
+          | PageItem::Path(_)
+          | PageItem::Polyline(_)
+      )
+    })
+  {
+    // A WPS shape is an as-character fly portion, but its vector paint is
+    // lowered to Path/Rect items before paragraph adjustment. Writer's
+    // SwTextAdjuster::CalcFlyAdjust() moves that fly portion with the line's
+    // left/right margin glue. Preserve the same line ownership when no text
+    // or image item remains to provide an alignment y-coordinate.
+    if let Some((min_x, _, max_x, _)) = page_items_bounds(items, text_metrics) {
+      let available = line_right - min_x;
+      let line_width = max_x - min_x;
+      let offset = match alignment {
+        ParagraphAlignment::Center => (available - line_width).max(0.0) / 2.0,
+        ParagraphAlignment::Right => (available - line_width).max(0.0),
+        ParagraphAlignment::Left | ParagraphAlignment::Justify => 0.0,
+      };
+      if offset > 0.0 {
+        for item in items {
+          shift_item_x(item, offset);
+        }
+      }
+    }
+    return;
+  }
+
   for y in line_ys {
     if items.iter().any(|item| {
       item_locks_paragraph_alignment(item)
@@ -33687,10 +33943,27 @@ fn shift_item_x(item: &mut PageItem, offset: f32) {
       translate_image_clip_path(image, offset, 0.0);
     }
     PageItem::Rect(rect) => rect.x_pt += offset,
-    PageItem::Fill(_) => {}
-    PageItem::Line(_) => {}
-    PageItem::Path(_) => {}
-    PageItem::Polyline(_) => {}
+    PageItem::Fill(fill) => fill.x_pt += offset,
+    PageItem::Line(line) => {
+      line.x1_pt += offset;
+      line.x2_pt += offset;
+    }
+    PageItem::Path(path) => {
+      path.bounds.origin.x.0 += offset;
+      for point in &mut path.points {
+        point.x.0 += offset;
+      }
+      path.commands = common::drawingml_geometry::transform_commands(
+        std::mem::take(&mut path.commands),
+        Affine::translate((f64::from(offset), 0.0)),
+      );
+    }
+    PageItem::Polyline(polyline) => {
+      polyline.x_pt += offset;
+      for point in &mut polyline.points {
+        point.0 += offset;
+      }
+    }
   }
 }
 
@@ -34586,6 +34859,22 @@ mod tests {
     ParagraphFormat, TableBordersModel, TextRun,
   };
   use ooxmlsdk::schemas::schemas_microsoft_com_vml as v;
+
+  #[test]
+  fn word_fixed_output_font_grid_is_materialized_after_layout() {
+    let layout_style = TextStyle {
+      font_size_pt: 11.0,
+      complex_font_size_pt: Some(20.0),
+      ..TextStyle::default()
+    };
+
+    let paint_style = word_fixed_output_common_text_style(layout_style.clone());
+
+    assert_eq!(layout_style.font_size_pt, 11.0);
+    assert_eq!(layout_style.complex_font_size_pt, Some(20.0));
+    assert!((paint_style.font_size.0 - 11.04).abs() < 0.0001);
+    assert!((paint_style.complex_font_size.expect("complex paint size").0 - 20.04).abs() < 0.0001);
+  }
 
   #[test]
   fn wordprocessing_overflow_punctuation_fit_honors_compatibility_story_and_script_language() {
@@ -35560,6 +35849,38 @@ mod tests {
   }
 
   #[test]
+  fn word_drawing_backdrop_density_tracks_direct2d_prescale_bands() {
+    let samples = [
+      // Sharp outer shadows remain at Word's 200-DPI base surface.
+      (0.0, 200.0),
+      // ptab/draw-shape-inline-effect and the 5-point picture shadow.
+      (50_800.0 / 9_525.0, 100.0),
+      (63_500.0 / 9_525.0, 100.0),
+      // AlphaMod's 6-point and WPC_Shadow's 8-point shadows.
+      (76_200.0 / 9_525.0, 200.0 / 3.0),
+      (101_600.0 / 9_525.0, 200.0 / 3.0),
+      // shape-effect-preservation's 9-point shadow.
+      (114_300.0 / 9_525.0, 50.0),
+    ];
+    for (radius_px, expected_dpi) in samples {
+      let actual = wordprocessing_drawing_backdrop_pixels_per_point(radius_px);
+      assert!(
+        (actual - expected_dpi / units::POINTS_PER_INCH).abs() < 0.0001,
+        "radius={radius_px}, actual_dpi={}",
+        actual * units::POINTS_PER_INCH
+      );
+    }
+
+    // A foreground-modifying effect has no separated backdrop and therefore
+    // keeps the 200-DPI surface rather than entering the blur prescaler.
+    assert!(
+      (wordprocessing_drawing_effect_max_pixels_per_point(None) - 200.0 / units::POINTS_PER_INCH)
+        .abs()
+        < f32::EPSILON
+    );
+  }
+
+  #[test]
   fn word_text_effect_target_keeps_exact_origin_and_truncates_pixel_extent() {
     let target = wordprocessing_effect_bitmap_target(
       common::drawingml_image_effects::EffectOutputBounds {
@@ -36405,6 +36726,54 @@ mod tests {
       panic!("expected clip move");
     };
     assert_eq!((point.x.0, point.y.0), (25.0, 20.0));
+  }
+
+  #[test]
+  fn shape_only_paragraph_alignment_moves_the_complete_vector_portion() {
+    fn shape_path() -> PageItem {
+      PageItem::path(common::PathItem {
+        bounds: common_rect(10.0, 20.0, 30.0, 40.0),
+        points: Vec::new(),
+        commands: vec![
+          common::PathCommand::MoveTo(common_point(10.0, 20.0)),
+          common::PathCommand::LineTo(common_point(40.0, 20.0)),
+          common::PathCommand::Close,
+        ],
+        closed: true,
+        fill: common::Fill::None,
+        stroke: None,
+      })
+    }
+
+    let mut centered = vec![shape_path()];
+    let mut text_metrics = TextMetrics::new();
+    align_paragraph_items(
+      &mut centered,
+      ParagraphAlignment::Center,
+      &mut text_metrics,
+      100.0,
+    );
+
+    let PageItem::Path(centered) = &centered[0] else {
+      panic!("expected vector shape");
+    };
+    assert!((centered.bounds.origin.x.0 - 40.0).abs() < 0.001);
+    let common::PathCommand::MoveTo(point) = centered.commands[0] else {
+      panic!("expected translated path origin");
+    };
+    assert!((point.x.0 - 40.0).abs() < 0.001);
+
+    let mut left = vec![shape_path()];
+    align_paragraph_items(
+      &mut left,
+      ParagraphAlignment::Left,
+      &mut text_metrics,
+      100.0,
+    );
+    let PageItem::Path(left) = &left[0] else {
+      panic!("expected vector shape");
+    };
+    assert!((left.bounds.origin.x.0 - 10.0).abs() < 0.001);
   }
 
   #[test]
@@ -38367,9 +38736,196 @@ mod tests {
       &tall_run.text,
       &mut text_metrics,
     );
-    // Style inheritance changes where Word places the first-line baseline,
-    // not whether the inherited line-height multiple applies to the line box.
+    // Inheritance does not change the line-box multiple. A zero-leading
+    // typographic face owns the proportional excess below the text, while a
+    // legacy face with intrinsic leading keeps its centered baseline box.
     assert!((inherited_height - tall_natural_height * 1.5).abs() < 0.001);
+    let zero_leading_extents = WordLineTextExtents {
+      has_text: true,
+      has_intrinsic_leading_above: false,
+      ..inherited_line_text_extents
+    };
+    assert!(
+      (inherited_frame.text_baseline_line_height_for_text(inherited_height, zero_leading_extents)
+        - tall_natural_height)
+        .abs()
+        < 0.001
+    );
+    let legacy_leading_extents = WordLineTextExtents {
+      has_intrinsic_leading_above: true,
+      ..zero_leading_extents
+    };
+    assert_eq!(
+      inherited_frame.text_baseline_line_height_for_text(inherited_height, legacy_leading_extents),
+      inherited_height
+    );
+
+    let mut compatible_shape_text = inherited.clone();
+    compatible_shape_text
+      .format
+      .wordprocessing_shape_compatible_line_spacing = true;
+    let compatible_shape_frame = TextFrame::new(&compatible_shape_text, flow, &mut text_metrics);
+    assert!(
+      (compatible_shape_frame
+        .text_baseline_line_height_for_text(inherited_height, legacy_leading_extents)
+        - tall_natural_height)
+        .abs()
+        < 0.001,
+      "compatLnSpc owns the inherited 150% excess below legacy-font text"
+    );
+
+    compatible_shape_text.format.line_height_pt =
+      Some(LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE);
+    let compact_shape_frame = TextFrame::new(&compatible_shape_text, flow, &mut text_metrics);
+    assert_eq!(
+      compact_shape_frame.text_baseline_line_height_for_text(
+        compact_shape_frame.base_line_height,
+        legacy_leading_extents,
+      ),
+      compact_shape_frame.base_line_height,
+      "compatLnSpc does not move Word's ordinary 115% textbox baseline"
+    );
+
+    let mut blocked = inherited.clone();
+    blocked.format.wordprocessing_shape_compatible_line_spacing = true;
+    blocked.format.justification_set = true;
+    blocked.format.justification.adjust = crate::docx::ParagraphAdjust::Block;
+    let blocked_frame = TextFrame::new(&blocked, flow, &mut text_metrics);
+    assert_eq!(
+      blocked_frame.text_baseline_line_height_for_text(inherited_height, zero_leading_extents),
+      inherited_height
+    );
+  }
+
+  #[test]
+  fn generated_resource_minimum_height_survives_a_mixed_text_line() {
+    let base_style = TextStyle {
+      font_size_pt: 12.0,
+      ..Default::default()
+    };
+    let resource_minimum =
+      base_style.font_size_pt * crate::docx::WORD_ZH_STYLE_REF_ERROR_LINE_HEIGHT_PER_FONT_SIZE;
+    let resource_style = TextStyle {
+      line_height_override_pt: Some(resource_minimum),
+      ..base_style.clone()
+    };
+    let run = |text: &str, style: TextStyle| {
+      InlineItem::Text(TextRun {
+        text: text.into(),
+        style,
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let paragraph = Paragraph {
+      inlines: vec![
+        run("ordinary prefix", base_style.clone()),
+        run("错误!", resource_style.clone()),
+      ],
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: base_style.clone(),
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat::default()),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let flow = flow_from_block_area(BlockArea {
+      setup: PageSetup::default(),
+      section_index: 0,
+      section_page_index: 0,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: 72.0,
+      content_left_pt: 72.0,
+      content_bottom: 720.0,
+      body_content_bottom_pt: 720.0,
+      content_width: 468.0,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
+      compatibility_mode: 15,
+      justify_lines_with_shrinking: false,
+      do_not_expand_shift_return: false,
+      repeating_slots: RepeatingSlotState::default(),
+    });
+    let mut text_metrics = TextMetrics::new();
+    let frame = TextFrame::new(&paragraph, flow, &mut text_metrics);
+    let natural_height = inline_text_height(&base_style, &mut text_metrics);
+    assert!((frame.base_line_height - natural_height).abs() < 0.001);
+
+    let mut extents = WordLineTextExtents::default();
+    let ordinary_height = include_text_height(
+      frame.base_line_height,
+      &paragraph,
+      flow,
+      frame,
+      &mut extents,
+      &base_style,
+      "ordinary prefix",
+      &mut text_metrics,
+    );
+    let mixed_height = include_text_height(
+      ordinary_height,
+      &paragraph,
+      flow,
+      frame,
+      &mut extents,
+      &resource_style,
+      "错误!",
+      &mut text_metrics,
+    );
+    assert!((mixed_height - resource_minimum).abs() < 0.001);
+    assert!(
+      (frame.text_baseline_line_height_for_text(mixed_height, extents) - natural_height).abs()
+        < 0.001,
+      "the resource minimum advances flow without moving the natural first-line baseline"
+    );
+
+    let mut plain_extents = WordLineTextExtents::default();
+    let plain_height = include_text_height(
+      frame.base_line_height,
+      &paragraph,
+      flow,
+      frame,
+      &mut plain_extents,
+      &base_style,
+      "普通文本",
+      &mut text_metrics,
+    );
+    assert!(
+      (plain_height - natural_height).abs() < 0.001,
+      "a same-size run without an application resource minimum stays natural"
+    );
+
+    let mut exact_paragraph = paragraph.clone();
+    exact_paragraph.format.line_height_rule = LineHeightRule::Exact;
+    exact_paragraph.format.line_height_pt = Some(12.0);
+    let exact_frame = TextFrame::new(&exact_paragraph, flow, &mut text_metrics);
+    let mut exact_extents = WordLineTextExtents::default();
+    let exact_height = include_text_height(
+      exact_frame.base_line_height,
+      &exact_paragraph,
+      flow,
+      exact_frame,
+      &mut exact_extents,
+      &resource_style,
+      "错误!",
+      &mut text_metrics,
+    );
+    assert_eq!(exact_height, exact_frame.base_line_height);
   }
 
   #[test]
@@ -38516,6 +39072,7 @@ mod tests {
       proportional_auto_gap_below_pt: 0.0,
       proportional_auto_text_line_spacing_multiple: None,
       proportional_auto_baseline_uses_text_line_spacing: false,
+      proportional_auto_baseline_allows_zero_leading_text: false,
       auto_baseline_line_height_cap: None,
       line_height_rule: LineHeightRule::Auto,
       grid_auto_following_line_height_pt: None,
@@ -39112,6 +39669,26 @@ mod tests {
       50.0,
       100.0
     ));
+  }
+
+  #[test]
+  fn centered_word_shape_overflow_starts_at_top_without_changing_other_anchor_modes() {
+    assert_eq!(
+      shape_text_box_vertical_adjustment(TextBoxVerticalAlignment::Center, false, -30.0),
+      0.0
+    );
+    assert_eq!(
+      shape_text_box_vertical_adjustment(TextBoxVerticalAlignment::Center, false, 20.0),
+      20.0
+    );
+    assert_eq!(
+      shape_text_box_vertical_adjustment(TextBoxVerticalAlignment::Bottom, false, -30.0),
+      -30.0
+    );
+    assert_eq!(
+      shape_text_box_vertical_adjustment(TextBoxVerticalAlignment::Bottom, true, -30.0),
+      0.0
+    );
   }
 
   #[test]
@@ -40516,7 +41093,7 @@ mod tests {
       });
       state.finish_line(10.0 + index as f32 * 14.0, 14.0);
       if index == 1 {
-        state.note_page_follow(1, 10.0);
+        state.note_page_follow(1, 10.0, 0);
       }
     }
 
@@ -40540,7 +41117,7 @@ mod tests {
       });
       state.finish_line(10.0 + index as f32 * 14.0, 14.0);
       if index == 1 {
-        state.note_page_follow(1, 10.0);
+        state.note_page_follow(1, 10.0, 0);
       }
     }
 
@@ -40552,6 +41129,15 @@ mod tests {
       state.page_split_decision(false, 0, 0),
       TextSplitDecision::Allowed
     );
+  }
+
+  #[test]
+  fn paragraph_alignment_uses_the_current_follow_page_item_start() {
+    let mut state = TextFrameState::new();
+    state.note_page_follow(1, 72.0, 3);
+
+    assert_eq!(state.current_page_item_start(23, 0, 1), 3);
+    assert_eq!(state.current_page_item_start(23, 0, 0), 23);
   }
 
   #[test]
@@ -41319,7 +41905,7 @@ mod tests {
       floating(-1.0, 4, true),
     ];
 
-    order_floating_page_items(&mut items, None, false);
+    order_floating_page_items(&mut items, None, false, 12);
 
     let ids = items
       .iter()
@@ -41361,7 +41947,7 @@ mod tests {
       },
     ];
 
-    let order = order_floating_page_items(&mut items, None, false);
+    let order = order_floating_page_items(&mut items, None, false, 12);
 
     assert_eq!(order.old_to_new, vec![1, 2, 0]);
     assert_eq!(order.remap_range(0, 1), (1, 2));
@@ -41378,28 +41964,47 @@ mod tests {
   }
 
   #[test]
-  fn drawingml_relative_height_normalizes_word_sentinel_values() {
+  fn drawingml_relative_height_preserves_legacy_sentinels_and_modern_unsigned_order() {
     const MAX_DRAWINGML_RELATIVE_HEIGHT: u32 = 0x1dff_ffff;
-    let maximum = floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(
-      MAX_DRAWINGML_RELATIVE_HEIGHT,
-    ));
+    let legacy_maximum = floating_paint_order_key(
+      FloatingPaintOrder::DrawingMlRelativeHeight(MAX_DRAWINGML_RELATIVE_HEIGHT),
+      12,
+    );
 
     assert_eq!(
-      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(0)),
-      maximum
+      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(0), 12),
+      legacy_maximum
     );
     assert_eq!(
-      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(1)),
-      maximum
+      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(1), 12),
+      legacy_maximum
     );
     assert_eq!(
-      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(
-        MAX_DRAWINGML_RELATIVE_HEIGHT + 1,
-      )),
-      maximum
+      floating_paint_order_key(
+        FloatingPaintOrder::DrawingMlRelativeHeight(MAX_DRAWINGML_RELATIVE_HEIGHT + 1),
+        12,
+      ),
+      legacy_maximum
     );
-    assert!(floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(2)) < maximum);
-    assert!(floating_paint_order_key(FloatingPaintOrder::VmlZIndex(i32::MIN)) > maximum);
+    assert!(
+      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(2), 12) < legacy_maximum
+    );
+
+    let modern_zero = floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(0), 15);
+    let modern_one = floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(1), 15);
+    let modern_peer =
+      floating_paint_order_key(FloatingPaintOrder::DrawingMlRelativeHeight(0x0f00_0000), 15);
+    let modern_above_legacy_max = floating_paint_order_key(
+      FloatingPaintOrder::DrawingMlRelativeHeight(MAX_DRAWINGML_RELATIVE_HEIGHT + 1),
+      15,
+    );
+    assert!(modern_zero < modern_one);
+    assert!(modern_one < modern_peer);
+    assert!(modern_peer < modern_above_legacy_max);
+    assert!(
+      floating_paint_order_key(FloatingPaintOrder::VmlZIndex(i32::MIN), 15)
+        > modern_above_legacy_max
+    );
   }
 
   #[test]
@@ -41524,7 +42129,7 @@ mod tests {
       behind_text: false,
     }];
 
-    order_floating_page_items(&mut items, None, false);
+    order_floating_page_items(&mut items, None, false, 12);
 
     let PageItem::FloatingDrawing { items, .. } = &items[0] else {
       panic!("expected floating drawing");

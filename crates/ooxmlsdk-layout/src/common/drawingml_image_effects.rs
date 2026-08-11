@@ -117,9 +117,9 @@ pub(crate) enum GlowBlurKernel {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ShadowBlurKernel {
-  /// DrawingML shape shadows historically match Office through a Gaussian
-  /// whose variance is equivalent to the authored Stack Blur radius.
-  GaussianEquivalent,
+  /// DrawingML shape shadows use Direct2D's Gaussian shadow contract, where
+  /// the authored blur radius is three standard deviations.
+  Direct2dGaussian,
   StackTwice,
 }
 
@@ -171,6 +171,44 @@ pub(crate) struct ImageEffectSourceRequirements {
 pub(crate) struct ImageEffectContainer {
   pub(crate) kind: ImageEffectContainerKind,
   pub(crate) effects: Vec<ImageEffect>,
+}
+
+/// Builds a sharp outer-shadow branch while preserving the original vector
+/// foreground as the final sibling. This is the normalized form used by
+/// source formats, such as VML, which express a shadow as an x/y offset
+/// instead of DrawingML's polar distance and direction.
+pub(crate) fn offset_outer_shadow_with_identity(
+  offset_x_px: f32,
+  offset_y_px: f32,
+  color: ResolvedEffectColor,
+) -> ImageEffectContainer {
+  let distance_px = offset_x_px.hypot(offset_y_px);
+  let direction_degrees = offset_y_px.atan2(offset_x_px).to_degrees();
+  ImageEffectContainer {
+    kind: ImageEffectContainerKind::Sibling,
+    effects: vec![
+      ImageEffect::OuterShadow {
+        blur_radius_px: 0.0,
+        distance_px,
+        raster_length_scale: 1.0,
+        bounds_radius_scale: 1.0,
+        blur_kernel: ShadowBlurKernel::Direct2dGaussian,
+        direction_degrees,
+        transform: ImageEffectTransform {
+          scale_x: 1.0,
+          scale_y: 1.0,
+          skew_x: 0.0,
+          skew_y: 0.0,
+          shift_x_px: 0.0,
+          shift_y_px: 0.0,
+        },
+        alignment: (0.5, 0.5),
+        rotate_with_shape: false,
+        color,
+      },
+      ImageEffect::Identity,
+    ],
+  }
 }
 
 /// Separates effect branches that are explicitly composited behind an
@@ -225,6 +263,55 @@ pub(crate) fn contains_glow(container: &ImageEffectContainer) -> bool {
     | ImageEffect::Blend { container, .. } => contains_glow(container),
     _ => false,
   })
+}
+
+/// Returns the largest blur-kernel radius used by an effect branch whose
+/// output can be painted behind a separately retained foreground.
+///
+/// DrawingML's authored glow radius covers both the spread and blur stages;
+/// LibreOffice's `GlowPrimitive2D` uses half of that radius for the actual
+/// blur. Other spatial effects store their blur radius directly. Hosts use
+/// this value to choose a working-surface density without confusing authored
+/// output bounds with the smaller filter kernel.
+pub(crate) fn effective_backdrop_blur_radius_px(container: &ImageEffectContainer) -> f32 {
+  fn finite_radius(radius: f32) -> f32 {
+    if radius.is_finite() {
+      radius.max(0.0)
+    } else {
+      0.0
+    }
+  }
+
+  fn visit_effect(effect: &ImageEffect) -> f32 {
+    match effect {
+      ImageEffect::Blur { radius_px, .. } => finite_radius(*radius_px),
+      ImageEffect::Glow {
+        radius_px,
+        raster_length_scale,
+        ..
+      } => finite_radius(*radius_px * *raster_length_scale * 0.5),
+      ImageEffect::InnerShadow { blur_radius_px, .. } => finite_radius(*blur_radius_px),
+      ImageEffect::OuterShadow {
+        blur_radius_px,
+        raster_length_scale,
+        ..
+      } => finite_radius(*blur_radius_px * *raster_length_scale),
+      ImageEffect::Reflection(reflection) => finite_radius(reflection.blur_radius_px),
+      ImageEffect::SoftEdge(radius_px) => finite_radius(*radius_px),
+      ImageEffect::AlphaModulate(nested)
+      | ImageEffect::Container(nested)
+      | ImageEffect::Blend {
+        container: nested, ..
+      } => effective_backdrop_blur_radius_px(nested),
+      _ => 0.0,
+    }
+  }
+
+  container
+    .effects
+    .iter()
+    .map(visit_effect)
+    .fold(0.0, f32::max)
 }
 
 /// Removes soft-edge effects from a DrawingML effect graph.
@@ -1027,7 +1114,7 @@ fn outer_shadow(
       .unwrap_or_default(),
     raster_length_scale: 1.0,
     bounds_radius_scale: 1.0,
-    blur_kernel: ShadowBlurKernel::GaussianEquivalent,
+    blur_kernel: ShadowBlurKernel::Direct2dGaussian,
     direction_degrees: effect.direction.unwrap_or_default() as f32 / 60_000.0,
     transform: ImageEffectTransform {
       scale_x: effect
@@ -1134,7 +1221,7 @@ fn preset_shadow(
     distance_px,
     raster_length_scale: 1.0,
     bounds_radius_scale: 1.0,
-    blur_kernel: ShadowBlurKernel::GaussianEquivalent,
+    blur_kernel: ShadowBlurKernel::Direct2dGaussian,
     direction_degrees,
     transform,
     alignment,
@@ -3390,8 +3477,18 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
   });
   let alpha = if blur_radius_px > f32::EPSILON {
     match blur_kernel {
-      ShadowBlurKernel::GaussianEquivalent => {
-        image::imageops::blur(&alpha, stack_blur_equivalent_sigma(blur_radius_px))
+      ShadowBlurKernel::Direct2dGaussian => {
+        // Microsoft's A8-mask sample uses an integer pixel size and pixel
+        // snapping to avoid fractional-pixel blur. Word fixed output follows
+        // that contract for opaque, axis-aligned shape masks. Preserve the
+        // antialiased source for rotated geometry and intrinsically
+        // translucent images; their partial alpha is content, not a sampling
+        // edge.
+        let pixel_center_mask = axis_aligned_opaque_pixel_center_mask(&alpha);
+        image::imageops::blur(
+          pixel_center_mask.as_ref().unwrap_or(&alpha),
+          direct2d_gaussian_sigma(blur_radius_px),
+        )
       }
       ShadowBlurKernel::StackTwice => {
         let mut alpha = alpha;
@@ -3431,11 +3528,52 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
   })
 }
 
-/// Converts the authored Stack Blur radius to the Gaussian standard deviation
-/// used by the established DrawingML shape-shadow path. A triangular kernel
-/// has variance `radius * (radius + 2) / 6`.
-fn stack_blur_equivalent_sigma(radius_px: f32) -> f32 {
-  (radius_px * (radius_px + 2.0) / 6.0).sqrt()
+/// Converts DrawingML's authored shadow blur radius to Direct2D's Gaussian
+/// standard deviation. Both Microsoft APIs describe the former as a radius;
+/// Direct2D defines its finite kernel radius as three standard deviations.
+fn direct2d_gaussian_sigma(blur_radius_px: f32) -> f32 {
+  blur_radius_px / 3.0
+}
+
+fn axis_aligned_opaque_pixel_center_mask(alpha: &image::GrayImage) -> Option<image::GrayImage> {
+  let (width, height) = alpha.dimensions();
+  if width < 3 || height < 3 {
+    return None;
+  }
+  let mut left = width;
+  let mut top = height;
+  let mut right = 0;
+  let mut bottom = 0;
+  let mut has_covered_pixel = false;
+  for (x, y, pixel) in alpha.enumerate_pixels() {
+    if pixel.0[0] < 128 {
+      continue;
+    }
+    has_covered_pixel = true;
+    left = left.min(x);
+    top = top.min(y);
+    right = right.max(x);
+    bottom = bottom.max(y);
+  }
+  if !has_covered_pixel || right.saturating_sub(left) < 2 || bottom.saturating_sub(top) < 2 {
+    return None;
+  }
+  for (x, y, pixel) in alpha.enumerate_pixels() {
+    let inside = x >= left && x <= right && y >= top && y <= bottom;
+    if inside != (pixel.0[0] >= 128) {
+      return None;
+    }
+    if x > left && x < right && y > top && y < bottom && pixel.0[0] != u8::MAX {
+      return None;
+    }
+  }
+  Some(image::GrayImage::from_fn(width, height, |x, y| {
+    image::Luma([if x >= left && x <= right && y >= top && y <= bottom {
+      u8::MAX
+    } else {
+      0
+    }])
+  }))
 }
 
 fn reflection_image(
@@ -3779,9 +3917,9 @@ mod tests {
     apply_container_to_padded_image_with_sources,
     apply_container_to_padded_image_with_sources_and_anchor, apply_to_image,
     container_output_bounds, container_output_bounds_with_anchor,
-    container_output_bounds_with_anchors, from_effect_dag, from_effect_list,
-    from_wordprocessing_text_effects, mso_brightness_contrast_component, reflection,
-    reflection_image, rotate_container_with_shape, sample_fill, source_requirements,
+    container_output_bounds_with_anchors, effective_backdrop_blur_radius_px, from_effect_dag,
+    from_effect_list, from_wordprocessing_text_effects, mso_brightness_contrast_component,
+    reflection, reflection_image, rotate_container_with_shape, sample_fill, source_requirements,
     suppress_soft_edge, unchanged_foreground_backdrop, wordprocessing_reflection_canvas_bounds,
   };
   use crate::model::RgbColor;
@@ -3800,7 +3938,7 @@ mod tests {
           distance_px: 2.0,
           raster_length_scale: 1.0,
           bounds_radius_scale: 1.0,
-          blur_kernel: ShadowBlurKernel::GaussianEquivalent,
+          blur_kernel: ShadowBlurKernel::Direct2dGaussian,
           direction_degrees: 0.0,
           transform: ImageEffectTransform {
             scale_x: 1.0,
@@ -3830,6 +3968,51 @@ mod tests {
       backdrop.effects.as_slice(),
       [ImageEffect::OuterShadow { .. }]
     ));
+  }
+
+  #[test]
+  fn backdrop_blur_radius_uses_the_effective_filter_kernel() {
+    let color = ResolvedEffectColor {
+      color: RgbColor { r: 1, g: 2, b: 3 },
+      alpha: 255,
+    };
+    let glow = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![ImageEffect::Glow {
+        radius_px: 32.0 / 3.0,
+        raster_length_scale: 1.0,
+        bounds_radius_scale: 1.0,
+        spread_ratio: 0.5,
+        spread_kernel: super::GlowSpreadKernel::Square,
+        blur_kernel: super::GlowBlurKernel::Stack,
+        color,
+      }],
+    };
+    assert!((effective_backdrop_blur_radius_px(&glow) - 16.0 / 3.0).abs() < 0.0001);
+
+    let shadow = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![ImageEffect::OuterShadow {
+        blur_radius_px: 12.0,
+        distance_px: 0.0,
+        raster_length_scale: 0.5,
+        bounds_radius_scale: 1.0,
+        blur_kernel: ShadowBlurKernel::Direct2dGaussian,
+        direction_degrees: 0.0,
+        transform: ImageEffectTransform {
+          scale_x: 1.0,
+          scale_y: 1.0,
+          skew_x: 0.0,
+          skew_y: 0.0,
+          shift_x_px: 0.0,
+          shift_y_px: 0.0,
+        },
+        alignment: (0.5, 0.5),
+        rotate_with_shape: false,
+        color,
+      }],
+    };
+    assert!((effective_backdrop_blur_radius_px(&shadow) - 6.0).abs() < f32::EPSILON);
   }
 
   #[test]
@@ -3984,6 +4167,50 @@ mod tests {
   }
 
   #[test]
+  fn drawingml_shadow_blur_radius_maps_to_direct2d_standard_deviation() {
+    assert_eq!(super::direct2d_gaussian_sigma(0.0), 0.0);
+    assert!((super::direct2d_gaussian_sigma(6.0) - 2.0).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn pixel_center_shadow_mask_accepts_only_an_opaque_axis_aligned_source() {
+    let rectangle = image::GrayImage::from_fn(7, 7, |x, y| {
+      let alpha = if (2..=4).contains(&x) && (2..=4).contains(&y) {
+        if x == 3 && y == 3 { u8::MAX } else { 192 }
+      } else if (1..=5).contains(&x) && (1..=5).contains(&y) {
+        64
+      } else {
+        0
+      };
+      image::Luma([alpha])
+    });
+    let snapped =
+      super::axis_aligned_opaque_pixel_center_mask(&rectangle).expect("opaque axis-aligned mask");
+    assert_eq!(snapped.get_pixel(1, 3).0[0], 0);
+    assert_eq!(snapped.get_pixel(2, 2).0[0], u8::MAX);
+    assert_eq!(snapped.get_pixel(4, 4).0[0], u8::MAX);
+    assert_eq!(snapped.get_pixel(5, 3).0[0], 0);
+
+    let rotated = image::GrayImage::from_fn(7, 7, |x, y| {
+      image::Luma([if x.abs_diff(3) + y.abs_diff(3) <= 2 {
+        u8::MAX
+      } else {
+        0
+      }])
+    });
+    assert!(super::axis_aligned_opaque_pixel_center_mask(&rotated).is_none());
+
+    let translucent = image::GrayImage::from_fn(7, 7, |x, y| {
+      image::Luma([if (1..=5).contains(&x) && (1..=5).contains(&y) {
+        192
+      } else {
+        0
+      }])
+    });
+    assert!(super::axis_aligned_opaque_pixel_center_mask(&translucent).is_none());
+  }
+
+  #[test]
   fn stack_blur_alpha_uses_the_finite_triangular_kernel() {
     let mut alpha = vec![0; 11 * 11];
     alpha[5 * 11 + 5] = 255;
@@ -4033,7 +4260,7 @@ mod tests {
         distance_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
+        blur_kernel: ShadowBlurKernel::Direct2dGaussian,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,
@@ -4398,7 +4625,7 @@ mod tests {
         distance_px: 2.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
+        blur_kernel: ShadowBlurKernel::Direct2dGaussian,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,
@@ -4752,7 +4979,7 @@ mod tests {
         distance_px: 1.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
+        blur_kernel: ShadowBlurKernel::Direct2dGaussian,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 2.0,
@@ -4811,7 +5038,7 @@ mod tests {
         distance_px: 3.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
+        blur_kernel: ShadowBlurKernel::Direct2dGaussian,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,
@@ -4848,7 +5075,7 @@ mod tests {
         distance_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
-        blur_kernel: ShadowBlurKernel::GaussianEquivalent,
+        blur_kernel: ShadowBlurKernel::Direct2dGaussian,
         direction_degrees: 0.0,
         transform: ImageEffectTransform {
           scale_x: 1.0,

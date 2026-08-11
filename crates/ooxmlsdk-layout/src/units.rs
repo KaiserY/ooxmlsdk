@@ -40,8 +40,78 @@ pub fn millimeters_to_points(value: f32) -> f32 {
   value * POINTS_PER_INCH / MILLIMETERS_PER_INCH
 }
 
+/// Converts a VML `strokeweight`/`v:stroke@weight` markup value to points.
+///
+/// Unitless markup values are EMUs. This is deliberately distinct from VML
+/// CSS dimensions, whose omitted unit is pixels, and from scripted
+/// `strokeweight` assignment, whose omitted unit is points.
+pub fn vml_stroke_weight_to_points(value: &str) -> Option<f32> {
+  let value = value.trim();
+  if value.is_empty() {
+    return None;
+  }
+
+  let (number, multiplier) = if let Some(number) = value.strip_suffix("emu") {
+    (number, 1.0 / sdk_units::EMUS_PER_POINT as f32)
+  } else if let Some(number) = value.strip_suffix("pt") {
+    (number, 1.0)
+  } else if let Some(number) = value.strip_suffix("in") {
+    (number, POINTS_PER_INCH)
+  } else if let Some(number) = value.strip_suffix("cm") {
+    (number, POINTS_PER_INCH / CENTIMETERS_PER_INCH)
+  } else if let Some(number) = value.strip_suffix("mm") {
+    (number, POINTS_PER_INCH / MILLIMETERS_PER_INCH)
+  } else if let Some(number) = value.strip_suffix("pc") {
+    (number, 12.0)
+  } else if let Some(number) = value.strip_suffix("px") {
+    (number, POINTS_PER_CSS_PIXEL)
+  } else {
+    (value, 1.0 / sdk_units::EMUS_PER_POINT as f32)
+  };
+
+  number
+    .trim()
+    .parse::<f32>()
+    .ok()
+    .map(|value| value * multiplier)
+}
+
 #[inline]
 pub fn quantize_points_to_office_print_grid(value: f32) -> f32 {
   (value * OFFICE_FIXED_OUTPUT_DPI / POINTS_PER_INCH).round() * POINTS_PER_INCH
     / OFFICE_FIXED_OUTPUT_DPI
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn assert_close(actual: Option<f32>, expected: f32) {
+    let actual = actual.expect("VML stroke weight");
+    assert!(
+      (actual - expected).abs() < 0.000_01,
+      "actual={actual}, expected={expected}"
+    );
+  }
+
+  #[test]
+  fn unitless_vml_stroke_weight_defaults_to_emu() {
+    assert_close(vml_stroke_weight_to_points("12700"), 1.0);
+    assert_close(vml_stroke_weight_to_points("28440"), 28440.0 / 12700.0);
+    assert_close(vml_stroke_weight_to_points("720"), 720.0 / 12700.0);
+  }
+
+  #[test]
+  fn explicit_vml_stroke_units_do_not_use_the_emu_default() {
+    assert_close(vml_stroke_weight_to_points("1pt"), 1.0);
+    assert_close(vml_stroke_weight_to_points("0.5pt"), 0.5);
+    assert_close(vml_stroke_weight_to_points("1in"), 72.0);
+    assert_close(vml_stroke_weight_to_points("2.54cm"), 72.0);
+    assert_close(vml_stroke_weight_to_points("25.4mm"), 72.0);
+    assert_close(vml_stroke_weight_to_points("1pc"), 12.0);
+    assert_close(vml_stroke_weight_to_points("96px"), 72.0);
+    assert_close(vml_stroke_weight_to_points("12700emu"), 1.0);
+    assert_eq!(vml_stroke_weight_to_points(""), None);
+    assert_eq!(vml_stroke_weight_to_points("auto"), None);
+  }
 }

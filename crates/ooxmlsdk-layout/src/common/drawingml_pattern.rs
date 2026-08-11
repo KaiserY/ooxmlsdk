@@ -268,6 +268,26 @@ mod tests {
   }
 
   #[test]
+  fn drawingml_pattern_preserves_office_fixed_output_sampling_lattice() {
+    let style = EmfPlusHatchStyle::WideUpwardDiagonal;
+    let fill =
+      super::super::PatternFill::drawingml(style, color(0x5e, 0xad, 0x35), color(0x00, 0x79, 0x29));
+
+    assert_eq!(fill.bitmap_sampling.image_size_px(), 16);
+    assert_eq!(fill.bitmap_sampling.tile_repetitions(), 1);
+    assert_eq!(fill.bitmap_tile_size_points(), 6.0);
+    for y in 0..16 {
+      for x in 0..16 {
+        assert_eq!(
+          fill.bitmap_sample_is_foreground(x, y),
+          style.is_foreground((x / 2) as i32, (y / 2) as i32),
+          "sample ({x}, {y})",
+        );
+      }
+    }
+  }
+
+  #[test]
   fn vml_historical_pattern_uses_white_as_foreground() {
     let mut input = Vec::new();
     let mut pixels = vec![0_u8; 8 * 8 * 4];

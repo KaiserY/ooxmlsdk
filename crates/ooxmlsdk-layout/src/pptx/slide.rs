@@ -1369,7 +1369,7 @@ impl SlidePersist {
             width_emu: model
               .stroke_weight
               .as_deref()
-              .and_then(vml_measure_to_points)
+              .and_then(units::vml_stroke_weight_to_points)
               .map(points_to_emu),
             placeholder_color: None,
             source_outline: None,

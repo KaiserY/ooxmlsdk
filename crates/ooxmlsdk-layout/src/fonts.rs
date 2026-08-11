@@ -846,12 +846,15 @@ fn apply_wordprocessingml_single_double_byte_width_balance(
     if local_start > local_end || local_end > run.text.len() {
       continue;
     }
-    let previous_matches = local_start == 0
-      || inside_cjk_script
-      || run.text[..local_start].chars().next_back() == Some(' ');
-    let next_matches = local_end == run.text.len()
-      || inside_cjk_script
-      || run.text[local_end..].chars().next() == Some(' ');
+    // This function also sees trial prefixes while Word line fitting. A
+    // shaping-fragment edge is not a logical text edge, so it cannot qualify
+    // an otherwise isolated Latin space. Office's Indent_Spacing.Template
+    // output and Writer's tdf#88908 test both retain the legacy adjustment for
+    // adjacent spaces in proportional faces.
+    let previous_matches = inside_cjk_script
+      || (local_start > 0 && run.text[..local_start].chars().next_back() == Some(' '));
+    let next_matches = inside_cjk_script
+      || (local_end < run.text.len() && run.text[local_end..].chars().next() == Some(' '));
     if !previous_matches && !next_matches {
       continue;
     }
@@ -1732,11 +1735,11 @@ mod tests {
   }
 
   #[test]
-  fn single_double_byte_balance_expands_only_qualifying_latin_spaces() {
+  fn single_double_byte_balance_expands_only_adjacent_latin_spaces() {
     let mut trailing = synthetic_space_run("A: ", TextScript::Latin);
     apply_wordprocessingml_single_double_byte_width_balance(&mut trailing, 1.0, 0.0);
-    assert_eq!(trailing.glyphs[2].x_advance_pt, 5.0);
-    assert_eq!(trailing.advance_pt, 17.0);
+    assert_eq!(trailing.glyphs[2].x_advance_pt, 2.5);
+    assert_eq!(trailing.advance_pt, 14.5);
 
     let mut internal = synthetic_space_run("A B", TextScript::Latin);
     apply_wordprocessingml_single_double_byte_width_balance(&mut internal, 1.0, 0.0);

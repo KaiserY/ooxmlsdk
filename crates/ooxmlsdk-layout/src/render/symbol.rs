@@ -46,10 +46,12 @@ pub(crate) fn font_symbol_transport_text<'a>(font: Option<&str>, text: &'a str) 
   let mut mapped: Option<String> = None;
 
   for (byte_index, character) in text.char_indices() {
-    // LibreOffice's DrawingML importer preserves the selected symbol-font
-    // glyph by converting its single-byte character to U+F0XX. Existing PUA
-    // transport codes and already-Unicode characters remain unchanged.
-    let replacement = if character as u32 <= 0xFF {
+    // LibreOffice's Adobe Symbol table leaves the C0 range undefined and
+    // starts its printable single-byte repertoire at 0x20. Keep run controls
+    // such as WordprocessingML's tab and carriage return as layout controls;
+    // converting them to F0XX would turn them into missing glyphs. Existing
+    // PUA transport codes and already-Unicode characters remain unchanged.
+    let replacement = if (0x20..=0xFF).contains(&(character as u32)) {
       char::from_u32(0xF000 | character as u32).unwrap_or(character)
     } else {
       character
@@ -272,6 +274,14 @@ mod tests {
     let text = font_symbol_transport_text(Some("Wingdings"), "q");
     assert_eq!(text, "\u{f071}");
     assert!(matches!(text, Cow::Owned(_)));
+  }
+
+  #[test]
+  fn symbol_font_transport_preserves_run_controls() {
+    assert_eq!(
+      font_symbol_transport_text(Some("Symbol"), "\tA\n\r"),
+      "\t\u{f041}\n\r"
+    );
   }
 
   #[test]

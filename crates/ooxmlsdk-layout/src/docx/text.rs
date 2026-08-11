@@ -1,14 +1,15 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use std::sync::Arc;
 
-use crate::fonts::effective_font_size_pt;
+use crate::{fonts::effective_font_size_pt, units};
 
 use super::{
   ComplexFieldImportState, CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog,
-  ImageCatalog, ListLabelImage, NumberingCatalog, NumberingFormatMergeContext, NumberingReference,
-  Paragraph, ParagraphFormat, ParagraphInlineImport, ParagraphProps, RunStyleOverrides,
-  StylesCatalog, TextRun, TextStyle, paragraph_field_events, paragraph_inlines_with_policy,
-  paragraph_note_reference_ids, properties, select_paragraph_numbering,
+  ImageCatalog, LineHeightRule, ListLabelImage, NumberingCatalog, NumberingFormatMergeContext,
+  NumberingReference, Paragraph, ParagraphFormat, ParagraphInlineImport, ParagraphProps,
+  RunStyleOverrides, StylesCatalog, TextRun, TextStyle, paragraph_field_events,
+  paragraph_inlines_with_policy, paragraph_note_reference_ids, properties,
+  select_paragraph_numbering,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -396,35 +397,36 @@ fn paragraph_model_with_base_impl<'a>(
     }));
   }
   let line_vertical_alignment = format.line_vertical_alignment.unwrap_or_default();
+  let use_windows_font_metrics = paragraph_uses_windows_font_metrics(&format);
   paragraph_mark_style.line_vertical_alignment = line_vertical_alignment;
-  paragraph_mark_style.use_windows_font_metrics = true;
+  paragraph_mark_style.use_windows_font_metrics = use_windows_font_metrics;
   list_label_style.line_vertical_alignment = line_vertical_alignment;
-  list_label_style.use_windows_font_metrics = true;
+  list_label_style.use_windows_font_metrics = use_windows_font_metrics;
   for inline in &mut inlines {
     match inline {
       super::InlineItem::Text(run) => {
         run.style.line_vertical_alignment = line_vertical_alignment;
-        run.style.use_windows_font_metrics = true;
+        run.style.use_windows_font_metrics = use_windows_font_metrics;
       }
       super::InlineItem::PositionalTab(tab) => {
         tab.style.line_vertical_alignment = line_vertical_alignment;
-        tab.style.use_windows_font_metrics = true;
+        tab.style.use_windows_font_metrics = use_windows_font_metrics;
       }
       super::InlineItem::Ruby(ruby) => {
         for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
           run.style.line_vertical_alignment = line_vertical_alignment;
-          run.style.use_windows_font_metrics = true;
+          run.style.use_windows_font_metrics = use_windows_font_metrics;
         }
       }
       super::InlineItem::NoteReferenceMark(mark) => {
-        mark.style.use_windows_font_metrics = true;
+        mark.style.use_windows_font_metrics = use_windows_font_metrics;
       }
       super::InlineItem::NoteSeparatorMark(mark) => {
-        mark.style.use_windows_font_metrics = true;
+        mark.style.use_windows_font_metrics = use_windows_font_metrics;
       }
       super::InlineItem::LegacyFormCheckBox(check_box) => {
         check_box.style.line_vertical_alignment = line_vertical_alignment;
-        check_box.style.use_windows_font_metrics = true;
+        check_box.style.use_windows_font_metrics = use_windows_font_metrics;
       }
       _ => {}
     }
@@ -495,6 +497,21 @@ fn paragraph_model_with_base_impl<'a>(
     list_label_hyperlink_url: None,
     list_label_tab_stop_pt,
   }
+}
+
+fn paragraph_uses_windows_font_metrics(format: &ParagraphFormat) -> bool {
+  const WORD_COMPACT_AUTO_LINE_MULTIPLE: f32 = 259.0 / units::WORD_LINE_HEIGHT_UNITS_PER_LINE;
+
+  // Word's built-in compact styles use an auto line value of 259/240. Office
+  // fixed output keeps those lines, compressed/single lines, and physical
+  // exact/atLeast boxes on the Windows alignment baseline. Larger automatic
+  // multiples own their extra leading as a gap below the visible line, so use
+  // the natural typographic baseline instead; OS/2 usWinAscent is a clipping
+  // extent and would otherwise move the first baseline into that gap.
+  !matches!(format.line_height_rule, LineHeightRule::Auto)
+    || !format
+      .line_height_pt
+      .is_some_and(|multiple| multiple > WORD_COMPACT_AUTO_LINE_MULTIPLE)
 }
 
 pub(super) fn paragraph_style_ref_text(
@@ -587,4 +604,45 @@ fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {
     })
     .map(|size| size.to_half_points() <= 9)
     .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn proportional_auto_line_spacing_uses_typographic_baseline_metrics() {
+    for line_units in [276.0, 360.0] {
+      let format = ParagraphFormat {
+        line_height_rule: LineHeightRule::Auto,
+        line_height_pt: Some(line_units / units::WORD_LINE_HEIGHT_UNITS_PER_LINE),
+        ..Default::default()
+      };
+
+      assert!(!paragraph_uses_windows_font_metrics(&format));
+    }
+  }
+
+  #[test]
+  fn non_proportional_line_spacing_keeps_windows_baseline_metrics() {
+    for (line_height_rule, line_height_pt) in [
+      (LineHeightRule::Auto, None),
+      (LineHeightRule::Auto, Some(0.9)),
+      (LineHeightRule::Auto, Some(1.0)),
+      (
+        LineHeightRule::Auto,
+        Some(259.0 / units::WORD_LINE_HEIGHT_UNITS_PER_LINE),
+      ),
+      (LineHeightRule::AtLeast, Some(18.0)),
+      (LineHeightRule::Exact, Some(18.0)),
+    ] {
+      let format = ParagraphFormat {
+        line_height_rule,
+        line_height_pt,
+        ..Default::default()
+      };
+
+      assert!(paragraph_uses_windows_font_metrics(&format));
+    }
+  }
 }

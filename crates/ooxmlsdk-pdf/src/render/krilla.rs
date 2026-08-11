@@ -433,7 +433,7 @@ fn render_inner(
   let pdf = pdf
     .finish()
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))?;
-  let pdf = fonts.restore_office_font_descriptor_metrics(pdf)?;
+  let pdf = fonts.restore_office_font_metadata(pdf)?;
   let pdf = inject_form_widget_annotations(pdf, form_widget_annotations)?;
   Ok(RenderOutput {
     pdf,
@@ -4622,6 +4622,15 @@ fn draw_text_item(
       && let Some(glyphs) = &portion.glyphs
     {
       for run in glyphs {
+        if item.style.explicit_symbol_character {
+          for glyph in &run.glyphs {
+            if glyph.glyph_id.to_u32() == 0
+              && let Some(semantic) = glyph_semantic_text.get(glyph.text_range.clone())
+            {
+              fonts.record_explicit_notdef_semantic(&run.font_face, semantic);
+            }
+          }
+        }
         let selected = fonts.select_face(&run.font_face)?;
         let glyph_outlines = text_requires_glyph_outlines(&item.style);
         surface.set_stroke(text_stroke_with_fill(
@@ -6381,7 +6390,9 @@ fn drawingml_pattern_paint(
 }
 
 fn pattern_tile_image(pattern: common::PatternFill) -> Option<Image> {
-  if !matches!(pattern.mask, common::PatternMask::Bitmap8(_)) {
+  if matches!(pattern.mask, common::PatternMask::EmfPlusHatch(_))
+    && pattern.bitmap_sampling == common::PatternBitmapSampling::NATIVE_8X8
+  {
     return None;
   }
   let image_size = u32::from(pattern.bitmap_sampling.image_size_px());

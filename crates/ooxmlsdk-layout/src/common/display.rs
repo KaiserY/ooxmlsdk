@@ -577,13 +577,17 @@ pub struct TextStyle<'doc> {
   pub line_vertical_alignment: LineVerticalAlignment,
   /// Retain searchable/taggable text without painting visible glyphs.
   pub semantic_only: bool,
-  /// Use legacy Windows/GDI ascent for the first baseline. PowerPoint's PDF
-  /// path follows this metric; Word layout retains typographic metrics.
+  /// Use the OS/2 Windows/GDI alignment-box ascent for the baseline. Office
+  /// fixed output selects this for WordprocessingML and DrawingML text unless
+  /// the face opts into typographic metrics.
   pub use_windows_font_metrics: bool,
   /// Select Common characters using the WordprocessingML rFonts slot table.
   pub wordprocessingml_font_slots: bool,
   /// Enable Word's document-level East Asian punctuation compression.
   pub cjk_punctuation_compression_ratio: f32,
+  /// Balance qualifying ordinary spaces to half an ideographic em for the
+  /// WordprocessingML compatibility setting of the same name.
+  pub wordprocessingml_balance_single_byte_double_byte_width: bool,
   /// Paint glyph outlines instead of searchable PDF text. Office uses this
   /// for DrawingML text transforms that its fixed-format writer vectorizes.
   pub pdf_glyph_outlines: bool,

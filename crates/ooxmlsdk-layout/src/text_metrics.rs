@@ -113,6 +113,12 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     self.style.cjk_punctuation_compression_ratio()
   }
+
+  fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
+    self
+      .style
+      .wordprocessingml_balance_single_byte_double_byte_width()
+  }
 }
 
 // Last-resort vertical metrics when no usable font face can be loaded. Keep
@@ -352,6 +358,7 @@ struct MeasureStyleKey {
   wordprocessingml_east_asia_language_is_chinese: bool,
   wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   cjk_punctuation_compression_ratio_bits: u32,
+  wordprocessingml_balance_single_byte_double_byte_width: bool,
 }
 
 impl MeasureStyleKey {
@@ -388,6 +395,8 @@ impl MeasureStyleKey {
         .wordprocessingml_east_asia_language_is_chinese(),
       wordprocessingml_east_asia_font_charset: style.wordprocessingml_east_asia_font_charset(),
       cjk_punctuation_compression_ratio_bits: style.cjk_punctuation_compression_ratio().to_bits(),
+      wordprocessingml_balance_single_byte_double_byte_width: style
+        .wordprocessingml_balance_single_byte_double_byte_width(),
     }
   }
 
@@ -425,6 +434,8 @@ impl MeasureStyleKey {
         == style.wordprocessingml_east_asia_font_charset()
       && self.cjk_punctuation_compression_ratio_bits
         == style.cjk_punctuation_compression_ratio().to_bits()
+      && self.wordprocessingml_balance_single_byte_double_byte_width
+        == style.wordprocessingml_balance_single_byte_double_byte_width()
   }
 }
 
@@ -869,7 +880,10 @@ impl TextMetrics {
       }
   }
 
-  fn line_vertical_metrics(&mut self, style: &(impl FontStyleRef + ?Sized)) -> TextVerticalMetrics {
+  pub fn line_vertical_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> TextVerticalMetrics {
     let Some((font_size_pt, complex_font_size_pt)) = style.automatic_escapement_font_sizes_pt()
     else {
       return self.vertical_metrics(style);
@@ -881,7 +895,7 @@ impl TextMetrics {
     })
   }
 
-  fn line_vertical_metrics_for_text(
+  pub fn line_vertical_metrics_for_text(
     &mut self,
     text: &str,
     style: &(impl FontStyleRef + ?Sized),

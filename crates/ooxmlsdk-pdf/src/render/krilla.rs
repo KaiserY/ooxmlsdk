@@ -639,6 +639,7 @@ struct TextStyle<'doc> {
   wordprocessingml_east_asia_language_is_chinese: bool,
   wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   cjk_punctuation_compression_ratio: f32,
+  wordprocessingml_balance_single_byte_double_byte_width: bool,
   pdf_glyph_outlines: bool,
   pdf_glyph_outline_options: Option<common::PdfGlyphOutlineOptions>,
   bold: bool,
@@ -802,6 +803,10 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     self.cjk_punctuation_compression_ratio
+  }
+
+  fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
+    self.wordprocessingml_balance_single_byte_double_byte_width
   }
 
   fn kerning_enabled(&self) -> bool {
@@ -2683,6 +2688,8 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
       .wordprocessingml_east_asia_language_is_chinese,
     wordprocessingml_east_asia_font_charset: style.wordprocessingml_east_asia_font_charset,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
+    wordprocessingml_balance_single_byte_double_byte_width: style
+      .wordprocessingml_balance_single_byte_double_byte_width,
     pdf_glyph_outlines: style.pdf_glyph_outlines,
     pdf_glyph_outline_options: style.pdf_glyph_outline_options.as_deref().cloned(),
     bold: style.bold,
@@ -2879,7 +2886,7 @@ fn common_writer_line_baselines(
   owners: &[Option<PaintLineOwner>],
   text_metrics: &mut TextMetrics,
 ) -> Vec<Option<f32>> {
-  let mut baselines = HashMap::<(usize, usize), f32>::default();
+  let mut line_metrics = HashMap::<(usize, usize), WriterLineMetrics>::default();
   for (item, owner) in items.iter().zip(owners) {
     let Some(owner) = owner else {
       continue;
@@ -2890,29 +2897,57 @@ fn common_writer_line_baselines(
     ) {
       continue;
     }
-    let Some(offset) = writer_item_line_baseline_offset(item, text_metrics) else {
+    let Some(metrics) = writer_item_line_metrics(item, text_metrics) else {
       continue;
     };
-    baselines
+    line_metrics
       .entry((owner.frame_index, owner.line_index))
-      .and_modify(|baseline| *baseline = baseline.max(offset))
-      .or_insert(offset);
+      .and_modify(|line| line.include(metrics))
+      .or_insert(metrics);
   }
   owners
     .iter()
     .map(|owner| {
       let owner = owner.as_ref()?;
-      baselines
+      line_metrics
         .get(&(owner.frame_index, owner.line_index))
-        .copied()
+        .map(|metrics| metrics.baseline_offset_pt())
     })
     .collect()
 }
 
-fn writer_item_line_baseline_offset(
+#[derive(Clone, Copy, Debug, Default)]
+struct WriterLineMetrics {
+  ascent_pt: f32,
+  descent_pt: f32,
+  resolved_height_pt: f32,
+  top_aligned: bool,
+}
+
+impl WriterLineMetrics {
+  fn include(&mut self, other: Self) {
+    self.ascent_pt = self.ascent_pt.max(other.ascent_pt);
+    self.descent_pt = self.descent_pt.max(other.descent_pt);
+    self.resolved_height_pt = self.resolved_height_pt.max(other.resolved_height_pt);
+    self.top_aligned &= other.top_aligned;
+  }
+
+  fn baseline_offset_pt(self) -> f32 {
+    let content_height_pt = self.ascent_pt + self.descent_pt;
+    let extra_leading_pt = (self.resolved_height_pt - content_height_pt).max(0.0);
+    self.ascent_pt
+      + if self.top_aligned {
+        0.0
+      } else {
+        extra_leading_pt / 2.0
+      }
+  }
+}
+
+fn writer_item_line_metrics(
   item: &PageItem<'_>,
   text_metrics: &mut TextMetrics,
-) -> Option<f32> {
+) -> Option<WriterLineMetrics> {
   match item {
     PageItem::Text(text)
       if !text.style.semantic_only
@@ -2921,30 +2956,43 @@ fn writer_item_line_baseline_offset(
           common::LineVerticalAlignment::Auto | common::LineVerticalAlignment::Baseline
         ) =>
     {
-      Some(
-        if text.style.use_windows_font_metrics {
-          text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-            &text.text,
-            &text.style,
-            text.line_height_pt,
-          )
-        } else {
-          text_metrics.baseline_offset_in_line_for_text(
-            &text.text,
-            &text.style,
-            text.line_height_pt,
-          )
-        } + text.style.baseline_shift_pt,
-      )
+      let normalized_automatic_escapement = text.style.automatic_escapement_font_size_pt.is_some()
+        && text.style.baseline_shift_pt.abs() <= f32::EPSILON;
+      let metrics = if normalized_automatic_escapement {
+        text_metrics.vertical_metrics_for_text(&text.text, &text.style)
+      } else {
+        text_metrics.line_vertical_metrics_for_text(&text.text, &text.style)
+      };
+      let default_baseline_pt = if text.style.use_windows_font_metrics {
+        metrics.directwrite_baseline_offset_pt
+      } else {
+        metrics.leading_above_pt() + metrics.ascent_pt
+      };
+      let line_shift_pt = if text.style.automatic_escapement_font_size_pt.is_some() {
+        0.0
+      } else {
+        text.style.baseline_shift_pt
+      };
+      Some(WriterLineMetrics {
+        ascent_pt: (default_baseline_pt + line_shift_pt).max(0.0),
+        descent_pt: (metrics.line_height_pt() - default_baseline_pt - line_shift_pt).max(0.0),
+        resolved_height_pt: text.line_height_pt,
+        top_aligned: normalized_automatic_escapement,
+      })
     }
     PageItem::Group {
       inherit_text_line_owner: true,
       items,
       ..
-    } => items
-      .iter()
-      .filter_map(|item| writer_item_line_baseline_offset(item, text_metrics))
-      .reduce(f32::max),
+    } => items.iter().fold(None, |line, item| {
+      let Some(metrics) = writer_item_line_metrics(item, text_metrics) else {
+        return line;
+      };
+      Some(line.map_or(metrics, |mut line: WriterLineMetrics| {
+        line.include(metrics);
+        line
+      }))
+    }),
     PageItem::Group { .. } => None,
     PageItem::Text(_)
     | PageItem::Image(_)

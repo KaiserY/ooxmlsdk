@@ -1025,6 +1025,7 @@ pub(crate) struct InlineShape {
   pub text_box_auto_fit: bool,
   pub text_box_resizes_to_fit: bool,
   pub text_box_word_wrap: bool,
+  pub text_box_clip_vertical_overflow: bool,
   pub text_vertical_alignment: TextBoxVerticalAlignment,
 }
 
@@ -1158,6 +1159,10 @@ pub(crate) struct FloatingImagePlacement {
   /// The shared host extent used by `wp:align` for children of a DrawingML
   /// group. Child geometry still keeps its own mapped width and height.
   pub alignment_extent: Option<FloatingAlignmentExtent>,
+  /// Child offset inside a percentage-sized VML group host. The host extent
+  /// owns alignment; this offset is scaled with that host at layout time.
+  pub group_child_offset_x_pt: f32,
+  pub group_child_offset_y_pt: f32,
   pub horizontal_offset_pt: f32,
   pub vertical_offset_pt: f32,
   pub horizontal_offset_pct: Option<f32>,

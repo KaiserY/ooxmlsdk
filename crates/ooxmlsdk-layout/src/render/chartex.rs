@@ -271,6 +271,7 @@ struct PlotRect {
 #[derive(Clone, Debug)]
 struct Appearance {
   host: ChartExHost,
+  chart_width_pt: f32,
   theme: ChartExTheme,
   chart_fill: RgbColor,
   chart_gradient: Option<a::GradientFill>,
@@ -1099,6 +1100,7 @@ fn chart_appearance(
 
   Appearance {
     host: options.host,
+    chart_width_pt: options.frame.width_pt,
     theme: options.theme,
     chart_fill,
     chart_gradient,
@@ -2135,6 +2137,7 @@ struct AxisScale {
 const OFFICE_FIXED_CHART_CENTER_GRID_PT: f32 = 0.06;
 const OFFICE_FIXED_CHART_EDGE_GRID_PT: f32 = 0.12;
 const OFFICE_FIXED_CHART_EDGE_GRID_PHASE_PT: f32 = 0.06;
+const AUTOMATIC_AXIS_TITLE_DISTANCE_RATIO: f32 = 0.02;
 
 impl AxisScale {
   fn y(self, plot: PlotRect, value: f64) -> f32 {
@@ -2220,20 +2223,7 @@ fn cartesian_plot_with_top_inset(plot: PlotRect, options: CartesianPlotOptions<'
     use_excel_minimum_gutter,
   } = options;
   let style = &appearance.label_style;
-  let format = axis
-    .and_then(|axis| axis.number_format.as_ref())
-    .map(|format| format.format_code.as_str());
-  let mut widest_label = 0.0_f32;
-  let mut value = scale.minimum;
-  let mut guard = 0;
-  while value <= scale.maximum + scale.major * 0.001 && guard < 100 {
-    widest_label = widest_label.max(text_width(
-      &format_chart_number(value / scale.divisor, format),
-      style,
-    ));
-    value += scale.major;
-    guard += 1;
-  }
+  let mut widest_label = widest_value_axis_label(scale, axis, style);
   // Office keeps a stable value-axis gutter even when every visible tick is
   // a single digit. The shaped "0.0" template is the lower bound exposed by
   // paretoLine.xlsx; wider labels continue to grow the gutter normally.
@@ -2288,6 +2278,24 @@ fn cartesian_plot_with_top_inset(plot: PlotRect, options: CartesianPlotOptions<'
     width: (plot.width - left - right).max(1.0),
     height: data_plot_height,
   }
+}
+
+fn widest_value_axis_label(scale: AxisScale, axis: Option<&cx::Axis>, style: &TextStyle) -> f32 {
+  let format = axis
+    .and_then(|axis| axis.number_format.as_ref())
+    .map(|format| format.format_code.as_str());
+  let mut widest_label = 0.0_f32;
+  let mut value = scale.minimum;
+  let mut guard = 0;
+  while value <= scale.maximum + scale.major * 0.001 && guard < 100 {
+    widest_label = widest_label.max(text_width(
+      &format_chart_number(value / scale.divisor, format),
+      style,
+    ));
+    value += scale.major;
+    guard += 1;
+  }
+  widest_label
 }
 
 fn excel_wrapped_value_axis_title_gutter(
@@ -2376,6 +2384,22 @@ fn axis_title(title: Option<&cx::AxisTitle>, ui_language: Option<&str>) -> Optio
         .filter(|value| !value.is_empty())
     });
   explicit.or_else(|| Some(automatic_axis_title(ui_language).to_string()))
+}
+
+fn axis_title_offset_points(title: Option<&cx::AxisTitle>) -> (f32, f32) {
+  let Some(offset) = title.and_then(|title| title.offset.as_ref()) else {
+    return (0.0, 0.0);
+  };
+  // [MS-ODRAWXML] 2.24.3.66 defines these as signed inch offsets from the
+  // automatic position, with positive left/top values moving right/down.
+  let points = |inches: f64| {
+    if inches.is_finite() {
+      (inches * 72.0) as f32
+    } else {
+      0.0
+    }
+  };
+  (points(offset.left), points(offset.top))
 }
 
 fn automatic_axis_title(ui_language: Option<&str>) -> &'static str {
@@ -2552,6 +2576,34 @@ struct AxisPaintOptions<'a> {
   category_crossing: CategoryAxisCrossing,
 }
 
+fn automatic_value_axis_title_center(
+  data_plot: PlotRect,
+  scale: AxisScale,
+  axis: Option<&cx::Axis>,
+  appearance: &Appearance,
+  title: &str,
+  style: &TextStyle,
+) -> (f32, f32) {
+  let show_ticks = axis.is_none_or(|axis| axis.tick_labels.is_some());
+  let outer_axis_left = if show_ticks {
+    data_plot.x - 6.25 - widest_value_axis_label(scale, axis, &appearance.label_style)
+  } else {
+    data_plot.x
+  };
+  let title_cross_extent = TextMetrics::new()
+    .vertical_metrics_for_text(title, style)
+    .ink_height_pt();
+  // LibreOffice ChartView positions an automatic left-axis title outside the
+  // complete diagram-plus-axes rectangle by 2% of the chart width. Office's
+  // 216pt and 432pt Word chart references expose the same proportional gap.
+  (
+    outer_axis_left
+      - appearance.chart_width_pt * AUTOMATIC_AXIS_TITLE_DISTANCE_RATIO
+      - title_cross_extent * 0.5,
+    data_plot.y + data_plot.height * 0.5,
+  )
+}
+
 fn lower_axes(
   items: &mut Vec<PageItem>,
   data_plot: PlotRect,
@@ -2568,6 +2620,8 @@ fn lower_axes(
   } = options;
   let value_axis = value_axis(chart_space);
   let category_axis = category_axis(chart_space);
+  let value_axis_title = value_axis.and_then(|axis| axis.axis_title.as_deref());
+  let category_axis_title = category_axis.and_then(|axis| axis.axis_title.as_deref());
   let value_hidden = value_axis
     .and_then(|axis| axis.hidden)
     .is_some_and(|hidden| hidden.as_bool());
@@ -2652,12 +2706,10 @@ fn lower_axes(
       value += scale.major;
       guard += 1;
     }
-    if let Some(title) = axis_title(
-      value_axis.and_then(|axis| axis.axis_title.as_deref()),
-      ui_language,
-    ) {
+    if let Some(title) = axis_title(value_axis_title, ui_language) {
       let mut style = appearance.axis_title_style.clone();
       style.rotation_deg = -90.0;
+      let (offset_x, offset_y) = axis_title_offset_points(value_axis_title);
       let maximum_inline_width =
         (data_plot.height - style.font_size_pt * 4.0).max(style.font_size_pt * 2.0);
       let wrapped = wrap_chart_axis_title(&title, maximum_inline_width, &style);
@@ -2667,13 +2719,15 @@ fn lower_axes(
         // and advances columns by the resolved font line height.
         let wrapped_gutter =
           excel_wrapped_value_axis_title_gutter(data_plot.height, value_axis, appearance);
-        let block_center_x =
-          data_plot.x - (12.05 + appearance.axis_title_style.font_size_pt * 1.62 + wrapped_gutter);
+        let block_center_x = data_plot.x
+          - (12.05 + appearance.axis_title_style.font_size_pt * 1.62 + wrapped_gutter)
+          + offset_x;
         // LibreOffice ChartView centers vertical titles on the plot area
         // excluding axes and data tables; Office fixed output follows the
         // same geometry, then snaps the rotated frame upward on its output
         // grid. push_centered_rotated_text owns the remaining glyph metrics.
-        let center_y = data_plot.y + data_plot.height * 0.5 - OFFICE_FIXED_CHART_EDGE_GRID_PT * 2.5;
+        let center_y =
+          data_plot.y + data_plot.height * 0.5 - OFFICE_FIXED_CHART_EDGE_GRID_PT * 2.5 + offset_y;
         let line_advance = appearance.axis_title_style.font_size_pt * 1.227;
         let line_center = (wrapped.len().saturating_sub(1)) as f32 * 0.5;
         let mut metrics = TextMetrics::new();
@@ -2691,10 +2745,14 @@ fn lower_axes(
           );
         }
       } else {
-        push_text(
+        let (center_x, center_y) = automatic_value_axis_title_center(
+          data_plot, scale, value_axis, appearance, &title, &style,
+        );
+        let width = TextMetrics::new().measure_text(&title, &style);
+        push_centered_rotated_text(
           items,
-          data_plot.x - 34.0,
-          data_plot.y + data_plot.height * 0.62,
+          (center_x + offset_x, center_y + offset_y),
+          width,
           title,
           style,
         );
@@ -2728,14 +2786,12 @@ fn lower_axes(
         );
       }
     }
-    if let Some(title) = axis_title(
-      category_axis.and_then(|axis| axis.axis_title.as_deref()),
-      ui_language,
-    ) {
+    if let Some(title) = axis_title(category_axis_title, ui_language) {
+      let (offset_x, offset_y) = axis_title_offset_points(category_axis_title);
       push_centered_text(
         items,
         PlotRect {
-          x: data_plot.x,
+          x: data_plot.x + offset_x,
           // The title follows the category-label line rather than sharing
           // its slot. Office reserves a 1.25-em label line and a 0.65-em
           // title gap after the fixed 6.5pt tick-label inset.
@@ -2743,7 +2799,8 @@ fn lower_axes(
             + data_plot.height
             + 6.5
             + appearance.label_style.font_size_pt * 1.25
-            + appearance.axis_title_style.font_size_pt * 0.65,
+            + appearance.axis_title_style.font_size_pt * 0.65
+            + offset_y,
           width: data_plot.width,
           height: appearance.axis_title_style.font_size_pt * 1.4,
         },
@@ -6451,5 +6508,18 @@ mod tests {
       (scale.minimum, scale.maximum, scale.major),
       (-100.0, 150.0, 50.0)
     );
+  }
+
+  #[test]
+  fn axis_title_offset_converts_signed_inches_to_points() {
+    let title = cx::AxisTitle {
+      offset: Some(cx::Offset {
+        left: -0.25,
+        top: 0.5,
+      }),
+      ..cx::AxisTitle::default()
+    };
+    assert_eq!(axis_title_offset_points(Some(&title)), (-18.0, 36.0));
+    assert_eq!(axis_title_offset_points(None), (0.0, 0.0));
   }
 }

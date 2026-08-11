@@ -397,22 +397,34 @@ fn paragraph_model_with_base_impl<'a>(
   }
   let line_vertical_alignment = format.line_vertical_alignment.unwrap_or_default();
   paragraph_mark_style.line_vertical_alignment = line_vertical_alignment;
+  paragraph_mark_style.use_windows_font_metrics = true;
   list_label_style.line_vertical_alignment = line_vertical_alignment;
+  list_label_style.use_windows_font_metrics = true;
   for inline in &mut inlines {
     match inline {
       super::InlineItem::Text(run) => {
         run.style.line_vertical_alignment = line_vertical_alignment;
+        run.style.use_windows_font_metrics = true;
       }
       super::InlineItem::PositionalTab(tab) => {
         tab.style.line_vertical_alignment = line_vertical_alignment;
+        tab.style.use_windows_font_metrics = true;
       }
       super::InlineItem::Ruby(ruby) => {
         for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
           run.style.line_vertical_alignment = line_vertical_alignment;
+          run.style.use_windows_font_metrics = true;
         }
+      }
+      super::InlineItem::NoteReferenceMark(mark) => {
+        mark.style.use_windows_font_metrics = true;
+      }
+      super::InlineItem::NoteSeparatorMark(mark) => {
+        mark.style.use_windows_font_metrics = true;
       }
       super::InlineItem::LegacyFormCheckBox(check_box) => {
         check_box.style.line_vertical_alignment = line_vertical_alignment;
+        check_box.style.use_windows_font_metrics = true;
       }
       _ => {}
     }

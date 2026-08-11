@@ -165,6 +165,9 @@ pub trait FontStyleRef {
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     0.0
   }
+  fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
+    false
+  }
 }
 
 impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
@@ -306,6 +309,10 @@ impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
 
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     (**self).cjk_punctuation_compression_ratio()
+  }
+
+  fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
+    (**self).wordprocessingml_balance_single_byte_double_byte_width()
   }
 }
 
@@ -588,6 +595,10 @@ impl FontStyleRef for TextStyle {
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     self.cjk_punctuation_compression_ratio
   }
+
+  fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
+    self.wordprocessingml_balance_single_byte_double_byte_width
+  }
 }
 
 impl FontStyleRef for common::TextStyle<'_> {
@@ -751,6 +762,10 @@ impl FontStyleRef for common::TextStyle<'_> {
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     self.cjk_punctuation_compression_ratio
   }
+
+  fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
+    self.wordprocessingml_balance_single_byte_double_byte_width
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -802,6 +817,49 @@ fn apply_wordprocessingml_punctuation_compression(run: &mut ShapedRun<'_, '_>, r
     total_reduction += reduction;
   }
   run.advance_pt = (run.advance_pt - total_reduction).max(0.0);
+}
+
+fn apply_wordprocessingml_single_double_byte_width_balance(
+  run: &mut ShapedRun<'_, '_>,
+  horizontal_scale: f32,
+  character_spacing_pt: f32,
+) {
+  let inside_cjk_script = matches!(
+    run.script,
+    Some(TextScript::Han | TextScript::Hiragana | TextScript::Katakana | TextScript::Hangul)
+  );
+  let target_space_advance =
+    run.font_size_pt.0 * 0.5 * horizontal_scale.max(f32::EPSILON) + character_spacing_pt;
+  let run_start = run.text_range.start;
+  let mut total_adjustment = 0.0;
+
+  for glyph in run.glyphs.to_mut() {
+    if glyph.source_char != Some(' ') {
+      continue;
+    }
+    let Some(local_start) = glyph.text_range.start.checked_sub(run_start) else {
+      continue;
+    };
+    let Some(local_end) = glyph.text_range.end.checked_sub(run_start) else {
+      continue;
+    };
+    if local_start > local_end || local_end > run.text.len() {
+      continue;
+    }
+    let previous_matches = local_start == 0
+      || inside_cjk_script
+      || run.text[..local_start].chars().next_back() == Some(' ');
+    let next_matches = local_end == run.text.len()
+      || inside_cjk_script
+      || run.text[local_end..].chars().next() == Some(' ');
+    if !previous_matches && !next_matches {
+      continue;
+    }
+
+    total_adjustment += target_space_advance - glyph.x_advance_pt;
+    glyph.x_advance_pt = target_space_advance;
+  }
+  run.advance_pt += total_adjustment;
 }
 
 pub fn load_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
@@ -1101,6 +1159,16 @@ impl FontResolver {
         let _ = self.font_face_data_from_registry(&registry, &run.font_id);
       }
       for run in &mut runs {
+        if style.wordprocessingml_balance_single_byte_double_byte_width() {
+          // ECMA-376 Part 1 §17.15.3.3 balances half-width and full-width
+          // spaces at 1:2. Writer's BalanceCjkSpaces applies the adjustment
+          // to raw advances before every other kind of justification.
+          apply_wordprocessingml_single_double_byte_width_balance(
+            run,
+            style.horizontal_scale(),
+            style.character_spacing_pt(),
+          );
+        }
         apply_wordprocessingml_punctuation_compression(
           run,
           style.cjk_punctuation_compression_ratio(),
@@ -1616,6 +1684,7 @@ pub fn cached_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFace
 
 #[cfg(test)]
 mod tests {
+  use std::borrow::Cow;
   use std::sync::Arc;
 
   use crate::common::{
@@ -1624,15 +1693,69 @@ mod tests {
   };
   use crate::docx::TextStyle;
   use ooxmlsdk_fonts::{
-    FontCharset, FontSize, ScriptScanOptions, TextDirection, TextScript, WordprocessingFontSlot,
-    script_direction_runs_with_options,
+    FontCharset, FontId, FontSize, ScriptScanOptions, ShapedGlyph, ShapedRun, ShapingDiagnostics,
+    TextDirection, TextScript, WordprocessingFontSlot, script_direction_runs_with_options,
   };
 
   use super::{
-    effective_font_size_pt, font_request, font_request_for_slot, load_text_face,
-    materialize_wordprocessingml_source_font_slot, script_fallback_font_family_for_slot,
-    script_font_family_for_slot, script_scan_options, shape_text_runs,
+    apply_wordprocessingml_single_double_byte_width_balance, effective_font_size_pt, font_request,
+    font_request_for_slot, load_text_face, materialize_wordprocessingml_source_font_slot,
+    script_fallback_font_family_for_slot, script_font_family_for_slot, script_scan_options,
+    shape_text_runs,
   };
+
+  fn synthetic_space_run(text: &'static str, script: TextScript) -> ShapedRun<'static, 'static> {
+    let glyphs = text
+      .char_indices()
+      .map(|(start, ch)| ShapedGlyph {
+        text_range: start..start + ch.len_utf8(),
+        source_char: Some(ch),
+        x_advance_pt: if ch == ' ' { 2.5 } else { 6.0 },
+        ..ShapedGlyph::default()
+      })
+      .collect::<Vec<_>>();
+    let advance_pt = glyphs.iter().map(|glyph| glyph.x_advance_pt).sum();
+    ShapedRun {
+      font_id: FontId(Arc::from("synthetic-balance-spaces")),
+      font_size_pt: FontSize(10.0),
+      text,
+      text_range: 0..text.len(),
+      glyphs: Cow::Owned(glyphs),
+      advance_pt,
+      direction: TextDirection::LeftToRight,
+      script: Some(script),
+      safe_breaks: Vec::new(),
+      approximate: false,
+      decorations: Vec::new(),
+      diagnostics: ShapingDiagnostics::default(),
+    }
+  }
+
+  #[test]
+  fn single_double_byte_balance_expands_only_qualifying_latin_spaces() {
+    let mut trailing = synthetic_space_run("A: ", TextScript::Latin);
+    apply_wordprocessingml_single_double_byte_width_balance(&mut trailing, 1.0, 0.0);
+    assert_eq!(trailing.glyphs[2].x_advance_pt, 5.0);
+    assert_eq!(trailing.advance_pt, 17.0);
+
+    let mut internal = synthetic_space_run("A B", TextScript::Latin);
+    apply_wordprocessingml_single_double_byte_width_balance(&mut internal, 1.0, 0.0);
+    assert_eq!(internal.glyphs[1].x_advance_pt, 2.5);
+    assert_eq!(internal.advance_pt, 14.5);
+
+    let mut adjacent = synthetic_space_run("A  B", TextScript::Latin);
+    apply_wordprocessingml_single_double_byte_width_balance(&mut adjacent, 1.0, 0.0);
+    assert_eq!(adjacent.glyphs[1].x_advance_pt, 5.0);
+    assert_eq!(adjacent.glyphs[2].x_advance_pt, 5.0);
+  }
+
+  #[test]
+  fn single_double_byte_balance_resets_cjk_spaces_before_other_spacing() {
+    let mut run = synthetic_space_run("甲 乙", TextScript::Han);
+    apply_wordprocessingml_single_double_byte_width_balance(&mut run, 0.8, 0.25);
+    assert_eq!(run.glyphs[1].x_advance_pt, 4.25);
+    assert_eq!(run.advance_pt, 16.25);
+  }
 
   #[test]
   fn kerning_feature_follows_the_wordprocessingml_size_threshold() {

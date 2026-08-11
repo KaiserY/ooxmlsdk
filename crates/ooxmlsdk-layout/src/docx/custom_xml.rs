@@ -3,6 +3,9 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::cell::RefCell;
 
+const CORE_PROPERTIES_STORE_ITEM_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
+const EXTENDED_PROPERTIES_STORE_ITEM_ID: &str = "{6668398D-A668-4E3E-A5EB-62B293D839F1}";
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CustomXmlBindings {
   entries: Vec<CustomXmlBindingEntry>,
@@ -34,7 +37,25 @@ impl CustomXmlBindings {
       && let Ok(Some(xml)) = part.data_as_str(package)
     {
       entries.push(CustomXmlBindingEntry {
-        store_item_id: Some("{6C3C8BC8-F283-45AE-878A-BAB7291924A1}".to_owned()),
+        store_item_id: Some(CORE_PROPERTIES_STORE_ITEM_ID.to_owned()),
+        xml: xml.to_owned(),
+      });
+    }
+    let extended_properties_part = {
+      package
+        .get_parts_of_type::<
+          ooxmlsdk::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
+        >()
+        .next()
+    };
+    if let Some(part) = extended_properties_part
+      && let Ok(Some(xml)) = part.data_as_str(package)
+    {
+      // Word exposes docProps/app.xml to SDT XML mappings through this
+      // reserved store item ID. LibreOffice SdtHelper::loadPropertiesXMLs()
+      // uses the same fixed mapping alongside the core-properties store.
+      entries.push(CustomXmlBindingEntry {
+        store_item_id: Some(EXTENDED_PROPERTIES_STORE_ITEM_ID.to_owned()),
         xml: xml.to_owned(),
       });
     }

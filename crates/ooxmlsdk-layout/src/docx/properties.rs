@@ -112,11 +112,82 @@ pub(super) fn paragraph_mark_run_style(
   style
 }
 
+pub(super) fn paragraph_mark_run_style_for_numbering(
+  properties: Option<&w::ParagraphMarkRunProperties>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+) -> TextStyle {
+  let mut style = base_style;
+  let Some(properties) = properties else {
+    return style;
+  };
+
+  // ECMA-376 Part 1 §17.3.1.29 describes these properties as formatting
+  // for the paragraph-mark glyph. Word additionally applies a filtered
+  // subset to its synthesized numbering portion. LibreOffice mirrors that
+  // compatibility rule in checkApplyParagraphMarkFormatToNumbering(): run
+  // shading, underline, and escapement are excluded, while highlight and
+  // the remaining character properties are retained. A referenced character
+  // style is subject to the same exclusions.
+  style = styles.character_run_style_for_numbering(
+    super::paragraph_mark_run_properties_run_style(properties)
+      .map(|run_style| run_style.val.as_str()),
+    style,
+  );
+  merge_run_style_with_policy(
+    &mut style,
+    Some(RunProps::ParagraphMark(properties)),
+    &styles.theme_fonts,
+    &styles.theme_colors,
+    RunStyleMergePolicy::NUMBERING_PARAGRAPH_MARK,
+  );
+  styles
+    .apply_word_font_table_mappings(&mut style, RunProps::ParagraphMark(properties).run_fonts());
+  style
+}
+
+#[derive(Clone, Copy)]
+struct RunStyleMergePolicy {
+  shading: bool,
+  underline: bool,
+  escapement: bool,
+}
+
+impl RunStyleMergePolicy {
+  const ALL: Self = Self {
+    shading: true,
+    underline: true,
+    escapement: true,
+  };
+
+  const NUMBERING_PARAGRAPH_MARK: Self = Self {
+    shading: false,
+    underline: false,
+    escapement: false,
+  };
+}
+
 pub(super) fn merge_run_style(
   style: &mut TextStyle,
   properties: Option<RunProps<'_>>,
   theme_fonts: &ThemeFonts,
   theme_colors: &ThemeColors,
+) {
+  merge_run_style_with_policy(
+    style,
+    properties,
+    theme_fonts,
+    theme_colors,
+    RunStyleMergePolicy::ALL,
+  );
+}
+
+fn merge_run_style_with_policy(
+  style: &mut TextStyle,
+  properties: Option<RunProps<'_>>,
+  theme_fonts: &ThemeFonts,
+  theme_colors: &ThemeColors,
+  policy: RunStyleMergePolicy,
 ) {
   // This merger is WordprocessingML-specific. Preserve the rFonts slot
   // classifier even for styles constructed outside the document-default
@@ -281,7 +352,8 @@ pub(super) fn merge_run_style(
       }
     }
   }
-  if let Some(shading) = properties.shading()
+  if policy.shading
+    && let Some(shading) = properties.shading()
     && let Some(background) = text_background_shading_fill(shading, theme_colors).solid_color()
   {
     // ECMA-376 Part 1 §17.3.2.32 makes run shading a background behind
@@ -289,6 +361,12 @@ pub(super) fn merge_run_style(
     // selects the higher-contrast neutral for a dark run background.
     style.highlight = Some(background);
   }
+  let has_solid_text_fill = properties.text_fill().is_some_and(|fill_effect| {
+    matches!(
+      fill_effect.fill_text_effect_choice.as_ref(),
+      Some(w14::FillTextEffectChoice::SolidColorFillProperties(_))
+    )
+  });
   if let Some(fill_effect) = properties.text_fill() {
     match drawingml_text_effect_common_fill(fill_effect, theme_colors) {
       Some(common::Fill::None) => {
@@ -368,7 +446,13 @@ pub(super) fn merge_run_style(
             .as_deref()
             .cloned()
             .unwrap_or_default();
-          options.semantic_text_overlay = style.opacity <= f32::EPSILON;
+          // Word fixed output paints a solid text fill plus a solid outline
+          // as glyph paths, then retains a clipped transparent text object for
+          // search and extraction (tdf166325 and fdo79062). An implicit or
+          // gradient fill does not get that object (TextEffects_TextOutline
+          // and TextEffects_Groupshapes), while noFill still needs it for the
+          // independently painted outline (fdo80897).
+          options.semantic_text_overlay = has_solid_text_fill || style.opacity <= f32::EPSILON;
           options.outline_stroke =
             wordprocessing_text_outline_common_stroke(outline_effect, theme_colors);
           style.pdf_glyph_outline_options = Some(Arc::new(options));
@@ -545,14 +629,18 @@ pub(super) fn merge_run_style(
     }
     style.open_type_features.stylistic_sets = Some(enabled);
   }
-  if let Some(position) = properties.position() {
+  if policy.escapement
+    && let Some(position) = properties.position()
+  {
     // ECMA-376 Part 1 §17.3.2.24 defines w:position as a signed half-point
     // displacement from the surrounding text baseline without resizing the
     // font. LibreOffice defers this property until the final run size is
     // known, then imports the same physical displacement as CharEscapement.
     style.baseline_shift_pt = position.val.to_points() as f32;
   }
-  if let Some(underline) = properties.underline() {
+  if policy.underline
+    && let Some(underline) = properties.underline()
+  {
     style.underline = !matches!(underline.val, Some(w::UnderlineValues::None));
   }
   if let Some(strike) = properties.strike() {
@@ -570,7 +658,9 @@ pub(super) fn merge_run_style(
   if let Some(vanish) = properties.vanish() {
     style.hidden = vanish.val.is_none_or(|value| value.as_bool());
   }
-  if let Some(vertical_alignment) = properties.vertical_text_alignment() {
+  if policy.escapement
+    && let Some(vertical_alignment) = properties.vertical_text_alignment()
+  {
     apply_vertical_text_alignment(style, vertical_alignment.val);
   }
   if let Some(highlight) = properties.highlight() {

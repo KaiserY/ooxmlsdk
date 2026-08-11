@@ -287,18 +287,29 @@ fn export_decoded_image(
     resized = true;
   }
 
+  let mut interpolate = raster_interpolation(format);
   if format == RasterImageFormat::Jpeg
     && !export_options.use_lossless_compression
     && (resized || export_options.jpeg_quality.is_some())
   {
-    let jpeg = encode_jpeg(raster.image, export_options.jpeg_quality.unwrap_or(90))?;
-    return Image::from_jpeg_with_icc(jpeg.into(), raster.icc_profile.map(Into::into), true)
-      .map_err(PdfError::Krilla);
+    let jpeg = encode_jpeg(&raster.image, export_options.jpeg_quality.unwrap_or(90))?;
+    let (width, height) = raster.image.dimensions();
+    let lossless_color_bytes = u64::from(width) * u64::from(height) * 3;
+    if (jpeg.len() as u64) < lossless_color_bytes {
+      return Image::from_jpeg_with_icc(jpeg.into(), raster.icc_profile.map(Into::into), true)
+        .map_err(PdfError::Krilla);
+    }
+
+    // Word fixed output does not pay the JPEG header/DCT overhead for tiny
+    // rasters when it is larger than the decoded color plane. Its independent
+    // 2x2 JPEG fixtures become 12-byte RGB XObjects with `/Interpolate false`,
+    // while a 14x22 JPEG whose compressed stream is smaller remains DCT data.
+    interpolate = false;
   }
 
   Image::from_custom(
     PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile),
-    raster_interpolation(format),
+    interpolate,
   )
   .map_err(PdfError::Krilla)
 }
@@ -391,7 +402,7 @@ fn downsample_size(size: (u32, u32), max_size: (u32, u32)) -> Option<(u32, u32)>
   (target_width > 0 && target_height > 0).then_some((target_width, target_height))
 }
 
-fn encode_jpeg(image: image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
+fn encode_jpeg(image: &image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
   let rgb = image.to_rgb8();
   let (width, height) = rgb.dimensions();
   let width = u16::try_from(width)
@@ -877,7 +888,7 @@ mod tests {
 
   #[test]
   fn jpeg_export_uses_office_four_two_zero_sampling() {
-    let jpeg = encode_jpeg(DynamicImage::new_rgb8(16, 16), 75).unwrap();
+    let jpeg = encode_jpeg(&DynamicImage::new_rgb8(16, 16), 75).unwrap();
     let sof = jpeg
       .windows(2)
       .position(|marker| marker == [0xff, 0xc0])

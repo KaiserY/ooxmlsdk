@@ -160,6 +160,9 @@ pub struct TextStyle {
   pub wordprocessingml_font_slots: bool,
   /// Fraction of Word's maximum full-width punctuation compression to apply.
   pub cjk_punctuation_compression_ratio: f32,
+  /// Apply WordprocessingML's document-level half-width/full-width space
+  /// balancing compatibility rule before line justification.
+  pub wordprocessingml_balance_single_byte_double_byte_width: bool,
   pub pdf_glyph_outlines: bool,
   pub pdf_glyph_outline_options: Option<Arc<common::PdfGlyphOutlineOptions>>,
   pub(crate) text_glow: Option<common::drawingml_image_effects::WordprocessingTextGlow>,
@@ -269,6 +272,7 @@ impl Default for TextStyle {
       use_windows_font_metrics: false,
       wordprocessingml_font_slots: false,
       cjk_punctuation_compression_ratio: 0.0,
+      wordprocessingml_balance_single_byte_double_byte_width: false,
       pdf_glyph_outlines: false,
       pdf_glyph_outline_options: None,
       text_glow: None,
@@ -642,6 +646,8 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
+    wordprocessingml_balance_single_byte_double_byte_width: style
+      .wordprocessingml_balance_single_byte_double_byte_width,
     pdf_glyph_outlines: style.pdf_glyph_outlines,
     pdf_glyph_outline_options: style.pdf_glyph_outline_options,
     bold: style.bold,

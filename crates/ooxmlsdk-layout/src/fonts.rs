@@ -1512,11 +1512,11 @@ fn build_style_font_registry_for_slot(
         families.push(Cow::Borrowed(family));
       }
       // ECMA-376 Part 1 §21.1.2.5 requires DrawingML font substitution
-      // when the requested typeface is unavailable. Keep the requested face
-      // primary, but place document-scoped alternate names and the font-table
-      // family representative before generic platform fallbacks.
+      // when the requested typeface is unavailable. Keep these document-scoped
+      // alternate names in the missing-family phase; glyph fallback remains a
+      // separate coverage decision after the primary face has been selected.
       if !families.is_empty() {
-        registry.book.fallback_chains.insert(
+        registry.book.family_substitution_chains.insert(
           0,
           FontFallbackChain {
             requested_family: Some(Cow::Owned(requested_family.to_string())),

@@ -235,6 +235,26 @@ fn word_automatic_titled_bottom_layout(
     && chart.view_3d.is_none()
 }
 
+fn word_uses_hidden_vertical_value_band(
+  layout_profile: ChartLayoutProfile,
+  value_tick_labels_visible: bool,
+  horizontal_bar_only: bool,
+) -> bool {
+  layout_profile == ChartLayoutProfile::Word && !value_tick_labels_visible && !horizontal_bar_only
+}
+
+fn word_titled_bottom_band_height(
+  has_word_titled_bottom_layout: bool,
+  horizontal_bar_only: bool,
+  frame_height_pt: f32,
+) -> f32 {
+  if has_word_titled_bottom_layout && !horizontal_bar_only {
+    profiles::WORD_TITLED_BOTTOM_DEVICE_BAND_HEIGHT_PT
+  } else {
+    frame_height_pt
+  }
+}
+
 fn east_asian_title_script(title: &str, style: &TextStyle) -> Option<TextScript> {
   script_direction_runs(title, FontSize(style.font_size_pt), style.small_caps)
     .into_iter()
@@ -856,10 +876,20 @@ pub(crate) fn lower_clustered_column_chart(
   };
   let has_word_titled_bottom_layout = word_automatic_titled_bottom_layout(chart, style);
   let word_titled_bottom_adjustment = if has_word_titled_bottom_layout {
-    profiles::WORD_TITLED_BOTTOM_LEGEND
+    if horizontal_bar_only {
+      profiles::WORD_TITLED_BOTTOM_HORIZONTAL_BAR
+    } else {
+      profiles::WORD_TITLED_BOTTOM_LEGEND
+    }
   } else {
     profiles::CartesianLayoutAdjustment::default()
   };
+  let has_word_titled_bottom_device_bands = has_word_titled_bottom_layout && !horizontal_bar_only;
+  let automatic_band_height_pt = word_titled_bottom_band_height(
+    has_word_titled_bottom_layout,
+    horizontal_bar_only,
+    frame.height_pt,
+  );
   let powerpoint_derived_title_adjustment =
     if has_powerpoint_derived_single_series_title && has_side_legend && chart.plot_layout.is_none()
     {
@@ -936,7 +966,7 @@ pub(crate) fn lower_clustered_column_chart(
   // title, value labels, category labels, and legend. The distances scale with
   // chart height, while actual label widths determine the left plot inset.
   let title_top = frame.y_pt
-    + frame.height_pt
+    + automatic_band_height_pt
       * if style.layout_profile == ChartLayoutProfile::Excel
         && chart.title_overlay
         && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic))
@@ -970,26 +1000,28 @@ pub(crate) fn lower_clustered_column_chart(
     frame.y_pt + frame.height_pt
       - data_table_height
       - if has_bottom_legend {
-        legend_line_height + frame.height_pt * profiles::DATA_TABLE_BOTTOM_LEGEND_GAP_RATIO
+        legend_line_height + automatic_band_height_pt * profiles::DATA_TABLE_BOTTOM_LEGEND_GAP_RATIO
       } else {
-        frame.height_pt * category_bottom_ratio
+        automatic_band_height_pt * category_bottom_ratio
       }
   } else if !category_tick_labels_visible {
-    frame.y_pt + frame.height_pt * (1.0 - category_bottom_ratio)
+    frame.y_pt + frame.height_pt - automatic_band_height_pt * category_bottom_ratio
   } else if has_bottom_legend {
     legend_top
       - category_label_height
-      - frame.height_pt
+      - automatic_band_height_pt
         * if has_explicit_powerpoint_title {
           profiles::POWERPOINT_TITLED_BOTTOM_LEGEND_CATEGORY_GAP_RATIO
         } else {
           profiles::DEFAULT_BOTTOM_LEGEND_CATEGORY_GAP_RATIO
         }
   } else {
-    frame.y_pt + frame.height_pt - category_label_height - frame.height_pt * category_bottom_ratio
+    frame.y_pt + frame.height_pt
+      - category_label_height
+      - automatic_band_height_pt * category_bottom_ratio
   } + frame.height_pt * word_side_adjustment.category_top_ratio
     + frame.height_pt * word_no_legend_adjustment.category_top_ratio
-    + frame.height_pt * word_titled_bottom_adjustment.category_top_ratio
+    + automatic_band_height_pt * word_titled_bottom_adjustment.category_top_ratio
     + frame.height_pt * powerpoint_derived_title_adjustment.category_top_ratio
     + frame.height_pt * powerpoint_generated_title_bottom_adjustment.category_top_ratio
     + frame.height_pt * powerpoint_generated_title_no_legend_adjustment.category_top_ratio
@@ -1056,7 +1088,7 @@ pub(crate) fn lower_clustered_column_chart(
     frame.y_pt + frame.height_pt * untitled_plot_top_ratio
   } + frame.height_pt * word_side_adjustment.plot_top_ratio
     + frame.height_pt * word_no_legend_adjustment.plot_top_ratio
-    + frame.height_pt * word_titled_bottom_adjustment.plot_top_ratio
+    + automatic_band_height_pt * word_titled_bottom_adjustment.plot_top_ratio
     + frame.height_pt * powerpoint_derived_title_adjustment.plot_top_ratio
     + frame.height_pt * powerpoint_generated_title_bottom_adjustment.plot_top_ratio
     + frame.height_pt * powerpoint_generated_title_no_legend_adjustment.plot_top_ratio
@@ -1071,7 +1103,8 @@ pub(crate) fn lower_clustered_column_chart(
     && let Some(script) = east_asian_title_script(title, &style.title)
   {
     let metrics = metrics.vertical_metrics_for_script(&style.title, script);
-    plot_top += frame.height_pt * profiles::WORD_BOTTOM_LEGEND_EAST_ASIAN_TITLE_EXTRA_RATIO
+    plot_top += automatic_band_height_pt
+      * profiles::WORD_BOTTOM_LEGEND_EAST_ASIAN_TITLE_EXTRA_RATIO
       + (metrics.line_height_pt() - style.title.font_size_pt).max(0.0);
   }
   if has_independent_axis_text_layout {
@@ -1157,7 +1190,7 @@ pub(crate) fn lower_clustered_column_chart(
       profiles::DEFAULT_CATEGORY_PLOT_GAP_RATIO
     };
   let mut plot_bottom = category_top
-    - frame.height_pt
+    - automatic_band_height_pt
       * if has_side_legend {
         side_category_gap_ratio
       } else if has_bottom_legend && has_explicit_powerpoint_title {
@@ -1168,9 +1201,9 @@ pub(crate) fn lower_clustered_column_chart(
   plot_bottom += frame.height_pt
     * (word_side_adjustment.plot_bottom_ratio
       + word_no_legend_adjustment.plot_bottom_ratio
-      + word_titled_bottom_adjustment.plot_bottom_ratio
       + powerpoint_derived_title_adjustment.plot_bottom_ratio
-      + powerpoint_generated_title_bottom_adjustment.plot_bottom_ratio);
+      + powerpoint_generated_title_bottom_adjustment.plot_bottom_ratio)
+    + automatic_band_height_pt * word_titled_bottom_adjustment.plot_bottom_ratio;
   plot_bottom +=
     frame.height_pt * powerpoint_generated_title_no_legend_adjustment.plot_bottom_ratio;
   plot_bottom += frame.height_pt * excel_vary_colors_data_table_adjustment.plot_bottom_ratio;
@@ -1333,7 +1366,11 @@ pub(crate) fn lower_clustered_column_chart(
     profiles::EXCEL_LEGACY_SINGLE_SERIES_TICK_LEFT_RATIO
   } else if has_untitled_bottom_column_layout {
     profiles::EXCEL_UNTITLED_BOTTOM_COLUMN_TICK_LEFT_RATIO
-  } else if !value_tick_labels_visible && style.layout_profile == ChartLayoutProfile::Word {
+  } else if word_uses_hidden_vertical_value_band(
+    style.layout_profile,
+    value_tick_labels_visible,
+    horizontal_bar_only,
+  ) {
     profiles::WORD_HIDDEN_VALUE_TICK_LEFT_RATIO
   } else if has_side_legend {
     match style.layout_profile {
@@ -1366,7 +1403,7 @@ pub(crate) fn lower_clustered_column_chart(
       0.0
     };
   let tick_left = frame.x_pt
-    + frame.height_pt * tick_left_ratio
+    + automatic_band_height_pt * tick_left_ratio
     + if primary_value_axis_on_right {
       0.0
     } else {
@@ -1389,7 +1426,7 @@ pub(crate) fn lower_clustered_column_chart(
       0.0
     };
   let mut tick_left = tick_left
-    + frame.height_pt * word_titled_bottom_adjustment.tick_left_ratio
+    + automatic_band_height_pt * word_titled_bottom_adjustment.tick_left_ratio
     + frame.height_pt * powerpoint_derived_title_adjustment.tick_left_ratio
     + frame.height_pt * powerpoint_generated_title_no_legend_adjustment.tick_left_ratio
     + if has_indexed_scatter_automatic_layout {
@@ -1403,7 +1440,7 @@ pub(crate) fn lower_clustered_column_chart(
   tick_left +=
     frame.height_pt * excel_explicit_date_line_top_right_overlay_adjustment.tick_left_ratio;
   let tick_gap = if value_tick_labels_visible {
-    frame.height_pt
+    automatic_band_height_pt
       * if has_side_legend {
         if has_shifted_category_empty_side_legend_layout {
           profiles::EXCEL_SHIFTED_CATEGORY_EMPTY_SIDE_LEGEND_TICK_GAP_RATIO
@@ -1446,10 +1483,14 @@ pub(crate) fn lower_clustered_column_chart(
     - if has_side_legend {
       side_legend_width + side_plot_outer_margin + side_plot_gap
     } else {
-      frame.height_pt
+      automatic_band_height_pt
         * if has_bottom_legend && has_explicit_powerpoint_title {
           profiles::POWERPOINT_TITLED_BOTTOM_RIGHT_MARGIN_RATIO
-        } else if !value_tick_labels_visible && style.layout_profile == ChartLayoutProfile::Word {
+        } else if word_uses_hidden_vertical_value_band(
+          style.layout_profile,
+          value_tick_labels_visible,
+          horizontal_bar_only,
+        ) {
           profiles::WORD_HIDDEN_VALUE_RIGHT_MARGIN_RATIO
         } else {
           profiles::DEFAULT_RIGHT_MARGIN_RATIO
@@ -1464,17 +1505,17 @@ pub(crate) fn lower_clustered_column_chart(
   plot_left += frame.height_pt
     * (word_side_adjustment.plot_left_ratio
       + word_no_legend_adjustment.plot_left_ratio
-      + word_titled_bottom_adjustment.plot_left_ratio
       + powerpoint_derived_title_adjustment.plot_left_ratio
       + powerpoint_generated_title_no_legend_adjustment.plot_left_ratio
-      + legacy_default_single_series_adjustment.plot_left_ratio);
+      + legacy_default_single_series_adjustment.plot_left_ratio)
+    + automatic_band_height_pt * word_titled_bottom_adjustment.plot_left_ratio;
   plot_right += frame.height_pt
     * (word_side_adjustment.plot_right_ratio
       + word_no_legend_adjustment.plot_right_ratio
-      + word_titled_bottom_adjustment.plot_right_ratio
       + powerpoint_derived_title_adjustment.plot_right_ratio
       + powerpoint_generated_title_no_legend_adjustment.plot_right_ratio
-      + legacy_default_single_series_adjustment.plot_right_ratio);
+      + legacy_default_single_series_adjustment.plot_right_ratio)
+    + automatic_band_height_pt * word_titled_bottom_adjustment.plot_right_ratio;
   if style.layout_profile == ChartLayoutProfile::Excel
     && has_side_legend
     && has_layout_explicit_title
@@ -1726,7 +1767,7 @@ pub(crate) fn lower_clustered_column_chart(
         )
       },
     );
-  let has_excel_outer_value_label_band = has_legacy_single_series_title_layout
+  let has_outer_value_label_band = has_legacy_single_series_title_layout
     || has_untitled_bottom_column_layout
     || has_untitled_bottom_line_no_marker_layout
     || has_explicit_bottom_column_layout
@@ -1734,7 +1775,8 @@ pub(crate) fn lower_clustered_column_chart(
     || has_indexed_scatter_automatic_layout
     || has_excel_explicit_title_side_legend_layout
     || has_excel_title_only_layout
-    || has_excel_vary_colors_data_table_layout;
+    || has_excel_vary_colors_data_table_layout
+    || has_word_titled_bottom_device_bands;
   // LibreOffice's TickFactory2D keeps the fixed 1 mm
   // AXIS2D_TICKLABELSPACING separate from the projected tick geometry. The
   // ordinary 2D profiles already absorb that spacing into their calibrated
@@ -1748,15 +1790,18 @@ pub(crate) fn lower_clustered_column_chart(
   };
   let primary_value_label_gap = if primary_value_axis_on_right {
     tick_gap + frame.height_pt * 0.012_59 + projected_tick_label_spacing
-  } else if has_excel_outer_value_label_band && axis_text_projection_3d.is_none() {
-    // These Excel automatic profiles own an outer value-label band
-    // independently of the residual plot inset. Deriving labels from
+  } else if has_outer_value_label_band && axis_text_projection_3d.is_none() {
+    // These automatic profiles own an outer value-label band independently
+    // of the residual plot inset. Deriving labels from
     // `plot_left` with only the generic gap incorrectly carries that residual
     // into every label. Office fixed output for both `smoothed_series`
     // generations, `tdf115012`, `no_marker`, `chart_title`, the three
     // `testChartTitleProperties*Fill` variants, and `autotitledel_2013`,
     // `dispBlanksAs_2013`, and `ser_labels` instead keep the widest label at
     // `tick_left` while the plot remains at its separately adjusted edge.
+    // Word's fixed titled-bottom band has the same ownership split: its
+    // 6.6pt label edge is stable while the measured label width still
+    // contributes to `plot_left`.
     (plot_left - tick_left - maximum_tick_width).max(0.0)
   } else {
     tick_gap + projected_tick_label_spacing
@@ -7611,7 +7656,11 @@ fn clustered_series_slot_center(
       category_index,
       context.category_count,
     ),
-    if clustered { peer_index } else { 0 },
+    if clustered {
+      category_axis_series_slot(series.kind, peer_index, peer_count)
+    } else {
+      0
+    },
     context.category_count,
     if clustered { peer_count } else { 1 },
     context.chart.gap_width_percent,
@@ -8980,7 +9029,7 @@ fn lower_column_series(
       1
     };
     let slot_series_index = if series.grouping == ChartSeriesGrouping::Clustered {
-      peer_index
+      category_axis_series_slot(series.kind, peer_index, peer_count)
     } else {
       0
     };
@@ -9653,7 +9702,7 @@ fn lower_bar_series(
       1
     };
     let slot_series_index = if series.grouping == ChartSeriesGrouping::Clustered {
-      peer_index
+      category_axis_series_slot(series.kind, peer_index, peer_count)
     } else {
       0
     };
@@ -11125,7 +11174,17 @@ fn lower_horizontal_bar_axes(
       push_text(
         &mut value_label_items,
         axis_x - width * 0.5,
-        axis_y + style.value_label.font_size_pt * if category_labels_first { 0.70 } else { 0.25 },
+        axis_y
+          + style.value_label.font_size_pt
+            * if category_labels_first || style.layout_profile == ChartLayoutProfile::Word {
+              // The immutable Word horizontal-bar fixtures place the 9pt
+              // bottom value labels in a 6.3pt outer band. This is the
+              // exchanged horizontal axis, independent of PowerPoint's
+              // category-first paint order.
+              0.70
+            } else {
+              0.25
+            },
         label.clone(),
         style.value_label.clone(),
       );
@@ -11582,7 +11641,11 @@ fn data_label_anchor(
           point_index,
           category_count,
         ),
-        if clustered { peer_index } else { 0 },
+        if clustered {
+          category_axis_series_slot(series.kind, peer_index, peers)
+        } else {
+          0
+        },
         category_count,
         if clustered { peers } else { 1 },
         chart.gap_width_percent,
@@ -11687,6 +11750,24 @@ fn series_category_display_index(
     category_count - 1 - source_index
   } else {
     source_index
+  }
+}
+
+fn category_axis_series_slot(
+  kind: ChartSeriesKind,
+  authored_slot: usize,
+  series_count: usize,
+) -> usize {
+  if kind == ChartSeriesKind::Bar {
+    // ECMA-376 §21.2.3.4 puts clustered series next to one another along the
+    // category axis. With §21.2.2.17's horizontal `bar` direction, that axis
+    // is vertical; the default minMax category orientation therefore places
+    // order 0 at the bottom and the largest order at the top. LibreOffice
+    // expresses the same exchange through BarChartTypeTemplate::isSwapXAndY
+    // and BarPositionHelper's category slot coordinate.
+    series_count.saturating_sub(1).saturating_sub(authored_slot)
+  } else {
+    authored_slot
   }
 }
 
@@ -13052,7 +13133,17 @@ fn lower_horizontal_legend(
   let explicit_bottom_column = excel_explicit_bottom_column_layout(chart, style);
   let untitled_bottom_column = excel_untitled_bottom_column_layout(chart, style);
   let untitled_bottom_line_no_marker = excel_untitled_bottom_line_no_marker_layout(chart, style);
-  let word_automatic_title_bottom_column = word_automatic_titled_bottom_layout(chart, style)
+  let has_word_automatic_titled_bottom_layout = word_automatic_titled_bottom_layout(chart, style);
+  let horizontal_bar_only = chart
+    .series
+    .iter()
+    .all(|series| series.kind == ChartSeriesKind::Bar);
+  let automatic_band_height_pt = word_titled_bottom_band_height(
+    has_word_automatic_titled_bottom_layout,
+    horizontal_bar_only,
+    frame.height_pt,
+  );
+  let word_automatic_title_bottom_column = has_word_automatic_titled_bottom_layout
     && !style.has_explicit_title
     && chart
       .series
@@ -13060,7 +13151,7 @@ fn lower_horizontal_legend(
       .all(|series| matches!(series.kind, ChartSeriesKind::Column | ChartSeriesKind::Bar));
   let legend_profile = if word_automatic_title_bottom_column {
     profiles::WORD_AUTOMATIC_TITLE_BOTTOM_COLUMN_LEGEND
-  } else if word_automatic_titled_bottom_layout(chart, style) {
+  } else if has_word_automatic_titled_bottom_layout {
     profiles::WORD_TITLED_BOTTOM_CARTESIAN_LEGEND
   } else if titled_indexed_scatter {
     profiles::EXCEL_TITLED_INDEXED_SCATTER_LEGEND
@@ -13105,8 +13196,8 @@ fn lower_horizontal_legend(
   if titled_indexed_scatter {
     x += (entry_gap - base_entry_gap) * entries.len().saturating_sub(1) as f32 / 2.0;
   }
-  x += frame.height_pt * legend_profile.x_offset_height_ratio;
-  let y = y + frame.height_pt * legend_profile.y_offset_height_ratio;
+  x += automatic_band_height_pt * legend_profile.x_offset_height_ratio;
+  let y = y + automatic_band_height_pt * legend_profile.y_offset_height_ratio;
   push_legend_frame(
     items,
     PlotRect {
@@ -14080,14 +14171,15 @@ mod tests {
     Chart3DView, ChartLayoutProfile, ChartPointAnchor, ChartTextBodyInsets, PlotRect,
     RadialChartKind, ResolvedDataLabelTextFrame, SurfaceVertex,
     apply_chart_legend_vertical_overflow, bind_chart_gradient_to_bounds, cardinal_cubic_controls,
-    cartesian_3d_projection, cartesian_legend_reverses_series, category_axis_text_rotation_degrees,
-    category_axis_text_rotation_degrees_for_layout, category_axis_text_rotation_is_supported,
-    clip_surface_polygon, data_label_pdf_text_segmentation, excel_fixed_inner_pie_3d_radii,
-    format_axis_value, horizontal_bar_data_label_origin, lower_3d_extruded_polygon,
-    lower_3d_line_stripes, maximum_auto_main_increment_count, pie_custom_label_maximum_width,
-    push_chart_data_rect, sample_cardinal_chart_line, series_axis_label_rhythm,
-    series_category_display_index, single_line_vertical_anchor_offset, word_fixed_chart_data_edge,
-    word_fixed_chart_value_edge,
+    cartesian_3d_projection, cartesian_legend_reverses_series, category_axis_series_slot,
+    category_axis_text_rotation_degrees, category_axis_text_rotation_degrees_for_layout,
+    category_axis_text_rotation_is_supported, clip_surface_polygon,
+    data_label_pdf_text_segmentation, excel_fixed_inner_pie_3d_radii, format_axis_value,
+    horizontal_bar_data_label_origin, lower_3d_extruded_polygon, lower_3d_line_stripes,
+    maximum_auto_main_increment_count, pie_custom_label_maximum_width, push_chart_data_rect,
+    sample_cardinal_chart_line, series_axis_label_rhythm, series_category_display_index,
+    single_line_vertical_anchor_offset, word_fixed_chart_data_edge, word_fixed_chart_value_edge,
+    word_titled_bottom_band_height, word_uses_hidden_vertical_value_band,
   };
   use crate::model::{PageItem, PdfTextSegmentation, RgbColor, TextStyle, common_rect};
   use crate::render::chart::{ChartManualLayout, ChartSeriesKind};
@@ -14215,6 +14307,41 @@ mod tests {
       series_category_display_index(true, ChartSeriesKind::Bar, 0, 4),
       0
     );
+  }
+
+  #[test]
+  fn horizontal_clustered_series_follow_the_category_axis_order() {
+    assert_eq!(category_axis_series_slot(ChartSeriesKind::Column, 0, 3), 0);
+    assert_eq!(category_axis_series_slot(ChartSeriesKind::Column, 2, 3), 2);
+    assert_eq!(category_axis_series_slot(ChartSeriesKind::Bar, 0, 3), 2);
+    assert_eq!(category_axis_series_slot(ChartSeriesKind::Bar, 1, 3), 1);
+    assert_eq!(category_axis_series_slot(ChartSeriesKind::Bar, 2, 3), 0);
+  }
+
+  #[test]
+  fn word_horizontal_bar_does_not_use_hidden_vertical_value_axis_margins() {
+    assert!(word_uses_hidden_vertical_value_band(
+      ChartLayoutProfile::Word,
+      false,
+      false,
+    ));
+    assert!(!word_uses_hidden_vertical_value_band(
+      ChartLayoutProfile::Word,
+      false,
+      true,
+    ));
+    assert!(!word_uses_hidden_vertical_value_band(
+      ChartLayoutProfile::PowerPoint,
+      false,
+      false,
+    ));
+  }
+
+  #[test]
+  fn word_titled_bottom_vertical_axis_uses_fixed_device_bands() {
+    assert_eq!(word_titled_bottom_band_height(true, false, 325.5), 252.0);
+    assert_eq!(word_titled_bottom_band_height(true, true, 314.25), 314.25);
+    assert_eq!(word_titled_bottom_band_height(false, false, 325.5), 325.5);
   }
 
   #[test]

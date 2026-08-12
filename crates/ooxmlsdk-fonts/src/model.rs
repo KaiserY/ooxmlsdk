@@ -280,7 +280,10 @@ impl<'a> FontRegistry<'a> {
         to: Cow::Borrowed(to),
       });
     }
-    for chain in default_fallback_chains() {
+    for chain in default_family_substitution_chains() {
+      self.book.family_substitution_chains.push(chain);
+    }
+    for chain in default_glyph_fallback_chains() {
       self.book.fallback_chains.push(chain);
     }
   }
@@ -354,6 +357,9 @@ impl<'a> FontRegistry<'a> {
         if aliased.as_ref() != family {
           queries.push(PlatformFontQueryFamily::Name(aliased.into_owned()));
         }
+      }
+      for (family, _) in self.family_substitution_families(request) {
+        queries.push(PlatformFontQueryFamily::Name(family.to_owned()));
       }
       for family in self.fallback_families(request) {
         queries.push(PlatformFontQueryFamily::Name(family.to_owned()));
@@ -522,13 +528,13 @@ impl<'a> FontRegistry<'a> {
     match self.book.resolve(request, &self.faces) {
       Ok(resolved) => Ok(resolved),
       Err(FontError::NoMatch) => {
-        for family in self.fallback_families(request) {
+        for (family, reason) in self.family_substitution_families(request) {
           if let Ok(mut resolved) =
             self
               .book
               .resolve_matching_family(request, &self.faces, family, false)
           {
-            resolved.match_diagnostics.fallback_level = Some(0);
+            resolved.substitution = font_substitution(request, &resolved, reason);
             return Ok(resolved);
           }
         }
@@ -542,13 +548,13 @@ impl<'a> FontRegistry<'a> {
     match self.book.resolve_with_diagnostics(request, &self.faces) {
       Ok(resolved) => Ok(resolved),
       Err(FontError::NoMatch) => {
-        for family in self.fallback_families(request) {
+        for (family, reason) in self.family_substitution_families(request) {
           if let Ok(mut resolved) =
             self
               .book
               .resolve_matching_family(request, &self.faces, family, true)
           {
-            resolved.match_diagnostics.fallback_level = Some(0);
+            resolved.substitution = font_substitution(request, &resolved, reason);
             return Ok(resolved);
           }
         }
@@ -928,16 +934,68 @@ impl<'a> FontRegistry<'a> {
     missing
   }
 
-  fn fallback_families<'book>(&'book self, request: &FontRequest<'_>) -> Vec<&'book str> {
-    let mut families: Vec<&'book str> = Vec::new();
-    let mut normalized_families: Vec<String> = Vec::new();
-    let requested_family = request.family.as_deref().map(normalize_family);
+  /// Returns deterministic family-substitution candidates for an unavailable
+  /// requested family.
+  ///
+  /// Family substitution is deliberately separate from glyph fallback. This
+  /// follows LibreOffice's `PhysicalFontCollection::FindFontFamily()` versus
+  /// `GetGlyphFallbackFont()` split, Skia DirectWrite's family match versus
+  /// `onFallback()` split, and ReactOS's font mapper versus FontLink split.
+  fn family_substitution_families<'book>(
+    &'book self,
+    request: &FontRequest<'_>,
+  ) -> SmallVec<[(&'book str, FontSubstitutionReason); 8]> {
+    let Some(requested_family) = request.family.as_deref() else {
+      return SmallVec::new();
+    };
+    let mut families = SmallVec::<[(&'book str, FontSubstitutionReason); 8]>::new();
+    for chain in &self.book.family_substitution_chains {
+      let reason = if let Some(family) = chain.requested_family.as_deref() {
+        if !normalized_family_eq(family, requested_family) {
+          continue;
+        }
+        FontSubstitutionReason::MissingFamily
+      } else {
+        FontSubstitutionReason::LastResort
+      };
+      if chain
+        .script
+        .is_some_and(|script| request.script != Some(script))
+      {
+        continue;
+      }
+      if chain.language.as_deref().is_some_and(|language| {
+        request
+          .language
+          .as_deref()
+          .is_some_and(|requested| !requested.eq_ignore_ascii_case(language))
+      }) {
+        continue;
+      }
+      for family in &chain.families {
+        if !families
+          .iter()
+          .any(|(existing, _)| normalized_family_eq(existing, family.as_ref()))
+        {
+          families.push((family.as_ref(), reason));
+        }
+      }
+    }
+    families
+  }
+
+  /// Returns fonts that may cover glyphs missing from an already selected
+  /// primary face. These chains must never select the primary face for a
+  /// missing requested family.
+  fn fallback_families<'book>(
+    &'book self,
+    request: &FontRequest<'_>,
+  ) -> SmallVec<[&'book str; 16]> {
+    let mut families = SmallVec::<[&'book str; 16]>::new();
+    let requested_family = request.family.as_deref();
     for chain in &self.book.fallback_chains {
       if chain.requested_family.as_deref().is_some_and(|family| {
-        let chain_family = normalize_family(family);
-        requested_family
-          .as_ref()
-          .is_none_or(|requested| requested != &chain_family)
+        requested_family.is_none_or(|requested| !normalized_family_eq(requested, family))
       }) {
         continue;
       }
@@ -956,12 +1014,10 @@ impl<'a> FontRegistry<'a> {
         continue;
       }
       for family in &chain.families {
-        let normalized = normalize_family(family.as_ref());
-        if !normalized_families
+        if !families
           .iter()
-          .any(|existing| existing == &normalized)
+          .any(|existing| normalized_family_eq(existing, family.as_ref()))
         {
-          normalized_families.push(normalized);
           families.push(family.as_ref());
         }
       }
@@ -1046,6 +1102,7 @@ impl<'a> FontRegistry<'a> {
       synthetic_bold: false,
       synthetic_italic: false,
       metrics: face.metrics.clone(),
+      substitution: None,
       match_diagnostics: FontMatchDiagnostics {
         candidates: Vec::new(),
         fallback_level,
@@ -1073,6 +1130,9 @@ pub struct FontBook<'a> {
   pub faces: Vec<FontFaceInfo<'a>>,
   pub family_aliases: Vec<FontFamilyAlias<'a>>,
   pub substitutions: Vec<FontSubstitutionRule<'a>>,
+  /// Ordered pure-Rust policy used only when the requested family is absent.
+  pub family_substitution_chains: Vec<FontFallbackChain<'a>>,
+  /// Ordered glyph-coverage policy used only after a primary face is chosen.
   pub fallback_chains: Vec<FontFallbackChain<'a>>,
   pub fallback_cache: Vec<GlyphFallbackCacheEntry<'a>>,
 }
@@ -1111,11 +1171,26 @@ impl<'a> FontBook<'a> {
     family_override: Option<&str>,
     include_diagnostics: bool,
   ) -> Result<ResolvedFont<'a>> {
+    let mut substitution = None;
     let target_family_names = family_override.or(request.family.as_deref()).map(|family| {
       let aliased = resolve_family_alias(self, Cow::Borrowed(family));
-      let substituted =
-        find_substitution_rule(self, aliased.as_ref()).map(|rule| rule.substitute_family.as_ref());
-      normalized_family_names(substituted.unwrap_or_else(|| aliased.as_ref()))
+      let rule = find_substitution_rule(self, aliased.as_ref());
+      let target = rule
+        .map(|rule| rule.substitute_family.as_ref())
+        .unwrap_or_else(|| aliased.as_ref());
+      if family_override.is_none() {
+        let reason = rule
+          .map(|rule| rule.reason)
+          .or_else(|| (aliased.as_ref() != family).then_some(FontSubstitutionReason::Alias));
+        if let Some(reason) = reason {
+          substitution = Some(FontSubstitution {
+            requested_family: Cow::Owned(family.to_string()),
+            substituted_family: Cow::Owned(target.to_string()),
+            reason,
+          });
+        }
+      }
+      normalized_family_names(target)
     });
     let requested_weight = requested_weight(request);
     let requested_slant = requested_slant(request);
@@ -1163,6 +1238,7 @@ impl<'a> FontBook<'a> {
       synthetic_bold,
       synthetic_italic,
       metrics: face.metrics.clone(),
+      substitution,
       match_diagnostics: FontMatchDiagnostics {
         candidates: diagnostics
           .map(|mut diagnostics| {
@@ -1597,6 +1673,8 @@ pub struct ResolvedFont<'book> {
   pub synthetic_bold: bool,
   pub synthetic_italic: bool,
   pub metrics: FontMetrics,
+  /// The family-selection decision, distinct from later missing-glyph runs.
+  pub substitution: Option<FontSubstitution<'book>>,
   pub match_diagnostics: FontMatchDiagnostics<'book>,
 }
 
@@ -2762,7 +2840,7 @@ const DEFAULT_PDF_EMBED_TABLES: &[&str] = &[
   "prep", "CFF2",
 ];
 
-fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
+fn default_family_specific_chains<'a>() -> Vec<FontFallbackChain<'a>> {
   vec![
     office_family_fallback("Calibri", &["Carlito", "Liberation Sans"]),
     office_family_fallback("Calibri Light", &["Carlito", "Liberation Sans"]),
@@ -2783,16 +2861,6 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
     // BMP glyphs when the Ext-B member is unavailable; true Extension-B
     // characters that it cannot cover continue through script fallback.
     office_family_fallback("SimSun-ExtB", &["SimSun"]),
-    // Word keeps Liberation Sans for its covered Latin glyphs, but fixed
-    // output links missing Han glyphs from that requested face through SimSun.
-    // Scope this to Han so explicit Chinese faces and other script fallbacks
-    // continue to use their own chains.
-    FontFallbackChain {
-      requested_family: Some(Cow::Borrowed("Liberation Sans")),
-      script: Some(TextScript::Han),
-      language: None,
-      families: vec![Cow::Borrowed("SimSun")],
-    },
     // Ebrima is Windows' default African-language face and supplies real
     // regular/bold Ethiopic fonts when optional Nyala is unavailable.
     office_family_fallback("Nyala", &["Ebrima"]),
@@ -2820,6 +2888,43 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
       "BIZ UDMincho Medium",
       &["BIZ UDMincho", "Noto Serif CJK JP"],
     ),
+  ]
+}
+
+fn default_family_substitution_chains<'a>() -> Vec<FontFallbackChain<'a>> {
+  let mut chains = default_family_specific_chains();
+  // A family with no authored or known metric-compatible replacement still
+  // needs a text face before glyph coverage can be evaluated. Keep this
+  // deterministic and separate from the Common-script symbol chain below.
+  // LibreOffice ends `FindFontFamily()` at an attribute/default family and
+  // only then calls `GetGlyphFallbackFont()` for missing code points.
+  chains.push(FontFallbackChain {
+    requested_family: None,
+    script: None,
+    language: None,
+    families: vec![
+      Cow::Borrowed("DejaVu Sans"),
+      Cow::Borrowed("Liberation Sans"),
+      Cow::Borrowed("Noto Sans"),
+      Cow::Borrowed("Noto Sans CJK JP"),
+    ],
+  });
+  chains
+}
+
+fn default_glyph_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
+  let mut chains = default_family_specific_chains();
+  chains.extend([
+    // Word keeps Liberation Sans for its covered Latin glyphs, but fixed
+    // output links missing Han glyphs from that requested face through SimSun.
+    // Scope this to Han so explicit Chinese faces and other script fallbacks
+    // continue to use their own chains.
+    FontFallbackChain {
+      requested_family: Some(Cow::Borrowed("Liberation Sans")),
+      script: Some(TextScript::Han),
+      language: None,
+      families: vec![Cow::Borrowed("SimSun")],
+    },
     FontFallbackChain {
       requested_family: None,
       script: Some(TextScript::Han),
@@ -2897,7 +3002,8 @@ fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
         Cow::Borrowed("Noto Sans CJK JP"),
       ],
     },
-  ]
+  ]);
+  chains
 }
 
 fn office_family_fallback<'a>(
@@ -3020,6 +3126,18 @@ fn scored_font_match_cmp(
   })
 }
 
+fn font_substitution<'book>(
+  request: &FontRequest<'_>,
+  resolved: &ResolvedFont<'book>,
+  reason: FontSubstitutionReason,
+) -> Option<FontSubstitution<'book>> {
+  Some(FontSubstitution {
+    requested_family: Cow::Owned(request.family.as_deref()?.to_string()),
+    substituted_family: resolved.resolved_family.clone(),
+    reason,
+  })
+}
+
 fn normalize_family(value: &str) -> String {
   value
     .chars()
@@ -3040,6 +3158,10 @@ fn family_matches_names(face: &FontFaceInfo<'_>, target_names: &[String]) -> boo
 
 fn normalized_family_eq_normalized(candidate: &str, normalized: &str) -> bool {
   normalized_family_chars(candidate).eq(normalized.chars())
+}
+
+fn normalized_family_eq(left: &str, right: &str) -> bool {
+  normalized_family_chars(left).eq(normalized_family_chars(right))
 }
 
 fn normalized_family_chars(value: &str) -> impl Iterator<Item = char> + '_ {
@@ -3709,11 +3831,10 @@ fn resolve_family_alias<'book, 'request>(
 where
   'book: 'request,
 {
-  let normalized_family = normalize_family(family.as_ref());
   book
     .family_aliases
     .iter()
-    .find(|alias| normalize_family(&alias.from) == normalized_family)
+    .find(|alias| normalized_family_eq(&alias.from, family.as_ref()))
     .map(|alias| {
       let family: Cow<'request, str> = alias.to.clone();
       family
@@ -3725,11 +3846,10 @@ fn find_substitution_rule<'a, 'b>(
   book: &'b FontBook<'a>,
   family: &str,
 ) -> Option<&'b FontSubstitutionRule<'a>> {
-  let normalized_family = normalize_family(family);
   book
     .substitutions
     .iter()
-    .find(|rule| normalize_family(&rule.requested_family) == normalized_family)
+    .find(|rule| normalized_family_eq(&rule.requested_family, family))
 }
 
 fn requested_weight(request: &FontRequest<'_>) -> FontWeight {
@@ -5016,6 +5136,7 @@ mod tests {
       synthetic_bold: false,
       synthetic_italic: false,
       metrics: FontMetrics::default(),
+      substitution: None,
       match_diagnostics: FontMatchDiagnostics::default(),
     };
 
@@ -5217,6 +5338,104 @@ mod tests {
       )
       .unwrap();
     assert_eq!(cached_runs, runs);
+  }
+
+  #[test]
+  fn missing_family_substitution_is_separate_from_glyph_fallback() {
+    // LO PhysicalFontCollection.cxx selects a primary family before
+    // GetGlyphFallbackFont(); Skia and ReactOS keep the same boundary between
+    // family matching and character/font-link fallback.
+    let mut registry = FontRegistry::new();
+    let mut text = FontFaceInfo::synthetic("text", "Text Face");
+    text.coverage.unicode_ranges = std::iter::once(u32::from('A')..u32::from('A') + 1).collect();
+    registry.register_face(FontSource::System, text);
+    let mut symbol = FontFaceInfo::synthetic("symbol", "Symbol Face");
+    symbol.coverage.unicode_ranges =
+      std::iter::once(u32::from('\u{2610}')..u32::from('\u{2610}') + 1).collect();
+    registry.register_face(FontSource::System, symbol);
+    registry
+      .book
+      .family_substitution_chains
+      .push(FontFallbackChain {
+        requested_family: None,
+        script: None,
+        language: None,
+        families: vec![Cow::Borrowed("Text Face")],
+      });
+    registry.book.fallback_chains.push(FontFallbackChain {
+      requested_family: None,
+      script: None,
+      language: None,
+      families: vec![Cow::Borrowed("Symbol Face")],
+    });
+
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Unavailable Face")),
+      script: Some(TextScript::Common),
+      size_pt: FontSize(12.0),
+      ..FontRequest::default()
+    };
+    let resolved = registry.resolve(&request).unwrap();
+    assert_eq!(resolved.font_id, FontId(Arc::from("text")));
+    assert_eq!(resolved.match_diagnostics.fallback_level, None);
+    assert_eq!(
+      resolved.substitution,
+      Some(FontSubstitution {
+        requested_family: Cow::Owned("Unavailable Face".to_string()),
+        substituted_family: Cow::Borrowed("Text Face"),
+        reason: FontSubstitutionReason::LastResort,
+      })
+    );
+
+    let runs = registry
+      .shape_text_runs(&request, "A\u{2610}", TextDirection::LeftToRight)
+      .unwrap();
+    assert_eq!(runs.len(), 2);
+    assert_eq!(runs[0].font_id, FontId(Arc::from("text")));
+    assert_eq!(runs[1].font_id, FontId(Arc::from("symbol")));
+    assert_eq!(
+      runs[1].diagnostics.fallback_runs[0].reason,
+      FontSubstitutionReason::MissingGlyph
+    );
+  }
+
+  #[test]
+  fn requested_family_substitution_precedes_last_resort() {
+    let mut registry = FontRegistry::new();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("specific", "Specific Substitute"),
+    );
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("last-resort", "Last Resort"),
+    );
+    registry.book.family_substitution_chains.extend([
+      FontFallbackChain {
+        requested_family: Some(Cow::Borrowed("Missing Face")),
+        script: None,
+        language: None,
+        families: vec![Cow::Borrowed("Specific Substitute")],
+      },
+      FontFallbackChain {
+        requested_family: None,
+        script: None,
+        language: None,
+        families: vec![Cow::Borrowed("Last Resort")],
+      },
+    ]);
+
+    let resolved = registry
+      .resolve(&FontRequest {
+        family: Some(Cow::Borrowed("Missing Face")),
+        ..FontRequest::default()
+      })
+      .unwrap();
+    assert_eq!(resolved.font_id, FontId(Arc::from("specific")));
+    assert_eq!(
+      resolved.substitution.as_ref().map(|item| item.reason),
+      Some(FontSubstitutionReason::MissingFamily)
+    );
   }
 
   #[test]

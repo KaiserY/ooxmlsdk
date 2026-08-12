@@ -225,8 +225,13 @@ which is not itself in a text frame. Important sizing and positioning rules:
   text or line spacing.
 - Word defaults omitted `hAnchor` and `vAnchor` to `text`, rather than the
   ECMA `page` defaults, and evaluates horizontal anchoring from the left edge.
-- An omitted `wrap` means `around`. Explicit `auto` remains
-  application-defined and is not equivalent to omission.
+- ECMA-376 defines the schema omission default for `wrap` as `around`, but
+  Word's application default is not specified by `[MS-OI29500]`. The
+  Word-compatible import path resolves an omitted legacy `wrap` to
+  non-wrapping (`none`), matching LibreOffice's `DomainMapper_Impl` default
+  and Office fixed output for `tdf133457.docx`; an authored `around` remains
+  distinct. Explicit `auto` remains application-defined and is not equivalent
+  to omission.
 - `around`, `tight`, and `through` allow non-frame text to use remaining line
   space. `none` and `notBeside` move intersecting non-frame text to the next
   nonintersecting line.

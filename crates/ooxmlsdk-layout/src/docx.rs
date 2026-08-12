@@ -3336,13 +3336,13 @@ fn apply_note_reference_labels_to_blocks(
                 .and_then(|id| id.parse::<i64>().ok())
                 && let Some(label) = footnote_labels.get(&id)
               {
-                run.text.clone_from(label);
+                run.text = run_display_text(label.clone(), run.style.clone());
               } else if let Some(id) = url
                 .strip_prefix("ooxmlsdk-pdf:endnote-reference:")
                 .and_then(|id| id.parse::<i64>().ok())
                 && let Some(label) = endnote_labels.get(&id)
               {
-                run.text.clone_from(label);
+                run.text = run_display_text(label.clone(), run.style.clone());
               }
             }
             InlineItem::Shape(shape) => apply_note_reference_labels_to_blocks(
@@ -3689,7 +3689,7 @@ fn resolve_note_reference_marks_in_blocks(blocks: &mut [Block], label: Option<&N
             InlineItem::NoteReferenceMark(mark) => {
               if let Some(label) = label.filter(|label| label.kind == mark.kind) {
                 resolved.push(InlineItem::Text(TextRun {
-                  text: label.text.clone(),
+                  text: run_display_text(label.text.clone(), mark.style.clone()),
                   // ECMA-376 Part 1 §§17.11.6 and 17.11.13 define the mark as
                   // automatically numbered text at its exact run position.
                   // Keep every authored mark and the style of its owning run;
@@ -3868,7 +3868,19 @@ fn table_model(
     .and_then(|properties| properties.table_look.as_ref())
     .map(table_look_model)
     .unwrap_or_default();
-  let style_cell_margins = table_style.cell_margins.unwrap_or_default();
+  let effective_table_style_id = table_style_id.or(env.styles.default_table_style_id.as_deref());
+  let style_cell_margins = table_style.cell_margins.unwrap_or_else(|| {
+    // [MS-OI29500] Part 1 §17.15.1.24: when settings.xml omits
+    // w:defaultTableStyle, Word applies TableGrid. TableGrid does not carry
+    // the TableNormal 108/115-twip cell-padding defaults; absent an authored
+    // tblCellMar, its cell content starts at the border. Keep the schema
+    // default margins for an explicitly selected/default non-TableGrid style.
+    if effective_table_style_id.is_none_or(|style_id| style_id.eq_ignore_ascii_case("TableGrid")) {
+      CellMargins::zero()
+    } else {
+      default_table_cell_margins(env.styles.has_styles_part)
+    }
+  });
   let direct_cell_margins =
     properties.is_some_and(|properties| properties.table_cell_margin_default.is_some());
   let cell_margins = properties
@@ -4132,6 +4144,20 @@ fn should_align_leading_cell_content(
   compatibility_mode < 15 || !has_styles_part
 }
 
+fn default_table_cell_margins(has_styles_part: bool) -> CellMargins {
+  if has_styles_part {
+    CellMargins::default()
+  } else {
+    // ECMA-376 Part 1 §§17.4.5 and 17.4.34 apply the 115-twip default
+    // through the table-style hierarchy.  A package without word/styles.xml
+    // has no such hierarchy: LibreOffice's CellMarginHandler starts every
+    // omitted side at zero, and Word's legacy no-Styles tables use the same
+    // recovery (tdf131203).  Keep explicit tblCellMar/tcMar values layered
+    // on top of that zero baseline below.
+    CellMargins::zero()
+  }
+}
+
 fn table_starts_after_last_rendered_page_break(rows: &[TableRow]) -> bool {
   rows
     .iter()
@@ -4279,7 +4305,14 @@ fn frame_vertical_alignment(value: w::VerticalAlignmentValues) -> FrameVerticalA
 }
 
 fn frame_wrap_mode(value: Option<w::TextWrappingValues>) -> FrameWrapMode {
-  match value.unwrap_or(w::TextWrappingValues::Around) {
+  // ECMA-376 §17.3.1.11 gives the schema-level omission default as
+  // `around`, but Word's application behavior is not specified by
+  // [MS-OI29500]. LibreOffice's DomainMapper initializes an omitted legacy
+  // frame wrap to NONE, and Office fixed output for the legacy
+  // `tdf133457.docx` fixture keeps the following non-frame paragraph below
+  // the frame instead of flowing it through the remaining side space. Keep
+  // that Word-compatible import behavior distinct from an authored `around`.
+  match value.unwrap_or(w::TextWrappingValues::None) {
     w::TextWrappingValues::Auto => FrameWrapMode::Auto,
     w::TextWrappingValues::Around => FrameWrapMode::Around,
     w::TextWrappingValues::Tight => FrameWrapMode::Tight,
@@ -5614,6 +5647,17 @@ fn paragraph_borders_model(borders: &w::ParagraphBorders) -> ParagraphBordersMod
   }
 }
 
+fn paragraph_border_overrides(borders: &w::ParagraphBorders) -> ParagraphBorderOverrides {
+  ParagraphBorderOverrides {
+    top: borders.top_border.is_some(),
+    right: borders.right_border.is_some(),
+    bottom: borders.bottom_border.is_some(),
+    left: borders.left_border.is_some(),
+    between: borders.between_border.is_some(),
+    bar: borders.bar_border.is_some(),
+  }
+}
+
 fn page_borders_model(borders: &w::PageBorders) -> CellBordersModel {
   CellBordersModel {
     top: borders.top_border.as_ref().and_then(top_border_style),
@@ -6092,7 +6136,10 @@ fn merge_paragraph_format_with_theme(
   }
 
   if let Some(borders) = properties.paragraph_borders() {
-    format.borders = paragraph_borders_model(borders);
+    let values = paragraph_borders_model(borders);
+    let overrides = paragraph_border_overrides(borders);
+    overrides.merge(&mut format.borders, values);
+    format.border_overrides.include(overrides);
   }
 
   if let Some(outline_level) = properties.outline_level() {
@@ -6663,6 +6710,16 @@ fn paragraph_inlines_with_policy(
         );
       }
       choice => {
+        // ECMA-376 §17.13.5.1 bookmark and permission/range markers are
+        // zero-width metadata.  They may sit immediately before or after an
+        // explicit m:oMathPara; never materialize a standalone display-math
+        // image for that metadata just because the surrounding paragraph is a
+        // display zone.
+        if display_math
+          && paragraph_choice_is_math_zone_neutral(choice, styles.preserve_word_text_whitespace)
+        {
+          continue;
+        }
         if merge_display_math {
           if !paragraph_choice_is_math_zone_neutral(choice, styles.preserve_word_text_whitespace)
             && let Some(image) = merged_display_math_image.take()
@@ -10067,9 +10124,15 @@ fn push_note_reference(
   if id < 0 {
     return;
   }
+  let style = note_reference_style(&style);
   inlines.push(InlineItem::Text(TextRun {
-    text: id.to_string(),
-    style: note_reference_style(&style),
+    // Generated note labels keep the owning run's font contract.  Word uses
+    // the legacy Symbol single-byte transport for an explicit Symbol-font
+    // reference (for example, decimal 1 is U+F031), just as for authored
+    // Symbol text.  Convert at this generated-text boundary so the PDF text
+    // mapping still follows the selected face.
+    text: run_display_text(id.to_string(), style.clone()),
+    style,
     hyperlink_url,
     dynamic_field: None,
     style_ref_keys: Vec::new(),
@@ -12033,6 +12096,16 @@ fn wordprocessing_shape_textbox_frame(
       .and_then(|properties| properties.up_right.as_ref())
       .is_some_and(|value| value.as_bool()),
     text_box_writing_mode: text_box.writing_mode,
+    word_text_frame: shape
+      .wordprocessing_shape_choice1
+      .as_ref()
+      .is_some_and(|choice| {
+        matches!(
+          choice,
+          wps::WordprocessingShapeChoice::NonVisualDrawingShapeProperties(properties)
+            if properties.text_box.as_ref().is_some_and(|value| value.as_bool())
+        )
+      }),
     text_box_blocks: text_box.blocks,
     text_inset_left_pt: text_box.left_pt,
     text_inset_top_pt: text_box.top_pt,
@@ -12718,6 +12791,7 @@ fn drawingml_generic_shape_shape(
     static3d: properties.static3d(&context.styles.theme_colors),
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
+    word_text_frame: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -13111,6 +13185,16 @@ fn wordprocessing_shape_shape(
     static3d: properties.static3d(&context.styles.theme_colors),
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
+    word_text_frame: shape
+      .wordprocessing_shape_choice1
+      .as_ref()
+      .is_some_and(|choice| {
+        matches!(
+          choice,
+          wps::WordprocessingShapeChoice::NonVisualDrawingShapeProperties(properties)
+            if properties.text_box.as_ref().is_some_and(|value| value.as_bool())
+        )
+      }),
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -13484,6 +13568,7 @@ fn drawingml_diagram_shape_shape(
     static3d: properties.static3d(&context.styles.theme_colors),
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
+    word_text_frame: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -14734,6 +14819,7 @@ fn chart_shape(
     static3d: None,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
+    word_text_frame: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -15306,6 +15392,7 @@ fn anchor_wrap_polygon_shape(
     static3d: None,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
+    word_text_frame: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -15774,6 +15861,7 @@ fn drawingml_picture_frame(
     static3d: None,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
+    word_text_frame: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -18311,11 +18399,10 @@ fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<I
     .flatten();
   let stroke = if stroked {
     Some(BorderStyle {
-      width_pt: polyline
-        .stroke_weight
-        .as_deref()
-        .and_then(units::vml_stroke_weight_to_points)
-        .unwrap_or(VML_DEFAULT_STROKE_WEIGHT_PT),
+      width_pt: units::office_vml_stroke_weight_to_points(
+        polyline.stroke_weight.as_deref(),
+        VML_DEFAULT_STROKE_WEIGHT_PT,
+      ),
       spacing_pt: 0.0,
       color: polyline
         .stroke_color
@@ -18369,6 +18456,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<I
     static3d: None,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
+    word_text_frame: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -18453,9 +18541,10 @@ fn vml_inline_shape(
   let stroke = stroke_color
     .and_then(parse_vml_color)
     .map(|color| BorderStyle {
-      width_pt: stroke_weight
-        .and_then(units::vml_stroke_weight_to_points)
-        .unwrap_or(VML_DEFAULT_STROKE_WEIGHT_PT),
+      width_pt: units::office_vml_stroke_weight_to_points(
+        stroke_weight,
+        VML_DEFAULT_STROKE_WEIGHT_PT,
+      ),
       spacing_pt: 0.0,
       color,
       compound: false,
@@ -18562,6 +18651,7 @@ fn vml_shape_frame(
     static3d: None,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
+    word_text_frame: false,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
     text_inset_top_pt: 0.0,
@@ -18639,6 +18729,7 @@ fn vml_textbox_frame(
     // leaving the shape geometry transformed.
     text_upright: true,
     text_box_writing_mode: frame.writing_mode,
+    word_text_frame: true,
     text_box_blocks: frame.blocks,
     text_inset_left_pt: frame.left_pt,
     text_inset_top_pt: frame.top_pt,
@@ -20854,13 +20945,7 @@ fn vml_group_stroked_child_touches_leading_edge(
     }
     _ => return false,
   };
-  if !model.stroked
-    || model
-      .stroke_weight
-      .as_deref()
-      .and_then(units::vml_stroke_weight_to_points)
-      .is_some_and(|width| width <= f32::EPSILON)
-  {
+  if !model.stroked {
     return false;
   }
   let Some(style) = style.filter(|style| {
@@ -22209,6 +22294,15 @@ impl StylesCatalog {
     let theme = ThemeData::load(package, main, locales.default_document_resource_locale());
     let font_substitutions = load_font_substitutions(package, main);
     let cjk_punctuation_compression = theme.cjk_punctuation_compression;
+    let settings_default_table_style_id = main
+      .document_settings_part(package)
+      .and_then(|part| part.root_element(package).ok())
+      .and_then(|settings| {
+        settings
+          .default_table_style
+          .as_ref()
+          .map(|style| style.val.to_string())
+      });
     let Some(styles_part) = main.style_definitions_part(package) else {
       let mut catalog = Self {
         import_settings,
@@ -22220,6 +22314,7 @@ impl StylesCatalog {
         theme_lines: theme.lines,
         theme_effects: theme.effects,
         font_substitutions,
+        default_table_style_id: settings_default_table_style_id,
         ..Self::default()
       };
       catalog.doc_default_run.wordprocessingml_font_slots = true;
@@ -22274,6 +22369,7 @@ impl StylesCatalog {
       theme_lines: theme.lines,
       theme_effects: theme.effects,
       font_substitutions,
+      default_table_style_id: settings_default_table_style_id,
       ..Self::default()
     };
     catalog.doc_default_run.kerning_minimum_size_pt = Some(f32::INFINITY);
@@ -22326,7 +22422,8 @@ impl StylesCatalog {
       {
         catalog.default_paragraph_style_id = Some(style_id.to_string());
       }
-      if matches!(style.r#type, Some(w::StyleValues::Table))
+      if catalog.default_table_style_id.is_none()
+        && matches!(style.r#type, Some(w::StyleValues::Table))
         && style.default.is_some_and(|value| value.as_bool())
       {
         catalog.default_table_style_id = Some(style_id.to_string());
@@ -24687,8 +24784,11 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.shading.is_some() {
     target.shading = values.shading;
   }
-  if !values.borders.is_empty() {
-    target.borders = values.borders;
+  if values.border_overrides != ParagraphBorderOverrides::default() {
+    values
+      .border_overrides
+      .merge(&mut target.borders, values.borders);
+    target.border_overrides.include(values.border_overrides);
   }
   if values.page_break_before_set {
     target.page_break_before = values.page_break_before;
@@ -25670,18 +25770,27 @@ impl NumberingCatalog {
       level.symbol_run_properties.as_ref(),
       &mut text,
     );
-    // [MS-OI29500] §17.3.2.26 assigns U+2460..U+24FF to the East Asian
-    // numbering repertoire. Word's decimalEnclosedFullstop golden keeps the
-    // ordinary Latin face for its ASCII suffix but uses SimSun when that face
-    // lacks the generated enclosed glyph. Keep any document-scoped substitute
-    // authoritative and leave symbols outside this repertoire on the generic
-    // fallback chain (notably Segoe UI Symbol for checkbox characters).
-    if style.fallback_font_family.is_none()
-      && text
-        .chars()
-        .any(|character| ('\u{2460}'..='\u{24ff}').contains(&character))
+    // ECMA-376 Part 1 §17.3.2.26 classifies U+2460..U+24FF as High ANSI
+    // unless the authored hint is eastAsia. Word's circle-number portion
+    // uses the document's CJK face when the ordinary High ANSI face lacks the
+    // generated enclosed glyph; keep the ASCII period on its own slot.
+    if matches!(
+      level.format,
+      w::NumberFormatValues::DecimalEnclosedCircle
+        | w::NumberFormatValues::DecimalEnclosedCircleChinese
+    ) && text
+      .chars()
+      .any(|character| ('\u{2460}'..='\u{24ff}').contains(&character))
     {
-      style.fallback_font_family = Some(Arc::from("SimSun"));
+      // [MS-DOC] classifies the enclosed-alphanumeric block as an East Asian
+      // double-byte range even though ECMA-376's slot table calls it High
+      // ANSI without an authored eastAsia hint.  Word's synthesized circle
+      // number therefore uses the installed Simplified-Chinese face for the
+      // enclosed glyph; keeping it as the slot face (rather than an authored
+      // family-substitution fallback) makes glyph coverage deterministic while
+      // the ASCII suffix remains on the paragraph's ordinary ASCII slot.
+      style.high_ansi_font_family = Some(Arc::from("SimSun"));
+      style.high_ansi_fallback_font_family = None;
     }
     let picture_bullet = level.picture_bullet_id.is_some();
     let image_replacement_text = picture_bullet.then(|| {
@@ -28252,6 +28361,21 @@ fn twips_measure_to_points(value: &TwipsMeasureValue) -> Option<f32> {
   twips_measure_to_twips(value).map(units::twips_to_points)
 }
 
+fn word_page_size_measure_to_points(value: &TwipsMeasureValue) -> Option<(f32, bool)> {
+  let twips = value.to_twips();
+  // Word's legacy page-size fields are 16-bit in the binary model.  Values
+  // above that range are observed on import as the low 16 bits (the
+  // tdf#142693 fixture uses 90369/104372 -> 24833/38836).  Keep the existing
+  // 22-inch guard for representable values; tdf149649 is a PASS at 65534.
+  let legacy_overflow = twips > u16::MAX as i64;
+  let twips = if legacy_overflow {
+    twips & u16::MAX as i64
+  } else {
+    twips
+  };
+  Some((units::twips_to_points(twips as f32), legacy_overflow))
+}
+
 fn signed_twips_measure_to_points(value: &SignedTwipsMeasureValue) -> Option<f32> {
   signed_twips_measure_to_twips(value).map(units::twips_to_points)
 }
@@ -28287,11 +28411,27 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
   let mut setup = default_word_page_setup();
 
   if let Some(size) = &section.page_size {
-    if let Some(width) = size.width.as_ref().and_then(twips_measure_to_points) {
-      setup.width_pt = width.min(WORD_MAX_PAGE_SIZE_PT);
+    if let Some((width, legacy_overflow)) = size
+      .width
+      .as_ref()
+      .and_then(word_page_size_measure_to_points)
+    {
+      setup.width_pt = if legacy_overflow {
+        width
+      } else {
+        width.min(WORD_MAX_PAGE_SIZE_PT)
+      };
     }
-    if let Some(height) = size.height.as_ref().and_then(twips_measure_to_points) {
-      setup.height_pt = height.min(WORD_MAX_PAGE_SIZE_PT);
+    if let Some((height, legacy_overflow)) = size
+      .height
+      .as_ref()
+      .and_then(word_page_size_measure_to_points)
+    {
+      setup.height_pt = if legacy_overflow {
+        height
+      } else {
+        height.min(WORD_MAX_PAGE_SIZE_PT)
+      };
     }
   }
 
@@ -28941,8 +29081,8 @@ mod tests {
   }
 
   #[test]
-  fn omitted_framepr_wrap_defaults_to_around_while_explicit_auto_is_retained() {
-    assert_eq!(frame_wrap_mode(None), FrameWrapMode::Around);
+  fn omitted_framepr_wrap_defaults_to_none_while_explicit_auto_is_retained() {
+    assert_eq!(frame_wrap_mode(None), FrameWrapMode::None);
     assert_eq!(
       frame_wrap_mode(Some(w::TextWrappingValues::Auto)),
       FrameWrapMode::Auto
@@ -28968,6 +29108,44 @@ mod tests {
       borders.bar.expect("bar").dash_pattern,
       BorderDashPattern::Dashed
     );
+  }
+
+  #[test]
+  fn paragraph_border_none_clears_only_the_authored_inherited_side() {
+    let parent = w::StyleParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:pBdr>
+          <w:top w:val="single" w:sz="4"/>
+          <w:bottom w:val="single" w:sz="4"/>
+        </w:pBdr>
+      </w:pPr>"#,
+    )
+    .expect("parent paragraph properties");
+    let child = w::StyleParagraphProperties::from_bytes(
+      br#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:pBdr><w:bottom w:val="none" w:sz="0"/></w:pBdr>
+      </w:pPr>"#,
+    )
+    .expect("child paragraph properties");
+
+    let mut parent_format = ParagraphFormat::default();
+    merge_paragraph_format(
+      &mut parent_format,
+      Some(ParagraphProps::Style(&parent)),
+      ImportSettings::default(),
+    );
+    let mut child_format = ParagraphFormat::default();
+    merge_paragraph_format(
+      &mut child_format,
+      Some(ParagraphProps::Style(&child)),
+      ImportSettings::default(),
+    );
+    let mut resolved = ParagraphFormat::default();
+    merge_format_values(&mut resolved, &parent_format);
+    merge_format_values(&mut resolved, &child_format);
+
+    assert!(resolved.borders.top.is_some());
+    assert!(resolved.borders.bottom.is_none());
   }
 
   #[test]
@@ -29002,6 +29180,26 @@ mod tests {
     assert!(matches!(
       inlines.as_slice(),
       [InlineItem::Text(TextRun { text, .. })] if text == "0"
+    ));
+  }
+
+  #[test]
+  fn generated_symbol_note_reference_uses_symbol_transport_code() {
+    let mut inlines = Vec::new();
+    push_note_reference(
+      &mut inlines,
+      1,
+      TextStyle {
+        font_family: Some(Arc::from("Symbol")),
+        ..TextStyle::default()
+      },
+      None,
+    );
+
+    assert!(matches!(
+      inlines.as_slice(),
+      [InlineItem::Text(TextRun { text, style, .. })]
+        if text == "\u{f031}" && style.font_family.as_deref() == Some("Symbol")
     ));
   }
 
@@ -30874,6 +31072,29 @@ mod tests {
         .alignment,
       None
     );
+  }
+
+  #[test]
+  fn office_math_display_ignores_zero_width_bookmark_end() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:bookmarkStart w:id="0" w:name="_GoBack"/><w:bookmarkEnd w:id="0"/><m:oMathPara><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></m:oMathPara></w:p>"#,
+    )
+    .expect("math paragraph");
+    let image = imported_office_math_image(&paragraph, &StylesCatalog::default());
+    assert_eq!(image.alt_text.as_deref(), Some("𝑥"));
+    let images = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut FormWidgetIdAllocator::default(),
+    )
+    .into_iter()
+    .filter(|inline| matches!(inline, InlineItem::Image(_)))
+    .count();
+    assert_eq!(images, 1);
   }
 
   #[test]
@@ -33985,6 +34206,16 @@ mod tests {
     assert_eq!(margins.bottom_pt, 0.0);
     assert!((margins.left_pt - 5.75).abs() < 0.001);
     assert!((margins.right_pt - 5.75).abs() < 0.001);
+  }
+
+  #[test]
+  fn tables_without_a_styles_part_start_omitted_cell_margins_at_zero() {
+    let styled = default_table_cell_margins(true);
+    assert!((styled.left_pt - 5.75).abs() < 0.001);
+    assert!((styled.right_pt - 5.75).abs() < 0.001);
+
+    let unstyled = default_table_cell_margins(false);
+    assert_eq!(unstyled, CellMargins::zero());
   }
 
   #[test]
@@ -38535,6 +38766,19 @@ mod tests {
 
     assert_eq!(setup.width_pt, 1_584.0);
     assert_eq!(setup.height_pt, 1_584.0);
+  }
+
+  #[test]
+  fn word_page_size_wraps_values_beyond_legacy_u16_fields() {
+    let setup = page_setup(&section(
+      90_369,
+      104_372,
+      w::PageOrientationValues::Portrait,
+      None,
+    ));
+
+    assert!((setup.width_pt - units::twips_to_points(24_833.0)).abs() < 0.001);
+    assert!((setup.height_pt - units::twips_to_points(38_836.0)).abs() < 0.001);
   }
 
   #[test]

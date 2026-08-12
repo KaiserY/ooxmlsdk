@@ -403,6 +403,17 @@ impl Default for CellMargins {
   }
 }
 
+impl CellMargins {
+  pub(crate) const fn zero() -> Self {
+    Self {
+      top_pt: 0.0,
+      right_pt: 0.0,
+      bottom_pt: 0.0,
+      left_pt: 0.0,
+    }
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum TableCellVerticalAlignment {
   #[default]
@@ -434,6 +445,48 @@ pub(crate) struct ParagraphBordersModel {
 impl ParagraphBordersModel {
   pub(crate) fn is_empty(self) -> bool {
     self == Self::default()
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct ParagraphBorderOverrides {
+  pub top: bool,
+  pub right: bool,
+  pub bottom: bool,
+  pub left: bool,
+  pub between: bool,
+  pub bar: bool,
+}
+
+impl ParagraphBorderOverrides {
+  pub(crate) fn merge(self, target: &mut ParagraphBordersModel, values: ParagraphBordersModel) {
+    if self.top {
+      target.top = values.top;
+    }
+    if self.right {
+      target.right = values.right;
+    }
+    if self.bottom {
+      target.bottom = values.bottom;
+    }
+    if self.left {
+      target.left = values.left;
+    }
+    if self.between {
+      target.between = values.between;
+    }
+    if self.bar {
+      target.bar = values.bar;
+    }
+  }
+
+  pub(crate) fn include(&mut self, values: Self) {
+    self.top |= values.top;
+    self.right |= values.right;
+    self.bottom |= values.bottom;
+    self.left |= values.left;
+    self.between |= values.between;
+    self.bar |= values.bar;
   }
 }
 
@@ -491,6 +544,10 @@ pub(crate) struct ParagraphFormat {
   /// inherited value without becoming indistinguishable from omission.
   pub shading: Option<ShadingPaint>,
   pub borders: ParagraphBordersModel,
+  /// Tracks which individual `w:pBdr` children were authored. A missing side
+  /// inherits through the style hierarchy, while `w:val="none"` is an
+  /// authored side whose effective border is deliberately empty.
+  pub border_overrides: ParagraphBorderOverrides,
   pub page_break_before: bool,
   pub page_break_before_set: bool,
   pub keep_with_next: bool,
@@ -1022,6 +1079,11 @@ pub(crate) struct InlineShape {
   pub static3d: Option<common::drawingml_3d::Static3dStyle>,
   pub text_upright: bool,
   pub text_box_writing_mode: TextBoxWritingMode,
+  /// Whether the WPS non-visual properties explicitly mark this shape as a
+  /// Word text frame (`wps:cNvSpPr/@txBox`).  The marker is independent of
+  /// `text_box_blocks`: Word text frames may intentionally have an empty
+  /// textbox story while still participating in paragraph wrapping.
+  pub word_text_frame: bool,
   pub text_box_blocks: Vec<Block>,
   pub text_inset_left_pt: f32,
   pub text_inset_top_pt: f32,

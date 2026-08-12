@@ -184,7 +184,10 @@ pub struct TextDecorationMetrics {
 pub(crate) struct MathFontMetrics {
   pub script_scale: f32,
   pub script_script_scale: f32,
-  pub display_operator_min_height_pt: f32,
+  /// Effective OfficeMath minimum for display n-ary operators. Word uses the
+  /// MATH table's `delimitedSubFormulaMinHeight` field here, despite the
+  /// OpenType name `displayOperatorMinHeight` describing a different field.
+  pub office_display_operator_min_height_pt: f32,
   pub math_leading_pt: f32,
   pub axis_height_pt: f32,
   pub accent_base_height_pt: f32,
@@ -240,7 +243,13 @@ impl MathFontMetrics {
     Self {
       script_scale: 0.8,
       script_script_scale: 0.6,
-      display_operator_min_height_pt: em * 1.3,
+      // OpenType suggests normal line height × 1.5 for a delimited
+      // sub-formula minimum. This fallback is used only when no MATH table
+      // is available; a real MATH face supplies the authored value below.
+      // Keep the pre-MATH renderer default for faces without an explicit
+      // OfficeMath constant; only a real MATH table supplies the Word-specific
+      // `delimitedSubFormulaMinHeight` value below.
+      office_display_operator_min_height_pt: em * 1.3,
       // OpenType defines MathLeading as font-authored whitespace between
       // formulas. A face without a usable MATH table has no such authored
       // whitespace; its ordinary text line metrics remain authoritative.
@@ -1026,7 +1035,10 @@ fn math_font_metrics_from_face(face: &FontFaceData, font_size_pt: f32) -> Option
   Some(MathFontMetrics {
     script_scale: percentage(0).unwrap_or(0.8),
     script_script_scale: percentage(2).unwrap_or(0.6),
-    display_operator_min_height_pt: f32::from(be_u16(bytes, constants_offset + 6)?) * scale,
+    // Word selects display n-ary variants with delimitedSubFormulaMinHeight
+    // (the third MathConstants field), not displayOperatorMinHeight (the
+    // fourth field prescribed by OpenType).
+    office_display_operator_min_height_pt: f32::from(be_u16(bytes, constants_offset + 4)?) * scale,
     math_leading_pt: value(0)?,
     axis_height_pt: value(1)?,
     accent_base_height_pt: value(2)?,

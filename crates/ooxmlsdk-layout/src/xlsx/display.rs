@@ -1606,11 +1606,8 @@ pub(crate) fn vml_shape_common_stroke(
   if !shape.stroked {
     return None;
   }
-  let width = shape
-    .stroke_weight
-    .as_deref()
-    .and_then(units::vml_stroke_weight_to_points)
-    .unwrap_or(0.75);
+  let width = shape.stroke_weight.as_deref();
+  let width = units::office_vml_stroke_weight_to_points(width, 0.75);
   let color = vml_common_color(
     shape.stroke_color.as_deref(),
     shape.stroke_opacity.as_deref(),

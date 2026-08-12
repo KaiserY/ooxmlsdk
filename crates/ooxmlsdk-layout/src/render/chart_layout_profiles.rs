@@ -272,8 +272,11 @@ pub(crate) const WORD_UNTITLED_HORIZONTAL_BAR_NO_LEGEND: CartesianLayoutAdjustme
   CartesianLayoutAdjustment {
     plot_top_ratio: 0.010_51,
     plot_bottom_ratio: -0.004_42,
-    plot_left_ratio: -0.016_65,
-    plot_right_ratio: -0.004_41,
+    // Horizontal bars use the ordinary outer horizontal-axis margins rather
+    // than the hidden-vertical-value-axis margins. These residuals preserve
+    // the measured tdf132174 inner plot after that semantic split.
+    plot_left_ratio: 0.013_85,
+    plot_right_ratio: -0.019_41,
     ..ZERO_ADJUSTMENT
   };
 
@@ -284,9 +287,8 @@ pub(crate) const WORD_UNTITLED_HORIZONTAL_BAR_NO_LEGEND: CartesianLayoutAdjustme
 /// `tdf91250.docx`, `tdf131288.docx`, `tdf125337.docx`, and
 /// `Chart_Plot_BorderLine_Style.docx`. Those documents cover automatic and
 /// explicit titles, Latin and East Asian title faces, one and three series,
-/// and line and column plots. Title-script and physical-font-height residuals
-/// are added by the lowering code; the remaining plot, axis, category, and
-/// legend bands are invariant across that matrix.
+/// and line and column plots in a 432 x 252pt chart frame. Title-script and
+/// physical-font-height residuals are added by the lowering code.
 pub(crate) const WORD_TITLED_BOTTOM_LEGEND: CartesianLayoutAdjustment = CartesianLayoutAdjustment {
   category_top_ratio: -0.021_274,
   plot_top_ratio: 0.005_444,
@@ -296,6 +298,41 @@ pub(crate) const WORD_TITLED_BOTTOM_LEGEND: CartesianLayoutAdjustment = Cartesia
   plot_right_ratio: -0.017_651,
   ..ZERO_ADJUSTMENT
 };
+
+/// Reference device height used to express Word's titled-bottom automatic
+/// chart bands above as physical points.
+///
+/// Apache POI's `bar-chart-template.docx` and `61745.docx` contain a second,
+/// structurally equivalent three-series column chart in a 432 x 325.5pt
+/// frame. Its Office fixed output and `tdf131288.docx` keep the plot edges at
+/// the same physical insets: 19.387pt left, 10.989pt right, 38.156pt top, and
+/// 46.016pt bottom. The value-label edge likewise stays about 6.6pt from the
+/// frame. Consequently these old ratio fields encode bands measured on the
+/// 252pt reference device; they must not be rescaled by a taller chart frame.
+pub(crate) const WORD_TITLED_BOTTOM_DEVICE_BAND_HEIGHT_PT: f32 = 252.0;
+
+/// Word's automatic horizontal-bar layout with a non-overlay title and bottom
+/// legend.
+///
+/// `barDir="bar"` exchanges the physical category and value axes, so neither
+/// the hidden vertical-value-axis margins nor the ordinary column plot band
+/// applies. The ratios are measured from the immutable Office fixed output
+/// for Apache POI's `bar-chart-template.docx` and `61745.docx`. Both use a
+/// 432 x 314.25pt chart frame and expose the same
+/// `(126.26, 110.28)-(490.81, 341.41)` inner plot, while covering one versus
+/// three series and present versus absent data labels. The untitled/no-legend
+/// horizontal bar and the titled column fixtures above are structural
+/// counterexamples selected separately by the lowering code.
+pub(crate) const WORD_TITLED_BOTTOM_HORIZONTAL_BAR: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    category_top_ratio: -0.021_274,
+    plot_top_ratio: -0.002_243,
+    plot_bottom_ratio: -0.037_304,
+    tick_left_ratio: 0.010_897,
+    plot_left_ratio: -0.000_864,
+    plot_right_ratio: -0.015_966,
+    ..ZERO_ADJUSTMENT
+  };
 
 /// DrawingML's automatic East Asian title box reserves additional leading
 /// beyond an otherwise equal-height Latin title. Any physical line-height

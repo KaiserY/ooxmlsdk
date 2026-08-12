@@ -525,6 +525,15 @@ fn office_math_line_layout(
     return None;
   }
 
+  // Normalize the complete root sequence before binary-break fragmentation.
+  // `m:brkBin="before"` may put U+2026 in a fragment whose local first atom
+  // has no preceding operator, even though the authored root sequence has a
+  // preceding `+`. The row-level normalizer must therefore see the complete
+  // root context once; each fragment can then retain the resolved scalar when
+  // it is rebuilt for PDF output. Explicit m:lit/m:nor classes remain
+  // protected by the same override check as the normal display path.
+  normalize_row_automatic_math_ellipsis(&mut nodes);
+
   let classes = resolved_row_math_classes(&nodes);
   let mut boundaries = vec![None; nodes.len() + 1];
   for (index, manual_break) in manual_breaks {
@@ -3172,6 +3181,7 @@ fn layout_node(node: &MathNode, context: MathLayoutContext, metrics: &mut TextMe
         character,
         false,
         false,
+        true,
         control_style.as_ref(),
         context,
         metrics,
@@ -3195,6 +3205,7 @@ fn layout_node(node: &MathNode, context: MathLayoutContext, metrics: &mut TextMe
         character,
         *bottom,
         true,
+        false,
         control_style.as_ref(),
         context,
         metrics,
@@ -6184,13 +6195,17 @@ fn layout_nary(
   let base_box = layout_node(base, context, metrics);
   let mut minimum_height = effective_style.font_size_pt;
   if policy.use_display_operator_minimum {
-    // OpenType MATH defines DisplayOperatorMinHeight as the complete minimum
-    // height of a display-style n-ary operator. AxisHeight independently
-    // controls vertical centering and must not be subtracted from, or
-    // reflected into, this variant-selection lower bound. Use the realized
+    // Word's OfficeMath implementation does not use the OpenType
+    // displayOperatorMinHeight value when selecting a display n-ary variant;
+    // the Microsoft typography issue for that parameter records that Word
+    // uses delimitedSubFormulaMinHeight instead.  This matters for Cambria
+    // Math, whose authored values are 3000 and 2500 design units: the former
+    // selects Word's 4406-unit ∭/∯ variants while the latter selects the
+    // visibly smaller 2769-unit forms.  AxisHeight independently controls
+    // centering and is not part of this lower bound.  Use the realized
     // script-sized MATH metrics so a nested n-ary remains in its authored
     // style rather than inheriting the root zone's display minimum.
-    minimum_height = minimum_height.max(math.display_operator_min_height_pt);
+    minimum_height = minimum_height.max(math.office_display_operator_min_height_pt);
   }
   let target_height = if grow {
     minimum_height.max(base_box.ascent_pt + base_box.descent_pt)
@@ -6320,6 +6335,7 @@ fn layout_accent(
   character: &str,
   bottom: bool,
   exact_frame_width: bool,
+  replace_variant_semantics: bool,
   control_style: Option<&TextStyle>,
   context: MathLayoutContext,
   metrics: &mut TextMetrics,
@@ -6412,7 +6428,7 @@ fn layout_accent(
   } else {
     (base_width, 0.0, base_attachment - accent_attachment)
   };
-  if let Some(placement) = normal_semantic_placement {
+  if replace_variant_semantics && let Some(placement) = normal_semantic_placement {
     let logical_semantic_x = base_x + base_attachment - normal_accent_attachment + placement.x_pt;
     accent.replace_variant_semantics_with_combining_accent(
       character,
@@ -7997,6 +8013,16 @@ mod tests {
       MathNode::row([automatic("x"), automatic("+"), automatic("\u{2026}")]).semantic_text(),
       "x+\u{22ef}"
     );
+    let fraction = || MathNode::Fraction {
+      numerator: Box::new(automatic("x")),
+      denominator: Box::new(automatic("1")),
+      kind: m::FractionTypeValues::Bar,
+      control_style: None,
+    };
+    assert_eq!(
+      MathNode::row([fraction(), automatic("+"), automatic("\u{2026}")]).semantic_text(),
+      "x1+\u{22ef}"
+    );
     assert_eq!(
       text_math_classes("\u{22ef}", None),
       MathAtomClasses {
@@ -8044,6 +8070,28 @@ mod tests {
       ])
       .semantic_text(),
       "x+\u{22ef}"
+    );
+  }
+
+  #[test]
+  fn office_math_zone_normalizes_ellipsis_after_a_built_up_object() {
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMathPara><m:oMath><m:f><m:num><m:r><m:t>x</m:t></m:r></m:num><m:den><m:r><m:t>1</m:t></m:r></m:den></m:f><m:r><m:t>+…</m:t></m:r></m:oMath></m:oMathPara></w:p>"#;
+    let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+    let choice = paragraph.paragraph_choice.first().expect("math paragraph");
+    let image = wordprocessing_math_zone_image(
+      std::iter::once(choice),
+      &TextStyle::default(),
+      &StylesCatalog::default(),
+      true,
+    )
+    .expect("built-up math must produce an image");
+    let alt_text = image.alt_text.as_deref().expect("math semantic text");
+    assert!(alt_text.contains("+\u{22ef}"), "alt text: {alt_text:?}");
+    let svg = std::str::from_utf8(&image.data).expect("math SVG");
+    assert!(svg.contains("\u{22ef}"), "SVG semantic text: {svg}");
+    assert!(
+      !svg.contains("\u{2026}"),
+      "SVG retained baseline ellipsis: {svg}"
     );
   }
 
@@ -8599,6 +8647,24 @@ mod tests {
         })
         .collect::<Vec<_>>(),
       [None, Some("+"), Some("=")]
+    );
+  }
+
+  #[test]
+  fn office_math_break_before_keeps_ellipsis_context_across_fragments() {
+    let run = r#"<m:f><m:num><m:r><m:t>x</m:t></m:r></m:num><m:den><m:r><m:t>1</m:t></m:r></m:den></m:f><m:r><m:t>+…</m:t></m:r>"#;
+    let layout = office_math_break_layout(
+      run,
+      m::BreakBinaryOperatorValues::Before,
+      m::BreakBinarySubtractionValues::MinusMinus,
+    );
+    assert_eq!(
+      layout
+        .fragments
+        .iter()
+        .map(|fragment| fragment.image.alt_text.as_deref().unwrap_or_default())
+        .collect::<Vec<_>>(),
+      ["𝑥1+", "\u{22ef}"]
     );
   }
 

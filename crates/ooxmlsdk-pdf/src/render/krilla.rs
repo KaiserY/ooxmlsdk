@@ -3537,12 +3537,15 @@ fn paint_line_owners(
                   // frame, so a same-baseline item can outlive an imprecise
                   // flattened item range. Its page-space origin remains an
                   // unambiguous owner: prefer the smallest cell containing
-                  // that origin.
+                  // that origin. Cell rectangles are left/top-closed and
+                  // right/bottom-open; otherwise text whose origin is exactly
+                  // on an adjacent cell boundary is assigned to the earlier
+                  // cell and gets clipped out of the visible PDF paint.
                   fragment.bounds.is_some_and(|bounds| {
                     x_pt + f32::EPSILON >= bounds.origin.x.0
-                      && x_pt <= bounds.origin.x.0 + bounds.size.width.0 + f32::EPSILON
+                      && x_pt < bounds.origin.x.0 + bounds.size.width.0
                       && y_pt + f32::EPSILON >= bounds.origin.y.0
-                      && y_pt <= bounds.origin.y.0 + bounds.size.height.0 + f32::EPSILON
+                      && y_pt < bounds.origin.y.0 + bounds.size.height.0
                   })
                 } else {
                   fragment.item_range.start <= item_index && item_index < fragment.item_range.end

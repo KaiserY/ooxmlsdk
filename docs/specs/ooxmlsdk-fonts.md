@@ -222,7 +222,8 @@ FontBook
   face_infos
   family_aliases
   substitution_rules
-  fallback_chains
+  family_substitution_chains
+  fallback_chains (missing-glyph coverage only)
 
 FontFaceInfo
   font_id
@@ -343,13 +344,27 @@ Resolution is a multi-step process:
 
 1. Resolve theme family to a requested family if a theme map is present.
 2. Match requested family, weight, and slant.
-3. Apply Office/LO-like substitution if no face is available.
+3. Apply Office/LO-like family substitution if no requested face is available.
 4. Split shaping runs by script/language/direction where necessary.
 5. Apply fallback per segment or per character for missing glyph coverage.
 6. Mark synthetic style if bold/italic is synthesized.
 
 Do not silently replace unavailable fonts without recording the substitution.
 Layout and tests must be able to inspect the requested and resolved family.
+Family substitution and missing-glyph fallback are separate policy stages. A
+general symbol fallback must not become the primary face merely because the
+requested family is unavailable. This follows LibreOffice
+`PhysicalFontCollection::FindFontFamily()` versus `GetGlyphFallbackFont()`,
+Skia DirectWrite family matching versus `onFallback()`, Wine DirectWrite's
+base-family-first `MapCharacters()` path, and ReactOS font realization versus
+`FontLink_Chain_FindGlyph()`.
+
+Keep the implementation platform-neutral. Native platform fallback APIs may be
+used offline to establish evidence for a deterministic policy entry, but the
+runtime policy and tests must remain pure Rust and must not vary with the host
+OS. Resolve the primary and fallback chain once per request/style and reuse it;
+per-cluster shaping should perform cmap coverage checks, not rescan family
+substitution tables.
 
 ## 9. Metrics Policy
 

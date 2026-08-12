@@ -1599,6 +1599,7 @@ dependencies = [
  "icu_properties",
  "icu_segmenter",
  "image",
+ "jiff",
  "kurbo",
  "olecfsdk",
  "ooxmlsdk",

@@ -79,6 +79,7 @@ image = { version = "0.25.10", default-features = false, features = [
   "webp",
 ] }
 jpeg-encoder = "0.7.0"
+jiff = "0.2.34"
 krilla = { version = "0.8.2", default-features = false, features = [
   "raster-images",
   "pdf",

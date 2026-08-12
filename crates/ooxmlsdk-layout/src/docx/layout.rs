@@ -343,11 +343,10 @@ fn grid_auto_line_heights(
 ) -> Option<GridAutoLineHeights> {
   if !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
     || !paragraph.format.snap_to_grid.unwrap_or(true)
-    || !text_segment_uses_document_grid(text_segmentation, setup)
   {
     return None;
   }
-  let grid_height = setup.doc_grid_line_pitch_pt?;
+  let grid_height = doc_grid_line_pitch_for_segment(setup, text_segmentation)?;
   let visible_line_height = inline_text_height(base_line_style, text_metrics);
   let snapped_line_height = snap_line_height_to_doc_grid(visible_line_height, Some(grid_height));
   let proportional_line_height = paragraph
@@ -551,6 +550,22 @@ fn text_segment_uses_document_grid(text_segmentation: TextSegmentation, setup: P
       && setup.adjust_table_line_heights_to_grid)
 }
 
+fn doc_grid_line_pitch_for_segment(
+  setup: PageSetup,
+  text_segmentation: TextSegmentation,
+) -> Option<f32> {
+  match text_segmentation {
+    TextSegmentation::Body => setup.doc_grid_line_pitch_pt,
+    TextSegmentation::TableCell if setup.adjust_table_line_heights_to_grid => setup
+      .table_cell_doc_grid_line_pitch_pt
+      .or(setup.doc_grid_line_pitch_pt),
+    TextSegmentation::DrawingLayer
+    | TextSegmentation::RepeatingSlot
+    | TextSegmentation::Notes
+    | TextSegmentation::TableCell => None,
+  }
+}
+
 fn snap_line_height_to_doc_grid(line_height: f32, doc_grid_line_pitch_pt: Option<f32>) -> f32 {
   let Some(grid_height) = doc_grid_line_pitch_pt else {
     return line_height;
@@ -575,12 +590,10 @@ fn document_grid_line_metrics(
   setup: PageSetup,
   text_segmentation: TextSegmentation,
 ) -> Option<DocumentGridLineMetrics> {
-  if !paragraph.format.snap_to_grid.unwrap_or(true)
-    || !text_segment_uses_document_grid(text_segmentation, setup)
-  {
+  if !paragraph.format.snap_to_grid.unwrap_or(true) {
     return None;
   }
-  let grid_height_pt = setup.doc_grid_line_pitch_pt?;
+  let grid_height_pt = doc_grid_line_pitch_for_segment(setup, text_segmentation)?;
 
   // ECMA-376 Part 1 §§17.3.1.32 and 17.6.5 make the current line use the
   // section's document-grid pitch. Writer's SwTextFormatter::CalcRealHeight()
@@ -915,22 +928,11 @@ fn inline_drawing_line_height(
   text_frame: TextFrame,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
+  let portion_height_pt =
+    inline_drawing_portion_line_height(object_height_pt, paragraph, text_frame, text_metrics);
   if matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
-    return object_height_pt;
+    return portion_height_pt;
   }
-  let mut proportional_gap = || {
-    paragraph
-      .format
-      .line_height_pt
-      .filter(|multiple| *multiple > 1.0)
-      .map_or(0.0, |multiple| {
-        paragraph_single_line_height(
-          paragraph,
-          &paragraph_base_line_style(paragraph),
-          text_metrics,
-        ) * (multiple - 1.0)
-      })
-  };
   if legacy_inline_object_owns_line_box(paragraph, text_frame) {
     // Writer's SwTextFormatter::InsertPortion() implements
     // MS_WORD_COMP_MIN_LINE_HEIGHT_BY_FLY through compatibility mode 14 by
@@ -939,7 +941,7 @@ fn inline_drawing_line_height(
     // This applies to every inline fly/drawing, including an imported Math
     // object with an intrinsic baseline, rather than only to chart objects.
     // CalcRealHeight() subsequently owns the proportional spacing below it.
-    return object_height_pt + proportional_gap();
+    return portion_height_pt;
   }
   if paragraph_has_only_inline_drawing_content(paragraph)
     && matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
@@ -956,7 +958,7 @@ fn inline_drawing_line_height(
     // paragraphs in artistic_effects.docx. Text sharing the line, omitted or
     // <=100% auto spacing, and exact/at-least spacing retain the glyph-like
     // paragraph-mark descent below.
-    return object_height_pt + proportional_gap();
+    return portion_height_pt;
   }
   // ECMA-376 Part 1 §20.4.2.8 defines an inline drawing as affecting its
   // line like a character glyph of similar size. The object's height is the
@@ -964,10 +966,43 @@ fn inline_drawing_line_height(
   // font descent below it. Writer models the same split in
   // SwLineLayout::MaxAscentDescent(), keeping fly-content ascent/descent and
   // ordinary text descent as independent maxima.
-  object_height_pt
+  portion_height_pt
     + text_metrics
       .vertical_metrics(&paragraph_base_line_style(paragraph))
       .descent_pt
+}
+
+fn inline_drawing_portion_line_height(
+  object_height_pt: f32,
+  paragraph: &crate::docx::Paragraph,
+  text_frame: TextFrame,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
+    return object_height_pt;
+  }
+  if legacy_inline_object_owns_line_box(paragraph, text_frame)
+    || (paragraph_has_only_inline_drawing_content(paragraph)
+      && matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+      && paragraph
+        .format
+        .line_height_pt
+        .is_some_and(|multiple| multiple > 1.0))
+  {
+    let proportional_gap_pt = paragraph
+      .format
+      .line_height_pt
+      .filter(|multiple| *multiple > 1.0)
+      .map_or(0.0, |multiple| {
+        paragraph_single_line_height(
+          paragraph,
+          &paragraph_base_line_style(paragraph),
+          text_metrics,
+        ) * (multiple - 1.0)
+      });
+    return object_height_pt + proportional_gap_pt;
+  }
+  object_height_pt
 }
 
 fn inline_image_line_height(
@@ -1047,6 +1082,88 @@ fn inline_image_line_height(
   object_ascent + object_descent.max(paragraph_descent)
 }
 
+fn inline_image_portion_line_height(
+  metrics: InlineImageMetrics,
+  paragraph: &crate::docx::Paragraph,
+  text_frame: TextFrame,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if metrics.line_box == crate::docx::InlineImageLineBox::EmbeddedObjectRunPosition {
+    return inline_drawing_portion_line_height(
+      metrics.frame_height_pt,
+      paragraph,
+      text_frame,
+      text_metrics,
+    );
+  }
+  if metrics.explicit_baseline_gap {
+    let extents = inline_image_vertical_extents(metrics);
+    let portion_height_pt = extents.ascent_pt + extents.descent_pt;
+    if legacy_inline_object_owns_line_box(paragraph, text_frame)
+      && metrics.line_box != crate::docx::InlineImageLineBox::OfficeMathExternal
+    {
+      return inline_drawing_portion_line_height(
+        portion_height_pt,
+        paragraph,
+        text_frame,
+        text_metrics,
+      );
+    }
+    return portion_height_pt;
+  }
+  if legacy_inline_object_owns_line_box(paragraph, text_frame)
+    && metrics.line_box != crate::docx::InlineImageLineBox::OfficeMathExternal
+  {
+    return inline_drawing_portion_line_height(
+      metrics.frame_height_pt,
+      paragraph,
+      text_frame,
+      text_metrics,
+    );
+  }
+  if metrics.content_bottom_gap_pt >= 0.0 {
+    return inline_drawing_portion_line_height(
+      metrics.frame_height_pt,
+      paragraph,
+      text_frame,
+      text_metrics,
+    );
+  }
+  let object_descent_pt = -metrics.content_bottom_gap_pt;
+  (metrics.frame_height_pt - object_descent_pt).max(0.0) + object_descent_pt
+}
+
+fn nonfinal_inline_object_only_line_height(
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+  text_frame: TextFrame,
+  object_portion_height_pt: f32,
+) -> Option<f32> {
+  if object_portion_height_pt <= LAYOUT_EPSILON_PT
+    || paragraph.list_label.is_some()
+    || paragraph.list_label_image.is_some()
+    || !paragraph_has_only_inline_drawing_content(paragraph)
+    || matches!(text_frame.line_height_rule, LineHeightRule::Exact)
+  {
+    return None;
+  }
+
+  // ECMA-376 Part 1 §20.4.2.8 makes an inline drawing a character-like
+  // portion. Writer creates the zero-length text portion which carries the
+  // paragraph mark only after the formatter reaches the paragraph end
+  // (SwTextFormatter::NewPortion), while SwLineLayout::MaxAscentDescent()
+  // measures only the portions attached to the current physical line. An
+  // object-only line ended by automatic wrapping therefore owns only its
+  // drawing portions; the paragraph-mark descent belongs to the final line.
+  let object_height_pt =
+    inline_object_line_metrics_for_flow(object_portion_height_pt, paragraph, flow).height_pt;
+  Some(match text_frame.line_height_rule {
+    LineHeightRule::Auto => object_height_pt,
+    LineHeightRule::AtLeast => object_height_pt.max(text_frame.base_line_height),
+    LineHeightRule::Exact => unreachable!("exact line height returned above"),
+  })
+}
+
 fn inline_image_ascent(metrics: InlineImageMetrics) -> f32 {
   if metrics.line_box == crate::docx::InlineImageLineBox::EmbeddedObjectRunPosition {
     return metrics.frame_height_pt;
@@ -1081,7 +1198,7 @@ fn numbering_image_metrics(
   max_width_pt: f32,
   label_style: &TextStyle,
 ) -> InlineImageMetrics {
-  let mut metrics = inline_image_metrics(&label_image.image, max_width_pt);
+  let mut metrics = width_limited_inline_image_metrics(&label_image.image, max_width_pt);
   // Office fixed output uses the character cell after its approximately
   // two-point internal leading, rather than the font file's Symbol advance
   // (which is only about half an em for U+F0B7 in common Symbol fonts).
@@ -9763,9 +9880,12 @@ fn keep_group_height(
     && paragraph.format.keep_with_next
     && let Some(Block::Paragraph(next)) = next
   {
-    // CheckMoveFwd()/WouldFit() tests whether the next content can start in
-    // the remaining upper, not whether the whole next paragraph fits there.
-    height += estimated_paragraph_first_line_height(next, flow, text_metrics);
+    // ECMA-376 Part 1 §§17.3.1.15 and 17.3.1.44 require the current
+    // paragraph to share a page with a legal prefix of the next paragraph.
+    // With widow/orphan control enabled, one isolated next-paragraph line is
+    // not such a prefix. Writer's WouldFit() likewise satisfies the orphan
+    // minimum before accepting the next frame in the remaining upper.
+    height += estimated_paragraph_keep_start_height(next, flow, text_metrics);
   }
   height
 }
@@ -9801,6 +9921,8 @@ fn estimated_paragraph_content_height(
 struct EstimatedParagraphContentExtents {
   flow_height: f32,
   floating_bottom: f32,
+  leading_line_heights_pt: [f32; DEFAULT_ORPHAN_LINES],
+  line_count: usize,
 }
 
 fn estimated_paragraph_content_extents(
@@ -9886,21 +10008,40 @@ fn estimated_paragraph_content_extents(
   }
   let mut content_height = 0.0;
   let mut floating_bottom: f32 = 0.0;
+  let mut leading_line_heights_pt = [0.0; DEFAULT_ORPHAN_LINES];
   let mut has_flow_content = paragraph.list_label.is_some() || paragraph.list_label_image.is_some();
   let mut legacy_line_has_object = false;
+  let mut line_inline_object_portion_height = 0.0_f32;
   let mut x = first_line_indent_pt.max(0.0);
   let mut line_index = 0;
   let mut finish_line = |content_height: &mut f32,
                          line_height: &mut f32,
-                         line_text_extents: &mut WordLineTextExtents| {
-    *content_height += line_real_height(
+                         line_text_extents: &mut WordLineTextExtents,
+                         line_inline_object_portion_height: &mut f32,
+                         is_final_line: bool| {
+    if !is_final_line
+      && let Some(nonfinal_height_pt) = nonfinal_inline_object_only_line_height(
+        paragraph,
+        flow,
+        text_frame,
+        *line_inline_object_portion_height,
+      )
+    {
+      *line_height = nonfinal_height_pt;
+    }
+    let flow_height = line_real_height(
       paragraph,
       *line_height,
       line_index,
       grid_auto_following_line_height_pt,
       false,
     );
+    *content_height += flow_height;
+    if let Some(leading_height) = leading_line_heights_pt.get_mut(line_index) {
+      *leading_height = flow_height;
+    }
     *line_height = base_line_height;
+    *line_inline_object_portion_height = 0.0;
     *line_text_extents = WordLineTextExtents::default();
     line_index += 1;
   };
@@ -9919,6 +10060,8 @@ fn estimated_paragraph_content_extents(
               &mut content_height,
               &mut line_height,
               &mut line_text_extents,
+              &mut line_inline_object_portion_height,
+              false,
             );
             has_flow_content = true;
             x = 0.0;
@@ -9952,6 +10095,8 @@ fn estimated_paragraph_content_extents(
               &mut content_height,
               &mut line_height,
               &mut line_text_extents,
+              &mut line_inline_object_portion_height,
+              false,
             );
             x = 0.0;
           }
@@ -9968,6 +10113,8 @@ fn estimated_paragraph_content_extents(
                       &mut content_height,
                       &mut line_height,
                       &mut line_text_extents,
+                      &mut line_inline_object_portion_height,
+                      false,
                     );
                     x = 0.0;
                   }
@@ -9992,6 +10139,8 @@ fn estimated_paragraph_content_extents(
                   &mut content_height,
                   &mut line_height,
                   &mut line_text_extents,
+                  &mut line_inline_object_portion_height,
+                  false,
                 );
                 x = 0.0;
               }
@@ -10039,6 +10188,8 @@ fn estimated_paragraph_content_extents(
             &mut content_height,
             &mut line_height,
             &mut line_text_extents,
+            &mut line_inline_object_portion_height,
+            false,
           );
           x = 0.0;
         }
@@ -10055,6 +10206,8 @@ fn estimated_paragraph_content_extents(
           &mut content_height,
           &mut line_height,
           &mut line_text_extents,
+          &mut line_inline_object_portion_height,
+          false,
         );
         has_flow_content = true;
         x = 0.0;
@@ -10081,6 +10234,8 @@ fn estimated_paragraph_content_extents(
             &mut content_height,
             &mut line_height,
             &mut line_text_extents,
+            &mut line_inline_object_portion_height,
+            false,
           );
         }
         // This estimator only owns vertical fit. Center/right positional tabs
@@ -10106,6 +10261,8 @@ fn estimated_paragraph_content_extents(
             &mut content_height,
             &mut line_height,
             &mut line_text_extents,
+            &mut line_inline_object_portion_height,
+            false,
           );
           x = 0.0;
         }
@@ -10122,6 +10279,8 @@ fn estimated_paragraph_content_extents(
             &mut content_height,
             &mut line_height,
             &mut line_text_extents,
+            &mut line_inline_object_portion_height,
+            false,
           );
           x = 0.0;
         }
@@ -10169,17 +10328,23 @@ fn estimated_paragraph_content_extents(
             floating_bottom.max(image_y + metrics.content_height_pt + placement.margin_bottom_pt);
           continue;
         }
-        let metrics = inline_image_metrics(image, content_width);
+        let metrics = inline_image_metrics(image);
         has_flow_content = true;
         if x + metrics.frame_width_pt > content_width && x > 0.0 {
           finish_line(
             &mut content_height,
             &mut line_height,
             &mut line_text_extents,
+            &mut line_inline_object_portion_height,
+            false,
           );
           x = 0.0;
           legacy_line_has_object = false;
         }
+        let object_portion_height =
+          inline_image_portion_line_height(metrics, paragraph, text_frame, text_metrics);
+        line_inline_object_portion_height =
+          line_inline_object_portion_height.max(object_portion_height);
         let source_line_height =
           inline_image_line_height(metrics, paragraph, text_frame, text_metrics);
         let resolved_line_height =
@@ -10250,12 +10415,18 @@ fn estimated_paragraph_content_extents(
             &mut content_height,
             &mut line_height,
             &mut line_text_extents,
+            &mut line_inline_object_portion_height,
+            false,
           );
           x = 0.0;
           compatibility_forced_shape_line = true;
           legacy_line_has_object = false;
         }
         has_flow_content = true;
+        let object_portion_height =
+          inline_drawing_portion_line_height(frame_height, paragraph, text_frame, text_metrics);
+        line_inline_object_portion_height =
+          line_inline_object_portion_height.max(object_portion_height);
         let source_line_height =
           inline_drawing_line_height(frame_height, paragraph, text_frame, text_metrics);
         let resolved_line_height =
@@ -10280,6 +10451,8 @@ fn estimated_paragraph_content_extents(
           &mut content_height,
           &mut line_height,
           &mut line_text_extents,
+          &mut line_inline_object_portion_height,
+          false,
         );
         x = 0.0;
       }
@@ -10290,28 +10463,57 @@ fn estimated_paragraph_content_extents(
       &mut content_height,
       &mut line_height,
       &mut line_text_extents,
+      &mut line_inline_object_portion_height,
+      true,
     );
   }
   EstimatedParagraphContentExtents {
     flow_height: content_height,
     floating_bottom,
+    leading_line_heights_pt,
+    line_count: line_index,
   }
 }
 
-fn estimated_paragraph_first_line_height(
+fn paragraph_widow_control_applies(paragraph: &crate::docx::Paragraph, flow: FlowContext) -> bool {
+  paragraph.format.widow_control != Some(false)
+    && (flow.text_segmentation != TextSegmentation::TableCell || flow.word_floating_table_cell)
+}
+
+fn estimated_paragraph_keep_start_height(
   paragraph: &crate::docx::Paragraph,
   flow: FlowContext,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
   let base_line_style = paragraph_base_line_style(paragraph);
-  paragraph_upper_space(paragraph)
-    + paragraph_line_height_for_setup(
-      paragraph,
-      &base_line_style,
-      flow.setup,
-      flow.text_segmentation,
-      text_metrics,
-    )
+  let base_line_height = paragraph_line_height_for_setup(
+    paragraph,
+    &base_line_style,
+    flow.setup,
+    flow.text_segmentation,
+    text_metrics,
+  );
+  let extents = estimated_paragraph_content_extents(paragraph, flow, text_metrics);
+  let content_height = if paragraph.format.keep_lines {
+    extents
+      .flow_height
+      .max(extents.floating_bottom)
+      .max(base_line_height)
+  } else if extents.line_count == 0 {
+    base_line_height
+  } else {
+    let minimum_lines = if paragraph_widow_control_applies(paragraph, flow) {
+      DEFAULT_ORPHAN_LINES
+    } else {
+      1
+    };
+    extents
+      .leading_line_heights_pt
+      .iter()
+      .take(minimum_lines.min(extents.line_count))
+      .sum()
+  };
+  paragraph_upper_space(paragraph) + content_height
 }
 
 fn starts_new_page(kind: SectionBreakKind) -> bool {
@@ -10370,6 +10572,38 @@ fn page_has_body_region_items(page: &Page, flow: FlowContext) -> bool {
     .items
     .iter()
     .any(|item| item_is_in_body_region(item, flow))
+}
+
+fn page_has_body_region_items_before(page: &Page, flow: FlowContext, item_end: usize) -> bool {
+  page.items[..item_end.min(page.items.len())]
+    .iter()
+    .any(|item| item_is_in_body_region(item, flow))
+}
+
+struct FirstLineInlineObjectFit<'a> {
+  page: &'a Page,
+  flow: FlowContext,
+  y: f32,
+  line_height: f32,
+  object_line_height: f32,
+  paragraph_item_start: usize,
+  line_content_item_start: usize,
+  has_finished_lines: bool,
+  remains_on_start_page: bool,
+  allow_reflow: bool,
+}
+
+fn first_line_inline_object_requires_paragraph_follow(fit: FirstLineInlineObjectFit<'_>) -> bool {
+  fit.allow_reflow
+    && fit.remains_on_start_page
+    && !fit.has_finished_lines
+    && fit.line_content_item_start < fit.page.items.len()
+    && inline_object_requires_flow_advance(
+      fit.y,
+      fit.line_height.max(fit.object_line_height),
+      fit.flow.content_bottom,
+      page_has_body_region_items_before(fit.page, fit.flow, fit.paragraph_item_start),
+    )
 }
 
 fn paragraph_spacing_before(
@@ -10520,40 +10754,6 @@ fn paragraph_starts_with_last_rendered_page_break(paragraph: &crate::docx::Parag
       )
     })
     .is_some_and(|inline| matches!(inline, InlineItem::LastRenderedPageBreak))
-}
-
-fn paragraph_has_text_after_leading_last_rendered_page_break(
-  paragraph: &crate::docx::Paragraph,
-) -> bool {
-  let mut saw_last_rendered_page_break = false;
-  for inline in &paragraph.inlines {
-    match inline {
-      InlineItem::LastRenderedPageBreak => saw_last_rendered_page_break = true,
-      InlineItem::Text(run) if !run.text.trim().is_empty() => {
-        return saw_last_rendered_page_break;
-      }
-      InlineItem::NoteReferenceMark(_) | InlineItem::PositionalTab(_) => {
-        if saw_last_rendered_page_break {
-          return true;
-        }
-      }
-      InlineItem::Ruby(_)
-      | InlineItem::NoteSeparatorMark(_)
-      | InlineItem::Image(_)
-      | InlineItem::Shape(_)
-      | InlineItem::LegacyFormCheckBox(_)
-      | InlineItem::PageBreak
-      | InlineItem::ColumnBreak
-      | InlineItem::ClearLineBreak(_) => return false,
-      InlineItem::Text(_)
-      | InlineItem::BookmarkStart(_)
-      | InlineItem::FormWidgetStart(_)
-      | InlineItem::FormWidgetEnd(_)
-      | InlineItem::DrawingGroupStart(_)
-      | InlineItem::DrawingGroupEnd => {}
-    }
-  }
-  false
 }
 
 fn paragraph_ends_with_explicit_page_break(paragraph: &crate::docx::Paragraph) -> bool {
@@ -10829,6 +11029,10 @@ fn layout_document_block(
       )
     }
     Block::Table(table) => {
+      let mut flow = flow;
+      if table_page_break_before_applies(table, target.current, flow) {
+        (flow, y) = force_page_break(flow, target.current, target.pages);
+      }
       let (carried_before, carried_after) =
         nested_table_preceding_paragraph_spacing(previous, table, flow, target.text_metrics);
       let table_y = y - carried_before;
@@ -11023,6 +11227,22 @@ fn table_has_indirect_previous_frame(page: &Page, flow: FlowContext, y: f32) -> 
     return page.body_content_frames > 0;
   }
   page_has_body_region_items(page, flow) || y > flow.content_top_pt + LAYOUT_EPSILON_PT
+}
+
+fn table_page_break_before_applies(table: &Table, page: &Page, flow: FlowContext) -> bool {
+  if !table.page_break_before || flow.text_segmentation != TextSegmentation::Body {
+    return false;
+  }
+  body_frame_precedes_table_page_break(page)
+}
+
+fn body_frame_precedes_table_page_break(page: &Page) -> bool {
+  // An empty body paragraph is still a Writer content frame and therefore
+  // makes a table-level PAGE_BEFORE effective. By contrast, force_page_break
+  // seeds its new target page with one bookkeeping frame; that seed alone must
+  // not make the transferred table break advance a second time.
+  let break_target_seed = usize::from(page.explicit_break_target);
+  page.body_content_frames > break_target_seed
 }
 
 fn note_body_content_frame(current: &mut Page, flow: FlowContext) {
@@ -14412,14 +14632,15 @@ fn body_content_limits_for_page(
 ) -> (f32, f32) {
   let mut top = setup.margin_top_pt;
   let mut bottom = setup.height_pt - setup.margin_bottom_pt;
-  let (has_header, has_footer, header_height, footer_height, first_header) =
+  let (has_header, has_footer, header_height, footer_height, _) =
     repeating_slots_present_for_page(slots, page_number, section_page_index);
 
   if has_header && !setup.top_margin_was_negative {
     top = top.max(header_slot_bottom(setup));
-    if !first_header {
-      top = top.max(setup.header_distance_pt.max(0.0) + header_height);
-    }
+    // ECMA-376 Part 1 §17.6.11 applies the same nonnegative `top` rule to
+    // every page: body text starts below the greater of the specified margin
+    // and the actual header extent. A title-page header is not an exception.
+    top = top.max(setup.header_distance_pt.max(0.0) + header_height);
   }
   if has_footer && !setup.bottom_margin_was_negative {
     let footer_bottom = (setup.height_pt - setup.footer_distance_pt.max(0.0))
@@ -19882,6 +20103,24 @@ fn autofit_table_column_widths(
     && table.preferred_width_pct.is_none()
     && row_cell_widths_are_implicit
     && has_row_grid_offset;
+  let first_row_defines_dynamic_grid_from_absolute_widths = table.column_widths_pt.len()
+    < column_count
+    && table.preferred_width_pt.is_none()
+    && table.preferred_width_pct.is_none()
+    && table.rows.first().is_some_and(|row| {
+      row.grid_before == 0
+        && row.grid_after == 0
+        && row
+          .cells
+          .iter()
+          .map(|cell| cell.grid_span.max(1))
+          .sum::<usize>()
+          == column_count
+        && row.cells.iter().all(|cell| {
+          cell.preferred_width_pt.is_some_and(|width| width > 0.0)
+            && cell.preferred_width_pct.is_none()
+        })
+    });
 
   apply_complete_autofit_percentage_row_widths(table, &mut widths);
 
@@ -19946,6 +20185,20 @@ fn autofit_table_column_widths(
           &mut protected_preferred[grid_index..grid_index + span],
           preferred.max(minimum),
         );
+      }
+      if first_row_defines_dynamic_grid_from_absolute_widths
+        && row_index == 0
+        && fixed_preferred.is_some()
+      {
+        // ECMA-376 Part 1 §17.18.87 first applies the first row's tcW values
+        // and dynamically extends an underspecified tblGrid. With no tblW,
+        // that row determines the still-open table width. Word preserves
+        // those absolute span widths and grows the dynamic tail to its
+        // content minimum; treating the implied total as a fixed preferred
+        // table width instead shrinks every preceding span (fdo59273).
+        for index in grid_index..grid_index + span {
+          protected_preferred[index] = protected_preferred[index].max(widths[index]);
+        }
       }
       grid_index += span;
     }
@@ -20037,6 +20290,23 @@ fn autofit_table_column_widths(
     }
     if deficit <= f32::EPSILON {
       continue;
+    }
+
+    if first_row_defines_dynamic_grid_from_absolute_widths {
+      // There is no authored table-width ceiling in this form: use the
+      // remaining page width before cannibalizing the absolute first-row
+      // spans. If the page is exhausted, the ordinary two-priority donor
+      // path below still resolves the remaining deficit.
+      let table_total = widths.iter().sum::<f32>();
+      let growth = deficit.min((content_width - table_total).max(0.0));
+      if growth > 0.0 {
+        grow_spanned_columns_to_width(&mut widths[start..end], current_span_width + growth);
+        current_span_width += growth;
+        deficit -= growth;
+      }
+      if deficit <= f32::EPSILON {
+        continue;
+      }
     }
 
     let reclaimed = shrink_autofit_donors(
@@ -21225,7 +21495,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
     text_metrics,
   );
   let first_line_style = table_cell_first_line_style(cell);
-  let first_line_height = table_cell_first_inline_text_height(cell, true, text_metrics);
+  let first_line_height = table_cell_first_resolved_line_height(cell, setup, true, text_metrics);
   // Table text is stored at its resolved baseline because PDF paint owners do
   // not add a second line offset for table frames. Word's Windows fixed-layout
   // path uses the Windows ascent here ([MS-DOCX] usePre2018iOSMacLayout); using
@@ -21859,12 +22129,16 @@ fn following_text_flow_cell_bottom(current: &Page, text_bottom: f32) -> f32 {
 }
 
 fn table_cell_first_line_style(cell: &TableCell) -> TextStyle {
-  for block in &cell.blocks {
-    if let Block::Paragraph(paragraph) = block {
-      return paragraph_base_line_style(paragraph);
-    }
-  }
-  TextStyle::default()
+  table_cell_first_paragraph(cell)
+    .map(paragraph_base_line_style)
+    .unwrap_or_default()
+}
+
+fn table_cell_first_paragraph(cell: &TableCell) -> Option<&crate::docx::Paragraph> {
+  cell
+    .blocks
+    .iter()
+    .find_map(|block| block_paragraph(Some(block)))
 }
 
 fn table_cell_first_inline_text_height(
@@ -21902,6 +22176,32 @@ fn table_cell_first_inline_text_height(
   } else {
     inline_text_height(&TextStyle::default(), text_metrics)
   }
+}
+
+fn table_cell_first_resolved_line_height(
+  cell: &TableCell,
+  setup: PageSetup,
+  script_sensitive_line_height: bool,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let source_line_height =
+    table_cell_first_inline_text_height(cell, script_sensitive_line_height, text_metrics);
+  let Some(paragraph) = table_cell_first_paragraph(cell) else {
+    return source_line_height;
+  };
+  // Table frames hand an already-resolved baseline to the PDF paint owner, so
+  // their first line cannot rely on the ordinary paragraph renderer to center
+  // the natural text box inside a taller document-grid row. Resolve the same
+  // grid height here before `table_cell_initial_baseline_offset()` computes the
+  // initial ascent. `document_grid_line_metrics()` keeps snapToGrid=false and
+  // a disabled table-grid compatibility path on the natural-height branch.
+  document_grid_line_metrics(
+    source_line_height,
+    paragraph,
+    setup,
+    TextSegmentation::TableCell,
+  )
+  .map_or(source_line_height, |metrics| metrics.height_pt)
 }
 
 fn table_cell_blocks_for_split_fragment(
@@ -23982,7 +24282,8 @@ fn suppress_overlap_reflow_content_height(
     ..flow
   };
   let first_line_style = table_cell_first_line_style(cell);
-  let first_line_height = table_cell_first_inline_text_height(cell, true, text_metrics);
+  let first_line_height =
+    table_cell_first_resolved_line_height(cell, flow.setup, true, text_metrics);
   let baseline_offset =
     table_cell_initial_baseline_offset(&first_line_style, first_line_height, text_metrics);
   let start_y = content_top
@@ -24364,6 +24665,45 @@ fn floating_image_position(
   )
 }
 
+fn floating_picture_position(
+  placement: FloatingImagePlacement,
+  flow: FlowContext,
+  paragraph_indents: ParagraphIndents,
+  current_x: f32,
+  current_y: f32,
+  image_width: f32,
+  image_height: f32,
+) -> (f32, f32) {
+  let (mut x_pt, y_pt) = floating_image_position(
+    placement,
+    flow,
+    paragraph_indents,
+    current_x,
+    current_y,
+    image_width,
+    image_height,
+  );
+  if flow.text_segmentation == TextSegmentation::Body
+    && !matches!(placement.wrap, ImageWrapMode::None | ImageWrapMode::Through)
+    && image_width > flow.setup.width_pt
+  {
+    // ECMA-376 Part 1 §§20.4.2.10 and 20.4.2.12 make posOffset an absolute
+    // distance from its positioning base. Word therefore preserves the
+    // authored offset when a page-fitting picture merely extends past a page
+    // edge (tdf#163149). Retain Writer's page-capture interoperability branch
+    // only for an object wider than the page, which cannot fit at any x: its
+    // right-edge correction followed by its left-edge correction places it at
+    // the page origin. Wrap-through remains the independent no-capture case.
+    if x_pt + image_width > flow.setup.width_pt {
+      x_pt = flow.setup.width_pt - image_width;
+    }
+    if x_pt < 0.0 {
+      x_pt = 0.0;
+    }
+  }
+  (x_pt, y_pt)
+}
+
 fn floating_group_child_position(
   (x_pt, y_pt): (f32, f32),
   placement: FloatingImagePlacement,
@@ -24460,6 +24800,27 @@ fn word_text_frame_line_placement(
   placement
 }
 
+fn shape_uses_initial_line_wrap(
+  shape: &crate::docx::InlineShape,
+  placement: FloatingImagePlacement,
+) -> bool {
+  (shape.word_text_frame || !shape.text_box_blocks.is_empty())
+    && matches!(placement.wrap, ImageWrapMode::Square | ImageWrapMode::Tight)
+    && placement.horizontal_relative_to != HorizontalImageReference::Character
+    && placement.vertical_relative_to == VerticalImageReference::Line
+}
+
+fn first_line_word_text_frame_was_dodged_by_own_wrap(
+  has_finished_lines: bool,
+  undodged_line_y: f32,
+  current_line_y: f32,
+  initial_wrap_bottom_y: f32,
+) -> bool {
+  !has_finished_lines
+    && current_line_y > undodged_line_y + LAYOUT_EPSILON_PT
+    && (current_line_y - initial_wrap_bottom_y).abs() <= LAYOUT_EPSILON_PT
+}
+
 fn floating_anchor_line_top(
   flow: FlowContext,
   paragraph: &crate::docx::Paragraph,
@@ -24488,6 +24849,7 @@ fn paragraph_initial_floating_image_wrap_exclusions(
   text_frame: TextFrame,
   line_y: f32,
   paragraph_anchor_top: f32,
+  suppress_after_first_page_break: bool,
   text_metrics: &mut TextMetrics,
 ) -> Vec<WrapExclusion> {
   let line_anchor_top = floating_anchor_line_top(
@@ -24497,10 +24859,20 @@ fn paragraph_initial_floating_image_wrap_exclusions(
     text_frame.base_line_height,
     text_metrics,
   );
+  let first_page_break = suppress_after_first_page_break
+    .then(|| {
+      paragraph
+        .inlines
+        .iter()
+        .position(|inline| matches!(inline, InlineItem::PageBreak))
+    })
+    .flatten();
   paragraph
     .inlines
     .iter()
-    .filter_map(|inline| {
+    .enumerate()
+    .filter(|(index, _)| first_page_break.is_none_or(|page_break| *index < page_break))
+    .filter_map(|(_, inline)| {
       match inline {
         InlineItem::Image(image) => {
           let crate::docx::ImagePlacement::Floating(placement) = image.placement else {
@@ -24524,7 +24896,7 @@ fn paragraph_initial_floating_image_wrap_exclusions(
           let metrics = floating_image_metrics(image, placement, flow);
           let anchor_y =
             floating_anchor_reference_y(placement, paragraph_anchor_top, line_anchor_top);
-          let (frame_x, frame_y) = floating_image_position(
+          let (frame_x, frame_y) = floating_picture_position(
             placement,
             flow,
             text_frame.paragraph_indents(),
@@ -24557,14 +24929,7 @@ fn paragraph_initial_floating_image_wrap_exclusions(
           // square/tight case before earlier text portions are formatted.
           // Ordinary floating shapes and character-relative anchors retain
           // their existing encounter-time behavior.
-          if !shape.word_text_frame && shape.text_box_blocks.is_empty()
-            || !matches!(placement.wrap, ImageWrapMode::Square | ImageWrapMode::Tight)
-            || matches!(
-              placement.horizontal_relative_to,
-              HorizontalImageReference::Character
-            )
-            || !matches!(placement.vertical_relative_to, VerticalImageReference::Line)
-          {
+          if !shape_uses_initial_line_wrap(shape, placement) {
             return None;
           }
           let (group_scale_x, group_scale_y) = floating_group_scale(placement, flow);
@@ -25663,6 +26028,7 @@ struct TextFrameState {
   page_follows: Vec<TextFrameFollow>,
   line_content_item_start_index: usize,
   line_content_height: f32,
+  line_inline_object_portion_height: f32,
   line_text_extents: WordLineTextExtents,
   line_has_note_separator_mark: bool,
   smart_justify_terminal_overhang_pt: f32,
@@ -25677,6 +26043,7 @@ impl TextFrameState {
       page_follows: Vec::new(),
       line_content_item_start_index: 0,
       line_content_height: 0.0,
+      line_inline_object_portion_height: 0.0,
       line_text_extents: WordLineTextExtents::default(),
       line_has_note_separator_mark: false,
       smart_justify_terminal_overhang_pt: 0.0,
@@ -25695,6 +26062,7 @@ impl TextFrameState {
       height_pt,
     });
     self.current_line_start = self.current_position;
+    self.line_inline_object_portion_height = 0.0;
     self.line_text_extents = WordLineTextExtents::default();
     self.line_has_note_separator_mark = false;
     self.smart_justify_terminal_overhang_pt = 0.0;
@@ -26176,7 +26544,6 @@ struct ParagraphLayoutPosition {
 fn can_defer_page_break_for_following_floating_anchor(
   paragraph: &crate::docx::Paragraph,
   next_inline_index: usize,
-  has_content_before_break: bool,
   split_page_break_and_paragraph_mark: bool,
 ) -> bool {
   if split_page_break_and_paragraph_mark {
@@ -26223,30 +26590,34 @@ fn can_defer_page_break_for_following_floating_anchor(
   if anchor_index == usize::MAX {
     return false;
   }
-  has_content_before_break
-    || paragraph
-      .inlines
-      .iter()
-      .skip(anchor_index + 1)
-      .all(|inline| match inline {
-        InlineItem::LastRenderedPageBreak => true,
-        InlineItem::Text(run) => run.text.trim().is_empty(),
-        InlineItem::NoteReferenceMark(_) => true,
-        InlineItem::PositionalTab(_) => true,
-        InlineItem::NoteSeparatorMark(_)
-        | InlineItem::Ruby(_)
-        | InlineItem::LegacyFormCheckBox(_)
-        | InlineItem::ClearLineBreak(_) => false,
-        InlineItem::BookmarkStart(_)
-        | InlineItem::FormWidgetStart(_)
-        | InlineItem::FormWidgetEnd(_)
-        | InlineItem::DrawingGroupStart(_)
-        | InlineItem::DrawingGroupEnd => true,
-        InlineItem::PageBreak
-        | InlineItem::ColumnBreak
-        | InlineItem::Image(_)
-        | InlineItem::Shape(_) => false,
-      })
+  // A TO-character floating anchor remains on the master side only when it
+  // terminates the paragraph. Content before the break does not decide this:
+  // Word still moves the anchor to the follow when ordinary content follows
+  // it (tdf153613_anchoredAfterPgBreak6). LibreOffice's corresponding QA
+  // marks its master-page result as a known "DID YOU FIX ME?" limitation.
+  paragraph
+    .inlines
+    .iter()
+    .skip(anchor_index + 1)
+    .all(|inline| match inline {
+      InlineItem::LastRenderedPageBreak => true,
+      InlineItem::Text(run) => run.text.trim().is_empty(),
+      InlineItem::NoteReferenceMark(_) => true,
+      InlineItem::PositionalTab(_) => true,
+      InlineItem::NoteSeparatorMark(_)
+      | InlineItem::Ruby(_)
+      | InlineItem::LegacyFormCheckBox(_)
+      | InlineItem::ClearLineBreak(_) => false,
+      InlineItem::BookmarkStart(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd => true,
+      InlineItem::PageBreak
+      | InlineItem::ColumnBreak
+      | InlineItem::Image(_)
+      | InlineItem::Shape(_) => false,
+    })
 }
 
 fn page_break_has_following_content(inlines: &[InlineItem], next_inline_index: usize) -> bool {
@@ -26381,6 +26752,17 @@ impl<'a> TextFrameLayout<'a> {
     y: f32,
     line_height: &mut f32,
   ) -> (FlowContext, TextFrame, f32, f32, f32) {
+    if let Some(nonfinal_height_pt) = nonfinal_inline_object_only_line_height(
+      self.paragraph,
+      advance.active.flow,
+      advance.active.frame,
+      advance.state.line_inline_object_portion_height,
+    ) {
+      *line_height = nonfinal_height_pt;
+      if at_least_uses_separate_content_height(self.paragraph, advance.active.flow) {
+        advance.state.line_content_height = advance.state.line_inline_object_portion_height;
+      }
+    }
     if self.paragraph.format.bidi {
       reorder_bidi_line_items(
         &mut advance.current.items,
@@ -26542,9 +26924,16 @@ impl<'a> TextFrameLayout<'a> {
     pages: &mut Vec<Page>,
     text_metrics: &mut TextMetrics,
     wrap_exclusions: &mut Vec<WrapExclusion>,
+    paragraph_anchor_top: &mut f32,
     preserve_paragraph_upper_space: bool,
   ) -> (FlowContext, TextFrame, f32, f32, f32, f32) {
     let (next_flow, mut y) = force_page_break(flow, current, pages);
+    // A run-level page break splits one Word paragraph into a master and a
+    // follow text frame. Paragraph-relative drawings after the break use the
+    // follow frame's origin, not the master frame's pre-break origin. This is
+    // observable both when splitPgBreakAndParaMark forces an otherwise empty
+    // follow and when ordinary following content makes the break immediate.
+    *paragraph_anchor_top = next_flow.content_top_pt;
     if preserve_paragraph_upper_space {
       // An explicit w:br page break can split one paragraph into two page
       // frames. Word/Writer's PARA_SPACE_MAX_AT_PAGES compatibility keeps the
@@ -26668,7 +27057,7 @@ impl<'a> TextFrameLayout<'a> {
     allow_reflow: bool,
   ) -> (FlowContext, f32) {
     let mut y = position.y;
-    let paragraph_anchor_top = position.anchor_top;
+    let mut paragraph_anchor_top = position.anchor_top;
     let paragraph = self.paragraph;
     let mut flow = self.flow;
     let mut text_frame = self.frame;
@@ -26707,6 +27096,17 @@ impl<'a> TextFrameLayout<'a> {
       .copied()
       .filter(|exclusion| exclusion.bottom_pt > y)
       .collect::<Vec<_>>();
+    let suppress_initial_wrap_after_first_page_break = paragraph
+      .inlines
+      .iter()
+      .position(|inline| matches!(inline, InlineItem::PageBreak))
+      .is_some_and(|page_break_index| {
+        !can_defer_page_break_for_following_floating_anchor(
+          paragraph,
+          page_break_index + 1,
+          flow.split_page_break_and_paragraph_mark,
+        )
+      });
     extend_wrap_exclusions_unique(
       &mut wrap_exclusions,
       &paragraph_initial_floating_image_wrap_exclusions(
@@ -26715,6 +27115,7 @@ impl<'a> TextFrameLayout<'a> {
         text_frame,
         y,
         paragraph_anchor_top,
+        suppress_initial_wrap_after_first_page_break,
         text_metrics,
       ),
     );
@@ -26732,6 +27133,7 @@ impl<'a> TextFrameLayout<'a> {
             pages,
             text_metrics,
             &mut wrap_exclusions,
+            &mut paragraph_anchor_top,
             preserve_paragraph_upper_space,
           );
           first_inline_index = 1;
@@ -27113,6 +27515,8 @@ impl<'a> TextFrameLayout<'a> {
     let mut drawing_group_effects = Vec::<(usize, InlineDrawingGroupEffect)>::new();
     let mut track_bottom_hyphenation_slots = Vec::<HyphenationBottomSlot>::new();
     let mut auto_script_spacing = AutoScriptSpacingState::default();
+    let mut reflow_first_line_for_inline_object = false;
+    let mut reflow_leading_cached_boundary_on_split = false;
 
     for (inline_index, item) in paragraph
       .inlines
@@ -27256,6 +27660,7 @@ impl<'a> TextFrameLayout<'a> {
               pages,
               text_metrics,
               &mut wrap_exclusions,
+              &mut paragraph_anchor_top,
               true,
             );
             default_line_right = text_frame.default_line_right;
@@ -27362,6 +27767,7 @@ impl<'a> TextFrameLayout<'a> {
               pages,
               text_metrics,
               &mut wrap_exclusions,
+              &mut paragraph_anchor_top,
               true,
             );
             default_line_right = text_frame.default_line_right;
@@ -27437,6 +27843,7 @@ impl<'a> TextFrameLayout<'a> {
               pages,
               text_metrics,
               &mut wrap_exclusions,
+              &mut paragraph_anchor_top,
               true,
             );
             default_line_right = text_frame.default_line_right;
@@ -27543,6 +27950,7 @@ impl<'a> TextFrameLayout<'a> {
               pages,
               text_metrics,
               &mut wrap_exclusions,
+              &mut paragraph_anchor_top,
               true,
             );
             default_line_right = text_frame.default_line_right;
@@ -27659,6 +28067,7 @@ impl<'a> TextFrameLayout<'a> {
               pages,
               text_metrics,
               &mut wrap_exclusions,
+              &mut paragraph_anchor_top,
               true,
             );
             default_line_right = text_frame.default_line_right;
@@ -27680,6 +28089,19 @@ impl<'a> TextFrameLayout<'a> {
             active_form_widget_ids.last().copied(),
             flow.text_segmentation,
           );
+          if run.text.is_empty() && run.style_ref_text.is_some() {
+            push_invisible_style_ref_marker(
+              current,
+              TextPlacement {
+                x_pt: chunk_x,
+                y_pt: y,
+                line_height_pt: text_frame
+                  .text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
+              },
+              &run.style,
+              &meta,
+            );
+          }
 
           let mut segments = VecDeque::from(split_auto_script_spacing_segments(
             if flow.text_segmentation == TextSegmentation::DrawingLayer {
@@ -29005,28 +29427,43 @@ impl<'a> TextFrameLayout<'a> {
               });
             }
           }
-          // ECMA-376 Part 1 §17.3.3.13 defines a leading
-          // `w:lastRenderedPageBreak` as the boundary at which the previous
-          // pagination ended.  It is cached evidence rather than an
-          // authored `w:br`, so replay it only for a body paragraph whose
-          // first real content is text and only when the current page already
-          // contains body content.  Explicit page breaks and drawing anchors
-          // retain their own owners; this avoids duplicating the
-          // continuous-break and drawing cases covered by the existing
-          // cursor/table paths.
-          let cached_leading_page_break = flow.text_segmentation == TextSegmentation::Body
-            && !flow.inside_paragraph_frame
+          // `w:lastRenderedPageBreak` records the producer's previous
+          // pagination; it is not an authored page break. Keep using an
+          // internal marker as evidence when the current paginator reaches
+          // the same page-bottom boundary. A leading marker can resolve a
+          // one-line disagreement by moving that first line to the follow,
+          // but it still needs the local last-line-slot calculation as
+          // corroboration. Word can emit a leading marker at a continuous
+          // section break ([MS-OI29500] §17.3.3.13), where replaying it near
+          // the top of the page would create a page that the section does not
+          // own.
+          let marker_precedes_first_line = !emitted
             && paragraph.starts_after_last_rendered_page_break
-            && paragraph_has_text_after_leading_last_rendered_page_break(paragraph)
-            && page_has_body_region_items(current, flow);
-          let page_bottom_break = cached_leading_page_break
-            || (!advanced_for_hyphenation
+            && flow.paragraph_spacing_context != ParagraphSpacingContext::SectionStart
+            // A continuous multi-column section can synthesize a short
+            // balanced column slot, making its first line look like a local
+            // page bottom. The marker there is section/column evidence, not
+            // permission to create a physical page; emitted-line markers keep
+            // using the established column-flow branch below.
+            && flow.columns.count == 1;
+          let leading_marker_has_block_boundary_evidence = marker_precedes_first_line
+            && (self.spacing_after_pt > LAYOUT_EPSILON_PT
+              || y
+                + line_real_height(
+                  paragraph,
+                  line_height,
+                  text_state.line_fragments.len(),
+                  text_frame.grid_auto_following_line_height_pt,
+                  line_has_form_widget,
+                )
+                > flow.content_bottom + LAYOUT_EPSILON_PT);
+          let page_bottom_break = !advanced_for_hyphenation
             && flow.text_segmentation == TextSegmentation::Body
             // A framePr paragraph is a separate anchored text flow. Its
             // cached marker describes the containing story's page split; it
             // must not create a hidden page follow inside the fixed frame.
             && !flow.inside_paragraph_frame
-            && emitted
+            && (emitted || leading_marker_has_block_boundary_evidence)
             && page_has_body_region_items(current, flow)
             && text_line_is_last_in_flow_slot(
               paragraph,
@@ -29036,7 +29473,12 @@ impl<'a> TextFrameLayout<'a> {
               line_height,
               text_state.line_fragments.len(),
               line_has_form_widget,
-            ));
+            );
+          reflow_leading_cached_boundary_on_split |= marker_precedes_first_line
+            && flow.text_segmentation == TextSegmentation::Body
+            && !flow.inside_paragraph_frame
+            && page_has_body_region_items(current, flow)
+            && !page_bottom_break;
           if page_bottom_break {
             // The marker is cursor evidence from the producer's previous
             // pagination, not an authored w:br.  In a balanced multi-column
@@ -29073,6 +29515,7 @@ impl<'a> TextFrameLayout<'a> {
                   pages,
                   text_metrics,
                   &mut wrap_exclusions,
+                  &mut paragraph_anchor_top,
                   false,
                 );
             }
@@ -29102,7 +29545,7 @@ impl<'a> TextFrameLayout<'a> {
               floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
             let anchor_y =
               floating_anchor_reference_y(placement, paragraph_anchor_top, line_anchor_top);
-            let (frame_x, frame_y) = floating_image_position(
+            let (frame_x, frame_y) = floating_picture_position(
               placement,
               flow,
               text_frame.paragraph_indents(),
@@ -29143,6 +29586,7 @@ impl<'a> TextFrameLayout<'a> {
             };
             let (image_item_start, _) =
               push_docx_picture_image(&mut current.items, image, image_item);
+            let floating_picture_started_empty_line = line_item_start_index == image_item_start;
             if effective_layout_in_cell(placement, flow) {
               current.items.push(PageItem::Rect(RectItem {
                 x_pt: image_x,
@@ -29241,6 +29685,24 @@ impl<'a> TextFrameLayout<'a> {
                   image_item_end,
                   influence_bounds,
                 );
+                if floating_picture_started_empty_line {
+                  // ECMA-376 Part 1 §20.4.2.17 requires subsequent text to
+                  // wrap around the square bounds. Writer's CalcFlyWidth()
+                  // represents a fly that consumes the complete line as a
+                  // dummy line and resumes below it. Encounter-time anchors
+                  // can do the same while the line is still empty; a partial
+                  // width fly keeps its usable side segment, and a fly after
+                  // already-painted text retains the ordinary reflow path.
+                  let previous_y = y;
+                  y = dodge_text_wrap_exclusions(
+                    y,
+                    line_height,
+                    text_frame.default_line_left,
+                    text_frame.default_line_right,
+                    &wrap_exclusions,
+                  );
+                  floating_wrap_advanced_line |= y > previous_y + LAYOUT_EPSILON_PT;
+                }
                 (line_left, line_right) =
                   self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
                 x = x.max(line_left).min(line_right);
@@ -29295,6 +29757,7 @@ impl<'a> TextFrameLayout<'a> {
               pages,
               text_metrics,
               &mut wrap_exclusions,
+              &mut paragraph_anchor_top,
               true,
             );
             default_line_right = text_frame.default_line_right;
@@ -29542,7 +30005,16 @@ impl<'a> TextFrameLayout<'a> {
                     // A fragment with no legal internal operator break may
                     // overhang its math margin; it is not scaled like a
                     // generic inline picture.
-                    let metrics = inline_image_metrics(piece, f32::MAX);
+                    let metrics = inline_image_metrics(piece);
+                    let object_portion_height = inline_image_portion_line_height(
+                      metrics,
+                      paragraph,
+                      text_frame,
+                      text_metrics,
+                    );
+                    text_state.line_inline_object_portion_height = text_state
+                      .line_inline_object_portion_height
+                      .max(object_portion_height);
                     let source_line_height =
                       inline_image_line_height(metrics, paragraph, text_frame, text_metrics);
                     if at_least_uses_separate_content_height(paragraph, flow) {
@@ -29552,6 +30024,21 @@ impl<'a> TextFrameLayout<'a> {
                     let object_line_metrics =
                       inline_object_line_metrics_for_flow(source_line_height, paragraph, flow);
                     let object_line_height = object_line_metrics.height_pt;
+                    reflow_first_line_for_inline_object |=
+                      first_line_inline_object_requires_paragraph_follow(
+                        FirstLineInlineObjectFit {
+                          page: current,
+                          flow,
+                          y,
+                          line_height,
+                          object_line_height,
+                          paragraph_item_start: start_item_index,
+                          line_content_item_start: text_state.line_content_item_start_index,
+                          has_finished_lines: !text_state.line_fragments.is_empty(),
+                          remains_on_start_page: pages.len() == start_pages_len,
+                          allow_reflow,
+                        },
+                      );
                     if line_item_start_index == current.items.len()
                       && let Some(next) = self.advance_for_inline_object(InlineObjectAdvance {
                         current,
@@ -29640,7 +30127,7 @@ impl<'a> TextFrameLayout<'a> {
               continue;
             }
           }
-          let metrics = inline_image_metrics(image, flow.content_width);
+          let metrics = inline_image_metrics(image);
           if x + metrics.frame_width_pt > line_right && x > line_left {
             (flow, text_frame, y, line_left, line_right) = self.advance_line(
               TextLineAdvance {
@@ -29671,6 +30158,11 @@ impl<'a> TextFrameLayout<'a> {
             line_used_punctuation_fit = false;
             line_has_tab = false;
           }
+          let object_portion_height =
+            inline_image_portion_line_height(metrics, paragraph, text_frame, text_metrics);
+          text_state.line_inline_object_portion_height = text_state
+            .line_inline_object_portion_height
+            .max(object_portion_height);
           let source_line_height =
             inline_image_line_height(metrics, paragraph, text_frame, text_metrics);
           if at_least_uses_separate_content_height(paragraph, flow) {
@@ -29679,6 +30171,19 @@ impl<'a> TextFrameLayout<'a> {
           let object_line_metrics =
             inline_object_line_metrics_for_flow(source_line_height, paragraph, flow);
           let object_line_height = object_line_metrics.height_pt;
+          reflow_first_line_for_inline_object |=
+            first_line_inline_object_requires_paragraph_follow(FirstLineInlineObjectFit {
+              page: current,
+              flow,
+              y,
+              line_height,
+              object_line_height,
+              paragraph_item_start: start_item_index,
+              line_content_item_start: text_state.line_content_item_start_index,
+              has_finished_lines: !text_state.line_fragments.is_empty(),
+              remains_on_start_page: pages.len() == start_pages_len,
+              allow_reflow,
+            });
           if line_item_start_index == current.items.len()
             && let Some(next) = self.advance_for_inline_object(InlineObjectAdvance {
               current,
@@ -30155,8 +30660,51 @@ impl<'a> TextFrameLayout<'a> {
               let height = auto_fit_size
                 .map(|size| size.height_pt)
                 .unwrap_or(authored_height);
-              let line_anchor_top =
+              let current_line_anchor_top =
                 floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
+              let line_anchor_top =
+                if shape.word_text_frame && shape_uses_initial_line_wrap(shape, placement) {
+                  let initial_line_anchor_top = floating_anchor_line_top(
+                    flow,
+                    paragraph,
+                    undodged_first_line_y,
+                    line_height,
+                    text_metrics,
+                  );
+                  let (_, initial_frame_y) = floating_image_position(
+                    placement,
+                    flow,
+                    text_frame.paragraph_indents(),
+                    text_frame.first_line_left,
+                    initial_line_anchor_top,
+                    width,
+                    height,
+                  );
+                  let initial_shape_y = adjusted_floating_shape_y(
+                    placement,
+                    shape,
+                    initial_frame_y + shape.offset_y_pt * group_scale_y,
+                  );
+                  let initial_wrap_bottom_y = initial_shape_y + height + placement.margin_bottom_pt;
+                  if first_line_word_text_frame_was_dodged_by_own_wrap(
+                    !text_state.line_fragments.is_empty(),
+                    undodged_first_line_y,
+                    y,
+                    initial_wrap_bottom_y,
+                  ) {
+                    // ECMA-376 Part 1 §20.4.3.5 makes a line-relative drawing
+                    // relative to the line containing its anchor character.
+                    // The textbox's pre-registered square/tight exclusion can
+                    // move that line below the textbox, but it cannot move its
+                    // own anchor with it. Writer's to-content object positioner
+                    // uses ToCharTopOfLine() for the same TEXT_LINE case.
+                    initial_line_anchor_top
+                  } else {
+                    current_line_anchor_top
+                  }
+                } else {
+                  current_line_anchor_top
+                };
               let anchor_y = if shape.allow_outside_page
                 && matches!(
                   placement.vertical_relative_to,
@@ -30523,6 +31071,7 @@ impl<'a> TextFrameLayout<'a> {
                     pages,
                     text_metrics,
                     &mut wrap_exclusions,
+                    &mut paragraph_anchor_top,
                     true,
                   );
                 default_line_right = text_frame.default_line_right;
@@ -30568,6 +31117,15 @@ impl<'a> TextFrameLayout<'a> {
                 line_used_punctuation_fit = false;
                 line_has_tab = false;
               }
+              let object_portion_height = inline_drawing_portion_line_height(
+                frame_height,
+                paragraph,
+                text_frame,
+                text_metrics,
+              );
+              text_state.line_inline_object_portion_height = text_state
+                .line_inline_object_portion_height
+                .max(object_portion_height);
               let source_line_height =
                 inline_drawing_line_height(frame_height, paragraph, text_frame, text_metrics);
               if at_least_uses_separate_content_height(paragraph, flow) {
@@ -30577,6 +31135,19 @@ impl<'a> TextFrameLayout<'a> {
               let object_line_metrics =
                 inline_object_line_metrics_for_flow(source_line_height, paragraph, flow);
               let object_line_height = object_line_metrics.height_pt;
+              reflow_first_line_for_inline_object |=
+                first_line_inline_object_requires_paragraph_follow(FirstLineInlineObjectFit {
+                  page: current,
+                  flow,
+                  y,
+                  line_height,
+                  object_line_height,
+                  paragraph_item_start: start_item_index,
+                  line_content_item_start: text_state.line_content_item_start_index,
+                  has_finished_lines: !text_state.line_fragments.is_empty(),
+                  remains_on_start_page: pages.len() == start_pages_len,
+                  allow_reflow,
+                });
               if line_item_start_index == current.items.len()
                 && let Some(next) = self.advance_for_inline_object(InlineObjectAdvance {
                   current,
@@ -30655,6 +31226,7 @@ impl<'a> TextFrameLayout<'a> {
               pages,
               text_metrics,
               &mut wrap_exclusions,
+              &mut paragraph_anchor_top,
               true,
             );
             x = line_left;
@@ -30752,7 +31324,6 @@ impl<'a> TextFrameLayout<'a> {
           if can_defer_page_break_for_following_floating_anchor(
             paragraph,
             inline_index + 1,
-            emitted,
             flow.split_page_break_and_paragraph_mark,
           ) {
             pending_text_page_break = true;
@@ -30765,6 +31336,7 @@ impl<'a> TextFrameLayout<'a> {
               pages,
               text_metrics,
               &mut wrap_exclusions,
+              &mut paragraph_anchor_top,
               preserve_paragraph_upper_space,
             );
             default_line_right = text_frame.default_line_right;
@@ -30808,6 +31380,49 @@ impl<'a> TextFrameLayout<'a> {
         }
       }
     }
+    if reflow_first_line_for_inline_object {
+      // ECMA-376 Part 1 §20.4.2.8 makes an inline drawing participate in
+      // the height and layout of its complete line. If a tall object appears
+      // after text on the paragraph's first line, the untouched-line fast
+      // path above cannot advance it by itself. Writer exercises the same
+      // non-leading-run boundary in tdf153613_inlineAfterPgBreak2: retry the
+      // paragraph on a follow so the text and object retain one line box.
+      restore_text_frame_start_page(
+        current,
+        pages,
+        start_pages_len,
+        start_current,
+        start_page_snapshot.as_ref(),
+        start_pending_snapshot.as_ref(),
+      );
+      if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len) {
+        anchors.truncate(len);
+      }
+      let (follow_flow, follow_y) = advance_text_frame_flow(start_flow, current, pages);
+      return TextFrameLayout::new(paragraph, follow_flow, self.spacing_after_pt, text_metrics)
+        .with_border_context(self.border_context)
+        .with_shading_spacing(
+          ParagraphShadingContext {
+            joins_previous: self.shading_before_pt > 0.0,
+            joins_next: self.shading_after_pt > 0.0,
+          },
+          self.shading_before_pt,
+        )
+        .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
+        .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
+        .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth)
+        .format_with_reflow(
+          current,
+          pages,
+          anchor_pages,
+          text_metrics,
+          ParagraphLayoutPosition {
+            y: follow_y,
+            anchor_top: follow_y,
+          },
+          false,
+        );
+    }
     if pending_text_page_break {
       (flow, text_frame, y, _, _, line_height) = self.force_text_page_break(
         flow,
@@ -30815,6 +31430,7 @@ impl<'a> TextFrameLayout<'a> {
         pages,
         text_metrics,
         &mut wrap_exclusions,
+        &mut paragraph_anchor_top,
         false,
       );
       default_line_right = text_frame.default_line_right;
@@ -30826,7 +31442,38 @@ impl<'a> TextFrameLayout<'a> {
     }
 
     let paragraph_bottom;
-    if emitted && flow_blocking_floating_only && floating_wrap_advanced_line {
+    if emitted
+      && flow_blocking_floating_only
+      && flow.split_page_break_and_paragraph_mark
+      && pages.len() > start_pages_len
+      && paragraph
+        .inlines
+        .iter()
+        .any(|inline| matches!(inline, InlineItem::PageBreak))
+    {
+      // splitPgBreakAndParaMark moves the paragraph mark to the explicit
+      // break's follow frame. A floating drawing is not that mark. Format an
+      // empty mark line around the drawing before the next paragraph starts;
+      // a page-wide square/tight object therefore pushes the mark below its
+      // wrap bounds (tdf153613_anchoredAfterPgBreak3).
+      let mark_y = dodge_text_wrap_exclusions(
+        y,
+        base_line_height,
+        text_frame.default_line_left,
+        text_frame.default_line_right,
+        &wrap_exclusions,
+      );
+      let empty_line_height = word_east_asian_paragraph_mark_single_line_height(
+        paragraph,
+        flow.compatibility_mode,
+        text_state.line_fragments.len(),
+        text_metrics,
+      )
+      .map_or(base_line_height, |height| base_line_height.max(height));
+      text_state.finish_paragraph(mark_y, empty_line_height, true);
+      paragraph_bottom = mark_y + empty_line_height;
+      y = paragraph_bottom + self.spacing_after_pt;
+    } else if emitted && flow_blocking_floating_only && floating_wrap_advanced_line {
       // A front floating object is anchored to this paragraph's original
       // line. Once top/bottom wrapping has moved the cursor to the object's
       // lower edge, allocating another empty anchor line there double-counts
@@ -31024,8 +31671,7 @@ impl<'a> TextFrameLayout<'a> {
     // properties, but LibreOffice 84cf61a9d44e / testSplitFlyWidow preserves
     // Word's exception for a split floating table: its cell text keeps the
     // normal two-line orphan/widow rule.
-    let widow_control = paragraph.format.widow_control != Some(false)
-      && (flow.text_segmentation != TextSegmentation::TableCell || flow.word_floating_table_cell);
+    let widow_control = paragraph_widow_control_applies(paragraph, flow);
     let (orphan_lines, widow_lines) = if widow_control {
       (DEFAULT_ORPHAN_LINES, DEFAULT_WIDOW_LINES)
     } else {
@@ -31033,6 +31679,21 @@ impl<'a> TextFrameLayout<'a> {
     };
     let split_decision =
       text_state.page_split_decision(paragraph.format.keep_lines, orphan_lines, widow_lines);
+    let split_decision = if reflow_leading_cached_boundary_on_split
+      && matches!(
+        split_decision,
+        TextSplitDecision::Allowed | TextSplitDecision::RebalanceWidow { .. }
+      ) {
+      // The marker is only cached evidence, so it cannot force a page by
+      // itself. Once normal formatting independently proves that this
+      // paragraph splits, however, the producer's recorded boundary locates
+      // that split before the paragraph rather than inside it. Replay the
+      // complete paragraph on the follow; authored page/column breaks report
+      // `Forced` and deliberately stay outside this branch.
+      TextSplitDecision::Rejected
+    } else {
+      split_decision
+    };
     #[cfg(debug_assertions)]
     if flow.note_continuation_top_inset_pt > LAYOUT_EPSILON_PT
       && std::env::var_os("OOXMLSDK_LAYOUT_TRACE_NOTES").is_some()
@@ -34480,19 +35141,15 @@ fn office_math_display_line_x(
 fn floating_image_layout_size(
   width: f32,
   height: f32,
-  placement: FloatingImagePlacement,
-  flow: FlowContext,
+  _placement: FloatingImagePlacement,
+  _flow: FlowContext,
 ) -> (f32, f32) {
-  // wp:anchor's extent is authored page-layer geometry. A behindDoc object
-  // does not participate in the paragraph's line width, regardless of its
-  // wrap element, so a narrow paragraph (or its indents) must not implicitly
-  // scale that extent. Writer likewise keeps GraphicImport's
-  // CT_PositiveSize2D for the tdf160049 column-relative anchor cases.
-  if placement.behind_text {
-    return (width.max(0.0), height.max(0.0));
-  }
-
-  fit_image_to_line(width, height, flow.content_width)
+  // ISO/IEC 29500-1 §20.4.2.7 makes wp:extent the final displayed size for
+  // both wp:inline and wp:anchor. Wrapping changes positioning and exclusion
+  // geometry, not the object's intrinsic size. Writer's GraphicImport
+  // likewise assigns the imported CT_PositiveSize2D to PROP_SIZE for both
+  // IMPORT_AS_DETECTED_INLINE and IMPORT_AS_DETECTED_ANCHOR.
+  (width.max(0.0), height.max(0.0))
 }
 
 fn image_frame_width(image: &crate::docx::InlineImage) -> f32 {
@@ -34553,11 +35210,39 @@ struct InlineImageMetrics {
   line_box: crate::docx::InlineImageLineBox,
 }
 
-fn inline_image_metrics(image: &crate::docx::InlineImage, max_width_pt: f32) -> InlineImageMetrics {
+fn inline_image_metrics(image: &crate::docx::InlineImage) -> InlineImageMetrics {
+  let frame_width = image_frame_width(image);
+  let frame_height = image_frame_height(image);
+  // ISO/IEC 29500-1 §20.4.2.7 makes wp:extent the final displayed size.
+  // wp:inline participates in line layout like a similarly sized glyph; it
+  // does not imply shrink-to-fit against the paragraph's text width. Word and
+  // Writer therefore preserve an overwide extent and clip it at the page edge.
+  let (frame_width_pt, frame_height_pt) =
+    if frame_width <= f32::EPSILON || frame_height <= f32::EPSILON {
+      (0.0, 0.0)
+    } else {
+      (frame_width, frame_height)
+    };
+  inline_image_metrics_for_frame(image, frame_width_pt, frame_height_pt)
+}
+
+fn width_limited_inline_image_metrics(
+  image: &crate::docx::InlineImage,
+  max_width_pt: f32,
+) -> InlineImageMetrics {
   let frame_width = image_frame_width(image);
   let frame_height = image_frame_height(image);
   let (frame_width_pt, frame_height_pt) =
     fit_image_to_line(frame_width, frame_height, max_width_pt);
+  inline_image_metrics_for_frame(image, frame_width_pt, frame_height_pt)
+}
+
+fn inline_image_metrics_for_frame(
+  image: &crate::docx::InlineImage,
+  frame_width_pt: f32,
+  frame_height_pt: f32,
+) -> InlineImageMetrics {
+  let frame_width = image_frame_width(image);
   let scale = if frame_width > f32::EPSILON {
     frame_width_pt / frame_width
   } else {
@@ -34743,6 +35428,27 @@ fn flush_text(
     return;
   }
 
+  push_text_item(page, placement, std::mem::take(chunk), style, meta);
+}
+
+fn push_invisible_style_ref_marker(
+  page: &mut Page,
+  placement: TextPlacement,
+  style: &TextStyle,
+  meta: &TextChunkMeta<'_>,
+) {
+  debug_assert!(!meta.style_ref_keys.is_empty());
+  debug_assert!(meta.style_ref_text.is_some());
+  push_text_item(page, placement, String::new(), style, meta);
+}
+
+fn push_text_item(
+  page: &mut Page,
+  placement: TextPlacement,
+  text: String,
+  style: &TextStyle,
+  meta: &TextChunkMeta<'_>,
+) {
   let mut style = style.clone();
   if meta.normalize_baseline_shift {
     // When the paragraph mark and every printable portion carry the same
@@ -34756,7 +35462,7 @@ fn flush_text(
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
     wordprocessing_effect_host: None,
-    text: std::mem::take(chunk),
+    text,
     style,
     rotation_center_pt: None,
     hyperlink_url: meta.hyperlink_url.map(ToString::to_string),
@@ -35200,6 +35906,21 @@ fn push_line_item(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn table_page_break_counts_empty_body_frame_but_not_break_target_seed() {
+    let mut page = empty_page(PageSetup::default(), 0);
+    assert!(!body_frame_precedes_table_page_break(&page));
+
+    page.body_content_frames = 1;
+    assert!(body_frame_precedes_table_page_break(&page));
+
+    page.explicit_break_target = true;
+    assert!(!body_frame_precedes_table_page_break(&page));
+
+    page.body_content_frames = 2;
+    assert!(body_frame_precedes_table_page_break(&page));
+  }
   use crate::docx::{
     CellBorderSuppressions, CellBordersModel, CellMargins, Paragraph, ParagraphBordersModel,
     ParagraphFormat, TableBordersModel, TextRun,
@@ -35670,6 +36391,93 @@ mod tests {
   }
 
   #[test]
+  fn table_cell_first_baseline_centers_text_in_an_enabled_document_grid_row() {
+    let cell = |snap_to_grid| {
+      let run = TextRun {
+        text: "grid text".into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      };
+      TableCell {
+        blocks: vec![Block::paragraph(Paragraph {
+          inlines: vec![InlineItem::Text(run.clone())],
+          field_events: Vec::new(),
+          footnote_reference_ids: Vec::new(),
+          endnote_reference_ids: Vec::new(),
+          starts_after_last_rendered_page_break: false,
+          base_style: TextStyle::default(),
+          runs: vec![run],
+          format: Box::new(ParagraphFormat {
+            snap_to_grid,
+            ..ParagraphFormat::default()
+          }),
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
+          style_ref_numbering_text: None,
+          list_label: None,
+          list_label_image: None,
+          list_label_style: TextStyle::default(),
+          list_label_hyperlink_url: None,
+          list_label_tab_stop_pt: None,
+        })],
+        shading: None,
+        borders: CellBordersModel::default(),
+        border_suppressions: CellBorderSuppressions::default(),
+        margins: CellMargins::default(),
+        preferred_width_pt: None,
+        preferred_width_pct: None,
+        grid_span: 1,
+        vertical_merge_continue: false,
+        no_wrap: false,
+        fit_text: false,
+        hide_end_mark: false,
+        vertical_alignment: TableCellVerticalAlignment::Top,
+        text_rotation_deg: None,
+      }
+    };
+    let grid_setup = PageSetup {
+      table_cell_doc_grid_line_pitch_pt: Some(18.0),
+      adjust_table_line_heights_to_grid: true,
+      ..PageSetup::default()
+    };
+    let mut text_metrics = TextMetrics::new();
+    let snapped_cell = cell(None);
+    let natural_height =
+      table_cell_first_inline_text_height(&snapped_cell, true, &mut text_metrics);
+    let resolved_height =
+      table_cell_first_resolved_line_height(&snapped_cell, grid_setup, true, &mut text_metrics);
+    assert_eq!(resolved_height, 18.0);
+
+    let style = table_cell_first_line_style(&snapped_cell);
+    let natural_baseline =
+      table_cell_initial_baseline_offset(&style, natural_height, &mut text_metrics);
+    let grid_baseline =
+      table_cell_initial_baseline_offset(&style, resolved_height, &mut text_metrics);
+    assert!(
+      (grid_baseline - natural_baseline - (18.0 - natural_height) / 2.0).abs() < LAYOUT_EPSILON_PT
+    );
+
+    let disabled_setup = PageSetup {
+      adjust_table_line_heights_to_grid: false,
+      ..grid_setup
+    };
+    assert_eq!(
+      table_cell_first_resolved_line_height(&snapped_cell, disabled_setup, true, &mut text_metrics,),
+      natural_height
+    );
+    let unsnapped_cell = cell(Some(false));
+    assert_eq!(
+      table_cell_first_resolved_line_height(&unsnapped_cell, grid_setup, true, &mut text_metrics,),
+      table_cell_first_inline_text_height(&unsnapped_cell, true, &mut text_metrics)
+    );
+  }
+
+  #[test]
   fn repeating_story_lines_retain_frame_ownership_after_materialization() {
     let run = |text: &str, font_family: &str| TextRun {
       text: text.into(),
@@ -35937,6 +36745,277 @@ mod tests {
   }
 
   #[test]
+  fn explicit_page_break_rebases_a_following_paragraph_relative_picture() {
+    fn text_run(text: &str) -> TextRun {
+      TextRun {
+        text: text.into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      }
+    }
+
+    fn paragraph(inlines: Vec<InlineItem>) -> Block {
+      Block::paragraph(Paragraph {
+        runs: inlines
+          .iter()
+          .filter_map(|inline| match inline {
+            InlineItem::Text(run) => Some(run.clone()),
+            _ => None,
+          })
+          .collect(),
+        inlines,
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        format: Box::new(ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      })
+    }
+
+    fn floating_picture() -> crate::docx::InlineImage {
+      crate::docx::InlineImage {
+        data: Arc::<[u8]>::from([0]),
+        content_type: Some("image/png".into()),
+        picture_frame: None,
+        picture_frame_clips_image: false,
+        effects: None,
+        static3d: None,
+        width_pt: 700.0,
+        height_pt: 20.0,
+        inline_offset_x_pt: 0.0,
+        inline_offset_y_pt: 0.0,
+        effect_left_pt: 0.0,
+        effect_top_pt: 0.0,
+        effect_right_pt: 0.0,
+        effect_bottom_pt: 0.0,
+        inline_baseline_gap_pt: None,
+        line_box: crate::docx::InlineImageLineBox::CharacterLike,
+        office_math_line_layout: None,
+        office_math_display_layout: None,
+        crop: ImageCrop::default(),
+        rotation_deg: 0.0,
+        flip_horizontal: false,
+        flip_vertical: false,
+        metafile_background_color: None,
+        alt_text: None,
+        hyperlink_url: None,
+        semantic_metafile_text: false,
+        metafile_semantic_text_includes_raster_backdrop: false,
+        signature_line: None,
+        semantic_metafile_font_family: None,
+        native_ole_equation: None,
+        metafile_native_size: false,
+        picture_content_control: false,
+        placement: crate::docx::ImagePlacement::Floating(FloatingImagePlacement {
+          horizontal_relative_to: HorizontalImageReference::Column,
+          vertical_relative_to: VerticalImageReference::Paragraph,
+          horizontal_alignment: None,
+          vertical_alignment: None,
+          alignment_extent: None,
+          group_child_offset_x_pt: 0.0,
+          group_child_offset_y_pt: 0.0,
+          horizontal_offset_pt: 0.0,
+          vertical_offset_pt: -10.0,
+          horizontal_offset_pct: None,
+          vertical_offset_pct: None,
+          wrap: ImageWrapMode::Square,
+          wrap_side: ImageWrapSide::BothSides,
+          behind_text: false,
+          layout_in_cell: true,
+          allow_overlap: true,
+          paint_order: FloatingPaintOrder::Unspecified,
+          relative_width_to: None,
+          relative_width_pct: None,
+          relative_height_to: None,
+          relative_height_pct: None,
+          margin_top_pt: 0.0,
+          margin_right_pt: 0.0,
+          margin_bottom_pt: 0.0,
+          margin_left_pt: 0.0,
+        }),
+      }
+    }
+
+    fn document(split_page_break_and_paragraph_mark: bool) -> DocxDocument {
+      DocxDocument {
+        page: PageSetup::default(),
+        page_background_pattern: None,
+        line_number_style: TextStyle::default(),
+        note_separator_style: TextStyle::default(),
+        footnote_separator_stories: Default::default(),
+        endnote_separator_stories: Default::default(),
+        has_styles_part: false,
+        default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        hyphenation: crate::docx::HyphenationSettings::default(),
+        compatibility_mode: 14,
+        justify_lines_with_shrinking: false,
+        do_not_expand_shift_return: false,
+        even_and_odd_headers: false,
+        split_page_break_and_paragraph_mark,
+        form_widgets: Vec::new(),
+        sections: Vec::new(),
+        header_blocks: Vec::new(),
+        footer_blocks: Vec::new(),
+        first_header_blocks: Vec::new(),
+        first_footer_blocks: Vec::new(),
+        footnote_blocks: Vec::new(),
+        footnotes: Default::default(),
+        footnote_numbering: Vec::new(),
+        footnote_positions: Vec::new(),
+        endnotes: Default::default(),
+        endnote_numbering: Vec::new(),
+        endnote_position: w::EndnotePositionValues::DocumentEnd,
+        title_page: false,
+        blocks: vec![
+          paragraph(vec![InlineItem::Text(text_run("before"))]),
+          paragraph(vec![
+            InlineItem::PageBreak,
+            InlineItem::Image(floating_picture()),
+          ]),
+          paragraph(vec![InlineItem::Text(text_run("after"))]),
+        ],
+      }
+    }
+
+    fn floating_picture_position(document: &LayoutDocument) -> (usize, f32) {
+      fn y_in(items: &[PageItem]) -> Option<f32> {
+        items.iter().find_map(|item| match item {
+          PageItem::Image(image) if image.floating => Some(image.y_pt),
+          PageItem::Group(items)
+          | PageItem::IndependentTextFrame(items)
+          | PageItem::FloatingDrawing { items, .. } => y_in(items),
+          _ => None,
+        })
+      }
+
+      document
+        .pages
+        .iter()
+        .enumerate()
+        .find_map(|(page_index, page)| y_in(&page.items).map(|y| (page_index, y)))
+        .expect("floating picture")
+    }
+
+    fn text_position(document: &LayoutDocument, expected: &str) -> (usize, f32) {
+      document
+        .pages
+        .iter()
+        .enumerate()
+        .find_map(|(page_index, page)| {
+          page.items.iter().find_map(|item| match item {
+            PageItem::Text(text) if text.text == expected => Some((page_index, text.y_pt)),
+            _ => None,
+          })
+        })
+        .expect("text position")
+    }
+
+    let split = layout(&document(true), &LayoutOptions::default()).expect("split layout");
+    let split_position = floating_picture_position(&split);
+    assert_eq!(split_position.0, 1);
+    assert!((split_position.1 - 62.0).abs() < LAYOUT_EPSILON_PT);
+    let after_position = text_position(&split, "after");
+    assert_eq!(after_position.0, 1);
+    assert!(after_position.1 > split_position.1 + 30.0);
+
+    // Without splitPgBreakAndParaMark, the terminal floating anchor is the
+    // counterexample: Word leaves it on the master paragraph before the break.
+    let deferred = layout(&document(false), &LayoutOptions::default()).expect("deferred layout");
+    let deferred_position = floating_picture_position(&deferred);
+    assert_eq!(deferred_position.0, 0);
+    assert!(deferred_position.1 > split_position.1 + LAYOUT_EPSILON_PT);
+
+    fn append_anchor_text(document: &mut DocxDocument, text: &str) {
+      let Block::Paragraph(paragraph) = &mut document.blocks[1] else {
+        panic!("anchor paragraph");
+      };
+      let run = text_run(text);
+      paragraph.runs.push(run.clone());
+      paragraph.inlines.push(InlineItem::Text(run));
+    }
+
+    let mut trailing = document(false);
+    append_anchor_text(&mut trailing, "anchor-follow");
+    let trailing = layout(&trailing, &LayoutOptions::default()).expect("trailing-text layout");
+    let trailing_picture = floating_picture_position(&trailing);
+    let trailing_text = text_position(&trailing, "anchor-follow");
+    assert_eq!(trailing_picture.0, 1);
+    assert_eq!(trailing_text.0, 1);
+    assert!(trailing_text.1 >= trailing_picture.1 + 20.0 - LAYOUT_EPSILON_PT);
+
+    // A narrower square fly leaves a usable right-side segment, so the same
+    // following text remains on its original line instead of being lowered.
+    let mut narrow = document(false);
+    let Block::Paragraph(narrow_paragraph) = &mut narrow.blocks[1] else {
+      panic!("narrow anchor paragraph");
+    };
+    let InlineItem::Image(narrow_picture) = &mut narrow_paragraph.inlines[1] else {
+      panic!("narrow floating picture");
+    };
+    narrow_picture.width_pt = 100.0;
+    append_anchor_text(&mut narrow, "narrow-follow");
+    let narrow = layout(&narrow, &LayoutOptions::default()).expect("narrow layout");
+    let narrow_picture = floating_picture_position(&narrow);
+    let narrow_text = text_position(&narrow, "narrow-follow");
+    assert_eq!(narrow_picture.0, 1);
+    assert_eq!(narrow_text.0, 1);
+    assert!(narrow_text.1 < narrow_picture.1 + 20.0 - LAYOUT_EPSILON_PT);
+
+    let mut lookahead = document(false);
+    {
+      let Block::Paragraph(paragraph) = &mut lookahead.blocks[1] else {
+        panic!("lookahead anchor paragraph");
+      };
+      let run = text_run("master-side");
+      paragraph.runs.insert(0, run.clone());
+      paragraph.inlines.insert(0, InlineItem::Text(run));
+    }
+    append_anchor_text(&mut lookahead, "follow-side");
+    let lookahead = layout(&lookahead, &LayoutOptions::default()).expect("lookahead layout");
+    let lookahead_picture = floating_picture_position(&lookahead);
+    let master_text = text_position(&lookahead, "master-side");
+    let follow_text = text_position(&lookahead, "follow-side");
+    assert_eq!(master_text.0, 0);
+    assert_eq!(lookahead_picture.0, 1);
+    assert_eq!(follow_text.0, 1);
+    assert!(follow_text.1 >= lookahead_picture.1 + 20.0 - LAYOUT_EPSILON_PT);
+
+    // Removing the follow-page picture must not change the already-formatted
+    // master-side text. This proves that an anchor moved by lookahead is not
+    // also pre-registered as a wrap exclusion before the page break.
+    let mut lookahead_control = document(false);
+    {
+      let Block::Paragraph(paragraph) = &mut lookahead_control.blocks[1] else {
+        panic!("lookahead control paragraph");
+      };
+      let run = text_run("master-side");
+      paragraph.runs.insert(0, run.clone());
+      paragraph.inlines.insert(0, InlineItem::Text(run));
+      paragraph.inlines.remove(2);
+    }
+    append_anchor_text(&mut lookahead_control, "follow-side");
+    let lookahead_control =
+      layout(&lookahead_control, &LayoutOptions::default()).expect("lookahead control layout");
+    let control_master_text = text_position(&lookahead_control, "master-side");
+    assert_eq!(control_master_text.0, 0);
+    assert!((master_text.1 - control_master_text.1).abs() < LAYOUT_EPSILON_PT);
+  }
+
+  #[test]
   fn body_style_ref_searches_up_before_down_and_respects_localized_style_names() {
     let standard_key = Arc::<str>::from("Heading 1");
     let custom_key = Arc::<str>::from(format!(
@@ -36025,6 +37104,58 @@ mod tests {
     assert_eq!(
       localized_field_message(FieldMessage::MissingStyle("Heading 1"), Some("zh-CN")),
       "错误!使用“开始”选项卡将 Heading 1 应用于要在此处显示的文字。"
+    );
+  }
+
+  #[test]
+  fn invisible_style_ref_marker_is_collected_without_display_text() {
+    let keys = [Arc::<str>::from("Main Index Entry")];
+    let style_ref_text = Arc::<str>::from(" ");
+    let meta = TextChunkMeta {
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: &keys,
+      style_ref_text: Some(&style_ref_text),
+      style_ref_numbering_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      normalize_baseline_shift: false,
+      segmentation: TextSegmentation::Body,
+    };
+    let mut page = empty_page(PageSetup::default(), 0);
+
+    push_invisible_style_ref_marker(
+      &mut page,
+      TextPlacement {
+        x_pt: 72.0,
+        y_pt: 144.0,
+        line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      },
+      &TextStyle::default(),
+      &meta,
+    );
+
+    let PageItem::Text(marker) = &page.items[0] else {
+      panic!("expected invisible text marker");
+    };
+    assert!(marker.text.is_empty());
+    let candidates = style_ref_candidates_by_page(&[page]);
+    assert_eq!(
+      resolve_style_ref(
+        &candidates,
+        0,
+        StyleRefRequest {
+          field_y_pt: 36.0,
+          in_marginal: true,
+          style_name: "Main Index Entry",
+          from_bottom: false,
+          numbering_only: false,
+          suppress_non_numerical: false,
+          ui_language: None,
+        },
+      ),
+      Some(" ".to_string())
     );
   }
 
@@ -37606,6 +38737,7 @@ mod tests {
       split_allowed: true,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -38548,7 +39680,109 @@ mod tests {
   }
 
   #[test]
-  fn repeating_page_background_keeps_its_authored_extent() {
+  fn oversized_wrapped_picture_is_captured_but_page_fitting_offset_is_preserved() {
+    let flow = flow_from_block_area(BlockArea {
+      setup: PageSetup {
+        width_pt: 419.64,
+        height_pt: 297.72,
+        margin_top_pt: 70.85,
+        margin_right_pt: 70.85,
+        margin_bottom_pt: 70.85,
+        margin_left_pt: 70.85,
+        ..Default::default()
+      },
+      section_index: 0,
+      section_page_index: 1,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: 70.85,
+      content_left_pt: 70.85,
+      content_bottom: 226.87,
+      body_content_bottom_pt: 226.87,
+      content_width: 277.94,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
+      compatibility_mode: 14,
+      justify_lines_with_shrinking: false,
+      do_not_expand_shift_return: false,
+      repeating_slots: RepeatingSlotState::default(),
+    });
+    let mut placement = FloatingImagePlacement {
+      horizontal_relative_to: HorizontalImageReference::Column,
+      vertical_relative_to: VerticalImageReference::Paragraph,
+      horizontal_alignment: None,
+      vertical_alignment: None,
+      alignment_extent: None,
+      group_child_offset_x_pt: 0.0,
+      group_child_offset_y_pt: 0.0,
+      horizontal_offset_pt: -0.35,
+      vertical_offset_pt: -22.85,
+      horizontal_offset_pct: None,
+      vertical_offset_pct: None,
+      wrap: ImageWrapMode::Square,
+      wrap_side: ImageWrapSide::BothSides,
+      behind_text: false,
+      layout_in_cell: true,
+      allow_overlap: true,
+      paint_order: FloatingPaintOrder::Unspecified,
+      relative_width_to: None,
+      relative_width_pct: None,
+      relative_height_to: None,
+      relative_height_pct: None,
+      margin_top_pt: 0.0,
+      margin_right_pt: 9.0,
+      margin_bottom_pt: 0.0,
+      margin_left_pt: 9.0,
+    };
+
+    let wrapped = floating_picture_position(
+      placement,
+      flow,
+      ParagraphIndents::default(),
+      70.85,
+      70.85,
+      453.5,
+      97.2,
+    );
+    assert!(wrapped.0.abs() < LAYOUT_EPSILON_PT);
+    assert!((wrapped.1 - 48.0).abs() < LAYOUT_EPSILON_PT);
+
+    // A picture narrower than the page can satisfy its authored absolute
+    // column offset even when its right edge extends beyond the page. This is
+    // the Word fixed-output boundary opposite the oversized capture above.
+    placement.horizontal_offset_pt = 250.0;
+    let page_fitting = floating_picture_position(
+      placement,
+      flow,
+      ParagraphIndents::default(),
+      70.85,
+      70.85,
+      150.0,
+      97.2,
+    );
+    assert!((page_fitting.0 - 320.85).abs() < LAYOUT_EPSILON_PT);
+    assert!(page_fitting.0 + 150.0 > flow.setup.width_pt);
+
+    // Writer's DOCX import permits a wrap-through object to retain the same
+    // authored off-page position; it must not inherit the wrapped correction.
+    placement.horizontal_offset_pt = -0.35;
+    placement.wrap = ImageWrapMode::Through;
+    let through = floating_picture_position(
+      placement,
+      flow,
+      ParagraphIndents::default(),
+      70.85,
+      70.85,
+      453.5,
+      97.2,
+    );
+    assert!((through.0 - 70.5).abs() < LAYOUT_EPSILON_PT);
+    assert!((through.1 - 48.0).abs() < LAYOUT_EPSILON_PT);
+  }
+
+  #[test]
+  fn floating_drawing_extent_is_not_implicitly_scaled_to_text_width() {
     let flow = FlowContext {
       text_segmentation: TextSegmentation::RepeatingSlot,
       content_width: 451.35,
@@ -38632,12 +39866,21 @@ mod tests {
     );
 
     let body_foreground = FloatingImagePlacement {
+      horizontal_relative_to: HorizontalImageReference::Column,
+      vertical_relative_to: VerticalImageReference::Paragraph,
+      wrap: ImageWrapMode::Square,
       behind_text: false,
       ..page_background
     };
-    let (width, height) = floating_image_layout_size(596.25, 843.55, body_foreground, flow);
-    assert!((width - 451.35).abs() < 0.001);
-    assert!((height - 638.55).abs() < 0.01);
+    let foreground_flow = FlowContext {
+      text_segmentation: TextSegmentation::Body,
+      content_width: 277.9,
+      ..flow
+    };
+    assert_eq!(
+      floating_image_layout_size(453.5, 97.2, body_foreground, foreground_flow),
+      (453.5, 97.2)
+    );
   }
 
   #[test]
@@ -38725,6 +39968,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: Some(TableBordersModel {
         top: Some(border),
@@ -40403,6 +41647,33 @@ mod tests {
     );
     assert!((table_grid_height - 15.6).abs() < 0.01);
 
+    let omitted_type_table_setup = PageSetup {
+      doc_grid_line_pitch_pt: None,
+      table_cell_doc_grid_line_pitch_pt: Some(15.6),
+      adjust_table_line_heights_to_grid: true,
+      ..setup
+    };
+    assert!(
+      grid_auto_line_heights(
+        &paragraph,
+        &base_style,
+        omitted_type_table_setup,
+        TextSegmentation::Body,
+        &mut text_metrics,
+      )
+      .is_none()
+    );
+    assert!(
+      grid_auto_line_heights(
+        &paragraph,
+        &base_style,
+        omitted_type_table_setup,
+        TextSegmentation::TableCell,
+        &mut text_metrics,
+      )
+      .is_some()
+    );
+
     paragraph.format.line_height_pt = Some(0.75);
     let below_single_height = paragraph_line_height_for_setup(
       &paragraph,
@@ -40540,6 +41811,29 @@ mod tests {
     assert!((top - (setup.header_distance_pt + 40.0)).abs() < 0.01);
     let footer_bottom = setup.height_pt - setup.footer_distance_pt;
     assert!((bottom - (footer_bottom - 30.0)).abs() < 0.01);
+  }
+
+  #[test]
+  fn body_limits_grow_for_first_page_header_content() {
+    let setup = PageSetup {
+      margin_top_pt: 72.0,
+      header_distance_pt: 36.0,
+      ..Default::default()
+    };
+    let mut slots = RepeatingSlotState {
+      title_page: true,
+      first_header: true,
+      first_header_height_pt: 73.548,
+      ..Default::default()
+    };
+
+    let (top, _) = body_content_limits_for_page(setup, slots, 1, 0);
+
+    assert!((top - 109.548).abs() < 0.01);
+
+    slots.first_header_height_pt = 20.0;
+    let (top, _) = body_content_limits_for_page(setup, slots, 1, 0);
+    assert_eq!(top, setup.margin_top_pt);
   }
 
   #[test]
@@ -40817,6 +42111,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -40858,6 +42153,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -40919,6 +42215,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -40949,6 +42246,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -41010,6 +42308,114 @@ mod tests {
 
     assert_eq!(reclaimed, 15.0);
     assert_eq!(widths, [40.0, 30.0, 35.0]);
+  }
+
+  #[test]
+  fn incomplete_autofit_grid_grows_dynamic_tail_without_shrinking_first_row_tcw_spans() {
+    let cell = |text: &str, preferred_width_pt: f32, grid_span: usize| {
+      let run = TextRun {
+        text: text.to_string(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      };
+      TableCell {
+        blocks: vec![Block::paragraph(Paragraph {
+          inlines: vec![InlineItem::Text(run.clone())],
+          field_events: Vec::new(),
+          footnote_reference_ids: Vec::new(),
+          endnote_reference_ids: Vec::new(),
+          starts_after_last_rendered_page_break: false,
+          base_style: TextStyle::default(),
+          runs: vec![run],
+          format: Box::new(ParagraphFormat::default()),
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
+          style_ref_numbering_text: None,
+          list_label: None,
+          list_label_image: None,
+          list_label_style: TextStyle::default(),
+          list_label_hyperlink_url: None,
+          list_label_tab_stop_pt: None,
+        })],
+        shading: None,
+        borders: CellBordersModel::default(),
+        border_suppressions: CellBorderSuppressions::default(),
+        margins: CellMargins::zero(),
+        preferred_width_pt: Some(preferred_width_pt),
+        preferred_width_pct: None,
+        grid_span,
+        vertical_merge_continue: false,
+        no_wrap: false,
+        fit_text: false,
+        hide_end_mark: false,
+        vertical_alignment: TableCellVerticalAlignment::Top,
+        text_rotation_deg: None,
+      }
+    };
+    let table = Table {
+      column_widths_pt: vec![214.45, 68.15, 84.75, 0.05],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      layout: TableLayoutMode::AutoFit,
+      indent_left_pt: -3.5,
+      alignment: TableAlignment::Left,
+      right_to_left: false,
+      align_leading_cell_content: true,
+      in_header_footer: false,
+      placement: None,
+      allow_overlap: true,
+      split_allowed: false,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      page_break_before: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![TableRow {
+        cells: vec![
+          cell("A", 214.45, 5),
+          cell("B", 68.15, 2),
+          cell("C", 84.75, 2),
+          cell("D", 0.05, 2),
+        ],
+        height_pt: Some(27.65),
+        exact_height: true,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: true,
+        cell_spacing_pt: None,
+        grid_before: 0,
+        grid_after: 0,
+        width_before_pt: None,
+        width_after_pt: None,
+        layout: None,
+        borders: None,
+        spacing_shading: None,
+        redline_color: None,
+      }],
+    };
+    let mut text_metrics = TextMetrics::new();
+
+    let widths = table_column_widths(&table, 11, 453.6, false, &mut text_metrics);
+
+    assert!((widths[..5].iter().sum::<f32>() - 214.45).abs() < LAYOUT_EPSILON_PT);
+    assert!((widths[5..7].iter().sum::<f32>() - 68.15).abs() < LAYOUT_EPSILON_PT);
+    assert!((widths[7..9].iter().sum::<f32>() - 84.75).abs() < LAYOUT_EPSILON_PT);
+    assert!(widths[9..].iter().sum::<f32>() > 0.05 + LAYOUT_EPSILON_PT);
+    assert!(widths.iter().sum::<f32>() > 367.4 + LAYOUT_EPSILON_PT);
+
+    let mut complete_grid = table;
+    complete_grid.column_widths_pt = vec![
+      42.89, 42.89, 42.89, 42.89, 42.89, 34.075, 34.075, 42.375, 42.375, 0.025, 0.025,
+    ];
+    let complete_widths = table_column_widths(&complete_grid, 11, 453.6, false, &mut text_metrics);
+    assert!(complete_widths[..5].iter().sum::<f32>() < 214.45 - LAYOUT_EPSILON_PT);
+    assert!((complete_widths.iter().sum::<f32>() - 367.4).abs() < LAYOUT_EPSILON_PT);
   }
 
   #[test]
@@ -41080,6 +42486,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -41134,6 +42541,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -41196,6 +42604,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -41296,6 +42705,7 @@ mod tests {
       split_allowed: true,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -41422,6 +42832,7 @@ mod tests {
       split_allowed: true,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -41509,6 +42920,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -41629,6 +43041,7 @@ mod tests {
       split_allowed: false,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 2.0,
@@ -41702,6 +43115,101 @@ mod tests {
       state.page_split_decision(false, 0, 0),
       TextSplitDecision::Allowed
     );
+  }
+
+  #[test]
+  fn keep_with_next_preflight_reserves_a_legal_follow_paragraph_prefix() {
+    let paragraph = |text: &str, widow_control: Option<bool>, keep_lines: bool| {
+      let run = TextRun {
+        text: text.to_string(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      };
+      Paragraph {
+        inlines: vec![InlineItem::Text(run.clone())],
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        runs: vec![run],
+        format: Box::new(ParagraphFormat {
+          widow_control,
+          keep_lines,
+          ..ParagraphFormat::default()
+        }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      }
+    };
+    let flow = flow_from_block_area(BlockArea {
+      setup: PageSetup::default(),
+      section_index: 0,
+      section_page_index: 0,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: 72.0,
+      content_left_pt: 72.0,
+      content_bottom: 720.0,
+      body_content_bottom_pt: 720.0,
+      content_width: 468.0,
+      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      hyphenation: crate::docx::HyphenationSettings::default(),
+      consecutive_hyphenated_lines: 0,
+      compatibility_mode: 15,
+      justify_lines_with_shrinking: false,
+      do_not_expand_shift_return: false,
+      repeating_slots: RepeatingSlotState::default(),
+    });
+    let mut text_metrics = TextMetrics::new();
+    let three_lines = paragraph("one\ntwo\nthree", None, false);
+    let widow_disabled = paragraph("one\ntwo\nthree", Some(false), false);
+    let one_line = paragraph("one", None, false);
+    let one_line_widow_disabled = paragraph("one", Some(false), false);
+    let kept_three_lines = paragraph("one\ntwo\nthree", None, true);
+
+    let two_line_prefix =
+      estimated_paragraph_keep_start_height(&three_lines, flow, &mut text_metrics);
+    let one_line_prefix =
+      estimated_paragraph_keep_start_height(&widow_disabled, flow, &mut text_metrics);
+    assert!(two_line_prefix > one_line_prefix + LAYOUT_EPSILON_PT);
+    assert!(
+      (estimated_paragraph_keep_start_height(&one_line, flow, &mut text_metrics)
+        - estimated_paragraph_keep_start_height(&one_line_widow_disabled, flow, &mut text_metrics,))
+      .abs()
+        < LAYOUT_EPSILON_PT
+    );
+    assert!(
+      estimated_paragraph_keep_start_height(&kept_three_lines, flow, &mut text_metrics)
+        > two_line_prefix + LAYOUT_EPSILON_PT
+    );
+  }
+
+  #[test]
+  fn line_relative_word_text_frame_keeps_its_undodged_first_line_anchor() {
+    assert!(first_line_word_text_frame_was_dodged_by_own_wrap(
+      false, 56.7, 111.1, 111.1,
+    ));
+    assert!(!first_line_word_text_frame_was_dodged_by_own_wrap(
+      true, 56.7, 111.1, 111.1,
+    ));
+    assert!(!first_line_word_text_frame_was_dodged_by_own_wrap(
+      false, 56.7, 125.0, 111.1,
+    ));
+    assert!(!first_line_word_text_frame_was_dodged_by_own_wrap(
+      false, 56.7, 56.7, 111.1,
+    ));
   }
 
   #[test]
@@ -43080,6 +44588,110 @@ mod tests {
     assert!((same_line_estimated - same_line_laid_out).abs() < LAYOUT_EPSILON_PT);
     assert!((wrapped_estimated - wrapped_laid_out).abs() < LAYOUT_EPSILON_PT);
     assert!(wrapped_laid_out > same_line_laid_out + LAYOUT_EPSILON_PT);
+
+    let modern_flow = FlowContext {
+      text_segmentation: TextSegmentation::Body,
+      compatibility_mode: 15,
+      ..flow
+    };
+    let single_image = paragraph(vec![InlineItem::Image(image(60.0))]);
+    let wrapped_images = paragraph(vec![
+      InlineItem::Image(image(60.0)),
+      InlineItem::Image(image(60.0)),
+    ]);
+    let wrapped_images_with_text = paragraph(vec![
+      InlineItem::Text(crate::docx::TextRun {
+        text: "x".into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      }),
+      InlineItem::Image(image(60.0)),
+      InlineItem::Image(image(60.0)),
+    ]);
+    let (single_estimated, single_laid_out) = heights(&single_image, modern_flow);
+    let (pure_estimated, pure_laid_out) = heights(&wrapped_images, modern_flow);
+    let (mixed_estimated, mixed_laid_out) = heights(&wrapped_images_with_text, modern_flow);
+    assert!((single_estimated - single_laid_out).abs() < LAYOUT_EPSILON_PT);
+    assert!((pure_estimated - pure_laid_out).abs() < LAYOUT_EPSILON_PT);
+    assert!((mixed_estimated - mixed_laid_out).abs() < LAYOUT_EPSILON_PT);
+    // The first physical line ends before the paragraph mark, so it advances
+    // by the drawing portion alone. Text is the counterexample: a glyph on
+    // that same non-final line retains its own descent.
+    assert!((pure_laid_out - single_laid_out - 16.0).abs() < LAYOUT_EPSILON_PT);
+    let mut text_metrics = TextMetrics::new();
+    let paragraph_descent = text_metrics
+      .vertical_metrics(&paragraph_base_line_style(&wrapped_images_with_text))
+      .descent_pt;
+    assert!((mixed_laid_out - pure_laid_out - paragraph_descent).abs() < LAYOUT_EPSILON_PT);
+
+    let mut exact_single = paragraph(vec![InlineItem::Image(image(60.0))]);
+    exact_single.format.line_height_rule = LineHeightRule::Exact;
+    exact_single.format.line_height_pt = Some(24.0);
+    let mut exact_wrapped = paragraph(vec![
+      InlineItem::Image(image(60.0)),
+      InlineItem::Image(image(60.0)),
+    ]);
+    exact_wrapped.format.line_height_rule = LineHeightRule::Exact;
+    exact_wrapped.format.line_height_pt = Some(24.0);
+    let (_, exact_single_laid_out) = heights(&exact_single, modern_flow);
+    let (_, exact_wrapped_laid_out) = heights(&exact_wrapped, modern_flow);
+    assert!((exact_wrapped_laid_out - exact_single_laid_out - 24.0).abs() < LAYOUT_EPSILON_PT);
+  }
+
+  #[test]
+  fn ordinary_inline_extent_overhangs_while_explicit_width_limit_scales() {
+    let image = crate::docx::InlineImage {
+      data: Arc::from([]),
+      content_type: Some("image/png".into()),
+      picture_frame: None,
+      picture_frame_clips_image: false,
+      effects: None,
+      static3d: None,
+      width_pt: 453.5,
+      height_pt: 97.5,
+      inline_offset_x_pt: 0.0,
+      inline_offset_y_pt: 0.0,
+      effect_left_pt: 0.0,
+      effect_top_pt: 0.0,
+      effect_right_pt: 0.0,
+      effect_bottom_pt: 0.0,
+      inline_baseline_gap_pt: None,
+      line_box: crate::docx::InlineImageLineBox::CharacterLike,
+      office_math_line_layout: None,
+      office_math_display_layout: None,
+      crop: ImageCrop::default(),
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      metafile_background_color: None,
+      alt_text: None,
+      hyperlink_url: None,
+      semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
+      semantic_metafile_font_family: None,
+      native_ole_equation: None,
+      metafile_native_size: false,
+      picture_content_control: false,
+      placement: crate::docx::ImagePlacement::Inline,
+    };
+
+    let ordinary = inline_image_metrics(&image);
+    assert!((ordinary.frame_width_pt - 453.5).abs() < LAYOUT_EPSILON_PT);
+    assert!((ordinary.frame_height_pt - 97.5).abs() < LAYOUT_EPSILON_PT);
+
+    // Picture bullets are normalized character-cell images and retain their
+    // explicit width-limited path; this is the counterexample to the ordinary
+    // wp:inline rule above.
+    let width_limited = width_limited_inline_image_metrics(&image, 277.9);
+    let expected_scale = 277.9 / 453.5;
+    assert!((width_limited.frame_width_pt - 277.9).abs() < LAYOUT_EPSILON_PT);
+    assert!((width_limited.frame_height_pt - 97.5 * expected_scale).abs() < LAYOUT_EPSILON_PT);
   }
 
   #[test]
@@ -43387,13 +44999,10 @@ mod tests {
     let body_flow = flow(grid_setup, TextSegmentation::Body);
     let mut text_metrics = TextMetrics::new();
     let text_frame = TextFrame::new(&snapped_paragraph, body_flow, &mut text_metrics);
-    let inline_metrics = inline_image_metrics(
-      match &snapped_paragraph.inlines[0] {
-        InlineItem::Image(image) => image,
-        _ => unreachable!(),
-      },
-      body_flow.content_width,
-    );
+    let inline_metrics = inline_image_metrics(match &snapped_paragraph.inlines[0] {
+      InlineItem::Image(image) => image,
+      _ => unreachable!(),
+    });
     let raw_height = inline_image_line_height(
       inline_metrics,
       &snapped_paragraph,

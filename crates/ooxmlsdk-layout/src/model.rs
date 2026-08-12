@@ -344,6 +344,14 @@ pub struct PageSetup {
   pub borders_offset_from_text: bool,
   pub line_numbering: Option<LineNumbering>,
   pub doc_grid_line_pitch_pt: Option<f32>,
+  /// Line pitch retained for Word 2007-and-later fixed output's
+  /// `adjustLineHeightInTable` path when `w:docGrid/@w:type` is omitted.
+  ///
+  /// ECMA-376 defaults that omission to no body grid, but Word still applies
+  /// the authored pitch inside table cells when the compatibility switch is
+  /// enabled. Keeping this separate prevents the dormant pitch from snapping
+  /// ordinary body paragraphs.
+  pub table_cell_doc_grid_line_pitch_pt: Option<f32>,
   pub doc_grid_character_spacing_pt: Option<f32>,
   pub adjust_table_line_heights_to_grid: bool,
   pub page_number_start: Option<i32>,
@@ -375,6 +383,7 @@ impl Default for PageSetup {
       borders_offset_from_text: false,
       line_numbering: None,
       doc_grid_line_pitch_pt: None,
+      table_cell_doc_grid_line_pitch_pt: None,
       doc_grid_character_spacing_pt: None,
       adjust_table_line_heights_to_grid: false,
       page_number_start: None,

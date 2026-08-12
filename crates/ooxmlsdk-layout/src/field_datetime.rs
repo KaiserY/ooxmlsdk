@@ -49,6 +49,11 @@ pub(crate) fn format_date_time_field(
     // from the later conversion-manifest timestamp.
     value.second = 0;
     DefaultFieldFormat::DocumentDateTime
+  } else if field_name.eq_ignore_ascii_case("CREATEDATE") {
+    // CREATEDATE is sourced from the absolute dcterms:created core property.
+    // Unlike PRINTDATE/SAVEDATE, preserve its recorded seconds after the
+    // caller-selected time-zone conversion.
+    DefaultFieldFormat::DocumentDateTime
   } else {
     return None;
   };
@@ -796,7 +801,7 @@ mod tests {
     );
     assert_eq!(
       format_date_time_field(&tokens(&["CREATEDATE"]), Some("en-US"), VALUE),
-      None
+      Some("7/12/2026 8:19:54 PM".to_string())
     );
   }
 

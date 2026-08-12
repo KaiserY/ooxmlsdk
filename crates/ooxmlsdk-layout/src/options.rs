@@ -24,6 +24,13 @@ pub struct LayoutOptions {
   ///
   /// Leaving this unset preserves the package's cached field results.
   pub field_update_datetime: Option<FieldUpdateDateTime>,
+  /// IANA time-zone name used to convert absolute package-property
+  /// timestamps, such as `dcterms:created`, when fields are refreshed.
+  ///
+  /// This is independent from the UI language and formatting locale. When
+  /// absent or invalid, fields that require an absolute-to-local conversion
+  /// preserve their cached results.
+  pub field_update_time_zone: Option<String>,
   pub action: LayoutActionOptions,
   pub diagnostics: LayoutDiagnosticsOptions,
 }

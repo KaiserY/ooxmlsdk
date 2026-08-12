@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use icu_locale::fallback::LocaleFallbacker;
-use icu_locale::{DataLocale, Locale, LocaleCanonicalizer, LocaleExpander};
+use icu_locale::{DataLocale, Locale, LocaleCanonicalizer, LocaleDirectionality, LocaleExpander};
 
 /// The locale dimensions needed while reproducing application output.
 ///
@@ -140,6 +140,11 @@ pub(crate) fn drawingml_theme_script(value: &str) -> Option<Arc<str>> {
     "ug" => Some(Arc::from("Uigh")),
     _ => locale.id.script.map(|script| Arc::from(script.as_str())),
   }
+}
+
+pub(crate) fn locale_is_right_to_left(value: &str) -> bool {
+  canonical_locale(value)
+    .is_some_and(|locale| LocaleDirectionality::new_extended().is_right_to_left(&locale.id))
 }
 
 fn maximized_locale(value: &str) -> Option<Locale> {

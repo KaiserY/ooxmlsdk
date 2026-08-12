@@ -11,7 +11,7 @@ use crate::render::chart::{
   horizontal_axis_number_format_code, linear_axis_scale_with_options, trendline_legend_title,
   value_axis_display_unit, value_axis_display_unit_label_text, vertical_axis_number_format_code,
 };
-use crate::text_metrics::TextMetrics;
+use crate::text_metrics::{TextMetrics, TextVerticalMetrics};
 use kurbo::BezPath;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
@@ -265,6 +265,10 @@ fn east_asian_title_script(title: &str, style: &TextStyle) -> Option<TextScript>
         TextScript::Han | TextScript::Hiragana | TextScript::Katakana | TextScript::Hangul
       )
     })
+}
+
+fn word_chart_title_ink_box_excess(metrics: TextVerticalMetrics, font_size_pt: f32) -> f32 {
+  (metrics.ink_height_pt() - font_size_pt).max(0.0)
 }
 
 #[derive(Clone, Debug)]
@@ -1105,7 +1109,7 @@ pub(crate) fn lower_clustered_column_chart(
     let metrics = metrics.vertical_metrics_for_script(&style.title, script);
     plot_top += automatic_band_height_pt
       * profiles::WORD_BOTTOM_LEGEND_EAST_ASIAN_TITLE_EXTRA_RATIO
-      + (metrics.line_height_pt() - style.title.font_size_pt).max(0.0);
+      + word_chart_title_ink_box_excess(metrics, style.title.font_size_pt);
   }
   if has_independent_axis_text_layout {
     plot_top += frame.height_pt * profiles::EXCEL_INDEPENDENT_AXIS_TEXT.plot_top_ratio;
@@ -14178,12 +14182,13 @@ mod tests {
     horizontal_bar_data_label_origin, lower_3d_extruded_polygon, lower_3d_line_stripes,
     maximum_auto_main_increment_count, pie_custom_label_maximum_width, push_chart_data_rect,
     sample_cardinal_chart_line, series_axis_label_rhythm, series_category_display_index,
-    single_line_vertical_anchor_offset, word_fixed_chart_data_edge, word_fixed_chart_value_edge,
-    word_titled_bottom_band_height, word_uses_hidden_vertical_value_band,
+    single_line_vertical_anchor_offset, word_chart_title_ink_box_excess,
+    word_fixed_chart_data_edge, word_fixed_chart_value_edge, word_titled_bottom_band_height,
+    word_uses_hidden_vertical_value_band,
   };
   use crate::model::{PageItem, PdfTextSegmentation, RgbColor, TextStyle, common_rect};
   use crate::render::chart::{ChartManualLayout, ChartSeriesKind};
-  use crate::text_metrics::TextMetrics;
+  use crate::text_metrics::{TextMetrics, TextVerticalMetrics};
 
   #[test]
   fn axis_values_do_not_expose_binary_float_artifacts() {
@@ -14342,6 +14347,27 @@ mod tests {
     assert_eq!(word_titled_bottom_band_height(true, false, 325.5), 252.0);
     assert_eq!(word_titled_bottom_band_height(true, true, 314.25), 314.25);
     assert_eq!(word_titled_bottom_band_height(false, false, 325.5), 325.5);
+  }
+
+  #[test]
+  fn word_east_asian_title_adds_ink_overflow_without_double_counting_line_gap() {
+    let simsun = TextVerticalMetrics {
+      ascent_pt: 12.031_25,
+      descent_pt: 1.968_75,
+      line_gap_pt: 1.968_75,
+      baseline_offset_pt: 12.031_25,
+      directwrite_baseline_offset_pt: 12.031_25,
+    };
+    assert_eq!(word_chart_title_ink_box_excess(simsun, 14.0), 0.0);
+
+    let dengxian = TextVerticalMetrics {
+      ascent_pt: 11.340_82,
+      descent_pt: 3.247_07,
+      line_gap_pt: 0.0,
+      baseline_offset_pt: 11.340_82,
+      directwrite_baseline_offset_pt: 11.340_82,
+    };
+    assert!((word_chart_title_ink_box_excess(dengxian, 14.0) - 0.587_89).abs() < 0.000_01);
   }
 
   #[test]

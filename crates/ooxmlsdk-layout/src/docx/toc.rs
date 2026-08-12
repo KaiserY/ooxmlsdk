@@ -1908,6 +1908,7 @@ mod tests {
       split_allowed: true,
       following_text_flow: false,
       explicit_no_repeat_header: false,
+      page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,

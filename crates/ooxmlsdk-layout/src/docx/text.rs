@@ -360,6 +360,7 @@ fn paragraph_model_with_base_impl<'a>(
       suppress_toc_hyperlink_style: styles.is_toc_entry_paragraph_style(style_id),
       complex_fields: complex_fields.as_deref_mut(),
       table_depth,
+      style_outline_level: format.style_outline_level,
     },
   );
   let mut field_events = paragraph_field_events(paragraph);

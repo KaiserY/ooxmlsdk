@@ -335,8 +335,9 @@ pub(crate) const WORD_TITLED_BOTTOM_HORIZONTAL_BAR: CartesianLayoutAdjustment =
   };
 
 /// DrawingML's automatic East Asian title box reserves additional leading
-/// beyond an otherwise equal-height Latin title. Any physical line-height
-/// excess of the selected East Asian face is added separately in points.
+/// beyond an otherwise equal-height Latin title. Any physical ink-box excess
+/// of the selected East Asian face is added separately in points; the title
+/// reservation already owns the line box, including the OpenType line gap.
 pub(crate) const WORD_BOTTOM_LEGEND_EAST_ASIAN_TITLE_EXTRA_RATIO: f32 = 0.004_405;
 
 /// Excel side-legend charts with an explicit title.

@@ -132,6 +132,17 @@ pub(super) fn apply_generated_field_message_style(
   }
 }
 
+pub(super) fn apply_bidi_outline_missing_context_style(style: &mut TextStyle) {
+  // Word materializes the missing numbering context as an application-
+  // generated placeholder rather than persisted field text. Its built-in
+  // resource is bold, while an explicitly authored w:b=false on the field
+  // remains authoritative just as it does for other generated diagnostics.
+  style.wordprocessingml_generated_field_diagnostic = true;
+  let bold = style.wordprocessingml_field_bold_override != Some(false);
+  style.bold = bold;
+  style.complex_bold = Some(bold);
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -168,6 +179,22 @@ mod tests {
       Some("zh-CN"),
     );
     assert!(!explicitly_plain.bold);
+  }
+
+  #[test]
+  fn bidi_outline_placeholder_bold_default_respects_an_explicit_word_override() {
+    let mut default_style = TextStyle::default();
+    apply_bidi_outline_missing_context_style(&mut default_style);
+    assert!(default_style.bold);
+    assert!(default_style.wordprocessingml_generated_field_diagnostic);
+
+    let mut explicitly_plain = TextStyle {
+      wordprocessingml_field_bold_override: Some(false),
+      ..TextStyle::default()
+    };
+    apply_bidi_outline_missing_context_style(&mut explicitly_plain);
+    assert!(!explicitly_plain.bold);
+    assert_eq!(explicitly_plain.complex_bold, Some(false));
   }
 
   #[test]

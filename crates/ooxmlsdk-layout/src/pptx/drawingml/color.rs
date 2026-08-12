@@ -337,6 +337,37 @@ impl Color {
   where
     F: FnMut(a::SchemeColorValues) -> Option<Color>,
   {
+    self.resolve_rgb_with_policy(
+      scheme_resolver,
+      placeholder_color,
+      ColorTransformPolicy::Standard,
+    )
+  }
+
+  pub(crate) fn resolve_rgb_with_saturation_overflow<F>(
+    &self,
+    scheme_resolver: &mut F,
+    placeholder_color: Option<&Color>,
+  ) -> Option<ResolvedColor>
+  where
+    F: FnMut(a::SchemeColorValues) -> Option<Color>,
+  {
+    self.resolve_rgb_with_policy(
+      scheme_resolver,
+      placeholder_color,
+      ColorTransformPolicy::PreserveSaturationModOverflow,
+    )
+  }
+
+  fn resolve_rgb_with_policy<F>(
+    &self,
+    scheme_resolver: &mut F,
+    placeholder_color: Option<&Color>,
+    policy: ColorTransformPolicy,
+  ) -> Option<ResolvedColor>
+  where
+    F: FnMut(a::SchemeColorValues) -> Option<Color>,
+  {
     let (mut color, transformations) = match self {
       Self::RgbHex(color) => (
         ResolvedColor::from_hex(&color.value)?,
@@ -375,14 +406,21 @@ impl Color {
         } else {
           scheme_resolver(color.value)
         }?;
-        let mut resolved = base.resolve_rgb(scheme_resolver, placeholder_color)?;
-        apply_transformations(&mut resolved, &color.transformations);
+        let mut resolved =
+          base.resolve_rgb_with_policy(scheme_resolver, placeholder_color, policy)?;
+        apply_transformations_with_policy(&mut resolved, &color.transformations, policy);
         return Some(resolved);
       }
     };
-    apply_transformations(&mut color, transformations);
+    apply_transformations_with_policy(&mut color, transformations, policy);
     Some(color)
   }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ColorTransformPolicy {
+  Standard,
+  PreserveSaturationModOverflow,
 }
 
 fn best_solid_gradient_color(fill: &a::GradientFill) -> Option<Color> {
@@ -949,6 +987,14 @@ pub(crate) fn apply_transformations(
   color: &mut ResolvedColor,
   transformations: &[ColorTransformation],
 ) {
+  apply_transformations_with_policy(color, transformations, ColorTransformPolicy::Standard);
+}
+
+fn apply_transformations_with_policy(
+  color: &mut ResolvedColor,
+  transformations: &[ColorTransformation],
+  policy: ColorTransformPolicy,
+) {
   for transformation in transformations {
     let value = transformation.value.unwrap_or(0);
     match transformation.kind {
@@ -988,20 +1034,33 @@ pub(crate) fn apply_transformations(
       | ColorTransformationKind::SatOff
       | ColorTransformationKind::Lum
       | ColorTransformationKind::LumMod
-      | ColorTransformationKind::LumOff => apply_hsl_transform(color, transformation.kind, value),
+      | ColorTransformationKind::LumOff => {
+        apply_hsl_transform(color, transformation.kind, value, policy)
+      }
     }
     color.alpha = clamp_percent(color.alpha);
   }
 }
 
-fn apply_hsl_transform(color: &mut ResolvedColor, kind: ColorTransformationKind, value: i32) {
+fn apply_hsl_transform(
+  color: &mut ResolvedColor,
+  kind: ColorTransformationKind,
+  value: i32,
+  policy: ColorTransformPolicy,
+) {
   let (mut h, mut s, mut l) = drawingml_rgb_to_hsl(*color);
   match kind {
     ColorTransformationKind::Hue => h = value.rem_euclid(360 * 60_000),
     ColorTransformationKind::HueMod => h = mod_value(h, value, 360 * 60_000),
     ColorTransformationKind::HueOff => h = wrap_hue(h, value),
     ColorTransformationKind::Sat => s = clamp_percent(value),
-    ColorTransformationKind::SatMod => s = mod_value(s, value, COLOR_PERCENT_MAX),
+    ColorTransformationKind::SatMod => {
+      s = if policy == ColorTransformPolicy::PreserveSaturationModOverflow {
+        mod_value_without_upper_bound(s, value)
+      } else {
+        mod_value(s, value, COLOR_PERCENT_MAX)
+      }
+    }
     ColorTransformationKind::SatOff => s = offset_value(s, value, COLOR_PERCENT_MAX),
     ColorTransformationKind::Lum => l = clamp_percent(value),
     ColorTransformationKind::LumMod => l = mod_value(l, value, COLOR_PERCENT_MAX),
@@ -1011,7 +1070,12 @@ fn apply_hsl_transform(color: &mut ResolvedColor, kind: ColorTransformationKind,
   if l == 0 || l == COLOR_PERCENT_MAX {
     s = 0;
   }
-  set_rgb_preserve_alpha(color, drawingml_hsl_to_rgb(h, s, l));
+  let rgb = if kind == ColorTransformationKind::SatMod && s > COLOR_PERCENT_MAX {
+    drawingml_hsl_to_rgb_with_saturation_overflow(h, s, l)
+  } else {
+    drawingml_hsl_to_rgb(h, s, l)
+  };
+  set_rgb_preserve_alpha(color, rgb);
 }
 
 fn apply_shade(color: &mut ResolvedColor, value: i32) {
@@ -1103,6 +1167,11 @@ fn mod_value(value: i32, modifier: i32, max: i32) -> i32 {
     as i32
 }
 
+fn mod_value_without_upper_bound(value: i32, modifier: i32) -> i32 {
+  (i64::from(value) * i64::from(modifier) / i64::from(COLOR_PERCENT_MAX))
+    .clamp(0, i64::from(i32::MAX)) as i32
+}
+
 fn offset_value(value: i32, offset: i32, max: i32) -> i32 {
   (i64::from(value) + i64::from(offset)).clamp(0, i64::from(max)) as i32
 }
@@ -1132,6 +1201,29 @@ fn drawingml_hsl_to_rgb(hue: i32, saturation: i32, luminance: i32) -> ResolvedCo
   }
   .to_srgb8();
   ResolvedColor::new(r, g, b)
+}
+
+fn drawingml_hsl_to_rgb_with_saturation_overflow(
+  hue: i32,
+  saturation: i32,
+  luminance: i32,
+) -> ResolvedColor {
+  let hue = hue.rem_euclid(360 * 60_000) as f64 / 60_000.0;
+  let saturation = f64::from(saturation.max(0)) / f64::from(COLOR_PERCENT_MAX);
+  let luminance = f64::from(clamp_percent(luminance)) / f64::from(COLOR_PERCENT_MAX);
+  let chroma = (1.0 - (2.0 * luminance - 1.0).abs()) * saturation;
+  let secondary = chroma * (1.0 - ((hue / 60.0).rem_euclid(2.0) - 1.0).abs());
+  let offset = luminance - chroma * 0.5;
+  let [red, green, blue] = match hue {
+    value if value < 60.0 => [chroma, secondary, 0.0],
+    value if value < 120.0 => [secondary, chroma, 0.0],
+    value if value < 180.0 => [0.0, chroma, secondary],
+    value if value < 240.0 => [0.0, secondary, chroma],
+    value if value < 300.0 => [secondary, 0.0, chroma],
+    _ => [chroma, 0.0, secondary],
+  };
+  let channel = |value: f64| ((value + offset).clamp(0.0, 1.0) * 255.0).round() as u8;
+  ResolvedColor::new(channel(red), channel(green), channel(blue))
 }
 
 #[cfg(test)]

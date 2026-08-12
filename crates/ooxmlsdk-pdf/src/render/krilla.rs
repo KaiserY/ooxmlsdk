@@ -2028,6 +2028,7 @@ fn expand_metafile_semantic_text_item<'doc>(
       }
 
       let flatten_native_emf_text = paint_native_text
+        && image.signature_line.is_some()
         && image.content_type.as_deref().is_some_and(|content_type| {
           matches!(
             content_type.to_ascii_lowercase().as_str(),

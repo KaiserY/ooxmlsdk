@@ -32,6 +32,11 @@ pub struct PdfOptions {
   /// remain authoritative.
   pub field_update_datetime: Option<ooxmlsdk_layout::options::FieldUpdateDateTime>,
 
+  /// IANA time-zone name used to convert absolute package-property
+  /// timestamps when fields such as WordprocessingML CREATEDATE are
+  /// refreshed. This is independent from UI language and format locale.
+  pub field_update_time_zone: Option<String>,
+
   pub general: PdfGeneralOptions,
   pub images: PdfImageOptions,
   pub links: PdfLinkOptions,
@@ -55,6 +60,7 @@ impl Default for PdfOptions {
       format_locale: None,
       default_document_language: None,
       field_update_datetime: None,
+      field_update_time_zone: None,
       general: PdfGeneralOptions::default(),
       images: PdfImageOptions::default(),
       links: PdfLinkOptions::default(),
@@ -116,6 +122,7 @@ impl PdfOptions {
       format_locale: self.format_locale.clone(),
       default_document_language: self.default_document_language.clone(),
       field_update_datetime: self.field_update_datetime,
+      field_update_time_zone: self.field_update_time_zone.clone(),
       ..Default::default()
     }
   }

@@ -351,6 +351,24 @@ fn script_scan_options(
   }
 }
 
+fn wordprocessing_line_metrics_font_slot(
+  style: &(impl FontStyleRef + ?Sized),
+  wordprocessingml_font_slot: Option<WordprocessingFontSlot>,
+) -> Option<WordprocessingFontSlot> {
+  // [MS-OI29500] §2.1.88 states that w:cs/w:rtl selects the cs face
+  // regardless of the run's Unicode values. Word fixed output paints Basic
+  // Latin decimal digits with the ASCII family, but Comment066 demonstrates
+  // that those glyphs do not contribute ASCII-face ascender/descender values
+  // to the line box. Keep the paint exception out of line measurement.
+  if style.complex_script_override() == Some(true)
+    && wordprocessingml_font_slot == Some(WordprocessingFontSlot::Ascii)
+  {
+    Some(WordprocessingFontSlot::ComplexScript)
+  } else {
+    wordprocessingml_font_slot
+  }
+}
+
 fn wordprocessingml_east_asia_uses_ascii(style: &(impl FontStyleRef + ?Sized)) -> bool {
   style
     .east_asia_font_family()
@@ -1009,8 +1027,10 @@ impl FontResolver {
 
     let mut combined: Option<ooxmlsdk_fonts::VerticalMetrics> = None;
     for run in script_runs {
+      let metrics_slot =
+        wordprocessing_line_metrics_font_slot(style, run.wordprocessingml_font_slot);
       let metrics = self
-        .font_metrics_for_slot(style, Some(run.script), run.wordprocessingml_font_slot)?
+        .font_metrics_for_slot(style, Some(run.script), metrics_slot)?
         .vertical;
       if let Some(combined) = &mut combined {
         combined.ascent_pt = combined.ascent_pt.max(metrics.ascent_pt);
@@ -1179,6 +1199,16 @@ impl FontResolver {
         run.offset_text_range(script_run.text_range.start);
       }
       output.extend(runs);
+    }
+    if style
+      .resolved_bidi_level()
+      .is_some_and(|level| level % 2 == 1)
+    {
+      // This function receives one directionally uniform bidi portion. UAX #9
+      // rule L2 therefore reverses its complete font/script-run sequence at an
+      // odd level. HarfBuzz has already put the glyphs inside each run in RTL
+      // order, so only the sequence of independently shaped runs belongs here.
+      output.reverse();
     }
     Some(output)
   }
@@ -1371,6 +1401,13 @@ fn script_font_family_for_slot(
   script: Option<TextScript>,
   wordprocessingml_font_slot: Option<WordprocessingFontSlot>,
 ) -> Option<&str> {
+  // Word fixed output keeps U+0030..U+0039 on the ASCII rFonts family even
+  // when w:cs/w:rtl selects complex-script formatting for the run. The font
+  // scanner emits Ascii under that narrow exception; let it precede the run
+  // override without changing szCs/bCs/iCs selection.
+  if wordprocessingml_font_slot == Some(WordprocessingFontSlot::Ascii) {
+    return style.font_family();
+  }
   if let Some(force_complex) = style.complex_script_override() {
     return if force_complex {
       style.complex_font_family()
@@ -1455,6 +1492,9 @@ fn script_font_family_class_for_slot(
     // The w:sym PUA transport deliberately suppresses generic font matching;
     // only the declared face and its document-authored alternate are valid.
     return None;
+  }
+  if wordprocessingml_font_slot == Some(WordprocessingFontSlot::Ascii) {
+    return style.font_family_class();
   }
   if let Some(force_complex) = style.complex_script_override() {
     return (!force_complex)
@@ -1704,7 +1744,7 @@ mod tests {
     apply_wordprocessingml_single_double_byte_width_balance, effective_font_size_pt, font_request,
     font_request_for_slot, load_text_face, materialize_wordprocessingml_source_font_slot,
     script_fallback_font_family_for_slot, script_font_family_for_slot, script_scan_options,
-    shape_text_runs,
+    shape_text_runs, wordprocessing_line_metrics_font_slot,
   };
 
   fn synthetic_space_run(text: &'static str, script: TextScript) -> ShapedRun<'static, 'static> {
@@ -1796,6 +1836,65 @@ mod tests {
     assert_eq!(request.size_pt.0, 20.0);
     assert!(request.bold);
     assert!(!request.italic);
+  }
+
+  #[test]
+  fn wordprocessing_rtl_digits_keep_ascii_family_and_complex_run_properties() {
+    let text = "1A";
+    let style = TextStyle {
+      font_family: Some(Arc::from("Latin Face")),
+      complex_font_family: Some(Arc::from("Complex Face")),
+      font_size_pt: 10.0,
+      complex_font_size_pt: Some(20.0),
+      right_to_left: Some(true),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+
+    let runs = script_direction_runs_with_options(
+      text,
+      FontSize(style.font_size_pt),
+      script_scan_options(&style, false),
+    );
+    assert_eq!(runs.len(), 2);
+    assert_eq!(&text[runs[0].text_range.clone()], "1");
+    assert_eq!(
+      runs[0].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
+    let digit = font_request_for_slot(
+      &style,
+      Some(runs[0].script),
+      runs[0].wordprocessingml_font_slot,
+    );
+    assert_eq!(digit.family.as_deref(), Some("Latin Face"));
+    assert_eq!(digit.size_pt.0, 20.0);
+    assert_eq!(
+      wordprocessing_line_metrics_font_slot(&style, runs[0].wordprocessingml_font_slot),
+      Some(WordprocessingFontSlot::ComplexScript)
+    );
+
+    assert_eq!(&text[runs[1].text_range.clone()], "A");
+    assert_eq!(
+      runs[1].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::ComplexScript)
+    );
+    let letter = font_request_for_slot(
+      &style,
+      Some(runs[1].script),
+      runs[1].wordprocessingml_font_slot,
+    );
+    assert_eq!(letter.family.as_deref(), Some("Complex Face"));
+    assert_eq!(letter.size_pt.0, 20.0);
+
+    let ordinary = TextStyle {
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    assert_eq!(
+      wordprocessing_line_metrics_font_slot(&ordinary, Some(WordprocessingFontSlot::Ascii)),
+      Some(WordprocessingFontSlot::Ascii)
+    );
   }
 
   #[test]
@@ -2045,6 +2144,49 @@ mod tests {
     assert_eq!(ltr.len(), 1);
     assert_eq!(ltr[0].direction, TextDirection::LeftToRight);
     assert_eq!(rtl[0].glyphs[0].glyph_id, ltr[0].glyphs[0].glyph_id);
+  }
+
+  #[test]
+  fn resolved_odd_bidi_level_reverses_the_complete_shaping_run_sequence() {
+    // Comment066.docx contains this exact w:rtl fragment. Word's ASCII font
+    // slot splits the leading neutral punctuation from the Arabic script, but
+    // both pieces have the same resolved level and form one visual RTL run.
+    let text = "; اطفال ";
+    let rtl_style = TextStyle {
+      font_family: Some(Arc::from("Cambria")),
+      high_ansi_font_family: Some(Arc::from("Cambria")),
+      complex_font_family: Some(Arc::from("Times New Roman")),
+      right_to_left: Some(true),
+      resolved_bidi_level: Some(1),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let rtl = shape_text_runs(text, &rtl_style).expect("resolved RTL fragment");
+    assert_eq!(
+      rtl
+        .iter()
+        .map(|run| run.text_range.clone())
+        .collect::<Vec<_>>(),
+      vec![2..text.len(), 0..2]
+    );
+    assert!(
+      rtl
+        .iter()
+        .all(|run| run.direction == TextDirection::RightToLeft)
+    );
+
+    let ltr_style = TextStyle {
+      resolved_bidi_level: Some(0),
+      ..rtl_style
+    };
+    let ltr = shape_text_runs(text, &ltr_style).expect("resolved LTR counterexample");
+    assert_eq!(
+      ltr
+        .iter()
+        .map(|run| run.text_range.clone())
+        .collect::<Vec<_>>(),
+      vec![0..2, 2..text.len()]
+    );
   }
 
   #[test]

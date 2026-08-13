@@ -14723,7 +14723,7 @@ fn repeating_slot_state(
       first_footer: blocks_have_visible_body_content(&section.first_footer_blocks),
       even_header: blocks_have_visible_body_content(&section.even_header_blocks),
       even_footer: blocks_have_visible_body_content(&section.even_footer_blocks),
-      default_header_height_pt: measured_repeating_blocks_height(
+      default_header_height_pt: measured_header_blocks_height(
         &section.header_blocks,
         section.page,
         document.default_tab_stop_pt,
@@ -14744,7 +14744,7 @@ fn repeating_slot_state(
         text_metrics,
         false,
       ),
-      first_header_height_pt: measured_repeating_blocks_height(
+      first_header_height_pt: measured_header_blocks_height(
         &section.first_header_blocks,
         section.page,
         document.default_tab_stop_pt,
@@ -14765,7 +14765,7 @@ fn repeating_slot_state(
         text_metrics,
         false,
       ),
-      even_header_height_pt: measured_repeating_blocks_height(
+      even_header_height_pt: measured_header_blocks_height(
         &section.even_header_blocks,
         section.page,
         document.default_tab_stop_pt,
@@ -14798,7 +14798,7 @@ fn repeating_slot_state(
     first_footer: blocks_have_visible_body_content(&document.first_footer_blocks),
     even_header: blocks_have_visible_body_content(&document.header_blocks),
     even_footer: blocks_have_visible_body_content(&document.footer_blocks),
-    default_header_height_pt: measured_repeating_blocks_height(
+    default_header_height_pt: measured_header_blocks_height(
       &document.header_blocks,
       document.page,
       document.default_tab_stop_pt,
@@ -14819,7 +14819,7 @@ fn repeating_slot_state(
       text_metrics,
       false,
     ),
-    first_header_height_pt: measured_repeating_blocks_height(
+    first_header_height_pt: measured_header_blocks_height(
       &document.first_header_blocks,
       document.page,
       document.default_tab_stop_pt,
@@ -14840,7 +14840,7 @@ fn repeating_slot_state(
       text_metrics,
       false,
     ),
-    even_header_height_pt: measured_repeating_blocks_height(
+    even_header_height_pt: measured_header_blocks_height(
       &document.header_blocks,
       document.page,
       document.default_tab_stop_pt,
@@ -14944,6 +14944,46 @@ fn measured_repeating_blocks_height(
   text_metrics: &mut TextMetrics,
   include_last_compat_spacing: bool,
 ) -> f32 {
+  measured_repeating_blocks_height_at(
+    blocks,
+    setup,
+    default_tab_stop_pt,
+    text_metrics,
+    include_last_compat_spacing,
+    0.0,
+  )
+}
+
+fn measured_header_blocks_height(
+  blocks: &[Block],
+  setup: PageSetup,
+  default_tab_stop_pt: f32,
+  text_metrics: &mut TextMetrics,
+  include_last_compat_spacing: bool,
+) -> f32 {
+  // Header content is formatted at w:header's absolute page coordinate.
+  // Keeping that origin is observable when ordinary header paragraphs reach
+  // a page-anchored floating table: the intersecting line is pushed below
+  // the fly and grows the header frame (tdf#159453). Measuring from zero
+  // misses the intersection while leaving the painted header unchanged.
+  measured_repeating_blocks_height_at(
+    blocks,
+    setup,
+    default_tab_stop_pt,
+    text_metrics,
+    include_last_compat_spacing,
+    setup.header_distance_pt.max(0.0),
+  )
+}
+
+fn measured_repeating_blocks_height_at(
+  blocks: &[Block],
+  setup: PageSetup,
+  default_tab_stop_pt: f32,
+  text_metrics: &mut TextMetrics,
+  include_last_compat_spacing: bool,
+  origin_y_pt: f32,
+) -> f32 {
   if blocks.is_empty() {
     return 0.0;
   }
@@ -14966,7 +15006,7 @@ fn measured_repeating_blocks_height(
     section_page_index: 0,
     column_index: 0,
     columns: SectionColumns::default(),
-    content_top_pt: 0.0,
+    content_top_pt: origin_y_pt,
     content_left_pt: setup.margin_left_pt,
     content_bottom: MEASURE_SCRATCH_PAGE_HEIGHT_PT,
     body_content_bottom_pt: MEASURE_SCRATCH_PAGE_HEIGHT_PT,
@@ -14990,7 +15030,7 @@ fn measured_repeating_blocks_height(
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
   };
-  let mut y = 0.0;
+  let mut y = origin_y_pt;
   for (index, block) in blocks.iter().enumerate() {
     y = layout_repeating_block(
       block,
@@ -15002,7 +15042,7 @@ fn measured_repeating_blocks_height(
       (index + 1 == blocks.len(), include_last_compat_spacing),
     );
   }
-  y
+  (y - origin_y_pt).max(0.0)
 }
 
 fn layout_repeating_block(
@@ -18842,6 +18882,19 @@ impl RowFrame<'_, '_> {
         ));
       }
       let cell_fragment_index = current.frame_fragments.len();
+      let physical_fragment_height = (row_bottom - row_top).max(0.0);
+      let (cell_fragment_top, cell_fragment_height) = complete_vertical_merge_fragment_span(
+        self.table,
+        &self.table_frame.row_heights,
+        self.row_index,
+        grid_start,
+        row_top,
+        row_bottom,
+        content_offset,
+        self.table_frame.block.content_top_pt,
+        self.table_frame.block.content_bottom,
+      )
+      .unwrap_or((row_top, physical_fragment_height));
       push_page_fragment(
         current,
         PageFragmentRecord {
@@ -18853,13 +18906,16 @@ impl RowFrame<'_, '_> {
           item_start: cell_item_start,
           item_end: current.items.len(),
           // A table-cell fragment owns the cell box, not the ink bounds of
-          // whichever text item happens to be first. PDF painting uses this
-          // box to clip inline cell content at the row edges.
+          // whichever text item happens to be first. A complete vertical
+          // merge is one consolidated cell, so every physical-row fragment
+          // exposes the same spanning box. PDF painting can then select any
+          // covered fragment without clipping the master's content at an
+          // internal row edge.
           bounds: Some(FrameBounds {
             x_pt: cell_frame.left_pt,
-            y_pt: row_top,
+            y_pt: cell_fragment_top,
             width_pt: cell_frame.width_pt,
-            height_pt: (row_bottom - row_top).max(0.0),
+            height_pt: cell_fragment_height,
           }),
         },
         text_metrics,
@@ -19501,13 +19557,27 @@ fn vertical_merge_origin_cell(
   row_index: usize,
   grid_start: usize,
 ) -> Option<&TableCell> {
+  vertical_merge_origin_row_index(table, row_index, grid_start)
+    .and_then(|origin_row_index| table.rows.get(origin_row_index))
+    .and_then(|row| row_cell_at_grid(row, grid_start))
+}
+
+fn vertical_merge_origin_row_index(
+  table: &Table,
+  row_index: usize,
+  grid_start: usize,
+) -> Option<usize> {
   table
     .rows
     .iter()
+    .enumerate()
     .take(row_index)
     .rev()
-    .filter_map(|row| row_cell_at_grid(row, grid_start))
-    .find(|cell| !cell.vertical_merge_continue)
+    .find_map(|(candidate_row_index, row)| {
+      row_cell_at_grid(row, grid_start)
+        .filter(|cell| !cell.vertical_merge_continue)
+        .map(|_| candidate_row_index)
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -19541,6 +19611,62 @@ fn vertical_merge_content_height(
     has_continuation = true;
   }
   has_continuation.then_some(height)
+}
+
+fn complete_vertical_merge_fragment_span(
+  table: &Table,
+  row_heights: &[f32],
+  row_index: usize,
+  grid_start: usize,
+  row_top: f32,
+  row_bottom: f32,
+  content_offset: f32,
+  page_content_top: f32,
+  page_content_bottom: f32,
+) -> Option<(f32, f32)> {
+  if content_offset > LAYOUT_EPSILON_PT {
+    return None;
+  }
+  let row = table.rows.get(row_index)?;
+  let cell = row_cell_at_grid(row, grid_start)?;
+  let origin_row_index = if cell.vertical_merge_continue {
+    vertical_merge_origin_row_index(table, row_index, grid_start)?
+  } else {
+    table_cell_has_vertical_merge_follow(table, row_index, grid_start).then_some(row_index)?
+  };
+  let end_row_index = vertical_merge_follow_end_row(table, origin_row_index, grid_start)?;
+  if row_index > end_row_index {
+    return None;
+  }
+
+  let current_row_height = row_heights.get(row_index).copied()?;
+  if ((row_bottom - row_top) - current_row_height).abs() > LAYOUT_EPSILON_PT {
+    // Keep split-row fragments page-local. The complete-span box is only
+    // valid when all physical rows of the merge are present in this upper.
+    return None;
+  }
+  let height_before_current = row_heights[origin_row_index..row_index].iter().sum::<f32>()
+    + table.rows[origin_row_index..row_index]
+      .iter()
+      .map(|span_row| row_cell_spacing_pt(table, span_row))
+      .sum::<f32>();
+  let merged_top = row_top - height_before_current;
+  let merged_height = row_heights[origin_row_index..=end_row_index]
+    .iter()
+    .sum::<f32>()
+    + table.rows[origin_row_index..end_row_index]
+      .iter()
+      .map(|span_row| row_cell_spacing_pt(table, span_row))
+      .sum::<f32>();
+  let merged_bottom = merged_top + merged_height;
+  if merged_top + LAYOUT_EPSILON_PT < page_content_top
+    || merged_bottom > page_content_bottom + LAYOUT_EPSILON_PT
+  {
+    // A rowspan crossing a page/table follow owns one clip on each upper;
+    // retain the existing physical fragment bounds for that split case.
+    return None;
+  }
+  Some((merged_top, merged_height))
 }
 
 fn row_has_vertical_merge_context(table: &Table, row_index: usize) -> bool {
@@ -26646,6 +26772,40 @@ fn page_break_has_following_content(inlines: &[InlineItem], next_inline_index: u
     .unwrap_or(false)
 }
 
+fn top_bottom_anchor_has_following_line_participant(
+  inlines: &[InlineItem],
+  next_inline_index: usize,
+) -> bool {
+  inlines
+    .iter()
+    .skip(next_inline_index)
+    .find_map(|inline| match inline {
+      InlineItem::Text(run) if run.text.is_empty() => None,
+      InlineItem::NoteReferenceMark(_)
+      | InlineItem::LastRenderedPageBreak
+      | InlineItem::BookmarkStart(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd => None,
+      InlineItem::Image(image) => {
+        matches!(image.placement, crate::docx::ImagePlacement::Inline).then_some(true)
+      }
+      InlineItem::Shape(shape) => {
+        matches!(shape.placement, crate::docx::ImagePlacement::Inline).then_some(true)
+      }
+      InlineItem::PageBreak | InlineItem::ColumnBreak | InlineItem::ClearLineBreak(_) => {
+        Some(false)
+      }
+      InlineItem::Text(_)
+      | InlineItem::NoteSeparatorMark(_)
+      | InlineItem::PositionalTab(_)
+      | InlineItem::Ruby(_)
+      | InlineItem::LegacyFormCheckBox(_) => Some(true),
+    })
+    .unwrap_or(false)
+}
+
 fn justify_soft_break_line(justify_wrapped_lines: bool, do_not_expand_shift_return: bool) -> bool {
   // ECMA-376 Part 1 §17.15.3.5 keeps a soft-break line in block
   // justification by default. w:doNotExpandShiftReturn is the opt-out.
@@ -30864,6 +31024,12 @@ impl<'a> TextFrameLayout<'a> {
               });
               match placement.wrap {
                 ImageWrapMode::TopBottom => {
+                  let keep_anchor_line = !placement.behind_text
+                    && flow.text_segmentation == TextSegmentation::RepeatingSlot
+                    && top_bottom_anchor_has_following_line_participant(
+                      &paragraph.inlines,
+                      inline_index + 1,
+                    );
                   if !placement.behind_text {
                     append_vertical_wrap_exclusion(
                       current,
@@ -30881,27 +31047,41 @@ impl<'a> TextFrameLayout<'a> {
                       shape_item_end,
                       influence_bounds,
                     );
-                    let previous_y = y;
-                    y = y.max(shape_y + height + placement.margin_bottom_pt);
-                    floating_wrap_advanced_line |= y > previous_y + LAYOUT_EPSILON_PT;
-                    if y + text_frame.page_fit_height(base_line_height) > flow.content_bottom
-                      && page_has_body_region_items(current, flow)
-                    {
-                      (flow, y) = advance_section_flow(flow, current, pages);
-                      text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
-                      text_state.note_page_follow(pages.len(), y, current.items.len());
-                      reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
-                      default_line_right = text_frame.default_line_right;
-                      paragraph_left = text_frame.paragraph_left;
-                      base_line_height = text_frame.base_line_height;
-                      line_height = base_line_height;
-                      line_item_start_index = current.items.len();
+                    // A floating drawing is anchored to a character in the
+                    // already-open text line. Writer computes its fly base
+                    // with the owning text frame ignored before applying
+                    // avoidance (`SwTextFly::SetIgnoreCurrentFrame(true)`).
+                    // Office's stress017 repeating header consequently keeps
+                    // the following inline group on that anchor line. Body
+                    // stories retain ordinary top/bottom avoidance (for
+                    // example WPC_CurvedConnector2). Preserve this header
+                    // line, while the retained blocking exclusion moves later
+                    // lines and paragraphs below the drawing.
+                    if !keep_anchor_line {
+                      let previous_y = y;
+                      y = y.max(shape_y + height + placement.margin_bottom_pt);
+                      floating_wrap_advanced_line |= y > previous_y + LAYOUT_EPSILON_PT;
+                      if y + text_frame.page_fit_height(base_line_height) > flow.content_bottom
+                        && page_has_body_region_items(current, flow)
+                      {
+                        (flow, y) = advance_section_flow(flow, current, pages);
+                        text_frame = TextFrame::new(self.paragraph, flow, text_metrics);
+                        text_state.note_page_follow(pages.len(), y, current.items.len());
+                        reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
+                        default_line_right = text_frame.default_line_right;
+                        paragraph_left = text_frame.paragraph_left;
+                        base_line_height = text_frame.base_line_height;
+                        line_height = base_line_height;
+                        line_item_start_index = current.items.len();
+                      }
                     }
                   }
-                  (line_left, line_right) =
-                    self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
-                  x = line_left;
-                  line_height = base_line_height;
+                  if !keep_anchor_line {
+                    (line_left, line_right) =
+                      self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+                    x = line_left;
+                    line_height = base_line_height;
+                  }
                 }
                 ImageWrapMode::Square | ImageWrapMode::Tight
                   if effective_layout_in_cell(placement, flow) && !shape.allow_outside_page =>
@@ -33499,7 +33679,8 @@ fn align_paragraph_items(
     return;
   }
 
-  let align_by_baseline = items.iter().any(is_office_math_alignment_item);
+  let align_by_baseline = items.iter().any(is_office_math_alignment_item)
+    || items.iter().any(is_inline_baseline_alignment_item);
   let mut line_ys = Vec::new();
   for item in items.iter() {
     let Some(y) = item_alignment_y(item, text_metrics, align_by_baseline) else {
@@ -34881,6 +35062,10 @@ fn is_office_math_alignment_item(item: &PageItem) -> bool {
     }
     _ => false,
   }
+}
+
+fn is_inline_baseline_alignment_item(item: &PageItem) -> bool {
+  matches!(item, PageItem::Image(image) if image.inline_baseline_participant)
 }
 
 fn item_alignment_y(
@@ -38262,6 +38447,78 @@ mod tests {
   }
 
   #[test]
+  fn right_alignment_keeps_text_and_tall_inline_image_in_one_baseline_group() {
+    let mut text_metrics = TextMetrics::new();
+    let style = TextStyle::default();
+    let line_height_pt = DEFAULT_LINE_HEIGHT_PT;
+    let text_width_pt = text_metrics.measure_text("On", &style);
+    let baseline_pt = 120.0;
+    let text_y_pt =
+      baseline_pt - text_metrics.baseline_offset_in_line_for_text("On", &style, line_height_pt);
+    let mut items = vec![
+      PageItem::Text(Box::new(TextItem {
+        x_pt: 0.0,
+        y_pt: text_y_pt,
+        line_height_pt,
+        wordprocessing_effect_host: None,
+        text: "On".to_string(),
+        style,
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        dynamic_field_line_anchor: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        form_widget_id: None,
+        paragraph_bidi: true,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      })),
+      PageItem::Image(ImageItem {
+        x_pt: text_width_pt,
+        y_pt: 0.0,
+        width_pt: 100.0,
+        height_pt: baseline_pt,
+        inline_baseline_gap_pt: 0.0,
+        inline_baseline_participant: true,
+        paragraph_alignment_locked: false,
+        crop: ImageCrop::default(),
+        clip_path: Vec::new(),
+        rotation_deg: 0.0,
+        flip_horizontal: false,
+        flip_vertical: false,
+        data: Arc::from([]),
+        content_type: None,
+        metafile_background_color: None,
+        alt_text: None,
+        hyperlink_url: None,
+        semantic_metafile_text: false,
+        metafile_semantic_text_includes_raster_backdrop: false,
+        signature_line: None,
+        metafile_native_size: false,
+        floating: false,
+        behind_text: false,
+      }),
+    ];
+
+    align_paragraph_items(
+      &mut items,
+      ParagraphAlignment::Right,
+      &mut text_metrics,
+      300.0,
+    );
+
+    let (PageItem::Text(text), PageItem::Image(image)) = (&items[0], &items[1]) else {
+      panic!("expected text followed by an inline image");
+    };
+    assert!((text.x_pt + text_width_pt - image.x_pt).abs() < 0.001);
+    assert!((image.x_pt + image.width_pt - 300.0).abs() < 0.001);
+  }
+
+  #[test]
   fn shape_only_paragraph_alignment_moves_the_complete_vector_portion() {
     fn shape_path() -> PageItem {
       PageItem::path(common::PathItem {
@@ -38452,6 +38709,35 @@ mod tests {
       0,
     ));
     assert!(!page_break_has_following_content(
+      &[InlineItem::LastRenderedPageBreak],
+      0,
+    ));
+  }
+
+  #[test]
+  fn top_bottom_anchor_keeps_only_its_open_line_participants_above_the_exclusion() {
+    let text = || {
+      InlineItem::Text(TextRun {
+        text: "inline".into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+
+    assert!(top_bottom_anchor_has_following_line_participant(
+      &[InlineItem::LastRenderedPageBreak, text()],
+      0,
+    ));
+    assert!(!top_bottom_anchor_has_following_line_participant(
+      &[InlineItem::PageBreak, text()],
+      0,
+    ));
+    assert!(!top_bottom_anchor_has_following_line_participant(
       &[InlineItem::LastRenderedPageBreak],
       0,
     ));
@@ -41752,6 +42038,159 @@ mod tests {
   }
 
   #[test]
+  fn header_measurement_preserves_page_origin_for_floating_table_wrap() {
+    let empty_paragraph = || {
+      Block::paragraph(Paragraph {
+        inlines: Vec::new(),
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        runs: Vec::new(),
+        format: Box::new(ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      })
+    };
+    let run = TextRun {
+      text: "table".into(),
+      style: TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    };
+    let mut table_cell_paragraph = empty_paragraph();
+    let Block::Paragraph(paragraph) = &mut table_cell_paragraph else {
+      unreachable!("default test paragraph is inline")
+    };
+    paragraph.inlines.push(InlineItem::Text(run.clone()));
+    paragraph.runs.push(run);
+    let floating_table = Block::Table(Table {
+      column_widths_pt: vec![468.0],
+      preferred_width_pt: Some(468.0),
+      preferred_width_pct: None,
+      layout: TableLayoutMode::Fixed,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      right_to_left: false,
+      align_leading_cell_content: false,
+      in_header_footer: true,
+      placement: Some(FloatingFramePlacement {
+        horizontal_anchor: FrameHorizontalAnchor::Page,
+        vertical_anchor: FrameVerticalAnchor::Page,
+        horizontal_offset_pt: 72.0,
+        vertical_offset_pt: 100.0,
+        vertical_offset_explicit: true,
+        wrap: FrameWrapMode::Around,
+        ..Default::default()
+      }),
+      allow_overlap: true,
+      split_allowed: false,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      page_break_before: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![TableRow {
+        cells: vec![TableCell {
+          blocks: vec![table_cell_paragraph],
+          shading: None,
+          borders: CellBordersModel::default(),
+          border_suppressions: CellBorderSuppressions::default(),
+          margins: CellMargins::zero(),
+          preferred_width_pt: Some(468.0),
+          preferred_width_pct: None,
+          grid_span: 1,
+          vertical_merge_continue: false,
+          no_wrap: false,
+          fit_text: false,
+          hide_end_mark: false,
+          vertical_alignment: TableCellVerticalAlignment::Top,
+          text_rotation_deg: None,
+        }],
+        height_pt: Some(60.0),
+        exact_height: true,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: true,
+        cell_spacing_pt: None,
+        grid_before: 0,
+        grid_after: 0,
+        width_before_pt: None,
+        width_after_pt: None,
+        layout: None,
+        borders: None,
+        spacing_shading: None,
+        redline_color: None,
+      }],
+    });
+    let mut blocks = vec![floating_table];
+    blocks.extend((0..6).map(|_| empty_paragraph()));
+    let setup = PageSetup {
+      width_pt: 612.0,
+      height_pt: 792.0,
+      margin_top_pt: 72.0,
+      margin_right_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      margin_left_pt: 72.0,
+      header_distance_pt: 36.0,
+      ..Default::default()
+    };
+    let mut text_metrics = TextMetrics::new();
+
+    let normalized = measured_repeating_blocks_height_at(
+      &blocks,
+      setup,
+      DEFAULT_TAB_STOP_PT,
+      &mut text_metrics,
+      false,
+      0.0,
+    );
+    let before_fly = measured_repeating_blocks_height_at(
+      &blocks,
+      setup,
+      DEFAULT_TAB_STOP_PT,
+      &mut text_metrics,
+      false,
+      10.0,
+    );
+    let at_header_origin = measured_header_blocks_height(
+      &blocks,
+      setup,
+      DEFAULT_TAB_STOP_PT,
+      &mut text_metrics,
+      false,
+    );
+
+    // Translating a short header without reaching the page-anchored fly does
+    // not change its measured height. At the real header origin, a later line
+    // intersects the full-width table and must continue below its 160pt edge.
+    assert!(
+      (before_fly - normalized).abs() < 0.01,
+      "normalized={normalized}, before_fly={before_fly}, at_header_origin={at_header_origin}",
+    );
+    assert!(
+      at_header_origin > normalized + 40.0,
+      "normalized={normalized}, before_fly={before_fly}, at_header_origin={at_header_origin}",
+    );
+    assert!(
+      setup.header_distance_pt + at_header_origin > 160.0,
+      "normalized={normalized}, before_fly={before_fly}, at_header_origin={at_header_origin}",
+    );
+  }
+
+  #[test]
   fn body_limits_use_imported_header_footer_slots() {
     let setup = PageSetup {
       margin_top_pt: 56.7,
@@ -43063,6 +43502,64 @@ mod tests {
         },
       ),
       Some(38.0)
+    );
+    assert_eq!(vertical_merge_origin_row_index(&table, 2, 0), Some(0));
+    assert_eq!(
+      complete_vertical_merge_fragment_span(
+        &table,
+        &[10.0, 11.0, 12.0],
+        0,
+        0,
+        100.0,
+        110.0,
+        0.0,
+        72.0,
+        720.0,
+      ),
+      Some((100.0, 38.0))
+    );
+    assert_eq!(
+      complete_vertical_merge_fragment_span(
+        &table,
+        &[10.0, 11.0, 12.0],
+        1,
+        0,
+        113.0,
+        124.0,
+        0.0,
+        72.0,
+        720.0,
+      ),
+      Some((100.0, 38.0))
+    );
+    assert_eq!(
+      complete_vertical_merge_fragment_span(
+        &table,
+        &[10.0, 11.0, 12.0],
+        2,
+        0,
+        126.0,
+        138.0,
+        0.0,
+        72.0,
+        720.0,
+      ),
+      Some((100.0, 38.0))
+    );
+    assert_eq!(
+      complete_vertical_merge_fragment_span(
+        &table,
+        &[10.0, 11.0, 12.0],
+        1,
+        0,
+        72.0,
+        83.0,
+        0.0,
+        72.0,
+        720.0,
+      ),
+      None,
+      "a continuation moved to a new upper keeps its page-local clip",
     );
     assert!(row_has_vertical_merge_context(&table, 0));
     assert!(row_has_vertical_merge_context(&table, 1));

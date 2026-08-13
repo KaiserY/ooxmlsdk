@@ -2062,8 +2062,10 @@ pub struct ScriptScanOptions {
   pub wordprocessingml_east_asia_language_is_chinese: bool,
   /// Character set declared for the effective East Asian font-table entry.
   pub wordprocessingml_east_asia_font_charset: Option<FontCharset>,
-  /// A run-level `w:cs` or `w:rtl` forces Word's complex-script font for the
-  /// complete run, independently from its Unicode scripts.
+  /// A run-level `w:cs` or `w:rtl` selects Word's complex-script font for the
+  /// run, independently from its Unicode scripts. Word fixed output retains
+  /// the ASCII family for Basic Latin decimal digits; complex-script run
+  /// properties such as size remain a separate layout decision.
   pub wordprocessingml_complex_font_override: bool,
   /// Word uses the ASCII face for East Asian-classified characters when the
   /// effective East Asian face is Times New Roman and ASCII and High ANSI
@@ -4245,10 +4247,17 @@ fn strong_text_script(ch: char, options: ScriptScanOptions) -> Option<TextScript
 fn wordprocessing_font_slot(ch: char, options: ScriptScanOptions) -> WordprocessingFontSlot {
   use WordprocessingFontSlot::{Ascii, ComplexScript, HighAnsi};
 
-  // [MS-OI29500] section 2.1.88: either run-level property forces the cs
-  // face for every Unicode value. This precedes all table classifications.
+  // [MS-OI29500] section 2.1.88 documents that either run-level property
+  // forces the cs face for every Unicode value. Word fixed output has one
+  // narrower compatibility exception: U+0030..U+0039 retain the ASCII family.
+  // Keep this at the font-slot boundary; szCs/bCs/iCs still apply to the whole
+  // run in the layout layer.
   if options.wordprocessingml_complex_font_override {
-    return ComplexScript;
+    return if ch.is_ascii_digit() {
+      Ascii
+    } else {
+      ComplexScript
+    };
   }
 
   // ST_Hint resolves otherwise ambiguous glyphs, but `eastAsia` is already
@@ -5762,6 +5771,22 @@ mod tests {
     assert!(complex.iter().all(|run| {
       run.wordprocessingml_font_slot == Some(WordprocessingFontSlot::ComplexScript)
     }));
+
+    // Word fixed output keeps only Basic Latin decimal digits on the ASCII
+    // family. The adjacent Latin and CJK counterexamples above remain on cs.
+    let decimal_digit = script_direction_runs_with_options(
+      "0",
+      FontSize(11.0),
+      ScriptScanOptions {
+        wordprocessingml_font_slots: true,
+        wordprocessingml_complex_font_override: true,
+        ..ScriptScanOptions::default()
+      },
+    );
+    assert_eq!(
+      decimal_digit[0].wordprocessingml_font_slot,
+      Some(WordprocessingFontSlot::Ascii)
+    );
 
     let east_asia_as_ascii = script_direction_runs_with_options(
       "水",

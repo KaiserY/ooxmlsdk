@@ -3179,7 +3179,7 @@ fn text_paint_portions<'doc>(
     strikethrough,
     link,
   } = source;
-  let ranges = text_portion_ranges(text);
+  let ranges = visually_ordered_text_portion_ranges(text);
   let can_move_glyphs =
     glyphs.is_some() && ranges.len() == 1 && ranges[0].1 == (0..text.text.len());
   let mut glyphs = glyphs;
@@ -3240,6 +3240,22 @@ fn text_paint_portions<'doc>(
     });
   }
   portions
+}
+
+fn visually_ordered_text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
+  let mut ranges = text_portion_ranges(text);
+  if text
+    .style
+    .resolved_bidi_level
+    .is_some_and(|level| level % 2 == 1)
+  {
+    // The source ranges remain logical for tagging and ActualText, but their
+    // paint origins must follow the visual order resolved by UAX #9 rule L2.
+    // This matters when Office's WordLine segmentation isolates a hyphen
+    // inside one otherwise directionally uniform RTL text item.
+    ranges.reverse();
+  }
+  ranges
 }
 
 fn text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
@@ -4505,10 +4521,7 @@ fn draw_text_item(
   link_annotations: &mut Vec<Annotation>,
 ) -> Result<()> {
   let item = &text.item;
-  let bidi_semantic_text =
-    bidi_mirrored_semantic_text(&item.text, item.style.resolved_bidi_level());
-  let small_caps_semantic_text =
-    word_small_caps_semantic_text(bidi_semantic_text.as_ref(), item.style.small_caps);
+  let small_caps_semantic_text = word_small_caps_semantic_text(&item.text, item.style.small_caps);
   let glyph_semantic_text = symbol_font_semantic_text(
     small_caps_semantic_text.as_ref(),
     item.style.font_family.as_deref(),
@@ -5446,28 +5459,6 @@ fn word_small_caps_semantic_text(text: &str, small_caps: bool) -> Cow<'_, str> {
   // the source text in layout and shaping, and change only the PDF semantic
   // mapping after glyph selection.
   Cow::Owned(uppercase)
-}
-
-fn bidi_mirrored_semantic_text(text: &str, resolved_level: Option<u8>) -> Cow<'_, str> {
-  if !resolved_level.is_some_and(|level| level % 2 == 1) {
-    return Cow::Borrowed(text);
-  }
-
-  let mut changed = false;
-  let mirrored = text
-    .chars()
-    .map(|character| {
-      unicode_bidi_mirroring::get_mirrored(character)
-        .filter(|mirrored| mirrored.len_utf8() == character.len_utf8())
-        .inspect(|_| changed = true)
-        .unwrap_or(character)
-    })
-    .collect::<String>();
-  if changed {
-    Cow::Owned(mirrored)
-  } else {
-    Cow::Borrowed(text)
-  }
 }
 
 fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Cow<'a, str> {
@@ -8005,13 +7996,14 @@ mod tests {
   use super::{
     GlyphId, ImageCrop, ImageItem, OfficeMathSvgTextMarker, PageItem, PaintDocument, PaintItem,
     PaintTextPortionKind, TextItem, TextMetrics, TextStyle as PaintTextStyle,
-    bidi_mirrored_semantic_text, conversion_font_audit, draw_office_math_text,
-    gamma_correct_gradient_color, localized_metafile_ui_font_family,
-    metafile_render_options_for_image, office_math_semantic_glyph_id, office_math_svg_text_marker,
-    pdf_metadata, pdf_page_dimension, render, semantic_advance_for_text_range,
+    conversion_font_audit, draw_office_math_text, gamma_correct_gradient_color,
+    localized_metafile_ui_font_family, metafile_render_options_for_image,
+    office_math_semantic_glyph_id, office_math_svg_text_marker, pdf_metadata, pdf_page_dimension,
+    render, semantic_advance_for_text_range, shaped_pdf_glyphs,
     source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
     text_portion_ranges, text_requires_glyph_outlines, text_stroke_with_fill,
-    text_style_from_common, word_small_caps_semantic_text, word_unsigned_signature_line_items,
+    text_style_from_common, visually_ordered_text_portion_ranges, word_small_caps_semantic_text,
+    word_unsigned_signature_line_items,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -8316,6 +8308,55 @@ mod tests {
       .map(|(_, range)| range)
       .collect::<Vec<_>>();
     assert_eq!(ranges, vec![0..3, 3..4, 4..12]);
+  }
+
+  #[test]
+  fn odd_bidi_word_line_portions_follow_visual_order() {
+    // Comment066.docx contains this exact directionally uniform w:rtl
+    // fragment. The source ranges stay logical while their paint order is
+    // reversed as one level-1 sequence.
+    let text = " قبرص /افب-تصز";
+    let rtl_item = TextItem {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      line_height_pt: 12.0,
+      paint_clip: None,
+      text: text.into(),
+      style: PaintTextStyle {
+        resolved_bidi_level: Some(1),
+        ..PaintTextStyle::default()
+      },
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      form_widget_id: None,
+      paragraph_bidi: true,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: common::PdfTextSegmentation::WordLine,
+      source_path: None,
+      semantic_target_width_pt: None,
+    };
+
+    let rtl_ranges = visually_ordered_text_portion_ranges(&rtl_item)
+      .into_iter()
+      .map(|(_, range)| range)
+      .collect::<Vec<_>>();
+    assert_eq!(rtl_ranges, vec![18..text.len(), 17..18, 0..17]);
+
+    let ltr_item = TextItem {
+      style: PaintTextStyle {
+        resolved_bidi_level: Some(2),
+        ..rtl_item.style.clone()
+      },
+      ..rtl_item
+    };
+    let ltr_ranges = visually_ordered_text_portion_ranges(&ltr_item)
+      .into_iter()
+      .map(|(_, range)| range)
+      .collect::<Vec<_>>();
+    assert_eq!(ltr_ranges, vec![0..17, 17..18, 18..text.len()]);
   }
 
   #[test]
@@ -8814,11 +8855,44 @@ mod tests {
   }
 
   #[test]
-  fn odd_bidi_levels_expose_mirrored_glyphs_in_pdf_semantic_text() {
-    assert_eq!(bidi_mirrored_semantic_text("(", Some(1)), ")");
-    assert_eq!(bidi_mirrored_semantic_text(")", Some(1)), "(");
-    assert_eq!(bidi_mirrored_semantic_text("(plain)", Some(2)), "(plain)");
-    assert_eq!(bidi_mirrored_semantic_text("plain", Some(1)), "plain");
+  fn odd_bidi_mirrored_glyph_keeps_its_authored_pdf_semantic_range() {
+    let authored_text = "(";
+    let rtl_style = PaintTextStyle {
+      font_family: Some(Cow::Borrowed("Arial")),
+      complex_font_family: Some(Cow::Borrowed("Arial")),
+      font_size_pt: 11.0,
+      complex_font_size_pt: Some(11.0),
+      right_to_left: Some(true),
+      resolved_bidi_level: Some(1),
+      ..PaintTextStyle::default()
+    };
+    let mut text_metrics = TextMetrics::new();
+    let rtl = shaped_pdf_glyphs(authored_text, &rtl_style, 0.0, &mut text_metrics)
+      .expect("odd-level parenthesis must shape");
+    assert_eq!(rtl.font_runs.len(), 1);
+    assert_eq!(rtl.font_runs[0].glyphs.len(), 1);
+    let rtl_glyph = &rtl.font_runs[0].glyphs[0];
+
+    // UAX #9 L4 changes the visible glyph, but Krilla's semantic source range
+    // remains the authored character used for ToUnicode/ActualText.
+    assert_eq!(rtl_glyph.text_range, 0..authored_text.len());
+    assert_eq!(&authored_text[rtl_glyph.text_range.clone()], "(");
+
+    let ltr_style = PaintTextStyle {
+      right_to_left: Some(false),
+      resolved_bidi_level: Some(0),
+      ..rtl_style.clone()
+    };
+    let visible_counterpart = shaped_pdf_glyphs(")", &ltr_style, 0.0, &mut text_metrics)
+      .expect("visible mirrored counterpart must shape");
+    let unmirrored_counterexample = shaped_pdf_glyphs("(", &ltr_style, 0.0, &mut text_metrics)
+      .expect("even-level parenthesis must shape");
+    let counterpart_run = &visible_counterpart.font_runs[0];
+    let unmirrored_run = &unmirrored_counterexample.font_runs[0];
+    assert_eq!(rtl.font_runs[0].font_face, counterpart_run.font_face);
+    assert_eq!(rtl_glyph.glyph_id, counterpart_run.glyphs[0].glyph_id);
+    assert_eq!(rtl.font_runs[0].font_face, unmirrored_run.font_face);
+    assert_ne!(rtl_glyph.glyph_id, unmirrored_run.glyphs[0].glyph_id);
   }
 
   #[test]

@@ -240,6 +240,19 @@ fn paragraph_model_with_base_impl<'a>(
     .paragraph_properties
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref());
+  format.numbered_paragraph_mark_background = format.numbering_id.is_some()
+    && paragraph_mark_run_properties.is_some_and(|properties| {
+      properties
+        .paragraph_mark_run_properties_choice2
+        .iter()
+        .any(|property| {
+          matches!(
+            property,
+            w::ParagraphMarkRunPropertiesChoice2::Highlight(_)
+              | w::ParagraphMarkRunPropertiesChoice2::Shading(_)
+          )
+        })
+    });
   let mut paragraph_mark_style =
     properties::paragraph_mark_run_style(paragraph_mark_run_properties, run_style.clone(), styles);
   let has_direct_indentation = numbering_format_context.has_direct_indentation();
@@ -384,7 +397,7 @@ fn paragraph_model_with_base_impl<'a>(
   let style_ref_keys = style_id
     .map(|style_id| styles.style_ref_keys(style_id))
     .unwrap_or_default();
-  let style_ref_text = paragraph_style_ref_text(&inlines, list_label.as_deref());
+  let style_ref_text = paragraph_style_ref_text(&inlines);
   if inlines.is_empty() && paragraph_requires_placeholder_run(paragraph) {
     inlines.push(super::InlineItem::Text(TextRun {
       text: String::new(),
@@ -515,16 +528,12 @@ fn paragraph_uses_windows_font_metrics(format: &ParagraphFormat) -> bool {
       .is_some_and(|multiple| multiple > WORD_COMPACT_AUTO_LINE_MULTIPLE)
 }
 
-pub(super) fn paragraph_style_ref_text(
-  inlines: &[super::InlineItem],
-  list_label: Option<&str>,
-) -> Option<Arc<str>> {
+pub(super) fn paragraph_style_ref_text(inlines: &[super::InlineItem]) -> Option<Arc<str>> {
   let mut text = String::new();
-  if let Some(label) = list_label
-    && !label.chars().all(char::is_whitespace)
-  {
-    text.push_str(label);
-  }
+  // A plain STYLEREF field returns only the referenced paragraph text. Its
+  // list number is a separate result selected by \n/\r/\t/\w. Keeping the
+  // visible label here makes adjacent number-only and text-only fields repeat
+  // the label ("Appendix A A. Comment-Based Help" in tdf95495.docx).
   for item in inlines {
     if let super::InlineItem::Text(run) = item
       && run.dynamic_field.is_none()
@@ -610,6 +619,27 @@ fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn paragraph_style_ref_text_excludes_the_separate_list_label() {
+    let inlines = [super::super::InlineItem::Text(TextRun {
+      text: "Comment-Based Help".to_string(),
+      style: TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    })];
+
+    // The caller retains "A. " in Paragraph::list_label and exposes its
+    // numbering-only STYLEREF value through style_ref_numbering_text.
+    assert_eq!(
+      paragraph_style_ref_text(&inlines).as_deref(),
+      Some("Comment-Based Help")
+    );
+  }
 
   #[test]
   fn proportional_auto_line_spacing_uses_typographic_baseline_metrics() {

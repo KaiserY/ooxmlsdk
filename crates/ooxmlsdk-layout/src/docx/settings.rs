@@ -184,6 +184,16 @@ pub(super) fn do_not_expand_shift_return(
     .is_some_and(do_not_expand_shift_return_value)
 }
 
+pub(super) fn use_far_east_layout(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .is_some_and(use_far_east_layout_value)
+}
+
 pub(super) fn balance_single_byte_double_byte_width(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
@@ -207,6 +217,14 @@ fn do_not_expand_shift_return_value(settings: &w::Settings) -> bool {
     .compatibility
     .iter()
     .find_map(|compatibility| compatibility.do_not_expand_shift_return.as_ref())
+    .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
+}
+
+fn use_far_east_layout_value(settings: &w::Settings) -> bool {
+  settings
+    .compatibility
+    .iter()
+    .find_map(|compatibility| compatibility.use_far_east_layout.as_ref())
     .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
 }
 
@@ -268,7 +286,7 @@ mod tests {
     MICROSOFT_WORD_COMPATIBILITY_URI, PageBottomHyphenation,
     balance_single_byte_double_byte_width_value, compatibility_setting_value,
     do_not_break_wrapped_tables_value, do_not_expand_shift_return_value, page_bottom_hyphenation,
-    parse_compatibility_on_off, w,
+    parse_compatibility_on_off, use_far_east_layout_value, w,
   };
 
   #[test]
@@ -368,6 +386,26 @@ mod tests {
       ooxmlsdk::simple_type::OnOffValue::False,
     )))));
     assert!(!do_not_expand_shift_return_value(&settings(None)));
+  }
+
+  #[test]
+  fn far_east_layout_honors_on_off_and_omission() {
+    let settings = |value: Option<Option<ooxmlsdk::simple_type::OnOffValue>>| w::Settings {
+      compatibility: vec![w::Compatibility {
+        use_far_east_layout: value.map(|val| w::UseFarEastLayout { val }),
+        ..w::Compatibility::default()
+      }],
+      ..w::Settings::default()
+    };
+
+    assert!(use_far_east_layout_value(&settings(Some(None))));
+    assert!(use_far_east_layout_value(&settings(Some(Some(
+      ooxmlsdk::simple_type::OnOffValue::True,
+    )))));
+    assert!(!use_far_east_layout_value(&settings(Some(Some(
+      ooxmlsdk::simple_type::OnOffValue::False,
+    )))));
+    assert!(!use_far_east_layout_value(&settings(None)));
   }
 
   #[test]

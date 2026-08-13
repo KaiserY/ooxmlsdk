@@ -5624,19 +5624,19 @@ mod tests {
     );
 
     assert_eq!(runs.len(), 3);
-    assert_eq!(&text[runs[0].text_range.clone()], "Before");
+    assert_eq!(&text[runs[0].text_range.clone()], "Before ");
     assert_eq!(runs[0].script, TextScript::Latin);
     assert_eq!(
       runs[0].wordprocessingml_font_slot,
       Some(WordprocessingFontSlot::Ascii)
     );
-    assert_eq!(&text[runs[1].text_range.clone()], " “水” ");
+    assert_eq!(&text[runs[1].text_range.clone()], "“水”");
     assert_eq!(runs[1].script, TextScript::Han);
     assert_eq!(
       runs[1].wordprocessingml_font_slot,
       Some(WordprocessingFontSlot::EastAsia)
     );
-    assert_eq!(&text[runs[2].text_range.clone()], "After");
+    assert_eq!(&text[runs[2].text_range.clone()], " After");
     assert_eq!(runs[2].script, TextScript::Latin);
     assert_eq!(
       runs[2].wordprocessingml_font_slot,

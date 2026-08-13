@@ -120,6 +120,10 @@ pub(crate) struct SectionColumns {
   pub separator: bool,
   pub unbalanced: bool,
   pub balanced_height_pt: Option<f32>,
+  /// Layout-only sum of the content heights in columns completed before the
+  /// current column. Import initializes this to zero; pagination distinguishes
+  /// a naturally filled column from an authored early column break.
+  pub completed_content_height_pt: f32,
   pub explicit_count: usize,
   pub explicit_widths_pt: [f32; 45],
   pub explicit_gaps_pt: [f32; 44],
@@ -133,6 +137,7 @@ impl Default for SectionColumns {
       separator: false,
       unbalanced: false,
       balanced_height_pt: None,
+      completed_content_height_pt: 0.0,
       explicit_count: 0,
       explicit_widths_pt: [0.0; 45],
       explicit_gaps_pt: [0.0; 44],
@@ -165,6 +170,10 @@ impl Block {
 #[derive(Clone, Debug)]
 pub(crate) struct FloatingFrame {
   pub blocks: Vec<Block>,
+  /// The effective `w:pageBreakBefore` from the paragraph which starts this
+  /// frame. Word applies the break to the frame's anchor in the outer story,
+  /// not to the paragraph after it has moved into the frame story.
+  pub page_break_before: bool,
   pub width_pt: Option<f32>,
   pub height_pt: Option<f32>,
   pub height_rule: FrameHeightRule,
@@ -512,6 +521,11 @@ pub(crate) struct ParagraphFormat {
   pub line_height_pt: Option<f32>,
   pub line_height_set: bool,
   pub line_height_rule: LineHeightRule,
+  /// A numbered source paragraph directly paints its mark with `w:highlight`
+  /// or `w:shd`. Word retains that painted numbering mark as an independent
+  /// CJK line-box participant; the resolved [`TextStyle`] alone cannot
+  /// preserve which layer supplied the paint after style merging.
+  pub numbered_paragraph_mark_background: bool,
   /// WPS `bodyPr@compatLnSpc` is a text-body compatibility switch, not a
   /// paragraph-style property. The importer annotates every paragraph in the
   /// completed textbox story so line layout can keep the state scoped to that
@@ -731,6 +745,14 @@ pub(crate) enum ParagraphAlignment {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ParagraphJustification {
   pub adjust: ParagraphAdjust,
+  /// The effective style-hierarchy value came from the logical `w:jc=start`
+  /// token, rather than the physically spelled `left` or legacy `numTab`
+  /// tokens which can resolve to the same painted edge in an LTR paragraph.
+  pub logical_start: bool,
+  /// The effective style-hierarchy value came from the explicit physical
+  /// `w:jc=left` token. Keep it separate from `logical_start`, `numTab`, and
+  /// the omitted/default state even when import resolves them to one edge.
+  pub physical_left: bool,
   pub one_word_adjust: ParagraphAdjust,
   pub last_line_adjust: ParagraphAdjust,
   pub word_spacing: JustificationWordSpacing,
@@ -745,6 +767,8 @@ impl Default for ParagraphJustification {
   fn default() -> Self {
     Self {
       adjust: ParagraphAdjust::Left,
+      logical_start: false,
+      physical_left: false,
       one_word_adjust: ParagraphAdjust::Left,
       last_line_adjust: ParagraphAdjust::Left,
       word_spacing: JustificationWordSpacing::default(),

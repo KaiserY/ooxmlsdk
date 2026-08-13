@@ -33,7 +33,7 @@ ooxmlsdk-layout = { version = "0.12.0", path = "crates/ooxmlsdk-layout" }
 ooxmlsdk-pdf = { version = "0.12.0", path = "crates/ooxmlsdk-pdf" }
 emfsdk = { path = "../emfsdk/crates/emfsdk", features = ["render"] }
 olecfsdk = { path = "../olecfsdk/crates/olecfsdk" }
-base64 = "0.22.1"
+base64 = "0.23.1"
 bitflags = "2.13.1"
 bytes = "1.12.1"
 color = "0.3.3"
@@ -46,7 +46,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_derive = "1.0.229"
 serde_json = "1.0.151"
 quote = "1.0.47"
-syn = { version = "3.0.2", features = ["full"] }
+syn = { version = "3.0.3", features = ["full"] }
 prettyplease = "0.3.0"
 proc-macro2 = "1.0.107"
 heck = "0.5.0"
@@ -54,20 +54,20 @@ smallvec = "1.15.2"
 zip = { version = "8.6.0", default-features = false, features = [
   "deflate-flate2-zlib-rs",
 ] }
-thiserror = "2.0.19"
+thiserror = "2.0.20"
 zmij = "1.0.23"
 criterion = "0.8.2"
 encoding_rs = "0.8.35"
 lopdf = "0.44.0"
 pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
 png = "0.18.1"
-toml = "1.1.3"
+toml = "1.1.4"
 fontique = { version = "0.11.0", features = ["fontconfig-dlopen", "system"] }
-harfrust = { version = "0.10.0", default-features = false, features = ["std"] }
+harfrust = { version = "0.12.0", default-features = false, features = ["std"] }
 html5ever = "0.39.0"
 hypher = "0.1.7"
 icu_collator = { version = "2.2.1", features = ["compiled_data"] }
-icu_calendar = { version = "2.2.0", features = ["compiled_data"] }
+icu_calendar = { version = "2.2.1", features = ["compiled_data"] }
 icu_datetime = { version = "2.2.0", features = ["compiled_data"] }
 icu_locale = { version = "2.2.0", features = ["compiled_data"] }
 icu_properties = { version = "2.2.0", features = ["compiled_data"] }
@@ -78,8 +78,8 @@ image = { version = "0.25.10", default-features = false, features = [
   "gif",
   "webp",
 ] }
-jpeg-encoder = "0.7.0"
-jiff = "0.2.34"
+jpeg-encoder = "0.7.1"
+jiff = "0.2.35"
 krilla = { version = "0.8.2", default-features = false, features = [
   "raster-images",
   "pdf",
@@ -90,7 +90,7 @@ krilla-svg = "0.8.1"
 kurbo = "0.13.1"
 libm = "0.2.16"
 num-complex = "0.4.6"
-num-integer = "0.1.46"
+num-integer = "0.1.47"
 num-traits = "0.2.19"
 parley = { version = "0.11.0", default-features = false, features = [
   "std",
@@ -98,7 +98,7 @@ parley = { version = "0.11.0", default-features = false, features = [
 ] }
 rustfft = "6.4.1"
 statrs = { version = "0.18.0", default-features = false }
-skrifa = "0.43.2"
+skrifa = "0.46.0"
 unicode-bidi = "0.3.18"
 unicode-math-class = "0.1.0"
 unicode-script = "0.5.8"

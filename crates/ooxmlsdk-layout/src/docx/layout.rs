@@ -90,6 +90,20 @@ const LAYOUT_EPSILON_PT: f32 = 0.1;
 const LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT: f32 = 115.0;
 const PERCENT_SCALE: f32 = 100.0;
 const LO_EMPTY_PARAGRAPH_FIRST_LINE_HEIGHT_PER_FONT_SIZE: f32 = 340.0 / 220.0;
+// Office fixed output gives both gridbefore.docx (Lucida Sans Unicode in the
+// East Asian slot) and large-twips.docx (Droid Sans Fallback in that slot) a
+// 17.28pt horizontal table line at 12pt. The shared 36/25 ratio proves this is
+// a compatibility line box, not either requested face's platform metrics.
+const WORD_LEGACY_ZH_TABLE_LINE_HEIGHT_PER_FONT_SIZE: f32 = 36.0 / 25.0;
+// Writer's Word-compatible font cache scales ascent and height by 127% when
+// the effective font participates in its CJK compatibility path
+// (sw/source/core/txtnode/fntcache.cxx, tdf#129808). Word fixed output exposes
+// the same scale for a directly formatted paragraph mark: the 12pt
+// tdf135774_numberingShading/tdf138345_numberingHighlight marks produce
+// 17.28pt lines, while the 24pt tdf135774_numberingCRProps marks produce
+// 34.8--34.944pt lines. Keep the factor on the resolved mark font metrics so
+// different faces retain their own natural height.
+const WORD_DIRECT_PARAGRAPH_MARK_CJK_HEIGHT_SCALE: f32 = 127.0 / 100.0;
 const LO_DRAWING_ANCHOR_MARGIN_LINE_HEIGHT_PT: f32 = 288.0 / units::TWIPS_PER_POINT;
 // Word extends a paragraph decoration box beyond its text frame before
 // applying w:pBdr/@space and the border stroke. Keep decoration paint and
@@ -428,17 +442,47 @@ fn paragraph_has_automatic_superscript(paragraph: &crate::docx::Paragraph) -> bo
   })
 }
 
+fn paragraph_has_form_widget(paragraph: &crate::docx::Paragraph) -> bool {
+  paragraph.inlines.iter().any(|inline| {
+    matches!(
+      inline,
+      InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_)
+    )
+  })
+}
+
 fn word_east_asian_paragraph_mark_single_line_height(
   paragraph: &crate::docx::Paragraph,
   compatibility_mode: u16,
+  text_segmentation: TextSegmentation,
+  horizontal_table_cell: bool,
   prior_line_count: usize,
   text_metrics: &mut TextMetrics,
 ) -> Option<f32> {
+  let legacy_chinese_table_line = compatibility_mode < 15
+    && text_segmentation == TextSegmentation::TableCell
+    && horizontal_table_cell
+    && paragraph
+      .base_style
+      .east_asia_language
+      .as_deref()
+      .is_some_and(|language| {
+        language
+          .split(['-', '_'])
+          .next()
+          .is_some_and(|primary| primary.eq_ignore_ascii_case("zh"))
+      });
+  let modern_physical_left_mark = paragraph.format.justification.physical_left
+    && text_segmentation == TextSegmentation::Body
+    && (paragraph.format.bidi || paragraph_has_form_widget(paragraph));
   let uses_east_asian_paragraph_mark = if compatibility_mode >= 15 {
-    paragraph.format.justification.adjust == crate::docx::ParagraphAdjust::Start
+    (paragraph.format.justification.adjust == crate::docx::ParagraphAdjust::Start
+      && (paragraph.format.justification.logical_start || modern_physical_left_mark))
+      || paragraph.format.numbered_paragraph_mark_background
   } else {
-    paragraph.format.justification.adjust == crate::docx::ParagraphAdjust::Left
-      && paragraph_has_automatic_superscript(paragraph)
+    paragraph.format.numbered_paragraph_mark_background
+      || (paragraph.format.justification.adjust == crate::docx::ParagraphAdjust::Left
+        && (paragraph_has_automatic_superscript(paragraph) || legacy_chinese_table_line))
   };
   if prior_line_count != 0
     || !uses_east_asian_paragraph_mark
@@ -450,18 +494,38 @@ fn word_east_asian_paragraph_mark_single_line_height(
 
   // MS-OI29500 §17.3.2.26 still selects the ascii face for Basic Latin glyphs.
   // Word nevertheless sizes the implicit paragraph-mark box from the
-  // paragraph's East Asian face for compatibility-mode-15 logical-start text
-  // and for a legacy mixed ordinary/automatic-superscript line. Office fixed
-  // output keeps the Latin glyphs in Liberation Serif while its 17.28pt
-  // baseline step matches the 17.244pt Noto Serif CJK SC line box. The
+  // paragraph's East Asian face for compatibility-mode-15 `w:jc=start` text
+  // and for a legacy mixed ordinary/automatic-superscript line. The
   // superscript itself uses the Latin face's OS/2 superscript size and offset;
   // its presence is the legacy paragraph-mark trigger, not a request to shape
   // the visible Latin text with the East Asian face.
-  // Keep wrapped lines on their visible-script metrics and preserve the
-  // legacy physical-left path used by older compatibility documents.
+  //
+  // The legacy Chinese table path is a separate compatibility line box:
+  // gridbefore.docx and large-twips.docx use different East Asian faces but
+  // both emit a 17.28pt line at 12pt. tdf128399.docx is the opposite-state
+  // btLr fixture and retains its authored 276-twip row only when this rule is
+  // restricted to horizontal cells. Body text, non-Chinese cells, wrapped
+  // lines, and explicit line spacing remain further counterexamples.
+  // Keep wrapped lines, ordinary physical `w:jc=left`, and default alignment
+  // on their visible-script metrics, and preserve the legacy physical-left
+  // path used by older compatibility documents. ECMA-376 Part 1 §§17.3.1.13
+  // and 17.18.44 distinguish the logical leading-edge `start` token.
+  // `content-control-rtl.docx` supplies the narrow modern physical-left
+  // exception: its body alternates RTL mark-only paragraphs and SDT form
+  // widgets, and Word gives both the East Asian mark line. `tdf122648.docx` is
+  // the opposite state: its horizontal table cells and ordinary LTR separator
+  // retain the Source Sans Pro box instead of the Noto Serif CJK SC mark box.
+  if legacy_chinese_table_line {
+    return Some(
+      paragraph.base_style.font_size_pt * WORD_LEGACY_ZH_TABLE_LINE_HEIGHT_PER_FONT_SIZE,
+    );
+  }
   let metrics = text_metrics
     .vertical_metrics_for_script(&paragraph.base_style, ooxmlsdk_fonts::TextScript::Han);
-  let line_height = metrics.line_height_pt();
+  let mut line_height = metrics.line_height_pt();
+  if paragraph.format.numbered_paragraph_mark_background {
+    line_height *= WORD_DIRECT_PARAGRAPH_MARK_CJK_HEIGHT_SCALE;
+  }
   (line_height > 0.0).then_some(line_height)
 }
 
@@ -2083,6 +2147,7 @@ struct FlowContext {
   split_page_break_and_paragraph_mark: bool,
   repeating_slots: RepeatingSlotState,
   text_segmentation: TextSegmentation,
+  horizontal_table_cell: bool,
   paragraph_spacing_context: ParagraphSpacingContext,
   preserve_horizontal_on_advance: bool,
   script_sensitive_line_height: bool,
@@ -4589,6 +4654,12 @@ struct SectionBodyItemStart {
   current_items_len: usize,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct BalancedSectionHeights {
+  layout_height_pt: f32,
+  frame_height_pt: f32,
+}
+
 #[derive(Clone, Copy)]
 struct SectionBodyWritingTransform {
   pivot_x: f32,
@@ -4924,18 +4995,19 @@ impl<'a> RootFrameLayout<'a> {
         self.current.preserve_empty = true;
         self.current.delete_forbidden = true;
       }
-      self.format_block_sequence_with_previous(
+      let end_flow = self.format_block_sequence_with_previous(
         &section.blocks,
         flow,
         previous_section_block,
         previous_section.and_then(|section| section.discarded_carrier_spacing_after_pt),
       );
-      if let Some(balance_height_pt) = self.balanced_section_height_pt(
+      if let Some(balance_heights) = self.balanced_section_heights(
         section_index,
         section,
         item_start.pages_len,
         item_start.current_items_len,
         self.y,
+        end_flow.columns.completed_content_height_pt,
       ) {
         let checkpoint_index = self.checkpoints.iter().position(|checkpoint| {
           checkpoint.section_index == section_index
@@ -4948,7 +5020,7 @@ impl<'a> RootFrameLayout<'a> {
         {
           self.checkpoints.truncate(checkpoint_index + 1);
           let mut balanced_columns = section.columns;
-          balanced_columns.balanced_height_pt = Some(balance_height_pt);
+          balanced_columns.balanced_height_pt = Some(balance_heights.layout_height_pt);
           let mut balanced_flow = self.body_flow(document_page_frame(
             section.page,
             section_index,
@@ -4956,15 +5028,29 @@ impl<'a> RootFrameLayout<'a> {
           ));
           balanced_flow.content_top_pt = self.y.max(balanced_flow.content_top_pt);
           balanced_flow.content_bottom = (balanced_flow.content_top_pt
-            + balance_height_pt.max(DEFAULT_LINE_HEIGHT_PT))
+            + balance_heights.layout_height_pt.max(DEFAULT_LINE_HEIGHT_PT))
           .min(balanced_flow.body_content_bottom_pt);
           self.y = self.y.max(balanced_flow.content_top_pt);
-          self.format_block_sequence_with_previous(
+          let balanced_frame_top_pt = balanced_flow.content_top_pt;
+          let balanced_end_flow = self.format_block_sequence_with_previous(
             &section.blocks,
             balanced_flow,
             previous_section_block,
             previous_section.and_then(|section| section.discarded_carrier_spacing_after_pt),
           );
+          if self.pages.len() == item_start.pages_len
+            && document
+              .sections
+              .get(section_index + 1)
+              .is_some_and(|next| next.break_kind == SectionBreakKind::Continuous)
+          {
+            let frame_bottom_pt = (balanced_frame_top_pt + balance_heights.frame_height_pt)
+              .min(balanced_flow.body_content_bottom_pt);
+            let trailing_spacing_after_pt =
+              balanced_section_trailing_spacing_after(section.blocks.last(), balanced_end_flow);
+            self.y =
+              balanced_section_frame_end_y(self.y, trailing_spacing_after_pt, frame_bottom_pt);
+          }
         }
       }
       if let Some(transform) = writing_transform {
@@ -5160,14 +5246,15 @@ impl<'a> RootFrameLayout<'a> {
     self.y > body_top + LAYOUT_EPSILON_PT
   }
 
-  fn balanced_section_height_pt(
+  fn balanced_section_heights(
     &self,
     section_index: usize,
     section: &crate::docx::ImportedSection,
     start_page_index: usize,
     start_items_len: usize,
     end_y: f32,
-  ) -> Option<f32> {
+    completed_content_height_pt: f32,
+  ) -> Option<BalancedSectionHeights> {
     if section.columns.count <= 1
       || section.columns.unbalanced
       || section.blocks.is_empty()
@@ -5189,20 +5276,36 @@ impl<'a> RootFrameLayout<'a> {
         page_items_vertical_bounds(&self.current.items[start_items_len..]).map(|(top, _)| top)
       })
       .unwrap_or(self.y.min(end_y));
-    let content_height = (end_y - start_y).max(0.0);
-    if content_height <= LAYOUT_EPSILON_PT {
-      return None;
-    }
     let available_height =
       (self.current.setup.height_pt - self.current.setup.margin_bottom_pt - start_y)
         .max(DEFAULT_LINE_HEIGHT_PT);
-    let average_height = content_height / section.columns.count as f32;
-    let height = (average_height / DEFAULT_LINE_HEIGHT_PT).ceil() * DEFAULT_LINE_HEIGHT_PT;
-    if height >= available_height - LAYOUT_EPSILON_PT {
+    let content_height =
+      balanced_column_content_height(start_y, end_y, completed_content_height_pt);
+    if content_height <= LAYOUT_EPSILON_PT {
       return None;
     }
-    let height = height.max(DEFAULT_LINE_HEIGHT_PT).min(available_height);
-    Some(height)
+    // ECMA-376 Part 4 §14.8.3.27 defines balancing as distributing lines
+    // evenly between the columns. The unrounded average is the physical
+    // section-frame height handed to a following continuous section. Keep the
+    // existing whole-line layout slot separately: it prevents a nearly fitting
+    // line from changing columns while the frame still closes at its measured
+    // height. Word's fixed output for tdf121670_columnsInSectionsOnly exposes
+    // the distinction because the final paragraph's lower spacing participates
+    // in the average but does not escape the balanced section frame.
+    let frame_height_pt = (content_height / section.columns.count as f32)
+      .max(DEFAULT_LINE_HEIGHT_PT)
+      .min(available_height);
+    let layout_height_pt =
+      (frame_height_pt / DEFAULT_LINE_HEIGHT_PT).ceil() * DEFAULT_LINE_HEIGHT_PT;
+    if layout_height_pt >= available_height - LAYOUT_EPSILON_PT {
+      return None;
+    }
+    Some(BalancedSectionHeights {
+      layout_height_pt: layout_height_pt
+        .max(DEFAULT_LINE_HEIGHT_PT)
+        .min(available_height),
+      frame_height_pt,
+    })
   }
 
   fn format_block_sequence(&mut self, blocks: &[Block], mut flow: FlowContext) {
@@ -5220,7 +5323,7 @@ impl<'a> RootFrameLayout<'a> {
     mut flow: FlowContext,
     previous_block: Option<&Block>,
     discarded_carrier_spacing_after_pt: Option<f32>,
-  ) {
+  ) -> FlowContext {
     let mut section_boundary_previous = previous_block.cloned();
     if let Some(spacing_after_pt) = discarded_carrier_spacing_after_pt
       && let Some(Block::Paragraph(previous)) = section_boundary_previous.as_mut()
@@ -5249,6 +5352,7 @@ impl<'a> RootFrameLayout<'a> {
       self.format_block(index, previous, block, next, &mut flow);
       flow.paragraph_spacing_context = ParagraphSpacingContext::Normal;
     }
+    flow
   }
 
   fn format_block_range(&mut self, blocks: &[Block], start_index: usize, mut flow: FlowContext) {
@@ -9620,6 +9724,7 @@ fn flow_context(
     split_page_break_and_paragraph_mark: false,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::Body,
+    horizontal_table_cell: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
@@ -9737,7 +9842,11 @@ fn advance_section_flow(
   let next_column = flow.column_index + 1;
   if next_column < flow.columns.count {
     let mut next_flow = flow;
-    if next_column + 1 == flow.columns.count {
+    next_flow.columns.completed_content_height_pt +=
+      (flow.content_bottom - flow.content_top_pt).max(0.0);
+    let closes_balanced_frame =
+      next_column + 1 == flow.columns.count && next_flow.columns.balanced_height_pt.is_some();
+    if closes_balanced_frame {
       // A balanced section frame is closed after its final column.  The
       // final column must still accept the remainder of the section and hand
       // its actual bottom to the following continuous section; retaining the
@@ -9745,7 +9854,10 @@ fn advance_section_flow(
       // physical page advance before the next section can reuse the page.
       next_flow.columns.balanced_height_pt = None;
     }
-    let next_flow = flow_with_column(next_flow, next_column);
+    let mut next_flow = flow_with_column(next_flow, next_column);
+    if closes_balanced_frame {
+      next_flow = restore_body_content_bottom(next_flow);
+    }
     (next_flow, next_flow.content_top_pt)
   } else {
     let next_page_number = pages.len() + 2;
@@ -9768,6 +9880,7 @@ fn advance_section_flow(
           section_page_index: flow.section_page_index + 1,
           columns: SectionColumns {
             balanced_height_pt: None,
+            completed_content_height_pt: 0.0,
             ..flow.columns
           },
           ..flow
@@ -10934,6 +11047,10 @@ fn layout_document_block(
       let shading_context = ParagraphShadingContext::for_blocks(previous, paragraph, next);
       let mut ignore_top_margin_at_page_start = false;
       if let Some(frame) = paragraph_frame(paragraph) {
+        let mut flow = flow;
+        if floating_frame_page_break_before_applies(&frame, target.current, flow) {
+          (flow, y) = force_page_break(flow, target.current, target.pages);
+        }
         note_body_content_frame(target.current, flow);
         return layout_floating_frame(
           &frame,
@@ -11055,6 +11172,10 @@ fn layout_document_block(
       (table_flow, table_bottom + carried_after)
     }
     Block::Frame(frame) => {
+      let mut flow = flow;
+      if floating_frame_page_break_before_applies(frame, target.current, flow) {
+        (flow, y) = force_page_break(flow, target.current, target.pages);
+      }
       note_body_content_frame(target.current, flow);
       layout_floating_frame(
         frame,
@@ -11233,14 +11354,25 @@ fn table_page_break_before_applies(table: &Table, page: &Page, flow: FlowContext
   if !table.page_break_before || flow.text_segmentation != TextSegmentation::Body {
     return false;
   }
-  body_frame_precedes_table_page_break(page)
+  body_frame_precedes_transferred_page_break(page)
 }
 
-fn body_frame_precedes_table_page_break(page: &Page) -> bool {
+fn floating_frame_page_break_before_applies(
+  frame: &FloatingFrame,
+  page: &Page,
+  flow: FlowContext,
+) -> bool {
+  if !frame.page_break_before || flow.text_segmentation != TextSegmentation::Body {
+    return false;
+  }
+  body_frame_precedes_transferred_page_break(page)
+}
+
+fn body_frame_precedes_transferred_page_break(page: &Page) -> bool {
   // An empty body paragraph is still a Writer content frame and therefore
-  // makes a table-level PAGE_BEFORE effective. By contrast, force_page_break
-  // seeds its new target page with one bookkeeping frame; that seed alone must
-  // not make the transferred table break advance a second time.
+  // makes a PAGE_BEFORE transferred to a table/frame anchor effective. By
+  // contrast, force_page_break seeds its new target page with one bookkeeping
+  // frame; that seed alone must not advance the transferred break twice.
   let break_target_seed = usize::from(page.explicit_break_target);
   page.body_content_frames > break_target_seed
 }
@@ -11258,8 +11390,11 @@ fn paragraph_frame(paragraph: &crate::docx::Paragraph) -> Option<FloatingFrame> 
   let frame = paragraph.format.frame?;
   let mut content = paragraph.clone();
   content.format.frame = None;
+  content.format.page_break_before = false;
+  content.format.page_break_before_set = false;
   Some(FloatingFrame {
     blocks: vec![Block::paragraph(content)],
+    page_break_before: paragraph.format.page_break_before,
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
@@ -11671,6 +11806,7 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     split_page_break_and_paragraph_mark: false,
     repeating_slots: area.repeating_slots,
     text_segmentation: TextSegmentation::Body,
+    horizontal_table_cell: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
@@ -11678,6 +11814,58 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     floating_table_cell_follow_top_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
+  }
+}
+
+fn balanced_column_content_height(
+  start_y: f32,
+  end_y: f32,
+  completed_content_height_pt: f32,
+) -> f32 {
+  // SwSectionFrame balances the complete column chain, not just the tail in
+  // its current column. Naturally filled columns contribute their full layout
+  // height, while an authored w:br/@type=column contributes only the content
+  // before the break. This distinction is observable between cached
+  // pagination in Open XML SDK complex0.docx and the early break in
+  // tdf103975_notPageBreakE.docx.
+  completed_content_height_pt.max(0.0) + (end_y - start_y).max(0.0)
+}
+
+fn explicit_column_break_completed_content_height(
+  flow: FlowContext,
+  column_content_bottom_y: f32,
+) -> f32 {
+  let column_height = (flow.content_bottom - flow.content_top_pt).max(0.0);
+  let used_height = (column_content_bottom_y - flow.content_top_pt).clamp(0.0, column_height);
+  flow.columns.completed_content_height_pt.max(0.0) + used_height
+}
+
+fn balanced_section_trailing_spacing_after(block: Option<&Block>, flow: FlowContext) -> f32 {
+  let Some(Block::Paragraph(paragraph)) = block else {
+    return 0.0;
+  };
+  if paragraph_frame(paragraph).is_some() || paragraph_ends_with_explicit_page_break(paragraph) {
+    return 0.0;
+  }
+  paragraph_spacing_after(paragraph, None, flow)
+}
+
+fn balanced_section_frame_end_y(
+  replay_end_y: f32,
+  trailing_spacing_after_pt: f32,
+  frame_bottom_pt: f32,
+) -> f32 {
+  // SwSectionFrame::FormatWidthCols sizes the section frame from the balanced
+  // column chain, and the following section is positioned after that frame.
+  // The final paragraph can report a cursor below the frame solely because its
+  // authored lower spacing was already included in the balance measurement.
+  // Close at the frame bottom only when removing that spacing proves all real
+  // content still fits; otherwise retain the replay cursor to prevent overlap.
+  let content_end_y = replay_end_y - trailing_spacing_after_pt.max(0.0);
+  if content_end_y <= frame_bottom_pt + LAYOUT_EPSILON_PT {
+    frame_bottom_pt
+  } else {
+    replay_end_y
   }
 }
 
@@ -12967,6 +13155,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
       repeating_slots: header_repeating_slots,
       text_segmentation: TextSegmentation::RepeatingSlot,
+      horizontal_table_cell: false,
       paragraph_spacing_context: ParagraphSpacingContext::Normal,
       preserve_horizontal_on_advance: false,
       script_sensitive_line_height: true,
@@ -13012,6 +13201,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
       repeating_slots: footer_repeating_slots,
       text_segmentation: TextSegmentation::RepeatingSlot,
+      horizontal_table_cell: false,
       paragraph_spacing_context: ParagraphSpacingContext::Normal,
       preserve_horizontal_on_advance: false,
       script_sensitive_line_height: true,
@@ -13022,7 +13212,26 @@ fn repeating_slot_wrap_exclusions_for_page(
     },
   );
 
-  adornment.wrap_exclusions
+  repeating_story_body_wrap_exclusions(&adornment.wrap_exclusions)
+}
+
+fn repeating_story_body_wrap_exclusions(exclusions: &[WrapExclusion]) -> Vec<WrapExclusion> {
+  exclusions
+    .iter()
+    .copied()
+    .filter(|exclusion| {
+      // A framePr fly still participates in wrapping inside its own header or
+      // footer story while that story is laid out above. It must not then be
+      // copied into the main-story wrap set. LibreOffice's Word import keeps
+      // header/footer frames independently wrap-capable (ww8par6.cxx), while
+      // its MS-compat layout tests require spill-over header objects not to
+      // move body text (tdf104254_noHeaderWrapping and
+      // tdf143793_noBodyWrapping). Preserve the other repeating exclusions:
+      // they are separate drawing/table owners and remain a counterexample to
+      // dropping the complete repeating-wrap catalog.
+      exclusion.owner != WrapExclusionOwner::ParagraphFrame
+    })
+    .collect()
 }
 
 fn repeating_wrap_exclusion_catalog_for_page(
@@ -13261,6 +13470,7 @@ fn apply_headers_and_footers(
         split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
         repeating_slots: header_repeating_slots,
         text_segmentation: TextSegmentation::RepeatingSlot,
+        horizontal_table_cell: false,
         paragraph_spacing_context: ParagraphSpacingContext::Normal,
         preserve_horizontal_on_advance: false,
         script_sensitive_line_height: true,
@@ -13309,6 +13519,7 @@ fn apply_headers_and_footers(
         split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
         repeating_slots: footer_repeating_slots,
         text_segmentation: TextSegmentation::RepeatingSlot,
+        horizontal_table_cell: false,
         paragraph_spacing_context: ParagraphSpacingContext::Normal,
         preserve_horizontal_on_advance: false,
         script_sensitive_line_height: true,
@@ -15022,6 +15233,7 @@ fn measured_repeating_blocks_height_at(
     split_page_break_and_paragraph_mark: false,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::RepeatingSlot,
+    horizontal_table_cell: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
@@ -20571,6 +20783,27 @@ fn table_cell_content_width_range(
   if cell.fit_text {
     return CellContentWidthRange::default();
   }
+  if cell.text_rotation_deg.is_some() {
+    // ECMA-376 Part 1 §17.18.93 makes btLr (and its Office 2010 `lr`
+    // spelling) a vertical writing mode. Its logical block height is the
+    // physical column width; using the unrotated string width here expands
+    // the column before the later axis transpose and wraps adjacent cells.
+    // Cell margins remain physical and are added by the caller.
+    let physical_content_width = (table_cell_content_height_for_table(
+      cell,
+      UNBOUNDED_LAYOUT_EXTENT_PT,
+      PageSetup::default(),
+      true,
+      12,
+      text_metrics,
+    ) - cell.margins.top_pt
+      - cell.margins.bottom_pt)
+      .max(0.0);
+    return CellContentWidthRange {
+      minimum_pt: physical_content_width,
+      maximum_pt: physical_content_width,
+    };
+  }
   cell
     .blocks
     .iter()
@@ -21777,6 +22010,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
     split_page_break_and_paragraph_mark: false,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
+    horizontal_table_cell: !vertical_text,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
     // A split-fly cell's SwTextFrame follow remains inside the follow cell;
     // it does not widen to the page body. Keeping the cell print width is
@@ -22489,6 +22723,8 @@ fn table_cell_first_content_line_height(
           split_page_break_and_paragraph_mark: false,
           repeating_slots: RepeatingSlotState::default(),
           text_segmentation,
+          horizontal_table_cell: text_segmentation == TextSegmentation::TableCell
+            && cell.text_rotation_deg.is_none(),
           paragraph_spacing_context: ParagraphSpacingContext::Normal,
           preserve_horizontal_on_advance: false,
           script_sensitive_line_height: true,
@@ -22552,6 +22788,8 @@ fn table_cell_first_content_line_height(
             split_page_break_and_paragraph_mark: false,
             repeating_slots: RepeatingSlotState::default(),
             text_segmentation,
+            horizontal_table_cell: text_segmentation == TextSegmentation::TableCell
+              && cell.text_rotation_deg.is_none(),
             paragraph_spacing_context: ParagraphSpacingContext::Normal,
             preserve_horizontal_on_advance: false,
             script_sensitive_line_height: true,
@@ -22582,12 +22820,27 @@ fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom:
       .any(|item| table_cell_item_intersects_vertical_bounds(item, top, bottom)),
     // TextItem::y_pt is the resolved baseline. A split SwTextFrame assigns a
     // whole line to the fragment containing that baseline; ink overlap from
-    // the preceding line must not duplicate it in the follow.
+    // the preceding line must not duplicate it in the follow. A nested
+    // vertical cell retains its logical horizontal baseline until PDF paint;
+    // test the transformed physical baseline so an enclosing cell does not
+    // discard it before that rotation is materialized (tdf79272/tdf162180).
     PageItem::Text(text) => {
-      text.y_pt >= top - LAYOUT_EPSILON_PT && text.y_pt < bottom - LAYOUT_EPSILON_PT
+      let baseline_y = rotated_item_origin_y(
+        text.x_pt,
+        text.y_pt,
+        text.style.rotation_deg,
+        text.rotation_center_pt,
+      );
+      baseline_y >= top - LAYOUT_EPSILON_PT && baseline_y < bottom - LAYOUT_EPSILON_PT
     }
     PageItem::LegacyFormCheckBox(check_box) => {
-      check_box.y_pt >= top - LAYOUT_EPSILON_PT && check_box.y_pt < bottom - LAYOUT_EPSILON_PT
+      let baseline_y = rotated_item_origin_y(
+        check_box.x_pt,
+        check_box.y_pt,
+        check_box.rotation_deg,
+        check_box.rotation_center_pt,
+      );
+      baseline_y >= top - LAYOUT_EPSILON_PT && baseline_y < bottom - LAYOUT_EPSILON_PT
     }
     PageItem::Image(image) => {
       image.y_pt + image.height_pt > top + LAYOUT_EPSILON_PT
@@ -22598,6 +22851,22 @@ fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom:
     }
     PageItem::Fill(_) | PageItem::Line(_) | PageItem::Path(_) | PageItem::Polyline(_) => true,
   }
+}
+
+fn rotated_item_origin_y(
+  x_pt: f32,
+  y_pt: f32,
+  rotation_deg: f32,
+  rotation_center_pt: Option<(f32, f32)>,
+) -> f32 {
+  let Some((center_x, center_y)) = rotation_center_pt else {
+    return y_pt;
+  };
+  if rotation_deg.abs() <= f32::EPSILON {
+    return y_pt;
+  }
+  let (sin, cos) = rotation_deg.to_radians().sin_cos();
+  center_y + (x_pt - center_x) * sin + (y_pt - center_y) * cos
 }
 
 fn shape_text_box_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom: f32) -> bool {
@@ -22967,6 +23236,7 @@ fn layout_shape_text_box(
     split_page_break_and_paragraph_mark: parent_flow.split_page_break_and_paragraph_mark,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
+    horizontal_table_cell: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
@@ -23489,6 +23759,7 @@ fn shape_text_box_measure_flow(parent_flow: FlowContext, content_width: f32) -> 
     split_page_break_and_paragraph_mark: parent_flow.split_page_break_and_paragraph_mark,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
+    horizontal_table_cell: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
@@ -24341,6 +24612,7 @@ fn table_cell_content_height_with_mode(
     split_page_break_and_paragraph_mark: false,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
+    horizontal_table_cell: cell.text_rotation_deg.is_none(),
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
@@ -24601,7 +24873,8 @@ fn table_cell_paragraph_height(
   //
   // lcl_CalcHeightOfFirstContentLine(): a split text frame follow that has a
   // master is not measured with its master's upper/lower spacing again.
-  let content = estimated_paragraph_content_height(paragraph, flow, text_metrics);
+  let extents = estimated_paragraph_content_extents(paragraph, flow, text_metrics);
+  let content = extents.flow_height.max(extents.floating_bottom);
   let min_height = paragraph_line_height_for_setup(
     paragraph,
     &paragraph_base_line_style(paragraph),
@@ -24609,6 +24882,15 @@ fn table_cell_paragraph_height(
     flow.text_segmentation,
     text_metrics,
   );
+  let paragraph_mark_height = word_east_asian_paragraph_mark_single_line_height(
+    paragraph,
+    flow.compatibility_mode,
+    flow.text_segmentation,
+    flow.horizontal_table_cell,
+    extents.line_count.saturating_sub(1),
+    text_metrics,
+  )
+  .unwrap_or_default();
   let upper = if split_follow_text_frame {
     0.0
   } else {
@@ -24629,7 +24911,7 @@ fn table_cell_paragraph_height(
   // ends a list inside a table cell still owns its automatic upper spacing
   // (LibreOffice testTdf132807). Folding `upper` into max() swallowed almost
   // the entire 280-twip space whenever the empty line itself was shorter.
-  upper + content.max(min_height) + lower
+  upper + content.max(min_height).max(paragraph_mark_height) + lower
 }
 
 fn paragraph_line_spacing_excess(paragraph: &crate::docx::Paragraph) -> f32 {
@@ -27159,12 +27441,19 @@ impl<'a> TextFrameLayout<'a> {
   fn apply_column_break(
     &self,
     flow: FlowContext,
+    column_content_bottom_y: f32,
     current: &mut Page,
     pages: &mut Vec<Page>,
     text_metrics: &mut TextMetrics,
     wrap_exclusions: &mut Vec<WrapExclusion>,
   ) -> (FlowContext, TextFrame, f32, f32, f32, f32, bool) {
-    let (next_flow, y) = advance_text_frame_flow(flow, current, pages);
+    let (mut next_flow, y) = advance_text_frame_flow(flow, current, pages);
+    if next_flow.section_page_index == flow.section_page_index
+      && next_flow.column_index > flow.column_index
+    {
+      next_flow.columns.completed_content_height_pt =
+        explicit_column_break_completed_content_height(flow, column_content_bottom_y);
+    }
     reset_wrap_exclusions_for_y(current, y, wrap_exclusions);
     let next_frame = TextFrame::new(self.paragraph, next_flow, text_metrics);
     let y = dodge_text_wrap_exclusions(
@@ -27301,7 +27590,7 @@ impl<'a> TextFrameLayout<'a> {
         }
         Some(InlineItem::ColumnBreak) => {
           (flow, text_frame, y, _, _, _, _) =
-            self.apply_column_break(flow, current, pages, text_metrics, &mut wrap_exclusions);
+            self.apply_column_break(flow, y, current, pages, text_metrics, &mut wrap_exclusions);
           first_inline_index = 1;
         }
         _ => {}
@@ -27541,6 +27830,12 @@ impl<'a> TextFrameLayout<'a> {
           // suffix. A w:lvl/w:pPr number tab is the first stop for that
           // suffix even when a paragraph style overrides the hanging indent.
           tab_stop.max(default_line_left)
+        } else if label_follow == Some(' ') {
+          // ECMA-376 Part 1 §17.9.29 defines w:suff="space" as one space
+          // between the number and paragraph text. It does not align that
+          // text to the level's hanging-indent stop: tdf95495's "A.1 " ends
+          // before the stop, and Word continues immediately after the space.
+          label_end + text_metrics.measure_text(" ", &list_label_style)
         } else if paragraph.format.list_label_width_aware_tab {
           match label_follow {
             // The imported list-label fallback is only used to place an empty
@@ -31545,7 +31840,14 @@ impl<'a> TextFrameLayout<'a> {
             line_right,
             line_height,
             column_emitted,
-          ) = self.apply_column_break(flow, current, pages, text_metrics, &mut wrap_exclusions);
+          ) = self.apply_column_break(
+            flow,
+            y + line_height,
+            current,
+            pages,
+            text_metrics,
+            &mut wrap_exclusions,
+          );
           default_line_right = text_frame.default_line_right;
           paragraph_left = text_frame.paragraph_left;
           base_line_height = text_frame.base_line_height;
@@ -31646,6 +31948,8 @@ impl<'a> TextFrameLayout<'a> {
       let empty_line_height = word_east_asian_paragraph_mark_single_line_height(
         paragraph,
         flow.compatibility_mode,
+        flow.text_segmentation,
+        flow.horizontal_table_cell,
         text_state.line_fragments.len(),
         text_metrics,
       )
@@ -31665,6 +31969,8 @@ impl<'a> TextFrameLayout<'a> {
       if let Some(single_line_height) = word_east_asian_paragraph_mark_single_line_height(
         paragraph,
         flow.compatibility_mode,
+        flow.text_segmentation,
+        flow.horizontal_table_cell,
         text_state.line_fragments.len(),
         text_metrics,
       ) {
@@ -31766,6 +32072,8 @@ impl<'a> TextFrameLayout<'a> {
       let empty_line_height = word_east_asian_paragraph_mark_single_line_height(
         paragraph,
         flow.compatibility_mode,
+        flow.text_segmentation,
+        flow.horizontal_table_cell,
         text_state.line_fragments.len(),
         text_metrics,
       )
@@ -36093,18 +36401,61 @@ mod tests {
   use super::*;
 
   #[test]
-  fn table_page_break_counts_empty_body_frame_but_not_break_target_seed() {
+  fn transferred_page_break_counts_empty_body_frame_but_not_break_target_seed() {
     let mut page = empty_page(PageSetup::default(), 0);
-    assert!(!body_frame_precedes_table_page_break(&page));
+    assert!(!body_frame_precedes_transferred_page_break(&page));
 
     page.body_content_frames = 1;
-    assert!(body_frame_precedes_table_page_break(&page));
+    assert!(body_frame_precedes_transferred_page_break(&page));
 
     page.explicit_break_target = true;
-    assert!(!body_frame_precedes_table_page_break(&page));
+    assert!(!body_frame_precedes_transferred_page_break(&page));
 
     page.body_content_frames = 2;
-    assert!(body_frame_precedes_table_page_break(&page));
+    assert!(body_frame_precedes_transferred_page_break(&page));
+  }
+
+  #[test]
+  fn framed_page_break_applies_only_after_body_progress() {
+    let mut frame = FloatingFrame {
+      blocks: Vec::new(),
+      page_break_before: true,
+      width_pt: None,
+      height_pt: None,
+      height_rule: FrameHeightRule::Auto,
+      vertical_text_flow: None,
+      placement: FloatingFramePlacement::default(),
+      suppress_overlap: false,
+      outer_fill_color: None,
+      outer_borders: ParagraphBordersModel::default(),
+    };
+    let mut page = empty_page(PageSetup::default(), 0);
+    let mut flow = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+
+    assert!(!floating_frame_page_break_before_applies(
+      &frame, &page, flow
+    ));
+    page.body_content_frames = 1;
+    assert!(floating_frame_page_break_before_applies(
+      &frame, &page, flow
+    ));
+
+    frame.page_break_before = false;
+    assert!(!floating_frame_page_break_before_applies(
+      &frame, &page, flow
+    ));
+    frame.page_break_before = true;
+    flow.text_segmentation = TextSegmentation::RepeatingSlot;
+    assert!(!floating_frame_page_break_before_applies(
+      &frame, &page, flow
+    ));
   }
   use crate::docx::{
     CellBorderSuppressions, CellBordersModel, CellMargins, Paragraph, ParagraphBordersModel,
@@ -38673,6 +39024,78 @@ mod tests {
   }
 
   #[test]
+  fn final_balanced_column_accepts_the_section_remainder() {
+    let setup = PageSetup {
+      margin_top_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      ..PageSetup::default()
+    };
+    let columns = SectionColumns {
+      count: 3,
+      balanced_height_pt: Some(154.0),
+      ..SectionColumns::default()
+    };
+    let mut flow = flow_context(setup, 0, columns, 0, 0, DEFAULT_TAB_STOP_PT);
+    flow.content_top_pt = 158.0;
+    flow.content_bottom = 312.0;
+    flow.body_content_bottom_pt = 720.0;
+    let mut current = empty_section_page(setup, 0, 0);
+    let mut pages = Vec::new();
+
+    let (middle, _) = advance_section_flow(flow, &mut current, &mut pages);
+    assert_eq!(middle.column_index, 1);
+    assert_eq!(middle.columns.balanced_height_pt, Some(154.0));
+    assert_eq!(middle.content_bottom, 312.0);
+
+    let (last, _) = advance_section_flow(middle, &mut current, &mut pages);
+    assert_eq!(last.column_index, 2);
+    assert_eq!(last.columns.balanced_height_pt, None);
+    assert_eq!(last.content_bottom, 720.0);
+    assert!(pages.is_empty());
+  }
+
+  #[test]
+  fn balanced_height_counts_completed_columns_before_the_tail() {
+    assert_eq!(balanced_column_content_height(406.0, 574.0, 314.0), 482.0,);
+    assert_eq!(balanced_column_content_height(406.0, 574.0, 0.0), 168.0,);
+  }
+
+  #[test]
+  fn authored_column_break_counts_only_the_used_column_height() {
+    let setup = PageSetup::default();
+    let columns = SectionColumns {
+      count: 2,
+      completed_content_height_pt: 12.0,
+      ..SectionColumns::default()
+    };
+    let mut flow = flow_context(setup, 0, columns, 0, 0, DEFAULT_TAB_STOP_PT);
+    flow.content_top_pt = 78.0;
+    flow.content_bottom = 827.9;
+
+    let height = explicit_column_break_completed_content_height(flow, 91.8);
+    assert!((height - 25.8).abs() <= 0.001, "height={height}");
+  }
+
+  #[test]
+  fn balanced_continuous_section_closes_at_frame_without_overlapping_content() {
+    let frame_bottom = 151.94;
+    assert_eq!(
+      balanced_section_frame_end_y(158.11, 10.0, frame_bottom),
+      frame_bottom,
+    );
+    assert_eq!(
+      balanced_section_frame_end_y(165.0, 10.0, frame_bottom),
+      165.0,
+      "visible content beyond the balanced frame must keep the replay cursor",
+    );
+    assert_eq!(
+      balanced_section_frame_end_y(149.0, 0.0, frame_bottom),
+      frame_bottom,
+      "a short final column still hands off at the balanced frame edge",
+    );
+  }
+
+  #[test]
   fn explicit_page_break_detects_content_on_its_paragraph_follow() {
     let text = || {
       InlineItem::Text(TextRun {
@@ -39192,6 +39615,7 @@ mod tests {
         list_label_hyperlink_url: None,
         list_label_tab_stop_pt: None,
       })],
+      page_break_before: false,
       width_pt: None,
       height_pt: None,
       height_rule: FrameHeightRule::Auto,
@@ -41113,7 +41537,7 @@ mod tests {
   }
 
   #[test]
-  fn east_asian_paragraph_mark_metrics_require_a_modern_start_or_legacy_superscript() {
+  fn east_asian_paragraph_mark_metrics_cover_direct_marks_and_alignment_counterexamples() {
     let mut paragraph = Paragraph {
       inlines: Vec::new(),
       field_events: Vec::new(),
@@ -41126,6 +41550,7 @@ mod tests {
       format: Box::new(ParagraphFormat {
         justification: crate::docx::ParagraphJustification {
           adjust: crate::docx::ParagraphAdjust::Start,
+          logical_start: true,
           ..Default::default()
         },
         ..Default::default()
@@ -41142,16 +41567,89 @@ mod tests {
     let mut text_metrics = TextMetrics::new();
 
     assert!(
-      word_east_asian_paragraph_mark_single_line_height(&paragraph, 15, 0, &mut text_metrics)
-        .is_some()
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        15,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_some()
+    );
+    paragraph.format.justification.logical_start = false;
+    paragraph.format.justification.physical_left = true;
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        15,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_none()
+    );
+    paragraph.format.bidi = true;
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        15,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_some()
+    );
+    paragraph.format.bidi = false;
+    paragraph.inlines.push(InlineItem::FormWidgetStart(0));
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        15,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_some()
     );
     assert!(
-      word_east_asian_paragraph_mark_single_line_height(&paragraph, 12, 0, &mut text_metrics)
-        .is_none()
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        15,
+        TextSegmentation::TableCell,
+        true,
+        0,
+        &mut text_metrics,
+      )
+      .is_none()
+    );
+    paragraph.inlines.clear();
+    paragraph.format.justification.physical_left = false;
+    paragraph.format.justification.logical_start = true;
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_none()
     );
     assert!(
-      word_east_asian_paragraph_mark_single_line_height(&paragraph, 15, 1, &mut text_metrics)
-        .is_none()
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        15,
+        TextSegmentation::Body,
+        false,
+        1,
+        &mut text_metrics,
+      )
+      .is_none()
     );
 
     paragraph.inlines.push(InlineItem::Text(TextRun {
@@ -41169,18 +41667,144 @@ mod tests {
       preserve_text_portion: false,
     }));
     assert!(
-      word_east_asian_paragraph_mark_single_line_height(&paragraph, 12, 0, &mut text_metrics)
-        .is_none()
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_none()
     );
 
     paragraph.format.justification.adjust = crate::docx::ParagraphAdjust::Left;
     assert!(
-      word_east_asian_paragraph_mark_single_line_height(&paragraph, 15, 0, &mut text_metrics)
-        .is_none()
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        15,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_none()
     );
     assert!(
-      word_east_asian_paragraph_mark_single_line_height(&paragraph, 12, 0, &mut text_metrics)
-        .is_some()
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_some()
+    );
+
+    paragraph.inlines.clear();
+    paragraph.format.numbered_paragraph_mark_background = true;
+    let direct_height = word_east_asian_paragraph_mark_single_line_height(
+      &paragraph,
+      12,
+      TextSegmentation::Body,
+      false,
+      0,
+      &mut text_metrics,
+    )
+    .expect("direct paragraph-mark formatting must participate in the line box");
+    paragraph.format.numbered_paragraph_mark_background = false;
+    paragraph.format.justification.adjust = crate::docx::ParagraphAdjust::Start;
+    let implicit_height = word_east_asian_paragraph_mark_single_line_height(
+      &paragraph,
+      15,
+      TextSegmentation::Body,
+      false,
+      0,
+      &mut text_metrics,
+    )
+    .expect("modern logical-start paragraph retains the implicit mark metrics");
+    assert!((direct_height - implicit_height * 1.27).abs() < 0.001);
+  }
+
+  #[test]
+  fn legacy_chinese_horizontal_table_cell_uses_fixed_line_box() {
+    let mut paragraph = Paragraph {
+      inlines: Vec::new(),
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle {
+        east_asia_language: Some(Arc::from("zh-CN")),
+        font_size_pt: 12.0,
+        ..Default::default()
+      },
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        justification: crate::docx::ParagraphJustification {
+          adjust: crate::docx::ParagraphAdjust::Left,
+          ..Default::default()
+        },
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let mut text_metrics = TextMetrics::new();
+
+    assert_eq!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+        0,
+        &mut text_metrics,
+      ),
+      Some(17.28)
+    );
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_none()
+    );
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_none()
+    );
+
+    paragraph.base_style.east_asia_language = Some(Arc::from("en-US"));
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+        0,
+        &mut text_metrics,
+      )
+      .is_none()
     );
   }
 
@@ -41251,6 +41875,7 @@ mod tests {
       split_page_break_and_paragraph_mark: false,
       repeating_slots: RepeatingSlotState::default(),
       text_segmentation: TextSegmentation::TableCell,
+      horizontal_table_cell: true,
       paragraph_spacing_context: ParagraphSpacingContext::Normal,
       preserve_horizontal_on_advance: false,
       script_sensitive_line_height: true,
@@ -41343,6 +41968,7 @@ mod tests {
         split_page_break_and_paragraph_mark: false,
         repeating_slots: RepeatingSlotState::default(),
         text_segmentation: TextSegmentation::TableCell,
+        horizontal_table_cell: true,
         paragraph_spacing_context: ParagraphSpacingContext::Normal,
         preserve_horizontal_on_advance: false,
         script_sensitive_line_height: true,
@@ -41436,6 +42062,7 @@ mod tests {
         split_page_break_and_paragraph_mark: false,
         repeating_slots: RepeatingSlotState::default(),
         text_segmentation: TextSegmentation::TableCell,
+        horizontal_table_cell: true,
         paragraph_spacing_context: ParagraphSpacingContext::Normal,
         preserve_horizontal_on_advance: false,
         script_sensitive_line_height: true,
@@ -41543,6 +42170,20 @@ mod tests {
       50.0,
       100.0
     ));
+
+    let mut rotated = text(120.0);
+    let PageItem::Text(text) = &mut rotated else {
+      unreachable!();
+    };
+    text.x_pt = 40.0;
+    text.style.rotation_deg = -90.0;
+    text.rotation_center_pt = Some((0.0, 100.0));
+    // The logical baseline is below this fragment, but rotating it around the
+    // cell's lower-left pivot puts the physical baseline at y=60pt.
+    assert!(table_cell_item_intersects_vertical_bounds(
+      &rotated, 50.0, 100.0
+    ));
+
     assert!(!frame_bounds_intersects_vertical_bounds(
       FrameBounds {
         x_pt: 0.0,
@@ -41672,6 +42313,7 @@ mod tests {
       split_page_break_and_paragraph_mark: false,
       repeating_slots: RepeatingSlotState::default(),
       text_segmentation: TextSegmentation::TableCell,
+      horizontal_table_cell: true,
       paragraph_spacing_context: ParagraphSpacingContext::Normal,
       preserve_horizontal_on_advance: false,
       script_sensitive_line_height: true,
@@ -42187,6 +42829,29 @@ mod tests {
     assert!(
       setup.header_distance_pt + at_header_origin > 160.0,
       "normalized={normalized}, before_fly={before_fly}, at_header_origin={at_header_origin}",
+    );
+  }
+
+  #[test]
+  fn repeating_paragraph_frame_wrap_stays_in_the_repeating_story() {
+    let paragraph_frame = WrapExclusion {
+      left_pt: 0.0,
+      right_pt: 612.0,
+      top_pt: 504.0,
+      bottom_pt: 563.0,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: true,
+      uses_contour: false,
+      owner: WrapExclusionOwner::ParagraphFrame,
+    };
+    let drawing = WrapExclusion {
+      owner: WrapExclusionOwner::Drawing,
+      ..paragraph_frame
+    };
+
+    assert_eq!(
+      repeating_story_body_wrap_exclusions(&[paragraph_frame, drawing]),
+      vec![drawing],
     );
   }
 
@@ -42861,6 +43526,69 @@ mod tests {
   fn autofit_content_minimum_rounds_up_to_the_docx_twip_grid() {
     assert!((ceil_table_width_to_twip(22.650_39) - 22.7).abs() < 0.001);
     assert!((ceil_table_width_to_twip(22.6) - 22.6).abs() < 0.001);
+  }
+
+  #[test]
+  fn vertical_table_cell_uses_logical_height_as_its_physical_width() {
+    let run = TextRun {
+      text: "USA".to_string(),
+      style: TextStyle {
+        rotation_deg: -90.0,
+        ..TextStyle::default()
+      },
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    };
+    let paragraph = Paragraph {
+      inlines: vec![InlineItem::Text(run.clone())],
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: run.style.clone(),
+      runs: vec![run],
+      format: Box::new(ParagraphFormat {
+        indent_left_pt: 5.65,
+        indent_right_pt: 5.65,
+        ..ParagraphFormat::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let mut cell = TableCell {
+      blocks: vec![Block::paragraph(paragraph)],
+      shading: None,
+      borders: CellBordersModel::default(),
+      border_suppressions: CellBorderSuppressions::default(),
+      margins: CellMargins::default(),
+      preferred_width_pt: Some(24.55),
+      preferred_width_pct: None,
+      grid_span: 1,
+      vertical_merge_continue: false,
+      no_wrap: false,
+      fit_text: false,
+      hide_end_mark: false,
+      vertical_alignment: TableCellVerticalAlignment::Center,
+      text_rotation_deg: Some(-90.0),
+    };
+    let mut text_metrics = TextMetrics::new();
+    let vertical = table_cell_content_width_range(&cell, 132.4, &mut text_metrics);
+
+    cell.text_rotation_deg = None;
+    let horizontal = table_cell_content_width_range(&cell, 132.4, &mut text_metrics);
+
+    assert!(vertical.maximum_pt < horizontal.minimum_pt);
+    assert!(vertical.maximum_pt < 24.0);
   }
 
   #[test]
@@ -44036,16 +44764,16 @@ mod tests {
   }
 
   #[test]
-  fn justified_line_shrink_counts_separator_and_stops_at_twenty_five_percent() {
+  fn word_compat_justified_line_shrink_counts_separator_and_stops_at_twenty_percent() {
     let mut text_metrics = TextMetrics::new();
     let mut style = TextStyle::default();
     round_style_to_word_print_grid(&mut style);
     let space_width = text_metrics.measure_text(" ", &style);
     let line_right = 100.0;
-    let shrink_capacity = 2.0 * space_width * 0.25;
+    let shrink_capacity = 2.0 * space_width * 0.20;
     let word_spacing = crate::docx::JustificationWordSpacing {
       desired_pct: 100,
-      minimum_pct: 75,
+      minimum_pct: 80,
       maximum_pct: 150,
     };
     let fit = |overflow| LineShrinkFit {

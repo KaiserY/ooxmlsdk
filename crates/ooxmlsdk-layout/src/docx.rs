@@ -79,7 +79,7 @@ use settings::{
   adjust_line_height_in_table, balance_single_byte_double_byte_width, compatibility_mode,
   do_not_break_wrapped_tables, do_not_expand_shift_return, do_not_use_html_paragraph_auto_spacing,
   explicit_default_tab_stop_pt, hyphenation_settings, no_column_balance,
-  split_page_break_and_paragraph_mark, update_fields_on_open,
+  split_page_break_and_paragraph_mark, update_fields_on_open, use_far_east_layout,
 };
 use table::TableLookModel;
 use text::{
@@ -180,6 +180,14 @@ const OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE: f32 = 276.0 / 240.0;
 const OFFICE_RECOVERED_ZH_HANS_TABLE_LINE_HEIGHT_MULTIPLE: f32 = 360.0 / 240.0;
 // The same repair path synthesizes the normal 360-twip section line pitch.
 const OFFICE_RECOVERED_DOCUMENT_GRID_LINE_PITCH_PT: f32 = 18.0;
+// w:useFELayout selects Word's East Asian/complex-script layout path. Office
+// 16 fixed output for tdf130088.docx supplies both sides of that path's smart
+// justification boundary: an approximately 81.6% fit is accepted, while an
+// approximately 75.5% fit before "Vestibulum" is rejected. Writer's original
+// tdf#119908/tdf#158776 interoperability implementation uses the same 20%
+// shrink limit. The ordinary compatibility-mode 15 path retains Writer's
+// later 75% calibration below.
+const WORD_FE_LAYOUT_SMART_JUSTIFY_MINIMUM_WORD_SPACING_PCT: u16 = 80;
 // ECMA-376 Part 1 §17.6.8 deliberately leaves an omitted w:distance
 // implementation-defined. Current Word fixed-format output places the right
 // edge of an automatic line number 18pt from the text margin; both Open XML
@@ -190,6 +198,7 @@ const OFFICE_AUTOMATIC_LINE_NUMBER_DISTANCE_PT: f32 = 18.0;
 struct ImportSettings {
   compatibility_mode: u16,
   justify_lines_with_shrinking: bool,
+  use_far_east_layout: bool,
   fixed_html_paragraph_auto_spacing: bool,
   do_not_break_wrapped_tables: bool,
   do_not_expand_shift_return: bool,
@@ -244,12 +253,14 @@ pub(crate) fn extract(
   let fixed_html_paragraph_auto_spacing = do_not_use_html_paragraph_auto_spacing(package, &main);
   let do_not_break_wrapped_tables = do_not_break_wrapped_tables(package, &main);
   let do_not_expand_shift_return = do_not_expand_shift_return(package, &main);
+  let use_far_east_layout = use_far_east_layout(package, &main);
   let balance_single_byte_double_byte_width = balance_single_byte_double_byte_width(package, &main);
   let document_math_settings = document_math_settings(package, &main);
   let document_created_datetime = document_created_datetime(package, options);
   let import_settings = ImportSettings {
     compatibility_mode,
     justify_lines_with_shrinking: compatibility_mode >= 15,
+    use_far_east_layout,
     fixed_html_paragraph_auto_spacing,
     do_not_break_wrapped_tables,
     do_not_expand_shift_return,
@@ -1613,8 +1624,7 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
         runs.append(&mut paragraph.runs);
         paragraph.runs = runs;
       }
-      paragraph.style_ref_text =
-        text::paragraph_style_ref_text(&paragraph.inlines, paragraph.list_label.as_deref());
+      paragraph.style_ref_text = text::paragraph_style_ref_text(&paragraph.inlines);
       **previous = paragraph;
       return;
     }
@@ -1636,7 +1646,7 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     previous.inlines.append(&mut paragraph.inlines);
     return;
   }
-  push_story_paragraph(blocks, paragraph);
+  push_story_paragraph(blocks, paragraph, true);
 }
 
 fn normalize_complex_field_paragraph_breaks(blocks: &mut Vec<Block>) {
@@ -1785,8 +1795,7 @@ fn paragraph_content_with_metadata(content: Paragraph, mut metadata: Paragraph) 
 }
 
 fn refresh_paragraph_story_derivatives(paragraph: &mut Paragraph) {
-  paragraph.style_ref_text =
-    text::paragraph_style_ref_text(&paragraph.inlines, paragraph.list_label.as_deref());
+  paragraph.style_ref_text = text::paragraph_style_ref_text(&paragraph.inlines);
   #[cfg(test)]
   {
     paragraph.runs = paragraph
@@ -1800,12 +1809,22 @@ fn refresh_paragraph_story_derivatives(paragraph: &mut Paragraph) {
   }
 }
 
-fn push_story_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
+fn push_story_paragraph(
+  blocks: &mut Vec<Block>,
+  mut paragraph: Paragraph,
+  transfer_frame_page_break_before: bool,
+) {
   if let Some(frame) = paragraph.format.frame {
+    let page_break_before = transfer_frame_page_break_before && paragraph.format.page_break_before;
     let suppress_overlap = paragraph.format.suppress_overlap == Some(true);
     let vertical_text_flow = paragraph.format.vertical_text_flow;
     paragraph.format.frame = None;
+    if transfer_frame_page_break_before {
+      paragraph.format.page_break_before = false;
+      paragraph.format.page_break_before_set = false;
+    }
     if let Some(Block::Frame(previous)) = blocks.last_mut()
+      && !page_break_before
       && paragraph_belongs_to_frame(previous, frame, suppress_overlap, vertical_text_flow)
     {
       previous.blocks.push(Block::paragraph(paragraph));
@@ -1813,6 +1832,7 @@ fn push_story_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     }
     blocks.push(Block::Frame(FloatingFrame {
       blocks: vec![Block::paragraph(paragraph)],
+      page_break_before,
       width_pt: frame.width_pt,
       height_pt: frame.height_pt,
       height_rule: frame.height_rule,
@@ -1836,7 +1856,7 @@ fn normalize_repeating_story_frames(blocks: &mut Vec<Block>) {
   let mut normalized = Vec::with_capacity(blocks.len());
   for block in std::mem::take(blocks) {
     match block {
-      Block::Paragraph(paragraph) => push_story_paragraph(&mut normalized, *paragraph),
+      Block::Paragraph(paragraph) => push_story_paragraph(&mut normalized, *paragraph, false),
       block => normalized.push(block),
     }
   }
@@ -1919,6 +1939,7 @@ fn promote_preceding_table_to_anchored_frame(blocks: &mut Vec<Block>, anchor: &P
   flatten_promoted_table_cell_frames(&mut table);
   blocks.push(Block::Frame(FloatingFrame {
     blocks: vec![Block::Table(table)],
+    page_break_before: anchor.format.page_break_before,
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
@@ -2348,6 +2369,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
         separator: columns.separator.is_some_and(|value| value.as_bool()),
         unbalanced: false,
         balanced_height_pt: None,
+        completed_content_height_pt: 0.0,
         explicit_count,
         explicit_widths_pt: widths,
         explicit_gaps_pt: gaps,
@@ -2365,6 +2387,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
     separator: columns.separator.is_some_and(|value| value.as_bool()),
     unbalanced: false,
     balanced_height_pt: None,
+    completed_content_height_pt: 0.0,
     explicit_count: 0,
     explicit_widths_pt: [0.0; 45],
     explicit_gaps_pt: [0.0; 44],
@@ -4785,6 +4808,18 @@ fn table_cell_model(
     let block_start = blocks.len();
     match choice {
       w::TableCellChoice::Paragraph(paragraph) => {
+        let paragraph_base_format = if paragraph_mark_is_deleted(paragraph) {
+          // ECMA-376 Part 1 §17.13.5.21 makes w:pPr/w:rPr/w:moveFrom a
+          // revision of the paragraph mark itself. In Word's final-view fixed
+          // output the hidden move-source line keeps the document-default
+          // paragraph metrics; the table style's paragraph overlay belongs to
+          // the current (move-to) cell story. TC-table-DnD-move.docx is the
+          // counterexample: both tables use Table Grid, but only the source
+          // rows retain the 259/240 line multiple and 160-twip lower spacing.
+          context.styles.doc_default_paragraph.clone()
+        } else {
+          style.paragraph_format.clone()
+        };
         let mut model = paragraph_model_with_base_in_story(
           paragraph,
           context.styles,
@@ -4792,7 +4827,7 @@ fn table_cell_model(
           context.images,
           context.hyperlinks,
           ParagraphImportBase {
-            format: style.paragraph_format.clone(),
+            format: paragraph_base_format,
             run_style: style.run_style.clone(),
             run_overrides: style.run_overrides,
             custom_xml_bindings: Some(context.custom_xml_bindings),
@@ -5054,6 +5089,7 @@ fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   }
   blocks.push(Block::Frame(FloatingFrame {
     blocks: vec![Block::paragraph(paragraph)],
+    page_break_before: false,
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
@@ -6291,14 +6327,22 @@ fn paragraph_justification(
       justification.last_line_adjust = ParagraphAdjust::Block;
       justification.adjust = ParagraphAdjust::Block;
       if import_settings.justify_lines_with_shrinking {
-        justification.word_spacing.minimum_pct = 75;
+        justification.word_spacing.minimum_pct = if import_settings.use_far_east_layout {
+          WORD_FE_LAYOUT_SMART_JUSTIFY_MINIMUM_WORD_SPACING_PCT
+        } else {
+          75
+        };
         justification.word_spacing.maximum_pct = 150;
       }
     }
     w::JustificationValues::Both | w::JustificationValues::ThaiDistribute => {
       justification.adjust = ParagraphAdjust::Block;
       if import_settings.justify_lines_with_shrinking {
-        justification.word_spacing.minimum_pct = 75;
+        justification.word_spacing.minimum_pct = if import_settings.use_far_east_layout {
+          WORD_FE_LAYOUT_SMART_JUSTIFY_MINIMUM_WORD_SPACING_PCT
+        } else {
+          75
+        };
         justification.word_spacing.maximum_pct = 150;
       }
     }
@@ -6326,9 +6370,7 @@ fn paragraph_justification(
         maximum_pct: 300,
       };
     }
-    w::JustificationValues::Left
-    | w::JustificationValues::Start
-    | w::JustificationValues::NumTab => {
+    w::JustificationValues::Left => {
       justification.adjust = if import_settings.use_literal_direction {
         if import_settings.exchange_left_right {
           ParagraphAdjust::Right
@@ -6338,6 +6380,30 @@ fn paragraph_justification(
       } else {
         ParagraphAdjust::Start
       };
+      justification.physical_left = true;
+    }
+    w::JustificationValues::NumTab => {
+      justification.adjust = if import_settings.use_literal_direction {
+        if import_settings.exchange_left_right {
+          ParagraphAdjust::Right
+        } else {
+          ParagraphAdjust::Left
+        }
+      } else {
+        ParagraphAdjust::Start
+      };
+    }
+    w::JustificationValues::Start => {
+      justification.adjust = if import_settings.use_literal_direction {
+        if import_settings.exchange_left_right {
+          ParagraphAdjust::Right
+        } else {
+          ParagraphAdjust::Left
+        }
+      } else {
+        ParagraphAdjust::Start
+      };
+      justification.logical_start = true;
     }
   }
   justification
@@ -13689,6 +13755,8 @@ fn drawingml_diagram_shape_shape(
   let smartart_text_color = context
     .smartart_text_colors_by_model_id
     .and_then(|colors| colors.get(shape.model_id.as_str()).copied());
+  let smartart_text_color =
+    drawingml_diagram_shape_text_color(shape, smartart_text_color, &context.styles.theme_colors);
   let mut text_box = drawingml_diagram_shape_text_box(shape, context.styles, smartart_text_color);
   if fill_color.is_none()
     && fill_pattern.is_none()
@@ -13788,6 +13856,23 @@ fn drawingml_diagram_shape_shape(
     shape.text_vertical_alignment = text_box.vertical_alignment;
   }
   Some(shape)
+}
+
+fn drawingml_diagram_shape_text_color(
+  shape: &dsp::Shape,
+  mapped_text_color: Option<RgbColor>,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  // ECMA-376 Part 1 §20.1.4.1.17 carries a shape's text color through
+  // a:fontRef. LibreOffice's DiagramLayoutAtom applies txFillClrLst after the
+  // style reference, so keep the diagram color mapping authoritative and use
+  // the persisted drawing's font reference only when that mapping is absent.
+  mapped_text_color.or_else(|| {
+    shape
+      .shape_style
+      .as_deref()
+      .and_then(|style| drawingml_font_reference_color(&style.font_reference, theme_colors))
+  })
 }
 
 fn drawingml_diagram_shape_text_box(
@@ -29424,6 +29509,47 @@ mod tests {
   }
 
   #[test]
+  fn body_framepr_transfers_page_break_before_and_splits_a_later_frame_group() {
+    let frame = ParagraphFrameProperties {
+      width_pt: Some(382.75),
+      height_pt: None,
+      height_rule: FrameHeightRule::Auto,
+      placement: FloatingFramePlacement {
+        vertical_anchor: FrameVerticalAnchor::Text,
+        wrap: FrameWrapMode::Around,
+        ..Default::default()
+      },
+      drop_cap: false,
+    };
+    let mut first = merge_test_paragraph("same-page frame");
+    first.format.frame = Some(frame);
+    let mut page_two = merge_test_paragraph("page two frame");
+    page_two.format.frame = Some(frame);
+    page_two.format.page_break_before = true;
+    page_two.format.page_break_before_set = true;
+    let mut continuation = merge_test_paragraph("same page-two frame");
+    continuation.format.frame = Some(frame);
+    let mut blocks = Vec::new();
+
+    push_body_paragraph(&mut blocks, first);
+    push_body_paragraph(&mut blocks, page_two);
+    push_body_paragraph(&mut blocks, continuation);
+
+    let [Block::Frame(first), Block::Frame(second)] = blocks.as_slice() else {
+      panic!("a later framed page break must start a new outer-story frame");
+    };
+    assert!(!first.page_break_before);
+    assert_eq!(first.blocks.len(), 1);
+    assert!(second.page_break_before);
+    assert_eq!(second.blocks.len(), 2);
+    let Block::Paragraph(page_two) = &second.blocks[0] else {
+      panic!("framed content paragraph");
+    };
+    assert!(!page_two.format.page_break_before);
+    assert!(!page_two.format.page_break_before_set);
+  }
+
+  #[test]
   fn repeating_story_framepr_paragraphs_become_one_floating_frame() {
     let frame = ParagraphFrameProperties {
       width_pt: None,
@@ -33747,6 +33873,39 @@ mod tests {
         g: 255,
         b: 255,
       })
+    );
+  }
+
+  #[test]
+  fn diagram_shape_font_reference_is_only_a_fallback_for_mapped_text_color() {
+    let font_reference = a::FontReference::from_bytes(
+      br#"<a:fontRef xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" idx="minor"><a:schemeClr val="lt1"/></a:fontRef>"#,
+    )
+    .expect("font reference");
+    let mut shape = dsp::Shape::default();
+    shape.shape_style = Some(Box::new(dsp::ShapeStyle {
+      font_reference: Box::new(font_reference),
+      ..Default::default()
+    }));
+    let white = RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    };
+
+    assert_eq!(
+      drawingml_diagram_shape_text_color(&shape, None, &ThemeColors::default()),
+      Some(white)
+    );
+
+    let mapped = RgbColor {
+      r: 0x52,
+      g: 0x7d,
+      b: 0x55,
+    };
+    assert_eq!(
+      drawingml_diagram_shape_text_color(&shape, Some(mapped), &ThemeColors::default(),),
+      Some(mapped)
     );
   }
 

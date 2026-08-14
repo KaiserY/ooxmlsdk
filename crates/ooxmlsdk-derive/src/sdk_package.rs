@@ -189,28 +189,49 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       #[inline]
       fn root_element(
         &self,
-        part_id: crate::common::PartId,
+        part_slot: crate::common::PartSlot,
       ) -> Option<&crate::parts::PartRootElement> {
-        self
-          .#root_elements_ident
-          .get(part_id.index())
-          .and_then(Option::as_ref)
+        self.#root_elements_ident.get(part_slot)
       }
 
       #[inline]
-      fn root_element_slot_mut(
+      fn cache_root_element(
+        &self,
+        part_slot: crate::common::PartSlot,
+        root_element: crate::parts::PartRootElement,
+      ) -> Option<&crate::parts::PartRootElement> {
+        self.#root_elements_ident.set_once(part_slot, root_element)
+      }
+
+      #[inline]
+      fn root_element_mut(
         &mut self,
-        part_id: crate::common::PartId,
-      ) -> Option<&mut Option<crate::parts::PartRootElement>> {
-        let required_len = part_id.index().checked_add(1)?;
-        if self.#root_elements_ident.len() < required_len {
-          self.#root_elements_ident.resize_with(required_len, || None);
-        }
-        self.#root_elements_ident.get_mut(part_id.index())
+        part_slot: crate::common::PartSlot,
+      ) -> Option<&mut crate::parts::PartRootElement> {
+        self.#root_elements_ident.get_mut(part_slot)
       }
 
       #[inline]
-      fn push_root_element_slot(&mut self) {}
+      fn replace_root_element(
+        &mut self,
+        part_slot: crate::common::PartSlot,
+        root_element: crate::parts::PartRootElement,
+      ) -> bool {
+        self.#root_elements_ident.replace(part_slot, root_element)
+      }
+
+      #[inline]
+      fn take_root_element(
+        &mut self,
+        part_slot: crate::common::PartSlot,
+      ) -> Option<crate::parts::PartRootElement> {
+        self.#root_elements_ident.take(part_slot)
+      }
+
+      #[inline]
+      fn push_root_element_slot(&mut self) {
+        self.#root_elements_ident.push_empty();
+      }
     }
   });
   let child_field_inits = child_infos.iter().map(|child| {
@@ -234,7 +255,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
           .filter(|(_, part)| !part.is_deleted())
           .map(|(index, part)| {
             (
-              crate::common::PartId::from_index(index),
+              crate::common::PartSlot::from_index(index),
               part.path().to_string(),
             )
           })
@@ -961,20 +982,18 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
-    pub fn get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef> {
+    pub fn get_part_by_id(
+      &self,
+      relationship_id: &str,
+    ) -> Option<crate::parts::PartRef> {
       crate::sdk::SdkPackage::get_part_by_id(self, relationship_id)
     }
 
     #[inline]
-    pub fn get_part_by_id_required(
+    pub fn try_get_part_by_id(
       &self,
       relationship_id: &str,
     ) -> Result<crate::parts::PartRef, crate::common::SdkError> {
-      crate::sdk::SdkPackage::get_part_by_id_required(self, relationship_id)
-    }
-
-    #[inline]
-    pub fn try_get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef> {
       crate::sdk::SdkPackage::try_get_part_by_id(self, relationship_id)
     }
 
@@ -991,16 +1010,11 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
-    pub fn get_id_of_part<T: crate::sdk::SdkPart>(&self, part: &T) -> Option<&str> {
-      crate::sdk::SdkPackage::get_id_of_part(self, part)
-    }
-
-    #[inline]
-    pub fn get_id_of_part_required<T: crate::sdk::SdkPart>(
+    pub fn get_id_of_part<T: crate::sdk::SdkPart>(
       &self,
       part: &T,
     ) -> Result<&str, crate::common::SdkError> {
-      crate::sdk::SdkPackage::get_id_of_part_required(self, part)
+      crate::sdk::SdkPackage::get_id_of_part(self, part)
     }
 
     #[inline]

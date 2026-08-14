@@ -46,9 +46,9 @@ fn is_part_handle_struct(fields: &syn::FieldsNamed) -> bool {
   fields
     .named
     .iter()
-    .any(|field| field.ident.as_ref().is_some_and(|ident| ident == "id"))
+    .any(|field| field.ident.as_ref().is_some_and(|ident| ident == "key"))
     && fields.named.iter().all(|field| {
-      field.ident.as_ref().is_some_and(|ident| ident == "id")
+      field.ident.as_ref().is_some_and(|ident| ident == "key")
         || part_child_field_info(&field.ty).is_some()
         || marker_inner_type(&field.ty, "PartRoot").is_some()
     })
@@ -61,8 +61,8 @@ fn expand_part_handle(
   let ident = &input.ident;
   let field_inits = fields.named.iter().map(|field| {
     let field_ident = field.ident.as_ref().unwrap();
-    if field_ident == "id" {
-      quote! { #field_ident: part_id }
+    if field_ident == "key" {
+      quote! { #field_ident: part_key }
     } else {
       quote! { #field_ident: Default::default() }
     }
@@ -70,7 +70,7 @@ fn expand_part_handle(
   let mut child_infos = Vec::new();
   let mut root_info = None;
   for field in &fields.named {
-    if field.ident.as_ref().is_some_and(|ident| ident == "id") {
+    if field.ident.as_ref().is_some_and(|ident| ident == "key") {
       continue;
     }
 
@@ -98,26 +98,28 @@ fn expand_part_handle(
   let child_methods = part_handle_child_methods_tokens(ident, &child_infos);
   let constraint_impl = part_constraint_impl_tokens(&child_infos);
   Ok(quote! {
-    impl crate::sdk::SdkPart for #ident {
-      #constraint_impl
-
+    impl crate::private::SdkPartHandle for #ident {
       #[inline]
-      fn from_part_id(part_id: crate::common::PartId) -> Self {
+      fn from_part_key(part_key: crate::common::PartKey) -> Self {
         Self {
           #( #field_inits, )*
         }
       }
 
       #[inline]
-      fn part_id(&self) -> crate::common::PartId {
-        self.id
+      fn part_key(&self) -> crate::common::PartKey {
+        self.key
       }
+    }
+
+    impl crate::sdk::SdkPart for #ident {
+      #constraint_impl
     }
 
     impl #ident {
       #[inline]
-      pub(crate) const fn part_id(&self) -> crate::common::PartId {
-        self.id
+      pub(crate) const fn part_key(&self) -> crate::common::PartKey {
+        self.key
       }
 
       #[inline]
@@ -1054,17 +1056,11 @@ fn part_handle_root_method_tokens(
     {
       let root_element = {
         let storage = crate::sdk::SdkPackage::storage(package);
-        let _part = storage.part(self.id).ok_or_else(|| {
-          crate::common::SdkError::CommonError(format!(
-            "part id {:?} is not present in package storage",
-            self.id,
-          ))
-        })?;
-        let bytes = storage.part_bytes(self.id)?;
-        if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
+        let bytes = storage.part_bytes_for_root(part_slot)?;
+        if let Some(bytes) = crate::common::decode_utf16_xml_bytes(&bytes)? {
           <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?
         } else {
-          <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?
+          <#root_ty as crate::sdk::SdkType>::from_bytes(&bytes)?
         }
       };
 
@@ -1086,7 +1082,11 @@ fn part_handle_root_method_tokens(
     impl #part_ident {
       #[inline]
       pub fn is_root_element_loaded<P: crate::sdk::SdkPackage>(&self, package: &P) -> bool {
-        crate::sdk::SdkPackage::is_root_element_loaded(package, self.id)
+        self.key
+          .resolve_optional(crate::sdk::SdkPackage::storage(package))
+          .is_some_and(|part_slot| {
+            crate::sdk::SdkPackage::is_root_element_loaded(package, part_slot)
+          })
       }
 
       #[inline]
@@ -1094,30 +1094,31 @@ fn part_handle_root_method_tokens(
         &self,
         package: &mut P,
       ) -> Option<crate::parts::PartRootElement> {
-        crate::sdk::SdkPackage::unload_root_element(package, self.id)
+        let part_slot = self
+          .key
+          .resolve_optional(crate::sdk::SdkPackage::storage(package))?;
+        crate::sdk::SdkPackage::unload_root_element(package, part_slot)
       }
 
       pub fn root_element<'a, P: crate::sdk::SdkPackage>(
         &self,
-        package: &'a mut P,
+        package: &'a P,
       ) -> Result<&'a #root_ty, crate::common::SdkError> {
-        if crate::sdk::SdkPackage::root_element(package, self.id)
+        let part_slot = self.key.resolve(crate::sdk::SdkPackage::storage(package))?;
+        if crate::sdk::SdkPackage::root_element(package, part_slot)
           .and_then(<Self as crate::sdk::SdkPartRoot>::root_element_ref)
           .is_none()
         {
           let root_element = #load_root_element;
-
-          crate::sdk::SdkPackage::storage_mut(package).discard_cached_part_bytes(self.id);
-
-          *crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
-            crate::common::SdkError::CommonError(format!(
-              "part id {:?} is not present in package root cache",
-              self.id,
-            ))
-          })? = Some(<Self as crate::sdk::SdkPartRoot>::wrap_root_element(root_element));
+          crate::sdk::SdkPackage::cache_root_element(
+            package,
+            part_slot,
+            <Self as crate::sdk::SdkPartRoot>::wrap_root_element(root_element),
+          )
+          .ok_or(crate::common::SdkError::StalePart)?;
         }
 
-        crate::sdk::SdkPackage::root_element(package, self.id)
+        crate::sdk::SdkPackage::root_element(package, part_slot)
           .and_then(<Self as crate::sdk::SdkPartRoot>::root_element_ref)
           .ok_or_else(|| {
             crate::common::SdkError::CommonError(
@@ -1131,24 +1132,9 @@ fn part_handle_root_method_tokens(
         &self,
         package: &'a mut P,
       ) -> Result<&'a mut #root_ty, crate::common::SdkError> {
-        if crate::sdk::SdkPackage::root_element(package, self.id)
-          .and_then(<Self as crate::sdk::SdkPartRoot>::root_element_ref)
-          .is_none()
-        {
-          let root_element = #load_root_element;
-
-          crate::sdk::SdkPackage::storage_mut(package).discard_cached_part_bytes(self.id);
-
-          *crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
-            crate::common::SdkError::CommonError(format!(
-              "part id {:?} is not present in package root cache",
-              self.id,
-            ))
-          })? = Some(<Self as crate::sdk::SdkPartRoot>::wrap_root_element(root_element));
-        }
-
-        crate::sdk::SdkPackage::root_element_slot_mut(package, self.id)
-          .and_then(Option::as_mut)
+        self.root_element(package)?;
+        let part_slot = self.key.resolve(crate::sdk::SdkPackage::storage(package))?;
+        crate::sdk::SdkPackage::root_element_mut(package, part_slot)
           .and_then(<Self as crate::sdk::SdkPartRoot>::root_element_mut)
           .ok_or_else(|| {
             crate::common::SdkError::CommonError(
@@ -1163,14 +1149,14 @@ fn part_handle_root_method_tokens(
         package: &mut P,
         root_element: #root_ty,
       ) -> Result<(), crate::common::SdkError> {
-        *crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
-          crate::common::SdkError::CommonError(format!(
-            "part id {:?} is not present in package root cache",
-            self.id,
-          ))
-        })? = Some(<Self as crate::sdk::SdkPartRoot>::wrap_root_element(root_element));
-
-        Ok(())
+        let part_slot = self.key.resolve(crate::sdk::SdkPackage::storage(package))?;
+        crate::sdk::SdkPackage::replace_root_element(
+          package,
+          part_slot,
+          <Self as crate::sdk::SdkPartRoot>::wrap_root_element(root_element),
+        )
+        .then_some(())
+        .ok_or(crate::common::SdkError::StalePart)
       }
     }
   }
@@ -1191,9 +1177,7 @@ fn part_handle_child_methods_tokens(
     let map_relationship = quote! {
       move |relationship: &crate::common::RelationshipInfo| {
         if #relationship_matches {
-          relationship
-            .target_part_id()
-            .map(<#part_ty as crate::sdk::SdkPart>::from_part_id)
+          crate::sdk::relationship_target_as_part::<#part_ty>(storage, relationship)
         } else {
           None
         }
@@ -1207,9 +1191,12 @@ fn part_handle_child_methods_tokens(
           package: &'a P,
         ) -> impl Iterator<Item = #part_ty> + 'a {
           let _ = &self.#method_ident;
-          crate::sdk::SdkPackage::storage(package).relationships(self.id)
+          let storage = crate::sdk::SdkPackage::storage(package);
+          self.key
+            .resolve_optional(storage)
             .into_iter()
-            .flat_map(|relationships| relationships.iter())
+            .flat_map(move |part_slot| storage.relationships(part_slot))
+            .flat_map(crate::common::RelationshipSet::iter)
             .filter_map(#map_relationship)
         }
       },
@@ -1219,352 +1206,307 @@ fn part_handle_child_methods_tokens(
           package: &P,
         ) -> Option<#part_ty> {
           let _ = &self.#method_ident;
-          crate::sdk::SdkPackage::storage(package).relationships(self.id)
+          let storage = crate::sdk::SdkPackage::storage(package);
+          self.key
+            .resolve_optional(storage)
             .into_iter()
-            .flat_map(|relationships| relationships.iter())
+            .flat_map(move |part_slot| storage.relationships(part_slot))
+            .flat_map(crate::common::RelationshipSet::iter)
             .find_map(#map_relationship)
         }
       },
     }
   });
 
-  let part_ref_from_relationship = quote! {
-    fn part_ref_from_relationship<P: crate::sdk::SdkPackage>(
-      package: &P,
-      relationship: &crate::common::RelationshipInfo,
-    ) -> Option<crate::parts::PartRef> {
-      let _ = relationship.target_part_id()?;
-      crate::parts::PartRef::from_relationship_storage(
-        crate::sdk::SdkPackage::storage(package),
-        relationship,
-      )
-    }
-  };
-
   quote! {
-    impl #part_ident {
-      pub fn parts<'a, P: crate::sdk::SdkPackage>(
-        &'a self,
-        package: &'a P,
-      ) -> impl Iterator<Item = crate::parts::IdPartPair<'a>> + 'a {
-        crate::sdk::SdkPackage::storage(package).relationships(self.id)
-          .into_iter()
-          .flat_map(|relationships| relationships.iter())
-          .filter_map(|relationship| {
-            let part = Self::part_ref_from_relationship(package, relationship)?;
-            Some(crate::parts::IdPartPair::new(relationship.id(), part))
-          })
-      }
+      impl #part_ident {
+        pub fn parts<'a, P: crate::sdk::SdkPackage>(
+          &'a self,
+          package: &'a P,
+        ) -> impl Iterator<Item = crate::parts::IdPartPair<'a>> + 'a {
+          <Self as crate::sdk::SdkPart>::parts(self, package)
+        }
 
-      #[inline]
-      pub fn get_all_parts<'a, P: crate::sdk::SdkPackage>(
-        &'a self,
-        package: &'a P,
-      ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
-        <Self as crate::sdk::SdkPart>::get_all_parts(self, package)
-      }
+        #[inline]
+        pub fn get_all_parts<'a, P: crate::sdk::SdkPackage>(
+          &'a self,
+          package: &'a P,
+        ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
+          <Self as crate::sdk::SdkPart>::get_all_parts(self, package)
+        }
 
-      #[inline]
-      pub fn get_parent_parts<'a, P: crate::sdk::SdkPackage>(
-        &'a self,
-        package: &'a P,
-      ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
-        <Self as crate::sdk::SdkPart>::get_parent_parts(self, package)
-      }
+        #[inline]
+        pub fn get_parent_parts<'a, P: crate::sdk::SdkPackage>(
+          &'a self,
+          package: &'a P,
+        ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
+          <Self as crate::sdk::SdkPart>::get_parent_parts(self, package)
+        }
 
-      #[inline]
-      pub fn get_part_by_id<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &P,
-        relationship_id: &str,
-      ) -> Option<crate::parts::PartRef> {
-        let relationship =
-          crate::sdk::SdkPackage::storage(package).relationships(self.id)?.get(relationship_id)?;
-        Self::part_ref_from_relationship(package, relationship)
-      }
+        #[inline]
+        pub fn get_part_by_id<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &P,
+          relationship_id: &str,
+        ) -> Option<crate::parts::PartRef> {
+          <Self as crate::sdk::SdkPart>::get_part_by_id(self, package, relationship_id)
+        }
 
-      #[inline]
-      pub fn get_part_by_id_required<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &P,
-        relationship_id: &str,
-      ) -> Result<crate::parts::PartRef, crate::common::SdkError> {
-        self.get_part_by_id(package, relationship_id).ok_or_else(|| {
-          crate::common::SdkError::CommonError(format!(
-            "part relationship id {relationship_id} does not exist"
-          ))
-        })
-      }
+        #[inline]
+        pub fn try_get_part_by_id<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &P,
+          relationship_id: &str,
+        ) -> Result<crate::parts::PartRef, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::try_get_part_by_id(self, package, relationship_id)
+        }
 
-      #[inline]
-      pub fn try_get_part_by_id<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &P,
-        relationship_id: &str,
-      ) -> Option<crate::parts::PartRef> {
-        self.get_part_by_id(package, relationship_id)
-      }
+        pub fn get_parts_of_type<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
+          &'a self,
+          package: &'a P,
+        ) -> impl Iterator<Item = T> + 'a {
+          <Self as crate::sdk::SdkPart>::get_parts_of_type::<P, T>(self, package)
+        }
 
-      pub fn get_parts_of_type<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
-        &'a self,
-        package: &'a P,
-      ) -> impl Iterator<Item = T> + 'a {
-        <Self as crate::sdk::SdkPart>::get_parts_of_type::<P, T>(self, package)
-      }
+        pub fn get_id_of_part<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
+          &'a self,
+          package: &'a P,
+          part: &T,
+        ) -> Result<&'a str, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::get_id_of_part(self, package, part)
+        }
 
-      pub fn get_id_of_part<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
-        &'a self,
-        package: &'a P,
-        part: &T,
-      ) -> Option<&'a str> {
-        let target_part_id = part.part_id();
-        crate::sdk::SdkPackage::storage(package).relationships(self.id)?.iter().find_map(|relationship| {
-          (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
-        })
-      }
+        #[inline]
+        pub fn change_id_of_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
+          &self,
+          package: &mut P,
+          part: &T,
+          new_relationship_id: impl Into<String>,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::change_id_of_part(
+            self,
+            package,
+            part,
+            new_relationship_id,
+          )
+        }
 
-      #[inline]
-      pub fn get_id_of_part_required<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
-        &'a self,
-        package: &'a P,
-        part: &T,
-      ) -> Result<&'a str, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::get_id_of_part_required(self, package, part)
-      }
+        #[inline]
+        pub fn delete_part_by_id<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &mut P,
+          relationship_id: &str,
+        ) -> Result<bool, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::delete_part_by_id(self,
+            package,
+            relationship_id,
+          )
+        }
 
-      #[inline]
-      pub fn change_id_of_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
-        &self,
-        package: &mut P,
-        part: &T,
-        new_relationship_id: impl Into<String>,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::change_id_of_part(
-          self,
-          package,
-          part,
-          new_relationship_id,
-        )
-      }
+        #[inline]
+        pub fn delete_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
+          &self,
+          package: &mut P,
+          part: T,
+        ) -> Result<bool, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::delete_part(self, package, part)
+        }
 
-      #[inline]
-      pub fn delete_part_by_id<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &mut P,
-        relationship_id: &str,
-      ) -> Result<bool, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::delete_part_by_id(self,
-          package,
-          relationship_id,
-        )
-      }
+        #[inline]
+        pub fn delete_parts<P, T, I>(
+          &self,
+          package: &mut P,
+          parts: I,
+        ) -> Result<(), crate::common::SdkError>
+        where
+          P: crate::sdk::SdkPackage,
+          T: crate::sdk::SdkPart,
+          I: IntoIterator<Item = T>,
+        {
+          <Self as crate::sdk::SdkPart>::delete_parts(self, package, parts)
+        }
 
-      #[inline]
-      pub fn delete_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
-        &self,
-        package: &mut P,
-        part: T,
-      ) -> Result<bool, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::delete_part(self, package, part)
-      }
+        #[inline]
+        pub fn add_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
+          &self,
+          package: &mut P,
+          part: T,
+        ) -> Result<T, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_part(self, package, part)
+        }
 
-      #[inline]
-      pub fn delete_parts<P, T, I>(
-        &self,
-        package: &mut P,
-        parts: I,
-      ) -> Result<(), crate::common::SdkError>
-      where
-        P: crate::sdk::SdkPackage,
-        T: crate::sdk::SdkPart,
-        I: IntoIterator<Item = T>,
-      {
-        <Self as crate::sdk::SdkPart>::delete_parts(self, package, parts)
-      }
+        #[inline]
+        pub fn add_part_with_id<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
+          &self,
+          package: &mut P,
+          part: T,
+          relationship_id: impl Into<String>,
+        ) -> Result<T, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_part_with_id(self,
+            package,
+            part,
+            relationship_id,
+          )
+        }
 
-      #[inline]
-      pub fn add_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
-        &self,
-        package: &mut P,
-        part: T,
-      ) -> Result<T, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_part(self, package, part)
-      }
+        #[inline]
+        pub fn add_part_from_package<
+          P: crate::sdk::SdkPackage,
+          S: crate::sdk::SdkPackage,
+          T: crate::sdk::SdkPart,
+        >(
+          &self,
+          package: &mut P,
+          source_package: &S,
+          part: &T,
+        ) -> Result<T, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_part_from_package(
+            self,
+            package,
+            source_package,
+            part,
+          )
+        }
 
-      #[inline]
-      pub fn add_part_with_id<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
-        &self,
-        package: &mut P,
-        part: T,
-        relationship_id: impl Into<String>,
-      ) -> Result<T, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_part_with_id(self,
-          package,
-          part,
-          relationship_id,
-        )
-      }
+        #[inline]
+        pub fn add_part_from_package_with_id<
+          P: crate::sdk::SdkPackage,
+          S: crate::sdk::SdkPackage,
+          T: crate::sdk::SdkPart,
+        >(
+          &self,
+          package: &mut P,
+          source_package: &S,
+          part: &T,
+          relationship_id: impl Into<String>,
+        ) -> Result<T, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_part_from_package_with_id(
+            self,
+            package,
+            source_package,
+            part,
+            relationship_id,
+          )
+        }
 
-      #[inline]
-      pub fn add_part_from_package<
-        P: crate::sdk::SdkPackage,
-        S: crate::sdk::SdkPackage,
-        T: crate::sdk::SdkPart,
-      >(
-        &self,
-        package: &mut P,
-        source_package: &S,
-        part: &T,
-      ) -> Result<T, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_part_from_package(
-          self,
-          package,
-          source_package,
-          part,
-        )
-      }
+        #[inline]
+        pub fn create_relationship_to_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
+          &self,
+          package: &mut P,
+          part: T,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::create_relationship_to_part(self,
+            package,
+            part,
+          )
+        }
 
-      #[inline]
-      pub fn add_part_from_package_with_id<
-        P: crate::sdk::SdkPackage,
-        S: crate::sdk::SdkPackage,
-        T: crate::sdk::SdkPart,
-      >(
-        &self,
-        package: &mut P,
-        source_package: &S,
-        part: &T,
-        relationship_id: impl Into<String>,
-      ) -> Result<T, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_part_from_package_with_id(
-          self,
-          package,
-          source_package,
-          part,
-          relationship_id,
-        )
-      }
+        #[inline]
+        pub fn create_relationship_to_part_with_id<
+          P: crate::sdk::SdkPackage,
+          T: crate::sdk::SdkPart,
+        >(
+          &self,
+          package: &mut P,
+          part: T,
+          relationship_id: impl Into<String>,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::create_relationship_to_part_with_id(self,
+            package,
+            part,
+            relationship_id,
+          )
+        }
 
-      #[inline]
-      pub fn create_relationship_to_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
-        &self,
-        package: &mut P,
-        part: T,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::create_relationship_to_part(self,
-          package,
-          part,
-        )
-      }
+        #[inline]
+        pub fn add_audio_reference_relationship<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &mut P,
+          media_data_part: &crate::common::MediaDataPart,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_audio_reference_relationship(self,
+            package,
+            media_data_part,
+          )
+        }
 
-      #[inline]
-      pub fn create_relationship_to_part_with_id<
-        P: crate::sdk::SdkPackage,
-        T: crate::sdk::SdkPart,
-      >(
-        &self,
-        package: &mut P,
-        part: T,
-        relationship_id: impl Into<String>,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::create_relationship_to_part_with_id(self,
-          package,
-          part,
-          relationship_id,
-        )
-      }
+        #[inline]
+        pub fn add_audio_reference_relationship_with_id<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &mut P,
+          media_data_part: &crate::common::MediaDataPart,
+          relationship_id: impl Into<String>,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_audio_reference_relationship_with_id(self,
+            package,
+            media_data_part,
+            relationship_id,
+          )
+        }
 
-      #[inline]
-      pub fn add_audio_reference_relationship<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &mut P,
-        media_data_part: &crate::common::MediaDataPart,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_audio_reference_relationship(self,
-          package,
-          media_data_part,
-        )
-      }
+        #[inline]
+        pub fn add_media_reference_relationship<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &mut P,
+          media_data_part: &crate::common::MediaDataPart,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_media_reference_relationship(self,
+            package,
+            media_data_part,
+          )
+        }
 
-      #[inline]
-      pub fn add_audio_reference_relationship_with_id<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &mut P,
-        media_data_part: &crate::common::MediaDataPart,
-        relationship_id: impl Into<String>,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_audio_reference_relationship_with_id(self,
-          package,
-          media_data_part,
-          relationship_id,
-        )
-      }
+        #[inline]
+        pub fn add_media_reference_relationship_with_id<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &mut P,
+          media_data_part: &crate::common::MediaDataPart,
+          relationship_id: impl Into<String>,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_media_reference_relationship_with_id(self,
+            package,
+            media_data_part,
+            relationship_id,
+          )
+        }
 
-      #[inline]
-      pub fn add_media_reference_relationship<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &mut P,
-        media_data_part: &crate::common::MediaDataPart,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_media_reference_relationship(self,
-          package,
-          media_data_part,
-        )
-      }
+        #[inline]
+        pub fn add_video_reference_relationship<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &mut P,
+          media_data_part: &crate::common::MediaDataPart,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_video_reference_relationship(self,
+            package,
+            media_data_part,
+          )
+        }
 
-      #[inline]
-      pub fn add_media_reference_relationship_with_id<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &mut P,
-        media_data_part: &crate::common::MediaDataPart,
-        relationship_id: impl Into<String>,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_media_reference_relationship_with_id(self,
-          package,
-          media_data_part,
-          relationship_id,
-        )
-      }
+        #[inline]
+        pub fn add_video_reference_relationship_with_id<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &mut P,
+          media_data_part: &crate::common::MediaDataPart,
+          relationship_id: impl Into<String>,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_video_reference_relationship_with_id(self,
+            package,
+            media_data_part,
+            relationship_id,
+          )
+        }
 
-      #[inline]
-      pub fn add_video_reference_relationship<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &mut P,
-        media_data_part: &crate::common::MediaDataPart,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_video_reference_relationship(self,
-          package,
-          media_data_part,
-        )
-      }
-
-      #[inline]
-      pub fn add_video_reference_relationship_with_id<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &mut P,
-        media_data_part: &crate::common::MediaDataPart,
-        relationship_id: impl Into<String>,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_video_reference_relationship_with_id(self,
-          package,
-          media_data_part,
-          relationship_id,
-        )
-      }
-
-      #[inline]
-      pub fn add_data_part_reference_relationship_from_existing<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &mut P,
-        relationship: crate::common::Relationship,
-      ) -> Result<String, crate::common::SdkError> {
-        <Self as crate::sdk::SdkPart>::add_data_part_reference_relationship_from_existing(self,
-          package,
-          relationship,
-        )
-      }
-
-      #part_ref_from_relationship
+        #[inline]
+        pub fn add_data_part_reference_relationship_from_existing<P: crate::sdk::SdkPackage>(
+          &self,
+          package: &mut P,
+          relationship: crate::common::Relationship,
+        ) -> Result<String, crate::common::SdkError> {
+          <Self as crate::sdk::SdkPart>::add_data_part_reference_relationship_from_existing(self,
+            package,
+            relationship,
+          )
+        }
 
       #( #accessors )*
     }

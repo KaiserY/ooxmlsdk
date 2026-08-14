@@ -433,22 +433,14 @@ fn binary_resource_from_media_data_part(
   })
 }
 
-fn media_data_part_by_id(
-  package: &PresentationDocument,
-  part_id: ooxmlsdk::common::PartId,
-) -> Option<MediaDataPart> {
-  package
-    .media_data_parts()
-    .find(|part| part.part_id() == Some(part_id))
-}
-
 fn media_resource_from_relationship(
   package: &PresentationDocument,
   relationship: RelationshipRef<'_>,
 ) -> MediaResource {
   let data = relationship
-    .target_part_id()
-    .and_then(|part_id| media_data_part_by_id(package, part_id))
+    .target_media_data_part(package)
+    .ok()
+    .flatten()
     .and_then(|part| binary_resource_from_media_data_part(package, &part));
   MediaResource {
     relationship_id: relationship.id().to_string(),

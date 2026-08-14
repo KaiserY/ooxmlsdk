@@ -261,7 +261,7 @@ to typed source structs and stable source identities:
 &'doc w::Paragraph / &'doc w::Run / &'doc w::Table
 &'doc x::Worksheet / &'doc x::Row / &'doc x::Cell
 &'doc p::Slide / &'doc p::Shape / &'doc a::Paragraph
-PartId + engine-specific path indexes
+opaque part source identities + engine-specific path indexes
 ```
 
 Use `SourceRef`-style identities for hit testing, debug output, accessibility

@@ -16,16 +16,14 @@ pub use error::{
   validation_error,
 };
 #[cfg(feature = "parts")]
-pub(crate) use package::PackageId;
-#[cfg(feature = "parts")]
 pub(crate) use package::{
-  NewPartDescriptor, NewPartTargetMode, PackageSaveEntry, RelationshipInfo, RelationshipSet,
-  SdkPackageStorage, StoredPart, create_package_temp_file, default_part_extension_for_content_type,
-  replace_package_file,
+  NewPartDescriptor, NewPartTargetMode, PackageSaveEntry, PackageToken, PartKey, PartSlot,
+  RelationshipInfo, RelationshipSet, SdkPackageStorage, StoredPart, create_package_temp_file,
+  default_part_extension_for_content_type, replace_package_file,
 };
 #[cfg(feature = "parts")]
 pub use package::{
-  PartId, ReferenceRelationshipKind, Relationship, RelationshipRef, RelationshipTargetKind,
+  ReferenceRelationshipKind, Relationship, RelationshipRef, RelationshipTargetKind,
 };
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;

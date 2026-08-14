@@ -12,3 +12,6 @@ pub mod simple_type;
 pub mod units;
 #[cfg(feature = "validators")]
 pub mod validator;
+
+#[cfg(feature = "parts")]
+mod private;

@@ -3022,9 +3022,11 @@ fn header_blocks(
         }
         _ => None,
       })?;
-  let header_part = main
-    .header_parts(package)
-    .find(|part| main.get_id_of_part(package, part) == Some(relationship_id))?;
+  let header_part = main.header_parts(package).find(|part| {
+    main
+      .get_id_of_part(package, part)
+      .is_ok_and(|id| id == relationship_id)
+  })?;
   let images = ImageCatalog::load_from_header(package, &header_part);
   let hyperlinks = HyperlinkCatalog::load(package, &header_part);
   let header = header_part.root_element(package).ok()?;
@@ -3152,9 +3154,11 @@ fn footer_blocks(
         }
         _ => None,
       })?;
-  let footer_part = main
-    .footer_parts(package)
-    .find(|part| main.get_id_of_part(package, part) == Some(relationship_id))?;
+  let footer_part = main.footer_parts(package).find(|part| {
+    main
+      .get_id_of_part(package, part)
+      .is_ok_and(|id| id == relationship_id)
+  })?;
   let images = ImageCatalog::load_from_footer(package, &footer_part);
   let hyperlinks = HyperlinkCatalog::load(package, &footer_part);
   let footer = footer_part.root_element(package).ok()?;

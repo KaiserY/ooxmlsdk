@@ -269,7 +269,7 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
     quote! {
       #[derive(Clone, Debug, Eq, PartialEq)]
         pub struct ExtendedPart {
-          pub(crate) id: crate::common::PartId,
+          pub(crate) key: crate::common::PartKey,
         }
       impl crate::sdk::SdkPartDescriptor for ExtendedPart {
         const KIND: crate::parts::PartKind = crate::parts::PartKind::ExtendedPart;
@@ -278,6 +278,18 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
         const CONTENT_TYPE: &'static str = "";
         const TARGET_NAME: &'static str = "extendedPart";
         const EXTENSION: &'static str = "";
+      }
+
+      impl crate::private::SdkPartHandle for ExtendedPart {
+        #[inline]
+        fn from_part_key(part_key: crate::common::PartKey) -> Self {
+          Self { key: part_key }
+        }
+
+        #[inline]
+        fn part_key(&self) -> crate::common::PartKey {
+          self.key
+        }
       }
 
       impl crate::sdk::SdkPart for ExtendedPart {
@@ -290,17 +302,6 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
         ) -> Option<crate::sdk::PartConstraint> {
           None
         }
-
-        #[inline]
-        fn from_part_id(part_id: crate::common::PartId) -> Self {
-          Self { id: part_id }
-        }
-
-        #[inline]
-        fn part_id(&self) -> crate::common::PartId {
-          self.id
-        }
-
       }
     },
   )?;

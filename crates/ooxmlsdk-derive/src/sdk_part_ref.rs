@@ -49,12 +49,12 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     }
   });
 
-  let part_id_arms = variants.iter().map(|variant| {
+  let part_key_arms = variants.iter().map(|variant| {
     let attrs = cfg_attrs(&variant.attrs);
     let variant_ident = &variant.ident;
     quote! {
       #( #attrs )*
-      Self::#variant_ident(part) => <_ as crate::sdk::SdkPart>::part_id(part),
+      Self::#variant_ident(part) => <_ as crate::private::SdkPartHandle>::part_key(part),
     }
   });
 
@@ -115,7 +115,9 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       let content_type = LitByteStr::new(descriptor.content_type.as_bytes(), Span::call_site());
       let path_prefix = descriptor.path_prefix.as_str();
       let target_name = descriptor.target_name.as_str();
-      let content_type_match = quote! { content_type == #content_type };
+      let content_type_match = quote! {
+        crate::sdk::part_content_type_matches_bytes(#content_type, content_type)
+      };
       let part_ref_guard = if descriptor.content_type.is_empty() {
         quote! { true }
       } else {
@@ -190,7 +192,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         quote! {
           #( #attrs )*
           PartKind::#variant_ident => {
-            let part = <#variant_ty as crate::sdk::SdkPart>::from_part_id(part_id);
+            let part = <#variant_ty as crate::private::SdkPartHandle>::from_part_key(part_key);
             Some(Self::#variant_ident(part))
           },
         }
@@ -305,7 +307,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       PartKind::#variant_ident => #content_type.as_slice(),
     }
   });
-  let root_from_part_id_arms = root_variants.clone().map(|(variant, root)| {
+  let root_from_part_key_arms = root_variants.clone().map(|(variant, root)| {
     let attrs = cfg_attrs(&variant.attrs);
     let variant_ident = &variant.ident;
     let root_ty = &root.element_ty;
@@ -404,12 +406,12 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         }
       }
 
-      pub(crate) fn from_part_id(
+      pub(crate) fn from_part_slot(
         storage: &crate::common::SdkPackageStorage,
-        part_id: crate::common::PartId,
+        part_slot: crate::common::PartSlot,
         open_settings: &crate::sdk::OpenSettings,
       ) -> Result<Option<Self>, crate::common::SdkError> {
-        let Some(part) = storage.part(part_id) else {
+        let Some(part) = storage.part(part_slot) else {
           return Ok(None);
         };
         #[cfg(not(feature = "mce"))]
@@ -424,7 +426,8 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         ) {
           return Ok(None);
         }
-        let bytes = storage.part_bytes(part_id)?;
+        let bytes = storage.part_bytes_for_root(part_slot)?;
+        let bytes = bytes.as_ref();
         if matches!(part.kind(), PartKind::ChartPart)
           && crate::common::root_element_matches_namespace_local(
             bytes,
@@ -437,7 +440,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         let decoded_bytes = crate::common::decode_utf16_xml_bytes(bytes)?;
         let bytes = decoded_bytes.as_deref().unwrap_or(bytes);
         match part.kind() {
-          #( #root_from_part_id_arms )*
+          #( #root_from_part_key_arms )*
           _ => Ok(None),
         }
       }
@@ -449,18 +452,25 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
 
     impl #ident {
       #[inline]
-      pub fn part_id(&self) -> crate::common::PartId {
+      pub fn path<'a, P: crate::sdk::SdkPackage>(&self, package: &'a P) -> Option<&'a str> {
+        let storage = crate::sdk::SdkPackage::storage(package);
+        let part_slot = self.part_key().resolve_optional(storage)?;
+        storage.part(part_slot).map(crate::common::StoredPart::path)
+      }
+
+      #[inline]
+      pub(crate) fn part_key(&self) -> crate::common::PartKey {
         match self {
-          #( #part_id_arms )*
+          #( #part_key_arms )*
         }
       }
 
       #[inline]
-      pub(crate) fn from_part_id<P: crate::sdk::SdkPackage>(
+      pub(crate) fn from_part_slot<P: crate::sdk::SdkPackage>(
         package: &P,
-        part_id: crate::common::PartId,
+        part_slot: crate::common::PartSlot,
       ) -> Option<Self> {
-        Self::from_storage(crate::sdk::SdkPackage::storage(package), part_id)
+        Self::from_storage(crate::sdk::SdkPackage::storage(package), part_slot)
       }
 
       #[inline]
@@ -468,25 +478,29 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         storage: &crate::common::SdkPackageStorage,
         relationship: &crate::common::RelationshipInfo,
       ) -> Option<Self> {
-        Self::from_storage(storage, relationship.target_part_id()?)
+        if !relationship.is_child_part_relationship() {
+          return None;
+        }
+        Self::from_storage(storage, relationship.target_part_slot()?)
       }
 
       fn from_storage(
         storage: &crate::common::SdkPackageStorage,
-        part_id: crate::common::PartId,
+        part_slot: crate::common::PartSlot,
       ) -> Option<Self> {
-        let part = storage.part(part_id)?;
+        let part = storage.part(part_slot)?;
+        let part_key = storage.part_key(part_slot);
         match part.kind() {
           #( #part_ref_from_kind_arms )*
           PartKind::#extended_ident => {
-            Some(Self::extended_part(part_id))
+            Some(Self::extended_part(part_key))
           },
         }
       }
 
       #[inline]
-      fn extended_part(part_id: crate::common::PartId) -> Self {
-        let part = <#extended_ty as crate::sdk::SdkPart>::from_part_id(part_id);
+      fn extended_part(part_key: crate::common::PartKey) -> Self {
+        let part = <#extended_ty as crate::private::SdkPartHandle>::from_part_key(part_key);
         Self::#extended_ident(part)
       }
     }

@@ -6,71 +6,53 @@ use super::SdkError;
 
 #[derive(Clone, Debug, Default)]
 pub struct MediaDataPart {
-  pub(crate) package_id: Option<crate::common::PackageId>,
-  pub(crate) id: Option<crate::common::PartId>,
+  pub(crate) key: Option<crate::common::PartKey>,
   pub inner_path: String,
   pub part_content: Vec<u8>,
 }
 
 impl MediaDataPart {
   #[inline]
-  pub(crate) fn from_part_id(
-    package_id: crate::common::PackageId,
-    part_id: crate::common::PartId,
+  pub(crate) fn from_part_slot(
+    package_token: crate::common::PackageToken,
+    part_slot: crate::common::PartSlot,
     path: impl Into<String>,
   ) -> Self {
     Self {
-      package_id: Some(package_id),
-      id: Some(part_id),
+      key: Some(crate::common::PartKey::new(package_token, part_slot)),
       inner_path: path.into(),
       part_content: Vec::new(),
     }
   }
 
   #[inline]
-  pub fn part_id(&self) -> Option<crate::common::PartId> {
-    self.id
+  pub fn is_same_part(&self, other: &Self) -> bool {
+    self.key.is_some() && self.key == other.key
   }
 
   #[inline]
-  pub(crate) fn part_id_for_package<P: crate::sdk::SdkPackage>(
+  pub(crate) fn part_slot_for_package<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
-  ) -> Result<crate::common::PartId, SdkError> {
-    let part_id = self
-      .id
+  ) -> Result<crate::common::PartSlot, SdkError> {
+    let key = self
+      .key
       .ok_or_else(|| SdkError::CommonError("media data part is not package-backed".to_string()))?;
-    if self.package_id != Some(package.storage().id()) {
-      return Err(SdkError::CommonError(
-        "media data part belongs to a different package".to_string(),
-      ));
-    }
-    if package.storage().part(part_id).is_none() {
-      return Err(SdkError::CommonError(format!(
-        "part id {part_id:?} is not present in package storage"
-      )));
-    }
-    Ok(part_id)
+    key.resolve(package.storage())
   }
 
   #[inline]
   pub fn path<'a, P: crate::sdk::SdkPackage>(&'a self, package: &'a P) -> Option<&'a str> {
-    let part_id = self.id?;
-    if self.package_id != Some(package.storage().id()) {
-      return None;
-    }
-    package.storage().part(part_id).map(|part| part.path())
+    let part_slot = self.key?.resolve_optional(package.storage())?;
+    package.storage().part(part_slot).map(|part| part.path())
   }
 
   #[inline]
   pub fn content_type<'a, P: crate::sdk::SdkPackage>(&'a self, package: &'a P) -> Option<&'a str> {
-    let part_id = self.id?;
-    if self.package_id != Some(package.storage().id()) {
-      return None;
-    }
+    let part_slot = self.key?.resolve_optional(package.storage())?;
     package
       .storage()
-      .part(part_id)
+      .part(part_slot)
       .map(|part| part.content_type())
   }
 
@@ -84,13 +66,11 @@ impl MediaDataPart {
     &'a self,
     package: &'a P,
   ) -> Result<Option<&'a [u8]>, SdkError> {
-    let Some(part_id) = self.id else {
+    let Some(key) = self.key else {
       return Ok(None);
     };
-    if self.package_id != Some(package.storage().id()) {
-      return Ok(None);
-    }
-    package.storage().part_bytes(part_id).map(Some)
+    let part_slot = key.resolve(package.storage())?;
+    package.storage().part_bytes(part_slot).map(Some)
   }
 
   #[inline]
@@ -98,14 +78,15 @@ impl MediaDataPart {
     &'a self,
     package: &'a P,
   ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    let part_id = (self.package_id == Some(package.storage().id()))
-      .then_some(self.id)
-      .flatten();
-    part_id.into_iter().flat_map(move |part_id| {
+    let part_slot = self
+      .key
+      .and_then(|key| key.resolve_optional(package.storage()));
+    let package_token = package.storage().token();
+    part_slot.into_iter().flat_map(move |part_slot| {
       package
         .storage()
-        .data_part_reference_relationships_to(part_id)
-        .map(Into::into)
+        .data_part_reference_relationships_to(part_slot)
+        .map(move |relationship| crate::common::RelationshipRef::new(package_token, relationship))
     })
   }
 
@@ -123,8 +104,8 @@ impl MediaDataPart {
     package: &mut P,
     data: Vec<u8>,
   ) -> Result<(), SdkError> {
-    let part_id = self.part_id_for_package(package)?;
-    package.storage_mut().set_part_data(part_id, data)
+    let part_slot = self.part_slot_for_package(package)?;
+    package.storage_mut().set_part_data(part_slot, data)
   }
 
   pub(crate) fn new_from_archive<R: Read + Seek>(
@@ -137,8 +118,7 @@ impl MediaDataPart {
     zip_entry.read_to_end(&mut part_content)?;
 
     Ok(Self {
-      package_id: None,
-      id: None,
+      key: None,
       inner_path: path.to_string(),
       part_content,
     })

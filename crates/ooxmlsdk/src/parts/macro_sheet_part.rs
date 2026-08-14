@@ -6,7 +6,7 @@
 
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct MacroSheetPart {
-  pub(crate) id: crate::common::PartId,
+  pub(crate) key: crate::common::PartKey,
   pub(crate) root_element:
     crate::sdk::PartRoot<crate::schemas::schemas_microsoft_com_office_excel_2006_main::Macrosheet>,
   pub(crate) spreadsheet_printer_settings_parts: crate::sdk::RepeatedPart<

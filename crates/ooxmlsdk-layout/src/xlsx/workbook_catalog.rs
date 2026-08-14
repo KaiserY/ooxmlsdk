@@ -365,10 +365,11 @@ fn ordered_external_workbook_parts(
 
   let mut ordered = Vec::with_capacity(parts.len());
   for reference_id in reference_ids {
-    if let Some(part) = parts
-      .iter()
-      .find(|part| workbook_part.get_id_of_part(package, *part) == Some(reference_id.as_str()))
-    {
+    if let Some(part) = parts.iter().find(|part| {
+      workbook_part
+        .get_id_of_part(package, *part)
+        .is_ok_and(|id| id == reference_id)
+    }) {
       ordered.push(part.clone());
     }
   }

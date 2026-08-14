@@ -387,9 +387,11 @@ impl<'a> FontRegistry<'a> {
     // best system face whose OpenType code-page, pitch, and family metadata
     // does.  This is the portable equivalent of the final GDI font-mapper
     // phase and avoids maintaining a table of locale-specific font names.
-    if request.charset.is_some() && !self.has_exact_characteristics_match(request) {
+    if let Some(charset) = request.charset
+      && !self.has_exact_characteristics_match(request)
+    {
       let query_family = PlatformFontQueryFamily::Characteristics {
-        charset: request.charset.expect("checked above"),
+        charset,
         family_class: request.family_class,
         pitch: request.pitch,
       };
@@ -1456,7 +1458,6 @@ impl<'a> FontFaceInfo<'a> {
       cff2: face.cff2().is_ok(),
       variable: !axes.is_empty(),
       kashida_positions: face.morx().is_err(),
-      ..FontFlags::default()
     };
     let metrics = font_metrics_from_skrifa(&face, 1.0);
     let attributes = face.attributes();

@@ -23,6 +23,18 @@ pub enum SdkError {
   #[cfg(feature = "parts")]
   #[error("ZipError")]
   ZipError(#[from] zip::result::ZipError),
+  #[cfg(feature = "parts")]
+  #[error("part belongs to a different package")]
+  ForeignPart,
+  #[cfg(feature = "parts")]
+  #[error("part is no longer present in its package")]
+  StalePart,
+  #[cfg(feature = "parts")]
+  #[error("part is not directly referenced by this relationship source")]
+  PartNotReferenced,
+  #[cfg(feature = "parts")]
+  #[error("part relationship `{relationship_id}` does not exist")]
+  PartRelationshipNotFound { relationship_id: String },
   #[error("mismatch error (expected {expected:?}, found {found:?})")]
   MismatchError { expected: String, found: String },
   #[error("CommonError")]

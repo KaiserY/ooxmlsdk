@@ -6,7 +6,7 @@
 
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WordprocessingCommentsExPart {
-  pub(crate) id: crate::common::PartId,
+  pub(crate) key: crate::common::PartKey,
   pub(crate) root_element:
     crate::sdk::PartRoot<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::CommentsEx>,
   pub(crate) alternative_format_import_parts: crate::sdk::RepeatedPart<

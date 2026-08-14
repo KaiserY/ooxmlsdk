@@ -253,10 +253,12 @@ impl PresentationFragmentHandler {
     package: &PresentationDocument,
     relationship_id: &str,
   ) -> Option<SlidePart> {
-    self
-      .presentation_part
-      .slide_parts(package)
-      .find(|part| self.presentation_part.get_id_of_part(package, part) == Some(relationship_id))
+    self.presentation_part.slide_parts(package).find(|part| {
+      self
+        .presentation_part
+        .get_id_of_part(package, part)
+        .is_ok_and(|id| id == relationship_id)
+    })
   }
 
   fn slide_master_part_by_relationship_id(
@@ -267,7 +269,12 @@ impl PresentationFragmentHandler {
     self
       .presentation_part
       .slide_master_parts(package)
-      .find(|part| self.presentation_part.get_id_of_part(package, part) == Some(relationship_id))
+      .find(|part| {
+        self
+          .presentation_part
+          .get_id_of_part(package, part)
+          .is_ok_and(|id| id == relationship_id)
+      })
   }
 
   fn notes_master_part_by_relationship_id(
@@ -278,7 +285,12 @@ impl PresentationFragmentHandler {
     self
       .presentation_part
       .notes_master_part(package)
-      .filter(|part| self.presentation_part.get_id_of_part(package, part) == Some(relationship_id))
+      .filter(|part| {
+        self
+          .presentation_part
+          .get_id_of_part(package, part)
+          .is_ok_and(|id| id == relationship_id)
+      })
   }
 
   fn import_notes_master_slides(
@@ -393,6 +405,7 @@ impl PresentationFragmentHandler {
       path,
       slide_part
         .get_id_of_part(package, &notes_part)
+        .ok()
         .map(str::to_string),
       self.notes_size,
     );

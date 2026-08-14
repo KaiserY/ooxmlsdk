@@ -3813,6 +3813,7 @@ fn external_references<'doc>(
   for (index, part) in external_parts.iter().enumerate() {
     let id = workbook_part
       .get_id_of_part(document, part)
+      .ok()
       .map(|id| Cow::Owned(id.to_string()))
       .or_else(|| reference_ids.get(index).map(|id| Cow::Owned(id.clone())))
       .unwrap_or_else(|| Cow::Owned(format!("rId{}", index + 1)));
@@ -3961,10 +3962,11 @@ fn ordered_external_workbook_parts(
 
   let mut ordered = Vec::with_capacity(parts.len());
   for reference_id in reference_ids {
-    if let Some(part) = parts
-      .iter()
-      .find(|part| workbook_part.get_id_of_part(document, *part) == Some(reference_id.as_str()))
-    {
+    if let Some(part) = parts.iter().find(|part| {
+      workbook_part
+        .get_id_of_part(document, *part)
+        .is_ok_and(|id| id == reference_id)
+    }) {
       ordered.push(part.clone());
     }
   }

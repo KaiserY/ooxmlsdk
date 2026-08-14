@@ -22,9 +22,9 @@ const FLAT_OPC_PACKAGE_NS: &str = "http://schemas.microsoft.com/office/2006/xmlP
 const RELATIONSHIP_CONTENT_TYPE: &str = "application/vnd.openxmlformats-package.relationships+xml";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct PartId(u32);
+pub struct PartSlot(u32);
 
-impl PartId {
+impl PartSlot {
   #[inline]
   pub const fn from_index(index: usize) -> Self {
     Self(index as u32)
@@ -37,12 +37,41 @@ impl PartId {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct PackageId(u64);
+pub struct PackageToken(u64);
 
-impl PackageId {
+impl PackageToken {
   fn new() -> Self {
     static NEXT_PACKAGE_ID: AtomicU64 = AtomicU64::new(1);
     Self(NEXT_PACKAGE_ID.fetch_add(1, Ordering::Relaxed))
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct PartKey {
+  package: PackageToken,
+  slot: PartSlot,
+}
+
+impl PartKey {
+  #[inline]
+  pub(crate) const fn new(package: PackageToken, slot: PartSlot) -> Self {
+    Self { package, slot }
+  }
+
+  #[inline]
+  pub(crate) fn resolve(self, storage: &SdkPackageStorage) -> Result<PartSlot, SdkError> {
+    if self.package != storage.token() {
+      return Err(SdkError::ForeignPart);
+    }
+    if storage.part(self.slot).is_none() {
+      return Err(SdkError::StalePart);
+    }
+    Ok(self.slot)
+  }
+
+  #[inline]
+  pub(crate) fn resolve_optional(self, storage: &SdkPackageStorage) -> Option<PartSlot> {
+    self.resolve(storage).ok()
   }
 }
 
@@ -159,8 +188,8 @@ pub(crate) enum PackageSaveEntry {
   ArchivedExtra(usize),
   ContentTypes,
   PackageRelationships,
-  Part(PartId),
-  PartRelationships(PartId),
+  Part(PartSlot),
+  PartRelationships(PartSlot),
 }
 
 #[derive(Clone, Debug)]
@@ -359,7 +388,7 @@ pub(crate) fn replace_package_file(
     let backup_path = target_path.with_extension(format!(
       "ooxmlsdk-backup-{}-{}",
       std::process::id(),
-      PackageId::new().0
+      PackageToken::new().0
     ));
     std::fs::rename(target_path, &backup_path)?;
     if let Err(error) = std::fs::rename(temporary_path, target_path) {
@@ -378,7 +407,7 @@ pub(crate) struct RelationshipInfo {
   target: Box<str>,
   target_mode: Option<TargetMode>,
   target_kind: RelationshipTargetKind,
-  target_part_id: Option<PartId>,
+  target_part_slot: Option<PartSlot>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -403,7 +432,7 @@ impl RelationshipInfo {
     id: String,
     relationship_type: String,
     target: String,
-    target_part_id: PartId,
+    target_part_slot: PartSlot,
   ) -> Self {
     Self {
       id: id.into_boxed_str(),
@@ -411,7 +440,7 @@ impl RelationshipInfo {
       target: target.into_boxed_str(),
       target_mode: None,
       target_kind: RelationshipTargetKind::InternalPart,
-      target_part_id: Some(target_part_id),
+      target_part_slot: Some(target_part_slot),
     }
   }
 
@@ -427,7 +456,7 @@ impl RelationshipInfo {
       target: target.into_boxed_str(),
       target_mode,
       target_kind: RelationshipTargetKind::External,
-      target_part_id: None,
+      target_part_slot: None,
     }
   }
 
@@ -451,7 +480,7 @@ impl RelationshipInfo {
       target: target.into_boxed_str(),
       target_mode,
       target_kind,
-      target_part_id: None,
+      target_part_slot: None,
     }
   }
 
@@ -486,13 +515,23 @@ impl RelationshipInfo {
   }
 
   #[inline]
-  pub fn target_part_id(&self) -> Option<PartId> {
-    self.target_part_id
+  pub(crate) fn target_part_slot(&self) -> Option<PartSlot> {
+    self.target_part_slot
   }
 
   #[inline]
   pub fn is_reference_relationship(&self) -> bool {
     self.reference_kind().is_some()
+  }
+
+  #[inline]
+  pub(crate) fn is_child_part_relationship(&self) -> bool {
+    self.target_part_slot.is_some() && !self.is_reference_relationship()
+  }
+
+  #[inline]
+  pub(crate) fn is_data_part_reference_relationship(&self) -> bool {
+    super::is_data_part_reference_relationship_type_bytes(self.relationship_type_bytes())
   }
 
   #[inline]
@@ -526,11 +565,13 @@ impl RelationshipInfo {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Relationship {
   inner: RelationshipInfo,
+  package_token: PackageToken,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RelationshipRef<'a> {
   inner: &'a RelationshipInfo,
+  package_token: PackageToken,
 }
 
 macro_rules! impl_relationship_accessors {
@@ -562,11 +603,6 @@ macro_rules! impl_relationship_accessors {
       }
 
       #[inline]
-      pub fn target_part_id(&self) -> Option<PartId> {
-        self.inner.target_part_id()
-      }
-
-      #[inline]
       pub fn reference_kind(&self) -> Option<ReferenceRelationshipKind> {
         self.inner.reference_kind()
       }
@@ -574,6 +610,83 @@ macro_rules! impl_relationship_accessors {
       #[inline]
       pub fn is_reference_relationship(&self) -> bool {
         self.inner.is_reference_relationship()
+      }
+
+      #[inline]
+      pub fn target_part<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+      ) -> Result<Option<crate::parts::PartRef>, SdkError> {
+        let Some(part_slot) = self.target_part_slot_for_package(package)? else {
+          return Ok(None);
+        };
+        if !self.inner.is_child_part_relationship() {
+          return Ok(None);
+        }
+        crate::parts::PartRef::from_part_slot(package, part_slot)
+          .map(Some)
+          .ok_or(SdkError::StalePart)
+      }
+
+      #[inline]
+      pub fn target_part_path<'a, P: crate::sdk::SdkPackage>(
+        &self,
+        package: &'a P,
+      ) -> Result<Option<&'a str>, SdkError> {
+        let Some(part_slot) = self.target_part_slot_for_package(package)? else {
+          return Ok(None);
+        };
+        package
+          .storage()
+          .part(part_slot)
+          .map(|part| Some(part.path()))
+          .ok_or(SdkError::StalePart)
+      }
+
+      #[inline]
+      pub fn target_media_data_part<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+      ) -> Result<Option<crate::common::MediaDataPart>, SdkError> {
+        let Some(part_slot) = self.target_part_slot_for_package(package)? else {
+          return Ok(None);
+        };
+        if !self.inner.is_data_part_reference_relationship() {
+          return Ok(None);
+        }
+        let part = package
+          .storage()
+          .part(part_slot)
+          .ok_or(SdkError::StalePart)?;
+        Ok(Some(crate::common::MediaDataPart::from_part_slot(
+          package.storage().token(),
+          part_slot,
+          part.path(),
+        )))
+      }
+
+      #[inline]
+      pub fn targets_media_data_part<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+        media_data_part: &crate::common::MediaDataPart,
+      ) -> Result<bool, SdkError> {
+        let target_part_slot = self.target_part_slot_for_package(package)?;
+        if !self.inner.is_data_part_reference_relationship() {
+          return Ok(false);
+        }
+        Ok(target_part_slot == Some(media_data_part.part_slot_for_package(package)?))
+      }
+
+      #[inline]
+      pub(crate) fn target_part_slot_for_package<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+      ) -> Result<Option<PartSlot>, SdkError> {
+        if self.package_token != package.storage().token() {
+          return Err(SdkError::ForeignPart);
+        }
+        Ok(self.inner.target_part_slot())
       }
     }
   };
@@ -592,8 +705,11 @@ impl<'a> RelationshipRef<'a> {
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video";
 
   #[inline]
-  pub(crate) const fn new(inner: &'a RelationshipInfo) -> Self {
-    Self { inner }
+  pub(crate) const fn new(package_token: PackageToken, inner: &'a RelationshipInfo) -> Self {
+    Self {
+      inner,
+      package_token,
+    }
   }
 
   #[inline]
@@ -622,11 +738,6 @@ impl<'a> RelationshipRef<'a> {
   }
 
   #[inline]
-  pub fn target_part_id(&self) -> Option<PartId> {
-    self.inner.target_part_id()
-  }
-
-  #[inline]
   pub fn reference_kind(&self) -> Option<ReferenceRelationshipKind> {
     self.inner.reference_kind()
   }
@@ -635,12 +746,92 @@ impl<'a> RelationshipRef<'a> {
   pub fn is_reference_relationship(&self) -> bool {
     self.inner.is_reference_relationship()
   }
+
+  #[inline]
+  pub fn target_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<Option<crate::parts::PartRef>, SdkError> {
+    let Some(part_slot) = self.target_part_slot_for_package(package)? else {
+      return Ok(None);
+    };
+    if !self.inner.is_child_part_relationship() {
+      return Ok(None);
+    }
+    crate::parts::PartRef::from_part_slot(package, part_slot)
+      .map(Some)
+      .ok_or(SdkError::StalePart)
+  }
+
+  #[inline]
+  pub fn target_part_path<'b, P: crate::sdk::SdkPackage>(
+    &self,
+    package: &'b P,
+  ) -> Result<Option<&'b str>, SdkError> {
+    let Some(part_slot) = self.target_part_slot_for_package(package)? else {
+      return Ok(None);
+    };
+    package
+      .storage()
+      .part(part_slot)
+      .map(|part| Some(part.path()))
+      .ok_or(SdkError::StalePart)
+  }
+
+  #[inline]
+  pub fn target_media_data_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<Option<crate::common::MediaDataPart>, SdkError> {
+    let Some(part_slot) = self.target_part_slot_for_package(package)? else {
+      return Ok(None);
+    };
+    if !self.inner.is_data_part_reference_relationship() {
+      return Ok(None);
+    }
+    let part = package
+      .storage()
+      .part(part_slot)
+      .ok_or(SdkError::StalePart)?;
+    Ok(Some(crate::common::MediaDataPart::from_part_slot(
+      package.storage().token(),
+      part_slot,
+      part.path(),
+    )))
+  }
+
+  #[inline]
+  pub fn targets_media_data_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+    media_data_part: &crate::common::MediaDataPart,
+  ) -> Result<bool, SdkError> {
+    let target_part_slot = self.target_part_slot_for_package(package)?;
+    if !self.inner.is_data_part_reference_relationship() {
+      return Ok(false);
+    }
+    Ok(target_part_slot == Some(media_data_part.part_slot_for_package(package)?))
+  }
+
+  #[inline]
+  pub(crate) fn target_part_slot_for_package<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<Option<PartSlot>, SdkError> {
+    if self.package_token != package.storage().token() {
+      return Err(SdkError::ForeignPart);
+    }
+    Ok(self.inner.target_part_slot())
+  }
 }
 
-impl From<RelationshipInfo> for Relationship {
+impl Relationship {
   #[inline]
-  fn from(inner: RelationshipInfo) -> Self {
-    Self { inner }
+  pub(crate) const fn new(package_token: PackageToken, inner: RelationshipInfo) -> Self {
+    Self {
+      inner,
+      package_token,
+    }
   }
 }
 
@@ -649,14 +840,8 @@ impl From<RelationshipRef<'_>> for Relationship {
   fn from(value: RelationshipRef<'_>) -> Self {
     Self {
       inner: value.inner.clone(),
+      package_token: value.package_token,
     }
-  }
-}
-
-impl<'a> From<&'a RelationshipInfo> for RelationshipRef<'a> {
-  #[inline]
-  fn from(inner: &'a RelationshipInfo) -> Self {
-    Self::new(inner)
   }
 }
 
@@ -665,18 +850,9 @@ impl<'a> From<&'a RelationshipInfo> for RelationshipRef<'a> {
 pub struct RelationshipSet {
   relationships: Vec<RelationshipInfo>,
   by_id: HashMap<Box<str>, usize>,
+  next_relationship_id_hint: u64,
   raw_bytes: Option<Box<[u8]>>,
   archive_entry_index: Option<usize>,
-}
-
-fn next_relationship_id<'a>(relationships: impl Iterator<Item = &'a RelationshipInfo>) -> String {
-  let next = relationships
-    .filter_map(|relationship| relationship.id().strip_prefix("rId"))
-    .filter_map(|suffix| suffix.parse::<u32>().ok())
-    .max()
-    .unwrap_or_default()
-    + 1;
-  format!("rId{next}")
 }
 
 impl RelationshipSet {
@@ -713,7 +889,16 @@ impl RelationshipSet {
   }
 
   pub(crate) fn next_relationship_id(&self) -> String {
-    next_relationship_id(self.relationships.iter())
+    let mut next = self.next_relationship_id_hint.max(1);
+    loop {
+      let relationship_id = format!("rId{next}");
+      if !self.contains_id(&relationship_id) {
+        return relationship_id;
+      }
+      next = next
+        .checked_add(1)
+        .expect("relationship id sequence exhausted u64");
+    }
   }
 
   pub(crate) fn add_external_relationship(
@@ -761,13 +946,13 @@ impl RelationshipSet {
     relationship_id: impl Into<String>,
     relationship_type: impl Into<String>,
     target: impl Into<String>,
-    target_part_id: PartId,
+    target_part_slot: PartSlot,
   ) -> Result<&RelationshipInfo, SdkError> {
     self.push_relationship(RelationshipInfo::internal_part(
       relationship_id.into(),
       relationship_type.into(),
       target.into(),
-      target_part_id,
+      target_part_slot,
     ))
   }
 
@@ -887,7 +1072,7 @@ impl RelationshipSet {
     self
       .relationships
       .iter()
-      .filter(|relationship| relationship.target_kind() == RelationshipTargetKind::InternalPart)
+      .filter(|relationship| relationship.is_child_part_relationship())
   }
 
   #[inline]
@@ -926,13 +1111,13 @@ impl RelationshipSet {
   pub(crate) fn first_target_part_by_relationship_type(
     &self,
     relationship_type: &str,
-  ) -> Option<PartId> {
-    self.relationships.iter().find_map(|relationship| {
+  ) -> Option<PartSlot> {
+    self.part_relationships().find_map(|relationship| {
       super::relationship_type_matches_bytes(
         relationship.relationship_type_bytes(),
         relationship_type.as_bytes(),
       )
-      .then(|| relationship.target_part_id())
+      .then(|| relationship.target_part_slot())
       .flatten()
     })
   }
@@ -963,7 +1148,7 @@ impl RelationshipSet {
   fn from_relationships(
     relationships: Option<Relationships>,
     source_path: &str,
-    by_path: &HashMap<Box<str>, PartId>,
+    by_path: &HashMap<Box<str>, PartSlot>,
   ) -> Self {
     let Some(relationships) = relationships else {
       return Self::default();
@@ -973,6 +1158,7 @@ impl RelationshipSet {
     let mut set = Self {
       relationships: Vec::with_capacity(relationships.relationship.len()),
       by_id: HashMap::with_capacity(relationships.relationship.len()),
+      next_relationship_id_hint: 0,
       raw_bytes: None,
       archive_entry_index: None,
     };
@@ -989,6 +1175,7 @@ impl RelationshipSet {
     Self {
       relationships: Vec::new(),
       by_id: HashMap::new(),
+      next_relationship_id_hint: 0,
       raw_bytes: Some(bytes),
       archive_entry_index: None,
     }
@@ -1031,6 +1218,7 @@ impl RelationshipSet {
 
   fn push_relationship_unchecked(&mut self, relationship: RelationshipInfo) {
     let index = self.relationships.len();
+    self.update_next_relationship_id_hint(relationship.id());
     self.by_id.insert(relationship.id.clone(), index);
     self.relationships.push(relationship);
   }
@@ -1038,8 +1226,27 @@ impl RelationshipSet {
   fn rebuild_index(&mut self) {
     self.by_id.clear();
     self.by_id.reserve(self.relationships.len());
+    self.next_relationship_id_hint = 0;
     for (index, relationship) in self.relationships.iter().enumerate() {
       self.by_id.insert(relationship.id.clone(), index);
+      if let Some(next) = relationship
+        .id()
+        .strip_prefix("rId")
+        .and_then(|suffix| suffix.parse::<u64>().ok())
+        .and_then(|value| value.checked_add(1))
+      {
+        self.next_relationship_id_hint = self.next_relationship_id_hint.max(next);
+      }
+    }
+  }
+
+  fn update_next_relationship_id_hint(&mut self, relationship_id: &str) {
+    if let Some(next) = relationship_id
+      .strip_prefix("rId")
+      .and_then(|suffix| suffix.parse::<u64>().ok())
+      .and_then(|value| value.checked_add(1))
+    {
+      self.next_relationship_id_hint = self.next_relationship_id_hint.max(next);
     }
   }
 }
@@ -1101,26 +1308,43 @@ impl StoredPart {
   pub(crate) fn relationships_mut(&mut self) -> &mut RelationshipSet {
     &mut self.relationships
   }
+
+  fn mark_deleted(&mut self) -> Option<Box<str>> {
+    if self.deleted {
+      return None;
+    }
+
+    self.deleted = true;
+    let path = std::mem::take(&mut self.path);
+    self.content_type = Box::default();
+    self.relationship_type = None;
+    self.relationships = RelationshipSet::default();
+    self.data = StoredPartData::Owned {
+      bytes: Bytes::new(),
+      original_entry_index: None,
+    };
+    Some(path)
+  }
 }
 
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct SdkPackageStorage {
-  id: PackageId,
+  token: PackageToken,
   archive: Option<Arc<ArchiveBacking>>,
   archived_extra_entry_indices: Box<[usize]>,
   content_types: Types,
   content_types_archive_entry_index: Option<usize>,
   package_relationships: RelationshipSet,
   parts: Vec<StoredPart>,
-  by_path: HashMap<Box<str>, PartId>,
+  by_path: HashMap<Box<str>, PartSlot>,
   preferred_main_part_content_type: Option<&'static str>,
 }
 
 impl Clone for SdkPackageStorage {
   fn clone(&self) -> Self {
     Self {
-      id: PackageId::new(),
+      token: PackageToken::new(),
       archive: self.archive.clone(),
       archived_extra_entry_indices: self.archived_extra_entry_indices.clone(),
       content_types: self.content_types.clone(),
@@ -1136,7 +1360,7 @@ impl Clone for SdkPackageStorage {
 impl SdkPackageStorage {
   pub(crate) fn create(preferred_main_part_content_type: Option<&'static str>) -> Self {
     Self {
-      id: PackageId::new(),
+      token: PackageToken::new(),
       archive: None,
       archived_extra_entry_indices: Box::new([]),
       content_types: empty_content_types(),
@@ -1208,7 +1432,7 @@ impl SdkPackageStorage {
     let mut by_path = HashMap::with_capacity(raw_parts.len());
 
     for (index, raw_part) in raw_parts.iter().enumerate() {
-      by_path.insert(raw_part.path.clone(), PartId::from_index(index));
+      by_path.insert(raw_part.path.clone(), PartSlot::from_index(index));
     }
 
     let package_relationships = package_relationships
@@ -1268,7 +1492,7 @@ impl SdkPackageStorage {
     let archive = Arc::new(ArchiveBacking { archive });
 
     Ok(Self {
-      id: PackageId::new(),
+      token: PackageToken::new(),
       archive: Some(archive),
       archived_extra_entry_indices,
       content_types,
@@ -1302,7 +1526,7 @@ impl SdkPackageStorage {
 
     let mut by_path = HashMap::with_capacity(raw_parts.len());
     for (index, raw_part) in raw_parts.iter().enumerate() {
-      by_path.insert(raw_part.path.clone(), PartId::from_index(index));
+      by_path.insert(raw_part.path.clone(), PartSlot::from_index(index));
     }
 
     let content_types = content_types_from_raw_parts(&raw_parts);
@@ -1352,7 +1576,7 @@ impl SdkPackageStorage {
     }
 
     Ok(Self {
-      id: PackageId::new(),
+      token: PackageToken::new(),
       archive: None,
       archived_extra_entry_indices: Box::new([]),
       content_types,
@@ -1372,7 +1596,7 @@ impl SdkPackageStorage {
   ) -> Result<(), SdkError>
   where
     W: std::io::Write,
-    F: FnMut(PartId, &StoredPart) -> Result<Vec<u8>, SdkError>,
+    F: FnMut(PartSlot, &StoredPart) -> Result<Vec<u8>, SdkError>,
   {
     writer.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
     writer.write_all(b"\n<pkg:package")?;
@@ -1397,7 +1621,7 @@ impl SdkPackageStorage {
         continue;
       }
 
-      let part_id = PartId::from_index(index);
+      let part_id = PartSlot::from_index(index);
       let data = part_data(part_id, part)?;
       let part_name = format!("/{}", part.path());
       if flat_opc_part_is_xml(part, part_id, &alt_chunk_part_ids) {
@@ -1423,8 +1647,13 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub(crate) fn id(&self) -> PackageId {
-    self.id
+  pub(crate) fn token(&self) -> PackageToken {
+    self.token
+  }
+
+  #[inline]
+  pub(crate) fn part_key(&self, slot: PartSlot) -> PartKey {
+    PartKey::new(self.token, slot)
   }
 
   #[inline]
@@ -1456,7 +1685,7 @@ impl SdkPackageStorage {
       if part.is_deleted() {
         continue;
       }
-      let part_id = PartId::from_index(index);
+      let part_id = PartSlot::from_index(index);
       if !part.relationships().is_empty() {
         push(
           part.relationships().original_archive_entry_index(),
@@ -1489,7 +1718,7 @@ impl SdkPackageStorage {
     Ok(())
   }
 
-  pub(crate) fn part_bytes(&self, part_id: PartId) -> Result<&[u8], SdkError> {
+  pub(crate) fn part_bytes(&self, part_id: PartSlot) -> Result<&[u8], SdkError> {
     let part = self.part(part_id).ok_or_else(|| {
       SdkError::CommonError(format!(
         "part id {part_id:?} is not present in package storage"
@@ -1514,14 +1743,22 @@ impl SdkPackageStorage {
     )
   }
 
-  #[inline]
-  pub(crate) fn discard_cached_part_bytes(&mut self, part_id: PartId) {
-    if let Some(StoredPart {
-      data: StoredPartData::Archived { bytes, .. },
-      ..
-    }) = self.part_mut(part_id)
-    {
-      let _ = bytes.take();
+  pub(crate) fn part_bytes_for_root(&self, part_id: PartSlot) -> Result<Bytes, SdkError> {
+    let part = self.part(part_id).ok_or(SdkError::StalePart)?;
+    match &part.data {
+      StoredPartData::Archived { entry_index, bytes } => {
+        if let Some(bytes) = bytes.get() {
+          return Ok(bytes.clone());
+        }
+        self
+          .archive
+          .as_ref()
+          .ok_or_else(|| {
+            SdkError::CommonError("archived part has no package archive backing".to_string())
+          })?
+          .read_entry(*entry_index)
+      }
+      StoredPartData::Owned { bytes, .. } => Ok(bytes.clone()),
     }
   }
 
@@ -1551,7 +1788,7 @@ impl SdkPackageStorage {
 
   pub(crate) fn raw_copy_part<W: std::io::Write + std::io::Seek>(
     &self,
-    part_id: PartId,
+    part_id: PartSlot,
     writer: &mut zip::ZipWriter<W>,
   ) -> Result<bool, SdkError> {
     let Some(part) = self.part(part_id) else {
@@ -1579,7 +1816,7 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub(crate) fn part(&self, part_id: PartId) -> Option<&StoredPart> {
+  pub(crate) fn part(&self, part_id: PartSlot) -> Option<&StoredPart> {
     self
       .parts
       .get(part_id.index())
@@ -1587,7 +1824,7 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub(crate) fn part_mut(&mut self, part_id: PartId) -> Option<&mut StoredPart> {
+  pub(crate) fn part_mut(&mut self, part_id: PartSlot) -> Option<&mut StoredPart> {
     self
       .parts
       .get_mut(part_id.index())
@@ -1605,60 +1842,62 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub(crate) fn media_data_parts(&self) -> impl Iterator<Item = (PartId, &StoredPart)> {
+  pub(crate) fn media_data_parts(&self) -> impl Iterator<Item = (PartSlot, &StoredPart)> {
     self
       .parts
       .iter()
       .enumerate()
       .filter(|(_, part)| !part.is_deleted() && is_media_data_part(part))
-      .map(|(index, part)| (PartId::from_index(index), part))
+      .map(|(index, part)| (PartSlot::from_index(index), part))
   }
 
   #[inline]
-  pub(crate) fn relationships(&self, part_id: PartId) -> Option<&RelationshipSet> {
+  pub(crate) fn relationships(&self, part_id: PartSlot) -> Option<&RelationshipSet> {
     self.part(part_id).map(StoredPart::relationships)
   }
 
   #[inline]
-  pub(crate) fn relationships_mut(&mut self, part_id: PartId) -> Option<&mut RelationshipSet> {
+  pub(crate) fn relationships_mut(&mut self, part_id: PartSlot) -> Option<&mut RelationshipSet> {
     self.part_mut(part_id).map(StoredPart::relationships_mut)
   }
 
   #[inline]
-  pub(crate) fn target_part_id(
+  pub(crate) fn target_part_slot(
     &self,
-    source_part_id: PartId,
+    source_part_id: PartSlot,
     relationship_id: &str,
-  ) -> Option<PartId> {
-    self
-      .relationships(source_part_id)?
-      .get(relationship_id)?
-      .target_part_id()
+  ) -> Option<PartSlot> {
+    let relationship = self.relationships(source_part_id)?.get(relationship_id)?;
+    relationship
+      .is_child_part_relationship()
+      .then(|| relationship.target_part_slot())
+      .flatten()
   }
 
-  pub(crate) fn delete_package_part(&mut self, relationship_id: &str) -> Result<bool, SdkError> {
-    let Some(target_part_id) = self
+  pub(crate) fn delete_package_part(
+    &mut self,
+    relationship_id: &str,
+  ) -> Result<Option<Vec<PartSlot>>, SdkError> {
+    let Some(target_part_slot) = self
       .package_relationships
       .get(relationship_id)
-      .and_then(RelationshipInfo::target_part_id)
+      .filter(|relationship| relationship.is_child_part_relationship())
+      .and_then(RelationshipInfo::target_part_slot)
     else {
-      return Ok(false);
+      return Ok(None);
     };
 
     self.package_relationships.remove(relationship_id);
-    if !self.is_part_reachable(target_part_id) {
-      self.delete_unreachable_part_tree(target_part_id);
-    }
-    Ok(true)
+    Ok(Some(self.delete_unreachable_part_tree(target_part_slot)))
   }
 
   pub(crate) fn delete_child_part(
     &mut self,
-    source_part_id: PartId,
+    source_part_id: PartSlot,
     relationship_id: &str,
-  ) -> Result<bool, SdkError> {
-    let Some(target_part_id) = self.target_part_id(source_part_id, relationship_id) else {
-      return Ok(false);
+  ) -> Result<Option<Vec<PartSlot>>, SdkError> {
+    let Some(target_part_slot) = self.target_part_slot(source_part_id, relationship_id) else {
+      return Ok(None);
     };
 
     let relationships = self.relationships_mut(source_part_id).ok_or_else(|| {
@@ -1667,34 +1906,31 @@ impl SdkPackageStorage {
       ))
     })?;
     relationships.remove(relationship_id);
-    if !self.is_part_reachable(target_part_id) {
-      self.delete_unreachable_part_tree(target_part_id);
-    }
-    Ok(true)
+    Ok(Some(self.delete_unreachable_part_tree(target_part_slot)))
   }
 
   pub(crate) fn add_package_relationship_to_part(
     &mut self,
     relationship_id: impl Into<String>,
     relationship_type: &str,
-    target_part_id: PartId,
+    target_part_slot: PartSlot,
   ) -> Result<String, SdkError> {
     let relationship_id = relationship_id.into();
     if let Some(existing_relationship_id) =
-      self.existing_relationship_id_for_target(None, target_part_id)
+      self.existing_relationship_id_for_target(None, target_part_slot)
     {
       if existing_relationship_id == relationship_id {
         return Ok(existing_relationship_id);
       }
       return Err(SdkError::CommonError(format!(
-        "part id {target_part_id:?} is already referenced by relationship id {existing_relationship_id}"
+        "part id {target_part_slot:?} is already referenced by relationship id {existing_relationship_id}"
       )));
     }
 
     let target = {
-      let target_part = self.part(target_part_id).ok_or_else(|| {
+      let target_part = self.part(target_part_slot).ok_or_else(|| {
         SdkError::CommonError(format!(
-          "part id {target_part_id:?} is not present in package storage"
+          "part id {target_part_slot:?} is not present in package storage"
         ))
       })?;
       target_part.path().to_string()
@@ -1704,27 +1940,27 @@ impl SdkPackageStorage {
       relationship_id.clone(),
       relationship_type,
       target,
-      target_part_id,
+      target_part_slot,
     )?;
     Ok(relationship_id)
   }
 
   pub(crate) fn add_child_relationship_to_part(
     &mut self,
-    source_part_id: PartId,
+    source_part_id: PartSlot,
     relationship_id: impl Into<String>,
     relationship_type: &str,
-    target_part_id: PartId,
+    target_part_slot: PartSlot,
   ) -> Result<String, SdkError> {
     let relationship_id = relationship_id.into();
     if let Some(existing_relationship_id) =
-      self.existing_relationship_id_for_target(Some(source_part_id), target_part_id)
+      self.existing_relationship_id_for_target(Some(source_part_id), target_part_slot)
     {
       if existing_relationship_id == relationship_id {
         return Ok(existing_relationship_id);
       }
       return Err(SdkError::CommonError(format!(
-        "part id {target_part_id:?} is already referenced by relationship id {existing_relationship_id}"
+        "part id {target_part_slot:?} is already referenced by relationship id {existing_relationship_id}"
       )));
     }
 
@@ -1738,9 +1974,9 @@ impl SdkPackageStorage {
         })?
         .path()
         .to_string();
-      let target_part = self.part(target_part_id).ok_or_else(|| {
+      let target_part = self.part(target_part_slot).ok_or_else(|| {
         SdkError::CommonError(format!(
-          "part id {target_part_id:?} is not present in package storage"
+          "part id {target_part_slot:?} is not present in package storage"
         ))
       })?;
       relationship_target_from_source(&source_part_path, target_part.path())
@@ -1753,7 +1989,7 @@ impl SdkPackageStorage {
         relationship_id.clone(),
         relationship_type,
         relationship_target,
-        target_part_id,
+        target_part_slot,
       )?;
     Ok(relationship_id)
   }
@@ -1762,7 +1998,7 @@ impl SdkPackageStorage {
     &mut self,
     content_type: impl Into<String>,
     extension: impl AsRef<str>,
-  ) -> Result<PartId, SdkError> {
+  ) -> Result<PartSlot, SdkError> {
     let content_type = content_type.into();
     if content_type.is_empty() {
       return Err(SdkError::CommonError(
@@ -1777,10 +2013,10 @@ impl SdkPackageStorage {
 
   pub(crate) fn add_data_part_reference_relationship(
     &mut self,
-    source_part_id: PartId,
+    source_part_id: PartSlot,
     relationship_id: impl Into<String>,
     relationship_type: &str,
-    target_part_id: PartId,
+    target_part_slot: PartSlot,
   ) -> Result<String, SdkError> {
     let relationship_id = relationship_id.into();
     let relationship_target = {
@@ -1793,9 +2029,9 @@ impl SdkPackageStorage {
         })?
         .path()
         .to_string();
-      let target_part = self.part(target_part_id).ok_or_else(|| {
+      let target_part = self.part(target_part_slot).ok_or_else(|| {
         SdkError::CommonError(format!(
-          "part id {target_part_id:?} is not present in package storage"
+          "part id {target_part_slot:?} is not present in package storage"
         ))
       })?;
       relationship_target_from_source(&source_part_path, target_part.path())
@@ -1808,7 +2044,7 @@ impl SdkPackageStorage {
         relationship_id.clone(),
         relationship_type,
         relationship_target,
-        target_part_id,
+        target_part_slot,
       )?;
     Ok(relationship_id)
   }
@@ -1816,12 +2052,12 @@ impl SdkPackageStorage {
   pub(crate) fn import_part_tree_from(
     &mut self,
     source: &Self,
-    source_part_id: PartId,
-    parent_part_id: Option<PartId>,
+    source_part_id: PartSlot,
+    parent_part_id: Option<PartSlot>,
     relationship_id: impl Into<String>,
     relationship_type: &str,
-    mut part_data: impl FnMut(PartId, &StoredPart) -> Result<Vec<u8>, SdkError>,
-  ) -> Result<(PartId, usize), SdkError> {
+    mut part_data: impl FnMut(PartSlot, &StoredPart) -> Result<Vec<u8>, SdkError>,
+  ) -> Result<(PartSlot, usize), SdkError> {
     let relationship_id = relationship_id.into();
     source.part(source_part_id).ok_or_else(|| {
       SdkError::CommonError(format!(
@@ -1872,7 +2108,7 @@ impl SdkPackageStorage {
   #[inline]
   pub(crate) fn data_part_reference_relationships_to(
     &self,
-    target_part_id: PartId,
+    target_part_slot: PartSlot,
   ) -> impl Iterator<Item = &RelationshipInfo> {
     std::iter::once(self.package_relationships())
       .chain(
@@ -1883,7 +2119,7 @@ impl SdkPackageStorage {
           .map(StoredPart::relationships),
       )
       .flat_map(RelationshipSet::data_part_reference_relationships)
-      .filter(move |relationship| relationship.target_part_id() == Some(target_part_id))
+      .filter(move |relationship| relationship.target_part_slot() == Some(target_part_slot))
   }
 
   pub(crate) fn delete_unused_media_data_parts(&mut self) -> usize {
@@ -1898,29 +2134,17 @@ impl SdkPackageStorage {
       })
       .collect();
 
-    let deleted_count = unused_part_ids.len();
-    for part_id in unused_part_ids {
-      let Some(part) = self.part(part_id) else {
-        continue;
-      };
-      let path = part.path().to_string();
-      if let Some(part) = self.parts.get_mut(part_id.index()) {
-        part.deleted = true;
-      }
-      self.by_path.remove(path.as_str());
-      self.remove_content_type_override(&path);
-    }
-    deleted_count
+    self.delete_part_slots(unused_part_ids).len()
   }
 
   fn import_part_tree_recursive(
     &mut self,
     source: &Self,
-    source_part_id: PartId,
-    part_map: &mut HashMap<PartId, PartId>,
+    source_part_id: PartSlot,
+    part_map: &mut HashMap<PartSlot, PartSlot>,
     added_count: &mut usize,
-    part_data: &mut impl FnMut(PartId, &StoredPart) -> Result<Vec<u8>, SdkError>,
-  ) -> Result<PartId, SdkError> {
+    part_data: &mut impl FnMut(PartSlot, &StoredPart) -> Result<Vec<u8>, SdkError>,
+  ) -> Result<PartSlot, SdkError> {
     if let Some(imported_part_id) = part_map.get(&source_part_id).copied() {
       return Ok(imported_part_id);
     }
@@ -1941,10 +2165,10 @@ impl SdkPackageStorage {
     part_map.insert(source_part_id, imported_part_id);
 
     for relationship in source_part.relationships().iter() {
-      if let Some(target_part_id) = relationship.target_part_id() {
-        let imported_target_part_id = self.import_part_tree_recursive(
+      if let Some(target_part_slot) = relationship.target_part_slot() {
+        let imported_target_part_slot = self.import_part_tree_recursive(
           source,
-          target_part_id,
+          target_part_slot,
           part_map,
           added_count,
           part_data,
@@ -1954,14 +2178,14 @@ impl SdkPackageStorage {
             imported_part_id,
             relationship.id(),
             relationship.relationship_type(),
-            imported_target_part_id,
+            imported_target_part_slot,
           )?;
         } else {
           self.add_imported_part_relationship(
             Some(imported_part_id),
             relationship.id().to_string(),
             relationship.relationship_type(),
-            imported_target_part_id,
+            imported_target_part_slot,
           )?;
         }
       } else if relationship.is_reference_relationship()
@@ -1979,16 +2203,16 @@ impl SdkPackageStorage {
 
   fn add_imported_part_relationship(
     &mut self,
-    parent_part_id: Option<PartId>,
+    parent_part_id: Option<PartSlot>,
     relationship_id: String,
     relationship_type: &str,
-    target_part_id: PartId,
+    target_part_slot: PartSlot,
   ) -> Result<(), SdkError> {
     let target_part_path = self
-      .part(target_part_id)
+      .part(target_part_slot)
       .ok_or_else(|| {
         SdkError::CommonError(format!(
-          "part id {target_part_id:?} is not present in package storage"
+          "part id {target_part_slot:?} is not present in package storage"
         ))
       })?
       .path()
@@ -2019,17 +2243,17 @@ impl SdkPackageStorage {
       relationship_id,
       relationship_type,
       target,
-      target_part_id,
+      target_part_slot,
     )?;
     Ok(())
   }
 
   pub(crate) fn add_child_part(
     &mut self,
-    source_part_id: PartId,
+    source_part_id: PartSlot,
     relationship_id: impl Into<String>,
     descriptor: NewPartDescriptor,
-  ) -> Result<PartId, SdkError> {
+  ) -> Result<PartSlot, SdkError> {
     if descriptor.relationship_type.is_empty() {
       return Err(SdkError::CommonError(
         "cannot add a part with an empty relationship type".to_string(),
@@ -2095,7 +2319,7 @@ impl SdkPackageStorage {
     relationship_id: impl Into<String>,
     descriptor: NewPartDescriptor,
     target_mode: NewPartTargetMode,
-  ) -> Result<PartId, SdkError> {
+  ) -> Result<PartSlot, SdkError> {
     if descriptor.relationship_type.is_empty() {
       return Err(SdkError::CommonError(
         "cannot add a part with an empty relationship type".to_string(),
@@ -2136,11 +2360,11 @@ impl SdkPackageStorage {
 
   pub(crate) fn add_child_part_with_path(
     &mut self,
-    source_part_id: PartId,
+    source_part_id: PartSlot,
     relationship_id: impl Into<String>,
     descriptor: NewPartDescriptor,
     part_path: impl AsRef<str>,
-  ) -> Result<PartId, SdkError> {
+  ) -> Result<PartSlot, SdkError> {
     if descriptor.relationship_type.is_empty() {
       return Err(SdkError::CommonError(
         "cannot add a part with an empty relationship type".to_string(),
@@ -2197,8 +2421,8 @@ impl SdkPackageStorage {
     path: String,
     content_type: &str,
     relationship_type: Option<&str>,
-  ) -> PartId {
-    let part_id = PartId::from_index(self.parts.len());
+  ) -> PartSlot {
+    let part_id = PartSlot::from_index(self.parts.len());
     let kind = crate::parts::PartKind::classify(
       relationship_type.map(str::as_bytes),
       content_type.as_bytes(),
@@ -2223,7 +2447,7 @@ impl SdkPackageStorage {
 
   pub(crate) fn set_part_data(
     &mut self,
-    part_id: PartId,
+    part_id: PartSlot,
     data: impl Into<Vec<u8>>,
   ) -> Result<(), SdkError> {
     let part = self.part_mut(part_id).ok_or_else(|| {
@@ -2237,7 +2461,7 @@ impl SdkPackageStorage {
 
   pub(crate) fn feed_part_data<R: Read>(
     &mut self,
-    part_id: PartId,
+    part_id: PartSlot,
     reader: &mut R,
   ) -> Result<(), SdkError> {
     let part = self.part_mut(part_id).ok_or_else(|| {
@@ -2276,17 +2500,9 @@ impl SdkPackageStorage {
     ));
   }
 
-  fn remove_content_type_override(&mut self, path: &str) {
-    let part_name = format!("/{path}");
-    self
-      .content_types
-      .types_choice
-      .retain(|child| !matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name));
-  }
-
   pub(crate) fn set_part_content_type(
     &mut self,
-    part_id: PartId,
+    part_id: PartSlot,
     content_type: impl Into<Box<str>>,
   ) -> Result<(), SdkError> {
     let content_type = content_type.into();
@@ -2315,69 +2531,90 @@ impl SdkPackageStorage {
 
   fn existing_relationship_id_for_target(
     &self,
-    source_part_id: Option<PartId>,
-    target_part_id: PartId,
+    source_part_id: Option<PartSlot>,
+    target_part_slot: PartSlot,
   ) -> Option<String> {
     let relationships = match source_part_id {
       Some(source_part_id) => self.relationships(source_part_id)?,
       None => self.package_relationships(),
     };
-    relationships.iter().find_map(|relationship| {
-      (relationship.target_part_id() == Some(target_part_id)).then(|| relationship.id().to_string())
+    relationships.part_relationships().find_map(|relationship| {
+      (relationship.target_part_slot() == Some(target_part_slot))
+        .then(|| relationship.id().to_string())
     })
   }
 
-  fn is_part_reachable(&self, target_part_id: PartId) -> bool {
-    let mut visited = HashSet::new();
-    let mut stack: Vec<_> = self
-      .package_relationships
-      .part_relationships()
-      .filter_map(RelationshipInfo::target_part_id)
-      .collect();
+  fn reachable_child_parts(&self, roots: impl IntoIterator<Item = PartSlot>) -> Vec<bool> {
+    let mut reachable = vec![false; self.parts.len()];
+    let mut stack: Vec<_> = roots.into_iter().collect();
 
-    while let Some(part_id) = stack.pop() {
-      if !visited.insert(part_id) {
-        continue;
-      }
-      let Some(part) = self.part(part_id) else {
+    while let Some(part_slot) = stack.pop() {
+      let Some(is_reachable) = reachable.get_mut(part_slot.index()) else {
         continue;
       };
-      if part_id == target_part_id {
-        return true;
+      if *is_reachable {
+        continue;
       }
+      let Some(part) = self.part(part_slot) else {
+        continue;
+      };
+      *is_reachable = true;
       stack.extend(
         part
           .relationships()
           .part_relationships()
-          .filter_map(RelationshipInfo::target_part_id),
+          .filter_map(RelationshipInfo::target_part_slot),
       );
     }
 
-    false
+    reachable
   }
 
-  fn delete_unreachable_part_tree(&mut self, part_id: PartId) {
-    let Some(part) = self.part(part_id) else {
-      return;
-    };
-    let child_part_ids: Vec<_> = part
-      .relationships()
+  fn delete_unreachable_part_tree(&mut self, target_part_slot: PartSlot) -> Vec<PartSlot> {
+    let candidates = self.reachable_child_parts(std::iter::once(target_part_slot));
+    let package_roots = self
+      .package_relationships
       .part_relationships()
-      .filter_map(RelationshipInfo::target_part_id)
-      .collect();
-    let path = part.path().to_string();
+      .filter_map(RelationshipInfo::target_part_slot);
+    let live = self.reachable_child_parts(package_roots);
+    let unreachable = candidates
+      .into_iter()
+      .zip(live)
+      .enumerate()
+      .filter(|(_, (candidate, live))| *candidate && !*live)
+      .map(|(index, _)| PartSlot::from_index(index));
+    self.delete_part_slots(unreachable)
+  }
 
-    if let Some(part) = self.parts.get_mut(part_id.index()) {
-      part.deleted = true;
-    }
-    self.by_path.remove(path.as_str());
-    self.remove_content_type_override(&path);
+  fn delete_part_slots(&mut self, part_slots: impl IntoIterator<Item = PartSlot>) -> Vec<PartSlot> {
+    let mut deleted_slots = Vec::new();
+    let mut deleted_paths = HashSet::<Box<str>>::new();
 
-    for child_part_id in child_part_ids {
-      if !self.is_part_reachable(child_part_id) {
-        self.delete_unreachable_part_tree(child_part_id);
-      }
+    for part_slot in part_slots {
+      let Some(part) = self.parts.get_mut(part_slot.index()) else {
+        continue;
+      };
+      let Some(path) = part.mark_deleted() else {
+        continue;
+      };
+      deleted_paths.insert(path);
+      deleted_slots.push(part_slot);
     }
+
+    for path in &deleted_paths {
+      self.by_path.remove(path.as_ref());
+    }
+    self.content_types.types_choice.retain(|child| {
+      let TypesChoice::Override(override_type) = child else {
+        return true;
+      };
+      let Some(path) = override_type.part_name.strip_prefix('/') else {
+        return true;
+      };
+      !deleted_paths.contains(path)
+    });
+
+    deleted_slots
   }
 
   fn unique_import_part_path(&self, source_path: &str) -> String {
@@ -2500,7 +2737,7 @@ impl SdkPackageStorage {
   }
 
   #[cfg(feature = "flat-opc")]
-  fn alt_chunk_part_ids(&self) -> HashSet<PartId> {
+  fn alt_chunk_part_ids(&self) -> HashSet<PartSlot> {
     self
       .parts
       .iter()
@@ -2513,7 +2750,7 @@ impl SdkPackageStorage {
           super::REL_AF_CHUNK,
         )
       })
-      .filter_map(RelationshipInfo::target_part_id)
+      .filter_map(RelationshipInfo::target_part_slot)
       .collect()
   }
 }
@@ -2624,7 +2861,7 @@ fn empty_content_types() -> Types {
 fn relationships_from_flat_opc_part(
   bytes: Option<&[u8]>,
   source_path: &str,
-  by_path: &HashMap<Box<str>, PartId>,
+  by_path: &HashMap<Box<str>, PartSlot>,
 ) -> Result<RelationshipSet, SdkError> {
   let relationships = bytes
     .map(<Relationships as crate::sdk::SdkType>::from_bytes)
@@ -2843,8 +3080,8 @@ fn root_xml_bytes(bytes: &[u8]) -> Result<Vec<u8>, SdkError> {
 #[cfg(feature = "flat-opc")]
 fn flat_opc_part_is_xml(
   part: &StoredPart,
-  part_id: PartId,
-  alt_chunk_part_ids: &HashSet<PartId>,
+  part_id: PartSlot,
+  alt_chunk_part_ids: &HashSet<PartSlot>,
 ) -> bool {
   part.content_type().ends_with("xml") && !alt_chunk_part_ids.contains(&part_id)
 }
@@ -3027,7 +3264,7 @@ fn relationship_types_by_part(
 
   for relationship_set in std::iter::once(package_relationships).chain(part_relationships) {
     for relationship in relationship_set.iter() {
-      let Some(part_id) = relationship.target_part_id() else {
+      let Some(part_id) = relationship.target_part_slot() else {
         continue;
       };
       let slot = relationship_types.get_mut(part_id.index()).ok_or_else(|| {
@@ -3242,11 +3479,11 @@ fn lowercase_zip_filename(path: &str) -> Option<String> {
 fn relationship_info(
   relationship: OpcRelationship,
   source_parent_path: &str,
-  by_path: &HashMap<Box<str>, PartId>,
+  by_path: &HashMap<Box<str>, PartSlot>,
 ) -> RelationshipInfo {
   let target_mode = relationship.target_mode;
   let effective_target_mode = target_mode.unwrap_or(TargetMode::Internal);
-  let (target_kind, target_part_id) = if matches!(effective_target_mode, TargetMode::Internal) {
+  let (target_kind, target_part_slot) = if matches!(effective_target_mode, TargetMode::Internal) {
     if relationship.target.eq_ignore_ascii_case("NULL") {
       (RelationshipTargetKind::Null, None)
     } else {
@@ -3269,7 +3506,7 @@ fn relationship_info(
     target: relationship.target.into_boxed_str(),
     target_mode,
     target_kind,
-    target_part_id,
+    target_part_slot,
   }
 }
 
@@ -3283,7 +3520,47 @@ mod tests {
   use std::io::{Cursor, Write};
 
   #[test]
-  fn storage_resolves_package_relationship_target_part_id() {
+  fn relationship_set_separates_child_parts_and_caches_the_next_numeric_id() {
+    let mut relationships = RelationshipSet::default();
+    relationships
+      .add_internal_part_relationship(
+        "rId1",
+        "http://example.com/relationships/child",
+        "child.xml",
+        PartSlot::from_index(0),
+      )
+      .unwrap();
+    relationships
+      .add_internal_part_relationship(
+        "rId9",
+        RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE,
+        "media/audio.mp3",
+        PartSlot::from_index(1),
+      )
+      .unwrap();
+
+    assert_eq!(relationships.next_relationship_id(), "rId10");
+    assert_eq!(
+      relationships
+        .part_relationships()
+        .map(RelationshipInfo::id)
+        .collect::<Vec<_>>(),
+      vec!["rId1"]
+    );
+    assert_eq!(
+      relationships
+        .data_part_reference_relationships()
+        .map(RelationshipInfo::id)
+        .collect::<Vec<_>>(),
+      vec!["rId9"]
+    );
+
+    relationships.remove("rId9").unwrap();
+    assert_eq!(relationships.next_relationship_id(), "rId2");
+  }
+
+  #[test]
+  fn storage_resolves_package_relationship_target_part_slot() {
     let mut buffer = Cursor::new(Vec::new());
     {
       let mut zip = zip::ZipWriter::new(&mut buffer);
@@ -3318,7 +3595,7 @@ mod tests {
     buffer.set_position(0);
     let storage = SdkPackageStorage::open(buffer).unwrap();
     let relationship = storage.package_relationships().get("rId1").unwrap();
-    let part_id = relationship.target_part_id().unwrap();
+    let part_id = relationship.target_part_slot().unwrap();
     let part = storage.part(part_id).unwrap();
 
     assert_eq!(part.path(), "word/document.xml");
@@ -3424,10 +3701,10 @@ mod tests {
     let sheet_part_id = storage
       .package_relationships()
       .get("rId1")
-      .and_then(RelationshipInfo::target_part_id)
+      .and_then(RelationshipInfo::target_part_slot)
       .and_then(|workbook_part_id| storage.relationships(workbook_part_id))
       .and_then(|relationships| relationships.get("rId1"))
-      .and_then(RelationshipInfo::target_part_id)
+      .and_then(RelationshipInfo::target_part_slot)
       .unwrap();
     let drawing_relationship = storage
       .relationships(sheet_part_id)
@@ -3440,7 +3717,7 @@ mod tests {
       RelationshipTargetKind::InternalPart
     );
     let drawing_part = storage
-      .part(drawing_relationship.target_part_id().unwrap())
+      .part(drawing_relationship.target_part_slot().unwrap())
       .unwrap();
     assert_eq!(drawing_part.path(), "xl/drawings/drawing1.xml");
   }

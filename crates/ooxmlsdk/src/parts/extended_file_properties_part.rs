@@ -6,7 +6,7 @@
 
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ExtendedFilePropertiesPart {
-  pub(crate) id: crate::common::PartId,
+  pub(crate) key: crate::common::PartKey,
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_office_document_2006_extended_properties::Properties,
   >,

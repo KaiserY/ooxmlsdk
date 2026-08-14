@@ -8,7 +8,7 @@
 pub struct PresentationDocument {
   pub(crate) storage: crate::common::SdkPackageStorage,
   pub(crate) open_settings: crate::sdk::OpenSettings,
-  pub(crate) root_elements: Vec<Option<crate::parts::PartRootElement>>,
+  pub(crate) root_elements: crate::sdk::PartRootCache,
   #[sdk(package_main(accessor = "presentation_part"))]
   #[sdk(part_child(kind = "required"))]
   pub(crate) presentation_part:

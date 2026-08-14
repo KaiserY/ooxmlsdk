@@ -6,5 +6,5 @@
 
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomPropertyPart {
-  pub(crate) id: crate::common::PartId,
+  pub(crate) key: crate::common::PartKey,
 }

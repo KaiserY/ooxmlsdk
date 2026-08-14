@@ -1366,21 +1366,19 @@ impl<'a> IdPartPair<'a> {
 pub(crate) fn initialize_root_elements(
   storage: &mut crate::common::SdkPackageStorage,
   open_settings: &crate::sdk::OpenSettings,
-) -> Result<Vec<Option<crate::parts::PartRootElement>>, crate::common::SdkError> {
-  if !matches!(
+) -> Result<crate::sdk::PartRootCache, crate::common::SdkError> {
+  let root_elements = crate::sdk::PartRootCache::with_len(storage.parts().len());
+  if matches!(
     open_settings.root_element_open_mode(),
     crate::common::PackageOpenMode::Eager
   ) {
-    return Ok(Vec::new());
-  }
-  let mut root_elements = vec![None; storage.parts().len()];
-  for (index, slot) in root_elements.iter_mut().enumerate() {
-    let part_id = crate::common::PartId::from_index(index);
-    let root_element =
-      crate::parts::PartRootElement::from_part_id(storage, part_id, open_settings)?;
-    if let Some(root_element) = root_element {
-      storage.discard_cached_part_bytes(part_id);
-      *slot = Some(root_element);
+    for index in 0..storage.parts().len() {
+      let part_slot = crate::common::PartSlot::from_index(index);
+      if let Some(root_element) =
+        crate::parts::PartRootElement::from_part_slot(storage, part_slot, open_settings)?
+      {
+        let _ = root_elements.set_once(part_slot, root_element);
+      }
     }
   }
   Ok(root_elements)
@@ -1392,26 +1390,21 @@ where
   validate_missing_internal_relationships(package)?;
   let part_count = crate::sdk::SdkPackage::storage(package).parts().len();
   for index in 0..part_count {
-    let part_id = crate::common::PartId::from_index(index);
+    let part_slot = crate::common::PartSlot::from_index(index);
     if crate::sdk::SdkPackage::storage(package)
-      .part(part_id)
+      .part(part_slot)
       .is_none()
-      || crate::sdk::SdkPackage::is_root_element_loaded(package, part_id)
+      || crate::sdk::SdkPackage::is_root_element_loaded(package, part_slot)
     {
       continue;
     }
-    let root_element = crate::parts::PartRootElement::from_part_id(
+    let root_element = crate::parts::PartRootElement::from_part_slot(
       crate::sdk::SdkPackage::storage(package),
-      part_id,
+      part_slot,
       crate::sdk::SdkPackage::open_settings(package),
     )?;
-    if root_element.is_some() {
-      crate::sdk::SdkPackage::storage_mut(package).discard_cached_part_bytes(part_id);
-    }
-    if let Some(root_element) = root_element
-      && let Some(slot) = crate::sdk::SdkPackage::root_element_slot_mut(package, part_id)
-    {
-      *slot = Some(root_element);
+    if let Some(root_element) = root_element {
+      let _ = crate::sdk::SdkPackage::cache_root_element(package, part_slot, root_element);
     }
   }
   Ok(())

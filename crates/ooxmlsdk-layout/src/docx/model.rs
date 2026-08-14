@@ -25,7 +25,7 @@ pub(crate) struct DocxDocument {
   pub note_separator_style: TextStyle,
   pub footnote_separator_stories: NoteSeparatorStories,
   pub endnote_separator_stories: NoteSeparatorStories,
-  pub has_styles_part: bool,
+  pub uses_office_recovered_paragraph_defaults: bool,
   pub default_tab_stop_pt: f32,
   pub hyphenation: HyphenationSettings,
   pub compatibility_mode: u16,
@@ -270,11 +270,38 @@ pub(crate) enum ParagraphFieldEvent {
   SuppressParagraphBreak {
     deferred: bool,
   },
+  /// Suppress a cached-result delimiter owned by one unlocked REF field.
+  ///
+  /// Until fixed-output refresh resolves that field from its bookmark, this
+  /// has the same meaning as `SuppressParagraphBreak { deferred: true }`.
+  /// The import-local id lets refresh remove only this REF's cached paragraph
+  /// structure without changing nested or neighboring IF/REF fields.
+  SuppressReferenceParagraphBreak {
+    field_id: u64,
+  },
   /// Materialize a paragraph delimiter that was deferred by an open IF/REF
   /// field. `inline_offset` is measured in the paragraph's imported inline
   /// sequence, immediately after the closing field result.
   DeferredParagraphBreak {
     inline_offset: usize,
+  },
+  /// Cached REF-result delimiter paired with
+  /// `SuppressReferenceParagraphBreak` by `field_id`.
+  DeferredReferenceParagraphBreak {
+    field_id: u64,
+    inline_offset: usize,
+  },
+  /// Exact inline span occupied by one top-level unlocked REF result.
+  ///
+  /// Word's fixed-format exporter refreshes this span from the referenced
+  /// bookmark without mutating the open document. Keep the span internal to
+  /// import/refresh so unrelated cached fields remain authoritative.
+  ReferenceResultSpan {
+    field_id: u64,
+    bookmark_name: String,
+    inline_start: usize,
+    inline_end: usize,
+    merge_format: bool,
   },
 }
 
@@ -531,6 +558,13 @@ pub(crate) struct ParagraphFormat {
   /// completed textbox story so line layout can keep the state scoped to that
   /// shape; omission and an explicit false both remain the default here.
   pub wordprocessing_shape_compatible_line_spacing: bool,
+  /// A direct paragraph in `wps:txbx/w:txbxContent` belongs to an independent
+  /// WordprocessingML text-frame story. Layout currently reuses the table-cell
+  /// formatter for clipping and pagination, so retain this owner bit to avoid
+  /// inheriting real table-cell grid behavior from that implementation detail.
+  /// Paragraphs in an actual table nested inside the textbox remain ordinary
+  /// table-cell stories and deliberately leave this false.
+  pub wordprocessing_shape_story: bool,
   pub snap_to_grid: Option<bool>,
   pub line_vertical_alignment: Option<common::LineVerticalAlignment>,
   pub indent_left_pt: f32,
@@ -1075,6 +1109,14 @@ pub(crate) struct InlineImage {
 pub(crate) struct InlineShape {
   pub width_pt: f32,
   pub height_pt: f32,
+  /// Inline line-box size owned by the enclosing `wp:inline` object.
+  ///
+  /// A WPG child keeps its mapped child geometry in `width_pt`/`height_pt`,
+  /// while the parent `wp:extent` remains the character-like object which
+  /// changes the paragraph line height.  Keep those two coordinate-space
+  /// contracts separate so table-cell clipping cannot mistake a short,
+  /// offset child for the complete inline object.
+  pub inline_frame_size_pt: Option<(f32, f32)>,
   pub effect_left_pt: f32,
   pub effect_top_pt: f32,
   pub effect_right_pt: f32,
@@ -1095,7 +1137,6 @@ pub(crate) struct InlineShape {
   pub stroke_override: Option<Box<common::Stroke<'static>>>,
   pub suppress_zero_relative_background: bool,
   pub allow_outside_page: bool,
-  pub inline_anchor_after_line: bool,
   pub placement: ImagePlacement,
   pub chart: Option<Box<InlineChart>>,
   pub text_warp: Option<Box<a::PresetTextWarp>>,

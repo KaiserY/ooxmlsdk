@@ -14357,6 +14357,7 @@ mod tests {
       line_gap_pt: 1.968_75,
       baseline_offset_pt: 12.031_25,
       directwrite_baseline_offset_pt: 12.031_25,
+      wordprocessingml_cjk_line_metrics: false,
     };
     assert_eq!(word_chart_title_ink_box_excess(simsun, 14.0), 0.0);
 
@@ -14366,6 +14367,7 @@ mod tests {
       line_gap_pt: 0.0,
       baseline_offset_pt: 11.340_82,
       directwrite_baseline_offset_pt: 11.340_82,
+      wordprocessingml_cjk_line_metrics: true,
     };
     assert!((word_chart_title_ink_box_excess(dengxian, 14.0) - 0.587_89).abs() < 0.000_01);
   }

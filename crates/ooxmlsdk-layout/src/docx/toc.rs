@@ -467,6 +467,7 @@ impl ParagraphAddress {
 struct StoryParagraph {
   address: ParagraphAddress,
   bookmark_scopes: HashSet<String>,
+  content_bookmark_scopes: HashSet<String>,
   source_bookmarks: Vec<String>,
 }
 
@@ -597,11 +598,14 @@ fn scan_story_paragraph(
 ) {
   let ordinal = scan.paragraphs.len();
   let mut bookmark_scopes = active_bookmarks.values().cloned().collect::<HashSet<_>>();
+  let mut content_bookmark_scopes = HashSet::new();
   let mut source_bookmarks = Vec::new();
 
   for (event_index, event) in paragraph.field_events.iter().enumerate() {
     match event {
-      ParagraphFieldEvent::Content => {}
+      ParagraphFieldEvent::Content => {
+        content_bookmark_scopes.extend(active_bookmarks.values().cloned());
+      }
       ParagraphFieldEvent::Begin { locked, dirty } => fields.push(OpenStoryField {
         start_ordinal: ordinal,
         instruction: String::new(),
@@ -670,13 +674,17 @@ fn scan_story_paragraph(
         }
       }
       ParagraphFieldEvent::SuppressParagraphBreak { .. }
-      | ParagraphFieldEvent::DeferredParagraphBreak { .. } => {}
+      | ParagraphFieldEvent::SuppressReferenceParagraphBreak { .. }
+      | ParagraphFieldEvent::DeferredParagraphBreak { .. }
+      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { .. }
+      | ParagraphFieldEvent::ReferenceResultSpan { .. } => {}
     }
   }
 
   scan.paragraphs.push(StoryParagraph {
     address,
     bookmark_scopes,
+    content_bookmark_scopes,
     source_bookmarks,
   });
 }
@@ -788,6 +796,16 @@ struct StoryReplacement {
   blocks: Vec<Block>,
 }
 
+#[derive(Clone, Debug)]
+struct ReferenceResultRefresh {
+  paragraph_ordinal: usize,
+  field_id: u64,
+  inline_start: usize,
+  inline_end: usize,
+  replacement: Vec<InlineItem>,
+  paragraph_break_offsets: Vec<usize>,
+}
+
 pub(super) fn refresh_tables_of_contents(
   sections: &mut [ImportedSection],
   styles: &StylesCatalog,
@@ -801,8 +819,11 @@ pub(super) fn refresh_tables_of_contents(
     .extend(body_level_bookmarks.iter().cloned());
   let resolved_page_references =
     resolve_layout_stable_page_reference_fields(sections, &scan, ui_language);
+  let refreshed_body_references =
+    refresh_body_level_reference_fields(sections, &scan, body_level_bookmarks);
   let refreshed_reference_spans = refresh_missing_reference_fields(sections, &scan, ui_language);
-  let refreshed_references = resolved_page_references || refreshed_reference_spans;
+  let refreshed_references =
+    resolved_page_references || refreshed_body_references || refreshed_reference_spans;
   let scan = if refreshed_references {
     let mut refreshed_scan = scan_main_story(sections);
     refreshed_scan
@@ -903,6 +924,243 @@ pub(super) fn refresh_tables_of_contents(
   replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.span.start_ordinal));
   for replacement in replacements {
     replace_toc_span(sections, &scan, replacement);
+  }
+}
+
+fn refresh_body_level_reference_fields(
+  sections: &mut [ImportedSection],
+  scan: &StoryScan,
+  body_level_bookmarks: &HashSet<String>,
+) -> bool {
+  let mut refreshes = Vec::new();
+  for paragraph_ordinal in 0..scan.paragraphs.len() {
+    let Some(cached_paragraph) = paragraph(sections, scan, paragraph_ordinal) else {
+      continue;
+    };
+    for event in &cached_paragraph.field_events {
+      let ParagraphFieldEvent::ReferenceResultSpan {
+        field_id,
+        bookmark_name,
+        inline_start,
+        inline_end,
+        merge_format,
+      } = event
+      else {
+        continue;
+      };
+      let Some(canonical_name) = body_level_bookmarks
+        .iter()
+        .find(|candidate| candidate.eq_ignore_ascii_case(bookmark_name))
+      else {
+        continue;
+      };
+      let Some(source_paragraphs) = body_level_reference_source(sections, scan, canonical_name)
+      else {
+        continue;
+      };
+      let inline_start = (*inline_start).min(cached_paragraph.inlines.len());
+      let inline_end = (*inline_end)
+        .max(inline_start)
+        .min(cached_paragraph.inlines.len());
+      let cached_result = &cached_paragraph.inlines[inline_start..inline_end];
+      if !cached_result
+        .iter()
+        .all(|inline| matches!(inline, InlineItem::Text(_)))
+      {
+        // A text-only body-level REF is a closed, evidence-backed unit. Keep
+        // cached drawings, notes, controls, and mixed structural results until
+        // their bookmark-copy semantics are modeled without loss.
+        continue;
+      }
+
+      let cached_template = cached_result.iter().find_map(|inline| match inline {
+        InlineItem::Text(run) => Some(run.clone()),
+        _ => None,
+      });
+      let mut replacement = Vec::with_capacity(source_paragraphs.len());
+      let mut paragraph_break_offsets =
+        Vec::with_capacity(source_paragraphs.len().saturating_sub(1));
+      for (source_index, (text, source_style)) in source_paragraphs.iter().enumerate() {
+        let mut run = cached_template.clone().unwrap_or_else(|| TextRun {
+          text: String::new(),
+          style: cached_paragraph.base_style.clone(),
+          hyperlink_url: None,
+          dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
+          style_ref_numbering_text: None,
+          preserve_text_portion: false,
+        });
+        run.text.clone_from(text);
+        if !merge_format {
+          run.style.clone_from(source_style);
+        }
+        run.dynamic_field = None;
+        run.style_ref_keys.clear();
+        run.style_ref_text = None;
+        run.style_ref_numbering_text = None;
+        run.preserve_text_portion = false;
+        replacement.push(InlineItem::Text(run));
+        if source_index + 1 < source_paragraphs.len() {
+          paragraph_break_offsets.push(replacement.len());
+        }
+      }
+      mark_wordprocessing_field_result(&mut replacement);
+      refreshes.push(ReferenceResultRefresh {
+        paragraph_ordinal,
+        field_id: *field_id,
+        inline_start,
+        inline_end,
+        replacement,
+        paragraph_break_offsets,
+      });
+    }
+  }
+
+  if refreshes.is_empty() {
+    return false;
+  }
+
+  // Later spans first keep every earlier inline offset valid. Top-level REF
+  // fields cannot overlap; sorting also handles multiple sequential fields in
+  // one paragraph without field-specific offset heuristics.
+  refreshes.sort_by_key(|refresh| {
+    (
+      std::cmp::Reverse(refresh.paragraph_ordinal),
+      std::cmp::Reverse(refresh.inline_start),
+    )
+  });
+  let resolved_field_ids = refreshes
+    .iter()
+    .map(|refresh| refresh.field_id)
+    .collect::<HashSet<_>>();
+
+  for refresh in refreshes {
+    let Some(paragraph) = paragraph_mut(sections, scan, refresh.paragraph_ordinal) else {
+      continue;
+    };
+    let inserted_len = refresh.replacement.len();
+    adjust_reference_event_offsets_for_splice(
+      &mut paragraph.field_events,
+      refresh.inline_start,
+      refresh.inline_end,
+      inserted_len,
+    );
+    paragraph.inlines.splice(
+      refresh.inline_start..refresh.inline_end,
+      refresh.replacement,
+    );
+    paragraph
+      .field_events
+      .extend(
+        refresh
+          .paragraph_break_offsets
+          .into_iter()
+          .map(
+            |relative_offset| ParagraphFieldEvent::DeferredParagraphBreak {
+              inline_offset: refresh.inline_start + relative_offset,
+            },
+          ),
+      );
+    refresh_paragraph_story_derivatives(paragraph);
+  }
+
+  // Switch only the resolved REF's authored boundaries from cached-result
+  // reconstruction to fixed-output replacement. Unresolved or unsupported
+  // REF fields keep the old reversible events and therefore their cache.
+  for paragraph_ordinal in 0..scan.paragraphs.len() {
+    let Some(paragraph) = paragraph_mut(sections, scan, paragraph_ordinal) else {
+      continue;
+    };
+    let mut events = Vec::with_capacity(paragraph.field_events.len());
+    for event in std::mem::take(&mut paragraph.field_events) {
+      match event {
+        ParagraphFieldEvent::SuppressReferenceParagraphBreak { field_id }
+          if resolved_field_ids.contains(&field_id) =>
+        {
+          events.push(ParagraphFieldEvent::SuppressParagraphBreak { deferred: false });
+        }
+        ParagraphFieldEvent::DeferredReferenceParagraphBreak { field_id, .. }
+        | ParagraphFieldEvent::ReferenceResultSpan { field_id, .. }
+          if resolved_field_ids.contains(&field_id) => {}
+        event => events.push(event),
+      }
+    }
+    paragraph.field_events = events;
+  }
+  true
+}
+
+fn body_level_reference_source(
+  sections: &[ImportedSection],
+  scan: &StoryScan,
+  bookmark_name: &str,
+) -> Option<Vec<(String, TextStyle)>> {
+  let mut source = Vec::new();
+  for (ordinal, scanned_paragraph) in scan.paragraphs.iter().enumerate() {
+    if !scanned_paragraph
+      .content_bookmark_scopes
+      .iter()
+      .any(|candidate| candidate.eq_ignore_ascii_case(bookmark_name))
+    {
+      continue;
+    }
+    let paragraph = paragraph(sections, scan, ordinal)?;
+    if !paragraph
+      .inlines
+      .iter()
+      .all(|inline| matches!(inline, InlineItem::Text(_) | InlineItem::BookmarkStart(_)))
+    {
+      return None;
+    }
+    let text = paragraph_source_text(paragraph)?;
+    let style = paragraph
+      .inlines
+      .iter()
+      .find_map(|inline| match inline {
+        InlineItem::Text(run) => Some(run.style.clone()),
+        _ => None,
+      })
+      .unwrap_or_else(|| paragraph.base_style.clone());
+    source.push((text, style));
+  }
+  (!source.is_empty()).then_some(source)
+}
+
+fn adjust_reference_event_offsets_for_splice(
+  events: &mut [ParagraphFieldEvent],
+  inline_start: usize,
+  inline_end: usize,
+  inserted_len: usize,
+) {
+  let shift = |offset: &mut usize| {
+    if *offset >= inline_end {
+      *offset = if inserted_len >= inline_end.saturating_sub(inline_start) {
+        offset.saturating_add(inserted_len - inline_end.saturating_sub(inline_start))
+      } else {
+        offset.saturating_sub(inline_end.saturating_sub(inline_start) - inserted_len)
+      };
+    } else if *offset > inline_start {
+      *offset = inline_start + inserted_len;
+    }
+  };
+
+  for event in events {
+    match event {
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
+      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+        shift(inline_offset);
+      }
+      ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start: start,
+        inline_end: end,
+        ..
+      } => {
+        shift(start);
+        shift(end);
+      }
+      _ => {}
+    }
   }
 }
 

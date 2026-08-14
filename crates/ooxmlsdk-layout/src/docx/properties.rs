@@ -211,6 +211,8 @@ fn merge_run_style_with_policy(
       style.font_family = Some(font_family);
       style.fallback_font_family = None;
       style.font_family_class = None;
+      style.font_charset = None;
+      style.font_pitch = None;
     }
     if let Some(font_family) = resolve_word_run_font(
       fonts.high_ansi.as_deref(),
@@ -220,6 +222,8 @@ fn merge_run_style_with_policy(
       style.high_ansi_font_family = Some(font_family);
       style.high_ansi_fallback_font_family = None;
       style.high_ansi_font_family_class = None;
+      style.high_ansi_font_charset = None;
+      style.high_ansi_font_pitch = None;
     }
     if let Some(font_family) = resolve_word_run_font(
       fonts.east_asia.as_deref(),
@@ -230,6 +234,7 @@ fn merge_run_style_with_policy(
       style.east_asia_fallback_font_family = None;
       style.east_asia_font_family_class = None;
       style.east_asia_font_charset = None;
+      style.east_asia_font_pitch = None;
     }
     if let Some(font_family) = resolve_word_run_font(
       fonts.complex_script.as_deref(),
@@ -239,6 +244,8 @@ fn merge_run_style_with_policy(
       style.complex_font_family = Some(font_family);
       style.complex_fallback_font_family = None;
       style.complex_font_family_class = None;
+      style.complex_font_charset = None;
+      style.complex_font_pitch = None;
     }
     if let Some(hint) = fonts.hint {
       style.wordprocessingml_font_hint = Some(match hint {

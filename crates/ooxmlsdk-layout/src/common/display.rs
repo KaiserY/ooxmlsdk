@@ -544,7 +544,14 @@ pub struct TextStyle<'doc> {
   /// Effective WordprocessingML `w:rFonts/@w:hint` for ambiguous font slots.
   pub wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
   pub wordprocessingml_east_asia_language_is_chinese: bool,
+  pub font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  pub high_ansi_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   pub wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  pub complex_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  pub font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  pub high_ansi_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  pub east_asia_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  pub complex_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   pub font_size: Pt,
   pub complex_font_size: Option<Pt>,
   pub complex_script: Option<bool>,
@@ -583,6 +590,9 @@ pub struct TextStyle<'doc> {
   pub use_windows_font_metrics: bool,
   /// Select Common characters using the WordprocessingML rFonts slot table.
   pub wordprocessingml_font_slots: bool,
+  /// Enable CJK-capable font line metrics for WordprocessingML documents
+  /// carrying the `w:noLeading` compatibility setting.
+  pub wordprocessingml_cjk_line_metrics: bool,
   /// Enable Word's document-level East Asian punctuation compression.
   pub cjk_punctuation_compression_ratio: f32,
   /// Balance qualifying ordinary spaces to half an ideographic em for the

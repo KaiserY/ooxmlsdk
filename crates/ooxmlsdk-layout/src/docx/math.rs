@@ -401,7 +401,14 @@ pub(super) fn apply_office_math_font_family(
   style.high_ansi_font_family_class = None;
   style.east_asia_font_family_class = None;
   style.complex_font_family_class = None;
+  style.font_charset = None;
+  style.high_ansi_font_charset = None;
   style.east_asia_font_charset = None;
+  style.complex_font_charset = None;
+  style.font_pitch = None;
+  style.high_ansi_font_pitch = None;
+  style.east_asia_font_pitch = None;
+  style.complex_font_pitch = None;
   styles.apply_font_substitution(style);
 }
 
@@ -6672,7 +6679,14 @@ mod tests {
       high_ansi_font_family_class: Some(ooxmlsdk_fonts::FontFamilyClass::SansSerif),
       east_asia_font_family_class: Some(ooxmlsdk_fonts::FontFamilyClass::Schoolbook),
       complex_font_family_class: Some(ooxmlsdk_fonts::FontFamilyClass::OldStyle),
+      font_charset: Some(ooxmlsdk_fonts::FontCharset::Ansi),
+      high_ansi_font_charset: Some(ooxmlsdk_fonts::FontCharset::Russian),
       east_asia_font_charset: Some(ooxmlsdk_fonts::FontCharset::Gb2312),
+      complex_font_charset: Some(ooxmlsdk_fonts::FontCharset::Arabic),
+      font_pitch: Some(ooxmlsdk_fonts::FontPitch::Variable),
+      high_ansi_font_pitch: Some(ooxmlsdk_fonts::FontPitch::Fixed),
+      east_asia_font_pitch: Some(ooxmlsdk_fonts::FontPitch::Variable),
+      complex_font_pitch: Some(ooxmlsdk_fonts::FontPitch::Fixed),
       wordprocessingml_font_slots: true,
       ..TextStyle::default()
     };
@@ -6699,7 +6713,14 @@ mod tests {
     assert!(math.high_ansi_font_family_class.is_none());
     assert!(math.east_asia_font_family_class.is_none());
     assert!(math.complex_font_family_class.is_none());
+    assert!(math.font_charset.is_none());
+    assert!(math.high_ansi_font_charset.is_none());
     assert!(math.east_asia_font_charset.is_none());
+    assert!(math.complex_font_charset.is_none());
+    assert!(math.font_pitch.is_none());
+    assert!(math.high_ansi_font_pitch.is_none());
+    assert!(math.east_asia_font_pitch.is_none());
+    assert!(math.complex_font_pitch.is_none());
     assert!(math.wordprocessingml_font_slots);
 
     // Applying the math-zone state to a clone must not mutate the enclosing
@@ -7930,6 +7951,7 @@ mod tests {
       line_gap_pt: 2.0,
       baseline_offset_pt: 9.0,
       directwrite_baseline_offset_pt: 11.0,
+      wordprocessingml_cjk_line_metrics: false,
     };
 
     assert_eq!(

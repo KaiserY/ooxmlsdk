@@ -110,6 +110,10 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
     self.style.wordprocessingml_font_slots()
   }
 
+  fn wordprocessingml_cjk_line_metrics(&self) -> bool {
+    self.style.wordprocessingml_cjk_line_metrics()
+  }
+
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     self.style.cjk_punctuation_compression_ratio()
   }
@@ -127,6 +131,14 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
 const FALLBACK_ASCENT_EM: f32 = 0.8;
 const FALLBACK_DESCENT_EM: f32 = 0.2;
 const FALLBACK_LINE_GAP_EM: f32 = 0.05;
+// Word's `w:noLeading` DOC/DOCX compatibility metrics add this portion of the
+// natural font height above and below every line painted with a face whose
+// OS/2 code-page ranges advertise CP932/936/949/950. A 25pt DengXian control
+// gives a 33.84pt single-line advance from a 26.05pt natural box and moves the
+// first baseline down by 3.90pt, independently confirming the two 15% side
+// bands. Writer's tdf#129808 path gates the same four code-page bits behind
+// MS_WORD_COMP_GRID_METRICS and explicitly confirms Latin text as a control.
+const WORDPROCESSINGML_CJK_SIDE_LEADING_RATIO: f32 = 0.15;
 // FontMetricData::ImplInitTextLineSize.
 const LO_TEXT_LINE_DESCENT_FALLBACK_DIVISOR: f32 = 10.0;
 const LO_TEXT_LINE_MAX_DESCENT_DIVISOR: f32 = 3.0;
@@ -143,13 +155,14 @@ pub struct ShapedText {
   pub width_pt: f32,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextVerticalMetrics {
   pub ascent_pt: f32,
   pub descent_pt: f32,
   pub line_gap_pt: f32,
   pub baseline_offset_pt: f32,
   pub directwrite_baseline_offset_pt: f32,
+  pub wordprocessingml_cjk_line_metrics: bool,
 }
 
 impl TextVerticalMetrics {
@@ -363,9 +376,17 @@ struct MeasureStyleKey {
   small_caps: bool,
   kerning_enabled: bool,
   wordprocessingml_font_slots: bool,
+  wordprocessingml_cjk_line_metrics: bool,
   wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
   wordprocessingml_east_asia_language_is_chinese: bool,
+  font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  high_ansi_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  complex_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  high_ansi_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  east_asia_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  complex_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   cjk_punctuation_compression_ratio_bits: u32,
   wordprocessingml_balance_single_byte_double_byte_width: bool,
 }
@@ -399,10 +420,18 @@ impl MeasureStyleKey {
       small_caps: style.small_caps(),
       kerning_enabled: style.kerning_enabled(),
       wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
+      wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics(),
       wordprocessingml_font_hint: style.wordprocessingml_font_hint(),
       wordprocessingml_east_asia_language_is_chinese: style
         .wordprocessingml_east_asia_language_is_chinese(),
+      font_charset: style.font_charset(),
+      high_ansi_font_charset: style.high_ansi_font_charset(),
       wordprocessingml_east_asia_font_charset: style.wordprocessingml_east_asia_font_charset(),
+      complex_font_charset: style.complex_font_charset(),
+      font_pitch: style.font_pitch(),
+      high_ansi_font_pitch: style.high_ansi_font_pitch(),
+      east_asia_font_pitch: style.east_asia_font_pitch(),
+      complex_font_pitch: style.complex_font_pitch(),
       cjk_punctuation_compression_ratio_bits: style.cjk_punctuation_compression_ratio().to_bits(),
       wordprocessingml_balance_single_byte_double_byte_width: style
         .wordprocessingml_balance_single_byte_double_byte_width(),
@@ -436,11 +465,19 @@ impl MeasureStyleKey {
       && self.small_caps == style.small_caps()
       && self.kerning_enabled == style.kerning_enabled()
       && self.wordprocessingml_font_slots == style.wordprocessingml_font_slots()
+      && self.wordprocessingml_cjk_line_metrics == style.wordprocessingml_cjk_line_metrics()
       && self.wordprocessingml_font_hint == style.wordprocessingml_font_hint()
       && self.wordprocessingml_east_asia_language_is_chinese
         == style.wordprocessingml_east_asia_language_is_chinese()
+      && self.font_charset == style.font_charset()
+      && self.high_ansi_font_charset == style.high_ansi_font_charset()
       && self.wordprocessingml_east_asia_font_charset
         == style.wordprocessingml_east_asia_font_charset()
+      && self.complex_font_charset == style.complex_font_charset()
+      && self.font_pitch == style.font_pitch()
+      && self.high_ansi_font_pitch == style.high_ansi_font_pitch()
+      && self.east_asia_font_pitch == style.east_asia_font_pitch()
+      && self.complex_font_pitch == style.complex_font_pitch()
       && self.cjk_punctuation_compression_ratio_bits
         == style.cjk_punctuation_compression_ratio().to_bits()
       && self.wordprocessingml_balance_single_byte_double_byte_width
@@ -739,13 +776,7 @@ impl TextMetrics {
     self
       .fonts
       .vertical_metrics(style)
-      .map(|metrics| TextVerticalMetrics {
-        ascent_pt: metrics.ascent_pt,
-        descent_pt: metrics.descent_pt,
-        line_gap_pt: metrics.line_gap_pt,
-        baseline_offset_pt: metrics.baseline_offset_pt,
-        directwrite_baseline_offset_pt: metrics.directwrite_baseline_offset_pt,
-      })
+      .map(text_vertical_metrics_from_font_metrics)
       .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
   }
 
@@ -757,14 +788,9 @@ impl TextMetrics {
     self
       .fonts
       .vertical_metrics_for_script(style, script)
-      .map(|metrics| TextVerticalMetrics {
-        ascent_pt: metrics.ascent_pt,
-        descent_pt: metrics.descent_pt,
-        line_gap_pt: metrics.line_gap_pt,
-        baseline_offset_pt: metrics.baseline_offset_pt,
-        directwrite_baseline_offset_pt: metrics.directwrite_baseline_offset_pt,
-      })
-      .unwrap_or_else(|| self.vertical_metrics(style))
+      .or_else(|| self.fonts.vertical_metrics(style))
+      .map(text_vertical_metrics_from_font_metrics)
+      .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
   }
 
   pub fn vertical_metrics_for_text(
@@ -775,14 +801,9 @@ impl TextMetrics {
     self
       .fonts
       .text_vertical_metrics(text, style)
-      .map(|metrics| TextVerticalMetrics {
-        ascent_pt: metrics.ascent_pt,
-        descent_pt: metrics.descent_pt,
-        line_gap_pt: metrics.line_gap_pt,
-        baseline_offset_pt: metrics.baseline_offset_pt,
-        directwrite_baseline_offset_pt: metrics.directwrite_baseline_offset_pt,
-      })
-      .unwrap_or_else(|| self.vertical_metrics(style))
+      .or_else(|| self.fonts.vertical_metrics(style))
+      .map(text_vertical_metrics_from_font_metrics)
+      .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
   }
 
   pub fn text_decoration_metrics(
@@ -893,15 +914,18 @@ impl TextMetrics {
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
   ) -> TextVerticalMetrics {
-    let Some((font_size_pt, complex_font_size_pt)) = style.automatic_escapement_font_sizes_pt()
-    else {
-      return self.vertical_metrics(style);
+    let metrics = if let Some((font_size_pt, complex_font_size_pt)) =
+      style.automatic_escapement_font_sizes_pt()
+    {
+      self.vertical_metrics(&AutomaticEscapementMetricsStyle {
+        style,
+        font_size_pt,
+        complex_font_size_pt,
+      })
+    } else {
+      self.vertical_metrics(style)
     };
-    self.vertical_metrics(&AutomaticEscapementMetricsStyle {
-      style,
-      font_size_pt,
-      complex_font_size_pt,
-    })
+    wordprocessingml_line_vertical_metrics(style, metrics)
   }
 
   pub fn line_vertical_metrics_for_text(
@@ -909,37 +933,65 @@ impl TextMetrics {
     text: &str,
     style: &(impl FontStyleRef + ?Sized),
   ) -> TextVerticalMetrics {
-    let Some((font_size_pt, complex_font_size_pt)) = style.automatic_escapement_font_sizes_pt()
-    else {
-      return self.vertical_metrics_for_text(text, style);
+    let metrics = if let Some((font_size_pt, complex_font_size_pt)) =
+      style.automatic_escapement_font_sizes_pt()
+    {
+      self.vertical_metrics_for_text(
+        text,
+        &AutomaticEscapementMetricsStyle {
+          style,
+          font_size_pt,
+          complex_font_size_pt,
+        },
+      )
+    } else {
+      self.vertical_metrics_for_text(text, style)
     };
-    self.vertical_metrics_for_text(
-      text,
-      &AutomaticEscapementMetricsStyle {
-        style,
-        font_size_pt,
-        complex_font_size_pt,
-      },
-    )
+    wordprocessingml_line_vertical_metrics(style, metrics)
   }
 
   fn line_text_height(&mut self, text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
-    let Some((font_size_pt, complex_font_size_pt)) = style.automatic_escapement_font_sizes_pt()
-    else {
-      return self
-        .fonts
-        .max_text_line_height(text, style)
-        .unwrap_or_else(|| self.vertical_metrics(style).line_height_pt());
-    };
-    let metrics_style = AutomaticEscapementMetricsStyle {
-      style,
-      font_size_pt,
-      complex_font_size_pt,
-    };
     self
-      .fonts
-      .max_text_line_height(text, &metrics_style)
-      .unwrap_or_else(|| self.vertical_metrics(&metrics_style).line_height_pt())
+      .line_vertical_metrics_for_text(text, style)
+      .line_height_pt()
+  }
+}
+
+fn wordprocessingml_line_vertical_metrics(
+  style: &(impl FontStyleRef + ?Sized),
+  mut metrics: TextVerticalMetrics,
+) -> TextVerticalMetrics {
+  // Keep the physical font metrics available to callers that are sizing an
+  // implicit paragraph mark, drawing, or other non-line geometry. Word's
+  // DOC/DOCX CJK compatibility leading belongs to formatted text lines only.
+  // In particular, tscp.docx selects an East Asian face for its legacy
+  // automatic-superscript paragraph mark while its visible Latin line keeps
+  // the unscaled paragraph-mark box.
+  if !style.wordprocessingml_font_slots()
+    || !style.wordprocessingml_cjk_line_metrics()
+    || !metrics.wordprocessingml_cjk_line_metrics
+  {
+    return metrics;
+  }
+
+  let side_leading_pt = metrics.ink_height_pt() * WORDPROCESSINGML_CJK_SIDE_LEADING_RATIO;
+  metrics.ascent_pt += side_leading_pt;
+  metrics.descent_pt += side_leading_pt;
+  metrics.baseline_offset_pt += side_leading_pt;
+  metrics.directwrite_baseline_offset_pt += side_leading_pt;
+  metrics
+}
+
+fn text_vertical_metrics_from_font_metrics(
+  metrics: ooxmlsdk_fonts::VerticalMetrics,
+) -> TextVerticalMetrics {
+  TextVerticalMetrics {
+    ascent_pt: metrics.ascent_pt,
+    descent_pt: metrics.descent_pt,
+    line_gap_pt: metrics.line_gap_pt,
+    baseline_offset_pt: metrics.baseline_offset_pt,
+    directwrite_baseline_offset_pt: metrics.directwrite_baseline_offset_pt,
+    wordprocessingml_cjk_line_metrics: metrics.wordprocessingml_cjk_line_metrics,
   }
 }
 
@@ -1234,6 +1286,7 @@ fn approximate_vertical_metrics(font_size: f32) -> TextVerticalMetrics {
     line_gap_pt: font_size * FALLBACK_LINE_GAP_EM,
     baseline_offset_pt: font_size * (FALLBACK_ASCENT_EM + FALLBACK_LINE_GAP_EM / 2.0),
     directwrite_baseline_offset_pt: font_size * (FALLBACK_ASCENT_EM + FALLBACK_LINE_GAP_EM),
+    wordprocessingml_cjk_line_metrics: false,
   }
 }
 
@@ -1406,6 +1459,57 @@ mod tests {
 
     assert!((baseline - 22.48).abs() < 0.01);
     assert_eq!(fit_windows_baseline_to_line(9.0, 3.0, 14.4), 9.0);
+  }
+
+  #[test]
+  fn wordprocessingml_cjk_capability_adds_symmetric_side_leading() {
+    let metrics = TextVerticalMetrics {
+      ascent_pt: 20.0,
+      descent_pt: 6.0,
+      line_gap_pt: 0.0,
+      baseline_offset_pt: 20.0,
+      directwrite_baseline_offset_pt: 20.0,
+      wordprocessingml_cjk_line_metrics: true,
+    };
+    let style = TextStyle {
+      wordprocessingml_font_slots: true,
+      wordprocessingml_cjk_line_metrics: true,
+      ..TextStyle::default()
+    };
+
+    let adjusted = wordprocessingml_line_vertical_metrics(&style, metrics);
+    assert!((adjusted.ascent_pt - 23.9).abs() < 0.0001);
+    assert!((adjusted.descent_pt - 9.9).abs() < 0.0001);
+    assert!((adjusted.line_height_pt() - 33.8).abs() < 0.0001);
+    assert!((adjusted.baseline_offset_pt - 23.9).abs() < 0.0001);
+    assert!((adjusted.directwrite_baseline_offset_pt - 23.9).abs() < 0.0001);
+
+    let drawingml = TextStyle::default();
+    assert_eq!(
+      wordprocessingml_line_vertical_metrics(&drawingml, metrics),
+      metrics
+    );
+    let no_leading_unset = TextStyle {
+      wordprocessingml_font_slots: true,
+      ..TextStyle::default()
+    };
+    assert_eq!(
+      wordprocessingml_line_vertical_metrics(&no_leading_unset, metrics),
+      metrics
+    );
+    assert_eq!(
+      wordprocessingml_line_vertical_metrics(
+        &style,
+        TextVerticalMetrics {
+          wordprocessingml_cjk_line_metrics: false,
+          ..metrics
+        },
+      ),
+      TextVerticalMetrics {
+        wordprocessingml_cjk_line_metrics: false,
+        ..metrics
+      }
+    );
   }
 
   fn test_style() -> TextStyle<'static> {

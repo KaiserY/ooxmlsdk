@@ -377,77 +377,118 @@ impl<'a> FontRegistry<'a> {
     }
 
     for query_family in queries {
-      let platform_fonts = font_timing("platform font query", || {
-        platform_system_query_fonts(&query_family, request)
-      });
-      for platform_font in platform_fonts {
-        let mut face = (*platform_font.face).clone();
-        let matched_legacy_postscript_name =
-          if let PlatformFontQueryFamily::Name(family) = &query_family {
-            let normalized = normalize_family(family);
-            if !family_matches_names(&face, std::slice::from_ref(&normalized))
-              && !face
-                .postscript_name
-                .as_deref()
-                .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
-            {
-              continue;
-            }
-            face
+      registered += self.register_system_query_family(&query_family, request);
+    }
+
+    // A WordprocessingML font-table charset describes the physical face, not
+    // the Unicode script of the current text.  The ordinary platform queries
+    // above deliberately begin with the authored name and alternate names.
+    // If none of those faces satisfies the requested charset, register the
+    // best system face whose OpenType code-page, pitch, and family metadata
+    // does.  This is the portable equivalent of the final GDI font-mapper
+    // phase and avoids maintaining a table of locale-specific font names.
+    if request.charset.is_some() && !self.has_exact_characteristics_match(request) {
+      let query_family = PlatformFontQueryFamily::Characteristics {
+        charset: request.charset.expect("checked above"),
+        family_class: request.family_class,
+        pitch: request.pitch,
+      };
+      registered += self.register_system_query_family(&query_family, request);
+    }
+    Ok(registered)
+  }
+
+  fn register_system_query_family(
+    &mut self,
+    query_family: &PlatformFontQueryFamily,
+    request: &FontRequest<'_>,
+  ) -> usize {
+    let mut registered = 0usize;
+    let platform_fonts = font_timing("platform font query", || {
+      platform_system_query_fonts(query_family, request)
+    });
+    for platform_font in platform_fonts {
+      let mut face = (*platform_font.face).clone();
+      let matched_legacy_postscript_name =
+        if let PlatformFontQueryFamily::Name(family) = query_family {
+          let normalized = normalize_family(family);
+          if !family_matches_names(&face, std::slice::from_ref(&normalized))
+            && !face
               .postscript_name
               .as_deref()
               .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
-          } else {
-            false
-          };
-        if matched_legacy_postscript_name
-          && let PlatformFontQueryFamily::Name(family) = &query_family
-        {
-          // Fontique matched this platform family name even when it is a
-          // legacy name that is not the face's preferred OpenType family.
-          // Preserve that evidence so the Office resolver can still select
-          // the requested family instead of falling through to a later
-          // Office/script fallback.
-          push_unique_string(&mut face.family_names, family.clone());
-        }
-        let postscript_name = face
-          .postscript_name
-          .as_deref()
-          .or_else(|| face.family_names.first().map(Cow::as_ref))
-          .unwrap_or("unknown");
-        let font_id = format!(
-          "system-query:{}:{}",
-          postscript_name, platform_font.face_index
-        );
-        if self
-          .sources
-          .iter()
-          .any(|source| source.id() == Some(font_id.as_str()))
-        {
-          if let Some(existing) = self
-            .book
-            .faces
-            .iter_mut()
-            .find(|existing| existing.font_id.0.as_ref() == font_id)
-            && matched_legacy_postscript_name
-            && let PlatformFontQueryFamily::Name(family) = &query_family
           {
-            push_unique_string(&mut existing.family_names, family.clone());
+            continue;
           }
-          continue;
-        }
-        face.font_id = FontId(Arc::from(font_id.as_str()));
-        self.register_face(
-          FontSource::Memory {
-            id: Cow::Owned(font_id),
-            data: platform_font.data,
-          },
-          face,
-        );
-        registered += 1;
+          face
+            .postscript_name
+            .as_deref()
+            .is_some_and(|name| normalized_family_eq_normalized(name, &normalized))
+        } else {
+          false
+        };
+      if matched_legacy_postscript_name && let PlatformFontQueryFamily::Name(family) = query_family
+      {
+        // Fontique matched this platform family name even when it is a
+        // legacy name that is not the face's preferred OpenType family.
+        // Preserve that evidence so the Office resolver can still select
+        // the requested family instead of falling through to a later
+        // Office/script fallback.
+        push_unique_string(&mut face.family_names, family.clone());
       }
+      let postscript_name = face
+        .postscript_name
+        .as_deref()
+        .or_else(|| face.family_names.first().map(Cow::as_ref))
+        .unwrap_or("unknown");
+      let font_id = format!(
+        "system-query:{}:{}",
+        postscript_name, platform_font.face_index
+      );
+      if self
+        .sources
+        .iter()
+        .any(|source| source.id() == Some(font_id.as_str()))
+      {
+        if let Some(existing) = self
+          .book
+          .faces
+          .iter_mut()
+          .find(|existing| existing.font_id.0.as_ref() == font_id)
+          && matched_legacy_postscript_name
+          && let PlatformFontQueryFamily::Name(family) = query_family
+        {
+          push_unique_string(&mut existing.family_names, family.clone());
+        }
+        continue;
+      }
+      face.font_id = FontId(Arc::from(font_id.as_str()));
+      self.register_face(
+        FontSource::Memory {
+          id: Cow::Owned(font_id),
+          data: platform_font.data,
+        },
+        face,
+      );
+      registered += 1;
     }
-    Ok(registered)
+    registered
+  }
+
+  fn has_exact_characteristics_match(&self, request: &FontRequest<'_>) -> bool {
+    self.book.faces.iter().enumerate().any(|(index, face)| {
+      let scored = score_font_match(
+        index,
+        face,
+        &self.faces,
+        request,
+        None,
+        requested_slant(request),
+        request.stretch.unwrap_or(FontStretch::Normal),
+        requested_weight(request),
+      );
+      !scored.rejected && !scored.rank.pitch_mismatch
+    })
   }
 
   pub fn register_memory_font(
@@ -529,6 +570,32 @@ impl<'a> FontRegistry<'a> {
       Ok(resolved) => Ok(resolved),
       Err(FontError::NoMatch) => {
         for (family, reason) in self.family_substitution_families(request) {
+          if reason == FontSubstitutionReason::LastResort {
+            continue;
+          }
+          if let Ok(mut resolved) =
+            self
+              .book
+              .resolve_matching_family(request, &self.faces, family, false)
+          {
+            resolved.substitution = font_substitution(request, &resolved, reason);
+            return Ok(resolved);
+          }
+        }
+        if font_request_has_substitution_characteristics(request)
+          && let Ok(mut resolved) =
+            self
+              .book
+              .resolve_matching_characteristics(request, &self.faces, false)
+        {
+          resolved.substitution =
+            font_substitution(request, &resolved, FontSubstitutionReason::MissingFamily);
+          return Ok(resolved);
+        }
+        for (family, reason) in self.family_substitution_families(request) {
+          if reason != FontSubstitutionReason::LastResort {
+            continue;
+          }
           if let Ok(mut resolved) =
             self
               .book
@@ -549,6 +616,32 @@ impl<'a> FontRegistry<'a> {
       Ok(resolved) => Ok(resolved),
       Err(FontError::NoMatch) => {
         for (family, reason) in self.family_substitution_families(request) {
+          if reason == FontSubstitutionReason::LastResort {
+            continue;
+          }
+          if let Ok(mut resolved) =
+            self
+              .book
+              .resolve_matching_family(request, &self.faces, family, true)
+          {
+            resolved.substitution = font_substitution(request, &resolved, reason);
+            return Ok(resolved);
+          }
+        }
+        if font_request_has_substitution_characteristics(request)
+          && let Ok(mut resolved) =
+            self
+              .book
+              .resolve_matching_characteristics(request, &self.faces, true)
+        {
+          resolved.substitution =
+            font_substitution(request, &resolved, FontSubstitutionReason::MissingFamily);
+          return Ok(resolved);
+        }
+        for (family, reason) in self.family_substitution_families(request) {
+          if reason != FontSubstitutionReason::LastResort {
+            continue;
+          }
           if let Ok(mut resolved) =
             self
               .book
@@ -1164,6 +1257,17 @@ impl<'a> FontBook<'a> {
     self.resolve_impl(request, registered_faces, Some(family), include_diagnostics)
   }
 
+  fn resolve_matching_characteristics(
+    &self,
+    request: &FontRequest<'_>,
+    registered_faces: &[RegisteredFontFace<'a>],
+    include_diagnostics: bool,
+  ) -> Result<ResolvedFont<'a>> {
+    let mut request = request.clone();
+    request.family = None;
+    self.resolve_impl(&request, registered_faces, None, include_diagnostics)
+  }
+
   fn resolve_impl(
     &self,
     request: &FontRequest<'_>,
@@ -1331,11 +1435,19 @@ impl<'a> FontFaceInfo<'a> {
     } else {
       FontPitch::Variable
     };
+    let os2 = face.os2().ok();
+    let family_class = os2
+      .as_ref()
+      .and_then(|os2| font_family_class_from_opentype(os2.s_family_class()));
     let flags = FontFlags {
       // OpenType `cmap` platform 3 / encoding 0 identifies a Windows symbol
       // font.  Keep the parser's selected cmap classification on the face so
       // a charset-only request can distinguish it from an ordinary text face.
       symbolic: face.charmap().is_symbol(),
+      serif: matches!(
+        family_class,
+        Some(FontFamilyClass::Serif | FontFamilyClass::OldStyle)
+      ),
       monospace: metrics.is_monospace,
       color_glyphs: face.colr().is_ok() || face.sbix().is_ok(),
       vertical: face.vhea().is_ok() || face.vmtx().is_ok(),
@@ -1348,8 +1460,8 @@ impl<'a> FontFaceInfo<'a> {
     };
     let metrics = font_metrics_from_skrifa(&face, 1.0);
     let attributes = face.attributes();
-    let (weight, stretch) = face
-      .os2()
+    let (weight, stretch) = os2
+      .as_ref()
       .map_or((FontWeight::Normal, FontStretch::Normal), |os2| {
         (
           font_weight_from_opentype(os2.us_weight_class()),
@@ -1362,7 +1474,7 @@ impl<'a> FontFaceInfo<'a> {
       family_names,
       postscript_name,
       style_name,
-      family_class: None,
+      family_class,
       weight,
       slant: font_slant_from_skrifa(attributes.style),
       stretch,
@@ -2447,6 +2559,12 @@ pub struct VerticalMetrics {
   pub hanging_baseline_pt: f32,
   pub cjk_horizontal_advance_pt: f32,
   pub cjk_vertical_advance_pt: f32,
+  /// The OS/2 code-page ranges advertise Japanese, Simplified Chinese,
+  /// Korean Wansung, or Traditional Chinese coverage.
+  ///
+  /// Word uses this font capability—not the text script or selected OOXML
+  /// font slot—to opt a DOC/DOCX portion into its enlarged CJK line metrics.
+  pub wordprocessingml_cjk_line_metrics: bool,
 }
 
 impl VerticalMetrics {
@@ -2463,6 +2581,7 @@ impl VerticalMetrics {
       hanging_baseline_pt: self.hanging_baseline_pt * scale,
       cjk_horizontal_advance_pt: self.cjk_horizontal_advance_pt * scale,
       cjk_vertical_advance_pt: self.cjk_vertical_advance_pt * scale,
+      wordprocessingml_cjk_line_metrics: self.wordprocessingml_cjk_line_metrics,
     }
   }
 }
@@ -2734,7 +2853,7 @@ pub enum FontStretch {
   UltraExpanded,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum FontPitch {
   Fixed,
   #[default]
@@ -3069,21 +3188,28 @@ fn score_font_match(
   }
 
   let registered = registered_face_for_book_index(face_index, face, registered_faces);
-  let family_class_mismatch = target_family_names.is_none()
+  // ECMA-376 Part 1 §§17.8.2 and 17.8.3 define charset, pitch, and family
+  // class as substitution characteristics: they locate a replacement only
+  // when the primary font name (and its named alternates) is unavailable.
+  // They must not disqualify an installed face that matched that name.
+  let matching_by_characteristics = target_family_names.is_none();
+  let family_class_mismatch = matching_by_characteristics
     && request
       .family_class
       .is_some_and(|class| !font_family_class_matches(class, face));
-  let charset_mismatch = request
-    .charset
-    .is_some_and(|charset| !font_charset_matches(charset, face, registered));
+  let charset_mismatch = matching_by_characteristics
+    && request
+      .charset
+      .is_some_and(|charset| !font_charset_matches(charset, face, registered));
   let slant_mismatch = face.slant != requested_slant;
   let stretch_distance = stretch_distance(face.stretch, requested_stretch);
   let weight_distance = weight_distance(face.weight, requested_weight);
-  let pitch_mismatch = request.pitch.is_some_and(|pitch| pitch != face.pitch);
+  let pitch_mismatch =
+    matching_by_characteristics && request.pitch.is_some_and(|pitch| pitch != face.pitch);
   if charset_mismatch && !rejected && reason == Some(FontMatchReason::Family) {
     reason = Some(FontMatchReason::Charset);
   }
-  if target_family_names.is_none() && charset_mismatch {
+  if charset_mismatch {
     rejected = true;
     reason = Some(FontMatchReason::Charset);
   }
@@ -3140,6 +3266,10 @@ fn font_substitution<'book>(
   })
 }
 
+fn font_request_has_substitution_characteristics(request: &FontRequest<'_>) -> bool {
+  request.charset.is_some() || request.pitch.is_some() || request.family_class.is_some()
+}
+
 fn normalize_family(value: &str) -> String {
   value
     .chars()
@@ -3192,7 +3322,10 @@ fn registered_face_for_book_index<'faces, 'book>(
     .get(book_index)
     .filter(|registered| {
       registered.face_index == face.face_index
-        && registered.source.id() == Some(face.font_id.0.as_ref())
+        && registered
+          .source
+          .id()
+          .is_none_or(|id| id == face.font_id.0.as_ref())
     })
     .or_else(|| registered_face(face, registered_faces))
 }
@@ -3239,8 +3372,64 @@ fn font_charset_matches(
   face: &FontFaceInfo<'_>,
   registered: Option<&RegisteredFontFace<'_>>,
 ) -> bool {
-  registered.and_then(|face| face.charset) == Some(charset)
-    || (charset == FontCharset::Symbol && face.flags.symbolic)
+  if charset == FontCharset::Other(0x01) {
+    // DEFAULT_CHARSET is resolved from the current system locale; it is not
+    // evidence that the physical face supports one particular code page.
+    return true;
+  }
+  if let Some(registered_charset) = registered.and_then(|face| face.charset) {
+    return registered_charset == charset;
+  }
+  if charset == FontCharset::Symbol && face.flags.symbolic {
+    return true;
+  }
+  registered
+    .and_then(|registered| {
+      font_data_charset_matches(charset, registered.source.data()?, registered.face_index)
+    })
+    // An old face without OS/2 code-page fields provides no negative
+    // evidence.  Keep its name eligible instead of treating missing metadata
+    // as a proven charset mismatch.
+    .unwrap_or(true)
+}
+
+fn font_data_charset_matches(charset: FontCharset, data: &[u8], face_index: u32) -> Option<bool> {
+  if charset == FontCharset::Other(0x01) {
+    return Some(true);
+  }
+  let face = SkrifaFontRef::from_index(data, face_index).ok()?;
+  if charset == FontCharset::Symbol && face.charmap().is_symbol() {
+    return Some(true);
+  }
+  let os2 = face.os2().ok()?;
+  let range1 = os2.ul_code_page_range_1()?;
+  let range2 = os2.ul_code_page_range_2()?;
+  font_charset_code_page_masks(charset)
+    .map(|(mask1, mask2)| range1 & mask1 != 0 || range2 & mask2 != 0)
+}
+
+fn font_charset_code_page_masks(charset: FontCharset) -> Option<(u32, u32)> {
+  let range1 = match charset {
+    FontCharset::Ansi => 1 << 0,
+    FontCharset::EastEurope => 1 << 1,
+    FontCharset::Russian => 1 << 2,
+    FontCharset::Greek => 1 << 3,
+    FontCharset::Turkish => 1 << 4,
+    FontCharset::Hebrew => 1 << 5,
+    FontCharset::Arabic => 1 << 6,
+    FontCharset::Baltic => 1 << 7,
+    FontCharset::Vietnamese => 1 << 8,
+    FontCharset::Thai => 1 << 16,
+    FontCharset::ShiftJis => 1 << 17,
+    FontCharset::Gb2312 => 1 << 18,
+    FontCharset::Hangul => (1 << 19) | (1 << 21),
+    FontCharset::ChineseBig5 => 1 << 20,
+    FontCharset::Other(0x4D) => 1 << 29,
+    FontCharset::Oem => 1 << 30,
+    FontCharset::Symbol => 1 << 31,
+    FontCharset::Other(_) => return None,
+  };
+  Some((range1, 0))
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -3249,6 +3438,11 @@ enum PlatformFontQueryFamily {
   SansSerif,
   Serif,
   Monospace,
+  Characteristics {
+    charset: FontCharset,
+    family_class: Option<FontFamilyClass>,
+    pitch: Option<FontPitch>,
+  },
 }
 
 fn push_platform_generic_queries(
@@ -3382,6 +3576,47 @@ fn platform_system_query_fonts(
 
   slot
     .get_or_init(|| {
+      if let PlatformFontQueryFamily::Characteristics {
+        charset,
+        family_class,
+        pitch,
+      } = query_family
+      {
+        let mut characteristics_request = request.clone();
+        characteristics_request.family = None;
+        characteristics_request.charset = Some(*charset);
+        characteristics_request.family_class = *family_class;
+        characteristics_request.pitch = *pitch;
+        return platform_system_fonts()
+          .into_iter()
+          .filter(|candidate| {
+            font_data_charset_matches(*charset, candidate.data.as_slice(), candidate.face_index)
+              == Some(true)
+          })
+          .filter_map(|candidate| {
+            let scored = score_font_match(
+              0,
+              candidate.face.as_ref(),
+              &[],
+              &characteristics_request,
+              None,
+              requested_slant(&characteristics_request),
+              characteristics_request
+                .stretch
+                .unwrap_or(FontStretch::Normal),
+              requested_weight(&characteristics_request),
+            );
+            (!scored.rejected).then_some((candidate, scored.rank))
+          })
+          .min_by(|(left, left_rank), (right, right_rank)| {
+            left_rank.cmp(right_rank).then_with(|| {
+              primary_family_sort_key(left.face.as_ref())
+                .cmp(primary_family_sort_key(right.face.as_ref()))
+            })
+          })
+          .map(|(candidate, _)| vec![candidate])
+          .unwrap_or_default();
+      }
       let mut system = platform_font_system()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -3496,6 +3731,7 @@ fn platform_system_query_fonts(
         PlatformFontQueryFamily::Monospace => {
           PlatformQueryFamily::Generic(PlatformGenericFamily::Monospace)
         }
+        PlatformFontQueryFamily::Characteristics { .. } => unreachable!("handled above"),
       };
       let mut query = collection.query(source_cache);
       query.set_families([family]);
@@ -3530,6 +3766,7 @@ fn platform_system_query_fonts(
           PlatformFontQueryFamily::SansSerif
           | PlatformFontQueryFamily::Serif
           | PlatformFontQueryFamily::Monospace => true,
+          PlatformFontQueryFamily::Characteristics { .. } => unreachable!("handled above"),
         };
         if !matches_requested_family {
           return PlatformQueryStatus::Continue;
@@ -3900,6 +4137,10 @@ fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetri
   let ascender = metrics.ascent.max(0.0);
   let descender = (-metrics.descent).max(0.0);
   let os2 = face.os2().ok();
+  let wordprocessingml_cjk_line_metrics = os2
+    .as_ref()
+    .and_then(|os2| os2.ul_code_page_range_1())
+    .is_some_and(wordprocessingml_cjk_code_page_range);
   let uses_typographic_metrics = os2.as_ref().is_some_and(|os2| {
     use skrifa::raw::tables::os2::SelectionFlags;
     os2.version() >= 4
@@ -3978,6 +4219,7 @@ fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetri
       directwrite_baseline_offset_pt: directwrite_baseline_offset,
       line_gap_pt: line_gap,
       ink_height_pt: ascender + descender,
+      wordprocessingml_cjk_line_metrics,
       ..VerticalMetrics::default()
     },
     decoration: DecorationMetrics {
@@ -4001,6 +4243,16 @@ fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetri
     script,
     em_size,
   }
+}
+
+fn wordprocessingml_cjk_code_page_range(range: u32) -> bool {
+  // OpenType OS/2 ulCodePageRange1 bits 17..20 are Shift-JIS (CP932),
+  // PRC/Simplified Chinese (CP936), Korean Wansung (CP949), and Big5 /
+  // Traditional Chinese (CP950). Writer's DOC/DOCX compatibility path uses
+  // this exact four-bit capability test, including for Latin text painted by
+  // such a font (tdf#129808).
+  const EAST_ASIAN_CODE_PAGES: u32 = (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
+  range & EAST_ASIAN_CODE_PAGES != 0
 }
 
 fn directwrite_default_baseline_offset(
@@ -4631,6 +4883,19 @@ fn font_weight_from_opentype(weight: u16) -> FontWeight {
   }
 }
 
+fn font_family_class_from_opentype(value: i16) -> Option<FontFamilyClass> {
+  // Microsoft OpenType OS/2 `sFamilyClass` stores the IBM family in the high
+  // byte.  Word's font table uses a coarser family vocabulary, so collapse
+  // the seven serif families while retaining the independently parsed pitch.
+  match (value as u16) >> 8 {
+    1..=7 => Some(FontFamilyClass::Serif),
+    8 => Some(FontFamilyClass::SansSerif),
+    9 => Some(FontFamilyClass::Decorative),
+    10 => Some(FontFamilyClass::BrushScript),
+    _ => None,
+  }
+}
+
 fn font_slant_from_skrifa(style: SkrifaStyle) -> FontSlant {
   match style {
     SkrifaStyle::Italic => FontSlant::Italic,
@@ -4831,6 +5096,123 @@ mod tests {
     assert_eq!(resolved.resolved_family, Cow::Borrowed("Example"));
     assert!(!resolved.synthetic_bold);
     assert_eq!(resolved.match_diagnostics.candidates.len(), 2);
+  }
+
+  #[test]
+  fn exact_family_name_outranks_font_substitution_characteristics() {
+    let mut registry = FontRegistry::new();
+    let mut liberation = FontFaceInfo::synthetic("liberation", "Liberation Serif");
+    liberation.family_class = Some(FontFamilyClass::Serif);
+    registry.register_face(FontSource::System, liberation);
+    registry.faces[0].charset = Some(FontCharset::Ansi);
+
+    let mut fixed_mincho = FontFaceInfo::synthetic("ms-mincho", "MS Mincho");
+    fixed_mincho.family_class = Some(FontFamilyClass::Serif);
+    fixed_mincho.pitch = FontPitch::Fixed;
+    registry.register_face(FontSource::System, fixed_mincho);
+    registry.faces[1].charset = Some(FontCharset::ShiftJis);
+
+    let mut proportional_mincho = FontFaceInfo::synthetic("ms-pmincho", "MS PMincho");
+    proportional_mincho.family_class = Some(FontFamilyClass::Serif);
+    proportional_mincho.pitch = FontPitch::Variable;
+    registry.register_face(FontSource::System, proportional_mincho);
+    registry.faces[2].charset = Some(FontCharset::ShiftJis);
+
+    let mut generic_cjk = FontFaceInfo::synthetic("generic-cjk", "Noto Serif CJK JP");
+    generic_cjk.family_class = Some(FontFamilyClass::Serif);
+    generic_cjk.pitch = FontPitch::Variable;
+    registry.register_face(FontSource::System, generic_cjk);
+    registry.faces[3].charset = Some(FontCharset::ShiftJis);
+    registry
+      .book
+      .family_substitution_chains
+      .push(FontFallbackChain {
+        requested_family: None,
+        script: None,
+        language: None,
+        families: vec![Cow::Borrowed("Noto Serif CJK JP")],
+      });
+
+    let resolved = registry
+      .resolve(&FontRequest {
+        family: Some(Cow::Borrowed("Liberation Serif")),
+        family_class: Some(FontFamilyClass::Serif),
+        charset: Some(FontCharset::ShiftJis),
+        pitch: Some(FontPitch::Variable),
+        ..FontRequest::default()
+      })
+      .unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("liberation")));
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("Liberation Serif"));
+  }
+
+  #[test]
+  fn unavailable_family_uses_font_substitution_characteristics() {
+    let mut registry = FontRegistry::new();
+
+    let mut fixed_mincho = FontFaceInfo::synthetic("ms-mincho", "MS Mincho");
+    fixed_mincho.family_class = Some(FontFamilyClass::Serif);
+    fixed_mincho.pitch = FontPitch::Fixed;
+    registry.register_face(FontSource::System, fixed_mincho);
+    registry.faces[0].charset = Some(FontCharset::ShiftJis);
+
+    let mut proportional_mincho = FontFaceInfo::synthetic("ms-pmincho", "MS PMincho");
+    proportional_mincho.family_class = Some(FontFamilyClass::Serif);
+    proportional_mincho.pitch = FontPitch::Variable;
+    registry.register_face(FontSource::System, proportional_mincho);
+    registry.faces[1].charset = Some(FontCharset::ShiftJis);
+
+    let resolved = registry
+      .resolve(&FontRequest {
+        family: Some(Cow::Borrowed("Unavailable Japanese Serif")),
+        family_class: Some(FontFamilyClass::Serif),
+        charset: Some(FontCharset::ShiftJis),
+        pitch: Some(FontPitch::Variable),
+        ..FontRequest::default()
+      })
+      .unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("ms-pmincho")));
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("MS PMincho"));
+  }
+
+  #[test]
+  fn default_charset_does_not_disqualify_an_exact_family() {
+    let mut registry = FontRegistry::new();
+    let mut liberation = FontFaceInfo::synthetic("liberation", "Liberation Serif");
+    liberation.family_class = Some(FontFamilyClass::Serif);
+    registry.register_face(FontSource::System, liberation);
+    registry.faces[0].charset = Some(FontCharset::Ansi);
+
+    let resolved = registry
+      .resolve(&FontRequest {
+        family: Some(Cow::Borrowed("Liberation Serif")),
+        family_class: Some(FontFamilyClass::Serif),
+        charset: Some(FontCharset::Other(0x01)),
+        pitch: Some(FontPitch::Variable),
+        ..FontRequest::default()
+      })
+      .unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("liberation")));
+  }
+
+  #[test]
+  fn open_type_code_page_masks_follow_the_microsoft_os2_assignments() {
+    assert_eq!(
+      font_charset_code_page_masks(FontCharset::ShiftJis),
+      Some((1 << 17, 0))
+    );
+    assert_eq!(
+      font_charset_code_page_masks(FontCharset::Hangul),
+      Some(((1 << 19) | (1 << 21), 0))
+    );
+    assert_eq!(
+      font_charset_code_page_masks(FontCharset::ChineseBig5),
+      Some((1 << 20, 0))
+    );
+    assert_eq!(font_charset_code_page_masks(FontCharset::Other(0x01)), None);
   }
 
   #[test]
@@ -5133,6 +5515,20 @@ mod tests {
       directwrite_default_baseline_offset(1600.0, 400.0, 400.0, 1800.0, 400.0),
       2000.0
     );
+  }
+
+  #[test]
+  fn wordprocessingml_cjk_line_metrics_follow_os2_code_page_capabilities() {
+    for bit in 17..=20 {
+      assert!(wordprocessingml_cjk_code_page_range(1 << bit));
+    }
+    for bit in [0, 16, 21, 31] {
+      assert!(!wordprocessingml_cjk_code_page_range(1 << bit));
+    }
+    assert!(!wordprocessingml_cjk_code_page_range(0));
+    assert!(wordprocessingml_cjk_code_page_range(
+      (1 << 0) | (1 << 18) | (1 << 31)
+    ));
   }
 
   #[test]

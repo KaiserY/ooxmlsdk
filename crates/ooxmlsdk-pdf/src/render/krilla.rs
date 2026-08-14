@@ -60,6 +60,10 @@ use ooxmlsdk_layout::text_metrics::TextMetrics;
 use ooxmlsdk_layout::{common, units};
 
 const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
+// LibreOffice's LogicalFontInstance.hxx and PDFWriterImpl use a 1/3 shear
+// when the requested italic style has no physical italic face. Keep the
+// synthesis angle shared by ordinary PDF text and the outline paths below.
+const SYNTHETIC_ITALIC_SHEAR: f32 = 1.0 / 3.0;
 // Historical fixed-output calibration retained from the DOCX numbering/font
 // parity path. No matching LibreOffice source constant has been identified;
 // keep the trigger and scale isolated so font-metric work can remove it
@@ -635,9 +639,17 @@ struct TextStyle<'doc> {
   line_vertical_alignment: common::LineVerticalAlignment,
   use_windows_font_metrics: bool,
   wordprocessingml_font_slots: bool,
+  wordprocessingml_cjk_line_metrics: bool,
   wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
   wordprocessingml_east_asia_language_is_chinese: bool,
+  font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  high_ansi_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  complex_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  high_ansi_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  east_asia_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  complex_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   cjk_punctuation_compression_ratio: f32,
   wordprocessingml_balance_single_byte_double_byte_width: bool,
   pdf_glyph_outlines: bool,
@@ -789,6 +801,10 @@ impl FontStyleRef for TextStyle<'_> {
     self.wordprocessingml_font_slots
   }
 
+  fn wordprocessingml_cjk_line_metrics(&self) -> bool {
+    self.wordprocessingml_cjk_line_metrics
+  }
+
   fn wordprocessingml_font_hint(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontTypeHint> {
     self.wordprocessingml_font_hint
   }
@@ -797,8 +813,36 @@ impl FontStyleRef for TextStyle<'_> {
     self.wordprocessingml_east_asia_language_is_chinese
   }
 
+  fn font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
+    self.font_charset
+  }
+
+  fn high_ansi_font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
+    self.high_ansi_font_charset.or(self.font_charset)
+  }
+
   fn wordprocessingml_east_asia_font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
     self.wordprocessingml_east_asia_font_charset
+  }
+
+  fn complex_font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
+    self.complex_font_charset
+  }
+
+  fn font_pitch(&self) -> Option<ooxmlsdk_fonts::FontPitch> {
+    self.font_pitch
+  }
+
+  fn high_ansi_font_pitch(&self) -> Option<ooxmlsdk_fonts::FontPitch> {
+    self.high_ansi_font_pitch.or(self.font_pitch)
+  }
+
+  fn east_asia_font_pitch(&self) -> Option<ooxmlsdk_fonts::FontPitch> {
+    self.east_asia_font_pitch
+  }
+
+  fn complex_font_pitch(&self) -> Option<ooxmlsdk_fonts::FontPitch> {
+    self.complex_font_pitch
   }
 
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
@@ -2684,10 +2728,18 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     line_vertical_alignment: style.line_vertical_alignment,
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
+    wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics,
     wordprocessingml_font_hint: style.wordprocessingml_font_hint,
     wordprocessingml_east_asia_language_is_chinese: style
       .wordprocessingml_east_asia_language_is_chinese,
+    font_charset: style.font_charset,
+    high_ansi_font_charset: style.high_ansi_font_charset,
     wordprocessingml_east_asia_font_charset: style.wordprocessingml_east_asia_font_charset,
+    complex_font_charset: style.complex_font_charset,
+    font_pitch: style.font_pitch,
+    high_ansi_font_pitch: style.high_ansi_font_pitch,
+    east_asia_font_pitch: style.east_asia_font_pitch,
+    complex_font_pitch: style.complex_font_pitch,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
     wordprocessingml_balance_single_byte_double_byte_width: style
       .wordprocessingml_balance_single_byte_double_byte_width,
@@ -4721,13 +4773,15 @@ fn draw_text_item(
           ));
         }
         if !warped && !path_gradient_rasterized {
-          surface.draw_glyphs(
+          draw_glyphs_with_synthetic_italic(
+            surface,
             Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
             &run.glyphs,
             selected.font.clone(),
             &glyph_semantic_text,
             run.font_size_pt,
             glyph_outlines,
+            run.font_face.synthetic_italic,
           );
         }
         if path_gradient_rasterized
@@ -4741,13 +4795,15 @@ fn draw_text_item(
           .is_some()
         {
           surface.set_fill(None);
-          surface.draw_glyphs(
+          draw_glyphs_with_synthetic_italic(
+            surface,
             Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
             &run.glyphs,
             selected.font.clone(),
             &glyph_semantic_text,
             run.font_size_pt,
             true,
+            run.font_face.synthetic_italic,
           );
           surface.set_fill(glyph_fill.clone().or_else(|| Some(fill(&item.style))));
         }
@@ -4777,13 +4833,15 @@ fn draw_text_item(
             rule: Default::default(),
           }));
           surface.set_stroke(None);
-          surface.draw_glyphs(
+          draw_glyphs_with_synthetic_italic(
+            surface,
             Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
             &run.glyphs,
             selected.font,
             &glyph_semantic_text,
             run.font_size_pt,
             false,
+            run.font_face.synthetic_italic,
           );
           surface.set_fill(Some(fill(&item.style)));
         }
@@ -4824,6 +4882,44 @@ fn draw_text_item(
     }
   }
   Ok(())
+}
+
+fn synthetic_italic_text_transform(synthetic_italic: bool, baseline_y: f32) -> Option<Transform> {
+  synthetic_italic.then(|| {
+    // Krilla's layout coordinates point down the page. A negative x/y shear
+    // therefore becomes the positive 1/3 glyph-space shear emitted by
+    // PDFWriterImpl after Krilla applies its page-axis inversion. Translate by
+    // the baseline so the run origin and all horizontal advances stay fixed.
+    Transform::from_row(
+      1.0,
+      0.0,
+      -SYNTHETIC_ITALIC_SHEAR,
+      1.0,
+      baseline_y * SYNTHETIC_ITALIC_SHEAR,
+      0.0,
+    )
+  })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_glyphs_with_synthetic_italic(
+  surface: &mut Surface<'_>,
+  start: Point,
+  glyphs: &[PaintGlyph],
+  font: Font,
+  semantic_text: &str,
+  font_size_pt: f32,
+  outlined: bool,
+  synthetic_italic: bool,
+) {
+  let transform = synthetic_italic_text_transform(synthetic_italic, start.y);
+  if let Some(transform) = transform {
+    surface.push_transform(&transform);
+  }
+  surface.draw_glyphs(start, glyphs, font, semantic_text, font_size_pt, outlined);
+  if transform.is_some() {
+    surface.pop();
+  }
 }
 
 struct WarpedGlyphPlacement {
@@ -4938,7 +5034,7 @@ struct KrillaGlyphOutline<'a> {
 impl KrillaGlyphOutline<'_> {
   fn point(&self, x: f32, y: f32) -> common::Point {
     let x = if self.synthetic_italic {
-      x + y / 3.0
+      x + y * SYNTHETIC_ITALIC_SHEAR
     } else {
       x
     };
@@ -5123,7 +5219,7 @@ fn draw_warped_glyphs(
         // non-linear WordArt mapping so the authored envelope also bends the
         // synthesized slant.
         let synthetic_italic_x = if face_data.synthetic_italic {
-          point.x + point.y / 3.0
+          point.x + point.y * f64::from(SYNTHETIC_ITALIC_SHEAR)
         } else {
           point.x
         };
@@ -8001,9 +8097,9 @@ mod tests {
     office_math_semantic_glyph_id, office_math_svg_text_marker, pdf_metadata, pdf_page_dimension,
     render, semantic_advance_for_text_range, shaped_pdf_glyphs,
     source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
-    text_portion_ranges, text_requires_glyph_outlines, text_stroke_with_fill,
-    text_style_from_common, visually_ordered_text_portion_ranges, word_small_caps_semantic_text,
-    word_unsigned_signature_line_items,
+    synthetic_italic_text_transform, text_portion_ranges, text_requires_glyph_outlines,
+    text_stroke_with_fill, text_style_from_common, visually_ordered_text_portion_ranges,
+    word_small_caps_semantic_text, word_unsigned_signature_line_items,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -8012,6 +8108,7 @@ mod tests {
   use ooxmlsdk_layout::common::{
     self, Color, DisplayItem, DisplayPage, LayoutDocument, LayoutEngineKind, Pt, TextRun, TextStyle,
   };
+  use ooxmlsdk_layout::fonts::FontStyleRef;
 
   #[test]
   fn office_math_semantic_marker_carries_an_exact_glyph_id() {
@@ -9057,6 +9154,21 @@ mod tests {
   }
 
   #[test]
+  fn synthetic_italic_shears_about_the_run_baseline_only_when_needed() {
+    let baseline_y = 96.0;
+    let transform = synthetic_italic_text_transform(true, baseline_y)
+      .expect("upright fallback for italic request needs synthesis");
+
+    assert_eq!(transform.sx(), 1.0);
+    assert_eq!(transform.sy(), 1.0);
+    assert_eq!(transform.ky(), 0.0);
+    assert!((transform.kx() + 1.0 / 3.0).abs() < f32::EPSILON);
+    assert!((transform.tx() - 32.0).abs() < f32::EPSILON);
+    assert_eq!(transform.ty(), 0.0);
+    assert!(synthetic_italic_text_transform(false, baseline_y).is_none());
+  }
+
+  #[test]
   fn wordart_uses_every_intermediate_warp_boundary() {
     let warp = common::TextWarp {
       source_bounds: common::Rect {
@@ -9099,6 +9211,15 @@ mod tests {
       right_to_left: Some(true),
       complex_bold: Some(true),
       complex_italic: Some(false),
+      font_charset: Some(ooxmlsdk_fonts::FontCharset::ShiftJis),
+      high_ansi_font_charset: Some(ooxmlsdk_fonts::FontCharset::Ansi),
+      wordprocessingml_east_asia_font_charset: Some(ooxmlsdk_fonts::FontCharset::Gb2312),
+      complex_font_charset: Some(ooxmlsdk_fonts::FontCharset::Arabic),
+      font_pitch: Some(ooxmlsdk_fonts::FontPitch::Variable),
+      high_ansi_font_pitch: Some(ooxmlsdk_fonts::FontPitch::Fixed),
+      east_asia_font_pitch: Some(ooxmlsdk_fonts::FontPitch::Variable),
+      complex_font_pitch: Some(ooxmlsdk_fonts::FontPitch::Fixed),
+      wordprocessingml_cjk_line_metrics: true,
       ..TextStyle::default()
     };
 
@@ -9109,5 +9230,29 @@ mod tests {
     assert_eq!(style.right_to_left, Some(true));
     assert_eq!(style.complex_bold, Some(true));
     assert_eq!(style.complex_italic, Some(false));
+    assert_eq!(style.font_charset(), common_style.font_charset);
+    assert_eq!(
+      style.high_ansi_font_charset(),
+      common_style.high_ansi_font_charset
+    );
+    assert_eq!(
+      style.wordprocessingml_east_asia_font_charset(),
+      common_style.wordprocessingml_east_asia_font_charset
+    );
+    assert_eq!(
+      style.complex_font_charset(),
+      common_style.complex_font_charset
+    );
+    assert_eq!(style.font_pitch(), common_style.font_pitch);
+    assert_eq!(
+      style.high_ansi_font_pitch(),
+      common_style.high_ansi_font_pitch
+    );
+    assert_eq!(
+      style.east_asia_font_pitch(),
+      common_style.east_asia_font_pitch
+    );
+    assert_eq!(style.complex_font_pitch(), common_style.complex_font_pitch);
+    assert!(style.wordprocessingml_cjk_line_metrics());
   }
 }

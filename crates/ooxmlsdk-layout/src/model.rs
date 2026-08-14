@@ -111,8 +111,18 @@ pub struct TextStyle {
   pub bidi_language: Option<Arc<str>>,
   /// Effective WordprocessingML `w:rFonts/@w:hint` for ambiguous font slots.
   pub wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
-  /// Character set declared by the effective East Asian font-table entry.
+  /// Character sets declared by the effective WordprocessingML font-table
+  /// entries.  These belong to the four rFonts faces independently; they do
+  /// not reclassify the Unicode characters into another rFonts slot.
+  pub font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  pub high_ansi_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   pub east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  pub complex_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
+  /// Pitch metadata from the same four font-table entries.
+  pub font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  pub high_ansi_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  pub east_asia_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
+  pub complex_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   pub font_size_pt: f32,
   pub complex_font_size_pt: Option<f32>,
   /// Complex-script formatting selected by WordprocessingML `w:cs`.
@@ -158,6 +168,9 @@ pub struct TextStyle {
   pub use_windows_font_metrics: bool,
   /// Select Common characters using the WordprocessingML rFonts slot table.
   pub wordprocessingml_font_slots: bool,
+  /// Enable the CJK-capable font line metrics selected by the document-level
+  /// WordprocessingML `w:noLeading` compatibility setting.
+  pub wordprocessingml_cjk_line_metrics: bool,
   /// Fraction of Word's maximum full-width punctuation compression to apply.
   pub cjk_punctuation_compression_ratio: f32,
   /// Apply WordprocessingML's document-level half-width/full-width space
@@ -249,7 +262,14 @@ impl Default for TextStyle {
       east_asia_language: None,
       bidi_language: None,
       wordprocessingml_font_hint: None,
+      font_charset: None,
+      high_ansi_font_charset: None,
       east_asia_font_charset: None,
+      complex_font_charset: None,
+      font_pitch: None,
+      high_ansi_font_pitch: None,
+      east_asia_font_pitch: None,
+      complex_font_pitch: None,
       font_size_pt: 11.0,
       complex_font_size_pt: None,
       complex_script: None,
@@ -271,6 +291,7 @@ impl Default for TextStyle {
       semantic_only: false,
       use_windows_font_metrics: false,
       wordprocessingml_font_slots: false,
+      wordprocessingml_cjk_line_metrics: false,
       cjk_punctuation_compression_ratio: 0.0,
       wordprocessingml_balance_single_byte_double_byte_width: false,
       pdf_glyph_outlines: false,
@@ -631,7 +652,14 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
       .as_deref()
       .and_then(|language| language.split(['-', '_']).next())
       .is_some_and(|language| language.eq_ignore_ascii_case("zh")),
+    font_charset: style.font_charset,
+    high_ansi_font_charset: style.high_ansi_font_charset,
     wordprocessingml_east_asia_font_charset: style.east_asia_font_charset,
+    complex_font_charset: style.complex_font_charset,
+    font_pitch: style.font_pitch,
+    high_ansi_font_pitch: style.high_ansi_font_pitch,
+    east_asia_font_pitch: style.east_asia_font_pitch,
+    complex_font_pitch: style.complex_font_pitch,
     font_size: common::Pt(style.font_size_pt),
     complex_font_size: style.complex_font_size_pt.map(common::Pt),
     complex_script: style.complex_script,
@@ -654,6 +682,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     semantic_only: style.semantic_only,
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
+    wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
     wordprocessingml_balance_single_byte_double_byte_width: style
       .wordprocessingml_balance_single_byte_double_byte_width,

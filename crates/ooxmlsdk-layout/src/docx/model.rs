@@ -545,8 +545,35 @@ pub(crate) struct ParagraphFormat {
   pub spacing_after_auto_pt: Option<f32>,
   pub spacing_before_set: bool,
   pub spacing_after_set: bool,
+  /// Word repaired an undefined built-in heading through its application
+  /// heading-base parent. The recovered upper spacing is real style state,
+  /// but Word suppresses that application-supplied value on the first body
+  /// paragraph; authored first-paragraph spacing must remain distinguishable.
+  pub office_recovered_builtin_heading_spacing_before: bool,
   pub line_height_pt: Option<f32>,
   pub line_height_set: bool,
+  /// Word supplied the line multiple while repairing a missing application
+  /// paragraph default. ECMA-376 Part 1 §17.3.1.33 says an omitted direct
+  /// `w:spacing@line` retains the value already set in the style hierarchy, so
+  /// that authored value must remain distinct: both resolve with
+  /// `line_height_set == false`, but only the repaired value permits the legacy
+  /// East Asian paragraph-mark line box to remain authoritative.
+  pub office_recovered_line_height: bool,
+  /// The application line multiple was recovered while the package also
+  /// omitted its Settings part. This is narrower than missing pPrDefault:
+  /// packages with a real Settings part can carry document-grid and
+  /// compatibility state even when their style defaults are incomplete.
+  pub office_recovered_line_height_without_settings_part: bool,
+  /// A direct w:pPr/w:rPr font size formats the physical paragraph mark.
+  /// Keep this separate from an empty w:r/w:t insertion range: Word bases an
+  /// otherwise empty line on the mark, while direct paragraph-mark formatting
+  /// remains authoritative over application-recovered compatibility metrics.
+  pub paragraph_mark_font_size_set: bool,
+  /// The active numbering level owns an explicit `w:lvl/w:rPr/w:sz` or
+  /// `w:szCs`.  Word/Writer keep that synthesized number portion's font box
+  /// independent from paragraph hard attributes; retain the source bit after
+  /// style resolution so legacy line-height recovery cannot scale it twice.
+  pub numbering_level_font_size_set: bool,
   pub line_height_rule: LineHeightRule,
   /// A numbered source paragraph directly paints its mark with `w:highlight`
   /// or `w:shd`. Word retains that painted numbering mark as an independent

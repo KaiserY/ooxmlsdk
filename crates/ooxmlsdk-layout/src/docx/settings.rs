@@ -133,18 +133,41 @@ pub(super) fn no_column_balance(
 pub(super) fn adjust_line_height_in_table(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
-) -> bool {
-  main
-    .document_settings_part(package)
-    .and_then(|part| part.root_element(package).ok())
-    .and_then(|settings| {
-      settings
-        .compatibility
-        .iter()
-        .find_map(|compat| compat.adjust_line_height_in_table.as_ref())
-        .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
-    })
-    .unwrap_or(false)
+) -> (bool, bool) {
+  let Some(part) = main.document_settings_part(package) else {
+    return resolve_adjust_line_height_in_table(false, None);
+  };
+
+  let authored = part
+    .root_element(package)
+    .ok()
+    .and_then(|settings| adjust_line_height_in_table_value(&settings));
+  // Keep omission distinct from false. A present Settings part with no
+  // authored switch participates in Word's application repair only when the
+  // caller also repairs missing paragraph defaults and docGrid. This is the
+  // tdf131203 state. tdf109306 omits the part entirely, while
+  // Normalize/conflicting IDs.docx has complete styles and an explicit grid;
+  // neither may receive the repaired table-grid behavior.
+  resolve_adjust_line_height_in_table(true, authored)
+}
+
+fn adjust_line_height_in_table_value(settings: &w::Settings) -> Option<bool> {
+  settings
+    .compatibility
+    .iter()
+    .find_map(|compat| compat.adjust_line_height_in_table.as_ref())
+    .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
+}
+
+fn resolve_adjust_line_height_in_table(
+  has_settings_part: bool,
+  authored: Option<bool>,
+) -> (bool, bool) {
+  if !has_settings_part {
+    (false, false)
+  } else {
+    authored.map_or((false, true), |value| (value, false))
+  }
 }
 
 pub(super) fn do_not_use_html_paragraph_auto_spacing(
@@ -301,8 +324,32 @@ mod tests {
     MICROSOFT_WORD_COMPATIBILITY_URI, PageBottomHyphenation,
     balance_single_byte_double_byte_width_value, compatibility_setting_value,
     do_not_break_wrapped_tables_value, do_not_expand_shift_return_value, no_leading_value,
-    page_bottom_hyphenation, parse_compatibility_on_off, use_far_east_layout_value, w,
+    page_bottom_hyphenation, parse_compatibility_on_off, resolve_adjust_line_height_in_table,
+    use_far_east_layout_value, w,
   };
+
+  #[test]
+  fn table_grid_setting_keeps_part_omission_and_authored_false_distinct() {
+    assert_eq!(
+      resolve_adjust_line_height_in_table(false, None),
+      (false, false),
+      "a missing Settings part has no application-repair signal",
+    );
+    assert_eq!(
+      resolve_adjust_line_height_in_table(true, None),
+      (false, true),
+      "omission inside a present Settings part is deferred to the document-default repair gate",
+    );
+    assert_eq!(
+      resolve_adjust_line_height_in_table(true, Some(true)),
+      (true, false),
+    );
+    assert_eq!(
+      resolve_adjust_line_height_in_table(true, Some(false)),
+      (false, false),
+      "authored false must not be reinterpreted as omission",
+    );
+  }
 
   #[test]
   fn page_bottom_hyphenation_precedence_matches_office_fixed_output() {

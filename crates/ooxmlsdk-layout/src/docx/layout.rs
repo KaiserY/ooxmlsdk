@@ -367,19 +367,38 @@ fn grid_auto_line_heights(
   )?;
   let visible_line_height = inline_text_height(base_line_style, text_metrics);
   let snapped_line_height = snap_line_height_to_doc_grid(visible_line_height, Some(grid_height));
-  let proportional_line_height = paragraph
-    .format
-    .line_height_pt
-    .map_or(grid_height, |multiple| grid_height * multiple.max(1.0));
+  let recovered_table_grid = paragraph.format.office_recovered_line_height
+    && text_segmentation == TextSegmentation::TableCell
+    && !paragraph.format.wordprocessing_shape_story;
+  let recovered_direct_font_override = paragraph.format.office_recovered_line_height
+    && text_segmentation == TextSegmentation::Body
+    && base_line_style.font_size_pt < paragraph.base_style.font_size_pt - LAYOUT_EPSILON_PT;
+  let proportional_line_height = if recovered_table_grid || recovered_direct_font_override {
+    // The recovered Normal multiple is an application repair, not authored
+    // w:spacing. tdf131203 supplies both narrow states: its direct 10pt body
+    // runs use one recovered 15.6pt grid row, and its present Settings part
+    // fixes wrapped 10pt table lines at that same pitch. Multiplying either
+    // by the repaired 278/240 value is applying the synthetic default twice.
+    // The unformatted tdf148361/tdf120394 body text and authored/inherited
+    // line spacing are the opposite states and continue below.
+    grid_height
+  } else {
+    paragraph
+      .format
+      .line_height_pt
+      .map_or(grid_height, |multiple| grid_height * multiple.max(1.0))
+  };
 
-  // ECMA-376 Part 1 §§17.3.1.33 and 17.6.5 leave two independent lower
-  // bounds: the complete visible line snaps to whole grid rows, while auto
-  // line spacing scales one grid pitch. Word applies both bounds to every
-  // text line, including the first and the sole line of a paragraph. Office's
-  // tdf148361 and tdf120394 fixed output gives the direct control: on the
-  // recovered 15.6pt line grid, 278/240 auto spacing advances each paragraph
-  // by about 18.07pt before its separate 8pt after spacing; disabling only
-  // the grid returns the ordinary font-based proportional line height.
+  // ECMA-376 Part 1 §17.6.5 defines `linePitch` as the pitch of each grid line,
+  // while §17.3.1.33 keeps an authored auto line value independently effective
+  // through the style hierarchy. Do not fold an ordinary authored/inherited
+  // multiple into the first one-grid line: `lastEmptyLineWithDirectFormatting`
+  // is the immutable Office counterexample. Word's synthetic application
+  // repair is a narrower compatibility state. Office's tdf148361 and
+  // tdf120394 fixed output gives its positive control: on the recovered 15.6pt
+  // line grid, the repaired 278/240 multiple advances each paragraph by about
+  // 18.07pt before its separate 8pt after spacing; disabling only the grid
+  // returns the ordinary font-based proportional line height.
   // An inline-drawing-only body line is the independent character-like
   // exception: its object portion owns the line box and the proportional
   // excess is resolved by inline_drawing_portion_line_height(). A direct WPS
@@ -388,8 +407,9 @@ fn grid_auto_line_heights(
   // body section grid and the recovered Normal auto multiple inside that text
   // frame. Disabling only the textbox paragraph's grid in Office moves
   // tdf117188's inner line upward while leaving its inline host unchanged.
-  let proportional_first_line =
-    text_segmentation == TextSegmentation::Body || paragraph.format.wordprocessing_shape_story;
+  let proportional_first_line = (paragraph.format.office_recovered_line_height
+    && text_segmentation == TextSegmentation::Body)
+    || paragraph.format.wordprocessing_shape_story;
   let first_line_pt =
     if proportional_first_line && !paragraph_has_only_inline_drawing_content(paragraph) {
       snapped_line_height.max(proportional_line_height)
@@ -470,6 +490,59 @@ fn paragraph_has_form_widget(paragraph: &crate::docx::Paragraph) -> bool {
   })
 }
 
+fn paragraph_has_chinese_east_asia_language(paragraph: &crate::docx::Paragraph) -> bool {
+  paragraph
+    .base_style
+    .east_asia_language
+    .as_deref()
+    .is_some_and(|language| {
+      language
+        .split(['-', '_'])
+        .next()
+        .is_some_and(|primary| primary.eq_ignore_ascii_case("zh"))
+    })
+}
+
+fn word_recovered_legacy_chinese_table_break_line_height(
+  paragraph: &crate::docx::Paragraph,
+  compatibility_mode: u16,
+  text_segmentation: TextSegmentation,
+  horizontal_table_cell: bool,
+) -> Option<f32> {
+  if compatibility_mode >= 15
+    || text_segmentation != TextSegmentation::TableCell
+    || !horizontal_table_cell
+    || paragraph.format.wordprocessing_shape_story
+    || !paragraph_has_chinese_east_asia_language(paragraph)
+    || !paragraph.format.office_recovered_line_height
+    || paragraph.format.paragraph_mark_font_size_set
+    || !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    || paragraph.format.line_height_set
+  {
+    return None;
+  }
+
+  // ECMA-376 Part 1 §17.3.3.1 makes a text-wrapping w:br a physical line
+  // boundary. Writer mirrors Word by copying the root line height into an
+  // SwBreakPortion, and switches paragraph attributes on for an otherwise
+  // empty line (sw/source/core/text/porrst.cxx and itrform2.cxx). In
+  // tdf108714 the three cell-local breaks plus the postponed body break form
+  // four empty lines; tdf111550 independently terminates a visible-text line
+  // before its nested table. Office advances every one with the same 17.28pt
+  // legacy Chinese table box already fixed by gridbefore.docx and
+  // large-twips.docx. This is the explicit break line's minimum, so a taller
+  // text or inline-object portion remains authoritative through max(). Modern
+  // compatibility, vertical cells, authored spacing, and directly formatted
+  // paragraph marks are the opposite states.
+  Some(
+    paragraph
+      .base_style
+      .complex_font_size_pt
+      .unwrap_or(paragraph.base_style.font_size_pt)
+      * WORD_LEGACY_ZH_TABLE_LINE_HEIGHT_PER_FONT_SIZE,
+  )
+}
+
 fn word_east_asian_paragraph_mark_single_line_height(
   paragraph: &crate::docx::Paragraph,
   compatibility_mode: u16,
@@ -478,35 +551,46 @@ fn word_east_asian_paragraph_mark_single_line_height(
   prior_line_count: usize,
   text_metrics: &mut TextMetrics,
 ) -> Option<f32> {
+  let chinese_paragraph_mark = paragraph_has_chinese_east_asia_language(paragraph);
   let legacy_chinese_table_line = compatibility_mode < 15
     && text_segmentation == TextSegmentation::TableCell
     && horizontal_table_cell
-    && paragraph
-      .base_style
-      .east_asia_language
-      .as_deref()
-      .is_some_and(|language| {
-        language
-          .split(['-', '_'])
-          .next()
-          .is_some_and(|primary| primary.eq_ignore_ascii_case("zh"))
-      });
+    && chinese_paragraph_mark;
   let modern_physical_left_mark = paragraph.format.justification.physical_left
     && text_segmentation == TextSegmentation::Body
     && (paragraph.format.bidi || paragraph_has_form_widget(paragraph));
+  let recovered_empty_chinese_table_mark = legacy_chinese_table_line
+    && paragraph.format.office_recovered_line_height
+    && paragraph_is_effectively_empty(paragraph);
+  let recovered_empty_chinese_body_mark = compatibility_mode < 15
+    && text_segmentation == TextSegmentation::Body
+    && chinese_paragraph_mark
+    && paragraph.format.office_recovered_line_height
+    && paragraph.format.style_id.is_none()
+    && !paragraph.format.paragraph_mark_font_size_set
+    && paragraph_is_effectively_empty(paragraph);
   let uses_east_asian_paragraph_mark = if compatibility_mode >= 15 {
     (paragraph.format.justification.adjust == crate::docx::ParagraphAdjust::Start
       && (paragraph.format.justification.logical_start || modern_physical_left_mark))
       || paragraph.format.numbered_paragraph_mark_background
   } else {
     paragraph.format.numbered_paragraph_mark_background
+      || recovered_empty_chinese_table_mark
+      || recovered_empty_chinese_body_mark
       || (paragraph.format.justification.adjust == crate::docx::ParagraphAdjust::Left
         && (paragraph_has_automatic_superscript(paragraph) || legacy_chinese_table_line))
   };
+  // `Normalize/conflicting IDs.docx` inherits an authored 240/240 multiple
+  // from TableGrid, while styleless `tdf109306.docx` receives Word's repaired
+  // 278/240 application default. Their immutable Office PDFs are the paired
+  // opposite-state evidence: inherited style spacing suppresses this mark box,
+  // but the synthetic repair does not. ECMA-376 Part 1 §17.3.1.33 requires the
+  // inherited line value to remain effective when direct `w:spacing` omits it.
   if prior_line_count != 0
     || !uses_east_asian_paragraph_mark
     || !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
     || paragraph.format.line_height_set
+    || (paragraph.format.line_height_pt.is_some() && !paragraph.format.office_recovered_line_height)
   {
     return None;
   }
@@ -519,22 +603,35 @@ fn word_east_asian_paragraph_mark_single_line_height(
   // its presence is the legacy paragraph-mark trigger, not a request to shape
   // the visible Latin text with the East Asian face.
   //
-  // The legacy Chinese table path is a separate compatibility line box:
+  // The legacy Chinese paragraph-mark path is a separate compatibility line
+  // box:
   // gridbefore.docx and large-twips.docx use different East Asian faces but
   // both emit a 17.28pt line at 12pt. tdf128399.docx is the opposite-state
   // btLr fixture and retains its authored 276-twip row only when this rule is
   // restricted to horizontal cells. Body text, non-Chinese cells, wrapped
   // lines, and explicit line spacing remain further counterexamples.
-  // Keep wrapped lines, ordinary physical `w:jc=left`, and default alignment
-  // on their visible-script metrics, and preserve the legacy physical-left
-  // path used by older compatibility documents. ECMA-376 Part 1 §§17.3.1.13
-  // and 17.18.44 distinguish the logical leading-edge `start` token.
+  // Keep wrapped lines, ordinary physical `w:jc=left`, and default-aligned
+  // visible text on their visible-script metrics. A recovered empty paragraph
+  // is narrower: ECMA-376 Part 1 §17.3.1.29 assigns its only physical glyph to
+  // the paragraph mark, and Writer's SwTextFrame::EmptyHeight() resolves the
+  // text node's attributes or its paragraph-style collection before measuring
+  // that glyph. In tdf131203 every leading table <w:p/> and every styleless
+  // body mark contributes the 17.28pt 12pt complex-script box; GDB and the
+  // repeated 99.48pt Office body cadence distinguish it from the empty 10pt
+  // w:t insertion range. tdf128504 is the opposite state: its two empty body
+  // paragraphs explicitly reference style0, whose resolved 15.9836426pt line
+  // must not be replaced by the synthetic 17.28pt application-default box.
+  // lastEmptyLineWithDirectFormatting is the opposite state: a direct
+  // w:pPr/w:rPr size owns the mark and suppresses this recovered fixed box.
+  // Preserve the legacy physical-left path used by older compatibility
+  // documents. ECMA-376 Part 1 §§17.3.1.13 and 17.18.44 distinguish the
+  // logical leading-edge `start` token.
   // `content-control-rtl.docx` supplies the narrow modern physical-left
   // exception: its body alternates RTL mark-only paragraphs and SDT form
   // widgets, and Word gives both the East Asian mark line. `tdf122648.docx` is
   // the opposite state: its horizontal table cells and ordinary LTR separator
   // retain the Source Sans Pro box instead of the Noto Serif CJK SC mark box.
-  if legacy_chinese_table_line {
+  if legacy_chinese_table_line || recovered_empty_chinese_body_mark {
     return Some(
       paragraph
         .base_style
@@ -926,7 +1023,7 @@ fn include_numbering_label_height(
   // portion participates in the enclosing SwLineLayout just like ordinary
   // text. Keep that ownership here instead of deriving every numbered line
   // from the first printable body run.
-  include_text_height(
+  let resolved_height = include_text_height(
     line_height,
     paragraph,
     flow,
@@ -935,7 +1032,69 @@ fn include_numbering_label_height(
     &paragraph.list_label_style,
     visible_label,
     text_metrics,
-  )
+  );
+  let recovered_word_cjk_numbering = flow.compatibility_mode < 15
+    && flow.text_segmentation == TextSegmentation::Body
+    && !paragraph.format.wordprocessing_shape_story
+    && paragraph_has_chinese_east_asia_language(paragraph)
+    && paragraph.format.office_recovered_line_height
+    && paragraph
+      .format
+      .office_recovered_line_height_without_settings_part
+    && matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    && !paragraph.format.line_height_set
+    && !(paragraph.format.snap_to_grid.unwrap_or(true)
+      && doc_grid_line_pitch_for_segment(
+        flow.setup,
+        flow.text_segmentation,
+        paragraph.format.wordprocessing_shape_story,
+      )
+      .is_some());
+  if !recovered_word_cjk_numbering {
+    return resolved_height;
+  }
+
+  // CalcAscent() has a dedicated field-portion branch for numbering: under
+  // MS_WORD_COMP_GRID_METRICS it scales a CJK-capable number font's height by
+  // 127%, and tdf#171275 explicitly disables that adjustment when a snapped
+  // document grid is active (sw/source/core/text/itrform2.cxx). The malformed
+  // listWithLgl.docx omits pPrDefault/settings, so Word supplies the same
+  // Chinese application state retained by office_recovered_line_height. Its
+  // four immutable Office baselines advance by 25.2pt: the independently
+  // authored 8pt paragraph-after plus this scaled numbering portion. Keep the
+  // adjustment on the measured label font rather than inventing a fixed line
+  // height; modern compatibility, explicit spacing, non-Chinese defaults, and
+  // a live document grid are opposite states.
+  // This branch deliberately does not use line_vertical_metrics_for_text().
+  // Writer saves the complete numbering SwFont and asks GetTextHeight(); the
+  // glyphs present in a particular label do not trim that font box.
+  let metrics = text_metrics.line_vertical_metrics(&paragraph.list_label_style);
+  let numbering_portion_height = metrics.line_height_pt().max(
+    paragraph
+      .list_label_style
+      .line_height_override_pt
+      .unwrap_or_default(),
+  ) * WORD_DIRECT_PARAGRAPH_MARK_CJK_HEIGHT_SCALE;
+  // CalcAscent() resolves the number portion before CalcRealHeight() applies
+  // paragraph line spacing. A w:lvl/w:rPr font is an independently authored
+  // SwNumberPortion font: NewNumberPortion applies the level's character style
+  // after the paragraph font, and CalcAscent() explicitly says that such a
+  // numbering font is independent from hard paragraph attributes. Do not
+  // multiply that already resolved box by the synthetic Normal-line recovery
+  // (tdf#148132). An inherited number font still follows the recovered
+  // paragraph multiple; listWithLgl.docx is the opposite control.
+  let numbering_height = if paragraph.format.numbering_level_font_size_set {
+    numbering_portion_height
+  } else {
+    paragraph
+      .format
+      .line_height_pt
+      .filter(|multiple| multiple.is_finite() && *multiple > 0.0)
+      .map_or(numbering_portion_height, |multiple| {
+        numbering_portion_height * multiple
+      })
+  };
+  resolved_height.max(numbering_height)
 }
 
 fn numbering_label_origin_pt(
@@ -10420,8 +10579,15 @@ fn estimated_paragraph_content_extents(
     text_metrics,
   )
   .map(|heights| heights.following_line_pt);
+  // An application-recovered Normal multiple is not authored `w:spacing`.
+  // Office keeps that synthetic line box's internal leading on the first
+  // non-grid line (`tdf104713_undefinedStyles.docx`); treating it as Writer's
+  // ordinary gap-below compatibility path pins the glyph top to the page
+  // margin. Authored direct/inherited auto spacing continues to use the
+  // ECMA-376 §17.3.1.33 inter-line gap semantics.
   let proportional_auto_baseline_allows_zero_leading_text =
-    !(paragraph.format.justification_set && paragraph.format.justification.is_block());
+    !paragraph.format.office_recovered_line_height
+      && !(paragraph.format.justification_set && paragraph.format.justification.is_block());
   let proportional_auto_text_line_spacing_multiple =
     proportional_auto_text_line_spacing_multiple(paragraph, flow);
   let text_frame = TextFrame {
@@ -10532,6 +10698,14 @@ fn estimated_paragraph_content_extents(
             // content, that next (empty) line is part of the paragraph and
             // must be included in table-row measurement just as it is by
             // TextFrameLayout::format.
+            if let Some(break_line_height) = word_recovered_legacy_chinese_table_break_line_height(
+              paragraph,
+              flow.compatibility_mode,
+              flow.text_segmentation,
+              flow.horizontal_table_cell,
+            ) {
+              line_height = line_height.max(break_line_height);
+            }
             finish_line(
               &mut content_height,
               &mut line_height,
@@ -11101,6 +11275,21 @@ fn paragraph_spacing_before(
   paragraph: &crate::docx::Paragraph,
   flow: FlowContext,
 ) -> f32 {
+  if previous.is_none()
+    && paragraph
+      .format
+      .office_recovered_builtin_heading_spacing_before
+    && flow.text_segmentation == TextSegmentation::Body
+    && flow.section_index == 0
+    && flow.section_page_index == 0
+  {
+    // The malformed tdf104713_undefinedStyles package leaves Heading 1
+    // parentless and omits pPrDefault. Word retains the repaired heading-base
+    // spacing between headings, but its first body heading starts at the page
+    // print top. Keep this provenance-gated: an authored first-paragraph
+    // w:spacing@before remains effective (large-para-top-margin.docx).
+    return 0.0;
+  }
   if previous.is_none()
     && paragraph.format.spacing_before_auto == Some(true)
     && (matches!(
@@ -26837,7 +27026,8 @@ impl TextFrame {
     let proportional_auto_text_line_spacing_multiple =
       proportional_auto_text_line_spacing_multiple(paragraph, flow);
     let proportional_auto_baseline_allows_zero_leading_text =
-      !(paragraph.format.justification_set && paragraph.format.justification.is_block());
+      !paragraph.format.office_recovered_line_height
+        && !(paragraph.format.justification_set && paragraph.format.justification.is_block());
     let proportional_auto_baseline_uses_text_line_spacing =
       proportional_auto_baseline_uses_text_line_spacing(
         paragraph,
@@ -29282,6 +29472,14 @@ impl<'a> TextFrameLayout<'a> {
                 inline_index,
                 text_offset: segment.end,
               });
+              if let Some(break_line_height) = word_recovered_legacy_chinese_table_break_line_height(
+                paragraph,
+                flow.compatibility_mode,
+                flow.text_segmentation,
+                flow.horizontal_table_cell,
+              ) {
+                line_height = line_height.max(break_line_height);
+              }
               flush_text(
                 current,
                 TextPlacement {
@@ -41053,6 +41251,42 @@ mod tests {
       },
       page_follow.content_top_pt,
     ));
+
+    let mut recovered_heading = paragraph.clone();
+    recovered_heading.format.spacing_before_auto = None;
+    recovered_heading.format.spacing_before_auto_pt = None;
+    recovered_heading.format.spacing_before_pt =
+      super::super::OFFICE_RECOVERED_HEADING_BASE_BEFORE_PT;
+    recovered_heading.format.spacing_before_set = true;
+    recovered_heading
+      .format
+      .office_recovered_builtin_heading_spacing_before = true;
+    assert_eq!(
+      paragraph_spacing_before(None, &recovered_heading, flow),
+      0.0
+    );
+    assert_eq!(
+      paragraph_spacing_before(
+        None,
+        &recovered_heading,
+        FlowContext {
+          section_index: 1,
+          ..flow
+        },
+      ),
+      super::super::OFFICE_RECOVERED_HEADING_BASE_BEFORE_PT
+    );
+    assert_eq!(
+      paragraph_spacing_before(
+        None,
+        &recovered_heading,
+        FlowContext {
+          text_segmentation: TextSegmentation::TableCell,
+          ..flow
+        },
+      ),
+      super::super::OFFICE_RECOVERED_HEADING_BASE_BEFORE_PT
+    );
   }
 
   #[test]
@@ -42142,6 +42376,19 @@ mod tests {
       inherited_height
     );
 
+    let mut recovered = inherited.clone();
+    recovered.format.office_recovered_line_height = true;
+    let recovered_frame = TextFrame::new(&recovered, flow, &mut text_metrics);
+    assert_eq!(
+      recovered_frame.text_baseline_line_height_for_text(inherited_height, zero_leading_extents),
+      inherited_height,
+      "Word's application-recovered Normal multiple retains internal first-line leading",
+    );
+    assert!(
+      (recovered_frame.page_fit_height(inherited_height) - tall_natural_height).abs() < 0.001,
+      "the synthetic leading does not make a trailing proportional gap fit on the page",
+    );
+
     let mut compatible_shape_text = inherited.clone();
     compatible_shape_text
       .format
@@ -42414,7 +42661,7 @@ mod tests {
       font_size_pt: 48.0,
       ..Default::default()
     };
-    let paragraph = Paragraph {
+    let mut paragraph = Paragraph {
       inlines: vec![InlineItem::Text(TextRun {
         text: "body".into(),
         style: TextStyle::default(),
@@ -42464,7 +42711,7 @@ mod tests {
     };
     let mut text_metrics = TextMetrics::new();
     let expected = inline_text_height(&label_style, &mut text_metrics);
-    let flow = flow_from_block_area(BlockArea {
+    let mut flow = flow_from_block_area(BlockArea {
       setup: PageSetup::default(),
       section_index: 0,
       section_page_index: 0,
@@ -42496,6 +42743,69 @@ mod tests {
 
     assert!((height - expected.max(frame.base_line_height)).abs() < 0.001);
     assert!(height > frame.base_line_height);
+
+    paragraph.base_style.east_asia_language = Some(Arc::from("zh-CN"));
+    paragraph.format.line_height_pt = Some(278.0 / 240.0);
+    paragraph.format.office_recovered_line_height = true;
+    paragraph
+      .format
+      .office_recovered_line_height_without_settings_part = true;
+    flow.compatibility_mode = 12;
+    let recovered_frame = TextFrame {
+      script_sensitive_line_height: true,
+      ..frame
+    };
+    let mut line_text_extents = WordLineTextExtents::default();
+    let recovered_height = include_numbering_label_height(
+      &paragraph,
+      recovered_frame.base_line_height,
+      flow,
+      recovered_frame,
+      &mut line_text_extents,
+      &mut text_metrics,
+    );
+    assert!(
+      (recovered_height
+        - expected
+          * WORD_DIRECT_PARAGRAPH_MARK_CJK_HEIGHT_SCALE
+          * paragraph.format.line_height_pt.unwrap())
+      .abs()
+        < 0.001,
+      "a recovered legacy Chinese number portion owns its 127% compatibility box",
+    );
+
+    paragraph.format.numbering_level_font_size_set = true;
+    let mut line_text_extents = WordLineTextExtents::default();
+    let explicit_numbering_height = include_numbering_label_height(
+      &paragraph,
+      recovered_frame.base_line_height,
+      flow,
+      recovered_frame,
+      &mut line_text_extents,
+      &mut text_metrics,
+    );
+    assert!(
+      (explicit_numbering_height - expected * WORD_DIRECT_PARAGRAPH_MARK_CJK_HEIGHT_SCALE).abs()
+        < 0.001,
+      "an explicit numbering-level font owns its resolved portion and is not scaled twice",
+    );
+    paragraph.format.numbering_level_font_size_set = false;
+
+    flow.setup.doc_grid_line_pitch_pt = Some(15.6);
+    let mut line_text_extents = WordLineTextExtents::default();
+    let grid_height = include_numbering_label_height(
+      &paragraph,
+      recovered_frame.base_line_height,
+      flow,
+      recovered_frame,
+      &mut line_text_extents,
+      &mut text_metrics,
+    );
+    let expected_grid_height = snap_line_height_to_doc_grid(expected, Some(15.6));
+    assert!(
+      (grid_height - expected_grid_height.max(frame.base_line_height)).abs() < 0.001,
+      "an active snapped grid disables the independent CJK number-portion adjustment",
+    );
   }
 
   #[test]
@@ -42799,6 +43109,17 @@ mod tests {
       Some(17.28)
     );
     paragraph.format.line_height_pt = Some(278.0 / 240.0);
+    paragraph.format.office_recovered_line_height = true;
+    assert_eq!(
+      word_recovered_legacy_chinese_table_break_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+      ),
+      Some(17.28),
+      "a break-only line uses the recovered legacy Chinese table box",
+    );
     assert_eq!(
       word_east_asian_paragraph_mark_single_line_height(
         &paragraph,
@@ -42811,7 +43132,108 @@ mod tests {
       Some(17.28),
       "an application-recovered auto multiple must not masquerade as authored line spacing",
     );
+    paragraph.format.justification = crate::docx::ParagraphJustification::default();
+    paragraph.format.justification.adjust = crate::docx::ParagraphAdjust::Center;
+    assert_eq!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+        0,
+        &mut text_metrics,
+      ),
+      Some(17.28),
+      "a recovered empty table paragraph is physically only its Chinese paragraph mark",
+    );
+    assert_eq!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      ),
+      Some(17.28),
+      "an unformatted recovered Chinese body mark owns the otherwise empty line",
+    );
+    paragraph.format.style_id = Some(Arc::from("style0"));
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_none(),
+      "an explicit paragraph style remains authoritative for an empty body mark",
+    );
+    paragraph.format.style_id = None;
+    paragraph.format.paragraph_mark_font_size_set = true;
+    assert!(
+      word_recovered_legacy_chinese_table_break_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+      )
+      .is_none(),
+      "direct paragraph-mark size remains authoritative for a break-only line",
+    );
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_none(),
+      "direct paragraph-mark size remains authoritative",
+    );
+    paragraph.format.paragraph_mark_font_size_set = false;
+    paragraph.list_label = Some("visible".to_string());
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+        0,
+        &mut text_metrics,
+      )
+      .is_none(),
+      "default-aligned visible content must keep its visible-script line box",
+    );
+    paragraph.list_label = None;
+    paragraph.format.office_recovered_line_height = false;
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+        0,
+        &mut text_metrics,
+      )
+      .is_none(),
+      "a style-inherited auto multiple remains authored line spacing",
+    );
     paragraph.format.line_height_set = true;
+    assert!(
+      word_recovered_legacy_chinese_table_break_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+      )
+      .is_none(),
+      "authored line spacing remains authoritative for a break-only line",
+    );
     assert!(
       word_east_asian_paragraph_mark_single_line_height(
         &paragraph,
@@ -42826,6 +43248,38 @@ mod tests {
     );
     paragraph.format.line_height_pt = None;
     paragraph.format.line_height_set = false;
+    paragraph.format.office_recovered_line_height = true;
+    assert!(
+      word_recovered_legacy_chinese_table_break_line_height(
+        &paragraph,
+        15,
+        TextSegmentation::TableCell,
+        true,
+      )
+      .is_none(),
+      "the legacy box is not a modern-compatibility rule",
+    );
+    assert!(
+      word_recovered_legacy_chinese_table_break_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::Body,
+        false,
+      )
+      .is_none(),
+      "body breaks are not table-cell compatibility lines",
+    );
+    assert!(
+      word_recovered_legacy_chinese_table_break_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        false,
+      )
+      .is_none(),
+      "vertical table cells retain their authored orientation metrics",
+    );
+    paragraph.format.office_recovered_line_height = false;
     assert!(
       word_east_asian_paragraph_mark_single_line_height(
         &paragraph,
@@ -42849,7 +43303,18 @@ mod tests {
       .is_none()
     );
 
+    paragraph.format.office_recovered_line_height = true;
     paragraph.base_style.east_asia_language = Some(Arc::from("en-US"));
+    assert!(
+      word_recovered_legacy_chinese_table_break_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+      )
+      .is_none(),
+      "non-Chinese cells retain visible-script line metrics",
+    );
     assert!(
       word_east_asian_paragraph_mark_single_line_height(
         &paragraph,
@@ -43661,6 +44126,7 @@ mod tests {
       format: Box::new(ParagraphFormat {
         line_height_rule: LineHeightRule::Auto,
         line_height_pt: Some(1.35),
+        office_recovered_line_height: true,
         snap_to_grid: Some(true),
         ..Default::default()
       }),
@@ -43716,6 +44182,20 @@ mod tests {
       &mut text_metrics,
     );
     assert!(table_height < body_grid_heights.following_line_pt);
+
+    let mut inherited_paragraph = paragraph.clone();
+    inherited_paragraph.format.office_recovered_line_height = false;
+    let inherited_body_height = paragraph_line_height_for_setup(
+      &inherited_paragraph,
+      &base_style,
+      setup,
+      TextSegmentation::Body,
+      &mut text_metrics,
+    );
+    assert!(
+      (inherited_body_height - 15.6).abs() < 0.01,
+      "an authored style-hierarchy multiple must not enlarge the first one-grid line",
+    );
 
     let mut wordprocessing_shape_paragraph = paragraph.clone();
     wordprocessing_shape_paragraph

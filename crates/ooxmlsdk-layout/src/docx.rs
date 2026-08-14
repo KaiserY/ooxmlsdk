@@ -172,6 +172,8 @@ const MAX_WORD_TABLE_MARGIN_TWIPS: f32 = 31_680.0;
 // after the paragraph and 278/240 automatic line spacing in the calibrated
 // Simplified-Chinese authoring profile (tdf109306 and tdf117188).
 const OFFICE_RECOVERED_PARAGRAPH_AFTER_PT: f32 = 8.0;
+const OFFICE_RECOVERED_HEADING_BASE_BEFORE_PT: f32 = 12.0;
+const OFFICE_RECOVERED_HEADING_BASE_AFTER_PT: f32 = 6.0;
 // Writer's OOXML DomainMapper uses the Word binary importer's 280-twip
 // paragraph auto-spacing value in print layout. Word fixed-format output
 // exposes the same 14pt distance.
@@ -202,6 +204,7 @@ const OFFICE_AUTOMATIC_LINE_NUMBER_DISTANCE_PT: f32 = 18.0;
 
 #[derive(Clone, Copy, Debug, Default)]
 struct ImportSettings {
+  has_settings_part: bool,
   compatibility_mode: u16,
   justify_lines_with_shrinking: bool,
   use_far_east_layout: bool,
@@ -256,6 +259,7 @@ pub(crate) fn extract(
   options: &LayoutOptions,
 ) -> Result<DocxDocument> {
   let main = package.main_document_part()?;
+  let has_settings_part = main.document_settings_part(package).is_some();
   let compatibility_mode = compatibility_mode(package, &main);
   let fixed_html_paragraph_auto_spacing = do_not_use_html_paragraph_auto_spacing(package, &main);
   let do_not_break_wrapped_tables = do_not_break_wrapped_tables(package, &main);
@@ -266,6 +270,7 @@ pub(crate) fn extract(
   let document_math_settings = document_math_settings(package, &main);
   let document_created_datetime = document_created_datetime(package, options);
   let import_settings = ImportSettings {
+    has_settings_part,
     compatibility_mode,
     justify_lines_with_shrinking: compatibility_mode >= 15,
     use_far_east_layout,
@@ -307,7 +312,8 @@ pub(crate) fn extract(
   let hyphenation = hyphenation_settings(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
   let no_column_balance = no_column_balance(package, &main);
-  let adjust_line_height_in_table = adjust_line_height_in_table(package, &main);
+  let (adjust_line_height_in_table, recover_adjust_line_height_in_table) =
+    adjust_line_height_in_table(package, &main);
   let split_page_break_and_paragraph_mark = split_page_break_and_paragraph_mark(package, &main);
   let update_fields_on_open = update_fields_on_open(package, &main);
   let mirror_margins = mirror_margins(package, &main);
@@ -370,21 +376,36 @@ pub(crate) fn extract(
     apply_document_grid_compatibility_mode(&mut section.page, compatibility_mode);
   }
   for section in &mut sections {
-    if section.section_properties.is_none()
-      && section.page.doc_grid_line_pitch_pt.is_none()
-      && body_styles
-        .locales
-        .default_document_resource_locale()
-        .is_simplified_chinese()
-      && blocks_have_recoverable_document_grid_content(&section.blocks)
-    {
-      // Section recovery is independent of the Styles part: Office re-saves
-      // both styleless tdf117188 and tdf141969 with its existing Styles part,
-      // as well as table-only tdf109306, to the same 312-twip grid. The grid
-      // comes from the Simplified-Chinese authoring profile, not the UI label
-      // locale. An authored sectPr which merely omits docGrid remains an
-      // ordinary non-grid section; tdf131203 is the opposite-state control.
+    if should_recover_office_document_grid(
+      section.page,
+      section.section_properties.is_none(),
+      section
+        .section_properties
+        .as_ref()
+        .is_some_and(|properties| properties.doc_grid.is_some()),
+      &body_styles,
+      &section.blocks,
+    ) {
+      // ECMA-376 Part 1 §17.6.5 makes docGrid an optional child of sectPr;
+      // an empty sectPr therefore does not establish a second omission state.
+      // A present docGrid is normally different: §17.6.5 makes an omitted
+      // `type` explicitly default to `default`, which disables the grid while
+      // preserving linePitch/charSpace for possible re-enabling. Word honors
+      // that authored disabled state when Styles or Settings establishes the
+      // package context (n766487, tdf108496). Its styleless/settings-less
+      // application-repair entrance is an observed exception: tdf147724 keeps
+      // the recovered template cadence despite the preserved wrapper.
+      // Office has two independently observed repair entrances: an implicit
+      // final section (no sectPr), or a missing effective pPrDefault. The
+      // sectionless tdf95189 output advances by exact 312-twip grid rows with
+      // a complete Styles part; tdf131203 does the same with a
+      // header/footer-only sectPr and no Styles part. The independent
+      // tdf117188, tdf109306, and tdf141969 controls pin the same
+      // Simplified-Chinese pitch. An explicit active grid remains
+      // authoritative, while a present sectPr plus complete pPrDefault is the
+      // opposite state.
       section.page.doc_grid_line_pitch_pt = Some(OFFICE_RECOVERED_DOCUMENT_GRID_LINE_PITCH_PT);
+      section.page.adjust_table_line_heights_to_grid = recover_adjust_line_height_in_table;
     }
   }
   if let Some(first_section) = sections.first_mut()
@@ -398,7 +419,7 @@ pub(crate) fn extract(
     section.page.background = page_background;
     section.page.mirror_margins = mirror_margins;
     section.page.gutter_at_top = gutter_at_top;
-    section.page.adjust_table_line_heights_to_grid = adjust_line_height_in_table;
+    section.page.adjust_table_line_heights_to_grid |= adjust_line_height_in_table;
   }
   if mirror_margins
     && sections
@@ -1386,9 +1407,21 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
                   if matches!(paragraph.inlines.last(), Some(InlineItem::ColumnBreak))
               )
             });
+            let keeps_authored_paragraph_mark_height = section_break
+              == SectionBreakKind::Continuous
+              && empty_section_carrier_has_authored_paragraph_mark_height(
+                &model,
+                styles,
+                current_blocks.is_empty(),
+                section_properties
+                  .as_ref()
+                  .is_some_and(|section| section_column_count(section) > 1),
+              );
             section_metadata_only = !had_numbering_label
               && !(section_break == SectionBreakKind::Continuous
-                && (keeps_empty_multicolumn_section || follows_column_break));
+                && (keeps_empty_multicolumn_section
+                  || follows_column_break
+                  || keeps_authored_paragraph_mark_height));
           }
           if section_metadata_only {
             promote_preceding_table_to_anchored_frame(&mut current_blocks, &model);
@@ -2096,6 +2129,53 @@ fn empty_section_carrier_suppresses_numbering(
     || has_direct_indentation
     || paragraph_mark_is_deleted(paragraph)
     || section_break == SectionBreakKind::Continuous
+}
+
+fn empty_section_carrier_has_authored_paragraph_mark_height(
+  paragraph: &Paragraph,
+  styles: &StylesCatalog,
+  section_has_no_other_blocks: bool,
+  section_is_multicolumn: bool,
+) -> bool {
+  if paragraph.format.paragraph_mark_font_size_set || paragraph.format.line_height_set {
+    // ECMA-376 keeps the paragraph mark inside the ending section. Writer's
+    // floating-table-section-columns QA pins the observable multi-column
+    // case: the directly sized closing mark participates in the column frame,
+    // while the anchored table must retain its full (non-column) width.
+    // The single-column tdf148273/fdo53985/fdo73596 controls show that the
+    // same direct properties on a metadata carrier do not add a flow line.
+    return section_is_multicolumn;
+  }
+
+  // ECMA-376 Part 1 §17.6.17 makes the paragraph carrying w:pPr/w:sectPr
+  // the final paragraph of the section, and §17.3.1.29 applies its resolved
+  // run properties to the paragraph mark. LibreOffice SwTextFrame::EmptyHeight
+  // likewise constructs the empty-line font from the text node's resolved
+  // attributes (sw/source/core/text/porrst.cxx). Do not discard that paragraph
+  // when its authored paragraph style changes the mark height from docDefaults:
+  // tdf64372_continuousBreaks has four such carriers under a 48pt Normal style,
+  // and both Word fixed output and Writer retain all four line advances.
+  // Writer's section import only synthesizes a dummy paragraph when the
+  // section has no paragraph of its own (rtfdocumentimpl.cxx::sectBreak).
+  // Once a section already has content, its trailing empty carrier remains
+  // metadata: complex0/complex2010 exercise 17 such interleaved column
+  // transitions and are the opposite control for this branch. Requiring an
+  // actual style-derived height difference also preserves the style-less
+  // sdt_after_section_break state as section metadata.
+  if !section_has_no_other_blocks || !styles.has_styles_part {
+    return false;
+  }
+
+  let paragraph_complex_size = paragraph
+    .base_style
+    .complex_font_size_pt
+    .unwrap_or(paragraph.base_style.font_size_pt);
+  let default_complex_size = styles
+    .doc_default_run
+    .complex_font_size_pt
+    .unwrap_or(styles.doc_default_run.font_size_pt);
+  (paragraph.base_style.font_size_pt - styles.doc_default_run.font_size_pt).abs() > 0.001
+    || (paragraph_complex_size - default_complex_size).abs() > 0.001
 }
 
 fn paragraph_has_drop_cap_frame(paragraph: &Paragraph) -> bool {
@@ -2843,6 +2923,11 @@ fn apply_recovered_body_paragraph_defaults(
   if model.format.line_height_pt.is_none() {
     model.format.line_height_pt = Some(OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE);
     model.format.line_height_rule = LineHeightRule::Auto;
+    model.format.office_recovered_line_height = true;
+    model
+      .format
+      .office_recovered_line_height_without_settings_part =
+      !styles.import_settings.has_settings_part;
   }
 }
 
@@ -2895,6 +2980,25 @@ fn blocks_have_recoverable_document_grid_content(blocks: &[Block]) -> bool {
     // story was created from the application Normal template.
     Block::Frame(_) => false,
   })
+}
+
+fn should_recover_office_document_grid(
+  page: PageSetup,
+  section_properties_missing: bool,
+  document_grid_element_present: bool,
+  styles: &StylesCatalog,
+  blocks: &[Block],
+) -> bool {
+  let authored_disabled_grid_is_authoritative = document_grid_element_present
+    && (styles.has_styles_part || styles.import_settings.has_settings_part);
+  page.doc_grid_line_pitch_pt.is_none()
+    && !authored_disabled_grid_is_authoritative
+    && (section_properties_missing || styles.uses_office_recovered_paragraph_defaults())
+    && styles
+      .locales
+      .default_document_resource_locale()
+      .is_simplified_chinese()
+    && blocks_have_recoverable_document_grid_content(blocks)
 }
 
 fn header_blocks(
@@ -6367,9 +6471,14 @@ fn merge_paragraph_format_with_theme(
     if let Some(before) = spacing.before.as_ref() {
       format.spacing_before_set = true;
       format.spacing_before_pt = signed_twips_measure_to_points(before).unwrap_or(0.0);
+      format.office_recovered_builtin_heading_spacing_before = false;
     }
     if let Some(before_lines) = spacing.before_lines {
-      format.spacing_before_lines = Some((before_lines as f32 / 100.0).max(0.0));
+      let before_lines = (before_lines as f32 / 100.0).max(0.0);
+      format.spacing_before_lines = Some(before_lines);
+      if before_lines > 0.0 {
+        format.office_recovered_builtin_heading_spacing_before = false;
+      }
     }
     if let Some(before_auto_spacing) = spacing.before_auto_spacing {
       // Preserve explicit false independently from the resolved ordinary
@@ -6377,6 +6486,9 @@ fn merge_paragraph_format_with_theme(
       // inherited or sibling w:before value.
       let enabled = before_auto_spacing.as_bool();
       format.spacing_before_auto = Some(enabled);
+      if enabled {
+        format.office_recovered_builtin_heading_spacing_before = false;
+      }
       format.spacing_before_auto_pt =
         enabled.then_some(if import_settings.fixed_html_paragraph_auto_spacing {
           OFFICE_FIXED_AUTOMATIC_PARAGRAPH_BEFORE_PT
@@ -7292,6 +7404,38 @@ fn word_run_is_effectively_empty(run: &w::Run, preserve_word_text_whitespace: bo
     w::RunChoice::AlternateContent(_) => true,
     _ => false,
   })
+}
+
+fn word_run_preserves_empty_line_font_size(
+  run: &w::Run,
+  preserve_word_text_whitespace: bool,
+) -> bool {
+  let Some(properties) = run.run_properties.as_deref() else {
+    return false;
+  };
+  if run_properties_font_size(properties).is_none()
+    && run_properties_complex_script_font_size(properties).is_none()
+  {
+    return false;
+  }
+
+  // A present but empty w:t still creates a formatted insertion range in
+  // Word's model; it is narrower than an empty w:r with no text child. Writer
+  // mirrors this in DomainMapper_Impl::appendTextPortion(): the empty string
+  // and its character property map are both handed to XTextAppend, after
+  // which SwTextFormatter::NewTextPortion applies the start attributes to an
+  // empty line through SeekStartAndChg. Keep only the font-size-bearing case
+  // needed by line layout; no glyph or paint run is synthesized.
+  let has_explicit_empty_text = run.run_choice.iter().any(|choice| match choice {
+    w::RunChoice::Text(text) => {
+      word_text_value(text, preserve_word_text_whitespace).is_none_or(str::is_empty)
+    }
+    w::RunChoice::DeletedText(text) => {
+      word_text_value(text, preserve_word_text_whitespace).is_none_or(str::is_empty)
+    }
+    _ => false,
+  });
+  has_explicit_empty_text && word_run_is_effectively_empty(run, preserve_word_text_whitespace)
 }
 
 fn office_math_display_alignment(
@@ -9483,6 +9627,10 @@ fn push_run_with_character_style_policy(
     })
     .map(|style_id| styles.style_ref_keys(style_id))
     .unwrap_or_default();
+  let empty_line_font_style =
+    word_run_preserves_empty_line_font_size(run, styles.preserve_word_text_whitespace)
+      .then(|| style.clone());
+  let initial_inline_count = inlines.len();
   if style.hidden {
     push_hidden_run_for_style_ref(
       run,
@@ -9804,6 +9952,20 @@ fn push_run_with_character_style_policy(
   }
 
   flush_run_text(inlines, &mut text, style, hyperlink_url, &style_ref_keys);
+  if inlines.len() == initial_inline_count
+    && let Some(style) = empty_line_font_style
+  {
+    inlines.push(InlineItem::Text(TextRun {
+      text: String::new(),
+      style,
+      hyperlink_url: hyperlink_url.map(ToString::to_string),
+      dynamic_field: None,
+      style_ref_keys,
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    }));
+  }
 }
 
 fn push_hidden_run_for_style_ref(
@@ -22909,6 +23071,52 @@ struct StyleEntry {
   table_style: TableStyleModel,
 }
 
+fn is_reserved_office_heading_style_name(name: &str) -> bool {
+  let Some((prefix, level)) = name.rsplit_once(' ') else {
+    return false;
+  };
+  prefix.eq_ignore_ascii_case("heading")
+    && matches!(level, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
+}
+
+fn recover_office_builtin_heading_style(
+  has_default_paragraph_properties: bool,
+  entry: &mut StyleEntry,
+) {
+  if has_default_paragraph_properties
+    || !matches!(entry.style_type, Some(w::StyleValues::Paragraph))
+    || entry.custom_style
+    || entry.based_on.is_some()
+    || !entry
+      .name
+      .as_deref()
+      .is_some_and(is_reserved_office_heading_style_name)
+  {
+    return;
+  }
+
+  // ECMA-376 Part 1 §17.7.4.17 distinguishes application-defined styles from
+  // w:customStyle=true, and [MS-OE376] Part 4 §2.7.3.9(d) reserves the names
+  // heading 1 through heading 9 as built-in paragraph styles. Writer's DOCX
+  // importer resets a colliding built-in style, but only detaches its built-in
+  // parent when pPrDefault was imported (StyleSheetTable.cxx). With no
+  // pPrDefault, the retained COLL_HEADLINE_BASE supplies 12pt above and 6pt
+  // below (DocumentStylePoolManager.cxx); the tdf104713_undefinedStyles QA
+  // pins the resulting 6pt lower margin. Preserve independently authored
+  // spacing slots from the package.
+  if !entry.paragraph_format.spacing_before_set {
+    entry.paragraph_format.spacing_before_pt = OFFICE_RECOVERED_HEADING_BASE_BEFORE_PT;
+    entry.paragraph_format.spacing_before_set = true;
+    entry
+      .paragraph_format
+      .office_recovered_builtin_heading_spacing_before = true;
+  }
+  if !entry.paragraph_format.spacing_after_set {
+    entry.paragraph_format.spacing_after_pt = OFFICE_RECOVERED_HEADING_BASE_AFTER_PT;
+    entry.paragraph_format.spacing_after_set = true;
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct RunStyleOverrides {
   font_size_pt: Option<f32>,
@@ -23241,6 +23449,7 @@ impl StylesCatalog {
       entry.run_overrides =
         run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
       normalize_relative_run_style(&mut entry.run_style, entry.run_overrides);
+      recover_office_builtin_heading_style(has_default_paragraph_properties, &mut entry);
       entry.table_style = table_style_model(
         style,
         &catalog.theme_fonts,
@@ -25550,13 +25759,21 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.spacing_before_set || values.spacing_before_pt != 0.0 {
     target.spacing_before_pt = values.spacing_before_pt;
     target.spacing_before_set = values.spacing_before_set;
+    target.office_recovered_builtin_heading_spacing_before =
+      values.office_recovered_builtin_heading_spacing_before;
   }
   if values.spacing_before_lines.is_some() {
     target.spacing_before_lines = values.spacing_before_lines;
+    if values.spacing_before_lines.is_some_and(|lines| lines > 0.0) {
+      target.office_recovered_builtin_heading_spacing_before = false;
+    }
   }
   if values.spacing_before_auto.is_some() {
     target.spacing_before_auto = values.spacing_before_auto;
     target.spacing_before_auto_pt = values.spacing_before_auto_pt;
+    if values.spacing_before_auto == Some(true) {
+      target.office_recovered_builtin_heading_spacing_before = false;
+    }
   }
   if values.spacing_after_set || values.spacing_after_pt != 0.0 {
     target.spacing_after_pt = values.spacing_after_pt;
@@ -25770,13 +25987,21 @@ fn merge_numbering_format_values(
   if values.spacing_before_set || values.spacing_before_pt != 0.0 {
     target.spacing_before_pt = values.spacing_before_pt;
     target.spacing_before_set = values.spacing_before_set;
+    target.office_recovered_builtin_heading_spacing_before =
+      values.office_recovered_builtin_heading_spacing_before;
   }
   if values.spacing_before_lines.is_some() {
     target.spacing_before_lines = values.spacing_before_lines;
+    if values.spacing_before_lines.is_some_and(|lines| lines > 0.0) {
+      target.office_recovered_builtin_heading_spacing_before = false;
+    }
   }
   if values.spacing_before_auto.is_some() {
     target.spacing_before_auto = values.spacing_before_auto;
     target.spacing_before_auto_pt = values.spacing_before_auto_pt;
+    if values.spacing_before_auto == Some(true) {
+      target.office_recovered_builtin_heading_spacing_before = false;
+    }
   }
   if values.spacing_after_set || values.spacing_after_pt != 0.0 {
     target.spacing_after_pt = values.spacing_after_pt;
@@ -26436,6 +26661,14 @@ impl NumberingCatalog {
     let level = level_override
       .and_then(|override_| override_.level.as_ref())
       .or(abstract_level)?;
+    format.numbering_level_font_size_set =
+      level
+        .symbol_run_properties
+        .as_ref()
+        .is_some_and(|properties| {
+          let properties = RunProps::Numbering(properties);
+          properties.font_size().is_some() || properties.complex_script_font_size().is_some()
+        });
 
     let level_matches_paragraph_style =
       level.paragraph_style_id.as_deref() == format.style_id.as_deref();
@@ -32363,6 +32596,48 @@ mod tests {
   }
 
   #[test]
+  fn explicit_empty_word_text_retains_only_its_line_height_font_size() {
+    fn imported_inlines(xml: &[u8]) -> Vec<InlineItem> {
+      let paragraph = w::Paragraph::from_bytes(xml).expect("empty Word text paragraph");
+      let mut form_widget_ids = FormWidgetIdAllocator::default();
+      paragraph_inlines(
+        &paragraph,
+        TextStyle::default(),
+        &StylesCatalog::default(),
+        &ImageCatalog::default(),
+        &HyperlinkCatalog::default(),
+        &CustomXmlBindings::default(),
+        &mut form_widget_ids,
+      )
+    }
+
+    let inlines = imported_inlines(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t/></w:r></w:p>"#,
+    );
+    let [InlineItem::Text(run)] = inlines.as_slice() else {
+      panic!("the formatted empty w:t must retain one non-painting line-height run");
+    };
+    assert!(run.text.is_empty());
+    assert_eq!(run.style.font_size_pt, 10.0);
+
+    let no_text_child = imported_inlines(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:rPr><w:sz w:val="20"/></w:rPr></w:r></w:p>"#,
+    );
+    assert!(
+      no_text_child.is_empty(),
+      "an empty w:r is not the formatted insertion range represented by w:t"
+    );
+
+    let no_direct_size = imported_inlines(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:rPr><w:b/></w:rPr><w:t/></w:r></w:p>"#,
+    );
+    assert!(
+      no_direct_size.is_empty(),
+      "non-height formatting must not materialize a generic empty run"
+    );
+  }
+
+  #[test]
   fn table_row_exposes_cells_wrapped_in_content_controls() {
     let row = w::TableRow::from_bytes(
       br#"<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sdt><w:sdtContent><w:tc><w:p><w:r><w:t>controlled cell</w:t></w:r></w:p></w:tc></w:sdtContent></w:sdt></w:tr>"#,
@@ -36500,6 +36775,9 @@ mod tests {
   fn explicit_zero_paragraph_spacing_overrides_doc_default_spacing() {
     // spacing properties into the property map even when the value is zero.
     let mut format = ParagraphFormat {
+      spacing_before_pt: OFFICE_RECOVERED_HEADING_BASE_BEFORE_PT,
+      spacing_before_set: true,
+      office_recovered_builtin_heading_spacing_before: true,
       spacing_after_pt: 8.0,
       spacing_after_set: true,
       ..Default::default()
@@ -36508,14 +36786,84 @@ mod tests {
     merge_format_values(
       &mut format,
       &ParagraphFormat {
+        spacing_before_pt: 0.0,
+        spacing_before_set: true,
         spacing_after_pt: 0.0,
         spacing_after_set: true,
         ..Default::default()
       },
     );
 
+    assert_eq!(format.spacing_before_pt, 0.0);
+    assert!(format.spacing_before_set);
+    assert!(!format.office_recovered_builtin_heading_spacing_before);
     assert_eq!(format.spacing_after_pt, 0.0);
     assert!(format.spacing_after_set);
+  }
+
+  #[test]
+  fn undefined_builtin_heading_retains_the_application_heading_base_spacing() {
+    let built_in_heading = StyleEntry {
+      style_type: Some(w::StyleValues::Paragraph),
+      name: Some("heading 2".to_string()),
+      ..StyleEntry::default()
+    };
+    let mut recovered = built_in_heading.clone();
+
+    recover_office_builtin_heading_style(false, &mut recovered);
+
+    assert_eq!(
+      recovered.paragraph_format.spacing_before_pt,
+      OFFICE_RECOVERED_HEADING_BASE_BEFORE_PT
+    );
+    assert!(recovered.paragraph_format.spacing_before_set);
+    assert!(
+      recovered
+        .paragraph_format
+        .office_recovered_builtin_heading_spacing_before
+    );
+    assert_eq!(
+      recovered.paragraph_format.spacing_after_pt,
+      OFFICE_RECOVERED_HEADING_BASE_AFTER_PT
+    );
+    assert!(recovered.paragraph_format.spacing_after_set);
+
+    let mut authored = StyleEntry {
+      paragraph_format: ParagraphFormat {
+        spacing_before_pt: 3.0,
+        spacing_before_set: true,
+        spacing_after_pt: 4.0,
+        spacing_after_set: true,
+        ..ParagraphFormat::default()
+      },
+      ..built_in_heading.clone()
+    };
+    recover_office_builtin_heading_style(false, &mut authored);
+    assert_eq!(authored.paragraph_format.spacing_before_pt, 3.0);
+    assert_eq!(authored.paragraph_format.spacing_after_pt, 4.0);
+    assert!(
+      !authored
+        .paragraph_format
+        .office_recovered_builtin_heading_spacing_before
+    );
+
+    let mut with_paragraph_defaults = built_in_heading.clone();
+    recover_office_builtin_heading_style(true, &mut with_paragraph_defaults);
+    assert!(!with_paragraph_defaults.paragraph_format.spacing_before_set);
+
+    let mut custom = StyleEntry {
+      custom_style: true,
+      ..built_in_heading.clone()
+    };
+    recover_office_builtin_heading_style(false, &mut custom);
+    assert!(!custom.paragraph_format.spacing_before_set);
+
+    let mut explicitly_parented = StyleEntry {
+      based_on: Some("Normal".to_string()),
+      ..built_in_heading
+    };
+    recover_office_builtin_heading_style(false, &mut explicitly_parented);
+    assert!(!explicitly_parented.paragraph_format.spacing_before_set);
   }
 
   #[test]
@@ -36612,6 +36960,45 @@ mod tests {
       Some(OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE)
     );
     assert_eq!(model.format.line_height_rule, LineHeightRule::Auto);
+    assert!(model.format.office_recovered_line_height);
+    assert!(
+      model
+        .format
+        .office_recovered_line_height_without_settings_part
+    );
+  }
+
+  #[test]
+  fn recovered_line_height_retains_a_present_settings_part_as_an_opposite_state() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>body</w:t></w:r></w:p>"#,
+    )
+    .expect("body paragraph");
+    let styles = StylesCatalog {
+      import_settings: ImportSettings {
+        has_settings_part: true,
+        ..ImportSettings::default()
+      },
+      ..StylesCatalog::default()
+    };
+    let mut model = paragraph_model(
+      &paragraph,
+      &styles,
+      &mut NumberingCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut FormWidgetIdAllocator::default(),
+    );
+
+    apply_recovered_body_paragraph_defaults(&paragraph, &styles, &mut model);
+
+    assert!(model.format.office_recovered_line_height);
+    assert!(
+      !model
+        .format
+        .office_recovered_line_height_without_settings_part
+    );
   }
 
   #[test]
@@ -36748,6 +37135,7 @@ mod tests {
         Some(OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE)
       );
       assert_eq!(model.format.line_height_rule, LineHeightRule::Auto);
+      assert!(model.format.office_recovered_line_height);
       assert_eq!(
         model.format.spacing_after_pt,
         OFFICE_RECOVERED_PARAGRAPH_AFTER_PT
@@ -37084,6 +37472,7 @@ mod tests {
 
     assert_eq!(paragraph.base_style.font_size_pt, 48.0);
     assert_eq!(paragraph.base_style.complex_font_size_pt, Some(48.0));
+    assert!(paragraph.format.paragraph_mark_font_size_set);
     let InlineItem::Text(run) = &paragraph.inlines[0] else {
       panic!("expected text run");
     };
@@ -40192,13 +40581,16 @@ mod tests {
     assert_eq!(sections[1].page.height_pt, 612.0);
   }
 
-  fn imported_body_sections(xml: &[u8]) -> Vec<ImportedSection> {
+  fn imported_body_sections_with_styles(
+    xml: &[u8],
+    styles: &StylesCatalog,
+  ) -> Vec<ImportedSection> {
     let body = w::Body::from_bytes(xml).expect("body section story");
     let mut numbering = NumberingCatalog::default();
     body_sections(
       &body,
       BodySectionEnv {
-        styles: &StylesCatalog::default(),
+        styles,
         numbering: &mut numbering,
         images: &ImageCatalog::default(),
         alt_chunks: &AltChunkCatalog::default(),
@@ -40209,6 +40601,40 @@ mod tests {
         fixed_html_paragraph_auto_spacing: false,
       },
     )
+  }
+
+  fn imported_body_sections(xml: &[u8]) -> Vec<ImportedSection> {
+    imported_body_sections_with_styles(xml, &StylesCatalog::default())
+  }
+
+  fn large_normal_styles_catalog() -> StylesCatalog {
+    StylesCatalog {
+      has_styles_part: true,
+      default_paragraph_style_id: Some("Normal".into()),
+      doc_default_run: TextStyle {
+        font_size_pt: 11.0,
+        complex_font_size_pt: Some(11.0),
+        ..Default::default()
+      },
+      styles: HashMap::from([(
+        "Normal".into(),
+        StyleEntry {
+          style_type: Some(w::StyleValues::Paragraph),
+          run_style: TextStyle {
+            font_size_pt: 48.0,
+            complex_font_size_pt: Some(12.0),
+            ..Default::default()
+          },
+          run_overrides: RunStyleOverrides {
+            font_size_pt: Some(48.0),
+            complex_font_size_pt: Some(12.0),
+            ..Default::default()
+          },
+          ..Default::default()
+        },
+      )]),
+      ..Default::default()
+    }
   }
 
   #[test]
@@ -40230,6 +40656,82 @@ mod tests {
       panic!("the second section must contain its visible paragraph");
     };
     assert_eq!(inline_text(&visible.inlines), "visible");
+  }
+
+  #[test]
+  fn styled_empty_continuous_section_carrier_keeps_its_paragraph_mark_height() {
+    let styles = large_normal_styles_catalog();
+    let sections = imported_body_sections_with_styles(
+      br#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:pPr><w:sectPr><w:type w:val="continuous"/></w:sectPr></w:pPr></w:p>
+        <w:p><w:r><w:t>visible</w:t></w:r></w:p>
+        <w:sectPr/>
+      </w:body>"#,
+      &styles,
+    );
+
+    let [Block::Paragraph(section_carrier)] = sections[0].blocks.as_slice() else {
+      panic!("the styled section carrier must retain its empty paragraph mark");
+    };
+    assert!(section_carrier.inlines.is_empty());
+    assert_eq!(section_carrier.base_style.font_size_pt, 48.0);
+  }
+
+  #[test]
+  fn styled_empty_continuous_section_carrier_after_content_is_metadata_only() {
+    let styles = large_normal_styles_catalog();
+    let sections = imported_body_sections_with_styles(
+      br#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:r><w:t>section content</w:t></w:r></w:p>
+        <w:p><w:pPr><w:sectPr><w:type w:val="continuous"/></w:sectPr></w:pPr></w:p>
+        <w:p><w:r><w:t>next section</w:t></w:r></w:p>
+        <w:sectPr/>
+      </w:body>"#,
+      &styles,
+    );
+
+    let [Block::Paragraph(content)] = sections[0].blocks.as_slice() else {
+      panic!("a section with content must keep its trailing carrier as metadata");
+    };
+    assert_eq!(inline_text(&content.inlines), "section content");
+  }
+
+  #[test]
+  fn directly_sized_multicolumn_section_carrier_keeps_its_flow_line() {
+    let sections = imported_body_sections(
+      br#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:r><w:t>section content</w:t></w:r></w:p>
+        <w:p><w:pPr><w:rPr><w:sz w:val="16"/></w:rPr><w:sectPr><w:type w:val="continuous"/><w:cols w:num="2"/></w:sectPr></w:pPr></w:p>
+        <w:p><w:r><w:t>next section</w:t></w:r></w:p>
+        <w:sectPr/>
+      </w:body>"#,
+    );
+
+    let [Block::Paragraph(content), Block::Paragraph(section_carrier)] =
+      sections[0].blocks.as_slice()
+    else {
+      panic!("the directly sized multi-column carrier must retain a flow line");
+    };
+    assert_eq!(inline_text(&content.inlines), "section content");
+    assert!(section_carrier.inlines.is_empty());
+    assert_eq!(section_carrier.base_style.font_size_pt, 8.0);
+  }
+
+  #[test]
+  fn directly_sized_single_column_section_carrier_after_content_is_metadata_only() {
+    let sections = imported_body_sections(
+      br#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:r><w:t>section content</w:t></w:r></w:p>
+        <w:p><w:pPr><w:rPr><w:sz w:val="56"/></w:rPr><w:sectPr><w:type w:val="continuous"/></w:sectPr></w:pPr></w:p>
+        <w:p><w:r><w:t>next section</w:t></w:r></w:p>
+        <w:sectPr/>
+      </w:body>"#,
+    );
+
+    let [Block::Paragraph(content)] = sections[0].blocks.as_slice() else {
+      panic!("the directly sized single-column carrier must remain metadata");
+    };
+    assert_eq!(inline_text(&content.inlines), "section content");
   }
 
   #[test]
@@ -41236,11 +41738,11 @@ mod tests {
   }
 
   #[test]
-  fn recovered_document_grid_accepts_table_story_text_but_not_an_empty_story() {
+  fn recovered_document_grid_uses_repaired_defaults_not_the_sectpr_wrapper() {
     let document = w::Document::from_bytes(
-      br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/></w:body></w:document>"#,
+      br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr/></w:body></w:document>"#,
     )
-    .expect("styleless document with table text");
+    .expect("styleless document with table text and an empty sectPr");
     let styles = StylesCatalog::default();
     let mut numbering = NumberingCatalog::default();
     let images = ImageCatalog::default();
@@ -41266,6 +41768,7 @@ mod tests {
     assert!(blocks_have_recoverable_document_grid_content(
       &sections[0].blocks
     ));
+    assert!(sections[0].section_properties.is_some());
     let Block::Table(table) = &sections[0].blocks[0] else {
       panic!("first body block should be the table");
     };
@@ -41295,6 +41798,83 @@ mod tests {
         list_label_tab_stop_pt: None,
       }))
     ]));
+
+    let recovered_zh_cn_styles = StylesCatalog {
+      locales: OfficeLocaleContext::new(None, None, Some("zh-CN")),
+      ..Default::default()
+    };
+    assert!(should_recover_office_document_grid(
+      sections[0].page,
+      false,
+      false,
+      &recovered_zh_cn_styles,
+      &sections[0].blocks,
+    ));
+
+    // A package with neither Styles nor Settings is repaired wholly from the
+    // application template. Office's immutable tdf147724.docx output keeps
+    // the recovered 312-twip cadence even though its bare sectPr preserves a
+    // disabled docGrid wrapper for a 360-twip pitch.
+    assert!(should_recover_office_document_grid(
+      sections[0].page,
+      false,
+      true,
+      &recovered_zh_cn_styles,
+      &sections[0].blocks,
+    ));
+
+    // ECMA-376 Part 1 §17.6.5: an omitted docGrid@type means `default`,
+    // which deliberately disables the grid while retaining its pitch. Once a
+    // real Styles or Settings part establishes package-level application
+    // state, Word honors that authored disabled grid. The n766487.docx and
+    // tdf108496.docx Office goldens are independent controls.
+    let settings_backed_zh_cn_styles = StylesCatalog {
+      import_settings: ImportSettings {
+        has_settings_part: true,
+        ..ImportSettings::default()
+      },
+      ..recovered_zh_cn_styles.clone()
+    };
+    assert!(!should_recover_office_document_grid(
+      sections[0].page,
+      false,
+      true,
+      &settings_backed_zh_cn_styles,
+      &sections[0].blocks,
+    ));
+
+    let explicit_grid = PageSetup {
+      doc_grid_line_pitch_pt: Some(18.0),
+      ..sections[0].page
+    };
+    assert!(!should_recover_office_document_grid(
+      explicit_grid,
+      false,
+      false,
+      &recovered_zh_cn_styles,
+      &sections[0].blocks,
+    ));
+
+    let complete_paragraph_defaults = StylesCatalog {
+      locales: OfficeLocaleContext::new(None, None, Some("zh-CN")),
+      has_styles_part: true,
+      has_default_paragraph_properties: true,
+      ..Default::default()
+    };
+    assert!(should_recover_office_document_grid(
+      sections[0].page,
+      true,
+      false,
+      &complete_paragraph_defaults,
+      &sections[0].blocks,
+    ));
+    assert!(!should_recover_office_document_grid(
+      sections[0].page,
+      false,
+      false,
+      &complete_paragraph_defaults,
+      &sections[0].blocks,
+    ));
   }
 
   #[test]

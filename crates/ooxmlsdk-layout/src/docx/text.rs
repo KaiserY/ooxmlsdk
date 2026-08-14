@@ -240,6 +240,10 @@ fn paragraph_model_with_base_impl<'a>(
     .paragraph_properties
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref());
+  format.paragraph_mark_font_size_set = paragraph_mark_run_properties.is_some_and(|properties| {
+    super::paragraph_mark_run_properties_font_size(properties).is_some()
+      || super::paragraph_mark_run_properties_complex_script_font_size(properties).is_some()
+  });
   format.numbered_paragraph_mark_background = format.numbering_id.is_some()
     && paragraph_mark_run_properties.is_some_and(|properties| {
       properties

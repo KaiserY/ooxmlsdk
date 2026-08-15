@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
+use bytes::Bytes;
 use tiny_skia::{FillRule, LineCap, LineJoin, Paint, Path, PathBuilder, Pixmap, Stroke, Transform};
 
 use super::sheet_conditions::IconSetType;
@@ -21,9 +22,9 @@ const GRAY: [u8; 4] = [132, 132, 132, 255];
 const DARK: [u8; 4] = [55, 55, 55, 255];
 const LIGHT: [u8; 4] = [225, 225, 225, 255];
 
-type IconPngCache = HashMap<(IconSetType, usize), Arc<[u8]>>;
+type IconPngCache = HashMap<(IconSetType, usize), Bytes>;
 
-pub(super) fn icon_png(icon_set: IconSetType, icon_index: usize) -> Option<Arc<[u8]>> {
+pub(super) fn icon_png(icon_set: IconSetType, icon_index: usize) -> Option<Bytes> {
   static ICONS: OnceLock<IconPngCache> = OnceLock::new();
   ICONS
     .get_or_init(|| {
@@ -52,7 +53,7 @@ pub(super) fn icon_png(icon_set: IconSetType, icon_index: usize) -> Option<Arc<[
       ] {
         for icon_index in 0..icon_set.icon_count() {
           if let Some(bytes) = render_icon(icon_set, icon_index) {
-            icons.insert((icon_set, icon_index), Arc::from(bytes));
+            icons.insert((icon_set, icon_index), Bytes::from(bytes));
           }
         }
       }

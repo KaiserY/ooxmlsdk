@@ -1,6 +1,6 @@
 use std::io::Cursor;
-use std::sync::Arc;
 
+use bytes::Bytes;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
 use kurbo::{
@@ -251,7 +251,7 @@ pub(crate) fn outer_shadow_image_item(
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
@@ -384,7 +384,7 @@ pub(crate) fn inner_shadow_image_item(
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
@@ -503,7 +503,7 @@ pub(crate) fn soft_edge_mask_image_item(
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
@@ -606,7 +606,7 @@ pub(crate) fn reflection_mask_image_item(
     rotation_deg,
     flip_horizontal,
     flip_vertical,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
@@ -868,7 +868,7 @@ pub(crate) fn glow_image_item(
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,

@@ -266,7 +266,7 @@ pub(crate) struct BinaryResourceCatalog;
 
 impl WorksheetObjectResourceCatalog {
   pub(crate) fn from_worksheet_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &WorksheetPart,
   ) -> Result<Self> {
     let vml_drawing_parts = part.vml_drawing_parts(package).collect::<Vec<_>>();
@@ -301,7 +301,7 @@ impl WorksheetObjectResourceCatalog {
   }
 
   pub(crate) fn from_chartsheet_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &ooxmlsdk::parts::chartsheet_part::ChartsheetPart,
   ) -> Self {
     let vml_drawing_parts = part.vml_drawing_parts(package).collect::<Vec<_>>();
@@ -317,9 +317,10 @@ impl WorksheetObjectResourceCatalog {
 }
 
 impl VmlDrawingResourceCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &VmlDrawingPart) -> Self {
+  fn from_part(package: &SpreadsheetDocument, part: &VmlDrawingPart) -> Self {
     let shapes = part
-      .data_to_vec(package)
+      .try_data_bytes(package)
+      .ok()
       .map(|data| vml_shapes(&data))
       .unwrap_or_default();
     Self {
@@ -1462,7 +1463,7 @@ fn collect_vml_image_resources(
       Some((
         related_part.relationship_id().to_string(),
         ImageResource {
-          data: related_part.part().data_to_vec(package)?.into(),
+          data: related_part.part().try_data_bytes(package).ok()?,
           content_type: related_part
             .part()
             .content_type(package)
@@ -1577,7 +1578,7 @@ fn vml_object_type_name(value: xvml::ObjectValues) -> &'static str {
 }
 
 impl ControlPersistenceResourceCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &EmbeddedControlPersistencePart) -> Self {
+  fn from_part(package: &SpreadsheetDocument, part: &EmbeddedControlPersistencePart) -> Self {
     Self {
       binary_data_parts: part
         .embedded_control_persistence_binary_data_parts(package)
@@ -1588,7 +1589,7 @@ impl ControlPersistenceResourceCatalog {
 }
 
 impl ControlPropertiesResourceCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &ControlPropertiesPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &ControlPropertiesPart) -> Result<Self> {
     let properties = part.root_element(package)?;
     Ok(Self::from_properties(properties))
   }

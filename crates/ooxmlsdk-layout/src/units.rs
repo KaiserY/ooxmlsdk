@@ -89,7 +89,7 @@ pub fn vml_stroke_weight_to_points(value: &str) -> Option<f32> {
 #[inline]
 pub fn office_vml_stroke_weight_to_points(value: Option<&str>, default: f32) -> f32 {
   match value.and_then(vml_stroke_weight_to_points) {
-    Some(width) if width == 0.0 => OFFICE_VML_HAIRLINE_WIDTH_PT,
+    Some(0.0) => OFFICE_VML_HAIRLINE_WIDTH_PT,
     Some(width) => width,
     None => default,
   }

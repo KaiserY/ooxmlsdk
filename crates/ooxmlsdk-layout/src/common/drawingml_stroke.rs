@@ -98,7 +98,7 @@ fn merge_gradient_fill(target: &mut a::GradientFill, source: &a::GradientFill) {
     target.flip = source.flip;
   }
   if source.rotate_with_shape.is_some() {
-    target.rotate_with_shape = source.rotate_with_shape.clone();
+    target.rotate_with_shape = source.rotate_with_shape;
   }
   if source
     .gradient_stop_list
@@ -117,7 +117,7 @@ fn merge_gradient_fill(target: &mut a::GradientFill, source: &a::GradientFill) {
           target.angle = source.angle;
         }
         if source.scaled.is_some() {
-          target.scaled = source.scaled.clone();
+          target.scaled = source.scaled;
         }
       }
       (

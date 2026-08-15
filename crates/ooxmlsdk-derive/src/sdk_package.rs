@@ -200,7 +200,19 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         part_slot: crate::common::PartSlot,
         root_element: crate::parts::PartRootElement,
       ) -> Option<&crate::parts::PartRootElement> {
-        self.#root_elements_ident.set_once(part_slot, root_element)
+        self.#root_elements_ident.cache_loaded(
+          part_slot,
+          root_element,
+          &self.#open_settings_ident,
+        )
+      }
+
+      #[inline]
+      fn root_element_requires_serialization(
+        &self,
+        part_slot: crate::common::PartSlot,
+      ) -> bool {
+        self.#root_elements_ident.requires_serialization(part_slot)
       }
 
       #[inline]
@@ -1009,6 +1021,7 @@ fn package_relationship_method_tokens(
       crate::sdk::SdkPackage::related_parts_of_type(self)
     }
 
+    /// Returns the first matching relationship ID in package relationship order.
     #[inline]
     pub fn get_id_of_part<T: crate::sdk::SdkPart>(
       &self,

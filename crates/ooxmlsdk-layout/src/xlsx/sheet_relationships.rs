@@ -75,7 +75,7 @@ pub(crate) struct WorksheetSortMapCatalog {
 
 impl SheetRelationshipCatalog {
   pub(crate) fn from_worksheet_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &WorksheetPart,
   ) -> Result<Self> {
     // relationship-scoped worksheet helpers before final sheet/layout
@@ -132,7 +132,7 @@ impl SheetRelationshipCatalog {
 }
 
 impl SingleXmlCellCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &SingleCellTablePart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &SingleCellTablePart) -> Result<Self> {
     let cells = part.root_element(package)?;
     Ok(Self {
       cells: cells.single_xml_cell.len(),
@@ -179,7 +179,7 @@ impl SingleXmlCellCatalog {
 }
 
 impl NamedSheetViewCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &NamedSheetViewsPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &NamedSheetViewsPart) -> Result<Self> {
     let views = part.root_element(package)?;
     Ok(Self {
       views: views.named_sheet_view.len(),
@@ -207,7 +207,7 @@ impl NamedSheetViewCatalog {
 }
 
 impl SlicerCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &SlicersPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &SlicersPart) -> Result<Self> {
     let slicers = part.root_element(package)?;
     Ok(Self {
       slicers: slicers.slicer.len(),
@@ -223,7 +223,7 @@ impl SlicerCatalog {
 }
 
 impl TimelineCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &TimeLinePart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &TimeLinePart) -> Result<Self> {
     let timelines = part.root_element(package)?;
     Ok(Self {
       timelines: timelines.timeline.len(),
@@ -239,7 +239,7 @@ impl TimelineCatalog {
 }
 
 impl WorksheetSortMapCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &WorksheetSortMapPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &WorksheetSortMapPart) -> Result<Self> {
     let sort_map = part.root_element(package)?;
     Ok(Self {
       row_items: sort_map

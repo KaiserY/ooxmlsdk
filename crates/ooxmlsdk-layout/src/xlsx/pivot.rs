@@ -1625,7 +1625,7 @@ pub(crate) struct PivotTableImportContext<'a> {
 
 impl PivotTableCatalog {
   pub(crate) fn from_parts(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     parts: &[PivotTablePart],
     context: PivotTableImportContext<'_>,
   ) -> Result<Self> {
@@ -1640,7 +1640,7 @@ impl PivotTableCatalog {
 
 impl PivotTableModel {
   fn from_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &PivotTablePart,
     context: PivotTableImportContext<'_>,
   ) -> Result<Self> {
@@ -2010,7 +2010,7 @@ fn pivot_cache_field_grouped(cache: &x::PivotCacheDefinition) -> Vec<bool> {
 }
 
 fn pivot_cache_source_number_format_ids(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   cache: &x::PivotCacheDefinition,
 ) -> Result<Vec<Option<u32>>> {
   let Some(x::CacheSourceChoice::WorksheetSource(source)) =
@@ -2059,7 +2059,7 @@ fn pivot_cache_source_number_format_ids(
 }
 
 fn pivot_cache_source_field_names(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   cache: &x::PivotCacheDefinition,
   shared_strings: &[SharedStringModel],
 ) -> Result<Vec<String>> {
@@ -2161,7 +2161,7 @@ fn pivot_source_field_names_from_worksheet(
 }
 
 fn pivot_source_cache_table(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   cache: &x::PivotCacheDefinition,
   shared_strings: &[SharedStringModel],
 ) -> Result<Option<PivotSourceCacheTable>> {

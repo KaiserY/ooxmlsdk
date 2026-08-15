@@ -20,6 +20,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::common::{self, color_math};
+use bytes::Bytes;
 use image::{ImageEncoder, codecs::png::PngEncoder};
 use kurbo::Affine;
 use ooxmlsdk::parts::{
@@ -220,7 +221,7 @@ struct ImportSettings {
 }
 
 fn document_created_datetime(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   options: &LayoutOptions,
 ) -> Option<FieldUpdateDateTime> {
   // A field update is explicit. Merely opening a package must not replace an
@@ -255,7 +256,7 @@ fn field_update_datetime_in_time_zone(
 }
 
 pub(crate) fn extract(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   options: &LayoutOptions,
 ) -> Result<DocxDocument> {
   let main = package.main_document_part()?;
@@ -565,14 +566,14 @@ pub(crate) fn quantize_word_fixed_output_text_style(style: &mut TextStyle) {
 }
 
 pub fn layout(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   layout_document(package, options)
 }
 
 pub fn layout_document(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   let document = extract(package, options)?;
@@ -580,7 +581,7 @@ pub fn layout_document(
 }
 
 pub fn layout_anchor_pages(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   options: &LayoutOptions,
 ) -> Result<Vec<crate::common::AnchorPage<'static>>> {
   let document = extract(package, options)?;
@@ -615,7 +616,7 @@ pub fn layout_anchor_pages(
 }
 
 pub fn inspect_layout(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   options: &LayoutOptions,
 ) -> Result<DocxLayoutSummary> {
   let document = extract(package, options)?;
@@ -773,7 +774,7 @@ fn drawingml_crgb_component_to_rgb(value: i32) -> u8 {
   color_math::drawingml_scrgb_to_srgb8(value)
 }
 
-fn even_and_odd_headers(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
+fn even_and_odd_headers(package: &WordprocessingDocument, main: &MainDocumentPart) -> bool {
   main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
@@ -786,7 +787,7 @@ fn even_and_odd_headers(package: &mut WordprocessingDocument, main: &MainDocumen
     .unwrap_or(false)
 }
 
-fn mirror_margins(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
+fn mirror_margins(package: &WordprocessingDocument, main: &MainDocumentPart) -> bool {
   main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
@@ -799,7 +800,7 @@ fn mirror_margins(package: &mut WordprocessingDocument, main: &MainDocumentPart)
     .unwrap_or(false)
 }
 
-fn gutter_at_top(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
+fn gutter_at_top(package: &WordprocessingDocument, main: &MainDocumentPart) -> bool {
   main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
@@ -844,7 +845,7 @@ fn math_boolean_on(value: Option<ooxmlsdk::schemas::m::BooleanValues>) -> bool {
 }
 
 fn document_math_settings(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> DocumentMathSettings {
   let math_properties = main
@@ -965,7 +966,7 @@ fn document_math_settings(
 }
 
 fn resolve_section_repeating_blocks(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
   custom_xml_bindings: &CustomXmlBindings,
@@ -3002,7 +3003,7 @@ fn should_recover_office_document_grid(
 }
 
 fn header_blocks(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   section: &w::SectionProperties,
   styles: &StylesCatalog,
@@ -3114,7 +3115,7 @@ fn header_blocks(
 }
 
 fn referenced_header_blocks(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   section: &w::SectionProperties,
   styles: &StylesCatalog,
@@ -3134,7 +3135,7 @@ fn referenced_header_blocks(
 }
 
 fn footer_blocks(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   section: &w::SectionProperties,
   styles: &StylesCatalog,
@@ -3245,7 +3246,7 @@ fn footer_blocks(
 }
 
 fn referenced_footer_blocks(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   section: &w::SectionProperties,
   styles: &StylesCatalog,
@@ -3300,7 +3301,7 @@ type NoteReferenceLabels = (
 );
 
 fn note_reference_labels(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   sections: &[ImportedSection],
   language: Option<&str>,
@@ -3345,7 +3346,7 @@ fn note_reference_labels(
 }
 
 fn footnote_positions(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   sections: &[ImportedSection],
 ) -> Vec<w::FootnotePositionValues> {
@@ -3372,7 +3373,7 @@ fn footnote_positions(
 }
 
 fn endnote_position(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> w::EndnotePositionValues {
   main
@@ -3394,7 +3395,7 @@ fn endnote_position(
 }
 
 fn note_special_reference_ids(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> (HashSet<i64>, HashSet<i64>) {
   let settings = main
@@ -3648,7 +3649,7 @@ fn apply_note_reference_labels_to_blocks(
 }
 
 fn footnotes(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
   custom_xml_bindings: &CustomXmlBindings,
@@ -3729,7 +3730,7 @@ fn footnote_block_choices(footnote: &w::Footnote) -> impl Iterator<Item = NoteBl
 }
 
 fn endnotes(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
   custom_xml_bindings: &CustomXmlBindings,
@@ -17265,7 +17266,7 @@ fn resolved_docx_drawing_color(color: Color, theme_colors: &ThemeColors) -> Opti
 }
 
 struct ImportedImageData {
-  data: Arc<[u8]>,
+  data: Bytes,
   content_type: Option<String>,
 }
 
@@ -17278,7 +17279,7 @@ fn drawing_image_data(
     return Some(image_data_with_effects(resource, properties));
   }
   properties.external_link.then(|| ImportedImageData {
-    data: Arc::from([]),
+    data: Bytes::new(),
     content_type: None,
   })
 }
@@ -19367,7 +19368,7 @@ fn vml_fill_image(
   let recolored_pattern =
     crate::xlsx::recolor_typed_vml_pattern_image(fill, resource.data.as_ref());
   let data = recolored_pattern
-    .map(Arc::from)
+    .map(Bytes::from)
     .unwrap_or_else(|| resource.data.clone());
   let content_type = if data.as_ref() == resource.data.as_ref() {
     resource.content_type.clone()
@@ -23258,7 +23259,7 @@ impl StylesCatalog {
   }
 
   fn load(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     main: &MainDocumentPart,
     import_settings: ImportSettings,
     locales: &OfficeLocaleContext,
@@ -23988,7 +23989,7 @@ fn normalized_style_ref_lookup_key(name: &str) -> String {
 }
 
 fn load_font_substitutions(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> HashMap<String, FontSubstitution> {
   let Some(font_table_part) = main.font_table_part(package) else {
@@ -24259,7 +24260,7 @@ impl<'a> Iterator for StyleChainIter<'a> {
 
 impl ThemeData {
   fn load(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     main: &MainDocumentPart,
     default_document_resource_locale: OfficeResourceLocale,
   ) -> Self {
@@ -26503,7 +26504,7 @@ impl NumberingCatalog {
   }
 
   fn load(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     main: &MainDocumentPart,
     import_settings: ImportSettings,
     styles: &StylesCatalog,
@@ -30856,7 +30857,7 @@ mod tests {
   fn office_vml_pattern_images() -> ImageCatalog {
     // Office's historical 8x8 GIF: no global table, a local white/black table,
     // and white foreground bits at (0,0) and (4,4).
-    let data: Arc<[u8]> = vec![
+    let data: Bytes = vec![
       0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x08, 0x00, 0x08, 0x00, 0x77, 0x01, 0x00, 0x2c, 0x00,
       0x00, 0x00, 0x00, 0x08, 0x00, 0x08, 0x00, 0x80, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x02,
       0x08, 0x44, 0x8e, 0xa9, 0xcb, 0x6c, 0x0d, 0x61, 0x01, 0x00, 0x3b,
@@ -34743,11 +34744,13 @@ mod tests {
       br#"<a:fontRef xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" idx="minor"><a:schemeClr val="lt1"/></a:fontRef>"#,
     )
     .expect("font reference");
-    let mut shape = dsp::Shape::default();
-    shape.shape_style = Some(Box::new(dsp::ShapeStyle {
-      font_reference: Box::new(font_reference),
+    let shape = dsp::Shape {
+      shape_style: Some(Box::new(dsp::ShapeStyle {
+        font_reference: Box::new(font_reference),
+        ..Default::default()
+      })),
       ..Default::default()
-    }));
+    };
     let white = RgbColor {
       r: 255,
       g: 255,

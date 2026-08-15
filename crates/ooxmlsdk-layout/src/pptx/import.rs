@@ -51,7 +51,7 @@ pub(crate) struct ThemeFragmentRecord {
 }
 
 impl PowerPointImport {
-  pub(crate) fn import_document(package: &mut PresentationDocument) -> Result<Self> {
+  pub(crate) fn import_document(package: &PresentationDocument) -> Result<Self> {
     // PowerPointImport::importDocument resolves the officeDocument part,
     // imports the presentation fragment, then imports presProps when present.
     let presentation_part = package.presentation_part()?;
@@ -327,7 +327,7 @@ impl PowerPointImport {
 
   fn load_table_style_list(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     presentation_part: &PresentationPart,
   ) -> Result<()> {
     // tableStyles relationship from the office document. The Rust importer

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
 use crate::common;
@@ -529,7 +530,7 @@ pub(crate) struct ImageItem {
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
-  pub data: Arc<[u8]>,
+  pub data: Bytes,
   pub content_type: Option<String>,
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   pub metafile_background_color: Option<[u8; 3]>,

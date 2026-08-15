@@ -485,12 +485,14 @@ impl MeasureStyleKey {
   }
 }
 
+type GdiHintedExtentCache = HashMap<u32, HashMap<Arc<str>, Option<f32>>>;
+
 #[derive(Debug, Default)]
 pub struct TextMetrics {
   fonts: FontResolver,
   measure_styles: Vec<MeasureStyleKey>,
   measure_widths: Vec<HashMap<Arc<str>, f32>>,
-  gdi_hinted_extents: Vec<HashMap<u32, HashMap<Arc<str>, Option<f32>>>>,
+  gdi_hinted_extents: Vec<GdiHintedExtentCache>,
   gdi_hinting_instances: GdiHintingInstanceCache,
   last_measure_style: Option<usize>,
 }

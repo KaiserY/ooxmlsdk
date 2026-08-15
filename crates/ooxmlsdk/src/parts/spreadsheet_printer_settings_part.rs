@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct SpreadsheetPrinterSettingsPart {
   pub(crate) key: crate::common::PartKey,
 }

@@ -282,7 +282,7 @@ pub(crate) struct VolatileDependenciesResource {
 
 impl WorkbookCatalog {
   pub(crate) fn from_workbook_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     workbook_part: &WorkbookPart,
   ) -> Result<Self> {
     // finalizeImport imports persons, connections, custom XML, xmlMaps,
@@ -382,7 +382,7 @@ fn ordered_external_workbook_parts(
 }
 
 fn external_cached_cells_from_part(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   part: &ExternalWorkbookPart,
   link_index: usize,
 ) -> Result<Vec<ExternalCachedCell>> {
@@ -431,7 +431,7 @@ fn external_cached_cells_from_part(
 }
 
 fn external_defined_names_from_part(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   part: &ExternalWorkbookPart,
   link_index: usize,
 ) -> Result<Vec<ExternalDefinedName>> {
@@ -488,7 +488,7 @@ fn normalize_external_defined_name_formula(link_index: usize, formula: &str) -> 
 }
 
 impl ExternalLinkModel {
-  fn from_part(package: &mut SpreadsheetDocument, part: &ExternalWorkbookPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &ExternalWorkbookPart) -> Result<Self> {
     let link = part.root_element(package)?;
     let mut model = Self {
       kind: ExternalLinkKind::Unknown,
@@ -545,7 +545,7 @@ impl ExternalLinkModel {
 
 impl XmlMapsModel {
   fn from_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &ooxmlsdk::parts::custom_xml_mappings_part::CustomXmlMappingsPart,
   ) -> Result<Self> {
     let maps = part.root_element(package)?;
@@ -573,7 +573,7 @@ impl XmlMapsModel {
 }
 
 impl PersonModel {
-  fn from_part(package: &mut SpreadsheetDocument, part: &WorkbookPersonPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &WorkbookPersonPart) -> Result<Self> {
     let persons = part.root_element(package)?;
     Ok(Self {
       persons: persons.person.len(),
@@ -593,7 +593,7 @@ fn person_text_len(person: &tc::Person) -> usize {
 
 impl RevisionHeadersModel {
   fn from_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &ooxmlsdk::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart,
   ) -> Result<Self> {
     let revision_logs = part.workbook_revision_log_parts(package).count();
@@ -635,7 +635,7 @@ impl RevisionHeadersModel {
 
 impl WorkbookRelationshipResources {
   fn from_workbook_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     workbook_part: &WorkbookPart,
   ) -> Result<Self> {
     let custom_xml_parts = workbook_part.custom_xml_parts(package).collect::<Vec<_>>();
@@ -749,7 +749,7 @@ impl WorkbookRelationshipResources {
 }
 
 impl CustomXmlResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &CustomXmlPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &CustomXmlPart) -> Result<Self> {
     let properties = part.custom_xml_properties_part(package);
     let (schema_refs, text_len) = properties
       .as_ref()
@@ -781,7 +781,7 @@ impl CustomXmlResource {
 }
 
 impl CustomDataResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &CustomDataPropertiesPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &CustomDataPropertiesPart) -> Result<Self> {
     let has_custom_data = part.custom_data_part(package).is_some();
     let item = part.root_element(package)?;
     Ok(Self {
@@ -793,7 +793,7 @@ impl CustomDataResource {
 }
 
 impl SlicerCacheResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &SlicerCachePart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &SlicerCachePart) -> Result<Self> {
     let cache = part.root_element(package)?;
     Ok(Self {
       name_len: cache.name.len(),
@@ -812,7 +812,7 @@ impl SlicerCacheResource {
 }
 
 impl TimelineCacheResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &TimeLineCachePart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &TimeLineCachePart) -> Result<Self> {
     let cache = part.root_element(package)?;
     let state = &cache.timeline_state;
     Ok(Self {
@@ -846,7 +846,7 @@ impl TimelineCacheResource {
 }
 
 impl RichValueResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &RdRichValuePart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &RdRichValuePart) -> Result<Self> {
     let data = part.root_element(package)?;
     Ok(Self {
       declared_count: data.count,
@@ -876,7 +876,7 @@ impl RichValueResource {
 }
 
 impl RichValueStructureResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &RdRichValueStructurePart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &RdRichValueStructurePart) -> Result<Self> {
     let structures = part.root_element(package)?;
     Ok(Self {
       declared_count: structures.count,
@@ -899,7 +899,7 @@ impl RichValueStructureResource {
 }
 
 impl ArrayDataResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &RdArrayPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &RdArrayPart) -> Result<Self> {
     let arrays = part.root_element(package)?;
     Ok(Self {
       declared_count: arrays.count,
@@ -929,7 +929,7 @@ impl ArrayDataResource {
 }
 
 impl RichStylesResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &RichStylesPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &RichStylesPart) -> Result<Self> {
     let stylesheet = part.root_element(package)?;
     Ok(Self {
       has_dxfs: stylesheet.dxfs.is_some(),
@@ -951,10 +951,7 @@ impl RichStylesResource {
 }
 
 impl SupportingPropertyBagResource {
-  fn from_part(
-    package: &mut SpreadsheetDocument,
-    part: &RdSupportingPropertyBagPart,
-  ) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &RdSupportingPropertyBagPart) -> Result<Self> {
     let bags = part.root_element(package)?;
     let arrays = bags
       .supporting_property_bag_array_data
@@ -994,7 +991,7 @@ impl SupportingPropertyBagResource {
 
 impl SupportingPropertyBagStructureResource {
   fn from_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &RdSupportingPropertyBagStructurePart,
   ) -> Result<Self> {
     let structures = part.root_element(package)?;
@@ -1018,7 +1015,7 @@ impl SupportingPropertyBagStructureResource {
 }
 
 impl RichValueTypesResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &RdRichValueTypesPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &RdRichValueTypesPart) -> Result<Self> {
     let info = part.root_element(package)?;
     let type_records = info
       .rich_value_types
@@ -1082,7 +1079,7 @@ impl RichValueTypesResource {
 }
 
 impl RichValueWebImageResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &RdRichValueWebImagePart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &RdRichValueWebImagePart) -> Result<Self> {
     let images = part.root_element(package)?;
     Ok(Self {
       images: images.web_image_supporting_rich_data.len(),
@@ -1111,7 +1108,7 @@ impl RichValueWebImageResource {
 }
 
 impl FeaturePropertyBagsResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &FeaturePropertyBagsPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &FeaturePropertyBagsPart) -> Result<Self> {
     let bags = part.root_element(package)?;
     Ok(Self {
       declared_count: bags.count.unwrap_or_default(),
@@ -1138,7 +1135,7 @@ impl FeaturePropertyBagsResource {
 }
 
 impl WorkbookUserDataResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &WorkbookUserDataPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &WorkbookUserDataPart) -> Result<Self> {
     let users = part.root_element(package)?;
     Ok(Self {
       declared_count: users.count.unwrap_or_default(),
@@ -1158,7 +1155,7 @@ impl WorkbookUserDataResource {
 }
 
 impl CalculationChainResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &CalculationChainPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &CalculationChainPart) -> Result<Self> {
     let chain = part.root_element(package)?;
     Ok(Self {
       cells: chain.calculation_cell.len(),
@@ -1185,7 +1182,7 @@ impl CalculationChainResource {
 }
 
 impl CellMetadataResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &CellMetadataPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &CellMetadataPart) -> Result<Self> {
     let metadata = part.root_element(package)?;
     let cell_blocks = metadata
       .cell_metadata
@@ -1254,7 +1251,7 @@ impl CellMetadataResource {
 }
 
 impl VolatileDependenciesResource {
-  fn from_part(package: &mut SpreadsheetDocument, part: &VolatileDependenciesPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &VolatileDependenciesPart) -> Result<Self> {
     let dependencies = part.root_element(package)?;
     Ok(Self {
       types: dependencies.volatile_type.len(),

@@ -7252,7 +7252,7 @@ impl OfficeMathSvgFonts {
         .iter()
         .map(|variation| (krilla::text::Tag::new(&variation.tag), variation.value))
         .collect::<SmallVec<[_; 2]>>();
-      Font::new_variable(font_data.into(), index, &coordinates)
+      Font::new_variable(font_data, index, &coordinates)
     });
     self.fonts.insert(key, font.clone());
     font

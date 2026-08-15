@@ -1,6 +1,7 @@
 use std::fmt::Write as _;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use ooxmlsdk::schemas::{m, schemas_openxmlformats_org_wordprocessingml_2006_main as w};
 use ooxmlsdk_fonts::FeatureValue;
 use skrifa::{
@@ -446,7 +447,7 @@ fn inline_image_from_math_box(math_box: MathBox, semantic_text: String) -> Inlin
   let svg = math_box.to_svg();
   let padding = MIN_RULE_WIDTH_PT;
   InlineImage {
-    data: Arc::<[u8]>::from(svg.into_bytes()),
+    data: Bytes::from(svg.into_bytes()),
     content_type: Some(OFFICE_MATH_SVG_CONTENT_TYPE.to_string()),
     picture_frame: None,
     picture_frame_clips_image: false,
@@ -2336,6 +2337,13 @@ struct AccentLayout {
   accent_baseline_y_pt: f32,
 }
 
+#[derive(Clone, Copy)]
+struct AccentLayoutOptions {
+  bottom: bool,
+  exact_frame_width: bool,
+  replace_variant_semantics: bool,
+}
+
 #[derive(Clone, Debug)]
 struct MathSemanticTextPlacement {
   style: TextStyle,
@@ -3186,9 +3194,11 @@ fn layout_node(node: &MathNode, context: MathLayoutContext, metrics: &mut TextMe
       layout_accent(
         base,
         character,
-        false,
-        false,
-        true,
+        AccentLayoutOptions {
+          bottom: false,
+          exact_frame_width: false,
+          replace_variant_semantics: true,
+        },
         control_style.as_ref(),
         context,
         metrics,
@@ -3210,9 +3220,11 @@ fn layout_node(node: &MathNode, context: MathLayoutContext, metrics: &mut TextMe
       let group = layout_accent(
         base,
         character,
-        *bottom,
-        true,
-        false,
+        AccentLayoutOptions {
+          bottom: *bottom,
+          exact_frame_width: true,
+          replace_variant_semantics: false,
+        },
         control_style.as_ref(),
         context,
         metrics,
@@ -6340,9 +6352,7 @@ fn layout_radical(
 fn layout_accent(
   base: &MathNode,
   character: &str,
-  bottom: bool,
-  exact_frame_width: bool,
-  replace_variant_semantics: bool,
+  options: AccentLayoutOptions,
   control_style: Option<&TextStyle>,
   context: MathLayoutContext,
   metrics: &mut TextMetrics,
@@ -6362,8 +6372,8 @@ fn layout_accent(
   let script_base_descent = base_box.script_base_descent_pt();
   let base_italics_correction = base_box.italics_correction_pt;
   let base_italics_correction_in_advance = base_box.italics_correction_in_advance;
-  let base_text_like = !exact_frame_width && base_box.text_like;
-  let base_attachment = if bottom {
+  let base_text_like = !options.exact_frame_width && base_box.text_like;
+  let base_attachment = if options.bottom {
     base_box.bottom_accent_attachment_pt()
   } else {
     base_box.top_accent_attachment_pt()
@@ -6377,7 +6387,7 @@ fn layout_accent(
       value: u32::from(script_level),
     });
   }
-  let flatten = !bottom && base_ascent > math.flattened_accent_base_height_pt;
+  let flatten = !options.bottom && base_ascent > math.flattened_accent_base_height_pt;
   let mut accent_features = fallback_features.clone();
   if flatten {
     accent_features.push(FeatureValue {
@@ -6423,7 +6433,7 @@ fn layout_accent(
   apply_control_background(&mut accent, &accent_style);
   let accent_width = accent.width_pt;
   let accent_attachment = accent.top_accent_attachment_pt();
-  let (width, base_x, accent_x) = if exact_frame_width {
+  let (width, base_x, accent_x) = if options.exact_frame_width {
     let pre_width = accent_attachment - base_attachment;
     let post_width = (accent_width - accent_attachment) - (base_width - base_attachment);
     let width = pre_width.max(0.0) + base_width + post_width.max(0.0);
@@ -6435,7 +6445,9 @@ fn layout_accent(
   } else {
     (base_width, 0.0, base_attachment - accent_attachment)
   };
-  if replace_variant_semantics && let Some(placement) = normal_semantic_placement {
+  if options.replace_variant_semantics
+    && let Some(placement) = normal_semantic_placement
+  {
     let logical_semantic_x = base_x + base_attachment - normal_accent_attachment + placement.x_pt;
     accent.replace_variant_semantics_with_combining_accent(
       character,
@@ -6447,7 +6459,7 @@ fn layout_accent(
   // AccentBaseHeight raises a top accent only by the excess height of a tall
   // base; bottom accents start on the base's descent. Overbar/underbar gaps
   // belong to rule objects and must not be reused here.
-  let accent_y = if bottom {
+  let accent_y = if options.bottom {
     base_descent
   } else {
     base_ascent.min(math.accent_base_height_pt) - base_ascent

@@ -1,8 +1,5 @@
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use base64::Engine;
+use bytes::Bytes;
 use olecfsdk::{
   cfb::CompoundFile,
   forms::{CommandButtonControl, LabelControl, MorphDataControl, TextProps},
@@ -30,6 +27,8 @@ use ooxmlsdk::schemas::{
 };
 use ooxmlsdk::sdk::{RelatedPart, SdkPart, SdkType};
 use quick_xml::events::{BytesStart, Event};
+use std::borrow::Cow;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {
@@ -77,7 +76,7 @@ pub(super) struct AltChunkCatalog {
 
 #[derive(Clone, Debug)]
 pub(super) struct AltChunkResource {
-  pub(super) data: Arc<[u8]>,
+  pub(super) data: Bytes,
   pub(super) content_type: Option<String>,
 }
 
@@ -88,11 +87,11 @@ impl AltChunkCatalog {
       .filter_map(|related| {
         let relationship_id = related.relationship_id().to_string();
         let part = related.part();
-        let data = part.data_to_vec(package)?;
+        let data = part.try_data_bytes(package).ok()?;
         Some((
           relationship_id,
           AltChunkResource {
-            data: data.into(),
+            data,
             content_type: part.content_type(package).map(str::to_string),
           },
         ))
@@ -130,7 +129,7 @@ impl HyperlinkCatalog {
 
 #[derive(Clone, Debug)]
 pub(super) struct ImageResource {
-  pub(super) data: Arc<[u8]>,
+  pub(super) data: Bytes,
   pub(super) content_type: Option<String>,
 }
 
@@ -413,46 +412,40 @@ fn is_text_box_class(class_id: &str) -> bool {
 }
 
 impl ImageCatalog {
-  pub(super) fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
+  pub(super) fn load(package: &WordprocessingDocument, main: &MainDocumentPart) -> Self {
     Self::load_from_part(package, main)
   }
 
-  pub(super) fn load_from_header(
-    package: &mut WordprocessingDocument,
-    header: &HeaderPart,
-  ) -> Self {
+  pub(super) fn load_from_header(package: &WordprocessingDocument, header: &HeaderPart) -> Self {
     Self::load_from_part(package, header)
   }
 
-  pub(super) fn load_from_footer(
-    package: &mut WordprocessingDocument,
-    footer: &FooterPart,
-  ) -> Self {
+  pub(super) fn load_from_footer(package: &WordprocessingDocument, footer: &FooterPart) -> Self {
     Self::load_from_part(package, footer)
   }
 
   pub(super) fn load_from_footnotes(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     footnotes: &FootnotesPart,
   ) -> Self {
     Self::load_from_part(package, footnotes)
   }
 
   pub(super) fn load_from_endnotes(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     endnotes: &EndnotesPart,
   ) -> Self {
     Self::load_from_part(package, endnotes)
   }
 
   pub(super) fn load_from_numbering(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     numbering: &NumberingDefinitionsPart,
   ) -> Self {
     Self::load_from_part(package, numbering)
   }
 
-  fn load_from_part<P>(package: &mut WordprocessingDocument, part: &P) -> Self
+  fn load_from_part<P>(package: &WordprocessingDocument, part: &P) -> Self
   where
     P: SdkPart,
   {
@@ -462,12 +455,12 @@ impl ImageCatalog {
       .filter_map(|related| {
         let relationship_id = related.relationship_id().to_string();
         let control_part = related.part();
-        let control_xml = control_part.data_to_vec(package)?;
+        let control_xml = control_part.try_data_bytes(package).ok()?;
         let control = ax::ActiveXControlData::from_bytes(&control_xml).ok()?;
         let binary = control_part
           .embedded_control_persistence_binary_data_parts(package)
           .next()
-          .and_then(|part| part.data_to_vec(package));
+          .and_then(|part| part.try_data_bytes(package).ok());
         let style = active_x_text_style(&control, binary.as_deref())?;
         Some((relationship_id, style))
       })
@@ -475,7 +468,7 @@ impl ImageCatalog {
     catalog.math_type_by_relationship_id = part
       .related_parts_of_type::<_, EmbeddedObjectPart>(package)
       .filter_map(|related| {
-        let data = related.part().data_to_vec(package)?;
+        let data = related.part().try_data_bytes(package).ok()?;
         let equation = super::math_type::equation_native(&data)?;
         Some((related.relationship_id().to_string(), equation))
       })
@@ -483,7 +476,7 @@ impl ImageCatalog {
     catalog.ograph_charts_by_relationship_id = part
       .related_parts_of_type::<_, EmbeddedObjectPart>(package)
       .filter_map(|related| {
-        let data = related.part().data_to_vec(package)?;
+        let data = related.part().try_data_bytes(package).ok()?;
         let file = OgraphFile::from_bytes_compatible(&data).ok()?.value;
         let chart = file.workbook.chart().ok()?;
         Some((
@@ -543,13 +536,13 @@ impl ImageCatalog {
     for related_part in image_parts {
       let relationship_id = related_part.relationship_id();
       let image_part = related_part.part();
-      let Some(data) = image_part.data_to_vec(package) else {
+      let Ok(data) = image_part.try_data_bytes(package) else {
         continue;
       };
       by_relationship_id.insert(
         relationship_id.to_string(),
         ImageResource {
-          data: data.into(),
+          data,
           content_type: image_part.content_type(package).map(str::to_string),
         },
       );
@@ -570,7 +563,7 @@ impl ImageCatalog {
   }
 
   fn chart_parts<'a>(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     chart_parts: impl IntoIterator<Item = (String, ChartPart)> + 'a,
   ) -> (
     HashMap<String, c::ChartSpace>,
@@ -581,7 +574,7 @@ impl ImageCatalog {
     for (relationship_id, chart_part) in chart_parts {
       if let Ok(chart_space) = chart_part.root_element(package) {
         classic_by_relationship_id.insert(relationship_id, chart_space.clone());
-      } else if let Some(data) = chart_part.data_to_vec(package)
+      } else if let Ok(data) = chart_part.try_data_bytes(package)
         && let Ok(chart_space) = cx::ChartSpace::from_bytes(&data)
       {
         // Some Office producers keep the legacy chart relationship/content
@@ -611,7 +604,7 @@ impl ImageCatalog {
   }
 
   fn extended_chart_parts<'a>(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     chart_parts: impl IntoIterator<Item = (String, ExtendedChartPart)> + 'a,
   ) -> HashMap<String, ExtendedChartResource> {
     let mut by_relationship_id = HashMap::new();
@@ -643,7 +636,7 @@ impl ImageCatalog {
   }
 
   fn diagram_color_parts<'a>(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     parts: impl IntoIterator<Item = (String, DiagramColorsPart)> + 'a,
   ) -> HashMap<String, dgm::ColorsDefinition> {
     let mut by_relationship_id = HashMap::new();
@@ -657,7 +650,7 @@ impl ImageCatalog {
   }
 
   fn diagram_data_parts<'a>(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     parts: impl IntoIterator<Item = (String, DiagramDataPart)> + 'a,
   ) -> HashMap<String, dgm::DataModelRoot> {
     let mut by_relationship_id = HashMap::new();
@@ -671,7 +664,7 @@ impl ImageCatalog {
   }
 
   fn diagram_drawing_parts<'a>(
-    package: &mut WordprocessingDocument,
+    package: &WordprocessingDocument,
     parts: impl IntoIterator<Item = (String, DiagramPersistLayoutPart)> + 'a,
   ) -> HashMap<String, dsp::Drawing> {
     let mut by_relationship_id = HashMap::new();

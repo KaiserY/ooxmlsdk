@@ -1448,6 +1448,7 @@ mod tests {
     rasterize_group_items_for_effects_at_pixels_per_point, rasterize_vector_items,
     rasterize_vector_items_for_effects,
   };
+  use bytes::Bytes;
   use image::codecs::png::PngEncoder;
   use image::{ColorType, ImageEncoder, Rgba, RgbaImage};
   use std::borrow::Cow;
@@ -1744,7 +1745,7 @@ mod tests {
       flip_horizontal: false,
       flip_vertical: false,
       content_type: Cow::Borrowed("image/png"),
-      bytes: Arc::from(png),
+      bytes: Bytes::from(png),
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,

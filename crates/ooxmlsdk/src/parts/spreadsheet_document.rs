@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
+#[derive(Debug, ooxmlsdk_derive::SdkPackage)]
 pub struct SpreadsheetDocument {
   pub(crate) storage: crate::common::SdkPackageStorage,
   pub(crate) open_settings: crate::sdk::OpenSettings,

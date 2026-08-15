@@ -25,7 +25,7 @@ pub(crate) struct ExcelImport {
 
 impl ExcelImport {
   pub(crate) fn import_document(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     options: &LayoutOptions,
   ) -> Result<Self> {
     // ExcelFilter::importDocument creates workbook-global state and delegates
@@ -74,7 +74,7 @@ impl ExcelImport {
 }
 
 fn spreadsheet_producer_profile(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   workbook: &ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workbook,
 ) -> SpreadsheetProducerProfile {
   let extended_properties_part = {

@@ -14,6 +14,7 @@ readme.workspace = true
 
 [dependencies]
 base64 = { workspace = true }
+bytes = { workspace = true }
 color = { workspace = true }
 emfsdk = { workspace = true }
 encoding_rs = { workspace = true }

@@ -11,6 +11,7 @@ use std::f32::consts::{PI, TAU};
 use std::io::Cursor;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2012_chart_style as cs;
@@ -5974,7 +5975,7 @@ fn data_point_effect_backdrop(
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,

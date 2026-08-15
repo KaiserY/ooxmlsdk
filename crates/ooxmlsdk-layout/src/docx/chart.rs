@@ -2,7 +2,7 @@ use super::*;
 use crate::render::chart as shared_chart;
 
 pub(super) fn supplemental_graphic_blocks(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
 ) -> Vec<Block> {
@@ -10,7 +10,7 @@ pub(super) fn supplemental_graphic_blocks(
 }
 
 fn chart_text_blocks(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
 ) -> Vec<Block> {

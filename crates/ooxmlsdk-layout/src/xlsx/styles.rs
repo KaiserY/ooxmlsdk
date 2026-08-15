@@ -236,7 +236,7 @@ impl StylesCatalog {
   }
 
   pub(crate) fn from_workbook_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     workbook_part: &WorkbookPart,
     locales: &OfficeLocaleContext,
   ) -> Result<Self> {

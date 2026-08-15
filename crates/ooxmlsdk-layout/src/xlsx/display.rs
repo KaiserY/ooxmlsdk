@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder, imageops::FilterType};
@@ -875,7 +876,7 @@ fn push_vml_checkbox_items(
   push_vml_checkable_control_text_item(items, shape, rect, false);
 }
 
-fn push_vml_control_snapshot_image(items: &mut Vec<PageItem>, rect: CellRect, data: Arc<[u8]>) {
+fn push_vml_control_snapshot_image(items: &mut Vec<PageItem>, rect: CellRect, data: Bytes) {
   items.push(PageItem::Image(ImageItem {
     x_pt: rect.x_pt,
     y_pt: rect.y_pt,
@@ -977,7 +978,7 @@ fn vml_option_button_snapshot_png(
   host: LegacyVmlControlHost,
   checked: i64,
   flat: bool,
-) -> Option<Arc<[u8]>> {
+) -> Option<Bytes> {
   let mut image = image::RgbaImage::new(host.width_px, host.height_px);
   draw_vml_option_button_indicator(&mut image, host, checked, flat);
   encode_vml_control_snapshot_png(image)
@@ -1066,7 +1067,7 @@ fn vml_group_box_snapshot_png(
   host: LegacyVmlControlHost,
   caption_width_pt: f32,
   flat: bool,
-) -> Option<Arc<[u8]>> {
+) -> Option<Bytes> {
   let width = host.width_px;
   let height = host.height_px;
   let mut image = image::RgbaImage::new(width, height);
@@ -1131,7 +1132,7 @@ fn vml_control_snapshot_pixels(length_pt: f32, minimum: u32) -> u32 {
   .max(minimum as f32) as u32
 }
 
-fn encode_vml_control_snapshot_png(image: image::RgbaImage) -> Option<Arc<[u8]>> {
+fn encode_vml_control_snapshot_png(image: image::RgbaImage) -> Option<Bytes> {
   let mut png = Cursor::new(Vec::new());
   PngEncoder::new(&mut png)
     .write_image(
@@ -1141,7 +1142,7 @@ fn encode_vml_control_snapshot_png(image: image::RgbaImage) -> Option<Arc<[u8]>>
       ColorType::Rgba8.into(),
     )
     .ok()?;
-  Some(Arc::from(png.into_inner()))
+  Some(Bytes::from(png.into_inner()))
 }
 
 fn vml_checkbox_image_rect(rect: CellRect, compact_indicator_only: bool) -> CellRect {
@@ -1308,7 +1309,7 @@ fn vml_checkbox_snapshot_png(
   rect: CellRect,
   checked: i64,
   compact_indicator_only: bool,
-) -> Option<Arc<[u8]>> {
+) -> Option<Bytes> {
   const SNAPSHOT_DPI: f32 = 200.0;
   const INDICATOR_SIZE: u32 = 14;
   const INDICATOR_LEADING: u32 = 5;
@@ -1439,7 +1440,7 @@ fn vml_checkbox_snapshot_png(
       ColorType::Rgba8.into(),
     )
     .ok()?;
-  Some(Arc::from(png.into_inner()))
+  Some(Bytes::from(png.into_inner()))
 }
 
 pub(crate) fn vml_shape_common_fill(
@@ -4083,7 +4084,7 @@ fn print_page_image_items(
   items
 }
 
-fn web_extension_placeholder_png(resource: &super::drawing::ImageResource) -> Option<Arc<[u8]>> {
+fn web_extension_placeholder_png(resource: &super::drawing::ImageResource) -> Option<Bytes> {
   let mut source = image::load_from_memory(&resource.data).ok()?.to_rgba8();
   let is_standard_content_add_in_placeholder = source.width() == 96
     && source.height() == 96
@@ -4092,7 +4093,7 @@ fn web_extension_placeholder_png(resource: &super::drawing::ImageResource) -> Op
         || (pixel[0] == 0 && pixel[1] == 115 && pixel[2] == 198 && pixel[3] == 255)
     });
   if is_standard_content_add_in_placeholder {
-    return super::office_web_extension_assets::content_add_in_placeholder_png().map(Arc::from);
+    return super::office_web_extension_assets::content_add_in_placeholder_png().map(Bytes::from);
   }
   // Both Open XML SDK content-add-in fixtures carry this exact DrawingML
   // fallback effect: <a:clrChange> maps opaque black to black with alpha=0.
@@ -4118,7 +4119,7 @@ fn web_extension_placeholder_png(resource: &super::drawing::ImageResource) -> Op
       ColorType::Rgba8.into(),
     )
     .ok()?;
-  Some(Arc::from(png.into_inner()))
+  Some(Bytes::from(png.into_inner()))
 }
 
 fn push_group_image_items(
@@ -4194,7 +4195,7 @@ struct DrawingMlImageFillInput {
   authored_rotation_deg: f32,
   authored_flip_horizontal: bool,
   authored_flip_vertical: bool,
-  data: Arc<[u8]>,
+  data: Bytes,
   content_type: Option<String>,
   alt_text: Option<String>,
   hyperlink_url: Option<String>,
@@ -4233,7 +4234,7 @@ fn drawingml_image_fill_items(
       rotation_deg,
       flip_horizontal: flip_horizontal ^ placement.flip_horizontal,
       flip_vertical: flip_vertical ^ placement.flip_vertical,
-      data: Arc::clone(&data),
+      data: data.clone(),
       content_type: content_type.clone(),
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
@@ -4304,8 +4305,8 @@ fn vml_image_items(
   let recolored_pattern = is_fill
     .then(|| recolor_vml_pattern_image(shape, &resource.data))
     .flatten();
-  let image_data: Arc<[u8]> = recolored_pattern
-    .map(Arc::from)
+  let image_data: Bytes = recolored_pattern
+    .map(Bytes::from)
     .unwrap_or_else(|| resource.data.clone());
   let content_type = if image_data.as_ref() == resource.data.as_ref() {
     resource.content_type.clone()
@@ -5226,7 +5227,7 @@ fn finish_xlsx_shape_effects(
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
@@ -8722,7 +8723,7 @@ fn xlsx_image_data_with_effects(
   drawing: &super::drawing::DrawingResourceCatalog,
   resource: &super::drawing::ImageResource,
   object: &super::drawing::DrawingObjectModel,
-) -> (Arc<[u8]>, Option<String>) {
+) -> (Bytes, Option<String>) {
   let effects = xlsx_image_effects(
     import,
     &object.image_effects,
@@ -8737,7 +8738,7 @@ fn xlsx_image_data_with_effects(
     resource.content_type.as_deref(),
     &effects,
   )
-  .map(|data| (Arc::from(data), Some("image/png".to_string())))
+  .map(|data| (Bytes::from(data), Some("image/png".to_string())))
   .unwrap_or_else(|| (resource.data.clone(), resource.content_type.clone()))
 }
 

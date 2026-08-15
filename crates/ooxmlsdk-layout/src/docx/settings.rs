@@ -3,7 +3,7 @@ use super::*;
 const MICROSOFT_WORD_COMPATIBILITY_URI: &str = "http://schemas.microsoft.com/office/word";
 
 pub(super) fn hyphenation_settings(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> HyphenationSettings {
   let Some(settings) = main
@@ -93,10 +93,7 @@ fn page_bottom_hyphenation(
   }
 }
 
-pub(super) fn compatibility_mode(
-  package: &mut WordprocessingDocument,
-  main: &MainDocumentPart,
-) -> u16 {
+pub(super) fn compatibility_mode(package: &WordprocessingDocument, main: &MainDocumentPart) -> u16 {
   main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
@@ -113,10 +110,7 @@ pub(super) fn compatibility_mode(
     .unwrap_or(12)
 }
 
-pub(super) fn no_column_balance(
-  package: &mut WordprocessingDocument,
-  main: &MainDocumentPart,
-) -> bool {
+pub(super) fn no_column_balance(package: &WordprocessingDocument, main: &MainDocumentPart) -> bool {
   main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
@@ -131,7 +125,7 @@ pub(super) fn no_column_balance(
 }
 
 pub(super) fn adjust_line_height_in_table(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> (bool, bool) {
   let Some(part) = main.document_settings_part(package) else {
@@ -141,7 +135,7 @@ pub(super) fn adjust_line_height_in_table(
   let authored = part
     .root_element(package)
     .ok()
-    .and_then(|settings| adjust_line_height_in_table_value(&settings));
+    .and_then(adjust_line_height_in_table_value);
   // Keep omission distinct from false. A present Settings part with no
   // authored switch participates in Word's application repair only when the
   // caller also repairs missing paragraph defaults and docGrid. This is the
@@ -171,7 +165,7 @@ fn resolve_adjust_line_height_in_table(
 }
 
 pub(super) fn do_not_use_html_paragraph_auto_spacing(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> bool {
   main
@@ -188,7 +182,7 @@ pub(super) fn do_not_use_html_paragraph_auto_spacing(
 }
 
 pub(super) fn do_not_break_wrapped_tables(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> bool {
   main
@@ -198,7 +192,7 @@ pub(super) fn do_not_break_wrapped_tables(
 }
 
 pub(super) fn do_not_expand_shift_return(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> bool {
   main
@@ -208,7 +202,7 @@ pub(super) fn do_not_expand_shift_return(
 }
 
 pub(super) fn use_far_east_layout(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> bool {
   main
@@ -218,7 +212,7 @@ pub(super) fn use_far_east_layout(
 }
 
 pub(super) fn balance_single_byte_double_byte_width(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> bool {
   main
@@ -227,7 +221,7 @@ pub(super) fn balance_single_byte_double_byte_width(
     .is_some_and(balance_single_byte_double_byte_width_value)
 }
 
-pub(super) fn no_leading(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
+pub(super) fn no_leading(package: &WordprocessingDocument, main: &MainDocumentPart) -> bool {
   main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
@@ -275,7 +269,7 @@ fn no_leading_value(settings: &w::Settings) -> bool {
 }
 
 pub(super) fn split_page_break_and_paragraph_mark(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> bool {
   main
@@ -292,7 +286,7 @@ pub(super) fn split_page_break_and_paragraph_mark(
 }
 
 pub(super) fn update_fields_on_open(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> bool {
   main
@@ -303,7 +297,7 @@ pub(super) fn update_fields_on_open(
 }
 
 pub(super) fn explicit_default_tab_stop_pt(
-  package: &mut WordprocessingDocument,
+  package: &WordprocessingDocument,
   main: &MainDocumentPart,
 ) -> Option<f32> {
   main

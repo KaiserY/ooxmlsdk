@@ -35,15 +35,12 @@ impl SlideFragmentHandler {
 
   pub(crate) fn import_slide_part(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     slide_part: &SlidePart,
   ) -> Result<()> {
     // The constructor imports related vmlDrawing/legacyDrawing before XML
     // contexts create shapes; destruction converts and inserts VML drawing.
-    let fallback_previews = slide_part
-      .data_to_vec(package)
-      .map(|data| active_x_fallback_previews(&data))
-      .unwrap_or_default();
+    let fallback_previews = active_x_fallback_previews(&slide_part.try_data_bytes(package)?);
     self.slide_persist.import_image_parts(package, slide_part);
     self
       .slide_persist
@@ -82,7 +79,7 @@ impl SlideFragmentHandler {
 
   pub(crate) fn import_notes_slide_part(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     notes_part: &NotesSlidePart,
   ) -> Result<()> {
     // notes as a slide fragment with its own relationship scope and notes-size
@@ -121,7 +118,7 @@ impl SlideFragmentHandler {
 
   pub(crate) fn import_notes_master_part(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     notes_master_part: &NotesMasterPart,
   ) -> Result<()> {
     // notes slide content so placeholder/style lookup uses notes text style.

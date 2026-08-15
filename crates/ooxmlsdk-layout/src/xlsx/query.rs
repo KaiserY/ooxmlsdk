@@ -23,7 +23,7 @@ pub(crate) struct QueryTableModel {
 
 impl QueryTableCatalog {
   pub(crate) fn from_parts(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     parts: &[QueryTablePart],
   ) -> Result<Self> {
     Ok(Self {
@@ -36,7 +36,7 @@ impl QueryTableCatalog {
 }
 
 impl QueryTableModel {
-  fn from_part(package: &mut SpreadsheetDocument, part: &QueryTablePart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &QueryTablePart) -> Result<Self> {
     let query_table = part.root_element(package)?;
     let refresh = query_table.query_table_refresh.as_deref();
     Ok(Self {

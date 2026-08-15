@@ -654,14 +654,13 @@ macro_rules! impl_relationship_accessors {
         if !self.inner.is_data_part_reference_relationship() {
           return Ok(None);
         }
-        let part = package
+        package
           .storage()
           .part(part_slot)
           .ok_or(SdkError::StalePart)?;
         Ok(Some(crate::common::MediaDataPart::from_part_slot(
           package.storage().token(),
           part_slot,
-          part.path(),
         )))
       }
 
@@ -789,14 +788,13 @@ impl<'a> RelationshipRef<'a> {
     if !self.inner.is_data_part_reference_relationship() {
       return Ok(None);
     }
-    let part = package
+    package
       .storage()
       .part(part_slot)
       .ok_or(SdkError::StalePart)?;
     Ok(Some(crate::common::MediaDataPart::from_part_slot(
       package.storage().token(),
       part_slot,
-      part.path(),
     )))
   }
 
@@ -1341,22 +1339,6 @@ pub struct SdkPackageStorage {
   preferred_main_part_content_type: Option<&'static str>,
 }
 
-impl Clone for SdkPackageStorage {
-  fn clone(&self) -> Self {
-    Self {
-      token: PackageToken::new(),
-      archive: self.archive.clone(),
-      archived_extra_entry_indices: self.archived_extra_entry_indices.clone(),
-      content_types: self.content_types.clone(),
-      content_types_archive_entry_index: self.content_types_archive_entry_index,
-      package_relationships: self.package_relationships.clone(),
-      parts: self.parts.clone(),
-      by_path: self.by_path.clone(),
-      preferred_main_part_content_type: self.preferred_main_part_content_type,
-    }
-  }
-}
-
 impl SdkPackageStorage {
   pub(crate) fn create(preferred_main_part_content_type: Option<&'static str>) -> Self {
     Self {
@@ -1743,23 +1725,22 @@ impl SdkPackageStorage {
     )
   }
 
-  pub(crate) fn part_bytes_for_root(&self, part_id: PartSlot) -> Result<Bytes, SdkError> {
+  pub(crate) fn part_bytes_owned(&self, part_id: PartSlot) -> Result<Bytes, SdkError> {
+    let _ = self.part_bytes(part_id)?;
     let part = self.part(part_id).ok_or(SdkError::StalePart)?;
     match &part.data {
-      StoredPartData::Archived { entry_index, bytes } => {
-        if let Some(bytes) = bytes.get() {
-          return Ok(bytes.clone());
-        }
-        self
-          .archive
-          .as_ref()
-          .ok_or_else(|| {
-            SdkError::CommonError("archived part has no package archive backing".to_string())
-          })?
-          .read_entry(*entry_index)
-      }
+      StoredPartData::Archived { bytes, .. } => Ok(
+        bytes
+          .get()
+          .expect("part_bytes initialized archived part data")
+          .clone(),
+      ),
       StoredPartData::Owned { bytes, .. } => Ok(bytes.clone()),
     }
+  }
+
+  pub(crate) fn part_bytes_for_root(&self, part_id: PartSlot) -> Result<Bytes, SdkError> {
+    self.part_bytes_owned(part_id)
   }
 
   pub(crate) fn raw_copy_archive_entry<W: std::io::Write + std::io::Seek>(

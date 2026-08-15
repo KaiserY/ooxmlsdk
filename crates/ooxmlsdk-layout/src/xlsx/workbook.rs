@@ -64,7 +64,7 @@ impl WorkbookFragment {
 
   pub(crate) fn finalize_import(
     &mut self,
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     producer: SpreadsheetProducerProfile,
     locales: &OfficeLocaleContext,
   ) -> Result<Vec<CalcSheet>> {
@@ -146,7 +146,7 @@ struct WorkbookSheetContext<'a> {
 }
 
 fn worksheet_sheet(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   part: &WorksheetPart,
   sheet: &x::Sheet,
   context: WorkbookSheetContext<'_>,
@@ -180,7 +180,7 @@ fn worksheet_sheet(
 }
 
 fn chartsheet(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   part: &ChartsheetPart,
   sheet: &x::Sheet,
   workbook_index: usize,
@@ -203,7 +203,7 @@ fn chartsheet(
 }
 
 fn shared_strings(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   workbook_part: &WorkbookPart,
 ) -> Result<Vec<SharedStringModel>> {
   let Some(shared_string_part) = workbook_part.shared_string_table_part(package) else {

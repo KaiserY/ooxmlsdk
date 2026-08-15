@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
+use bytes::Bytes;
 use ooxmlsdk::common::{MediaDataPart, RelationshipRef};
 use ooxmlsdk::parts::{
   chart_color_style_part::ChartColorStylePart, chart_drawing_part::ChartDrawingPart,
@@ -147,7 +147,7 @@ pub(crate) struct SlidePersist {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ImageResource {
-  pub(crate) data: Arc<[u8]>,
+  pub(crate) data: Bytes,
   pub(crate) content_type: Option<String>,
   pub(crate) monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   pub(crate) metafile_external_header: Option<crate::render::emf_wmf::WmfExternalHeader>,
@@ -377,7 +377,7 @@ pub(crate) struct DiagramDrawingResource {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct BinaryResource {
   pub(crate) path: Option<String>,
-  pub(crate) data: Vec<u8>,
+  pub(crate) data: Bytes,
   pub(crate) content_type: Option<String>,
 }
 
@@ -417,7 +417,7 @@ where
 {
   Some(BinaryResource {
     path: part.path(package).map(str::to_string),
-    data: part.data_to_vec(package)?,
+    data: part.try_data_bytes(package).ok()?,
     content_type: part.content_type(package).map(str::to_string),
   })
 }
@@ -428,7 +428,7 @@ fn binary_resource_from_media_data_part(
 ) -> Option<BinaryResource> {
   Some(BinaryResource {
     path: part.path(package).map(str::to_string),
-    data: part.data(package)?.to_vec(),
+    data: part.try_data_bytes(package).ok()?,
     content_type: part.content_type(package).map(str::to_string),
   })
 }
@@ -464,7 +464,7 @@ where
       Some((
         related_part.relationship_id().to_string(),
         ImageResource {
-          data: related_part.part().data_to_vec(package)?.into(),
+          data: related_part.part().try_data_bytes(package).ok()?,
           content_type: related_part
             .part()
             .content_type(package)
@@ -478,10 +478,7 @@ where
     .collect()
 }
 
-fn chart_resource(
-  package: &mut PresentationDocument,
-  chart_part: &ChartPart,
-) -> Result<ChartResource> {
+fn chart_resource(package: &PresentationDocument, chart_part: &ChartPart) -> Result<ChartResource> {
   let drawing_part = chart_part.chart_drawing_part(package);
   let embedded_package_part = chart_part.embedded_package_part(package);
   let theme_override_part = chart_part.theme_override_part(package);
@@ -516,7 +513,7 @@ fn chart_resource(
 }
 
 fn extended_chart_resource(
-  package: &mut PresentationDocument,
+  package: &PresentationDocument,
   chart_part: &ExtendedChartPart,
 ) -> Result<ExtendedChartResource> {
   let drawing_part = chart_part.chart_drawing_part(package);
@@ -553,7 +550,7 @@ fn extended_chart_resource(
 }
 
 fn chart_drawing_resource(
-  package: &mut PresentationDocument,
+  package: &PresentationDocument,
   part: &ChartDrawingPart,
 ) -> Result<ChartDrawingResource> {
   let image_resources = collect_image_resources(package, part);
@@ -565,7 +562,7 @@ fn chart_drawing_resource(
 }
 
 fn theme_override_resource(
-  package: &mut PresentationDocument,
+  package: &PresentationDocument,
   part: &ThemeOverridePart,
 ) -> Result<ThemeOverrideResource> {
   let image_resources = collect_image_resources(package, part);
@@ -577,7 +574,7 @@ fn theme_override_resource(
 }
 
 fn chart_style_resource(
-  package: &mut PresentationDocument,
+  package: &PresentationDocument,
   part: &ChartStylePart,
 ) -> Result<ChartStyleResource> {
   Ok(ChartStyleResource {
@@ -587,7 +584,7 @@ fn chart_style_resource(
 }
 
 fn chart_color_style_resource(
-  package: &mut PresentationDocument,
+  package: &PresentationDocument,
   part: &ChartColorStylePart,
 ) -> Result<ChartColorStyleResource> {
   Ok(ChartColorStyleResource {
@@ -1020,13 +1017,13 @@ impl SlidePersist {
     for related_part in part.related_parts_of_type::<_, ImagePart>(package) {
       let relationship_id = related_part.relationship_id().to_string();
       let image_part = related_part.part();
-      let Some(data) = image_part.data_to_vec(package) else {
+      let Ok(data) = image_part.try_data_bytes(package) else {
         continue;
       };
       self.image_resources.insert(
         relationship_id,
         ImageResource {
-          data: data.into(),
+          data,
           content_type: image_part.content_type(package).map(str::to_string),
           monochrome_dib_palette_override: None,
           metafile_external_header: None,
@@ -1088,7 +1085,7 @@ impl SlidePersist {
 
   pub(crate) fn import_graphic_frame_related_parts<P>(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     part: &P,
   ) -> Result<()>
   where
@@ -1262,7 +1259,8 @@ impl SlidePersist {
     for drawing_part in drawing_parts {
       let image_resources = collect_image_resources(package, drawing_part);
       let models = drawing_part
-        .data_to_vec(package)
+        .try_data_bytes(package)
+        .ok()
         .map(|data| crate::xlsx::object_resources::vml_shapes(&data))
         .unwrap_or_default();
       for model in models {
@@ -1321,7 +1319,7 @@ impl SlidePersist {
               if let Some(data) =
                 crate::xlsx::recolor_vml_pattern_image(&model, resource.data.as_ref())
               {
-                resource.data = Arc::from(data);
+                resource.data = Bytes::from(data);
                 resource.content_type = Some("image/png".to_string());
                 resource.monochrome_dib_palette_override = None;
               }
@@ -2221,7 +2219,7 @@ mod tests {
     );
 
     let fallback_resource = ImageResource {
-      data: Arc::from(&b"fallback"[..]),
+      data: Bytes::from_static(b"fallback"),
       content_type: Some("image/x-wmf".to_string()),
       monochrome_dib_palette_override: None,
       metafile_external_header: None,
@@ -2296,7 +2294,7 @@ mod tests {
     );
 
     let vml_resource = ImageResource {
-      data: Arc::from(&b"vml"[..]),
+      data: Bytes::from_static(b"vml"),
       content_type: Some("image/x-wmf".to_string()),
       monochrome_dib_palette_override: None,
       metafile_external_header: None,
@@ -2386,7 +2384,7 @@ mod tests {
       ..crate::xlsx::object_resources::VmlShapeModel::default()
     };
     let resource = ImageResource {
-      data: Arc::from(&b"emf"[..]),
+      data: Bytes::from_static(b"emf"),
       content_type: Some("image/x-emf".to_string()),
       monochrome_dib_palette_override: None,
       metafile_external_header: None,

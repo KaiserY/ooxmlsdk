@@ -4,7 +4,7 @@ use crate::error::Result;
 use crate::options::PdfOptions;
 
 pub(crate) fn layout(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   options: &mut PdfOptions,
 ) -> Result<ooxmlsdk_layout::common::LayoutDocument<'static>> {
   let options = options.take_layout_options();

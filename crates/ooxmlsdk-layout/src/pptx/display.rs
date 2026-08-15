@@ -29,6 +29,7 @@ use crate::render::symbol as shared_symbol;
 use crate::text_layout::{StyledTextSpan, break_text_lines};
 use crate::text_metrics::TextMetrics;
 use crate::units;
+use bytes::Bytes;
 use icu_segmenter::GraphemeClusterSegmenter;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
@@ -5514,8 +5515,8 @@ fn lower_empty_blip_fill_placeholder(
   }));
 }
 
-fn missing_picture_icon_png() -> Arc<[u8]> {
-  static PNG: OnceLock<Arc<[u8]>> = OnceLock::new();
+fn missing_picture_icon_png() -> Bytes {
+  static PNG: OnceLock<Bytes> = OnceLock::new();
   PNG
     .get_or_init(|| {
       #[rustfmt::skip]
@@ -5530,7 +5531,7 @@ fn missing_picture_icon_png() -> Arc<[u8]> {
       PngEncoder::new(&mut png)
         .write_image(&RGB, 4, 5, ColorType::Rgb8.into())
         .expect("encoding the fixed missing-picture icon cannot fail");
-      Arc::from(png.into_inner())
+      Bytes::from(png.into_inner())
     })
     .clone()
 }
@@ -7088,7 +7089,7 @@ fn finish_shape_effect_raster(
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
@@ -7892,7 +7893,7 @@ fn blip_fill_image_items_from_resource(
 }
 
 fn tiled_blip_fill_image_items(
-  data: Arc<[u8]>,
+  data: Bytes,
   content_type: Option<String>,
   tile: &a::Tile,
   source_crop: ImageCrop,
@@ -7934,7 +7935,7 @@ fn tiled_blip_fill_image_items(
       rotation_deg: placement.rotation_deg,
       flip_horizontal: placement.flip_horizontal ^ tile.flip_horizontal,
       flip_vertical: placement.flip_vertical ^ tile.flip_vertical,
-      data: Arc::clone(&data),
+      data: data.clone(),
       content_type: content_type.clone(),
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
@@ -8004,7 +8005,7 @@ fn jpeg_density_dpi(data: &[u8]) -> Option<(f32, f32)> {
 }
 
 struct ImportedImageData {
-  data: Arc<[u8]>,
+  data: Bytes,
   content_type: Option<String>,
 }
 
@@ -8102,7 +8103,7 @@ impl ImageEffectColorResolver for PptxImageEffectColorResolver<'_> {
 fn image_data_with_blip_effects(
   import: &PowerPointImport,
   slide: &SlidePersist,
-  data: &Arc<[u8]>,
+  data: &Bytes,
   content_type: Option<&str>,
   blip_choices: &[a::BlipChoice],
 ) -> ImportedImageData {
@@ -8110,7 +8111,7 @@ fn image_data_with_blip_effects(
   let effects = image_effects_from_blip(import, slide, blip_choices, content_type);
   if effects.0.is_empty() {
     return ImportedImageData {
-      data: Arc::clone(data),
+      data: data.clone(),
       content_type: content_type.map(str::to_string),
     };
   }
@@ -8118,7 +8119,7 @@ fn image_data_with_blip_effects(
     common::drawingml_image_effects::apply(data_ref, content_type, effects.0.as_slice())
   else {
     return ImportedImageData {
-      data: Arc::clone(data),
+      data: data.clone(),
       content_type: content_type.map(str::to_string),
     };
   };
@@ -8777,7 +8778,7 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
       rotation_deg: 0.0,
       flip_horizontal: false,
       flip_vertical: false,
-      data: Arc::from(png.into_inner()),
+      data: Bytes::from(png.into_inner()),
       content_type: Some("image/png".to_string()),
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
@@ -11605,7 +11606,7 @@ fn push_math_ole_preview_item(
   }));
 }
 
-fn transparent_png_1x1() -> Option<Arc<[u8]>> {
+fn transparent_png_1x1() -> Option<Bytes> {
   let mut output = Vec::new();
   let encoder = PngEncoder::new(Cursor::new(&mut output));
   encoder

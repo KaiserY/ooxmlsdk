@@ -267,7 +267,7 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
   write_generated_module(
     &out_parts_dir_path.join("extended_part.rs"),
     quote! {
-      #[derive(Clone, Debug, Eq, PartialEq)]
+      #[derive(Clone, Debug, Eq, Hash, PartialEq)]
         pub struct ExtendedPart {
           pub(crate) key: crate::common::PartKey,
         }

@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use std::io::Cursor;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use icu_properties::{
   CodePointMapData,
   props::{GeneralCategory, VerticalOrientation},
@@ -177,6 +178,12 @@ struct WordLineTextExtents {
   minimum_height_pt: f32,
   has_text: bool,
   has_intrinsic_leading_above: bool,
+}
+
+#[derive(Clone, Copy)]
+struct TextPortion<'a> {
+  style: &'a TextStyle,
+  text: &'a str,
 }
 
 impl WordLineTextExtents {
@@ -410,14 +417,14 @@ fn grid_auto_line_heights(
   let proportional_first_line = (paragraph.format.office_recovered_line_height
     && text_segmentation == TextSegmentation::Body)
     || paragraph.format.wordprocessing_shape_story;
-  let first_line_pt =
-    if proportional_first_line && !paragraph_has_only_inline_drawing_content(paragraph) {
-      snapped_line_height.max(proportional_line_height)
-    } else if snapped_line_height > grid_height + LAYOUT_EPSILON_PT {
-      snapped_line_height.max(proportional_line_height)
-    } else {
-      snapped_line_height
-    };
+  let first_line_pt = if (proportional_first_line
+    && !paragraph_has_only_inline_drawing_content(paragraph))
+    || snapped_line_height > grid_height + LAYOUT_EPSILON_PT
+  {
+    snapped_line_height.max(proportional_line_height)
+  } else {
+    snapped_line_height
+  };
 
   Some(GridAutoLineHeights {
     first_line_pt,
@@ -856,13 +863,12 @@ fn include_text_height(
   flow: FlowContext,
   text_frame: TextFrame,
   line_text_extents: &mut WordLineTextExtents,
-  style: &TextStyle,
-  text: &str,
+  portion: TextPortion<'_>,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
   line_text_extents.include(
-    style,
-    text,
+    portion.style,
+    portion.text,
     text_frame.script_sensitive_line_height,
     text_metrics,
   );
@@ -980,16 +986,15 @@ fn include_text_content_height(
   flow: FlowContext,
   text_frame: TextFrame,
   line_text_extents: &mut WordLineTextExtents,
-  style: &TextStyle,
-  text: &str,
+  portion: TextPortion<'_>,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
   if !at_least_uses_separate_content_height(paragraph, flow) {
     return content_height;
   }
   line_text_extents.include(
-    style,
-    text,
+    portion.style,
+    portion.text,
     text_frame.script_sensitive_line_height,
     text_metrics,
   );
@@ -1029,8 +1034,10 @@ fn include_numbering_label_height(
     flow,
     text_frame,
     line_text_extents,
-    &paragraph.list_label_style,
-    visible_label,
+    TextPortion {
+      style: &paragraph.list_label_style,
+      text: visible_label,
+    },
     text_metrics,
   );
   let recovered_word_cjk_numbering = flow.compatibility_mode < 15
@@ -2287,7 +2294,7 @@ pub(crate) struct ImageItem {
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
-  pub data: Arc<[u8]>,
+  pub data: Bytes,
   pub content_type: Option<String>,
   pub metafile_background_color: Option<[u8; 3]>,
   pub alt_text: Option<String>,
@@ -2382,6 +2389,12 @@ struct FlowContext {
   floating_table_cell_follow_top_inset_pt: f32,
   note_continuation_top_inset_pt: f32,
   inside_paragraph_frame: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FlowPosition {
+  context: FlowContext,
+  y_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -3945,7 +3958,7 @@ fn finish_docx_drawing_effects(
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_background_color: None,
     alt_text: None,
@@ -4108,7 +4121,7 @@ fn finish_docx_group_effects(
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
-    data: Arc::from(png.into_inner()),
+    data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
     metafile_background_color: None,
     alt_text: None,
@@ -5659,16 +5672,20 @@ impl<'a> RootFrameLayout<'a> {
       &mut self.text_metrics,
     );
     let transition = self.follow_transition_start(*flow);
-    (*flow, self.y) = prepare_block_flow(
+    let position = prepare_block_flow(
       block,
       next,
-      block_flow,
+      FlowPosition {
+        context: block_flow,
+        y_pt: self.y,
+      },
       &mut self.current,
       &mut self.pages,
       &mut self.text_metrics,
-      self.y,
       overfull_keep_chain,
     );
+    *flow = position.context;
+    self.y = position.y_pt;
     self.record_follow_transition(
       transition,
       *flow,
@@ -7641,7 +7658,7 @@ fn materialize_wordprocessing_text_effects_in_items(
       rotation_deg: 0.0,
       flip_horizontal: false,
       flip_vertical: false,
-      data: Arc::from(png),
+      data: Bytes::from(png),
       content_type: Some(content_type.to_string()),
       metafile_background_color: None,
       alt_text: None,
@@ -10359,23 +10376,27 @@ fn preserve_explicit_break_body_flow_width_reduction(
 fn prepare_block_flow(
   block: &Block,
   next: Option<&Block>,
-  flow: FlowContext,
+  position: FlowPosition,
   current: &mut Page,
   pages: &mut Vec<Page>,
   text_metrics: &mut TextMetrics,
-  y: f32,
   overfull_keep_chain: bool,
-) -> (FlowContext, f32) {
+) -> FlowPosition {
+  let FlowPosition {
+    context: flow,
+    y_pt: y,
+  } = position;
   if !page_has_body_region_items(current, flow)
     || !block_should_stay_together(block, next, overfull_keep_chain)
   {
-    return (flow, y);
+    return position;
   }
   let required_height = keep_group_height(block, next, flow, text_metrics, overfull_keep_chain);
   if y + required_height <= flow.content_bottom || y <= flow.content_top_pt + LAYOUT_EPSILON_PT {
-    return (flow, y);
+    return position;
   }
-  advance_section_flow(flow, current, pages)
+  let (context, y_pt) = advance_section_flow(flow, current, pages);
+  FlowPosition { context, y_pt }
 }
 
 fn block_should_stay_together(
@@ -10776,8 +10797,10 @@ fn estimated_paragraph_content_extents(
                       flow,
                       text_frame,
                       &mut line_text_extents,
-                      &run.style,
-                      text,
+                      TextPortion {
+                        style: &run.style,
+                        text,
+                      },
                       text_metrics,
                     );
                   }
@@ -10802,8 +10825,10 @@ fn estimated_paragraph_content_extents(
                   flow,
                   text_frame,
                   &mut line_text_extents,
-                  &run.style,
-                  &text,
+                  TextPortion {
+                    style: &run.style,
+                    text: &text,
+                  },
                   text_metrics,
                 );
               }
@@ -10818,8 +10843,10 @@ fn estimated_paragraph_content_extents(
               flow,
               text_frame,
               &mut line_text_extents,
-              &run.style,
-              &segment,
+              TextPortion {
+                style: &run.style,
+                text: &segment,
+              },
               text_metrics,
             );
           }
@@ -13851,6 +13878,12 @@ fn layout_repeating_blocks_into_page(
   y
 }
 
+struct RepeatingFrameSink<'a> {
+  page_index: usize,
+  collect_items: bool,
+  frames: &'a mut Vec<LayoutFrame>,
+}
+
 fn layout_repeating_blocks_with_frames_into_page(
   blocks: &[Block],
   page: &mut Page,
@@ -13858,9 +13891,7 @@ fn layout_repeating_blocks_with_frames_into_page(
   text_metrics: &mut TextMetrics,
   mut y: f32,
   flow: FlowContext,
-  page_index: usize,
-  collect_frame_items: bool,
-  frames: &mut Vec<LayoutFrame>,
+  frame_sink: RepeatingFrameSink<'_>,
 ) -> f32 {
   for (block_index, block) in blocks.iter().enumerate() {
     let item_start = page.items.len();
@@ -13898,17 +13929,17 @@ fn layout_repeating_blocks_with_frames_into_page(
       item_end,
       Some(block_index),
     );
-    frames.push(LayoutFrame {
+    frame_sink.frames.push(LayoutFrame {
       kind,
       block_index: Some(block_index),
       split_start: frame_cursor(Some(block_index), kind, item_start, &lines, true),
       split_end: frame_cursor(Some(block_index), kind, item_end, &lines, false),
-      page_index,
+      page_index: frame_sink.page_index,
       section_index: page.section_index,
       section_page_index: page.section_page_index,
       column_index: flow.column_index,
       item_count: item_end.saturating_sub(item_start),
-      items: if collect_frame_items {
+      items: if frame_sink.collect_items {
         page.items[item_start..item_end].to_vec()
       } else {
         Vec::new()
@@ -14052,9 +14083,11 @@ fn apply_headers_and_footers(
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
       },
-      index,
-      collect_frame_items,
-      &mut adornment_frames,
+      RepeatingFrameSink {
+        page_index: index,
+        collect_items: collect_frame_items,
+        frames: &mut adornment_frames,
+      },
     );
 
     let footer_repeating_slots = repeating_slot_state(document, page.section_index, text_metrics);
@@ -14105,9 +14138,11 @@ fn apply_headers_and_footers(
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
       },
-      index,
-      collect_frame_items,
-      &mut adornment_frames,
+      RepeatingFrameSink {
+        page_index: index,
+        collect_items: collect_frame_items,
+        frames: &mut adornment_frames,
+      },
     );
 
     extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &adornment.wrap_exclusions);
@@ -16834,16 +16869,16 @@ fn floating_table_frame_bounds(
       continue;
     };
     let mut row_bottom = row.y_pt + row.height_pt;
-    if fragment.row_index + 1 == table.rows.len() {
-      if let Some(painted_bottom) = final_row_bottom_border_ink_bottom(&page.items, row, table) {
-        // Row frame heights do not all end on the same side of a collapsed
-        // bottom border: authored fixed rows already cover the painted edge,
-        // while an AutoFit row can stop at its inner edge. Use the actual
-        // final-row border ink to extend only a frame that is genuinely short.
-        // The fly page can contain nested content, so arbitrary item ink must
-        // not be allowed to enlarge the outer table frame.
-        row_bottom = row_bottom.max(painted_bottom);
-      }
+    if fragment.row_index + 1 == table.rows.len()
+      && let Some(painted_bottom) = final_row_bottom_border_ink_bottom(&page.items, row, table)
+    {
+      // Row frame heights do not all end on the same side of a collapsed
+      // bottom border: authored fixed rows already cover the painted edge,
+      // while an AutoFit row can stop at its inner edge. Use the actual
+      // final-row border ink to extend only a frame that is genuinely short.
+      // The fly page can contain nested content, so arbitrary item ink must
+      // not be allowed to enlarge the outer table frame.
+      row_bottom = row_bottom.max(painted_bottom);
     }
     table_bounds = Some(match table_bounds {
       None => (row.x_pt, row.y_pt, row.x_pt + row.width_pt, row_bottom),
@@ -19818,13 +19853,15 @@ impl RowFrame<'_, '_> {
       let (cell_fragment_top, cell_fragment_height) = complete_vertical_merge_fragment_span(
         self.table,
         &self.table_frame.row_heights,
-        self.row_index,
-        grid_start,
-        row_top,
-        row_bottom,
-        content_offset,
-        self.table_frame.block.content_top_pt,
-        self.table_frame.block.content_bottom,
+        VerticalMergeFragmentContext {
+          row_index: self.row_index,
+          grid_start,
+          row_top_pt: row_top,
+          row_bottom_pt: row_bottom,
+          content_offset,
+          page_content_top_pt: self.table_frame.block.content_top_pt,
+          page_content_bottom_pt: self.table_frame.block.content_bottom,
+        },
       )
       .unwrap_or((row_top, physical_fragment_height));
       push_page_fragment(
@@ -20520,6 +20557,17 @@ struct VerticalMergeSpan {
   current_row_height: f32,
 }
 
+#[derive(Clone, Copy)]
+struct VerticalMergeFragmentContext {
+  row_index: usize,
+  grid_start: usize,
+  row_top_pt: f32,
+  row_bottom_pt: f32,
+  content_offset: f32,
+  page_content_top_pt: f32,
+  page_content_bottom_pt: f32,
+}
+
 fn vertical_merge_content_height(
   table: &Table,
   row_heights: &[f32],
@@ -20549,41 +20597,39 @@ fn vertical_merge_content_height(
 fn complete_vertical_merge_fragment_span(
   table: &Table,
   row_heights: &[f32],
-  row_index: usize,
-  grid_start: usize,
-  row_top: f32,
-  row_bottom: f32,
-  content_offset: f32,
-  page_content_top: f32,
-  page_content_bottom: f32,
+  fragment: VerticalMergeFragmentContext,
 ) -> Option<(f32, f32)> {
-  if content_offset > LAYOUT_EPSILON_PT {
+  if fragment.content_offset > LAYOUT_EPSILON_PT {
     return None;
   }
-  let row = table.rows.get(row_index)?;
-  let cell = row_cell_at_grid(row, grid_start)?;
+  let row = table.rows.get(fragment.row_index)?;
+  let cell = row_cell_at_grid(row, fragment.grid_start)?;
   let origin_row_index = if cell.vertical_merge_continue {
-    vertical_merge_origin_row_index(table, row_index, grid_start)?
+    vertical_merge_origin_row_index(table, fragment.row_index, fragment.grid_start)?
   } else {
-    table_cell_has_vertical_merge_follow(table, row_index, grid_start).then_some(row_index)?
+    table_cell_has_vertical_merge_follow(table, fragment.row_index, fragment.grid_start)
+      .then_some(fragment.row_index)?
   };
-  let end_row_index = vertical_merge_follow_end_row(table, origin_row_index, grid_start)?;
-  if row_index > end_row_index {
+  let end_row_index = vertical_merge_follow_end_row(table, origin_row_index, fragment.grid_start)?;
+  if fragment.row_index > end_row_index {
     return None;
   }
 
-  let current_row_height = row_heights.get(row_index).copied()?;
-  if ((row_bottom - row_top) - current_row_height).abs() > LAYOUT_EPSILON_PT {
+  let current_row_height = row_heights.get(fragment.row_index).copied()?;
+  if ((fragment.row_bottom_pt - fragment.row_top_pt) - current_row_height).abs() > LAYOUT_EPSILON_PT
+  {
     // Keep split-row fragments page-local. The complete-span box is only
     // valid when all physical rows of the merge are present in this upper.
     return None;
   }
-  let height_before_current = row_heights[origin_row_index..row_index].iter().sum::<f32>()
-    + table.rows[origin_row_index..row_index]
+  let height_before_current = row_heights[origin_row_index..fragment.row_index]
+    .iter()
+    .sum::<f32>()
+    + table.rows[origin_row_index..fragment.row_index]
       .iter()
       .map(|span_row| row_cell_spacing_pt(table, span_row))
       .sum::<f32>();
-  let merged_top = row_top - height_before_current;
+  let merged_top = fragment.row_top_pt - height_before_current;
   let merged_height = row_heights[origin_row_index..=end_row_index]
     .iter()
     .sum::<f32>()
@@ -20592,8 +20638,8 @@ fn complete_vertical_merge_fragment_span(
       .map(|span_row| row_cell_spacing_pt(table, span_row))
       .sum::<f32>();
   let merged_bottom = merged_top + merged_height;
-  if merged_top + LAYOUT_EPSILON_PT < page_content_top
-    || merged_bottom > page_content_bottom + LAYOUT_EPSILON_PT
+  if merged_top + LAYOUT_EPSILON_PT < fragment.page_content_top_pt
+    || merged_bottom > fragment.page_content_bottom_pt + LAYOUT_EPSILON_PT
   {
     // A rowspan crossing a page/table follow owns one clip on each upper;
     // retain the existing physical fragment bounds for that split case.
@@ -27806,6 +27852,15 @@ struct InlineObjectAdvance<'a> {
   object_line_height: f32,
 }
 
+struct TextPageBreakAdvance<'a> {
+  current: &'a mut Page,
+  pages: &'a mut Vec<Page>,
+  text_metrics: &'a mut TextMetrics,
+  wrap_exclusions: &'a mut Vec<WrapExclusion>,
+  paragraph_anchor_top: &'a mut f32,
+  preserve_paragraph_upper_space: bool,
+}
+
 struct TextFrameLayout<'a> {
   paragraph: &'a crate::docx::Paragraph,
   flow: FlowContext,
@@ -28252,13 +28307,16 @@ impl<'a> TextFrameLayout<'a> {
   fn force_text_page_break(
     &self,
     flow: FlowContext,
-    current: &mut Page,
-    pages: &mut Vec<Page>,
-    text_metrics: &mut TextMetrics,
-    wrap_exclusions: &mut Vec<WrapExclusion>,
-    paragraph_anchor_top: &mut f32,
-    preserve_paragraph_upper_space: bool,
+    advance: TextPageBreakAdvance<'_>,
   ) -> (FlowContext, TextFrame, f32, f32, f32, f32) {
+    let TextPageBreakAdvance {
+      current,
+      pages,
+      text_metrics,
+      wrap_exclusions,
+      paragraph_anchor_top,
+      preserve_paragraph_upper_space,
+    } = advance;
     let (next_flow, mut y) = force_page_break(flow, current, pages);
     // A run-level page break splits one Word paragraph into a master and a
     // follow text frame. Paragraph-relative drawings after the break use the
@@ -28468,12 +28526,14 @@ impl<'a> TextFrameLayout<'a> {
             page_break_has_following_content(&paragraph.inlines, 1);
           (flow, text_frame, y, _, _, _) = self.force_text_page_break(
             flow,
-            current,
-            pages,
-            text_metrics,
-            &mut wrap_exclusions,
-            &mut paragraph_anchor_top,
-            preserve_paragraph_upper_space,
+            TextPageBreakAdvance {
+              current,
+              pages,
+              text_metrics,
+              wrap_exclusions: &mut wrap_exclusions,
+              paragraph_anchor_top: &mut paragraph_anchor_top,
+              preserve_paragraph_upper_space,
+            },
           );
           first_inline_index = 1;
           leading_break_was_page = true;
@@ -28532,8 +28592,10 @@ impl<'a> TextFrameLayout<'a> {
           flow,
           text_frame,
           &mut text_state.line_text_extents,
-          &paragraph.list_label_style,
-          visible_label,
+          TextPortion {
+            style: &paragraph.list_label_style,
+            text: visible_label,
+          },
           text_metrics,
         );
       }
@@ -29001,12 +29063,14 @@ impl<'a> TextFrameLayout<'a> {
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
-              current,
-              pages,
-              text_metrics,
-              &mut wrap_exclusions,
-              &mut paragraph_anchor_top,
-              true,
+              TextPageBreakAdvance {
+                current,
+                pages,
+                text_metrics,
+                wrap_exclusions: &mut wrap_exclusions,
+                paragraph_anchor_top: &mut paragraph_anchor_top,
+                preserve_paragraph_upper_space: true,
+              },
             );
             default_line_right = text_frame.default_line_right;
             paragraph_left = text_frame.paragraph_left;
@@ -29108,12 +29172,14 @@ impl<'a> TextFrameLayout<'a> {
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
-              current,
-              pages,
-              text_metrics,
-              &mut wrap_exclusions,
-              &mut paragraph_anchor_top,
-              true,
+              TextPageBreakAdvance {
+                current,
+                pages,
+                text_metrics,
+                wrap_exclusions: &mut wrap_exclusions,
+                paragraph_anchor_top: &mut paragraph_anchor_top,
+                preserve_paragraph_upper_space: true,
+              },
             );
             default_line_right = text_frame.default_line_right;
             paragraph_left = text_frame.paragraph_left;
@@ -29184,12 +29250,14 @@ impl<'a> TextFrameLayout<'a> {
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
-              current,
-              pages,
-              text_metrics,
-              &mut wrap_exclusions,
-              &mut paragraph_anchor_top,
-              true,
+              TextPageBreakAdvance {
+                current,
+                pages,
+                text_metrics,
+                wrap_exclusions: &mut wrap_exclusions,
+                paragraph_anchor_top: &mut paragraph_anchor_top,
+                preserve_paragraph_upper_space: true,
+              },
             );
             default_line_right = text_frame.default_line_right;
             paragraph_left = text_frame.paragraph_left;
@@ -29291,12 +29359,14 @@ impl<'a> TextFrameLayout<'a> {
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
-              current,
-              pages,
-              text_metrics,
-              &mut wrap_exclusions,
-              &mut paragraph_anchor_top,
-              true,
+              TextPageBreakAdvance {
+                current,
+                pages,
+                text_metrics,
+                wrap_exclusions: &mut wrap_exclusions,
+                paragraph_anchor_top: &mut paragraph_anchor_top,
+                preserve_paragraph_upper_space: true,
+              },
             );
             default_line_right = text_frame.default_line_right;
             paragraph_left = text_frame.paragraph_left;
@@ -29408,12 +29478,14 @@ impl<'a> TextFrameLayout<'a> {
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
-              current,
-              pages,
-              text_metrics,
-              &mut wrap_exclusions,
-              &mut paragraph_anchor_top,
-              true,
+              TextPageBreakAdvance {
+                current,
+                pages,
+                text_metrics,
+                wrap_exclusions: &mut wrap_exclusions,
+                paragraph_anchor_top: &mut paragraph_anchor_top,
+                preserve_paragraph_upper_space: true,
+              },
             );
             default_line_right = text_frame.default_line_right;
             paragraph_left = text_frame.paragraph_left;
@@ -30011,8 +30083,10 @@ impl<'a> TextFrameLayout<'a> {
                   flow,
                   text_frame,
                   &mut text_state.line_text_extents,
-                  &run.style,
-                  &selected.prefix,
+                  TextPortion {
+                    style: &run.style,
+                    text: &selected.prefix,
+                  },
                   text_metrics,
                 );
                 line_height = include_text_height(
@@ -30021,8 +30095,10 @@ impl<'a> TextFrameLayout<'a> {
                   flow,
                   text_frame,
                   &mut text_state.line_text_extents,
-                  &run.style,
-                  &selected.prefix,
+                  TextPortion {
+                    style: &run.style,
+                    text: &selected.prefix,
+                  },
                   text_metrics,
                 );
               }
@@ -30381,8 +30457,10 @@ impl<'a> TextFrameLayout<'a> {
                         flow,
                         text_frame,
                         &mut text_state.line_text_extents,
-                        &run.style,
-                        text,
+                        TextPortion {
+                          style: &run.style,
+                          text,
+                        },
                         text_metrics,
                       );
                       line_height = include_text_height(
@@ -30391,8 +30469,10 @@ impl<'a> TextFrameLayout<'a> {
                         flow,
                         text_frame,
                         &mut text_state.line_text_extents,
-                        &run.style,
-                        text,
+                        TextPortion {
+                          style: &run.style,
+                          text,
+                        },
                         text_metrics,
                       );
                     }
@@ -30516,8 +30596,10 @@ impl<'a> TextFrameLayout<'a> {
                     flow,
                     text_frame,
                     &mut text_state.line_text_extents,
-                    &run.style,
-                    &text,
+                    TextPortion {
+                      style: &run.style,
+                      text: &text,
+                    },
                     text_metrics,
                   );
                   line_height = include_text_height(
@@ -30526,8 +30608,10 @@ impl<'a> TextFrameLayout<'a> {
                     flow,
                     text_frame,
                     &mut text_state.line_text_extents,
-                    &run.style,
-                    &text,
+                    TextPortion {
+                      style: &run.style,
+                      text: &text,
+                    },
                     text_metrics,
                   );
                 }
@@ -30584,8 +30668,10 @@ impl<'a> TextFrameLayout<'a> {
                 flow,
                 text_frame,
                 &mut text_state.line_text_extents,
-                &run.style,
-                &segment.text,
+                TextPortion {
+                  style: &run.style,
+                  text: &segment.text,
+                },
                 text_metrics,
               );
               line_height = include_text_height(
@@ -30594,8 +30680,10 @@ impl<'a> TextFrameLayout<'a> {
                 flow,
                 text_frame,
                 &mut text_state.line_text_extents,
-                &run.style,
-                &segment.text,
+                TextPortion {
+                  style: &run.style,
+                  text: &segment.text,
+                },
                 text_metrics,
               );
             }
@@ -30870,12 +30958,14 @@ impl<'a> TextFrameLayout<'a> {
               (flow, text_frame, y, line_left, line_right, line_height) = self
                 .force_text_page_break(
                   flow,
-                  current,
-                  pages,
-                  text_metrics,
-                  &mut wrap_exclusions,
-                  &mut paragraph_anchor_top,
-                  false,
+                  TextPageBreakAdvance {
+                    current,
+                    pages,
+                    text_metrics,
+                    wrap_exclusions: &mut wrap_exclusions,
+                    paragraph_anchor_top: &mut paragraph_anchor_top,
+                    preserve_paragraph_upper_space: false,
+                  },
                 );
             }
             default_line_right = text_frame.default_line_right;
@@ -31112,12 +31202,14 @@ impl<'a> TextFrameLayout<'a> {
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
-              current,
-              pages,
-              text_metrics,
-              &mut wrap_exclusions,
-              &mut paragraph_anchor_top,
-              true,
+              TextPageBreakAdvance {
+                current,
+                pages,
+                text_metrics,
+                wrap_exclusions: &mut wrap_exclusions,
+                paragraph_anchor_top: &mut paragraph_anchor_top,
+                preserve_paragraph_upper_space: true,
+              },
             );
             default_line_right = text_frame.default_line_right;
             paragraph_left = text_frame.paragraph_left;
@@ -32446,12 +32538,14 @@ impl<'a> TextFrameLayout<'a> {
                 (flow, text_frame, y, line_left, line_right, line_height) = self
                   .force_text_page_break(
                     flow,
-                    current,
-                    pages,
-                    text_metrics,
-                    &mut wrap_exclusions,
-                    &mut paragraph_anchor_top,
-                    true,
+                    TextPageBreakAdvance {
+                      current,
+                      pages,
+                      text_metrics,
+                      wrap_exclusions: &mut wrap_exclusions,
+                      paragraph_anchor_top: &mut paragraph_anchor_top,
+                      preserve_paragraph_upper_space: true,
+                    },
                   );
                 default_line_right = text_frame.default_line_right;
                 paragraph_left = text_frame.paragraph_left;
@@ -32595,12 +32689,14 @@ impl<'a> TextFrameLayout<'a> {
           if pending_text_page_break {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
-              current,
-              pages,
-              text_metrics,
-              &mut wrap_exclusions,
-              &mut paragraph_anchor_top,
-              true,
+              TextPageBreakAdvance {
+                current,
+                pages,
+                text_metrics,
+                wrap_exclusions: &mut wrap_exclusions,
+                paragraph_anchor_top: &mut paragraph_anchor_top,
+                preserve_paragraph_upper_space: true,
+              },
             );
             x = line_left;
             line_item_start_index = current.items.len();
@@ -32705,12 +32801,14 @@ impl<'a> TextFrameLayout<'a> {
               page_break_has_following_content(&paragraph.inlines, inline_index + 1);
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
-              current,
-              pages,
-              text_metrics,
-              &mut wrap_exclusions,
-              &mut paragraph_anchor_top,
-              preserve_paragraph_upper_space,
+              TextPageBreakAdvance {
+                current,
+                pages,
+                text_metrics,
+                wrap_exclusions: &mut wrap_exclusions,
+                paragraph_anchor_top: &mut paragraph_anchor_top,
+                preserve_paragraph_upper_space,
+              },
             );
             default_line_right = text_frame.default_line_right;
             paragraph_left = text_frame.paragraph_left;
@@ -32806,12 +32904,14 @@ impl<'a> TextFrameLayout<'a> {
     if pending_text_page_break {
       (flow, text_frame, y, _, _, line_height) = self.force_text_page_break(
         flow,
-        current,
-        pages,
-        text_metrics,
-        &mut wrap_exclusions,
-        &mut paragraph_anchor_top,
-        false,
+        TextPageBreakAdvance {
+          current,
+          pages,
+          text_metrics,
+          wrap_exclusions: &mut wrap_exclusions,
+          paragraph_anchor_top: &mut paragraph_anchor_top,
+          preserve_paragraph_upper_space: false,
+        },
       );
       default_line_right = text_frame.default_line_right;
       paragraph_left = text_frame.paragraph_left;
@@ -32893,11 +32993,13 @@ impl<'a> TextFrameLayout<'a> {
       justify_paragraph_last_line(
         paragraph.format.justification,
         &mut current.items,
-        line_item_start_index,
-        y,
-        line_left,
-        line_right,
-        text_state.smart_justify_terminal_overhang_pt,
+        LineJustificationContext {
+          item_start: line_item_start_index,
+          y_pt: y,
+          left_pt: line_left,
+          right_pt: line_right,
+          terminal_overhang_pt: text_state.smart_justify_terminal_overhang_pt,
+        },
         text_metrics,
       );
       align_line_items_to_inline_object_baseline(
@@ -36088,24 +36190,29 @@ fn justify_line_items(
   }
 }
 
+#[derive(Clone, Copy)]
+struct LineJustificationContext {
+  item_start: usize,
+  y_pt: f32,
+  left_pt: f32,
+  right_pt: f32,
+  terminal_overhang_pt: f32,
+}
+
 fn justify_paragraph_last_line(
   justification: crate::docx::ParagraphJustification,
   items: &mut [PageItem],
-  start_index: usize,
-  y: f32,
-  line_left: f32,
-  line_right: f32,
-  terminal_overhang_pt: f32,
+  line: LineJustificationContext,
   text_metrics: &mut TextMetrics,
 ) {
   if justification.last_line_adjust == crate::docx::ParagraphAdjust::Block {
     justify_line_items(
       items,
-      start_index,
-      y,
-      line_left,
-      line_right,
-      terminal_overhang_pt,
+      line.item_start,
+      line.y_pt,
+      line.left_pt,
+      line.right_pt,
+      line.terminal_overhang_pt,
       text_metrics,
     );
   }
@@ -37567,8 +37674,8 @@ mod tests {
 
   #[test]
   fn trailing_hanging_punctuation_does_not_decompress_the_line() {
-    let natural_right = 341.850_006;
-    let line_right = 329.699_982;
+    let natural_right = 341.85;
+    let line_right = 329.699_98;
     let total_capacity = 15.75;
     let trailing_full_stop_capacity = 5.25;
 
@@ -37814,7 +37921,7 @@ mod tests {
     )
     .expect("painted VML image host");
     let image = crate::docx::InlineImage {
-      data: Arc::<[u8]>::from([1, 2, 3]),
+      data: Bytes::from_static(&[1, 2, 3]),
       content_type: Some("image/png".into()),
       picture_frame: Some(Box::new(host)),
       picture_frame_clips_image: false,
@@ -38421,7 +38528,7 @@ mod tests {
 
     fn floating_picture() -> crate::docx::InlineImage {
       crate::docx::InlineImage {
-        data: Arc::<[u8]>::from([0]),
+        data: Bytes::from_static(&[0]),
         content_type: Some("image/png".into()),
         picture_frame: None,
         picture_frame_clips_image: false,
@@ -39906,7 +40013,7 @@ mod tests {
       rotation_deg: 0.0,
       flip_horizontal: false,
       flip_vertical: false,
-      data: Arc::from(Vec::<u8>::new()),
+      data: Bytes::new(),
       content_type: None,
       metafile_background_color: None,
       alt_text: None,
@@ -39975,7 +40082,7 @@ mod tests {
         rotation_deg: 0.0,
         flip_horizontal: false,
         flip_vertical: false,
-        data: Arc::from([]),
+        data: Bytes::new(),
         content_type: None,
         metafile_background_color: None,
         alt_text: None,
@@ -42326,8 +42433,10 @@ mod tests {
       flow,
       frame,
       &mut line_text_extents,
-      &tall_run.style,
-      &tall_run.text,
+      TextPortion {
+        style: &tall_run.style,
+        text: &tall_run.text,
+      },
       &mut text_metrics,
     );
 
@@ -42348,8 +42457,10 @@ mod tests {
       flow,
       inherited_frame,
       &mut inherited_line_text_extents,
-      &tall_run.style,
-      &tall_run.text,
+      TextPortion {
+        style: &tall_run.style,
+        text: &tall_run.text,
+      },
       &mut text_metrics,
     );
     // Inheritance does not change the line-box multiple. A zero-leading
@@ -42502,8 +42613,10 @@ mod tests {
       flow,
       frame,
       &mut extents,
-      &base_style,
-      "ordinary prefix",
+      TextPortion {
+        style: &base_style,
+        text: "ordinary prefix",
+      },
       &mut text_metrics,
     );
     let mixed_height = include_text_height(
@@ -42512,8 +42625,10 @@ mod tests {
       flow,
       frame,
       &mut extents,
-      &resource_style,
-      "错误!",
+      TextPortion {
+        style: &resource_style,
+        text: "错误!",
+      },
       &mut text_metrics,
     );
     assert!((mixed_height - resource_minimum).abs() < 0.001);
@@ -42530,8 +42645,10 @@ mod tests {
       flow,
       frame,
       &mut plain_extents,
-      &base_style,
-      "普通文本",
+      TextPortion {
+        style: &base_style,
+        text: "普通文本",
+      },
       &mut text_metrics,
     );
     assert!(
@@ -42550,8 +42667,10 @@ mod tests {
       flow,
       exact_frame,
       &mut exact_extents,
-      &resource_style,
-      "错误!",
+      TextPortion {
+        style: &resource_style,
+        text: "错误!",
+      },
       &mut text_metrics,
     );
     assert_eq!(exact_height, exact_frame.base_line_height);
@@ -46085,13 +46204,15 @@ mod tests {
       complete_vertical_merge_fragment_span(
         &table,
         &[10.0, 11.0, 12.0],
-        0,
-        0,
-        100.0,
-        110.0,
-        0.0,
-        72.0,
-        720.0,
+        VerticalMergeFragmentContext {
+          row_index: 0,
+          grid_start: 0,
+          row_top_pt: 100.0,
+          row_bottom_pt: 110.0,
+          content_offset: 0.0,
+          page_content_top_pt: 72.0,
+          page_content_bottom_pt: 720.0,
+        },
       ),
       Some((100.0, 38.0))
     );
@@ -46099,13 +46220,15 @@ mod tests {
       complete_vertical_merge_fragment_span(
         &table,
         &[10.0, 11.0, 12.0],
-        1,
-        0,
-        113.0,
-        124.0,
-        0.0,
-        72.0,
-        720.0,
+        VerticalMergeFragmentContext {
+          row_index: 1,
+          grid_start: 0,
+          row_top_pt: 113.0,
+          row_bottom_pt: 124.0,
+          content_offset: 0.0,
+          page_content_top_pt: 72.0,
+          page_content_bottom_pt: 720.0,
+        },
       ),
       Some((100.0, 38.0))
     );
@@ -46113,13 +46236,15 @@ mod tests {
       complete_vertical_merge_fragment_span(
         &table,
         &[10.0, 11.0, 12.0],
-        2,
-        0,
-        126.0,
-        138.0,
-        0.0,
-        72.0,
-        720.0,
+        VerticalMergeFragmentContext {
+          row_index: 2,
+          grid_start: 0,
+          row_top_pt: 126.0,
+          row_bottom_pt: 138.0,
+          content_offset: 0.0,
+          page_content_top_pt: 72.0,
+          page_content_bottom_pt: 720.0,
+        },
       ),
       Some((100.0, 38.0))
     );
@@ -46127,13 +46252,15 @@ mod tests {
       complete_vertical_merge_fragment_span(
         &table,
         &[10.0, 11.0, 12.0],
-        1,
-        0,
-        72.0,
-        83.0,
-        0.0,
-        72.0,
-        720.0,
+        VerticalMergeFragmentContext {
+          row_index: 1,
+          grid_start: 0,
+          row_top_pt: 72.0,
+          row_bottom_pt: 83.0,
+          content_offset: 0.0,
+          page_content_top_pt: 72.0,
+          page_content_bottom_pt: 720.0,
+        },
       ),
       None,
       "a continuation moved to a new upper keeps its page-local clip",
@@ -46785,8 +46912,10 @@ mod tests {
   #[test]
   fn smart_justify_compares_hinted_runs_with_the_authored_line_width() {
     let mut text_metrics = TextMetrics::new();
-    let mut style = TextStyle::default();
-    style.font_size_pt = 24.0;
+    let mut style = TextStyle {
+      font_size_pt: 24.0,
+      ..Default::default()
+    };
     round_style_to_word_print_grid(&mut style);
     let space_width = text_metrics
       .gdi_hinted_text_extent_pt(" ", &style, units::OFFICE_FIXED_OUTPUT_DPI)
@@ -46873,11 +47002,13 @@ mod tests {
         ..Default::default()
       },
       &mut items,
-      0,
-      20.0,
-      0.0,
-      line_right,
-      0.0,
+      LineJustificationContext {
+        item_start: 0,
+        y_pt: 20.0,
+        left_pt: 0.0,
+        right_pt: line_right,
+        terminal_overhang_pt: 0.0,
+      },
       &mut text_metrics,
     );
 
@@ -46978,7 +47109,7 @@ mod tests {
         rotation_deg: 0.0,
         flip_horizontal: false,
         flip_vertical: false,
-        data: Arc::from([]),
+        data: Bytes::new(),
         content_type: None,
         metafile_background_color: None,
         alt_text: None,
@@ -47068,7 +47199,7 @@ mod tests {
           rotation_deg: 0.0,
           flip_horizontal: false,
           flip_vertical: false,
-          data: Arc::from([]),
+          data: Bytes::new(),
           content_type: None,
           metafile_background_color: None,
           alt_text: None,
@@ -47130,7 +47261,7 @@ mod tests {
         rotation_deg: 0.0,
         flip_horizontal: false,
         flip_vertical: false,
-        data: Arc::from([]),
+        data: Bytes::new(),
         content_type: None,
         metafile_background_color: None,
         alt_text: None,
@@ -47390,7 +47521,7 @@ mod tests {
       rotation_deg: 0.0,
       flip_horizontal: false,
       flip_vertical: false,
-      data: Arc::from([]),
+      data: Bytes::new(),
       content_type: None,
       metafile_background_color: None,
       alt_text: None,
@@ -47495,7 +47626,7 @@ mod tests {
   fn office_math_external_line_bounds_do_not_repeat_legacy_auto_spacing() {
     let mut paragraph = Paragraph {
       inlines: vec![InlineItem::Image(crate::docx::InlineImage {
-        data: Arc::from([]),
+        data: Bytes::new(),
         content_type: Some("application/vnd.ooxmlsdk.office-math+xml".into()),
         picture_frame: None,
         picture_frame_clips_image: false,
@@ -47642,7 +47773,7 @@ mod tests {
 
     fn image(width_pt: f32) -> crate::docx::InlineImage {
       crate::docx::InlineImage {
-        data: Arc::from([]),
+        data: Bytes::new(),
         content_type: Some("image/png".into()),
         picture_frame: None,
         picture_frame_clips_image: false,
@@ -47934,7 +48065,7 @@ mod tests {
   #[test]
   fn ordinary_inline_extent_overhangs_while_explicit_width_limit_scales() {
     let image = crate::docx::InlineImage {
-      data: Arc::from([]),
+      data: Bytes::new(),
       content_type: Some("image/png".into()),
       picture_frame: None,
       picture_frame_clips_image: false,
@@ -48117,7 +48248,7 @@ mod tests {
     ) -> Paragraph {
       Paragraph {
         inlines: vec![InlineItem::Image(crate::docx::InlineImage {
-          data: Arc::from([]),
+          data: Bytes::new(),
           content_type: None,
           picture_frame: None,
           picture_frame_clips_image: false,

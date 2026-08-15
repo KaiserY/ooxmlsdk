@@ -1834,7 +1834,7 @@ impl PageBreakModel {
 
 impl SheetResourceCatalog {
   pub(crate) fn from_worksheet_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &WorksheetPart,
     context: WorksheetResourceImportContext<'_>,
   ) -> Result<Self> {
@@ -1897,7 +1897,7 @@ impl SheetResourceCatalog {
   }
 
   pub(crate) fn from_chartsheet_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &ChartsheetPart,
     styles: &StylesCatalog,
   ) -> Result<Self> {

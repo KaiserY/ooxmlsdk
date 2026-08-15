@@ -145,6 +145,18 @@ fn expand_part_handle(
         <Self as crate::sdk::SdkPart>::try_data(self, package)
       }
 
+      /// Returns an owned, shared view of the part payload.
+      ///
+      /// Loading an archived part may allocate once; cloning the returned
+      /// [`bytes::Bytes`] reuses that cached payload without copying its contents.
+      #[inline]
+      pub fn try_data_bytes<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+      ) -> Result<bytes::Bytes, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPart>::try_data_bytes(self, package)
+      }
+
       #[inline]
       pub fn data_to_vec<P: crate::sdk::SdkPackage>(&self, package: &P) -> Option<Vec<u8>> {
         <Self as crate::sdk::SdkPart>::data_to_vec(self, package)
@@ -1268,6 +1280,7 @@ fn part_handle_child_methods_tokens(
           <Self as crate::sdk::SdkPart>::get_parts_of_type::<P, T>(self, package)
         }
 
+        /// Returns the first matching relationship ID in source relationship order.
         pub fn get_id_of_part<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
           &'a self,
           package: &'a P,

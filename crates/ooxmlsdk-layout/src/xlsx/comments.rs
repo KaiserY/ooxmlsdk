@@ -53,7 +53,7 @@ pub(crate) struct ThreadedCommentModel {
 
 impl CommentsCatalog {
   pub(crate) fn from_worksheet_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     comments_part: Option<WorksheetCommentsPart>,
     threaded_parts: Vec<WorksheetThreadedCommentsPart>,
   ) -> Result<Self> {
@@ -73,7 +73,7 @@ impl CommentsCatalog {
 }
 
 impl LegacyCommentsCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &WorksheetCommentsPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &WorksheetCommentsPart) -> Result<Self> {
     let comments = part.root_element(package)?;
     let authors = comments
       .authors
@@ -112,7 +112,7 @@ impl LegacyCommentModel {
 
 impl ThreadedCommentsCatalog {
   fn from_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &WorksheetThreadedCommentsPart,
   ) -> Result<Self> {
     let comments = part.root_element(package)?;

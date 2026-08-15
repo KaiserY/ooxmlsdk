@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
+use bytes::Bytes;
 use ooxmlsdk::parts::chart_part::ChartPart;
 use ooxmlsdk::parts::diagram_colors_part::DiagramColorsPart;
 use ooxmlsdk::parts::diagram_data_part::DiagramDataPart;
@@ -45,7 +45,7 @@ pub(crate) struct DrawingResourceCatalog {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ImageResource {
-  pub(crate) data: Arc<[u8]>,
+  pub(crate) data: Bytes,
   pub(crate) content_type: Option<String>,
 }
 
@@ -294,7 +294,7 @@ pub(crate) struct DiagramDrawingCatalog {
 
 impl DrawingResourceCatalog {
   pub(crate) fn from_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &DrawingsPart,
     ui_language: Option<&str>,
   ) -> Result<Self> {
@@ -425,7 +425,7 @@ fn collect_image_resources(
       Some((
         related_part.relationship_id().to_string(),
         ImageResource {
-          data: related_part.part().data_to_vec(package)?.into(),
+          data: related_part.part().try_data_bytes(package).ok()?,
           content_type: related_part
             .part()
             .content_type(package)
@@ -2022,7 +2022,7 @@ fn drawingml_run_color(properties: &a::RunProperties) -> Option<Color> {
 }
 
 impl DiagramResourceCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &DrawingsPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &DrawingsPart) -> Result<Self> {
     let data_parts = part
       .related_parts_of_type::<_, DiagramDataPart>(package)
       .map(|related| (related.relationship_id().to_string(), related.into_part()))
@@ -2067,7 +2067,7 @@ impl DiagramResourceCatalog {
 
 impl DiagramDataCatalog {
   fn from_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     relationship_id: String,
     part: &DiagramDataPart,
   ) -> Result<Self> {
@@ -2148,10 +2148,7 @@ impl DiagramDataCatalog {
 }
 
 impl DiagramLayoutCatalog {
-  fn from_part(
-    package: &mut SpreadsheetDocument,
-    part: &DiagramLayoutDefinitionPart,
-  ) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &DiagramLayoutDefinitionPart) -> Result<Self> {
     let model = {
       let layout = part.root_element(package)?;
       Self::from_layout(layout)
@@ -2193,7 +2190,7 @@ impl DiagramLayoutCatalog {
 }
 
 impl DiagramStyleCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &DiagramStylePart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &DiagramStylePart) -> Result<Self> {
     let style = part.root_element(package)?;
     Ok(Self {
       style: Some(Box::new(style.clone())),
@@ -2225,7 +2222,7 @@ impl DiagramStyleCatalog {
 }
 
 impl DiagramColorCatalog {
-  fn from_part(package: &mut SpreadsheetDocument, part: &DiagramColorsPart) -> Result<Self> {
+  fn from_part(package: &SpreadsheetDocument, part: &DiagramColorsPart) -> Result<Self> {
     let colors = part.root_element(package)?;
     Ok(Self {
       colors: Some(Box::new(colors.clone())),
@@ -2257,7 +2254,7 @@ impl DiagramColorCatalog {
 
 impl DiagramDrawingCatalog {
   fn from_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     relationship_id: String,
     part: &DiagramPersistLayoutPart,
   ) -> Result<Self> {
@@ -2287,7 +2284,7 @@ impl DiagramDrawingCatalog {
 
 impl ChartResourceCatalog {
   pub(crate) fn from_chart_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     relationship_id: String,
     part: &ChartPart,
     ui_language: Option<&str>,
@@ -2308,7 +2305,7 @@ impl ChartResourceCatalog {
   }
 
   pub(crate) fn from_extended_chart_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     relationship_id: String,
     part: &ExtendedChartPart,
   ) -> Result<Self> {
@@ -2787,7 +2784,7 @@ mod tests {
       print_with_sheet: true,
     };
     let resource = || ImageResource {
-      data: Arc::from([]),
+      data: Bytes::new(),
       content_type: Some("image/png".to_string()),
     };
     let anchors = vec![web_extension(2), web_extension(3)];

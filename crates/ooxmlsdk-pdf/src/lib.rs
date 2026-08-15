@@ -54,8 +54,8 @@ where
     },
     ..Default::default()
   };
-  let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
-  convert_wordprocessing_document(&mut document, options)
+  let document = WordprocessingDocument::new_with_settings(reader, settings)?;
+  convert_wordprocessing_document(&document, options)
 }
 
 /// Convert a DOCX stream and return the exact font/glyph data passed to PDF serialization.
@@ -73,10 +73,10 @@ where
     },
     ..Default::default()
   };
-  let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
+  let document = WordprocessingDocument::new_with_settings(reader, settings)?;
   let mut options = options;
   let layout_options = options.take_layout_options();
-  let pages = ooxmlsdk_layout::docx::layout_document(&mut document, &layout_options)?;
+  let pages = ooxmlsdk_layout::docx::layout_document(&document, &layout_options)?;
   render::krilla::render_with_diagnostics(&pages, &options)
 }
 
@@ -92,16 +92,16 @@ where
     },
     ..Default::default()
   };
-  let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
+  let document = WordprocessingDocument::new_with_settings(reader, settings)?;
   let mut options = options;
   let layout_options = options.take_layout_options();
-  let pages = ooxmlsdk_layout::docx::layout_document(&mut document, &layout_options)?;
+  let pages = ooxmlsdk_layout::docx::layout_document(&document, &layout_options)?;
   render::krilla::render_with_font_audit(&pages, &options)
 }
 
 /// Convert an opened Wordprocessing document into PDF bytes.
 pub fn convert_wordprocessing_document(
-  document: &mut WordprocessingDocument,
+  document: &WordprocessingDocument,
   mut options: PdfOptions,
 ) -> Result<Vec<u8>> {
   let layout_options = options.take_layout_options();
@@ -125,7 +125,7 @@ where
     },
     ..Default::default()
   };
-  let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
+  let document = WordprocessingDocument::new_with_settings(reader, settings)?;
   let mut layout_options = options.take_layout_options();
   layout_options.diagnostics = ooxmlsdk_layout::options::LayoutDiagnosticsOptions {
     collect_debug_records: true,
@@ -133,7 +133,7 @@ where
     preserve_source_links: true,
   };
   Ok(ooxmlsdk_layout::docx::inspect_layout(
-    &mut document,
+    &document,
     &layout_options,
   )?)
 }
@@ -153,8 +153,8 @@ where
     },
     ..Default::default()
   };
-  let mut document = PresentationDocument::new_with_settings(reader, settings)?;
-  ooxmlsdk_layout::pptx::inspect_layout(&mut document).map_err(Into::into)
+  let document = PresentationDocument::new_with_settings(reader, settings)?;
+  ooxmlsdk_layout::pptx::inspect_layout(&document).map_err(Into::into)
 }
 
 /// Convert an XLSX stream into PDF bytes.
@@ -169,8 +169,8 @@ where
     },
     ..Default::default()
   };
-  let mut document = SpreadsheetDocument::new_with_settings(reader, settings)?;
-  convert_spreadsheet_document(&mut document, options)
+  let document = SpreadsheetDocument::new_with_settings(reader, settings)?;
+  convert_spreadsheet_document(&document, options)
 }
 
 /// Convert an XLSX stream and return the exact font/glyph data passed to PDF serialization.
@@ -188,8 +188,8 @@ where
     },
     ..Default::default()
   };
-  let mut document = SpreadsheetDocument::new_with_settings(reader, settings)?;
-  let pages = xlsx::layout(&mut document, &mut options)?;
+  let document = SpreadsheetDocument::new_with_settings(reader, settings)?;
+  let pages = xlsx::layout(&document, &mut options)?;
   render::krilla::render_with_diagnostics(&pages, &options)
 }
 
@@ -208,14 +208,14 @@ where
     },
     ..Default::default()
   };
-  let mut document = SpreadsheetDocument::new_with_settings(reader, settings)?;
-  let pages = xlsx::layout(&mut document, &mut options)?;
+  let document = SpreadsheetDocument::new_with_settings(reader, settings)?;
+  let pages = xlsx::layout(&document, &mut options)?;
   render::krilla::render_with_font_audit(&pages, &options)
 }
 
 /// Convert an opened spreadsheet document into PDF bytes.
 pub fn convert_spreadsheet_document(
-  document: &mut SpreadsheetDocument,
+  document: &SpreadsheetDocument,
   mut options: PdfOptions,
 ) -> Result<Vec<u8>> {
   let pages = xlsx::layout(document, &mut options)?;
@@ -234,8 +234,8 @@ where
     },
     ..Default::default()
   };
-  let mut document = PresentationDocument::new_with_settings(reader, settings)?;
-  convert_presentation_document(&mut document, options)
+  let document = PresentationDocument::new_with_settings(reader, settings)?;
+  convert_presentation_document(&document, options)
 }
 
 /// Convert a PPTX stream and return the exact font/glyph data passed to PDF serialization.
@@ -253,10 +253,10 @@ where
     },
     ..Default::default()
   };
-  let mut document = PresentationDocument::new_with_settings(reader, settings)?;
+  let document = PresentationDocument::new_with_settings(reader, settings)?;
   let mut options = options;
   let layout_options = options.take_layout_options();
-  let pages = ooxmlsdk_layout::pptx::layout_document(&mut document, &layout_options)?;
+  let pages = ooxmlsdk_layout::pptx::layout_document(&document, &layout_options)?;
   render::krilla::render_with_diagnostics(&pages, &options)
 }
 
@@ -272,16 +272,16 @@ where
     },
     ..Default::default()
   };
-  let mut document = PresentationDocument::new_with_settings(reader, settings)?;
+  let document = PresentationDocument::new_with_settings(reader, settings)?;
   let mut options = options;
   let layout_options = options.take_layout_options();
-  let pages = ooxmlsdk_layout::pptx::layout_document(&mut document, &layout_options)?;
+  let pages = ooxmlsdk_layout::pptx::layout_document(&document, &layout_options)?;
   render::krilla::render_with_font_audit(&pages, &options)
 }
 
 /// Convert an opened presentation document into PDF bytes.
 pub fn convert_presentation_document(
-  document: &mut PresentationDocument,
+  document: &PresentationDocument,
   mut options: PdfOptions,
 ) -> Result<Vec<u8>> {
   let layout_options = options.take_layout_options();

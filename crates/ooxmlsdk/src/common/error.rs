@@ -33,6 +33,11 @@ pub enum SdkError {
   #[error("part is not directly referenced by this relationship source")]
   PartNotReferenced,
   #[cfg(feature = "parts")]
+  #[error(
+    "part is referenced by {relationship_count} relationships; use a relationship-id API to select one"
+  )]
+  AmbiguousPartRelationship { relationship_count: usize },
+  #[cfg(feature = "parts")]
   #[error("part relationship `{relationship_id}` does not exist")]
   PartRelationshipNotFound { relationship_id: String },
   #[error("mismatch error (expected {expected:?}, found {found:?})")]

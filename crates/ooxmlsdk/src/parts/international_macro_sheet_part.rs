@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct InternationalMacroSheetPart {
   pub(crate) key: crate::common::PartKey,
   pub(crate) spreadsheet_printer_settings_parts: crate::sdk::RepeatedPart<

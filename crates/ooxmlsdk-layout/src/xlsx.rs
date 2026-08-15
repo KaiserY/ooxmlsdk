@@ -49,14 +49,14 @@ pub(crate) fn format_spreadsheet_number(value: f64, format_code: &str) -> String
 }
 
 pub fn layout(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   layout_document(package, options)
 }
 
 pub fn layout_document(
-  package: &mut SpreadsheetDocument,
+  package: &SpreadsheetDocument,
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   let import = ExcelImport::import_document(package, options)?;

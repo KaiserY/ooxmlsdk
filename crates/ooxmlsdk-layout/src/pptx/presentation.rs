@@ -48,7 +48,7 @@ pub(crate) struct CustomShow {
 
 impl PresentationFragmentHandler {
   pub(crate) fn new(
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     presentation_part: PresentationPart,
   ) -> Result<Self> {
     // PresentationFragmentHandler records ids and presentation-wide state
@@ -119,7 +119,7 @@ impl PresentationFragmentHandler {
 
   pub(crate) fn finalize_import(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
   ) -> Result<()> {
     self.import_master_slides(package, import)?;
@@ -145,7 +145,7 @@ impl PresentationFragmentHandler {
 
   pub(crate) fn import_master_slides(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
   ) -> Result<()> {
     for relationship_id in self.slide_master_vector.clone() {
@@ -194,7 +194,7 @@ impl PresentationFragmentHandler {
 
   pub(crate) fn import_slide(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
     index: usize,
     slide_ref: SlideRef,
@@ -295,7 +295,7 @@ impl PresentationFragmentHandler {
 
   fn import_notes_master_slides(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
   ) -> Result<()> {
     // from presentation.xml and imports them as master persists using notes
@@ -313,7 +313,7 @@ impl PresentationFragmentHandler {
 
   fn import_layout_persist(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
     layout_part: SlideLayoutPart,
   ) -> Result<Option<usize>> {
@@ -387,7 +387,7 @@ impl PresentationFragmentHandler {
 
   fn import_notes_slide(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
     slide_index: usize,
     slide_part: &SlidePart,
@@ -446,7 +446,7 @@ impl PresentationFragmentHandler {
 
   fn import_notes_master_persist(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
     notes_master_part: NotesMasterPart,
   ) -> Result<Option<usize>> {
@@ -485,7 +485,7 @@ impl PresentationFragmentHandler {
 
   fn import_master_theme(
     &self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
     master_part: &SlideMasterPart,
   ) -> Result<Option<String>> {
@@ -513,7 +513,7 @@ impl PresentationFragmentHandler {
 
   fn import_notes_master_theme(
     &self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
     notes_master_part: &NotesMasterPart,
   ) -> Result<Option<String>> {
@@ -541,7 +541,7 @@ impl PresentationFragmentHandler {
 
   fn import_slide_comments(
     &mut self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     persist: &mut SlidePersist,
     slide_part: &SlidePart,
   ) -> Result<()> {
@@ -591,7 +591,7 @@ impl PresentationFragmentHandler {
 
   fn import_presentation_properties(
     &self,
-    package: &mut PresentationDocument,
+    package: &PresentationDocument,
     import: &mut PowerPointImport,
   ) -> Result<()> {
     // The presProps fragment maps showPr/@loop, showPr/@useTimings,
@@ -744,7 +744,7 @@ fn slide_name_matches_title(name: &str, title: &str) -> bool {
 }
 
 fn presentation_comment_authors(
-  package: &mut PresentationDocument,
+  package: &PresentationDocument,
   presentation_part: &PresentationPart,
 ) -> Result<Vec<SlideCommentAuthor>> {
   let mut authors = Vec::new();

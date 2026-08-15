@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
@@ -1076,7 +1077,7 @@ pub(crate) struct OfficeMathDisplayLayout {
 
 #[derive(Clone, Debug)]
 pub(crate) struct InlineImage {
-  pub data: Arc<[u8]>,
+  pub data: Bytes,
   pub content_type: Option<String>,
   pub picture_frame: Option<Box<InlineShape>>,
   /// Whether the picture frame geometry clips the image surface. DrawingML
@@ -1258,7 +1259,7 @@ pub(crate) struct InlineChart {
 
 #[derive(Clone, Debug)]
 pub(crate) struct InlineShapeImageFill {
-  pub data: Arc<[u8]>,
+  pub data: Bytes,
   pub content_type: Option<String>,
   pub crop: ImageCrop,
   pub rotation_deg: f32,

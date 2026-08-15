@@ -72,18 +72,19 @@ fn parse_control_part(
   package: &PresentationDocument,
   part: &EmbeddedControlPersistencePart,
 ) -> Option<ActiveXControlState> {
-  let control_data = ActiveXControlData::from_bytes(part.data_to_vec(package)?.as_slice()).ok()?;
+  let control_data = ActiveXControlData::from_bytes(&part.try_data_bytes(package).ok()?).ok()?;
   let kind = control_kind(&control_data.active_x_control_class_id)?;
   let binary = part
     .embedded_control_persistence_binary_data_parts(package)
     .next()?
-    .data_to_vec(package)?;
+    .try_data_bytes(package)
+    .ok()?;
   let contents = match control_data.persistence {
     PersistenceValues::PersistStorage => CompoundFile::from_bytes(&binary)
       .ok()?
       .stream("Contents")?
       .to_vec(),
-    PersistenceValues::PersistStream | PersistenceValues::PersistStreamInit => binary,
+    PersistenceValues::PersistStream | PersistenceValues::PersistStreamInit => binary.to_vec(),
     PersistenceValues::PersistPropertyBag => return None,
   };
 

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use ooxmlsdk_fonts::{FontId, ShapedGlyph, ShapedRun};
 
@@ -189,7 +190,7 @@ pub struct ImageItem<'doc> {
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
   pub content_type: Cow<'doc, str>,
-  pub bytes: Arc<[u8]>,
+  pub bytes: Bytes,
   /// Optional caller-specific realization colors for a one-bit WMF DIB
   /// pattern. Ordinary metafiles retain their embedded palettes.
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,

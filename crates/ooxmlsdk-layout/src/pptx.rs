@@ -92,14 +92,14 @@ pub struct PptxBulletParagraphSummary {
 }
 
 pub fn layout(
-  package: &mut PresentationDocument,
+  package: &PresentationDocument,
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   layout_document(package, options)
 }
 
 pub fn layout_document(
-  package: &mut PresentationDocument,
+  package: &PresentationDocument,
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
   let mut import = PowerPointImport::import_document(package)?;
@@ -117,7 +117,7 @@ pub fn layout_document(
   Ok(document)
 }
 
-pub fn inspect_layout(package: &mut PresentationDocument) -> Result<PptxLayoutSummary> {
+pub fn inspect_layout(package: &PresentationDocument) -> Result<PptxLayoutSummary> {
   let import = PowerPointImport::import_document(package)?;
   Ok(display::inspect_layout_summary(&import))
 }

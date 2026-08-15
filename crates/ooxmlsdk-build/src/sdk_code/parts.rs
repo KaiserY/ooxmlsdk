@@ -26,7 +26,7 @@ fn gen_package_module(part: &PartModuleDecl) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = package_marker_fields(part)?;
   let package_struct: ItemStruct = parse2(quote! {
-    #[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
+    #[derive(Debug, ooxmlsdk_derive::SdkPackage)]
     pub struct #struct_name_ident {
       pub(crate) storage: crate::common::SdkPackageStorage,
       pub(crate) open_settings: crate::sdk::OpenSettings,
@@ -87,7 +87,7 @@ fn gen_part_handle_module(part: &PartModuleDecl) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = part_handle_marker_fields(part)?;
   let part_struct: ItemStruct = parse2(quote! {
-    #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+    #[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
     pub struct #struct_name_ident {
       pub(crate) key: crate::common::PartKey,
       #( #marker_fields )*
@@ -241,7 +241,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
     #( #mod_list )*
     pub mod extended_part;
 
-    #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPartRef)]
+    #[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPartRef)]
     pub enum PartRef {
       #( #part_ref_variants )*
       ExtendedPart(crate::parts::extended_part::ExtendedPart),
@@ -276,7 +276,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           if let Some(root_element) =
             crate::parts::PartRootElement::from_part_slot(storage, part_slot, open_settings)?
           {
-            let _ = root_elements.set_once(part_slot, root_element);
+            let _ = root_elements.cache_loaded(part_slot, root_element, open_settings);
           }
         }
       }
@@ -433,8 +433,10 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
                 "part id {part_id:?} is not present in package storage"
               ))
             })?;
-            if let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id) {
-              let bytes = root_element.to_bytes()?;
+            if crate::sdk::SdkPackage::root_element_requires_serialization(package, part_id) {
+              let bytes = crate::sdk::SdkPackage::root_element(package, part_id)
+                .ok_or(crate::common::SdkError::StalePart)?
+                .to_bytes()?;
               zip.start_file(part.path(), options)?;
               zip.write_all(&bytes)?;
             } else if !storage.raw_copy_part(part_id, &mut zip)? {

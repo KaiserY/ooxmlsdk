@@ -57,7 +57,7 @@ pub(crate) struct TableStyleModel {
 
 impl TableResourceCatalog {
   pub(crate) fn from_part(
-    package: &mut SpreadsheetDocument,
+    package: &SpreadsheetDocument,
     part: &TableDefinitionPart,
   ) -> Result<Self> {
     let table = part.root_element(package)?;

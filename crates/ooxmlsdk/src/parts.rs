@@ -133,7 +133,7 @@ pub mod worksheet_part;
 pub mod worksheet_sort_map_part;
 pub mod worksheet_threaded_comments_part;
 pub mod xml_signature_part;
-#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPartRef)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPartRef)]
 pub enum PartRef {
   #[sdk(
         relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
@@ -1377,7 +1377,7 @@ pub(crate) fn initialize_root_elements(
       if let Some(root_element) =
         crate::parts::PartRootElement::from_part_slot(storage, part_slot, open_settings)?
       {
-        let _ = root_elements.set_once(part_slot, root_element);
+        let _ = root_elements.cache_loaded(part_slot, root_element, open_settings);
       }
     }
   }
@@ -1509,8 +1509,10 @@ where
             "part id {part_id:?} is not present in package storage"
           ))
         })?;
-        if let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id) {
-          let bytes = root_element.to_bytes()?;
+        if crate::sdk::SdkPackage::root_element_requires_serialization(package, part_id) {
+          let bytes = crate::sdk::SdkPackage::root_element(package, part_id)
+            .ok_or(crate::common::SdkError::StalePart)?
+            .to_bytes()?;
           zip.start_file(part.path(), options)?;
           zip.write_all(&bytes)?;
         } else if !storage.raw_copy_part(part_id, &mut zip)? {

@@ -26,12 +26,12 @@ pub struct XlsxWorkbook<'doc> {
 }
 
 impl<'doc> XlsxWorkbook<'doc> {
-  pub fn from_spreadsheet_document(document: &'doc mut SpreadsheetDocument) -> Self {
+  pub fn from_spreadsheet_document(document: &'doc SpreadsheetDocument) -> Self {
     Self::from_spreadsheet_document_with_values(document, None)
   }
 
   pub fn from_spreadsheet_document_with_values(
-    document: &'doc mut SpreadsheetDocument,
+    document: &'doc SpreadsheetDocument,
     value_model: Option<&'doc ooxmlsdk_formula::WorkbookValueModel<'doc>>,
   ) -> Self {
     let Ok(workbook_part) = document.workbook_part() else {
@@ -171,7 +171,7 @@ fn import_sheet<'doc>(
 }
 
 fn import_table_parts<'doc>(
-  document: &mut SpreadsheetDocument,
+  document: &SpreadsheetDocument,
   worksheet_part: &ooxmlsdk::parts::worksheet_part::WorksheetPart,
 ) -> Vec<XlsxTable<'doc>> {
   let table_parts = worksheet_part

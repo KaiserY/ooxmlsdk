@@ -20,7 +20,7 @@ struct CustomXmlBindingEntry {
 }
 
 impl CustomXmlBindings {
-  pub(super) fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
+  pub(super) fn load(package: &WordprocessingDocument, main: &MainDocumentPart) -> Self {
     let parts = main.custom_xml_parts(package).collect::<Vec<_>>();
     let mut entries: Vec<CustomXmlBindingEntry> = parts
       .iter()

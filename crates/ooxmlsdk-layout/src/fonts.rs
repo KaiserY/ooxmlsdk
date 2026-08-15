@@ -999,10 +999,10 @@ fn apply_wordprocessingml_single_double_byte_width_balance(
     // an otherwise isolated Latin space. Office's Indent_Spacing.Template
     // output and Writer's tdf#88908 test both retain the legacy adjustment for
     // adjacent spaces in proportional faces.
-    let previous_matches = inside_cjk_script
-      || (local_start > 0 && run.text[..local_start].chars().next_back() == Some(' '));
-    let next_matches = inside_cjk_script
-      || (local_end < run.text.len() && run.text[local_end..].chars().next() == Some(' '));
+    let previous_matches =
+      inside_cjk_script || (local_start > 0 && run.text[..local_start].ends_with(' '));
+    let next_matches =
+      inside_cjk_script || (local_end < run.text.len() && run.text[local_end..].starts_with(' '));
     if !previous_matches && !next_matches {
       continue;
     }

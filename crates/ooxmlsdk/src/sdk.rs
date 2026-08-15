@@ -150,6 +150,11 @@ impl<T, C> PartialEq for PartChild<T, C> {
 }
 
 #[cfg(feature = "parts")]
+impl<T, C> std::hash::Hash for PartChild<T, C> {
+  fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
+}
+
+#[cfg(feature = "parts")]
 pub struct PartRoot<T>(std::marker::PhantomData<T>);
 
 #[cfg(feature = "parts")]
@@ -192,6 +197,11 @@ impl<T> PartialEq for PartRoot<T> {
   fn eq(&self, _other: &Self) -> bool {
     true
   }
+}
+
+#[cfg(feature = "parts")]
+impl<T> std::hash::Hash for PartRoot<T> {
+  fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
 }
 
 #[cfg(feature = "parts")]
@@ -253,6 +263,25 @@ pub(crate) fn relationship_target_as_part<T: SdkPart>(
   let part = storage.part(part_id)?;
   (part.kind() == T::KIND)
     .then(|| <T as crate::private::SdkPartHandle>::from_part_key(storage.part_key(part_id)))
+}
+
+#[cfg(feature = "parts")]
+fn unique_relationship_id_for_part(
+  relationships: &crate::common::RelationshipSet,
+  target_part_slot: crate::common::PartSlot,
+) -> Result<&str, crate::common::SdkError> {
+  let mut matching = relationships
+    .part_relationships()
+    .filter(|relationship| relationship.target_part_slot() == Some(target_part_slot));
+  let first = matching
+    .next()
+    .ok_or(crate::common::SdkError::PartNotReferenced)?;
+  let Some(_second) = matching.next() else {
+    return Ok(first.id());
+  };
+  Err(crate::common::SdkError::AmbiguousPartRelationship {
+    relationship_count: 2 + matching.count(),
+  })
 }
 
 #[cfg(feature = "parts")]
@@ -1072,12 +1101,35 @@ impl OpenSettings {
 
     self.open_mode
   }
+
+  #[inline]
+  fn transforms_loaded_roots(self) -> bool {
+    !matches!(
+      self.markup_compatibility_process_settings.process_mode,
+      MarkupCompatibilityProcessMode::NoProcess
+    )
+  }
 }
 
 #[cfg(feature = "parts")]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PartRootState {
+  Clean,
+  Transformed,
+  Dirty,
+}
+
+#[cfg(feature = "parts")]
+#[derive(Debug)]
+struct CachedPartRoot {
+  root_element: crate::parts::PartRootElement,
+  state: PartRootState,
+}
+
+#[cfg(feature = "parts")]
+#[derive(Debug)]
 pub(crate) struct PartRootCache {
-  entries: Vec<std::sync::OnceLock<crate::parts::PartRootElement>>,
+  entries: Vec<std::sync::OnceLock<CachedPartRoot>>,
 }
 
 #[cfg(feature = "parts")]
@@ -1093,7 +1145,7 @@ impl PartRootCache {
   fn cell(
     &self,
     part_slot: crate::common::PartSlot,
-  ) -> Option<&std::sync::OnceLock<crate::parts::PartRootElement>> {
+  ) -> Option<&std::sync::OnceLock<CachedPartRoot>> {
     self.entries.get(part_slot.index())
   }
 
@@ -1101,7 +1153,7 @@ impl PartRootCache {
   fn cell_mut(
     &mut self,
     part_slot: crate::common::PartSlot,
-  ) -> Option<&mut std::sync::OnceLock<crate::parts::PartRootElement>> {
+  ) -> Option<&mut std::sync::OnceLock<CachedPartRoot>> {
     self.entries.get_mut(part_slot.index())
   }
 
@@ -1110,7 +1162,10 @@ impl PartRootCache {
     &self,
     part_slot: crate::common::PartSlot,
   ) -> Option<&crate::parts::PartRootElement> {
-    self.cell(part_slot)?.get()
+    self
+      .cell(part_slot)?
+      .get()
+      .map(|cached| &cached.root_element)
   }
 
   #[inline]
@@ -1118,18 +1173,37 @@ impl PartRootCache {
     &mut self,
     part_slot: crate::common::PartSlot,
   ) -> Option<&mut crate::parts::PartRootElement> {
-    self.cell_mut(part_slot)?.get_mut()
+    let cached = self.cell_mut(part_slot)?.get_mut()?;
+    cached.state = PartRootState::Dirty;
+    Some(&mut cached.root_element)
   }
 
   #[inline]
-  pub(crate) fn set_once(
+  pub(crate) fn cache_loaded(
     &self,
     part_slot: crate::common::PartSlot,
     root_element: crate::parts::PartRootElement,
+    open_settings: &OpenSettings,
   ) -> Option<&crate::parts::PartRootElement> {
     let cell = self.cell(part_slot)?;
-    let _ = cell.set(root_element);
-    cell.get()
+    let state = if open_settings.transforms_loaded_roots() {
+      PartRootState::Transformed
+    } else {
+      PartRootState::Clean
+    };
+    let _ = cell.set(CachedPartRoot {
+      root_element,
+      state,
+    });
+    cell.get().map(|cached| &cached.root_element)
+  }
+
+  #[inline]
+  pub(crate) fn requires_serialization(&self, part_slot: crate::common::PartSlot) -> bool {
+    self
+      .cell(part_slot)
+      .and_then(std::sync::OnceLock::get)
+      .is_some_and(|cached| cached.state != PartRootState::Clean)
   }
 
   #[inline]
@@ -1143,7 +1217,10 @@ impl PartRootCache {
     };
     let _ = cell.take();
     cell
-      .set(root_element)
+      .set(CachedPartRoot {
+        root_element,
+        state: PartRootState::Dirty,
+      })
       .expect("empty root cache cell must accept a value");
     true
   }
@@ -1153,7 +1230,10 @@ impl PartRootCache {
     &mut self,
     part_slot: crate::common::PartSlot,
   ) -> Option<crate::parts::PartRootElement> {
-    self.cell_mut(part_slot)?.take()
+    self
+      .cell_mut(part_slot)?
+      .take()
+      .map(|cached| cached.root_element)
   }
 
   #[inline]
@@ -1163,7 +1243,7 @@ impl PartRootCache {
 }
 
 #[cfg(feature = "parts")]
-pub trait SdkPackage: Clone + Sized + 'static {
+pub trait SdkPackage: Sized + 'static {
   #[doc(hidden)]
   const CHILD_PART_CONSTRAINTS: &'static [PartConstraint];
 
@@ -1229,6 +1309,9 @@ pub trait SdkPackage: Clone + Sized + 'static {
   ) -> Option<&crate::parts::PartRootElement>;
 
   #[doc(hidden)]
+  fn root_element_requires_serialization(&self, part_id: crate::common::PartSlot) -> bool;
+
+  #[doc(hidden)]
   fn root_element_mut(
     &mut self,
     part_id: crate::common::PartSlot,
@@ -1271,11 +1354,13 @@ pub trait SdkPackage: Clone + Sized + 'static {
     &self,
     part_id: crate::common::PartSlot,
   ) -> Result<Vec<u8>, crate::common::SdkError> {
-    if let Some(root_element) = self.root_element(part_id) {
-      root_element.to_bytes()
-    } else {
-      Ok(Self::storage(self).part_bytes(part_id)?.to_vec())
+    if self.root_element_requires_serialization(part_id) {
+      return self
+        .root_element(part_id)
+        .ok_or(crate::common::SdkError::StalePart)?
+        .to_bytes();
     }
+    Ok(Self::storage(self).part_bytes(part_id)?.to_vec())
   }
 
   #[inline]
@@ -1293,15 +1378,16 @@ pub trait SdkPackage: Clone + Sized + 'static {
     writer: &mut W,
   ) -> Result<(), crate::common::SdkError> {
     crate::sdk::SdkPackage::storage(self).write_flat_opc(writer, |part_id, _part| {
-      if let Some(root_element) = crate::sdk::SdkPackage::root_element(self, part_id) {
-        root_element.to_bytes()
-      } else {
-        Ok(
-          crate::sdk::SdkPackage::storage(self)
-            .part_bytes(part_id)?
-            .to_vec(),
-        )
+      if crate::sdk::SdkPackage::root_element_requires_serialization(self, part_id) {
+        return crate::sdk::SdkPackage::root_element(self, part_id)
+          .ok_or(crate::common::SdkError::StalePart)?
+          .to_bytes();
       }
+      Ok(
+        crate::sdk::SdkPackage::storage(self)
+          .part_bytes(part_id)?
+          .to_vec(),
+      )
     })
   }
 
@@ -1487,11 +1573,10 @@ pub trait SdkPackage: Clone + Sized + 'static {
   fn media_data_parts(&self) -> impl Iterator<Item = crate::common::MediaDataPart> + '_ {
     crate::sdk::SdkPackage::storage(self)
       .media_data_parts()
-      .map(|(part_id, part)| {
+      .map(|(part_id, _part)| {
         crate::common::MediaDataPart::from_part_slot(
           crate::sdk::SdkPackage::storage(self).token(),
           part_id,
-          part.path(),
         )
       })
   }
@@ -1580,6 +1665,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
       })
   }
 
+  /// Returns the first matching relationship ID in package relationship order.
   #[inline]
   fn get_id_of_part<T: SdkPart>(&self, part: &T) -> Result<&str, crate::common::SdkError> {
     let target_part_slot = crate::private::SdkPartHandle::part_slot(part, self)?;
@@ -1597,7 +1683,12 @@ pub trait SdkPackage: Clone + Sized + 'static {
     part: &T,
     new_relationship_id: impl Into<String>,
   ) -> Result<String, crate::common::SdkError> {
-    let old_relationship_id = self.get_id_of_part(part)?.to_string();
+    let target_part_slot = crate::private::SdkPartHandle::part_slot(part, self)?;
+    let old_relationship_id = unique_relationship_id_for_part(
+      crate::sdk::SdkPackage::relationships(self),
+      target_part_slot,
+    )?
+    .to_string();
     self.change_relationship_id(&old_relationship_id, new_relationship_id)?;
     Ok(old_relationship_id)
   }
@@ -1806,19 +1897,9 @@ pub trait SdkPackage: Clone + Sized + 'static {
   ) -> Result<crate::common::MediaDataPart, crate::common::SdkError> {
     let part_id = crate::sdk::SdkPackage::storage_mut(self)
       .create_media_data_part(content_type.into().into_owned(), extension)?;
-    let path = crate::sdk::SdkPackage::storage(self)
-      .part(part_id)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {part_id:?} is not present in package storage"
-        ))
-      })?
-      .path()
-      .to_string();
     Ok(crate::common::MediaDataPart::from_part_slot(
       crate::sdk::SdkPackage::storage(self).token(),
       part_id,
-      path,
     ))
   }
 
@@ -3699,6 +3780,20 @@ pub trait SdkPart:
     storage.part_bytes(part_slot).map(Some)
   }
 
+  /// Returns an owned, shared view of the part payload.
+  ///
+  /// Loading an archived part may allocate once; cloning the returned
+  /// [`bytes::Bytes`] reuses that cached payload without copying its contents.
+  #[inline]
+  fn try_data_bytes<P: SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<bytes::Bytes, crate::common::SdkError> {
+    let storage = crate::sdk::SdkPackage::storage(package);
+    let part_slot = crate::private::SdkPartHandle::part_slot(self, package)?;
+    storage.part_bytes_owned(part_slot)
+  }
+
   #[inline]
   fn data_to_vec<P: SdkPackage>(&self, package: &P) -> Option<Vec<u8>> {
     self.data(package).map(<[u8]>::to_vec)
@@ -3850,6 +3945,7 @@ pub trait SdkPart:
       .filter_map(move |relationship| relationship_target_as_part::<T>(storage, relationship))
   }
 
+  /// Returns the first matching relationship ID in source relationship order.
   #[inline]
   fn get_id_of_part<'a, P: SdkPackage, T: SdkPart>(
     &'a self,
@@ -3875,7 +3971,13 @@ pub trait SdkPart:
     part: &T,
     new_relationship_id: impl Into<String>,
   ) -> Result<String, crate::common::SdkError> {
-    let old_relationship_id = self.get_id_of_part(package, part)?.to_string();
+    let source_part_slot = crate::private::SdkPartHandle::part_slot(self, package)?;
+    let target_part_slot = crate::private::SdkPartHandle::part_slot(part, package)?;
+    let relationships = crate::sdk::SdkPackage::storage(package)
+      .relationships(source_part_slot)
+      .ok_or(crate::common::SdkError::StalePart)?;
+    let old_relationship_id =
+      unique_relationship_id_for_part(relationships, target_part_slot)?.to_string();
     self.change_relationship_id(package, &old_relationship_id, new_relationship_id)?;
     Ok(old_relationship_id)
   }
@@ -4114,25 +4216,6 @@ pub trait SdkPart:
     )?;
     Ok(relationship_id)
   }
-}
-
-#[cfg(feature = "parts")]
-pub trait SdkDataPartReference: Sized {
-  const RELATIONSHIP_TYPE: &'static str;
-
-  fn new_from_archive<R: std::io::Read + std::io::Seek>(
-    path: &str,
-    r_id: &str,
-    part_index: usize,
-    archive: &mut zip::ZipArchive<R>,
-  ) -> Result<Self, crate::common::SdkError>;
-
-  fn save_zip<W: std::io::Write + std::io::Seek>(
-    &self,
-    parent_path: &str,
-    zip: &mut zip::ZipWriter<W>,
-    entry_set: &mut std::collections::HashSet<String>,
-  ) -> Result<(), crate::common::SdkError>;
 }
 
 #[cfg(all(test, feature = "mce"))]

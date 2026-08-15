@@ -1101,35 +1101,12 @@ impl OpenSettings {
 
     self.open_mode
   }
-
-  #[inline]
-  fn transforms_loaded_roots(self) -> bool {
-    !matches!(
-      self.markup_compatibility_process_settings.process_mode,
-      MarkupCompatibilityProcessMode::NoProcess
-    )
-  }
-}
-
-#[cfg(feature = "parts")]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PartRootState {
-  Clean,
-  Transformed,
-  Dirty,
-}
-
-#[cfg(feature = "parts")]
-#[derive(Debug)]
-struct CachedPartRoot {
-  root_element: crate::parts::PartRootElement,
-  state: PartRootState,
 }
 
 #[cfg(feature = "parts")]
 #[derive(Debug)]
 pub(crate) struct PartRootCache {
-  entries: Vec<std::sync::OnceLock<CachedPartRoot>>,
+  entries: Vec<std::sync::OnceLock<crate::parts::PartRootElement>>,
 }
 
 #[cfg(feature = "parts")]
@@ -1145,7 +1122,7 @@ impl PartRootCache {
   fn cell(
     &self,
     part_slot: crate::common::PartSlot,
-  ) -> Option<&std::sync::OnceLock<CachedPartRoot>> {
+  ) -> Option<&std::sync::OnceLock<crate::parts::PartRootElement>> {
     self.entries.get(part_slot.index())
   }
 
@@ -1153,7 +1130,7 @@ impl PartRootCache {
   fn cell_mut(
     &mut self,
     part_slot: crate::common::PartSlot,
-  ) -> Option<&mut std::sync::OnceLock<CachedPartRoot>> {
+  ) -> Option<&mut std::sync::OnceLock<crate::parts::PartRootElement>> {
     self.entries.get_mut(part_slot.index())
   }
 
@@ -1162,10 +1139,7 @@ impl PartRootCache {
     &self,
     part_slot: crate::common::PartSlot,
   ) -> Option<&crate::parts::PartRootElement> {
-    self
-      .cell(part_slot)?
-      .get()
-      .map(|cached| &cached.root_element)
+    self.cell(part_slot)?.get()
   }
 
   #[inline]
@@ -1173,9 +1147,7 @@ impl PartRootCache {
     &mut self,
     part_slot: crate::common::PartSlot,
   ) -> Option<&mut crate::parts::PartRootElement> {
-    let cached = self.cell_mut(part_slot)?.get_mut()?;
-    cached.state = PartRootState::Dirty;
-    Some(&mut cached.root_element)
+    self.cell_mut(part_slot)?.get_mut()
   }
 
   #[inline]
@@ -1183,27 +1155,17 @@ impl PartRootCache {
     &self,
     part_slot: crate::common::PartSlot,
     root_element: crate::parts::PartRootElement,
-    open_settings: &OpenSettings,
   ) -> Option<&crate::parts::PartRootElement> {
     let cell = self.cell(part_slot)?;
-    let state = if open_settings.transforms_loaded_roots() {
-      PartRootState::Transformed
-    } else {
-      PartRootState::Clean
-    };
-    let _ = cell.set(CachedPartRoot {
-      root_element,
-      state,
-    });
-    cell.get().map(|cached| &cached.root_element)
+    let _ = cell.set(root_element);
+    cell.get()
   }
 
   #[inline]
   pub(crate) fn requires_serialization(&self, part_slot: crate::common::PartSlot) -> bool {
     self
       .cell(part_slot)
-      .and_then(std::sync::OnceLock::get)
-      .is_some_and(|cached| cached.state != PartRootState::Clean)
+      .is_some_and(|cell| cell.get().is_some())
   }
 
   #[inline]
@@ -1217,10 +1179,7 @@ impl PartRootCache {
     };
     let _ = cell.take();
     cell
-      .set(CachedPartRoot {
-        root_element,
-        state: PartRootState::Dirty,
-      })
+      .set(root_element)
       .expect("empty root cache cell must accept a value");
     true
   }
@@ -1230,10 +1189,7 @@ impl PartRootCache {
     &mut self,
     part_slot: crate::common::PartSlot,
   ) -> Option<crate::parts::PartRootElement> {
-    self
-      .cell_mut(part_slot)?
-      .take()
-      .map(|cached| cached.root_element)
+    self.cell_mut(part_slot)?.take()
   }
 
   #[inline]

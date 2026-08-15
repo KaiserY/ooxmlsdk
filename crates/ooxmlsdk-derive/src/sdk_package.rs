@@ -200,11 +200,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         part_slot: crate::common::PartSlot,
         root_element: crate::parts::PartRootElement,
       ) -> Option<&crate::parts::PartRootElement> {
-        self.#root_elements_ident.cache_loaded(
-          part_slot,
-          root_element,
-          &self.#open_settings_ident,
-        )
+        self.#root_elements_ident.cache_loaded(part_slot, root_element)
       }
 
       #[inline]

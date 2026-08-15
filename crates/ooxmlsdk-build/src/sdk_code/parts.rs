@@ -276,7 +276,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           if let Some(root_element) =
             crate::parts::PartRootElement::from_part_slot(storage, part_slot, open_settings)?
           {
-            let _ = root_elements.cache_loaded(part_slot, root_element, open_settings);
+            let _ = root_elements.cache_loaded(part_slot, root_element);
           }
         }
       }

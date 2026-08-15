@@ -147,14 +147,6 @@ pub(crate) enum StoredPartData {
 
 impl StoredPartData {
   #[inline]
-  fn cached_bytes(&self) -> Option<&[u8]> {
-    match self {
-      Self::Archived { bytes, .. } => bytes.get().map(AsRef::as_ref),
-      Self::Owned { bytes, .. } => Some(bytes.as_ref()),
-    }
-  }
-
-  #[inline]
   fn original_entry_index(&self) -> Option<usize> {
     match self {
       Self::Archived { entry_index, .. } => Some(*entry_index),
@@ -1700,47 +1692,60 @@ impl SdkPackageStorage {
     Ok(())
   }
 
-  pub(crate) fn part_bytes(&self, part_id: PartSlot) -> Result<&[u8], SdkError> {
+  fn cached_part_bytes(&self, part_id: PartSlot) -> Result<&Bytes, SdkError> {
     let part = self.part(part_id).ok_or_else(|| {
       SdkError::CommonError(format!(
         "part id {part_id:?} is not present in package storage"
       ))
     })?;
-    if let Some(bytes) = part.data.cached_bytes() {
-      return Ok(bytes);
+    match &part.data {
+      StoredPartData::Archived { entry_index, bytes } => {
+        if bytes.get().is_none() {
+          let archive = self.archive.as_ref().ok_or_else(|| {
+            SdkError::CommonError("archived part has no package archive backing".to_string())
+          })?;
+          let loaded = archive.read_entry(*entry_index)?;
+          let _ = bytes.set(loaded);
+        }
+        Ok(
+          bytes
+            .get()
+            .expect("part bytes were initialized or another thread initialized them"),
+        )
+      }
+      StoredPartData::Owned { bytes, .. } => Ok(bytes),
     }
+  }
 
-    let StoredPartData::Archived { entry_index, bytes } = &part.data else {
-      unreachable!("owned part data always has cached bytes")
-    };
-    let archive = self.archive.as_ref().ok_or_else(|| {
-      SdkError::CommonError("archived part has no package archive backing".to_string())
-    })?;
-    let loaded = archive.read_entry(*entry_index)?;
-    let _ = bytes.set(loaded);
-    Ok(
-      bytes
-        .get()
-        .expect("part bytes were initialized or another thread initialized them"),
-    )
+  pub(crate) fn part_bytes(&self, part_id: PartSlot) -> Result<&[u8], SdkError> {
+    self.cached_part_bytes(part_id).map(AsRef::as_ref)
   }
 
   pub(crate) fn part_bytes_owned(&self, part_id: PartSlot) -> Result<Bytes, SdkError> {
-    let _ = self.part_bytes(part_id)?;
-    let part = self.part(part_id).ok_or(SdkError::StalePart)?;
-    match &part.data {
-      StoredPartData::Archived { bytes, .. } => Ok(
-        bytes
-          .get()
-          .expect("part_bytes initialized archived part data")
-          .clone(),
-      ),
-      StoredPartData::Owned { bytes, .. } => Ok(bytes.clone()),
-    }
+    self.cached_part_bytes(part_id).cloned()
   }
 
   pub(crate) fn part_bytes_for_root(&self, part_id: PartSlot) -> Result<Bytes, SdkError> {
-    self.part_bytes_owned(part_id)
+    let part = self.part(part_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "part id {part_id:?} is not present in package storage"
+      ))
+    })?;
+    match &part.data {
+      StoredPartData::Archived { entry_index, bytes } => {
+        if let Some(bytes) = bytes.get() {
+          return Ok(bytes.clone());
+        }
+        self
+          .archive
+          .as_ref()
+          .ok_or_else(|| {
+            SdkError::CommonError("archived part has no package archive backing".to_string())
+          })?
+          .read_entry(*entry_index)
+      }
+      StoredPartData::Owned { bytes, .. } => Ok(bytes.clone()),
+    }
   }
 
   pub(crate) fn raw_copy_archive_entry<W: std::io::Write + std::io::Seek>(
@@ -3602,6 +3607,14 @@ mod tests {
         PackageSaveEntry::Part(part_id),
       ]
     );
+    assert_eq!(
+      storage.part_bytes_for_root(part_id).unwrap(),
+      Bytes::from_static(br#"<w:document xmlns:w="w"/>"#)
+    );
+    assert!(matches!(
+      &storage.parts[part_id.index()].data,
+      StoredPartData::Archived { bytes, .. } if bytes.get().is_none()
+    ));
     assert_eq!(
       storage.part_bytes(part_id).unwrap(),
       br#"<w:document xmlns:w="w"/>"#

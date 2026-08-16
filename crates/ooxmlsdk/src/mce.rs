@@ -1,11 +1,13 @@
 use crate::common::{SdkError, XmlNamespace};
 use crate::sdk::{FileFormatVersion, MarkupCompatibilityProcessSettings};
 
+#[cfg(test)]
 #[derive(Clone, Debug)]
 struct McePrefixList<'a> {
   value: std::borrow::Cow<'a, [u8]>,
 }
 
+#[cfg(test)]
 impl<'a> McePrefixList<'a> {
   fn new(value: &'a [u8]) -> Result<Self, SdkError> {
     Ok(Self {
@@ -85,7 +87,7 @@ impl<'a> MceQNameList<'a> {
         namespace: candidate_namespace,
         local_name: candidate_local_name,
       } => {
-        *candidate_namespace == namespace
+        namespace_uris_match(candidate_namespace, namespace)
           && match candidate_local_name {
             MceQNameLocal::Any => true,
             MceQNameLocal::Range(range) => self.value[range.clone()] == *local_name,
@@ -114,11 +116,11 @@ pub(crate) enum ElementAction {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct MceContextAttributes<'a> {
-  pub(crate) ignorable: Option<&'a [u8]>,
+  pub(crate) ignorable: Option<&'a [XmlNamespace]>,
   pub(crate) preserve_attributes: Option<&'a [u8]>,
   pub(crate) preserve_elements: Option<&'a [u8]>,
   pub(crate) process_content: Option<&'a [u8]>,
-  pub(crate) must_understand: Option<&'a [u8]>,
+  pub(crate) must_understand: Option<&'a [XmlNamespace]>,
 }
 
 impl<'a> MceContext<'a> {
@@ -131,7 +133,7 @@ impl<'a> MceContext<'a> {
     let context = Self {
       parent: Some(self),
       namespaces,
-      ignorable_namespaces: self.current_ignorable_namespaces(namespaces, mce_attrs.ignorable)?,
+      ignorable_namespaces: self.current_ignorable_namespaces(mce_attrs.ignorable),
       preserve_attributes: mce_attrs
         .preserve_attributes
         .map(|value| MceQNameList::new(self, namespaces, value))
@@ -152,18 +154,18 @@ impl<'a> MceContext<'a> {
 
   fn validate_must_understand(
     &self,
-    mc_must_understand: Option<&[u8]>,
+    mc_must_understand: Option<&[XmlNamespace]>,
     settings: &MarkupCompatibilityProcessSettings,
   ) -> Result<(), SdkError> {
-    if let Some(value) = mc_must_understand {
-      let prefixes = McePrefixList::new(value)?;
-      for prefix in prefixes.prefixes() {
-        let Some(ns) = self.namespace_for_prefix_bytes(prefix) else {
+    if let Some(namespaces) = mc_must_understand {
+      for namespace in namespaces {
+        let (prefix, ns) = namespace.parts();
+        if ns.is_empty() {
           let prefix = String::from_utf8_lossy(prefix);
           return Err(SdkError::CommonError(format!(
             "MCE MustUnderstand prefix `{prefix}` is not declared"
           )));
-        };
+        }
         if !namespace_supported(ns, settings.target_file_format_version) {
           let namespace = String::from_utf8_lossy(ns);
           return Err(SdkError::CommonError(format!(
@@ -279,27 +281,41 @@ impl<'a> MceContext<'a> {
 
   fn current_ignorable_namespaces<'b>(
     &'b self,
-    namespaces: &'b [XmlNamespace],
-    mc_ignorable: Option<&'b [u8]>,
-  ) -> Result<Vec<&'b [u8]>, SdkError> {
+    mc_ignorable: Option<&'b [XmlNamespace]>,
+  ) -> Vec<&'b [u8]> {
     let mut ignorable_namespaces = Vec::new();
-    if let Some(value) = mc_ignorable {
-      let prefixes = McePrefixList::new(value)?;
-      for prefix in prefixes.prefixes() {
-        if let Some(ns) = self.namespace_for_prefix_with_current_bytes(namespaces, prefix) {
+    if let Some(namespaces) = mc_ignorable {
+      for namespace in namespaces {
+        let ns = namespace.parts().1;
+        if !ns.is_empty() {
           ignorable_namespaces.push(ns);
         }
       }
     }
-    Ok(ignorable_namespaces)
+    ignorable_namespaces
   }
 
   pub(crate) fn is_ignorable_namespace_bytes(&self, namespace: &[u8]) -> bool {
-    self.ignorable_namespaces.contains(&namespace)
+    self
+      .ignorable_namespaces
+      .iter()
+      .any(|candidate| namespace_uris_match(candidate, namespace))
       || self
         .parent
         .is_some_and(|parent| parent.is_ignorable_namespace_bytes(namespace))
   }
+}
+
+#[inline]
+fn namespace_uris_match(left: &[u8], right: &[u8]) -> bool {
+  if left == right {
+    return true;
+  }
+  let Some(left) = crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(left) else {
+    return false;
+  };
+  crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(right)
+    .is_some_and(|right| left.schema_namespace() == right.schema_namespace())
 }
 
 pub(crate) fn namespace_supported(ns: &[u8], target: FileFormatVersion) -> bool {
@@ -359,6 +375,7 @@ const fn is_xml_whitespace(value: u8) -> bool {
   matches!(value, b' ' | b'\r' | b'\n' | b'\t')
 }
 
+#[cfg(test)]
 fn split_xml_whitespace(value: &[u8]) -> impl Iterator<Item = &[u8]> {
   value
     .split(|byte| is_xml_whitespace(*byte))
@@ -397,6 +414,7 @@ fn decode_mce_attr_value(value: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Sdk
   })
 }
 
+#[cfg(test)]
 pub(crate) fn for_each_mce_prefix(
   value: &[u8],
   mut f: impl FnMut(&[u8]) -> Result<(), SdkError>,
@@ -444,12 +462,8 @@ where
   for (index, branch) in alternate_content_choice.iter_mut().enumerate() {
     match branch {
       AlternateContentChoice::Choice(choice) => {
-        let supported = choice_requires_supported(
-          Some(choice.requires.as_bytes()),
-          &alternate_context,
-          &[choice.xmlns.as_slice(), xmlns.as_slice()],
-          settings.target_file_format_version,
-        )?;
+        let supported =
+          choice_requires_supported(&choice.requires, settings.target_file_format_version);
         if !supported {
           continue;
         }
@@ -501,46 +515,10 @@ where
   Ok(())
 }
 
-fn choice_requires_supported(
-  requires: Option<&[u8]>,
-  context: &MceContext<'_>,
-  namespace_frames: &[&[XmlNamespace]],
-  target: FileFormatVersion,
-) -> Result<bool, SdkError> {
-  let Some(requires) = requires else {
-    return Ok(false);
-  };
-  let mut supported = true;
-  for_each_mce_prefix(requires, |prefix| {
-    let Some(ns) = namespace_for_prefix_with_frames(context, namespace_frames, prefix) else {
-      supported = false;
-      return Ok(());
-    };
-    if !namespace_supported(ns, target) {
-      supported = false;
-    }
-    Ok(())
-  })?;
-  Ok(supported)
-}
-
-fn namespace_for_prefix_with_frames<'a>(
-  context: &'a MceContext<'_>,
-  namespace_frames: &'a [&'a [XmlNamespace]],
-  prefix: &[u8],
-) -> Option<&'a [u8]> {
-  namespace_frames
-    .iter()
-    .find_map(|namespaces| namespace_for_prefix_in_frame(namespaces, prefix))
-    .or_else(|| context.namespace_for_prefix_bytes(prefix))
-}
-
-fn namespace_for_prefix_in_frame<'a>(
-  namespaces: &'a [XmlNamespace],
-  prefix: &[u8],
-) -> Option<&'a [u8]> {
-  namespaces.iter().rev().find_map(|namespace| {
-    let (namespace_prefix, namespace_uri) = namespace.parts();
-    (namespace_prefix == prefix).then_some(namespace_uri)
-  })
+fn choice_requires_supported(requires: &[XmlNamespace], target: FileFormatVersion) -> bool {
+  !requires.is_empty()
+    && requires.iter().all(|namespace| {
+      let uri = namespace.parts().1;
+      !uri.is_empty() && namespace_supported(uri, target)
+    })
 }

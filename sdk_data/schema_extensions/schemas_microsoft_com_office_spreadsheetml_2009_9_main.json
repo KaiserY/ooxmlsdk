@@ -2,10 +2,7 @@
   "Types": [
     {
       "ClassName": "ConditionalFormatting",
-      "HaveXmlnsFields": true,
-      "CanonicalNamespacePrefixes": [
-        "xm:xne"
-      ]
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ConditionalFormattingValueObject",
@@ -27,10 +24,7 @@
     },
     {
       "ClassName": "DataValidations",
-      "HaveXmlnsFields": true,
-      "CanonicalNamespacePrefixes": [
-        "xm:xne"
-      ]
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "DataValidation",
@@ -50,10 +44,7 @@
     },
     {
       "ClassName": "SparklineGroups",
-      "HaveXmlnsFields": true,
-      "CanonicalNamespacePrefixes": [
-        "xm:xne"
-      ]
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "SparklineGroup",

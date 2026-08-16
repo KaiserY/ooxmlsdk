@@ -826,7 +826,6 @@ fn build_type_decl(
         have_mc_process_content: schema_type.have_mc_process_content,
         have_mc_must_understand: schema_type.have_mc_must_understand,
         extra_xmlns: schema_type.extra_xmlns.clone(),
-        canonical_namespace_prefixes: schema_type.canonical_namespace_prefixes.clone(),
         alternate_content_children: Default::default(),
       },
       estimated_size: 0,
@@ -1621,7 +1620,7 @@ fn build_attr_member_decl(
       qname: attr.q_name.clone(),
       bit: attr.bit,
       list: matches!(attr_type_kind, AttrTypeKind::List),
-      match_local_name: attr.match_local_name,
+      read_aliases: attr.read_aliases.clone(),
       empty_as_none: attr.empty_as_none,
     },
     cardinality: if attr.required {
@@ -1724,7 +1723,11 @@ fn build_list_type_ref_from_inner_type(
         }
       }
       AttrTypeKind::Simple { simple_type, .. } => {
-        format!("crate::simple_type::{simple_type}")
+        if simple_type.starts_with("crate::") {
+          simple_type.to_string()
+        } else {
+          format!("crate::simple_type::{simple_type}")
+        }
       }
     };
 
@@ -4297,7 +4300,7 @@ mod tests {
         qname: ":val".to_string(),
         bit: Some(7),
         list: false,
-        match_local_name: false,
+        read_aliases: Vec::new(),
         empty_as_none: false,
       }
     );
@@ -7015,6 +7018,34 @@ mod tests {
     assert_eq!(helper_fields.len(), 1);
     assert_eq!(helper_fields[0].rust_name, "leaf_b");
     assert_eq!(helper_fields[0].cardinality, Cardinality::One);
+  }
+
+  #[test]
+  fn maps_explicit_rust_list_attribute_type() {
+    let schema = Schema {
+      module_name: "test_schema".to_string(),
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+    let attr = SchemaTypeAttribute {
+      q_name: "Requires".to_string(),
+      property_name: "Requires".to_string(),
+      r#type: "ListValue<crate::common::XmlNamespace>".to_string(),
+      required: true,
+      ..Default::default()
+    };
+
+    let member = build_attr_member_decl(&attr, &schema, &context).unwrap();
+    let MemberDecl::Field(field) = member else {
+      panic!("expected attribute field");
+    };
+    assert_eq!(field.rust_name, "requires");
+    assert_eq!(field.type_ref.rust_type, "Vec<crate::common::XmlNamespace>");
+    assert_eq!(field.type_ref.module_path, None);
+    assert!(matches!(
+      field.wire,
+      FieldWireDecl::Attribute { list: true, .. }
+    ));
   }
 
   #[test]

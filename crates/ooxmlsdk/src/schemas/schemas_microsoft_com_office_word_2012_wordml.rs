@@ -70,7 +70,7 @@ pub struct Appearance {
 #[sdk(xml_header, qname = "w15:commentsEx")]
 pub struct CommentsEx {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Defines the CommentEx Class.
   #[sdk(child(qname = "w15:commentEx"))]
   pub comment_ex: Vec<CommentEx>,
@@ -80,7 +80,7 @@ pub struct CommentsEx {
 #[sdk(xml_header, qname = "w15:people")]
 pub struct People {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Defines the Person Class.
   #[sdk(child(qname = "w15:person"))]
   pub person: Vec<Person>,

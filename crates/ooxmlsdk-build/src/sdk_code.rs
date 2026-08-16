@@ -37,6 +37,242 @@ const FILE_HEADER: &str = r#"//
 //
 "#;
 
+// These namespaces are part of the generated static namespace model even
+// though they are not present in the Open XML SDK namespace input data.
+const KNOWN_NAMESPACE_SUPPLEMENTS: &[(&str, &str, &str, &str)] = &[
+  (
+    "Xsi",
+    "xsi",
+    "http://www.w3.org/2001/XMLSchema-instance",
+    "Office2007",
+  ),
+  (
+    "W14Preview2007",
+    "w14",
+    "http://schemas.microsoft.com/office/word/2007/5/30/wordml",
+    "Office2010",
+  ),
+  (
+    "W14Preview2008",
+    "w14",
+    "http://schemas.microsoft.com/office/word/2008/9/12/wordml",
+    "Office2010",
+  ),
+  (
+    "W14Preview",
+    "w14",
+    "http://schemas.microsoft.com/office/word/2009/2/wordml",
+    "Office2010",
+  ),
+  (
+    "W15Preview",
+    "w15",
+    "http://schemas.microsoft.com/office/word/2010/11/wordml",
+    "Office2013",
+  ),
+  (
+    "Cx1",
+    "cx1",
+    "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex",
+    "Office2016",
+  ),
+  (
+    "Cx2",
+    "cx2",
+    "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex",
+    "Office2016",
+  ),
+  (
+    "Cx3",
+    "cx3",
+    "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex",
+    "Office2016",
+  ),
+  (
+    "Cx4",
+    "cx4",
+    "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex",
+    "Office2016",
+  ),
+  (
+    "Cx5",
+    "cx5",
+    "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex",
+    "Office2016",
+  ),
+  (
+    "Cx6",
+    "cx6",
+    "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex",
+    "Office2016",
+  ),
+  (
+    "Cx7",
+    "cx7",
+    "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex",
+    "Office2016",
+  ),
+  (
+    "Cx8",
+    "cx8",
+    "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex",
+    "Office2016",
+  ),
+  (
+    "Wpi",
+    "wpi",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingInk",
+    "Office2010",
+  ),
+  (
+    "W16",
+    "w16",
+    "http://schemas.microsoft.com/office/word/2018/wordml",
+    "Office2021",
+  ),
+  (
+    "Ve",
+    "ve",
+    "http://schemas.openxmlformats.org/markup-compatibility/2006",
+    "Office2007",
+  ),
+  (
+    "Hs",
+    "hs",
+    "http://schemas.haansoft.com/office/spreadsheet/8.0",
+    "Office2007",
+  ),
+];
+
+// Historical preview namespaces retain their source URI for package fidelity,
+// while generated schema matching treats them as their finalized namespace.
+const KNOWN_NAMESPACE_SCHEMA_EQUIVALENTS: &[(&str, &str)] = &[
+  ("W14Preview2007", "W14"),
+  ("W14Preview2008", "W14"),
+  ("W14Preview", "W14"),
+  ("W15Preview", "W15"),
+  ("W16", "W16cur"),
+  ("Ve", "Mc"),
+];
+
+// Keep the upstream entries aligned with OpenXmlNamespaceResolver. Aliases
+// resolve to the canonical statically generated namespace and serialize through
+// that namespace's canonical prefix and URI.
+const KNOWN_NAMESPACE_ALIASES: &[(&str, &str)] = &[
+  (
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/3/main",
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+  ),
+  (
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/5/main",
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+  ),
+  (
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/6/main",
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+  ),
+  (
+    "http://schemas.openxmlformats.org/spreadsheetml/2006/5/main",
+    "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+  ),
+  (
+    "http://schemas.openxmlformats.org/spreadsheetml/2006/7/main",
+    "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+  ),
+  (
+    "http://schemas.openxmlformats.org/presentationml/2006/3/main",
+    "http://schemas.openxmlformats.org/presentationml/2006/main",
+  ),
+  (
+    "http://schemas.openxmlformats.org/drawingml/2006/3/main",
+    "http://schemas.openxmlformats.org/drawingml/2006/main",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/drawingml/chart",
+    "http://schemas.openxmlformats.org/drawingml/2006/chart",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/drawingml/chartDrawing",
+    "http://schemas.openxmlformats.org/drawingml/2006/chartDrawing",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/drawingml/diagram",
+    "http://schemas.openxmlformats.org/drawingml/2006/diagram",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/drawingml/main",
+    "http://schemas.openxmlformats.org/drawingml/2006/main",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/drawingml/picture",
+    "http://schemas.openxmlformats.org/drawingml/2006/picture",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing",
+    "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing",
+    "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/officeDocument/bibliography",
+    "http://schemas.openxmlformats.org/officeDocument/2006/bibliography",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/officeDocument/customProperties",
+    "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/officeDocument/customXml",
+    "http://schemas.openxmlformats.org/officeDocument/2006/customXml",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes",
+    "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/officeDocument/extendedProperties",
+    "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/officeDocument/math",
+    "http://schemas.openxmlformats.org/officeDocument/2006/math",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/officeDocument/relationships",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/presentationml/main",
+    "http://schemas.openxmlformats.org/presentationml/2006/main",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/schemaLibrary/main",
+    "http://schemas.openxmlformats.org/schemaLibrary/2006/main",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/spreadsheetml/main",
+    "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/wordprocessingml/main",
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/drawingml/lockedCanvas",
+    "http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/drawingml/compatibility",
+    "http://schemas.openxmlformats.org/drawingml/2006/compatibility",
+  ),
+  (
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/customXml",
+    "http://schemas.openxmlformats.org/officeDocument/2006/customXml",
+  ),
+];
+
 struct LoadedSchema {
   ir: SchemaModuleDecl,
 }
@@ -328,8 +564,36 @@ struct NamespacesInput<'a> {
   include_default_namespace_style: bool,
 }
 
+struct KnownNamespaceSpec<'a> {
+  variant_name: String,
+  prefix: &'a str,
+  uri: &'a str,
+  version: &'a str,
+}
+
 fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
+  let mut namespaces = input
+    .sdk_data_namespaces
+    .iter()
+    .filter(|namespace| !namespace.prefix.is_empty() && !namespace.uri.is_empty())
+    .map(|namespace| KnownNamespaceSpec {
+      variant_name: namespace_variant_name(&namespace.prefix),
+      prefix: &namespace.prefix,
+      uri: &namespace.uri,
+      version: &namespace.version,
+    })
+    .collect::<Vec<_>>();
+  namespaces.extend(KNOWN_NAMESPACE_SUPPLEMENTS.iter().map(
+    |&(variant_name, prefix, uri, version)| KnownNamespaceSpec {
+      variant_name: variant_name.to_owned(),
+      prefix,
+      uri,
+      version,
+    },
+  ));
+
   let mut prefix_to_uri_arms: Vec<syn::Arm> = vec![];
+  let mut prefix_to_variant_arms: Vec<syn::Arm> = vec![];
   let mut prefix_to_minimum_version_arms: Vec<syn::Arm> = vec![];
   let mut uri_to_minimum_version_arms: Vec<syn::Arm> = vec![];
   let mut known_namespace_variants: Vec<TokenStream> = vec![];
@@ -337,28 +601,31 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
   let mut seen_prefixes = HashSet::new();
   let mut seen_variants = HashSet::new();
 
-  for namespace in input.sdk_data_namespaces {
-    if namespace.prefix.is_empty() || namespace.uri.is_empty() {
-      continue;
-    }
-    let prefix = namespace.prefix.as_str();
-    let uri = namespace.uri.as_str();
-    let attrs = version_cfg_attrs(&namespace.version);
+  for namespace in &namespaces {
+    let prefix = namespace.prefix;
+    let uri = namespace.uri;
+    let attrs = version_cfg_attrs(namespace.version);
 
-    if seen_uris.insert(uri) {
-      let variant_name = namespace_variant_name(prefix);
-      let variant_ident: Ident = parse_str(&variant_name)?;
-      if seen_variants.insert(variant_name) {
-        known_namespace_variants.push(quote! {
-          #( #attrs )*
-          #[sdk(#prefix, #uri)]
-          #variant_ident,
-        });
-      }
+    let first_uri = seen_uris.insert(uri);
+    let variant_ident: Ident = parse_str(&namespace.variant_name)?;
+    if seen_variants.insert(namespace.variant_name.as_str()) {
+      let aliases = first_uri
+        .then_some(())
+        .into_iter()
+        .flat_map(|()| KNOWN_NAMESPACE_ALIASES.iter())
+        .filter_map(|&(alias, canonical)| (canonical == uri).then_some(alias));
+      known_namespace_variants.push(quote! {
+        #( #attrs )*
+        #[sdk(#prefix, #uri)]
+        #( #[sdk_alias(#aliases)] )*
+        #variant_ident,
+      });
+    }
+    if first_uri {
       let version = if namespace.version.is_empty() {
         "Office2007"
       } else {
-        namespace.version.as_str()
+        namespace.version
       };
       let version_ident: Ident = parse_str(version)?;
       let uri_bytes = syn::LitByteStr::new(uri.as_bytes(), proc_macro2::Span::call_site());
@@ -372,8 +639,13 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
         #( #attrs )*
         #prefix => Some(#uri),
       })?);
+      let variant_name = namespace.variant_name.as_str();
+      prefix_to_variant_arms.push(parse2(quote! {
+        #( #attrs )*
+        #prefix => Some(#variant_name),
+      })?);
       if !namespace.version.is_empty() {
-        let version = namespace.version.as_str();
+        let version = namespace.version;
         prefix_to_minimum_version_arms.push(parse2(quote! {
           #prefix => Some(#version),
         })?);
@@ -381,11 +653,44 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
     }
   }
 
+  let mut seen_aliases = HashSet::new();
+  for &(alias, canonical) in KNOWN_NAMESPACE_ALIASES {
+    if !seen_aliases.insert(alias) {
+      return Err(format!("duplicate known namespace alias {alias}").into());
+    }
+    if seen_uris.contains(alias) {
+      return Err(format!("known namespace alias {alias} is also an exact namespace URI").into());
+    }
+    let Some(namespace) = namespaces
+      .iter()
+      .find(|namespace| namespace.uri == canonical)
+    else {
+      return Err(format!("known namespace alias {alias} targets unknown URI {canonical}").into());
+    };
+    let version = if namespace.version.is_empty() {
+      "Office2007"
+    } else {
+      namespace.version
+    };
+    let version_ident: Ident = parse_str(version)?;
+    let alias_bytes = syn::LitByteStr::new(alias.as_bytes(), proc_macro2::Span::call_site());
+    uri_to_minimum_version_arms.push(parse2(quote! {
+      #alias_bytes => Some(crate::sdk::FileFormatVersion::#version_ident),
+    })?);
+  }
+
   let uri_by_prefix_tokens = if input.include_uri_by_prefix {
     quote! {
       pub(crate) fn uri_by_prefix(prefix: &str) -> Option<&'static str> {
         match prefix {
           #( #prefix_to_uri_arms )*
+          _ => None,
+        }
+      }
+
+      pub(crate) fn variant_by_prefix(prefix: &str) -> Option<&'static str> {
+        match prefix {
+          #( #prefix_to_variant_arms )*
           _ => None,
         }
       }
@@ -426,6 +731,14 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
     quote! {}
   };
   let known_namespace_tokens = if input.include_known_namespace {
+    let schema_namespace_arms = KNOWN_NAMESPACE_SCHEMA_EQUIVALENTS
+      .iter()
+      .map(|&(source, target)| {
+        let source_ident: Ident = parse_str(source)?;
+        let target_ident: Ident = parse_str(target)?;
+        Ok(quote! { Self::#source_ident => Self::#target_ident, })
+      })
+      .collect::<Result<Vec<_>>>()?;
     quote! {
       #[repr(u16)]
       #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkXmlNamespace)]
@@ -437,6 +750,16 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
         #[inline]
         fn default() -> Self {
           Self::A
+        }
+      }
+
+      impl XmlKnownNamespace {
+        #[inline]
+        pub(crate) const fn schema_namespace(self) -> Self {
+          match self {
+            #( #schema_namespace_arms )*
+            namespace => namespace,
+          }
         }
       }
 

@@ -17,7 +17,9 @@
       "Attributes": [
         {
           "PropertyName": "SigningInstructions",
-          "MatchLocalName": true
+          "ReadAliases": [
+            "o:signinginstructions"
+          ]
         }
       ]
     }

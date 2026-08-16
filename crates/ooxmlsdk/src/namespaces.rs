@@ -8,6 +8,8 @@
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkXmlNamespace)]
 pub enum XmlKnownNamespace {
   #[sdk("a", "http://schemas.openxmlformats.org/drawingml/2006/main")]
+  #[sdk_alias("http://schemas.openxmlformats.org/drawingml/2006/3/main")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/drawingml/main")]
   A,
   #[sdk("a14", "http://schemas.microsoft.com/office/drawing/2010/main")]
   A14,
@@ -55,6 +57,7 @@ pub enum XmlKnownNamespace {
     "ap",
     "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
   )]
+  #[sdk_alias("http://purl.oclc.org/ooxml/officeDocument/extendedProperties")]
   Ap,
   #[sdk(
     "ask",
@@ -71,8 +74,10 @@ pub enum XmlKnownNamespace {
     "b",
     "http://schemas.openxmlformats.org/officeDocument/2006/bibliography"
   )]
+  #[sdk_alias("http://purl.oclc.org/ooxml/officeDocument/bibliography")]
   B,
   #[sdk("c", "http://schemas.openxmlformats.org/drawingml/2006/chart")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/drawingml/chart")]
   C,
   #[sdk("c14", "http://schemas.microsoft.com/office/drawing/2007/8/2/chart")]
   C14,
@@ -90,6 +95,7 @@ pub enum XmlKnownNamespace {
   )]
   Cdip,
   #[sdk("cdr", "http://schemas.openxmlformats.org/drawingml/2006/chartDrawing")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/drawingml/chartDrawing")]
   Cdr,
   #[sdk(
     "cdr14",
@@ -107,6 +113,7 @@ pub enum XmlKnownNamespace {
     "comp",
     "http://schemas.openxmlformats.org/drawingml/2006/compatibility"
   )]
+  #[sdk_alias("http://purl.oclc.org/ooxml/drawingml/compatibility")]
   Comp,
   #[sdk(
     "cp",
@@ -128,6 +135,7 @@ pub enum XmlKnownNamespace {
   #[sdk("dcterms", "http://purl.org/dc/terms/")]
   Dcterms,
   #[sdk("dgm", "http://schemas.openxmlformats.org/drawingml/2006/diagram")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/drawingml/diagram")]
   Dgm,
   #[sdk("dgm14", "http://schemas.microsoft.com/office/drawing/2010/diagram")]
   Dgm14,
@@ -145,6 +153,8 @@ pub enum XmlKnownNamespace {
     "ds",
     "http://schemas.openxmlformats.org/officeDocument/2006/customXml"
   )]
+  #[sdk_alias("http://purl.oclc.org/ooxml/officeDocument/customXml")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/officeDocument/relationships/customXml")]
   Ds,
   #[sdk("dsp", "http://schemas.microsoft.com/office/drawing/2008/diagram")]
   Dsp,
@@ -153,6 +163,7 @@ pub enum XmlKnownNamespace {
   #[sdk("inkml", "http://www.w3.org/2003/InkML")]
   Inkml,
   #[sdk("lc", "http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/drawingml/lockedCanvas")]
   Lc,
   #[sdk(
     "lp",
@@ -160,6 +171,7 @@ pub enum XmlKnownNamespace {
   )]
   Lp,
   #[sdk("m", "http://schemas.openxmlformats.org/officeDocument/2006/math")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/officeDocument/math")]
   M,
   #[sdk(
     "ma",
@@ -191,8 +203,11 @@ pub enum XmlKnownNamespace {
     "op",
     "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"
   )]
+  #[sdk_alias("http://purl.oclc.org/ooxml/officeDocument/customProperties")]
   Op,
   #[sdk("p", "http://schemas.openxmlformats.org/presentationml/2006/main")]
+  #[sdk_alias("http://schemas.openxmlformats.org/presentationml/2006/3/main")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/presentationml/main")]
   P,
   #[sdk("p14", "http://schemas.microsoft.com/office/powerpoint/2010/main")]
   P14,
@@ -250,6 +265,7 @@ pub enum XmlKnownNamespace {
   #[sdk("pct", "http://schemas.openxmlformats.org/package/2006/content-types")]
   Pct,
   #[sdk("pic", "http://schemas.openxmlformats.org/drawingml/2006/picture")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/drawingml/picture")]
   Pic,
   #[sdk("pic14", "http://schemas.microsoft.com/office/drawing/2010/picture")]
   Pic14,
@@ -261,8 +277,10 @@ pub enum XmlKnownNamespace {
     "r",
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
   )]
+  #[sdk_alias("http://purl.oclc.org/ooxml/officeDocument/relationships")]
   R,
   #[sdk("sl", "http://schemas.openxmlformats.org/schemaLibrary/2006/main")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/schemaLibrary/main")]
   Sl,
   #[sdk("sle", "http://schemas.microsoft.com/office/drawing/2010/slicer")]
   Sle,
@@ -278,8 +296,13 @@ pub enum XmlKnownNamespace {
     "vt",
     "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
   )]
+  #[sdk_alias("http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes")]
   Vt,
   #[sdk("w", "http://schemas.openxmlformats.org/wordprocessingml/2006/main")]
+  #[sdk_alias("http://schemas.openxmlformats.org/wordprocessingml/2006/3/main")]
+  #[sdk_alias("http://schemas.openxmlformats.org/wordprocessingml/2006/5/main")]
+  #[sdk_alias("http://schemas.openxmlformats.org/wordprocessingml/2006/6/main")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/wordprocessingml/main")]
   W,
   #[sdk("w10", "urn:schemas-microsoft-com:office:word")]
   W10,
@@ -328,6 +351,7 @@ pub enum XmlKnownNamespace {
     "wp",
     "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
   )]
+  #[sdk_alias("http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing")]
   Wp,
   #[sdk(
     "wp14",
@@ -355,6 +379,9 @@ pub enum XmlKnownNamespace {
   )]
   Wps,
   #[sdk("x", "http://schemas.openxmlformats.org/spreadsheetml/2006/main")]
+  #[sdk_alias("http://schemas.openxmlformats.org/spreadsheetml/2006/5/main")]
+  #[sdk_alias("http://schemas.openxmlformats.org/spreadsheetml/2006/7/main")]
+  #[sdk_alias("http://purl.oclc.org/ooxml/spreadsheetml/main")]
   X,
   #[sdk("x12ac", "http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac")]
   X12ac,
@@ -401,6 +428,7 @@ pub enum XmlKnownNamespace {
     "xdr",
     "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
   )]
+  #[sdk_alias("http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing")]
   Xdr,
   #[sdk(
     "xdr14",
@@ -580,11 +608,65 @@ pub enum XmlKnownNamespace {
     "http://schemas.microsoft.com/office/spreadsheetml/2022/pivotVersionInfo"
   )]
   Xxpvi,
+  #[sdk("xsi", "http://www.w3.org/2001/XMLSchema-instance")]
+  Xsi,
+  #[sdk("w14", "http://schemas.microsoft.com/office/word/2007/5/30/wordml")]
+  W14Preview2007,
+  #[sdk("w14", "http://schemas.microsoft.com/office/word/2008/9/12/wordml")]
+  W14Preview2008,
+  #[sdk("w14", "http://schemas.microsoft.com/office/word/2009/2/wordml")]
+  W14Preview,
+  #[sdk("w15", "http://schemas.microsoft.com/office/word/2010/11/wordml")]
+  W15Preview,
+  #[sdk("cx1", "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex")]
+  Cx1,
+  #[sdk(
+    "cx2",
+    "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex"
+  )]
+  Cx2,
+  #[sdk("cx3", "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex")]
+  Cx3,
+  #[sdk("cx4", "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex")]
+  Cx4,
+  #[sdk("cx5", "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex")]
+  Cx5,
+  #[sdk("cx6", "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex")]
+  Cx6,
+  #[sdk("cx7", "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex")]
+  Cx7,
+  #[sdk("cx8", "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex")]
+  Cx8,
+  #[sdk(
+    "wpi",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+  )]
+  Wpi,
+  #[sdk("w16", "http://schemas.microsoft.com/office/word/2018/wordml")]
+  W16,
+  #[sdk("ve", "http://schemas.openxmlformats.org/markup-compatibility/2006")]
+  Ve,
+  #[sdk("hs", "http://schemas.haansoft.com/office/spreadsheet/8.0")]
+  Hs,
 }
 impl Default for XmlKnownNamespace {
   #[inline]
   fn default() -> Self {
     Self::A
+  }
+}
+impl XmlKnownNamespace {
+  #[inline]
+  pub(crate) const fn schema_namespace(self) -> Self {
+    match self {
+      Self::W14Preview2007 => Self::W14,
+      Self::W14Preview2008 => Self::W14,
+      Self::W14Preview => Self::W14,
+      Self::W15Preview => Self::W15,
+      Self::W16 => Self::W16cur,
+      Self::Ve => Self::Mc,
+      namespace => namespace,
+    }
   }
 }
 #[cfg(feature = "mce")]
@@ -1073,6 +1155,131 @@ pub(crate) fn minimum_version_by_uri(uri: &[u8]) -> Option<crate::sdk::FileForma
     }
     b"http://schemas.microsoft.com/office/spreadsheetml/2022/pivotVersionInfo" => {
       Some(crate::sdk::FileFormatVersion::Microsoft365)
+    }
+    b"http://www.w3.org/2001/XMLSchema-instance" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://schemas.microsoft.com/office/word/2007/5/30/wordml" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/word/2008/9/12/wordml" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/word/2009/2/wordml" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.microsoft.com/office/word/2010/11/wordml" => {
+      Some(crate::sdk::FileFormatVersion::Office2013)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2015/9/8/chartex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2015/10/21/chartex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/5/9/chartex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/5/10/chartex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/5/11/chartex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/5/12/chartex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/5/13/chartex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/drawing/2016/5/14/chartex" => {
+      Some(crate::sdk::FileFormatVersion::Office2016)
+    }
+    b"http://schemas.microsoft.com/office/word/2010/wordprocessingInk" => {
+      Some(crate::sdk::FileFormatVersion::Office2010)
+    }
+    b"http://schemas.haansoft.com/office/spreadsheet/8.0" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/wordprocessingml/2006/3/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/wordprocessingml/2006/5/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/wordprocessingml/2006/6/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/spreadsheetml/2006/5/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/spreadsheetml/2006/7/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/presentationml/2006/3/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://schemas.openxmlformats.org/drawingml/2006/3/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/drawingml/chart" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/drawingml/chartDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/drawingml/diagram" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/drawingml/main" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://purl.oclc.org/ooxml/drawingml/picture" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/officeDocument/bibliography" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/officeDocument/customProperties" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/officeDocument/customXml" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/officeDocument/extendedProperties" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/officeDocument/math" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/officeDocument/relationships" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/presentationml/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/schemaLibrary/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/spreadsheetml/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/wordprocessingml/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/drawingml/lockedCanvas" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/drawingml/compatibility" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
+    b"http://purl.oclc.org/ooxml/officeDocument/relationships/customXml" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
     }
     _ => None,
   }

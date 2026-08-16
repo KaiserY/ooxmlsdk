@@ -1797,25 +1797,13 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           .collect::<Vec<_>>();
         quote! { extra_xmlns(#(#prefixes),*), }
       };
-      let canonical_namespace_prefix = if type_decl.support.canonical_namespace_prefixes.is_empty()
-      {
-        quote! {}
-      } else {
-        let prefixes = type_decl
-          .support
-          .canonical_namespace_prefixes
-          .iter()
-          .map(|prefix| proc_macro2::Literal::string(prefix))
-          .collect::<Vec<_>>();
-        quote! { canonical_namespace_prefix(#(#prefixes),*), }
-      };
       let xml_header = if type_decl.support.has_xml_header {
         quote! { xml_header, }
       } else {
         quote! {}
       };
       quote! {
-        #[sdk(#(#type_sdk_version_markers,)* #no_prefix #extra_xmlns #canonical_namespace_prefix #xml_header qname = #qname)]
+        #[sdk(#(#type_sdk_version_markers,)* #no_prefix #extra_xmlns #xml_header qname = #qname)]
       }
     } else {
       quote! {}
@@ -3510,7 +3498,7 @@ fn gen_attr_from_decl(
     qname,
     bit,
     list,
-    match_local_name,
+    read_aliases,
     empty_as_none,
   } = &attr.wire
   else {
@@ -3528,10 +3516,12 @@ fn gen_attr_from_decl(
   let attr_attrs = module_version_cfg_attrs(&attr.version, version_cfg);
   let attr_sdk_version_markers = sdk_version_markers(&attr.version);
   let list_attr = list.then_some(quote! { list, });
-  let match_local_name_attr = match_local_name.then_some(quote! { match_local_name, });
+  let read_alias_attrs = read_aliases
+    .iter()
+    .map(|read_alias| quote! { read_alias = #read_alias, });
   let empty_as_none_attr = empty_as_none.then_some(quote! { empty_as_none, });
   let sdk_attr_attrs = quote! {
-    #[sdk(attr(#(#attr_sdk_version_markers,)* #list_attr #match_local_name_attr #empty_as_none_attr qname = #qname))]
+    #[sdk(attr(#(#attr_sdk_version_markers,)* #list_attr #(#read_alias_attrs)* #empty_as_none_attr qname = #qname))]
   };
   let validator_attrs: Vec<TokenStream> = attr
     .validators
@@ -4519,7 +4509,7 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
 
   if support.have_mc_ignorable {
     fields.push(quote! {
-      pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+      pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
     });
   }
 
@@ -4543,7 +4533,7 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
 
   if support.have_mc_must_understand {
     fields.push(quote! {
-      pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
+      pub mc_must_understand: Option<Vec<crate::common::XmlNamespace>>,
     });
   }
 
@@ -7600,7 +7590,7 @@ mod tests {
               qname: ":val".to_string(),
               bit: None,
               list: false,
-              match_local_name: false,
+              read_aliases: Vec::new(),
               empty_as_none: false,
             },
             type_ref: TypeRefDecl {
@@ -8212,7 +8202,7 @@ mod tests {
         qname: ":creationId".to_string(),
         bit: None,
         list: false,
-        match_local_name: false,
+        read_aliases: Vec::new(),
         empty_as_none: false,
       },
       cardinality: Cardinality::Optional,
@@ -8285,6 +8275,38 @@ mod tests {
     assert!(generated.contains("# [sdk (string_length (min = 2u32 , max = 8u32 ,))]"));
     assert!(generated.contains("# [sdk (number_range (range = 0 .. 10 ,))]"));
     assert!(generated.contains("# [sdk (number_sign (kind = \"non_negative\"))]"));
+  }
+
+  #[test]
+  fn emits_attribute_read_aliases_from_codegen_ir() {
+    let attr = FieldDecl {
+      rust_name: "left".to_string(),
+      wire: FieldWireDecl::Attribute {
+        qname: "w:left".to_string(),
+        bit: None,
+        list: false,
+        read_aliases: vec![":left".to_string(), "o:left".to_string()],
+        empty_as_none: false,
+      },
+      cardinality: Cardinality::Optional,
+      type_ref: TypeRefDecl {
+        rust_type: "StringValue".to_string(),
+        module_path: Some("crate::simple_type".to_string()),
+      },
+      ..Default::default()
+    };
+
+    let generated = gen_attr_from_decl(
+      &attr,
+      VersionCfgContext::default(),
+      &TypeContainmentGraph::default(),
+    )
+    .unwrap()
+    .to_string();
+
+    assert!(generated.contains("read_alias = \":left\""));
+    assert!(generated.contains("read_alias = \"o:left\""));
+    assert!(generated.contains("qname = \"w:left\""));
   }
 
   #[test]

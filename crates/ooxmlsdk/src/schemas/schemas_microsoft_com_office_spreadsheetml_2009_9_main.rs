@@ -318,11 +318,7 @@ pub struct ConditionalFormattings {
 }
 /// Defines the DataValidations Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  no_prefix,
-  canonical_namespace_prefix("xm:xne"),
-  qname = "x14:dataValidations"
-)]
+#[sdk(no_prefix, qname = "x14:dataValidations")]
 pub struct DataValidations {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// disablePrompts
@@ -343,11 +339,7 @@ pub struct DataValidations {
 }
 /// Defines the SparklineGroups Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  no_prefix,
-  canonical_namespace_prefix("xm:xne"),
-  qname = "x14:sparklineGroups"
-)]
+#[sdk(no_prefix, qname = "x14:sparklineGroups")]
 pub struct SparklineGroups {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the SparklineGroup Class.
@@ -855,11 +847,7 @@ pub struct SlicerCacheDefinition {
 }
 /// Defines the ConditionalFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  no_prefix,
-  canonical_namespace_prefix("xm:xne"),
-  qname = "x14:conditionalFormatting"
-)]
+#[sdk(no_prefix, qname = "x14:conditionalFormatting")]
 pub struct ConditionalFormatting {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// pivot

@@ -9,9 +9,9 @@
 #[sdk(qname = "mc:AlternateContent")]
 pub struct AlternateContent {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_process_content: Option<std::boxed::Box<[u8]>>,
-  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
+  pub mc_must_understand: Option<Vec<crate::common::XmlNamespace>>,
   #[sdk(
         choice(
             child(variant = Choice, boxed, qname = "mc:Choice"),
@@ -25,14 +25,14 @@ pub struct AlternateContent {
 #[sdk(qname = "mc:Choice")]
 pub struct Choice {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   pub mc_process_content: Option<std::boxed::Box<[u8]>>,
-  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
+  pub mc_must_understand: Option<Vec<crate::common::XmlNamespace>>,
   /// Requires
-  #[sdk(attr(qname = "Requires"))]
-  pub requires: crate::simple_type::StringValue,
+  #[sdk(attr(list, qname = "Requires"))]
+  pub requires: Vec<crate::common::XmlNamespace>,
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
@@ -41,9 +41,9 @@ pub struct Choice {
 #[sdk(qname = "mc:Fallback")]
 pub struct Fallback {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_process_content: Option<std::boxed::Box<[u8]>>,
-  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
+  pub mc_must_understand: Option<Vec<crate::common::XmlNamespace>>,
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }

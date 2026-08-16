@@ -9,7 +9,7 @@
 #[sdk(no_prefix_only, xml_header, qname = "xnsv:namedSheetViews")]
 pub struct NamedSheetViews {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Defines the NamedSheetView Class.
   #[sdk(child(qname = "xnsv:namedSheetView"))]
   pub named_sheet_view: Vec<NamedSheetView>,

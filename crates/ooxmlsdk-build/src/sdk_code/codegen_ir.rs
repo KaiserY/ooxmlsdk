@@ -125,8 +125,6 @@ pub struct SystemSupportDecl {
   pub have_mc_must_understand: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub extra_xmlns: Vec<String>,
-  #[serde(skip_serializing_if = "Vec::is_empty")]
-  pub canonical_namespace_prefixes: Vec<String>,
   #[serde(skip_serializing_if = "HashMap::is_empty")]
   pub alternate_content_children: HashMap<String, Vec<String>>,
 }
@@ -141,10 +139,7 @@ impl SystemSupportDecl {
   }
 
   pub fn has_extra_support_fields(&self) -> bool {
-    self.have_xmlns_fields
-      || self.has_mce_attributes()
-      || !self.extra_xmlns.is_empty()
-      || !self.canonical_namespace_prefixes.is_empty()
+    self.have_xmlns_fields || self.has_mce_attributes() || !self.extra_xmlns.is_empty()
   }
 }
 
@@ -176,8 +171,8 @@ pub enum FieldWireDecl {
     bit: Option<u32>,
     #[serde(default)]
     list: bool,
-    #[serde(default)]
-    match_local_name: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    read_aliases: Vec<String>,
     #[serde(default)]
     empty_as_none: bool,
   },
@@ -364,9 +359,6 @@ fn estimate_support_size(support: &SystemSupportDecl) -> usize {
     .filter(|enabled| *enabled)
     .count();
   if !support.extra_xmlns.is_empty() {
-    size += VEC_SIZE;
-  }
-  if !support.canonical_namespace_prefixes.is_empty() {
     size += VEC_SIZE;
   }
   size
@@ -559,7 +551,6 @@ mod tests {
           have_mc_process_content: false,
           have_mc_must_understand: false,
           extra_xmlns: Vec::new(),
-          canonical_namespace_prefixes: Vec::new(),
           alternate_content_children: HashMap::new(),
         },
         estimated_size: 0,
@@ -572,7 +563,7 @@ mod tests {
               qname: "ex:id".to_string(),
               bit: Some(1),
               list: false,
-              match_local_name: false,
+              read_aliases: Vec::new(),
               empty_as_none: false,
             },
             cardinality: Cardinality::One,

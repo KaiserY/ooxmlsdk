@@ -2271,7 +2271,7 @@ pub struct RgbColorModelPercentage {
 #[sdk(qname = "a:srgbClr")]
 pub struct RgbColorModelHex {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_length(min = 3u32, max = 3u32))]
@@ -4396,7 +4396,7 @@ pub struct Blip {
 #[sdk(xml_header, qname = "a:theme")]
 pub struct Theme {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,

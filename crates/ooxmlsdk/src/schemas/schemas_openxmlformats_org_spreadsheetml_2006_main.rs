@@ -1591,7 +1591,7 @@ pub struct CalculationChain {
 #[sdk(no_prefix_only, xml_header, qname = "x:comments")]
 pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Authors
   #[sdk(child(qname = "x:authors"))]
   pub authors: Authors,
@@ -1622,7 +1622,7 @@ pub struct MapInfo {
 #[sdk(no_prefix_only, xml_header, qname = "x:connections")]
 pub struct Connections {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Connection.
   #[sdk(child(qname = "x:connection"))]
   pub connection: Vec<Connection>,
@@ -1632,7 +1632,7 @@ pub struct Connections {
 #[sdk(no_prefix_only, xml_header, qname = "x:pivotCacheDefinition")]
 pub struct PivotCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -1732,7 +1732,7 @@ pub struct PivotCacheDefinition {
 #[sdk(no_prefix_only, xml_header, qname = "x:pivotCacheRecords")]
 pub struct PivotCacheRecords {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// PivotCache Records Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
@@ -1748,7 +1748,7 @@ pub struct PivotCacheRecords {
 #[sdk(no_prefix_only, xml_header, qname = "x:pivotTableDefinition")]
 pub struct PivotTableDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -2013,7 +2013,7 @@ pub struct PivotTableDefinition {
 #[sdk(no_prefix_only, xml_header, qname = "x:queryTable")]
 pub struct QueryTable {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -2116,7 +2116,7 @@ pub struct SharedStringTable {
 #[sdk(no_prefix_only, xml_header, qname = "x:headers")]
 pub struct Headers {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Last Revision GUID
   #[sdk(attr(qname = ":guid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
@@ -2166,7 +2166,7 @@ pub struct Headers {
 #[sdk(no_prefix_only, xml_header, qname = "x:revisions")]
 pub struct Revisions {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   #[sdk(
         choice(
             child(variant = RevisionRowColumn, boxed, qname = "x:rrc"),
@@ -2190,7 +2190,7 @@ pub struct Revisions {
 #[sdk(no_prefix_only, xml_header, qname = "x:users")]
 pub struct Users {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Active User Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
@@ -2203,7 +2203,7 @@ pub struct Users {
 #[sdk(no_prefix_only, xml_header, qname = "x:worksheet")]
 pub struct Worksheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// Revision Unique Identifier
   #[sdk(attr(qname = "xr:uid"))]
@@ -2334,7 +2334,7 @@ pub struct Worksheet {
 #[sdk(no_prefix_only, xml_header, qname = "x:chartsheet")]
 pub struct Chartsheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Revision Unique Identifier
   #[sdk(attr(qname = "xr:uid"))]
   pub xr_uid: Option<crate::simple_type::StringValue>,
@@ -2386,7 +2386,7 @@ pub struct Chartsheet {
 #[sdk(no_prefix_only, xml_header, qname = "x:dialogsheet")]
 pub struct DialogSheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Revision 6 Unique Identifier
   #[sdk(attr(qname = "xr6:uid"))]
   pub xr6_uid: Option<crate::simple_type::StringValue>,
@@ -2480,7 +2480,7 @@ pub struct SingleXmlCells {
 #[sdk(no_prefix_only, xml_header, qname = "x:styleSheet")]
 pub struct Stylesheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
   pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
@@ -2523,7 +2523,7 @@ pub struct Stylesheet {
 #[sdk(no_prefix_only, xml_header, qname = "x:externalLink")]
 pub struct ExternalLink {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   #[sdk(
         choice(
             child(variant = ExternalBook, boxed, qname = "x:externalBook"),
@@ -2541,7 +2541,7 @@ pub struct ExternalLink {
 #[sdk(no_prefix_only, xml_header, qname = "x:table")]
 pub struct Table {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Table Id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
@@ -2644,7 +2644,7 @@ pub struct VolatileTypes {
 #[sdk(no_prefix_only, xml_header, qname = "x:workbook")]
 pub struct Workbook {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// conformance
   #[sdk(attr(qname = ":conformance"))]
   pub conformance: Option<ConformanceClass>,
@@ -10794,7 +10794,7 @@ pub struct DefinedNames {
 #[sdk(no_prefix_only, qname = "x:calcPr")]
 pub struct CalculationProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Calculation Id
   #[sdk(attr(qname = ":calcId"))]
   pub calculation_id: Option<crate::simple_type::UInt32Value>,

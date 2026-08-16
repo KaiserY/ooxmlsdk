@@ -6,7 +6,7 @@
 
 /// Legacy Drawing Object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(canonical_namespace_prefix("com:comp"), qname = "comp:legacyDrawing")]
+#[sdk(qname = "comp:legacyDrawing")]
 pub struct LegacyDrawing {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Shape ID

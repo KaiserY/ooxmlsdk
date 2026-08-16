@@ -1549,6 +1549,7 @@ dependencies = [
  "bytes",
  "itoa",
  "lexical-parse-float",
+ "memchr",
  "ooxmlsdk-derive",
  "quick-xml",
  "regex",

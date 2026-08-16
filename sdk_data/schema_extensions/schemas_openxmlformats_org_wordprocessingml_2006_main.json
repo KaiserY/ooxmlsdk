@@ -800,11 +800,6 @@
       "HaveMcPreserveAttributes": true,
       "HaveMcProcessContent": true,
       "HaveMcMustUnderstand": true,
-      "CanonicalNamespacePrefixes": [
-        "ns2:r",
-        "ve:mc",
-        "ns1:mc"
-      ],
       "Attributes": [
         {
           "QName": "xml:space",
@@ -842,7 +837,9 @@
       "Attributes": [
         {
           "PropertyName": "Left",
-          "MatchLocalName": true
+          "ReadAliases": [
+            ":left"
+          ]
         },
         {
           "PropertyName": "Hanging",
@@ -857,15 +854,6 @@
     {
       "ClassName": "FooterReference",
       "HaveXmlnsFields": true
-    },
-    {
-      "ClassName": "HeaderFooterReferenceType",
-      "Attributes": [
-        {
-          "PropertyName": "Id",
-          "MatchLocalName": true
-        }
-      ]
     },
     {
       "ClassName": "Drawing",
@@ -1295,10 +1283,6 @@
       "HaveXmlnsFields": true,
       "Attributes": [
         {
-          "PropertyName": "TextId",
-          "MatchLocalName": true
-        },
-        {
           "QName": "w14:editId",
           "PropertyName": "W14EditId",
           "PropertyComments": "Legacy paragraph edit identifier",
@@ -1639,10 +1623,7 @@
     },
     {
       "ClassName": "WebSettings",
-      "HaveMcIgnorable": true,
-      "CanonicalNamespacePrefixes": [
-        "ns0:w"
-      ]
+      "HaveMcIgnorable": true
     },
     {
       "ClassName": "AbstractNum",

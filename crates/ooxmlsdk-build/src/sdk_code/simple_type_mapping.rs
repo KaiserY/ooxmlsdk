@@ -197,6 +197,10 @@ impl<'a> MappingBuilder<'a> {
     qname: &str,
     qname_fallback: bool,
   ) -> Result<()> {
+    let type_path = innermost_type_path(&type_ref.rust_type)?;
+    if is_xml_namespace_type(&type_path) {
+      return Ok(());
+    }
     let mut visiting = HashSet::new();
     let kind = self
       .resolve_type_ref(module, type_ref, &mut visiting)?
@@ -206,7 +210,7 @@ impl<'a> MappingBuilder<'a> {
           type_ref.rust_type
         )
       })?;
-    let Some(type_name) = innermost_type_path(&type_ref.rust_type)?.last().cloned() else {
+    let Some(type_name) = type_path.last().cloned() else {
       return Ok(());
     };
     self.insert_type(&type_name, kind);
@@ -316,6 +320,10 @@ fn innermost_type_path(value: &str) -> Result<Vec<String>> {
 
 fn path_module_path(path: &[String]) -> Option<String> {
   (path.len() > 1).then(|| path[..path.len() - 1].join("::"))
+}
+
+fn is_xml_namespace_type(path: &[String]) -> bool {
+  path == ["crate", "common", "XmlNamespace"]
 }
 
 fn schema_module_from_path(path: Option<&str>) -> Option<&str> {

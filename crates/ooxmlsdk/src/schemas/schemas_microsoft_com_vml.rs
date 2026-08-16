@@ -582,7 +582,7 @@ pub struct ImageData {
 }
 /// Shape Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(canonical_namespace_prefix("wvml:w10"), qname = "v:shape")]
+#[sdk(qname = "v:shape")]
 pub struct Shape {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]

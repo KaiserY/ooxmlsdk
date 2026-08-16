@@ -6,15 +6,10 @@
 
 /// Defines the Macrosheet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  extra_xmlns("x"),
-  canonical_namespace_prefix("xm:xne"),
-  xml_header,
-  qname = "xne:macrosheet"
-)]
+#[sdk(extra_xmlns("x"), xml_header, qname = "xne:macrosheet")]
 pub struct Macrosheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Revision 6 Unique Identifier
   #[sdk(attr(qname = "xr6:uid"))]
   pub xr6_uid: Option<crate::simple_type::StringValue>,

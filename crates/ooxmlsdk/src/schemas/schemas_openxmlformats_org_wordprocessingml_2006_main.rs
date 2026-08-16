@@ -4715,7 +4715,7 @@ pub struct SpacingBetweenLines {
 #[sdk(qname = "w:ind")]
 pub struct Indentation {
   /// Left Indentation
-  #[sdk(attr(match_local_name, qname = "w:left"))]
+  #[sdk(attr(read_alias = ":left", qname = "w:left"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:integer"))]
   #[sdk(pattern(
@@ -4973,7 +4973,7 @@ pub struct HeaderReference {
   #[sdk(attr(qname = "w:type"))]
   pub r#type: HeaderFooterValues,
   /// Relationship to Part
-  #[sdk(attr(match_local_name, qname = "r:id"))]
+  #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Footer Reference.
@@ -4985,7 +4985,7 @@ pub struct FooterReference {
   #[sdk(attr(qname = "w:type"))]
   pub r#type: HeaderFooterValues,
   /// Relationship to Part
-  #[sdk(attr(match_local_name, qname = "r:id"))]
+  #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Break.
@@ -5177,7 +5177,7 @@ pub struct EndnoteReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:drawing")]
 pub struct Drawing {
-  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
+  pub mc_must_understand: Option<Vec<crate::common::XmlNamespace>>,
   #[sdk(
         choice(
             child(variant = Anchor, boxed, qname = "wp:anchor"),
@@ -7715,7 +7715,7 @@ pub struct Paragraph {
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub paragraph_id: Option<crate::simple_type::HexBinaryValue>,
   /// textId
-  #[sdk(attr(match_local_name, qname = "w14:textId"))]
+  #[sdk(attr(qname = "w14:textId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub text_id: Option<crate::simple_type::HexBinaryValue>,
   /// noSpellErr
@@ -9994,7 +9994,7 @@ pub struct TextBoxContent {
 #[sdk(xml_header, qname = "w:comments")]
 pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Comment Content.
   #[sdk(child(qname = "w:comment"))]
   pub comment: Vec<Comment>,
@@ -10004,7 +10004,7 @@ pub struct Comments {
 #[sdk(xml_header, qname = "w:footnotes")]
 pub struct Footnotes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Footnote Content.
   #[sdk(child(qname = "w:footnote"))]
   pub footnote: Vec<Footnote>,
@@ -10014,7 +10014,7 @@ pub struct Footnotes {
 #[sdk(xml_header, qname = "w:endnotes")]
 pub struct Endnotes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Endnote Content.
   #[sdk(child(qname = "w:endnote"))]
   pub endnote: Vec<Endnote>,
@@ -10024,7 +10024,7 @@ pub struct Endnotes {
 #[sdk(xml_header, qname = "w:hdr")]
 pub struct Header {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   #[sdk(
         choice(
             child(variant = AltChunk, boxed, qname = "w:altChunk"),
@@ -10095,7 +10095,7 @@ pub struct Header {
 #[sdk(xml_header, qname = "w:ftr")]
 pub struct Footer {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   #[sdk(
         choice(
             child(variant = AltChunk, boxed, qname = "w:altChunk"),
@@ -10166,7 +10166,7 @@ pub struct Footer {
 #[sdk(xml_header, qname = "w:settings")]
 pub struct Settings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Write Protection
   #[sdk(child(qname = "w:writeProtection"))]
   pub write_protection: Option<WriteProtection>,
@@ -10509,14 +10509,10 @@ pub struct Settings {
 }
 /// Web Page Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  canonical_namespace_prefix("ns0:w"),
-  xml_header,
-  qname = "w:webSettings"
-)]
+#[sdk(xml_header, qname = "w:webSettings")]
 pub struct WebSettings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Nested Frameset Definition.
   #[sdk(child(qname = "w:frameset"))]
   pub frameset: Option<std::boxed::Box<Frameset>>,
@@ -10559,7 +10555,7 @@ pub struct WebSettings {
 #[sdk(xml_header, qname = "w:fonts")]
 pub struct Fonts {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   #[sdk(
         choice(
             child(variant = Font, boxed, qname = "w:font"),
@@ -10573,7 +10569,7 @@ pub struct Fonts {
 #[sdk(xml_header, qname = "w:numbering")]
 pub struct Numbering {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Picture Numbering Symbol Definition.
   #[sdk(child(qname = "w:numPicBullet"))]
   pub numbering_picture_bullet: Vec<NumberingPictureBullet>,
@@ -10592,7 +10588,7 @@ pub struct Numbering {
 #[sdk(xml_header, qname = "w:styles")]
 pub struct Styles {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Document Default Paragraph and Run Properties
   #[sdk(child(qname = "w:docDefaults"))]
   pub doc_defaults: Option<std::boxed::Box<DocDefaults>>,
@@ -10605,17 +10601,13 @@ pub struct Styles {
 }
 /// Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  canonical_namespace_prefix("ns2:r", "ve:mc", "ns1:mc"),
-  xml_header,
-  qname = "w:document"
-)]
+#[sdk(xml_header, qname = "w:document")]
 pub struct Document {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   pub mc_process_content: Option<std::boxed::Box<[u8]>>,
-  pub mc_must_understand: Option<std::boxed::Box<[u8]>>,
+  pub mc_must_understand: Option<Vec<crate::common::XmlNamespace>>,
   /// conformance
   #[sdk(attr(qname = "w:conformance"))]
   pub w_conformance: Option<DocumentConformance>,
@@ -10634,7 +10626,7 @@ pub struct Document {
 #[sdk(xml_header, qname = "w:glossaryDocument")]
 pub struct GlossaryDocument {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Document Background
   #[sdk(child(qname = "w:background"))]
   pub document_background: Option<std::boxed::Box<DocumentBackground>>,
@@ -13225,7 +13217,7 @@ pub struct ParagraphPropertiesBaseStyle {
 #[sdk(qname = "w:rPrDefault")]
 pub struct RunPropertiesDefault {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Run Properties
   #[sdk(child(qname = "w:rPr"))]
   pub run_properties_base_style: Option<std::boxed::Box<RunPropertiesBaseStyle>>,
@@ -14357,7 +14349,7 @@ pub struct LatentStyles {
 #[sdk(qname = "w:style")]
 pub struct Style {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Style Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<StyleValues>,

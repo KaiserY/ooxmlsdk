@@ -27,17 +27,116 @@ fn extra_xmlns_ident(prefix: &str) -> Ident {
   Ident::new(&ident, Span::call_site())
 }
 
-fn canonical_xmlns_ident(prefix: &str) -> Ident {
-  let mut ident = String::from("has_canonical_xmlns");
-  for byte in prefix.bytes() {
-    if byte.is_ascii_alphanumeric() {
-      ident.push('_');
-      ident.push(byte.to_ascii_lowercase() as char);
-    } else {
-      ident.push('_');
+fn static_attribute_qname_key(qname: &str, require_known_prefix: bool) -> syn::Result<String> {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  if local_name.is_empty() {
+    return Err(syn::Error::new(
+      Span::call_site(),
+      format!("attribute QName {qname:?} must have a local name"),
+    ));
+  }
+  if tag_prefix.is_empty() {
+    return Ok(format!("{{}}{local_name}"));
+  }
+  if let Some(uri) = namespaces::uri_by_prefix(&tag_prefix) {
+    return Ok(format!("{{{uri}}}{local_name}"));
+  }
+  if require_known_prefix {
+    return Err(syn::Error::new(
+      Span::call_site(),
+      format!("attribute read alias {qname:?} uses unknown prefix {tag_prefix:?}"),
+    ));
+  }
+  Ok(format!("{{prefix:{tag_prefix}}}{local_name}"))
+}
+
+fn validate_attribute_read_aliases(fields: &[SdkAttrField]) -> syn::Result<()> {
+  let primary_keys = fields
+    .iter()
+    .map(|field| static_attribute_qname_key(&field.name, false))
+    .collect::<syn::Result<Vec<_>>>()?;
+  let mut aliases = std::collections::HashMap::<String, (&Ident, &str)>::new();
+
+  for field in fields {
+    for read_alias in &field.read_aliases {
+      let alias_key = static_attribute_qname_key(read_alias, true)?;
+      if let Some((index, _)) = primary_keys
+        .iter()
+        .enumerate()
+        .find(|(_, primary_key)| **primary_key == alias_key)
+      {
+        return Err(syn::Error::new_spanned(
+          &field.ident,
+          format!(
+            "attribute read alias {read_alias:?} collides with primary attribute field {:?}",
+            fields[index].ident
+          ),
+        ));
+      }
+      if let Some((existing_field, existing_alias)) =
+        aliases.insert(alias_key, (&field.ident, read_alias))
+      {
+        return Err(syn::Error::new_spanned(
+          &field.ident,
+          format!(
+            "attribute read alias {read_alias:?} collides with {existing_alias:?} on field {existing_field:?}"
+          ),
+        ));
+      }
     }
   }
-  Ident::new(&ident, Span::call_site())
+  Ok(())
+}
+
+struct AttributeQNameDispatchTokens {
+  match_arm: proc_macro2::TokenStream,
+  namespace_target: Option<proc_macro2::TokenStream>,
+}
+
+fn known_namespace_variant_tokens(prefix: &str) -> Option<proc_macro2::TokenStream> {
+  let variant = Ident::new(namespaces::variant_by_prefix(prefix)?, Span::call_site());
+  Some(quote! { crate::namespaces::XmlKnownNamespace::#variant })
+}
+
+fn attribute_qname_dispatch_tokens(
+  qname: &str,
+  assign_tokens: proc_macro2::TokenStream,
+) -> AttributeQNameDispatchTokens {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let name_bytes_lit = LitByteStr::new(qname.as_bytes(), Span::call_site());
+  let local_name_bytes_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let namespace = (!tag_prefix.is_empty())
+    .then(|| known_namespace_variant_tokens(&tag_prefix))
+    .flatten();
+  let match_arm = quote! {
+    #name_bytes_lit => {
+      #assign_tokens
+    }
+  };
+  let namespace_target = if tag_prefix == "xml" {
+    None
+  } else {
+    namespace.map(|namespace| {
+      quote! {
+        crate::common::AttributeQNameTarget::new(
+          #local_name_bytes_lit,
+          #namespace,
+          #name_bytes_lit,
+        )
+      }
+    })
+  };
+
+  AttributeQNameDispatchTokens {
+    match_arm,
+    namespace_target,
+  }
 }
 
 fn choice_child_read_tokens(
@@ -49,11 +148,11 @@ fn choice_child_read_tokens(
 ) -> proc_macro2::TokenStream {
   let value_tokens = if let Some(child_ty) = ty {
     quote! {
-      <#child_ty as crate::sdk::SdkType>::read_inner(#xml_reader, e, next_empty)?
+      <#child_ty as crate::sdk::SdkType>::read_inner(#xml_reader, e, next_empty, read_context)?
     }
   } else {
     quote! {
-      crate::sdk::SdkType::read_inner(#xml_reader, e, next_empty)?
+      crate::sdk::SdkType::read_inner(#xml_reader, e, next_empty, read_context)?
     }
   };
   let value_tokens = if boxed {
@@ -83,94 +182,6 @@ fn static_xmlns_attr_tokens(prefix: Option<&str>, uri: &str) -> proc_macro2::Tok
   quote! {
     writer.write_all(#attr_lit)?;
   }
-}
-
-fn canonical_namespace_prefix_tokens(
-  prefix_pairs: &[String],
-) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
-  if prefix_pairs.is_empty() {
-    return Ok((quote! {}, quote! {}));
-  }
-
-  let mut mappings = Vec::with_capacity(prefix_pairs.len());
-  let mut targets = Vec::<String>::new();
-  for prefix_pair in prefix_pairs {
-    let Some((from_prefix, to_prefix)) = prefix_pair.split_once(':') else {
-      return Err(syn::Error::new(
-        Span::call_site(),
-        format!("canonical_namespace_prefix expects from:to, got {prefix_pair}"),
-      ));
-    };
-    if from_prefix.is_empty() || to_prefix.is_empty() {
-      return Err(syn::Error::new(
-        Span::call_site(),
-        format!("canonical_namespace_prefix expects non-empty from:to, got {prefix_pair}"),
-      ));
-    }
-    let Some(target_uri) = namespaces::uri_by_prefix(to_prefix) else {
-      return Err(syn::Error::new(
-        Span::call_site(),
-        format!("unknown canonical namespace prefix {to_prefix}"),
-      ));
-    };
-    if mappings
-      .iter()
-      .any(|(candidate, _, _)| candidate == from_prefix)
-    {
-      return Err(syn::Error::new(
-        Span::call_site(),
-        format!("duplicate canonical namespace source prefix {from_prefix}"),
-      ));
-    }
-    mappings.push((from_prefix.to_string(), to_prefix.to_string(), target_uri));
-    if !targets.iter().any(|candidate| candidate == to_prefix) {
-      targets.push(to_prefix.to_string());
-    }
-  }
-
-  let init_tokens = targets.iter().map(|prefix| {
-    let ident = canonical_xmlns_ident(prefix);
-    quote! { let mut #ident = false; }
-  });
-  let source_arms = mappings.iter().map(|(from_prefix, to_prefix, target_uri)| {
-    let from_lit = LitByteStr::new(from_prefix.as_bytes(), Span::call_site());
-    let to_lit = LitByteStr::new(to_prefix.as_bytes(), Span::call_site());
-    let target_uri_lit = LitByteStr::new(target_uri.as_bytes(), Span::call_site());
-    let seen_ident = canonical_xmlns_ident(to_prefix);
-    quote! {
-      #from_lit if declaration_uri == #target_uri_lit => {
-        if #seen_ident {
-          continue;
-        }
-        #seen_ident = true;
-        #to_lit.as_slice()
-      }
-    }
-  });
-  let target_arms = targets.iter().map(|target_prefix| {
-    let target_lit = LitByteStr::new(target_prefix.as_bytes(), Span::call_site());
-    let seen_ident = canonical_xmlns_ident(target_prefix);
-    quote! {
-      #target_lit => {
-        if #seen_ident {
-          continue;
-        }
-        #seen_ident = true;
-        declaration_prefix
-      }
-    }
-  });
-
-  Ok((
-    quote! { #( #init_tokens )* },
-    quote! {
-      let declaration_prefix = match declaration_prefix {
-        #( #source_arms )*
-        #( #target_arms )*
-        _ => declaration_prefix,
-      };
-    },
-  ))
 }
 
 fn extra_xmlns_tokens(
@@ -260,6 +271,7 @@ fn wml_table_stack_read_table_value_tokens() -> proc_macro2::TokenStream {
       let mut __ooxmlsdk_stack = Vec::<__OoxmlsdkWmlTableStackFrame>::new();
       if !parsed_child.__ooxmlsdk_read_inner_stack_start(
         xml_reader,
+        read_context,
         e,
         next_empty,
       )? {
@@ -275,12 +287,12 @@ fn wml_table_stack_read_table_value_tokens() -> proc_macro2::TokenStream {
             match __ooxmlsdk_frame {
               __OoxmlsdkWmlTableStackFrame::Table {
                 value,
-              } => value.__ooxmlsdk_read_inner_stack_next(xml_reader)?,
+              } => value.__ooxmlsdk_read_inner_stack_next(xml_reader, read_context)?,
               __OoxmlsdkWmlTableStackFrame::Row(value) => {
-                value.__ooxmlsdk_read_inner_stack_next(xml_reader)?
+                value.__ooxmlsdk_read_inner_stack_next(xml_reader, read_context)?
               }
               __OoxmlsdkWmlTableStackFrame::Cell(value) => {
-                value.__ooxmlsdk_read_inner_stack_next(xml_reader)?
+                value.__ooxmlsdk_read_inner_stack_next(xml_reader, read_context)?
               }
             }
           };
@@ -1434,6 +1446,7 @@ fn root_read_tokens(
   ident: &Ident,
   local_name_lit: &LitByteStr,
   mode: DeserializeMode,
+  preparse_namespaces: bool,
 ) -> proc_macro2::TokenStream {
   let read_start = match mode {
     DeserializeMode::Borrowed => quote! { crate::common::read_root_start_borrowed },
@@ -1443,13 +1456,20 @@ fn root_read_tokens(
     DeserializeMode::Borrowed => quote! { <Self as crate::sdk::SdkType>::read_inner },
     DeserializeMode::Io => quote! { <Self as crate::sdk::SdkType>::read_inner },
   };
+  let enter_root = if preparse_namespaces {
+    quote! { read_context.enter_root_scope(empty); }
+  } else {
+    quote! { read_context.enter_root(&start, empty, xml_reader.decoder())?; }
+  };
   quote! {
     let (start, empty) = #read_start(
       &mut xml_reader,
       stringify!(#ident),
       #local_name_lit,
     )?;
-    #read_inner(&mut xml_reader, start, empty)
+    let mut read_context = crate::common::ReadContext::default();
+    #enter_root
+    #read_inner(&mut xml_reader, start, empty, &mut read_context)
   }
 }
 
@@ -1636,7 +1656,7 @@ fn sequence_option_field_parse_body(
     }
     if let Some(#choice_ty::#variant(value)) = &mut #field_ident {
       value.#option_field_ident = Some(
-        crate::sdk::SdkType::read_inner(xml_reader, e, next_empty)?
+        crate::sdk::SdkType::read_inner(xml_reader, e, next_empty, read_context)?
       );
     }
     #xml_child_slot_assign
@@ -1674,8 +1694,8 @@ fn expand_tuple_wrapper(
     quote! { self.write_inner(writer)? }
   };
   let root_read_borrowed_tokens =
-    root_read_tokens(ident, &local_name_lit, DeserializeMode::Borrowed);
-  let root_read_io_tokens = root_read_tokens(ident, &local_name_lit, DeserializeMode::Io);
+    root_read_tokens(ident, &local_name_lit, DeserializeMode::Borrowed, false);
+  let root_read_io_tokens = root_read_tokens(ident, &local_name_lit, DeserializeMode::Io, false);
   let root_methods_tokens = sdk_type_root_methods_tokens(
     &root_read_borrowed_tokens,
     &root_read_io_tokens,
@@ -1749,8 +1769,10 @@ fn expand_tuple_wrapper(
         xml_reader: &mut R,
         start: quick_xml::events::BytesStart<'xml>,
         empty: bool,
+        read_context: &mut crate::common::ReadContext,
       ) -> Result<Self, crate::common::SdkError> {
-        <#inner_ty as crate::sdk::SdkType>::read_inner(xml_reader, start, empty).map(Self)
+        <#inner_ty as crate::sdk::SdkType>::read_inner(xml_reader, start, empty, read_context)
+          .map(Self)
       }
 
       #root_methods_tokens
@@ -2292,7 +2314,11 @@ fn mce_choice_impl_tokens(
             let parsed_child = if next_empty {
               #empty_parse_tokens
             } else {
-              let value = child_reader.read_text(e.name(), stringify!(#ident), stringify!(#variant))?;
+              let value = child_reader.read_text(
+                e.name(),
+                stringify!(#ident),
+                stringify!(#variant),
+              )?;
               #value_parse_tokens
             };
             Some(#choice_ty::#variant(parsed_child))
@@ -2326,9 +2352,12 @@ fn mce_choice_impl_tokens(
         child_xml: std::boxed::Box<[u8]>,
       ) -> Result<Option<Self>, crate::common::SdkError> {
         let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref());
+        let mut child_read_context = crate::common::ReadContext::default();
+        let read_context = &mut child_read_context;
         loop {
           match child_reader.next()? {
             crate::common::PayloadEvent::Start(e, next_empty) => {
+              read_context.enter_root(&e, next_empty, child_reader.decoder())?;
               let event_name = crate::common::xml_local_name(e.name());
               return Ok(match event_name {
                 #( #parse_replacement_arms )*
@@ -2837,9 +2866,18 @@ fn sdk_type_read_inner_value_tokens(
   xml_reader: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   if let Some(child_ty) = child_ty {
-    quote! { <#child_ty as crate::sdk::SdkType>::read_inner(#xml_reader, e, next_empty)? }
+    quote! {
+      <#child_ty as crate::sdk::SdkType>::read_inner(
+        #xml_reader,
+        e,
+        next_empty,
+        read_context,
+      )?
+    }
   } else {
-    quote! { crate::sdk::SdkType::read_inner(#xml_reader, e, next_empty)? }
+    quote! {
+      crate::sdk::SdkType::read_inner(#xml_reader, e, next_empty, read_context)?
+    }
   }
 }
 
@@ -2968,7 +3006,12 @@ fn read_integer_text_child_tokens(
     IntegerTypeKind::I64 => quote! { crate::common::read_i64_text_child_value },
   };
   quote! {
-    #read_fn(#xml_reader_expr, #end_expr, #owner_expr, #field_expr)?
+    #read_fn(
+      #xml_reader_expr,
+      #end_expr,
+      #owner_expr,
+      #field_expr,
+    )?
   }
 }
 
@@ -2990,7 +3033,12 @@ fn read_float_text_child_tokens(
     _ => return None,
   };
   Some(quote! {
-    #read_fn(#xml_reader_expr, #end_expr, #owner_expr, #field_expr)?
+    #read_fn(
+      #xml_reader_expr,
+      #end_expr,
+      #owner_expr,
+      #field_expr,
+    )?
   })
 }
 
@@ -3030,7 +3078,12 @@ fn text_child_read_parse_tokens(
       quote! { crate::common::read_enum_text_child_value }
     };
     return quote! {
-      #read_fn(#xml_reader_expr, #end_expr, #owner_expr, #field_expr)?
+      #read_fn(
+        #xml_reader_expr,
+        #end_expr,
+        #owner_expr,
+        #field_expr,
+      )?
     };
   }
 
@@ -3304,7 +3357,11 @@ fn build_text_child_parse_body(
   let read_parse_tokens = if options.list {
     if list_is_string_like {
       quote! {{
-        let text = xml_reader.read_text(e.name(), stringify!(#owner_ident), stringify!(#field_ident))?;
+        let text = xml_reader.read_text(
+          e.name(),
+          stringify!(#owner_ident),
+          stringify!(#field_ident),
+        )?;
         #parse_from_text_tokens
       }}
     } else {
@@ -3761,13 +3818,13 @@ fn expand_helper_struct(
       let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty);
       if field.repeated {
         quote! {
-          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty, read_context)?;
           #field_ident.push(#parsed_child_expr);
           #xml_child_slot_assign
         }
       } else {
         quote! {
-          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty, read_context)?;
           #field_ident = Some(#parsed_child_expr);
           #xml_child_slot_assign
         }
@@ -4102,6 +4159,7 @@ fn expand_helper_struct(
         xml_reader: &mut R,
         start: quick_xml::events::BytesStart<'xml>,
         empty: bool,
+        read_context: &mut crate::common::ReadContext,
       ) -> Result<Self, crate::common::SdkError> {
         #read_inner_body
       }
@@ -4143,9 +4201,6 @@ fn expand_named_struct(
   let extra_xmlns = parse_sdk_extra_xmlns(&input.attrs)?;
   let (extra_xmlns_init_tokens, extra_xmlns_mark_tokens, extra_xmlns_write_tokens) =
     extra_xmlns_tokens(&extra_xmlns)?;
-  let canonical_namespace_prefixes = parse_sdk_canonical_namespace_prefixes(&input.attrs)?;
-  let (canonical_namespace_prefix_init_tokens, canonical_namespace_prefix_tokens) =
-    canonical_namespace_prefix_tokens(&canonical_namespace_prefixes)?;
   let start_tag_open = write_start_tag_open_tokens(schema_qname, no_prefix);
   let end_tag = write_end_tag_tokens(schema_qname, no_prefix);
   let wml_table_kind = wml_table_stack_kind(ident, schema_qname);
@@ -4214,7 +4269,7 @@ fn expand_named_struct(
       SdkTypeFieldKind::Attr {
         name,
         list,
-        match_local_name,
+        read_aliases,
         empty_as_none,
       } => attr_fields.push(SdkAttrField {
         ident: field_ident.clone(),
@@ -4222,7 +4277,7 @@ fn expand_named_struct(
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         list,
-        match_local_name,
+        read_aliases,
         empty_as_none,
         validators: parsed_attrs.validators,
       }),
@@ -4300,6 +4355,7 @@ fn expand_named_struct(
       "SdkType currently supports at most one #[sdk(any)] field",
     ));
   }
+  validate_attribute_read_aliases(&attr_fields)?;
 
   let has_xmlns_fields = !xmlns_fields.is_empty();
   let has_mc_ignorable_field = mc_ignorable_field.is_some();
@@ -4313,7 +4369,6 @@ fn expand_named_struct(
     || has_mc_process_content_field
     || has_mc_must_understand_field;
   let tracks_xml_child_slot = !mce_fields.is_empty();
-  let needs_canonical_xmlns_prefix = !canonical_namespace_prefixes.is_empty();
   let end_name_matches = quote! { e.name() == __end_qname };
   let end_qname_decl = quote! { let __end_qname = e.name(); };
 
@@ -4345,8 +4400,29 @@ fn expand_named_struct(
     }
   };
 
+  let namespace_list_parser_tokens = |attribute: proc_macro2::TokenStream| {
+    let parse = if has_xmlns_fields {
+      quote! {
+        crate::common::parse_xml_namespace_list(read_context, &xmlns, value.as_bytes())
+      }
+    } else {
+      quote! {
+        crate::common::parse_xml_namespace_list_on(read_context, &e, value.as_bytes())
+      }
+    };
+    quote! {{
+      let value = #attribute.decoded_and_normalized_value(
+        quick_xml::XmlVersion::Implicit1_0,
+        decoder,
+      )?;
+      #parse
+    }}
+  };
   let mut attr_decl_tokens = Vec::new();
+  let mut attr_post_parse_tokens = Vec::new();
   let mut attr_parse_tokens = Vec::new();
+  let mut attr_namespace_parse_tokens = Vec::new();
+  let mut attr_namespace_targets = Vec::new();
   let mut attr_write_tokens = Vec::new();
   let mut attr_init_tokens = Vec::new();
   let mut attr_finish_tokens = Vec::new();
@@ -4354,12 +4430,6 @@ fn expand_named_struct(
   for field in &attr_fields {
     let field_ident = &field.ident;
     let name_lit = LitStr::new(&field.name, Span::call_site());
-    let name_bytes_lit = LitByteStr::new(field.name.as_bytes(), Span::call_site());
-    let QNameInfo { local_name, .. } = parse_qname_info(&field.name);
-    let local_name_bytes_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-    let local_name_suffix = format!(":{local_name}");
-    let local_name_suffix_bytes_lit =
-      LitByteStr::new(local_name_suffix.as_bytes(), Span::call_site());
     let value_ty = if field.list {
       vec_inner_type(&unwrap_option_type(&field.ty)).ok_or_else(|| {
         syn::Error::new_spanned(&field.ty, "#[sdk(attr(..., list))] requires Vec<T>")
@@ -4367,11 +4437,18 @@ fn expand_named_struct(
     } else {
       unwrap_wrapped_type(&field.ty)
     };
-    let simple_type = mapped_simple_type_name(Some(&value_ty), &field.name, field.list);
+    let namespace_list = type_terminal_name(&value_ty).as_deref() == Some("XmlNamespace");
+    let simple_type = if namespace_list {
+      None
+    } else {
+      mapped_simple_type_name(Some(&value_ty), &field.name, field.list)
+    };
     let simple_union_kind = simple_union_effective_type_kind(&value_ty, simple_type);
     let from_bytes_attr = is_from_bytes_attr_effective_type(&value_ty, simple_type);
     let integer_kind = integer_effective_type_kind(&value_ty, simple_type);
-    let parser = if field.list {
+    let parser = if namespace_list {
+      namespace_list_parser_tokens(quote! { attr })
+    } else if field.list {
       if is_string_like_effective_type(&value_ty, simple_type) {
         quote! {
           crate::common::parse_list_attr::<#value_ty>(
@@ -4425,7 +4502,25 @@ fn expand_named_struct(
         compile_error!("unmapped XML attribute value type")
       }
     };
-    let assign_attr_tokens = if field.empty_as_none {
+    let parse_storage_ident = namespace_list.then(|| {
+      Ident::new(
+        &format!("__ooxmlsdk_{}_attribute", field_ident),
+        Span::call_site(),
+      )
+    });
+    let assign_attr_tokens = if let Some(parse_storage_ident) = &parse_storage_ident {
+      if field.empty_as_none {
+        quote! {
+          if !attr.value.as_ref().is_empty() {
+            #parse_storage_ident = Some(attr.clone());
+          }
+        }
+      } else {
+        quote! {
+          #parse_storage_ident = Some(attr.clone());
+        }
+      }
+    } else if field.empty_as_none {
       quote! {
         if !attr.value.as_ref().is_empty() {
           #field_ident = Some(#parser);
@@ -4436,32 +4531,46 @@ fn expand_named_struct(
         #field_ident = Some(#parser);
       }
     };
-    let attr_local_fallback_parse_tokens = if field.match_local_name && !local_name.is_empty() {
-      quote! {
-        key if key == #local_name_bytes_lit || key.ends_with(#local_name_suffix_bytes_lit) => {
-          #assign_attr_tokens
-        }
+    let primary_dispatch = attribute_qname_dispatch_tokens(&field.name, assign_attr_tokens.clone());
+    attr_parse_tokens.push(primary_dispatch.match_arm.clone());
+    if let Some(namespace_target) = primary_dispatch.namespace_target {
+      attr_namespace_parse_tokens.push(primary_dispatch.match_arm);
+      attr_namespace_targets.push(namespace_target);
+    }
+    let assigned_ident = parse_storage_ident.as_ref().unwrap_or(field_ident);
+    let assign_read_alias_tokens = quote! {
+      if #assigned_ident.is_none() {
+        #assign_attr_tokens
       }
-    } else {
-      quote! {}
     };
-    if field.optional {
-      attr_decl_tokens.push(quote! { let mut #field_ident = None; });
-      attr_parse_tokens.push(quote! {
-        #name_bytes_lit => {
-          #assign_attr_tokens
-        }
-        #attr_local_fallback_parse_tokens
+    for read_alias in &field.read_aliases {
+      let alias_dispatch =
+        attribute_qname_dispatch_tokens(read_alias, assign_read_alias_tokens.clone());
+      attr_parse_tokens.push(alias_dispatch.match_arm.clone());
+      if let Some(namespace_target) = alias_dispatch.namespace_target {
+        attr_namespace_parse_tokens.push(alias_dispatch.match_arm);
+        attr_namespace_targets.push(namespace_target);
+      }
+    }
+    if let Some(parse_storage_ident) = &parse_storage_ident {
+      let parser = namespace_list_parser_tokens(quote! { attr });
+      attr_decl_tokens.push(quote! {
+        let mut #parse_storage_ident =
+          None::<quick_xml::events::attributes::Attribute<'xml>>;
       });
+      attr_post_parse_tokens.push(quote! {
+        let #field_ident = if let Some(attr) = #parse_storage_ident {
+          Some(#parser)
+        } else {
+          None
+        };
+      });
+    } else {
+      attr_decl_tokens.push(quote! { let mut #field_ident = None; });
+    }
+    if field.optional {
       attr_init_tokens.push(quote! { #field_ident });
     } else {
-      attr_decl_tokens.push(quote! { let mut #field_ident = None; });
-      attr_parse_tokens.push(quote! {
-        #name_bytes_lit => {
-          #assign_attr_tokens
-        }
-        #attr_local_fallback_parse_tokens
-      });
       attr_finish_tokens.push(quote! {
         #field_ident: match #field_ident {
           Some(value) => value,
@@ -4476,68 +4585,73 @@ fn expand_named_struct(
       format!(" {}=\"", field.name).as_bytes(),
       proc_macro2::Span::call_site(),
     );
-    let attr_write_value_tokens =
-      if field.list && is_string_like_effective_type(&value_ty, simple_type) {
-        quote! {
-          writer.write_all(#attr_prefix_lit)?;
-          crate::common::write_list_str_value(writer, value.as_slice())?;
-          writer.write_all(b"\"")?;
-        }
-      } else if field.list {
-        let write_list_tokens =
-          write_list_attr_tokens(&value_ty, simple_type, quote! { value.as_slice() });
-        quote! {
-          writer.write_all(#attr_prefix_lit)?;
-          #write_list_tokens
-          writer.write_all(b"\"")?;
-        }
-      } else if let Some(kind) = simple_union_kind {
-        write_simple_union_attr_tokens(kind, &attr_prefix_lit, quote! { value })
-      } else if let Some(kind) = integer_kind {
-        let write_value_tokens = write_integer_value_tokens_by_kind(kind, quote! { value });
-        quote! {
-          writer.write_all(#attr_prefix_lit)?;
-          #write_value_tokens
-          writer.write_all(b"\"")?;
-        }
-      } else if effective_type_name(&value_ty, simple_type)
-        .as_deref()
-        .is_some_and(is_xml_schema_float_type_name)
-      {
-        let write_value_tokens =
-          write_xml_schema_float_effective_tokens(quote! { value }, &value_ty, simple_type, "");
-        quote! {
-          writer.write_all(#attr_prefix_lit)?;
-          #write_value_tokens
-          writer.write_all(b"\"")?;
-        }
-      } else if is_string_like_effective_type(&value_ty, simple_type) {
-        quote! {
-          writer.write_all(#attr_prefix_lit)?;
-          crate::common::write_escaped_str(writer, value.as_ref())?;
-          writer.write_all(b"\"")?;
-        }
-      } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
-        quote! {
-          writer.write_all(#attr_prefix_lit)?;
-          writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
-          writer.write_all(b"\"")?;
-        }
-      } else if let Some(write_value_tokens) =
-        write_from_bytes_value_tokens(&value_ty, simple_type, quote! { value })
-      {
-        quote! {
-          writer.write_all(#attr_prefix_lit)?;
-          #write_value_tokens
-          writer.write_all(b"\"")?;
-        }
-      } else {
-        quote! {
-          writer.write_all(#attr_prefix_lit)?;
-          compile_error!("unmapped XML attribute value type");
-          writer.write_all(b"\"")?;
-        }
-      };
+    let attr_write_value_tokens = if namespace_list {
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        crate::common::write_xml_namespace_list_value(writer, value.as_slice())?;
+        writer.write_all(b"\"")?;
+      }
+    } else if field.list && is_string_like_effective_type(&value_ty, simple_type) {
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        crate::common::write_list_str_value(writer, value.as_slice())?;
+        writer.write_all(b"\"")?;
+      }
+    } else if field.list {
+      let write_list_tokens =
+        write_list_attr_tokens(&value_ty, simple_type, quote! { value.as_slice() });
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        #write_list_tokens
+        writer.write_all(b"\"")?;
+      }
+    } else if let Some(kind) = simple_union_kind {
+      write_simple_union_attr_tokens(kind, &attr_prefix_lit, quote! { value })
+    } else if let Some(kind) = integer_kind {
+      let write_value_tokens = write_integer_value_tokens_by_kind(kind, quote! { value });
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        #write_value_tokens
+        writer.write_all(b"\"")?;
+      }
+    } else if effective_type_name(&value_ty, simple_type)
+      .as_deref()
+      .is_some_and(is_xml_schema_float_type_name)
+    {
+      let write_value_tokens =
+        write_xml_schema_float_effective_tokens(quote! { value }, &value_ty, simple_type, "");
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        #write_value_tokens
+        writer.write_all(b"\"")?;
+      }
+    } else if is_string_like_effective_type(&value_ty, simple_type) {
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        crate::common::write_escaped_str(writer, value.as_ref())?;
+        writer.write_all(b"\"")?;
+      }
+    } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        writer.write_all(crate::sdk::SdkEnum::as_xml_bytes(value))?;
+        writer.write_all(b"\"")?;
+      }
+    } else if let Some(write_value_tokens) =
+      write_from_bytes_value_tokens(&value_ty, simple_type, quote! { value })
+    {
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        #write_value_tokens
+        writer.write_all(b"\"")?;
+      }
+    } else {
+      quote! {
+        writer.write_all(#attr_prefix_lit)?;
+        compile_error!("unmapped XML attribute value type");
+        writer.write_all(b"\"")?;
+      }
+    };
     if field.optional {
       attr_write_tokens.push(quote! {
         if let Some(value) = &self.#field_ident {
@@ -4702,124 +4816,99 @@ fn expand_named_struct(
     }
   }
 
-  let xmlns_parse_tokens = if has_xmlns_fields {
-    quote! {
-      b"xmlns" => {
-        xmlns.push(crate::common::XmlNamespace::raw("", attr.value.as_ref()));
-      }
-      key if key.starts_with(b"xmlns:") => {
-        xmlns.push(crate::common::XmlNamespace::raw(&key[6..], attr.value.as_ref()));
-      }
-    }
+  let (xmlns_preparse_tokens, xmlns_parse_tokens) = if has_xmlns_fields {
+    (
+      quote! {
+        let __ooxmlsdk_root_namespace_scope =
+          read_context.take_root_namespaces_pending();
+      },
+      quote! {
+        b"xmlns" => {
+          let (uri, known, canonical) =
+            crate::common::parse_xml_namespace_uri(&attr, b"", decoder)?;
+          crate::common::XmlNamespace::push_normalized_resolved(
+            &mut xmlns,
+            &mut __ooxmlsdk_xmlns_state,
+            b"",
+            uri.as_ref(),
+            known,
+            canonical,
+          );
+          if __ooxmlsdk_root_namespace_scope {
+            read_context.declare_namespace_resolved(b"", uri.as_ref(), canonical);
+          }
+        }
+        key if key.starts_with(b"xmlns:") => {
+          let (uri, known, canonical) =
+            crate::common::parse_xml_namespace_uri(&attr, &key[6..], decoder)?;
+          crate::common::XmlNamespace::push_normalized_resolved(
+            &mut xmlns,
+            &mut __ooxmlsdk_xmlns_state,
+            &key[6..],
+            uri.as_ref(),
+            known,
+            canonical,
+          );
+          if __ooxmlsdk_root_namespace_scope {
+            read_context.declare_namespace_resolved(&key[6..], uri.as_ref(), canonical);
+          }
+        }
+      },
+    )
   } else {
-    quote! {}
+    (quote! {}, quote! {})
   };
-  let mc_namespace_uri = LitByteStr::new(
-    namespaces::uri_by_prefix("mc")
-      .expect("mc namespace must be registered")
-      .as_bytes(),
-    Span::call_site(),
-  );
-  let mc_ignorable_parse_tokens = has_mc_ignorable_field.then(|| {
+  let mc_ignorable_assign_tokens = has_mc_ignorable_field.then(|| {
     quote! {
-      b"mc:Ignorable" => { mc_ignorable = Some(attr.value.as_ref().into()); }
+      __ooxmlsdk_mc_ignorable_attribute = Some(attr.clone());
     }
   });
-  let mc_preserve_attributes_parse_tokens = has_mc_preserve_attributes_field.then(|| {
+  let mc_preserve_attributes_assign_tokens = has_mc_preserve_attributes_field.then(|| {
     quote! {
-      b"mc:PreserveAttributes" => {
-        mc_preserve_attributes = Some(attr.value.as_ref().into());
-      }
+      mc_preserve_attributes = Some(attr.value.as_ref().into());
     }
   });
-  let mc_preserve_elements_parse_tokens = has_mc_preserve_elements_field.then(|| {
+  let mc_preserve_elements_assign_tokens = has_mc_preserve_elements_field.then(|| {
     quote! {
-      b"mc:PreserveElements" => {
-        mc_preserve_elements = Some(attr.value.as_ref().into());
-      }
+      mc_preserve_elements = Some(attr.value.as_ref().into());
     }
   });
-  let mc_process_content_parse_tokens = has_mc_process_content_field.then(|| {
+  let mc_process_content_assign_tokens = has_mc_process_content_field.then(|| {
     quote! {
-      b"mc:ProcessContent" => {
-        mc_process_content = Some(attr.value.as_ref().into());
-      }
+      mc_process_content = Some(attr.value.as_ref().into());
     }
   });
-  let mc_must_understand_parse_tokens = has_mc_must_understand_field.then(|| {
+  let mc_must_understand_assign_tokens = has_mc_must_understand_field.then(|| {
     quote! {
-      b"mc:MustUnderstand" => {
-        mc_must_understand = Some(attr.value.as_ref().into());
-      }
+      __ooxmlsdk_mc_must_understand_attribute = Some(attr.clone());
     }
   });
-  let mc_ignorable_local_parse_tokens = has_mc_ignorable_field.then(|| {
-    quote! {
-      b"Ignorable" => {
-        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
-          mc_ignorable = Some(attr.value.as_ref().into());
-        }
-      }
-    }
-  });
-  let mc_preserve_attributes_local_parse_tokens = has_mc_preserve_attributes_field.then(|| {
-    quote! {
-      b"PreserveAttributes" => {
-        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
-          mc_preserve_attributes = Some(attr.value.as_ref().into());
-        }
-      }
-    }
-  });
-  let mc_preserve_elements_local_parse_tokens = has_mc_preserve_elements_field.then(|| {
-    quote! {
-      b"PreserveElements" => {
-        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
-          mc_preserve_elements = Some(attr.value.as_ref().into());
-        }
-      }
-    }
-  });
-  let mc_process_content_local_parse_tokens = has_mc_process_content_field.then(|| {
-    quote! {
-      b"ProcessContent" => {
-        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
-          mc_process_content = Some(attr.value.as_ref().into());
-        }
-      }
-    }
-  });
-  let mc_must_understand_local_parse_tokens = has_mc_must_understand_field.then(|| {
-    quote! {
-      b"MustUnderstand" => {
-        if crate::common::attribute_qname_has_namespace(&e, key, #mc_namespace_uri)? {
-          mc_must_understand = Some(attr.value.as_ref().into());
-        }
-      }
-    }
-  });
-  let unknown_attr_parse_tokens = if has_mc_fields {
-    quote! {
-      #mc_ignorable_parse_tokens
-      #mc_preserve_attributes_parse_tokens
-      #mc_preserve_elements_parse_tokens
-      #mc_process_content_parse_tokens
-      #mc_must_understand_parse_tokens
-      key => match crate::common::xml_local_name(quick_xml::name::QName(key)) {
-        #mc_ignorable_local_parse_tokens
-        #mc_preserve_attributes_local_parse_tokens
-        #mc_preserve_elements_local_parse_tokens
-        #mc_process_content_local_parse_tokens
-        #mc_must_understand_local_parse_tokens
-        _ => {}
-      }
-    }
-  } else {
-    quote! { _ => {} }
-  };
+  for (qname, assign_tokens) in [
+    ("mc:Ignorable", mc_ignorable_assign_tokens),
+    (
+      "mc:PreserveAttributes",
+      mc_preserve_attributes_assign_tokens,
+    ),
+    ("mc:PreserveElements", mc_preserve_elements_assign_tokens),
+    ("mc:ProcessContent", mc_process_content_assign_tokens),
+    ("mc:MustUnderstand", mc_must_understand_assign_tokens),
+  ] {
+    let Some(assign_tokens) = assign_tokens else {
+      continue;
+    };
+    let dispatch = attribute_qname_dispatch_tokens(qname, assign_tokens);
+    attr_parse_tokens.push(dispatch.match_arm.clone());
+    attr_namespace_parse_tokens.push(dispatch.match_arm);
+    attr_namespace_targets.push(
+      dispatch
+        .namespace_target
+        .expect("MCE attributes use a known namespace"),
+    );
+  }
   let mc_ignorable_decl_tokens = has_mc_ignorable_field.then(|| {
     quote! {
-      let mut mc_ignorable = None::<std::boxed::Box<[u8]>>;
+      let mut __ooxmlsdk_mc_ignorable_attribute =
+        None::<quick_xml::events::attributes::Attribute<'xml>>;
     }
   });
   let mc_preserve_attributes_decl_tokens = has_mc_preserve_attributes_field.then(|| {
@@ -4839,14 +4928,77 @@ fn expand_named_struct(
   });
   let mc_must_understand_decl_tokens = has_mc_must_understand_field.then(|| {
     quote! {
-      let mut mc_must_understand = None::<std::boxed::Box<[u8]>>;
+      let mut __ooxmlsdk_mc_must_understand_attribute =
+        None::<quick_xml::events::attributes::Attribute<'xml>>;
     }
   });
+  let mc_ignorable_post_parse_tokens = has_mc_ignorable_field.then(|| {
+    let parser = namespace_list_parser_tokens(quote! { attr });
+    quote! {
+      let mc_ignorable =
+        if let Some(attr) = __ooxmlsdk_mc_ignorable_attribute {
+          Some(#parser)
+        } else {
+          None
+        };
+    }
+  });
+  let mc_must_understand_post_parse_tokens = has_mc_must_understand_field.then(|| {
+    let parser = namespace_list_parser_tokens(quote! { attr });
+    quote! {
+      let mc_must_understand =
+        if let Some(attr) = __ooxmlsdk_mc_must_understand_attribute {
+          Some(#parser)
+        } else {
+          None
+        };
+    }
+  });
+  let attr_namespace_resolve_decl_tokens = (!attr_namespace_targets.is_empty()).then(|| {
+    quote! {
+      const __OOXMLSDK_ATTRIBUTE_QNAME_TARGETS: &[crate::common::AttributeQNameTarget] = &[
+        #( #attr_namespace_targets, )*
+      ];
+    }
+  });
+  let attribute_dispatch_tokens = |xmlns_tokens: &proc_macro2::TokenStream| {
+    if attr_namespace_targets.is_empty() {
+      quote! {
+        match attr.key.as_ref() {
+          #xmlns_tokens
+          #( #attr_parse_tokens )*
+          _ => {}
+        }
+      }
+    } else {
+      quote! {
+        match attr.key.as_ref() {
+          #xmlns_tokens
+          #( #attr_parse_tokens )*
+          key => {
+            match read_context.resolve_attribute_key(
+              &e,
+              key,
+              __OOXMLSDK_ATTRIBUTE_QNAME_TARGETS,
+            ) {
+              #( #attr_namespace_parse_tokens )*
+              _ => {}
+            }
+          }
+        }
+      }
+    }
+  };
+  let attribute_loop_body_with_xmlns = attribute_dispatch_tokens(&xmlns_parse_tokens);
   let namespace_attr_parse_tokens = if attr_fields.is_empty() && !has_xmlns_fields && !has_mc_fields
   {
     quote! {}
   } else {
-    let decoder_decl_tokens = if attr_fields.is_empty() {
+    let decoder_decl_tokens = if attr_fields.is_empty()
+      && !has_xmlns_fields
+      && !has_mc_ignorable_field
+      && !has_mc_must_understand_field
+    {
       quote! {}
     } else {
       quote! { let decoder = xml_reader.decoder(); }
@@ -4854,20 +5006,25 @@ fn expand_named_struct(
     if has_xmlns_fields {
       quote! {
         let mut xmlns = Vec::<crate::common::XmlNamespace>::new();
+        let mut __ooxmlsdk_xmlns_state = crate::common::XmlNamespaceState::new();
         #mc_ignorable_decl_tokens
         #mc_preserve_attributes_decl_tokens
         #mc_preserve_elements_decl_tokens
         #mc_process_content_decl_tokens
         #mc_must_understand_decl_tokens
         #decoder_decl_tokens
+        #xmlns_preparse_tokens
+        if __ooxmlsdk_root_namespace_scope {
+          xmlns.reserve((e.attributes_raw().len() / 64).min(64));
+        }
+        #attr_namespace_resolve_decl_tokens
         for attr in e.attributes().with_checks(false) {
           let attr = attr?;
-          match attr.key.as_ref() {
-            #xmlns_parse_tokens
-            #( #attr_parse_tokens )*
-            #unknown_attr_parse_tokens
-          }
+          #attribute_loop_body_with_xmlns
         }
+        #( #attr_post_parse_tokens )*
+        #mc_ignorable_post_parse_tokens
+        #mc_must_understand_post_parse_tokens
       }
     } else {
       quote! {
@@ -4877,13 +5034,14 @@ fn expand_named_struct(
         #mc_process_content_decl_tokens
         #mc_must_understand_decl_tokens
         #decoder_decl_tokens
+        #attr_namespace_resolve_decl_tokens
         for attr in e.attributes().with_checks(false) {
           let attr = attr?;
-          match attr.key.as_ref() {
-            #( #attr_parse_tokens )*
-            #unknown_attr_parse_tokens
-          }
+          #attribute_loop_body_with_xmlns
         }
+        #( #attr_post_parse_tokens )*
+        #mc_ignorable_post_parse_tokens
+        #mc_must_understand_post_parse_tokens
       }
     }
   };
@@ -4914,13 +5072,13 @@ fn expand_named_struct(
       let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty);
       if field.repeated {
         quote! {
-          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty, read_context)?;
           #field_ident.push(#parsed_child_expr);
           #xml_child_slot_assign
         }
       } else {
         quote! {
-          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty, read_context)?;
           #field_ident = Some(#parsed_child_expr);
           #xml_child_slot_assign
         }
@@ -4987,7 +5145,7 @@ fn expand_named_struct(
       };
       mce_slot_parse_tokens.push(quote! {
         if #condition {
-          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty, read_context)?;
           #assign
           __xml_child_slot = #xml_child_slot;
         } else
@@ -5281,7 +5439,12 @@ fn expand_named_struct(
                 quote! { #field_ident = Some(#choice_ty::#variant(std::boxed::Box::new(parsed_child))); }
               };
               let body = quote! {
-                  let parsed_child = crate::sdk::SdkType::read_inner(xml_reader, e, next_empty)?;
+                  let parsed_child = crate::sdk::SdkType::read_inner(
+                    xml_reader,
+                    e,
+                    next_empty,
+                    read_context,
+                  )?;
                   #assign_tokens
                   #xml_child_slot_assign
               };
@@ -5421,7 +5584,12 @@ fn expand_named_struct(
               quote! { #field_ident = Some(#choice_ty::#variant(std::boxed::Box::new(parsed_child))); }
             };
             let parse = quote! {
-              let parsed_child = crate::sdk::SdkType::read_inner(xml_reader, e, next_empty)?;
+              let parsed_child = crate::sdk::SdkType::read_inner(
+                xml_reader,
+                e,
+                next_empty,
+                read_context,
+              )?;
               #assign_tokens
               #xml_child_slot_assign
             };
@@ -6105,7 +6273,7 @@ fn expand_named_struct(
         &mut match_tokens,
         &field.qname,
         quote! {
-          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty, read_context)?;
           #assign_tokens
           #terminal
         },
@@ -6198,7 +6366,12 @@ fn expand_named_struct(
             choice_assign_tokens(quote! { std::boxed::Box::new(parsed_child) });
           quote! {
             let mut parsed_child = TableRow::default();
-            if parsed_child.__ooxmlsdk_read_inner_stack_start(xml_reader, e, next_empty)? {
+            if parsed_child.__ooxmlsdk_read_inner_stack_start(
+              xml_reader,
+              read_context,
+              e,
+              next_empty,
+            )? {
               #choice_assign_tokens
               #terminal
             } else {
@@ -6318,7 +6491,7 @@ fn expand_named_struct(
           &mut stack_child_match_tokens,
           &field.qname,
           quote! {
-            let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+            let parsed_child = #deserialize_call(xml_reader, e, next_empty, read_context)?;
             #assign_tokens
           },
         );
@@ -6395,7 +6568,12 @@ fn expand_named_struct(
               choice_assign_tokens(quote! { std::boxed::Box::new(parsed_child) });
             quote! {
                 let mut parsed_child = #child_ty::default();
-                if parsed_child.__ooxmlsdk_read_inner_stack_start(xml_reader, e, next_empty)? {
+                if parsed_child.__ooxmlsdk_read_inner_stack_start(
+                  xml_reader,
+                  read_context,
+                  e,
+                  next_empty,
+                )? {
                   #choice_assign_tokens
                 } else {
                 return Ok(Some(#frame_tokens));
@@ -6566,49 +6744,7 @@ fn expand_named_struct(
     stack_children_tag_loop_tokens
   };
   let special_namespace_write_tokens = if has_xmlns_fields {
-    if needs_canonical_xmlns_prefix
-      && has_xml_header
-      && no_prefix
-      && let Some(fixed_namespace_uri) = fixed_namespace_uri
-    {
-      let fixed_xmlns_tokens = static_xmlns_attr_tokens(None, fixed_namespace_uri);
-      quote! {
-        #extra_xmlns_init_tokens
-        #canonical_namespace_prefix_init_tokens
-        let mut has_default_xmlns = false;
-        for declaration in &self.xmlns {
-          let (declaration_prefix, declaration_uri) = declaration.parts();
-          if declaration_prefix.is_empty() {
-            has_default_xmlns = true;
-            crate::common::write_xmlns_attr(writer, None, declaration_uri)?;
-          } else {
-            #canonical_namespace_prefix_tokens
-            #extra_xmlns_mark_tokens
-            crate::common::write_xmlns_attr(writer, Some(declaration_prefix), declaration_uri)?;
-          }
-        }
-        if !has_default_xmlns {
-          #fixed_xmlns_tokens
-        }
-        #extra_xmlns_write_tokens
-      }
-    } else if needs_canonical_xmlns_prefix {
-      quote! {
-        #extra_xmlns_init_tokens
-        #canonical_namespace_prefix_init_tokens
-        for declaration in &self.xmlns {
-          let (declaration_prefix, declaration_uri) = declaration.parts();
-          if declaration_prefix.is_empty() {
-            crate::common::write_xmlns_attr(writer, None, declaration_uri)?;
-          } else {
-            #canonical_namespace_prefix_tokens
-            #extra_xmlns_mark_tokens
-            crate::common::write_xmlns_attr(writer, Some(declaration_prefix), declaration_uri)?;
-          }
-        }
-        #extra_xmlns_write_tokens
-      }
-    } else if has_xml_header
+    if has_xml_header
       && no_prefix
       && let Some(fixed_namespace_uri) = fixed_namespace_uri
     {
@@ -6658,7 +6794,7 @@ fn expand_named_struct(
   let mc_ignorable_write_tokens = if has_mc_ignorable_field {
     quote! {
       if let Some(value) = &self.mc_ignorable {
-        crate::common::write_mc_ignorable_attr(writer, value.as_ref())?;
+        crate::common::write_mc_ignorable_attr(writer, value.as_slice())?;
       }
     }
   } else {
@@ -6688,7 +6824,7 @@ fn expand_named_struct(
   let mc_must_understand_write_tokens = has_mc_must_understand_field.then(|| {
     quote! {
       if let Some(value) = &self.mc_must_understand {
-        crate::common::write_mc_must_understand_attr(writer, value.as_ref())?;
+        crate::common::write_mc_must_understand_attr(writer, value.as_slice())?;
       }
     }
   });
@@ -6726,9 +6862,18 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let root_read_borrowed_tokens =
-    root_read_tokens(ident, &local_name_lit, DeserializeMode::Borrowed);
-  let root_read_io_tokens = root_read_tokens(ident, &local_name_lit, DeserializeMode::Io);
+  let root_read_borrowed_tokens = root_read_tokens(
+    ident,
+    &local_name_lit,
+    DeserializeMode::Borrowed,
+    has_xmlns_fields,
+  );
+  let root_read_io_tokens = root_read_tokens(
+    ident,
+    &local_name_lit,
+    DeserializeMode::Io,
+    has_xmlns_fields,
+  );
   let writes_body = !child_fields.is_empty()
     || !mce_fields.is_empty()
     || !empty_child_fields.is_empty()
@@ -6794,7 +6939,12 @@ fn expand_named_struct(
         field_ident.to_string(),
         quote! {
           #( #targets )|* => {
-            let mut parsed_child = #deserialize_call(&mut child_reader, e, next_empty)?;
+            let mut parsed_child = #deserialize_call(
+              &mut child_reader,
+              e,
+              next_empty,
+              read_context,
+            )?;
             let action = parsed_child.process_mce_with_context(settings, child_context)?;
             if matches!(action, crate::mce::ElementAction::Normal) {
               #assign
@@ -6897,9 +7047,12 @@ fn expand_named_struct(
               context,
               |child_xml, child_context| {
                 let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref());
+                let mut child_read_context = crate::common::ReadContext::default();
+                let read_context = &mut child_read_context;
                 loop {
                   match child_reader.next()? {
                     crate::common::PayloadEvent::Start(e, next_empty) => {
+                      read_context.enter_root(&e, next_empty, child_reader.decoder())?;
                       let event_name = crate::common::xml_local_name(e.name());
                       match event_name {
                         #( #parse_arms )*
@@ -7102,6 +7255,7 @@ fn expand_named_struct(
         pub(crate) fn __ooxmlsdk_read_inner_stack_start<'xml, R: crate::common::XmlRead<'xml>>(
           &mut self,
           xml_reader: &mut R,
+          read_context: &mut crate::common::ReadContext,
           e: quick_xml::events::BytesStart<'xml>,
           empty_tag: bool,
         ) -> Result<bool, crate::common::SdkError> {
@@ -7111,6 +7265,7 @@ fn expand_named_struct(
         pub(crate) fn __ooxmlsdk_read_inner_stack_next<'xml, R: crate::common::XmlRead<'xml>>(
           &mut self,
           xml_reader: &mut R,
+          read_context: &mut crate::common::ReadContext,
         ) -> Result<Option<__OoxmlsdkWmlTableStackFrame>, crate::common::SdkError> {
           #stack_children_loop_tokens
         }
@@ -7342,6 +7497,7 @@ fn expand_named_struct(
         xml_reader: &mut R,
         e: quick_xml::events::BytesStart<'xml>,
         empty_tag: bool,
+        read_context: &mut crate::common::ReadContext,
       ) -> Result<Self, crate::common::SdkError> {
         #read_inner_body
       }

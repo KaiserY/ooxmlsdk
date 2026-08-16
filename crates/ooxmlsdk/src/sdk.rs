@@ -583,6 +583,7 @@ pub trait SdkType: Sized {
     _xml_reader: &mut R,
     _start: quick_xml::events::BytesStart<'xml>,
     _empty: bool,
+    _read_context: &mut crate::common::ReadContext,
   ) -> Result<Self, crate::common::SdkError> {
     Err(crate::common::SdkError::CommonError(
       "SdkType does not support deserialization".to_string(),
@@ -645,8 +646,9 @@ impl<T: SdkType> SdkType for Box<T> {
     xml_reader: &mut R,
     start: quick_xml::events::BytesStart<'xml>,
     empty: bool,
+    read_context: &mut crate::common::ReadContext,
   ) -> Result<Self, crate::common::SdkError> {
-    T::read_inner(xml_reader, start, empty).map(Box::new)
+    T::read_inner(xml_reader, start, empty, read_context).map(Box::new)
   }
 }
 

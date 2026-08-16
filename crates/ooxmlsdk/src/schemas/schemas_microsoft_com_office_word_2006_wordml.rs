@@ -35,7 +35,7 @@ pub struct Mcds {
 #[sdk(xml_header, qname = "wne:vbaSuppData")]
 pub struct VbaSuppData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Defines the DocEvents Class.
   #[sdk(child(qname = "wne:docEvents"))]
   pub doc_events: Option<DocEvents>,
@@ -48,7 +48,7 @@ pub struct VbaSuppData {
 #[sdk(xml_header, qname = "wne:recipients")]
 pub struct MailMergeRecipients {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Defines the SingleDataSourceRecord Class.
   #[sdk(child(qname = "wne:recipientData"))]
   pub single_data_source_record: Vec<SingleDataSourceRecord>,

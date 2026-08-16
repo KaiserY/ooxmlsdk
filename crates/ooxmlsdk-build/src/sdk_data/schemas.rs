@@ -213,7 +213,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               have_mc_process_content,
               have_mc_must_understand,
               extra_xmlns: Vec::new(),
-              canonical_namespace_prefixes: Vec::new(),
               text_value_type: text_value_type_from_sources(ty),
               api_kind: resolve_api_kind(ty, &type_map),
               attributes: ty

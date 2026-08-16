@@ -56,8 +56,6 @@ pub struct SchemaTypeExtension {
   pub have_mc_must_understand: Option<bool>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub extra_xmlns: Vec<String>,
-  #[serde(skip_serializing_if = "Vec::is_empty")]
-  pub canonical_namespace_prefixes: Vec<String>,
   pub attributes: Vec<SchemaTypeAttributeExtension>,
   pub children: Vec<SchemaTypeChildExtension>,
   pub add_children: Vec<SchemaTypeAddChildExtension>,
@@ -118,7 +116,8 @@ pub struct SchemaTypeAttributeExtension {
   #[serde(skip_serializing_if = "String::is_empty")]
   pub version: String,
   pub optional: Option<bool>,
-  pub match_local_name: Option<bool>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub read_aliases: Vec<String>,
   pub empty_as_none: Option<bool>,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_type: String,
@@ -368,14 +367,6 @@ pub fn apply_schema_extensions(
             schema_type.extra_xmlns.push(prefix.clone());
           }
         }
-        for prefix in &extension.canonical_namespace_prefixes {
-          if !schema_type.canonical_namespace_prefixes.contains(prefix) {
-            schema_type
-              .canonical_namespace_prefixes
-              .push(prefix.clone());
-          }
-        }
-
         for attr_extension in &extension.attributes {
           let Some(attr) = schema_type.attributes.iter_mut().find(|attr| {
             (!attr_extension.q_name.is_empty() && attr.q_name == attr_extension.q_name)
@@ -404,7 +395,7 @@ pub fn apply_schema_extensions(
                 property_comments: attr_extension.property_comments.clone(),
                 version: attr_extension.version.clone(),
                 required: !attr_extension.optional.unwrap_or(false),
-                match_local_name: attr_extension.match_local_name.unwrap_or(false),
+                read_aliases: attr_extension.read_aliases.clone(),
                 empty_as_none: attr_extension.empty_as_none.unwrap_or(false),
                 ..Default::default()
               });
@@ -420,8 +411,10 @@ pub fn apply_schema_extensions(
           if !attr_extension.version.is_empty() {
             attr.version = attr_extension.version.clone();
           }
-          if let Some(match_local_name) = attr_extension.match_local_name {
-            attr.match_local_name = match_local_name;
+          for read_alias in &attr_extension.read_aliases {
+            if !attr.read_aliases.contains(read_alias) {
+              attr.read_aliases.push(read_alias.clone());
+            }
           }
           if let Some(empty_as_none) = attr_extension.empty_as_none {
             attr.empty_as_none = empty_as_none;
@@ -588,7 +581,6 @@ pub fn apply_codegen_ir_schema_extensions(
 
   for type_extension in &extensions.types {
     if type_extension.extra_xmlns.is_empty()
-      && type_extension.canonical_namespace_prefixes.is_empty()
       && type_extension.alternate_content.is_empty()
       && !type_extension.alternate_content_choice
       && type_extension.add_choice.is_empty()
@@ -624,19 +616,6 @@ pub fn apply_codegen_ir_schema_extensions(
         type_decl.support.extra_xmlns.push(prefix.clone());
       }
     }
-    for prefix in &type_extension.canonical_namespace_prefixes {
-      if !type_decl
-        .support
-        .canonical_namespace_prefixes
-        .contains(prefix)
-      {
-        type_decl
-          .support
-          .canonical_namespace_prefixes
-          .push(prefix.clone());
-      }
-    }
-
     if !type_extension.alternate_content.is_empty() {
       add_alternate_content_fields(module_name, type_decl, type_extension)?;
     }
@@ -1764,7 +1743,7 @@ mod tests {
             property_comments: "Integer Value".to_string(),
             version: "Office2010".to_string(),
             optional: Some(false),
-            match_local_name: None,
+            read_aliases: vec![":legacyVal".to_string()],
             empty_as_none: None,
             override_type: "Int32Value".to_string(),
           }],
@@ -1787,6 +1766,7 @@ mod tests {
     assert_eq!(attr.property_comments, "Integer Value");
     assert_eq!(attr.version, "Office2010");
     assert_eq!(attr.r#type, "Int32Value");
+    assert_eq!(attr.read_aliases, [":legacyVal"]);
     assert!(attr.required);
   }
 

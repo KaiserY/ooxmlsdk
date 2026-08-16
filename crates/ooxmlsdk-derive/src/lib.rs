@@ -64,7 +64,7 @@ pub fn sdk_package(input: TokenStream) -> TokenStream {
   }
 }
 
-#[proc_macro_derive(SdkXmlNamespace, attributes(sdk))]
+#[proc_macro_derive(SdkXmlNamespace, attributes(sdk, sdk_alias))]
 pub fn sdk_xml_namespace(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   match sdk_xml_namespace::expand_sdk_xml_namespace(&input) {
@@ -119,7 +119,7 @@ struct SdkAttrField {
   ty: Type,
   optional: bool,
   list: bool,
-  match_local_name: bool,
+  read_aliases: Vec<String>,
   empty_as_none: bool,
   validators: Vec<SdkFieldValidator>,
 }
@@ -203,7 +203,7 @@ enum SdkTypeFieldKind {
   Attr {
     name: String,
     list: bool,
-    match_local_name: bool,
+    read_aliases: Vec<String>,
     empty_as_none: bool,
   },
   Child {
@@ -654,33 +654,6 @@ fn parse_sdk_extra_xmlns(attrs: &[Attribute]) -> syn::Result<Vec<String>> {
   Ok(prefixes)
 }
 
-fn parse_sdk_canonical_namespace_prefixes(attrs: &[Attribute]) -> syn::Result<Vec<String>> {
-  let mut prefixes = Vec::new();
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-    let metas =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    for meta in metas {
-      let Meta::List(meta) = meta else {
-        continue;
-      };
-      if !meta.path.is_ident("canonical_namespace_prefix") {
-        continue;
-      }
-      let args = meta.parse_args_with(Punctuated::<ExtraXmlnsArg, Token![,]>::parse_terminated)?;
-      for arg in args {
-        let prefix = arg.value();
-        if !prefixes.contains(&prefix) {
-          prefixes.push(prefix);
-        }
-      }
-    }
-  }
-  Ok(prefixes)
-}
-
 fn is_sdk_version_marker_path(path: &syn::Path) -> bool {
   path.is_ident("office2010")
     || path.is_ident("office2013")
@@ -693,7 +666,7 @@ fn is_sdk_version_marker_path(path: &syn::Path) -> bool {
 fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeFieldAttrs> {
   let mut attr_name = None;
   let mut attr_list = false;
-  let mut attr_match_local_name = false;
+  let mut attr_read_aliases = Vec::new();
   let mut attr_empty_as_none = false;
   let mut kind = None;
   let mut choice_accepts_text = None;
@@ -720,8 +693,13 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             } else if nested.path.is_ident("list") {
               attr_list = true;
               Ok(())
-            } else if nested.path.is_ident("match_local_name") {
-              attr_match_local_name = true;
+            } else if nested.path.is_ident("read_alias") {
+              let value: LitStr = nested.value()?.parse()?;
+              let read_alias = normalize_attr_qname(&value.value());
+              if read_alias.is_empty() {
+                return Err(nested.error("sdk attr read_alias must have a local name"));
+              }
+              attr_read_aliases.push(read_alias);
               Ok(())
             } else if nested.path.is_ident("empty_as_none") {
               attr_empty_as_none = true;
@@ -1366,7 +1344,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
     kind = Some(SdkTypeFieldKind::Attr {
       name: attr_name.unwrap_or_default(),
       list: attr_list,
-      match_local_name: attr_match_local_name,
+      read_aliases: attr_read_aliases,
       empty_as_none: attr_empty_as_none,
     });
   }
@@ -2016,6 +1994,30 @@ mod tests {
       };
       assert!(error.to_string().contains("unsupported sdk"));
     }
+  }
+
+  #[test]
+  fn parses_attribute_read_aliases() {
+    let input: DeriveInput = parse_str(
+      r#"struct Value {
+        #[sdk(attr(read_alias = ":left", read_alias = "o:left", qname = "w:left"))]
+        left: Option<String>,
+      }"#,
+    )
+    .expect("derive input");
+    let Data::Struct(data) = input.data else {
+      unreachable!();
+    };
+    let field = data.fields.iter().next().expect("field");
+    let parsed = parse_sdk_type_field_attrs(&field.attrs).expect("attribute metadata");
+    let Some(SdkTypeFieldKind::Attr {
+      name, read_aliases, ..
+    }) = parsed.kind
+    else {
+      panic!("expected attribute metadata");
+    };
+    assert_eq!(name, "w:left");
+    assert_eq!(read_aliases, ["left", "o:left"]);
   }
 
   #[test]

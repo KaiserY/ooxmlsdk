@@ -9,7 +9,7 @@
 #[sdk(xml_header, qname = "w16cid:commentsIds")]
 pub struct CommentsIds {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   /// Defines the CommentId Class.
   #[sdk(child(qname = "w16cid:commentId"))]
   pub comment_id: Vec<CommentId>,

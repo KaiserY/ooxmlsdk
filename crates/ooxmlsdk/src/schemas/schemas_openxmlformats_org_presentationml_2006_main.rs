@@ -1001,7 +1001,7 @@ pub struct OleObject {
 #[sdk(xml_header, qname = "p:presentation")]
 pub struct Presentation {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// serverZoom
   #[sdk(attr(qname = ":serverZoom"))]
@@ -1088,7 +1088,7 @@ pub struct Presentation {
 #[sdk(xml_header, qname = "p:presentationPr")]
 pub struct PresentationProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// HTML Publishing Properties
   #[sdk(child(qname = "p:htmlPubPr"))]
@@ -1114,7 +1114,7 @@ pub struct PresentationProperties {
 #[sdk(xml_header, qname = "p:sld")]
 pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1149,7 +1149,7 @@ pub struct Slide {
 #[sdk(xml_header, qname = "p:sldLayout")]
 pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1197,7 +1197,7 @@ pub struct SlideLayout {
 #[sdk(xml_header, qname = "p:sldMaster")]
 pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
@@ -1253,7 +1253,7 @@ pub struct HandoutMaster {
 #[sdk(xml_header, qname = "p:notesMaster")]
 pub struct NotesMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:cSld"))]
@@ -1276,7 +1276,7 @@ pub struct NotesMaster {
 #[sdk(xml_header, qname = "p:notes")]
 pub struct NotesSlide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1326,7 +1326,7 @@ pub struct TagList {
 #[sdk(xml_header, qname = "p:viewPr")]
 pub struct ViewProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub mc_ignorable: Option<std::boxed::Box<[u8]>>,
+  pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
   /// Last View
   #[sdk(attr(qname = ":lastView"))]

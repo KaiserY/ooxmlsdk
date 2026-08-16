@@ -130,6 +130,274 @@ pub enum DeEvent<'xml> {
   Eof,
 }
 
+pub(crate) struct AttributeQNameTarget {
+  local_name: &'static [u8],
+  namespace: crate::namespaces::XmlKnownNamespace,
+  canonical_qname: &'static [u8],
+}
+
+type ParsedXmlNamespaceUri<'xml> = (
+  Cow<'xml, [u8]>,
+  Option<crate::namespaces::XmlKnownNamespace>,
+  bool,
+);
+
+impl AttributeQNameTarget {
+  #[inline]
+  pub(crate) const fn new(
+    local_name: &'static [u8],
+    namespace: crate::namespaces::XmlKnownNamespace,
+    canonical_qname: &'static [u8],
+  ) -> Self {
+    Self {
+      local_name,
+      namespace,
+      canonical_qname,
+    }
+  }
+}
+
+#[inline(never)]
+pub(crate) fn parse_xml_namespace_uri<'xml>(
+  attr: &Attribute<'xml>,
+  prefix: &[u8],
+  decoder: Decoder,
+) -> Result<ParsedXmlNamespaceUri<'xml>, SdkError> {
+  let raw = attr.value.as_ref();
+  if let Some(known) = crate::namespaces::XmlKnownNamespace::from_prefix_uri_bytes(prefix, raw) {
+    let canonical = known.schema_namespace() == known && known.prefix_bytes() == prefix;
+    return Ok((attr.value.clone(), Some(known), canonical));
+  }
+
+  parse_xml_namespace_uri_slow(attr, prefix, decoder)
+}
+
+#[cold]
+#[inline(never)]
+fn parse_xml_namespace_uri_slow<'xml>(
+  attr: &Attribute<'xml>,
+  prefix: &[u8],
+  decoder: Decoder,
+) -> Result<ParsedXmlNamespaceUri<'xml>, SdkError> {
+  let uri = attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?;
+  let known = crate::namespaces::XmlKnownNamespace::from_prefix_uri_bytes(prefix, uri.as_bytes());
+  let canonical = known.is_some_and(|namespace| {
+    namespace.schema_namespace() == namespace && namespace.prefix_bytes() == prefix
+  });
+  let uri = match uri {
+    Cow::Borrowed(uri) => Cow::Borrowed(uri.as_bytes()),
+    Cow::Owned(uri) => Cow::Owned(uri.into_bytes()),
+  };
+  Ok((uri, known, canonical))
+}
+
+/// Root namespace aliases used by generated deserializers.
+///
+/// Generated element dispatch is deliberately local-name based. Attribute
+/// dispatch first uses its generated QName and consults this context only after
+/// that exact match misses. OOXML producers conventionally declare shared
+/// namespaces on the part root; a declaration on the attribute's own element
+/// is handled directly by `resolve_attribute_key`.
+#[doc(hidden)]
+#[derive(Debug, Default)]
+pub struct ReadContext {
+  root_bindings: Vec<super::XmlNamespace>,
+  root_namespaces_pending: bool,
+}
+
+impl ReadContext {
+  #[inline]
+  pub(crate) fn enter_root(
+    &mut self,
+    start: &BytesStart<'_>,
+    _empty: bool,
+    decoder: Decoder,
+  ) -> Result<(), SdkError> {
+    for attr in start.attributes().with_checks(false) {
+      let attr = attr?;
+      let key = attr.key.as_ref();
+      let prefix = if key == b"xmlns" {
+        &[][..]
+      } else if let Some(prefix) = key.strip_prefix(b"xmlns:") {
+        prefix
+      } else {
+        continue;
+      };
+      let (uri, _, canonical) = parse_xml_namespace_uri(&attr, prefix, decoder)?;
+      self.declare_namespace_resolved(prefix, uri.as_ref(), canonical);
+    }
+    Ok(())
+  }
+
+  #[inline]
+  pub(crate) fn enter_root_scope(&mut self, _empty: bool) {
+    self.root_namespaces_pending = true;
+  }
+
+  #[inline(always)]
+  pub(crate) fn take_root_namespaces_pending(&mut self) -> bool {
+    if self.root_namespaces_pending {
+      self.root_namespaces_pending = false;
+      true
+    } else {
+      false
+    }
+  }
+
+  #[inline(always)]
+  pub(crate) fn declare_namespace_resolved(&mut self, prefix: &[u8], uri: &[u8], canonical: bool) {
+    if canonical {
+      return;
+    }
+    self.declare_namespace_alias(prefix, uri);
+  }
+
+  #[cold]
+  #[inline(never)]
+  fn declare_namespace_alias(&mut self, prefix: &[u8], uri: &[u8]) {
+    self
+      .root_bindings
+      .retain(|binding| binding.parts().0 != prefix);
+    self
+      .root_bindings
+      .push(super::XmlNamespace::raw(prefix, uri));
+  }
+
+  #[cfg(test)]
+  #[inline]
+  pub(crate) fn attribute_qname_has_namespace(&self, qname: &[u8], uri: &[u8]) -> bool {
+    let Some(separator) = memchr::memchr(b':', qname) else {
+      return false;
+    };
+    let actual = self.namespace_for_prefix(&qname[..separator]);
+    let actual_uri = actual.parts().1;
+    match (
+      crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(actual_uri),
+      crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(uri),
+    ) {
+      (Some(actual), Some(expected)) => actual.schema_namespace() == expected.schema_namespace(),
+      _ => actual_uri == uri,
+    }
+  }
+
+  #[cold]
+  #[inline(never)]
+  pub(crate) fn resolve_attribute_key<'xml>(
+    &self,
+    start: &BytesStart<'_>,
+    qname: &'xml [u8],
+    targets: &'static [AttributeQNameTarget],
+  ) -> &'xml [u8] {
+    let Some(separator) = memchr::memchr(b':', qname) else {
+      return qname;
+    };
+    let prefix = &qname[..separator];
+    if prefix == b"xml" || prefix == b"xmlns" {
+      return qname;
+    }
+    let local_name = &qname[separator + 1..];
+    let namespace = match self.known_namespace_declared_on(start, prefix) {
+      Some(namespace) => namespace,
+      None => self.known_namespace_for_prefix(prefix),
+    };
+    let Some(namespace) = namespace else {
+      return &[];
+    };
+    targets
+      .iter()
+      .find(|target| {
+        target.local_name == local_name
+          && target.namespace.schema_namespace() == namespace.schema_namespace()
+      })
+      .map_or(&[], |target| target.canonical_qname)
+  }
+
+  #[cold]
+  fn known_namespace_declared_on(
+    &self,
+    start: &BytesStart<'_>,
+    prefix: &[u8],
+  ) -> Option<Option<crate::namespaces::XmlKnownNamespace>> {
+    start
+      .attributes()
+      .with_checks(false)
+      .filter_map(Result::ok)
+      .find_map(|attr| {
+        attr
+          .key
+          .as_ref()
+          .strip_prefix(b"xmlns:")
+          .filter(|candidate| *candidate == prefix)
+          .map(|_| {
+            crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(attr.value.as_ref())
+          })
+      })
+  }
+
+  #[inline]
+  fn known_namespace_for_prefix(
+    &self,
+    prefix: &[u8],
+  ) -> Option<crate::namespaces::XmlKnownNamespace> {
+    if let Some(binding) = self
+      .root_bindings
+      .iter()
+      .rev()
+      .find(|binding| binding.parts().0 == prefix)
+    {
+      return crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(binding.parts().1);
+    }
+
+    crate::namespaces::XmlKnownNamespace::from_prefix_bytes(prefix)
+      .map(crate::namespaces::XmlKnownNamespace::schema_namespace)
+  }
+
+  #[cold]
+  #[inline(never)]
+  pub(crate) fn namespace_for_prefix_on(
+    &self,
+    start: &BytesStart<'_>,
+    prefix: &[u8],
+  ) -> super::XmlNamespace {
+    let declaration = start
+      .attributes()
+      .with_checks(false)
+      .filter_map(Result::ok)
+      .find(|attr| {
+        attr
+          .key
+          .as_ref()
+          .strip_prefix(b"xmlns:")
+          .is_some_and(|candidate| candidate == prefix)
+      });
+    let Some(declaration) = declaration else {
+      return self.namespace_for_prefix(prefix);
+    };
+    crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(declaration.value.as_ref())
+      .map_or_else(
+        || super::XmlNamespace::raw(prefix, declaration.value.as_ref()),
+        super::XmlNamespace::Known,
+      )
+  }
+
+  #[inline]
+  pub(crate) fn namespace_for_prefix(&self, prefix: &[u8]) -> super::XmlNamespace {
+    let Some(binding) = self
+      .root_bindings
+      .iter()
+      .rev()
+      .find(|binding| binding.parts().0 == prefix)
+    else {
+      return crate::namespaces::XmlKnownNamespace::from_prefix_bytes(prefix).map_or_else(
+        || super::XmlNamespace::raw(prefix, b""),
+        super::XmlNamespace::Known,
+      );
+    };
+    crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(binding.parts().1)
+      .map_or_else(|| binding.clone(), super::XmlNamespace::Known)
+  }
+}
+
 #[inline(always)]
 pub(crate) fn xml_local_name<'a>(name: quick_xml::name::QName<'a>) -> &'a [u8] {
   let raw_name = name.0;
@@ -138,30 +406,6 @@ pub(crate) fn xml_local_name<'a>(name: quick_xml::name::QName<'a>) -> &'a [u8] {
   } else {
     name.local_name().into_inner()
   }
-}
-
-#[inline]
-pub(crate) fn attribute_qname_has_namespace(
-  start: &BytesStart<'_>,
-  qname: &[u8],
-  namespace_uri: &[u8],
-) -> Result<bool, SdkError> {
-  let Some(separator) = qname.iter().rposition(|byte| *byte == b':') else {
-    return Ok(false);
-  };
-  let prefix = &qname[..separator];
-  for attr in start.attributes().with_checks(false) {
-    let attr = attr?;
-    if attr
-      .key
-      .as_ref()
-      .strip_prefix(b"xmlns:")
-      .is_some_and(|candidate| candidate == prefix)
-    {
-      return Ok(attr.value.as_ref() == namespace_uri);
-    }
-  }
-  Ok(false)
 }
 
 #[inline]

@@ -13,7 +13,13 @@
       "HaveMcPreserveElements": true,
       "HaveMcProcessContent": true,
       "HaveMcMustUnderstand": true,
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "Attributes": [
+        {
+          "PropertyName": "Requires",
+          "OverrideType": "ListValue<crate::common::XmlNamespace>"
+        }
+      ]
     },
     {
       "ClassName": "Fallback",

@@ -4,7 +4,9 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct Model3DReferenceRelationshipPart {
-  pub(crate) key: crate::common::PartKey,
-}
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct Model3DReferenceRelationshipPartSpec {}
+pub type Model3DReferenceRelationshipPart =
+  crate::sdk::PartHandle<Model3DReferenceRelationshipPartSpec>;

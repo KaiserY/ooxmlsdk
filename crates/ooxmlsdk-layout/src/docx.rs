@@ -28808,7 +28808,10 @@ macro_rules! run_properties_accessor {
         .run_properties_choice
         .iter()
         .find_map(|choice| match choice {
-          w::RunPropertiesChoice::$variant(value) => Some(value.as_ref()),
+          w::RunPropertiesChoice::$variant(value) => {
+            let value: &$ty = value;
+            Some(value)
+          }
           _ => None,
         })
     }
@@ -28822,7 +28825,10 @@ macro_rules! paragraph_mark_run_properties_accessor {
         .paragraph_mark_run_properties_choice2
         .iter()
         .find_map(|choice| match choice {
-          w::ParagraphMarkRunPropertiesChoice2::$variant(value) => Some(value.as_ref()),
+          w::ParagraphMarkRunPropertiesChoice2::$variant(value) => {
+            let value: &$ty = value;
+            Some(value)
+          }
           _ => None,
         })
     }

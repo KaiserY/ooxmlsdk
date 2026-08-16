@@ -4,10 +4,12 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct WebSettingsPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct WebSettingsPartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::WebSettings,
   >,
 }
+pub type WebSettingsPart = crate::sdk::PartHandle<WebSettingsPartSpec>;

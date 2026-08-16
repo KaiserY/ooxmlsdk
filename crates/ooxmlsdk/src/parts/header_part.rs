@@ -4,9 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct HeaderPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct HeaderPartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Header,
   >,
@@ -39,3 +40,4 @@ pub struct HeaderPart {
     crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
   >,
 }
+pub type HeaderPart = crate::sdk::PartHandle<HeaderPartSpec>;

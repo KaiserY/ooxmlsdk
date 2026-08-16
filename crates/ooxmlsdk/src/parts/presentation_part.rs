@@ -4,9 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct PresentationPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct PresentationPartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Presentation,
   >,
@@ -43,3 +44,4 @@ pub struct PresentationPart {
   pub(crate) authors_part:
     crate::sdk::OptionalPart<crate::parts::power_point_authors_part::PowerPointAuthorsPart>,
 }
+pub type PresentationPart = crate::sdk::PartHandle<PresentationPartSpec>;

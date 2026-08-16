@@ -4,10 +4,12 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct PowerPointAuthorsPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct PowerPointAuthorsPartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::AuthorList,
   >,
 }
+pub type PowerPointAuthorsPart = crate::sdk::PartHandle<PowerPointAuthorsPartSpec>;

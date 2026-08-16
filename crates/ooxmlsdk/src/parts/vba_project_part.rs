@@ -4,8 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct VbaProjectPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct VbaProjectPartSpec {
   pub(crate) vba_data_part: crate::sdk::OptionalPart<crate::parts::vba_data_part::VbaDataPart>,
 }
+pub type VbaProjectPart = crate::sdk::PartHandle<VbaProjectPartSpec>;

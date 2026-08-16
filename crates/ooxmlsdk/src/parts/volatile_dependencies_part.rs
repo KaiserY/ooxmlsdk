@@ -4,10 +4,12 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct VolatileDependenciesPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct VolatileDependenciesPartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::VolatileTypes,
   >,
 }
+pub type VolatileDependenciesPart = crate::sdk::PartHandle<VolatileDependenciesPartSpec>;

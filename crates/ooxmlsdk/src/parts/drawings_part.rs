@@ -4,9 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct DrawingsPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct DrawingsPartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_spreadsheet_drawing::WorksheetDrawing,
   >,
@@ -30,3 +31,4 @@ pub struct DrawingsPart {
   pub(crate) web_extension_parts:
     crate::sdk::RepeatedPart<crate::parts::web_extension_part::WebExtensionPart>,
 }
+pub type DrawingsPart = crate::sdk::PartHandle<DrawingsPartSpec>;

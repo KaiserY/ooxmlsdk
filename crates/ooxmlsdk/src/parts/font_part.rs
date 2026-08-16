@@ -4,7 +4,8 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct FontPart {
-  pub(crate) key: crate::common::PartKey,
-}
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct FontPartSpec {}
+pub type FontPart = crate::sdk::PartHandle<FontPartSpec>;

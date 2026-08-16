@@ -4,9 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct InternationalMacroSheetPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct InternationalMacroSheetPartSpec {
   pub(crate) spreadsheet_printer_settings_parts: crate::sdk::RepeatedPart<
     crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
   >,
@@ -23,3 +24,4 @@ pub struct InternationalMacroSheetPart {
     crate::sdk::RepeatedPart<crate::parts::embedded_package_part::EmbeddedPackagePart>,
   pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }
+pub type InternationalMacroSheetPart = crate::sdk::PartHandle<InternationalMacroSheetPartSpec>;

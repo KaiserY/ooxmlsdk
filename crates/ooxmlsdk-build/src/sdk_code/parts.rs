@@ -85,17 +85,20 @@ fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
 
 fn gen_part_handle_module(part: &PartModuleDecl) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
+  let spec_name_ident: Ident = parse_str(&format!("{}Spec", part.struct_name))?;
   let marker_fields = part_handle_marker_fields(part)?;
   let part_struct: ItemStruct = parse2(quote! {
-    #[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-    pub struct #struct_name_ident {
-      pub(crate) key: crate::common::PartKey,
+    #[doc(hidden)]
+    #[derive(ooxmlsdk_derive::SdkPart)]
+    #[sdk(part_handle_spec)]
+    pub struct #spec_name_ident {
       #( #marker_fields )*
     }
   })?;
 
   Ok(quote! {
     #part_struct
+    pub type #struct_name_ident = crate::sdk::PartHandle<#spec_name_ident>;
   })
 }
 
@@ -562,8 +565,12 @@ mod tests {
     };
 
     let rendered = gen_part_module(&part).unwrap().to_string();
-    assert!(rendered.contains("pub struct MainDocumentPart"));
-    assert!(rendered.contains("key : crate :: common :: PartKey"));
+    assert!(rendered.contains("pub struct MainDocumentPartSpec"));
+    assert!(
+      rendered.contains(
+        "pub type MainDocumentPart = crate :: sdk :: PartHandle < MainDocumentPartSpec >"
+      )
+    );
     assert!(rendered.contains("ooxmlsdk_derive :: SdkPart"));
     assert!(!rendered.contains("impl crate :: sdk :: SdkPart for MainDocumentPart"));
     assert!(!rendered.contains("pub fn relationships"));

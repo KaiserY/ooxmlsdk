@@ -4,10 +4,12 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct TimeLineCachePart {
-    pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct TimeLineCachePartSpec {
     pub(crate) root_element: crate::sdk::PartRoot<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheDefinition,
     >,
 }
+pub type TimeLineCachePart = crate::sdk::PartHandle<TimeLineCachePartSpec>;

@@ -2,11 +2,53 @@
 
 ## Unreleased
 
+## 0.13.0
+
+### Breaking Changes
+
+- Reworked package ownership around package-bound Part handles. Package types
+  are no longer `Clone`; public numeric `PartId`, low-level `SdkPart` Part-ID
+  methods, `MediaDataPart::part_id`, and relationship `target_part_id`
+  accessors were removed in favor of typed Part and relationship APIs.
+- Generated Part names now alias a shared typed handle, and generated schema
+  types no longer implement the redundant `AsRef<Self>`. Existing Part method
+  names and XML read/write entry points are unchanged.
+
+### Added
+
+- Added `try_data_bytes` for shared owned `Bytes` access to typed and media Part
+  payloads, package-aware relationship target helpers, and structured errors
+  for foreign, stale, missing, unreferenced, and ambiguous Part relationships.
+
 ### Changed
 
-- Upgraded the PDF backend to `krilla` 0.8.2 and `krilla-svg` 0.8.1. The
-  `ooxmlsdk-pdf` crate now requires Rust 1.92; the core crates retain Rust 1.88
-  as their minimum supported version.
+- Preserved every relationship edge when multiple IDs target the same Part.
+  `RelatedPart` and plural APIs expose the individual IDs, while single-ID
+  mutations reject ambiguous targets.
+- Stored package payloads as shared immutable bytes. Untouched lazy Parts retain
+  their source payload, while every loaded typed root is serialized on save.
+- Moved known namespace aliases, Strict/Transitional URI handling, prefixed
+  attributes, and MCE namespace lists onto static namespace IDs without merging
+  the borrowed-bytes and streaming reader paths.
+
+### Fixed
+
+- Resolved supported `mc:AlternateContent` branches into typed schema fields.
+- Accepted non-canonical namespace prefixes such as Pandoc's `ns0` input and
+  emitted canonical OOXML prefixes without weakening static schema matching.
+
+### Performance
+
+- Shared generated Part facades, root read/write wrappers, and XML writer bodies
+  instead of expanding them for every generated type. Cold core checks improved
+  by about 30%, metadata shrank by 21%, and full dev builds improved by 16%.
+- Reused immutable `Bytes` payloads across Part and package access, reducing
+  decompression retention and payload copies.
+
+### Testing
+
+- Passed the core feature matrix, Clippy, and all 5,477 round trips across Apache
+  POI, LibreOffice, Open XML SDK, Pandoc, and ClosedXML.
 
 ## 0.12.0
 

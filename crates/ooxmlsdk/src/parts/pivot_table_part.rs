@@ -4,9 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct PivotTablePart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct PivotTablePartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinition,
   >,
@@ -14,3 +15,4 @@ pub struct PivotTablePart {
     crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart,
   >,
 }
+pub type PivotTablePart = crate::sdk::PartHandle<PivotTablePartSpec>;

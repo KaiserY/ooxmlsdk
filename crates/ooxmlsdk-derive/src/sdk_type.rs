@@ -1,11 +1,5 @@
 use super::*;
 
-#[derive(Clone, Copy)]
-enum DeserializeMode {
-  Borrowed,
-  Io,
-}
-
 fn child_uses_parent_default_namespace(
   qname: &str,
   parent_tag_prefix: &str,
@@ -685,9 +679,11 @@ fn write_typed_child_tokens(
   let start_tag_open = write_start_tag_open_tokens(qname, child_no_prefix);
   let end_tag = write_end_tag_tokens(qname, child_no_prefix);
   let write_inner_call = if child_no_prefix {
-    quote! { <#child_ty>::write_inner_no_prefix(#value, writer)? }
+    quote! {
+      <#child_ty as crate::sdk::SdkType>::write_inner_no_prefix(#value, writer)?
+    }
   } else {
-    quote! { <#child_ty>::write_inner(#value, writer)? }
+    quote! { <#child_ty as crate::sdk::SdkType>::write_inner(#value, writer)? }
   };
   quote! {
     #start_tag_open
@@ -761,9 +757,9 @@ fn build_choice_write_tokens(
         {
           quote! { value.__ooxmlsdk_write_inner_stack(writer)? }
         } else if child_no_prefix {
-          quote! { value.write_inner_no_prefix(writer)? }
+          quote! { crate::sdk::SdkType::write_inner_no_prefix(value, writer)? }
         } else {
-          quote! { value.write_inner(writer)? }
+          quote! { crate::sdk::SdkType::write_inner(value, writer)? }
         };
         arms.push(quote! {
           #choice_ty::#variant(value) => {
@@ -834,7 +830,7 @@ fn build_choice_write_tokens(
           let child = &children[0];
           let qname = &child.qname;
           let payload_ty = child.ty.as_ref().map(unwrap_option_vec_type);
-          let value_expr = quote! { value.as_ref() };
+          let value_expr = quote! { value };
           let write_tokens = match child.kind {
             SdkTypeChoiceSequenceChildKind::Child => {
               let child_ty = payload_ty
@@ -888,9 +884,9 @@ fn build_choice_write_tokens(
           });
         } else {
           let write_inner_call = if parent_no_prefix {
-            quote! { value.write_inner_no_prefix(writer)? }
+            quote! { crate::sdk::SdkType::write_inner_no_prefix(value, writer)? }
           } else {
-            quote! { value.write_inner(writer)? }
+            quote! { crate::sdk::SdkType::write_inner(value, writer)? }
           };
           arms.push(quote! {
             #choice_ty::#variant(value) => {
@@ -989,9 +985,9 @@ fn build_wml_table_stack_choice_next_tokens(
         let start_tag_open = write_start_tag_open_tokens(qname, child_no_prefix);
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
         let write_inner_call = if child_no_prefix {
-          quote! { value.write_inner_no_prefix(writer)? }
+          quote! { crate::sdk::SdkType::write_inner_no_prefix(value, writer)? }
         } else {
-          quote! { value.write_inner(writer)? }
+          quote! { crate::sdk::SdkType::write_inner(value, writer)? }
         };
         arms.push(quote! {
           #choice_ty::#variant(value) => {
@@ -1062,7 +1058,7 @@ fn build_wml_table_stack_choice_next_tokens(
           let child = &children[0];
           let qname = &child.qname;
           let payload_ty = child.ty.as_ref().map(unwrap_option_vec_type);
-          let value_expr = quote! { value.as_ref() };
+          let value_expr = quote! { value };
           let write_tokens = match child.kind {
             SdkTypeChoiceSequenceChildKind::Child => {
               let child_ty = payload_ty
@@ -1116,9 +1112,9 @@ fn build_wml_table_stack_choice_next_tokens(
           });
         } else {
           let write_inner_call = if parent_no_prefix {
-            quote! { value.write_inner_no_prefix(writer)? }
+            quote! { crate::sdk::SdkType::write_inner_no_prefix(value, writer)? }
           } else {
-            quote! { value.write_inner(writer)? }
+            quote! { crate::sdk::SdkType::write_inner(value, writer)? }
           };
           arms.push(quote! {
             #choice_ty::#variant(value) => {
@@ -1278,6 +1274,24 @@ fn validator_methods_tokens(
   }
 }
 
+fn validator_impl_tokens(
+  impl_generics: proc_macro2::TokenStream,
+  ident: &Ident,
+  type_generics: proc_macro2::TokenStream,
+  where_clause: proc_macro2::TokenStream,
+  methods: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  if methods.is_empty() {
+    return quote! {};
+  }
+
+  quote! {
+    impl #impl_generics #ident #type_generics #where_clause {
+      #methods
+    }
+  }
+}
+
 fn generate_mce_tokens() -> bool {
   cfg!(feature = "mce")
 }
@@ -1285,12 +1299,6 @@ fn generate_mce_tokens() -> bool {
 pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-  let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
-    quote! { #impl_generics },
-    ident,
-    quote! { #type_generics },
-    quote! { #where_clause },
-  );
   let Data::Struct(data_struct) = &input.data else {
     return Err(syn::Error::new_spanned(
       input,
@@ -1316,6 +1324,13 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
     }
     _ => {
       let validator_methods_tokens = validator_methods_tokens(quote! {});
+      let validator_impl_tokens = validator_impl_tokens(
+        quote! { #impl_generics },
+        ident,
+        quote! { #type_generics },
+        quote! { #where_clause },
+        validator_methods_tokens,
+      );
       let public_mce_method_tokens = parse_sdk_xml_header(&input.attrs)?.then(|| {
         quote! {
           #[inline]
@@ -1355,65 +1370,39 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
         quote! {}
       };
       Ok(quote! {
-        #as_ref_self_impl_tokens
         impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
-        impl #impl_generics #ident #type_generics #where_clause {
-          #validator_methods_tokens
-        }
+        #validator_impl_tokens
         #mce_methods_tokens
       })
     }
   }
 }
 
-fn as_ref_self_impl_tokens(
-  impl_generics: proc_macro2::TokenStream,
+fn sdk_type_root_info_tokens(
   ident: &Ident,
-  type_generics: proc_macro2::TokenStream,
-  where_clause: proc_macro2::TokenStream,
+  local_name_lit: &LitByteStr,
+  schema_qname: &str,
+  prefix_write_mode: PrefixWriteMode,
+  preparse_namespaces: bool,
+  writes_xml_header: bool,
 ) -> proc_macro2::TokenStream {
+  let no_prefix = prefix_write_mode.writes_no_prefix();
+  let start_tag_open = tag_literal(schema_qname, "<", "", no_prefix);
+  let end_tag = tag_literal(schema_qname, "</", ">", no_prefix);
+  let writes_inner_without_prefix = prefix_write_mode == PrefixWriteMode::NoPrefixDual;
+
   quote! {
-    impl #impl_generics std::convert::AsRef<#ident #type_generics> for #ident #type_generics #where_clause {
-      #[inline]
-      fn as_ref(&self) -> &#ident #type_generics {
-        self
-      }
-    }
-  }
-}
-
-fn sdk_type_root_methods_tokens(
-  root_read_borrowed_tokens: &proc_macro2::TokenStream,
-  root_read_io_tokens: &proc_macro2::TokenStream,
-  xml_header_tokens: &proc_macro2::TokenStream,
-  start_tag_open: &proc_macro2::TokenStream,
-  end_tag: &proc_macro2::TokenStream,
-  write_inner_root_call: &proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  quote! {
-    fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
-      let mut xml_reader = crate::common::from_bytes_inner(bytes);
-      #root_read_borrowed_tokens
-    }
-
-    fn from_reader<R: std::io::BufRead>(
-      reader: R,
-    ) -> Result<Self, crate::common::SdkError> {
-      let mut xml_reader = crate::common::from_reader_inner(reader);
-      #root_read_io_tokens
-    }
-
-    fn write_to<W: std::io::Write>(
-      &self,
-      writer: &mut W,
-    ) -> Result<(), std::io::Error> {
-      #xml_header_tokens
-      #start_tag_open
-      if !#write_inner_root_call {
-        #end_tag
-      }
-      Ok(())
-    }
+    const ROOT_INFO: Option<crate::sdk::SdkTypeRootInfo> = Some(
+      crate::sdk::SdkTypeRootInfo::new(
+        stringify!(#ident),
+        #local_name_lit,
+        #start_tag_open,
+        #end_tag,
+        #preparse_namespaces,
+        #writes_xml_header,
+        #writes_inner_without_prefix,
+      ),
+    );
   }
 }
 
@@ -1439,37 +1428,6 @@ fn sdk_type_from_str_impl_tokens(
         <Self as crate::sdk::SdkType>::from_bytes(s.as_bytes())
       }
     }
-  }
-}
-
-fn root_read_tokens(
-  ident: &Ident,
-  local_name_lit: &LitByteStr,
-  mode: DeserializeMode,
-  preparse_namespaces: bool,
-) -> proc_macro2::TokenStream {
-  let read_start = match mode {
-    DeserializeMode::Borrowed => quote! { crate::common::read_root_start_borrowed },
-    DeserializeMode::Io => quote! { crate::common::read_root_start_io },
-  };
-  let read_inner = match mode {
-    DeserializeMode::Borrowed => quote! { <Self as crate::sdk::SdkType>::read_inner },
-    DeserializeMode::Io => quote! { <Self as crate::sdk::SdkType>::read_inner },
-  };
-  let enter_root = if preparse_namespaces {
-    quote! { read_context.enter_root_scope(empty); }
-  } else {
-    quote! { read_context.enter_root(&start, empty, xml_reader.decoder())?; }
-  };
-  quote! {
-    let (start, empty) = #read_start(
-      &mut xml_reader,
-      stringify!(#ident),
-      #local_name_lit,
-    )?;
-    let mut read_context = crate::common::ReadContext::default();
-    #enter_root
-    #read_inner(&mut xml_reader, start, empty, &mut read_context)
   }
 }
 
@@ -1685,24 +1643,13 @@ fn expand_tuple_wrapper(
 
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
   let prefix_write_mode = parse_sdk_prefix_write_mode(&input.attrs)?;
-  let no_prefix = prefix_write_mode.writes_no_prefix();
-  let start_tag_open = write_start_tag_open_tokens(schema_qname, no_prefix);
-  let end_tag = write_end_tag_tokens(schema_qname, no_prefix);
-  let write_inner_root_call = if prefix_write_mode == PrefixWriteMode::NoPrefixDual {
-    quote! { self.write_inner_no_prefix(writer)? }
-  } else {
-    quote! { self.write_inner(writer)? }
-  };
-  let root_read_borrowed_tokens =
-    root_read_tokens(ident, &local_name_lit, DeserializeMode::Borrowed, false);
-  let root_read_io_tokens = root_read_tokens(ident, &local_name_lit, DeserializeMode::Io, false);
-  let root_methods_tokens = sdk_type_root_methods_tokens(
-    &root_read_borrowed_tokens,
-    &root_read_io_tokens,
-    &quote! {},
-    &start_tag_open,
-    &end_tag,
-    &write_inner_root_call,
+  let root_info_tokens = sdk_type_root_info_tokens(
+    ident,
+    &local_name_lit,
+    schema_qname,
+    prefix_write_mode,
+    false,
+    false,
   );
   let display_method_tokens = sdk_type_display_method_tokens();
   let from_str_impl_tokens = sdk_type_from_str_impl_tokens(
@@ -1711,15 +1658,16 @@ fn expand_tuple_wrapper(
     quote! { #type_generics },
     quote! { #where_clause },
   );
-  let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
+  let validator_methods_tokens = validator_methods_tokens(quote! {
+    self.0.validate_into(context);
+  });
+  let validator_impl_tokens = validator_impl_tokens(
     quote! { #impl_generics },
     ident,
     quote! { #type_generics },
     quote! { #where_clause },
+    validator_methods_tokens,
   );
-  let validator_methods_tokens = validator_methods_tokens(quote! {
-    self.0.validate_into(context);
-  });
   let (mce_element_action_tokens, _) = mce_element_action_tokens(&input.attrs, schema_qname)?;
   let public_mce_method_tokens = parse_sdk_xml_header(&input.attrs)?.then(|| {
     quote! {
@@ -1762,8 +1710,6 @@ fn expand_tuple_wrapper(
   };
 
   Ok(quote! {
-    #as_ref_self_impl_tokens
-
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
         xml_reader: &mut R,
@@ -1775,7 +1721,14 @@ fn expand_tuple_wrapper(
           .map(Self)
       }
 
-      #root_methods_tokens
+      #root_info_tokens
+
+      fn write_inner<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+      ) -> Result<bool, std::io::Error> {
+        <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer)
+      }
     }
 
     #mce_methods_tokens
@@ -1805,23 +1758,7 @@ fn expand_tuple_wrapper(
 
     #from_str_impl_tokens
 
-    impl #impl_generics #ident #type_generics #where_clause {
-      pub(crate) fn write_inner<W: std::io::Write>(
-        &self,
-        writer: &mut W,
-      ) -> Result<bool, std::io::Error> {
-        self.0.write_inner(writer)
-      }
-
-      pub(crate) fn write_inner_no_prefix<W: std::io::Write>(
-        &self,
-        writer: &mut W,
-      ) -> Result<bool, std::io::Error> {
-        self.0.write_inner(writer)
-      }
-
-      #validator_methods_tokens
-    }
+    #validator_impl_tokens
 
     impl #impl_generics ::std::fmt::Display for #ident #type_generics #where_clause {
       #display_method_tokens
@@ -4125,11 +4062,12 @@ fn expand_helper_struct(
     #( #child_validate_tokens )*
     #( #choice_validate_tokens )*
   });
-  let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
+  let validator_impl_tokens = validator_impl_tokens(
     quote! { #impl_generics },
     ident,
     quote! { #type_generics },
     quote! { #where_clause },
+    validator_methods_tokens,
   );
   let mce_methods_tokens = if generate_mce_tokens() {
     quote! {
@@ -4152,8 +4090,6 @@ fn expand_helper_struct(
 
   Ok(quote! {
     #( #mce_choice_impl_tokens )*
-    #as_ref_self_impl_tokens
-
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
         xml_reader: &mut R,
@@ -4164,17 +4100,14 @@ fn expand_helper_struct(
         #read_inner_body
       }
 
-    }
-    impl #impl_generics #ident #type_generics #where_clause {
-      pub(crate) fn write_inner<W: std::io::Write>(
+      fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
       ) -> Result<bool, std::io::Error> {
         #write_inner_body
       }
-
-      #validator_methods_tokens
     }
+    #validator_impl_tokens
 
     #mce_methods_tokens
   })
@@ -4201,7 +4134,6 @@ fn expand_named_struct(
   let extra_xmlns = parse_sdk_extra_xmlns(&input.attrs)?;
   let (extra_xmlns_init_tokens, extra_xmlns_mark_tokens, extra_xmlns_write_tokens) =
     extra_xmlns_tokens(&extra_xmlns)?;
-  let start_tag_open = write_start_tag_open_tokens(schema_qname, no_prefix);
   let end_tag = write_end_tag_tokens(schema_qname, no_prefix);
   let wml_table_kind = wml_table_stack_kind(ident, schema_qname);
   let fixed_namespace_uri = namespaces::uri_by_prefix(&tag_prefix);
@@ -6855,25 +6787,6 @@ fn expand_named_struct(
       let mut __xml_child_slot = 0usize;
     }
   });
-  let xml_header_tokens = if has_xml_header {
-    quote! {
-      writer.write_all(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")?;
-    }
-  } else {
-    quote! {}
-  };
-  let root_read_borrowed_tokens = root_read_tokens(
-    ident,
-    &local_name_lit,
-    DeserializeMode::Borrowed,
-    has_xmlns_fields,
-  );
-  let root_read_io_tokens = root_read_tokens(
-    ident,
-    &local_name_lit,
-    DeserializeMode::Io,
-    has_xmlns_fields,
-  );
   let writes_body = !child_fields.is_empty()
     || !mce_fields.is_empty()
     || !empty_child_fields.is_empty()
@@ -6890,11 +6803,6 @@ fn expand_named_struct(
     body_write_tokens_for(ordered_write_tokens_no_prefix, writes_body)
   } else {
     quote! {}
-  };
-  let write_inner_root_call = if prefix_write_mode == PrefixWriteMode::NoPrefixDual {
-    quote! { self.write_inner_no_prefix(writer)? }
-  } else {
-    quote! { self.write_inner(writer)? }
   };
   let mce_static_attr_process_tokens = if generate_mce_tokens() {
     attr_fields
@@ -7190,16 +7098,16 @@ fn expand_named_struct(
       quote! { #where_clause },
     )
   };
-  let public_root_methods_tokens = if local_name.is_empty() {
+  let public_root_info_tokens = if local_name.is_empty() {
     quote! {}
   } else {
-    sdk_type_root_methods_tokens(
-      &root_read_borrowed_tokens,
-      &root_read_io_tokens,
-      &xml_header_tokens,
-      &start_tag_open,
-      &end_tag,
-      &write_inner_root_call,
+    sdk_type_root_info_tokens(
+      ident,
+      &local_name_lit,
+      schema_qname,
+      prefix_write_mode,
+      has_xmlns_fields,
+      has_xml_header,
     )
   };
   let public_root_display_tokens = if local_name.is_empty() {
@@ -7443,17 +7351,18 @@ fn expand_named_struct(
     #mc_must_understand_write_tokens
     #body_write_tokens
   });
-  let as_ref_self_impl_tokens = as_ref_self_impl_tokens(
-    quote! { #impl_generics },
-    ident,
-    quote! { #type_generics },
-    quote! { #where_clause },
-  );
   let validator_methods_tokens = validator_methods_tokens(quote! {
     #( #attr_validate_tokens )*
     #( #child_validate_tokens )*
     #( #choice_validate_tokens )*
   });
+  let validator_impl_tokens = validator_impl_tokens(
+    quote! { #impl_generics },
+    ident,
+    quote! { #type_generics },
+    quote! { #where_clause },
+    validator_methods_tokens,
+  );
   let write_inner_no_prefix_method_tokens = if prefix_write_mode == PrefixWriteMode::NoPrefixDual {
     let write_inner_no_prefix_body = write_inner_body_tokens(quote! {
       #special_namespace_write_tokens
@@ -7466,20 +7375,11 @@ fn expand_named_struct(
       #body_write_no_prefix_tokens
     });
     quote! {
-      pub(crate) fn write_inner_no_prefix<W: std::io::Write>(
+      fn write_inner_no_prefix<W: std::io::Write>(
         &self,
         writer: &mut W,
       ) -> Result<bool, std::io::Error> {
         #write_inner_no_prefix_body
-      }
-    }
-  } else if prefix_write_mode == PrefixWriteMode::NoPrefixOnly {
-    quote! {
-      pub(crate) fn write_inner_no_prefix<W: std::io::Write>(
-        &self,
-        writer: &mut W,
-      ) -> Result<bool, std::io::Error> {
-        self.write_inner(writer)
       }
     }
   } else {
@@ -7490,8 +7390,6 @@ fn expand_named_struct(
     #stack_frame_enum_tokens
     #stack_read_inner_method_tokens
     #stack_write_inner_method_tokens
-    #as_ref_self_impl_tokens
-
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
         xml_reader: &mut R,
@@ -7502,11 +7400,9 @@ fn expand_named_struct(
         #read_inner_body
       }
 
-      #public_root_methods_tokens
-    }
+      #public_root_info_tokens
 
-    impl #impl_generics #ident #type_generics #where_clause {
-      pub(crate) fn write_inner<W: std::io::Write>(
+      fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
       ) -> Result<bool, std::io::Error> {
@@ -7514,9 +7410,9 @@ fn expand_named_struct(
       }
 
       #write_inner_no_prefix_method_tokens
-
-      #validator_methods_tokens
     }
+
+    #validator_impl_tokens
 
     #mce_methods_tokens
 

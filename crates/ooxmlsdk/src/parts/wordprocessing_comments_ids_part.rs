@@ -4,9 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct WordprocessingCommentsIdsPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct WordprocessingCommentsIdsPartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_word_2016_wordml_cid::CommentsIds,
   >,
@@ -39,3 +40,4 @@ pub struct WordprocessingCommentsIdsPart {
     crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
   >,
 }
+pub type WordprocessingCommentsIdsPart = crate::sdk::PartHandle<WordprocessingCommentsIdsPartSpec>;

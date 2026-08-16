@@ -4,9 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct ChartDrawingPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct ChartDrawingPartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::UserShapes,
   >,
@@ -15,3 +16,4 @@ pub struct ChartDrawingPart {
     crate::sdk::OptionalPart<crate::parts::extended_chart_part::ExtendedChartPart>,
   pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }
+pub type ChartDrawingPart = crate::sdk::PartHandle<ChartDrawingPartSpec>;

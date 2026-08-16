@@ -4,9 +4,11 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct WorkbookUserDataPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct WorkbookUserDataPartSpec {
   pub(crate) root_element:
     crate::sdk::PartRoot<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Users>,
 }
+pub type WorkbookUserDataPart = crate::sdk::PartHandle<WorkbookUserDataPartSpec>;

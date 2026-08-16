@@ -4,9 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct SlideLayoutPart {
-    pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct SlideLayoutPartSpec {
     pub(crate) root_element: crate::sdk::PartRoot<
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideLayout,
     >,
@@ -68,3 +69,4 @@ pub struct SlideLayoutPart {
         crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
     >,
 }
+pub type SlideLayoutPart = crate::sdk::PartHandle<SlideLayoutPartSpec>;

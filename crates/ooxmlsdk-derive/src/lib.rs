@@ -1443,12 +1443,7 @@ fn qname_write_prefix(prefix: &str, no_prefix: bool) -> &str {
   if no_prefix { "" } else { prefix }
 }
 
-fn write_tag_literal_tokens(
-  qname: &str,
-  open: &str,
-  close: &str,
-  no_prefix: bool,
-) -> proc_macro2::TokenStream {
+fn tag_literal(qname: &str, open: &str, close: &str, no_prefix: bool) -> LitByteStr {
   let QNameInfo {
     tag_prefix,
     local_name,
@@ -1459,7 +1454,16 @@ fn write_tag_literal_tokens(
   } else {
     format!("{open}{write_prefix}:{local_name}{close}")
   };
-  let tag_lit = LitByteStr::new(tag.as_bytes(), Span::call_site());
+  LitByteStr::new(tag.as_bytes(), Span::call_site())
+}
+
+fn write_tag_literal_tokens(
+  qname: &str,
+  open: &str,
+  close: &str,
+  no_prefix: bool,
+) -> proc_macro2::TokenStream {
+  let tag_lit = tag_literal(qname, open, close, no_prefix);
   quote! { writer.write_all(#tag_lit)?; }
 }
 
@@ -2064,13 +2068,52 @@ mod tests {
   }
 
   #[test]
+  fn sdk_type_prefix_write_modes_keep_distinct_static_paths() {
+    fn expansion(source: &str) -> String {
+      let input: DeriveInput = parse_str(source).expect("derive input");
+      sdk_type::expand_sdk_type(&input)
+        .expect("SdkType expansion")
+        .to_string()
+    }
+
+    let no_prefix_only = expansion(
+      r#"
+        #[sdk(no_prefix_only, qname = "x:root")]
+        struct Root {
+          #[sdk(child(qname = "x:child"))]
+          child: Option<Child>,
+        }
+      "#,
+    );
+    assert!(no_prefix_only.contains(r#"b"<root""#));
+    assert!(no_prefix_only.contains(r#"b"<child""#));
+    assert!(!no_prefix_only.contains(r#"b"<x:root""#));
+    assert!(!no_prefix_only.contains(r#"b"<x:child""#));
+    assert!(!no_prefix_only.contains("fn write_inner_no_prefix"));
+
+    let dual = expansion(
+      r#"
+        #[sdk(no_prefix, qname = "x:root")]
+        struct Root {
+          #[sdk(child(qname = "x:child"))]
+          child: Option<Child>,
+        }
+      "#,
+    );
+    assert!(dual.contains(r#"b"<root""#));
+    assert!(dual.contains(r#"b"<x:child""#));
+    assert!(dual.contains(r#"b"<child""#));
+    assert!(dual.contains("fn write_inner_no_prefix"));
+  }
+
+  #[test]
   #[ignore]
   fn dump_context_node_expansion() {
     dump_one_expansion(
       &std::env::var("OOXMLSDK_DUMP_KIND").unwrap_or_else(|_| "SdkPart".to_string()),
       &std::env::var("OOXMLSDK_DUMP_FILE")
         .unwrap_or_else(|_| "parts/main_document_part.rs".to_string()),
-      &std::env::var("OOXMLSDK_DUMP_TARGET").unwrap_or_else(|_| "MainDocumentPart".to_string()),
+      &std::env::var("OOXMLSDK_DUMP_TARGET").unwrap_or_else(|_| "MainDocumentPartSpec".to_string()),
     );
   }
 

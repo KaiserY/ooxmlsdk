@@ -4,7 +4,8 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct XmlSignaturePart {
-  pub(crate) key: crate::common::PartKey,
-}
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct XmlSignaturePartSpec {}
+pub type XmlSignaturePart = crate::sdk::PartHandle<XmlSignaturePartSpec>;

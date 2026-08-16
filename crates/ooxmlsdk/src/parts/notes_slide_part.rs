@@ -4,9 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct NotesSlidePart {
-    pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct NotesSlidePartSpec {
     pub(crate) root_element: crate::sdk::PartRoot<
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesSlide,
     >,
@@ -63,3 +64,4 @@ pub struct NotesSlidePart {
         crate::parts::user_defined_tags_part::UserDefinedTagsPart,
     >,
 }
+pub type NotesSlidePart = crate::sdk::PartHandle<NotesSlidePartSpec>;

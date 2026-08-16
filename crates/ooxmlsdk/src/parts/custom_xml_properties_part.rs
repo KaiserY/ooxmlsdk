@@ -4,10 +4,12 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPart)]
-pub struct CustomXmlPropertiesPart {
-  pub(crate) key: crate::common::PartKey,
+#[doc(hidden)]
+#[derive(ooxmlsdk_derive::SdkPart)]
+#[sdk(part_handle_spec)]
+pub struct CustomXmlPropertiesPartSpec {
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_office_document_2006_custom_xml::DataStoreItem,
   >,
 }
+pub type CustomXmlPropertiesPart = crate::sdk::PartHandle<CustomXmlPropertiesPartSpec>;

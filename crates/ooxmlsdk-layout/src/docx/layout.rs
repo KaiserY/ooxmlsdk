@@ -359,6 +359,31 @@ struct GridAutoLineHeights {
   following_line_pt: f32,
 }
 
+fn document_grid_line_metric_style(style: &TextStyle) -> Cow<'_, TextStyle> {
+  if style.wordprocessingml_font_slots
+    && matches!(
+      style.wordprocessingml_font_hint,
+      Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia)
+    )
+    && !style.wordprocessingml_cjk_line_metrics
+  {
+    // ECMA-376 Part 1 §17.3.2.26 and [MS-OI29500] §2.1.88 preserve Basic
+    // Latin in the ASCII slot, but w:hint=eastAsia still marks the run's East
+    // Asian formatting context. For document-grid row selection, Word uses
+    // its CJK-capable face metrics in that context even when the visible text
+    // is Latin. tdf154751_dualStrikethrough is the immutable Office control:
+    // its 36pt DengXian line requires four 15.6pt rows after the established
+    // CP936 side-leading adjustment, rather than three rows from the raw font
+    // box. The font capability check remains in TextMetrics, so a Latin-only
+    // face and a non-grid line are independent opposite states.
+    let mut style = style.clone();
+    style.wordprocessingml_cjk_line_metrics = true;
+    Cow::Owned(style)
+  } else {
+    Cow::Borrowed(style)
+  }
+}
+
 fn grid_auto_line_heights(
   paragraph: &crate::docx::Paragraph,
   base_line_style: &TextStyle,
@@ -376,7 +401,8 @@ fn grid_auto_line_heights(
     text_segmentation,
     paragraph.format.wordprocessing_shape_story,
   )?;
-  let visible_line_height = inline_text_height(base_line_style, text_metrics);
+  let grid_line_style = document_grid_line_metric_style(base_line_style);
+  let visible_line_height = inline_text_height(grid_line_style.as_ref(), text_metrics);
   let snapped_line_height = snap_line_height_to_doc_grid(visible_line_height, Some(grid_height));
   let recovered_table_grid = paragraph.format.office_recovered_line_height
     && text_segmentation == TextSegmentation::TableCell
@@ -402,14 +428,25 @@ fn grid_auto_line_heights(
 
   // ECMA-376 Part 1 §17.6.5 defines `linePitch` as the pitch of each grid line,
   // while §17.3.1.33 keeps an authored auto line value independently effective
-  // through the style hierarchy. Do not fold an ordinary authored/inherited
-  // multiple into the first one-grid line: `lastEmptyLineWithDirectFormatting`
-  // is the immutable Office counterexample. Word's synthetic application
-  // repair is a narrower compatibility state. Office's tdf148361 and
-  // tdf120394 fixed output gives its positive control: on the recovered 15.6pt
-  // line grid, the repaired 278/240 multiple advances each paragraph by about
-  // 18.07pt before its separate 8pt after spacing; disabling only the grid
-  // returns the ordinary font-based proportional line height.
+  // through the style hierarchy and includes each paragraph's inter-line
+  // spacing when resolving the space between adjacent paragraphs on an
+  // explicitly active document grid. Office's ParaPr/paraspace.docx supplies
+  // that boundary: its second Style1 paragraph inherits 880/240 auto spacing
+  // on an authored 15.6pt `w:docGrid`, and Word centers its only visible line
+  // in the 57.2pt proportional grid box.
+  // `lastEmptyLineWithDirectFormatting` is the opposite state: it has no
+  // authored line multiple and its direct formatting owns an empty paragraph
+  // mark, so it remains a one-grid line. Word's synthetic application repair
+  // is a separate compatibility state. Office's tdf148361 and tdf120394 fixed
+  // output gives its positive control: on the recovered 15.6pt line grid, the
+  // repaired 278/240 multiple advances each paragraph by about 18.07pt before
+  // its separate 8pt after spacing; disabling only the grid returns the
+  // ordinary font-based proportional line height. The recovered-grid entrance
+  // is not an authored `w:docGrid`: floattable-negative-vert-offset and
+  // floattable-anchor-next-page inherit an authored Normal 276/240 multiple,
+  // but their immutable Office output keeps each visible anchor paragraph on
+  // one recovered grid row. LibreOffice's paired core/text QA pins the
+  // downstream non-overlap and next-page anchor behavior.
   // An inline-drawing-only body line is the independent character-like
   // exception: its object portion owns the line box and the proportional
   // excess is resolved by inline_drawing_portion_line_height(). A direct WPS
@@ -418,7 +455,17 @@ fn grid_auto_line_heights(
   // body section grid and the recovered Normal auto multiple inside that text
   // frame. Disabling only the textbox paragraph's grid in Office moves
   // tdf117188's inner line upward while leaving its inline host unchanged.
-  let proportional_first_line = (paragraph.format.office_recovered_line_height
+  let authored_visible_body_multiple = text_segmentation == TextSegmentation::Body
+    && setup.table_cell_doc_grid_line_pitch_pt.is_some()
+    && paragraph
+      .format
+      .line_height_pt
+      .is_some_and(|multiple| multiple > 1.0)
+    && paragraph.inlines.iter().any(
+      |inline| matches!(inline, InlineItem::Text(run) if text_run_affects_line_height(&run.text)),
+    );
+  let proportional_first_line = ((paragraph.format.office_recovered_line_height
+    || authored_visible_body_multiple)
     && text_segmentation == TextSegmentation::Body)
     || paragraph.format.wordprocessing_shape_story;
   let first_line_pt = if (proportional_first_line
@@ -570,8 +617,17 @@ fn word_east_asian_paragraph_mark_single_line_height(
   let modern_physical_left_mark = paragraph.format.justification.physical_left
     && text_segmentation == TextSegmentation::Body
     && (paragraph.format.bidi || paragraph_has_form_widget(paragraph));
+  // ECMA-376 Part 1 §17.3.1.29 gives an empty paragraph's mark the resolved
+  // paragraph properties. In tdf59274 every empty cell paragraph explicitly
+  // selects style0 (Times New Roman 12pt): Word advances those marks with the
+  // resolved 15.9836pt line, not the synthetic 17.28pt styleless Chinese box.
+  // The styleless gridbefore, large-twips, and tdf131203 table paragraphs are
+  // the positive state for the legacy recovery below.
+  let styled_empty_paragraph =
+    paragraph.format.style_id.is_some() && paragraph_is_effectively_empty(paragraph);
   let recovered_empty_chinese_table_mark = legacy_chinese_table_line
     && paragraph.format.office_recovered_line_height
+    && !styled_empty_paragraph
     && paragraph_is_effectively_empty(paragraph);
   let recovered_empty_chinese_body_mark = compatibility_mode < 15
     && text_segmentation == TextSegmentation::Body
@@ -589,7 +645,8 @@ fn word_east_asian_paragraph_mark_single_line_height(
       || recovered_empty_chinese_table_mark
       || recovered_empty_chinese_body_mark
       || (paragraph.format.justification.adjust == crate::docx::ParagraphAdjust::Left
-        && (paragraph_has_automatic_superscript(paragraph) || legacy_chinese_table_line))
+        && (paragraph_has_automatic_superscript(paragraph)
+          || (legacy_chinese_table_line && !styled_empty_paragraph)))
   };
   // `Normalize/conflicting IDs.docx` inherits an authored 240/240 multiple
   // from TableGrid, while styleless `tdf109306.docx` receives Word's repaired
@@ -17961,6 +18018,7 @@ impl<'a> TableFrameLayout<'a> {
       column_count,
       available_width,
       allow_width_overflow,
+      area.compatibility_mode,
       text_metrics,
     );
     let constrained_nested_fixed_auto_width = inside_table_cell
@@ -21087,6 +21145,7 @@ fn table_column_widths(
   column_count: usize,
   content_width: f32,
   allow_width_overflow: bool,
+  compatibility_mode: u16,
   text_metrics: &mut TextMetrics,
 ) -> Vec<f32> {
   let has_autofit = table
@@ -21099,6 +21158,7 @@ fn table_column_widths(
     content_width,
     allow_width_overflow,
     has_autofit,
+    compatibility_mode >= 15,
   );
   if !has_autofit {
     return widths;
@@ -21108,6 +21168,7 @@ fn table_column_widths(
     widths,
     content_width,
     allow_width_overflow,
+    compatibility_mode >= 15,
     text_metrics,
   )
 }
@@ -21118,6 +21179,7 @@ fn fixed_table_column_widths(
   content_width: f32,
   allow_width_overflow: bool,
   defer_autofit_expansion: bool,
+  constrain_automatic_width_to_content: bool,
 ) -> Vec<f32> {
   let preserve_absolute_autofit_width =
     defer_autofit_expansion && table.preferred_width_pt.is_some();
@@ -21141,6 +21203,11 @@ fn fixed_table_column_widths(
       .is_some_and(|preferred| grid_width > preferred + LAYOUT_EPSILON_PT)
       && (table.layout == TableLayoutMode::Fixed
         || (table.placement.is_some() && table.preferred_width_pct.is_some()));
+    let fixed_auto_width_is_derived_from_rows = constrain_automatic_width_to_content
+      && table.layout == TableLayoutMode::Fixed
+      && table.preferred_width_pt.is_none()
+      && table.preferred_width_pct.is_none()
+      && !table.rows.is_empty();
     if !grid_expands_preferred_width
       && let Some(preferred) = preferred_width
       && preferred > 0.0
@@ -21155,9 +21222,15 @@ fn fixed_table_column_widths(
     // is converted to a frame: DomainMapperTableHandler applies the percentage
     // to that frame and makes the table consume 100% of it, so an already wider
     // resolved grid must remain the frame width. Otherwise an explicit table
-    // preferred width constrains and proportionally scales those columns.
+    // preferred width constrains and proportionally scales those columns. For
+    // In Word 2013+ compatibility mode, an inline fixed grid whose automatic
+    // width is actually derived from its rows uses the containing text extent
+    // as an upper bound: conditionalstyles-tbllook.docx is the immutable
+    // mode-15 Office control. Legacy mode is deliberately excluded: the
+    // mode-12 2_table_doc.docx and mode-14 table-auto-column-fixed-size2.docx
+    // controls preserve their saved over-wide grids.
     if !allow_width_overflow
-      && preferred_width.is_some()
+      && (preferred_width.is_some() || fixed_auto_width_is_derived_from_rows)
       && !grid_expands_preferred_width
       && !preserve_absolute_autofit_width
     {
@@ -21234,6 +21307,7 @@ fn autofit_table_column_widths(
   mut widths: Vec<f32>,
   content_width: f32,
   allow_width_overflow: bool,
+  constrain_automatic_width_to_content: bool,
   text_metrics: &mut TextMetrics,
 ) -> Vec<f32> {
   let column_count = widths.len();
@@ -21566,6 +21640,21 @@ fn autofit_table_column_widths(
       scale_widths_to_total(&mut widths, preferred);
     }
   }
+  if constrain_automatic_width_to_content
+    && table.preferred_width_pt.is_none()
+    && table.preferred_width_pct.is_none()
+    && !allow_width_overflow
+  {
+    // In mode 15, the page width is the final AutoFit growth boundary and
+    // then forces cell line breaks for an automatic table width. Apply that
+    // boundary to an already over-wide saved automatic grid too, not only to
+    // widths grown while resolving content. An explicit dxa/pct tblW remains
+    // a preferred table extent rather than an automatic page-width request;
+    // tdf133647's mode-15 Office output preserves its 10631-twip table. Legacy
+    // Word compatibility modes preserve automatic saved overflow as well, as
+    // pinned by the paired mode-12/14 Office controls above.
+    clamp_widths_to_content(&mut widths, content_width);
+  }
   widths
 }
 
@@ -21721,7 +21810,8 @@ fn block_content_width_range(
       if column_count == 0 {
         return CellContentWidthRange::default();
       }
-      let widths = fixed_table_column_widths(table, column_count, content_width, true, false);
+      let widths =
+        fixed_table_column_widths(table, column_count, content_width, true, false, false);
       let width = widths.iter().sum::<f32>()
         + table_max_cell_spacing_pt(table) * column_count.saturating_sub(1) as f32;
       let has_autofit = table
@@ -33385,17 +33475,27 @@ impl<'a> TextFrameLayout<'a> {
       );
     }
     if start_item_index <= current.items.len() {
+      let decoration_baseline_offset_pt =
+        if matches!(flow.text_segmentation, TextSegmentation::TableCell) {
+          table_cell_initial_baseline_offset(
+            &paragraph_base_line_style(paragraph),
+            text_frame.base_line_height,
+            text_metrics,
+          )
+        } else {
+          0.0
+        };
       decorate_paragraph(
         current,
         ParagraphDecoration {
           start_item_index,
           paragraph,
           border_context: self.border_context,
-          flow,
           x: paragraph_left,
           y: paragraph_top,
           width: default_line_right - paragraph_left,
           height: paragraph_bottom - paragraph_top,
+          baseline_offset_pt: decoration_baseline_offset_pt,
           shading_before_pt: self.shading_before_pt,
           shading_after_pt: self.shading_after_pt,
           outer_bottom_pt: self.decoration_outer_bottom_pt,
@@ -35047,11 +35147,11 @@ struct ParagraphDecoration<'a> {
   start_item_index: usize,
   paragraph: &'a crate::docx::Paragraph,
   border_context: ParagraphBorderContext,
-  flow: FlowContext,
   x: f32,
   y: f32,
   width: f32,
   height: f32,
+  baseline_offset_pt: f32,
   shading_before_pt: f32,
   shading_after_pt: f32,
   outer_bottom_pt: Option<f32>,
@@ -35062,11 +35162,11 @@ fn decorate_paragraph(page: &mut Page, decoration: ParagraphDecoration<'_>) {
     start_item_index,
     paragraph,
     border_context,
-    flow,
     x,
     y,
     width,
     height,
+    baseline_offset_pt,
     shading_before_pt,
     shading_after_pt,
     outer_bottom_pt,
@@ -35078,9 +35178,17 @@ fn decorate_paragraph(page: &mut Page, decoration: ParagraphDecoration<'_>) {
   // decoration starts at the line-layout bounds with no corresponding inset.
   let horizontal_padding_pt = WORD_PARAGRAPH_DECORATION_HORIZONTAL_PADDING_PT;
   let box_left = x - horizontal_padding_pt;
-  let box_top = y;
+  // A table paint owner stores paragraph `y` as the already-resolved first
+  // glyph baseline, while paragraph background and borders belong to the
+  // physical text-frame box. LibreOffice PaintSwFrameBackground() likewise
+  // paints an IsTextFrame() from getFrameArea()/UnionFrame(), independently
+  // of its enclosing SwCellFrame. In Office's paired tdf165492 fixtures the
+  // glyph baseline is 10.47pt below the cell print top and pPr/shd begins at
+  // that print top; subtract exactly the established table baseline ascent.
+  // Ordinary body paragraphs already store a line-top origin and pass zero.
+  let box_top = y - baseline_offset_pt;
   let box_right = x + width + horizontal_padding_pt;
-  let mut box_bottom = y + height;
+  let mut box_bottom = box_top + height;
   let top = border_context.top(paragraph);
   let bottom = border_context.bottom(paragraph);
   if let Some(outer_bottom_pt) = outer_bottom_pt {
@@ -35107,12 +35215,18 @@ fn decorate_paragraph(page: &mut Page, decoration: ParagraphDecoration<'_>) {
     let shading_bottom = bottom
       .map_or(box_bottom, |border| box_bottom + border.spacing_pt)
       .max(box_bottom + shading_after_pt);
-    let (x, y, width, height) = table_cell_paragraph_shading_bounds(flow).unwrap_or((
+    // ECMA-376 Part 1 §17.3.1.31 applies paragraph shading to the paragraph
+    // contents. Only tcPr/shd (§17.4.32) fills the complete table-cell
+    // extent, including an otherwise empty padding area. Keep pPr/shd on its
+    // paragraph decoration box inside table cells: the paired LibreOffice
+    // tdf165492 exact/atLeast fixtures contain pPr/shd but no tcPr/shd, and
+    // Word leaves their large authored row-margin remainders unpainted.
+    let (x, y, width, height) = (
       shading_left,
       shading_top,
       shading_right - shading_left,
       shading_bottom - shading_top,
-    ));
+    );
     page.items.insert(
       start_item_index,
       PageItem::Fill(FillItem {
@@ -35150,19 +35264,6 @@ fn decorate_paragraph(page: &mut Page, decoration: ParagraphDecoration<'_>) {
   if let Some(border) = paragraph.format.borders.left {
     push_styled_line(page, left_x, top_y, left_x, bottom_y, border);
   }
-}
-
-fn table_cell_paragraph_shading_bounds(flow: FlowContext) -> Option<(f32, f32, f32, f32)> {
-  if !matches!(flow.text_segmentation, TextSegmentation::TableCell) {
-    return None;
-  }
-  let bounds = flow.layout_cell_bounds?;
-  (bounds.height_pt > LAYOUT_EPSILON_PT).then_some((
-    bounds.x_pt,
-    bounds.y_pt,
-    bounds.width_pt,
-    bounds.height_pt,
-  ))
 }
 
 fn trim_word_compatible_trailing_blanks(
@@ -41343,25 +41444,6 @@ mod tests {
       list_label_tab_stop_pt: None,
     };
     let setup = PageSetup::default();
-    let flow = flow_from_block_area(BlockArea {
-      setup,
-      section_index: 0,
-      section_page_index: 0,
-      column_index: 0,
-      columns: SectionColumns::default(),
-      content_top_pt: 72.0,
-      content_left_pt: 72.0,
-      content_bottom: setup.height_pt - 72.0,
-      body_content_bottom_pt: setup.height_pt - 72.0,
-      content_width: setup.width_pt - 144.0,
-      default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
-      hyphenation: crate::docx::HyphenationSettings::default(),
-      consecutive_hyphenated_lines: 0,
-      compatibility_mode: 15,
-      justify_lines_with_shrinking: false,
-      do_not_expand_shift_return: false,
-      repeating_slots: RepeatingSlotState::default(),
-    });
     let mut page = empty_page(setup, 0);
 
     decorate_paragraph(
@@ -41370,11 +41452,11 @@ mod tests {
         start_item_index: 0,
         paragraph: &paragraph,
         border_context: ParagraphBorderContext::default(),
-        flow,
         x: 97.0,
         y: 90.0,
         width: 238.4,
         height: 50.0,
+        baseline_offset_pt: 0.0,
         shading_before_pt: 0.0,
         shading_after_pt: 0.0,
         outer_bottom_pt: Some(275.0),
@@ -41405,6 +41487,29 @@ mod tests {
     assert!((lines[2].y1_pt + lines[2].width_pt / 2.0 - 275.0).abs() < 0.001);
     assert!((lines[1].y2_pt - 273.5).abs() < 0.001);
     assert!((lines[3].y2_pt - 273.5).abs() < 0.001);
+
+    let mut baseline_owned_page = empty_page(setup, 0);
+    decorate_paragraph(
+      &mut baseline_owned_page,
+      ParagraphDecoration {
+        start_item_index: 0,
+        paragraph: &paragraph,
+        border_context: ParagraphBorderContext::default(),
+        x: 97.0,
+        y: 90.0,
+        width: 238.4,
+        height: 50.0,
+        baseline_offset_pt: 10.0,
+        shading_before_pt: 0.0,
+        shading_after_pt: 0.0,
+        outer_bottom_pt: None,
+      },
+    );
+    let PageItem::Fill(fill) = baseline_owned_page.items[0] else {
+      panic!("baseline-owned paragraph shading was not painted");
+    };
+    assert!((fill.y_pt - 70.0).abs() < 0.001);
+    assert!((fill.y_pt + fill.height_pt - 130.0).abs() < 0.001);
   }
 
   #[test]
@@ -43442,6 +43547,18 @@ mod tests {
       .is_none(),
       "an explicit paragraph style remains authoritative for an empty body mark",
     );
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        12,
+        TextSegmentation::TableCell,
+        true,
+        0,
+        &mut text_metrics,
+      )
+      .is_none(),
+      "an explicit paragraph style remains authoritative for an empty table mark",
+    );
     paragraph.format.style_id = None;
     paragraph.format.paragraph_mark_font_size_set = true;
     assert!(
@@ -44418,6 +44535,17 @@ mod tests {
     };
     let mut text_metrics = TextMetrics::new();
     let base_style = paragraph_base_line_style(&paragraph);
+    let mut east_asia_hint_style = base_style.clone();
+    east_asia_hint_style.wordprocessingml_font_slots = true;
+    east_asia_hint_style.wordprocessingml_font_hint =
+      Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia);
+    assert!(
+      document_grid_line_metric_style(&east_asia_hint_style).wordprocessingml_cjk_line_metrics
+    );
+    assert!(
+      !document_grid_line_metric_style(&base_style).wordprocessingml_cjk_line_metrics,
+      "a non-East-Asian hint must not opt a grid line into CJK face metrics",
+    );
     let body_height = paragraph_line_height_for_setup(
       &paragraph,
       &base_style,
@@ -44467,7 +44595,44 @@ mod tests {
     );
     assert!(
       (inherited_body_height - 15.6).abs() < 0.01,
-      "an authored style-hierarchy multiple must not enlarge the first one-grid line",
+      "an empty paragraph mark stays on the first one-grid line",
+    );
+
+    inherited_paragraph.inlines = vec![InlineItem::Text(TextRun {
+      text: "visible".into(),
+      style: base_style.clone(),
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    })];
+    let recovered_grid_visible_body_height = paragraph_line_height_for_setup(
+      &inherited_paragraph,
+      &base_style,
+      setup,
+      TextSegmentation::Body,
+      &mut text_metrics,
+    );
+    assert!(
+      (recovered_grid_visible_body_height - 15.6).abs() < 0.01,
+      "an authored multiple does not enlarge a synthetic recovered grid row",
+    );
+    let authored_grid_setup = PageSetup {
+      table_cell_doc_grid_line_pitch_pt: Some(15.6),
+      ..setup
+    };
+    let authored_grid_visible_body_height = paragraph_line_height_for_setup(
+      &inherited_paragraph,
+      &base_style,
+      authored_grid_setup,
+      TextSegmentation::Body,
+      &mut text_metrics,
+    );
+    assert!(
+      (authored_grid_visible_body_height - 21.06).abs() < 0.01,
+      "a visible line keeps its inherited proportional height on an authored grid",
     );
 
     let mut wordprocessing_shape_paragraph = paragraph.clone();
@@ -45211,6 +45376,25 @@ mod tests {
 
   #[test]
   fn auto_width_table_keeps_explicit_grid_width_beyond_text_area() {
+    fn empty_cell() -> TableCell {
+      TableCell {
+        blocks: Vec::new(),
+        shading: None,
+        borders: CellBordersModel::default(),
+        border_suppressions: CellBorderSuppressions::default(),
+        margins: CellMargins::zero(),
+        preferred_width_pt: None,
+        preferred_width_pct: None,
+        grid_span: 1,
+        vertical_merge_continue: false,
+        no_wrap: false,
+        fit_text: false,
+        hide_end_mark: false,
+        vertical_alignment: TableCellVerticalAlignment::Top,
+        text_rotation_deg: None,
+      }
+    }
+
     let table = Table {
       column_widths_pt: vec![231.0, 231.0],
       preferred_width_pt: None,
@@ -45235,8 +45419,37 @@ mod tests {
 
     let mut text_metrics = TextMetrics::new();
     assert_eq!(
-      table_column_widths(&table, 2, 451.0, false, &mut text_metrics),
+      table_column_widths(&table, 2, 451.0, false, 15, &mut text_metrics),
       [231.0, 231.0]
+    );
+
+    let mut populated = table.clone();
+    populated.layout = TableLayoutMode::Fixed;
+    populated.rows.push(TableRow {
+      cells: vec![empty_cell(), empty_cell()],
+      height_pt: None,
+      exact_height: false,
+      repeat_header: false,
+      keep_with_next: false,
+      cant_split: false,
+      cell_spacing_pt: None,
+      grid_before: 0,
+      grid_after: 0,
+      width_before_pt: None,
+      width_after_pt: None,
+      layout: None,
+      borders: None,
+      spacing_shading: None,
+      redline_color: None,
+    });
+    assert_eq!(
+      table_column_widths(&populated, 2, 451.0, false, 15, &mut text_metrics),
+      [225.5, 225.5]
+    );
+    assert_eq!(
+      table_column_widths(&populated, 2, 451.0, false, 14, &mut text_metrics),
+      [231.0, 231.0],
+      "legacy compatibility mode preserves an authored over-wide automatic grid",
     );
 
     let mut indented = table;
@@ -45344,16 +45557,45 @@ mod tests {
       })
       .collect::<Vec<_>>();
 
-    let widths = table_column_widths(&table, 2, content_width, false, &mut text_metrics);
+    let widths = table_column_widths(&table, 2, content_width, false, 15, &mut text_metrics);
 
     assert_eq!(widths, expected);
     assert!(widths.iter().sum::<f32>() < content_width);
     assert!(widths[1] > widths[0]);
 
+    let mut overwide = table.clone();
+    overwide.column_widths_pt = vec![231.0, 231.0];
+    for cell in &mut overwide.rows[0].cells {
+      cell.preferred_width_pt = Some(231.0);
+    }
+    let legacy_overwide_widths =
+      table_column_widths(&overwide, 2, content_width, false, 14, &mut text_metrics);
+    assert_eq!(legacy_overwide_widths, [231.0, 231.0]);
+    let overwide_widths =
+      table_column_widths(&overwide, 2, content_width, false, 15, &mut text_metrics);
+    assert!((overwide_widths.iter().sum::<f32>() - content_width).abs() < LAYOUT_EPSILON_PT);
+    assert!((overwide_widths[0] - 216.0).abs() < LAYOUT_EPSILON_PT);
+    assert!((overwide_widths[1] - 216.0).abs() < LAYOUT_EPSILON_PT);
+
+    let mut explicitly_wide = overwide.clone();
+    explicitly_wide.preferred_width_pt = Some(462.0);
+    let explicitly_wide_widths = table_column_widths(
+      &explicitly_wide,
+      2,
+      content_width,
+      false,
+      15,
+      &mut text_metrics,
+    );
+    assert!(
+      (explicitly_wide_widths.iter().sum::<f32>() - 462.0).abs() < LAYOUT_EPSILON_PT,
+      "an explicit absolute tblW is not the automatic mode-15 page clamp",
+    );
+
     let mut fixed = table;
     fixed.layout = TableLayoutMode::Fixed;
     assert_eq!(
-      table_column_widths(&fixed, 2, content_width, false, &mut text_metrics),
+      table_column_widths(&fixed, 2, content_width, false, 15, &mut text_metrics),
       [216.0, 216.0]
     );
   }
@@ -45450,7 +45692,7 @@ mod tests {
 
     let mut text_metrics = TextMetrics::new();
     assert_eq!(
-      table_column_widths(&table, 3, 523.3, false, &mut text_metrics),
+      table_column_widths(&table, 3, 523.3, false, 15, &mut text_metrics),
       [82.0, 402.75, 49.35]
     );
   }
@@ -45627,7 +45869,7 @@ mod tests {
     };
     let mut text_metrics = TextMetrics::new();
 
-    let widths = table_column_widths(&table, 11, 453.6, false, &mut text_metrics);
+    let widths = table_column_widths(&table, 11, 453.6, false, 15, &mut text_metrics);
 
     assert!((widths[..5].iter().sum::<f32>() - 214.45).abs() < LAYOUT_EPSILON_PT);
     assert!((widths[5..7].iter().sum::<f32>() - 68.15).abs() < LAYOUT_EPSILON_PT);
@@ -45639,7 +45881,8 @@ mod tests {
     complete_grid.column_widths_pt = vec![
       42.89, 42.89, 42.89, 42.89, 42.89, 34.075, 34.075, 42.375, 42.375, 0.025, 0.025,
     ];
-    let complete_widths = table_column_widths(&complete_grid, 11, 453.6, false, &mut text_metrics);
+    let complete_widths =
+      table_column_widths(&complete_grid, 11, 453.6, false, 15, &mut text_metrics);
     assert!(complete_widths[..5].iter().sum::<f32>() < 214.45 - LAYOUT_EPSILON_PT);
     assert!((complete_widths.iter().sum::<f32>() - 367.4).abs() < LAYOUT_EPSILON_PT);
   }
@@ -45807,7 +46050,7 @@ mod tests {
         + table.rows[0].cells[0].margins.right_pt,
     );
 
-    let widths = table_column_widths(&table, 1, content_width, false, &mut text_metrics);
+    let widths = table_column_widths(&table, 1, content_width, false, 15, &mut text_metrics);
 
     assert!((widths[0] - expected_minimum).abs() < LAYOUT_EPSILON_PT);
     assert!(widths[0] > content_width * 0.09);

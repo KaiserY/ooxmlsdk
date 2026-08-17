@@ -1047,7 +1047,7 @@ impl MathParser<'_> {
       }
       Some(m::ControlPropertiesChoice::DrawingRunProperties(properties)) => {
         let mut style = self.base_style.clone();
-        super::apply_chart_run_properties(&mut style, properties, self.styles);
+        super::apply_drawingml_run_properties(&mut style, properties, self.styles);
         style
       }
       _ => self.base_style.clone(),

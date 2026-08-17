@@ -347,16 +347,10 @@ fn merge_run_style_with_policy(
       .as_deref()
       .is_some_and(|value| value.eq_ignore_ascii_case("auto"))
     {
-      if matches!(&properties, RunProps::Numbering(_)) {
-        style.color = super::RgbColor {
-          r: 255,
-          g: 255,
-          b: 255,
-        };
-        style.color_is_automatic = false;
-      } else {
-        style.color_is_automatic = true;
-      }
+      // ECMA-376 Part 1 §17.3.2.6 leaves `auto` for the consumer to
+      // resolve. This is equally true for w:lvl/w:rPr: LibreOffice's
+      // 0xffffffff layout-dump value is COL_AUTO, not an authored white.
+      style.color_is_automatic = true;
     }
   }
   if policy.shading

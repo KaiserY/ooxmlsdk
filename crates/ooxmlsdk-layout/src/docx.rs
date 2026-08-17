@@ -2890,7 +2890,7 @@ fn replace_sdt_block_text(
   replace(
     blocks,
     &mut Some(value),
-    sdt_replacement_run_properties(properties),
+    sdt_placeholder_replacement_run_properties(properties),
     styles,
   );
 }
@@ -4837,20 +4837,26 @@ fn table_row_model(
   // ECMA-376 Part 1 §17.4.60 makes tblPrEx properties replace tblPr for the
   // current row. In particular, the effective tblLook controls which
   // conditional table-style regions apply to both its row and its cells.
-  // w:cnfStyle only records the conditional formatting already applied by a
-  // producer; it is an optimization, not a second selector. A real tblHeader,
-  // however, forces the firstRow condition for every header row even when the
-  // table look disables the geometrical first row. This is Word behavior
-  // covered by LibreOffice's tdf138020 import test and table mapper.
+  // ECMA-376 Part 1 §17.4.8 records explicitly calculated conditional
+  // regions in cnfStyle. Open-Xml-PowerTools' FormattingAssembler consumes
+  // those row bits when rolling tblStylePr into rows and their cells, and the
+  // LibreOffice calendar2-5 fixtures require firstRow on two authored header
+  // rows. The effective tblLook must still enable that region: the paired
+  // tdf167843 fixture has a stale firstRow cnf bit but an explicit
+  // tblLook/firstRow=0, and Office does not apply the style. This remains
+  // separate from §17.4.49 tblHeader, which only requests repetition on
+  // subsequent pages: Office fixed output for
+  // tdf138020_all_rows_tblHeader does not select firstRow merely because every
+  // row carries tblHeader.
   let row_table_look = table_row_look(row, context.table_look);
   let direct_row_style = direct_table_row_style(row.table_row_properties.as_deref());
-  let is_header_row = direct_row_style.repeat_header == Some(true);
+  let explicit_first_row = table_row_explicit_first_row(row.table_row_properties.as_deref());
   let mut row_style = table_row_style_for(
     context.table_style,
     row_table_look,
     row_index,
     context.row_count,
-    is_header_row,
+    explicit_first_row,
   );
   merge_table_row_style(&mut row_style, &direct_row_style);
   let row_spacing_shading = row
@@ -4883,7 +4889,7 @@ fn table_row_model(
               row_count: context.row_count,
               cell_index: cells.len(),
               cell_count,
-              is_header_row,
+              explicit_first_row,
             },
           ),
         );
@@ -4933,6 +4939,30 @@ fn table_row_look(row: &w::TableRow, table_look: TableLookModel) -> TableLookMod
     .and_then(|properties| properties.table_look.as_ref())
     .map(table_look_model)
     .unwrap_or(table_look)
+}
+
+fn table_row_explicit_first_row(properties: Option<&w::TableRowProperties>) -> bool {
+  properties
+    .and_then(|properties| {
+      properties
+        .table_row_properties_choice1
+        .iter()
+        .find_map(|choice| match choice {
+          w::TableRowPropertiesChoice::ConditionalFormatStyle(style) => Some(style.as_ref()),
+          _ => None,
+        })
+    })
+    .is_some_and(|style| {
+      style.first_row.as_ref().map_or_else(
+        || {
+          style
+            .val
+            .as_deref()
+            .is_some_and(|value| value.as_bytes().first().is_some_and(|bit| *bit == b'1'))
+        },
+        |value| value.as_bool(),
+      )
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -5087,7 +5117,7 @@ fn table_row_style_for(
   look: TableLookModel,
   row_index: usize,
   row_count: usize,
-  is_header_row: bool,
+  explicit_first_row: bool,
 ) -> TableRowStyle {
   let mut style = table_style.whole_row;
   for (condition, conditional_style) in &table_style.conditional_rows {
@@ -5097,7 +5127,7 @@ fn table_row_style_for(
       row_index,
       row_count,
       table_style.row_band_size.unwrap_or(0),
-      is_header_row,
+      explicit_first_row,
     ) {
       merge_table_row_style(&mut style, conditional_style);
     }
@@ -5112,29 +5142,51 @@ struct TableCellStyleContext {
   row_count: usize,
   cell_index: usize,
   cell_count: usize,
-  is_header_row: bool,
+  explicit_first_row: bool,
 }
 
 fn table_cell_style_for(
   table_style: &TableStyleModel,
   context: TableCellStyleContext,
 ) -> TableCellStyle {
+  let mut effective_look = context.look;
+  if effective_look.first_column
+    && !table_style
+      .conditional
+      .iter()
+      .any(|(condition, _)| matches!(condition, w::TableStyleOverrideValues::FirstColumn))
+  {
+    // A tblLook flag does not reserve a conditional region when the selected
+    // style has no definition for it. LibreOffice's source-backed
+    // tdf138020_undefined_firstCol QA and Word's immutable fixed output agree:
+    // with firstColumn=1 but no firstCol tblStylePr, A1 remains in odd vertical
+    // banding instead of becoming an unformatted hole. Keep the check on the
+    // fully inherited style model so a base-style definition still counts.
+    effective_look.first_column = false;
+  }
   let mut style = table_style.whole_table.clone();
   for (condition, conditional_style) in &table_style.conditional {
     if table::cell_style_condition_applies(
       *condition,
       table::CellStyleConditionContext {
-        look: context.look,
+        look: effective_look,
         row_index: context.row_index,
         row_count: context.row_count,
         cell_index: context.cell_index,
         cell_count: context.cell_count,
         row_band_size: table_style.row_band_size.unwrap_or(0),
         column_band_size: table_style.column_band_size.unwrap_or(0),
-        is_header_row: context.is_header_row,
+        explicit_first_row: context.explicit_first_row,
       },
     ) {
       let mut conditional_style = conditional_style.clone();
+      conditional_style.borders = conditional_cell_borders_for_region(
+        conditional_style.borders,
+        conditional_style.inside_horizontal_border,
+        conditional_style.inside_vertical_border,
+        *condition,
+        context,
+      );
       if let Some(table_borders) = conditional_style.conditional_table_borders.take() {
         let mut borders = conditional_table_borders_for_cell(table_borders, context);
         // Within one tblStylePr, tcPr follows tblPr and therefore wins per
@@ -5346,11 +5398,13 @@ fn table_cell_model(
   {
     // ECMA-376 Part 1 §17.3.2.6 leaves `auto` text color dependent on
     // its display background. Word resolves automatic text in a solid dark
-    // table cell to white; explicit colors and paragraph/run backgrounds stay
-    // authoritative (tdf#64264).
+    // table cell to white; explicit run colors and character backgrounds stay
+    // authoritative. Paragraph shading does not hide text from the cell's
+    // resolved display background (para-border-in-cell-clip.docx).
     apply_automatic_text_color_to_blocks(
       &mut blocks,
       automatic_text_color_for_background(background),
+      false,
     );
   }
   TableCell {
@@ -6055,6 +6109,52 @@ fn conditional_table_borders_for_cell(
     }
   }
   cell
+}
+
+fn conditional_cell_borders_for_region(
+  mut borders: CellBordersModel,
+  inside_horizontal: Option<BorderStyle>,
+  inside_vertical: Option<BorderStyle>,
+  condition: w::TableStyleOverrideValues,
+  context: TableCellStyleContext,
+) -> CellBordersModel {
+  // ECMA-376 Part 1 §17.4.23 defines tcBorders/insideH over the current
+  // *group* of cells and uses a first-column conditional region as its exact
+  // example. Microsoft’s tblStylePr documentation likewise applies tcPr to
+  // the region selected by w:type. Consequently the outer top/bottom of a
+  // first/last-column region occur only in the table's first/last row; its
+  // intermediate edges are insideH. The transposed rule applies to a
+  // first/last-row region. conditionalstyles-tbllook.docx is the immutable
+  // Office control: flattening firstCol/bottom onto every member cell creates
+  // a 2.25pt rule and the same cumulative row drift at every internal edge.
+  match condition {
+    w::TableStyleOverrideValues::FirstColumn | w::TableStyleOverrideValues::LastColumn => {
+      borders.top = if context.row_index == 0 {
+        borders.top
+      } else {
+        inside_horizontal
+      };
+      borders.bottom = if context.row_index + 1 == context.row_count {
+        borders.bottom
+      } else {
+        inside_horizontal
+      };
+    }
+    w::TableStyleOverrideValues::FirstRow | w::TableStyleOverrideValues::LastRow => {
+      borders.left = if context.cell_index == 0 {
+        borders.left
+      } else {
+        inside_vertical
+      };
+      borders.right = if context.cell_index + 1 == context.cell_count {
+        borders.right
+      } else {
+        inside_vertical
+      };
+    }
+    _ => {}
+  }
+  borders
 }
 
 fn merge_cell_borders(target: &mut CellBordersModel, source: &CellBordersModel) {
@@ -10339,11 +10439,24 @@ fn push_sdt_run(
   if let Some((properties, value)) = sdt.sdt_properties.as_ref().and_then(|properties| {
     sdt_bound_replacement(context.custom_xml_bindings, properties).map(|value| (properties, value))
   }) {
-    let style = if let Some(run_properties) = sdt_replacement_run_properties(Some(properties)) {
-      properties::run_style(Some(run_properties), base_style, context.styles)
-    } else {
-      base_style
-    };
+    let style =
+      if let Some(run_properties) = sdt_placeholder_replacement_run_properties(Some(properties)) {
+        properties::run_style(Some(run_properties), base_style, context.styles)
+      } else if !showing_placeholder && sdt_is_plain_text_control(properties) {
+        // ECMA-376 Part 1 §17.5.2.27 scopes sdtPr/rPr to replacement of
+        // placeholder text. For an already-materialized plain-text cache,
+        // update its text while retaining the cached run's formatting. Word's
+        // immutable ShapeOverlappingWithSdt output keeps the cached accent
+        // color, and Writer's sdt-data-binding-char-style test pins the same
+        // non-placeholder character-style behavior.
+        sdt_cached_run_style(content, base_style.clone(), context.styles).unwrap_or(base_style)
+      } else {
+        // A showing placeholder is only a temporary cache and must not leak its
+        // PlaceholderText style into the bound value. Date controls likewise
+        // synthesize formatted text from the binding rather than preserving the
+        // stale cached run (Writer's paired data-binding color/date tests).
+        base_style
+      };
     inlines.push(InlineItem::Text(TextRun {
       text: run_display_text(value, style.clone()),
       style,
@@ -10490,10 +10603,37 @@ fn push_sdt_run(
   }
 }
 
-fn sdt_replacement_run_properties(
+fn sdt_cached_run_style(
+  content: &w::SdtContentRun,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+) -> Option<TextStyle> {
+  content
+    .sdt_content_run_choice
+    .iter()
+    .find_map(|choice| match choice {
+      w::SdtContentRunChoice::WRun(run) => Some(properties::run_style(
+        run.run_properties.as_deref(),
+        base_style.clone(),
+        styles,
+      )),
+      _ => None,
+    })
+}
+
+fn sdt_placeholder_replacement_run_properties(
   properties: Option<&w::SdtProperties>,
 ) -> Option<&w::RunProperties> {
-  properties?.sdt_properties_choice.iter().find_map(|choice| {
+  let properties = properties?;
+  // ECMA-376 Part 1 §17.5.2.27 limits sdtPr/rPr to text initially
+  // entered in replacement of placeholder text. It is not a formatting
+  // cascade over already-materialized, non-placeholder sdtContent. Office's
+  // fdo78469 fixed output preserves that cached run formatting while updating
+  // the mapped value; showingPlcHdr is the standard's opposite state.
+  if !sdt_showing_placeholder(properties) {
+    return None;
+  }
+  properties.sdt_properties_choice.iter().find_map(|choice| {
     let w::SdtPropertiesChoice::RunProperties(properties) = choice else {
       return None;
     };
@@ -10547,6 +10687,13 @@ fn sdt_supports_bound_text(properties: &w::SdtProperties) -> bool {
       w::SdtPropertiesChoice::SdtContentText(_) | w::SdtPropertiesChoice::SdtContentDate(_)
     )
   })
+}
+
+fn sdt_is_plain_text_control(properties: &w::SdtProperties) -> bool {
+  properties
+    .sdt_properties_choice
+    .iter()
+    .any(|choice| matches!(choice, w::SdtPropertiesChoice::SdtContentText(_)))
 }
 
 fn sdt_bound_replacement(
@@ -12086,7 +12233,11 @@ fn first_text_color_in_block(block: &Block) -> Option<RgbColor> {
   }
 }
 
-fn apply_automatic_text_color_to_blocks(blocks: &mut [Block], color: RgbColor) {
+fn apply_automatic_text_color_to_blocks(
+  blocks: &mut [Block],
+  color: RgbColor,
+  paragraph_shading_suppresses_host_color: bool,
+) {
   for block in blocks {
     match block {
       Block::Paragraph(paragraph) => {
@@ -12095,41 +12246,60 @@ fn apply_automatic_text_color_to_blocks(blocks: &mut [Block], color: RgbColor) {
         // complete paragraph. Otherwise the shape color is applied only to
         // automatic runs without a character background; explicit run colors
         // remain authoritative.
-        if paragraph
-          .format
-          .shading
-          .is_some_and(ShadingPaint::is_visible)
+        if paragraph_shading_suppresses_host_color
+          && paragraph
+            .format
+            .shading
+            .is_some_and(ShadingPaint::is_visible)
         {
           continue;
         }
-        apply_automatic_text_color_to_style(&mut paragraph.base_style, color);
-        apply_automatic_text_color_to_style(&mut paragraph.list_label_style, color);
-        for inline in &mut paragraph.inlines {
-          match inline {
-            InlineItem::Text(run) => {
-              apply_automatic_text_color_to_style(&mut run.style, color);
-            }
-            InlineItem::PositionalTab(tab) => {
-              apply_automatic_text_color_to_style(&mut tab.style, color);
-            }
-            InlineItem::Ruby(ruby) => {
-              for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
-                apply_automatic_text_color_to_style(&mut run.style, color);
-              }
-            }
-            InlineItem::LegacyFormCheckBox(check_box) => {
-              apply_automatic_text_color_to_style(&mut check_box.style, color);
-            }
-            _ => {}
-          }
-        }
+        apply_automatic_text_color_to_paragraph_parts(
+          &mut paragraph.base_style,
+          &mut paragraph.list_label_style,
+          &mut paragraph.inlines,
+          color,
+        );
       }
       Block::Table(table) => {
         for cell in table.rows.iter_mut().flat_map(|row| &mut row.cells) {
-          apply_automatic_text_color_to_blocks(&mut cell.blocks, color);
+          apply_automatic_text_color_to_blocks(
+            &mut cell.blocks,
+            color,
+            paragraph_shading_suppresses_host_color,
+          );
         }
       }
-      Block::Frame(frame) => apply_automatic_text_color_to_blocks(&mut frame.blocks, color),
+      Block::Frame(frame) => apply_automatic_text_color_to_blocks(
+        &mut frame.blocks,
+        color,
+        paragraph_shading_suppresses_host_color,
+      ),
+    }
+  }
+}
+
+fn apply_automatic_text_color_to_paragraph_parts(
+  base_style: &mut TextStyle,
+  list_label_style: &mut TextStyle,
+  inlines: &mut [InlineItem],
+  color: RgbColor,
+) {
+  apply_automatic_text_color_to_style(base_style, color);
+  apply_automatic_text_color_to_style(list_label_style, color);
+  for inline in inlines {
+    match inline {
+      InlineItem::Text(run) => apply_automatic_text_color_to_style(&mut run.style, color),
+      InlineItem::PositionalTab(tab) => apply_automatic_text_color_to_style(&mut tab.style, color),
+      InlineItem::Ruby(ruby) => {
+        for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
+          apply_automatic_text_color_to_style(&mut run.style, color);
+        }
+      }
+      InlineItem::LegacyFormCheckBox(check_box) => {
+        apply_automatic_text_color_to_style(&mut check_box.style, color)
+      }
+      _ => {}
     }
   }
 }
@@ -12294,7 +12464,7 @@ fn text_box_frame_from_wordprocessing_shape(
   prepare_wordprocessing_shape_story(&mut blocks, styles);
   let mut frame = TextBoxFrameContent::new(blocks);
   if let Some(color) = shape_text_color {
-    apply_automatic_text_color_to_blocks(&mut frame.blocks, color);
+    apply_automatic_text_color_to_blocks(&mut frame.blocks, color, true);
   }
   if let Some(properties) = shape.text_body_properties.as_deref() {
     apply_wordprocessing_shape_textbox_body_properties(properties, &mut frame);
@@ -14442,15 +14612,68 @@ fn drawingml_diagram_shape_text_box(
   smartart_text_color: Option<RgbColor>,
 ) -> Option<TextBoxFrameContent> {
   let text_body = shape.text_body.as_ref()?;
-  let texts = drawingml_text_body_texts(&text_body.paragraph);
-  if texts.is_empty() {
+  let color = smartart_text_color.unwrap_or_else(|| TextStyle::default().color);
+  let blocks = text_body
+    .paragraph
+    .iter()
+    .filter_map(|paragraph| {
+      let text = drawingml_paragraph_text(paragraph)?;
+      let mut style = text_style_with_color(styles, color);
+      if let Some(properties) = paragraph
+        .paragraph_properties
+        .as_deref()
+        .and_then(|properties| properties.default_run_properties.as_deref())
+      {
+        apply_drawingml_default_run_properties(&mut style, properties, styles);
+      }
+      // [MS-OI29500] §20.1.2.2.37(c): text-body children override the
+      // corresponding a:fontRef style properties. Persisted SmartArt shapes
+      // commonly carry an explicit a:rPr color and size even when their
+      // fallback fontRef selects the opposite theme color.
+      if let Some(properties) = paragraph
+        .paragraph_choice
+        .iter()
+        .find_map(|choice| match choice {
+          a::ParagraphChoice::Run(run) if !run.text.as_str().is_empty() => {
+            run.run_properties.as_deref()
+          }
+          a::ParagraphChoice::Field(field)
+            if field
+              .text
+              .as_ref()
+              .is_some_and(|text| !text.as_str().is_empty()) =>
+          {
+            field.run_properties.as_deref()
+          }
+          _ => None,
+        })
+      {
+        apply_drawingml_run_properties(&mut style, properties, styles);
+      }
+      let alignment = paragraph
+        .paragraph_properties
+        .as_deref()
+        .and_then(|properties| properties.alignment);
+      let mut block = simple_text_block(text, style);
+      if let Block::Paragraph(paragraph) = &mut block
+        && let Some(alignment) = alignment
+      {
+        paragraph.format.alignment = match alignment {
+          a::TextAlignmentTypeValues::Left => ParagraphAlignment::Left,
+          a::TextAlignmentTypeValues::Center => ParagraphAlignment::Center,
+          a::TextAlignmentTypeValues::Right => ParagraphAlignment::Right,
+          a::TextAlignmentTypeValues::Justified
+          | a::TextAlignmentTypeValues::JustifiedLow
+          | a::TextAlignmentTypeValues::Distributed
+          | a::TextAlignmentTypeValues::ThaiDistributed => ParagraphAlignment::Justify,
+        };
+      }
+      Some(block)
+    })
+    .collect::<Vec<_>>();
+  if blocks.is_empty() {
     return None;
   }
-  let color = smartart_text_color.unwrap_or_else(|| TextStyle::default().color);
-  let blocks = texts
-    .into_iter()
-    .map(|text| simple_text_block(text, text_style_with_color(styles, color)))
-    .collect();
   let mut frame = TextBoxFrameContent::new(blocks);
   apply_drawingml_textbox_body_properties_model(
     drawingml_body_properties_from_model(&text_body.body_properties),
@@ -15807,7 +16030,7 @@ fn apply_chart_text_properties(
   else {
     return;
   };
-  apply_chart_default_run_properties(style, properties, styles);
+  apply_drawingml_default_run_properties(style, properties, styles);
 }
 
 fn apply_chart_rich_title_properties(
@@ -15830,7 +16053,7 @@ fn apply_chart_rich_title_properties(
     .as_deref()
     .and_then(|properties| properties.default_run_properties.as_deref())
   {
-    apply_chart_default_run_properties(style, properties, styles);
+    apply_drawingml_default_run_properties(style, properties, styles);
   }
   if let Some(properties) = paragraph
     .paragraph_choice
@@ -15843,7 +16066,7 @@ fn apply_chart_rich_title_properties(
       | a::ParagraphChoice::AlternateContent(_) => None,
     })
   {
-    apply_chart_run_properties(style, properties, styles);
+    apply_drawingml_run_properties(style, properties, styles);
   }
 }
 
@@ -15888,10 +16111,10 @@ fn chart_data_label_host_styles(
         .map(|run| {
           let mut style = label_style.clone();
           if let Some(properties) = run.paragraph_default_run_properties {
-            apply_chart_default_run_properties(&mut style, properties, styles);
+            apply_drawingml_default_run_properties(&mut style, properties, styles);
           }
           if let Some(properties) = run.run_properties {
-            apply_chart_run_properties(&mut style, properties, styles);
+            apply_drawingml_run_properties(&mut style, properties, styles);
           }
           style
         })
@@ -15901,7 +16124,7 @@ fn chart_data_label_host_styles(
   (label_styles, rich_text_styles)
 }
 
-fn apply_chart_default_run_properties(
+fn apply_drawingml_default_run_properties(
   style: &mut TextStyle,
   properties: &a::DefaultRunProperties,
   styles: &StylesCatalog,
@@ -15940,10 +16163,11 @@ fn apply_chart_default_run_properties(
   {
     style.color = color.color;
     style.opacity = color.opacity;
+    style.color_is_automatic = false;
   }
 }
 
-fn apply_chart_run_properties(
+fn apply_drawingml_run_properties(
   style: &mut TextStyle,
   properties: &a::RunProperties,
   styles: &StylesCatalog,
@@ -15981,6 +16205,7 @@ fn apply_chart_run_properties(
   {
     style.color = color.color;
     style.opacity = color.opacity;
+    style.color_is_automatic = false;
   }
 }
 
@@ -16819,13 +17044,6 @@ fn drawing_is_hidden(drawing: &w::Drawing) -> bool {
     }
     None => false,
   }
-}
-
-fn drawingml_text_body_texts(paragraphs: &[a::Paragraph]) -> Vec<String> {
-  paragraphs
-    .iter()
-    .filter_map(drawingml_paragraph_text)
-    .collect()
 }
 
 fn drawingml_paragraph_text(paragraph: &a::Paragraph) -> Option<String> {
@@ -18769,6 +18987,14 @@ fn vml_shape_shape_with_style(
     // shape. Carry the resolved shape brush to the warped glyph path instead
     // of leaving it on the outer geometry, which is not painted for WordArt.
     // This deliberately carries Fill::None too, preserving `filled="f"`.
+    // VML style rotation is positive clockwise (Microsoft's VML positioning
+    // contract), while `vml_rotation_degrees` stores the inverse angle used by
+    // the raster-image path and LibreOffice's counter-clockwise drawing API.
+    // Shape text is transformed in the layout model's y-down coordinate space,
+    // where a positive angle is already clockwise. Restore the authored VML
+    // angle at this boundary; fdo78659's rotation:315 watermark is the exact
+    // Office-output example (it rises left-to-right, rather than falling).
+    inline.rotation_deg = -inline.rotation_deg;
     inline.text_fill = inline.fill_override.clone();
     inline.text_warp = Some(Box::new(a::PresetTextWarp {
       preset,
@@ -23752,6 +23978,7 @@ fn recover_office_builtin_heading_style(
 
 #[derive(Clone, Copy, Debug, Default)]
 struct RunStyleOverrides {
+  color_is_automatic: Option<bool>,
   font_size_pt: Option<f32>,
   complex_font_size_pt: Option<f32>,
   vertical_alignment: Option<w::VerticalPositionValues>,
@@ -23834,6 +24061,10 @@ struct TableCellStyle {
   /// the matching cell, not promoted to the table's unconditional borders.
   conditional_table_borders: Option<TableBordersModel>,
   borders: CellBordersModel,
+  /// Interior edges of a tcBorders nested in tblStylePr/tcPr belong to the
+  /// selected conditional region, rather than to one member cell.
+  inside_horizontal_border: Option<BorderStyle>,
+  inside_vertical_border: Option<BorderStyle>,
   margins: CellMarginStyle,
   vertical_alignment: Option<TableCellVerticalAlignment>,
   no_wrap: Option<bool>,
@@ -25822,16 +26053,19 @@ fn conditional_table_cell_style(
   properties: &w::TableStyleConditionalFormattingTableCellProperties,
   theme_colors: &ThemeColors,
 ) -> TableCellStyle {
+  let borders = properties.table_cell_borders.as_deref();
   TableCellStyle {
     shading: properties
       .shading
       .as_ref()
       .map(|shading| shading_fill(shading, theme_colors)),
-    borders: properties
-      .table_cell_borders
-      .as_deref()
-      .map(cell_borders_model)
-      .unwrap_or_default(),
+    borders: borders.map(cell_borders_model).unwrap_or_default(),
+    inside_horizontal_border: borders
+      .and_then(|borders| borders.inside_horizontal_border.as_ref())
+      .and_then(inside_horizontal_border_style),
+    inside_vertical_border: borders
+      .and_then(|borders| borders.inside_vertical_border.as_ref())
+      .and_then(inside_vertical_border_style),
     margins: properties
       .table_cell_margin
       .as_deref()
@@ -26051,6 +26285,12 @@ fn merge_table_cell_style(target: &mut TableCellStyle, source: &TableCellStyle) 
     target.conditional_table_borders = source.conditional_table_borders;
   }
   merge_cell_borders(&mut target.borders, &source.borders);
+  if source.inside_horizontal_border.is_some() {
+    target.inside_horizontal_border = source.inside_horizontal_border;
+  }
+  if source.inside_vertical_border.is_some() {
+    target.inside_vertical_border = source.inside_vertical_border;
+  }
   merge_cell_margin_style(&mut target.margins, &source.margins);
   if source.vertical_alignment.is_some() {
     target.vertical_alignment = source.vertical_alignment;
@@ -26067,6 +26307,9 @@ fn merge_run_style_overrides(
   mut target: RunStyleOverrides,
   source: RunStyleOverrides,
 ) -> RunStyleOverrides {
+  if source.color_is_automatic.is_some() {
+    target.color_is_automatic = source.color_is_automatic;
+  }
   if source.bold.is_some() {
     target.bold = source.bold;
   }
@@ -26190,6 +26433,12 @@ fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
   };
 
   RunStyleOverrides {
+    color_is_automatic: properties.color().map(|color| {
+      color
+        .val
+        .as_deref()
+        .is_some_and(|value| value.eq_ignore_ascii_case("auto"))
+    }),
     font_size_pt: properties
       .font_size()
       .map(|value| (value.val.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT)),
@@ -26260,6 +26509,14 @@ fn normalize_relative_run_style(style: &mut TextStyle, overrides: RunStyleOverri
 }
 
 fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides) {
+  if let Some(color_is_automatic) = overrides.color_is_automatic {
+    style.color_is_automatic = color_is_automatic;
+    if color_is_automatic {
+      // An explicit `auto` is itself a cascade value. Reset any lower-priority
+      // concrete color before the display background is known.
+      style.color = RgbColor { r: 0, g: 0, b: 0 };
+    }
+  }
   if let Some(font_size_pt) = overrides.font_size_pt {
     properties::set_font_size_preserving_automatic_escapement(style, font_size_pt);
   }
@@ -31665,6 +31922,26 @@ mod tests {
   }
 
   #[test]
+  fn vml_textpath_uses_the_authored_clockwise_rotation() {
+    let shape = v::Shape::from_bytes(
+      br##"<v:shape xmlns:v="urn:schemas-microsoft-com:vml"
+          style="width:397.65pt;height:238.6pt;rotation:315"
+          type="#_x0000_t136" fillcolor="silver" stroked="f">
+        <v:textpath string="DRAFT"/>
+      </v:shape>"##,
+    )
+    .expect("VML watermark shape");
+    let shape =
+      vml_shape_shape(&shape, &ImageCatalog::default(), &[]).expect("VML watermark WordArt");
+
+    assert_eq!(shape.rotation_deg, 315.0);
+    assert_eq!(
+      vml_image_style(Some("width:397.65pt;height:238.6pt;rotation:315")).rotation_deg,
+      -315.0
+    );
+  }
+
+  #[test]
   fn disabled_vml_document_pattern_falls_back_to_the_word_background_color() {
     for disabled in ["fill=\"f\"", ""] {
       let fill_on = if disabled.is_empty() { "on=\"f\"" } else { "" };
@@ -33291,43 +33568,145 @@ mod tests {
   }
 
   #[test]
-  fn cell_level_content_control_refreshes_its_cached_text_from_data_binding() {
+  fn cell_level_data_binding_uses_sdt_insertion_format_only_for_placeholder_cache() {
     const CORE_PROPERTIES_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
-    let table = w::Table::from_bytes(
-      format!(
-        r#"<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tblGrid><w:gridCol w:w="4000"/></w:tblGrid><w:tr><w:sdt><w:sdtPr><w:dataBinding w:xpath="/cp:coreProperties[1]/dc:title[1]" w:storeItemID="{CORE_PROPERTIES_ID}"/><w:text/></w:sdtPr><w:sdtContent><w:tc><w:p><w:r><w:t>cached title</w:t></w:r></w:p></w:tc></w:sdtContent></w:sdt></w:tr></w:tbl>"#
-      )
-      .as_bytes(),
-    )
-    .expect("table with a data-bound cell content control");
     let bindings = CustomXmlBindings::from_test_xml(
       Some(CORE_PROPERTIES_ID),
       r#"<cp:coreProperties xmlns:cp="urn:core" xmlns:dc="urn:dc"><dc:title>Bound title</dc:title></cp:coreProperties>"#,
     );
-    let mut numbering = NumberingCatalog::default();
+    for (placeholder, expected_color) in [
+      ("", RgbColor { r: 0, g: 0, b: 0 }),
+      (
+        "<w:showingPlcHdr/>",
+        RgbColor {
+          r: 255,
+          g: 255,
+          b: 255,
+        },
+      ),
+    ] {
+      let table = w::Table::from_bytes(
+        format!(
+          r#"<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tblGrid><w:gridCol w:w="4000"/></w:tblGrid><w:tr><w:sdt><w:sdtPr><w:rPr><w:color w:val="FFFFFF"/></w:rPr>{placeholder}<w:dataBinding w:xpath="/cp:coreProperties[1]/dc:title[1]" w:storeItemID="{CORE_PROPERTIES_ID}"/><w:text/></w:sdtPr><w:sdtContent><w:tc><w:p><w:r><w:t>cached title</w:t></w:r></w:p></w:tc></w:sdtContent></w:sdt></w:tr></w:tbl>"#
+        )
+        .as_bytes(),
+      )
+      .expect("table with a data-bound cell content control");
+      let mut numbering = NumberingCatalog::default();
+      let mut form_widget_ids = FormWidgetIdAllocator::default();
+      let mut complex_fields = ComplexFieldImportState::default();
+      let model = table_model(
+        &table,
+        &mut TableModelEnv {
+          styles: &StylesCatalog::default(),
+          numbering: &mut numbering,
+          images: &ImageCatalog::default(),
+          hyperlinks: &HyperlinkCatalog::default(),
+          custom_xml_bindings: &bindings,
+          form_widget_ids: &mut form_widget_ids,
+          complex_fields: &mut complex_fields,
+        },
+        TableModelContext {
+          nested_table_level: 1,
+          in_header_footer: false,
+        },
+      );
+
+      let [Block::Paragraph(paragraph)] = model.rows[0].cells[0].blocks.as_slice() else {
+        panic!("expected the controlled table cell paragraph");
+      };
+      assert_eq!(inline_text(&paragraph.inlines), "Bound title");
+      let [InlineItem::Text(run)] = paragraph.inlines.as_slice() else {
+        panic!("expected the controlled table cell text run");
+      };
+      assert_eq!(run.style.color, expected_color, "{placeholder}");
+    }
+  }
+
+  #[test]
+  fn inline_data_binding_keeps_non_placeholder_cached_run_formatting() {
+    const CORE_PROPERTIES_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
+    let paragraph = w::Paragraph::from_bytes(
+      format!(
+        r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sdt><w:sdtPr><w:rPr><w:color w:val="FFFFFF"/></w:rPr><w:dataBinding w:xpath="/cp:coreProperties[1]/dc:title[1]" w:storeItemID="{CORE_PROPERTIES_ID}"/><w:text/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:color w:val="365F91"/></w:rPr><w:t>cached title</w:t></w:r></w:sdtContent></w:sdt></w:p>"#
+      )
+      .as_bytes(),
+    )
+    .expect("inline data-bound content control");
+    let bindings = CustomXmlBindings::from_test_xml(
+      Some(CORE_PROPERTIES_ID),
+      r#"<cp:coreProperties xmlns:cp="urn:core" xmlns:dc="urn:dc"><dc:title>Bound title</dc:title></cp:coreProperties>"#,
+    );
     let mut form_widget_ids = FormWidgetIdAllocator::default();
-    let mut complex_fields = ComplexFieldImportState::default();
-    let model = table_model(
-      &table,
-      &mut TableModelEnv {
-        styles: &StylesCatalog::default(),
-        numbering: &mut numbering,
-        images: &ImageCatalog::default(),
-        hyperlinks: &HyperlinkCatalog::default(),
-        custom_xml_bindings: &bindings,
-        form_widget_ids: &mut form_widget_ids,
-        complex_fields: &mut complex_fields,
-      },
-      TableModelContext {
-        nested_table_level: 1,
-        in_header_footer: false,
-      },
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &bindings,
+      &mut form_widget_ids,
     );
 
-    let [Block::Paragraph(paragraph)] = model.rows[0].cells[0].blocks.as_slice() else {
-      panic!("expected the controlled table cell paragraph");
-    };
-    assert_eq!(inline_text(&paragraph.inlines), "Bound title");
+    assert_eq!(inline_text(&inlines), "Bound title");
+    let run = inlines
+      .iter()
+      .find_map(|inline| match inline {
+        InlineItem::Text(run) => Some(run),
+        _ => None,
+      })
+      .expect("refreshed cached run");
+    assert_eq!(run.text, "Bound title");
+    assert_eq!(
+      run.style.color,
+      RgbColor {
+        r: 0x36,
+        g: 0x5f,
+        b: 0x91,
+      }
+    );
+  }
+
+  #[test]
+  fn inline_placeholder_and_date_bindings_discard_cached_run_formatting() {
+    const CORE_PROPERTIES_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
+    let bindings = CustomXmlBindings::from_test_xml(
+      Some(CORE_PROPERTIES_ID),
+      r#"<cp:coreProperties xmlns:cp="urn:core" xmlns:dc="urn:dc"><dc:title>2022-04-26T00:00:00</dc:title></cp:coreProperties>"#,
+    );
+
+    for control in [
+      "<w:showingPlcHdr/><w:text/>",
+      "<w:date><w:dateFormat w:val=\"M/d/yyyy\"/></w:date>",
+    ] {
+      let paragraph = w::Paragraph::from_bytes(
+        format!(
+          r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sdt><w:sdtPr><w:dataBinding w:xpath="/cp:coreProperties[1]/dc:title[1]" w:storeItemID="{CORE_PROPERTIES_ID}"/>{control}</w:sdtPr><w:sdtContent><w:r><w:rPr><w:b/><w:color w:val="FF0000"/></w:rPr><w:t>stale cache</w:t></w:r></w:sdtContent></w:sdt></w:p>"#
+        )
+        .as_bytes(),
+      )
+      .expect("placeholder or date data-bound content control");
+      let mut form_widget_ids = FormWidgetIdAllocator::default();
+      let inlines = paragraph_inlines(
+        &paragraph,
+        TextStyle::default(),
+        &StylesCatalog::default(),
+        &ImageCatalog::default(),
+        &HyperlinkCatalog::default(),
+        &bindings,
+        &mut form_widget_ids,
+      );
+      let run = inlines
+        .iter()
+        .find_map(|inline| match inline {
+          InlineItem::Text(run) => Some(run),
+          _ => None,
+        })
+        .expect("refreshed binding run");
+
+      assert_eq!(run.style.color, RgbColor { r: 0, g: 0, b: 0 }, "{control}");
+      assert!(!run.style.bold, "{control}");
+    }
   }
 
   #[test]
@@ -35412,6 +35791,43 @@ mod tests {
   }
 
   #[test]
+  fn diagram_text_body_run_properties_override_font_reference_fallback() {
+    let text_body = dsp::TextBody::from_bytes(
+      br#"<dsp:txBody xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:bodyPr/>
+        <a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="2100"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill></a:rPr><a:t>One</a:t></a:r></a:p>
+      </dsp:txBody>"#,
+    )
+    .expect("diagram text body");
+    let shape = dsp::Shape {
+      text_body: Some(Box::new(text_body)),
+      ..Default::default()
+    };
+    let frame = drawingml_diagram_shape_text_box(
+      &shape,
+      &StylesCatalog::default(),
+      Some(RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      }),
+    )
+    .expect("text box");
+    let [Block::Paragraph(paragraph)] = frame.blocks.as_slice() else {
+      panic!("expected one diagram paragraph");
+    };
+    let [InlineItem::Text(run)] = paragraph.inlines.as_slice() else {
+      panic!("expected one diagram run");
+    };
+
+    assert_eq!(run.text, "One");
+    assert_eq!(run.style.font_size_pt, 21.0);
+    assert_eq!(run.style.color, RgbColor { r: 0, g: 0, b: 0 });
+    assert!(!run.style.color_is_automatic);
+    assert_eq!(paragraph.format.alignment, ParagraphAlignment::Center);
+  }
+
+  #[test]
   fn automatic_shape_text_color_uses_the_higher_contrast_neutral() {
     assert_eq!(
       automatic_text_color_for_background(RgbColor {
@@ -35480,6 +35896,119 @@ mod tests {
     );
     assert_eq!(style.color, RgbColor { r: 0, g: 0, b: 0 });
     assert!(!style.color_is_automatic);
+  }
+
+  #[test]
+  fn table_cell_background_resolves_auto_text_through_paragraph_shading() {
+    let mut paragraph = merge_test_paragraph("A1");
+    paragraph.format.shading = Some(ShadingPaint::Solid(RgbColor {
+      r: 0xc0,
+      g: 0,
+      b: 0,
+    }));
+    let mut blocks = vec![Block::Paragraph(Box::new(paragraph))];
+
+    apply_automatic_text_color_to_blocks(
+      &mut blocks,
+      RgbColor {
+        r: 0xff,
+        g: 0xff,
+        b: 0xff,
+      },
+      false,
+    );
+
+    let Block::Paragraph(paragraph) = &blocks[0] else {
+      panic!("expected paragraph");
+    };
+    let InlineItem::Text(run) = &paragraph.inlines[0] else {
+      panic!("expected text run");
+    };
+    assert_eq!(
+      run.style.color,
+      RgbColor {
+        r: 0xff,
+        g: 0xff,
+        b: 0xff,
+      }
+    );
+    assert!(!run.style.color_is_automatic);
+  }
+
+  #[test]
+  fn framed_paragraph_shading_resolves_only_automatic_text_color() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:framePr w:w="851" w:h="1701" w:hRule="exact"/><w:shd w:val="clear" w:color="auto" w:fill="0C0C0C"/></w:pPr><w:r><w:t>automatic</w:t></w:r><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t> explicit</w:t></w:r></w:p>"#,
+    )
+    .expect("dark shaded paragraph with automatic and explicit text");
+    let model = paragraph_model(
+      &paragraph,
+      &StylesCatalog::default(),
+      &mut NumberingCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut FormWidgetIdAllocator::default(),
+    );
+
+    assert_eq!(
+      model.runs[0].style.color,
+      RgbColor {
+        r: 0xff,
+        g: 0xff,
+        b: 0xff,
+      }
+    );
+    assert!(!model.runs[0].style.color_is_automatic);
+    assert_eq!(model.runs[1].style.color, RgbColor { r: 0, g: 0, b: 0 });
+    assert!(!model.runs[1].style.color_is_automatic);
+  }
+
+  #[test]
+  fn body_paragraph_shading_does_not_pre_resolve_automatic_text_color() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:shd w:val="clear" w:color="auto" w:fill="8064A2"/></w:pPr><w:r><w:t>Hello</w:t></w:r></w:p>"#,
+    )
+    .expect("ordinary dark shaded body paragraph");
+    let model = paragraph_model(
+      &paragraph,
+      &StylesCatalog::default(),
+      &mut NumberingCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut FormWidgetIdAllocator::default(),
+    );
+
+    assert_eq!(model.runs[0].style.color, RgbColor { r: 0, g: 0, b: 0 });
+    assert!(model.runs[0].style.color_is_automatic);
+  }
+
+  #[test]
+  fn numbering_symbol_auto_color_remains_automatic() {
+    let properties = w::NumberingSymbolRunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:color w:val="auto"/></w:rPr>"#,
+    )
+    .expect("automatically colored numbering symbol");
+    let mut style = TextStyle {
+      color: RgbColor {
+        r: 0xff,
+        g: 0,
+        b: 0,
+      },
+      color_is_automatic: false,
+      ..Default::default()
+    };
+
+    properties::merge_run_style(
+      &mut style,
+      Some(RunProps::Numbering(&properties)),
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+    );
+
+    assert_eq!(style.color, RgbColor { r: 0, g: 0, b: 0 });
+    assert!(style.color_is_automatic);
   }
 
   #[test]
@@ -37004,7 +37533,7 @@ mod tests {
         row_count: 2,
         cell_index: 0,
         cell_count: 1,
-        is_header_row: false,
+        explicit_first_row: false,
       },
     );
     let body_row = table_cell_style_for(
@@ -37015,7 +37544,7 @@ mod tests {
         row_count: 2,
         cell_index: 0,
         cell_count: 1,
-        is_header_row: false,
+        explicit_first_row: false,
       },
     );
 
@@ -37051,6 +37580,64 @@ mod tests {
   }
 
   #[test]
+  fn table_style_last_row_auto_color_overrides_last_column_color() {
+    fn conditional_color(
+      condition: w::TableStyleOverrideValues,
+      value: &str,
+    ) -> w::TableStyleProperties {
+      w::TableStyleProperties {
+        r#type: condition,
+        run_properties_base_style: Some(Box::new(w::RunPropertiesBaseStyle {
+          color: Some(w::Color {
+            val: Some(value.into()),
+            ..Default::default()
+          }),
+          ..Default::default()
+        })),
+        ..Default::default()
+      }
+    }
+
+    let style = table_style_model(
+      &w::Style {
+        r#type: Some(w::StyleValues::Table),
+        table_style_properties: vec![
+          conditional_color(w::TableStyleOverrideValues::LastColumn, "FFFFFF"),
+          conditional_color(w::TableStyleOverrideValues::LastRow, "auto"),
+        ],
+        ..Default::default()
+      },
+      &ThemeFonts::default(),
+      &ThemeColors::default(),
+      &HashMap::new(),
+      ImportSettings::default(),
+    );
+    let cell_style = table_cell_style_for(
+      &style,
+      TableCellStyleContext {
+        look: TableLookModel {
+          last_row: true,
+          last_column: true,
+          ..Default::default()
+        },
+        row_index: 1,
+        row_count: 2,
+        cell_index: 1,
+        cell_count: 2,
+        explicit_first_row: false,
+      },
+    );
+    let resolved = StylesCatalog::default().run_style_with_base(
+      None,
+      cell_style.run_style,
+      cell_style.run_overrides,
+    );
+
+    assert_eq!(resolved.color, RgbColor { r: 0, g: 0, b: 0 });
+    assert!(resolved.color_is_automatic);
+  }
+
+  #[test]
   fn table_style_column_and_corner_conditions_apply_by_cell_position() {
     fn style(fill: &str) -> TableCellStyle {
       TableCellStyle {
@@ -37079,7 +37666,7 @@ mod tests {
         row_count: 2,
         cell_index: 2,
         cell_count: 3,
-        is_header_row: false,
+        explicit_first_row: false,
       },
     );
     let body_right = table_cell_style_for(
@@ -37090,7 +37677,7 @@ mod tests {
         row_count: 2,
         cell_index: 2,
         cell_count: 3,
-        is_header_row: false,
+        explicit_first_row: false,
       },
     );
 
@@ -37109,6 +37696,43 @@ mod tests {
         g: 0xFF,
         b: 0x00
       }))
+    );
+  }
+
+  #[test]
+  fn undefined_first_column_condition_does_not_displace_vertical_banding() {
+    let green = ShadingPaint::Solid(RgbColor {
+      r: 0xD9,
+      g: 0xF2,
+      b: 0xD0,
+    });
+    let table_style = TableStyleModel {
+      column_band_size: Some(1),
+      conditional: vec![(
+        w::TableStyleOverrideValues::Band1Vertical,
+        TableCellStyle {
+          shading: Some(green),
+          ..Default::default()
+        },
+      )],
+      ..Default::default()
+    };
+    let context = TableCellStyleContext {
+      look: TableLookModel {
+        first_column: true,
+        vertical_banding: true,
+        ..Default::default()
+      },
+      row_index: 0,
+      row_count: 3,
+      cell_index: 0,
+      cell_count: 4,
+      explicit_first_row: false,
+    };
+
+    assert_eq!(
+      table_cell_style_for(&table_style, context).shading,
+      Some(green)
     );
   }
 
@@ -37158,7 +37782,7 @@ mod tests {
           cell_count: 5,
           row_band_size: 1,
           column_band_size: 2,
-          is_header_row: false,
+          explicit_first_row: false,
         },
       ));
     }
@@ -37173,10 +37797,79 @@ mod tests {
           cell_count: 5,
           row_band_size: 1,
           column_band_size: 2,
-          is_header_row: false,
+          explicit_first_row: false,
         },
       ));
     }
+  }
+
+  #[test]
+  fn table_header_and_cnf_style_respect_the_first_row_table_look() {
+    let properties = w::TableRowProperties::from_bytes(
+      br#"<w:trPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tblHeader/></w:trPr>"#,
+    )
+    .expect("table row properties");
+    let direct = direct_table_row_style(Some(&properties));
+    let table_style = TableStyleModel {
+      conditional_rows: vec![(
+        w::TableStyleOverrideValues::FirstRow,
+        TableRowStyle {
+          cant_split: Some(true),
+          ..Default::default()
+        },
+      )],
+      ..Default::default()
+    };
+    let mut resolved = table_row_style_for(
+      &table_style,
+      TableLookModel {
+        first_row: false,
+        ..Default::default()
+      },
+      0,
+      2,
+      false,
+    );
+    merge_table_row_style(&mut resolved, &direct);
+
+    assert_eq!(resolved.repeat_header, Some(true));
+    assert_eq!(resolved.cant_split, None);
+
+    let explicit_properties = w::TableRowProperties::from_bytes(
+      br#"<w:trPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:cnfStyle w:val="100000000000" w:firstRow="1"/><w:tblHeader/></w:trPr>"#,
+    )
+    .expect("explicit first-row properties");
+    assert!(table_row_explicit_first_row(Some(&explicit_properties)));
+
+    let explicitly_disabled = table_row_style_for(
+      &table_style,
+      TableLookModel {
+        first_row: false,
+        ..Default::default()
+      },
+      1,
+      3,
+      true,
+    );
+    assert_eq!(explicitly_disabled.cant_split, None);
+
+    let mut explicitly_selected = table_row_style_for(
+      &table_style,
+      TableLookModel {
+        first_row: true,
+        ..Default::default()
+      },
+      1,
+      3,
+      true,
+    );
+    merge_table_row_style(
+      &mut explicitly_selected,
+      &direct_table_row_style(Some(&explicit_properties)),
+    );
+
+    assert_eq!(explicitly_selected.repeat_header, Some(true));
+    assert_eq!(explicitly_selected.cant_split, Some(true));
   }
 
   #[test]
@@ -37215,6 +37908,73 @@ mod tests {
     assert_eq!(merged.left, Some(border(2.5)));
     assert!(suppressions.top);
     assert!(!suppressions.right);
+  }
+
+  #[test]
+  fn conditional_column_cell_borders_use_region_outer_and_inside_edges() {
+    fn border(width_pt: f32) -> BorderStyle {
+      BorderStyle {
+        width_pt,
+        ..Default::default()
+      }
+    }
+
+    let region = CellBordersModel {
+      top: Some(border(1.0)),
+      right: Some(border(1.25)),
+      bottom: Some(border(2.25)),
+      left: Some(border(1.5)),
+    };
+    let context = |row_index| TableCellStyleContext {
+      look: TableLookModel::default(),
+      row_index,
+      row_count: 3,
+      cell_index: 0,
+      cell_count: 4,
+      explicit_first_row: false,
+    };
+
+    let first = conditional_cell_borders_for_region(
+      region,
+      Some(border(0.5)),
+      None,
+      w::TableStyleOverrideValues::FirstColumn,
+      context(0),
+    );
+    assert_eq!(first.top, Some(border(1.0)));
+    assert_eq!(first.bottom, Some(border(0.5)));
+
+    let middle = conditional_cell_borders_for_region(
+      region,
+      Some(border(0.5)),
+      None,
+      w::TableStyleOverrideValues::FirstColumn,
+      context(1),
+    );
+    assert_eq!(middle.top, Some(border(0.5)));
+    assert_eq!(middle.bottom, Some(border(0.5)));
+    assert_eq!(middle.left, Some(border(1.5)));
+    assert_eq!(middle.right, Some(border(1.25)));
+
+    let last = conditional_cell_borders_for_region(
+      region,
+      Some(border(0.5)),
+      None,
+      w::TableStyleOverrideValues::FirstColumn,
+      context(2),
+    );
+    assert_eq!(last.top, Some(border(0.5)));
+    assert_eq!(last.bottom, Some(border(2.25)));
+
+    let no_inside = conditional_cell_borders_for_region(
+      region,
+      None,
+      None,
+      w::TableStyleOverrideValues::FirstColumn,
+      context(1),
+    );
+    assert_eq!(no_inside.top, None);
+    assert_eq!(no_inside.bottom, None);
   }
 
   #[test]
@@ -37408,7 +38168,7 @@ mod tests {
         row_count: 2,
         cell_index: 0,
         cell_count: 2,
-        is_header_row: false,
+        explicit_first_row: false,
       },
     );
     let margins = first_cell.margins.apply(CellMargins::default());

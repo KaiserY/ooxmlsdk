@@ -482,6 +482,25 @@ fn paragraph_model_with_base_impl<'a>(
   }
   let starts_after_last_rendered_page_break =
     super::paragraph_starts_after_last_rendered_page_break(&inlines);
+  if let Some(background) = format
+    .frame
+    .and(format.shading)
+    .and_then(super::ShadingPaint::solid_color)
+  {
+    // ECMA-376 Part 1 §17.3.2.6 makes automatic run color dependent on
+    // its display background. Writer's fixed-output path asks the text frame
+    // for its effective background brush and chooses white for a dark brush
+    // (fntcache.cxx). Keep that lookup scoped to an actual w:framePr:
+    // fdo76979's dark shaded header frame paints white text, while Office's
+    // para-shading fixed output keeps omitted body text black. A direct run
+    // color remains authoritative through the shared automatic-only helper.
+    super::apply_automatic_text_color_to_paragraph_parts(
+      &mut paragraph_mark_style,
+      &mut list_label_style,
+      &mut inlines,
+      super::automatic_text_color_for_background(background),
+    );
+  }
   #[cfg(test)]
   let runs = inlines
     .iter()

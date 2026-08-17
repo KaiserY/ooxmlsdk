@@ -45,10 +45,10 @@ impl TableConditionalStyleMask {
     row_index: usize,
     row_count: usize,
     row_band_size: usize,
-    is_header_row: bool,
+    explicit_first_row: bool,
   ) -> Self {
     let mut mask = Self::default();
-    if is_header_row || (look.first_row && row_index == 0) {
+    if look.first_row && (explicit_first_row || row_index == 0) {
       mask.first_row = true;
     } else if look.last_row && row_index + 1 == row_count {
       mask.last_row = true;
@@ -162,14 +162,14 @@ pub(super) fn row_style_condition_applies(
   row_index: usize,
   row_count: usize,
   row_band_size: usize,
-  is_header_row: bool,
+  explicit_first_row: bool,
 ) -> bool {
   TableConditionalStyleMask::from_row_position(
     look,
     row_index,
     row_count,
     row_band_size,
-    is_header_row,
+    explicit_first_row,
   )
   .row_condition_applies(condition)
 }
@@ -183,7 +183,7 @@ pub(super) struct CellStyleConditionContext {
   pub cell_count: usize,
   pub row_band_size: usize,
   pub column_band_size: usize,
-  pub is_header_row: bool,
+  pub explicit_first_row: bool,
 }
 
 pub(super) fn cell_style_condition_applies(
@@ -195,7 +195,7 @@ pub(super) fn cell_style_condition_applies(
     context.row_index,
     context.row_count,
     context.row_band_size,
-    context.is_header_row,
+    context.explicit_first_row,
   )
   .with_cell_mask(TableConditionalStyleMask::from_cell_position(
     context.look,

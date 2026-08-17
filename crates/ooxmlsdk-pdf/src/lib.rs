@@ -36,11 +36,26 @@ pub use ooxmlsdk_layout::pptx::{
   PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
 };
 pub use options::{
-  PdfAttachment, PdfAttachmentAssociation, PdfDateTime, PdfFormOptions, PdfFormSubmitFormat,
-  PdfGeneralOptions, PdfImageOptions, PdfLinkDefaultAction, PdfLinkOptions, PdfMetadataOptions,
-  PdfOptions, PdfPageLayout, PdfSpreadsheetOptions, PdfStandard, PdfViewerMagnification,
-  PdfViewerOptions, PdfViewerPageMode, PdfWatermarkOptions,
+  PdfAttachment, PdfAttachmentAssociation, PdfDateTime, PdfDocumentKind, PdfFormOptions,
+  PdfFormSubmitFormat, PdfGeneralOptions, PdfImageOptions, PdfLinkDefaultAction, PdfLinkOptions,
+  PdfMetadataOptions, PdfOptionAdjustment, PdfOptionFeature, PdfOptionSupport, PdfOptions,
+  PdfPageLayout, PdfSpreadsheetOptions, PdfStandard, PdfViewerMagnification, PdfViewerOptions,
+  PdfViewerPageMode, PdfWatermarkOptions, ResolvedPdfOptions, pdf_option_support,
 };
+
+/// Validate and normalize a requested option set for one OOXML document family.
+///
+/// Conversion entry points call this before layout. Callers that generate test
+/// plans can use the same function to store the effective configuration and
+/// any implied settings rather than assuming every requested field is active.
+pub fn resolve_pdf_options(
+  document_kind: PdfDocumentKind,
+  options: &PdfOptions,
+) -> Result<ResolvedPdfOptions> {
+  let resolved = options.clone().resolve_for(document_kind)?;
+  render::settings::validate_options(resolved.effective())?;
+  Ok(resolved)
+}
 
 /// Convert a DOCX stream into PDF bytes.
 pub fn convert_docx<R>(reader: R, options: PdfOptions) -> Result<Vec<u8>>
@@ -74,7 +89,7 @@ where
     ..Default::default()
   };
   let document = WordprocessingDocument::new_with_settings(reader, settings)?;
-  let mut options = options;
+  let mut options = resolve_pdf_options(PdfDocumentKind::Docx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::docx::layout_document(&document, &layout_options)?;
   render::krilla::render_with_diagnostics(&pages, &options)
@@ -93,7 +108,7 @@ where
     ..Default::default()
   };
   let document = WordprocessingDocument::new_with_settings(reader, settings)?;
-  let mut options = options;
+  let mut options = resolve_pdf_options(PdfDocumentKind::Docx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::docx::layout_document(&document, &layout_options)?;
   render::krilla::render_with_font_audit(&pages, &options)
@@ -102,8 +117,9 @@ where
 /// Convert an opened Wordprocessing document into PDF bytes.
 pub fn convert_wordprocessing_document(
   document: &WordprocessingDocument,
-  mut options: PdfOptions,
+  options: PdfOptions,
 ) -> Result<Vec<u8>> {
+  let mut options = resolve_pdf_options(PdfDocumentKind::Docx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::docx::layout_document(document, &layout_options)?;
   render::krilla::render(&pages, &options)
@@ -176,7 +192,7 @@ where
 /// Convert an XLSX stream and return the exact font/glyph data passed to PDF serialization.
 pub fn convert_xlsx_with_diagnostics<R>(
   reader: R,
-  mut options: PdfOptions,
+  options: PdfOptions,
 ) -> Result<PdfConversionOutput>
 where
   R: Read + Seek,
@@ -189,15 +205,13 @@ where
     ..Default::default()
   };
   let document = SpreadsheetDocument::new_with_settings(reader, settings)?;
+  let mut options = resolve_pdf_options(PdfDocumentKind::Xlsx, &options)?.into_effective();
   let pages = xlsx::layout(&document, &mut options)?;
   render::krilla::render_with_diagnostics(&pages, &options)
 }
 
 /// Convert an XLSX stream and return a bounded font-integrity audit.
-pub fn convert_xlsx_with_font_audit<R>(
-  reader: R,
-  mut options: PdfOptions,
-) -> Result<PdfFontAuditOutput>
+pub fn convert_xlsx_with_font_audit<R>(reader: R, options: PdfOptions) -> Result<PdfFontAuditOutput>
 where
   R: Read + Seek,
 {
@@ -209,6 +223,7 @@ where
     ..Default::default()
   };
   let document = SpreadsheetDocument::new_with_settings(reader, settings)?;
+  let mut options = resolve_pdf_options(PdfDocumentKind::Xlsx, &options)?.into_effective();
   let pages = xlsx::layout(&document, &mut options)?;
   render::krilla::render_with_font_audit(&pages, &options)
 }
@@ -216,8 +231,9 @@ where
 /// Convert an opened spreadsheet document into PDF bytes.
 pub fn convert_spreadsheet_document(
   document: &SpreadsheetDocument,
-  mut options: PdfOptions,
+  options: PdfOptions,
 ) -> Result<Vec<u8>> {
+  let mut options = resolve_pdf_options(PdfDocumentKind::Xlsx, &options)?.into_effective();
   let pages = xlsx::layout(document, &mut options)?;
   render::krilla::render(&pages, &options)
 }
@@ -254,7 +270,7 @@ where
     ..Default::default()
   };
   let document = PresentationDocument::new_with_settings(reader, settings)?;
-  let mut options = options;
+  let mut options = resolve_pdf_options(PdfDocumentKind::Pptx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::pptx::layout_document(&document, &layout_options)?;
   render::krilla::render_with_diagnostics(&pages, &options)
@@ -273,7 +289,7 @@ where
     ..Default::default()
   };
   let document = PresentationDocument::new_with_settings(reader, settings)?;
-  let mut options = options;
+  let mut options = resolve_pdf_options(PdfDocumentKind::Pptx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::pptx::layout_document(&document, &layout_options)?;
   render::krilla::render_with_font_audit(&pages, &options)
@@ -282,8 +298,9 @@ where
 /// Convert an opened presentation document into PDF bytes.
 pub fn convert_presentation_document(
   document: &PresentationDocument,
-  mut options: PdfOptions,
+  options: PdfOptions,
 ) -> Result<Vec<u8>> {
+  let mut options = resolve_pdf_options(PdfDocumentKind::Pptx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::pptx::layout_document(document, &layout_options)?;
   render::krilla::render(&pages, &options)

@@ -1668,6 +1668,7 @@ dependencies = [
  "hypher",
  "icu_segmenter",
  "image",
+ "jiff",
  "jpeg-encoder",
  "krilla",
  "krilla-svg",

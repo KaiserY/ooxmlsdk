@@ -16,7 +16,7 @@ use krilla::embed::{AssociationKind, EmbeddedFile, MimeType};
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
 use krilla::mask::{Mask, MaskType};
-use krilla::metadata::{DateTime, Metadata};
+use krilla::metadata::{DateTime, Metadata, PageLayout as KrillaPageLayout};
 use krilla::num::NormalizedF32;
 use krilla::outline::{Outline, OutlineNode};
 use krilla::page::{NumberingStyle, PageLabel, PageSettings};
@@ -46,9 +46,12 @@ use smallvec::SmallVec;
 use super::fonts::FontSet;
 use super::form_widgets::{collect_form_widget_annotations, inject_form_widget_annotations};
 use super::image::ImageSet;
-use super::settings::serialize_settings;
+use super::settings::{requests_tagging, serialize_settings};
+use super::viewer::apply_viewer_preferences;
 use crate::error::{PdfError, Result};
-use crate::options::{PdfAttachmentAssociation, PdfDateTime, PdfOptions};
+use crate::options::{
+  PdfAttachmentAssociation, PdfDateTime, PdfLinkDefaultAction, PdfOptions, PdfPageLayout,
+};
 use crate::{
   PdfConversionDiagnostics, PdfConversionOutput, PdfFontAudit, PdfFontAuditIssue,
   PdfFontAuditIssueKind, PdfFontAuditOutput, PdfFontFaceDiagnostics, PdfGlyphBoundsDiagnostics,
@@ -125,6 +128,114 @@ struct RenderOutput {
   pdf: Vec<u8>,
   diagnostics: PdfConversionDiagnostics,
   font_audit: PdfFontAudit,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PageSelection {
+  source_indices: Vec<usize>,
+  first_output_index: Vec<Option<usize>>,
+}
+
+impl PageSelection {
+  fn from_range(page_count: usize, range: Option<&str>) -> Result<Self> {
+    if page_count == 0 {
+      return Err(PdfError::Options(
+        "cannot select pages from an empty layout document".to_string(),
+      ));
+    }
+    let source_indices = match range {
+      None => (0..page_count).collect(),
+      Some(range) => parse_page_range(range, page_count)?,
+    };
+    if source_indices.is_empty() {
+      return Err(PdfError::Options(
+        "page range selects no generated pages".to_string(),
+      ));
+    }
+    let mut first_output_index = vec![None; page_count];
+    for (output_index, source_index) in source_indices.iter().copied().enumerate() {
+      if let Some(slot) = first_output_index.get_mut(source_index) {
+        slot.get_or_insert(output_index);
+      }
+    }
+    Ok(Self {
+      source_indices,
+      first_output_index,
+    })
+  }
+
+  fn output_index(&self, source_index: usize) -> Option<usize> {
+    self.first_output_index.get(source_index).copied().flatten()
+  }
+}
+
+fn parse_page_range(range: &str, page_count: usize) -> Result<Vec<usize>> {
+  if range.trim().is_empty() {
+    return Err(PdfError::Options(
+      "page range must not be empty".to_string(),
+    ));
+  }
+  let mut pages = Vec::new();
+  for segment in range.split([',', ';']) {
+    let segment = segment.trim();
+    if segment.is_empty() {
+      return Err(PdfError::Options(format!(
+        "page range '{range}' contains an empty segment"
+      )));
+    }
+    let hyphen_count = segment.bytes().filter(|byte| *byte == b'-').count();
+    match hyphen_count {
+      0 => {
+        let page = parse_page_number(segment, range)?;
+        if page <= page_count {
+          pages.push(page - 1);
+        }
+      }
+      1 => {
+        let (first, last) = segment.split_once('-').unwrap();
+        let first = if first.trim().is_empty() {
+          1
+        } else {
+          parse_page_number(first.trim(), range)?
+        };
+        let last = if last.trim().is_empty() {
+          page_count
+        } else {
+          parse_page_number(last.trim(), range)?
+        };
+        if (first > page_count && last > page_count) || page_count == 0 {
+          continue;
+        }
+        let first = first.min(page_count);
+        let last = last.min(page_count);
+        if first <= last {
+          pages.extend((first..=last).map(|page| page - 1));
+        } else {
+          pages.extend((last..=first).rev().map(|page| page - 1));
+        }
+      }
+      _ => {
+        return Err(PdfError::Options(format!(
+          "page range segment '{segment}' contains more than one hyphen"
+        )));
+      }
+    }
+  }
+  Ok(pages)
+}
+
+fn parse_page_number(value: &str, range: &str) -> Result<usize> {
+  let page = value.parse::<usize>().map_err(|_| {
+    PdfError::Options(format!(
+      "page range '{range}' contains invalid page number '{value}'"
+    ))
+  })?;
+  if page == 0 {
+    return Err(PdfError::Options(
+      "page range uses one-based page numbers; page 0 is invalid".to_string(),
+    ));
+  }
+  Ok(page)
 }
 
 fn render_inner(
@@ -279,8 +390,17 @@ fn render_inner(
     })
   }));
   let mut text_metrics = TextMetrics::new();
-  let paint =
+  let all_paint =
     PaintDocument::from_layout(document, &mut text_metrics, options.ui_language.as_deref());
+  let page_selection =
+    PageSelection::from_range(all_paint.pages.len(), options.general.page_range.as_deref())?;
+  let paint = PaintDocument {
+    pages: page_selection
+      .source_indices
+      .iter()
+      .map(|source_index| all_paint.pages[*source_index].clone())
+      .collect(),
+  };
   let diagnostics = if observation == RenderObservation::Diagnostics {
     conversion_diagnostics(&paint)
   } else {
@@ -291,15 +411,19 @@ fn render_inner(
   } else {
     PdfFontAudit::default()
   };
-  let form_widget_annotations = collect_form_widget_annotations(document, &mut text_metrics);
+  let form_widget_annotations = if options.forms.export_form_fields {
+    collect_form_widget_annotations(document, &mut text_metrics, &page_selection.source_indices)
+  } else {
+    Vec::new()
+  };
   if options.general.pdf_ua_compliance && !form_widget_annotations.is_empty() {
     return Err(PdfError::Options(
       "PDF/UA form widgets require a tagged form API and cannot use the lopdf post-processor"
         .to_string(),
     ));
   }
-  let internal_links = InternalLinkTargets::from_layout(&paint, document);
-  debug_assert_eq!(paint.pages.len(), document.pages.len());
+  let internal_links = InternalLinkTargets::from_layout(&paint, document, &page_selection);
+  debug_assert_eq!(paint.pages.len(), page_selection.source_indices.len());
   debug_assert!(paint.pages.iter().all(|page| {
     page.width_pt >= 3.0
       && page.height_pt >= 3.0
@@ -360,16 +484,17 @@ fn render_inner(
   let mut pdf = Document::new_with(serialize_settings(options)?);
   pdf.set_metadata(pdf_metadata(options));
   embed_attachments(&mut pdf, options)?;
-  register_named_destinations(&mut pdf, document, options)?;
+  register_named_destinations(&mut pdf, document, options, &page_selection)?;
   let mut fonts = FontSet::new();
   let mut images = ImageSet::default();
-  let tagging_enabled = options.general.tagged_pdf || options.general.pdf_ua_compliance;
+  let tagging_enabled = requests_tagging(options);
   let mut tag_tree = TagTree::new().with_lang(options.canonical_document_language());
 
   for (page_index, page) in paint.pages.iter().enumerate() {
+    let source_page_index = page_selection.source_indices[page_index];
     let mut settings = PageSettings::from_wh(page.width_pt, page.height_pt)
       .ok_or_else(|| PdfError::Krilla("invalid page size".to_string()))?;
-    if let Some(label) = page_label(document, page_index) {
+    if let Some(label) = page_label(document, source_page_index) {
       settings = settings.with_page_label(label);
     }
 
@@ -419,6 +544,7 @@ fn render_inner(
     if tagging_enabled {
       tag_tree.push(build_page_tag_group(
         document,
+        source_page_index,
         page_index,
         page,
         tagged_items,
@@ -427,7 +553,13 @@ fn render_inner(
     }
   }
 
-  if let Some(outline) = pdf_outline_for_entries(&document.outline_entries) {
+  if options.general.export_bookmarks
+    && let Some(outline) = pdf_outline_for_entries(
+      &document.outline_entries,
+      options.general.open_bookmark_levels,
+      &page_selection,
+    )
+  {
     pdf.set_outline(outline);
   }
   if tagging_enabled {
@@ -439,6 +571,7 @@ fn render_inner(
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))?;
   let pdf = fonts.restore_office_font_metadata(pdf)?;
   let pdf = inject_form_widget_annotations(pdf, form_widget_annotations)?;
+  let pdf = apply_viewer_preferences(pdf, options)?;
   Ok(RenderOutput {
     pdf,
     diagnostics,
@@ -1543,16 +1676,23 @@ struct InternalLinkTargets {
 }
 
 impl InternalLinkTargets {
-  fn from_layout(paint: &PaintDocument<'_>, document: &common::LayoutDocument<'static>) -> Self {
+  fn from_layout(
+    paint: &PaintDocument<'_>,
+    document: &common::LayoutDocument<'static>,
+    page_selection: &PageSelection,
+  ) -> Self {
     let mut positions = HashMap::default();
     for anchor in &document.anchor_pages {
-      if anchor.name.is_empty() || anchor.page_index >= paint.pages.len() {
+      let Some(page_index) = page_selection.output_index(anchor.page_index) else {
+        continue;
+      };
+      if anchor.name.is_empty() {
         continue;
       }
       positions
         .entry(format!("ooxmlsdk-pdf:bookmark:{}", anchor.name))
         .or_insert(InternalLinkPosition {
-          page_index: anchor.page_index,
+          page_index,
           x_pt: 0.0,
           y_pt: 0.0,
         });
@@ -3748,7 +3888,8 @@ enum PageTagBlock {
 
 fn build_page_tag_group(
   document: &common::LayoutDocument<'static>,
-  page_index: usize,
+  source_page_index: usize,
+  output_page_index: usize,
   page: &PaintPage<'_>,
   records: Vec<TaggedPaintRecord>,
   annotation_ids: &[Identifier],
@@ -3819,7 +3960,7 @@ fn build_page_tag_group(
           continue;
         };
         let bbox = Rect::from_xywh(image.x_pt, image.y_pt, image.width_pt, image.height_pt)
-          .map(|rect| BBox::new(page_index, rect));
+          .map(|rect| BBox::new(output_page_index, rect));
         let figure = Tag::Figure(image.alt_text.as_deref().map(str::to_string)).with_bbox(bbox);
         let figure: Node = TagGroup::with_children(figure, vec![content]).into();
         let node = if annotations.is_empty() {
@@ -3839,7 +3980,7 @@ fn build_page_tag_group(
           .and_then(|(left, top, right, bottom)| {
             Rect::from_xywh(left, top, right - left, bottom - top)
           })
-          .map(|rect| BBox::new(page_index, rect));
+          .map(|rect| BBox::new(output_page_index, rect));
         let figure = Tag::Figure(Some(alt_text.to_string())).with_bbox(bbox);
         let figure: Node = TagGroup::with_children(figure, vec![content]).into();
         let node = if annotations.is_empty() {
@@ -3871,7 +4012,7 @@ fn build_page_tag_group(
   for block in blocks {
     match block {
       PageTagBlock::Paragraph(paragraph) => {
-        part.push(paragraph_tag_group(document, page_index, paragraph));
+        part.push(paragraph_tag_group(document, source_page_index, paragraph));
       }
       PageTagBlock::Table(table) => part.push(table_tag_group(table)),
       PageTagBlock::Node(node) => part.children.push(node),
@@ -4059,7 +4200,14 @@ fn draw_paint_item(
 ) -> Result<()> {
   match item {
     PaintItem::Text(text) if !text.item.text.is_empty() => {
-      draw_text_item(surface, text, fonts, internal_links, link_annotations)?;
+      draw_text_item(
+        surface,
+        text,
+        fonts,
+        internal_links,
+        link_annotations,
+        options,
+      )?;
     }
     PaintItem::Text(_) => {}
     PaintItem::LinkArea(link_area) => {
@@ -4070,7 +4218,8 @@ fn draw_paint_item(
         link_area.height_pt,
         &link_area.hyperlink_url,
         internal_links,
-      ) {
+        options,
+      )? {
         link_annotations.push(annotation);
       }
     }
@@ -4119,7 +4268,8 @@ fn draw_paint_item(
           image.height_pt,
           url,
           internal_links,
-        )
+          options,
+        )?
       {
         link_annotations.push(annotation);
       }
@@ -4538,7 +4688,19 @@ fn rotate_point(x: f32, y: f32, rotation_x: f32, rotation_y: f32, angle: f32) ->
   )
 }
 
-fn pdf_outline_for_entries(entries: &[common::OutlineEntry<'static>]) -> Option<Outline> {
+fn pdf_outline_for_entries(
+  entries: &[common::OutlineEntry<'static>],
+  open_levels: Option<i32>,
+  page_selection: &PageSelection,
+) -> Option<Outline> {
+  let entries = entries
+    .iter()
+    .filter_map(|entry| {
+      let mut entry = entry.clone();
+      entry.page_index = page_selection.output_index(entry.page_index)?;
+      Some(entry)
+    })
+    .collect::<Vec<_>>();
   if entries.is_empty() {
     return None;
   }
@@ -4546,7 +4708,7 @@ fn pdf_outline_for_entries(entries: &[common::OutlineEntry<'static>]) -> Option<
   let mut index = 0;
   while index < entries.len() {
     let level = entries[index].level;
-    outline.push_child(pdf_outline_node(entries, &mut index, level));
+    outline.push_child(pdf_outline_node(&entries, &mut index, level, open_levels));
   }
   Some(outline)
 }
@@ -4555,6 +4717,7 @@ fn pdf_outline_node(
   entries: &[common::OutlineEntry<'static>],
   index: &mut usize,
   level: u8,
+  open_levels: Option<i32>,
 ) -> OutlineNode {
   let entry = &entries[*index];
   *index += 1;
@@ -4564,10 +4727,11 @@ fn pdf_outline_node(
       entry.page_index,
       Point::from_xy(entry.target.x.0, entry.target.y.0),
     ),
-  );
+  )
+  .with_open(open_levels.is_some_and(|levels| levels < 0 || levels >= i32::from(entry.level)));
   while *index < entries.len() && entries[*index].level > level {
     let child_level = entries[*index].level;
-    node.push_child(pdf_outline_node(entries, index, child_level));
+    node.push_child(pdf_outline_node(entries, index, child_level, open_levels));
   }
   node
 }
@@ -4578,6 +4742,7 @@ fn draw_text_item(
   fonts: &mut FontSet,
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
+  options: &PdfOptions,
 ) -> Result<()> {
   let item = &text.item;
   let small_caps_semantic_text = word_small_caps_semantic_text(&item.text, item.style.small_caps);
@@ -4874,7 +5039,8 @@ fn draw_text_item(
         link.height_pt,
         url,
         internal_links,
-      )
+        options,
+      )?
     {
       link_annotations.push(annotation);
     }
@@ -5627,17 +5793,57 @@ fn link_annotation_for_rect(
   height_pt: f32,
   url: &str,
   internal_links: &InternalLinkTargets,
-) -> Option<Annotation> {
-  let rect = Rect::from_ltrb(x_pt, y_pt, x_pt + width_pt, y_pt + height_pt)?;
-  let target = if is_internal_link_url(url) {
-    internal_links.target_for_url(url)?
-  } else {
-    Target::Action(Action::Link(LinkAction::new(normalize_external_url(url))))
+  options: &PdfOptions,
+) -> Result<Option<Annotation>> {
+  let rect = Rect::from_ltrb(x_pt, y_pt, x_pt + width_pt, y_pt + height_pt);
+  let Some(rect) = rect else {
+    return Ok(None);
   };
-  Some(Annotation::new_link(
+  let target = if is_internal_link_url(url) {
+    let Some(target) = internal_links.target_for_url(url) else {
+      return Ok(None);
+    };
+    target
+  } else {
+    if matches!(
+      options.links.default_action,
+      PdfLinkDefaultAction::RemoveExternalLinks
+    ) {
+      return Ok(None);
+    }
+    let url = normalize_external_url(url);
+    let url = if options.links.convert_office_targets_to_pdf_targets {
+      office_target_as_pdf(&url)
+    } else {
+      url
+    };
+    match options.links.default_action {
+      PdfLinkDefaultAction::Uri => Target::Action(Action::Link(LinkAction::new(url))),
+      PdfLinkDefaultAction::UriDestination | PdfLinkDefaultAction::Launch => {
+        return Err(PdfError::Options(
+          "the selected external link action is unavailable in the current PDF backend".to_string(),
+        ));
+      }
+      PdfLinkDefaultAction::RemoveExternalLinks => unreachable!(),
+    }
+  };
+  Ok(Some(Annotation::new_link(
     LinkAnnotation::new(rect, target),
     None,
-  ))
+  )))
+}
+
+fn office_target_as_pdf(url: &str) -> String {
+  let suffix_start = url.find(['?', '#']).unwrap_or(url.len());
+  let (path, suffix) = url.split_at(suffix_start);
+  const OFFICE_EXTENSIONS: [&str; 6] = [".docx", ".xlsx", ".pptx", ".doc", ".xls", ".ppt"];
+  let Some(extension) = OFFICE_EXTENSIONS
+    .into_iter()
+    .find(|extension| path.to_ascii_lowercase().ends_with(extension))
+  else {
+    return url.to_string();
+  };
+  format!("{}.pdf{suffix}", &path[..path.len() - extension.len()])
 }
 
 fn normalize_external_url(url: &str) -> String {
@@ -7761,17 +7967,21 @@ fn register_named_destinations(
   pdf: &mut Document,
   document: &common::LayoutDocument<'static>,
   options: &PdfOptions,
+  page_selection: &PageSelection,
 ) -> Result<()> {
   if !options.links.export_bookmarks_to_pdf_destinations {
     return Ok(());
   }
   for anchor in &document.anchor_pages {
+    let Some(page_index) = page_selection.output_index(anchor.page_index) else {
+      continue;
+    };
     if anchor.name.is_empty() || anchor.page_index >= document.pages.len() {
       continue;
     }
     let destination = NamedDestination::new(
       anchor.name.to_string(),
-      XyzDestination::new(anchor.page_index, Point::from_xy(0.0, 0.0)),
+      XyzDestination::new(page_index, Point::from_xy(0.0, 0.0)),
     );
     pdf.register_named_destination(destination).ok_or_else(|| {
       PdfError::Options(format!(
@@ -7835,9 +8045,18 @@ fn pdf_metadata(options: &PdfOptions) -> Metadata {
   if let Some(producer) = &options.metadata.producer {
     metadata = metadata.producer(producer.clone());
   }
+  if let Some(creation_date) = options.metadata.creation_date {
+    metadata = metadata.creation_date(pdf_date_time(creation_date));
+  }
   if let Some(language) = options.canonical_document_language() {
     metadata = metadata.language(language);
   }
+  metadata = match options.viewer.page_layout {
+    PdfPageLayout::Default => metadata,
+    PdfPageLayout::SinglePage => metadata.page_layout(KrillaPageLayout::SinglePage),
+    PdfPageLayout::Continuous => metadata.page_layout(KrillaPageLayout::OneColumn),
+    PdfPageLayout::ContinuousFacing => metadata.page_layout(KrillaPageLayout::TwoColumnRight),
+  };
   metadata
 }
 
@@ -8108,7 +8327,7 @@ mod tests {
     text_stroke_with_fill, text_style_from_common, visually_ordered_text_portion_ranges,
     word_small_caps_semantic_text, word_unsigned_signature_line_items, writer_item_line_metrics,
   };
-  use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
+  use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfLinkDefaultAction, PdfOptions};
   use krilla::Document;
   use krilla::geom::Size;
   use krilla::page::PageSettings;
@@ -8816,6 +9035,16 @@ mod tests {
     options.metadata.keywords = Some("alpha, beta; gamma".to_string());
     options.metadata.creator = Some("creator".to_string());
     options.metadata.producer = Some("producer".to_string());
+    options.metadata.creation_date = Some(crate::PdfDateTime {
+      year: 2026,
+      month: Some(8),
+      day: Some(17),
+      hour: Some(12),
+      minute: Some(30),
+      second: Some(45),
+      utc_offset_hour: Some(8),
+      utc_offset_minute: Some(0),
+    });
     let mut document = Document::new();
     document.set_metadata(pdf_metadata(&options));
     let settings = PageSettings::new(Size::from_wh(10.0, 10.0).unwrap());
@@ -8832,6 +9061,10 @@ mod tests {
     assert_eq!(
       info.get(b"Producer").unwrap().as_str().unwrap(),
       b"producer"
+    );
+    assert_eq!(
+      info.get(b"CreationDate").unwrap().as_str().unwrap(),
+      b"D:20260817123045+08'00"
     );
   }
 
@@ -8937,6 +9170,7 @@ mod tests {
     });
     let mut options = PdfOptions::default();
     options.general.pdf_ua_compliance = true;
+    options.forms.export_form_fields = true;
 
     assert!(matches!(
       render(&document, &options),
@@ -9007,6 +9241,163 @@ mod tests {
     let destinations = resolved_dictionary(&pdf, names.get(b"Dests").unwrap());
     let destination_entries = destinations.get(b"Names").unwrap().as_array().unwrap();
     assert_eq!(destination_entries[0].as_str().unwrap(), b"section-one");
+  }
+
+  #[test]
+  fn page_range_parser_matches_libreoffice_open_reverse_and_sequence_forms() {
+    assert_eq!(
+      super::parse_page_range("3-1; 2, 5-", 6).unwrap(),
+      vec![2, 1, 0, 1, 4, 5]
+    );
+    assert_eq!(super::parse_page_range("-2", 6).unwrap(), vec![0, 1]);
+    assert!(super::parse_page_range("0", 6).is_err());
+    assert!(super::parse_page_range("1--3", 6).is_err());
+  }
+
+  #[test]
+  fn page_range_changes_real_pdf_page_order_and_remaps_named_destinations() {
+    let mut document = tagged_test_document();
+    let base_page = document.pages[0].clone();
+    document.pages = [200.0, 240.0, 280.0]
+      .into_iter()
+      .map(|width| {
+        let mut page = base_page.clone();
+        page.setup.size.width = Pt(width);
+        page.bounds.size.width = Pt(width);
+        page
+      })
+      .collect();
+    document.anchor_pages.push(common::AnchorPage {
+      name: "third-page".into(),
+      page_index: 2,
+      section_index: 0,
+      section_page_index: 0,
+      physical_page_number: 3,
+      virtual_page_number: 3,
+    });
+    let mut options = PdfOptions::default();
+    options.general.page_range = Some("3,1".to_string());
+    options.links.export_bookmarks_to_pdf_destinations = true;
+
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let pages = pdf.get_pages();
+    assert_eq!(pages.len(), 2);
+    let media_width = |page_number: u32| {
+      let page = pdf.get_dictionary(pages[&page_number]).unwrap();
+      let media_box = page.get(b"MediaBox").unwrap().as_array().unwrap();
+      media_box[2].as_float().unwrap() - media_box[0].as_float().unwrap()
+    };
+    assert!(media_width(1) > media_width(2));
+
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let catalog = pdf.get_dictionary(catalog_id).unwrap();
+    let names = resolved_dictionary(&pdf, catalog.get(b"Names").unwrap());
+    let destinations = resolved_dictionary(&pdf, names.get(b"Dests").unwrap());
+    let destination_entries = destinations.get(b"Names").unwrap().as_array().unwrap();
+    assert_eq!(destination_entries[0].as_str().unwrap(), b"third-page");
+    let destination = match &destination_entries[1] {
+      lopdf::Object::Reference(id) => pdf.get_object(*id).unwrap(),
+      destination => destination,
+    };
+    let destination = destination.as_array().unwrap();
+    assert_eq!(destination[0].as_reference().unwrap(), pages[&1]);
+  }
+
+  #[test]
+  fn bookmark_export_and_open_levels_change_outline_objects() {
+    let mut document = tagged_test_document();
+    document.outline_entries.push(common::OutlineEntry {
+      level: 1,
+      text: "Child".into(),
+      page_index: 0,
+      target: common::Point::default(),
+      merged_hidden_separator: false,
+    });
+
+    let mut no_bookmarks = PdfOptions::default();
+    no_bookmarks.general.export_bookmarks = false;
+    let bytes = render(&document, &no_bookmarks).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    assert!(
+      pdf
+        .get_dictionary(catalog_id)
+        .unwrap()
+        .get(b"Outlines")
+        .is_err()
+    );
+
+    let mut expanded = PdfOptions::default();
+    expanded.general.open_bookmark_levels = Some(-1);
+    let bytes = render(&document, &expanded).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let catalog = pdf.get_dictionary(catalog_id).unwrap();
+    let outlines = resolved_dictionary(&pdf, catalog.get(b"Outlines").unwrap());
+    let first = resolved_dictionary(&pdf, outlines.get(b"First").unwrap());
+    assert!(first.get(b"Count").unwrap().as_i64().unwrap() > 0);
+  }
+
+  #[test]
+  fn form_export_flag_controls_real_widget_annotations() {
+    let mut document = tagged_test_document();
+    let DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.form_widget_id = Some(1);
+    document.form_widgets.push(common::FormWidget {
+      id: 1,
+      kind: common::FormWidgetKind::Text,
+      entries: Vec::new(),
+    });
+
+    let bytes = render(&document, &PdfOptions::default()).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let page_id = pdf.get_pages()[&1];
+    assert!(pdf.get_dictionary(page_id).unwrap().get(b"Annots").is_err());
+
+    let mut options = PdfOptions::default();
+    options.forms.export_form_fields = true;
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let page_id = pdf.get_pages()[&1];
+    let page = pdf.get_dictionary(page_id).unwrap();
+    let annotations = page.get(b"Annots").unwrap().as_array().unwrap();
+    let widget = resolved_dictionary(&pdf, &annotations[0]);
+    assert_eq!(
+      widget.get(b"Subtype").unwrap().as_name().unwrap(),
+      b"Widget"
+    );
+  }
+
+  #[test]
+  fn link_options_rewrite_office_targets_or_remove_external_annotations() {
+    let mut document = tagged_test_document();
+    let DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.hyperlink_url = Some("https://example.test/report.docx?view=1".into());
+
+    let mut options = PdfOptions::default();
+    options.links.convert_office_targets_to_pdf_targets = true;
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let page_id = pdf.get_pages()[&1];
+    let page = pdf.get_dictionary(page_id).unwrap();
+    let annotations = page.get(b"Annots").unwrap().as_array().unwrap();
+    let annotation = resolved_dictionary(&pdf, &annotations[0]);
+    let action = resolved_dictionary(&pdf, annotation.get(b"A").unwrap());
+    assert_eq!(
+      action.get(b"URI").unwrap().as_str().unwrap(),
+      b"https://example.test/report.pdf?view=1"
+    );
+
+    options.links.default_action = PdfLinkDefaultAction::RemoveExternalLinks;
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let page_id = pdf.get_pages()[&1];
+    assert!(pdf.get_dictionary(page_id).unwrap().get(b"Annots").is_err());
   }
 
   #[test]

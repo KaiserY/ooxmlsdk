@@ -1,6 +1,7 @@
 use krilla::SerializeSettings;
 use krilla::configure::{
-  Accessibility, Archival, Configuration, ConfigurationBuilder, PdfVersion, Validator,
+  Accessibility, Archival, Configuration, ConfigurationBuilder, ConfigurationError, PdfVersion,
+  Validators,
 };
 
 use crate::error::{PdfError, Result};
@@ -19,9 +20,24 @@ pub(crate) fn serialize_settings(options: &PdfOptions) -> Result<SerializeSettin
     xmp_metadata: true,
     cmyk_profile: None,
     configuration: pdf_configuration(options)?,
-    enable_tagging: options.general.tagged_pdf || options.general.pdf_ua_compliance,
+    enable_tagging: requests_tagging(options),
     render_svg_glyph_fn: krilla_svg::render_svg_glyph,
   })
+}
+
+pub(crate) fn validate_options(options: &PdfOptions) -> Result<()> {
+  pdf_configuration(options).map(|_| ())
+}
+
+pub(crate) fn requests_tagging(options: &PdfOptions) -> bool {
+  options.general.tagged_pdf
+    || options.general.pdf_ua_compliance
+    || options.standards.iter().any(|standard| {
+      matches!(
+        standard,
+        PdfStandard::PdfA1a | PdfStandard::PdfA2a | PdfStandard::PdfA3a | PdfStandard::PdfUa1
+      )
+    })
 }
 
 fn requests_archival_standard(options: &PdfOptions) -> bool {
@@ -45,11 +61,11 @@ fn requests_archival_standard(options: &PdfOptions) -> bool {
 
 fn pdf_configuration(options: &PdfOptions) -> Result<Configuration> {
   let mut version = None::<PdfVersion>;
-  let mut validator = None::<Validator>;
-
-  if options.general.pdf_ua_compliance {
-    set_validator(&mut validator, Accessibility::UA1.into())?;
-  }
+  let mut archival = None::<Archival>;
+  let mut accessibility = options
+    .general
+    .pdf_ua_compliance
+    .then_some(Accessibility::UA1);
 
   for standard in &options.standards {
     match standard {
@@ -58,33 +74,38 @@ fn pdf_configuration(options: &PdfOptions) -> Result<Configuration> {
       PdfStandard::Pdf16 => set_version(&mut version, PdfVersion::Pdf16)?,
       PdfStandard::Pdf17 => set_version(&mut version, PdfVersion::Pdf17)?,
       PdfStandard::Pdf20 => set_version(&mut version, PdfVersion::Pdf20)?,
-      PdfStandard::PdfA1a => set_validator(&mut validator, Archival::A1_A.into())?,
-      PdfStandard::PdfA1b => set_validator(&mut validator, Archival::A1_B.into())?,
-      PdfStandard::PdfA2a => set_validator(&mut validator, Archival::A2_A.into())?,
-      PdfStandard::PdfA2b => set_validator(&mut validator, Archival::A2_B.into())?,
-      PdfStandard::PdfA2u => set_validator(&mut validator, Archival::A2_U.into())?,
-      PdfStandard::PdfA3a => set_validator(&mut validator, Archival::A3_A.into())?,
-      PdfStandard::PdfA3b => set_validator(&mut validator, Archival::A3_B.into())?,
-      PdfStandard::PdfA3u => set_validator(&mut validator, Archival::A3_U.into())?,
-      PdfStandard::PdfA4 => set_validator(&mut validator, Archival::A4.into())?,
-      PdfStandard::PdfA4f => set_validator(&mut validator, Archival::A4F.into())?,
-      PdfStandard::PdfA4e => set_validator(&mut validator, Archival::A4E.into())?,
-      PdfStandard::PdfUa1 => set_validator(&mut validator, Accessibility::UA1.into())?,
+      PdfStandard::PdfA1a => set_archival(&mut archival, Archival::A1_A)?,
+      PdfStandard::PdfA1b => set_archival(&mut archival, Archival::A1_B)?,
+      PdfStandard::PdfA2a => set_archival(&mut archival, Archival::A2_A)?,
+      PdfStandard::PdfA2b => set_archival(&mut archival, Archival::A2_B)?,
+      PdfStandard::PdfA2u => set_archival(&mut archival, Archival::A2_U)?,
+      PdfStandard::PdfA3a => set_archival(&mut archival, Archival::A3_A)?,
+      PdfStandard::PdfA3b => set_archival(&mut archival, Archival::A3_B)?,
+      PdfStandard::PdfA3u => set_archival(&mut archival, Archival::A3_U)?,
+      PdfStandard::PdfA4 => set_archival(&mut archival, Archival::A4)?,
+      PdfStandard::PdfA4f => set_archival(&mut archival, Archival::A4F)?,
+      PdfStandard::PdfA4e => set_archival(&mut archival, Archival::A4E)?,
+      PdfStandard::PdfUa1 => set_accessibility(&mut accessibility, Accessibility::UA1)?,
     }
   }
 
-  let version = version.unwrap_or_else(|| validator.map_or(PdfVersion::Pdf17, Validator::max));
-  let mut builder = ConfigurationBuilder::new().with_version(version);
-  if let Some(validator) = validator {
-    builder = builder.set_validator(validator);
+  if matches!(archival, Some(Archival::A1_A | Archival::A1_B)) && accessibility.is_some() {
+    return Err(PdfError::Options(
+      "PDF/A-1 cannot be combined with PDF/UA in the supported export policy".to_string(),
+    ));
   }
-  builder.finish().map_err(|_| {
-    PdfError::Options(format!(
-      "{} is not compatible with {}",
-      version.as_str(),
-      validator.map_or("the requested PDF configuration", Validator::as_str)
-    ))
-  })
+
+  let mut builder = ConfigurationBuilder::new();
+  if let Some(version) = version {
+    builder = builder.with_version(version);
+  }
+  if let Some(archival) = archival {
+    builder = builder.with_archival_validator(archival);
+  }
+  if let Some(accessibility) = accessibility {
+    builder = builder.with_accessibility_validator(accessibility);
+  }
+  builder.finish().map_err(configuration_error)
 }
 
 fn set_version(slot: &mut Option<PdfVersion>, version: PdfVersion) -> Result<()> {
@@ -101,18 +122,56 @@ fn set_version(slot: &mut Option<PdfVersion>, version: PdfVersion) -> Result<()>
   Ok(())
 }
 
-fn set_validator(slot: &mut Option<Validator>, validator: Validator) -> Result<()> {
+fn set_archival(slot: &mut Option<Archival>, archival: Archival) -> Result<()> {
   if let Some(previous) = slot
-    && *previous != validator
+    && *previous != archival
   {
     return Err(PdfError::Options(format!(
       "PDF cannot conform to both {} and {}",
       previous.as_str(),
-      validator.as_str()
+      archival.as_str()
     )));
   }
-  *slot = Some(validator);
+  *slot = Some(archival);
   Ok(())
+}
+
+fn set_accessibility(slot: &mut Option<Accessibility>, accessibility: Accessibility) -> Result<()> {
+  if let Some(previous) = slot
+    && *previous != accessibility
+  {
+    return Err(PdfError::Options(format!(
+      "PDF cannot conform to both {} and {}",
+      previous.as_str(),
+      accessibility.as_str()
+    )));
+  }
+  *slot = Some(accessibility);
+  Ok(())
+}
+
+fn configuration_error(error: ConfigurationError) -> PdfError {
+  match error {
+    ConfigurationError::VersionDoesNotMatchValidatorsRange(version, validators) => {
+      PdfError::Options(format!(
+        "{} is not compatible with {}",
+        version.as_str(),
+        validator_names(validators)
+      ))
+    }
+    ConfigurationError::NoOverlappingValidatorsRange(validators) => PdfError::Options(format!(
+      "the requested validators have no compatible PDF version: {}",
+      validator_names(validators)
+    )),
+  }
+}
+
+fn validator_names(validators: Validators) -> String {
+  validators
+    .into_iter()
+    .map(|validator| validator.as_str())
+    .collect::<Vec<_>>()
+    .join(" + ")
 }
 
 #[cfg(test)]
@@ -166,14 +225,30 @@ mod tests {
   }
 
   #[test]
-  fn existing_single_validator_policy_rejects_pdf_a_plus_pdf_ua() {
+  fn compatible_pdf_a_plus_pdf_ua_is_preserved() {
     let mut options = PdfOptions::default();
     options.general.pdf_ua_compliance = true;
     options.standards.push(PdfStandard::PdfA2a);
 
+    let configuration = pdf_configuration(&options).unwrap();
+    assert_eq!(configuration.version(), PdfVersion::Pdf17);
+    assert_eq!(configuration.validators().archival(), Some(Archival::A2_A));
+    assert_eq!(
+      configuration.validators().accessibility(),
+      Some(Accessibility::UA1)
+    );
+  }
+
+  #[test]
+  fn pdf_a_1_plus_pdf_ua_is_rejected_without_a_common_version() {
+    let mut options = PdfOptions::default();
+    options.general.pdf_ua_compliance = true;
+    options.standards.push(PdfStandard::PdfA1a);
+
     assert!(matches!(
       pdf_configuration(&options),
-      Err(PdfError::Options(_))
+      Err(PdfError::Options(message))
+        if message.contains("PDF/A-1 cannot be combined")
     ));
   }
 }

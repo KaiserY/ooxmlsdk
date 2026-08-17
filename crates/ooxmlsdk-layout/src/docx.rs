@@ -14634,9 +14634,7 @@ fn drawingml_diagram_shape_text_box(
         .paragraph_choice
         .iter()
         .find_map(|choice| match choice {
-          a::ParagraphChoice::Run(run) if !run.text.as_str().is_empty() => {
-            run.run_properties.as_deref()
-          }
+          a::ParagraphChoice::Run(run) if !run.text.is_empty() => run.run_properties.as_deref(),
           a::ParagraphChoice::Field(field)
             if field
               .text

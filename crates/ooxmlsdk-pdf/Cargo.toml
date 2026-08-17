@@ -18,6 +18,7 @@ hypher = { workspace = true }
 icu_segmenter = { workspace = true }
 image = { workspace = true }
 jpeg-encoder = { workspace = true }
+jiff = { workspace = true }
 krilla = { workspace = true }
 krilla-svg = { workspace = true }
 kurbo = { workspace = true }

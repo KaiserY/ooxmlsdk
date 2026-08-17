@@ -106,9 +106,13 @@ pub(super) fn inject_form_widget_annotations(
 pub(super) fn collect_form_widget_annotations(
   document: &common::LayoutDocument<'static>,
   text_metrics: &mut TextMetrics,
+  source_page_indices: &[usize],
 ) -> Vec<WidgetAnnotationSpec> {
   let mut annotations = Vec::new();
-  for (page_index, page) in document.pages.iter().enumerate() {
+  for (page_index, source_page_index) in source_page_indices.iter().copied().enumerate() {
+    let Some(page) = document.pages.get(source_page_index) else {
+      continue;
+    };
     let mut widgets = HashMap::<u32, WidgetBounds>::new();
     for item in &page.items {
       let common::DisplayItem::Text(text) = item else {

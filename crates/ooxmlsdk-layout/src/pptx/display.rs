@@ -65,6 +65,7 @@ use super::drawingml::text_body::{
 use super::drawingml::text_list_style::{
   TextListLevelParagraphProperties, TextListParagraphStyle, TextListStyle,
 };
+use super::drawingml::theme::{ThemeColorScheme, ThemeFormatScheme};
 use super::import::{PowerPointImport, ThemeFragmentRecord};
 use super::shadow::{
   ShadowFrame, ShadowShape, glow_image_item, inner_shadow_image_item, outer_shadow_image_item,
@@ -196,6 +197,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     text: Cow::Owned(item.text),
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
+    line_metrics_participant: true,
     paint_clip: None,
     style: common_text_style(*item.style),
     font_id: None,
@@ -1226,7 +1228,8 @@ fn lower_chart(
       theme_language: default_document_language,
       ..title_text_style_context
     };
-    let point_colors = (0..chart.values.len())
+    let chart_style_id = shared_chart::chart_style_id(&chart_resource.chart_space).unwrap_or(2);
+    let point_colors: Vec<RgbColor> = (0..chart.values.len())
       .map(|index| {
         chart
           .data_point_fills
@@ -1253,7 +1256,7 @@ fn lower_chart(
               import,
               slide,
               chart_resource,
-              shared_chart::chart_style_id(&chart_resource.chart_space).unwrap_or(2),
+              chart_style_id,
               formatting_index,
               maximum_formatting_index,
             )
@@ -1265,6 +1268,18 @@ fn lower_chart(
       pptx_chart_shape_style(import, slide, chart_resource, chart.series_shape_properties);
     let point_styles = (0..chart.values.len())
       .map(|index| {
+        let automatic_fill = pptx_automatic_chart_fill_style(
+          import,
+          slide,
+          chart_resource,
+          chart_style_id,
+          chart.kind == shared_chart::RadialChartKind::Pie3D,
+          point_colors[index],
+        );
+        let inherited_fill = inherited_point_style
+          .fill
+          .resolve_over(&automatic_fill)
+          .clone();
         let point_style = chart
           .data_points
           .iter()
@@ -1279,10 +1294,7 @@ fn lower_chart(
           })
           .unwrap_or_default();
         common::ShapeStyle {
-          fill: point_style
-            .fill
-            .resolve_over(&inherited_point_style.fill)
-            .clone(),
+          fill: point_style.fill.resolve_over(&inherited_fill).clone(),
           stroke: point_style
             .stroke
             .resolve_over(&inherited_point_style.stroke)
@@ -1449,6 +1461,83 @@ fn lower_chart(
       .iter()
       .map(|series| pptx_chart_shape_style(import, slide, chart_resource, series.shape_properties))
       .collect::<Vec<_>>();
+    let automatic_series_marker_strokes = series_colors
+      .iter()
+      .copied()
+      .map(|color| pptx_automatic_chart_marker_stroke_style(import, slide, chart_resource, color))
+      .collect::<Vec<_>>();
+    let series_marker_styles = chart
+      .series
+      .iter()
+      .enumerate()
+      .map(|(series_index, series)| {
+        let style = pptx_chart_shape_style(
+          import,
+          slide,
+          chart_resource,
+          series
+            .marker
+            .and_then(|marker| marker.chart_shape_properties.as_deref()),
+        );
+        crate::pptx::chart::normalize_chart_marker_shape_style(
+          series.marker,
+          style,
+          automatic_series_marker_strokes.get(series_index),
+        )
+      })
+      .collect::<Vec<_>>();
+    let automatic_series_fills = chart
+      .series
+      .iter()
+      .enumerate()
+      .map(|(series_index, series)| {
+        pptx_automatic_chart_fill_style(
+          import,
+          slide,
+          chart_resource,
+          chart_style_id,
+          series.is_3d,
+          series_colors.get(series_index).copied().unwrap_or_default(),
+        )
+      })
+      .collect::<Vec<_>>();
+    let chart_effect_resolver = PptxImageEffectColorResolver {
+      import,
+      slide: Some(slide),
+      chart_resource: Some(chart_resource),
+      placeholder_color: Some(Color::Scheme(SchemeColor {
+        value: a::SchemeColorValues::Dark1,
+        transformations: Vec::new(),
+      })),
+    };
+    let chart_format_scheme = chart_format_scheme(import, slide, chart_resource);
+    let data_point_effect_style = shared_chart::chart_shape_effects_from_theme_style(
+      shared_chart::automatic_chart_data_point_effect_style_index(chart_style_id)
+        .and_then(|index| chart_format_scheme?.get_effect_style_source(index)),
+      &chart_effect_resolver,
+    );
+    let series_effect_styles = chart
+      .series
+      .iter()
+      .map(|series| {
+        shared_chart::chart_shape_effects_from_properties(
+          series.shape_properties,
+          &chart_effect_resolver,
+        )
+      })
+      .collect::<Vec<_>>();
+    let series_marker_effect_styles = chart
+      .series
+      .iter()
+      .map(|series| {
+        shared_chart::chart_shape_effects_from_properties(
+          series
+            .marker
+            .and_then(|marker| marker.chart_shape_properties.as_deref()),
+          &chart_effect_resolver,
+        )
+      })
+      .collect::<Vec<_>>();
     let series_point_styles = chart
       .series
       .iter()
@@ -1458,6 +1547,7 @@ fn lower_chart(
             series
               .data_points
               .iter()
+              .rev()
               .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
               .map(|point| {
                 pptx_chart_shape_style(
@@ -1465,6 +1555,89 @@ fn lower_chart(
                   slide,
                   chart_resource,
                   point.chart_shape_properties.as_deref(),
+                )
+              })
+          })
+          .collect::<Vec<_>>()
+      })
+      .collect::<Vec<_>>();
+    let series_point_marker_styles = chart
+      .series
+      .iter()
+      .enumerate()
+      .map(|(series_index, series)| {
+        (0..series.values.len())
+          .map(|point_index| {
+            series
+              .data_points
+              .iter()
+              .rev()
+              .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
+              .and_then(|point| point.marker.as_deref())
+              .map(|marker| {
+                let style = pptx_chart_shape_style(
+                  import,
+                  slide,
+                  chart_resource,
+                  marker.chart_shape_properties.as_deref(),
+                );
+                crate::pptx::chart::normalize_chart_marker_shape_style(
+                  Some(marker),
+                  style,
+                  series_point_styles
+                    .get(series_index)
+                    .and_then(|points| points.get(point_index))
+                    .and_then(Option::as_ref)
+                    .map(|point| &point.stroke)
+                    .filter(|stroke| !matches!(stroke, crate::common::ShapeStyleValue::Unspecified))
+                    .or_else(|| {
+                      series_marker_styles
+                        .get(series_index)
+                        .map(|style| &style.stroke)
+                    }),
+                )
+              })
+          })
+          .collect()
+      })
+      .collect::<Vec<_>>();
+    let series_point_effect_styles = chart
+      .series
+      .iter()
+      .map(|series| {
+        (0..series.values.len())
+          .map(|point_index| {
+            series
+              .data_points
+              .iter()
+              .rev()
+              .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
+              .map(|point| {
+                shared_chart::chart_shape_effects_from_properties(
+                  point.chart_shape_properties.as_deref(),
+                  &chart_effect_resolver,
+                )
+              })
+          })
+          .collect()
+      })
+      .collect::<Vec<_>>();
+    let series_point_marker_effect_styles = chart
+      .series
+      .iter()
+      .map(|series| {
+        (0..series.values.len())
+          .map(|point_index| {
+            series
+              .data_points
+              .iter()
+              .rev()
+              .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
+              .and_then(|point| point.marker.as_deref())
+              .map(|marker| {
+                shared_chart::chart_shape_effects_from_properties(
+                  marker.chart_shape_properties.as_deref(),
+                  &chart_effect_resolver,
                 )
               })
           })
@@ -1476,14 +1649,7 @@ fn lower_chart(
       .iter()
       .enumerate()
       .map(|(series_index, series)| {
-        if !chart.vary_colors_by_point
-          || chart.series.len() != 1
-          || series_index != 0
-          || series
-            .shape_properties
-            .and_then(shared_chart::chart_shape_solid_fill)
-            .is_some()
-        {
+        if !chart.vary_colors_by_point || chart.series.len() != 1 || series_index != 0 {
           return vec![None; series.values.len()];
         }
         let maximum_point_index = series.values.len().saturating_sub(1);
@@ -1497,6 +1663,46 @@ fn lower_chart(
               point_index,
               maximum_point_index,
             )
+          })
+          .collect()
+      })
+      .collect::<Vec<_>>();
+    let automatic_series_point_fills = chart
+      .series
+      .iter()
+      .enumerate()
+      .map(|(series_index, series)| {
+        series_point_colors
+          .get(series_index)
+          .map(|colors| {
+            colors
+              .iter()
+              .map(|color| {
+                color.map(|color| {
+                  pptx_automatic_chart_fill_style(
+                    import,
+                    slide,
+                    chart_resource,
+                    chart_style_id,
+                    series.is_3d,
+                    color,
+                  )
+                })
+              })
+              .collect()
+          })
+          .unwrap_or_default()
+      })
+      .collect::<Vec<_>>();
+    let automatic_series_point_marker_strokes = series_point_colors
+      .iter()
+      .map(|colors| {
+        colors
+          .iter()
+          .map(|color| {
+            color.map(|color| {
+              pptx_automatic_chart_marker_stroke_style(import, slide, chart_resource, color)
+            })
           })
           .collect()
       })
@@ -1731,6 +1937,8 @@ fn lower_chart(
           stroke_scale: 1.0,
           automatic_line_width_pt: powerpoint_chart_automatic_line_width_pt(
             import,
+            slide,
+            chart_resource,
             &chart_resource.chart_space,
           ),
           has_explicit_title: chart_resource
@@ -1791,6 +1999,17 @@ fn lower_chart(
           series_colors,
           series_point_colors,
           series_styles,
+          series_marker_styles,
+          series_point_marker_styles,
+          automatic_series_marker_strokes,
+          automatic_series_fills,
+          automatic_series_point_fills,
+          automatic_series_point_marker_strokes,
+          data_point_effect_style,
+          series_effect_styles,
+          series_marker_effect_styles,
+          series_point_effect_styles,
+          series_point_marker_effect_styles,
           trendline_styles,
           error_bar_styles,
           group_decoration_styles,
@@ -2316,7 +2535,7 @@ fn display_color_for_chart_series(
   formatting_index: usize,
   maximum_formatting_index: usize,
 ) -> Option<RgbColor> {
-  let theme = chart_theme(import, slide);
+  let color_scheme = chart_color_scheme(import, slide, chart_resource);
   let color_map = chart_resource.chart_space.color_map_override.as_deref();
   shared_chart::automatic_chart_series_color(
     chart_style_id,
@@ -2324,12 +2543,12 @@ fn display_color_for_chart_series(
     maximum_formatting_index,
     |token| {
       let mapped = shared_chart::scheme_color_token(color_map, token)?;
-      theme
-        .and_then(|theme| {
-          let color = theme.color_scheme.get_color(mapped)?.clone();
+      color_scheme
+        .and_then(|color_scheme| {
+          let color = color_scheme.get_color(mapped)?.clone();
           let mut scheme_resolver = |nested| {
             let mapped = shared_chart::scheme_color_token(color_map, nested)?;
-            theme.color_scheme.get_color(mapped).cloned()
+            color_scheme.get_color(mapped).cloned()
           };
           let resolved = color.resolve_rgb(&mut scheme_resolver, None)?;
           Some(RgbColor {
@@ -2472,13 +2691,49 @@ fn display_paint_for_chart_color(
   chart_resource: &ChartResource,
   color: &Color,
 ) -> Option<DisplayPaint> {
-  let theme = chart_theme(import, slide)?;
+  display_paint_for_chart_color_with_placeholder(import, slide, chart_resource, color, None)
+}
+
+fn display_paint_for_chart_color_with_placeholder(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  color: &Color,
+  placeholder_color: Option<&Color>,
+) -> Option<DisplayPaint> {
+  display_paint_for_chart_color_with_placeholder_policy(
+    import,
+    slide,
+    chart_resource,
+    color,
+    placeholder_color,
+    false,
+  )
+}
+
+fn display_paint_for_chart_color_with_placeholder_policy(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  color: &Color,
+  placeholder_color: Option<&Color>,
+  preserve_saturation_overflow: bool,
+) -> Option<DisplayPaint> {
+  let color_scheme = chart_color_scheme(import, slide, chart_resource)?;
   let color_map = chart_resource.chart_space.color_map_override.as_deref();
   let mut scheme_resolver = |token| {
     let mapped = shared_chart::scheme_color_token(color_map, token)?;
-    theme.color_scheme.get_color(mapped).cloned()
+    color_scheme.get_color(mapped).cloned()
   };
-  let color = color.clone().resolve_rgb(&mut scheme_resolver, None)?;
+  let color = if preserve_saturation_overflow {
+    color
+      .clone()
+      .resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?
+  } else {
+    color
+      .clone()
+      .resolve_rgb(&mut scheme_resolver, placeholder_color)?
+  };
   Some(DisplayPaint {
     color: RgbColor {
       r: color.r,
@@ -2577,10 +2832,14 @@ fn pptx_chart_area_shape_style(
 
 fn powerpoint_chart_automatic_line_width_pt(
   import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
   chart_space: &c::ChartSpace,
 ) -> f32 {
-  let subtle_theme_width = import
-    .get_theme_line_style(1)
+  let subtle_theme_width = chart_format_scheme(import, slide, chart_resource)
+    .and_then(|scheme| {
+      scheme.get_line_style(shared_chart::AUTOMATIC_CHART_DATA_POINT_LINE_STYLE_INDEX)
+    })
     .and_then(|line| line.width_emu)
     .map(units::emu_to_points)
     .unwrap_or(0.75);
@@ -2647,6 +2906,17 @@ fn pptx_chart_gradient_fill(
   chart_resource: &ChartResource,
   fill: &a::GradientFill,
 ) -> Option<common::Fill<'static>> {
+  pptx_chart_gradient_fill_with_placeholder(import, slide, chart_resource, fill, None, false)
+}
+
+fn pptx_chart_gradient_fill_with_placeholder(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  fill: &a::GradientFill,
+  placeholder_color: Option<&Color>,
+  preserve_saturation_overflow: bool,
+) -> Option<common::Fill<'static>> {
   let mut stops = fill
     .gradient_stop_list
     .as_ref()?
@@ -2654,7 +2924,14 @@ fn pptx_chart_gradient_fill(
     .iter()
     .filter_map(|stop| {
       let color = Color::from_gradient_stop_choice(stop.gradient_stop_choice.as_ref()?)?;
-      let paint = display_paint_for_chart_color(import, slide, chart_resource, &color)?;
+      let paint = display_paint_for_chart_color_with_placeholder_policy(
+        import,
+        slide,
+        chart_resource,
+        &color,
+        placeholder_color,
+        preserve_saturation_overflow,
+      )?;
       Some(common::GradientStop {
         position: stop.position.as_ratio() as f32,
         color: common_rgb(paint.color, paint.opacity),
@@ -2700,12 +2977,32 @@ fn pptx_chart_pattern_fill(
   chart_resource: &ChartResource,
   fill: &a::PatternFill,
 ) -> Option<common::PatternFill> {
+  pptx_chart_pattern_fill_with_placeholder(import, slide, chart_resource, fill, None, false)
+}
+
+fn pptx_chart_pattern_fill_with_placeholder(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  fill: &a::PatternFill,
+  placeholder_color: Option<&Color>,
+  preserve_saturation_overflow: bool,
+) -> Option<common::PatternFill> {
   let foreground = fill
     .foreground_color
     .as_ref()
     .and_then(|color| color.foreground_color_choice.as_ref())
     .and_then(Color::from_foreground_color_choice)
-    .and_then(|color| display_paint_for_chart_color(import, slide, chart_resource, &color))
+    .and_then(|color| {
+      display_paint_for_chart_color_with_placeholder_policy(
+        import,
+        slide,
+        chart_resource,
+        &color,
+        placeholder_color,
+        preserve_saturation_overflow,
+      )
+    })
     .map(|paint| common_rgb(paint.color, paint.opacity))
     .unwrap_or(common::Color {
       r: 0,
@@ -2718,7 +3015,16 @@ fn pptx_chart_pattern_fill(
     .as_ref()
     .and_then(|color| color.background_color_choice.as_ref())
     .and_then(Color::from_background_color_choice)
-    .and_then(|color| display_paint_for_chart_color(import, slide, chart_resource, &color))
+    .and_then(|color| {
+      display_paint_for_chart_color_with_placeholder_policy(
+        import,
+        slide,
+        chart_resource,
+        &color,
+        placeholder_color,
+        preserve_saturation_overflow,
+      )
+    })
     .map(|paint| common_rgb(paint.color, paint.opacity))
     .unwrap_or(common::Color {
       r: u8::MAX,
@@ -2747,6 +3053,148 @@ fn pptx_chart_blip_fill(fill: &a::BlipFill) -> common::Fill<'static> {
   }
 }
 
+fn pptx_automatic_chart_fill_style(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  chart_style_id: u8,
+  is_3d: bool,
+  placeholder: RgbColor,
+) -> common::ShapeStyleValue<common::Fill<'static>> {
+  let index = shared_chart::automatic_chart_data_point_fill_style_index(chart_style_id, is_3d);
+  let Some(fill) = chart_format_scheme(import, slide, chart_resource)
+    .and_then(|scheme| scheme.get_fill_style(index))
+    .cloned()
+  else {
+    return common::ShapeStyleValue::Unspecified;
+  };
+  let placeholder = diagram_rgb_color(placeholder);
+  let fill = fill.with_placeholder_color(Some(placeholder));
+  let resolved = match &fill.kind {
+    FillKind::None => Some(common::Fill::None),
+    FillKind::Solid(color) => color
+      .as_ref()
+      .or(fill.placeholder_color.as_ref())
+      .and_then(|color| {
+        display_paint_for_chart_color_with_placeholder_policy(
+          import,
+          slide,
+          chart_resource,
+          color,
+          fill.placeholder_color.as_ref(),
+          true,
+        )
+      })
+      .map(|paint| common::Fill::Solid(common_rgb(paint.color, paint.opacity))),
+    FillKind::Gradient(gradient) => pptx_chart_gradient_fill_with_placeholder(
+      import,
+      slide,
+      chart_resource,
+      gradient,
+      fill.placeholder_color.as_ref(),
+      true,
+    ),
+    FillKind::Pattern(pattern) => pptx_chart_pattern_fill_with_placeholder(
+      import,
+      slide,
+      chart_resource,
+      pattern,
+      fill.placeholder_color.as_ref(),
+      true,
+    )
+    .map(common::Fill::Pattern),
+    FillKind::Blip(blip) => Some(pptx_chart_blip_fill(blip)),
+    FillKind::SlideBackground | FillKind::Group => None,
+  };
+  resolved.map_or(
+    common::ShapeStyleValue::Unspecified,
+    common::ShapeStyleValue::Paint,
+  )
+}
+
+fn pptx_automatic_chart_marker_stroke_style(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  placeholder: RgbColor,
+) -> common::ShapeStyleValue<common::Stroke<'static>> {
+  let Some(line) = chart_format_scheme(import, slide, chart_resource)
+    .and_then(|scheme| {
+      scheme.get_line_style(shared_chart::AUTOMATIC_CHART_DATA_POINT_LINE_STYLE_INDEX)
+    })
+    .cloned()
+  else {
+    return common::ShapeStyleValue::Unspecified;
+  };
+  let placeholder = diagram_rgb_color(placeholder);
+  let line = line.with_placeholder_color(Some(placeholder));
+  let (color, pattern, gradient) = match &line.fill {
+    LineFill::None => return common::ShapeStyleValue::NoPaint,
+    LineFill::Unspecified => return common::ShapeStyleValue::Unspecified,
+    LineFill::Solid(color) => {
+      let Some(paint) = color
+        .as_ref()
+        .or(line.placeholder_color.as_ref())
+        .and_then(|color| {
+          display_paint_for_chart_color_with_placeholder_policy(
+            import,
+            slide,
+            chart_resource,
+            color,
+            line.placeholder_color.as_ref(),
+            true,
+          )
+        })
+      else {
+        return common::ShapeStyleValue::Unspecified;
+      };
+      (common_rgb(paint.color, paint.opacity), None, None)
+    }
+    LineFill::Pattern(fill) => {
+      let Some(pattern) = pptx_chart_pattern_fill_with_placeholder(
+        import,
+        slide,
+        chart_resource,
+        fill,
+        line.placeholder_color.as_ref(),
+        true,
+      ) else {
+        return common::ShapeStyleValue::Unspecified;
+      };
+      (pattern.foreground, Some(pattern), None)
+    }
+    LineFill::Gradient(fill) => {
+      let Some(common::Fill::Gradient(gradient)) = pptx_chart_gradient_fill_with_placeholder(
+        import,
+        slide,
+        chart_resource,
+        fill,
+        line.placeholder_color.as_ref(),
+        true,
+      ) else {
+        return common::ShapeStyleValue::Unspecified;
+      };
+      let color = gradient
+        .stops
+        .first()
+        .map(|stop| stop.color)
+        .unwrap_or_default();
+      (color, None, Some(gradient))
+    }
+  };
+  let mut stroke = common::Stroke {
+    width: common::Pt(line.width_emu.map(units::emu_to_points).unwrap_or(0.75)),
+    color,
+    pattern,
+    gradient,
+    ..Default::default()
+  };
+  if let Some(outline) = line.source_outline.as_deref() {
+    common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+  }
+  common::ShapeStyleValue::Paint(stroke)
+}
+
 fn chart_theme<'a>(
   import: &'a PowerPointImport,
   slide: &SlidePersist,
@@ -2756,6 +3204,30 @@ fn chart_theme<'a>(
     .as_deref()
     .and_then(|path| import.get_theme(path))
     .or_else(|| import.get_current_theme_ptr())
+}
+
+fn chart_color_scheme<'a>(
+  import: &'a PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &'a ChartResource,
+) -> Option<&'a ThemeColorScheme> {
+  chart_resource
+    .theme_override
+    .as_ref()
+    .and_then(|override_resource| override_resource.color_scheme.as_ref())
+    .or_else(|| chart_theme(import, slide).map(|theme| &theme.color_scheme))
+}
+
+fn chart_format_scheme<'a>(
+  import: &'a PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &'a ChartResource,
+) -> Option<&'a ThemeFormatScheme> {
+  chart_resource
+    .theme_override
+    .as_ref()
+    .and_then(|override_resource| override_resource.format_scheme.as_ref())
+    .or_else(|| chart_theme(import, slide).map(|theme| &theme.format_scheme))
 }
 
 fn pptx_chartex_theme(
@@ -6859,6 +7331,8 @@ fn finish_shape_effect_raster(
   let resolver = PptxImageEffectColorResolver {
     import: context.import,
     slide: Some(context.slide),
+    chart_resource: None,
+    placeholder_color: None,
   };
   let fixed_effect_list = matches!(context.source, Some(ShapeEffectSource::List(_)));
   let mut effects = match context.source {
@@ -8015,11 +8489,28 @@ struct ImageEffects(Vec<ImageEffect>);
 struct PptxImageEffectColorResolver<'a> {
   import: &'a PowerPointImport,
   slide: Option<&'a SlidePersist>,
+  chart_resource: Option<&'a ChartResource>,
+  placeholder_color: Option<Color>,
 }
 
 impl PptxImageEffectColorResolver<'_> {
   fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
-    let paint = display_paint_for_optional_slide(self.import, self.slide, &color?, None)?;
+    let color = color?;
+    let paint = match (self.slide, self.chart_resource) {
+      (Some(slide), Some(chart_resource)) => display_paint_for_chart_color_with_placeholder(
+        self.import,
+        slide,
+        chart_resource,
+        &color,
+        self.placeholder_color.as_ref(),
+      ),
+      _ => display_paint_for_optional_slide(
+        self.import,
+        self.slide,
+        &color,
+        self.placeholder_color.as_ref(),
+      ),
+    }?;
     Some(ResolvedEffectColor {
       color: paint.color,
       alpha: (paint.opacity.clamp(0.0, 1.0) * 255.0).round() as u8,
@@ -8080,13 +8571,24 @@ impl ImageEffectColorResolver for PptxImageEffectColorResolver<'_> {
     self.resolve(Color::from_preset_shadow_choice(choice))
   }
 
+  fn extrusion_color(&self, choice: &a::ExtrusionColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_extrusion_color_choice(choice))
+  }
+
+  fn contour_color(&self, choice: &a::ContourColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_contour_color_choice(choice))
+  }
+
   fn blip_fill(
     &self,
     fill: &a::BlipFill,
   ) -> Option<common::drawingml_image_effects::ImageEffectFill> {
-    let slide = self.slide?;
     let blip = fill.blip.as_ref()?;
-    let resource = slide.image_resources.get(blip.embed.as_deref()?)?;
+    let relationship_id = blip.embed.as_deref()?;
+    let resource = self
+      .chart_resource
+      .and_then(|chart| chart.image_resources.get(relationship_id))
+      .or_else(|| self.slide?.image_resources.get(relationship_id))?;
     let effects = common::drawingml_image_effects::from_blip_choices(
       &blip.blip_choice,
       resource.content_type.as_deref(),
@@ -8141,6 +8643,8 @@ fn image_effects_from_blip(
     &PptxImageEffectColorResolver {
       import,
       slide: Some(slide),
+      chart_resource: None,
+      placeholder_color: None,
     },
   ))
 }
@@ -9049,7 +9553,12 @@ fn drawingml_text_static3d(
     a::BodyPropertiesChoice2::Shape3DType(shape) => shape,
     a::BodyPropertiesChoice2::FlatText(_) => return None,
   };
-  let resolver = PptxImageEffectColorResolver { import, slide };
+  let resolver = PptxImageEffectColorResolver {
+    import,
+    slide,
+    chart_resource: None,
+    placeholder_color: None,
+  };
   let extrusion_color = shape
     .extrusion_color
     .as_deref()
@@ -13244,7 +13753,12 @@ fn drawingml_run_effects(
   slide: Option<&SlidePersist>,
   effect: &a::RunPropertiesChoice2,
 ) -> common::drawingml_image_effects::ImageEffectContainer {
-  let resolver = PptxImageEffectColorResolver { import, slide };
+  let resolver = PptxImageEffectColorResolver {
+    import,
+    slide,
+    chart_resource: None,
+    placeholder_color: None,
+  };
   match effect {
     a::RunPropertiesChoice2::EffectList(list) => {
       common::drawingml_image_effects::from_effect_list(list, None, &resolver)
@@ -13260,7 +13774,12 @@ fn drawingml_default_run_effects(
   slide: Option<&SlidePersist>,
   effect: &a::DefaultRunPropertiesChoice2,
 ) -> common::drawingml_image_effects::ImageEffectContainer {
-  let resolver = PptxImageEffectColorResolver { import, slide };
+  let resolver = PptxImageEffectColorResolver {
+    import,
+    slide,
+    chart_resource: None,
+    placeholder_color: None,
+  };
   match effect {
     a::DefaultRunPropertiesChoice2::EffectList(list) => {
       common::drawingml_image_effects::from_effect_list(list, None, &resolver)

@@ -25,6 +25,7 @@ use crate::error::Result;
 use crate::model::{ImageCrop, RgbColor};
 use crate::pptx::drawingml::color::{Color, RgbHexColor, SchemeColor};
 use crate::pptx::drawingml::shape::{FontStyleReference, ShapeStyleReference, ShapeStyleRefs};
+use crate::pptx::drawingml::theme::{ThemeColorScheme, ThemeFormatScheme};
 use crate::render::chart as shared_chart;
 
 use super::normalize_hyperlink_target;
@@ -199,6 +200,9 @@ pub(crate) struct ChartResourceCatalog {
   pub(crate) has_embedded_package: bool,
   pub(crate) images: usize,
   pub(crate) has_theme_override: bool,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
+  pub(crate) theme_color_scheme: Option<ThemeColorScheme>,
+  pub(crate) theme_format_scheme: Option<ThemeFormatScheme>,
   pub(crate) styles: usize,
   pub(crate) color_styles: usize,
 }
@@ -415,10 +419,13 @@ fn collect_object_image_relationships(
   }
 }
 
-fn collect_image_resources(
+fn collect_image_resources<P>(
   package: &SpreadsheetDocument,
-  part: &DrawingsPart,
-) -> HashMap<String, ImageResource> {
+  part: &P,
+) -> HashMap<String, ImageResource>
+where
+  P: SdkPart,
+{
   part
     .related_parts_of_type::<_, ImagePart>(package)
     .filter_map(|related_part| {
@@ -2293,11 +2300,22 @@ impl ChartResourceCatalog {
       let chart_space = part.root_element(package)?;
       Self::from_chart_space(Some(relationship_id), chart_space, ui_language)
     };
+    let image_resources = collect_image_resources(package, part);
+    let theme_override = part
+      .theme_override_part(package)
+      .and_then(|part| part.root_element(package).ok());
     Ok(Self {
       has_chart_drawing: part.chart_drawing_part(package).is_some(),
       has_embedded_package: part.embedded_package_part(package).is_some(),
-      images: part.image_parts(package).count(),
-      has_theme_override: part.theme_override_part(package).is_some(),
+      images: image_resources.len(),
+      has_theme_override: theme_override.is_some(),
+      image_resources,
+      theme_color_scheme: theme_override
+        .and_then(|theme| theme.color_scheme.as_deref())
+        .map(ThemeColorScheme::from_dml),
+      theme_format_scheme: theme_override
+        .and_then(|theme| theme.format_scheme.as_deref())
+        .map(ThemeFormatScheme::from_dml),
       styles: part.chart_style_parts(package).count(),
       color_styles: part.chart_color_style_parts(package).count(),
       ..model

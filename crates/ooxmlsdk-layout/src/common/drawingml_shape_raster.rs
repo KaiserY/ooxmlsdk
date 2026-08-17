@@ -1531,6 +1531,7 @@ mod tests {
         y: Pt(0.0),
       },
       line_height: Pt(12.0),
+      line_metrics_participant: true,
       paint_clip: None,
       style,
       font_id: None,

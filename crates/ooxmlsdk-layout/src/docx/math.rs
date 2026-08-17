@@ -478,7 +478,6 @@ fn inline_image_from_math_box(math_box: MathBox, semantic_text: String) -> Inlin
     semantic_metafile_font_family: None,
     native_ole_equation: None,
     metafile_native_size: false,
-    picture_content_control: false,
     placement: ImagePlacement::Inline,
   }
 }

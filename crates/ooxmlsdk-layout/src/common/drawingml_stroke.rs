@@ -231,6 +231,42 @@ pub(crate) fn apply_outline_style(stroke: &mut Stroke<'_>, outline: &a::Outline)
   });
 }
 
+/// Applies only line-style fields explicitly present on `outline` over an
+/// already resolved inherited stroke.
+///
+/// `apply_outline_style` is the terminal conversion for a complete outline
+/// and therefore clears omitted cap/join/end fields. Chart markers also allow
+/// a partial direct `a:ln` over a themed line; at that cascade boundary an
+/// omitted field must retain its inherited value instead.
+pub(crate) fn apply_outline_style_over_inherited(stroke: &mut Stroke<'_>, outline: &a::Outline) {
+  let mut direct = stroke.clone();
+  apply_outline_style(&mut direct, outline);
+  if outline.cap_type.is_some() {
+    stroke.cap = direct.cap;
+  }
+  if outline.compound_line_type.is_some() {
+    stroke.compound = direct.compound;
+  }
+  if outline.alignment.is_some() {
+    stroke.alignment = direct.alignment;
+  }
+  if outline.outline_choice2.as_ref().is_some_and(
+    |choice| !matches!(choice, a::OutlineChoice2::CustomDash(dash) if dash.dash_stop.is_empty()),
+  ) {
+    stroke.preset_dash = direct.preset_dash;
+    stroke.dash = direct.dash;
+  }
+  if outline.outline_choice3.is_some() {
+    stroke.join = direct.join;
+  }
+  if outline.head_end.is_some() {
+    stroke.head_end = direct.head_end;
+  }
+  if outline.tail_end.is_some() {
+    stroke.tail_end = direct.tail_end;
+  }
+}
+
 fn line_cap(value: a::LineCapValues) -> StrokeCap {
   match value {
     a::LineCapValues::Round => StrokeCap::Round,

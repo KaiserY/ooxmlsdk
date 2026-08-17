@@ -245,6 +245,27 @@ pub(crate) const WORD_UNTITLED_SIDE_LEGEND: CartesianLayoutAdjustment = Cartesia
   ..ZERO_ADJUSTMENT
 };
 
+/// Word's automatic 2-D plot reservation for a complex category axis on the
+/// physical horizontal axis.
+///
+/// A multi-level cache changes both the outer category band and the automatic
+/// inner plot rectangle; it is not equivalent to appending another ordinary
+/// tick-label line. The ratios are measured from the immutable Office fixed
+/// output for LibreOffice `testMultilevelCategoryAxis.docx`. The structurally
+/// matching single-level Word column chart `testBarChart.docx` is the negative
+/// control and retains `WORD_UNTITLED_SIDE_LEGEND`. Manual and 3-D plots remain
+/// under their authored/projected geometry paths.
+pub(crate) const WORD_AUTOMATIC_HORIZONTAL_MULTILEVEL_CATEGORY_AXIS: CartesianLayoutAdjustment =
+  CartesianLayoutAdjustment {
+    category_top_ratio: 0.000_748,
+    plot_top_ratio: -0.004_718,
+    plot_bottom_ratio: 0.007_007,
+    tick_left_ratio: -0.002_626,
+    plot_left_ratio: -0.005_31,
+    plot_right_ratio: 0.013_182,
+    ..ZERO_ADJUSTMENT
+  };
+
 /// Word's automatic untitled layout when no legend is present.
 ///
 /// The ratios are measured from the Office fixed-output plot rectangle of
@@ -812,6 +833,19 @@ pub(crate) const WORD_NO_LEGEND_PIE: RadialPlotProfile = RadialPlotProfile {
   center_y_height_ratio: 0.5,
   radius_x_height_ratio: 0.394_355_15,
   radius_y_height_ratio: 0.394_355_15,
+};
+
+/// Word automatic pie without a legend or visible data labels.
+///
+/// Data-label shapes reserve an outer ring even when the legend is absent.
+/// With no visible labels, Office expands the plot to an 11pt margin in the
+/// immutable 432x252pt `tdf129054.docx` chart frame: a 115pt radius, expressed
+/// here as the normal host-relative automatic-layout profile.
+pub(crate) const WORD_NO_LEGEND_UNLABELED_PIE: RadialPlotProfile = RadialPlotProfile {
+  center_x_width_ratio: 0.5,
+  center_y_height_ratio: 0.5,
+  radius_x_height_ratio: 0.456_349_2,
+  radius_y_height_ratio: 0.456_349_2,
 };
 
 /// Word automatic pie with a vertical side legend.

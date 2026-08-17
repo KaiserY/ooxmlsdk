@@ -37,6 +37,7 @@ use super::drawingml::line::{LineFill, LineProperties};
 use super::drawingml::shape::{LegacyVmlFillImage, Shape, ShapeMapEntry};
 use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 use super::drawingml::text_list_style::TextListStyle;
+use super::drawingml::theme::{ThemeColorScheme, ThemeFormatScheme};
 use super::import::PowerPointImport;
 // a 28000 x 21000 mm100 master page when exporting a presentation with no page
 // property value. Kept here until the full sd import defaults are ported.
@@ -277,6 +278,8 @@ impl ChartDrawingResource {
 pub(crate) struct ThemeOverrideResource {
   pub(crate) path: Option<String>,
   pub(crate) theme_override: a::ThemeOverride,
+  pub(crate) color_scheme: Option<ThemeColorScheme>,
+  pub(crate) format_scheme: Option<ThemeFormatScheme>,
   pub(crate) image_resources: HashMap<String, ImageResource>,
 }
 
@@ -569,6 +572,16 @@ fn theme_override_resource(
   Ok(ThemeOverrideResource {
     path: part.path(package).map(str::to_string),
     theme_override: part.root_element(package)?.clone(),
+    color_scheme: part
+      .root_element(package)?
+      .color_scheme
+      .as_deref()
+      .map(ThemeColorScheme::from_dml),
+    format_scheme: part
+      .root_element(package)?
+      .format_scheme
+      .as_deref()
+      .map(ThemeFormatScheme::from_dml),
     image_resources,
   })
 }

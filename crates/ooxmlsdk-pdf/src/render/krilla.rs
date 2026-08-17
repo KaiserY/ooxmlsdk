@@ -483,6 +483,7 @@ struct TextItem<'doc> {
   x_pt: f32,
   y_pt: f32,
   line_height_pt: f32,
+  line_metrics_participant: bool,
   paint_clip: Option<PaintClipRect>,
   text: Cow<'doc, str>,
   style: TextStyle<'doc>,
@@ -2035,6 +2036,7 @@ fn expand_metafile_semantic_text_item<'doc>(
             x_pt: image.x_pt + run.x * image.width_pt,
             y_pt: image.y_pt + run.y * image.height_pt,
             line_height_pt: (font_size_pt * 1.15).max(1.0),
+            line_metrics_participant: true,
             paint_clip: None,
             text: Cow::Owned(run.text),
             style: TextStyle {
@@ -2254,6 +2256,7 @@ fn word_signature_line_text_item<'doc>(
     x_pt,
     y_pt: baseline_y_pt,
     line_height_pt: font_size_pt * 1.15,
+    line_metrics_participant: true,
     paint_clip: None,
     text: Cow::Owned(text),
     style: TextStyle {
@@ -2348,6 +2351,7 @@ fn image_page_item_from_common<'doc>(
           x_pt: text_x_pt,
           y_pt: text_y_pt + line_index as f32 * 1.2,
           line_height_pt: 1.2,
+          line_metrics_participant: true,
           paint_clip: clip,
           text: Cow::Owned(text),
           style: style.clone(),
@@ -2487,6 +2491,7 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
     x_pt: text.origin.x.0,
     y_pt: text.origin.y.0,
     line_height_pt: text.line_height.0,
+    line_metrics_participant: text.line_metrics_participant,
     paint_clip: text.paint_clip.map(paint_clip_from_common),
     text: Cow::Borrowed(text.text.as_ref()),
     style: text_style_from_common(&text.style),
@@ -2859,6 +2864,7 @@ fn coalesced_writer_text_items<'doc>(
         {
           previous.text.to_mut().push_str(&text.text);
           previous.line_height_pt = previous.line_height_pt.max(text.line_height_pt);
+          previous.line_metrics_participant |= text.line_metrics_participant;
           continue;
         }
         output.push(PageItem::Text(text));
@@ -3003,7 +3009,8 @@ fn writer_item_line_metrics(
 ) -> Option<WriterLineMetrics> {
   match item {
     PageItem::Text(text)
-      if !text.style.semantic_only
+      if text.line_metrics_participant
+        && !text.style.semantic_only
         && matches!(
           text.style.line_vertical_alignment,
           common::LineVerticalAlignment::Auto | common::LineVerticalAlignment::Baseline
@@ -8090,16 +8097,16 @@ mod tests {
   use std::sync::Arc;
 
   use super::{
-    GlyphId, ImageCrop, ImageItem, OfficeMathSvgTextMarker, PageItem, PaintDocument, PaintItem,
-    PaintTextPortionKind, TextItem, TextMetrics, TextStyle as PaintTextStyle,
-    conversion_font_audit, draw_office_math_text, gamma_correct_gradient_color,
-    localized_metafile_ui_font_family, metafile_render_options_for_image,
-    office_math_semantic_glyph_id, office_math_svg_text_marker, pdf_metadata, pdf_page_dimension,
-    render, semantic_advance_for_text_range, shaped_pdf_glyphs,
+    FollowFrameKind, GlyphId, ImageCrop, ImageItem, OfficeMathSvgTextMarker, PageItem,
+    PaintDocument, PaintItem, PaintLineOwner, PaintTextPortionKind, TextItem, TextMetrics,
+    TextStyle as PaintTextStyle, common_writer_line_baselines, conversion_font_audit,
+    draw_office_math_text, gamma_correct_gradient_color, localized_metafile_ui_font_family,
+    metafile_render_options_for_image, office_math_semantic_glyph_id, office_math_svg_text_marker,
+    pdf_metadata, pdf_page_dimension, render, semantic_advance_for_text_range, shaped_pdf_glyphs,
     source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
     synthetic_italic_text_transform, text_portion_ranges, text_requires_glyph_outlines,
     text_stroke_with_fill, text_style_from_common, visually_ordered_text_portion_ranges,
-    word_small_caps_semantic_text, word_unsigned_signature_line_items,
+    word_small_caps_semantic_text, word_unsigned_signature_line_items, writer_item_line_metrics,
   };
   use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfOptions};
   use krilla::Document;
@@ -8384,6 +8391,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 0.0,
       line_height_pt: 12.0,
+      line_metrics_participant: true,
       paint_clip: None,
       text: "non-business".into(),
       style: PaintTextStyle::default(),
@@ -8408,6 +8416,70 @@ mod tests {
   }
 
   #[test]
+  fn word_shared_baseline_ignores_painted_nonparticipating_blank_run() {
+    let text_item =
+      |text: &'static str, font_size_pt: f32, line_metrics_participant: bool| TextItem {
+        x_pt: 0.0,
+        y_pt: 0.0,
+        line_height_pt: font_size_pt * 1.15,
+        line_metrics_participant,
+        paint_clip: None,
+        text: text.into(),
+        style: PaintTextStyle {
+          font_size_pt,
+          ..PaintTextStyle::default()
+        },
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: common::PdfTextSegmentation::Line,
+        source_path: None,
+        semantic_target_width_pt: None,
+      };
+    let visible = text_item("U+0020", 12.0, true);
+    let ignored_blank = text_item(" ", 48.0, false);
+    let mut text_metrics = TextMetrics::new();
+    let expected = writer_item_line_metrics(
+      &PageItem::Text(Box::new(visible.clone())),
+      &mut text_metrics,
+    )
+    .expect("visible label participates in the shared baseline")
+    .baseline_offset_pt();
+    assert!(
+      writer_item_line_metrics(
+        &PageItem::Text(Box::new(ignored_blank.clone())),
+        &mut text_metrics,
+      )
+      .is_none(),
+      "the blank remains paintable without contributing its 48pt font box",
+    );
+
+    let owner = Some(PaintLineOwner {
+      frame_index: 0,
+      line_index: 0,
+      frame_kind: FollowFrameKind::Paragraph,
+      clip: None,
+    });
+    let baselines = common_writer_line_baselines(
+      &[
+        PageItem::Text(Box::new(visible)),
+        PageItem::Text(Box::new(ignored_blank)),
+      ],
+      &[owner, owner],
+      &mut text_metrics,
+    );
+    assert_eq!(baselines.len(), 2);
+    for baseline in baselines {
+      assert!((baseline.expect("shared paragraph baseline") - expected).abs() < 0.001);
+    }
+  }
+
+  #[test]
   fn odd_bidi_word_line_portions_follow_visual_order() {
     // Comment066.docx contains this exact directionally uniform w:rtl
     // fragment. The source ranges stay logical while their paint order is
@@ -8417,6 +8489,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 0.0,
       line_height_pt: 12.0,
+      line_metrics_participant: true,
       paint_clip: None,
       text: text.into(),
       style: PaintTextStyle {
@@ -8462,6 +8535,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 0.0,
       line_height_pt: 12.0,
+      line_metrics_participant: true,
       paint_clip: None,
       text: ".".repeat(70).into(),
       style: PaintTextStyle::default(),
@@ -8491,6 +8565,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 0.0,
       line_height_pt: 12.0,
+      line_metrics_participant: true,
       paint_clip: None,
       text: "\t".into(),
       style: PaintTextStyle {
@@ -8581,6 +8656,7 @@ mod tests {
         y: Pt(24.0),
       },
       line_height: Pt(14.0),
+      line_metrics_participant: true,
       paint_clip: None,
       style: TextStyle {
         font_family: Some("Arial".into()),

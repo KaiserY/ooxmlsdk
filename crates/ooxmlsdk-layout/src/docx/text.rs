@@ -1,5 +1,6 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use std::sync::Arc;
+use unicode_script::{Script, UnicodeScript};
 
 use crate::{fonts::effective_font_size_pt, units};
 
@@ -425,6 +426,9 @@ fn paragraph_model_with_base_impl<'a>(
       super::InlineItem::Text(run) => {
         run.style.line_vertical_alignment = line_vertical_alignment;
         run.style.use_windows_font_metrics = use_windows_font_metrics;
+        if wordprocessingml_cjk_text_metrics(&run.text, &run.style) {
+          run.style.wordprocessingml_cjk_line_metrics = true;
+        }
       }
       super::InlineItem::PositionalTab(tab) => {
         tab.style.line_vertical_alignment = line_vertical_alignment;
@@ -434,6 +438,9 @@ fn paragraph_model_with_base_impl<'a>(
         for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
           run.style.line_vertical_alignment = line_vertical_alignment;
           run.style.use_windows_font_metrics = use_windows_font_metrics;
+          if wordprocessingml_cjk_text_metrics(&run.text, &run.style) {
+            run.style.wordprocessingml_cjk_line_metrics = true;
+          }
         }
       }
       super::InlineItem::NoteReferenceMark(mark) => {
@@ -515,6 +522,24 @@ fn paragraph_model_with_base_impl<'a>(
     list_label_hyperlink_url: None,
     list_label_tab_stop_pt,
   }
+}
+
+fn wordprocessingml_cjk_text_metrics(text: &str, style: &TextStyle) -> bool {
+  // Word applies its CJK-capable font-height adjustment to visible East Asian
+  // text even when `w:noLeading` is absent. Keep the document-level
+  // compatibility flag for the independent Latin-text path, and opt ordinary
+  // runs in from their statically classified Unicode script. A generated
+  // Office UI resource with an explicit line box already owns these metrics;
+  // applying the font adjustment again would move its baseline inside that
+  // box. Numbering labels retain their independent ownership in
+  // include_numbering_label_height.
+  style.line_height_override_pt.is_none()
+    && text.chars().any(|character| {
+      matches!(
+        character.script(),
+        Script::Bopomofo | Script::Han | Script::Hangul | Script::Hiragana | Script::Katakana
+      )
+    })
 }
 
 fn paragraph_uses_windows_font_metrics(format: &ParagraphFormat) -> bool {
@@ -623,6 +648,26 @@ fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn cjk_text_metrics_require_a_visible_east_asian_script() {
+    let style = TextStyle::default();
+    for text in ["預期結果", "かな", "カナ", "결과", "ㄅㄆㄇ"] {
+      assert!(wordprocessingml_cjk_text_metrics(text, &style), "{text}");
+    }
+    for text in ["Expected Result", "نتيجةمتوقعة", "（）"] {
+      assert!(!wordprocessingml_cjk_text_metrics(text, &style), "{text}");
+    }
+
+    let generated_resource = TextStyle {
+      line_height_override_pt: Some(16.32),
+      ..Default::default()
+    };
+    assert!(!wordprocessingml_cjk_text_metrics(
+      "错误!使用资源",
+      &generated_resource
+    ));
+  }
 
   #[test]
   fn paragraph_style_ref_text_excludes_the_separate_list_label() {

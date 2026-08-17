@@ -139,6 +139,10 @@ pub struct TextRun<'doc> {
   pub text: Cow<'doc, str>,
   pub origin: Point,
   pub line_height: Pt,
+  /// Whether this painted run contributes font ascent/descent to its shared
+  /// logical line metrics. Word can retain blank/tab portions in fixed output
+  /// while excluding their font box from line-height and baseline maxima.
+  pub line_metrics_participant: bool,
   /// Optional page-space paint clip. Text remains present in the PDF content
   /// stream and semantic layer while glyph ink outside this rectangle is
   /// suppressed.

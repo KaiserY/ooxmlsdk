@@ -235,6 +235,10 @@ impl StylesCatalog {
     self.theme_format.as_ref()?.get_effect_style(index)
   }
 
+  pub(crate) fn theme_effect_style_source(&self, index: u32) -> Option<&a::EffectStyle> {
+    self.theme_format.as_ref()?.get_effect_style_source(index)
+  }
+
   pub(crate) fn from_workbook_part(
     package: &SpreadsheetDocument,
     workbook_part: &WorkbookPart,

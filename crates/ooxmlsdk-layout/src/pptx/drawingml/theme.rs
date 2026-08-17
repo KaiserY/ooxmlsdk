@@ -26,6 +26,11 @@ pub(crate) struct ThemeFormatScheme {
   pub(crate) background_fill_styles: Vec<FillProperties>,
   pub(crate) line_styles: Vec<LineProperties>,
   pub(crate) effect_styles: Vec<EffectProperties>,
+  /// Typed effect-style sources retained beside the flattened inspection
+  /// model.  Chart defaults consume the complete DrawingML style, including
+  /// `scene3d` and `sp3d`; reducing it to the 2-D effect list loses the
+  /// themed bevel used by classic chart styles.
+  pub(crate) effect_style_sources: Vec<a::EffectStyle>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -140,6 +145,7 @@ impl ThemeFormatScheme {
         .iter()
         .map(effect_properties_from_dml)
         .collect(),
+      effect_style_sources: scheme.effect_style_list.effect_style.clone(),
     }
   }
 
@@ -157,6 +163,10 @@ impl ThemeFormatScheme {
 
   pub(crate) fn get_effect_style(&self, index: u32) -> Option<&EffectProperties> {
     style_at(&self.effect_styles, index)
+  }
+
+  pub(crate) fn get_effect_style_source(&self, index: u32) -> Option<&a::EffectStyle> {
+    style_at(&self.effect_style_sources, index)
   }
 }
 

@@ -47,7 +47,7 @@ use crate::model::{
 use crate::options::{LayoutActionOptions, LayoutOptions};
 use crate::pptx::chart::{
   ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
-  lower_clustered_column_chart, lower_radial_chart,
+  lower_clustered_column_chart, lower_radial_chart, radial_2d_segment_path,
 };
 use crate::render::chart as shared_chart;
 use crate::render::chart_layout_profiles as chart_profiles;
@@ -271,16 +271,16 @@ fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
     return style;
   }
 
-  paragraph_ignored_blank_line_style(paragraph).unwrap_or_else(|| paragraph.base_style.clone())
+  paragraph_empty_text_line_style(paragraph).unwrap_or_else(|| paragraph.base_style.clone())
 }
 
 fn text_run_affects_line_height(text: &str) -> bool {
   text
     .chars()
-    .any(|ch| ch != '\n' && ch != '\t' && !libreoffice_ignored_line_height_blank(ch))
+    .any(|ch| ch != '\n' && ch != '\t' && !word_line_height_ignored_blank(ch))
 }
 
-fn paragraph_ignored_blank_line_style(paragraph: &crate::docx::Paragraph) -> Option<TextStyle> {
+fn paragraph_empty_text_line_style(paragraph: &crate::docx::Paragraph) -> Option<TextStyle> {
   let mut style = paragraph.base_style.clone();
   style.font_size_pt = TextStyle::default().font_size_pt;
   let mut found = false;
@@ -288,7 +288,11 @@ fn paragraph_ignored_blank_line_style(paragraph: &crate::docx::Paragraph) -> Opt
     let InlineItem::Text(run) = inline else {
       continue;
     };
-    if text_run_affects_line_height(&run.text) {
+    // A serialized zero-length w:t retains its insertion-range run size for
+    // an otherwise empty line (tdf131203). It is distinct from a non-empty
+    // Word blank portion, whose font box is excluded and whose line falls
+    // back to the paragraph-mark style (tdf153136).
+    if !run.text.is_empty() {
       continue;
     }
     if !found || run.style.font_size_pt < style.font_size_pt {
@@ -2222,6 +2226,7 @@ pub(crate) struct TextItem {
   pub x_pt: f32,
   pub y_pt: f32,
   pub line_height_pt: f32,
+  pub line_metrics_participant: bool,
   /// Geometry owned by the WPS shape which produced this run.
   ///
   /// Run ink, character-cell alignment, reflection ramps, and the text
@@ -3310,6 +3315,7 @@ fn push_docx_picture_image(
         x_pt: content_bounds.origin.x.0 + run.x * content_bounds.size.width.0,
         y_pt: content_bounds.origin.y.0 + run.y * content_bounds.size.height.0,
         line_height_pt: (font_size_pt * 1.15).max(1.0),
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: run.text,
         style,
@@ -3362,6 +3368,7 @@ fn push_docx_picture_image(
         x_pt: content_bounds.origin.x.0 + run.x * content_bounds.size.width.0,
         y_pt: content_bounds.origin.y.0 + run.baseline_y * content_bounds.size.height.0,
         line_height_pt: font_size_pt * 1.2,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: run.text,
         style,
@@ -4443,6 +4450,7 @@ fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
     text: Cow::Owned(item.text),
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
+    line_metrics_participant: item.line_metrics_participant,
     paint_clip: None,
     style: word_fixed_output_common_text_style(item.style),
     font_id: None,
@@ -8187,6 +8195,7 @@ fn add_line_numbers_to_page(
         x_pt: (context.content_left_pt - context.numbering.distance_pt - width).max(0.0),
         y_pt: line_box.y_pt,
         line_height_pt: line_box.height_pt,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text,
         style,
@@ -11481,10 +11490,15 @@ fn paragraph_ends_with_explicit_page_break(paragraph: &crate::docx::Paragraph) -
 }
 
 fn segment_affects_line_height(text: &str) -> bool {
-  !text.is_empty() && !text.chars().all(libreoffice_ignored_line_height_blank)
+  !text.is_empty() && !text.chars().all(word_line_height_ignored_blank)
 }
 
-fn libreoffice_ignored_line_height_blank(ch: char) -> bool {
+fn word_line_height_ignored_blank(ch: char) -> bool {
+  // Word's tabs-and-blanks compatibility path excludes exactly these space
+  // portions from line-height maxima. LibreOffice mirrors the same closed set
+  // in SwLineLayout::CalcLine/lcl_HasOnlyBlanks (tdf#153136). A line made only
+  // from these characters still owns the paragraph-mark line box, so callers
+  // must fall back to Paragraph::base_style rather than the blank run style.
   matches!(ch, ' ' | '\u{2002}' | '\u{2003}' | '\u{2005}' | '\u{3000}')
 }
 
@@ -17256,7 +17270,7 @@ fn lower_inline_chart(
         chart_style_id: shared_chart::chart_style_id(chart_space).unwrap_or(2),
         modern_excel_profile: false,
         stroke_scale: 1.0,
-        automatic_line_width_pt: 1.5,
+        automatic_line_width_pt: chart.automatic_series_line_width_pt,
         has_explicit_title: matches!(model.title, Some(shared_chart::ChartTitleText::Explicit(_))),
         title_top_adjustment_ratio: 0.0,
         title: chart.title_style.clone(),
@@ -17280,6 +17294,17 @@ fn lower_inline_chart(
         series_colors: chart.series_colors.clone(),
         series_point_colors: chart.series_point_colors.clone(),
         series_styles: chart.series_styles.clone(),
+        series_marker_styles: chart.series_marker_styles.clone(),
+        series_point_marker_styles: chart.series_point_marker_styles.clone(),
+        automatic_series_marker_strokes: chart.automatic_series_marker_strokes.clone(),
+        automatic_series_fills: chart.automatic_series_fills.clone(),
+        automatic_series_point_fills: chart.automatic_series_point_fills.clone(),
+        automatic_series_point_marker_strokes: chart.automatic_series_point_marker_strokes.clone(),
+        data_point_effect_style: chart.data_point_effect_style.clone(),
+        series_effect_styles: chart.series_effect_styles.clone(),
+        series_marker_effect_styles: chart.series_marker_effect_styles.clone(),
+        series_point_effect_styles: chart.series_point_effect_styles.clone(),
+        series_point_marker_effect_styles: chart.series_point_marker_effect_styles.clone(),
         trendline_styles: chart.trendline_styles.clone(),
         error_bar_styles: chart.error_bar_styles.clone(),
         group_decoration_styles: chart.group_decoration_styles.clone(),
@@ -17354,6 +17379,8 @@ fn lower_word_pie_chart(
     // ECMA/MS-OI29500 data-selection and angle rules above.
     let profile = if bottom_legend {
       chart_profiles::WORD_BOTTOM_LEGEND_PIE
+    } else if no_legend && model.data_labels.is_empty() {
+      chart_profiles::WORD_NO_LEGEND_UNLABELED_PIE
     } else if no_legend {
       chart_profiles::WORD_NO_LEGEND_PIE
     } else {
@@ -17370,34 +17397,67 @@ fn lower_word_pie_chart(
         continue;
       }
       let sweep = sweep as f32;
-      let segment_count = ((sweep.to_degrees() / 1.0).ceil() as usize).max(1);
-      let mut points = Vec::with_capacity(segment_count + 3);
-      points.push((center_x, center_y));
-      for segment in 0..=segment_count {
-        let angle = start_angle + sweep * segment as f32 / segment_count as f32;
-        points.push((
-          center_x + angle.sin() * radius_x,
-          center_y - angle.cos() * radius_y,
-        ));
+      let fallback_color = chart
+        .pie_point_colors
+        .get(index)
+        .copied()
+        .unwrap_or_default();
+      let point_style = chart.pie_point_styles.get(index);
+      let has_authored_paint = point_style.is_some_and(|style| {
+        !matches!(&style.fill, common::ShapeStyleValue::Unspecified)
+          || !matches!(&style.stroke, common::ShapeStyleValue::Unspecified)
+      });
+      if has_authored_paint {
+        items.extend(docx_chart_page_items(radial_2d_segment_path(
+          (x_pt + center_x, chart_y_pt + center_y),
+          (radius_x, radius_y),
+          0.0,
+          (start_angle, sweep),
+          fallback_color,
+          (bottom_legend || no_legend).then_some((
+            RgbColor {
+              r: 255,
+              g: 255,
+              b: 255,
+            },
+            1.5,
+          )),
+          point_style,
+        )));
+      } else {
+        // Keep the compact solid-color path for the overwhelmingly common
+        // automatic case. Authored DrawingML paint above uses the shared
+        // shape-style path because PolylineItem cannot represent gradients,
+        // patterns, explicit noFill, or line join/cap semantics.
+        let segment_count = ((sweep.to_degrees() / 1.0).ceil() as usize).max(1);
+        let mut points = Vec::with_capacity(segment_count + 3);
+        points.push((center_x, center_y));
+        for segment in 0..=segment_count {
+          let angle = start_angle + sweep * segment as f32 / segment_count as f32;
+          points.push((
+            center_x + angle.sin() * radius_x,
+            center_y - angle.cos() * radius_y,
+          ));
+        }
+        items.push(PageItem::Polyline(PolylineItem {
+          x_pt,
+          y_pt: chart_y_pt,
+          width_pt,
+          height_pt,
+          points,
+          closed: true,
+          fill_color: chart.pie_point_colors.get(index).copied(),
+          stroke: (bottom_legend || no_legend).then_some(BorderStyle {
+            width_pt: 1.5,
+            color: RgbColor {
+              r: 255,
+              g: 255,
+              b: 255,
+            },
+            ..BorderStyle::default()
+          }),
+        }));
       }
-      items.push(PageItem::Polyline(PolylineItem {
-        x_pt,
-        y_pt: chart_y_pt,
-        width_pt,
-        height_pt,
-        points,
-        closed: true,
-        fill_color: chart.pie_point_colors.get(index).copied(),
-        stroke: (bottom_legend || no_legend).then_some(BorderStyle {
-          width_pt: 1.5,
-          color: RgbColor {
-            r: 255,
-            g: 255,
-            b: 255,
-          },
-          ..BorderStyle::default()
-        }),
-      }));
       start_angle += sweep;
     }
   }
@@ -17436,6 +17496,7 @@ fn lower_word_pie_chart(
             - mid_angle.cos() * label_radius_y
             - chart.data_label_style.font_size_pt * 0.99,
           line_height_pt: chart.data_label_style.font_size_pt * 1.2,
+          line_metrics_participant: true,
           wordprocessing_effect_host: None,
           text: label.text.clone(),
           style: chart.data_label_style.clone(),
@@ -17498,6 +17559,7 @@ fn lower_word_pie_chart(
         x_pt: item_x + marker_size + marker_text_gap,
         y_pt: text_y,
         line_height_pt: chart.label_style.font_size_pt * 1.2,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: text.clone(),
         style: chart.label_style.clone(),
@@ -17546,6 +17608,7 @@ fn lower_word_pie_chart(
           x_pt: text_x,
           y_pt: first_text_y + row_offset,
           line_height_pt: chart.label_style.font_size_pt * 1.2,
+          line_metrics_participant: true,
           wordprocessing_effect_host: None,
           text: text.clone(),
           style: chart.label_style.clone(),
@@ -17663,6 +17726,7 @@ fn lower_generic_inline_chart(
       x_pt,
       y_pt,
       line_height_pt: style.font_size_pt * 1.2,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: fixed_text,
       style,
@@ -17690,6 +17754,7 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
       x_pt: text.x_pt,
       y_pt: text.y_pt,
       line_height_pt: text.line_height_pt,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: text.text,
       style: *text.style,
@@ -28743,6 +28808,7 @@ impl<'a> TextFrameLayout<'a> {
         x_pt: label_x,
         y_pt: y,
         line_height_pt: text_frame.text_baseline_line_height(line_height),
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: visible_label.to_string(),
         style: list_label_style.clone(),
@@ -31659,13 +31725,6 @@ impl<'a> TextFrameLayout<'a> {
             line_has_tab = false;
           }
           let object_starts_line = line_item_start_index == current.items.len();
-          let picture_control_descent = if image.picture_content_control {
-            text_metrics
-              .vertical_metrics(&paragraph_base_line_style(paragraph))
-              .descent_pt
-          } else {
-            0.0
-          };
           let image_top = inline_drawing_top(
             y,
             inline_image_ascent(metrics),
@@ -31675,7 +31734,7 @@ impl<'a> TextFrameLayout<'a> {
           ) + object_line_metrics.ascent_adjustment_pt;
           let image_item = ImageItem {
             x_pt: x + metrics.content_offset_x_pt,
-            y_pt: image_top + metrics.content_offset_y_pt + picture_control_descent,
+            y_pt: image_top + metrics.content_offset_y_pt,
             width_pt: metrics.content_width_pt,
             height_pt: metrics.content_height_pt,
             inline_baseline_gap_pt: metrics.content_bottom_gap_pt,
@@ -36018,6 +36077,7 @@ fn push_tab_leader(
     x_pt,
     y_pt: placement.y,
     line_height_pt: placement.line_height,
+    line_metrics_participant: false,
     wordprocessing_effect_host: None,
     text: fill_char.to_string().repeat(count),
     style: metrics.paint_style,
@@ -37135,6 +37195,7 @@ fn push_text_item(
   style: &TextStyle,
   meta: &TextChunkMeta<'_>,
 ) {
+  let line_metrics_participant = segment_affects_line_height(&text);
   let mut style = style.clone();
   if meta.normalize_baseline_shift {
     // When the paragraph mark and every printable portion carry the same
@@ -37147,6 +37208,7 @@ fn push_text_item(
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
+    line_metrics_participant,
     wordprocessing_effect_host: None,
     text,
     style,
@@ -37189,6 +37251,7 @@ fn flush_discretionary_hyphen(
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
+    line_metrics_participant: true,
     wordprocessing_effect_host: None,
     text: std::mem::take(chunk),
     style,
@@ -37223,6 +37286,7 @@ fn push_ruby_text(
   if text.is_empty() {
     return;
   }
+  let line_metrics_participant = segment_affects_line_height(&text);
   let (style_ref_keys, style_ref_text, style_ref_numbering_text) = if run.style_ref_keys.is_empty()
   {
     (
@@ -37241,6 +37305,7 @@ fn push_ruby_text(
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
+    line_metrics_participant,
     wordprocessing_effect_host: None,
     text,
     style,
@@ -37657,6 +37722,88 @@ mod tests {
   use ooxmlsdk::schemas::schemas_microsoft_com_vml as v;
 
   #[test]
+  fn word_line_height_blanks_use_the_paragraph_mark_style() {
+    let ignored = [' ', '\u{2002}', '\u{2003}', '\u{2005}', '\u{3000}'];
+    let measured = [
+      '\u{00a0}', '\u{1680}', '\u{2000}', '\u{2001}', '\u{2004}', '\u{2006}', '\u{2007}',
+      '\u{2008}', '\u{2009}', '\u{200a}', '\u{202f}', '\u{205f}',
+    ];
+    for character in ignored {
+      assert!(
+        word_line_height_ignored_blank(character),
+        "U+{:04X}",
+        character as u32
+      );
+      assert!(!text_run_affects_line_height(&character.to_string()));
+    }
+    for character in measured {
+      assert!(
+        !word_line_height_ignored_blank(character),
+        "U+{:04X}",
+        character as u32
+      );
+      assert!(text_run_affects_line_height(&character.to_string()));
+    }
+    assert!(!text_run_affects_line_height("\t\n"));
+
+    let paragraph = |text: &str, run_size_pt: f32, paragraph_mark_size_pt: f32| Paragraph {
+      inlines: vec![InlineItem::Text(TextRun {
+        text: text.into(),
+        style: TextStyle {
+          font_size_pt: run_size_pt,
+          ..Default::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })],
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle {
+        font_size_pt: paragraph_mark_size_pt,
+        ..Default::default()
+      },
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat::default()),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+
+    assert_eq!(
+      paragraph_base_line_style(&paragraph(" ", 48.0, 11.0)).font_size_pt,
+      11.0
+    );
+    assert_eq!(
+      paragraph_base_line_style(&paragraph("\u{2002}", 48.0, 11.0)).font_size_pt,
+      11.0
+    );
+    assert_eq!(
+      paragraph_base_line_style(&paragraph("\u{00a0}", 48.0, 11.0)).font_size_pt,
+      48.0
+    );
+    assert_eq!(
+      paragraph_base_line_style(&paragraph(" ", 11.0, 48.0)).font_size_pt,
+      48.0
+    );
+    assert_eq!(
+      paragraph_base_line_style(&paragraph("", 10.0, 12.0)).font_size_pt,
+      10.0
+    );
+  }
+
+  #[test]
   fn word_fixed_output_font_grid_is_materialized_after_layout() {
     let layout_style = TextStyle {
       font_size_pt: 11.0,
@@ -37829,6 +37976,7 @@ mod tests {
       x_pt: 10.0,
       y_pt: 20.0,
       line_height_pt: 14.0,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: "Effect".to_string(),
       style,
@@ -37952,7 +38100,6 @@ mod tests {
       semantic_metafile_font_family: None,
       native_ole_equation: None,
       metafile_native_size: false,
-      picture_content_control: false,
       placement: crate::docx::ImagePlacement::Inline,
     };
     let image_item = ImageItem {
@@ -38559,7 +38706,6 @@ mod tests {
         semantic_metafile_font_family: None,
         native_ole_equation: None,
         metafile_native_size: false,
-        picture_content_control: false,
         placement: crate::docx::ImagePlacement::Floating(FloatingImagePlacement {
           horizontal_relative_to: HorizontalImageReference::Column,
           vertical_relative_to: VerticalImageReference::Paragraph,
@@ -39514,6 +39660,7 @@ mod tests {
       x_pt: 10.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      line_metrics_participant: false,
       wordprocessing_effect_host: None,
       text: " ".to_string(),
       style,
@@ -39675,6 +39822,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: "word ".to_string(),
       style,
@@ -39886,6 +40034,7 @@ mod tests {
       x_pt: field_x,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: "S".to_string(),
       style: style.clone(),
@@ -39907,6 +40056,7 @@ mod tests {
       x_pt: field_x + dot_width,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: "1".to_string(),
       style,
@@ -39959,6 +40109,7 @@ mod tests {
         x_pt,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: text.to_string(),
         style: TextStyle::default(),
@@ -40052,6 +40203,7 @@ mod tests {
         x_pt: 0.0,
         y_pt: text_y_pt,
         line_height_pt,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: "On".to_string(),
         style,
@@ -43775,6 +43927,7 @@ mod tests {
         x_pt: 0.0,
         y_pt,
         line_height_pt: 12.0,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: "follow".into(),
         style: TextStyle::default(),
@@ -43842,6 +43995,7 @@ mod tests {
         x_pt: 0.0,
         y_pt,
         line_height_pt: 12.0,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: "visible".into(),
         style: TextStyle::default(),
@@ -46632,6 +46786,7 @@ mod tests {
         x_pt,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: text.to_string(),
         style: style.clone(),
@@ -46965,6 +47120,7 @@ mod tests {
         x_pt,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: text.to_string(),
         style: TextStyle::default(),
@@ -47033,6 +47189,7 @@ mod tests {
         x_pt,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: "中".to_string(),
         style: style.clone(),
@@ -47125,6 +47282,7 @@ mod tests {
         x_pt: 120.0,
         y_pt: 0.0,
         line_height_pt: line_height,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: "label".to_string(),
         style: style.clone(),
@@ -47657,7 +47815,6 @@ mod tests {
         semantic_metafile_font_family: None,
         native_ole_equation: None,
         metafile_native_size: false,
-        picture_content_control: false,
         placement: crate::docx::ImagePlacement::Inline,
       })],
       field_events: Vec::new(),
@@ -47804,7 +47961,6 @@ mod tests {
         semantic_metafile_font_family: None,
         native_ole_equation: None,
         metafile_native_size: false,
-        picture_content_control: false,
         placement: crate::docx::ImagePlacement::Inline,
       }
     }
@@ -48096,7 +48252,6 @@ mod tests {
       semantic_metafile_font_family: None,
       native_ole_equation: None,
       metafile_native_size: false,
-      picture_content_control: false,
       placement: crate::docx::ImagePlacement::Inline,
     };
 
@@ -48279,7 +48434,6 @@ mod tests {
           semantic_metafile_font_family: None,
           native_ole_equation: None,
           metafile_native_size: false,
-          picture_content_control: false,
           placement: crate::docx::ImagePlacement::Inline,
         })],
         field_events: Vec::new(),
@@ -48522,6 +48676,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 0.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: "1".to_string(),
       style: TextStyle::default(),
@@ -48600,6 +48755,7 @@ mod tests {
         x_pt,
         y_pt,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: "cached".to_string(),
         style: TextStyle::default(),
@@ -48693,6 +48849,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: "96".to_string(),
       style: TextStyle::default(),
@@ -48743,6 +48900,7 @@ mod tests {
           x_pt: x,
           y_pt: 20.0,
           line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+          line_metrics_participant: true,
           wordprocessing_effect_host: None,
           text: value.to_string(),
           style: style.clone(),
@@ -48804,6 +48962,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: "1-".to_string(),
       style,
@@ -48861,6 +49020,7 @@ mod tests {
       x_pt: 17.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: "also coordinate with your current document look.".to_string(),
       style: TextStyle::default(),
@@ -48900,6 +49060,7 @@ mod tests {
         x_pt: 0.0,
         y_pt: 20.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: "25-12".to_string(),
         style: TextStyle {
@@ -48967,6 +49128,7 @@ mod tests {
       x_pt: 0.0,
       y_pt: 20.0,
       line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+      line_metrics_participant: true,
       wordprocessing_effect_host: None,
       text: "1-".to_string(),
       style: TextStyle::default(),
@@ -49004,6 +49166,7 @@ mod tests {
         x_pt: 0.0,
         y_pt: 0.0,
         line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        line_metrics_participant: true,
         wordprocessing_effect_host: None,
         text: text.to_string(),
         style: TextStyle::default(),

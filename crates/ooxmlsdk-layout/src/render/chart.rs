@@ -67,6 +67,108 @@ pub struct ChartDataPointFill<'a> {
   pub fill: &'a a::SolidFill,
 }
 
+/// Host-resolved DrawingML effects attached to one classic-chart shape.
+///
+/// The three components inherit independently.  In particular, an authored
+/// empty `effectLst` must still replace the themed 2-D effect graph, while an
+/// omitted `scene3d` or `sp3d` continues to inherit its chart-style default.
+/// Keeping the typed 3-D nodes also lets bubble markers replace only the
+/// implicit shape surface without manufacturing business rules in the low-
+/// level DrawingML renderer.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct ChartShapeEffects {
+  pub(crate) image_effects: Option<crate::common::drawingml_image_effects::ImageEffectContainer>,
+  pub(crate) scene_3d: Option<Box<a::Scene3DType>>,
+  pub(crate) shape_3d: Option<Box<a::Shape3DType>>,
+  pub(crate) extrusion_color: Option<crate::common::drawingml_3d::Static3dColor>,
+  pub(crate) contour_color: Option<crate::common::drawingml_3d::Static3dColor>,
+}
+
+fn chart_shape_3d_colors(
+  shape: Option<&a::Shape3DType>,
+  resolver: &impl crate::common::drawingml_image_effects::ImageEffectColorResolver,
+) -> (
+  Option<crate::common::drawingml_3d::Static3dColor>,
+  Option<crate::common::drawingml_3d::Static3dColor>,
+) {
+  let extrusion = shape
+    .and_then(|shape| shape.extrusion_color.as_deref())
+    .and_then(|color| color.extrusion_color_choice.as_ref())
+    .and_then(|choice| resolver.extrusion_color(choice))
+    .map(|color| crate::common::drawingml_3d::Static3dColor {
+      color: color.color,
+      alpha: color.alpha,
+    });
+  let contour = shape
+    .and_then(|shape| shape.contour_color.as_deref())
+    .and_then(|color| color.contour_color_choice.as_ref())
+    .and_then(|choice| resolver.contour_color(choice))
+    .map(|color| crate::common::drawingml_3d::Static3dColor {
+      color: color.color,
+      alpha: color.alpha,
+    });
+  (extrusion, contour)
+}
+
+pub(crate) fn chart_shape_effects_from_properties(
+  properties: Option<&c::ChartShapeProperties>,
+  resolver: &impl crate::common::drawingml_image_effects::ImageEffectColorResolver,
+) -> ChartShapeEffects {
+  let Some(properties) = properties else {
+    return ChartShapeEffects::default();
+  };
+  let image_effects =
+    properties
+      .chart_shape_properties_choice3
+      .as_ref()
+      .map(|source| match source {
+        c::ChartShapePropertiesChoice3::EffectList(source) => {
+          crate::common::drawingml_image_effects::from_effect_list(source, None, resolver)
+        }
+        c::ChartShapePropertiesChoice3::EffectDag(source) => {
+          crate::common::drawingml_image_effects::from_effect_dag(source, None, resolver)
+        }
+      });
+  let (extrusion_color, contour_color) =
+    chart_shape_3d_colors(properties.shape3_d_type.as_deref(), resolver);
+  ChartShapeEffects {
+    image_effects,
+    scene_3d: properties.scene3_d_type.clone(),
+    shape_3d: properties.shape3_d_type.clone(),
+    extrusion_color,
+    contour_color,
+  }
+}
+
+pub(crate) fn chart_shape_effects_from_theme_style(
+  style: Option<&a::EffectStyle>,
+  resolver: &impl crate::common::drawingml_image_effects::ImageEffectColorResolver,
+) -> ChartShapeEffects {
+  let Some(style) = style else {
+    return ChartShapeEffects::default();
+  };
+  let image_effects = style
+    .effect_style_choice
+    .as_ref()
+    .map(|source| match source {
+      a::EffectStyleChoice::EffectList(source) => {
+        crate::common::drawingml_image_effects::from_effect_list(source, None, resolver)
+      }
+      a::EffectStyleChoice::EffectDag(source) => {
+        crate::common::drawingml_image_effects::from_effect_dag(source, None, resolver)
+      }
+    });
+  let (extrusion_color, contour_color) =
+    chart_shape_3d_colors(style.shape3_d_type.as_deref(), resolver);
+  ChartShapeEffects {
+    image_effects,
+    scene_3d: style.scene3_d_type.clone(),
+    shape_3d: style.shape3_d_type.clone(),
+    extrusion_color,
+    contour_color,
+  }
+}
+
 #[derive(Clone, Debug)]
 pub struct SurfaceChartGroup<'a> {
   /// Index of the first series owned by this plot-area chart group.
@@ -124,6 +226,60 @@ pub enum ChartSeriesKind {
   Radar,
   Stock,
   Surface,
+}
+
+/// One contiguous label group on a multi-level category axis.
+///
+/// `start_index` and `span` are expressed in source category slots. Missing
+/// points in `c:multiLvlStrCache/c:lvl` continue the preceding group, while a
+/// present non-empty point starts a new group even when its text equals the
+/// preceding label.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChartCategoryGroup {
+  pub text: String,
+  pub start_index: usize,
+  pub span: usize,
+}
+
+/// A single multi-level category label row, ordered from the innermost leaf
+/// labels to the outermost parent labels.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChartCategoryLevel {
+  pub groups: Vec<ChartCategoryGroup>,
+}
+
+/// Lossless semantic projection of `c:multiLvlStrCache` for category axes.
+///
+/// The ordinary `ClusteredColumnChart::categories` vector remains the flat,
+/// per-point projection consumed by legends, data labels, data tables, pie
+/// charts, and polar charts. Cartesian category-axis layout uses this model
+/// only when `c:noMultiLvlLbl` permits hierarchical labels.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChartCategoryHierarchy {
+  pub point_count: usize,
+  /// Inner/leaf level first, outermost level last, matching OOXML document
+  /// order and the chart renderer's band order.
+  pub levels: Vec<ChartCategoryLevel>,
+}
+
+impl ChartCategoryHierarchy {
+  /// Expands one grouped level back to one text value per category slot.
+  pub fn expanded_level(&self, level_index: usize) -> Vec<String> {
+    let mut values = vec![String::new(); self.point_count];
+    let Some(level) = self.levels.get(level_index) else {
+      return values;
+    };
+    for group in &level.groups {
+      let end = group
+        .start_index
+        .saturating_add(group.span)
+        .min(values.len());
+      for value in &mut values[group.start_index.min(end)..end] {
+        value.clone_from(&group.text);
+      }
+    }
+    values
+  }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -282,9 +438,9 @@ pub struct ClusteredColumnSeries<'a> {
   /// `false` during shared chart import.
   pub smooth: Option<bool>,
   pub marker: Option<&'a c::Marker>,
-  /// Application-defined marker used when the chart-group style requires
-  /// markers but the series omits `c:marker`. An explicit series marker still
-  /// overrides this value, including `c:symbol="none"`.
+  /// Application-defined symbol used when `c:marker` is omitted or explicitly
+  /// selects `auto`. An explicit series marker still overrides this fallback,
+  /// including `c:symbol="none"`.
   pub automatic_marker_symbol: Option<c::MarkerStyleValues>,
   /// Whether the series explicitly suppresses its connecting line with
   /// `c:spPr/a:ln/a:noFill`. An omitted outline keeps the chart-style default.
@@ -438,7 +594,13 @@ pub struct ClusteredColumnChart<'a> {
   /// the source and axis position prevents secondary titles from being
   /// flattened to a generic right-side, -90-degree label.
   pub additional_axis_titles: Vec<AdditionalAxisTitle<'a>>,
+  /// Flat, per-point category labels. Multi-level caches are expanded from
+  /// outermost parent to innermost leaf so non-axis consumers retain each
+  /// point's complete category identity.
   pub categories: Vec<String>,
+  /// Grouped category-axis labels retained independently from the flat
+  /// projection above. This is populated only for `c:multiLvlStrCache`.
+  pub category_hierarchy: Option<ChartCategoryHierarchy>,
   /// Numeric category coordinates retained for a date axis. String
   /// formatting alone loses the spacing and major-unit rhythm Office uses.
   pub category_axis_values: Vec<Option<f64>>,
@@ -642,6 +804,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
 
   let mut series = Vec::with_capacity(bar_chart.bar_chart_series.len());
   let mut categories = Vec::new();
+  let mut category_hierarchy = None;
   for (series_index, source) in bar_chart.bar_chart_series.iter().enumerate() {
     let series_ref = bar_series_ref(source);
     let explicit_name = series_ref
@@ -651,14 +814,16 @@ pub fn clustered_column_chart_for_ui_language<'a>(
     let name = explicit_name
       .clone()
       .unwrap_or_else(|| default_series_label(series_ref, series_index + 1, ui_language));
-    let source_categories = source
+    let source_labels = source
       .category_axis_data
       .as_deref()
-      .map(indexed_category_axis_text_values)
+      .map(indexed_category_axis_labels)
       .unwrap_or_default();
-    if categories.is_empty() && !source_categories.is_empty() {
-      categories.clone_from(&source_categories);
+    if categories.is_empty() && !source_labels.flat.is_empty() {
+      categories.clone_from(&source_labels.flat);
+      category_hierarchy.clone_from(&source_labels.hierarchy);
     }
+    let source_categories = source_labels.flat;
     let values = source
       .values
       .as_deref()
@@ -870,6 +1035,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       .and_then(|title| chart_text_layout(title.layout.as_deref())),
     additional_axis_titles: Vec::new(),
     categories,
+    category_hierarchy,
     category_axis_values,
     category_number_format_code,
     date_1904: chart_uses_1904_date_system(chart_space),
@@ -1150,6 +1316,49 @@ pub fn cartesian_chart_for_locales<'a>(
   )
 }
 
+/// Office's application-defined automatic marker sequence.
+///
+/// OOXML deliberately leaves `auto` to the consumer. Office fixed output and
+/// LibreOffice's `XclChartHelper::GetAutoMarkerType` agree on this nine-symbol
+/// cycle. The input is `c:ser/c:idx`, the same formatting index used by the
+/// classic chart-color algorithm; using local XML order breaks combined
+/// charts whose indices contain gaps.
+const OFFICE_AUTOMATIC_MARKER_SYMBOLS: [c::MarkerStyleValues; 9] = [
+  c::MarkerStyleValues::Diamond,
+  c::MarkerStyleValues::Square,
+  c::MarkerStyleValues::Triangle,
+  c::MarkerStyleValues::X,
+  c::MarkerStyleValues::Star,
+  c::MarkerStyleValues::Circle,
+  c::MarkerStyleValues::Plus,
+  c::MarkerStyleValues::Dot,
+  c::MarkerStyleValues::Dash,
+];
+
+pub(crate) const fn office_automatic_marker_symbol(
+  formatting_index: usize,
+) -> c::MarkerStyleValues {
+  OFFICE_AUTOMATIC_MARKER_SYMBOLS[formatting_index % OFFICE_AUTOMATIC_MARKER_SYMBOLS.len()]
+}
+
+/// Office's application-defined marker diameter for an automatic marker.
+///
+/// The fixed-output result follows the effective series-line width rather
+/// than `CT_MarkerSize`'s 5pt concrete-symbol default. PowerPoint's object
+/// model exposes the same staircase: 0.25pt -> 3pt, 2.25pt -> 7pt, and 6pt ->
+/// 15pt. Keep the result in the schema's 2..=72 marker-size domain.
+pub(crate) fn office_automatic_marker_size_pt(effective_line_width_pt: f32) -> f32 {
+  (effective_line_width_pt.max(0.0) * 2.0 + 3.0)
+    .floor()
+    .clamp(2.0, 72.0)
+}
+
+fn apply_automatic_series_markers(series: &mut [ClusteredColumnSeries<'_>]) {
+  for series in series {
+    series.automatic_marker_symbol = Some(office_automatic_marker_symbol(series.formatting_index));
+  }
+}
+
 pub fn cartesian_chart_for_host_locales<'a>(
   chart_space: &'a c::ChartSpace,
   host: ChartHostApplication,
@@ -1160,6 +1369,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
   let category_number_format_code = chart_numeric_category_format_code(chart_space);
   let mut series = Vec::new();
   let mut categories = Vec::new();
+  let mut category_hierarchy = None;
   let mut gap_width_percent = 150.0;
   let mut overlap_percent = 0.0;
   let mut vary_colors_requested = false;
@@ -1186,7 +1396,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first_series_index = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.area_chart_series.iter().map(area_series_ref),
           chart.data_labels.as_deref(),
           (
@@ -1211,7 +1421,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first_series_index = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.area_chart_series.iter().map(area_series_ref),
           chart.data_labels.as_deref(),
           (
@@ -1244,7 +1454,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first_series_index = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.line_chart_series.iter().map(line_series_ref),
           chart.data_labels.as_deref(),
           (
@@ -1255,6 +1465,10 @@ pub fn cartesian_chart_for_host_locales<'a>(
           axis_set_index,
           ui_language,
         );
+        // [MS-OI29500] specifies that Office ignores lineChart/c:marker.
+        // Marker omission at series scope is `auto`; an explicit series
+        // marker (especially `none`) is resolved later as the higher layer.
+        apply_automatic_series_markers(&mut series[first_series_index..]);
         push_cartesian_group_decorations(
           &mut group_decorations,
           first_series_index,
@@ -1269,7 +1483,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first_series_index = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.line_chart_series.iter().map(line_series_ref),
           chart.data_labels.as_deref(),
           (ChartSeriesKind::Line, grouping(Some(&chart.grouping)), true),
@@ -1298,7 +1512,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first_series_index = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.line_chart_series.iter().map(line_series_ref),
           chart.data_labels.as_deref(),
           (ChartSeriesKind::Stock, ChartSeriesGrouping::Standard, false),
@@ -1319,24 +1533,30 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.radar_chart_series.iter().map(radar_series_ref),
           chart.data_labels.as_deref(),
           (ChartSeriesKind::Radar, ChartSeriesGrouping::Standard, false),
           axis_set_index,
           ui_language,
         );
-        if chart.radar_style.val == c::RadarStyleValues::Filled {
-          for series in &mut series[first..] {
-            series.filled_area = true;
+        match chart.radar_style.val {
+          c::RadarStyleValues::Marker => {
+            apply_automatic_series_markers(&mut series[first..]);
           }
+          c::RadarStyleValues::Filled => {
+            for series in &mut series[first..] {
+              series.filled_area = true;
+            }
+          }
+          c::RadarStyleValues::Standard => {}
         }
       }
       c::PlotAreaChoice::ScatterChart(chart) => {
         let first = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.scatter_chart_series.iter().map(scatter_series_ref),
           chart.data_labels.as_deref(),
           (
@@ -1351,29 +1571,19 @@ pub fn cartesian_chart_for_host_locales<'a>(
           .scatter_style
           .val
           .unwrap_or(c::ScatterStyleValues::Marker);
+        // Office loads every supported scatter-style spelling as a
+        // marker-bearing style. It represents the apparent `line`, `smooth`,
+        // and `marker` variants by explicit per-series marker/noFill settings
+        // when saving; those series settings remain authoritative here.
+        apply_automatic_series_markers(&mut series[first..]);
         if matches!(
           style,
-          c::ScatterStyleValues::LineMarker
-            | c::ScatterStyleValues::Marker
-            | c::ScatterStyleValues::SmoothMarker
+          c::ScatterStyleValues::Smooth | c::ScatterStyleValues::SmoothMarker
         ) {
-          // ECMA-376 requires markers for these scatter styles. Marker `auto`
-          // is application-defined; Office golden output for built-in chart
-          // style 2 establishes this series-order sequence.
-          const OFFICE_STYLE_2_MARKERS: [c::MarkerStyleValues; 3] = [
-            c::MarkerStyleValues::Circle,
-            c::MarkerStyleValues::Square,
-            c::MarkerStyleValues::Triangle,
-          ];
-          for (index, series) in series[first..].iter_mut().enumerate() {
-            series.automatic_marker_symbol = Some(if chart_style_id(chart_space) == Some(2) {
-              OFFICE_STYLE_2_MARKERS
-                .get(index)
-                .copied()
-                .unwrap_or(c::MarkerStyleValues::Auto)
-            } else {
-              c::MarkerStyleValues::Auto
-            });
+          for series in &mut series[first..] {
+            if series.smooth.is_none() {
+              series.smooth = Some(true);
+            }
           }
         }
       }
@@ -1398,7 +1608,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         );
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.bar_chart_series.iter().map(bar_series_ref),
           chart.data_labels.as_deref(),
           (
@@ -1429,7 +1639,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first_series = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.bar_chart_series.iter().map(bar_series_ref),
           chart.data_labels.as_deref(),
           (
@@ -1465,7 +1675,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first_series_index = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.surface_chart_series.iter().map(surface_series_ref),
           None,
           (
@@ -1492,7 +1702,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first_series_index = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.surface_chart_series.iter().map(surface_series_ref),
           None,
           (
@@ -1519,7 +1729,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
         let first_series_index = series.len();
         append_cartesian_series(
           &mut series,
-          &mut categories,
+          (&mut categories, &mut category_hierarchy),
           chart.bubble_chart_series.iter().map(bubble_series_ref),
           chart.data_labels.as_deref(),
           (
@@ -1764,6 +1974,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
       .and_then(|title| chart_text_layout(title.layout.as_deref())),
     additional_axis_titles,
     categories,
+    category_hierarchy,
     category_axis_values,
     category_number_format_code,
     date_1904: chart_uses_1904_date_system(chart_space),
@@ -1845,6 +2056,71 @@ pub(crate) fn chart_style_id(chart_space: &c::ChartSpace) -> Option<u8> {
     c::ChartSpaceChoice::CStyle(style) => Some(style.val.unwrap_or(2)),
     c::ChartSpaceChoice::AlternateContent(_) => None,
   }
+}
+
+/// One-based DrawingML theme effect-style index selected for classic-chart
+/// data points by ECMA-376 Part 1 §21.2.3.46 Table 5.
+pub(crate) const fn automatic_chart_data_point_effect_style_index(
+  chart_style_id: u8,
+) -> Option<u32> {
+  let style = if chart_style_id >= 1 && chart_style_id <= 48 {
+    chart_style_id
+  } else {
+    2
+  };
+  match style {
+    9..=16 => Some(1),
+    17..=24 => Some(2),
+    25..=32 | 41..=48 => Some(3),
+    1..=8 | 33..=40 => None,
+    _ => None,
+  }
+}
+
+/// One-based DrawingML theme fill-style index selected for classic-chart
+/// data points by ECMA-376 Part 1 §21.2.3.46 Table 5.
+///
+/// Bubble charts, including `c:bubble3D`, belong to the table's 2-D fill
+/// column: `bubble3D` adds a visual surface effect and does not turn the XY
+/// chart into a three-axis chart. Callers therefore pass the chart group's
+/// schema-level 3-D state rather than the presence of that bubble flag.
+pub(crate) const fn automatic_chart_data_point_fill_style_index(
+  chart_style_id: u8,
+  is_3d: bool,
+) -> u32 {
+  let style = if chart_style_id >= 1 && chart_style_id <= 48 {
+    chart_style_id
+  } else {
+    2
+  };
+  if is_3d {
+    if matches!(style, 18 | 26 | 42) { 3 } else { 1 }
+  } else if matches!(style, 17..=32 | 41..=48) {
+    3
+  } else {
+    1
+  }
+}
+
+/// One-based DrawingML theme line-style index selected for classic-chart
+/// filled data points and markers by ECMA-376 Part 1 §21.2.3.46 Table 1.
+/// Their themed line is always `Subtle`; Table 5 supplies its `phClr`.
+pub(crate) const AUTOMATIC_CHART_DATA_POINT_LINE_STYLE_INDEX: u32 = 1;
+
+/// Resolves ECMA's point -> series bubble-3D cascade.  Office currently
+/// ignores the point-level member in fixed output, but it is part of the
+/// standard `c:dPt` model and retaining it makes the static Rust model
+/// faithful for producers that use that scope.
+pub(crate) fn bubble_point_3d(series: &ClusteredColumnSeries<'_>, point_index: usize) -> bool {
+  series
+    .data_points
+    .iter()
+    .rev()
+    .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
+    .and_then(|point| point.bubble3_d.as_ref())
+    .map_or(series.bubble_3d, |bubble| {
+      bubble.val.is_none_or(|value| value.as_bool())
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -1977,13 +2253,14 @@ pub(crate) fn automatic_linear_series_line_width_scale(chart_space: &c::ChartSpa
 
 fn append_cartesian_series<'a>(
   target: &mut Vec<ClusteredColumnSeries<'a>>,
-  categories: &mut Vec<String>,
+  category_state: (&mut Vec<String>, &mut Option<ChartCategoryHierarchy>),
   sources: impl Iterator<Item = ChartSeriesRef<'a>>,
   chart_group_labels: Option<&'a c::DataLabels>,
   series_spec: (ChartSeriesKind, ChartSeriesGrouping, bool),
   axis_set_index: usize,
   ui_language: Option<&str>,
 ) {
+  let (categories, category_hierarchy) = category_state;
   let (kind, grouping, is_3d) = series_spec;
   for source in sources {
     let series_index = target.len() + 1;
@@ -1994,13 +2271,15 @@ fn append_cartesian_series<'a>(
     let name = explicit_name
       .clone()
       .unwrap_or_else(|| default_series_label(source, series_index, ui_language));
-    let source_categories = source
+    let source_labels = source
       .category_axis_data
-      .map(indexed_category_axis_text_values)
+      .map(indexed_category_axis_labels)
       .unwrap_or_default();
-    if categories.is_empty() && !source_categories.is_empty() {
-      categories.clone_from(&source_categories);
+    if categories.is_empty() && !source_labels.flat.is_empty() {
+      categories.clone_from(&source_labels.flat);
+      category_hierarchy.clone_from(&source_labels.hierarchy);
     }
+    let source_categories = source_labels.flat;
     let values = chart_series_numeric_values(source);
     let x_values = chart_series_x_numeric_values(source);
     let error_bars = resolved_error_bars(source.error_bars);
@@ -3937,7 +4216,10 @@ pub(crate) fn linear_axis_scale_with_options(
     }));
   }
 
-  let max_increments = maximum_auto_increment_count.clamp(2, 10);
+  // Host layout policy selects the physical interval budget. LibreOffice's
+  // estimator never supplies less than two, while Word permits one interval
+  // on very small generated numeric axes. Preserve that caller distinction.
+  let max_increments = maximum_auto_increment_count.clamp(1, 10);
   let mut major_unit = explicit_unit
     .flatten()
     .filter(|unit| unit.is_finite() && *unit > 0.0)
@@ -6175,71 +6457,177 @@ fn series_text_value(series_text: &c::SeriesText) -> String {
   values.join(" ")
 }
 
-fn indexed_category_axis_text_values(data: &c::CategoryAxisData) -> Vec<String> {
+#[derive(Default)]
+struct IndexedCategoryLabels {
+  flat: Vec<String>,
+  hierarchy: Option<ChartCategoryHierarchy>,
+}
+
+fn indexed_category_axis_labels(data: &c::CategoryAxisData) -> IndexedCategoryLabels {
   match data.category_axis_data_choice.as_ref() {
-    Some(c::CategoryAxisDataChoice::StringReference(reference)) => reference
-      .string_cache
-      .as_deref()
-      .map(|cache| indexed_string_points(&cache.string_point))
-      .unwrap_or_default(),
-    Some(c::CategoryAxisDataChoice::StringLiteral(literal)) => {
-      indexed_string_points(&literal.string_point)
-    }
+    Some(c::CategoryAxisDataChoice::StringReference(reference)) => IndexedCategoryLabels {
+      flat: reference
+        .string_cache
+        .as_deref()
+        .map(|cache| indexed_string_points(&cache.string_point))
+        .unwrap_or_default(),
+      hierarchy: None,
+    },
+    Some(c::CategoryAxisDataChoice::StringLiteral(literal)) => IndexedCategoryLabels {
+      flat: indexed_string_points(&literal.string_point),
+      hierarchy: None,
+    },
     Some(c::CategoryAxisDataChoice::MultiLevelStringReference(reference)) => reference
       .multi_level_string_cache
       .as_deref()
-      .map(|cache| {
-        let levels = cache
-          .level
-          .iter()
-          .map(|level| indexed_string_points(&level.string_point))
-          .collect::<Vec<_>>();
-        let count = levels.iter().map(Vec::len).max().unwrap_or(0);
-        let mut previous = vec![String::new(); levels.len()];
-        (0..count)
-          .map(|index| {
-            levels
-              .iter()
-              .enumerate()
-              .filter_map(|(level_index, level)| {
-                let value = level.get(index)?.trim();
-                if value.is_empty() || (level_index > 0 && previous[level_index].as_str() == value)
-                {
-                  return None;
-                }
-                previous[level_index] = value.to_string();
-                Some(value.to_string())
-              })
-              .collect::<Vec<_>>()
-              .join(" ")
-          })
-          .collect()
-      })
+      .map(multi_level_category_labels)
       .unwrap_or_default(),
-    Some(c::CategoryAxisDataChoice::NumberReference(reference)) => reference
-      .numbering_cache
-      .as_deref()
-      .map(|cache| {
-        indexed_formatted_numeric_point_texts(
-          &cache.numeric_point,
-          cache
-            .format_code
-            .as_ref()
-            .and_then(|code| code.xml_content.as_deref()),
-        )
-      })
-      .unwrap_or_default(),
-    Some(c::CategoryAxisDataChoice::NumberLiteral(literal)) => {
-      indexed_formatted_numeric_point_texts(
+    Some(c::CategoryAxisDataChoice::NumberReference(reference)) => IndexedCategoryLabels {
+      flat: reference
+        .numbering_cache
+        .as_deref()
+        .map(|cache| {
+          indexed_formatted_numeric_point_texts(
+            &cache.numeric_point,
+            cache
+              .format_code
+              .as_ref()
+              .and_then(|code| code.xml_content.as_deref()),
+          )
+        })
+        .unwrap_or_default(),
+      hierarchy: None,
+    },
+    Some(c::CategoryAxisDataChoice::NumberLiteral(literal)) => IndexedCategoryLabels {
+      flat: indexed_formatted_numeric_point_texts(
         &literal.numeric_point,
         literal
           .format_code
           .as_ref()
           .and_then(|code| code.xml_content.as_deref()),
-      )
-    }
-    _ => Vec::new(),
+      ),
+      hierarchy: None,
+    },
+    None => IndexedCategoryLabels::default(),
   }
+}
+
+fn indexed_category_axis_text_values(data: &c::CategoryAxisData) -> Vec<String> {
+  indexed_category_axis_labels(data).flat
+}
+
+fn multi_level_category_labels(cache: &c::MultiLevelStringCache) -> IndexedCategoryLabels {
+  let declared_count = cache
+    .point_count
+    .as_ref()
+    .and_then(|count| usize::try_from(count.val).ok())
+    .unwrap_or(0);
+  let indexed_count = cache
+    .level
+    .iter()
+    .flat_map(|level| &level.string_point)
+    .filter_map(|point| usize::try_from(point.index).ok())
+    .max()
+    .map_or(0, |index| index.saturating_add(1));
+  let point_count = declared_count.max(indexed_count);
+
+  let raw_levels = cache
+    .level
+    .iter()
+    .map(|level| {
+      let mut values = vec![None; point_count];
+      for point in &level.string_point {
+        let Ok(index) = usize::try_from(point.index) else {
+          continue;
+        };
+        if let Some(slot) = values.get_mut(index) {
+          *slot = Some(point.numeric_value.trim().to_string());
+        }
+      }
+      values
+    })
+    .collect::<Vec<_>>();
+
+  // OOXML stores the leaf level first. Build groups from the outside inward
+  // so a child group is forcibly split at every parent boundary. This mirrors
+  // LibreOffice ExplicitCategoriesProvider and prevents malformed sparse
+  // caches from producing a child label that crosses two parent groups.
+  let mut parent_group_starts = vec![false; point_count];
+  let mut reversed_levels = Vec::with_capacity(raw_levels.len());
+  for values in raw_levels.iter().rev() {
+    let groups = grouped_category_level(values, &parent_group_starts);
+    parent_group_starts.fill(false);
+    for group in groups.iter().skip(1) {
+      if let Some(boundary) = parent_group_starts.get_mut(group.start_index) {
+        *boundary = true;
+      }
+    }
+    reversed_levels.push(ChartCategoryLevel { groups });
+  }
+  reversed_levels.reverse();
+
+  // The flat category identity is deliberately independent from hierarchical
+  // axis painting. LibreOffice's getSimpleCategories() expands every group
+  // and joins parent-to-leaf text for legends, data labels, data tables, pie
+  // charts, polar charts, and c:noMultiLvlLbl="1" category axes.
+  let mut flat = vec![String::new(); point_count];
+  for level in reversed_levels.iter().rev() {
+    for group in &level.groups {
+      if group.text.is_empty() {
+        continue;
+      }
+      let end = group.start_index.saturating_add(group.span).min(flat.len());
+      for value in &mut flat[group.start_index.min(end)..end] {
+        if !value.is_empty() {
+          value.push(' ');
+        }
+        value.push_str(&group.text);
+      }
+    }
+  }
+
+  IndexedCategoryLabels {
+    flat,
+    hierarchy: (!reversed_levels.is_empty()).then_some(ChartCategoryHierarchy {
+      point_count,
+      levels: reversed_levels,
+    }),
+  }
+}
+
+fn grouped_category_level(
+  values: &[Option<String>],
+  parent_group_starts: &[bool],
+) -> Vec<ChartCategoryGroup> {
+  if values.is_empty() {
+    return Vec::new();
+  }
+
+  let mut groups = Vec::new();
+  let mut start_index = 0usize;
+  let mut text = values[0]
+    .as_deref()
+    .filter(|value| !value.is_empty())
+    .unwrap_or_default()
+    .to_string();
+  for (index, value) in values.iter().enumerate().skip(1) {
+    let next = value.as_deref().filter(|value| !value.is_empty());
+    if parent_group_starts.get(index).copied().unwrap_or(false) || next.is_some() {
+      groups.push(ChartCategoryGroup {
+        text,
+        start_index,
+        span: index - start_index,
+      });
+      start_index = index;
+      text = next.unwrap_or_default().to_string();
+    }
+  }
+  groups.push(ChartCategoryGroup {
+    text,
+    start_index,
+    span: values.len() - start_index,
+  });
+  groups
 }
 
 fn chart_numeric_category_values(chart_space: &c::ChartSpace) -> Vec<Option<f64>> {
@@ -7581,7 +7969,8 @@ mod tests {
     cartesian_chart_for_ui_language, chart_title_text, clustered_column_chart,
     clustered_column_slot, fixed_output_latin_font_family, fixed_output_texts_for_ui_language,
     format_chart_date, format_chart_number, has_indexed_scatter_multicomponent_data_labels,
-    largest_remainder_percentages, linear_axis_scale, linear_axis_scale_with_options,
+    indexed_category_axis_labels, largest_remainder_percentages, linear_axis_scale,
+    linear_axis_scale_with_options, office_automatic_marker_size_pt,
     ordinary_clustered_column_chart, pie_chart_model,
   };
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
@@ -7602,6 +7991,230 @@ mod tests {
   }
 
   #[test]
+  fn automatic_marker_cycle_uses_series_formatting_index_and_ignores_line_group_marker() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+        <c:chart><c:plotArea><c:lineChart>
+          <c:grouping val="standard"/><c:varyColors val="0"/>
+          <c:ser><c:idx val="0"/><c:order val="0"/></c:ser>
+          <c:ser><c:idx val="2"/><c:order val="1"/></c:ser>
+          <c:ser><c:idx val="9"/><c:order val="2"/></c:ser>
+          <c:ser><c:idx val="1"/><c:order val="3"/><c:marker><c:symbol val="none"/></c:marker></c:ser>
+          <c:ser><c:idx val="10"/><c:order val="4"/><c:marker><c:symbol val="auto"/></c:marker></c:ser>
+          <c:marker val="0"/><c:axId val="1"/><c:axId val="2"/>
+        </c:lineChart></c:plotArea></c:chart>
+      </c:chartSpace>"#,
+    )
+    .expect("line chart");
+
+    let chart = cartesian_chart_for_ui_language(&chart_space, None).expect("cartesian chart");
+    assert_eq!(
+      chart
+        .series
+        .iter()
+        .map(|series| series.automatic_marker_symbol)
+        .collect::<Vec<_>>(),
+      [
+        Some(c::MarkerStyleValues::Diamond),
+        Some(c::MarkerStyleValues::Triangle),
+        Some(c::MarkerStyleValues::Diamond),
+        Some(c::MarkerStyleValues::Square),
+        Some(c::MarkerStyleValues::Square),
+      ]
+    );
+    assert_eq!(
+      chart.series[3]
+        .marker
+        .and_then(|marker| marker.symbol.as_ref())
+        .map(|symbol| symbol.val),
+      Some(c::MarkerStyleValues::None)
+    );
+    assert_eq!(
+      chart.series[4]
+        .marker
+        .and_then(|marker| marker.symbol.as_ref())
+        .map(|symbol| symbol.val),
+      Some(c::MarkerStyleValues::Auto)
+    );
+  }
+
+  #[test]
+  fn automatic_marker_size_tracks_the_effective_series_line_width() {
+    for (line_width_pt, marker_size_pt) in [
+      (0.25, 3.0),
+      (0.5, 4.0),
+      (1.0, 5.0),
+      (1.5, 6.0),
+      (2.25, 7.0),
+      (2.5, 8.0),
+      (3.0, 9.0),
+      (6.0, 15.0),
+      (10.0, 23.0),
+    ] {
+      assert_eq!(
+        office_automatic_marker_size_pt(line_width_pt),
+        marker_size_pt,
+        "line width {line_width_pt}pt"
+      );
+    }
+    assert_eq!(office_automatic_marker_size_pt(100.0), 72.0);
+  }
+
+  #[test]
+  fn line_3d_and_stock_series_do_not_inherit_ordinary_line_automatic_markers() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+        <c:chart><c:plotArea>
+          <c:line3DChart><c:grouping val="standard"/>
+            <c:ser><c:idx val="0"/><c:order val="0"/></c:ser>
+            <c:axId val="1"/><c:axId val="2"/><c:axId val="3"/>
+          </c:line3DChart>
+          <c:stockChart>
+            <c:ser><c:idx val="1"/><c:order val="1"/></c:ser>
+            <c:ser><c:idx val="2"/><c:order val="2"/></c:ser>
+            <c:ser><c:idx val="3"/><c:order val="3"/></c:ser>
+            <c:axId val="1"/><c:axId val="2"/>
+          </c:stockChart>
+        </c:plotArea></c:chart>
+      </c:chartSpace>"#,
+    )
+    .expect("line 3-D and stock chart");
+
+    let chart = cartesian_chart_for_ui_language(&chart_space, None).expect("cartesian chart");
+    assert_eq!(chart.series.len(), 4);
+    assert!(chart.series.iter().all(|series| {
+      series.automatic_marker_symbol.is_none()
+        && matches!(
+          series.kind,
+          super::ChartSeriesKind::Line | super::ChartSeriesKind::Stock
+        )
+    }));
+    assert!(chart.series[0].is_3d);
+  }
+
+  #[test]
+  fn scatter_styles_share_office_marker_semantics_and_preserve_smoothing_overrides() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+        <c:chart><c:plotArea>
+          <c:scatterChart><c:scatterStyle val="line"/>
+            <c:ser><c:idx val="0"/><c:order val="0"/></c:ser><c:axId val="1"/><c:axId val="2"/>
+          </c:scatterChart>
+          <c:scatterChart><c:scatterStyle val="lineMarker"/>
+            <c:ser><c:idx val="1"/><c:order val="1"/></c:ser><c:axId val="1"/><c:axId val="2"/>
+          </c:scatterChart>
+          <c:scatterChart><c:scatterStyle val="marker"/>
+            <c:ser><c:idx val="2"/><c:order val="2"/><c:marker><c:symbol val="none"/></c:marker></c:ser><c:axId val="1"/><c:axId val="2"/>
+          </c:scatterChart>
+          <c:scatterChart><c:scatterStyle val="smooth"/>
+            <c:ser><c:idx val="3"/><c:order val="3"/></c:ser><c:axId val="1"/><c:axId val="2"/>
+          </c:scatterChart>
+          <c:scatterChart><c:scatterStyle val="smoothMarker"/>
+            <c:ser><c:idx val="4"/><c:order val="4"/><c:smooth val="0"/></c:ser><c:axId val="1"/><c:axId val="2"/>
+          </c:scatterChart>
+        </c:plotArea></c:chart>
+      </c:chartSpace>"#,
+    )
+    .expect("scatter styles");
+
+    let chart = cartesian_chart_for_ui_language(&chart_space, None).expect("cartesian chart");
+    assert_eq!(
+      chart
+        .series
+        .iter()
+        .map(|series| series.automatic_marker_symbol)
+        .collect::<Vec<_>>(),
+      [
+        Some(c::MarkerStyleValues::Diamond),
+        Some(c::MarkerStyleValues::Square),
+        Some(c::MarkerStyleValues::Triangle),
+        Some(c::MarkerStyleValues::X),
+        Some(c::MarkerStyleValues::Star),
+      ]
+    );
+    assert_eq!(
+      chart
+        .series
+        .iter()
+        .map(|series| series.smooth)
+        .collect::<Vec<_>>(),
+      [None, None, None, Some(true), Some(false)]
+    );
+    assert!(chart.series.iter().all(|series| !series.line_hidden));
+  }
+
+  #[test]
+  fn radar_group_style_only_supplies_automatic_markers_for_marker_radar() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+        <c:chart><c:plotArea>
+          <c:radarChart><c:radarStyle val="marker"/>
+            <c:ser><c:idx val="4"/><c:order val="0"/></c:ser>
+            <c:ser><c:idx val="5"/><c:order val="1"/><c:marker><c:symbol val="none"/></c:marker></c:ser>
+            <c:axId val="1"/><c:axId val="2"/>
+          </c:radarChart>
+          <c:radarChart><c:radarStyle val="filled"/>
+            <c:ser><c:idx val="6"/><c:order val="2"/></c:ser><c:axId val="1"/><c:axId val="2"/>
+          </c:radarChart>
+          <c:radarChart><c:radarStyle val="standard"/>
+            <c:ser><c:idx val="7"/><c:order val="3"/></c:ser><c:axId val="1"/><c:axId val="2"/>
+          </c:radarChart>
+        </c:plotArea></c:chart>
+      </c:chartSpace>"#,
+    )
+    .expect("radar styles");
+
+    let chart = cartesian_chart_for_ui_language(&chart_space, None).expect("cartesian chart");
+    assert_eq!(
+      chart
+        .series
+        .iter()
+        .map(|series| series.automatic_marker_symbol)
+        .collect::<Vec<_>>(),
+      [
+        Some(c::MarkerStyleValues::Star),
+        Some(c::MarkerStyleValues::Circle),
+        None,
+        None,
+      ]
+    );
+    assert!(!chart.series[0].filled_area);
+    assert!(!chart.series[1].filled_area);
+    assert!(chart.series[2].filled_area);
+    assert!(!chart.series[3].filled_area);
+  }
+
+  #[test]
+  fn classic_chart_fill_style_follows_the_distinct_2d_and_3d_table_columns() {
+    for style in 1..=48 {
+      let expected_2d = if matches!(style, 17..=32 | 41..=48) {
+        3
+      } else {
+        1
+      };
+      let expected_3d = if matches!(style, 18 | 26 | 42) { 3 } else { 1 };
+      assert_eq!(
+        super::automatic_chart_data_point_fill_style_index(style, false),
+        expected_2d,
+        "2-D style {style}"
+      );
+      assert_eq!(
+        super::automatic_chart_data_point_fill_style_index(style, true),
+        expected_3d,
+        "3-D style {style}"
+      );
+    }
+    assert_eq!(
+      super::automatic_chart_data_point_fill_style_index(0, false),
+      super::automatic_chart_data_point_fill_style_index(2, false)
+    );
+    assert_eq!(
+      super::automatic_chart_data_point_fill_style_index(49, true),
+      super::automatic_chart_data_point_fill_style_index(2, true)
+    );
+  }
+
+  #[test]
   fn general_number_format_uses_short_decimal_output_not_scientific_notation() {
     assert_eq!(format_chart_number(30.8, None), "30.8");
     assert_eq!(format_chart_number(66.79, Some("General")), "66.79");
@@ -7617,6 +8230,73 @@ mod tests {
     assert_eq!(
       largest_remainder_percentages(&[Some(1.0), Some(2.0)], f64::INFINITY),
       vec![0.0, 0.0]
+    );
+  }
+
+  #[test]
+  fn multilevel_categories_preserve_sparse_spans_and_flat_point_identity() {
+    let data = c::CategoryAxisData::from_bytes(
+      br#"<c:cat xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:multiLvlStrRef><c:f>Sheet1!$A$1:$C$5</c:f><c:multiLvlStrCache><c:ptCount val="5"/><c:lvl><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt><c:pt idx="2"><c:v>C</c:v></c:pt><c:pt idx="3"><c:v>D</c:v></c:pt></c:lvl><c:lvl><c:pt idx="0"><c:v>2011</c:v></c:pt><c:pt idx="2"><c:v>2012</c:v></c:pt></c:lvl><c:lvl><c:pt idx="0"><c:v>ROOT</c:v></c:pt></c:lvl></c:multiLvlStrCache></c:multiLvlStrRef></c:cat>"#,
+    )
+    .expect("category data");
+
+    let labels = indexed_category_axis_labels(&data);
+    assert_eq!(
+      labels.flat,
+      [
+        "ROOT 2011 A",
+        "ROOT 2011 B",
+        "ROOT 2012 C",
+        "ROOT 2012 D",
+        "ROOT 2012 D",
+      ]
+    );
+    let hierarchy = labels.hierarchy.expect("multi-level hierarchy");
+    assert_eq!(hierarchy.point_count, 5);
+    assert_eq!(hierarchy.expanded_level(0), ["A", "B", "C", "D", "D"]);
+    assert_eq!(
+      hierarchy.levels[1]
+        .groups
+        .iter()
+        .map(|group| (group.text.as_str(), group.start_index, group.span))
+        .collect::<Vec<_>>(),
+      [("2011", 0, 2), ("2012", 2, 3)]
+    );
+    assert_eq!(
+      hierarchy.levels[2]
+        .groups
+        .iter()
+        .map(|group| (group.text.as_str(), group.start_index, group.span))
+        .collect::<Vec<_>>(),
+      [("ROOT", 0, 5)]
+    );
+  }
+
+  #[test]
+  fn multilevel_categories_keep_equal_explicit_groups_and_parent_boundaries() {
+    let data = c::CategoryAxisData::from_bytes(
+      br#"<c:cat xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:multiLvlStrRef><c:f>Sheet1!$A$1:$B$4</c:f><c:multiLvlStrCache><c:ptCount val="4"/><c:lvl><c:pt idx="0"><c:v>Leaf</c:v></c:pt></c:lvl><c:lvl><c:pt idx="0"><c:v>Same</c:v></c:pt><c:pt idx="2"><c:v>Same</c:v></c:pt></c:lvl></c:multiLvlStrCache></c:multiLvlStrRef></c:cat>"#,
+    )
+    .expect("category data");
+
+    let labels = indexed_category_axis_labels(&data);
+    assert_eq!(labels.flat, ["Same Leaf", "Same Leaf", "Same", "Same"]);
+    let hierarchy = labels.hierarchy.expect("multi-level hierarchy");
+    assert_eq!(
+      hierarchy.levels[1]
+        .groups
+        .iter()
+        .map(|group| (group.text.as_str(), group.start_index, group.span))
+        .collect::<Vec<_>>(),
+      [("Same", 0, 2), ("Same", 2, 2)]
+    );
+    assert_eq!(
+      hierarchy.levels[0]
+        .groups
+        .iter()
+        .map(|group| (group.text.as_str(), group.start_index, group.span))
+        .collect::<Vec<_>>(),
+      [("Leaf", 0, 2), ("", 2, 2)]
     );
   }
 
@@ -7986,6 +8666,15 @@ mod tests {
     assert_eq!(scale.minimum, 0.0);
     assert_eq!(scale.maximum, 6.0);
     assert_eq!(scale.major_unit, 1.0);
+  }
+
+  #[test]
+  fn linear_scale_honors_a_single_interval_budget_from_the_host_layout() {
+    let scale = linear_axis_scale([0.7, 1.8, 2.6], None, 1).expect("finite values produce a scale");
+
+    assert_eq!(scale.minimum, 0.0);
+    assert_eq!(scale.maximum, 5.0);
+    assert_eq!(scale.major_unit, 5.0);
   }
 
   #[test]

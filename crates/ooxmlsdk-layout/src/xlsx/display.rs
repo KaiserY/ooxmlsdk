@@ -36,7 +36,7 @@ use crate::pptx::chart::{
   CartesianChartGroupDecorationStyle, ChartFrame, ChartLayoutProfile, ClusteredColumnStyle,
   RadialChartStyle, lower_clustered_column_chart, lower_radial_chart, solid_chart_shape_style,
 };
-use crate::pptx::drawingml::color::{Color, RgbHexColor};
+use crate::pptx::drawingml::color::{Color, RgbHexColor, SchemeColor};
 use crate::pptx::drawingml::fill::FillKind;
 use crate::pptx::drawingml::line::LineFill;
 
@@ -301,6 +301,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     text: Cow::Owned(item.text),
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
+    line_metrics_participant: true,
     paint_clip: item.paint_clip,
     style: common_text_style(*item.style),
     font_id: None,
@@ -5021,6 +5022,7 @@ fn finish_xlsx_shape_effects(
   let resolver = XlsxImageEffectColorResolver {
     import,
     image_resources: &drawing.image_resources,
+    chart_resource: None,
     placeholder_color: theme_effects
       .and_then(|(_, placeholder)| placeholder)
       .cloned(),
@@ -6108,17 +6110,17 @@ fn lower_drawing_chart(
     if let Some(properties) = chart.data_label_text_properties {
       apply_xlsx_chart_text_properties(&mut data_label_style, properties, import);
     }
-    let point_colors = (0..chart.values.len())
+    let point_colors: Vec<RgbColor> = (0..chart.values.len())
       .map(|index| {
         chart
           .data_point_fills
           .iter()
           .find(|fill| fill.index as usize == index)
-          .and_then(|fill| xlsx_chart_solid_fill_color(fill.fill, import))
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill.fill, import, resource))
           .or_else(|| {
             chart
               .series_solid_fill
-              .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+              .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource))
           })
           .or_else(|| {
             let (formatting_index, maximum_formatting_index) = if chart.vary_colors {
@@ -6132,6 +6134,7 @@ fn lower_drawing_chart(
             xlsx_automatic_chart_color(
               chart_space,
               import,
+              resource,
               chart_style.unwrap_or(2),
               formatting_index,
               maximum_formatting_index,
@@ -6143,10 +6146,22 @@ fn lower_drawing_chart(
     let inherited_point_style = xlsx_chart_shape_style(
       chart.series_shape_properties,
       import,
+      resource,
       common::ShapeStyle::default(),
     );
     let point_styles = (0..chart.values.len())
       .map(|index| {
+        let automatic_fill = xlsx_automatic_chart_fill_style(
+          import,
+          resource,
+          chart_style.unwrap_or(2),
+          chart.kind == shared_chart::RadialChartKind::Pie3D,
+          point_colors[index],
+        );
+        let inherited_fill = inherited_point_style
+          .fill
+          .resolve_over(&automatic_fill)
+          .clone();
         chart
           .data_points
           .iter()
@@ -6155,10 +6170,17 @@ fn lower_drawing_chart(
             xlsx_chart_shape_style(
               point.chart_shape_properties.as_deref(),
               import,
-              inherited_point_style.clone(),
+              resource,
+              common::ShapeStyle {
+                fill: inherited_fill.clone(),
+                stroke: inherited_point_style.stroke.clone(),
+              },
             )
           })
-          .unwrap_or_else(|| inherited_point_style.clone())
+          .unwrap_or_else(|| common::ShapeStyle {
+            fill: inherited_fill,
+            stroke: inherited_point_style.stroke.clone(),
+          })
       })
       .collect();
     let data_label_fill_colors = chart
@@ -6168,7 +6190,7 @@ fn lower_drawing_chart(
         label
           .shape_properties
           .and_then(shared_chart::chart_shape_solid_fill)
-          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+          .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource))
       })
       .collect();
     let (data_label_styles, data_label_rich_text_styles) =
@@ -6195,6 +6217,7 @@ fn lower_drawing_chart(
         leader_line_style: xlsx_chart_shape_style(
           chart.leader_line_shape_properties,
           import,
+          resource,
           common::ShapeStyle::default(),
         ),
         legend_frame_style: xlsx_chart_shape_style(
@@ -6204,16 +6227,19 @@ fn lower_drawing_chart(
             .as_deref()
             .and_then(|legend| legend.chart_shape_properties.as_deref()),
           import,
+          resource,
           common::ShapeStyle::default(),
         ),
         chart_area_style: xlsx_shape_style(
           chart_space.shape_properties.as_deref(),
           import,
+          resource,
           common::ShapeStyle::default(),
         ),
         plot_area_style: xlsx_shape_style(
           chart_space.chart.plot_area.shape_properties.as_deref(),
           import,
+          resource,
           common::ShapeStyle::default(),
         ),
       },
@@ -6322,17 +6348,18 @@ fn lower_drawing_chart(
     .map(|series| series.formatting_index)
     .max()
     .unwrap_or(0);
-  let series_colors = chart
+  let series_colors: Vec<RgbColor> = chart
     .series
     .iter()
     .map(|series| {
       series
         .solid_fill
-        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource))
         .or_else(|| {
           xlsx_automatic_chart_color(
             chart_space,
             import,
+            resource,
             chart_style.unwrap_or(2),
             series.formatting_index,
             maximum_series_formatting_index,
@@ -6340,7 +6367,26 @@ fn lower_drawing_chart(
         })
         .unwrap_or_default()
     })
-    .collect();
+    .collect::<Vec<_>>();
+  let automatic_series_fills = chart
+    .series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      xlsx_automatic_chart_fill_style(
+        import,
+        resource,
+        chart_style.unwrap_or(2),
+        series.is_3d,
+        series_colors.get(series_index).copied().unwrap_or_default(),
+      )
+    })
+    .collect::<Vec<_>>();
+  let automatic_series_marker_strokes = series_colors
+    .iter()
+    .copied()
+    .map(|color| xlsx_automatic_chart_marker_stroke_style(import, resource, color))
+    .collect::<Vec<_>>();
   let series_point_styles = chart
     .series
     .iter()
@@ -6350,16 +6396,18 @@ fn lower_drawing_chart(
           series
             .data_points
             .iter()
+            .rev()
             .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
             .map(|point| {
               xlsx_chart_shape_style(
                 point.chart_shape_properties.as_deref(),
                 import,
+                resource,
                 common::ShapeStyle::default(),
               )
             })
         })
-        .collect()
+        .collect::<Vec<_>>()
     })
     .collect::<Vec<_>>();
   let series_point_colors = chart
@@ -6367,14 +6415,7 @@ fn lower_drawing_chart(
     .iter()
     .enumerate()
     .map(|(series_index, series)| {
-      if !chart.vary_colors_by_point
-        || chart.series.len() != 1
-        || series_index != 0
-        || series
-          .shape_properties
-          .and_then(shared_chart::chart_shape_solid_fill)
-          .is_some()
-      {
+      if !chart.vary_colors_by_point || chart.series.len() != 1 || series_index != 0 {
         return vec![None; series.values.len()];
       }
       let maximum_point_index = series.values.len().saturating_sub(1);
@@ -6383,10 +6424,48 @@ fn lower_drawing_chart(
           xlsx_automatic_chart_color(
             chart_space,
             import,
+            resource,
             chart_style.unwrap_or(2),
             point_index,
             maximum_point_index,
           )
+        })
+        .collect()
+    })
+    .collect::<Vec<_>>();
+  let automatic_series_point_fills = chart
+    .series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      series_point_colors
+        .get(series_index)
+        .map(|colors| {
+          colors
+            .iter()
+            .map(|color| {
+              color.map(|color| {
+                xlsx_automatic_chart_fill_style(
+                  import,
+                  resource,
+                  chart_style.unwrap_or(2),
+                  series.is_3d,
+                  color,
+                )
+              })
+            })
+            .collect()
+        })
+        .unwrap_or_default()
+    })
+    .collect::<Vec<_>>();
+  let automatic_series_point_marker_strokes = series_point_colors
+    .iter()
+    .map(|colors| {
+      colors
+        .iter()
+        .map(|color| {
+          color.map(|color| xlsx_automatic_chart_marker_stroke_style(import, resource, color))
         })
         .collect()
     })
@@ -6399,7 +6478,7 @@ fn lower_drawing_chart(
         .band_fills
         .iter()
         .filter_map(|fill| {
-          xlsx_chart_solid_fill_color(fill.fill, import).map(|color| (fill.index, color))
+          xlsx_chart_solid_fill_color(fill.fill, import, resource).map(|color| (fill.index, color))
         })
         .collect()
     })
@@ -6541,10 +6620,10 @@ fn lower_drawing_chart(
     .and_then(
       |properties| match properties.chart_shape_properties_choice2.as_ref()? {
         c::ChartShapePropertiesChoice2::SolidFill(fill) => {
-          xlsx_chart_solid_fill_color(fill, import)
+          xlsx_chart_solid_fill_color(fill, import, resource)
         }
         c::ChartShapePropertiesChoice2::GradientFill(fill) => {
-          xlsx_chart_first_gradient_fill_color(fill, import)
+          xlsx_chart_first_gradient_fill_color(fill, import, resource)
         }
         _ => None,
       },
@@ -6554,7 +6633,7 @@ fn lower_drawing_chart(
     .and_then(|axis| axis.major_gridlines.as_deref())
     .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
     .and_then(shared_chart::chart_shape_outline_solid_fill)
-    .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+    .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource))
     .unwrap_or_else(|| {
       // ECMA's omitted legacy chart style resolves to style 2. LibreOffice's
       // ChartSpaceModel likewise initializes mnStyle to 2 before parsing an
@@ -6597,7 +6676,7 @@ fn lower_drawing_chart(
       .chart_shape_properties
       .as_deref()?;
     let color = shared_chart::chart_shape_outline_solid_fill(properties)
-      .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))?;
+      .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource))?;
     let width = xlsx_chart_outline_width_pt(properties)?;
     Some((color, width))
   });
@@ -6608,7 +6687,7 @@ fn lower_drawing_chart(
       .chart_shape_properties
       .as_deref()?;
     let color = shared_chart::chart_shape_outline_solid_fill(properties)
-      .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))?;
+      .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource))?;
     let width = xlsx_chart_outline_width_pt(properties)?;
     Some((color, width))
   });
@@ -6616,7 +6695,7 @@ fn lower_drawing_chart(
     .shape_properties
     .as_deref()
     .and_then(shared_chart::shape_properties_outline_solid_fill)
-    .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+    .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource))
     .or_else(|| {
       if chart_style.is_none() {
         // The legacy default-style chart area keeps the same neutral-gray
@@ -6656,10 +6735,150 @@ fn lower_drawing_chart(
       xlsx_chart_shape_style(
         series.shape_properties,
         import,
+        resource,
         common::ShapeStyle::default(),
       )
     })
-    .collect();
+    .collect::<Vec<_>>();
+  let series_marker_styles = chart
+    .series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      let style = xlsx_chart_shape_style(
+        series
+          .marker
+          .and_then(|marker| marker.chart_shape_properties.as_deref()),
+        import,
+        resource,
+        common::ShapeStyle::default(),
+      );
+      crate::pptx::chart::normalize_chart_marker_shape_style(
+        series.marker,
+        style,
+        automatic_series_marker_strokes.get(series_index),
+      )
+    })
+    .collect::<Vec<_>>();
+  let series_point_marker_styles = chart
+    .series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      (0..series.values.len())
+        .map(|point_index| {
+          series
+            .data_points
+            .iter()
+            .rev()
+            .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
+            .and_then(|point| point.marker.as_deref())
+            .map(|marker| {
+              let style = xlsx_chart_shape_style(
+                marker.chart_shape_properties.as_deref(),
+                import,
+                resource,
+                common::ShapeStyle::default(),
+              );
+              crate::pptx::chart::normalize_chart_marker_shape_style(
+                Some(marker),
+                style,
+                series_point_styles
+                  .get(series_index)
+                  .and_then(|points| points.get(point_index))
+                  .and_then(Option::as_ref)
+                  .map(|point| &point.stroke)
+                  .filter(|stroke| !matches!(stroke, common::ShapeStyleValue::Unspecified))
+                  .or_else(|| {
+                    series_marker_styles
+                      .get(series_index)
+                      .map(|style| &style.stroke)
+                  }),
+              )
+            })
+        })
+        .collect()
+    })
+    .collect::<Vec<_>>();
+  let chart_effect_resolver = XlsxImageEffectColorResolver {
+    import,
+    image_resources: &drawing.image_resources,
+    chart_resource: Some(resource),
+    placeholder_color: Some(Color::Scheme(SchemeColor {
+      value: a::SchemeColorValues::Dark1,
+      transformations: Vec::new(),
+    })),
+  };
+  let data_point_effect_style = shared_chart::chart_shape_effects_from_theme_style(
+    shared_chart::automatic_chart_data_point_effect_style_index(chart_style.unwrap_or(2))
+      .and_then(|index| xlsx_chart_effect_style_source(resource, import, index)),
+    &chart_effect_resolver,
+  );
+  let series_effect_styles = chart
+    .series
+    .iter()
+    .map(|series| {
+      shared_chart::chart_shape_effects_from_properties(
+        series.shape_properties,
+        &chart_effect_resolver,
+      )
+    })
+    .collect::<Vec<_>>();
+  let series_marker_effect_styles = chart
+    .series
+    .iter()
+    .map(|series| {
+      shared_chart::chart_shape_effects_from_properties(
+        series
+          .marker
+          .and_then(|marker| marker.chart_shape_properties.as_deref()),
+        &chart_effect_resolver,
+      )
+    })
+    .collect::<Vec<_>>();
+  let series_point_effect_styles = chart
+    .series
+    .iter()
+    .map(|series| {
+      (0..series.values.len())
+        .map(|point_index| {
+          series
+            .data_points
+            .iter()
+            .rev()
+            .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
+            .map(|point| {
+              shared_chart::chart_shape_effects_from_properties(
+                point.chart_shape_properties.as_deref(),
+                &chart_effect_resolver,
+              )
+            })
+        })
+        .collect()
+    })
+    .collect::<Vec<_>>();
+  let series_point_marker_effect_styles = chart
+    .series
+    .iter()
+    .map(|series| {
+      (0..series.values.len())
+        .map(|point_index| {
+          series
+            .data_points
+            .iter()
+            .rev()
+            .find(|point| usize::try_from(point.index.val).ok() == Some(point_index))
+            .and_then(|point| point.marker.as_deref())
+            .map(|marker| {
+              shared_chart::chart_shape_effects_from_properties(
+                marker.chart_shape_properties.as_deref(),
+                &chart_effect_resolver,
+              )
+            })
+        })
+        .collect()
+    })
+    .collect::<Vec<_>>();
   let trendline_styles = chart
     .series
     .iter()
@@ -6671,6 +6890,7 @@ fn lower_drawing_chart(
           xlsx_chart_shape_style(
             trendline.chart_shape_properties.as_deref(),
             import,
+            resource,
             common::ShapeStyle::default(),
           )
         })
@@ -6688,6 +6908,7 @@ fn lower_drawing_chart(
           xlsx_chart_shape_style(
             error_bars.shape_properties,
             import,
+            resource,
             common::ShapeStyle::default(),
           )
         })
@@ -6703,6 +6924,7 @@ fn lower_drawing_chart(
           .drop_lines
           .and_then(|lines| lines.chart_shape_properties.as_deref()),
         import,
+        resource,
         common::ShapeStyle::default(),
       ),
       high_low_lines: xlsx_chart_shape_style(
@@ -6710,6 +6932,7 @@ fn lower_drawing_chart(
           .high_low_lines
           .and_then(|lines| lines.chart_shape_properties.as_deref()),
         import,
+        resource,
         common::ShapeStyle::default(),
       ),
       up_bars: xlsx_chart_shape_style(
@@ -6718,6 +6941,7 @@ fn lower_drawing_chart(
           .and_then(|bars| bars.up_bars.as_deref())
           .and_then(|bars| bars.chart_shape_properties.as_deref()),
         import,
+        resource,
         common::ShapeStyle::default(),
       ),
       down_bars: xlsx_chart_shape_style(
@@ -6726,6 +6950,7 @@ fn lower_drawing_chart(
           .and_then(|bars| bars.down_bars.as_deref())
           .and_then(|bars| bars.chart_shape_properties.as_deref()),
         import,
+        resource,
         common::ShapeStyle::default(),
       ),
     })
@@ -6733,12 +6958,13 @@ fn lower_drawing_chart(
   let chart_area_style = xlsx_shape_style(
     chart_space.shape_properties.as_deref(),
     import,
+    resource,
     solid_chart_shape_style(
       chart_space
         .shape_properties
         .as_deref()
         .and_then(shared_chart::shape_properties_solid_fill)
-        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource)),
       chart_area_stroke_color.map(|color| {
         (
           color,
@@ -6754,6 +6980,7 @@ fn lower_drawing_chart(
   let plot_area_style = xlsx_shape_style(
     chart_space.chart.plot_area.shape_properties.as_deref(),
     import,
+    resource,
     solid_chart_shape_style(
       chart_space
         .chart
@@ -6761,14 +6988,14 @@ fn lower_drawing_chart(
         .shape_properties
         .as_deref()
         .and_then(shared_chart::shape_properties_solid_fill)
-        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import)),
+        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource)),
       chart_space
         .chart
         .plot_area
         .shape_properties
         .as_deref()
         .and_then(shared_chart::shape_properties_outline_solid_fill)
-        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+        .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource))
         .map(|color| {
           (
             color,
@@ -6797,7 +7024,7 @@ fn lower_drawing_chart(
       chart_style_id: chart_style.unwrap_or(2),
       modern_excel_profile: chart_style.is_some(),
       stroke_scale: drawing_scale,
-      automatic_line_width_pt: 1.5,
+      automatic_line_width_pt: xlsx_chart_automatic_line_width_pt(import, resource, chart_space),
       has_explicit_title: chart_space
         .chart
         .title
@@ -6836,6 +7063,17 @@ fn lower_drawing_chart(
       series_colors,
       series_point_colors,
       series_styles,
+      series_marker_styles,
+      series_point_marker_styles,
+      automatic_series_marker_strokes,
+      automatic_series_fills,
+      automatic_series_point_fills,
+      automatic_series_point_marker_strokes,
+      data_point_effect_style,
+      series_effect_styles,
+      series_marker_effect_styles,
+      series_point_effect_styles,
+      series_point_marker_effect_styles,
       trendline_styles,
       error_bar_styles,
       group_decoration_styles,
@@ -6852,7 +7090,7 @@ fn lower_drawing_chart(
               label
                 .shape_properties
                 .and_then(shared_chart::chart_shape_solid_fill)
-                .and_then(|fill| xlsx_chart_solid_fill_color(fill, import))
+                .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource))
             })
             .collect()
         })
@@ -6864,6 +7102,7 @@ fn lower_drawing_chart(
           .as_deref()
           .and_then(|legend| legend.chart_shape_properties.as_deref()),
         import,
+        resource,
         common::ShapeStyle::default(),
       ),
       chart_area_style,
@@ -6875,6 +7114,7 @@ fn lower_drawing_chart(
           .as_deref()
           .and_then(|floor| floor.shape_properties.as_deref()),
         import,
+        resource,
         solid_chart_shape_style(None, None),
       ),
       side_wall_style: xlsx_shape_style(
@@ -6884,6 +7124,7 @@ fn lower_drawing_chart(
           .as_deref()
           .and_then(|wall| wall.shape_properties.as_deref()),
         import,
+        resource,
         solid_chart_shape_style(None, None),
       ),
       back_wall_style: xlsx_shape_style(
@@ -6893,6 +7134,7 @@ fn lower_drawing_chart(
           .as_deref()
           .and_then(|wall| wall.shape_properties.as_deref()),
         import,
+        resource,
         solid_chart_shape_style(None, None),
       ),
     },
@@ -7843,17 +8085,29 @@ const XLSX_DEFAULT_CHART_SERIES_COLORS: [RgbColor; 6] = [
   },
 ];
 
-fn xlsx_chart_solid_fill_color(fill: &a::SolidFill, import: &ExcelImport) -> Option<RgbColor> {
+fn xlsx_chart_solid_fill_color(
+  fill: &a::SolidFill,
+  import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
+) -> Option<RgbColor> {
   let color = fill
     .solid_fill_choice
     .as_ref()
     .and_then(Color::from_solid_fill_choice)?;
-  xlsx_chart_color(color, import)
+  let color = xlsx_chart_effect_color_with_placeholder(color, import, resource, None)?;
+  Some(RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+  })
 }
 
 fn xlsx_chart_gradient_fill(
   fill: &a::GradientFill,
   import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
+  placeholder_color: Option<&Color>,
+  preserve_saturation_overflow: bool,
 ) -> Option<common::Fill<'static>> {
   let stops = fill
     .gradient_stop_list
@@ -7865,7 +8119,15 @@ fn xlsx_chart_gradient_fill(
         .gradient_stop_choice
         .as_ref()
         .and_then(Color::from_gradient_stop_choice)
-        .and_then(|color| xlsx_drawing_color(color, import))?;
+        .and_then(|color| {
+          xlsx_chart_color_with_placeholder_policy(
+            color,
+            import,
+            resource,
+            placeholder_color,
+            preserve_saturation_overflow,
+          )
+        })?;
       Some(common::GradientStop {
         position: stop.position.as_ratio() as f32,
         color,
@@ -7905,6 +8167,60 @@ fn xlsx_chart_gradient_fill(
   }))
 }
 
+fn xlsx_chart_pattern_fill(
+  fill: &a::PatternFill,
+  import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
+  placeholder_color: Option<&Color>,
+  preserve_saturation_overflow: bool,
+) -> common::PatternFill {
+  let foreground = fill
+    .foreground_color
+    .as_ref()
+    .and_then(|color| color.foreground_color_choice.as_ref())
+    .and_then(Color::from_foreground_color_choice)
+    .and_then(|color| {
+      xlsx_chart_color_with_placeholder_policy(
+        color,
+        import,
+        resource,
+        placeholder_color,
+        preserve_saturation_overflow,
+      )
+    })
+    .unwrap_or(common::Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: u8::MAX,
+    });
+  let background = fill
+    .background_color
+    .as_ref()
+    .and_then(|color| color.background_color_choice.as_ref())
+    .and_then(Color::from_background_color_choice)
+    .and_then(|color| {
+      xlsx_chart_color_with_placeholder_policy(
+        color,
+        import,
+        resource,
+        placeholder_color,
+        preserve_saturation_overflow,
+      )
+    })
+    .unwrap_or(common::Color {
+      r: u8::MAX,
+      g: u8::MAX,
+      b: u8::MAX,
+      a: u8::MAX,
+    });
+  common::PatternFill::drawingml(
+    common::drawingml_pattern::hatch_style(fill.preset),
+    foreground,
+    background,
+  )
+}
+
 fn xlsx_chart_blip_fill(fill: &a::BlipFill) -> common::Fill<'static> {
   let relationship_id = fill.blip.as_deref().and_then(|blip| {
     blip
@@ -7922,6 +8238,7 @@ fn xlsx_chart_blip_fill(fill: &a::BlipFill) -> common::Fill<'static> {
 fn xlsx_chart_shape_style(
   properties: Option<&c::ChartShapeProperties>,
   import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
   mut fallback: common::ShapeStyle<'static>,
 ) -> common::ShapeStyle<'static> {
   let Some(properties) = properties else {
@@ -7930,24 +8247,28 @@ fn xlsx_chart_shape_style(
   if let Some(fill) = properties.chart_shape_properties_choice2.as_ref() {
     fallback.fill = match fill {
       c::ChartShapePropertiesChoice2::NoFill(_) => common::ShapeStyleValue::NoPaint,
-      c::ChartShapePropertiesChoice2::SolidFill(fill) => xlsx_chart_solid_fill_color(fill, import)
-        .map(|color| common::ShapeStyleValue::Paint(common::Fill::Solid(common_rgb(color, 1.0))))
+      c::ChartShapePropertiesChoice2::SolidFill(fill) => fill
+        .solid_fill_choice
+        .as_ref()
+        .and_then(Color::from_solid_fill_choice)
+        .and_then(|color| xlsx_chart_effect_color_with_placeholder(color, import, resource, None))
+        .map(|color| common::ShapeStyleValue::Paint(common::Fill::Solid(color)))
         .unwrap_or(fallback.fill),
-      c::ChartShapePropertiesChoice2::GradientFill(fill) => xlsx_chart_gradient_fill(fill, import)
-        .map(common::ShapeStyleValue::Paint)
-        .unwrap_or(fallback.fill),
-      c::ChartShapePropertiesChoice2::PatternFill(fill) => {
-        drawing_object_pattern_fill(import, fill, None)
-          .map(|fill| common::ShapeStyleValue::Paint(common::Fill::Pattern(fill)))
+      c::ChartShapePropertiesChoice2::GradientFill(fill) => {
+        xlsx_chart_gradient_fill(fill, import, resource, None, false)
+          .map(common::ShapeStyleValue::Paint)
           .unwrap_or(fallback.fill)
       }
+      c::ChartShapePropertiesChoice2::PatternFill(fill) => common::ShapeStyleValue::Paint(
+        common::Fill::Pattern(xlsx_chart_pattern_fill(fill, import, resource, None, false)),
+      ),
       c::ChartShapePropertiesChoice2::BlipFill(fill) => {
         common::ShapeStyleValue::Paint(xlsx_chart_blip_fill(fill))
       }
     };
   }
   if let Some(outline) = properties.outline.as_deref() {
-    fallback.stroke = xlsx_chart_outline_style(outline, import, fallback.stroke);
+    fallback.stroke = xlsx_chart_outline_style(outline, import, resource, fallback.stroke);
   }
   fallback
 }
@@ -7955,6 +8276,7 @@ fn xlsx_chart_shape_style(
 fn xlsx_shape_style(
   properties: Option<&c::ShapeProperties>,
   import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
   mut fallback: common::ShapeStyle<'static>,
 ) -> common::ShapeStyle<'static> {
   let Some(properties) = properties else {
@@ -7963,17 +8285,21 @@ fn xlsx_shape_style(
   if let Some(fill) = properties.shape_properties_choice2.as_ref() {
     fallback.fill = match fill {
       c::ShapePropertiesChoice2::NoFill(_) => common::ShapeStyleValue::NoPaint,
-      c::ShapePropertiesChoice2::SolidFill(fill) => xlsx_chart_solid_fill_color(fill, import)
-        .map(|color| common::ShapeStyleValue::Paint(common::Fill::Solid(common_rgb(color, 1.0))))
+      c::ShapePropertiesChoice2::SolidFill(fill) => fill
+        .solid_fill_choice
+        .as_ref()
+        .and_then(Color::from_solid_fill_choice)
+        .and_then(|color| xlsx_chart_effect_color_with_placeholder(color, import, resource, None))
+        .map(|color| common::ShapeStyleValue::Paint(common::Fill::Solid(color)))
         .unwrap_or(fallback.fill),
-      c::ShapePropertiesChoice2::GradientFill(fill) => xlsx_chart_gradient_fill(fill, import)
-        .map(common::ShapeStyleValue::Paint)
-        .unwrap_or(fallback.fill),
-      c::ShapePropertiesChoice2::PatternFill(fill) => {
-        drawing_object_pattern_fill(import, fill, None)
-          .map(|fill| common::ShapeStyleValue::Paint(common::Fill::Pattern(fill)))
+      c::ShapePropertiesChoice2::GradientFill(fill) => {
+        xlsx_chart_gradient_fill(fill, import, resource, None, false)
+          .map(common::ShapeStyleValue::Paint)
           .unwrap_or(fallback.fill)
       }
+      c::ShapePropertiesChoice2::PatternFill(fill) => common::ShapeStyleValue::Paint(
+        common::Fill::Pattern(xlsx_chart_pattern_fill(fill, import, resource, None, false)),
+      ),
       c::ShapePropertiesChoice2::BlipFill(fill) => {
         common::ShapeStyleValue::Paint(xlsx_chart_blip_fill(fill))
       }
@@ -7981,7 +8307,7 @@ fn xlsx_shape_style(
     };
   }
   if let Some(outline) = properties.outline.as_deref() {
-    fallback.stroke = xlsx_chart_outline_style(outline, import, fallback.stroke);
+    fallback.stroke = xlsx_chart_outline_style(outline, import, resource, fallback.stroke);
   }
   fallback
 }
@@ -7989,6 +8315,7 @@ fn xlsx_shape_style(
 fn xlsx_chart_outline_style(
   outline: &a::Outline,
   import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
   fallback: common::ShapeStyleValue<common::Stroke<'static>>,
 ) -> common::ShapeStyleValue<common::Stroke<'static>> {
   let fallback_stroke = match &fallback {
@@ -7998,19 +8325,19 @@ fn xlsx_chart_outline_style(
   let (explicit_color, pattern, gradient) = match outline.outline_choice1.as_ref() {
     Some(a::OutlineChoice::NoFill(_)) => return common::ShapeStyleValue::NoPaint,
     Some(a::OutlineChoice::SolidFill(fill)) => {
-      let Some(color) = xlsx_chart_solid_fill_color(fill, import) else {
+      let Some(color) = xlsx_chart_solid_fill_color(fill, import, resource) else {
         return fallback;
       };
       (Some(common_rgb(color, 1.0)), None, None)
     }
     Some(a::OutlineChoice::PatternFill(fill)) => {
-      let Some(pattern) = drawing_object_pattern_fill(import, fill, None) else {
-        return fallback;
-      };
+      let pattern = xlsx_chart_pattern_fill(fill, import, resource, None, false);
       (Some(pattern.foreground), Some(pattern), None)
     }
     Some(a::OutlineChoice::GradientFill(fill)) => {
-      let Some(common::Fill::Gradient(gradient)) = xlsx_chart_gradient_fill(fill, import) else {
+      let Some(common::Fill::Gradient(gradient)) =
+        xlsx_chart_gradient_fill(fill, import, resource, None, false)
+      else {
         return fallback;
       };
       let color = gradient.stops.first().map(|stop| stop.color);
@@ -8061,6 +8388,7 @@ fn xlsx_outline_width_pt(outline: Option<&a::Outline>) -> Option<f32> {
 fn xlsx_chart_first_gradient_fill_color(
   fill: &a::GradientFill,
   import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
 ) -> Option<RgbColor> {
   let color = fill
     .gradient_stop_list
@@ -8070,19 +8398,7 @@ fn xlsx_chart_first_gradient_fill_color(
     .gradient_stop_choice
     .as_ref()
     .and_then(Color::from_gradient_stop_choice)?;
-  xlsx_chart_color(color, import)
-}
-
-fn xlsx_chart_color(color: Color, import: &ExcelImport) -> Option<RgbColor> {
-  let mut scheme_resolver = |value| {
-    let index = xlsx_scheme_color_index(value)?;
-    let color = import.styles.theme_color(index, 0.0)?;
-    Some(Color::RgbHex(RgbHexColor {
-      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
-      transformations: Vec::new(),
-    }))
-  };
-  let color = color.resolve_rgb(&mut scheme_resolver, None)?;
+  let color = xlsx_chart_effect_color_with_placeholder(color, import, resource, None)?;
   Some(RgbColor {
     r: color.r,
     g: color.g,
@@ -8090,9 +8406,262 @@ fn xlsx_chart_color(color: Color, import: &ExcelImport) -> Option<RgbColor> {
   })
 }
 
+fn xlsx_chart_effect_color_with_placeholder(
+  color: Color,
+  import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
+  placeholder_color: Option<&Color>,
+) -> Option<common::Color> {
+  xlsx_chart_color_with_placeholder_policy(color, import, resource, placeholder_color, false)
+}
+
+fn xlsx_chart_color_with_placeholder_policy(
+  color: Color,
+  import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
+  placeholder_color: Option<&Color>,
+  preserve_saturation_overflow: bool,
+) -> Option<common::Color> {
+  let color_map = resource
+    .chart_space
+    .as_deref()
+    .and_then(|chart_space| chart_space.color_map_override.as_deref());
+  let mut scheme_resolver = |token| {
+    let mapped = shared_chart::scheme_color_token(color_map, token)?;
+    if let Some(scheme) = resource.theme_color_scheme.as_ref() {
+      return scheme.get_color(mapped).cloned();
+    }
+    let index = xlsx_chart_theme_color_index(mapped);
+    let color = import
+      .styles
+      .theme_color(index, 0.0)
+      .or_else(|| xlsx_default_chart_theme_color(index))?;
+    Some(Color::RgbHex(RgbHexColor {
+      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+      transformations: Vec::new(),
+    }))
+  };
+  let color = if preserve_saturation_overflow {
+    color.resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?
+  } else {
+    color.resolve_rgb(&mut scheme_resolver, placeholder_color)?
+  };
+  Some(common::Color {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
+  })
+}
+
+fn xlsx_chart_theme_color_index(value: a::ColorSchemeIndexValues) -> u32 {
+  match value {
+    a::ColorSchemeIndexValues::Light1 => 0,
+    a::ColorSchemeIndexValues::Dark1 => 1,
+    a::ColorSchemeIndexValues::Light2 => 2,
+    a::ColorSchemeIndexValues::Dark2 => 3,
+    a::ColorSchemeIndexValues::Accent1 => 4,
+    a::ColorSchemeIndexValues::Accent2 => 5,
+    a::ColorSchemeIndexValues::Accent3 => 6,
+    a::ColorSchemeIndexValues::Accent4 => 7,
+    a::ColorSchemeIndexValues::Accent5 => 8,
+    a::ColorSchemeIndexValues::Accent6 => 9,
+    a::ColorSchemeIndexValues::Hyperlink => 10,
+    a::ColorSchemeIndexValues::FollowedHyperlink => 11,
+  }
+}
+
+fn xlsx_chart_effect_style_source<'a>(
+  resource: &'a super::drawing::ChartResourceCatalog,
+  import: &'a ExcelImport,
+  index: u32,
+) -> Option<&'a a::EffectStyle> {
+  resource
+    .theme_format_scheme
+    .as_ref()
+    .and_then(|scheme| scheme.get_effect_style_source(index))
+    .or_else(|| import.styles.theme_effect_style_source(index))
+}
+
+fn xlsx_automatic_chart_fill_style(
+  import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
+  chart_style_id: u8,
+  is_3d: bool,
+  placeholder: RgbColor,
+) -> common::ShapeStyleValue<common::Fill<'static>> {
+  let index = shared_chart::automatic_chart_data_point_fill_style_index(chart_style_id, is_3d);
+  let Some(fill) = resource
+    .theme_format_scheme
+    .as_ref()
+    .and_then(|scheme| scheme.get_fill_style(index))
+    .or_else(|| import.styles.theme_fill_style(index))
+    .cloned()
+  else {
+    return common::ShapeStyleValue::Unspecified;
+  };
+  let placeholder = Color::RgbHex(RgbHexColor {
+    value: format!(
+      "{:02X}{:02X}{:02X}",
+      placeholder.r, placeholder.g, placeholder.b
+    ),
+    transformations: Vec::new(),
+  });
+  let fill = fill.with_placeholder_color(Some(placeholder));
+  let resolved = match &fill.kind {
+    FillKind::None => Some(common::Fill::None),
+    FillKind::Solid(color) => color
+      .as_ref()
+      .or(fill.placeholder_color.as_ref())
+      .and_then(|color| {
+        xlsx_chart_color_with_placeholder_policy(
+          color.clone(),
+          import,
+          resource,
+          fill.placeholder_color.as_ref(),
+          true,
+        )
+      })
+      .map(common::Fill::Solid),
+    FillKind::Gradient(gradient) => xlsx_chart_gradient_fill(
+      gradient,
+      import,
+      resource,
+      fill.placeholder_color.as_ref(),
+      true,
+    ),
+    FillKind::Pattern(pattern) => Some(common::Fill::Pattern(xlsx_chart_pattern_fill(
+      pattern,
+      import,
+      resource,
+      fill.placeholder_color.as_ref(),
+      true,
+    ))),
+    FillKind::Blip(blip) => Some(xlsx_chart_blip_fill(blip)),
+    FillKind::SlideBackground | FillKind::Group => None,
+  };
+  resolved.map_or(
+    common::ShapeStyleValue::Unspecified,
+    common::ShapeStyleValue::Paint,
+  )
+}
+
+fn xlsx_chart_automatic_line_width_pt(
+  import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
+  chart_space: &c::ChartSpace,
+) -> f32 {
+  let subtle_theme_width = resource
+    .theme_format_scheme
+    .as_ref()
+    .and_then(|scheme| {
+      scheme.get_line_style(shared_chart::AUTOMATIC_CHART_DATA_POINT_LINE_STYLE_INDEX)
+    })
+    .or_else(|| {
+      import
+        .styles
+        .theme_line_style(shared_chart::AUTOMATIC_CHART_DATA_POINT_LINE_STYLE_INDEX)
+    })
+    .and_then(|line| line.width_emu)
+    .map(units::emu_to_points)
+    .unwrap_or(0.75);
+  subtle_theme_width * shared_chart::automatic_linear_series_line_width_scale(chart_space)
+}
+
+fn xlsx_automatic_chart_marker_stroke_style(
+  import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
+  placeholder: RgbColor,
+) -> common::ShapeStyleValue<common::Stroke<'static>> {
+  let Some(line) = resource
+    .theme_format_scheme
+    .as_ref()
+    .and_then(|scheme| {
+      scheme.get_line_style(shared_chart::AUTOMATIC_CHART_DATA_POINT_LINE_STYLE_INDEX)
+    })
+    .or_else(|| {
+      import
+        .styles
+        .theme_line_style(shared_chart::AUTOMATIC_CHART_DATA_POINT_LINE_STYLE_INDEX)
+    })
+    .cloned()
+  else {
+    return common::ShapeStyleValue::Unspecified;
+  };
+  let placeholder = Color::RgbHex(RgbHexColor {
+    value: format!(
+      "{:02X}{:02X}{:02X}",
+      placeholder.r, placeholder.g, placeholder.b
+    ),
+    transformations: Vec::new(),
+  });
+  let line = line.with_placeholder_color(Some(placeholder));
+  let (color, pattern, gradient) = match &line.fill {
+    LineFill::None => return common::ShapeStyleValue::NoPaint,
+    LineFill::Unspecified => return common::ShapeStyleValue::Unspecified,
+    LineFill::Solid(color) => {
+      let Some(color) = color
+        .clone()
+        .or_else(|| line.placeholder_color.clone())
+        .and_then(|color| {
+          xlsx_chart_color_with_placeholder_policy(
+            color,
+            import,
+            resource,
+            line.placeholder_color.as_ref(),
+            true,
+          )
+        })
+      else {
+        return common::ShapeStyleValue::Unspecified;
+      };
+      (color, None, None)
+    }
+    LineFill::Pattern(fill) => {
+      let pattern = xlsx_chart_pattern_fill(
+        fill,
+        import,
+        resource,
+        line.placeholder_color.as_ref(),
+        true,
+      );
+      (pattern.foreground, Some(pattern), None)
+    }
+    LineFill::Gradient(fill) => {
+      let Some(common::Fill::Gradient(gradient)) = xlsx_chart_gradient_fill(
+        fill,
+        import,
+        resource,
+        line.placeholder_color.as_ref(),
+        true,
+      ) else {
+        return common::ShapeStyleValue::Unspecified;
+      };
+      let color = gradient
+        .stops
+        .first()
+        .map(|stop| stop.color)
+        .unwrap_or_default();
+      (color, None, Some(gradient))
+    }
+  };
+  let mut stroke = common::Stroke {
+    width: common::Pt(line.width_emu.map(units::emu_to_points).unwrap_or(0.75)),
+    color,
+    pattern,
+    gradient,
+    ..Default::default()
+  };
+  if let Some(outline) = line.source_outline.as_deref() {
+    common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+  }
+  common::ShapeStyleValue::Paint(stroke)
+}
+
 fn xlsx_automatic_chart_color(
   chart_space: &c::ChartSpace,
   import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
   chart_style_id: u8,
   formatting_index: usize,
   maximum_formatting_index: usize,
@@ -8104,20 +8673,16 @@ fn xlsx_automatic_chart_color(
     |token| {
       let mapped =
         shared_chart::scheme_color_token(chart_space.color_map_override.as_deref(), token)?;
-      let theme_index = match mapped {
-        a::ColorSchemeIndexValues::Light1 => 0,
-        a::ColorSchemeIndexValues::Dark1 => 1,
-        a::ColorSchemeIndexValues::Light2 => 2,
-        a::ColorSchemeIndexValues::Dark2 => 3,
-        a::ColorSchemeIndexValues::Accent1 => 4,
-        a::ColorSchemeIndexValues::Accent2 => 5,
-        a::ColorSchemeIndexValues::Accent3 => 6,
-        a::ColorSchemeIndexValues::Accent4 => 7,
-        a::ColorSchemeIndexValues::Accent5 => 8,
-        a::ColorSchemeIndexValues::Accent6 => 9,
-        a::ColorSchemeIndexValues::Hyperlink => 10,
-        a::ColorSchemeIndexValues::FollowedHyperlink => 11,
-      };
+      if let Some(scheme) = resource.theme_color_scheme.as_ref() {
+        let color = scheme.get_color(mapped)?.clone();
+        let resolved = xlsx_chart_effect_color_with_placeholder(color, import, resource, None)?;
+        return Some(RgbColor {
+          r: resolved.r,
+          g: resolved.g,
+          b: resolved.b,
+        });
+      }
+      let theme_index = xlsx_chart_theme_color_index(mapped);
       import
         .styles
         .theme_color(theme_index, 0.0)
@@ -8745,13 +9310,23 @@ fn xlsx_image_data_with_effects(
 struct XlsxImageEffectColorResolver<'a> {
   import: &'a ExcelImport,
   image_resources: &'a HashMap<String, super::drawing::ImageResource>,
+  chart_resource: Option<&'a super::drawing::ChartResourceCatalog>,
   placeholder_color: Option<Color>,
 }
 
 impl XlsxImageEffectColorResolver<'_> {
   fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
-    let color =
-      xlsx_drawing_color_with_placeholder(color?, self.import, self.placeholder_color.as_ref())?;
+    let color = match self.chart_resource {
+      Some(chart_resource) => xlsx_chart_effect_color_with_placeholder(
+        color?,
+        self.import,
+        chart_resource,
+        self.placeholder_color.as_ref(),
+      ),
+      None => {
+        xlsx_drawing_color_with_placeholder(color?, self.import, self.placeholder_color.as_ref())
+      }
+    }?;
     Some(ResolvedEffectColor {
       color: RgbColor {
         r: color.r,
@@ -8816,12 +9391,24 @@ impl ImageEffectColorResolver for XlsxImageEffectColorResolver<'_> {
     self.resolve(Color::from_preset_shadow_choice(choice))
   }
 
+  fn extrusion_color(&self, choice: &a::ExtrusionColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_extrusion_color_choice(choice))
+  }
+
+  fn contour_color(&self, choice: &a::ContourColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_contour_color_choice(choice))
+  }
+
   fn blip_fill(
     &self,
     fill: &a::BlipFill,
   ) -> Option<common::drawingml_image_effects::ImageEffectFill> {
     let blip = fill.blip.as_ref()?;
-    let resource = self.image_resources.get(blip.embed.as_deref()?)?;
+    let relationship_id = blip.embed.as_deref()?;
+    let resource = self
+      .chart_resource
+      .and_then(|chart| chart.image_resources.get(relationship_id))
+      .or_else(|| self.image_resources.get(relationship_id))?;
     let effects = common::drawingml_image_effects::from_blip_choices(
       &blip.blip_choice,
       resource.content_type.as_deref(),
@@ -8847,6 +9434,7 @@ fn xlsx_image_effects(
     &XlsxImageEffectColorResolver {
       import,
       image_resources,
+      chart_resource: None,
       placeholder_color: None,
     },
   )

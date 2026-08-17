@@ -903,6 +903,81 @@ pub(crate) fn apply_static_3d_text(
   apply_static_3d_impl(image, scene, projection, shape, options, Some(geometry));
 }
 
+/// Applies the DrawingML material/light equation to an orthographically
+/// projected sphere while preserving the source image as the material's
+/// Shape color and alpha mask.
+///
+/// This is deliberately a surface primitive rather than a synthetic
+/// `a:sp3d/a:bevelT`: a circle bevel is a boundary profile plus a planar cap,
+/// whereas a sphere has a continuously varying normal across its full face.
+/// The model rectangle supplies the projected diameter (or a non-uniformly
+/// scaled ellipse), so callers can keep the existing vector/raster ownership
+/// and effect pipeline.
+pub(crate) fn apply_static_3d_sphere_surface(
+  image: &mut RgbaImage,
+  scene: &a::Scene3DType,
+  projection: Static3dProjection,
+  material: Option<a::PresetMaterialTypeValues>,
+  options: Static3dRenderOptions,
+) {
+  let Some(bounds) = alpha_bounds(image) else {
+    return;
+  };
+  let model_surface = options.model_surface.unwrap_or(Static3dSurface {
+    left_px: bounds.0 as f32,
+    top_px: bounds.1 as f32,
+    width_px: (bounds.2 - bounds.0 + 1).max(1) as f32,
+    height_px: (bounds.3 - bounds.1 + 1).max(1) as f32,
+  });
+  let center_x = model_surface.left_px + model_surface.width_px * 0.5;
+  let center_y = model_surface.top_px + model_surface.height_px * 0.5;
+  let radius_x = (model_surface.width_px * 0.5).max(0.5);
+  let radius_y = (model_surface.height_px * 0.5).max(0.5);
+  let radius_z = radius_x.min(radius_y);
+  let width = model_surface.width_px.max(1.0);
+  let height = model_surface.height_px.max(1.0);
+
+  for (x, y, pixel) in image.enumerate_pixels_mut() {
+    if pixel[3] == 0 {
+      continue;
+    }
+    let model_x = x as f32 + 0.5 - center_x;
+    let model_y = y as f32 + 0.5 - center_y;
+    let model_normal = sphere_surface_normal(model_x / radius_x, model_y / radius_y);
+    let model_z = model_normal[2] * radius_z;
+    let normal = lighting_surface_normal(scene, projection, model_normal);
+    let view_direction = surface_view_direction(
+      scene,
+      projection,
+      [model_x, model_y, model_z],
+      width,
+      height,
+      options.pixels_per_point,
+    );
+    let shade = legacy_material_diffuse_shade(scene, normal, material);
+    let specular = legacy_light_rig_surface_specular(scene, normal, view_direction, material);
+    let alpha = pixel[3];
+    for channel in 0..3 {
+      pixel[channel] =
+        shade_gouraud_channel_with_specular(pixel[channel], shade[channel], specular[channel]);
+    }
+    pixel[3] = alpha;
+  }
+}
+
+fn sphere_surface_normal(normalized_x: f32, normalized_y: f32) -> [f32; 3] {
+  let radial_squared = normalized_x * normalized_x + normalized_y * normalized_y;
+  if radial_squared >= 1.0 {
+    let inverse_length = radial_squared.sqrt().recip();
+    return [
+      normalized_x * inverse_length,
+      normalized_y * inverse_length,
+      0.0,
+    ];
+  }
+  [normalized_x, normalized_y, (1.0 - radial_squared).sqrt()]
+}
+
 fn apply_static_3d_impl(
   image: &mut RgbaImage,
   scene: &a::Scene3DType,

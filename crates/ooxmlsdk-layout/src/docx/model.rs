@@ -1129,7 +1129,6 @@ pub(crate) struct InlineImage {
   /// Whether Word should paint a near-native EMF Header.Frame inside the
   /// authored DrawingML extent.
   pub metafile_native_size: bool,
-  pub picture_content_control: bool,
   pub placement: ImagePlacement,
 }
 
@@ -1232,6 +1231,7 @@ pub(crate) struct InlineChart {
   pub data_label_rich_text_styles: Vec<Vec<Vec<TextStyle>>>,
   pub gridline_color: RgbColor,
   pub automatic_chart_area_line_width_pt: f32,
+  pub automatic_series_line_width_pt: f32,
   pub value_gridline_width_pt: Option<f32>,
   pub axis_line_width_pt: Option<f32>,
   pub category_major_gridline: Option<(RgbColor, f32)>,
@@ -1239,6 +1239,19 @@ pub(crate) struct InlineChart {
   pub series_colors: Vec<RgbColor>,
   pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
   pub series_styles: Vec<common::ShapeStyle<'static>>,
+  pub series_marker_styles: Vec<common::ShapeStyle<'static>>,
+  pub series_point_marker_styles: Vec<Vec<Option<common::ShapeStyle<'static>>>>,
+  pub automatic_series_marker_strokes: Vec<common::ShapeStyleValue<common::Stroke<'static>>>,
+  pub automatic_series_fills: Vec<common::ShapeStyleValue<common::Fill<'static>>>,
+  pub automatic_series_point_fills:
+    Vec<Vec<Option<common::ShapeStyleValue<common::Fill<'static>>>>>,
+  pub automatic_series_point_marker_strokes:
+    Vec<Vec<Option<common::ShapeStyleValue<common::Stroke<'static>>>>>,
+  pub data_point_effect_style: crate::render::chart::ChartShapeEffects,
+  pub series_effect_styles: Vec<crate::render::chart::ChartShapeEffects>,
+  pub series_marker_effect_styles: Vec<crate::render::chart::ChartShapeEffects>,
+  pub series_point_effect_styles: Vec<Vec<Option<crate::render::chart::ChartShapeEffects>>>,
+  pub series_point_marker_effect_styles: Vec<Vec<Option<crate::render::chart::ChartShapeEffects>>>,
   pub trendline_styles: Vec<Vec<common::ShapeStyle<'static>>>,
   pub error_bar_styles: Vec<Vec<common::ShapeStyle<'static>>>,
   pub group_decoration_styles: Vec<crate::pptx::chart::CartesianChartGroupDecorationStyle>,

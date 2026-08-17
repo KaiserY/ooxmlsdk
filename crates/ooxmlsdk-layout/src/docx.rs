@@ -74,7 +74,8 @@ use field_localization::{
 };
 pub(crate) use model::*;
 use package::{
-  AltChunkCatalog, AltChunkResource, ExtendedChartResource, HyperlinkCatalog, ImageCatalog,
+  AltChunkCatalog, AltChunkResource, ClassicChartResource, ExtendedChartResource, HyperlinkCatalog,
+  ImageCatalog,
 };
 use settings::{
   adjust_line_height_in_table, balance_single_byte_double_byte_width, compatibility_mode,
@@ -689,7 +690,6 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       semantic_metafile_font_family: None,
       native_ole_equation: None,
       metafile_native_size: false,
-      picture_content_control: false,
       placement: ImagePlacement::Floating(FloatingImagePlacement {
         horizontal_relative_to: HorizontalImageReference::Page,
         vertical_relative_to: VerticalImageReference::Page,
@@ -10327,13 +10327,6 @@ fn push_sdt_run(
     .sdt_properties
     .as_ref()
     .is_some_and(sdt_showing_placeholder);
-  let picture_content_control = !showing_placeholder
-    && sdt.sdt_properties.as_ref().is_some_and(|properties| {
-      properties
-        .sdt_properties_choice
-        .iter()
-        .any(|choice| matches!(choice, w::SdtPropertiesChoice::SdtContentPicture))
-    });
   let widget_id = sdt
     .sdt_properties
     .as_ref()
@@ -10476,20 +10469,6 @@ fn push_sdt_run(
     }
   }
   flush_unclosed_complex_fields(inlines, &mut complex_fields, context.styles);
-  if picture_content_control {
-    // ECMA-376 Part 1 §17.5.2.24 makes this a distinct inline control whose
-    // content is one DrawingML picture. Writer likewise retains it as a
-    // ContentControl text portion containing the frame (SdtHelper.cxx), not
-    // as an ordinary bare image. Preserve that ownership for line placement.
-    // Section 17.5.2.39 is a separate state: when `showingPlcHdr` is true,
-    // `sdtContent` is placeholder content rather than the control's regular
-    // current content, so its cached picture keeps ordinary inline placement.
-    for inline in &mut inlines[start..] {
-      if let InlineItem::Image(image) = inline {
-        image.picture_content_control = true;
-      }
-    }
-  }
   if showing_placeholder {
     for inline in &mut inlines[start..] {
       if let InlineItem::Text(run) = inline {
@@ -11099,7 +11078,6 @@ fn inline_image_impl(
         semantic_metafile_font_family: None,
         native_ole_equation: None,
         metafile_native_size: true,
-        picture_content_control: false,
         placement: ImagePlacement::Inline,
       })
     }
@@ -11168,7 +11146,6 @@ fn inline_image_impl(
         semantic_metafile_font_family: None,
         native_ole_equation: None,
         metafile_native_size: true,
-        picture_content_control: false,
         placement: drawing_placement_with_effect_extent(
           ImagePlacement::Floating(floating_image_placement(anchor)),
           effect_extent,
@@ -13774,6 +13751,8 @@ fn wrap_wordprocessing_group_effects(
       let resolver = DocxImageEffectColorResolver {
         theme_colors: &context.styles.theme_colors,
         images: Some(context.images),
+        chart_images: None,
+        chart_color_map: None,
         placeholder_color: None,
         word_group_glow: true,
       };
@@ -14194,6 +14173,8 @@ fn wrap_diagram_group_effects(
       let resolver = DocxImageEffectColorResolver {
         theme_colors: &context.styles.theme_colors,
         images: Some(context.images),
+        chart_images: None,
+        chart_color_map: None,
         placeholder_color: None,
         word_group_glow: false,
       };
@@ -14564,11 +14545,11 @@ fn diagram_ext_drawing_relationship_id(data: &dgm::DataModelRoot) -> Option<Stri
 fn drawing_chart_shapes(
   drawing: &w::Drawing,
   reference: &c::ChartReference,
-  charts_by_relationship_id: &HashMap<String, c::ChartSpace>,
+  charts_by_relationship_id: &HashMap<String, ClassicChartResource>,
   extended_charts_by_relationship_id: &HashMap<String, ExtendedChartResource>,
   styles: &StylesCatalog,
 ) -> Option<Vec<InlineShape>> {
-  let Some(chart_space) = charts_by_relationship_id.get(reference.id.as_str()) else {
+  let Some(chart_resource) = charts_by_relationship_id.get(reference.id.as_str()) else {
     return drawing_extended_chart_shapes(
       drawing,
       reference.id.as_str(),
@@ -14580,7 +14561,8 @@ fn drawing_chart_shapes(
   let effect_extent = drawing_effect_extent(drawing);
   let placement = drawing_placement_with_effect_extent(placement, effect_extent);
   chart_space_shapes(
-    chart_space,
+    &chart_resource.chart_space,
+    Some(chart_resource),
     width_pt,
     height_pt,
     placement,
@@ -14591,6 +14573,7 @@ fn drawing_chart_shapes(
 
 fn chart_space_shapes(
   chart_space: &c::ChartSpace,
+  chart_resource: Option<&ClassicChartResource>,
   width_pt: f32,
   height_pt: f32,
   placement: ImagePlacement,
@@ -14599,6 +14582,29 @@ fn chart_space_shapes(
 ) -> Option<Vec<InlineShape>> {
   let chart_style_id = shared_chart::chart_style_id(chart_space).unwrap_or(2);
   let default_theme_colors = ThemeColors::default();
+  let chart_override_colors = chart_resource
+    .and_then(|resource| resource.theme_override.as_ref())
+    .and_then(|theme| theme.color_scheme.as_deref())
+    .map(ThemeColors::from_color_scheme);
+  let chart_theme_colors = chart_override_colors
+    .as_ref()
+    .unwrap_or(&styles.theme_colors);
+  let chart_override_fills = chart_resource
+    .and_then(|resource| resource.theme_override.as_ref())
+    .and_then(|theme| theme.format_scheme.as_deref())
+    .map(ThemeFillStyles::from_format_scheme);
+  let chart_theme_fills = chart_override_fills.as_ref().unwrap_or(&styles.theme_fills);
+  let chart_override_lines = chart_resource
+    .and_then(|resource| resource.theme_override.as_ref())
+    .and_then(|theme| theme.format_scheme.as_deref())
+    .map(ThemeLineStyles::from_format_scheme);
+  let chart_theme_lines = chart_override_lines.as_ref().unwrap_or(&styles.theme_lines);
+  let automatic_series_line_width_pt =
+    usize::try_from(shared_chart::AUTOMATIC_CHART_DATA_POINT_LINE_STYLE_INDEX)
+      .ok()
+      .and_then(|index| chart_theme_lines.width_pt(index))
+      .unwrap_or(0.75)
+      * shared_chart::automatic_linear_series_line_width_scale(chart_space);
   let cartesian = shared_chart::cartesian_chart_for_host_locales(
     chart_space,
     shared_chart::ChartHostApplication::Wordprocessing,
@@ -14612,21 +14618,26 @@ fn chart_space_shapes(
     .map(|series| series.formatting_index)
     .max()
     .unwrap_or(0);
-  let series_colors = (0..series_count)
+  let series_colors: Vec<RgbColor> = (0..series_count)
     .map(|index| {
       cartesian
         .as_ref()
         .and_then(|chart| chart.series.get(index))
         .and_then(|series| series.solid_fill)
-        .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
-        .map(|fill| fill.color)
+        .and_then(|fill| {
+          word_chart_solid_fill_color(
+            fill,
+            chart_theme_colors,
+            chart_space.color_map_override.as_deref(),
+          )
+        })
         .or_else(|| {
           shared_chart::automatic_chart_series_color(
             chart_style_id,
             series[index].formatting_index,
             maximum_series_formatting_index,
             |token| {
-              word_chart_scheme_color(chart_space, &styles.theme_colors, token)
+              word_chart_scheme_color(chart_space, chart_theme_colors, token)
                 .or_else(|| word_chart_scheme_color(chart_space, &default_theme_colors, token))
             },
           )
@@ -14637,7 +14648,112 @@ fn chart_space_shapes(
   let series_styles = series
     .iter()
     .map(|series| {
-      drawingml_chart_shape_common_style(series.chart_shape_properties, &styles.theme_colors)
+      drawingml_chart_shape_common_style(
+        series.chart_shape_properties,
+        chart_theme_colors,
+        chart_space.color_map_override.as_deref(),
+      )
+    })
+    .collect::<Vec<_>>();
+  let automatic_series_marker_strokes = series_colors
+    .iter()
+    .copied()
+    .map(|color| {
+      word_automatic_chart_marker_stroke_style(
+        color,
+        chart_theme_lines,
+        chart_theme_colors,
+        chart_space.color_map_override.as_deref(),
+      )
+    })
+    .collect::<Vec<_>>();
+  let series_marker_styles = series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      let style = drawingml_chart_shape_common_style(
+        series
+          .marker
+          .and_then(|marker| marker.chart_shape_properties.as_deref()),
+        chart_theme_colors,
+        chart_space.color_map_override.as_deref(),
+      );
+      crate::pptx::chart::normalize_chart_marker_shape_style(
+        series.marker,
+        style,
+        automatic_series_marker_strokes.get(series_index),
+      )
+    })
+    .collect::<Vec<_>>();
+  let automatic_series_fills = cartesian
+    .as_ref()
+    .map(|chart| {
+      chart
+        .series
+        .iter()
+        .enumerate()
+        .map(|(series_index, series)| {
+          word_automatic_chart_fill_style(
+            chart_style_id,
+            series.is_3d,
+            series_colors.get(series_index).copied().unwrap_or_default(),
+            chart_theme_fills,
+            chart_theme_colors,
+            chart_space.color_map_override.as_deref(),
+          )
+        })
+        .collect()
+    })
+    .unwrap_or_default();
+  let chart_effect_colors = chart_theme_colors;
+  let chart_effect_styles = chart_resource
+    .and_then(|resource| resource.theme_override.as_ref())
+    .and_then(|theme| theme.format_scheme.as_deref())
+    .map(|format| format.effect_style_list.effect_style.as_slice())
+    .unwrap_or(styles.theme_effects.styles.as_slice());
+  let chart_effect_style = |index: usize| {
+    index
+      .checked_sub(1)
+      .and_then(|index| chart_effect_styles.get(index))
+  };
+  let chart_effect_placeholder = chart_effect_colors.dark1.map(|color| {
+    Color::RgbHex(RgbHexColor {
+      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+      transformations: Vec::new(),
+    })
+  });
+  let chart_effect_resolver = DocxImageEffectColorResolver {
+    theme_colors: chart_effect_colors,
+    images: None,
+    chart_images: chart_resource.map(|resource| &resource.image_resources),
+    chart_color_map: chart_space.color_map_override.as_deref(),
+    placeholder_color: chart_effect_placeholder,
+    word_group_glow: false,
+  };
+  let data_point_effect_style = shared_chart::chart_shape_effects_from_theme_style(
+    shared_chart::automatic_chart_data_point_effect_style_index(chart_style_id)
+      .and_then(|index| usize::try_from(index).ok())
+      .and_then(chart_effect_style),
+    &chart_effect_resolver,
+  );
+  let series_effect_styles = series
+    .iter()
+    .map(|series| {
+      shared_chart::chart_shape_effects_from_properties(
+        series.chart_shape_properties,
+        &chart_effect_resolver,
+      )
+    })
+    .collect::<Vec<_>>();
+  let series_marker_effect_styles = series
+    .iter()
+    .map(|series| {
+      shared_chart::chart_shape_effects_from_properties(
+        series
+          .marker
+          .and_then(|marker| marker.chart_shape_properties.as_deref()),
+        &chart_effect_resolver,
+      )
     })
     .collect::<Vec<_>>();
   let trendline_styles = series
@@ -14649,7 +14765,8 @@ fn chart_space_shapes(
         .map(|trendline| {
           drawingml_chart_shape_common_style(
             trendline.chart_shape_properties.as_deref(),
-            &styles.theme_colors,
+            chart_theme_colors,
+            chart_space.color_map_override.as_deref(),
           )
         })
         .collect()
@@ -14665,7 +14782,8 @@ fn chart_space_shapes(
         .map(|error_bars| {
           drawingml_chart_shape_common_style(
             error_bars.chart_shape_properties.as_deref(),
-            &styles.theme_colors,
+            chart_theme_colors,
+            chart_space.color_map_override.as_deref(),
           )
         })
         .collect()
@@ -14683,51 +14801,58 @@ fn chart_space_shapes(
               group
                 .drop_lines
                 .and_then(|lines| lines.chart_shape_properties.as_deref()),
-              &styles.theme_colors,
+              chart_theme_colors,
+              chart_space.color_map_override.as_deref(),
             ),
             high_low_lines: drawingml_chart_shape_common_style(
               group
                 .high_low_lines
                 .and_then(|lines| lines.chart_shape_properties.as_deref()),
-              &styles.theme_colors,
+              chart_theme_colors,
+              chart_space.color_map_override.as_deref(),
             ),
             up_bars: drawingml_chart_shape_common_style(
               group
                 .up_down_bars
                 .and_then(|bars| bars.up_bars.as_deref())
                 .and_then(|bars| bars.chart_shape_properties.as_deref()),
-              &styles.theme_colors,
+              chart_theme_colors,
+              chart_space.color_map_override.as_deref(),
             ),
             down_bars: drawingml_chart_shape_common_style(
               group
                 .up_down_bars
                 .and_then(|bars| bars.down_bars.as_deref())
                 .and_then(|bars| bars.chart_shape_properties.as_deref()),
-              &styles.theme_colors,
+              chart_theme_colors,
+              chart_space.color_map_override.as_deref(),
             ),
           },
         )
         .collect()
     })
     .unwrap_or_default();
+  let series_point_count = |series_index: usize, source: &shared_chart::ChartSeriesRef<'_>| {
+    cartesian
+      .as_ref()
+      .and_then(|chart| chart.series.get(series_index))
+      .map_or_else(
+        || {
+          source
+            .data_points
+            .iter()
+            .filter_map(|point| usize::try_from(point.index.val).ok())
+            .max()
+            .map_or(0, |index| index + 1)
+        },
+        |series| series.values.len(),
+      )
+  };
   let series_point_styles = series
     .iter()
     .enumerate()
     .map(|(series_index, series)| {
-      let point_count = cartesian
-        .as_ref()
-        .and_then(|chart| chart.series.get(series_index))
-        .map_or_else(
-          || {
-            series
-              .data_points
-              .iter()
-              .filter_map(|point| usize::try_from(point.index.val).ok())
-              .max()
-              .map_or(0, |index| index + 1)
-          },
-          |series| series.values.len(),
-        );
+      let point_count = series_point_count(series_index, series);
       let mut point_styles = vec![None; point_count];
       for point in series.data_points {
         let Ok(index) = usize::try_from(point.index.val) else {
@@ -14736,14 +14861,96 @@ fn chart_space_shapes(
         if index < point_styles.len() {
           point_styles[index] = Some(drawingml_chart_shape_common_style(
             point.chart_shape_properties.as_deref(),
-            &styles.theme_colors,
+            chart_theme_colors,
+            chart_space.color_map_override.as_deref(),
           ));
         }
       }
       point_styles
     })
     .collect::<Vec<_>>();
-  let series_point_colors = cartesian
+  let series_point_marker_styles = series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      let point_count = series_point_count(series_index, series);
+      let mut marker_styles = vec![None; point_count];
+      for point in series.data_points {
+        let Ok(index) = usize::try_from(point.index.val) else {
+          continue;
+        };
+        if index >= marker_styles.len() {
+          continue;
+        }
+        marker_styles[index] = point.marker.as_deref().map(|marker| {
+          let style = drawingml_chart_shape_common_style(
+            marker.chart_shape_properties.as_deref(),
+            chart_theme_colors,
+            chart_space.color_map_override.as_deref(),
+          );
+          crate::pptx::chart::normalize_chart_marker_shape_style(
+            Some(marker),
+            style,
+            series_point_styles
+              .get(series_index)
+              .and_then(|points| points.get(index))
+              .and_then(Option::as_ref)
+              .map(|point| &point.stroke)
+              .filter(|stroke| !matches!(stroke, common::ShapeStyleValue::Unspecified))
+              .or_else(|| {
+                series_marker_styles
+                  .get(series_index)
+                  .map(|style| &style.stroke)
+              }),
+          )
+        });
+      }
+      marker_styles
+    })
+    .collect::<Vec<_>>();
+  let series_point_effect_styles = series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      let point_count = series_point_count(series_index, series);
+      let mut point_styles = vec![None; point_count];
+      for point in series.data_points {
+        let Ok(index) = usize::try_from(point.index.val) else {
+          continue;
+        };
+        if index < point_styles.len() {
+          point_styles[index] = Some(shared_chart::chart_shape_effects_from_properties(
+            point.chart_shape_properties.as_deref(),
+            &chart_effect_resolver,
+          ));
+        }
+      }
+      point_styles
+    })
+    .collect::<Vec<_>>();
+  let series_point_marker_effect_styles = series
+    .iter()
+    .enumerate()
+    .map(|(series_index, series)| {
+      let point_count = series_point_count(series_index, series);
+      let mut marker_effects = vec![None; point_count];
+      for point in series.data_points {
+        let Ok(index) = usize::try_from(point.index.val) else {
+          continue;
+        };
+        if index < marker_effects.len() {
+          marker_effects[index] = point.marker.as_deref().map(|marker| {
+            shared_chart::chart_shape_effects_from_properties(
+              marker.chart_shape_properties.as_deref(),
+              &chart_effect_resolver,
+            )
+          });
+        }
+      }
+      marker_effects
+    })
+    .collect::<Vec<_>>();
+  let series_point_colors: Vec<Vec<Option<RgbColor>>> = cartesian
     .as_ref()
     .map(|chart| {
       chart
@@ -14751,14 +14958,7 @@ fn chart_space_shapes(
         .iter()
         .enumerate()
         .map(|(series_index, series)| {
-          if !chart.vary_colors_by_point
-            || chart.series.len() != 1
-            || series_index != 0
-            || series
-              .shape_properties
-              .and_then(shared_chart::chart_shape_solid_fill)
-              .is_some()
-          {
+          if !chart.vary_colors_by_point || chart.series.len() != 1 || series_index != 0 {
             return vec![None; series.values.len()];
           }
           let maximum_point_index = series.values.len().saturating_sub(1);
@@ -14769,7 +14969,7 @@ fn chart_space_shapes(
                 point_index,
                 maximum_point_index,
                 |token| {
-                  word_chart_scheme_color(chart_space, &styles.theme_colors, token)
+                  word_chart_scheme_color(chart_space, chart_theme_colors, token)
                     .or_else(|| word_chart_scheme_color(chart_space, &default_theme_colors, token))
                 },
               )
@@ -14779,6 +14979,56 @@ fn chart_space_shapes(
         .collect()
     })
     .unwrap_or_default();
+  let automatic_series_point_fills = cartesian
+    .as_ref()
+    .map(|chart| {
+      chart
+        .series
+        .iter()
+        .enumerate()
+        .map(|(series_index, series)| {
+          series_point_colors
+            .get(series_index)
+            .map(|colors| {
+              colors
+                .iter()
+                .map(|color| {
+                  color.map(|color| {
+                    word_automatic_chart_fill_style(
+                      chart_style_id,
+                      series.is_3d,
+                      color,
+                      chart_theme_fills,
+                      chart_theme_colors,
+                      chart_space.color_map_override.as_deref(),
+                    )
+                  })
+                })
+                .collect()
+            })
+            .unwrap_or_default()
+        })
+        .collect()
+    })
+    .unwrap_or_default();
+  let automatic_series_point_marker_strokes = series_point_colors
+    .iter()
+    .map(|colors| {
+      colors
+        .iter()
+        .map(|color| {
+          color.map(|color| {
+            word_automatic_chart_marker_stroke_style(
+              color,
+              chart_theme_lines,
+              chart_theme_colors,
+              chart_space.color_map_override.as_deref(),
+            )
+          })
+        })
+        .collect()
+    })
+    .collect::<Vec<_>>();
   let surface_band_colors = cartesian
     .as_ref()
     .map(|chart| {
@@ -14790,15 +15040,19 @@ fn chart_space_shapes(
             .band_fills
             .iter()
             .filter_map(|fill| {
-              resolve_drawingml_solid_fill(fill.fill, &styles.theme_colors)
-                .map(|resolved| (fill.index, resolved.color))
+              word_chart_solid_fill_color(
+                fill.fill,
+                chart_theme_colors,
+                chart_space.color_map_override.as_deref(),
+              )
+              .map(|color| (fill.index, color))
             })
             .collect()
         })
         .collect()
     })
     .unwrap_or_default();
-  let pie_point_colors = shared_chart::pie_chart_model(chart_space)
+  let pie_point_colors: Vec<RgbColor> = shared_chart::pie_chart_model(chart_space)
     .map(|pie| {
       (0..pie.values.len())
         .map(|index| {
@@ -14806,13 +15060,22 @@ fn chart_space_shapes(
             .data_point_fills
             .iter()
             .find(|fill| fill.index as usize == index)
-            .and_then(|fill| resolve_drawingml_solid_fill(fill.fill, &styles.theme_colors))
-            .or_else(|| {
-              pie
-                .series_solid_fill
-                .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
+            .and_then(|fill| {
+              word_chart_solid_fill_color(
+                fill.fill,
+                chart_theme_colors,
+                chart_space.color_map_override.as_deref(),
+              )
             })
-            .map(|fill| fill.color)
+            .or_else(|| {
+              pie.series_solid_fill.and_then(|fill| {
+                word_chart_solid_fill_color(
+                  fill,
+                  chart_theme_colors,
+                  chart_space.color_map_override.as_deref(),
+                )
+              })
+            })
             .or_else(|| {
               let (formatting_index, maximum_formatting_index) = if pie.vary_colors {
                 (index, pie.values.len().saturating_sub(1))
@@ -14827,7 +15090,7 @@ fn chart_space_shapes(
                 formatting_index,
                 maximum_formatting_index,
                 |token| {
-                  word_chart_scheme_color(chart_space, &styles.theme_colors, token)
+                  word_chart_scheme_color(chart_space, chart_theme_colors, token)
                     .or_else(|| word_chart_scheme_color(chart_space, &default_theme_colors, token))
                 },
               )
@@ -14843,13 +15106,22 @@ fn chart_space_shapes(
       let points = series_point_styles.first();
       (0..pie.values.len())
         .map(|index| {
+          let automatic_fill = word_automatic_chart_fill_style(
+            chart_style_id,
+            pie.kind == shared_chart::RadialChartKind::Pie3D,
+            pie_point_colors.get(index).copied().unwrap_or_default(),
+            chart_theme_fills,
+            chart_theme_colors,
+            chart_space.color_map_override.as_deref(),
+          );
+          let inherited_fill = inherited.fill.resolve_over(&automatic_fill);
           let point = points
             .and_then(|points| points.get(index))
             .and_then(Option::as_ref);
           common::ShapeStyle {
             fill: point
-              .map_or(&inherited.fill, |point| {
-                point.fill.resolve_over(&inherited.fill)
+              .map_or(inherited_fill, |point| {
+                point.fill.resolve_over(inherited_fill)
               })
               .clone(),
             stroke: point
@@ -14864,7 +15136,11 @@ fn chart_space_shapes(
     .unwrap_or_default();
   let leader_line_style = shared_chart::pie_chart_model(chart_space)
     .map(|pie| {
-      drawingml_chart_shape_common_style(pie.leader_line_shape_properties, &styles.theme_colors)
+      drawingml_chart_shape_common_style(
+        pie.leader_line_shape_properties,
+        chart_theme_colors,
+        chart_space.color_map_override.as_deref(),
+      )
     })
     .unwrap_or_default();
   let legend_frame_style = drawingml_chart_shape_common_style(
@@ -14873,15 +15149,18 @@ fn chart_space_shapes(
       .legend
       .as_deref()
       .and_then(|legend| legend.chart_shape_properties.as_deref()),
-    &styles.theme_colors,
+    chart_theme_colors,
+    chart_space.color_map_override.as_deref(),
   );
   let chart_area_style = drawingml_chart_area_common_style(
     chart_space.shape_properties.as_deref(),
-    &styles.theme_colors,
+    chart_theme_colors,
+    chart_space.color_map_override.as_deref(),
   );
   let plot_area_style = drawingml_chart_area_common_style(
     chart_space.chart.plot_area.shape_properties.as_deref(),
-    &styles.theme_colors,
+    chart_theme_colors,
+    chart_space.color_map_override.as_deref(),
   );
   let floor_style = drawingml_chart_area_common_style(
     chart_space
@@ -14889,7 +15168,8 @@ fn chart_space_shapes(
       .floor
       .as_deref()
       .and_then(|floor| floor.shape_properties.as_deref()),
-    &styles.theme_colors,
+    chart_theme_colors,
+    chart_space.color_map_override.as_deref(),
   );
   let side_wall_style = drawingml_chart_area_common_style(
     chart_space
@@ -14897,7 +15177,8 @@ fn chart_space_shapes(
       .side_wall
       .as_deref()
       .and_then(|wall| wall.shape_properties.as_deref()),
-    &styles.theme_colors,
+    chart_theme_colors,
+    chart_space.color_map_override.as_deref(),
   );
   let back_wall_style = drawingml_chart_area_common_style(
     chart_space
@@ -14905,7 +15186,8 @@ fn chart_space_shapes(
       .back_wall
       .as_deref()
       .and_then(|wall| wall.shape_properties.as_deref()),
-    &styles.theme_colors,
+    chart_theme_colors,
+    chart_space.color_map_override.as_deref(),
   );
   let title_fill_color = chart_space
     .chart
@@ -14914,12 +15196,16 @@ fn chart_space_shapes(
     .and_then(|title| title.chart_shape_properties.as_deref())
     .and_then(
       |properties| match properties.chart_shape_properties_choice2.as_ref()? {
-        c::ChartShapePropertiesChoice2::SolidFill(fill) => {
-          resolve_drawingml_solid_fill(fill, &styles.theme_colors).map(|fill| fill.color)
-        }
-        c::ChartShapePropertiesChoice2::GradientFill(fill) => {
-          drawingml_first_gradient_fill_color(fill, &styles.theme_colors)
-        }
+        c::ChartShapePropertiesChoice2::SolidFill(fill) => word_chart_solid_fill_color(
+          fill,
+          chart_theme_colors,
+          chart_space.color_map_override.as_deref(),
+        ),
+        c::ChartShapePropertiesChoice2::GradientFill(fill) => word_chart_first_gradient_fill_color(
+          fill,
+          chart_theme_colors,
+          chart_space.color_map_override.as_deref(),
+        ),
         _ => None,
       },
     );
@@ -15094,8 +15380,13 @@ fn chart_space_shapes(
               label
                 .shape_properties
                 .and_then(shared_chart::chart_shape_solid_fill)
-                .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
-                .map(|fill| fill.color)
+                .and_then(|fill| {
+                  word_chart_solid_fill_color(
+                    fill,
+                    chart_theme_colors,
+                    chart_space.color_map_override.as_deref(),
+                  )
+                })
             })
             .collect()
         })
@@ -15110,8 +15401,13 @@ fn chart_space_shapes(
     .and_then(|axis| axis.major_gridlines.as_deref())
     .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
     .and_then(shared_chart::chart_shape_outline_solid_fill)
-    .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))
-    .map(|fill| fill.color)
+    .and_then(|fill| {
+      word_chart_solid_fill_color(
+        fill,
+        chart_theme_colors,
+        chart_space.color_map_override.as_deref(),
+      )
+    })
     .unwrap_or(RgbColor {
       r: 134,
       g: 134,
@@ -15148,9 +15444,13 @@ fn chart_space_shapes(
       .as_deref()?
       .chart_shape_properties
       .as_deref()?;
-    let color = shared_chart::chart_shape_outline_solid_fill(properties)
-      .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))?
-      .color;
+    let color = shared_chart::chart_shape_outline_solid_fill(properties).and_then(|fill| {
+      word_chart_solid_fill_color(
+        fill,
+        chart_theme_colors,
+        chart_space.color_map_override.as_deref(),
+      )
+    })?;
     Some((color, chart_shape_outline_width_pt(properties)?))
   });
   let category_minor_gridline = cartesian.as_ref().and_then(|chart| {
@@ -15160,9 +15460,13 @@ fn chart_space_shapes(
       .as_deref()?
       .chart_shape_properties
       .as_deref()?;
-    let color = shared_chart::chart_shape_outline_solid_fill(properties)
-      .and_then(|fill| resolve_drawingml_solid_fill(fill, &styles.theme_colors))?
-      .color;
+    let color = shared_chart::chart_shape_outline_solid_fill(properties).and_then(|fill| {
+      word_chart_solid_fill_color(
+        fill,
+        chart_theme_colors,
+        chart_space.color_map_override.as_deref(),
+      )
+    })?;
     Some((color, chart_shape_outline_width_pt(properties)?))
   });
   let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
@@ -15188,6 +15492,7 @@ fn chart_space_shapes(
     data_label_rich_text_styles,
     gridline_color,
     automatic_chart_area_line_width_pt: styles.theme_lines.width_pt(1).unwrap_or(0.5),
+    automatic_series_line_width_pt,
     value_gridline_width_pt,
     axis_line_width_pt,
     category_major_gridline,
@@ -15195,6 +15500,17 @@ fn chart_space_shapes(
     series_colors,
     series_point_colors,
     series_styles,
+    series_marker_styles,
+    series_point_marker_styles,
+    automatic_series_marker_strokes,
+    automatic_series_fills,
+    automatic_series_point_fills,
+    automatic_series_point_marker_strokes,
+    data_point_effect_style,
+    series_effect_styles,
+    series_marker_effect_styles,
+    series_point_effect_styles,
+    series_point_marker_effect_styles,
     trendline_styles,
     error_bar_styles,
     group_decoration_styles,
@@ -15235,6 +15551,97 @@ fn word_chart_scheme_color(
     a::ColorSchemeIndexValues::Hyperlink => theme_colors.hyperlink,
     a::ColorSchemeIndexValues::FollowedHyperlink => theme_colors.followed_hyperlink,
   }
+}
+
+fn word_chart_solid_fill_color(
+  fill: &a::SolidFill,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+) -> Option<RgbColor> {
+  let color = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
+  let color = docx_chart_image_color_with_placeholder(color, theme_colors, color_map, None)?;
+  Some(RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+  })
+}
+
+fn word_chart_first_gradient_fill_color(
+  fill: &a::GradientFill,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+) -> Option<RgbColor> {
+  let common::Fill::Gradient(fill) =
+    drawingml_chart_gradient_fill_with_placeholder(fill, theme_colors, color_map, None)?
+  else {
+    return None;
+  };
+  fill.stops.first().map(|stop| RgbColor {
+    r: stop.color.r,
+    g: stop.color.g,
+    b: stop.color.b,
+  })
+}
+
+fn word_automatic_chart_fill_style(
+  chart_style_id: u8,
+  is_3d: bool,
+  placeholder: RgbColor,
+  theme_fills: &ThemeFillStyles,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+) -> common::ShapeStyleValue<common::Fill<'static>> {
+  let index = shared_chart::automatic_chart_data_point_fill_style_index(chart_style_id, is_3d);
+  let Some(style) = usize::try_from(index)
+    .ok()
+    .and_then(|index| theme_fills.get(index))
+  else {
+    return common::ShapeStyleValue::Unspecified;
+  };
+  let placeholder = Color::RgbHex(RgbHexColor {
+    value: format!(
+      "{:02X}{:02X}{:02X}",
+      placeholder.r, placeholder.g, placeholder.b
+    ),
+    transformations: Vec::new(),
+  });
+  drawingml_theme_fill_common_fill(style, theme_colors, color_map, Some(&placeholder)).map_or(
+    common::ShapeStyleValue::Unspecified,
+    common::ShapeStyleValue::Paint,
+  )
+}
+
+fn word_automatic_chart_marker_stroke_style(
+  placeholder: RgbColor,
+  theme_lines: &ThemeLineStyles,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+) -> common::ShapeStyleValue<common::Stroke<'static>> {
+  let Some(outline) = usize::try_from(shared_chart::AUTOMATIC_CHART_DATA_POINT_LINE_STYLE_INDEX)
+    .ok()
+    .and_then(|index| theme_lines.get(index))
+  else {
+    return common::ShapeStyleValue::Unspecified;
+  };
+  let placeholder = Color::RgbHex(RgbHexColor {
+    value: format!(
+      "{:02X}{:02X}{:02X}",
+      placeholder.r, placeholder.g, placeholder.b
+    ),
+    transformations: Vec::new(),
+  });
+  drawingml_outline_common_stroke_with_placeholder(
+    outline,
+    theme_colors,
+    Some(&placeholder),
+    true,
+    color_map,
+  )
+  .map_or(
+    common::ShapeStyleValue::NoPaint,
+    common::ShapeStyleValue::Paint,
+  )
 }
 
 fn chart_shape_outline_width_pt(properties: &c::ChartShapeProperties) -> Option<f32> {
@@ -15341,6 +15748,7 @@ fn drawing_extended_chart_shapes(
       b: 134,
     },
     automatic_chart_area_line_width_pt: styles.theme_lines.width_pt(1).unwrap_or(0.5),
+    automatic_series_line_width_pt: styles.theme_lines.width_pt(1).unwrap_or(0.75),
     value_gridline_width_pt: None,
     axis_line_width_pt: None,
     category_major_gridline: None,
@@ -15348,6 +15756,17 @@ fn drawing_extended_chart_shapes(
     series_colors: Vec::new(),
     series_point_colors: Vec::new(),
     series_styles: Vec::new(),
+    series_marker_styles: Vec::new(),
+    series_point_marker_styles: Vec::new(),
+    automatic_series_marker_strokes: Vec::new(),
+    automatic_series_fills: Vec::new(),
+    automatic_series_point_fills: Vec::new(),
+    automatic_series_point_marker_strokes: Vec::new(),
+    data_point_effect_style: Default::default(),
+    series_effect_styles: Vec::new(),
+    series_marker_effect_styles: Vec::new(),
+    series_point_effect_styles: Vec::new(),
+    series_point_marker_effect_styles: Vec::new(),
     trendline_styles: Vec::new(),
     error_bar_styles: Vec::new(),
     group_decoration_styles: Vec::new(),
@@ -16067,6 +16486,8 @@ impl DrawingMlShapeProperties {
         &DocxImageEffectColorResolver {
           theme_colors,
           images,
+          chart_images: None,
+          chart_color_map: None,
           placeholder_color: None,
           word_group_glow: false,
         },
@@ -16083,6 +16504,8 @@ impl DrawingMlShapeProperties {
         &DocxImageEffectColorResolver {
           theme_colors,
           images,
+          chart_images: None,
+          chart_color_map: None,
           placeholder_color: None,
           word_group_glow: false,
         },
@@ -16182,6 +16605,8 @@ fn drawingml_static3d_style(
   let resolver = DocxImageEffectColorResolver {
     theme_colors,
     images: None,
+    chart_images: None,
+    chart_color_map: None,
     placeholder_color: None,
     word_group_glow: false,
   };
@@ -16827,7 +17252,6 @@ fn drawingml_picture_image(
     semantic_metafile_font_family: None,
     native_ole_equation: None,
     metafile_native_size: true,
-    picture_content_control: false,
     placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
   })
 }
@@ -16978,21 +17402,38 @@ fn drawingml_pattern_fill(
   ))
 }
 
-fn drawingml_pattern_fill_with_placeholder(
+fn drawingml_chart_pattern_fill_with_placeholder(
   fill: &a::PatternFill,
   theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
   placeholder_color: Option<&Color>,
+) -> Option<common::PatternFill> {
+  drawingml_pattern_fill_with_color_resolver(fill, |color| {
+    docx_chart_image_color_with_placeholder(color, theme_colors, color_map, placeholder_color)
+  })
+}
+
+fn drawingml_chart_theme_pattern_fill_with_placeholder(
+  fill: &a::PatternFill,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+  placeholder_color: Option<&Color>,
+) -> Option<common::PatternFill> {
+  drawingml_pattern_fill_with_color_resolver(fill, |color| {
+    docx_chart_theme_color_with_placeholder(color, theme_colors, color_map, placeholder_color)
+  })
+}
+
+fn drawingml_pattern_fill_with_color_resolver(
+  fill: &a::PatternFill,
+  mut resolve: impl FnMut(Color) -> Option<common::Color>,
 ) -> Option<common::PatternFill> {
   let foreground = match fill
     .foreground_color
     .as_ref()
     .and_then(|color| color.foreground_color_choice.as_ref())
   {
-    Some(choice) => docx_image_color_with_placeholder(
-      Color::from_foreground_color_choice(choice)?,
-      theme_colors,
-      placeholder_color,
-    )?,
+    Some(choice) => resolve(Color::from_foreground_color_choice(choice)?)?,
     None => common::Color {
       r: 0,
       g: 0,
@@ -17005,11 +17446,7 @@ fn drawingml_pattern_fill_with_placeholder(
     .as_ref()
     .and_then(|color| color.background_color_choice.as_ref())
   {
-    Some(choice) => docx_image_color_with_placeholder(
-      Color::from_background_color_choice(choice)?,
-      theme_colors,
-      placeholder_color,
-    )?,
+    Some(choice) => resolve(Color::from_background_color_choice(choice)?)?,
     None => common::Color {
       r: u8::MAX,
       g: u8::MAX,
@@ -17036,6 +17473,42 @@ fn drawingml_gradient_fill_with_placeholder(
   theme_colors: &ThemeColors,
   placeholder_color: Option<&Color>,
 ) -> Option<common::Fill<'static>> {
+  drawingml_gradient_fill_with_color_resolver(fill, |authored| {
+    if let Some(placeholder_color) = placeholder_color {
+      docx_image_color_with_placeholder(authored, theme_colors, Some(placeholder_color))
+    } else {
+      let color = resolved_docx_drawing_color(authored, theme_colors)?;
+      Some(common_rgb(color.color, color.opacity))
+    }
+  })
+}
+
+fn drawingml_chart_gradient_fill_with_placeholder(
+  fill: &a::GradientFill,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+  placeholder_color: Option<&Color>,
+) -> Option<common::Fill<'static>> {
+  drawingml_gradient_fill_with_color_resolver(fill, |authored| {
+    docx_chart_image_color_with_placeholder(authored, theme_colors, color_map, placeholder_color)
+  })
+}
+
+fn drawingml_chart_theme_gradient_fill_with_placeholder(
+  fill: &a::GradientFill,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+  placeholder_color: Option<&Color>,
+) -> Option<common::Fill<'static>> {
+  drawingml_gradient_fill_with_color_resolver(fill, |authored| {
+    docx_chart_theme_color_with_placeholder(authored, theme_colors, color_map, placeholder_color)
+  })
+}
+
+fn drawingml_gradient_fill_with_color_resolver(
+  fill: &a::GradientFill,
+  mut resolve: impl FnMut(Color) -> Option<common::Color>,
+) -> Option<common::Fill<'static>> {
   let mut stops = fill
     .gradient_stop_list
     .as_ref()?
@@ -17043,12 +17516,7 @@ fn drawingml_gradient_fill_with_placeholder(
     .iter()
     .filter_map(|stop| {
       let authored = Color::from_gradient_stop_choice(stop.gradient_stop_choice.as_ref()?)?;
-      let color = if let Some(placeholder_color) = placeholder_color {
-        docx_image_color_with_placeholder(authored, theme_colors, Some(placeholder_color))?
-      } else {
-        let color = resolved_docx_drawing_color(authored, theme_colors)?;
-        common_rgb(color.color, color.opacity)
-      };
+      let color = resolve(authored)?;
       Some(common::GradientStop {
         position: stop.position.as_ratio() as f32,
         color,
@@ -17128,6 +17596,7 @@ fn drawingml_blip_common_fill(fill: &a::BlipFill) -> common::Fill<'static> {
 fn drawingml_chart_shape_common_style(
   properties: Option<&c::ChartShapeProperties>,
   theme_colors: &ThemeColors,
+  chart_color_map: Option<&c::ColorMapOverride>,
 ) -> common::ShapeStyle<'static> {
   let Some(properties) = properties else {
     return common::ShapeStyle::default();
@@ -17135,21 +17604,25 @@ fn drawingml_chart_shape_common_style(
   let fill = match properties.chart_shape_properties_choice2.as_ref() {
     None => common::ShapeStyleValue::Unspecified,
     Some(c::ChartShapePropertiesChoice2::NoFill(_)) => common::ShapeStyleValue::NoPaint,
-    Some(c::ChartShapePropertiesChoice2::SolidFill(fill)) => resolve_drawingml_solid_fill(
-      fill,
-      theme_colors,
-    )
-    .map_or(common::ShapeStyleValue::Unspecified, |paint| {
-      common::ShapeStyleValue::Paint(common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
-    }),
+    Some(c::ChartShapePropertiesChoice2::SolidFill(fill)) => fill
+      .solid_fill_choice
+      .as_ref()
+      .and_then(Color::from_solid_fill_choice)
+      .and_then(|color| {
+        docx_chart_image_color_with_placeholder(color, theme_colors, chart_color_map, None)
+      })
+      .map_or(common::ShapeStyleValue::Unspecified, |color| {
+        common::ShapeStyleValue::Paint(common::Fill::Solid(color))
+      }),
     Some(c::ChartShapePropertiesChoice2::GradientFill(fill)) => {
-      drawingml_gradient_fill(fill, theme_colors).map_or(
-        common::ShapeStyleValue::Unspecified,
-        common::ShapeStyleValue::Paint,
-      )
+      drawingml_chart_gradient_fill_with_placeholder(fill, theme_colors, chart_color_map, None)
+        .map_or(
+          common::ShapeStyleValue::Unspecified,
+          common::ShapeStyleValue::Paint,
+        )
     }
     Some(c::ChartShapePropertiesChoice2::PatternFill(fill)) => {
-      drawingml_pattern_fill(fill, theme_colors)
+      drawingml_chart_pattern_fill_with_placeholder(fill, theme_colors, chart_color_map, None)
         .map_or(common::ShapeStyleValue::Unspecified, |fill| {
           common::ShapeStyleValue::Paint(common::Fill::Pattern(fill))
         })
@@ -17168,7 +17641,14 @@ fn drawingml_chart_shape_common_style(
     {
       common::ShapeStyleValue::NoPaint
     }
-    Some(outline) => drawingml_outline_common_stroke(outline, theme_colors).map_or(
+    Some(outline) => drawingml_outline_common_stroke_with_placeholder(
+      outline,
+      theme_colors,
+      None,
+      false,
+      chart_color_map,
+    )
+    .map_or(
       common::ShapeStyleValue::Unspecified,
       common::ShapeStyleValue::Paint,
     ),
@@ -17179,6 +17659,7 @@ fn drawingml_chart_shape_common_style(
 fn drawingml_chart_area_common_style(
   properties: Option<&c::ShapeProperties>,
   theme_colors: &ThemeColors,
+  chart_color_map: Option<&c::ColorMapOverride>,
 ) -> common::ShapeStyle<'static> {
   let Some(properties) = properties else {
     return common::ShapeStyle::default();
@@ -17186,21 +17667,25 @@ fn drawingml_chart_area_common_style(
   let fill = match properties.shape_properties_choice2.as_ref() {
     None | Some(c::ShapePropertiesChoice2::GroupFill) => common::ShapeStyleValue::Unspecified,
     Some(c::ShapePropertiesChoice2::NoFill(_)) => common::ShapeStyleValue::NoPaint,
-    Some(c::ShapePropertiesChoice2::SolidFill(fill)) => resolve_drawingml_solid_fill(
-      fill,
-      theme_colors,
-    )
-    .map_or(common::ShapeStyleValue::Unspecified, |paint| {
-      common::ShapeStyleValue::Paint(common::Fill::Solid(common_rgb(paint.color, paint.opacity)))
-    }),
+    Some(c::ShapePropertiesChoice2::SolidFill(fill)) => fill
+      .solid_fill_choice
+      .as_ref()
+      .and_then(Color::from_solid_fill_choice)
+      .and_then(|color| {
+        docx_chart_image_color_with_placeholder(color, theme_colors, chart_color_map, None)
+      })
+      .map_or(common::ShapeStyleValue::Unspecified, |color| {
+        common::ShapeStyleValue::Paint(common::Fill::Solid(color))
+      }),
     Some(c::ShapePropertiesChoice2::GradientFill(fill)) => {
-      drawingml_gradient_fill(fill, theme_colors).map_or(
-        common::ShapeStyleValue::Unspecified,
-        common::ShapeStyleValue::Paint,
-      )
+      drawingml_chart_gradient_fill_with_placeholder(fill, theme_colors, chart_color_map, None)
+        .map_or(
+          common::ShapeStyleValue::Unspecified,
+          common::ShapeStyleValue::Paint,
+        )
     }
     Some(c::ShapePropertiesChoice2::PatternFill(fill)) => {
-      drawingml_pattern_fill(fill, theme_colors)
+      drawingml_chart_pattern_fill_with_placeholder(fill, theme_colors, chart_color_map, None)
         .map_or(common::ShapeStyleValue::Unspecified, |fill| {
           common::ShapeStyleValue::Paint(common::Fill::Pattern(fill))
         })
@@ -17219,7 +17704,14 @@ fn drawingml_chart_area_common_style(
     {
       common::ShapeStyleValue::NoPaint
     }
-    Some(outline) => drawingml_outline_common_stroke(outline, theme_colors).map_or(
+    Some(outline) => drawingml_outline_common_stroke_with_placeholder(
+      outline,
+      theme_colors,
+      None,
+      false,
+      chart_color_map,
+    )
+    .map_or(
       common::ShapeStyleValue::Unspecified,
       common::ShapeStyleValue::Paint,
     ),
@@ -17478,6 +17970,7 @@ fn drawingml_actual_line_stroke(
     theme_colors,
     placeholder_color.as_ref(),
     inherits_theme_paint,
+    None,
   )
 }
 
@@ -17503,6 +17996,8 @@ fn drawingml_effect_reference_effects(
   let resolver = DocxImageEffectColorResolver {
     theme_colors,
     images,
+    chart_images: None,
+    chart_color_map: None,
     placeholder_color: reference
       .effect_reference_choice
       .as_ref()
@@ -17557,21 +18052,41 @@ fn drawingml_fill_reference_common_fill(
     .fill_reference_choice
     .as_ref()
     .and_then(Color::from_fill_reference_choice);
+  drawingml_theme_fill_common_fill(style, theme_colors, None, placeholder_color.as_ref())
+}
+
+fn drawingml_theme_fill_common_fill(
+  style: &ThemeFillStyle,
+  theme_colors: &ThemeColors,
+  chart_color_map: Option<&c::ColorMapOverride>,
+  placeholder_color: Option<&Color>,
+) -> Option<common::Fill<'static>> {
   match style {
     ThemeFillStyle::None => Some(common::Fill::None),
     ThemeFillStyle::Solid(fill) => {
       let color = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
-      docx_image_color_with_placeholder(color, theme_colors, placeholder_color.as_ref())
-        .map(common::Fill::Solid)
+      docx_chart_theme_color_with_placeholder(
+        color,
+        theme_colors,
+        chart_color_map,
+        placeholder_color,
+      )
+      .map(common::Fill::Solid)
     }
-    ThemeFillStyle::Gradient(fill) => {
-      drawingml_gradient_fill_with_placeholder(fill, theme_colors, placeholder_color.as_ref())
-    }
+    ThemeFillStyle::Gradient(fill) => drawingml_chart_theme_gradient_fill_with_placeholder(
+      fill,
+      theme_colors,
+      chart_color_map,
+      placeholder_color,
+    ),
     ThemeFillStyle::Blip(fill) => Some(drawingml_blip_common_fill(fill)),
-    ThemeFillStyle::Pattern(fill) => {
-      drawingml_pattern_fill_with_placeholder(fill, theme_colors, placeholder_color.as_ref())
-        .map(common::Fill::Pattern)
-    }
+    ThemeFillStyle::Pattern(fill) => drawingml_chart_theme_pattern_fill_with_placeholder(
+      fill,
+      theme_colors,
+      chart_color_map,
+      placeholder_color,
+    )
+    .map(common::Fill::Pattern),
     // Group fill requires the enclosing group's resolved paint. Keep that
     // inheritance distinct from a concrete style-list paint.
     ThemeFillStyle::Group => None,
@@ -17599,7 +18114,7 @@ fn drawingml_outline_common_stroke(
   outline: &a::Outline,
   theme_colors: &ThemeColors,
 ) -> Option<common::Stroke<'static>> {
-  drawingml_outline_common_stroke_with_placeholder(outline, theme_colors, None, false)
+  drawingml_outline_common_stroke_with_placeholder(outline, theme_colors, None, false, None)
 }
 
 fn drawingml_outline_common_stroke_with_placeholder(
@@ -17607,6 +18122,7 @@ fn drawingml_outline_common_stroke_with_placeholder(
   theme_colors: &ThemeColors,
   placeholder_color: Option<&Color>,
   preserve_theme_saturation_overflow: bool,
+  chart_color_map: Option<&c::ColorMapOverride>,
 ) -> Option<common::Stroke<'static>> {
   let width_pt = outline
     .width
@@ -17618,20 +18134,57 @@ fn drawingml_outline_common_stroke_with_placeholder(
     a::OutlineChoice::SolidFill(fill) => {
       let authored = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
       let color = if preserve_theme_saturation_overflow {
-        docx_theme_line_color_with_placeholder(authored, theme_colors, placeholder_color)?
+        docx_chart_theme_color_with_placeholder(
+          authored,
+          theme_colors,
+          chart_color_map,
+          placeholder_color,
+        )?
       } else {
-        docx_image_color_with_placeholder(authored, theme_colors, placeholder_color)?
+        docx_chart_image_color_with_placeholder(
+          authored,
+          theme_colors,
+          chart_color_map,
+          placeholder_color,
+        )?
       };
       (color, None, None)
     }
     a::OutlineChoice::PatternFill(fill) => {
-      let pattern = drawingml_pattern_fill_with_placeholder(fill, theme_colors, placeholder_color)?;
+      let pattern = if preserve_theme_saturation_overflow {
+        drawingml_chart_theme_pattern_fill_with_placeholder(
+          fill,
+          theme_colors,
+          chart_color_map,
+          placeholder_color,
+        )?
+      } else {
+        drawingml_chart_pattern_fill_with_placeholder(
+          fill,
+          theme_colors,
+          chart_color_map,
+          placeholder_color,
+        )?
+      };
       (pattern.foreground, Some(pattern), None)
     }
     a::OutlineChoice::GradientFill(fill) => {
-      let common::Fill::Gradient(gradient) =
-        drawingml_gradient_fill_with_placeholder(fill, theme_colors, placeholder_color)?
-      else {
+      let resolved = if preserve_theme_saturation_overflow {
+        drawingml_chart_theme_gradient_fill_with_placeholder(
+          fill,
+          theme_colors,
+          chart_color_map,
+          placeholder_color,
+        )?
+      } else {
+        drawingml_chart_gradient_fill_with_placeholder(
+          fill,
+          theme_colors,
+          chart_color_map,
+          placeholder_color,
+        )?
+      };
+      let common::Fill::Gradient(gradient) = resolved else {
         return None;
       };
       let color = gradient
@@ -19930,6 +20483,7 @@ fn embedded_object_chart_shapes(
   let placement = drawing_placement_with_effect_extent(preview.placement, effect_extent);
   let mut shapes = chart_space_shapes(
     chart_space,
+    None,
     preview.width_pt,
     preview.height_pt,
     placement,
@@ -21177,7 +21731,6 @@ fn vml_image_data(
     semantic_metafile_font_family: None,
     native_ole_equation: None,
     metafile_native_size: false,
-    picture_content_control: false,
     placement: style.placement(),
   })
 }
@@ -22385,15 +22938,18 @@ struct DrawingImageProperties {
 struct DocxImageEffectColorResolver<'a> {
   theme_colors: &'a ThemeColors,
   images: Option<&'a ImageCatalog>,
+  chart_images: Option<&'a HashMap<String, package::ImageResource>>,
+  chart_color_map: Option<&'a c::ColorMapOverride>,
   placeholder_color: Option<Color>,
   word_group_glow: bool,
 }
 
 impl DocxImageEffectColorResolver<'_> {
   fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
-    let color = docx_image_color_with_placeholder(
+    let color = docx_chart_image_color_with_placeholder(
       color?,
       self.theme_colors,
+      self.chart_color_map,
       self.placeholder_color.as_ref(),
     )?;
     Some(ResolvedEffectColor {
@@ -22473,15 +23029,23 @@ impl ImageEffectColorResolver for DocxImageEffectColorResolver<'_> {
     self.resolve(Color::from_preset_shadow_choice(choice))
   }
 
+  fn extrusion_color(&self, choice: &a::ExtrusionColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_extrusion_color_choice(choice))
+  }
+
+  fn contour_color(&self, choice: &a::ContourColorChoice) -> Option<ResolvedEffectColor> {
+    self.resolve(Color::from_contour_color_choice(choice))
+  }
+
   fn blip_fill(
     &self,
     fill: &a::BlipFill,
   ) -> Option<common::drawingml_image_effects::ImageEffectFill> {
     let blip = fill.blip.as_ref()?;
     let resource = self
-      .images?
-      .by_relationship_id
-      .get(blip.embed.as_deref()?)?;
+      .chart_images
+      .and_then(|images| images.get(blip.embed.as_deref()?))
+      .or_else(|| self.images?.by_relationship_id.get(blip.embed.as_deref()?))?;
     let effects = common::drawingml_image_effects::from_blip_choices(
       &blip.blip_choice,
       resource.content_type.as_deref(),
@@ -22702,6 +23266,8 @@ fn apply_image_effects_from_blip(
       &DocxImageEffectColorResolver {
         theme_colors,
         images,
+        chart_images: None,
+        chart_color_map: None,
         placeholder_color: None,
         word_group_glow: false,
       },
@@ -22720,15 +23286,77 @@ fn docx_image_color_with_placeholder(
   docx_image_color_with_placeholder_policy(color, theme_colors, placeholder_color, false)
 }
 
-fn docx_theme_line_color_with_placeholder(
+fn docx_chart_image_color_with_placeholder(
   color: Color,
   theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
   placeholder_color: Option<&Color>,
 ) -> Option<common::Color> {
-  // Word fixed-layout output retains saturation above 100% while applying a
-  // theme line's phClr satMod, then clips the converted sRGB channels. Keep
-  // this compatibility behavior scoped to inherited Word theme-line paint.
-  docx_image_color_with_placeholder_policy(color, theme_colors, placeholder_color, true)
+  docx_chart_color_with_placeholder_policy(color, theme_colors, color_map, placeholder_color, false)
+}
+
+fn docx_chart_theme_color_with_placeholder(
+  color: Color,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+  placeholder_color: Option<&Color>,
+) -> Option<common::Color> {
+  docx_chart_color_with_placeholder_policy(color, theme_colors, color_map, placeholder_color, true)
+}
+
+fn docx_chart_color_with_placeholder_policy(
+  color: Color,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+  placeholder_color: Option<&Color>,
+  preserve_saturation_overflow: bool,
+) -> Option<common::Color> {
+  if color_map.is_none() {
+    return if preserve_saturation_overflow {
+      docx_image_color_with_placeholder_policy(color, theme_colors, placeholder_color, true)
+    } else {
+      docx_image_color_with_placeholder(color, theme_colors, placeholder_color)
+    };
+  }
+  let mut scheme_resolver = |value| {
+    let mapped = shared_chart::scheme_color_token(color_map, value)?;
+    let color = resolve_drawingml_color_scheme_index(mapped, theme_colors)?;
+    Some(Color::RgbHex(RgbHexColor {
+      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+      transformations: Vec::new(),
+    }))
+  };
+  let color = if preserve_saturation_overflow {
+    color.resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?
+  } else {
+    color.resolve_rgb(&mut scheme_resolver, placeholder_color)?
+  };
+  Some(common::Color {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
+  })
+}
+
+fn resolve_drawingml_color_scheme_index(
+  value: a::ColorSchemeIndexValues,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  match value {
+    a::ColorSchemeIndexValues::Dark1 => theme_colors.dark1,
+    a::ColorSchemeIndexValues::Light1 => theme_colors.light1,
+    a::ColorSchemeIndexValues::Dark2 => theme_colors.dark2,
+    a::ColorSchemeIndexValues::Light2 => theme_colors.light2,
+    a::ColorSchemeIndexValues::Accent1 => theme_colors.accent1,
+    a::ColorSchemeIndexValues::Accent2 => theme_colors.accent2,
+    a::ColorSchemeIndexValues::Accent3 => theme_colors.accent3,
+    a::ColorSchemeIndexValues::Accent4 => theme_colors.accent4,
+    a::ColorSchemeIndexValues::Accent5 => theme_colors.accent5,
+    a::ColorSchemeIndexValues::Accent6 => theme_colors.accent6,
+    a::ColorSchemeIndexValues::Hyperlink => theme_colors.hyperlink,
+    a::ColorSchemeIndexValues::FollowedHyperlink => theme_colors.followed_hyperlink,
+  }
 }
 
 fn docx_image_color_with_placeholder_policy(
@@ -22745,7 +23373,7 @@ fn docx_image_color_with_placeholder_policy(
     }))
   };
   let color = if preserve_saturation_overflow {
-    color.resolve_rgb_with_saturation_overflow(&mut scheme_resolver, placeholder_color)?
+    color.resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?
   } else {
     color.resolve_rgb(&mut scheme_resolver, placeholder_color)?
   };
@@ -24493,20 +25121,22 @@ fn theme_language_script(language: &str) -> Option<Arc<str>> {
 
 impl ThemeLineStyles {
   fn from_theme(theme: &a::Theme) -> Self {
+    Self::from_format_scheme(&theme.theme_elements.format_scheme)
+  }
+
+  fn from_format_scheme(format: &a::FormatScheme) -> Self {
     Self {
-      outlines: theme
-        .theme_elements
-        .format_scheme
-        .line_style_list
-        .outline
-        .clone(),
+      outlines: format.line_style_list.outline.clone(),
     }
   }
 }
 
 impl ThemeFillStyles {
   fn from_theme(theme: &a::Theme) -> Self {
-    let format = &theme.theme_elements.format_scheme;
+    Self::from_format_scheme(&theme.theme_elements.format_scheme)
+  }
+
+  fn from_format_scheme(format: &a::FormatScheme) -> Self {
     Self {
       styles: format
         .fill_style_list
@@ -24565,7 +25195,10 @@ impl ThemeEffectStyles {
 
 impl ThemeColors {
   fn from_theme(theme: &a::Theme) -> Self {
-    let scheme = &theme.theme_elements.color_scheme;
+    Self::from_color_scheme(&theme.theme_elements.color_scheme)
+  }
+
+  fn from_color_scheme(scheme: &a::ColorScheme) -> Self {
     Self {
       dark1: dark1_color_value(&scheme.dark1_color.dark1_color_choice),
       light1: light1_color_value(&scheme.light1_color.light1_color_choice),
@@ -27202,7 +27835,6 @@ fn numbering_drawing_image(
     semantic_metafile_font_family: None,
     native_ole_equation: None,
     metafile_native_size: true,
-    picture_content_control: false,
     placement: ImagePlacement::Inline,
   })
 }
@@ -42063,6 +42695,114 @@ mod tests {
   }
 
   #[test]
+  fn classic_chart_intense_fill_matches_office_for_all_theme_accents() {
+    let fill = a::GradientFill::from_bytes(
+      br#"<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:shade val="51000"/><a:satMod val="130000"/></a:schemeClr></a:gs><a:gs pos="80000"><a:schemeClr val="phClr"><a:shade val="93000"/><a:satMod val="130000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="94000"/><a:satMod val="135000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="16200000" scaled="0"/></a:gradFill>"#,
+    )
+    .expect("classic chart intense theme fill");
+    let theme_fills = ThemeFillStyles {
+      styles: vec![
+        ThemeFillStyle::None,
+        ThemeFillStyle::None,
+        ThemeFillStyle::Gradient(fill),
+      ],
+      background_styles: Vec::new(),
+    };
+
+    let office_theme_accents_and_stops = [
+      (
+        RgbColor {
+          r: 0x4F,
+          g: 0x81,
+          b: 0xBD,
+        },
+        [(44, 93, 152), (60, 123, 199), (58, 124, 203)],
+      ),
+      (
+        RgbColor {
+          r: 0xC0,
+          g: 0x50,
+          b: 0x4D,
+        },
+        [(155, 45, 42), (203, 61, 58), (206, 59, 55)],
+      ),
+      (
+        RgbColor {
+          r: 0x9B,
+          g: 0xBB,
+          b: 0x59,
+        },
+        [(118, 149, 53), (155, 195, 72), (156, 199, 70)],
+      ),
+      (
+        RgbColor {
+          r: 0x80,
+          g: 0x64,
+          b: 0xA2,
+        },
+        [(93, 65, 126), (123, 88, 166), (123, 87, 168)],
+      ),
+      (
+        RgbColor {
+          r: 0x4B,
+          g: 0xAC,
+          b: 0xC6,
+        },
+        [(39, 135, 160), (54, 177, 210), (52, 179, 214)],
+      ),
+      (
+        RgbColor {
+          r: 0xF7,
+          g: 0x96,
+          b: 0x46,
+        },
+        [(203, 108, 29), (255, 143, 42), (255, 143, 38)],
+      ),
+    ];
+
+    let mut resolved_accents = Vec::new();
+    for (placeholder, _) in office_theme_accents_and_stops {
+      let common::ShapeStyleValue::Paint(common::Fill::Gradient(fill)) =
+        word_automatic_chart_fill_style(
+          29,
+          false,
+          placeholder,
+          &theme_fills,
+          &ThemeColors::default(),
+          None,
+        )
+      else {
+        panic!("expected resolved intense chart gradient");
+      };
+
+      resolved_accents.push(
+        fill
+          .stops
+          .iter()
+          .map(|stop| (stop.color.r, stop.color.g, stop.color.b))
+          .collect::<Vec<_>>(),
+      );
+      assert_eq!(
+        fill
+          .stops
+          .iter()
+          .map(|stop| stop.position)
+          .collect::<Vec<_>>(),
+        [0.0, 0.8, 1.0]
+      );
+      assert_eq!(fill.angle_degrees, Some(270.0));
+      assert_eq!(fill.rotate_with_shape, Some(true));
+    }
+    assert_eq!(
+      resolved_accents,
+      office_theme_accents_and_stops
+        .iter()
+        .map(|(_, stops)| stops.to_vec())
+        .collect::<Vec<_>>()
+    );
+  }
+
+  #[test]
   fn wordart_path_gradient_distinguishes_missing_attributes_from_missing_focus() {
     let fill = w14::GradientFillProperties::from_bytes(
       br#"<w14:gradFill xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:gsLst><w14:gs w14:pos="0"><w14:srgbClr w14:val="FFFFFF"/></w14:gs><w14:gs w14:pos="100000"><w14:srgbClr w14:val="5B9BD5"/></w14:gs></w14:gsLst><w14:path w14:path="circle"><w14:fillToRect w14:r="100000" w14:b="100000"/></w14:path></w14:gradFill>"#,
@@ -42098,7 +42838,7 @@ mod tests {
     )
     .expect("chart plot shape properties");
 
-    let style = drawingml_chart_area_common_style(Some(&properties), &ThemeColors::default());
+    let style = drawingml_chart_area_common_style(Some(&properties), &ThemeColors::default(), None);
     let common::ShapeStyleValue::Paint(common::Fill::Gradient(gradient)) = style.fill else {
       panic!("expected path gradient");
     };
@@ -42134,7 +42874,8 @@ mod tests {
     )
     .expect("chart series shape properties");
 
-    let style = drawingml_chart_shape_common_style(Some(&properties), &ThemeColors::default());
+    let style =
+      drawingml_chart_shape_common_style(Some(&properties), &ThemeColors::default(), None);
     let common::ShapeStyleValue::Paint(common::Fill::Solid(fill)) = style.fill else {
       panic!("expected solid series fill");
     };

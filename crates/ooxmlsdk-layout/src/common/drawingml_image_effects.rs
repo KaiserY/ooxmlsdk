@@ -585,6 +585,12 @@ pub(crate) trait ImageEffectColorResolver {
   fn inner_shadow(&self, choice: &a::InnerShadowChoice) -> Option<ResolvedEffectColor>;
   fn outer_shadow(&self, choice: &a::OuterShadowChoice) -> Option<ResolvedEffectColor>;
   fn preset_shadow(&self, choice: &a::PresetShadowChoice) -> Option<ResolvedEffectColor>;
+  fn extrusion_color(&self, _choice: &a::ExtrusionColorChoice) -> Option<ResolvedEffectColor> {
+    None
+  }
+  fn contour_color(&self, _choice: &a::ContourColorChoice) -> Option<ResolvedEffectColor> {
+    None
+  }
   fn blip_fill(&self, _fill: &a::BlipFill) -> Option<ImageEffectFill> {
     None
   }

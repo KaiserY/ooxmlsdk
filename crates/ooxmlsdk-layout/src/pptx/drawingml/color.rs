@@ -337,14 +337,14 @@ impl Color {
   where
     F: FnMut(a::SchemeColorValues) -> Option<Color>,
   {
-    self.resolve_rgb_with_policy(
-      scheme_resolver,
-      placeholder_color,
-      ColorTransformPolicy::Standard,
-    )
+    self.resolve_rgb_standard(scheme_resolver, placeholder_color)
   }
 
-  pub(crate) fn resolve_rgb_with_saturation_overflow<F>(
+  /// Resolves an inherited DrawingML theme style without quantizing to 8-bit
+  /// sRGB between ordered color transformations. Office keeps that precision
+  /// across the format scheme's `shade`/`tint` and HSL transforms and permits
+  /// `satMod` to exceed 100% before clipping the resulting sRGB channels.
+  pub(crate) fn resolve_rgb_with_theme_style_precision<F>(
     &self,
     scheme_resolver: &mut F,
     placeholder_color: Option<&Color>,
@@ -352,18 +352,15 @@ impl Color {
   where
     F: FnMut(a::SchemeColorValues) -> Option<Color>,
   {
-    self.resolve_rgb_with_policy(
-      scheme_resolver,
-      placeholder_color,
-      ColorTransformPolicy::PreserveSaturationModOverflow,
-    )
+    self
+      .resolve_precise_theme_style(scheme_resolver, placeholder_color)
+      .map(PreciseResolvedColor::into_resolved)
   }
 
-  fn resolve_rgb_with_policy<F>(
+  fn resolve_rgb_standard<F>(
     &self,
     scheme_resolver: &mut F,
     placeholder_color: Option<&Color>,
-    policy: ColorTransformPolicy,
   ) -> Option<ResolvedColor>
   where
     F: FnMut(a::SchemeColorValues) -> Option<Color>,
@@ -406,21 +403,65 @@ impl Color {
         } else {
           scheme_resolver(color.value)
         }?;
-        let mut resolved =
-          base.resolve_rgb_with_policy(scheme_resolver, placeholder_color, policy)?;
-        apply_transformations_with_policy(&mut resolved, &color.transformations, policy);
+        let mut resolved = base.resolve_rgb_standard(scheme_resolver, placeholder_color)?;
+        apply_transformations(&mut resolved, &color.transformations);
         return Some(resolved);
       }
     };
-    apply_transformations_with_policy(&mut color, transformations, policy);
+    apply_transformations(&mut color, transformations);
     Some(color)
   }
-}
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ColorTransformPolicy {
-  Standard,
-  PreserveSaturationModOverflow,
+  fn resolve_precise_theme_style<F>(
+    &self,
+    scheme_resolver: &mut F,
+    placeholder_color: Option<&Color>,
+  ) -> Option<PreciseResolvedColor>
+  where
+    F: FnMut(a::SchemeColorValues) -> Option<Color>,
+  {
+    let (mut color, transformations) = match self {
+      Self::RgbHex(color) => (
+        PreciseResolvedColor::from_hex(&color.value)?,
+        color.transformations.as_slice(),
+      ),
+      Self::RgbPercent(color) => (
+        PreciseResolvedColor::from_scrgb_percent(color.red, color.green, color.blue),
+        color.transformations.as_slice(),
+      ),
+      Self::Hsl(color) => (
+        PreciseResolvedColor::from_hsl(color.hue, color.saturation, color.luminance),
+        color.transformations.as_slice(),
+      ),
+      Self::System(color) => (
+        PreciseResolvedColor::from_hex(color.last_color.as_deref()?)?,
+        color.transformations.as_slice(),
+      ),
+      Self::Preset(color) => (
+        PreciseResolvedColor::from_resolved(preset_color_rgb(color.value)?),
+        color.transformations.as_slice(),
+      ),
+      Self::Scheme(color) => {
+        let base = if color.value == a::SchemeColorValues::PhColor {
+          match placeholder_color {
+            Some(Self::Scheme(placeholder))
+              if placeholder.value == a::SchemeColorValues::PhColor =>
+            {
+              None
+            }
+            _ => placeholder_color.cloned(),
+          }
+        } else {
+          scheme_resolver(color.value)
+        }?;
+        let mut resolved = base.resolve_precise_theme_style(scheme_resolver, placeholder_color)?;
+        resolved.apply_transformations(&color.transformations);
+        return Some(resolved);
+      }
+    };
+    color.apply_transformations(transformations);
+    Some(color)
+  }
 }
 
 fn best_solid_gradient_color(fill: &a::GradientFill) -> Option<Color> {
@@ -520,6 +561,333 @@ impl ResolvedColor {
       u8::from_str_radix(&hex[4..6], 16).ok()?,
     ))
   }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum PreciseColorSpace {
+  Srgb([f64; 3]),
+  ScRgb([f64; 3]),
+  Hsl {
+    hue_degrees: f64,
+    saturation: f64,
+    luminance: f64,
+  },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct PreciseResolvedColor {
+  space: PreciseColorSpace,
+  alpha: i32,
+}
+
+impl PreciseResolvedColor {
+  fn from_resolved(color: ResolvedColor) -> Self {
+    Self {
+      space: PreciseColorSpace::Srgb([
+        f64::from(color.r) / 255.0,
+        f64::from(color.g) / 255.0,
+        f64::from(color.b) / 255.0,
+      ]),
+      alpha: color.alpha,
+    }
+  }
+
+  fn from_hex(hex: &str) -> Option<Self> {
+    ResolvedColor::from_hex(hex).map(Self::from_resolved)
+  }
+
+  fn from_scrgb_percent(red: i32, green: i32, blue: i32) -> Self {
+    Self {
+      space: PreciseColorSpace::ScRgb([
+        drawingml_ratio(red),
+        drawingml_ratio(green),
+        drawingml_ratio(blue),
+      ]),
+      alpha: COLOR_PERCENT_MAX,
+    }
+  }
+
+  fn from_hsl(hue: i32, saturation: i32, luminance: i32) -> Self {
+    Self {
+      space: PreciseColorSpace::Hsl {
+        hue_degrees: f64::from(hue.rem_euclid(360 * 60_000)) / 60_000.0,
+        saturation: drawingml_ratio(saturation),
+        luminance: drawingml_ratio(luminance),
+      },
+      alpha: COLOR_PERCENT_MAX,
+    }
+  }
+
+  fn into_resolved(mut self) -> ResolvedColor {
+    self.ensure_srgb();
+    let PreciseColorSpace::Srgb(channels) = self.space else {
+      unreachable!("color conversion must finish in sRGB")
+    };
+    let channel = |value: f64| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
+    ResolvedColor {
+      r: channel(channels[0]),
+      g: channel(channels[1]),
+      b: channel(channels[2]),
+      alpha: self.alpha.clamp(0, COLOR_PERCENT_MAX),
+    }
+  }
+
+  fn apply_transformations(&mut self, transformations: &[ColorTransformation]) {
+    for transformation in transformations {
+      let value = transformation.value.unwrap_or(0);
+      match transformation.kind {
+        ColorTransformationKind::Red => self.set_scrgb_component(0, drawingml_ratio(value)),
+        ColorTransformationKind::RedMod => self.mod_scrgb_component(0, value),
+        ColorTransformationKind::RedOff => self.offset_scrgb_component(0, value),
+        ColorTransformationKind::Green => self.set_scrgb_component(1, drawingml_ratio(value)),
+        ColorTransformationKind::GreenMod => self.mod_scrgb_component(1, value),
+        ColorTransformationKind::GreenOff => self.offset_scrgb_component(1, value),
+        ColorTransformationKind::Blue => self.set_scrgb_component(2, drawingml_ratio(value)),
+        ColorTransformationKind::BlueMod => self.mod_scrgb_component(2, value),
+        ColorTransformationKind::BlueOff => self.offset_scrgb_component(2, value),
+        ColorTransformationKind::Alpha => self.alpha = clamp_percent(value),
+        ColorTransformationKind::AlphaMod => {
+          self.alpha = mod_value(self.alpha, value, COLOR_PERCENT_MAX);
+        }
+        ColorTransformationKind::AlphaOff => {
+          self.alpha = offset_value(self.alpha, value, COLOR_PERCENT_MAX);
+        }
+        ColorTransformationKind::Shade => self.apply_scrgb_shade(value),
+        ColorTransformationKind::Tint => self.apply_scrgb_tint(value),
+        ColorTransformationKind::Gray => self.apply_gray(),
+        ColorTransformationKind::Comp => self.apply_complement(),
+        ColorTransformationKind::Inv => self.apply_scrgb_inverse(),
+        ColorTransformationKind::Gamma => self.apply_scrgb_gamma(false),
+        ColorTransformationKind::InvGamma => self.apply_scrgb_gamma(true),
+        ColorTransformationKind::Hue
+        | ColorTransformationKind::HueMod
+        | ColorTransformationKind::HueOff
+        | ColorTransformationKind::Sat
+        | ColorTransformationKind::SatMod
+        | ColorTransformationKind::SatOff
+        | ColorTransformationKind::Lum
+        | ColorTransformationKind::LumMod
+        | ColorTransformationKind::LumOff => self.apply_hsl_transform(transformation.kind, value),
+      }
+    }
+  }
+
+  fn ensure_srgb(&mut self) {
+    self.space = match self.space {
+      PreciseColorSpace::Srgb(channels) => PreciseColorSpace::Srgb(channels),
+      PreciseColorSpace::ScRgb(channels) => {
+        PreciseColorSpace::Srgb(channels.map(linear_to_srgb_f64))
+      }
+      PreciseColorSpace::Hsl {
+        hue_degrees,
+        saturation,
+        luminance,
+      } => PreciseColorSpace::Srgb(hsl_to_srgb_f64(hue_degrees, saturation, luminance)),
+    };
+  }
+
+  fn ensure_scrgb(&mut self) {
+    if matches!(self.space, PreciseColorSpace::ScRgb(_)) {
+      return;
+    }
+    self.ensure_srgb();
+    let PreciseColorSpace::Srgb(channels) = self.space else {
+      unreachable!("sRGB conversion must produce sRGB components")
+    };
+    self.space = PreciseColorSpace::ScRgb(channels.map(srgb_to_linear_f64));
+  }
+
+  fn ensure_hsl(&mut self) {
+    if matches!(self.space, PreciseColorSpace::Hsl { .. }) {
+      return;
+    }
+    self.ensure_srgb();
+    let PreciseColorSpace::Srgb(channels) = self.space else {
+      unreachable!("sRGB conversion must produce sRGB components")
+    };
+    let [hue_degrees, saturation, luminance] = srgb_to_hsl_f64(channels);
+    self.space = PreciseColorSpace::Hsl {
+      hue_degrees,
+      saturation,
+      luminance,
+    };
+  }
+
+  fn scrgb_components(&mut self) -> &mut [f64; 3] {
+    self.ensure_scrgb();
+    let PreciseColorSpace::ScRgb(channels) = &mut self.space else {
+      unreachable!("scRGB conversion must produce scRGB components")
+    };
+    channels
+  }
+
+  fn set_scrgb_component(&mut self, index: usize, value: f64) {
+    self.scrgb_components()[index] = value.clamp(0.0, 1.0);
+  }
+
+  fn mod_scrgb_component(&mut self, index: usize, value: i32) {
+    let factor = f64::from(value.max(0)) / f64::from(COLOR_PERCENT_MAX);
+    let channels = self.scrgb_components();
+    channels[index] = (channels[index] * factor).clamp(0.0, 1.0);
+  }
+
+  fn offset_scrgb_component(&mut self, index: usize, value: i32) {
+    let offset = f64::from(value) / f64::from(COLOR_PERCENT_MAX);
+    let channels = self.scrgb_components();
+    channels[index] = (channels[index] + offset).clamp(0.0, 1.0);
+  }
+
+  fn apply_scrgb_shade(&mut self, value: i32) {
+    let retention = drawingml_ratio(value);
+    for channel in self.scrgb_components() {
+      *channel = (*channel * retention).clamp(0.0, 1.0);
+    }
+  }
+
+  fn apply_scrgb_tint(&mut self, value: i32) {
+    let retention = drawingml_ratio(value);
+    for channel in self.scrgb_components() {
+      *channel = (1.0 - (1.0 - *channel) * retention).clamp(0.0, 1.0);
+    }
+  }
+
+  fn apply_gray(&mut self) {
+    self.ensure_srgb();
+    let PreciseColorSpace::Srgb(channels) = &mut self.space else {
+      unreachable!("sRGB conversion must produce sRGB components")
+    };
+    let gray = channels[0] * 0.22 + channels[1] * 0.72 + channels[2] * 0.06;
+    *channels = [gray; 3];
+  }
+
+  fn apply_complement(&mut self) {
+    self.ensure_hsl();
+    let PreciseColorSpace::Hsl { hue_degrees, .. } = &mut self.space else {
+      unreachable!("HSL conversion must produce HSL components")
+    };
+    *hue_degrees = (*hue_degrees + 180.0).rem_euclid(360.0);
+  }
+
+  fn apply_scrgb_inverse(&mut self) {
+    for channel in self.scrgb_components() {
+      *channel = 1.0 - *channel;
+    }
+  }
+
+  fn apply_scrgb_gamma(&mut self, inverse: bool) {
+    for channel in self.scrgb_components() {
+      *channel = if inverse {
+        srgb_to_linear_f64(*channel)
+      } else {
+        linear_to_srgb_f64(*channel)
+      };
+    }
+  }
+
+  fn apply_hsl_transform(&mut self, kind: ColorTransformationKind, value: i32) {
+    self.ensure_hsl();
+    let PreciseColorSpace::Hsl {
+      hue_degrees,
+      saturation,
+      luminance,
+    } = &mut self.space
+    else {
+      unreachable!("HSL conversion must produce HSL components")
+    };
+    match kind {
+      ColorTransformationKind::Hue => {
+        *hue_degrees = f64::from(value.rem_euclid(360 * 60_000)) / 60_000.0;
+      }
+      ColorTransformationKind::HueMod => {
+        *hue_degrees =
+          (*hue_degrees * f64::from(value.max(0)) / f64::from(COLOR_PERCENT_MAX)).clamp(0.0, 360.0);
+      }
+      ColorTransformationKind::HueOff => {
+        *hue_degrees = (*hue_degrees + f64::from(value) / 60_000.0).rem_euclid(360.0);
+      }
+      ColorTransformationKind::Sat => *saturation = drawingml_ratio(value),
+      ColorTransformationKind::SatMod => {
+        *saturation =
+          (*saturation * f64::from(value.max(0)) / f64::from(COLOR_PERCENT_MAX)).max(0.0);
+      }
+      ColorTransformationKind::SatOff => {
+        *saturation =
+          (*saturation + f64::from(value) / f64::from(COLOR_PERCENT_MAX)).clamp(0.0, 1.0);
+      }
+      ColorTransformationKind::Lum => *luminance = drawingml_ratio(value),
+      ColorTransformationKind::LumMod => {
+        *luminance =
+          (*luminance * f64::from(value.max(0)) / f64::from(COLOR_PERCENT_MAX)).clamp(0.0, 1.0);
+      }
+      ColorTransformationKind::LumOff => {
+        *luminance = (*luminance + f64::from(value) / f64::from(COLOR_PERCENT_MAX)).clamp(0.0, 1.0);
+      }
+      _ => unreachable!("non-HSL transform routed to HSL handler"),
+    }
+    if *luminance == 0.0 || *luminance == 1.0 {
+      *saturation = 0.0;
+    }
+  }
+}
+
+fn drawingml_ratio(value: i32) -> f64 {
+  f64::from(value.clamp(0, COLOR_PERCENT_MAX)) / f64::from(COLOR_PERCENT_MAX)
+}
+
+fn srgb_to_linear_f64(value: f64) -> f64 {
+  let value = value.clamp(0.0, 1.0);
+  if value <= 0.040_45 {
+    value / 12.92
+  } else {
+    ((value + 0.055) / 1.055).powf(2.4)
+  }
+}
+
+fn linear_to_srgb_f64(value: f64) -> f64 {
+  let value = value.clamp(0.0, 1.0);
+  if value <= 0.003_130_8 {
+    value * 12.92
+  } else {
+    1.055 * value.powf(1.0 / 2.4) - 0.055
+  }
+}
+
+fn srgb_to_hsl_f64([red, green, blue]: [f64; 3]) -> [f64; 3] {
+  let maximum = red.max(green).max(blue);
+  let minimum = red.min(green).min(blue);
+  let spread = maximum - minimum;
+  let luminance = (maximum + minimum) * 0.5;
+  if spread <= f64::EPSILON {
+    return [0.0, 0.0, luminance];
+  }
+  let mut hue_degrees = if maximum == red {
+    60.0 * ((green - blue) / spread).rem_euclid(6.0)
+  } else if maximum == green {
+    60.0 * ((blue - red) / spread + 2.0)
+  } else {
+    60.0 * ((red - green) / spread + 4.0)
+  };
+  hue_degrees = hue_degrees.rem_euclid(360.0);
+  let saturation = spread / (1.0 - (2.0 * luminance - 1.0).abs()).max(f64::EPSILON);
+  [hue_degrees, saturation, luminance]
+}
+
+fn hsl_to_srgb_f64(hue_degrees: f64, saturation: f64, luminance: f64) -> [f64; 3] {
+  let hue_degrees = hue_degrees.rem_euclid(360.0);
+  let luminance = luminance.clamp(0.0, 1.0);
+  let saturation = saturation.max(0.0);
+  let chroma = (1.0 - (2.0 * luminance - 1.0).abs()) * saturation;
+  let secondary = chroma * (1.0 - ((hue_degrees / 60.0).rem_euclid(2.0) - 1.0).abs());
+  let offset = luminance - chroma * 0.5;
+  let channels = match hue_degrees {
+    value if value < 60.0 => [chroma, secondary, 0.0],
+    value if value < 120.0 => [secondary, chroma, 0.0],
+    value if value < 180.0 => [0.0, chroma, secondary],
+    value if value < 240.0 => [0.0, secondary, chroma],
+    value if value < 300.0 => [secondary, 0.0, chroma],
+    _ => [chroma, 0.0, secondary],
+  };
+  channels.map(|channel| (channel + offset).clamp(0.0, 1.0))
 }
 
 pub(crate) fn apply_excel_tint(mut color: ResolvedColor, tint: f64) -> ResolvedColor {
@@ -987,14 +1355,6 @@ pub(crate) fn apply_transformations(
   color: &mut ResolvedColor,
   transformations: &[ColorTransformation],
 ) {
-  apply_transformations_with_policy(color, transformations, ColorTransformPolicy::Standard);
-}
-
-fn apply_transformations_with_policy(
-  color: &mut ResolvedColor,
-  transformations: &[ColorTransformation],
-  policy: ColorTransformPolicy,
-) {
   for transformation in transformations {
     let value = transformation.value.unwrap_or(0);
     match transformation.kind {
@@ -1034,33 +1394,20 @@ fn apply_transformations_with_policy(
       | ColorTransformationKind::SatOff
       | ColorTransformationKind::Lum
       | ColorTransformationKind::LumMod
-      | ColorTransformationKind::LumOff => {
-        apply_hsl_transform(color, transformation.kind, value, policy)
-      }
+      | ColorTransformationKind::LumOff => apply_hsl_transform(color, transformation.kind, value),
     }
     color.alpha = clamp_percent(color.alpha);
   }
 }
 
-fn apply_hsl_transform(
-  color: &mut ResolvedColor,
-  kind: ColorTransformationKind,
-  value: i32,
-  policy: ColorTransformPolicy,
-) {
+fn apply_hsl_transform(color: &mut ResolvedColor, kind: ColorTransformationKind, value: i32) {
   let (mut h, mut s, mut l) = drawingml_rgb_to_hsl(*color);
   match kind {
     ColorTransformationKind::Hue => h = value.rem_euclid(360 * 60_000),
     ColorTransformationKind::HueMod => h = mod_value(h, value, 360 * 60_000),
     ColorTransformationKind::HueOff => h = wrap_hue(h, value),
     ColorTransformationKind::Sat => s = clamp_percent(value),
-    ColorTransformationKind::SatMod => {
-      s = if policy == ColorTransformPolicy::PreserveSaturationModOverflow {
-        mod_value_without_upper_bound(s, value)
-      } else {
-        mod_value(s, value, COLOR_PERCENT_MAX)
-      }
-    }
+    ColorTransformationKind::SatMod => s = mod_value(s, value, COLOR_PERCENT_MAX),
     ColorTransformationKind::SatOff => s = offset_value(s, value, COLOR_PERCENT_MAX),
     ColorTransformationKind::Lum => l = clamp_percent(value),
     ColorTransformationKind::LumMod => l = mod_value(l, value, COLOR_PERCENT_MAX),
@@ -1070,12 +1417,7 @@ fn apply_hsl_transform(
   if l == 0 || l == COLOR_PERCENT_MAX {
     s = 0;
   }
-  let rgb = if kind == ColorTransformationKind::SatMod && s > COLOR_PERCENT_MAX {
-    drawingml_hsl_to_rgb_with_saturation_overflow(h, s, l)
-  } else {
-    drawingml_hsl_to_rgb(h, s, l)
-  };
-  set_rgb_preserve_alpha(color, rgb);
+  set_rgb_preserve_alpha(color, drawingml_hsl_to_rgb(h, s, l));
 }
 
 fn apply_shade(color: &mut ResolvedColor, value: i32) {
@@ -1167,11 +1509,6 @@ fn mod_value(value: i32, modifier: i32, max: i32) -> i32 {
     as i32
 }
 
-fn mod_value_without_upper_bound(value: i32, modifier: i32) -> i32 {
-  (i64::from(value) * i64::from(modifier) / i64::from(COLOR_PERCENT_MAX))
-    .clamp(0, i64::from(i32::MAX)) as i32
-}
-
 fn offset_value(value: i32, offset: i32, max: i32) -> i32 {
   (i64::from(value) + i64::from(offset)).clamp(0, i64::from(max)) as i32
 }
@@ -1201,29 +1538,6 @@ fn drawingml_hsl_to_rgb(hue: i32, saturation: i32, luminance: i32) -> ResolvedCo
   }
   .to_srgb8();
   ResolvedColor::new(r, g, b)
-}
-
-fn drawingml_hsl_to_rgb_with_saturation_overflow(
-  hue: i32,
-  saturation: i32,
-  luminance: i32,
-) -> ResolvedColor {
-  let hue = hue.rem_euclid(360 * 60_000) as f64 / 60_000.0;
-  let saturation = f64::from(saturation.max(0)) / f64::from(COLOR_PERCENT_MAX);
-  let luminance = f64::from(clamp_percent(luminance)) / f64::from(COLOR_PERCENT_MAX);
-  let chroma = (1.0 - (2.0 * luminance - 1.0).abs()) * saturation;
-  let secondary = chroma * (1.0 - ((hue / 60.0).rem_euclid(2.0) - 1.0).abs());
-  let offset = luminance - chroma * 0.5;
-  let [red, green, blue] = match hue {
-    value if value < 60.0 => [chroma, secondary, 0.0],
-    value if value < 120.0 => [secondary, chroma, 0.0],
-    value if value < 180.0 => [0.0, chroma, secondary],
-    value if value < 240.0 => [0.0, secondary, chroma],
-    value if value < 300.0 => [secondary, 0.0, chroma],
-    _ => [chroma, 0.0, secondary],
-  };
-  let channel = |value: f64| ((value + offset).clamp(0.0, 1.0) * 255.0).round() as u8;
-  ResolvedColor::new(channel(red), channel(green), channel(blue))
 }
 
 #[cfg(test)]
@@ -1258,6 +1572,34 @@ mod tests {
     let mut color = ResolvedColor::new(0, 0, 0);
     apply_tint(&mut color, 75_000);
     assert_eq!(color, ResolvedColor::new(0x89, 0x89, 0x89));
+  }
+
+  #[test]
+  fn theme_style_keeps_precision_between_scrgb_shade_and_hsl_saturation() {
+    let themed = Color::Scheme(SchemeColor {
+      value: a::SchemeColorValues::PhColor,
+      transformations: vec![
+        ColorTransformation {
+          kind: ColorTransformationKind::Shade,
+          value: Some(51_000),
+        },
+        ColorTransformation {
+          kind: ColorTransformationKind::SatMod,
+          value: Some(130_000),
+        },
+      ],
+    });
+    let placeholder = Color::RgbHex(RgbHexColor {
+      value: "4F81BD".to_string(),
+      transformations: Vec::new(),
+    });
+    let resolved = themed
+      .resolve_rgb_with_theme_style_precision(&mut |_| None, Some(&placeholder))
+      .expect("resolved phClr theme style");
+
+    // Office applies the shade in linear scRGB and does not quantize to u8
+    // before converting the retained value to HSL for satMod.
+    assert_eq!(resolved, ResolvedColor::new(0x2C, 0x5D, 0x98));
   }
 
   #[test]

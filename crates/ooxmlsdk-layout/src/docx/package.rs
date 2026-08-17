@@ -14,7 +14,7 @@ use ooxmlsdk::parts::{
   embedded_object_part::EmbeddedObjectPart, endnotes_part::EndnotesPart,
   extended_chart_part::ExtendedChartPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
   header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
-  numbering_definitions_part::NumberingDefinitionsPart,
+  numbering_definitions_part::NumberingDefinitionsPart, theme_override_part::ThemeOverridePart,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
@@ -24,6 +24,7 @@ use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2014_chartex as cx,
   schemas_openxmlformats_org_drawingml_2006_chart as c,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
+  schemas_openxmlformats_org_drawingml_2006_main as a,
 };
 use ooxmlsdk::sdk::{RelatedPart, SdkPart, SdkType};
 use quick_xml::events::{BytesStart, Event};
@@ -37,7 +38,7 @@ pub(super) struct ImageCatalog {
   pub(super) active_x_text_style_by_relationship_id: HashMap<String, ActiveXTextStyle>,
   pub(super) math_type_by_relationship_id: HashMap<String, super::math_type::MathTypeEquation>,
   pub(super) ograph_charts_by_relationship_id: HashMap<String, OgraphChartResource>,
-  pub(super) charts_by_relationship_id: HashMap<String, c::ChartSpace>,
+  pub(super) charts_by_relationship_id: HashMap<String, ClassicChartResource>,
   pub(super) extended_charts_by_relationship_id: HashMap<String, ExtendedChartResource>,
   pub(super) diagram_colors_by_relationship_id: HashMap<String, dgm::ColorsDefinition>,
   pub(super) diagram_data_by_relationship_id: HashMap<String, dgm::DataModelRoot>,
@@ -48,6 +49,13 @@ pub(super) struct ImageCatalog {
 pub(super) struct OgraphChartResource {
   pub(super) chart: OgraphChart,
   pub(super) chart_space: c::ChartSpace,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct ClassicChartResource {
+  pub(super) chart_space: c::ChartSpace,
+  pub(super) image_resources: HashMap<String, ImageResource>,
+  pub(super) theme_override: Option<a::ThemeOverride>,
 }
 
 #[derive(Clone, Debug)]
@@ -566,14 +574,37 @@ impl ImageCatalog {
     package: &WordprocessingDocument,
     chart_parts: impl IntoIterator<Item = (String, ChartPart)> + 'a,
   ) -> (
-    HashMap<String, c::ChartSpace>,
+    HashMap<String, ClassicChartResource>,
     HashMap<String, ExtendedChartResource>,
   ) {
     let mut classic_by_relationship_id = HashMap::new();
     let mut extended_by_relationship_id = HashMap::new();
     for (relationship_id, chart_part) in chart_parts {
       if let Ok(chart_space) = chart_part.root_element(package) {
-        classic_by_relationship_id.insert(relationship_id, chart_space.clone());
+        let image_resources = chart_part
+          .related_parts_of_type::<_, ImagePart>(package)
+          .filter_map(|related| {
+            Some((
+              related.relationship_id().to_string(),
+              ImageResource {
+                data: related.part().try_data_bytes(package).ok()?,
+                content_type: related.part().content_type(package).map(str::to_string),
+              },
+            ))
+          })
+          .collect();
+        let theme_override = chart_part
+          .related_parts_of_type::<_, ThemeOverridePart>(package)
+          .next()
+          .and_then(|related| related.part().root_element(package).ok().cloned());
+        classic_by_relationship_id.insert(
+          relationship_id,
+          ClassicChartResource {
+            chart_space: chart_space.clone(),
+            image_resources,
+            theme_override,
+          },
+        );
       } else if let Ok(data) = chart_part.try_data_bytes(package)
         && let Ok(chart_space) = cx::ChartSpace::from_bytes(&data)
       {

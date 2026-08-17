@@ -131,13 +131,13 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
 const FALLBACK_ASCENT_EM: f32 = 0.8;
 const FALLBACK_DESCENT_EM: f32 = 0.2;
 const FALLBACK_LINE_GAP_EM: f32 = 0.05;
-// Word's `w:noLeading` DOC/DOCX compatibility metrics add this portion of the
-// natural font height above and below every line painted with a face whose
-// OS/2 code-page ranges advertise CP932/936/949/950. A 25pt DengXian control
-// gives a 33.84pt single-line advance from a 26.05pt natural box and moves the
-// first baseline down by 3.90pt, independently confirming the two 15% side
-// bands. Writer's tdf#129808 path gates the same four code-page bits behind
-// MS_WORD_COMP_GRID_METRICS and explicitly confirms Latin text as a control.
+// Word's DOC/DOCX compatibility metrics require this much leading on each
+// side of the natural font ink box for a face whose OS/2 code-page ranges
+// advertise CP932/936/949/950. Existing hhea line gap contributes to those
+// side bands; it must not be appended a second time. A 25pt DengXian control
+// gives a 33.84pt single-line advance from a 26.05pt ink box and moves the
+// first baseline down by 3.90pt, independently confirming the two 15% bands.
+// Writer's tdf#129808 path confirms the same four-code-page capability rule.
 const WORDPROCESSINGML_CJK_SIDE_LEADING_RATIO: f32 = 0.15;
 // FontMetricData::ImplInitTextLineSize.
 const LO_TEXT_LINE_DESCENT_FALLBACK_DIVISOR: f32 = 10.0;
@@ -976,11 +976,12 @@ fn wordprocessingml_line_vertical_metrics(
     return metrics;
   }
 
-  let side_leading_pt = metrics.ink_height_pt() * WORDPROCESSINGML_CJK_SIDE_LEADING_RATIO;
-  metrics.ascent_pt += side_leading_pt;
-  metrics.descent_pt += side_leading_pt;
-  metrics.baseline_offset_pt += side_leading_pt;
-  metrics.directwrite_baseline_offset_pt += side_leading_pt;
+  let required_side_leading_pt = metrics.ink_height_pt() * WORDPROCESSINGML_CJK_SIDE_LEADING_RATIO;
+  let additional_side_leading_pt = (required_side_leading_pt - metrics.leading_above_pt()).max(0.0);
+  metrics.ascent_pt += additional_side_leading_pt;
+  metrics.descent_pt += additional_side_leading_pt;
+  metrics.baseline_offset_pt += additional_side_leading_pt;
+  metrics.directwrite_baseline_offset_pt += additional_side_leading_pt;
   metrics
 }
 
@@ -1485,6 +1486,17 @@ mod tests {
     assert!((adjusted.line_height_pt() - 33.8).abs() < 0.0001);
     assert!((adjusted.baseline_offset_pt - 23.9).abs() < 0.0001);
     assert!((adjusted.directwrite_baseline_offset_pt - 23.9).abs() < 0.0001);
+
+    let with_intrinsic_leading = TextVerticalMetrics {
+      line_gap_pt: 4.0,
+      ..metrics
+    };
+    let adjusted = wordprocessingml_line_vertical_metrics(&style, with_intrinsic_leading);
+    assert!((adjusted.ascent_pt - 21.9).abs() < 0.0001);
+    assert!((adjusted.descent_pt - 7.9).abs() < 0.0001);
+    assert!((adjusted.line_height_pt() - 33.8).abs() < 0.0001);
+    assert!((adjusted.baseline_offset_pt - 21.9).abs() < 0.0001);
+    assert!((adjusted.directwrite_baseline_offset_pt - 21.9).abs() < 0.0001);
 
     let drawingml = TextStyle::default();
     assert_eq!(

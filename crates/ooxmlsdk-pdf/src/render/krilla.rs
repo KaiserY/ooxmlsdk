@@ -419,17 +419,17 @@ fn render_inner(
   } else {
     PdfFontAudit::default()
   };
-  let form_widget_annotations = if options.forms.export_form_fields {
-    collect_form_widget_annotations(document, &mut text_metrics, &page_selection.source_indices)
-  } else {
-    Vec::new()
-  };
-  if options.general.pdf_ua_compliance && !form_widget_annotations.is_empty() {
-    return Err(PdfError::Options(
-      "PDF/UA form widgets require a tagged form API and cannot use the lopdf post-processor"
-        .to_string(),
-    ));
-  }
+  // Word's tagged fixed-format export flattens content controls into the
+  // already tagged page text instead of emitting AcroForm widgets. Follow
+  // that behavior for PDF/UA: the lopdf widget post-processor cannot attach
+  // annotations to Krilla's structure tree, while the visible control value
+  // is already present in `paint`.
+  let form_widget_annotations =
+    if options.forms.export_form_fields && !options.general.pdf_ua_compliance {
+      collect_form_widget_annotations(document, &mut text_metrics, &page_selection.source_indices)
+    } else {
+      Vec::new()
+    };
   let internal_links = InternalLinkTargets::from_layout(&paint, document, &page_selection);
   debug_assert_eq!(paint.pages.len(), page_selection.source_indices.len());
   debug_assert!(paint.pages.iter().all(|page| {
@@ -4236,6 +4236,7 @@ fn draw_paint_item(
         link_area.y_pt,
         link_area.width_pt,
         link_area.height_pt,
+        None,
         &link_area.hyperlink_url,
         internal_links,
         options,
@@ -4286,6 +4287,7 @@ fn draw_paint_item(
           image.y_pt,
           image.width_pt,
           image.height_pt,
+          image.alt_text.as_deref(),
           url,
           internal_links,
           options,
@@ -5105,6 +5107,7 @@ fn draw_text_item(
         link.y_pt,
         link.width_pt,
         link.height_pt,
+        item.text.get(portion.text_range.clone()),
         url,
         internal_links,
         options,
@@ -5157,7 +5160,52 @@ fn draw_glyphs_with_synthetic_italic(
   if let Some(transform) = transform {
     surface.push_transform(&transform);
   }
-  surface.draw_glyphs(start, glyphs, font, semantic_text, font_size_pt, outlined);
+  if glyphs
+    .iter()
+    .all(|glyph| source_range_requires_visible_glyph(semantic_text, &glyph.text_range))
+  {
+    surface.draw_glyphs(start, glyphs, font, semantic_text, font_size_pt, outlined);
+  } else {
+    // OOXML control characters participate in layout but have no printable
+    // glyph. Some fonts shape them to glyph 0; emitting that .notdef makes an
+    // otherwise conforming PDF/A or PDF/UA document fail validation. Split
+    // around those clusters while retaining every preceding advance so later
+    // visible glyphs stay at their resolved layout positions.
+    let mut segment_start = 0;
+    let mut segment_origin = start;
+    let mut cursor = start;
+    for (index, glyph) in glyphs.iter().enumerate() {
+      let visible = source_range_requires_visible_glyph(semantic_text, &glyph.text_range);
+      if !visible {
+        if segment_start < index {
+          surface.draw_glyphs(
+            segment_origin,
+            &glyphs[segment_start..index],
+            font.clone(),
+            semantic_text,
+            font_size_pt,
+            outlined,
+          );
+        }
+        segment_start = index + 1;
+      }
+      cursor.x += glyph.x_advance(font_size_pt);
+      cursor.y += glyph.y_advance(font_size_pt);
+      if !visible {
+        segment_origin = cursor;
+      }
+    }
+    if segment_start < glyphs.len() {
+      surface.draw_glyphs(
+        segment_origin,
+        &glyphs[segment_start..],
+        font,
+        semantic_text,
+        font_size_pt,
+        outlined,
+      );
+    }
+  }
   if transform.is_some() {
     surface.pop();
   }
@@ -5859,6 +5907,7 @@ fn link_annotation_for_rect(
   y_pt: f32,
   width_pt: f32,
   height_pt: f32,
+  alt_text: Option<&str>,
   url: &str,
   internal_links: &InternalLinkTargets,
   options: &PdfOptions,
@@ -5867,6 +5916,11 @@ fn link_annotation_for_rect(
   let Some(rect) = rect else {
     return Ok(None);
   };
+  let alt_text = alt_text
+    .map(str::trim)
+    .filter(|text| !text.is_empty())
+    .unwrap_or(url)
+    .to_string();
   let target = if is_internal_link_url(url) {
     let Some(target) = internal_links.target_for_url(url) else {
       return Ok(None);
@@ -5897,7 +5951,7 @@ fn link_annotation_for_rect(
   };
   Ok(Some(Annotation::new_link(
     LinkAnnotation::new(rect, target),
-    None,
+    Some(alt_text),
   )))
 }
 
@@ -6909,7 +6963,10 @@ fn draw_path_gradient_raster(
   {
     return false;
   }
-  let Ok(image) = Image::from_png(encoded.into_inner().into(), true) else {
+  // This raster is already sampled for its final page-space bounds. Do not
+  // ask the PDF consumer to interpolate it again: Office's archival output
+  // writes `/Interpolate false`, and PDF/A validation rejects `true`.
+  let Ok(image) = Image::from_png(encoded.into_inner().into(), false) else {
     return false;
   };
   let Some(size) = Size::from_wh(polyline.width_pt, polyline.height_pt) else {
@@ -9081,6 +9138,33 @@ mod tests {
     assert!(source_range_requires_visible_glyph("\u{e000}", &(0..3)));
   }
 
+  #[test]
+  fn pdf_a_does_not_emit_notdef_glyphs_for_layout_control_text() {
+    let mut document = tagged_test_document();
+    let DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.text = "\n".into();
+
+    let mut options = PdfOptions::default();
+    options.standards.push(PdfStandard::PdfA3a);
+    options.ui_language = Some("en-US".to_string());
+    options.metadata.title = Some("Control text test".to_string());
+    options.metadata.creation_date = Some(crate::PdfDateTime {
+      year: 2026,
+      month: Some(8),
+      day: Some(18),
+      hour: Some(12),
+      minute: Some(0),
+      second: Some(0),
+      utc_offset_hour: Some(8),
+      utc_offset_minute: Some(0),
+    });
+
+    let bytes = render(&document, &options).unwrap();
+    assert!(bytes.starts_with(b"%PDF-"));
+  }
+
   fn pdf_info_text(object: &lopdf::Object) -> String {
     let bytes = object.as_str().unwrap();
     if let Some(bytes) = bytes.strip_prefix(&[0xfe, 0xff]) {
@@ -9331,7 +9415,7 @@ mod tests {
   }
 
   #[test]
-  fn pdf_ua_rejects_untagged_lopdf_form_widget_post_processing() {
+  fn pdf_ua_flattens_form_widgets_into_tagged_page_text() {
     let mut document = tagged_test_document();
     let DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
       unreachable!();
@@ -9345,11 +9429,17 @@ mod tests {
     let mut options = PdfOptions::default();
     options.general.pdf_ua_compliance = true;
     options.forms.export_form_fields = true;
+    options.ui_language = Some("en-US".to_string());
+    options.metadata.title = Some("Tagged form test".to_string());
 
-    assert!(matches!(
-      render(&document, &options),
-      Err(crate::PdfError::Options(message)) if message.contains("tagged form API")
-    ));
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let page_id = pdf.get_pages()[&1];
+    assert!(pdf.get_dictionary(page_id).unwrap().get(b"Annots").is_err());
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let catalog = pdf.get_dictionary(catalog_id).unwrap();
+    assert!(catalog.get(b"AcroForm").is_err());
+    assert!(catalog.get(b"StructTreeRoot").is_ok());
   }
 
   #[test]
@@ -9561,6 +9651,10 @@ mod tests {
     let page = pdf.get_dictionary(page_id).unwrap();
     let annotations = page.get(b"Annots").unwrap().as_array().unwrap();
     let annotation = resolved_dictionary(&pdf, &annotations[0]);
+    assert_eq!(
+      annotation.get(b"Contents").unwrap().as_str().unwrap(),
+      b"Tagged paragraph"
+    );
     let action = resolved_dictionary(&pdf, annotation.get(b"A").unwrap());
     assert_eq!(
       action.get(b"URI").unwrap().as_str().unwrap(),
@@ -9575,7 +9669,7 @@ mod tests {
   }
 
   #[test]
-  fn tagged_image_link_without_alt_text_is_attached_to_the_tag_tree() {
+  fn tagged_image_link_without_alt_text_uses_the_target_as_annotation_alt_text() {
     let mut document = tagged_test_document();
     document.pages[0]
       .items
@@ -9617,7 +9711,13 @@ mod tests {
     let pdf = lopdf::Document::load_mem(&bytes).unwrap();
     let page_id = pdf.get_pages()[&1];
     let page = pdf.get_dictionary(page_id).unwrap();
-    assert_eq!(page.get(b"Annots").unwrap().as_array().unwrap().len(), 1);
+    let annotations = page.get(b"Annots").unwrap().as_array().unwrap();
+    assert_eq!(annotations.len(), 1);
+    let annotation = resolved_dictionary(&pdf, &annotations[0]);
+    assert_eq!(
+      annotation.get(b"Contents").unwrap().as_str().unwrap(),
+      b"https://example.test/image"
+    );
     assert!(page.get(b"StructParents").is_ok());
   }
 

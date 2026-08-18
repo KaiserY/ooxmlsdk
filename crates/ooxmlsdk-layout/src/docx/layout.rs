@@ -1084,6 +1084,10 @@ fn include_numbering_label_height(
     return line_height;
   }
 
+  if inherited_numbering_label_uses_body_auto_line_box(paragraph, visible_label, flow, text_frame) {
+    return line_height;
+  }
+
   // Writer creates numbering as a SwNumberPortion with its own font.
   // SwTextFormatter::CalcAscent() measures that font's height/ascent and the
   // portion participates in the enclosing SwLineLayout just like ordinary
@@ -1101,23 +1105,7 @@ fn include_numbering_label_height(
     },
     text_metrics,
   );
-  let recovered_word_cjk_numbering = flow.compatibility_mode < 15
-    && flow.text_segmentation == TextSegmentation::Body
-    && !paragraph.format.wordprocessing_shape_story
-    && paragraph_has_chinese_east_asia_language(paragraph)
-    && paragraph.format.office_recovered_line_height
-    && paragraph
-      .format
-      .office_recovered_line_height_without_settings_part
-    && matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
-    && !paragraph.format.line_height_set
-    && !(paragraph.format.snap_to_grid.unwrap_or(true)
-      && doc_grid_line_pitch_for_segment(
-        flow.setup,
-        flow.text_segmentation,
-        paragraph.format.wordprocessing_shape_story,
-      )
-      .is_some());
+  let recovered_word_cjk_numbering = recovered_word_cjk_numbering_owns_metrics(paragraph, flow);
   if !recovered_word_cjk_numbering {
     return resolved_height;
   }
@@ -1163,6 +1151,64 @@ fn include_numbering_label_height(
       })
   };
   resolved_height.max(numbering_height)
+}
+
+fn recovered_word_cjk_numbering_owns_metrics(
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+) -> bool {
+  flow.compatibility_mode < 15
+    && flow.text_segmentation == TextSegmentation::Body
+    && !paragraph.format.wordprocessing_shape_story
+    && paragraph_has_chinese_east_asia_language(paragraph)
+    && paragraph.format.office_recovered_line_height
+    && paragraph
+      .format
+      .office_recovered_line_height_without_settings_part
+    && matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    && !paragraph.format.line_height_set
+    && !(paragraph.format.snap_to_grid.unwrap_or(true)
+      && doc_grid_line_pitch_for_segment(
+        flow.setup,
+        flow.text_segmentation,
+        paragraph.format.wordprocessing_shape_story,
+      )
+      .is_some())
+}
+
+fn inherited_numbering_label_uses_body_auto_line_box(
+  paragraph: &crate::docx::Paragraph,
+  visible_label: &str,
+  flow: FlowContext,
+  text_frame: TextFrame,
+) -> bool {
+  if !matches!(text_frame.line_height_rule, LineHeightRule::Auto)
+    || paragraph.format.numbering_level_font_size_set
+    || recovered_word_cjk_numbering_owns_metrics(paragraph, flow)
+    || visible_label != "o"
+    || ![
+      paragraph.list_label_style.font_family.as_deref(),
+      paragraph.list_label_style.high_ansi_font_family.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .any(|family| family.eq_ignore_ascii_case("Courier New"))
+  {
+    return false;
+  }
+
+  let body_style = paragraph_base_line_style(paragraph);
+  let body_size_pt = effective_font_size_pt(&body_style, None);
+  let label_size_pt = effective_font_size_pt(&paragraph.list_label_style, None);
+
+  // Word's built-in hollow-circle level is encoded as Courier New "o". Fixed
+  // output keeps that inherited-size number portion on the body's automatic
+  // line box even though Courier New has taller vertical metrics. This is
+  // visible in bullet-simple.docx: its labels share the Times New Roman
+  // baseline while every following line still advances by the body's 13.8pt.
+  // Writer's SwNumberPortion and other label shapes/fonts are opposite
+  // controls, so keep their independent font boxes.
+  label_size_pt <= body_size_pt + LAYOUT_EPSILON_PT
 }
 
 fn numbering_label_origin_pt(
@@ -12326,16 +12372,26 @@ fn floating_frame_width(
     return available_width;
   }
   // ECMA-376 Part 1 §17.3.1.11 defines an omitted w as the maximum
-  // content-line width. Writer imports the same state as a zero-width
-  // SizeType::MIN frame, allowing its fly to grow around the content, but
-  // the containing print area still constrains that minimum-size frame.
-  frame
+  // content-line width. Word shrink-wraps a default-aligned visible line even
+  // below the default font size: bullet-simple.docx aligns its one-digit PAGE
+  // frame to the right margin with a 6pt frame width. A right-justified
+  // paragraph is the opposite Office control (NumberedList.docx,
+  // tdf103976.docx, and testTcBorders.docx): its zero-width SizeType::MIN
+  // frame retains the default-font minimum. Ink-empty frames need the same
+  // nonzero layout width.
+  let content_width = frame
     .blocks
     .iter()
     .map(|block| block_content_width_range(block, available_width, text_metrics).maximum_pt)
-    .fold(0.0_f32, f32::max)
-    .max(DEFAULT_FONT_SIZE_PT)
-    .min(available_width)
+    .fold(0.0_f32, f32::max);
+  let preserves_minimum_width = frame.blocks.iter().any(|block| {
+    matches!(block, Block::Paragraph(paragraph) if paragraph.format.alignment == ParagraphAlignment::Right)
+  });
+  if content_width <= LAYOUT_EPSILON_PT || preserves_minimum_width {
+    DEFAULT_FONT_SIZE_PT.min(available_width)
+  } else {
+    content_width.min(available_width)
+  }
 }
 
 fn block_has_width_filling_paragraph_decoration(block: &Block) -> bool {
@@ -28898,7 +28954,12 @@ impl<'a> TextFrameLayout<'a> {
         x_pt: label_x,
         y_pt: y,
         line_height_pt: text_frame.text_baseline_line_height(line_height),
-        line_metrics_participant: true,
+        line_metrics_participant: !inherited_numbering_label_uses_body_auto_line_box(
+          paragraph,
+          visible_label,
+          flow,
+          text_frame,
+        ),
         wordprocessing_effect_host: None,
         text: visible_label.to_string(),
         style: list_label_style.clone(),
@@ -41244,6 +41305,35 @@ mod tests {
       floating_frame_width(&frame, flow, &mut text_metrics),
       flow.content_width
     );
+
+    {
+      let Block::Paragraph(paragraph) = &mut frame.blocks[0] else {
+        unreachable!("test frame contains one paragraph");
+      };
+      paragraph.format.borders.top = None;
+      let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+        unreachable!("test paragraph contains one text run");
+      };
+      run.text = "1".to_string();
+      paragraph.runs[0].text = "1".to_string();
+    }
+    let digit_width = text_metrics.measure_text("1", &style);
+    assert!(digit_width < DEFAULT_FONT_SIZE_PT);
+    assert!(
+      (floating_frame_width(&frame, flow, &mut text_metrics) - digit_width).abs() < 0.001,
+      "an omitted frame width shrink-wraps one short content line",
+    );
+    {
+      let Block::Paragraph(paragraph) = &mut frame.blocks[0] else {
+        unreachable!("test frame contains one paragraph");
+      };
+      paragraph.format.alignment = ParagraphAlignment::Right;
+    }
+    assert_eq!(
+      floating_frame_width(&frame, flow, &mut text_metrics),
+      DEFAULT_FONT_SIZE_PT,
+      "a right-justified short line retains the minimum automatic frame width",
+    );
   }
 
   #[test]
@@ -43106,6 +43196,24 @@ mod tests {
       do_not_expand_shift_return: false,
       repeating_slots: RepeatingSlotState::default(),
     });
+    assert!(
+      !inherited_numbering_label_uses_body_auto_line_box(&paragraph, "•", flow, frame),
+      "a larger numbering label keeps its independent line metrics",
+    );
+    let mut inherited_size = paragraph.clone();
+    inherited_size.list_label_style.font_size_pt = inherited_size.base_style.font_size_pt;
+    inherited_size.list_label_style.font_family = Some(Arc::from("Courier New"));
+    assert!(inherited_numbering_label_uses_body_auto_line_box(
+      &inherited_size,
+      "o",
+      flow,
+      frame,
+    ));
+    inherited_size.format.numbering_level_font_size_set = true;
+    assert!(
+      !inherited_numbering_label_uses_body_auto_line_box(&inherited_size, "o", flow, frame),
+      "an explicitly sized numbering level remains an independent line portion",
+    );
 
     let mut line_text_extents = WordLineTextExtents::default();
     let height = include_numbering_label_height(

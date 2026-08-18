@@ -40,6 +40,7 @@ struct RasterExportOptions {
   use_lossless_compression: bool,
   jpeg_quality: Option<u8>,
   max_size_px: Option<(u32, u32)>,
+  allow_interpolation: bool,
 }
 
 impl RasterExportOptions {
@@ -59,6 +60,13 @@ impl RasterExportOptions {
       use_lossless_compression: options.images.use_lossless_compression,
       jpeg_quality: options.effective_jpeg_quality(),
       max_size_px,
+      // ISO 19005 forbids the image Interpolate key with a true value.
+      // Preserve Office's ordinary-PDF smoothing policy, but force the
+      // explicitly false archival form for every PDF/A profile.
+      allow_interpolation: !options
+        .standards
+        .iter()
+        .any(|standard| standard.is_archival()),
     }
   }
 }
@@ -164,7 +172,8 @@ fn decode_image(
           export_options,
         )
       }
-      "image/jpeg" => Image::from_jpeg(raster.data.into(), true).map_err(PdfError::Krilla),
+      "image/jpeg" => Image::from_jpeg(raster.data.into(), export_options.allow_interpolation)
+        .map_err(PdfError::Krilla),
       "image/png" => {
         let image = decode_png_relaxed(&raster.data)
           .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF PNG: {err}")))?;
@@ -199,7 +208,7 @@ fn decode_image(
       return export_decoded_image(decode_dynamic_image(data, format)?, format, export_options);
     }
     if format == RasterImageFormat::Jpeg
-      && let Ok(image) = Image::from_jpeg(data.to_vec().into(), true)
+      && let Ok(image) = Image::from_jpeg(data.to_vec().into(), export_options.allow_interpolation)
     {
       // Krilla reads and embeds the JPEG's native ICC profile while keeping
       // the compressed image stream intact.
@@ -222,12 +231,12 @@ fn decode_image(
   export_decoded_image(raster, format, export_options)
 }
 
-fn raster_interpolation(format: RasterImageFormat) -> bool {
+fn raster_interpolation(format: RasterImageFormat, export_options: RasterExportOptions) -> bool {
   // Word's fixed-format output marks photographic JPEG XObjects for smooth
   // interpolation while leaving lossless pixel graphics such as PNG
   // placeholders un-interpolated. Make that choice explicit instead of
   // inheriting one blanket backend default for every raster format.
-  format == RasterImageFormat::Jpeg
+  format == RasterImageFormat::Jpeg && export_options.allow_interpolation
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -287,7 +296,7 @@ fn export_decoded_image(
     resized = true;
   }
 
-  let mut interpolate = raster_interpolation(format);
+  let mut interpolate = raster_interpolation(format, export_options);
   if format == RasterImageFormat::Jpeg
     && !export_options.use_lossless_compression
     && (resized || export_options.jpeg_quality.is_some())
@@ -296,8 +305,12 @@ fn export_decoded_image(
     let (width, height) = raster.image.dimensions();
     let lossless_color_bytes = u64::from(width) * u64::from(height) * 3;
     if (jpeg.len() as u64) < lossless_color_bytes {
-      return Image::from_jpeg_with_icc(jpeg.into(), raster.icc_profile.map(Into::into), true)
-        .map_err(PdfError::Krilla);
+      return Image::from_jpeg_with_icc(
+        jpeg.into(),
+        raster.icc_profile.map(Into::into),
+        export_options.allow_interpolation,
+      )
+      .map_err(PdfError::Krilla);
     }
 
     // Word fixed output does not pay the JPEG header/DCT overhead for tiny
@@ -329,7 +342,7 @@ fn export_wordprocessing_static_3d_image(
   if export_options.use_lossless_compression {
     return Image::from_custom(
       PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile),
-      true,
+      export_options.allow_interpolation,
     )
     .map_err(PdfError::Krilla);
   }
@@ -348,7 +361,7 @@ fn export_wordprocessing_static_3d_image(
   let rgb = remove_black_matte(compressed_rgb, &rgba);
   Image::from_custom(
     PdfRasterImage::from_rgb_with_alpha(rgb, &rgba, raster.icc_profile),
-    true,
+    export_options.allow_interpolation,
   )
   .map_err(PdfError::Krilla)
 }
@@ -707,6 +720,19 @@ impl CustomImage for PdfRasterImage {
 mod tests {
   use super::*;
   use image::codecs::jpeg::JpegEncoder as ImageJpegEncoder;
+
+  #[test]
+  fn archival_raster_options_disable_pdf_image_interpolation() {
+    let ordinary = RasterExportOptions::new(&PdfOptions::default(), 72.0, 72.0);
+    assert!(ordinary.allow_interpolation);
+    assert!(raster_interpolation(RasterImageFormat::Jpeg, ordinary));
+
+    let mut archival = PdfOptions::default();
+    archival.standards.push(crate::options::PdfStandard::PdfA3a);
+    let archival = RasterExportOptions::new(&archival, 72.0, 72.0);
+    assert!(!archival.allow_interpolation);
+    assert!(!raster_interpolation(RasterImageFormat::Jpeg, archival));
+  }
 
   #[test]
   fn custom_raster_preserves_icc_profile() {

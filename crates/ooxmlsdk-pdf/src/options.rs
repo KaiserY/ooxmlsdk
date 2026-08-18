@@ -578,7 +578,7 @@ impl PdfStandard {
     )
   }
 
-  const fn is_archival(self) -> bool {
+  pub(crate) const fn is_archival(self) -> bool {
     !self.is_version() && !matches!(self, Self::PdfUa1)
   }
 

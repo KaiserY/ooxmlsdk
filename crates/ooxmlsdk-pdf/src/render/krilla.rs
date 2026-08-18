@@ -243,6 +243,14 @@ fn render_inner(
   options: &PdfOptions,
   observation: RenderObservation,
 ) -> Result<RenderOutput> {
+  // Krilla validates PDF/UA before returning bytes.  A package without an
+  // authored title still needs a stable document title, both for metadata and
+  // for the whole-document outline entry used when the source has no headings
+  // or bookmarks.  Keep this render-only derivation out of option resolution:
+  // callers can still distinguish an explicit metadata override from a title
+  // derived from the input identity.
+  let options = pdf_ua_render_options(document, options)?;
+  let options = options.as_ref();
   debug_assert!(
     document
       .follows
@@ -553,14 +561,26 @@ fn render_inner(
     }
   }
 
-  if options.general.export_bookmarks
-    && let Some(outline) = pdf_outline_for_entries(
+  if options.general.export_bookmarks || options.general.pdf_ua_compliance {
+    let outline = pdf_outline_for_entries(
       &document.outline_entries,
       options.general.open_bookmark_levels,
       &page_selection,
     )
-  {
-    pdf.set_outline(outline);
+    .or_else(|| {
+      if options.general.pdf_ua_compliance {
+        options
+          .metadata
+          .title
+          .as_deref()
+          .map(pdf_ua_document_outline)
+      } else {
+        None
+      }
+    });
+    if let Some(outline) = outline {
+      pdf.set_outline(outline);
+    }
   }
   if tagging_enabled {
     pdf.set_tag_tree(tag_tree);
@@ -4713,6 +4733,54 @@ fn pdf_outline_for_entries(
   Some(outline)
 }
 
+fn pdf_ua_render_options<'a>(
+  document: &common::LayoutDocument<'static>,
+  options: &'a PdfOptions,
+) -> Result<Cow<'a, PdfOptions>> {
+  if !options.general.pdf_ua_compliance {
+    return Ok(Cow::Borrowed(options));
+  }
+  if options
+    .metadata
+    .title
+    .as_deref()
+    .is_some_and(|title| !title.trim().is_empty())
+  {
+    return Ok(Cow::Borrowed(options));
+  }
+
+  let title = options
+    .source_file_name
+    .as_deref()
+    .map(str::trim)
+    .filter(|title| !title.is_empty())
+    .or_else(|| {
+      document
+        .outline_entries
+        .iter()
+        .map(|entry| entry.text.trim())
+        .find(|title| !title.is_empty())
+    })
+    .ok_or_else(|| {
+      PdfError::Options(
+        "PDF/UA requires a non-empty metadata title, source file name, or outline title"
+          .to_string(),
+      )
+    })?;
+  let mut effective = options.clone();
+  effective.metadata.title = Some(title.to_string());
+  Ok(Cow::Owned(effective))
+}
+
+fn pdf_ua_document_outline(title: &str) -> Outline {
+  let mut outline = Outline::new();
+  outline.push_child(OutlineNode::new(
+    title.to_string(),
+    XyzDestination::new(0, Point::from_xy(0.0, 0.0)),
+  ));
+  outline
+}
+
 fn pdf_outline_node(
   entries: &[common::OutlineEntry<'static>],
   index: &mut usize,
@@ -8327,7 +8395,10 @@ mod tests {
     text_stroke_with_fill, text_style_from_common, visually_ordered_text_portion_ranges,
     word_small_caps_semantic_text, word_unsigned_signature_line_items, writer_item_line_metrics,
   };
-  use crate::options::{PdfAttachment, PdfAttachmentAssociation, PdfLinkDefaultAction, PdfOptions};
+  use crate::options::{
+    PdfAttachment, PdfAttachmentAssociation, PdfDocumentKind, PdfLinkDefaultAction, PdfOptions,
+    PdfStandard,
+  };
   use krilla::Document;
   use krilla::geom::Size;
   use krilla::page::PageSettings;
@@ -9154,6 +9225,109 @@ mod tests {
     let bytes = render(&document, &options).unwrap();
 
     assert!(bytes.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn pdf_ua_without_authored_outline_emits_a_navigable_document_entry() {
+    let mut document = tagged_test_document();
+    document.outline_entries.clear();
+    let mut options = PdfOptions::default();
+    options.standards.push(PdfStandard::PdfUa1);
+    options.default_document_language = Some("en-US".to_string());
+    options.source_file_name = Some("input.docx".to_string());
+    options.metadata.title = Some("Configured PDF/UA title".to_string());
+    let options = crate::resolve_pdf_options(PdfDocumentKind::Docx, &options)
+      .unwrap()
+      .into_effective();
+
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let pages = pdf.get_pages();
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let catalog = pdf.get_dictionary(catalog_id).unwrap();
+    let outlines = resolved_dictionary(&pdf, catalog.get(b"Outlines").unwrap());
+    let first = resolved_dictionary(&pdf, outlines.get(b"First").unwrap());
+    assert_eq!(
+      pdf_info_text(first.get(b"Title").unwrap()),
+      "Configured PDF/UA title"
+    );
+    let destination = match first.get(b"Dest").unwrap() {
+      lopdf::Object::Reference(id) => pdf.get_object(*id).unwrap(),
+      destination => destination,
+    };
+    assert_eq!(
+      destination.as_array().unwrap()[0].as_reference().unwrap(),
+      pages[&1]
+    );
+    let preferences = resolved_dictionary(&pdf, catalog.get(b"ViewerPreferences").unwrap());
+    assert!(
+      preferences
+        .get(b"DisplayDocTitle")
+        .unwrap()
+        .as_bool()
+        .unwrap()
+    );
+  }
+
+  #[test]
+  fn pdf_ua_uses_source_file_name_when_metadata_and_outline_have_no_title() {
+    let mut document = tagged_test_document();
+    document.outline_entries.clear();
+    let mut options = PdfOptions::default();
+    options.standards.push(PdfStandard::PdfUa1);
+    options.default_document_language = Some("en-US".to_string());
+    options.source_file_name = Some("fallback.docx".to_string());
+    let options = crate::resolve_pdf_options(PdfDocumentKind::Docx, &options)
+      .unwrap()
+      .into_effective();
+
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let info_id = pdf.trailer.get(b"Info").unwrap().as_reference().unwrap();
+    let info = pdf.get_dictionary(info_id).unwrap();
+    assert_eq!(pdf_info_text(info.get(b"Title").unwrap()), "fallback.docx");
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let catalog = pdf.get_dictionary(catalog_id).unwrap();
+    let outlines = resolved_dictionary(&pdf, catalog.get(b"Outlines").unwrap());
+    let first = resolved_dictionary(&pdf, outlines.get(b"First").unwrap());
+    assert_eq!(pdf_info_text(first.get(b"Title").unwrap()), "fallback.docx");
+  }
+
+  #[test]
+  fn pdf_ua_without_a_document_identity_returns_an_options_error() {
+    let mut document = tagged_test_document();
+    document.outline_entries.clear();
+    let mut options = PdfOptions::default();
+    options.standards.push(PdfStandard::PdfUa1);
+    options.default_document_language = Some("en-US".to_string());
+    let options = crate::resolve_pdf_options(PdfDocumentKind::Docx, &options)
+      .unwrap()
+      .into_effective();
+
+    assert!(matches!(
+      render(&document, &options),
+      Err(crate::PdfError::Options(message)) if message.contains("non-empty metadata title")
+    ));
+  }
+
+  #[test]
+  fn ordinary_pdf_does_not_invent_an_outline() {
+    let mut document = tagged_test_document();
+    document.outline_entries.clear();
+    let mut options = PdfOptions::default();
+    options.general.export_bookmarks = true;
+    options.metadata.title = Some("Ordinary PDF".to_string());
+
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let catalog_id = pdf.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    assert!(
+      pdf
+        .get_dictionary(catalog_id)
+        .unwrap()
+        .get(b"Outlines")
+        .is_err()
+    );
   }
 
   #[test]

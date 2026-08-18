@@ -191,6 +191,7 @@ fn paragraph_model_with_base_impl<'a>(
     .outline_level;
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
+  format.additive_paragraph_spacing = styles.import_settings.fixed_html_paragraph_auto_spacing;
   // The Word-compatible proportional-gap path is driven by the paragraph's
   // directly authored line spacing. A line value inherited from a style still
   // determines total line height, but does not move the first-line baseline.

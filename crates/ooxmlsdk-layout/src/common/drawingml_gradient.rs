@@ -100,21 +100,20 @@ fn drawingml_relative_rect(
 /// ISO/IEC 29500-1 §20.1.8.31 defines `fillToRect` as a rectangle whose
 /// edges are offsets from the corresponding shape edges. Office-authored
 /// content can place the nominal left edge to the right of the nominal right
-/// edge (the equivalent VML uses a negative `focussize`). A rectangle is
-/// orientation-independent, so retain its covered region while putting the
-/// edges back into the monotonic form used by the path-gradient sampler.
+/// edge. The equivalent VML represents that case with a negative `focussize`;
+/// its fixed-output behavior clamps the negative extent to zero at the
+/// authored `focusposition`. Preserve valid outsets, but collapse an inverted
+/// axis at its leading edge instead of reflecting it across that edge.
 pub(crate) fn normalize_focus_rect(rect: RelativeRect) -> RelativeRect {
   let authored_left = rect.left;
   let authored_top = rect.top;
   let authored_right = 1.0 - rect.right;
   let authored_bottom = 1.0 - rect.bottom;
-  let left = authored_left.min(authored_right);
-  let top = authored_top.min(authored_bottom);
-  let right = authored_left.max(authored_right);
-  let bottom = authored_top.max(authored_bottom);
+  let right = authored_right.max(authored_left);
+  let bottom = authored_bottom.max(authored_top);
   RelativeRect {
-    left,
-    top,
+    left: authored_left,
+    top: authored_top,
     right: 1.0 - right,
     bottom: 1.0 - bottom,
   }
@@ -457,7 +456,7 @@ mod tests {
   }
 
   #[test]
-  fn inverted_authored_edges_keep_the_same_geometric_focus_rectangle() {
+  fn inverted_authored_edges_collapse_at_the_vml_focus_position() {
     let source = a::GradientFill::default();
     let path = a::PathGradientFill {
       path: Some(a::PathShadeValues::Circle),
@@ -474,7 +473,7 @@ mod tests {
     assert_eq!(
       resolved.fill_to,
       RelativeRect {
-        left: 0.0,
+        left: 0.2,
         top: 0.5,
         right: 0.8,
         bottom: 0.5,

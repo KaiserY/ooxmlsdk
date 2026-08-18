@@ -546,6 +546,11 @@ pub(crate) struct ParagraphFormat {
   pub spacing_after_auto_pt: Option<f32>,
   pub spacing_before_set: bool,
   pub spacing_after_set: bool,
+  /// `w:doNotUseHTMLParagraphAutoSpacing` selects Word's historical
+  /// non-HTML paragraph-spacing model. Adjacent ordinary margins add instead
+  /// of collapsing to their maximum; keep the document setting on each
+  /// imported paragraph so nested stories use the same rule during layout.
+  pub additive_paragraph_spacing: bool,
   /// Word repaired an undefined built-in heading through its application
   /// heading-base parent. The recovered upper spacing is real style state,
   /// but Word suppresses that application-supplied value on the first body

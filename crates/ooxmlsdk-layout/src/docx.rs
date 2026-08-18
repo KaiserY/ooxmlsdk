@@ -6342,6 +6342,7 @@ fn border_style(
     compound: border_value_is_compound(value),
     dash_pattern: border_value_dash_pattern(value),
     shadow: shadow.is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool),
+    inset_or_outset: matches!(value, w::BorderValues::Inset | w::BorderValues::Outset),
   })
 }
 
@@ -11138,7 +11139,18 @@ fn symbol_transport_char(
   let code = u32::from_str_radix(symbol.char.as_deref()?, 16).ok()?;
   let font = symbol.font.as_deref().unwrap_or("");
   let mapped = shared_symbol::font_symbol_code(symbol.font.as_deref(), code)?;
-  if font.eq_ignore_ascii_case("Symbol") && code & 0xFF == 0x94 {
+  let low_byte = code & 0xFF;
+  if (font.eq_ignore_ascii_case("UniversalMath1 BT") && low_byte == 0x81)
+    || (font.eq_ignore_ascii_case("Symbol") && low_byte == 0x7F)
+  {
+    // This producer pair appears at proof ends in the Open XML SDK equation
+    // corpus. Neither declared cmap contains the selector, while Word's fixed
+    // output paints the same hollow square for both and normalizes Symbol 7F
+    // to the UniversalMath F081 legacy ToUnicode value. Expose that visible
+    // character as standard U+25A1 and let the inherited Unicode face paint
+    // it, rather than treating a .notdef box as the intended glyph.
+    Some(('□', false))
+  } else if font.eq_ignore_ascii_case("Symbol") && low_byte == 0x94 {
     // Microsoft's Symbol cmap has no F094 entry. This producer-specific
     // legacy value is the existing opposite-state counterexample: paint the
     // Unicode black square with the inherited text fallback instead.
@@ -17299,6 +17311,7 @@ fn drawingml_picture_frame(
     compound: false,
     dash_pattern: BorderDashPattern::Solid,
     shadow: false,
+    inset_or_outset: false,
   });
   let mut geometry = properties
     .geometry_kind()
@@ -18434,6 +18447,7 @@ fn drawingml_border_style_from_common_stroke(stroke: &common::Stroke<'_>) -> Bor
     compound: false,
     dash_pattern: BorderDashPattern::Solid,
     shadow: false,
+    inset_or_outset: false,
   }
 }
 
@@ -20062,6 +20076,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<I
       compound: false,
       dash_pattern: BorderDashPattern::Solid,
       shadow: false,
+      inset_or_outset: false,
     })
   } else {
     None
@@ -20200,6 +20215,7 @@ fn vml_inline_shape(
       compound: false,
       dash_pattern: BorderDashPattern::Solid,
       shadow: false,
+      inset_or_outset: false,
     });
   if fill_color.is_none() && fill_image.is_none() && stroke.is_none() {
     return None;
@@ -20217,14 +20233,30 @@ fn vml_inline_shape(
 }
 
 fn vml_inline_group_frame(group: &v::Group) -> Option<InlineShape> {
-  if vml_group_has_explicit_floating_position(group.style.as_deref()) {
-    return None;
-  }
+  let explicitly_floating = vml_group_has_explicit_floating_position(group.style.as_deref());
   let mut frame = vml_shape_frame(
     group.style.as_deref(),
     vml_allow_in_cell(group.allow_in_cell),
     InlineShapeGeometry::Rectangle,
   )?;
+  if explicitly_floating {
+    let (wrap_type, wrap_side) = group
+      .group_choice
+      .iter()
+      .find_map(|choice| match choice {
+        v::GroupChoice::TextWrap(wrap) => Some((wrap.r#type, wrap.side)),
+        _ => None,
+      })
+      .unwrap_or_default();
+    if let ImagePlacement::Floating(placement) = &mut frame.placement {
+      apply_vml_wrap_properties(placement, wrap_type, wrap_side);
+    }
+    // A VML drawing canvas is one positioned object for line wrapping even
+    // though its children are flattened for paint. Keep an unpainted frame so
+    // a group-level w10:wrap (tdf#137314) advances following text by the
+    // authored canvas extent instead of leaving it at the anchor line.
+    return Some(frame);
+  }
   // mso-position-*-relative selects the coordinate system used by the
   // group's positioned children. Without an authored absolute position,
   // those declarations do not remove the root group box from line flow.
@@ -23076,7 +23108,15 @@ fn apply_vml_model_wrap(
   let ImagePlacement::Floating(placement) = &mut shape.placement else {
     return;
   };
-  if let Some(wrap_type) = model.wrap_type {
+  apply_vml_wrap_properties(placement, model.wrap_type, model.wrap_side);
+}
+
+fn apply_vml_wrap_properties(
+  placement: &mut FloatingImagePlacement,
+  wrap_type: Option<w10::WrapValues>,
+  wrap_side: Option<w10::WrapSideValues>,
+) {
+  if let Some(wrap_type) = wrap_type {
     placement.wrap = match wrap_type {
       w10::WrapValues::TopAndBottom => ImageWrapMode::TopBottom,
       w10::WrapValues::None => ImageWrapMode::Through,
@@ -23084,7 +23124,7 @@ fn apply_vml_model_wrap(
       w10::WrapValues::Tight | w10::WrapValues::Through => ImageWrapMode::Tight,
     };
   }
-  if let Some(side) = model.wrap_side {
+  if let Some(side) = wrap_side {
     placement.wrap_side = match side {
       w10::WrapSideValues::Both => ImageWrapSide::BothSides,
       w10::WrapSideValues::Left => ImageWrapSide::Left,
@@ -33047,10 +33087,19 @@ mod tests {
 
     let floating = v::Group::from_bytes(
       br#"<v:group xmlns:v="urn:schemas-microsoft-com:vml"
-          style="position:absolute;left:12pt;top:18pt;width:100pt;height:50pt"/>"#,
+          xmlns:w10="urn:schemas-microsoft-com:office:word"
+          style="position:absolute;left:12pt;top:18pt;width:100pt;height:50pt">
+        <w10:wrap type="topAndBottom"/>
+      </v:group>"#,
     )
     .expect("floating VML group");
-    assert!(vml_inline_group_frame(&floating).is_none());
+    let frame = vml_inline_group_frame(&floating).expect("floating group wrap frame");
+    let ImagePlacement::Floating(placement) = frame.placement else {
+      panic!("an explicitly positioned group must keep a floating wrap frame");
+    };
+    assert_eq!(placement.wrap, ImageWrapMode::TopBottom);
+    assert!((frame.width_pt - 100.0).abs() < 0.001);
+    assert!((frame.height_pt - 50.0).abs() < 0.001);
   }
 
   #[test]
@@ -36795,7 +36844,15 @@ mod tests {
         }),
         w::RunChoice::SymbolChar(w::SymbolChar {
           font: Some("UniversalMath1 BT".into()),
+          char: Some("F024".into()),
+        }),
+        w::RunChoice::SymbolChar(w::SymbolChar {
+          font: Some("UniversalMath1 BT".into()),
           char: Some("0081".into()),
+        }),
+        w::RunChoice::SymbolChar(w::SymbolChar {
+          font: Some("Symbol".into()),
+          char: Some("F07F".into()),
         }),
         w::RunChoice::SymbolChar(w::SymbolChar {
           font: Some("Symbol".into()),
@@ -36830,7 +36887,10 @@ mod tests {
       None,
     );
 
-    assert_eq!(inline_text(&inlines), "\u{f0b7}\u{f0fc}\u{f04c}\u{f081}■©");
+    assert_eq!(
+      inline_text(&inlines),
+      "\u{f0b7}\u{f0fc}\u{f04c}\u{f024}□□■©"
+    );
     let runs = inlines
       .iter()
       .filter_map(|inline| match inline {
@@ -36838,7 +36898,7 @@ mod tests {
         _ => None,
       })
       .collect::<Vec<_>>();
-    assert_eq!(runs.len(), 6);
+    assert_eq!(runs.len(), 8);
 
     let symbol = &runs[0].style;
     assert_eq!(symbol.font_family.as_deref(), Some("Symbol"));
@@ -36851,7 +36911,7 @@ mod tests {
     assert!(!symbol.wordprocessingml_font_slots);
 
     let alternate = &runs[3].style;
-    assert_eq!(runs[3].text, "\u{f081}");
+    assert_eq!(runs[3].text, "\u{f024}");
     assert_eq!(alternate.font_family.as_deref(), Some("UniversalMath1 BT"));
     assert_eq!(
       alternate.high_ansi_font_family.as_deref(),
@@ -36874,16 +36934,24 @@ mod tests {
     assert!(alternate.explicit_symbol_character);
     assert!(!alternate.wordprocessingml_font_slots);
 
+    for square in [&runs[4], &runs[5]] {
+      assert_eq!(square.text, "□");
+      assert_eq!(square.style.font_family.as_deref(), Some("Times New Roman"));
+      assert_eq!(square.style.symbol_font_family, None);
+      assert!(!square.style.explicit_symbol_character);
+      assert!(square.style.wordprocessingml_font_slots);
+    }
+
     // Microsoft's Symbol cmap lacks F094, so this one established legacy
     // code remains the opposite state and uses the inherited Unicode face.
-    assert_eq!(runs[4].text, "■");
+    assert_eq!(runs[6].text, "■");
     assert_eq!(
-      runs[4].style.font_family.as_deref(),
+      runs[6].style.font_family.as_deref(),
       Some("Times New Roman")
     );
-    assert_eq!(runs[4].style.symbol_font_family, None);
-    assert!(!runs[4].style.explicit_symbol_character);
-    assert!(runs[4].style.wordprocessingml_font_slots);
+    assert_eq!(runs[6].style.symbol_font_family, None);
+    assert!(!runs[6].style.explicit_symbol_character);
+    assert!(runs[6].style.wordprocessingml_font_slots);
   }
 
   #[test]

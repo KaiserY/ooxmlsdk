@@ -1591,8 +1591,18 @@ pub(crate) fn vml_shape_common_fill(
     angle_degrees,
     interpolation: if matches!(
       shape.fill_method,
-      Some(vml::FillMethodValues::Sigma | vml::FillMethodValues::Linearsigma)
+      Some(
+        vml::FillMethodValues::Any
+          | vml::FillMethodValues::Sigma
+          | vml::FillMethodValues::Linearsigma
+      )
     ) {
+      // MS-OI29500 says Office resolves ST_FillMethod's explicit `any`
+      // application-default value to linear sigma. The attribute itself is
+      // optional and has no schema default, so absence is not equivalent to
+      // `any`: Office z-order and Normalize fixtures with an omitted method
+      // retain linear stop interpolation. Explicit sigma variants use the
+      // calibrated fixed-output curve; explicit linear/none remain linear.
       common::GradientInterpolation::PowerPointGammaSigma
     } else {
       common::GradientInterpolation::LinearSrgb
@@ -10990,6 +11000,55 @@ mod drawing_page_tests {
       })
     );
     assert_eq!(stroke.dash.as_ref().map(Vec::len), Some(4));
+  }
+
+  #[test]
+  fn vml_gradient_distinguishes_absent_method_from_explicit_application_default() {
+    let mut shape = super::super::object_resources::VmlShapeModel {
+      fill_color: Some("#FE8637".into()),
+      fill_color2: Some("#FEB686".into()),
+      fill_type: Some(vml::FillTypeValues::Gradient),
+      ..Default::default()
+    };
+
+    let common::Fill::Gradient(default_fill) = vml_shape_common_fill(&shape, Affine::IDENTITY)
+    else {
+      panic!("expected gradient");
+    };
+    assert_eq!(
+      default_fill.interpolation,
+      common::GradientInterpolation::LinearSrgb
+    );
+
+    shape.fill_method = Some(vml::FillMethodValues::Any);
+    let common::Fill::Gradient(application_default) =
+      vml_shape_common_fill(&shape, Affine::IDENTITY)
+    else {
+      panic!("expected gradient");
+    };
+    assert_eq!(
+      application_default.interpolation,
+      common::GradientInterpolation::PowerPointGammaSigma
+    );
+
+    shape.fill_method = Some(vml::FillMethodValues::Sigma);
+    let common::Fill::Gradient(sigma) = vml_shape_common_fill(&shape, Affine::IDENTITY) else {
+      panic!("expected gradient");
+    };
+    assert_eq!(
+      sigma.interpolation,
+      common::GradientInterpolation::PowerPointGammaSigma
+    );
+
+    shape.fill_method = Some(vml::FillMethodValues::Linear);
+    let common::Fill::Gradient(explicit_linear) = vml_shape_common_fill(&shape, Affine::IDENTITY)
+    else {
+      panic!("expected gradient");
+    };
+    assert_eq!(
+      explicit_linear.interpolation,
+      common::GradientInterpolation::LinearSrgb
+    );
   }
 
   #[test]

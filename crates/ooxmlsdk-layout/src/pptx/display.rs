@@ -14399,6 +14399,7 @@ fn line_stroke(
       compound: false,
       dash_pattern: crate::model::BorderDashPattern::Solid,
       shadow: false,
+      inset_or_outset: false,
     },
     opacity: paint.opacity,
     common,

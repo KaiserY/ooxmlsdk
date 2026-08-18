@@ -11179,21 +11179,27 @@ fn estimated_paragraph_content_extents(
           {
             continue;
           }
-          let (group_scale_x, group_scale_y) = floating_group_scale(placement, flow);
-          let width =
-            relative_floating_width(placement, flow).unwrap_or(shape.width_pt * group_scale_x);
-          let height =
-            relative_floating_height(placement, flow).unwrap_or(shape.height_pt * group_scale_y);
-          let (_, shape_y) = floating_image_position(
+          let metrics = floating_shape_metrics(shape, placement, flow);
+          let (_, frame_y) = floating_image_position(
             placement,
             flow,
             text_frame.paragraph_indents(),
             x,
             content_height,
-            width,
-            height,
+            metrics.frame_width_pt,
+            metrics.frame_height_pt,
           );
-          floating_bottom = floating_bottom.max(shape_y + height + placement.margin_bottom_pt);
+          let shape_y = if metrics.uses_relative_effect_frame {
+            frame_y + metrics.content_offset_y_pt + shape.offset_y_pt * metrics.group_scale_y
+          } else {
+            adjusted_floating_shape_y(
+              placement,
+              shape,
+              frame_y + shape.offset_y_pt * metrics.group_scale_y,
+            )
+          };
+          floating_bottom =
+            floating_bottom.max(shape_y + metrics.content_height_pt + placement.margin_bottom_pt);
           continue;
         }
         let frame_width = inline_shape_frame_width(shape);
@@ -11523,6 +11529,27 @@ fn paragraph_spacing_before_after_previous(
   } else {
     paragraph_lower_space(previous)
   };
+  let additive_spacing =
+    previous.format.additive_paragraph_spacing || paragraph.format.additive_paragraph_spacing;
+  if additive_spacing {
+    // `w:doNotUseHTMLParagraphAutoSpacing` maps to Writer's PARA_SPACE_MAX.
+    // SwFlowFrame::CalcUpperSpace() then adds the previous lower and current
+    // upper margins instead of consolidating them with max(). The previous
+    // lower margin is already owned by paragraph_spacing_after(), so this
+    // side contributes the current upper margin in full. Two contextual
+    // paragraphs of the same style remain the source-backed exception.
+    if paragraph_styles_identical(previous, paragraph)
+      && previous.format.contextual_spacing
+      && paragraph.format.contextual_spacing
+    {
+      return 0.0;
+    }
+    return if same_numbering && paragraph.format.spacing_before_auto == Some(true) {
+      0.0
+    } else {
+      paragraph_upper_space(paragraph)
+    };
+  }
   if paragraph_styles_identical(previous, paragraph) {
     match (
       previous.format.contextual_spacing,
@@ -11631,11 +11658,15 @@ fn paragraph_spacing_after(
   if let Some(Block::Paragraph(next)) = next
     && paragraph_styles_identical(paragraph, next)
   {
+    let additive_spacing =
+      paragraph.format.additive_paragraph_spacing || next.format.additive_paragraph_spacing;
     match (
       paragraph.format.contextual_spacing,
       next.format.contextual_spacing,
     ) {
-      (true, true) | (true, false) => return 0.0,
+      (true, true) => return 0.0,
+      (true, false) if !additive_spacing => return 0.0,
+      (true, false) => {}
       (false, true) | (false, false) => {}
     }
   }
@@ -26471,48 +26502,39 @@ fn paragraph_initial_floating_image_wrap_exclusions(
           if !shape_uses_initial_line_wrap(shape, placement) {
             return None;
           }
-          let (group_scale_x, group_scale_y) = floating_group_scale(placement, flow);
-          let authored_width =
-            relative_floating_width(placement, flow).unwrap_or(shape.width_pt * group_scale_x);
-          let authored_height =
-            relative_floating_height(placement, flow).unwrap_or(shape.height_pt * group_scale_y);
-          let auto_fit_size = shape_text_box_auto_fit_size(
-            flow,
-            shape,
-            authored_width,
-            authored_height,
-            text_metrics,
-          );
-          let width = auto_fit_size
-            .map(|size| size.width_pt)
-            .unwrap_or(authored_width);
-          let height = auto_fit_size
-            .map(|size| size.height_pt)
-            .unwrap_or(authored_height);
+          let metrics = floating_shape_metrics_with_auto_fit(shape, placement, flow, text_metrics);
           let (frame_x, frame_y) = floating_image_position(
             placement,
             flow,
             text_frame.paragraph_indents(),
             text_frame.first_line_left,
             line_anchor_top,
-            width,
-            height,
+            metrics.frame_width_pt,
+            metrics.frame_height_pt,
           );
-          let shape_x = adjusted_floating_shape_x(
-            placement,
-            shape,
-            frame_x + shape.offset_x_pt * group_scale_x,
-          );
-          let shape_y = adjusted_floating_shape_y(
-            placement,
-            shape,
-            frame_y + shape.offset_y_pt * group_scale_y,
-          );
+          let shape_x = if metrics.uses_relative_effect_frame {
+            frame_x + metrics.content_offset_x_pt + shape.offset_x_pt * metrics.group_scale_x
+          } else {
+            adjusted_floating_shape_x(
+              placement,
+              shape,
+              frame_x + shape.offset_x_pt * metrics.group_scale_x,
+            )
+          };
+          let shape_y = if metrics.uses_relative_effect_frame {
+            frame_y + metrics.content_offset_y_pt + shape.offset_y_pt * metrics.group_scale_y
+          } else {
+            adjusted_floating_shape_y(
+              placement,
+              shape,
+              frame_y + shape.offset_y_pt * metrics.group_scale_y,
+            )
+          };
           Some(WrapExclusion {
             left_pt: shape_x - placement.margin_left_pt,
-            right_pt: shape_x + width + placement.margin_right_pt,
+            right_pt: shape_x + metrics.content_width_pt + placement.margin_right_pt,
             top_pt: shape_y - placement.margin_top_pt,
-            bottom_pt: shape_y + height + placement.margin_bottom_pt,
+            bottom_pt: shape_y + metrics.content_height_pt + placement.margin_bottom_pt,
             side: placement.wrap_side,
             blocks_flow: false,
             uses_contour: matches!(placement.wrap, ImageWrapMode::Tight),
@@ -26864,6 +26886,131 @@ fn relative_floating_height(placement: FloatingImagePlacement, flow: FlowContext
     return None;
   }
   Some((vertical_reference_height(reference, flow) * pct).max(0.0))
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FloatingShapeMetrics {
+  frame_width_pt: f32,
+  frame_height_pt: f32,
+  content_offset_x_pt: f32,
+  content_offset_y_pt: f32,
+  content_width_pt: f32,
+  content_height_pt: f32,
+  group_scale_x: f32,
+  group_scale_y: f32,
+  uses_relative_effect_frame: bool,
+}
+
+impl FloatingShapeMetrics {
+  fn with_content_size(mut self, width_pt: f32, height_pt: f32) -> Self {
+    self.frame_width_pt = (self.frame_width_pt - self.content_width_pt + width_pt).max(0.0);
+    self.frame_height_pt = (self.frame_height_pt - self.content_height_pt + height_pt).max(0.0);
+    self.content_width_pt = width_pt.max(0.0);
+    self.content_height_pt = height_pt.max(0.0);
+    self
+  }
+}
+
+fn floating_shape_metrics_for_sizes(
+  authored_width_pt: f32,
+  authored_height_pt: f32,
+  relative_frame_width_pt: Option<f32>,
+  relative_frame_height_pt: Option<f32>,
+  relative_size_includes_effect_extent: bool,
+  effect_extent_pt: [f32; 4],
+) -> FloatingShapeMetrics {
+  // ECMA-376 Part 1 §20.4.2.6 defines effectExtent as additional space on
+  // each edge of the drawing, while §20.4.2.17 explicitly makes those
+  // additions part of wrapSquare's virtual bounding rectangle. When
+  // wp14:sizeRelH/V supplies a positive size for that rectangle, Word applies
+  // the percentage to the outer effect frame: the painted wp:extent starts at
+  // l/t and occupies the remainder inside r/b. wrapNone has no wrapping
+  // rectangle and retains relative sizing of the visible shape itself
+  // (shape-left-padding-wrap-through-off-page.docx).
+  let uses_relative_effect_frame = relative_size_includes_effect_extent
+    && (relative_frame_width_pt.is_some() || relative_frame_height_pt.is_some());
+  let [
+    effect_left_pt,
+    effect_top_pt,
+    effect_right_pt,
+    effect_bottom_pt,
+  ] = effect_extent_pt;
+  let (effect_left_pt, effect_top_pt, effect_right_pt, effect_bottom_pt) =
+    if uses_relative_effect_frame {
+      (
+        effect_left_pt.max(0.0),
+        effect_top_pt.max(0.0),
+        effect_right_pt.max(0.0),
+        effect_bottom_pt.max(0.0),
+      )
+    } else {
+      (0.0, 0.0, 0.0, 0.0)
+    };
+  let content_width_pt = relative_frame_width_pt
+    .map(|width| (width - effect_left_pt - effect_right_pt).max(0.0))
+    .unwrap_or_else(|| authored_width_pt.max(0.0));
+  let content_height_pt = relative_frame_height_pt
+    .map(|height| (height - effect_top_pt - effect_bottom_pt).max(0.0))
+    .unwrap_or_else(|| authored_height_pt.max(0.0));
+
+  FloatingShapeMetrics {
+    frame_width_pt: relative_frame_width_pt
+      .unwrap_or(content_width_pt + effect_left_pt + effect_right_pt),
+    frame_height_pt: relative_frame_height_pt
+      .unwrap_or(content_height_pt + effect_top_pt + effect_bottom_pt),
+    content_offset_x_pt: effect_left_pt,
+    content_offset_y_pt: effect_top_pt,
+    content_width_pt,
+    content_height_pt,
+    group_scale_x: 1.0,
+    group_scale_y: 1.0,
+    uses_relative_effect_frame,
+  }
+}
+
+fn floating_shape_metrics(
+  shape: &InlineShape,
+  placement: FloatingImagePlacement,
+  flow: FlowContext,
+) -> FloatingShapeMetrics {
+  let (group_scale_x, group_scale_y) = floating_group_scale(placement, flow);
+  let metrics = floating_shape_metrics_for_sizes(
+    shape.width_pt * group_scale_x,
+    shape.height_pt * group_scale_y,
+    relative_floating_width(placement, flow),
+    relative_floating_height(placement, flow),
+    matches!(placement.wrap, ImageWrapMode::Square),
+    [
+      shape.effect_left_pt,
+      shape.effect_top_pt,
+      shape.effect_right_pt,
+      shape.effect_bottom_pt,
+    ],
+  );
+  let metrics = FloatingShapeMetrics {
+    group_scale_x,
+    group_scale_y,
+    ..metrics
+  };
+  metrics
+}
+
+fn floating_shape_metrics_with_auto_fit(
+  shape: &InlineShape,
+  placement: FloatingImagePlacement,
+  flow: FlowContext,
+  text_metrics: &mut TextMetrics,
+) -> FloatingShapeMetrics {
+  let metrics = floating_shape_metrics(shape, placement, flow);
+  shape_text_box_auto_fit_size(
+    flow,
+    shape,
+    metrics.content_width_pt,
+    metrics.content_height_pt,
+    text_metrics,
+  )
+  .map(|size| metrics.with_content_size(size.width_pt, size.height_pt))
+  .unwrap_or(metrics)
 }
 
 fn floating_alignment_size(
@@ -32303,24 +32450,10 @@ impl<'a> TextFrameLayout<'a> {
               if floating_shape_is_zero_relative_background(placement, shape) {
                 continue;
               }
-              let (group_scale_x, group_scale_y) = floating_group_scale(placement, flow);
-              let authored_width =
-                relative_floating_width(placement, flow).unwrap_or(shape.width_pt * group_scale_x);
-              let authored_height = relative_floating_height(placement, flow)
-                .unwrap_or(shape.height_pt * group_scale_y);
-              let auto_fit_size = shape_text_box_auto_fit_size(
-                flow,
-                shape,
-                authored_width,
-                authored_height,
-                text_metrics,
-              );
-              let width = auto_fit_size
-                .map(|size| size.width_pt)
-                .unwrap_or(authored_width);
-              let height = auto_fit_size
-                .map(|size| size.height_pt)
-                .unwrap_or(authored_height);
+              let metrics =
+                floating_shape_metrics_with_auto_fit(shape, placement, flow, text_metrics);
+              let width = metrics.content_width_pt;
+              let height = metrics.content_height_pt;
               let current_line_anchor_top =
                 floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
               let line_anchor_top =
@@ -32338,14 +32471,20 @@ impl<'a> TextFrameLayout<'a> {
                     text_frame.paragraph_indents(),
                     text_frame.first_line_left,
                     initial_line_anchor_top,
-                    width,
-                    height,
+                    metrics.frame_width_pt,
+                    metrics.frame_height_pt,
                   );
-                  let initial_shape_y = adjusted_floating_shape_y(
-                    placement,
-                    shape,
-                    initial_frame_y + shape.offset_y_pt * group_scale_y,
-                  );
+                  let initial_shape_y = if metrics.uses_relative_effect_frame {
+                    initial_frame_y
+                      + metrics.content_offset_y_pt
+                      + shape.offset_y_pt * metrics.group_scale_y
+                  } else {
+                    adjusted_floating_shape_y(
+                      placement,
+                      shape,
+                      initial_frame_y + shape.offset_y_pt * metrics.group_scale_y,
+                    )
+                  };
                   let initial_wrap_bottom_y = initial_shape_y + height + placement.margin_bottom_pt;
                   if first_line_word_text_frame_was_dodged_by_own_wrap(
                     !text_state.line_fragments.is_empty(),
@@ -32401,10 +32540,10 @@ impl<'a> TextFrameLayout<'a> {
                 text_frame.paragraph_indents(),
                 x,
                 anchor_y,
-                width,
-                height,
+                metrics.frame_width_pt,
+                metrics.frame_height_pt,
               );
-              let shape_x = shape_x + shape.offset_x_pt * group_scale_x;
+              let shape_x = shape_x + shape.offset_x_pt * metrics.group_scale_x;
               let text_anchor_offset = match placement.vertical_relative_to {
                 crate::docx::VerticalImageReference::Line if shape.allow_outside_page => {
                   // A line-relative legacy VML position is measured from the
@@ -32423,9 +32562,18 @@ impl<'a> TextFrameLayout<'a> {
                 crate::docx::VerticalImageReference::BottomMargin => line_height,
                 _ => 0.0,
               };
-              let shape_y = shape_y + shape.offset_y_pt * group_scale_y + text_anchor_offset;
-              let shape_x = adjusted_floating_shape_x(placement, shape, shape_x);
-              let shape_y = adjusted_floating_shape_y(placement, shape, shape_y);
+              let shape_y =
+                shape_y + shape.offset_y_pt * metrics.group_scale_y + text_anchor_offset;
+              let shape_x = if metrics.uses_relative_effect_frame {
+                shape_x + metrics.content_offset_x_pt
+              } else {
+                adjusted_floating_shape_x(placement, shape, shape_x)
+              };
+              let shape_y = if metrics.uses_relative_effect_frame {
+                shape_y + metrics.content_offset_y_pt
+              } else {
+                adjusted_floating_shape_y(placement, shape, shape_y)
+              };
               let shape_paint_y = if effective_layout_in_cell(placement, flow)
                 && matches!(placement.wrap, ImageWrapMode::Square | ImageWrapMode::Tight)
                 && shape.text_box_blocks.is_empty()
@@ -35165,16 +35313,19 @@ fn shift_first_line_below_upper_margin_exclusions(
     // SwContourCache::CalcBoundRect() gives tight wrapping a line-specific
     // contour, so it can retain a horizontal fly portion when usable side
     // space remains. Floating-table follows have the same explicit side-wrap
-    // contract in this representation. Office's square-wrap behavior is
-    // different here: tdf#124600 moves its first line below the drawing,
-    // while `customshape-position.docx` keeps its heading beside the tight
-    // contour. A full-width contour still creates the dummy line used by
-    // tdf#116486.
+    // contract in this representation. A square fly wholly inside the text
+    // frame is different: tdf#124600 moves its first line below the drawing.
+    // A page-edge sidebar is the stopping counterexample: both the Open XML
+    // SDK OrielLetter template and tdf#137314 keep following text beside a
+    // square-wrapped VML object whose outer edge reaches the text-frame edge.
+    // A full-width exclusion still creates the dummy line used by tdf#116486.
     let preserves_side_segment = margin_crossing.iter().all(|exclusion| {
       matches!(
         exclusion.owner,
         WrapExclusionOwner::ParagraphFrame | WrapExclusionOwner::FloatingTable
       ) || exclusion.uses_contour
+        || exclusion.left_pt <= default_left + LAYOUT_EPSILON_PT
+        || exclusion.right_pt >= default_right - LAYOUT_EPSILON_PT
     }) && available_line_bounds_for_y(
       default_left,
       default_right,
@@ -37724,10 +37875,14 @@ fn push_table_border_line(
         paint: ShadingPaint::Solid(border.color),
       }));
     } else {
-      // Writer assigns a collapsed vertical rule to the device column just
-      // inside the grid edge; the horizontal rules already carry their
-      // inward half-width in horizontal_table_border_center().
-      let center_x = x1 + printer_dot_pt;
+      // Inset/outset rules treat the collapsed cell edge as the outside of
+      // the vertical rule. Ordinary single rules retain Writer's historical
+      // one-device-column ownership of that edge.
+      let center_x = if border.inset_or_outset {
+        x1 + border.width_pt / 2.0
+      } else {
+        x1 + printer_dot_pt
+      };
       let top = y1.min(y2);
       page.items.push(PageItem::Fill(FillItem {
         x_pt: center_x - width_pt / 2.0,
@@ -37819,6 +37974,60 @@ fn push_line_item(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn positive_relative_shape_size_owns_the_outer_effect_frame() {
+    let metrics = floating_shape_metrics_for_sizes(
+      159.5,
+      172.9,
+      Some(166.12),
+      None,
+      true,
+      [7.5, 7.5, 12.4, 62.65],
+    );
+
+    assert!((metrics.frame_width_pt - 166.12).abs() < 0.001);
+    assert!((metrics.frame_height_pt - 243.05).abs() < 0.001);
+    assert!((metrics.content_offset_x_pt - 7.5).abs() < 0.001);
+    assert!((metrics.content_offset_y_pt - 7.5).abs() < 0.001);
+    assert!((metrics.content_width_pt - 146.22).abs() < 0.001);
+    assert!((metrics.content_height_pt - 172.9).abs() < 0.001);
+    assert!(metrics.uses_relative_effect_frame);
+  }
+
+  #[test]
+  fn fixed_shape_size_keeps_effect_extent_out_of_pos_offset_geometry() {
+    let metrics =
+      floating_shape_metrics_for_sizes(159.5, 172.9, None, None, true, [7.5, 7.5, 12.4, 62.65]);
+
+    assert!((metrics.frame_width_pt - 159.5).abs() < 0.001);
+    assert!((metrics.frame_height_pt - 172.9).abs() < 0.001);
+    assert_eq!(metrics.content_offset_x_pt, 0.0);
+    assert_eq!(metrics.content_offset_y_pt, 0.0);
+    assert!((metrics.content_width_pt - 159.5).abs() < 0.001);
+    assert!((metrics.content_height_pt - 172.9).abs() < 0.001);
+    assert!(!metrics.uses_relative_effect_frame);
+  }
+
+  #[test]
+  fn relative_wrap_none_size_targets_the_visible_shape() {
+    let metrics = floating_shape_metrics_for_sizes(
+      166.12,
+      110.6,
+      Some(166.12),
+      Some(83.06),
+      false,
+      [0.0, 0.0, 1.55, 1.15],
+    );
+
+    assert!((metrics.frame_width_pt - 166.12).abs() < 0.001);
+    assert!((metrics.frame_height_pt - 83.06).abs() < 0.001);
+    assert_eq!(metrics.content_offset_x_pt, 0.0);
+    assert_eq!(metrics.content_offset_y_pt, 0.0);
+    assert!((metrics.content_width_pt - 166.12).abs() < 0.001);
+    assert!((metrics.content_height_pt - 83.06).abs() < 0.001);
+    assert!(!metrics.uses_relative_effect_frame);
+  }
 
   #[test]
   fn transferred_page_break_counts_empty_body_frame_but_not_break_target_seed() {
@@ -41000,6 +41209,42 @@ mod tests {
       118.0
     );
 
+    let right_edge_sidebar = WrapExclusion {
+      left_pt: 472.0,
+      right_pt: 590.0,
+      top_pt: -7.0,
+      bottom_pt: 799.0,
+      ..side_wrapped_drawing
+    };
+    assert_eq!(
+      shift_first_line_below_upper_margin_exclusions(
+        116.0,
+        14.0,
+        54.0,
+        558.0,
+        &[right_edge_sidebar],
+      ),
+      116.0,
+      "a square sidebar touching the frame edge keeps the usable left segment"
+    );
+
+    let left_edge_sidebar = WrapExclusion {
+      left_pt: 20.0,
+      right_pt: 140.0,
+      ..right_edge_sidebar
+    };
+    assert_eq!(
+      shift_first_line_below_upper_margin_exclusions(
+        116.0,
+        14.0,
+        54.0,
+        558.0,
+        &[left_edge_sidebar],
+      ),
+      116.0,
+      "the mirrored page-edge control keeps the usable right segment"
+    );
+
     let side_wrapped_contour = WrapExclusion {
       uses_contour: true,
       ..side_wrapped_drawing
@@ -41779,6 +42024,89 @@ mod tests {
   }
 
   #[test]
+  fn non_html_paragraph_spacing_adds_adjacent_margins_without_changing_the_default() {
+    fn paragraph(before: f32, after: f32, additive: bool, contextual: bool) -> Paragraph {
+      Paragraph {
+        inlines: Vec::new(),
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        runs: Vec::new(),
+        format: Box::new(ParagraphFormat {
+          style_id: Some("Normal".into()),
+          spacing_before_pt: before,
+          spacing_after_pt: after,
+          additive_paragraph_spacing: additive,
+          contextual_spacing: contextual,
+          ..Default::default()
+        }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      }
+    }
+
+    let default_previous = paragraph(0.0, 4.0, false, false);
+    let default_current = paragraph(6.0, 0.0, false, false);
+    let default_after = paragraph_spacing_after(
+      &default_previous,
+      Some(&Block::paragraph(default_current.clone())),
+      FlowContext {
+        text_segmentation: TextSegmentation::Body,
+        ..flow_from_block_area(BlockArea {
+          setup: PageSetup::default(),
+          section_index: 0,
+          section_page_index: 0,
+          column_index: 0,
+          columns: SectionColumns::default(),
+          content_top_pt: 0.0,
+          content_left_pt: 0.0,
+          content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+          body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+          content_width: 200.0,
+          default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+          hyphenation: crate::docx::HyphenationSettings::default(),
+          consecutive_hyphenated_lines: 0,
+          compatibility_mode: 15,
+          justify_lines_with_shrinking: false,
+          do_not_expand_shift_return: false,
+          repeating_slots: RepeatingSlotState::default(),
+        })
+      },
+    );
+    assert_eq!(default_after, 4.0);
+    assert_eq!(
+      default_after + paragraph_spacing_before_after_previous(&default_previous, &default_current),
+      6.0,
+      "the omitted/false control keeps the HTML-style max collapse",
+    );
+
+    let additive_previous = paragraph(0.0, 4.0, true, false);
+    let additive_current = paragraph(6.0, 0.0, true, false);
+    assert_eq!(
+      paragraph_lower_space(&additive_previous)
+        + paragraph_spacing_before_after_previous(&additive_previous, &additive_current),
+      10.0,
+      "doNotUseHTMLParagraphAutoSpacing adds previous after and current before",
+    );
+
+    let contextual_previous = paragraph(0.0, 4.0, true, true);
+    let contextual_current = paragraph(6.0, 0.0, true, true);
+    assert_eq!(
+      paragraph_spacing_before_after_previous(&contextual_previous, &contextual_current),
+      0.0,
+      "identical contextual paragraphs remain the additive-mode exception",
+    );
+  }
+
+  #[test]
   fn floating_table_never_overlap_moves_the_later_intersecting_table_below() {
     let first = FloatingTableBounds {
       bounds: FrameBounds {
@@ -42323,6 +42651,7 @@ mod tests {
         compound: true,
         dash_pattern: BorderDashPattern::Solid,
         shadow: false,
+        inset_or_outset: false,
       },
     );
 
@@ -42349,6 +42678,29 @@ mod tests {
     };
 
     assert_eq!(horizontal_table_border_center(72.0, border), 72.25);
+  }
+
+  #[test]
+  fn solid_vertical_table_border_is_painted_inside_the_cell_edge() {
+    let mut page = empty_page(PageSetup::default(), 0);
+    push_table_border_line(
+      &mut page,
+      53.85,
+      71.65,
+      53.85,
+      129.95,
+      BorderStyle {
+        width_pt: 0.75,
+        inset_or_outset: true,
+        ..BorderStyle::default()
+      },
+    );
+
+    let [PageItem::Fill(fill)] = page.items.as_slice() else {
+      panic!("solid vertical table border fill");
+    };
+    assert!((fill.x_pt - 53.865).abs() < LAYOUT_EPSILON_PT);
+    assert!((fill.width_pt - 0.72).abs() < LAYOUT_EPSILON_PT);
   }
 
   #[test]
@@ -42474,6 +42826,7 @@ mod tests {
         compound: true,
         dash_pattern: BorderDashPattern::Solid,
         shadow: false,
+        inset_or_outset: false,
       },
     );
 

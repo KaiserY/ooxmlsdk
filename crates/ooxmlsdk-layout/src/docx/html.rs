@@ -209,8 +209,10 @@ struct HtmlImporter {
 
 impl HtmlImporter {
   fn new(fixed_paragraph_auto_spacing: bool) -> Self {
+    let mut root = ElementContext::root();
+    root.paragraph_format.additive_paragraph_spacing = fixed_paragraph_auto_spacing;
     Self {
-      contexts: vec![ElementContext::root()],
+      contexts: vec![root],
       current: None,
       blocks: Vec::new(),
       fixed_paragraph_auto_spacing,
@@ -360,6 +362,7 @@ fn element_context(
     explicit_paragraph: html_paragraph_tag(name),
     saw_substantial_child: false,
   };
+  context.paragraph_format.additive_paragraph_spacing = fixed_paragraph_auto_spacing;
   apply_html_element_defaults(&mut context, name, fixed_paragraph_auto_spacing);
   apply_html_presentational_attributes(&mut context, tag);
   if let Some(style) = attribute_value(&tag.attrs, "style") {

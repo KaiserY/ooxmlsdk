@@ -1325,7 +1325,11 @@ fn conversion_font_audit(paint: &PaintDocument<'_>) -> PdfFontAudit {
             }
             if visible
               && glyph.glyph_id.to_u32() == 0
-              && source_range_requires_visible_glyph(&text.item.text, &glyph.text_range)
+              && glyph_requires_pdf_paint(
+                &text.item.text,
+                glyph,
+                text.item.style.explicit_symbol_character,
+              )
             {
               if text.item.style.explicit_symbol_character {
                 audit.explicit_symbol_notdef_glyph_count += 1;
@@ -1398,6 +1402,43 @@ fn source_range_requires_visible_glyph(text: &str, range: &Range<usize>) -> bool
   text
     .get(range.clone())
     .is_some_and(|source| source.chars().any(|ch| !ch.is_control()))
+}
+
+fn glyph_requires_pdf_paint(
+  text: &str,
+  glyph: &PaintGlyph,
+  explicit_symbol_character: bool,
+) -> bool {
+  let Some(source) = text.get(glyph.text_range.clone()) else {
+    return true;
+  };
+  if !source.chars().any(|ch| !ch.is_control()) {
+    return false;
+  }
+
+  // ECMA-376 assigns ordinary PUA text to an actual run font but gives it no
+  // portable character semantics. LibreOffice consequently does not perform
+  // font fallback for PUA code points. When that exact face resolves to
+  // .notdef or an inkless source glyph, Word's fixed output preserves the
+  // shaped advance without painting a glyph. Explicit w:sym characters retain
+  // their authored selector even when the selected glyph has no outline.
+  let private_use_only =
+    !explicit_symbol_character && !source.is_empty() && source.chars().all(is_unicode_private_use);
+  if !private_use_only {
+    return true;
+  }
+
+  glyph.glyph_id.to_u32() != 0
+    && glyph
+      .bounds_em
+      .is_some_and(|bounds| bounds.x_min_em < bounds.x_max_em && bounds.y_min_em < bounds.y_max_em)
+}
+
+fn is_unicode_private_use(character: char) -> bool {
+  matches!(
+    character as u32,
+    0xe000..=0xf8ff | 0xf0000..=0xffffd | 0x100000..=0x10fffd
+  )
 }
 
 fn krilla_font_loads(face: &FontFaceData) -> bool {
@@ -4491,18 +4532,13 @@ fn metafile_render_options_for_image(
   image: &ImageItem<'_>,
   options: &PdfOptions,
 ) -> ooxmlsdk_layout::render::emf_wmf::RenderOptions {
-  let dpi = options
+  let configured_dpi = options
     .images
     .max_resolution_dpi
     .unwrap_or(300)
     .clamp(72, 600);
   let visible_width = (1.0 - image.crop.left - image.crop.right).max(f32::EPSILON);
   let visible_height = (1.0 - image.crop.top - image.crop.bottom).max(f32::EPSILON);
-  let pixels_for_axis = |size_pt: f32, visible_fraction: f32| {
-    ((size_pt.max(0.0) / visible_fraction) * dpi as f32 / 72.0)
-      .ceil()
-      .clamp(1.0, u32::MAX as f32) as u32
-  };
   let target_size = if image.metafile_semantic_text_includes_raster_backdrop {
     // PowerPoint ActiveX previews lift WMF vectors and text into the PDF form
     // while keeping an embedded DIB at its authored sample dimensions. Let
@@ -4510,27 +4546,29 @@ fn metafile_render_options_for_image(
     // first enlarged into a 200-DPI control-sized raster and then resampled a
     // second time by the PDF image matrix.
     None
-  } else if options.images.reduce_resolution {
-    Some((
-      pixels_for_axis(image.width_pt, visible_width),
-      pixels_for_axis(image.height_pt, visible_height),
-    ))
   } else {
     // Office fixed output rasterizes vector metafile previews at 200 DPI,
-    // independently of the producer's screen-sized import bitmap. For
-    // example, tdf136841.docx imports as a 76x76 bitmap in LibreOffice but
-    // Word's PDF contains a 157x157 image for the 56.8pt frame. VML-hosted
-    // tdf135653.docx follows the same rule and emits 214x137 pixels. Both use
-    // the floor of the uncropped viewport dimensions.
+    // independently of both the producer's screen-sized import bitmap and
+    // the configured bitmap downsampling ceiling. The ceiling applies to
+    // existing raster samples; it does not turn an EMF playback viewport into
+    // a lower-resolution source bitmap. In configured Office output,
+    // tdf136841.docx remains 157x157 at a requested 96 DPI and VML-hosted
+    // tdf135653.docx remains 214x137 at a requested 150 DPI. Both use the
+    // floor of the uncropped viewport dimensions.
     Some((
       office_fixed_output_raster_pixels(image.width_pt, visible_width),
       office_fixed_output_raster_pixels(image.height_pt, visible_height),
     ))
   };
+  let raster_budget_dpi = configured_dpi.max(units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32);
   ooxmlsdk_layout::render::emf_wmf::RenderOptions {
     target_width_px: target_size.map(|size| size.0),
     target_height_px: target_size.map(|size| size.1),
-    max_pixels: Some(dpi.saturating_mul(dpi).saturating_mul(64)),
+    max_pixels: Some(
+      raster_budget_dpi
+        .saturating_mul(raster_budget_dpi)
+        .saturating_mul(64),
+    ),
     transparent_background: image.metafile_background_color.is_some()
       || image.metafile_semantic_text_includes_raster_backdrop
       || (image.semantic_metafile_text
@@ -4933,10 +4971,19 @@ fn draw_text_item(
       && let Some(glyphs) = &portion.glyphs
     {
       for run in glyphs {
+        let remapped_glyphs = remap_glyph_text_ranges(
+          &run.glyphs,
+          item.text.as_ref(),
+          glyph_semantic_text.as_ref(),
+        );
+        let (run_semantic_text, run_semantic_glyphs) = match &remapped_glyphs {
+          Some(glyphs) => (glyph_semantic_text.as_ref(), glyphs.as_ref()),
+          None => (item.text.as_ref(), run.glyphs.as_slice()),
+        };
         if item.style.explicit_symbol_character {
-          for glyph in &run.glyphs {
+          for glyph in run_semantic_glyphs {
             if glyph.glyph_id.to_u32() == 0
-              && let Some(semantic) = glyph_semantic_text.get(glyph.text_range.clone())
+              && let Some(semantic) = run_semantic_text.get(glyph.text_range.clone())
             {
               fonts.record_explicit_notdef_semantic(&run.font_face, semantic);
             }
@@ -5018,12 +5065,13 @@ fn draw_text_item(
           draw_glyphs_with_synthetic_italic(
             surface,
             Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
-            &run.glyphs,
+            run_semantic_glyphs,
             selected.font.clone(),
-            &glyph_semantic_text,
+            run_semantic_text,
             run.font_size_pt,
             glyph_outlines,
             run.font_face.synthetic_italic,
+            item.style.explicit_symbol_character,
           );
         }
         if path_gradient_rasterized
@@ -5040,12 +5088,13 @@ fn draw_text_item(
           draw_glyphs_with_synthetic_italic(
             surface,
             Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
-            &run.glyphs,
+            run_semantic_glyphs,
             selected.font.clone(),
-            &glyph_semantic_text,
+            run_semantic_text,
             run.font_size_pt,
             true,
             run.font_face.synthetic_italic,
+            item.style.explicit_symbol_character,
           );
           surface.set_fill(glyph_fill.clone().or_else(|| Some(fill(&item.style))));
         }
@@ -5078,12 +5127,13 @@ fn draw_text_item(
           draw_glyphs_with_synthetic_italic(
             surface,
             Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
-            &run.glyphs,
+            run_semantic_glyphs,
             selected.font,
-            &glyph_semantic_text,
+            run_semantic_text,
             run.font_size_pt,
             false,
             run.font_face.synthetic_italic,
+            item.style.explicit_symbol_character,
           );
           surface.set_fill(Some(fill(&item.style)));
         }
@@ -5155,6 +5205,7 @@ fn draw_glyphs_with_synthetic_italic(
   font_size_pt: f32,
   outlined: bool,
   synthetic_italic: bool,
+  explicit_symbol_character: bool,
 ) {
   let transform = synthetic_italic_text_transform(synthetic_italic, start.y);
   if let Some(transform) = transform {
@@ -5162,20 +5213,19 @@ fn draw_glyphs_with_synthetic_italic(
   }
   if glyphs
     .iter()
-    .all(|glyph| source_range_requires_visible_glyph(semantic_text, &glyph.text_range))
+    .all(|glyph| glyph_requires_pdf_paint(semantic_text, glyph, explicit_symbol_character))
   {
     surface.draw_glyphs(start, glyphs, font, semantic_text, font_size_pt, outlined);
   } else {
-    // OOXML control characters participate in layout but have no printable
-    // glyph. Some fonts shape them to glyph 0; emitting that .notdef makes an
-    // otherwise conforming PDF/A or PDF/UA document fail validation. Split
-    // around those clusters while retaining every preceding advance so later
-    // visible glyphs stay at their resolved layout positions.
+    // OOXML controls and source-font PUA blanks participate in layout but have
+    // no printable glyph. Split around those clusters while retaining every
+    // preceding advance so later visible glyphs stay at their resolved layout
+    // positions.
     let mut segment_start = 0;
     let mut segment_origin = start;
     let mut cursor = start;
     for (index, glyph) in glyphs.iter().enumerate() {
-      let visible = source_range_requires_visible_glyph(semantic_text, &glyph.text_range);
+      let visible = glyph_requires_pdf_paint(semantic_text, glyph, explicit_symbol_character);
       if !visible {
         if segment_start < index {
           surface.draw_glyphs(
@@ -5846,60 +5896,159 @@ fn word_small_caps_semantic_text(text: &str, small_caps: bool) -> Cow<'_, str> {
   Cow::Owned(uppercase)
 }
 
+fn remap_glyph_text_ranges<'a>(
+  glyphs: &'a [PaintGlyph],
+  source_text: &str,
+  semantic_text: &str,
+) -> Option<Cow<'a, [PaintGlyph]>> {
+  let mut source_boundaries = source_text
+    .char_indices()
+    .map(|(index, _)| index)
+    .collect::<Vec<_>>();
+  source_boundaries.push(source_text.len());
+  let mut semantic_boundaries = semantic_text
+    .char_indices()
+    .map(|(index, _)| index)
+    .collect::<Vec<_>>();
+  semantic_boundaries.push(semantic_text.len());
+
+  // Semantic substitutions are deliberately one Unicode scalar for one
+  // source scalar. Refuse to guess cluster ownership if a future mapping
+  // violates that contract.
+  if source_boundaries.len() != semantic_boundaries.len() {
+    return None;
+  }
+  if source_boundaries == semantic_boundaries {
+    return Some(Cow::Borrowed(glyphs));
+  }
+
+  let mut remapped = Vec::with_capacity(glyphs.len());
+  for glyph in glyphs {
+    let start = source_boundaries
+      .binary_search(&glyph.text_range.start)
+      .ok()?;
+    let end = source_boundaries
+      .binary_search(&glyph.text_range.end)
+      .ok()?;
+    let mut glyph = glyph.clone();
+    glyph.text_range = semantic_boundaries[start]..semantic_boundaries[end];
+    remapped.push(glyph);
+  }
+  Some(Cow::Owned(remapped))
+}
+
 fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Cow<'a, str> {
   let symbol = font_family.is_some_and(|family| {
     family.eq_ignore_ascii_case("Symbol") || family.eq_ignore_ascii_case("SymbolMT")
   });
   let wingdings = font_family.is_some_and(|family| family.eq_ignore_ascii_case("Wingdings"));
-  if !(symbol
-    && (text.contains('\u{f02d}') || text.contains('\u{f05e}') || text.contains('\u{f0b7}'))
-    || wingdings
-      && (text.contains('\u{f04a}')
-        || text.contains('\u{f06c}')
-        || text.contains('\u{f06e}')
-        || text.contains('\u{f071}')
-        || text.contains('\u{f075}')
-        || text.contains('\u{f076}')
-        || text.contains('\u{f0a7}')
-        || text.contains('\u{f0d8}')
-        || text.contains('\u{f0e0}')
-        || text.contains('\u{f020}')
-        || text.contains('\u{f0fc}')))
-  {
+  let wingdings_2 = font_family.is_some_and(|family| {
+    family.eq_ignore_ascii_case("Wingdings 2") || family.eq_ignore_ascii_case("Wingdings2")
+  });
+  let mt_extra = font_family.is_some_and(|family| {
+    family.eq_ignore_ascii_case("MT Extra") || family.eq_ignore_ascii_case("MTExtra")
+  });
+  if !(symbol || wingdings || wingdings_2 || mt_extra) {
     return Cow::Borrowed(text);
   }
 
   // Keep the legacy symbol-font glyph selected by the shaped run, but expose
-  // its standardized character through the PDF ToUnicode map. Unicode WG2
-  // N4363 maps Wingdings character 108 to U+26AB; LibreOffice's Microsoft
-  // symbol conversion tables map character 0xD8 to U+27A2 and Symbol 0xB7
-  // to U+2022. PowerPoint's PDF export maps Wingdings 0x6E to U+25FC,
-  // 0x76 to U+2756, 0xA7 to U+25AA, and 0xE0 to U+2192.
+  // its standardized character through the PDF ToUnicode map. ECMA-376 Part
+  // 1 section 17.3.3.30 defines F000-offset storage as a legacy glyph selector,
+  // not the character's portable semantics. LibreOffice fontcvt.cxx supplies
+  // the Adobe Symbol mappings; Unicode WG2 N4363 supplies the unique modern
+  // Unicode mappings for the Wingdings families.
+  //
+  // PowerPoint's PDF export maps Wingdings 0x6E to U+25FC, 0x76 to U+2756,
+  // 0xA7 to U+25AA, and 0xE0 to U+2192.
   // Word's w:sym fixed output keeps the declared Wingdings glyph but maps
   // 0x20 to a space-equivalent en space and 0xFC to U+2713 in ToUnicode.
-  // Keeping a three-byte scalar preserves shaped cluster byte offsets.
-  Cow::Owned(
-    text
-      .chars()
-      .map(|character| match character {
+  let mut changed = false;
+  let mapped = text
+    .chars()
+    .map(|character| {
+      let mapped = match character {
+        '\u{f020}' if symbol => '\u{0020}',
+        '\u{f02a}' if symbol => '\u{2217}',
         '\u{f02d}' if symbol => '\u{2212}',
+        '\u{f031}' if symbol => '\u{0031}',
         '\u{f05e}' if symbol => '\u{22a5}',
+        '\u{f061}' if symbol => '\u{03b1}',
+        '\u{f062}' if symbol => '\u{03b2}',
+        '\u{f0a2}' if symbol => '\u{2032}',
+        '\u{f0a3}' if symbol => '\u{2264}',
+        '\u{f0b3}' if symbol => '\u{2265}',
+        '\u{f0b4}' if symbol => '\u{00d7}',
         '\u{f0b7}' if symbol => '\u{2022}',
+        '\u{f0b9}' if symbol => '\u{2260}',
+        '\u{f0c9}' if symbol => '\u{2283}',
+        '\u{f0ca}' if symbol => '\u{2287}',
+        '\u{f0cb}' if symbol => '\u{2284}',
+        '\u{f0cc}' if symbol => '\u{2282}',
+        '\u{f0cd}' if symbol => '\u{2286}',
+        '\u{f0ce}' if symbol => '\u{2208}',
+        '\u{f0cf}' if symbol => '\u{2209}',
+        '\u{f0d5}' if symbol => '\u{220f}',
+        '\u{f0d6}' if symbol => '\u{221a}',
+        '\u{f0d7}' if symbol => '\u{22c5}',
+        '\u{f0e5}' if symbol => '\u{2211}',
+        // Adobe Symbol names these six glyphs parenlefttp/ex/bt and
+        // parenrighttp/ex/bt. Unicode encodes the matching mathematical
+        // bracket pieces at U+239B..U+23A0 specifically for constructed
+        // display/print output.
+        '\u{f0e6}' if symbol => '\u{239b}',
+        '\u{f0e7}' if symbol => '\u{239c}',
+        '\u{f0e8}' if symbol => '\u{239d}',
+        '\u{f0f6}' if symbol => '\u{239e}',
+        '\u{f0f7}' if symbol => '\u{239f}',
+        '\u{f0f8}' if symbol => '\u{23a0}',
         '\u{f04a}' if wingdings => '\u{263a}',
+        '\u{f04c}' if wingdings => '\u{2639}',
+        '\u{f04d}' if wingdings => '\u{1f4a3}',
+        '\u{f04f}' if wingdings => '\u{1f3f3}',
         '\u{f06c}' if wingdings => '\u{26ab}',
         '\u{f06e}' if wingdings => '\u{25fc}',
+        '\u{f06f}' if wingdings => '\u{1f78f}',
         '\u{f071}' if wingdings => '\u{2751}',
         '\u{f075}' if wingdings => '\u{25c6}',
         '\u{f076}' if wingdings => '\u{2756}',
+        '\u{f097}' if wingdings => '\u{1f660}',
+        '\u{f0a3}' if wingdings => '\u{1f788}',
         '\u{f0a7}' if wingdings => '\u{25aa}',
+        '\u{f0c9}' if wingdings => '\u{2bb6}',
+        '\u{f0ca}' if wingdings => '\u{2bb7}',
+        '\u{f0cb}' if wingdings => '\u{1f66a}',
+        '\u{f0cc}' if wingdings => '\u{1f66b}',
+        '\u{f0cd}' if wingdings => '\u{1f655}',
+        '\u{f0ce}' if wingdings => '\u{1f654}',
+        '\u{f0cf}' if wingdings => '\u{1f657}',
+        '\u{f0d5}' if wingdings => '\u{232b}',
         '\u{f0d8}' if wingdings => '\u{27a2}',
         '\u{f0e0}' if wingdings => '\u{2192}',
-        '\u{f020}' if wingdings => '\u{2002}',
+        '\u{f0e7}' if wingdings => '\u{1f878}',
+        '\u{f0fb}' if wingdings => '\u{1f5f6}',
         '\u{f0fc}' if wingdings => '\u{2713}',
+        '\u{f0fd}' if wingdings => '\u{1f5f7}',
+        '\u{f0fe}' if wingdings => '\u{1f5f9}',
+        '\u{f020}' if wingdings => '\u{2002}',
+        '\u{f097}' if wingdings_2 => '\u{2981}',
+        '\u{f0a3}' if wingdings_2 => '\u{25a1}',
+        // LibreOffice's aMTExtraTab maps the MathType preview font's three
+        // ellipsis glyph selectors to these standardized math characters.
+        '\u{f04c}' if mt_extra => '\u{22ef}',
+        '\u{f04d}' if mt_extra => '\u{22ee}',
+        '\u{f04f}' if mt_extra => '\u{22f1}',
         _ => character,
-      })
-      .collect(),
-  )
+      };
+      changed |= mapped != character;
+      mapped
+    })
+    .collect();
+  if changed {
+    Cow::Owned(mapped)
+  } else {
+    Cow::Borrowed(text)
+  }
 }
 
 fn link_annotation_for_rect(
@@ -7080,13 +7229,11 @@ fn path_gradient_contains(
 fn normalized_path_gradient_focus(rect: common::RelativeRect) -> common::RelativeRect {
   let authored_right = 1.0 - rect.right;
   let authored_bottom = 1.0 - rect.bottom;
-  let left = rect.left.min(authored_right);
-  let top = rect.top.min(authored_bottom);
-  let right = rect.left.max(authored_right);
-  let bottom = rect.top.max(authored_bottom);
+  let right = authored_right.max(rect.left);
+  let bottom = authored_bottom.max(rect.top);
   common::RelativeRect {
-    left,
-    top,
+    left: rect.left,
+    top: rect.top,
     right: 1.0 - right,
     bottom: 1.0 - bottom,
   }
@@ -8442,15 +8589,17 @@ mod tests {
 
   use super::{
     FollowFrameKind, GlyphId, ImageCrop, ImageItem, OfficeMathSvgTextMarker, PageItem,
-    PaintDocument, PaintItem, PaintLineOwner, PaintTextPortionKind, TextItem, TextMetrics,
-    TextStyle as PaintTextStyle, common_writer_line_baselines, conversion_font_audit,
-    draw_office_math_text, gamma_correct_gradient_color, localized_metafile_ui_font_family,
-    metafile_render_options_for_image, office_math_semantic_glyph_id, office_math_svg_text_marker,
-    pdf_metadata, pdf_page_dimension, render, semantic_advance_for_text_range, shaped_pdf_glyphs,
-    source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
-    synthetic_italic_text_transform, text_portion_ranges, text_requires_glyph_outlines,
-    text_stroke_with_fill, text_style_from_common, visually_ordered_text_portion_ranges,
-    word_small_caps_semantic_text, word_unsigned_signature_line_items, writer_item_line_metrics,
+    PaintDocument, PaintGlyph, PaintItem, PaintLineOwner, PaintTextPortionKind, TextItem,
+    TextMetrics, TextStyle as PaintTextStyle, common_writer_line_baselines, conversion_font_audit,
+    draw_office_math_text, gamma_correct_gradient_color, glyph_requires_pdf_paint,
+    localized_metafile_ui_font_family, metafile_render_options_for_image,
+    normalized_path_gradient_focus, office_math_semantic_glyph_id, office_math_svg_text_marker,
+    pdf_metadata, pdf_page_dimension, remap_glyph_text_ranges, render,
+    semantic_advance_for_text_range, shaped_pdf_glyphs, source_range_requires_visible_glyph,
+    stroke_end_dimensions, symbol_font_semantic_text, synthetic_italic_text_transform,
+    text_portion_ranges, text_requires_glyph_outlines, text_stroke_with_fill,
+    text_style_from_common, visually_ordered_text_portion_ranges, word_small_caps_semantic_text,
+    word_unsigned_signature_line_items, writer_item_line_metrics,
   };
   use crate::options::{
     PdfAttachment, PdfAttachmentAssociation, PdfDocumentKind, PdfLinkDefaultAction, PdfOptions,
@@ -8463,6 +8612,24 @@ mod tests {
     self, Color, DisplayItem, DisplayPage, LayoutDocument, LayoutEngineKind, Pt, TextRun, TextStyle,
   };
   use ooxmlsdk_layout::fonts::FontStyleRef;
+
+  #[test]
+  fn inverted_path_gradient_focus_collapses_at_its_leading_edge() {
+    assert_eq!(
+      normalized_path_gradient_focus(common::RelativeRect {
+        left: 0.2,
+        top: 0.5,
+        right: 1.0,
+        bottom: 0.5,
+      }),
+      common::RelativeRect {
+        left: 0.2,
+        top: 0.5,
+        right: 0.8,
+        bottom: 0.5,
+      }
+    );
+  }
 
   #[test]
   fn office_math_semantic_marker_carries_an_exact_glyph_id() {
@@ -8706,8 +8873,21 @@ mod tests {
     let mut pdf_options = PdfOptions::default();
     pdf_options.images.reduce_resolution = true;
     let reduced = metafile_render_options_for_image(&image, &pdf_options);
-    assert_eq!(reduced.target_width_px, Some(600));
-    assert_eq!(reduced.target_height_px, Some(150));
+    assert_eq!(reduced.target_width_px, Some(400));
+    assert_eq!(reduced.target_height_px, Some(100));
+
+    pdf_options.images.max_resolution_dpi = Some(96);
+    let low_bitmap_ceiling = metafile_render_options_for_image(&image, &pdf_options);
+    assert_eq!(low_bitmap_ceiling.target_width_px, Some(400));
+    assert_eq!(low_bitmap_ceiling.target_height_px, Some(100));
+    assert_eq!(
+      low_bitmap_ceiling.max_pixels,
+      Some(
+        (ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32)
+          .saturating_pow(2)
+          .saturating_mul(64)
+      )
+    );
 
     let mut vml_preview = image;
     vml_preview.width_pt = 77.25;
@@ -9128,6 +9308,40 @@ mod tests {
         .all(|issue| issue.kind != crate::PdfFontAuditIssueKind::MissingGlyph),
       "explicit symbol .notdef must remain visible without becoming a font-integrity failure: {symbol_audit:#?}"
     );
+
+    let mut private_use_document = tagged_test_document();
+    let DisplayItem::Text(private_use_text) = &mut private_use_document.pages[0].items[0] else {
+      unreachable!();
+    };
+    private_use_text.text = "\u{e000}".into();
+    private_use_text.style.color = Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: 255,
+    };
+
+    let mut text_metrics = TextMetrics::new();
+    let mut private_use_paint =
+      PaintDocument::from_layout(&private_use_document, &mut text_metrics, None);
+    let PaintItem::Text(private_use_text) = &mut private_use_paint.pages[0].items[0] else {
+      unreachable!();
+    };
+    private_use_text.portions[0]
+      .glyphs
+      .as_mut()
+      .expect("shaped private-use text")[0]
+      .glyphs[0]
+      .glyph_id = GlyphId::new(0);
+
+    let private_use_audit = conversion_font_audit(&private_use_paint);
+    assert!(
+      private_use_audit
+        .issues
+        .iter()
+        .all(|issue| issue.kind != crate::PdfFontAuditIssueKind::MissingGlyph),
+      "an ordinary PUA .notdef is a source-font blank, not a fallback candidate: {private_use_audit:#?}"
+    );
   }
 
   #[test]
@@ -9136,6 +9350,55 @@ mod tests {
     assert!(!source_range_requires_visible_glyph("\t\r", &(0..2)));
     assert!(source_range_requires_visible_glyph("\nT", &(0..2)));
     assert!(source_range_requires_visible_glyph("\u{e000}", &(0..3)));
+  }
+
+  #[test]
+  fn pdf_paint_omits_only_inkless_ordinary_private_use_glyphs() {
+    let glyph = |glyph_id, bounds_em| PaintGlyph {
+      glyph_id: GlyphId::new(glyph_id),
+      text_range: 0..3,
+      x_advance: 1.0,
+      x_offset: 0.0,
+      y_offset: 0.0,
+      y_advance: 0.0,
+      bounds_em,
+    };
+    let visible_bounds = crate::PdfGlyphBoundsDiagnostics {
+      x_min_em: 0.1,
+      y_min_em: -0.2,
+      x_max_em: 0.8,
+      y_max_em: 0.9,
+    };
+    let empty_bounds = crate::PdfGlyphBoundsDiagnostics::default();
+
+    assert!(!glyph_requires_pdf_paint(
+      "\u{e000}",
+      &glyph(0, Some(visible_bounds)),
+      false
+    ));
+    assert!(!glyph_requires_pdf_paint(
+      "\u{e000}",
+      &glyph(7, Some(empty_bounds)),
+      false
+    ));
+    assert!(glyph_requires_pdf_paint(
+      "\u{e000}",
+      &glyph(7, Some(visible_bounds)),
+      false
+    ));
+    assert!(glyph_requires_pdf_paint(
+      "\u{e000}",
+      &glyph(0, Some(visible_bounds)),
+      true
+    ));
+    assert!(glyph_requires_pdf_paint(
+      "T",
+      &PaintGlyph {
+        text_range: 0..1,
+        ..glyph(0, Some(visible_bounds))
+      },
+      false
+    ));
   }
 
   #[test]
@@ -9794,6 +10057,45 @@ mod tests {
   }
 
   #[test]
+  fn semantic_glyph_ranges_follow_standardized_unicode_byte_boundaries() {
+    let glyph = |glyph_id, text_range| PaintGlyph {
+      glyph_id: GlyphId::new(glyph_id),
+      text_range,
+      x_advance: 1.0,
+      x_offset: 0.0,
+      y_offset: 0.0,
+      y_advance: 0.0,
+      bounds_em: None,
+    };
+    let glyphs = vec![glyph(1, 0..1), glyph(2, 1..4), glyph(3, 4..5)];
+    let remapped = remap_glyph_text_ranges(&glyphs, "A\u{f0e7}B", "A\u{1f878}B")
+      .expect("one-to-one Unicode substitution must preserve cluster ownership");
+
+    assert_eq!(
+      remapped
+        .iter()
+        .map(|glyph| glyph.text_range.clone())
+        .collect::<Vec<_>>(),
+      vec![0..1, 1..5, 5..6]
+    );
+  }
+
+  #[test]
+  fn semantic_glyph_range_remap_rejects_non_scalar_preserving_substitution() {
+    let glyphs = vec![PaintGlyph {
+      glyph_id: GlyphId::new(1),
+      text_range: 0..1,
+      x_advance: 1.0,
+      x_offset: 0.0,
+      y_offset: 0.0,
+      y_advance: 0.0,
+      bounds_em: None,
+    }];
+
+    assert!(remap_glyph_text_ranges(&glyphs, "A", "AA").is_none());
+  }
+
+  #[test]
   fn wingdings_black_circle_uses_standardized_pdf_unicode() {
     assert_eq!(
       symbol_font_semantic_text("\u{f06c}", Some("Wingdings")),
@@ -9818,6 +10120,33 @@ mod tests {
     assert_eq!(
       symbol_font_semantic_text("\u{f071}", Some("Wingdings")),
       "\u{2751}"
+    );
+  }
+
+  #[test]
+  fn adobe_symbol_parenthesis_pieces_use_standardized_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text(
+        "\u{f0e6}\u{f0e7}\u{f0e8}\u{f0f6}\u{f0f7}\u{f0f8}",
+        Some("Symbol")
+      ),
+      "\u{239b}\u{239c}\u{239d}\u{239e}\u{239f}\u{23a0}"
+    );
+    assert_eq!(
+      symbol_font_semantic_text("\u{f0e6}", Some("Calibri")),
+      "\u{f0e6}"
+    );
+  }
+
+  #[test]
+  fn mt_extra_ellipses_use_standardized_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f04c}\u{f04d}\u{f04f}", Some("MT Extra")),
+      "\u{22ef}\u{22ee}\u{22f1}"
+    );
+    assert_eq!(
+      symbol_font_semantic_text("\u{f04e}", Some("MT Extra")),
+      "\u{f04e}"
     );
   }
 
@@ -9870,6 +10199,29 @@ mod tests {
   }
 
   #[test]
+  fn unicode_wg2_wingdings_mappings_cover_pdfa_conversion_cases() {
+    assert_eq!(
+      symbol_font_semantic_text(
+        "\u{f04c}\u{f04d}\u{f04f}\u{f06f}\u{f0c9}\u{f0ca}\u{f0cb}\u{f0cc}\u{f0cd}\u{f0ce}\u{f0cf}\u{f0d5}\u{f0e7}\u{f0fb}\u{f0fd}\u{f0fe}",
+        Some("Wingdings")
+      ),
+      "\u{2639}\u{1f4a3}\u{1f3f3}\u{1f78f}\u{2bb6}\u{2bb7}\u{1f66a}\u{1f66b}\u{1f655}\u{1f654}\u{1f657}\u{232b}\u{1f878}\u{1f5f6}\u{1f5f7}\u{1f5f9}"
+    );
+  }
+
+  #[test]
+  fn unicode_wg2_wingdings_2_mappings_are_font_specific() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f097}\u{f0a3}", Some("Wingdings 2")),
+      "\u{2981}\u{25a1}"
+    );
+    assert_eq!(
+      symbol_font_semantic_text("\u{f097}\u{f0a3}", Some("Wingdings")),
+      "\u{1f660}\u{1f788}"
+    );
+  }
+
+  #[test]
   fn symbol_font_bullet_uses_standardized_pdf_unicode() {
     assert_eq!(
       symbol_font_semantic_text("\u{f0b7}", Some("Symbol")),
@@ -9898,6 +10250,17 @@ mod tests {
     assert_eq!(
       symbol_font_semantic_text("\u{f05e}", Some("Symbol")),
       "\u{22a5}"
+    );
+  }
+
+  #[test]
+  fn libreoffice_adobe_symbol_mappings_cover_pdfa_conversion_cases() {
+    assert_eq!(
+      symbol_font_semantic_text(
+        "\u{f020}\u{f02a}\u{f031}\u{f061}\u{f062}\u{f0a2}\u{f0a3}\u{f0b3}\u{f0b4}\u{f0b9}\u{f0c9}\u{f0ca}\u{f0cb}\u{f0cc}\u{f0cd}\u{f0ce}\u{f0cf}\u{f0d5}\u{f0d6}\u{f0d7}\u{f0e5}",
+        Some("Symbol")
+      ),
+      " \u{2217}1\u{03b1}\u{03b2}\u{2032}\u{2264}\u{2265}\u{00d7}\u{2260}\u{2283}\u{2287}\u{2284}\u{2282}\u{2286}\u{2208}\u{2209}\u{220f}\u{221a}\u{22c5}\u{2211}"
     );
   }
 

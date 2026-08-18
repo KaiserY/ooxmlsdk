@@ -39,8 +39,40 @@ struct CachedRaster {
 struct RasterExportOptions {
   use_lossless_compression: bool,
   jpeg_quality: Option<u8>,
-  max_size_px: Option<(u32, u32)>,
+  max_size_px: Option<RasterPixelLimits>,
   allow_interpolation: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct RasterPixelLimits {
+  width_bits: u64,
+  height_bits: u64,
+}
+
+impl RasterPixelLimits {
+  fn from_display_size(width_pt: f32, height_pt: f32, dpi: u32) -> Option<Self> {
+    if !width_pt.is_finite() || width_pt <= 0.0 || !height_pt.is_finite() || height_pt <= 0.0 {
+      return None;
+    }
+    Self::from_pixels(
+      f64::from(width_pt) * f64::from(dpi) / 72.0,
+      f64::from(height_pt) * f64::from(dpi) / 72.0,
+    )
+  }
+
+  fn from_pixels(width: f64, height: f64) -> Option<Self> {
+    (width.is_finite() && width > 0.0 && height.is_finite() && height > 0.0).then_some(Self {
+      width_bits: width.to_bits(),
+      height_bits: height.to_bits(),
+    })
+  }
+
+  fn pixels(self) -> (f64, f64) {
+    (
+      f64::from_bits(self.width_bits),
+      f64::from_bits(self.height_bits),
+    )
+  }
 }
 
 impl RasterExportOptions {
@@ -52,9 +84,7 @@ impl RasterExportOptions {
       .flatten()
       .filter(|dpi| *dpi > 50)
       .and_then(|dpi| {
-        let width = display_pixels(display_width_pt, dpi)?;
-        let height = display_pixels(display_height_pt, dpi)?;
-        Some((width, height))
+        RasterPixelLimits::from_display_size(display_width_pt, display_height_pt, dpi)
       });
     Self {
       use_lossless_compression: options.images.use_lossless_compression,
@@ -69,13 +99,6 @@ impl RasterExportOptions {
         .any(|standard| standard.is_archival()),
     }
   }
-}
-
-fn display_pixels(points: f32, dpi: u32) -> Option<u32> {
-  if !points.is_finite() || points <= 0.0 {
-    return None;
-  }
-  Some(((f64::from(points) * f64::from(dpi) / 72.0).round() as u32).max(1))
 }
 
 impl ImageSet {
@@ -290,9 +313,7 @@ fn export_decoded_image(
   if let Some(max_size) = export_options.max_size_px
     && let Some(target_size) = downsample_size(raster.image.dimensions(), max_size)
   {
-    raster.image = raster
-      .image
-      .resize_exact(target_size.0, target_size.1, FilterType::Lanczos3);
+    raster.image = resize_for_pdf(raster.image, target_size);
     resized = true;
   }
 
@@ -334,9 +355,7 @@ fn export_wordprocessing_static_3d_image(
   if let Some(max_size) = export_options.max_size_px
     && let Some(target_size) = downsample_size(raster.image.dimensions(), max_size)
   {
-    raster.image = raster
-      .image
-      .resize_exact(target_size.0, target_size.1, FilterType::Lanczos3);
+    raster.image = resize_for_pdf(raster.image, target_size);
   }
 
   if export_options.use_lossless_compression {
@@ -396,14 +415,12 @@ fn remove_black_matte(
   image
 }
 
-fn downsample_size(size: (u32, u32), max_size: (u32, u32)) -> Option<(u32, u32)> {
+fn downsample_size(size: (u32, u32), max_size: RasterPixelLimits) -> Option<(u32, u32)> {
   let (width, height) = size;
-  let (max_width, max_height) = max_size;
+  let (max_width, max_height) = max_size.pixels();
   if width <= 50
     || height <= 50
-    || max_width == 0
-    || max_height == 0
-    || (width <= max_width.saturating_add(4) && height <= max_height.saturating_add(4))
+    || (f64::from(width) <= max_width + 4.0 && f64::from(height) <= max_height + 4.0)
   {
     return None;
   }
@@ -413,6 +430,39 @@ fn downsample_size(size: (u32, u32), max_size: (u32, u32)) -> Option<(u32, u32)>
   let target_width = (f64::from(width) * scale).round() as u32;
   let target_height = (f64::from(height) * scale).round() as u32;
   (target_width > 0 && target_height > 0).then_some((target_width, target_height))
+}
+
+fn resize_for_pdf(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
+  if !image.color().has_alpha() {
+    return image.resize_exact(target_size.0, target_size.1, FilterType::Lanczos3);
+  }
+
+  let source = image.to_rgba8();
+  if source.pixels().all(|pixel| pixel[3] == 255) {
+    return DynamicImage::ImageRgba8(source).resize_exact(
+      target_size.0,
+      target_size.1,
+      FilterType::Lanczos3,
+    );
+  }
+
+  // LibreOffice's convolution scaler operates N32BitTcRgba in premultiplied
+  // space. This also matches Word's transparent bitmap XObjects: hidden RGB
+  // samples cannot bleed into a partially covered edge during downsampling.
+  let premultiplied = apply_black_matte(&source);
+  let mut resized = DynamicImage::ImageRgba8(premultiplied)
+    .resize_exact(target_size.0, target_size.1, FilterType::Lanczos3)
+    .to_rgba8();
+  for pixel in resized.pixels_mut() {
+    let alpha = u16::from(pixel[3]);
+    for channel in &mut pixel.0[..3] {
+      *channel = (u16::from(*channel) * 255 + alpha / 2)
+        .checked_div(alpha)
+        .unwrap_or_default()
+        .min(255) as u8;
+    }
+  }
+  DynamicImage::ImageRgba8(resized)
 }
 
 fn encode_jpeg(image: &image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
@@ -880,9 +930,43 @@ mod tests {
 
   #[test]
   fn downsampling_uses_office_small_image_and_rounding_tolerances() {
-    assert_eq!(downsample_size((50, 200), (25, 100)), None);
-    assert_eq!(downsample_size((104, 104), (100, 100)), None);
-    assert_eq!(downsample_size((105, 210), (100, 100)), Some((50, 100)));
+    let limits = |width, height| RasterPixelLimits::from_pixels(width, height).unwrap();
+    assert_eq!(downsample_size((50, 200), limits(25.0, 100.0)), None);
+    assert_eq!(downsample_size((104, 104), limits(100.0, 100.0)), None);
+    assert_eq!(
+      downsample_size((105, 210), limits(100.0, 100.0)),
+      Some((50, 100))
+    );
+  }
+
+  #[test]
+  fn downsampling_rounds_only_after_aspect_fit() {
+    let limits = RasterPixelLimits::from_display_size(103.75, 19.0, 96).unwrap();
+
+    // LibreOffice PDFWriter keeps the physical-size limits fractional while
+    // selecting one aspect-preserving scale, then rounds the final bitmap.
+    // Rounding the 25.333px height limit first would incorrectly produce
+    // 136x25 for content-control-header.docx instead of Word's 138x25.
+    assert_eq!(downsample_size((316, 58), limits), Some((138, 25)));
+  }
+
+  #[test]
+  fn transparent_downsampling_ignores_hidden_rgb_samples() {
+    let image_with_blue_transparency =
+      image::RgbaImage::from_raw(2, 1, vec![255, 0, 0, 255, 0, 0, 255, 0]).unwrap();
+    let image_with_green_transparency =
+      image::RgbaImage::from_raw(2, 1, vec![255, 0, 0, 255, 0, 255, 0, 0]).unwrap();
+
+    let blue = resize_for_pdf(
+      DynamicImage::ImageRgba8(image_with_blue_transparency),
+      (1, 1),
+    );
+    let green = resize_for_pdf(
+      DynamicImage::ImageRgba8(image_with_green_transparency),
+      (1, 1),
+    );
+
+    assert_eq!(blue.to_rgba8(), green.to_rgba8());
   }
 
   #[test]

@@ -22,6 +22,7 @@ pub struct BorderStyle {
   pub compound: bool,
   pub dash_pattern: BorderDashPattern,
   pub shadow: bool,
+  pub inset_or_outset: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -67,6 +68,7 @@ impl Default for BorderStyle {
       compound: false,
       dash_pattern: BorderDashPattern::Solid,
       shadow: false,
+      inset_or_outset: false,
     }
   }
 }

@@ -3998,13 +3998,13 @@ fn build_page_tag_group(
             .into(),
         ));
       }
-      PaintItem::Text(_)
-      | PaintItem::Image(_)
-      | PaintItem::Group { .. }
-      | PaintItem::Rect(_)
-      | PaintItem::Line(_)
-      | PaintItem::Polyline(_)
-      | PaintItem::LinkArea(_) => {}
+      _ if !annotations.is_empty() => {
+        blocks.push(PageTagBlock::Node(
+          TagGroup::with_children(Tag::Link, annotations.into_iter().map(Node::Leaf).collect())
+            .into(),
+        ));
+      }
+      _ => {}
     }
   }
 
@@ -9398,6 +9398,53 @@ mod tests {
     let pdf = lopdf::Document::load_mem(&bytes).unwrap();
     let page_id = pdf.get_pages()[&1];
     assert!(pdf.get_dictionary(page_id).unwrap().get(b"Annots").is_err());
+  }
+
+  #[test]
+  fn tagged_image_link_without_alt_text_is_attached_to_the_tag_tree() {
+    let mut document = tagged_test_document();
+    document.pages[0]
+      .items
+      .push(DisplayItem::Image(common::ImageItem {
+        bounds: common::Rect {
+          origin: common::Point {
+            x: Pt(40.0),
+            y: Pt(40.0),
+          },
+          size: common::Size {
+            width: Pt(20.0),
+            height: Pt(20.0),
+          },
+        },
+        crop: None,
+        clip_path: Vec::new(),
+        rotation_degrees: 0.0,
+        flip_horizontal: false,
+        flip_vertical: false,
+        content_type: "image/png".into(),
+        bytes: Default::default(),
+        metafile_monochrome_dib_palette_override: None,
+        metafile_background_color: None,
+        metafile_external_header: None,
+        relationship_id: None,
+        alt_text: None,
+        hyperlink_url: Some("https://example.test/image".into()),
+        semantic_metafile_text: false,
+        metafile_semantic_text_includes_raster_backdrop: false,
+        signature_line: None,
+        metafile_native_size: false,
+        floating: false,
+        behind_text: false,
+      }));
+    let mut options = PdfOptions::default();
+    options.general.tagged_pdf = true;
+
+    let bytes = render(&document, &options).unwrap();
+    let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+    let page_id = pdf.get_pages()[&1];
+    let page = pdf.get_dictionary(page_id).unwrap();
+    assert_eq!(page.get(b"Annots").unwrap().as_array().unwrap().len(), 1);
+    assert!(page.get(b"StructParents").is_ok());
   }
 
   #[test]

@@ -11,6 +11,17 @@ pub enum PdfDocumentKind {
   Pptx,
 }
 
+/// Resolution/quality target for fixed-format export.
+///
+/// This mirrors Office's print-versus-screen fixed-format intent.  Print is
+/// the Office default; screen output uses lower-resolution bitmap surfaces.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PdfOptimizeFor {
+  #[default]
+  Print,
+  Screen,
+}
+
 impl fmt::Display for PdfDocumentKind {
   fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
     formatter.write_str(match self {
@@ -28,6 +39,7 @@ pub enum PdfOptionFeature {
   PdfA,
   PdfUa,
   ContentStreamCompression,
+  OptimizeFor,
   UiLanguage,
   FormatLocale,
   DocumentLanguage,
@@ -51,11 +63,12 @@ pub enum PdfOptionFeature {
 }
 
 impl PdfOptionFeature {
-  pub const ALL: [Self; 24] = [
+  pub const ALL: [Self; 25] = [
     Self::PdfVersion,
     Self::PdfA,
     Self::PdfUa,
     Self::ContentStreamCompression,
+    Self::OptimizeFor,
     Self::UiLanguage,
     Self::FormatLocale,
     Self::DocumentLanguage,
@@ -86,6 +99,7 @@ impl fmt::Display for PdfOptionFeature {
       Self::PdfA => "pdf-a",
       Self::PdfUa => "pdf-ua",
       Self::ContentStreamCompression => "content-stream-compression",
+      Self::OptimizeFor => "optimize-for",
       Self::UiLanguage => "ui-language",
       Self::FormatLocale => "format-locale",
       Self::DocumentLanguage => "document-language",
@@ -129,6 +143,7 @@ pub const fn pdf_option_support(
   match feature {
     Feature::PdfVersion
     | Feature::ContentStreamCompression
+    | Feature::OptimizeFor
     | Feature::FormatLocale
     | Feature::DocumentLanguage
     | Feature::TaggedPdf
@@ -190,6 +205,9 @@ pub struct PdfOptions {
   /// Whether PDF content streams should be compressed.
   pub compress_content_streams: bool,
 
+  /// Whether fixed-format bitmap surfaces target print or screen output.
+  pub optimize_for: PdfOptimizeFor,
+
   /// JPEG quality used when the PDF filter asks raster graphics to be stored as JPEG.
   pub jpeg_quality: Option<u8>,
 
@@ -235,6 +253,7 @@ impl Default for PdfOptions {
     Self {
       standards: Vec::new(),
       compress_content_streams: true,
+      optimize_for: PdfOptimizeFor::Print,
       jpeg_quality: None,
       source_file_name: None,
       ui_language: None,
@@ -304,6 +323,14 @@ impl PdfOptions {
       default_document_language: self.default_document_language.clone(),
       field_update_datetime: self.field_update_datetime,
       field_update_time_zone: self.field_update_time_zone.clone(),
+      // WdExportOptimizeFor selects the fixed-output bitmap surface itself:
+      // Word's controlled static-3D screen export realizes a 34.5-point face
+      // as exactly 46 pixels at 96 DPI rather than reducing a 200-DPI face
+      // after the effect graph has been evaluated.
+      fixed_output_raster_dpi: Some(match self.optimize_for {
+        PdfOptimizeFor::Print => 200,
+        PdfOptimizeFor::Screen => 96,
+      }),
       ..Default::default()
     }
   }

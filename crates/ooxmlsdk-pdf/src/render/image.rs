@@ -1,7 +1,8 @@
 use std::hash::{Hash, Hasher};
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 use std::sync::{Arc, OnceLock};
 
+use flate2::{Compression, write::ZlibEncoder};
 use image::codecs::png::PngEncoder;
 use image::metadata::Orientation;
 use image::{
@@ -16,11 +17,13 @@ use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
 use rustc_hash::FxHashMap as HashMap;
 
 use crate::error::{PdfError, Result};
-use crate::options::PdfOptions;
+use crate::options::{PdfOptimizeFor, PdfOptions};
 use ooxmlsdk_layout::render::emf_wmf;
 
 const WORD_STATIC_3D_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-static-3d+png";
+const WORD_SHAPE_STORY_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-shape-story+png";
 
 #[derive(Default)]
 pub(super) struct ImageSet {
@@ -41,6 +44,7 @@ struct RasterExportOptions {
   jpeg_quality: Option<u8>,
   max_size_px: Option<RasterPixelLimits>,
   allow_interpolation: bool,
+  screen_optimization: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -77,12 +81,23 @@ impl RasterPixelLimits {
 
 impl RasterExportOptions {
   fn new(options: &PdfOptions, display_width_pt: f32, display_height_pt: f32) -> Self {
-    let max_size_px = options
+    let configured_max_dpi = options
       .images
       .reduce_resolution
       .then_some(options.images.max_resolution_dpi)
       .flatten()
-      .filter(|dpi| *dpi > 50)
+      .filter(|dpi| *dpi > 50);
+    // Word's WdExportOptimizeFor contract uses a 96-DPI bitmap surface for
+    // on-screen output and a 200-DPI surface for print. Controlled exports of
+    // tdf97371 and shape-3d-effect-preservation expose the same split even
+    // when ordinary image downsampling is disabled, so keep this intent
+    // independent from `images.reduce_resolution`. An explicit lower image
+    // cap still wins.
+    let optimize_for_max_dpi = (options.optimize_for == PdfOptimizeFor::Screen).then_some(96_u32);
+    let max_size_px = configured_max_dpi
+      .into_iter()
+      .chain(optimize_for_max_dpi)
+      .min()
       .and_then(|dpi| {
         RasterPixelLimits::from_display_size(display_width_pt, display_height_pt, dpi)
       });
@@ -97,6 +112,7 @@ impl RasterExportOptions {
         .standards
         .iter()
         .any(|standard| standard.is_archival()),
+      screen_optimization: options.optimize_for == PdfOptimizeFor::Screen,
     }
   }
 }
@@ -168,6 +184,15 @@ fn decode_image(
   metafile_render_options: Option<emf_wmf::RenderOptions>,
 ) -> Result<Image> {
   if content_type.is_some_and(|content_type| {
+    content_type.eq_ignore_ascii_case(WORD_SHAPE_STORY_BITMAP_CONTENT_TYPE)
+  }) {
+    return export_wordprocessing_shape_story_image(
+      decode_dynamic_image(data, RasterImageFormat::Png)?,
+      export_options,
+    );
+  }
+
+  if content_type.is_some_and(|content_type| {
     content_type.eq_ignore_ascii_case(WORD_STATIC_3D_BITMAP_CONTENT_TYPE)
   }) {
     return export_wordprocessing_static_3d_image(
@@ -225,8 +250,7 @@ fn decode_image(
         .max_size_px
         .is_some_and(|max_size| downsample_size(metadata.size, max_size).is_some())
     });
-    let needs_compression_change = format == RasterImageFormat::Jpeg
-      && (export_options.use_lossless_compression || export_options.jpeg_quality.is_some());
+    let needs_compression_change = raster_compression_change_requested(format, export_options);
     if needs_orientation || needs_downsampling || needs_compression_change {
       return export_decoded_image(decode_dynamic_image(data, format)?, format, export_options);
     }
@@ -260,6 +284,14 @@ fn raster_interpolation(format: RasterImageFormat, export_options: RasterExportO
   // placeholders un-interpolated. Make that choice explicit instead of
   // inheriting one blanket backend default for every raster format.
   format == RasterImageFormat::Jpeg && export_options.allow_interpolation
+}
+
+fn raster_compression_change_requested(
+  format: RasterImageFormat,
+  export_options: RasterExportOptions,
+) -> bool {
+  (format == RasterImageFormat::Jpeg && export_options.use_lossless_compression)
+    || (!export_options.use_lossless_compression && export_options.jpeg_quality.is_some())
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -313,19 +345,41 @@ fn export_decoded_image(
   if let Some(max_size) = export_options.max_size_px
     && let Some(target_size) = downsample_size(raster.image.dimensions(), max_size)
   {
-    raster.image = resize_for_pdf(raster.image, target_size);
+    raster.image = resize_for_export(raster.image, target_size, export_options);
     resized = true;
   }
 
   let mut interpolate = raster_interpolation(format, export_options);
-  if format == RasterImageFormat::Jpeg
-    && !export_options.use_lossless_compression
-    && (resized || export_options.jpeg_quality.is_some())
+  if !export_options.use_lossless_compression
+    && (resized && format == RasterImageFormat::Jpeg || export_options.jpeg_quality.is_some())
   {
-    let jpeg = encode_jpeg(&raster.image, export_options.jpeg_quality.unwrap_or(90))?;
-    let (width, height) = raster.image.dimensions();
-    let lossless_color_bytes = u64::from(width) * u64::from(height) * 3;
-    if (jpeg.len() as u64) < lossless_color_bytes {
+    let quality = export_options.jpeg_quality.unwrap_or(90);
+    let rgba = raster.image.to_rgba8();
+    let has_alpha = rgba.pixels().any(|pixel| pixel[3] != u8::MAX);
+    let jpeg_source = has_alpha
+      .then(|| DynamicImage::ImageRgba8(apply_black_matte(&rgba)))
+      .unwrap_or_else(|| raster.image.clone());
+    let jpeg = encode_jpeg(&jpeg_source, quality)?;
+    let lossless_color_bytes = deflated_rgb_size(&rgba);
+    if jpeg.len() < lossless_color_bytes {
+      if has_alpha {
+        let compressed_rgb = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)?
+          .image
+          .to_rgb8();
+        // Word applies the configured JPEG policy to an ordinary PNG's color
+        // plane and carries transparency in a separate SMask. Krilla cannot
+        // attach a custom alpha plane to a DCT stream yet, so store the
+        // decoded JPEG samples with the original alpha. Removing the black
+        // matte first is equivalent to Word's `/Matte [0 0 0]` at decoded
+        // sample points. If interpolation is enabled, PDF's interpolation
+        // order remains a separate backend-level distinction.
+        let rgb = remove_black_matte(compressed_rgb, &rgba);
+        return Image::from_custom(
+          PdfRasterImage::from_rgb_with_alpha(rgb, &rgba, raster.icc_profile),
+          export_options.allow_interpolation,
+        )
+        .map_err(PdfError::Krilla);
+      }
       return Image::from_jpeg_with_icc(
         jpeg.into(),
         raster.icc_profile.map(Into::into),
@@ -338,6 +392,8 @@ fn export_decoded_image(
     // rasters when it is larger than the decoded color plane. Its independent
     // 2x2 JPEG fixtures become 12-byte RGB XObjects with `/Interpolate false`,
     // while a 14x22 JPEG whose compressed stream is smaller remains DCT data.
+    // The same filter-level policy applies to ordinary PNG color planes:
+    // testWPGtextboxes' 39x29 opaque PNG becomes a quality-60 JPEG in Office.
     interpolate = false;
   }
 
@@ -355,13 +411,13 @@ fn export_wordprocessing_static_3d_image(
   if let Some(max_size) = export_options.max_size_px
     && let Some(target_size) = downsample_size(raster.image.dimensions(), max_size)
   {
-    raster.image = resize_for_pdf(raster.image, target_size);
+    raster.image = resize_for_export(raster.image, target_size, export_options);
   }
 
   if export_options.use_lossless_compression {
     return Image::from_custom(
       PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile),
-      export_options.allow_interpolation,
+      false,
     )
     .map_err(PdfError::Krilla);
   }
@@ -370,19 +426,153 @@ fn export_wordprocessing_static_3d_image(
   let premultiplied = apply_black_matte(&rgba);
   let quality = export_options.jpeg_quality.unwrap_or(75);
   let jpeg = encode_office_h2v2_jpeg(&premultiplied, quality)?;
+  // Word applies the same content-sensitive color-stream choice to static-3-D
+  // surfaces as to ordinary raster images.  Controlled Screen and Print
+  // exports of tdf97371 keep its nearly solid surface as Flate with
+  // `/Interpolate false`, while the textured surfaces in
+  // shape-3d-effect-preservation use DCT with `/Interpolate true` under the
+  // same PDF options.  Compare the two representations Word actually writes:
+  // an h2v2 JPEG and a level-6 deflate of the black-matted RGB plane.
+  if jpeg.len() >= deflated_rgb_size(&premultiplied) {
+    return Image::from_custom(
+      PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(rgba), raster.icc_profile),
+      false,
+    )
+    .map_err(PdfError::Krilla);
+  }
   let compressed_rgb = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)?
     .image
     .to_rgb8();
   // Office attaches `/Matte [0 0 0]` to the separate SMask. Krilla does not
-  // currently expose that image-dictionary entry, so bake the mathematically
-  // equivalent black-matte removal into the decoded color samples before the
-  // backend writes its ordinary RGB+SMask image.
+  // currently expose that image-dictionary entry, so bake black-matte removal
+  // into the decoded color samples before the backend writes its ordinary
+  // RGB+SMask image. This is mathematically equivalent at decoded sample
+  // points; `/Interpolate true` would additionally require the PDF backend to
+  // preserve Matte's associated-color interpolation order.
   let rgb = remove_black_matte(compressed_rgb, &rgba);
   Image::from_custom(
     PdfRasterImage::from_rgb_with_alpha(rgb, &rgba, raster.icc_profile),
     export_options.allow_interpolation,
   )
   .map_err(PdfError::Krilla)
+}
+
+fn export_wordprocessing_shape_story_image(
+  mut raster: DecodedRasterImage,
+  export_options: RasterExportOptions,
+) -> Result<Image> {
+  if let Some(max_size) = export_options.max_size_px
+    && let Some(target_size) = downsample_size(raster.image.dimensions(), max_size)
+  {
+    raster.image = resize_for_export(raster.image, target_size, export_options);
+  }
+
+  let rgba = resample_wordprocessing_shape_story_bitmap(&raster.image.to_rgba8());
+  if export_options.use_lossless_compression {
+    return Image::from_custom(
+      PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(rgba), raster.icc_profile),
+      export_options.allow_interpolation,
+    )
+    .map_err(PdfError::Krilla);
+  }
+
+  let premultiplied = apply_black_matte(&rgba);
+  let quality = export_options.jpeg_quality.unwrap_or(75);
+  let jpeg = encode_office_h2v2_jpeg(&premultiplied, quality)?;
+  let lossless_color_bytes = u64::from(rgba.width()) * u64::from(rgba.height()) * 3;
+  if (jpeg.len() as u64) < lossless_color_bytes {
+    let compressed_rgb = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)?
+      .image
+      .to_rgb8();
+    // Word records `/Matte [0 0 0]` on this WPG SMask. Krilla cannot attach
+    // that entry (or a custom alpha plane to a DCT stream), so undo the black
+    // matte before storing the JPEG-decoded samples as ordinary RGB+alpha.
+    // PDF compositing then reproduces the same single alpha multiplication.
+    let rgb = remove_black_matte(compressed_rgb, &rgba);
+    return Image::from_custom(
+      PdfRasterImage::from_rgb_with_alpha(rgb, &rgba, raster.icc_profile),
+      export_options.allow_interpolation,
+    )
+    .map_err(PdfError::Krilla);
+  }
+
+  Image::from_custom(
+    PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(rgba), raster.icc_profile),
+    false,
+  )
+  .map_err(PdfError::Krilla)
+}
+
+fn resample_wordprocessing_shape_story_bitmap(source: &image::RgbaImage) -> image::RgbaImage {
+  // testWPGtextboxes' opaque 39x29 PNG acquires an alpha ramp of 167/191/223
+  // at the top-left/top/left edges in both Word's 96-DPI screen export and its
+  // independent 200-DPI print export. That is rectangular WPG coverage at a
+  // 1/8px horizontal and 1/4px vertical phase, not transparent source-image
+  // padding: the print image is rescaled to 81x60 while retaining the same
+  // three coverage values. Keep source sampling edge-clamped and apply the
+  // geometric coverage separately.
+  //
+  // Word's screen export does not sample this WPG picture directly at 96 DPI.
+  // Controlled print exports expose a 200-DPI color surface; feeding that
+  // surface through Windows GDI+ bilinear scaling reproduces the screen color
+  // plane substantially more closely than a one-stage draw. Recreate the same
+  // two resolutions here. Lanczos3 is the closest available premultiplied
+  // approximation to the first high-quality Windows resample; the second pass
+  // is the observed bilinear reduction.
+  let intermediate_width = (u64::from(source.width()) * 200 / 96).max(1) as u32;
+  let intermediate_height = (u64::from(source.height()) * 200 / 96).max(1) as u32;
+  let intermediate = resize_for_pdf(
+    DynamicImage::ImageRgba8(source.clone()),
+    (intermediate_width, intermediate_height),
+  )
+  .to_rgba8();
+
+  // The color plane and the WPG surface coverage are independent. A GDI+
+  // control sweep places the 200-to-96-DPI color reduction at 3/8 pixel on
+  // both axes, while Word's alpha mask retains the original 1/8-by-1/4 edge
+  // coverage measured above.
+  const COLOR_PHASE: f64 = 3.0 / 8.0;
+  const COVERAGE_DENOMINATOR: f64 = 32.0;
+  image::RgbaImage::from_fn(source.width(), source.height(), |x, y| {
+    let axis = |index: u32, target_size: u32, source_size: u32| {
+      let position = ((f64::from(index) + 0.5 - COLOR_PHASE) * f64::from(source_size)
+        / f64::from(target_size)
+        - 0.5)
+        .clamp(0.0, f64::from(source_size.saturating_sub(1)));
+      let lower = position.floor() as u32;
+      let upper = lower.saturating_add(1).min(source_size.saturating_sub(1));
+      (lower, upper, position - f64::from(lower))
+    };
+    let (left, right, horizontal) = axis(x, source.width(), intermediate.width());
+    let (top, bottom, vertical) = axis(y, source.height(), intermediate.height());
+    let samples = [
+      ((1.0 - horizontal) * (1.0 - vertical), (left, top)),
+      (horizontal * (1.0 - vertical), (right, top)),
+      ((1.0 - horizontal) * vertical, (left, bottom)),
+      (horizontal * vertical, (right, bottom)),
+    ];
+    let mut weighted_alpha = 0.0;
+    let mut weighted_premultiplied = [0.0; 3];
+    for (weight, (sample_x, sample_y)) in samples {
+      let pixel = intermediate.get_pixel(sample_x, sample_y);
+      let alpha = f64::from(pixel[3]);
+      weighted_alpha += weight * alpha;
+      for (channel, sum) in weighted_premultiplied.iter_mut().enumerate() {
+        *sum += weight * alpha * f64::from(pixel[channel]);
+      }
+    }
+    if weighted_alpha <= f64::EPSILON {
+      return Rgba([0, 0, 0, 0]);
+    }
+    let coverage_x = if x == 0 { 28.0 } else { COVERAGE_DENOMINATOR };
+    let coverage_y = if y == 0 { 24.0 } else { COVERAGE_DENOMINATOR };
+    let alpha = (weighted_alpha * coverage_x * coverage_y / COVERAGE_DENOMINATOR.powi(2))
+      .round()
+      .clamp(0.0, 255.0) as u8;
+    let color =
+      weighted_premultiplied.map(|sum| (sum / weighted_alpha).round().clamp(0.0, 255.0) as u8);
+    Rgba([color[0], color[1], color[2], alpha])
+  })
 }
 
 fn apply_black_matte(image: &image::RgbaImage) -> image::RgbaImage {
@@ -398,21 +588,52 @@ fn apply_black_matte(image: &image::RgbaImage) -> image::RgbaImage {
   })
 }
 
+fn remove_black_matte_component(matted: u8, alpha: u8) -> u8 {
+  // A black Matte associates a color sample with its soft-mask sample:
+  // `matted = straight * alpha`. Undo that association before handing the
+  // image to a backend that only accepts ordinary straight RGB plus SMask.
+  // The alpha-zero color is unobservable, so choose zero deterministically.
+  // This is the same rounded integer form used by Cairo's PDF image path.
+  let alpha = u16::from(alpha);
+  (u16::from(matted) * 255 + alpha / 2)
+    .checked_div(alpha)
+    .unwrap_or_default()
+    .min(255) as u8
+}
+
 fn remove_black_matte(
   mut image: image::RgbImage,
   alpha_source: &image::RgbaImage,
 ) -> image::RgbImage {
-  debug_assert_eq!(image.dimensions(), alpha_source.dimensions());
+  assert_eq!(image.dimensions(), alpha_source.dimensions());
   for (pixel, source) in image.pixels_mut().zip(alpha_source.pixels()) {
-    let alpha = u16::from(source[3]);
     for channel in &mut pixel.0 {
-      *channel = (u16::from(*channel) * 255 + alpha / 2)
-        .checked_div(alpha)
-        .unwrap_or_default()
-        .min(255) as u8;
+      *channel = remove_black_matte_component(*channel, source[3]);
     }
   }
   image
+}
+
+fn deflated_rgb_size(image: &image::RgbaImage) -> usize {
+  let mut rgb = Vec::with_capacity(image.width() as usize * image.height() as usize * 3);
+  for pixel in image.pixels() {
+    rgb.extend_from_slice(&pixel.0[..3]);
+  }
+
+  // Krilla writes custom RGB image planes through a level-6 zlib stream.
+  // Compare the configured JPEG against that actual competing representation,
+  // not against the uncompressed pixel count. Word makes the same content-
+  // sensitive choice: screen-optimized 3-D shapes can be JPEG+Interpolate,
+  // while flat or tiny surfaces remain Flate+non-interpolated under the same
+  // JPEG-quality option.
+  let mut encoder = ZlibEncoder::new(Vec::new(), Compression::new(6));
+  encoder
+    .write_all(&rgb)
+    .expect("writing RGB bytes to an in-memory zlib stream cannot fail");
+  encoder
+    .finish()
+    .expect("finishing an in-memory zlib stream cannot fail")
+    .len()
 }
 
 fn downsample_size(size: (u32, u32), max_size: RasterPixelLimits) -> Option<(u32, u32)> {
@@ -430,6 +651,91 @@ fn downsample_size(size: (u32, u32), max_size: RasterPixelLimits) -> Option<(u32
   let target_width = (f64::from(width) * scale).round() as u32;
   let target_height = (f64::from(height) * scale).round() as u32;
   (target_width > 0 && target_height > 0).then_some((target_width, target_height))
+}
+
+fn resize_for_export(
+  image: DynamicImage,
+  target_size: (u32, u32),
+  export_options: RasterExportOptions,
+) -> DynamicImage {
+  if export_options.screen_optimization {
+    resize_for_word_screen(image, target_size)
+  } else {
+    resize_for_pdf(image, target_size)
+  }
+}
+
+fn resize_for_word_screen(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
+  let source = image.to_rgba8();
+  let (source_width, source_height) = source.dimensions();
+  let (target_width, target_height) = target_size;
+  if source_width == 0 || source_height == 0 || target_width == 0 || target_height == 0 {
+    return DynamicImage::ImageRgba8(source);
+  }
+
+  // GDI+ DrawImage maps integer destination coordinates through the inverse
+  // transform without adding a half pixel. Its default Graphics state uses
+  // bilinear interpolation; Wine and libgdiplus preserve the same contract.
+  // Controlled Office screen exports make both parts observable: a 116x72
+  // alpha impulse reduced to 55x34 yields alpha 97 at x=24 and 165 at y=14,
+  // exactly the four-point weights for 24*116/55 and 14*72/34.
+  DynamicImage::ImageRgba8(image::RgbaImage::from_fn(
+    target_width,
+    target_height,
+    |x, y| {
+      let source_x = x as f64 * f64::from(source_width) / f64::from(target_width);
+      let source_y = y as f64 * f64::from(source_height) / f64::from(target_height);
+      gdiplus_bilinear_sample(&source, source_x, source_y)
+    },
+  ))
+}
+
+fn gdiplus_bilinear_sample(source: &image::RgbaImage, x: f64, y: f64) -> Rgba<u8> {
+  let left = x.floor() as u32;
+  let top = y.floor() as u32;
+  let right = x.ceil() as u32;
+  let bottom = y.ceil() as u32;
+  let horizontal = x - x.floor();
+  let vertical = y - y.floor();
+  let sample = |sample_x: u32, sample_y: u32| {
+    source
+      .get_pixel(
+        sample_x.min(source.width().saturating_sub(1)),
+        sample_y.min(source.height().saturating_sub(1)),
+      )
+      .0
+  };
+  let samples = [
+    sample(left, top),
+    sample(right, top),
+    sample(left, bottom),
+    sample(right, bottom),
+  ];
+  let weights = [
+    (1.0 - horizontal) * (1.0 - vertical),
+    horizontal * (1.0 - vertical),
+    (1.0 - horizontal) * vertical,
+    horizontal * vertical,
+  ];
+  let alpha = samples
+    .iter()
+    .zip(weights)
+    .map(|(sample, weight)| f64::from(sample[3]) * weight)
+    .sum::<f64>();
+  if alpha <= f64::EPSILON {
+    return Rgba([0; 4]);
+  }
+  let mut result = [0_u8; 4];
+  result[3] = alpha.round().clamp(0.0, 255.0) as u8;
+  for channel in 0..3 {
+    let premultiplied = samples
+      .iter()
+      .zip(weights)
+      .map(|(sample, weight)| f64::from(sample[channel]) * f64::from(sample[3]) / 255.0 * weight)
+      .sum::<f64>();
+    result[channel] = (premultiplied * 255.0 / alpha).round().clamp(0.0, 255.0) as u8;
+  }
+  Rgba(result)
 }
 
 fn resize_for_pdf(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
@@ -454,12 +760,9 @@ fn resize_for_pdf(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage 
     .resize_exact(target_size.0, target_size.1, FilterType::Lanczos3)
     .to_rgba8();
   for pixel in resized.pixels_mut() {
-    let alpha = u16::from(pixel[3]);
+    let alpha = pixel[3];
     for channel in &mut pixel.0[..3] {
-      *channel = (u16::from(*channel) * 255 + alpha / 2)
-        .checked_div(alpha)
-        .unwrap_or_default()
-        .min(255) as u8;
+      *channel = remove_black_matte_component(*channel, alpha);
     }
   }
   DynamicImage::ImageRgba8(resized)
@@ -785,6 +1088,141 @@ mod tests {
   }
 
   #[test]
+  fn screen_optimization_caps_raster_surfaces_independently_of_image_downsampling() {
+    let mut screen = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..Default::default()
+    };
+    let export = RasterExportOptions::new(&screen, 41.4, 25.68);
+    let (width, height) = export.max_size_px.unwrap().pixels();
+    assert!((width - 55.2).abs() < 0.001);
+    assert!((height - 34.24).abs() < 0.001);
+
+    screen.images.reduce_resolution = true;
+    screen.images.max_resolution_dpi = Some(72);
+    let export = RasterExportOptions::new(&screen, 41.4, 25.68);
+    let (width, height) = export.max_size_px.unwrap().pixels();
+    assert!((width - 41.4).abs() < 0.001);
+    assert!((height - 25.68).abs() < 0.001);
+
+    assert!(
+      RasterExportOptions::new(&PdfOptions::default(), 41.4, 25.68)
+        .max_size_px
+        .is_none()
+    );
+  }
+
+  #[test]
+  fn word_screen_reduction_uses_the_office_gdiplus_bilinear_phase() {
+    let vertical = image::RgbaImage::from_fn(116, 72, |x, _| {
+      if x == 50 {
+        Rgba([238, 238, 238, 255])
+      } else {
+        Rgba([238, 238, 238, 0])
+      }
+    });
+    let reduced = resize_for_word_screen(DynamicImage::ImageRgba8(vertical), (55, 34)).to_rgba8();
+    assert_eq!(reduced.get_pixel(24, 17)[3], 97);
+    assert_eq!(reduced.get_pixel(23, 17)[3], 0);
+    assert_eq!(reduced.get_pixel(25, 17)[3], 0);
+
+    let horizontal = image::RgbaImage::from_fn(116, 72, |_, y| {
+      if y == 30 {
+        Rgba([238, 238, 238, 255])
+      } else {
+        Rgba([238, 238, 238, 0])
+      }
+    });
+    let reduced = resize_for_word_screen(DynamicImage::ImageRgba8(horizontal), (55, 34)).to_rgba8();
+    assert_eq!(reduced.get_pixel(27, 14)[3], 165);
+    assert_eq!(reduced.get_pixel(27, 13)[3], 0);
+    assert_eq!(reduced.get_pixel(27, 15)[3], 0);
+  }
+
+  #[test]
+  fn configured_jpeg_policy_reencodes_an_ordinary_opaque_png_color_plane() {
+    let source = image::RgbImage::from_fn(39, 29, |x, y| {
+      let value = (x + y * 39)
+        .wrapping_mul(1_664_525)
+        .wrapping_add(1_013_904_223);
+      image::Rgb([value as u8, (value >> 8) as u8, (value >> 16) as u8])
+    });
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(source.as_raw(), 39, 29, ColorType::Rgb8.into())
+      .unwrap();
+    let export_options = RasterExportOptions {
+      use_lossless_compression: false,
+      jpeg_quality: Some(60),
+      max_size_px: None,
+      allow_interpolation: false,
+      screen_optimization: false,
+    };
+
+    assert!(raster_compression_change_requested(
+      RasterImageFormat::Png,
+      export_options,
+    ));
+    let actual = decode_image(&png, Some("image/png"), export_options, None).unwrap();
+    let expected_jpeg = encode_jpeg(&DynamicImage::ImageRgb8(source), 60).unwrap();
+    let expected = Image::from_jpeg_with_icc(expected_jpeg.into(), None, false).unwrap();
+
+    assert_eq!(actual, expected);
+
+    let lossless = RasterExportOptions {
+      use_lossless_compression: true,
+      jpeg_quality: None,
+      ..export_options
+    };
+    assert!(!raster_compression_change_requested(
+      RasterImageFormat::Png,
+      lossless,
+    ));
+  }
+
+  #[test]
+  fn configured_jpeg_policy_keeps_a_compressible_small_surface_lossless() {
+    let source = image::RgbImage::from_pixel(55, 34, image::Rgb([238, 238, 238]));
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(source.as_raw(), 55, 34, ColorType::Rgb8.into())
+      .unwrap();
+    let export_options = RasterExportOptions {
+      use_lossless_compression: false,
+      jpeg_quality: Some(75),
+      max_size_px: None,
+      allow_interpolation: true,
+      screen_optimization: false,
+    };
+
+    let actual = decode_image(&png, Some("image/png"), export_options, None).unwrap();
+    let expected = Image::from_custom(
+      PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgb8(source), None),
+      false,
+    )
+    .unwrap();
+
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn word_shape_story_bitmap_uses_the_wpg_subpixel_phase() {
+    let source = image::RgbaImage::from_pixel(3, 3, Rgba([40, 80, 160, 255]));
+
+    let sampled = resample_wordprocessing_shape_story_bitmap(&source);
+
+    assert_eq!(sampled.get_pixel(0, 0).0, [40, 80, 160, 167]);
+    assert_eq!(sampled.get_pixel(2, 0).0, [40, 80, 160, 191]);
+    assert_eq!(sampled.get_pixel(0, 2).0, [40, 80, 160, 223]);
+    assert_eq!(sampled.get_pixel(2, 2).0, [40, 80, 160, 255]);
+
+    let hidden_color =
+      image::RgbaImage::from_raw(2, 1, vec![255, 0, 0, 255, 0, 0, 255, 0]).unwrap();
+    let sampled = resample_wordprocessing_shape_story_bitmap(&hidden_color);
+    assert_eq!(sampled.get_pixel(1, 0).0, [255, 0, 0, 70]);
+  }
+
+  #[test]
   fn custom_raster_preserves_icc_profile() {
     let profile = vec![0_u8; 128];
     let image =
@@ -839,6 +1277,96 @@ mod tests {
     );
     assert_eq!(restored.get_pixel(0, 0).0, [147, 208, 80]);
     assert_eq!(restored.get_pixel(1, 0).0, [0, 0, 0]);
+  }
+
+  #[test]
+  fn black_matte_cpu_emulation_preserves_every_associated_sample() {
+    for alpha in 0_u16..=255 {
+      for straight in 0_u16..=255 {
+        let matted = ((straight * alpha + 127) / 255) as u8;
+        let restored = remove_black_matte_component(matted, alpha as u8);
+        let rematted = ((u16::from(restored) * alpha + 127) / 255) as u8;
+
+        assert_eq!(rematted, matted, "alpha={alpha}, straight={straight}");
+      }
+    }
+  }
+
+  #[test]
+  fn word_static_3d_keeps_a_compressible_surface_lossless_and_uninterpolated() {
+    let source = image::RgbaImage::from_pixel(55, 34, Rgba([238, 238, 238, 255]));
+    let export_options = RasterExportOptions {
+      use_lossless_compression: false,
+      jpeg_quality: Some(75),
+      max_size_px: None,
+      allow_interpolation: true,
+      screen_optimization: false,
+    };
+
+    let actual = export_wordprocessing_static_3d_image(
+      DecodedRasterImage {
+        image: DynamicImage::ImageRgba8(source.clone()),
+        icc_profile: None,
+      },
+      export_options,
+    )
+    .unwrap();
+    let expected = Image::from_custom(
+      PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(source), None),
+      false,
+    )
+    .unwrap();
+
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn word_static_3d_uses_interpolated_jpeg_for_a_complex_color_surface() {
+    let source = image::RgbaImage::from_fn(160, 159, |x, y| {
+      let value = (x + y * 160)
+        .wrapping_mul(1_664_525)
+        .wrapping_add(1_013_904_223);
+      Rgba([
+        value as u8,
+        (value >> 8) as u8,
+        (value >> 16) as u8,
+        64 + (value >> 24) as u8 / 2,
+      ])
+    });
+    let export_options = RasterExportOptions {
+      use_lossless_compression: false,
+      jpeg_quality: Some(75),
+      max_size_px: None,
+      allow_interpolation: true,
+      screen_optimization: false,
+    };
+
+    let actual = export_wordprocessing_static_3d_image(
+      DecodedRasterImage {
+        image: DynamicImage::ImageRgba8(source.clone()),
+        icc_profile: None,
+      },
+      export_options,
+    )
+    .unwrap();
+    let premultiplied = apply_black_matte(&source);
+    let jpeg = encode_office_h2v2_jpeg(&premultiplied, 75).unwrap();
+    assert!(jpeg.len() < deflated_rgb_size(&premultiplied));
+    let compressed_rgb = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)
+      .unwrap()
+      .image
+      .to_rgb8();
+    let expected = Image::from_custom(
+      PdfRasterImage::from_rgb_with_alpha(
+        remove_black_matte(compressed_rgb, &source),
+        &source,
+        None,
+      ),
+      true,
+    )
+    .unwrap();
+
+    assert_eq!(actual, expected);
   }
 
   #[test]

@@ -120,6 +120,11 @@ pub(crate) enum ShadowBlurKernel {
   /// DrawingML shape shadows use Direct2D's Gaussian shadow contract, where
   /// the authored blur radius is three standard deviations.
   Direct2dGaussian,
+  /// A static-3-D surface carries antialiased A8 coverage through the shadow
+  /// graph.  Unlike an ordinary opaque axis-aligned 2-D primitive, those
+  /// boundary samples are already the realized 3-D silhouette and must not be
+  /// replaced by a pixel-center rectangle before the Gaussian pass.
+  Direct2dGaussianPreserveSourceAlpha,
   StackTwice,
 }
 
@@ -334,6 +339,31 @@ pub(crate) fn suppress_soft_edge(container: &mut ImageEffectContainer) {
     }
     _ => true,
   });
+}
+
+/// Keeps realized static-3-D silhouette coverage as the input to Direct2D
+/// shadow blur branches.
+///
+/// Word fixed-output controls with the same shape and `effectLst` show that a
+/// zero-radius shadow retains the 3-D surface's partial edge alpha, and the
+/// corresponding nonzero-radius shadow convolves those samples.  The generic
+/// 2-D pixel-center optimization is therefore not valid for this source type.
+pub(crate) fn preserve_static_3d_shadow_source_alpha(container: &mut ImageEffectContainer) {
+  for effect in &mut container.effects {
+    match effect {
+      ImageEffect::OuterShadow { blur_kernel, .. }
+        if *blur_kernel == ShadowBlurKernel::Direct2dGaussian =>
+      {
+        *blur_kernel = ShadowBlurKernel::Direct2dGaussianPreserveSourceAlpha;
+      }
+      ImageEffect::AlphaModulate(nested)
+      | ImageEffect::Blend {
+        container: nested, ..
+      }
+      | ImageEffect::Container(nested) => preserve_static_3d_shadow_source_alpha(nested),
+      _ => {}
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -3496,6 +3526,9 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
           direct2d_gaussian_sigma(blur_radius_px),
         )
       }
+      ShadowBlurKernel::Direct2dGaussianPreserveSourceAlpha => {
+        image::imageops::blur(&alpha, direct2d_gaussian_sigma(blur_radius_px))
+      }
       ShadowBlurKernel::StackTwice => {
         let mut alpha = alpha;
         let width = alpha.width() as usize;
@@ -3925,14 +3958,73 @@ mod tests {
     container_output_bounds, container_output_bounds_with_anchor,
     container_output_bounds_with_anchors, effective_backdrop_blur_radius_px, from_effect_dag,
     from_effect_list, from_wordprocessing_text_effects, mso_brightness_contrast_component,
-    reflection, reflection_image, rotate_container_with_shape, sample_fill, source_requirements,
-    suppress_soft_edge, unchanged_foreground_backdrop, wordprocessing_reflection_canvas_bounds,
+    preserve_static_3d_shadow_source_alpha, reflection, reflection_image,
+    rotate_container_with_shape, sample_fill, source_requirements, suppress_soft_edge,
+    unchanged_foreground_backdrop, wordprocessing_reflection_canvas_bounds,
   };
   use crate::model::RgbColor;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
   use ooxmlsdk::units::DrawingmlPercentageValue;
 
   struct NoColorResolver;
+
+  #[test]
+  fn static_3d_shadow_preserves_realized_alpha_through_nested_effect_graphs() {
+    let shadow = |blur_kernel| ImageEffect::OuterShadow {
+      blur_radius_px: 4.0,
+      distance_px: 2.0,
+      raster_length_scale: 1.0,
+      bounds_radius_scale: 1.0,
+      blur_kernel,
+      direction_degrees: 90.0,
+      transform: ImageEffectTransform {
+        scale_x: 1.0,
+        scale_y: 1.0,
+        skew_x: 0.0,
+        skew_y: 0.0,
+        shift_x_px: 0.0,
+        shift_y_px: 0.0,
+      },
+      alignment: (0.5, 0.5),
+      rotate_with_shape: false,
+      color: ResolvedEffectColor {
+        color: RgbColor { r: 1, g: 2, b: 3 },
+        alpha: 255,
+      },
+    };
+    let mut container = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![
+        shadow(ShadowBlurKernel::Direct2dGaussian),
+        ImageEffect::Container(ImageEffectContainer {
+          kind: ImageEffectContainerKind::Tree,
+          effects: vec![
+            shadow(ShadowBlurKernel::Direct2dGaussian),
+            shadow(ShadowBlurKernel::StackTwice),
+          ],
+        }),
+      ],
+    };
+
+    preserve_static_3d_shadow_source_alpha(&mut container);
+
+    let kernel = |effect: &ImageEffect| match effect {
+      ImageEffect::OuterShadow { blur_kernel, .. } => *blur_kernel,
+      _ => panic!("expected outer shadow"),
+    };
+    assert_eq!(
+      kernel(&container.effects[0]),
+      ShadowBlurKernel::Direct2dGaussianPreserveSourceAlpha,
+    );
+    let ImageEffect::Container(nested) = &container.effects[1] else {
+      panic!("expected nested effect container");
+    };
+    assert_eq!(
+      kernel(&nested.effects[0]),
+      ShadowBlurKernel::Direct2dGaussianPreserveSourceAlpha,
+    );
+    assert_eq!(kernel(&nested.effects[1]), ShadowBlurKernel::StackTwice,);
+  }
 
   #[test]
   fn effect_list_backdrop_can_leave_an_identity_foreground_unrasterized() {

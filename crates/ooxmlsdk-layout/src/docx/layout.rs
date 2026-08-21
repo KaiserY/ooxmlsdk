@@ -28,15 +28,15 @@ use crate::docx::{
   FloatingImagePlacement, FloatingPaintOrder, FrameHeightRule, FrameHorizontalAlignment,
   FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
   HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
-  InlineChart, InlineDrawingGroupEffect, InlineItem, InlineShape, InlineShapeGeometry,
-  InlineShapeImageFill, InlineShapeImageFillMode, LegacyTextRelief, LineBreakClear, LineHeightRule,
-  LineNumbering, NoteNumberingSpec, NoteSeparatorMark, PRESERVED_WORD_TEXT_TAB,
-  PageBottomHyphenation, PageSetup, ParagraphAlignment, PositionalTab, PositionalTabBase, RgbColor,
-  RubyAlignment, RubyInline, SectionBreakKind, SectionColumns, ShadingPaint, TabLeader, TabStop,
-  TabStopAlignment, Table, TableAlignment, TableBordersModel, TableCell,
-  TableCellVerticalAlignment, TableLayoutMode, TableRow, TextBoxVerticalAlignment,
-  TextBoxWritingMode, TextRun, TextStyle, VerticalImageAlignment, VerticalImageReference,
-  VerticalTextFlow, paragraph_is_effectively_empty,
+  InlineChart, InlineDrawingGroupEffect, InlineHorizontalRuleAlignment, InlineHorizontalRuleWidth,
+  InlineItem, InlineShape, InlineShapeGeometry, InlineShapeImageFill, InlineShapeImageFillMode,
+  LegacyTextRelief, LineBreakClear, LineHeightRule, LineNumbering, NoteNumberingSpec,
+  NoteSeparatorMark, PRESERVED_WORD_TEXT_TAB, PageBottomHyphenation, PageSetup, ParagraphAlignment,
+  PositionalTab, PositionalTabBase, RgbColor, RubyAlignment, RubyInline, SectionBreakKind,
+  SectionColumns, ShadingPaint, TabLeader, TabStop, TabStopAlignment, Table, TableAlignment,
+  TableBordersModel, TableCell, TableCellVerticalAlignment, TableLayoutMode, TableRow,
+  TextBoxVerticalAlignment, TextBoxWritingMode, TextRun, TextStyle, VerticalImageAlignment,
+  VerticalImageReference, VerticalTextFlow, paragraph_is_effectively_empty,
 };
 use crate::error::Result;
 use crate::fonts::effective_font_size_pt;
@@ -130,11 +130,26 @@ const WORD_FIXED_OUTPUT_DPI: f32 = 600.0;
 // authored DrawingML radius or alignment rectangle.
 const WORD_TEXT_EFFECT_RASTER_GUARD_PT: f32 = 10.0 * 72.0 / 96.0;
 const WORD_STATIC_3D_RASTER_EDGE_GUARD_PT: f32 = 72.0 / 200.0;
+// Word re-realizes the foreground of an on-screen static-3-D effect relative
+// to the independently 600-DPI-quantized PDF image rectangle. Controlled
+// Office alpha-impulse exports put both axes 2/5 of a pixel beyond that
+// rectangle-relative page coordinate. This is the fixed-output sampling
+// phase; it is independent of the shape's absolute page position.
+const WORD_SCREEN_STATIC_3D_SAMPLE_OFFSET_PX: f32 = 2.0 / 5.0;
+// The final resolved coverage lies five 1/32 samples inside the last vertical
+// pixel. Office's bottom-edge impulse is alpha 105 (13/32 coverage); the local
+// 32-sample resolve produces the adjacent representable value 104.
+const WORD_SCREEN_STATIC_3D_LAST_SAMPLE_INSET_PX: f32 = 5.0 / 32.0;
 // Internal transport tag for a Word-generated static-3D/effect render target.
 // The bytes remain PNG so layout consumers can decode them normally; the PDF
 // writer uses the tag to apply Word's fixed-output JPEG color-plane policy.
 const WORD_STATIC_3D_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-static-3d+png";
+// Internal transport tag for a PNG drawn through a WPS text story. Word's
+// fixed-output writer realizes that child on the WPG 96-DPI bitmap surface
+// before applying the configured PDF image compression policy.
+const WORD_SHAPE_STORY_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-shape-story+png";
 // Word fixed output snaps the legacy field glyph to its 600-DPI printer grid.
 // The independent 10-point Arial (checkboxes.docx), 11-point Calibri
 // (n766477.docx), and colored 10-point Open Sans fallback (tdf92472.docx)
@@ -1003,12 +1018,7 @@ fn proportional_auto_baseline_uses_text_line_spacing(
 ) -> bool {
   allows_gap_below
     && (paragraph.format.line_height_set
-      || (paragraph
-        .format
-        .wordprocessing_shape_compatible_line_spacing
-        && multiple.is_some_and(|multiple| {
-          multiple > LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE
-        })))
+      || multiple.is_some_and(|multiple| multiple > 1.0 + f32::EPSILON))
 }
 
 fn paragraph_line_spacing_base_covers_line_height(paragraph: &crate::docx::Paragraph) -> bool {
@@ -1648,6 +1658,49 @@ fn inline_drawing_top(
   line_top_pt + (baseline - object_height_pt).max(0.0)
 }
 
+fn inline_horizontal_rule_top(
+  line_top_pt: f32,
+  rule_height_pt: f32,
+  paragraph: &crate::docx::Paragraph,
+  text_frame: TextFrame,
+  text_metrics: &mut TextMetrics,
+  nonfinal_host_line_height_pt: Option<f32>,
+) -> f32 {
+  if let Some(host_line_height_pt) = nonfinal_host_line_height_pt {
+    // Word's legacy horizontal-line host is taller than the VML rectangle
+    // and centers the rectangle inside that physical line.  Keep the host
+    // and its paint separate: the former advances following text, while the
+    // latter owns only the authored VML height.
+    return line_top_pt + (host_line_height_pt - rule_height_pt).max(0.0) / 2.0;
+  }
+  if matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
+    return line_top_pt;
+  }
+
+  // Word exposes a VML horizontal line as wdInlineShapeHorizontalLine.  Its
+  // paragraph keeps the ordinary character line box even in compatibility
+  // mode, and the rule's lower edge is placed on that character baseline.
+  // This deliberately bypasses `legacy_inline_object_owns_line_box`: that
+  // LibreOffice compatibility branch applies to generic as-character fly
+  // portions, while Word's horizontal-rule host is a distinct inline object.
+  let baseline = text_metrics.baseline_offset_in_line(
+    &paragraph_base_line_style(paragraph),
+    text_frame.base_line_height,
+  );
+  line_top_pt + (baseline - rule_height_pt).max(0.0)
+}
+
+fn legacy_nonfinal_horizontal_rule_host_line_height(rule_height_pt: f32) -> f32 {
+  // A controlled Word fixed-layout probe varied the VML rule height
+  // (1.5/3/6/12 pt), paragraph font size (8/11/16 pt), and automatic line
+  // spacing (8/13.8/24 pt).  In compatibility mode 14 the next text line
+  // always began `rule height + 4.9 pt` below the rule's host-line origin;
+  // the rectangle was centered, leaving 2.45 pt on each side.  This is a
+  // horizontal-line host metric, not a font or paragraph-line metric.
+  const VERTICAL_INSET_PT: f32 = 2.45;
+  rule_height_pt.max(0.0) + 2.0 * VERTICAL_INSET_PT
+}
+
 fn paragraph_has_only_inline_drawing_content(paragraph: &crate::docx::Paragraph) -> bool {
   let mut saw_drawing = false;
   for inline in &paragraph.inlines {
@@ -1683,6 +1736,31 @@ fn paragraph_has_only_inline_drawing_content(paragraph: &crate::docx::Paragraph)
     }
   }
   saw_drawing
+}
+
+fn paragraph_has_only_horizontal_rule_content(paragraph: &crate::docx::Paragraph) -> bool {
+  let mut saw_rule = false;
+  for inline in &paragraph.inlines {
+    match inline {
+      InlineItem::Shape(shape)
+        if matches!(shape.placement, crate::docx::ImagePlacement::Inline)
+          && shape.horizontal_rule.is_some() =>
+      {
+        saw_rule = true;
+      }
+      InlineItem::Text(run) if run.text.is_empty() => {}
+      InlineItem::NoteReferenceMark(_)
+      | InlineItem::PositionalTab(_)
+      | InlineItem::DrawingGroupStart(_)
+      | InlineItem::DrawingGroupEnd
+      | InlineItem::BookmarkStart(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::LastRenderedPageBreak => {}
+      _ => return false,
+    }
+  }
+  saw_rule
 }
 
 fn legacy_inline_object_owns_line_box(
@@ -1721,30 +1799,35 @@ fn word_textbox_inline_drawing_spacing_after(
     return spacing_after_pt;
   }
 
-  let base_style = paragraph_base_line_style(paragraph);
-  let line_gap_below_pt = if let Some(multiple) = paragraph
+  if paragraph
     .format
     .line_height_pt
-    .filter(|multiple| *multiple > 1.0)
+    .is_some_and(|multiple| multiple > 1.0)
   {
-    paragraph_single_line_height(paragraph, &base_style, text_metrics) * (multiple - 1.0)
-  } else {
-    let metrics = text_metrics.vertical_metrics(&base_style);
-    // The object supplies the line ascent.  Of the paragraph mark's lower
-    // half, Word retains the half-leading around the following text line and
-    // lets only the ink descent overlap spacing-after.
-    (metrics.descent_pt - metrics.leading_above_pt()).max(0.0)
-  };
+    // `inline_drawing_portion_line_height()` already appends the authored
+    // proportional increment to this drawing-only line. Word's controlled
+    // 240/259/276/360-twip exports show that the complete increment remains
+    // in the centered WPS story height: the following picture moves by half
+    // the changed increment. Collapsing it into spacing-after here cancels
+    // that height and moves the complete story downward.
+    return spacing_after_pt;
+  }
+
+  let base_style = paragraph_base_line_style(paragraph);
+  let metrics = text_metrics.vertical_metrics(&base_style);
+  // The object supplies the line ascent. Of the paragraph mark's lower half,
+  // Word retains the half-leading around the following text line and lets
+  // only the ink descent overlap spacing-after.
+  let line_gap_below_pt = (metrics.descent_pt - metrics.leading_above_pt()).max(0.0);
 
   // Word's modern WPS text story lets a drawing-only line own its ascent. Its
-  // remaining lower line-box contribution is either the paragraph-mark's
-  // ink descent below its half-leading or, for proportional auto spacing, the
-  // proportional excess. That
-  // lower gap and spacing-after occupy the same inter-paragraph region, so the
-  // larger one wins rather than the two being added. tdf134784 (6 pt after)
-  // and textbox-makeflyframe (zero after) are the positive and negative Office
-  // fixed-output cases. Legacy mode 14, fixed/at-least line heights, and
-  // explicitly baselined objects resolve their vertical extents separately.
+  // remaining paragraph-mark ink descent and spacing-after occupy the same
+  // inter-paragraph region, so the larger one wins rather than the two being
+  // added. tdf134784 (6 pt after) and textbox-makeflyframe (zero after) are
+  // the positive and negative Office fixed-output cases. An authored
+  // proportional increment is the independent counterexample above. Legacy
+  // mode 14, fixed/at-least line heights, and explicitly baselined objects
+  // resolve their vertical extents separately.
   (spacing_after_pt - line_gap_below_pt).max(0.0)
 }
 
@@ -2389,6 +2472,12 @@ pub(crate) struct ImageItem {
   pub y_pt: f32,
   pub width_pt: f32,
   pub height_pt: f32,
+  /// Horizontal gap from the inline frame's left edge to the visible image.
+  /// This keeps asymmetric `wp:effectExtent` in paragraph alignment without
+  /// changing the painted image bounds.
+  pub inline_frame_left_gap_pt: f32,
+  /// Horizontal gap from the visible image to the inline frame's right edge.
+  pub inline_frame_right_gap_pt: f32,
   /// Distance from the visible image bottom to its inline frame baseline.
   pub inline_baseline_gap_pt: f32,
   /// Whether this image represents a `wp:inline` object that participates in
@@ -2421,6 +2510,9 @@ pub(crate) struct RectItem {
   pub y_pt: f32,
   pub width_pt: f32,
   pub height_pt: f32,
+  /// The rectangle already owns an inline object's explicit horizontal
+  /// placement and must not inherit the enclosing paragraph's alignment.
+  pub paragraph_alignment_locked: bool,
   pub fill_color: Option<RgbColor>,
   pub fill_opacity: f32,
   pub stroke: Option<BorderStyle>,
@@ -2497,6 +2589,7 @@ struct FlowContext {
   floating_table_cell_follow_top_inset_pt: f32,
   note_continuation_top_inset_pt: f32,
   inside_paragraph_frame: bool,
+  fixed_output_raster_dpi: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -3267,6 +3360,7 @@ fn finish_docx_shape_effects(
   content_start: usize,
   shape: &InlineShape,
   content_bounds: common::Rect,
+  fixed_output_raster_dpi: f32,
 ) {
   finish_docx_drawing_effects(
     items,
@@ -3277,6 +3371,7 @@ fn finish_docx_shape_effects(
       rotation_degrees: shape.rotation_deg,
       visual_rotation_degrees: inline_shape_visual_rotation_degrees(shape),
       placement: shape.placement,
+      max_pixels_per_point: Some(fixed_output_raster_dpi / units::POINTS_PER_INCH),
     },
     content_bounds,
   );
@@ -3297,6 +3392,7 @@ fn finish_docx_image_effects(
       rotation_degrees: image.rotation_deg,
       visual_rotation_degrees: image.static3d.as_ref().map_or(image.rotation_deg, |_| 0.0),
       placement: image.placement,
+      max_pixels_per_point: None,
     },
     content_bounds,
   );
@@ -3495,6 +3591,19 @@ fn push_docx_picture_image(
     }
   }
   (content_start, content_bounds)
+}
+
+fn wordprocessing_shape_story_image_content_type(
+  paragraph: &crate::docx::Paragraph,
+  content_type: Option<&str>,
+) -> Option<String> {
+  if paragraph.format.wordprocessing_group_shape_story
+    && content_type.is_some_and(|content_type| content_type.eq_ignore_ascii_case("image/png"))
+  {
+    Some(WORD_SHAPE_STORY_BITMAP_CONTENT_TYPE.to_string())
+  } else {
+    content_type.map(ToString::to_string)
+  }
 }
 
 #[derive(Clone, Copy)]
@@ -3754,6 +3863,7 @@ struct DocxDrawingEffectHost<'a> {
   rotation_degrees: f32,
   visual_rotation_degrees: f32,
   placement: crate::docx::ImagePlacement,
+  max_pixels_per_point: Option<f32>,
 }
 
 fn drawing_effect_content_bounds_with_markers(
@@ -3829,6 +3939,189 @@ fn wordprocessing_drawing_backdrop_pixels_per_point(effective_blur_radius_px: f3
   WORD_EFFECT_BASE_DPI / prescale_divisor.max(1.0) / units::POINTS_PER_INCH
 }
 
+fn wordprocessing_static_3d_bitmap_display_bounds(raster_bounds: common::Rect) -> common::Rect {
+  let printer_dots_per_point = WORD_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH;
+  // Office Screen position controls expose the edge ownership of Word's
+  // 600-DPI fixed-output grid independently of the 96-DPI image content. The
+  // leading x/y edges start on the next grid line. The horizontal far edge is
+  // floored inclusively, while the vertical far edge excludes an exactly
+  // aligned terminal line. Quantize the four edges independently: moving only
+  // the shape position then reproduces every observed 0.12-pt placement step.
+  let next_grid_line =
+    |value_pt: f32| ((value_pt * printer_dots_per_point).floor() + 1.0) / printer_dots_per_point;
+  let floor_grid_line =
+    |value_pt: f32| (value_pt * printer_dots_per_point).floor() / printer_dots_per_point;
+  let previous_grid_line =
+    |value_pt: f32| ((value_pt * printer_dots_per_point).ceil() - 1.0) / printer_dots_per_point;
+  let left = next_grid_line(raster_bounds.origin.x.0);
+  let top = next_grid_line(raster_bounds.origin.y.0);
+  let right = floor_grid_line(raster_bounds.origin.x.0 + raster_bounds.size.width.0);
+  let bottom = previous_grid_line(raster_bounds.origin.y.0 + raster_bounds.size.height.0);
+  let minimum_extent = 1.0 / printer_dots_per_point;
+  common_rect(
+    left,
+    top,
+    (right - left).max(minimum_extent),
+    (bottom - top).max(minimum_extent),
+  )
+}
+
+fn wordprocessing_screen_static_3d_raster_bounds(
+  raster_bounds: common::Rect,
+  pixels_per_point: f32,
+) -> common::Rect {
+  let display_bounds = wordprocessing_static_3d_bitmap_display_bounds(raster_bounds);
+  let truncated_extent =
+    |extent_pt: f32| (extent_pt * pixels_per_point).floor().max(1.0) / pixels_per_point;
+  common_rect(
+    raster_bounds.origin.x.0,
+    raster_bounds.origin.y.0,
+    truncated_extent(display_bounds.size.width.0),
+    truncated_extent(display_bounds.size.height.0),
+  )
+}
+
+#[derive(Clone, Copy, Debug)]
+struct WordScreenStatic3dTarget {
+  display_bounds: common::Rect,
+  source_mapping: common::drawingml_shape_raster::PageToRasterMapping,
+  geometry_mapping: common::drawingml_shape_raster::PageToRasterMapping,
+  model_surface: common::drawingml_3d::Static3dSurface,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WordScreenStatic3dRasterSpace {
+  LocalShape,
+  EffectSurface,
+}
+
+fn wordprocessing_screen_static_3d_target(
+  content_bounds: common::Rect,
+  static_display_bounds: common::Rect,
+  raster_bounds: common::Rect,
+  pixels_per_point: f32,
+  raster_space: WordScreenStatic3dRasterSpace,
+) -> WordScreenStatic3dTarget {
+  let display_bounds = wordprocessing_static_3d_bitmap_display_bounds(static_display_bounds);
+  let raster_width_px = (raster_bounds.size.width.0 * pixels_per_point)
+    .round()
+    .max(1.0) as u32;
+  let raster_height_px = (raster_bounds.size.height.0 * pixels_per_point)
+    .round()
+    .max(1.0) as u32;
+  let (left_px, top_px, width_px, height_px, scale_x, scale_y, translate_x, translate_y) =
+    match raster_space {
+      WordScreenStatic3dRasterSpace::LocalShape => {
+        let scale_x = raster_width_px as f32 / static_display_bounds.size.width.0.max(f32::EPSILON);
+        let scale_y =
+          raster_height_px as f32 / static_display_bounds.size.height.0.max(f32::EPSILON);
+        let translate_x = 0.5 - static_display_bounds.origin.x.0 * scale_x;
+        let translate_y = 0.5 - static_display_bounds.origin.y.0 * scale_y;
+        let left_px = content_bounds.origin.x.0 * scale_x + translate_x;
+        let top_px = content_bounds.origin.y.0 * scale_y + translate_y;
+        let width_px = content_bounds.size.width.0 * scale_x;
+        let height_px = content_bounds.size.height.0 * scale_y;
+        (
+          left_px,
+          top_px,
+          width_px,
+          height_px,
+          scale_x,
+          scale_y,
+          translate_x,
+          translate_y,
+        )
+      }
+      WordScreenStatic3dRasterSpace::EffectSurface => {
+        let quantize_coverage = |value: f32| (value * 16.0).round() / 16.0;
+        let left_px = quantize_coverage(
+          (content_bounds.origin.x.0 - display_bounds.origin.x.0) * pixels_per_point
+            + WORD_SCREEN_STATIC_3D_SAMPLE_OFFSET_PX,
+        );
+        let top_px = quantize_coverage(
+          (content_bounds.origin.y.0 - display_bounds.origin.y.0) * pixels_per_point
+            + WORD_SCREEN_STATIC_3D_SAMPLE_OFFSET_PX,
+        );
+        let width_px = (content_bounds.size.width.0 * pixels_per_point)
+          .round()
+          .max(1.0);
+        let height_px = (content_bounds.size.height.0 * pixels_per_point
+          - WORD_SCREEN_STATIC_3D_LAST_SAMPLE_INSET_PX)
+          .max(1.0);
+        let scale_x = width_px / content_bounds.size.width.0;
+        let scale_y = height_px / content_bounds.size.height.0;
+        (
+          left_px,
+          top_px,
+          width_px,
+          height_px,
+          scale_x,
+          scale_y,
+          left_px - content_bounds.origin.x.0 * scale_x,
+          top_px - content_bounds.origin.y.0 * scale_y,
+        )
+      }
+    };
+  let geometry_mapping = common::drawingml_shape_raster::PageToRasterMapping {
+    width_px: raster_width_px,
+    height_px: raster_height_px,
+    scale_x,
+    scale_y,
+    translate_x,
+    translate_y,
+  };
+  let source_mapping = if raster_space == WordScreenStatic3dRasterSpace::LocalShape {
+    // The clean shape paint is realized as a separately snapped source mask:
+    // one clear guard cell at the top and left, then opaque coverage through
+    // the bitmap's right and bottom boundaries. The continuous 3-D geometry
+    // mapping above remains untouched so its bevel normals retain their local
+    // material phase.
+    let scale_x = raster_width_px.saturating_sub(1).max(1) as f32
+      / content_bounds.size.width.0.max(f32::EPSILON);
+    let scale_y = raster_height_px.saturating_sub(1).max(1) as f32
+      / content_bounds.size.height.0.max(f32::EPSILON);
+    common::drawingml_shape_raster::PageToRasterMapping {
+      width_px: raster_width_px,
+      height_px: raster_height_px,
+      scale_x,
+      scale_y,
+      translate_x: 1.0 - content_bounds.origin.x.0 * scale_x,
+      translate_y: 1.0 - content_bounds.origin.y.0 * scale_y,
+    }
+  } else {
+    geometry_mapping
+  };
+  WordScreenStatic3dTarget {
+    display_bounds,
+    source_mapping,
+    geometry_mapping,
+    model_surface: common::drawingml_3d::Static3dSurface {
+      left_px,
+      top_px,
+      width_px,
+      height_px,
+    },
+  }
+}
+
+fn wordprocessing_fixed_output_static_3d_allocation_bounds(
+  mut raster_bounds: common::Rect,
+  pixels_per_point: f32,
+) -> common::Rect {
+  // GDI+'s AntiAlias8x modes resolve the last coverage sample at 7/8 of a
+  // device pixel.  Word consequently keeps an extent whose fractional tail
+  // is at most one sample inside the existing final pixel instead of
+  // allocating another transparent row/column.  Controlled 200-DPI exports
+  // exercise both sides of the threshold: 54.083px and 174.083px stay at
+  // 54/174, while 115.331px still allocates 116 pixels.
+  let last_sample_inset_pt = (1.0 / 8.0) / pixels_per_point;
+  raster_bounds.size.width.0 =
+    (raster_bounds.size.width.0 - last_sample_inset_pt).max(1.0 / pixels_per_point);
+  raster_bounds.size.height.0 =
+    (raster_bounds.size.height.0 - last_sample_inset_pt).max(1.0 / pixels_per_point);
+  raster_bounds
+}
+
 fn finish_docx_drawing_effects(
   items: &mut Vec<PageItem>,
   content_start: usize,
@@ -3864,6 +4157,7 @@ fn finish_docx_drawing_effects(
       });
   if host.static3d.is_some() {
     common::drawingml_image_effects::suppress_soft_edge(&mut effects);
+    common::drawingml_image_effects::preserve_static_3d_shadow_source_alpha(&mut effects);
   }
   if effects.effects.is_empty() && host.static3d.is_none() {
     return;
@@ -3872,10 +4166,11 @@ fn finish_docx_drawing_effects(
     &mut effects,
     host.visual_rotation_degrees,
   );
+  let separable_backdrop = common::drawingml_image_effects::unchanged_foreground_backdrop(&effects);
   let backdrop_effects = host
     .static3d
     .is_none()
-    .then(|| common::drawingml_image_effects::unchanged_foreground_backdrop(&effects))
+    .then(|| separable_backdrop.clone())
     .flatten();
   let raster_effects = backdrop_effects.as_ref().unwrap_or(&effects);
   let mut display_items = items[content_start..]
@@ -3901,18 +4196,38 @@ fn finish_docx_drawing_effects(
       content_bounds.size.height.0,
     )
   });
-  let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
+  let output_bounds = common::drawingml_image_effects::container_output_bounds(
     &effects,
     content_bounds.size.width.0,
     content_bounds.size.height.0,
-  ) else {
+  )
+  .or_else(|| {
+    // An empty effectLst is the identity graph, not a reason to discard an
+    // independently authored scene3d/sp3d surface. Word emits a static-3D
+    // bitmap for this exact theme form; the content rectangle is its logical
+    // graph output before camera and bevel padding are applied below.
+    host
+      .static3d
+      .is_some()
+      .then_some(common::drawingml_image_effects::EffectOutputBounds {
+        left_pt: 0.0,
+        top_pt: 0.0,
+        right_pt: content_bounds.size.width.0,
+        bottom_pt: content_bounds.size.height.0,
+      })
+  });
+  let Some(output_bounds) = output_bounds else {
     return;
   };
+  let static_projection = host
+    .static3d
+    .map(|style| common::drawingml_3d::camera_projection(&style.scene, host.rotation_degrees));
   let static_padding = host
     .static3d
-    .map(|style| {
+    .zip(static_projection)
+    .map(|(style, projection)| {
       common::drawingml_3d::output_padding(
-        common::drawingml_3d::camera_projection(&style.scene, host.rotation_degrees),
+        projection,
         &style.shape,
         content_bounds.size.width.0,
         content_bounds.size.height.0,
@@ -3925,7 +4240,14 @@ fn finish_docx_drawing_effects(
     output_bounds.right_pt.max(content_bounds.size.width.0) + static_padding.right_pt;
   let relative_bottom =
     output_bounds.bottom_pt.max(content_bounds.size.height.0) + static_padding.bottom_pt;
-  let raw_raster_bounds = common::Rect {
+  let requested_max_pixels_per_point =
+    wordprocessing_drawing_effect_max_pixels_per_point(backdrop_effects.as_ref());
+  let max_pixels_per_point = host
+    .max_pixels_per_point
+    .map_or(requested_max_pixels_per_point, |value| {
+      requested_max_pixels_per_point.min(value)
+    });
+  let effect_bounds = common::Rect {
     origin: common::Point {
       x: common::Pt(content_bounds.origin.x.0 + relative_left),
       y: common::Pt(content_bounds.origin.y.0 + relative_top),
@@ -3935,6 +4257,29 @@ fn finish_docx_drawing_effects(
       height: common::Pt(relative_bottom - relative_top),
     },
   };
+  // Word keeps one 200-DPI device pixel outside each edge of a static-3D
+  // shape's logical effect range. The on-screen surface retains that logical
+  // guard, but truncates the 96-DPI allocation rather than rounding it out
+  // (55x34 for tdf97371). Its PDF placement rectangle remains independently
+  // quantized on the 600-DPI fixed-output grid.
+  let static_display_guard_pt = if host.static3d.is_some() {
+    WORD_STATIC_3D_RASTER_EDGE_GUARD_PT
+  } else {
+    0.0
+  };
+  let static_display_bounds = common::Rect {
+    origin: common::Point {
+      x: common::Pt(effect_bounds.origin.x.0 - static_display_guard_pt),
+      y: common::Pt(effect_bounds.origin.y.0 - static_display_guard_pt),
+    },
+    size: common::Size {
+      width: common::Pt(effect_bounds.size.width.0 + static_display_guard_pt * 2.0),
+      height: common::Pt(effect_bounds.size.height.0 + static_display_guard_pt * 2.0),
+    },
+  };
+  let screen_static_3d =
+    host.static3d.is_some() && max_pixels_per_point <= 96.0 / units::POINTS_PER_INCH + f32::EPSILON;
+  let raw_raster_bounds = static_display_bounds;
   let shape_clip = display_items
     .iter()
     .filter_map(|item| match item {
@@ -3955,61 +4300,147 @@ fn finish_docx_drawing_effects(
   }
   let automatic_extrusion_color =
     common::drawingml_3d::automatic_extrusion_color_from_items(&display_items);
-  let max_pixels_per_point =
-    wordprocessing_drawing_effect_max_pixels_per_point(backdrop_effects.as_ref());
-  let (raster_bounds, pixels_per_point) =
+  let (aligned_raster_bounds, pixels_per_point) =
     common::drawingml_shape_raster::bounded_effect_raster_grid(
       raw_raster_bounds,
       max_pixels_per_point,
     );
-  let raster =
-    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_pixels_per_point(
-      &display_items,
+  // Static-3D Word output preserves the floating GetImageLocalBounds origin:
+  // the one-pixel guard above makes tdf97371's model surface begin at 9.75px
+  // in its 116x72 bitmap.  Aligning the absolute page rectangle instead moves
+  // that boundary by half a pixel (to 10.25px) and changes every bevel-edge
+  // sample.  Ordinary 2-D effects retain the Direct2D floor/ceil grid used to
+  // enclose fractional strokes and blur coverage.
+  let raster_bounds = if screen_static_3d {
+    wordprocessing_screen_static_3d_raster_bounds(raw_raster_bounds, pixels_per_point)
+  } else if host.static3d.is_some() {
+    raw_raster_bounds
+  } else {
+    aligned_raster_bounds
+  };
+  let raster_allocation_bounds = if host.static3d.is_some() && !screen_static_3d {
+    wordprocessing_fixed_output_static_3d_allocation_bounds(raster_bounds, pixels_per_point)
+  } else {
+    raster_bounds
+  };
+  let screen_target = screen_static_3d.then(|| {
+    wordprocessing_screen_static_3d_target(
+      content_bounds,
+      static_display_bounds,
       raster_bounds,
+      pixels_per_point,
+      if raster_effects.effects.is_empty() {
+        WordScreenStatic3dRasterSpace::LocalShape
+      } else {
+        WordScreenStatic3dRasterSpace::EffectSurface
+      },
+    )
+  });
+  let raster = if let Some(target) = screen_target {
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_with_mapping(
+      &display_items,
       raster_effects,
       pixels_per_point,
-    );
+      target.source_mapping,
+    )
+  } else {
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_pixels_per_point(
+      &display_items,
+      raster_allocation_bounds,
+      raster_effects,
+      pixels_per_point,
+    )
+  };
   let Some(mut raster) = raster else {
     return;
   };
-  if let Some(style) = host.static3d {
-    common::drawingml_3d::apply_static_3d(
-      &mut raster.image,
-      &style.scene,
-      common::drawingml_3d::camera_projection(&style.scene, host.rotation_degrees),
-      &style.shape,
-      common::drawingml_3d::Static3dRenderOptions {
-        extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
-        contour_color: style.contour_color,
-        pixels_per_point: raster.pixels_per_point,
-        model_surface: Some(common::drawingml_3d::Static3dSurface {
+  let shape_geometry = if shape_clip.is_empty() {
+    None
+  } else {
+    screen_target.map_or_else(
+      || {
+        common::drawingml_shape_raster::static_3d_shape_geometry(
+          &shape_clip,
+          raster_allocation_bounds,
+          raster.pixels_per_point,
+        )
+      },
+      |target| {
+        common::drawingml_shape_raster::static_3d_shape_geometry_with_mapping(
+          &shape_clip,
+          target.geometry_mapping,
+        )
+      },
+    )
+  };
+  if let Some((style, projection)) = host.static3d.zip(static_projection) {
+    let options = common::drawingml_3d::Static3dRenderOptions {
+      extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
+      contour_color: style.contour_color,
+      pixels_per_point: raster.pixels_per_point,
+      model_surface: Some(screen_target.map_or_else(
+        || common::drawingml_3d::Static3dSurface {
           left_px: (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
           top_px: (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
           width_px: content_bounds.size.width.0 * raster.pixels_per_point,
           height_px: content_bounds.size.height.0 * raster.pixels_per_point,
-        }),
+        },
+        |target| target.model_surface,
+      )),
+    };
+    if let Some(geometry) = shape_geometry.as_ref() {
+      common::drawingml_3d::apply_static_3d_shape_geometry(
+        &mut raster.image,
+        geometry,
+        &style.scene,
+        projection,
+        &style.shape,
+        options,
+      );
+    } else {
+      common::drawingml_3d::apply_static_3d(
+        &mut raster.image,
+        &style.scene,
+        projection,
+        &style.shape,
+        options,
+      );
+    }
+  }
+  if !raster_effects.effects.is_empty() {
+    let mut scaled_effects = raster_effects.clone();
+    common::drawingml_image_effects::scale_container_pixel_lengths(
+      &mut scaled_effects,
+      raster.pixels_per_point / (96.0 / 72.0),
+    );
+    let source_surface = screen_target.map(|target| target.model_surface);
+    common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+      &mut raster.image,
+      &scaled_effects,
+      source_surface.map_or_else(
+        || (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+        |surface| surface.left_px,
+      ),
+      source_surface.map_or_else(
+        || (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
+        |surface| surface.top_px,
+      ),
+      source_surface.map_or(
+        content_bounds.size.width.0 * raster.pixels_per_point,
+        |surface| surface.width_px,
+      ),
+      source_surface.map_or(
+        content_bounds.size.height.0 * raster.pixels_per_point,
+        |surface| surface.height_px,
+      ),
+      common::drawingml_image_effects::ImageEffectSourceImages {
+        fill: raster.fill_image.as_ref(),
+        line: raster.line_image.as_ref(),
+        fill_line: raster.fill_line_image.as_ref(),
+        children: raster.children_image.as_ref(),
       },
     );
   }
-  let mut scaled_effects = raster_effects.clone();
-  common::drawingml_image_effects::scale_container_pixel_lengths(
-    &mut scaled_effects,
-    raster.pixels_per_point / (96.0 / 72.0),
-  );
-  common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
-    &mut raster.image,
-    &scaled_effects,
-    (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
-    (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
-    content_bounds.size.width.0 * raster.pixels_per_point,
-    content_bounds.size.height.0 * raster.pixels_per_point,
-    common::drawingml_image_effects::ImageEffectSourceImages {
-      fill: raster.fill_image.as_ref(),
-      line: raster.line_image.as_ref(),
-      fill_line: raster.fill_line_image.as_ref(),
-      children: raster.children_image.as_ref(),
-    },
-  );
   let effect_item_bounds = backdrop_output_bounds
     .and_then(|output| {
       let pixels_per_point = raster.pixels_per_point;
@@ -4043,6 +4474,20 @@ fn finish_docx_drawing_effects(
       })
     })
     .unwrap_or(raster_bounds);
+  let effect_item_bounds = if host.static3d.is_some() {
+    // Office creates the shape bitmap on the independent 200-DPI surface
+    // above, then positions it on Word's 600-DPI printer grid.  The archived
+    // DirectX fixed-output path preserves rounded placement while truncating
+    // the device-grid extent.  For tdf97371 this maps the 116x72 working
+    // bitmap to the reference 41.40x25.68pt XObject rectangle without moving
+    // the floating bevel samples inside that bitmap.
+    screen_target.map_or_else(
+      || wordprocessing_static_3d_bitmap_display_bounds(static_display_bounds),
+      |target| target.display_bounds,
+    )
+  } else {
+    effect_item_bounds
+  };
   let mut png = Cursor::new(Vec::new());
   if PngEncoder::new(&mut png)
     .write_image(
@@ -4060,6 +4505,8 @@ fn finish_docx_drawing_effects(
     y_pt: effect_item_bounds.origin.y.0,
     width_pt: effect_item_bounds.size.width.0,
     height_pt: effect_item_bounds.size.height.0,
+    inline_frame_left_gap_pt: 0.0,
+    inline_frame_right_gap_pt: 0.0,
     inline_baseline_gap_pt: 0.0,
     inline_baseline_participant: matches!(host.placement, crate::docx::ImagePlacement::Inline),
     paragraph_alignment_locked: false,
@@ -4069,7 +4516,14 @@ fn finish_docx_drawing_effects(
     flip_horizontal: false,
     flip_vertical: false,
     data: Bytes::from(png.into_inner()),
-    content_type: Some("image/png".to_string()),
+    content_type: Some(
+      if host.static3d.is_some() {
+        WORD_STATIC_3D_BITMAP_CONTENT_TYPE
+      } else {
+        "image/png"
+      }
+      .to_string(),
+    ),
     metafile_background_color: None,
     alt_text: None,
     hyperlink_url: None,
@@ -4223,6 +4677,8 @@ fn finish_docx_group_effects(
     y_pt: raster_bounds.origin.y.0 - sample_edge_outset_pt,
     width_pt: raster_bounds.size.width.0 + sample_edge_outset_pt * 2.0,
     height_pt: raster_bounds.size.height.0 + sample_edge_outset_pt * 2.0,
+    inline_frame_left_gap_pt: 0.0,
+    inline_frame_right_gap_pt: 0.0,
     inline_baseline_gap_pt: 0.0,
     inline_baseline_participant: matches!(group.placement, crate::docx::ImagePlacement::Inline),
     paragraph_alignment_locked: false,
@@ -4375,6 +4831,8 @@ fn inline_shape_fill_image_items(
       y_pt,
       width_pt,
       height_pt,
+      inline_frame_left_gap_pt: 0.0,
+      inline_frame_right_gap_pt: 0.0,
       inline_baseline_gap_pt: 0.0,
       inline_baseline_participant: matches!(shape.placement, crate::docx::ImagePlacement::Inline),
       paragraph_alignment_locked: false,
@@ -4941,6 +5399,7 @@ struct RootFrameLayout<'a> {
   action: LayoutActionOptions,
   collect_frame_items: bool,
   emit_reflow_diagnostics: bool,
+  fixed_output_raster_dpi: f32,
   pages: Vec<Page>,
   current: Page,
   y: f32,
@@ -5103,6 +5562,10 @@ impl<'a> RootFrameLayout<'a> {
       action: options.action,
       collect_frame_items: options.diagnostics.collect_debug_records,
       emit_reflow_diagnostics: options.diagnostics.collect_reflow_records,
+      fixed_output_raster_dpi: options
+        .fixed_output_raster_dpi
+        .unwrap_or(units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32)
+        as f32,
       pages: Vec::new(),
       current: empty_page(document.page, 0),
       y: document.page.margin_top_pt,
@@ -5415,8 +5878,20 @@ impl<'a> RootFrameLayout<'a> {
               .min(balanced_flow.body_content_bottom_pt);
             let trailing_spacing_after_pt =
               balanced_section_trailing_spacing_after(section.blocks.last(), balanced_end_flow);
-            self.y =
-              balanced_section_frame_end_y(self.y, trailing_spacing_after_pt, frame_bottom_pt);
+            let horizontal_rule_spacing_stays_after_frame =
+              section.blocks.last().is_some_and(|block| {
+                matches!(
+                  block,
+                  Block::Paragraph(paragraph)
+                    if paragraph_has_only_horizontal_rule_content(paragraph)
+                )
+              });
+            self.y = balanced_section_frame_end_y(
+              self.y,
+              trailing_spacing_after_pt,
+              frame_bottom_pt,
+              horizontal_rule_spacing_stays_after_frame,
+            );
           }
         }
       }
@@ -5486,6 +5961,7 @@ impl<'a> RootFrameLayout<'a> {
         justify_lines_with_shrinking: self.document.justify_lines_with_shrinking,
         do_not_expand_shift_return: self.document.do_not_expand_shift_return,
         split_page_break_and_paragraph_mark: self.document.split_page_break_and_paragraph_mark,
+        fixed_output_raster_dpi: self.fixed_output_raster_dpi,
         ..flow
       },
       self.pages.len() + 1,
@@ -7761,6 +8237,8 @@ fn materialize_wordprocessing_text_effects_in_items(
       y_pt: image_bounds.origin.y.0,
       width_pt: image_bounds.size.width.0,
       height_pt: image_bounds.size.height.0,
+      inline_frame_left_gap_pt: 0.0,
+      inline_frame_right_gap_pt: 0.0,
       inline_baseline_gap_pt: 0.0,
       inline_baseline_participant: false,
       paragraph_alignment_locked: false,
@@ -10264,6 +10742,7 @@ fn flow_context(
     floating_table_cell_follow_top_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
+    fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
   }
 }
 
@@ -10771,10 +11250,22 @@ fn estimated_paragraph_content_extents(
   let mut content_height = 0.0;
   let mut floating_bottom: f32 = 0.0;
   let mut leading_line_heights_pt = [0.0; DEFAULT_ORPHAN_LINES];
-  let mut has_flow_content = paragraph.list_label.is_some() || paragraph.list_label_image.is_some();
+  let mut has_flow_content = paragraph.list_label.is_some()
+    || paragraph.list_label_image.is_some()
+    || paragraph
+      .format
+      .suppressed_picture_bullet_owns_numbering_margin;
   let mut legacy_line_has_object = false;
   let mut line_inline_object_portion_height = 0.0_f32;
-  let mut x = first_line_indent_pt.max(0.0);
+  let first_line_offset_pt = if paragraph
+    .format
+    .suppressed_picture_bullet_owns_numbering_margin
+  {
+    0.0
+  } else {
+    first_line_indent_pt
+  };
+  let mut x = first_line_offset_pt.max(0.0);
   let mut line_index = 0;
   let mut finish_line = |content_height: &mut f32,
                          line_height: &mut f32,
@@ -10817,7 +11308,7 @@ fn estimated_paragraph_content_extents(
     line_index += 1;
   };
 
-  for item in &paragraph.inlines {
+  for (inline_index, item) in paragraph.inlines.iter().enumerate() {
     match item {
       InlineItem::Text(run) => {
         for segment in text_segments_for_compatibility(
@@ -11148,6 +11639,71 @@ fn estimated_paragraph_content_extents(
         x += metrics.frame_width_pt;
       }
       InlineItem::Shape(shape) => {
+        if matches!(shape.placement, crate::docx::ImagePlacement::Inline)
+          && shape.horizontal_rule.is_some()
+        {
+          let is_first_line = content_height <= LAYOUT_EPSILON_PT;
+          let line_origin_x = if is_first_line {
+            first_line_offset_pt.max(0.0)
+          } else {
+            0.0
+          };
+          let line_has_content = x > line_origin_x + LAYOUT_EPSILON_PT
+            || line_text_extents.has_text
+            || line_inline_object_portion_height > LAYOUT_EPSILON_PT
+            || (is_first_line
+              && (paragraph.list_label.is_some()
+                || paragraph.list_label_image.is_some()
+                || paragraph
+                  .format
+                  .suppressed_picture_bullet_owns_numbering_margin));
+          if line_has_content {
+            finish_line(
+              &mut content_height,
+              &mut line_height,
+              &mut line_text_extents,
+              &mut line_inline_object_portion_height,
+              false,
+            );
+            legacy_line_has_object = false;
+          }
+
+          has_flow_content = true;
+          let frame_height = inline_shape_frame_height(shape);
+          let has_following_line_participant =
+            top_bottom_anchor_has_following_line_participant(&paragraph.inlines, inline_index + 1);
+          let object_portion_height =
+            if flow.compatibility_mode < 15 && has_following_line_participant {
+              legacy_nonfinal_horizontal_rule_host_line_height(frame_height)
+            } else {
+              inline_drawing_portion_line_height(frame_height, paragraph, text_frame, text_metrics)
+            };
+          line_inline_object_portion_height =
+            line_inline_object_portion_height.max(object_portion_height);
+          let source_line_height =
+            inline_drawing_line_height(frame_height, paragraph, text_frame, text_metrics);
+          let resolved_line_height =
+            inline_object_line_metrics_for_flow(source_line_height, paragraph, flow).height_pt;
+          // A paragraph-final horizontal rule retains the ordinary paragraph
+          // mark line below. If content follows the rule, finish_line() uses
+          // the registered object portion for Word's compact non-final
+          // compatibility line while the forced boundary remains intact.
+          line_height = line_height.max(resolved_line_height);
+          x = inline_horizontal_rule_width(shape, 0.0, content_width);
+
+          if has_following_line_participant {
+            finish_line(
+              &mut content_height,
+              &mut line_height,
+              &mut line_text_extents,
+              &mut line_inline_object_portion_height,
+              false,
+            );
+            x = 0.0;
+            legacy_line_has_object = false;
+          }
+          continue;
+        }
         if let crate::docx::ImagePlacement::Floating(placement) = shape.placement
           && (effective_layout_in_cell(placement, flow)
             || flow.text_segmentation == TextSegmentation::RepeatingSlot)
@@ -11894,9 +12450,9 @@ fn layout_document_block(
       if table_page_break_before_applies(table, target.current, flow) {
         (flow, y) = force_page_break(flow, target.current, target.pages);
       }
-      let (carried_before, carried_after) =
+      let nested_spacing =
         nested_table_preceding_paragraph_spacing(previous, table, flow, target.text_metrics);
-      let table_y = y - carried_before;
+      let table_y = y - nested_spacing.carried_before_pt;
       let floating_anchor_lift =
         following_text_flow_table_anchor_lift(previous, table, flow, target.text_metrics);
       let has_ind_prev = table_has_indirect_previous_frame(target.current, flow, table_y);
@@ -11912,8 +12468,9 @@ fn layout_document_block(
         table_y,
         has_ind_prev,
         floating_anchor_lift,
+        nested_spacing.direct_text_frame_story_owner,
       );
-      (table_flow, table_bottom + carried_after)
+      (table_flow, table_bottom + nested_spacing.carried_after_pt)
     }
     Block::Frame(frame) => {
       let mut flow = flow;
@@ -11933,18 +12490,41 @@ fn layout_document_block(
   }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct NestedTablePrecedingParagraphSpacing {
+  carried_before_pt: f32,
+  carried_after_pt: f32,
+  direct_text_frame_story_owner: bool,
+}
+
 fn nested_table_preceding_paragraph_spacing(
   previous: Option<&Block>,
   table: &Table,
   flow: FlowContext,
   text_metrics: &mut TextMetrics,
-) -> (f32, f32) {
+) -> NestedTablePrecedingParagraphSpacing {
   if flow.text_segmentation != TextSegmentation::TableCell || table.placement.is_some() {
-    return (0.0, 0.0);
+    return NestedTablePrecedingParagraphSpacing::default();
   }
   let Some(Block::Paragraph(previous)) = previous else {
-    return (0.0, 0.0);
+    return NestedTablePrecedingParagraphSpacing::default();
   };
+  let direct_text_frame_story_owner =
+    previous.format.wordprocessing_shape_story || previous.format.word_text_frame_story;
+  if direct_text_frame_story_owner {
+    // SwTextBoxHelper::create() gives shape text an associated SwFlyFrame,
+    // while SwFlowFrame::CalcLowerSpace() limits its last-in-cell spacing
+    // compatibility branch to an actual IsInTab() lower. The table is a
+    // direct lower in that independent text-frame story: Word's COM layout
+    // positions for WPC_tdf48610 and testWPGtextboxes put its upper edge at
+    // the story cursor, with the preceding paragraph's lower space already
+    // consumed above it. Our clipping formatter happens to reuse TableCell
+    // segmentation, but that must not manufacture a cell baseline carry.
+    return NestedTablePrecedingParagraphSpacing {
+      direct_text_frame_story_owner: true,
+      ..NestedTablePrecedingParagraphSpacing::default()
+    };
+  }
   // A nested inline table does not consume the preceding paragraph's trailing
   // line space or lower paragraph space above its row border. Word carries
   // those extents across the table and exposes them below it, while preserving
@@ -11976,7 +12556,11 @@ fn nested_table_preceding_paragraph_spacing(
   // remains symmetric. This distinction keeps the ordinary visible/empty
   // predecessor counterexamples unchanged.
   let line_restore = if break_only { 0.0 } else { line_carry };
-  (line_carry + lower_space, line_restore + lower_space)
+  NestedTablePrecedingParagraphSpacing {
+    carried_before_pt: line_carry + lower_space,
+    carried_after_pt: line_restore + lower_space,
+    direct_text_frame_story_owner: false,
+  }
 }
 
 fn inline_nested_table_empty_predecessor_baseline_carry(
@@ -12272,6 +12856,7 @@ fn layout_floating_frame(
       y_pt: frame_y,
       width_pt: width,
       height_pt: rendered_height,
+      paragraph_alignment_locked: false,
       fill_color: None,
       fill_opacity: 1.0,
       stroke: frame_stroke,
@@ -12568,6 +13153,7 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     floating_table_cell_follow_top_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
+    fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
   }
 }
 
@@ -12608,6 +13194,7 @@ fn balanced_section_frame_end_y(
   replay_end_y: f32,
   trailing_spacing_after_pt: f32,
   frame_bottom_pt: f32,
+  trailing_spacing_stays_after_frame: bool,
 ) -> f32 {
   // SwSectionFrame::FormatWidthCols sizes the section frame from the balanced
   // column chain, and the following section is positioned after that frame.
@@ -12617,7 +13204,18 @@ fn balanced_section_frame_end_y(
   // content still fits; otherwise retain the replay cursor to prevent overlap.
   let content_end_y = replay_end_y - trailing_spacing_after_pt.max(0.0);
   if content_end_y <= frame_bottom_pt + LAYOUT_EPSILON_PT {
+    // A standard VML horizontal rule is a line-owning inline object whose
+    // lower paragraph spacing remains after the balanced column frame. Word's
+    // fixed output and LibreOffice's fly-aware FormatWidthCols path agree that
+    // the spacing cannot be divided into an otherwise empty second column.
+    // Ordinary text/drawing paragraphs remain the counterexample: their
+    // trailing spacing is already part of the balanced frame measurement.
     frame_bottom_pt
+      + if trailing_spacing_stays_after_frame {
+        trailing_spacing_after_pt.max(0.0)
+      } else {
+        0.0
+      }
   } else {
     replay_end_y
   }
@@ -13917,6 +14515,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       floating_table_cell_follow_top_inset_pt: 0.0,
       note_continuation_top_inset_pt: 0.0,
       inside_paragraph_frame: false,
+      fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
     },
   );
 
@@ -13967,6 +14566,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       floating_table_cell_follow_top_inset_pt: 0.0,
       note_continuation_top_inset_pt: 0.0,
       inside_paragraph_frame: false,
+      fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
     },
   );
 
@@ -14240,6 +14840,7 @@ fn apply_headers_and_footers(
         floating_table_cell_follow_top_inset_pt: 0.0,
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
+        fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
       },
       RepeatingFrameSink {
         page_index: index,
@@ -14295,6 +14896,7 @@ fn apply_headers_and_footers(
         floating_table_cell_follow_top_inset_pt: 0.0,
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
+        fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
       },
       RepeatingFrameSink {
         page_index: index,
@@ -16014,6 +16616,7 @@ fn measured_repeating_blocks_height_at(
     floating_table_cell_follow_top_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
+    fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
   };
   let mut y = origin_y_pt;
   for (index, block) in blocks.iter().enumerate() {
@@ -16082,6 +16685,7 @@ fn layout_repeating_block(
         y,
         has_ind_prev,
         0.0,
+        false,
       );
       y
     }
@@ -16105,6 +16709,7 @@ fn layout_table(
   y: f32,
   has_ind_prev: bool,
   floating_anchor_lift_pt: f32,
+  direct_text_frame_story_owner: bool,
 ) -> (FlowContext, f32) {
   let TableLayoutTarget {
     current,
@@ -16127,6 +16732,7 @@ fn layout_table(
       flow.text_segmentation == TextSegmentation::TableCell,
       text_metrics,
     )
+    .map(|layout| layout.with_direct_text_frame_story_owner(direct_text_frame_story_owner))
     .map_or((flow, y), |layout| {
       let (flow, bottom) = layout.format(current, pages, text_metrics, y, has_ind_prev);
       (
@@ -16153,6 +16759,7 @@ fn layout_table(
     flow.text_segmentation == TextSegmentation::TableCell,
     text_metrics,
   )
+  .map(|layout| layout.with_direct_text_frame_story_owner(direct_text_frame_story_owner))
   .map_or((flow, y), |layout| {
     // TableFrameLayout's bottom is the row frame edge. The following flow
     // starts outside the painted bottom border, just as SwTabFrame's next
@@ -16818,6 +17425,7 @@ fn decorate_floating_table_page_bounds(
       y_pt: top_pt,
       width_pt,
       height_pt: (default_bottom_pt.unwrap_or(bottom_pt) - top_pt).max(DEFAULT_LINE_HEIGHT_PT),
+      paragraph_alignment_locked: false,
       fill_color: None,
       fill_opacity: 1.0,
       stroke: Some(BorderStyle::default()),
@@ -16852,6 +17460,7 @@ fn materialize_table_frame_fragment_bounds(pages: &mut [Page], frames: &[LayoutF
         y_pt: bounds.y_pt,
         width_pt: bounds.width_pt,
         height_pt: bounds.height_pt,
+        paragraph_alignment_locked: false,
         fill_color: None,
         fill_opacity: 1.0,
         stroke: Some(BorderStyle::default()),
@@ -17394,6 +18003,7 @@ fn lower_inline_chart(
     y_pt,
     width_pt,
     height_pt,
+    paragraph_alignment_locked: false,
     fill_color: None,
     fill_opacity: 1.0,
     stroke: frame_stroke,
@@ -17509,6 +18119,7 @@ fn lower_word_pie_chart(
     y_pt: chart_y_pt,
     width_pt,
     height_pt,
+    paragraph_alignment_locked: false,
     fill_color: None,
     fill_opacity: 1.0,
     stroke: Some(frame_stroke),
@@ -17693,6 +18304,7 @@ fn lower_word_pie_chart(
           y_pt: marker_y,
           width_pt: marker_size,
           height_pt: marker_size,
+          paragraph_alignment_locked: false,
           fill_color: Some(color),
           fill_opacity: 1.0,
           stroke: None,
@@ -17741,6 +18353,7 @@ fn lower_word_pie_chart(
           y_pt: first_marker_y + row_offset,
           width_pt: marker_size,
           height_pt: marker_size,
+          paragraph_alignment_locked: false,
           fill_color: Some(color),
           fill_opacity: 1.0,
           stroke: None,
@@ -17798,6 +18411,7 @@ fn lower_generic_inline_chart(
           y_pt,
           width_pt: diameter_pt,
           height_pt: diameter_pt,
+          paragraph_alignment_locked: false,
           fill_color: None,
           fill_opacity: 1.0,
           stroke,
@@ -17808,6 +18422,7 @@ fn lower_generic_inline_chart(
           y_pt,
           width_pt: diameter_pt,
           height_pt: diameter_pt,
+          paragraph_alignment_locked: false,
           fill_color: None,
           fill_opacity: 1.0,
           stroke,
@@ -17820,6 +18435,7 @@ fn lower_generic_inline_chart(
       y_pt,
       width_pt: width_pt / 3.0,
       height_pt: height_pt * 0.55,
+      paragraph_alignment_locked: false,
       fill_color: None,
       fill_opacity: 1.0,
       stroke,
@@ -17830,6 +18446,7 @@ fn lower_generic_inline_chart(
       y_pt: y_pt + height_pt * 1.055,
       width_pt,
       height_pt,
+      paragraph_alignment_locked: false,
       fill_color: None,
       fill_opacity: 1.0,
       stroke,
@@ -17846,6 +18463,7 @@ fn lower_generic_inline_chart(
       y_pt,
       width_pt,
       height_pt,
+      paragraph_alignment_locked: false,
       fill_color: None,
       fill_opacity: 1.0,
       stroke,
@@ -17925,6 +18543,7 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
       y_pt: rect.y_pt,
       width_pt: rect.width_pt,
       height_pt: rect.height_pt,
+      paragraph_alignment_locked: false,
       fill_color: rect.fill_color,
       fill_opacity: rect.fill_opacity,
       stroke: rect.stroke,
@@ -17949,6 +18568,8 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
       y_pt: image.y_pt,
       width_pt: image.width_pt,
       height_pt: image.height_pt,
+      inline_frame_left_gap_pt: 0.0,
+      inline_frame_right_gap_pt: 0.0,
       inline_baseline_gap_pt: 0.0,
       inline_baseline_participant: false,
       paragraph_alignment_locked: false,
@@ -18175,6 +18796,7 @@ impl<'a> TableFrameLayout<'a> {
         repeating_header_height,
         total_height,
         floating_table_cell_follow_top_inset_pt: 0.0,
+        direct_text_frame_story_owner: false,
       },
       inside_table_cell,
       nested_in_floating_table_cell: false,
@@ -18188,6 +18810,11 @@ impl<'a> TableFrameLayout<'a> {
     } else {
       0.0
     };
+    self
+  }
+
+  fn with_direct_text_frame_story_owner(mut self, owned: bool) -> Self {
+    self.frame.direct_text_frame_story_owner = owned;
     self
   }
 
@@ -18217,7 +18844,7 @@ impl<'a> TableFrameLayout<'a> {
       ..flow_from_block_area(layout.frame.block)
     };
     let mut repeating_headers_disabled = false;
-    y = layout.dodge_wrap_exclusions(current, y, layout.initial_dodge_height());
+    y = layout.resolve_wrap_position(current, y, layout.initial_dodge_height());
     if !layout.frame.split_allowed
       && y > layout.frame.block.content_top_pt + LAYOUT_EPSILON_PT
       && y + layout.frame.total_height > layout.frame.block.content_bottom + LAYOUT_EPSILON_PT
@@ -18270,7 +18897,7 @@ impl<'a> TableFrameLayout<'a> {
       });
       while row_index < format_until {
         let row = &layout.table.rows[row_index];
-        y = layout.dodge_wrap_exclusions(
+        y = layout.resolve_wrap_position(
           current,
           y,
           layout
@@ -18324,7 +18951,7 @@ impl<'a> TableFrameLayout<'a> {
         debug_assert!(follow_start_row_index >= row_index);
       }
       let row = &layout.table.rows[row_index];
-      y = layout.dodge_wrap_exclusions(
+      y = layout.resolve_wrap_position(
         current,
         y,
         split_decision
@@ -19257,6 +19884,7 @@ impl<'a> TableFrameLayout<'a> {
         self.nested_in_floating_table_cell,
         self.frame.floating_table_cell_follow_top_inset_pt,
       )
+      .with_direct_text_frame_story_owner(self.frame.direct_text_frame_story_owner)
     };
     if repeating_headers_disabled {
       layout = layout.without_repeating_headers();
@@ -19720,6 +20348,62 @@ impl<'a> TableFrameLayout<'a> {
     }
   }
 
+  fn resolve_wrap_position(&mut self, current: &Page, y: f32, height_pt: f32) -> f32 {
+    let y = self.dodge_wrap_exclusions(current, y, height_pt);
+    self.place_beside_wrap_exclusions(current, y, height_pt);
+    y
+  }
+
+  fn place_beside_wrap_exclusions(&mut self, current: &Page, y: f32, height_pt: f32) {
+    let table_width = self.frame.right_pt - self.frame.left_pt;
+    let block_left = self.frame.block.content_left_pt;
+    let block_right = block_left + self.frame.block.content_width;
+    let segments = available_line_segments_for_y(
+      block_left,
+      block_right,
+      y,
+      height_pt.max(TABLE_ROW_MIN_HEIGHT_PT),
+      &current.wrap_exclusions,
+    );
+    if segments.iter().any(|(left, right)| {
+      self.frame.left_pt + LAYOUT_EPSILON_PT >= *left
+        && self.frame.right_pt <= *right + LAYOUT_EPSILON_PT
+    }) {
+      return;
+    }
+
+    // SwTabFrame::CalcFlyOffsets() keeps an inline table on the same vertical
+    // position when its print width fits beside a wrapping fly, and applies
+    // the fly-with-spaces edge as a horizontal print-area offset. Preserve the
+    // table's own alignment inside each candidate segment, then choose the
+    // smallest displacement from its unwrapped position.
+    let candidate = segments
+      .into_iter()
+      .filter(|(left, right)| right - left + LAYOUT_EPSILON_PT >= table_width)
+      .filter_map(|(left, right)| {
+        let candidate_left = table_left_position(
+          self.table,
+          left,
+          right - left,
+          table_width,
+          self.inside_table_cell,
+        );
+        (candidate_left + LAYOUT_EPSILON_PT >= left
+          && candidate_left + table_width <= right + LAYOUT_EPSILON_PT)
+          .then_some(candidate_left)
+      })
+      .min_by(|first, second| {
+        (first - self.frame.left_pt)
+          .abs()
+          .partial_cmp(&(second - self.frame.left_pt).abs())
+          .unwrap_or(std::cmp::Ordering::Equal)
+      });
+    if let Some(left_pt) = candidate {
+      self.frame.left_pt = left_pt;
+      self.frame.right_pt = left_pt + table_width;
+    }
+  }
+
   fn blocking_wrap_exclusion(
     &self,
     current: &Page,
@@ -19834,6 +20518,7 @@ struct TableFrame {
   repeating_header_height: f32,
   total_height: f32,
   floating_table_cell_follow_top_inset_pt: f32,
+  direct_text_frame_story_owner: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -20495,6 +21180,7 @@ impl CellFrame<'_, '_> {
     layout_table_cell(TableCellLayout {
       cell: self.cell,
       table_following_text_flow: self.table.following_text_flow,
+      direct_text_frame_story_owner: self.table_frame.direct_text_frame_story_owner,
       word_floating_table_cell: self.table.placement.is_some(),
       ancestor_floating_table_cell_follow_top_inset_pt: self
         .table_frame
@@ -20622,6 +21308,7 @@ impl CellFrame<'_, '_> {
       y_pt: row_top,
       width_pt: self.width_pt,
       height_pt,
+      paragraph_alignment_locked: false,
       fill_color: None,
       fill_opacity: 1.0,
       stroke: Some(BorderStyle::default()),
@@ -22667,6 +23354,7 @@ fn spanned_cell_width(cell: &TableCell, column_widths: &[f32], grid_index: &mut 
 struct TableCellLayout<'a> {
   cell: &'a TableCell,
   table_following_text_flow: bool,
+  direct_text_frame_story_owner: bool,
   word_floating_table_cell: bool,
   ancestor_floating_table_cell_follow_top_inset_pt: f32,
   escape_following_text_flow_pages: bool,
@@ -22890,6 +23578,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
   let TableCellLayout {
     cell,
     table_following_text_flow,
+    direct_text_frame_story_owner,
     word_floating_table_cell,
     ancestor_floating_table_cell_follow_top_inset_pt,
     escape_following_text_flow_pages,
@@ -22942,7 +23631,16 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
     cell.blocks.first(),
     Some(Block::Table(table)) if table.placement.is_some()
   );
-  let first_line_baseline_offset = if matches!(cell.blocks.first(), Some(Block::Paragraph(_)))
+  let first_line_baseline_offset = if direct_text_frame_story_owner {
+    // A table directly owned by a shape text frame starts at that story's
+    // resolved cursor. Its cell paragraph still contributes the ordinary
+    // line ascent during text layout, so adding the table-paint baseline
+    // conversion here would move the glyphs down after the outer cell-only
+    // carry has been removed. Word's WPG fixed output independently exposes
+    // both coordinates: the table border begins at the story cursor and the
+    // first row text remains on the pre-existing baseline.
+    0.0
+  } else if matches!(cell.blocks.first(), Some(Block::Paragraph(_)))
     && !table_cell_empty_prefix_precedes_inline_table(&cell.blocks)
   {
     table_cell_initial_baseline_offset(&first_line_style, first_line_height, text_metrics)
@@ -23125,6 +23823,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
       + top_print_inset_for_lowers,
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
+    fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
   };
   let overlap_probe_exclusions = future_floating_table_wrap_exclusions(
     blocks_to_layout,
@@ -23855,6 +24554,7 @@ fn table_cell_first_content_line_height(
           floating_table_cell_follow_top_inset_pt: 0.0,
           note_continuation_top_inset_pt: 0.0,
           inside_paragraph_frame: false,
+          fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
         };
         let next = cell.blocks.get(1);
         return Some(
@@ -23920,6 +24620,7 @@ fn table_cell_first_content_line_height(
             floating_table_cell_follow_top_inset_pt: 0.0,
             note_continuation_top_inset_pt: 0.0,
             inside_paragraph_frame: false,
+            fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
           };
           frame
             .blocks
@@ -24406,6 +25107,7 @@ fn layout_shape_text_box(
     floating_table_cell_follow_top_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
+    fixed_output_raster_dpi: parent_flow.fixed_output_raster_dpi,
   };
   let content_height = match shape.text_vertical_alignment {
     TextBoxVerticalAlignment::Top => 0.0,
@@ -24449,7 +25151,13 @@ fn layout_shape_text_box(
   };
   let mut nested_page = empty_page(parent_flow.setup, current.section_index);
   let mut discarded_pages = Vec::new();
-  let mut text_cursor_y = text_y;
+  let mut text_cursor_y = shape_text_box_initial_cursor_y(
+    &shape.text_box_blocks,
+    flow,
+    text_y,
+    shape.text_vertical_alignment == TextBoxVerticalAlignment::Center && free_vertical_space < 0.0,
+    text_metrics,
+  );
   for (index, block) in shape.text_box_blocks.iter().enumerate() {
     if shape.text_box_clip_vertical_overflow && text_cursor_y > content_bottom {
       break;
@@ -24583,6 +25291,40 @@ fn layout_shape_text_box(
   attach_wordprocessing_text_effect_host(&mut items, effect_host);
   detach_nested_inline_baseline_participants(&mut items);
   current.items.extend(items);
+}
+
+fn shape_text_box_initial_cursor_y(
+  blocks: &[Block],
+  flow: FlowContext,
+  line_top_y: f32,
+  resolve_overflow_line_top: bool,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  if !resolve_overflow_line_top || flow.layout_cell_bounds.is_none() {
+    return line_top_y;
+  }
+  let Some(Block::Paragraph(paragraph)) = blocks.first() else {
+    return line_top_y;
+  };
+  if !paragraph.format.wordprocessing_shape_story {
+    return line_top_y;
+  }
+
+  // A centered WPS story that overflows its preset text rectangle starts at
+  // the rectangle top in Word/Sdr rather than shifting upward by half the
+  // overflow. When its host is inside a real table cell, the nested
+  // WordprocessingML story reuses that cell formatter, whose input cursor is
+  // a resolved baseline rather than the line top. Convert only this combined
+  // branch and only its direct WPS paragraph; body-owned shapes, top/bottom
+  // anchors, and a real table nested in the textbox own independent cursor
+  // contracts.
+  let text_frame = TextFrame::new(paragraph, flow, text_metrics);
+  line_top_y
+    + table_cell_initial_baseline_offset(
+      &paragraph_base_line_style(paragraph),
+      text_frame.base_line_height,
+      text_metrics,
+    )
 }
 
 fn shape_text_box_vertical_adjustment(
@@ -24929,6 +25671,7 @@ fn shape_text_box_measure_flow(parent_flow: FlowContext, content_width: f32) -> 
     floating_table_cell_follow_top_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
+    fixed_output_raster_dpi: parent_flow.fixed_output_raster_dpi,
   }
 }
 
@@ -25782,6 +26525,7 @@ fn table_cell_content_height_with_mode(
     floating_table_cell_follow_top_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
+    fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
   };
   let flow = FlowContext {
     script_sensitive_line_height: true,
@@ -26411,6 +27155,27 @@ fn floating_anchor_line_top(
       &paragraph_base_line_style(paragraph),
       line_height,
     )
+}
+
+fn dodge_line_origin_wrap_exclusions(
+  line_origin_y: f32,
+  line_top_y: f32,
+  line_height: f32,
+  default_left: f32,
+  default_right: f32,
+  exclusions: &[WrapExclusion],
+) -> f32 {
+  let dodged_line_top = dodge_text_wrap_exclusions(
+    line_top_y,
+    line_height,
+    default_left,
+    default_right,
+    exclusions,
+  );
+  // Body text uses the line top as its cursor, while a table-cell text frame
+  // stores the resolved baseline. Wrapping is a line-box collision in both
+  // cases: preserve the original top-to-origin distance when the line moves.
+  line_origin_y + (dodged_line_top - line_top_y)
 }
 
 fn paragraph_initial_floating_image_wrap_exclusions(
@@ -28874,7 +29639,11 @@ impl<'a> TextFrameLayout<'a> {
         text_metrics,
       ),
     );
-    let has_list_label = paragraph.list_label.is_some() || paragraph.list_label_image.is_some();
+    let has_list_label = paragraph.list_label.is_some()
+      || paragraph.list_label_image.is_some()
+      || paragraph
+        .format
+        .suppressed_picture_bullet_owns_numbering_margin;
     let mut first_inline_index = 0;
     let mut leading_break_was_page = false;
     if has_list_label {
@@ -29090,6 +29859,7 @@ impl<'a> TextFrameLayout<'a> {
             y_pt: y,
             width_pt: highlight_right - highlight_left,
             height_pt: line_height,
+            paragraph_alignment_locked: false,
             fill_color: Some(highlight),
             fill_opacity: 1.0,
             stroke: None,
@@ -29218,6 +29988,10 @@ impl<'a> TextFrameLayout<'a> {
           y_pt: image_top + metrics.content_offset_y_pt,
           width_pt: metrics.content_width_pt,
           height_pt: metrics.content_height_pt,
+          inline_frame_left_gap_pt: metrics.content_offset_x_pt,
+          inline_frame_right_gap_pt: metrics.frame_width_pt
+            - metrics.content_offset_x_pt
+            - metrics.content_width_pt,
           inline_baseline_gap_pt: metrics.content_bottom_gap_pt,
           inline_baseline_participant: false,
           paragraph_alignment_locked: false,
@@ -29227,7 +30001,10 @@ impl<'a> TextFrameLayout<'a> {
           flip_horizontal: image.flip_horizontal,
           flip_vertical: image.flip_vertical,
           data: image.data.clone(),
-          content_type: image.content_type.clone(),
+          content_type: wordprocessing_shape_story_image_content_type(
+            paragraph,
+            image.content_type.as_deref(),
+          ),
           metafile_background_color: image.metafile_background_color,
           alt_text: image.alt_text.clone(),
           hyperlink_url: image.hyperlink_url.clone(),
@@ -29386,7 +30163,16 @@ impl<'a> TextFrameLayout<'a> {
                     group_item_end,
                     influence_bounds,
                   );
-                  y = y.max(bottom + placement.margin_bottom_pt);
+                  let wrap_line_top =
+                    floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
+                  y = dodge_line_origin_wrap_exclusions(
+                    y,
+                    wrap_line_top,
+                    line_height,
+                    text_frame.default_line_left,
+                    text_frame.default_line_right,
+                    &wrap_exclusions,
+                  );
                   if y + text_frame.page_fit_height(base_line_height) > flow.content_bottom
                     && page_has_body_region_items(current, flow)
                   {
@@ -30294,22 +31080,31 @@ impl<'a> TextFrameLayout<'a> {
               .as_ref()
               .map_or(0.0, |continuation| continuation.fit_width_pt)
               + smart_justify_current_overhang.map_or(0.0, |punctuation| punctuation.width_pt);
-            // Writer enters its second, device-measured Guess() only for a
-            // full block-justified line whose word spacing is allowed to
-            // shrink (SwTextPortion::Format in portxt.cxx). Running the GDI
-            // compatibility measurement for every ordinary segment is both
-            // outside that semantic boundary and prohibitively expensive:
-            // TrueType hint programs would be executed throughout unrelated
-            // paragraphs before a shrink candidate even exists.
-            let smart_justify_device_fit = if !shrink_justified_lines
+            // Writer enters its second, device-measured Guess() for a full
+            // block-justified line whose word spacing may shrink
+            // (SwTextPortion::Format in portxt.cxx). That path compares a
+            // hinted run extent. Word's legacy VML text frame instead uses
+            // classic GDI's accumulated integer character advances for every
+            // ordinary break: fdo73215's 8pt Arial control measures 798 dots
+            // (95.76pt) at 600 DPI, while its unhinted PDF advance is only
+            // 95.156pt. Keep both device metrics scoped to their respective
+            // source-backed paths; body and real table text stay on normal
+            // shaping metrics.
+            let use_gdi_line_fit = shrink_justified_lines || paragraph.format.word_text_frame_story;
+            let gdi_line_fit_metric = if paragraph.format.word_text_frame_story {
+              GdiLineFitMetric::IntegerCharacterAdvances
+            } else {
+              GdiLineFitMetric::HintedRun
+            };
+            let gdi_line_fit = if !use_gdi_line_fit
               || flow.text_segmentation == TextSegmentation::DrawingLayer
               || grid_width.is_some()
               || leading_script_spacing > LAYOUT_EPSILON_PT
             {
               None
             } else {
-              smart_justify_device_fit(
-                SmartJustifyDeviceFitInput {
+              gdi_line_fit_adjustments(
+                GdiLineFitInput {
                   items: &current.items,
                   item_start: line_item_start_index,
                   chunk: &chunk,
@@ -30319,21 +31114,31 @@ impl<'a> TextFrameLayout<'a> {
                       punctuation.fit_text_without_punctuation
                     }),
                   style: &run.style,
+                  metric: gdi_line_fit_metric,
                   continuation_fit_width_pt: continuation_fit_width,
-                  continuation_hinted_fit_width_pt: continuation
-                    .as_ref()
-                    .map_or(Some(0.0), |continuation| {
-                      continuation.gdi_hinted_fit_width_pt
-                    }),
+                  continuation_device_fit_width_pt: continuation.as_ref().map_or(
+                    Some(0.0),
+                    |continuation| match gdi_line_fit_metric {
+                      GdiLineFitMetric::HintedRun => continuation.gdi_hinted_fit_width_pt,
+                      GdiLineFitMetric::IntegerCharacterAdvances => {
+                        continuation.gdi_character_fit_width_pt
+                      }
+                    },
+                  ),
                 },
                 text_metrics,
               )
             };
-            let device_overflows_line = smart_justify_device_fit.is_some_and(|device_fit| {
+            let device_overflows_line = gdi_line_fit.is_some_and(|device_fit| {
               x + fit_width_with_continuation + device_fit.candidate_right_adjustment_pt
                 > fit_line_right
             });
-            let overflows_line = natural_overflows_line || device_overflows_line;
+            let overflows_line = if paragraph.format.word_text_frame_story && gdi_line_fit.is_some()
+            {
+              device_overflows_line || blocks_compression_only_fit
+            } else {
+              natural_overflows_line || device_overflows_line
+            };
             let can_fit_with_shrink = !fits_pending_smart_justify_continuation
               && overflows_line
               && shrink_justified_lines
@@ -30349,7 +31154,7 @@ impl<'a> TextFrameLayout<'a> {
                     width: fit_width_with_continuation,
                     text: &segment.text,
                     line_right: fit_line_right,
-                    device_fit: smart_justify_device_fit,
+                    device_fit: gdi_line_fit,
                     items: &current.items,
                     item_start: line_item_start_index,
                     chunk: &chunk,
@@ -31351,8 +32156,10 @@ impl<'a> TextFrameLayout<'a> {
           }
           ended_with_explicit_page_break = false;
           text_state.set_position(InlineCursor::after_inline(inline_index));
-          pending_tab = None;
           if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
+            // An anchored drawing owns its independent position; a pending
+            // inline tab cannot align it as a character portion.
+            pending_tab = None;
             let metrics = floating_image_metrics(image, placement, flow);
             let line_anchor_top =
               floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
@@ -31376,6 +32183,8 @@ impl<'a> TextFrameLayout<'a> {
               y_pt: image_y,
               width_pt: width,
               height_pt: height,
+              inline_frame_left_gap_pt: 0.0,
+              inline_frame_right_gap_pt: 0.0,
               inline_baseline_gap_pt: 0.0,
               inline_baseline_participant: false,
               paragraph_alignment_locked: false,
@@ -31385,7 +32194,10 @@ impl<'a> TextFrameLayout<'a> {
               flip_horizontal: image.flip_horizontal,
               flip_vertical: image.flip_vertical,
               data: image.data.clone(),
-              content_type: image.content_type.clone(),
+              content_type: wordprocessing_shape_story_image_content_type(
+                paragraph,
+                image.content_type.as_deref(),
+              ),
               metafile_background_color: image.metafile_background_color,
               alt_text: image.alt_text.clone(),
               hyperlink_url: image.hyperlink_url.clone(),
@@ -31406,6 +32218,7 @@ impl<'a> TextFrameLayout<'a> {
                 y_pt: image_y,
                 width_pt: width,
                 height_pt: height,
+                paragraph_alignment_locked: false,
                 fill_color: None,
                 fill_opacity: 1.0,
                 stroke: Some(BorderStyle::default()),
@@ -31450,7 +32263,16 @@ impl<'a> TextFrameLayout<'a> {
                     influence_bounds,
                   );
                   let previous_y = y;
-                  y = y.max(image_y + height + placement.margin_bottom_pt);
+                  let wrap_line_top =
+                    floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
+                  y = dodge_line_origin_wrap_exclusions(
+                    y,
+                    wrap_line_top,
+                    line_height,
+                    text_frame.default_line_left,
+                    text_frame.default_line_right,
+                    &wrap_exclusions,
+                  );
                   floating_wrap_advanced_line |= y > previous_y + LAYOUT_EPSILON_PT;
                   if y + text_frame.page_fit_height(base_line_height) > flow.content_bottom
                     && page_has_body_region_items(current, flow)
@@ -31667,7 +32489,6 @@ impl<'a> TextFrameLayout<'a> {
                   default_line_right = text_frame.default_line_right;
                   paragraph_left = text_frame.paragraph_left;
                   base_line_height = text_frame.base_line_height;
-                  x = line_left;
                   line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
@@ -31890,6 +32711,10 @@ impl<'a> TextFrameLayout<'a> {
                       y_pt: image_top + metrics.content_offset_y_pt,
                       width_pt: metrics.content_width_pt,
                       height_pt: metrics.content_height_pt,
+                      inline_frame_left_gap_pt: metrics.content_offset_x_pt,
+                      inline_frame_right_gap_pt: metrics.frame_width_pt
+                        - metrics.content_offset_x_pt
+                        - metrics.content_width_pt,
                       inline_baseline_gap_pt: metrics.content_bottom_gap_pt,
                       inline_baseline_participant: true,
                       paragraph_alignment_locked: display_alignment.is_some(),
@@ -31899,7 +32724,10 @@ impl<'a> TextFrameLayout<'a> {
                       flip_horizontal: piece.flip_horizontal,
                       flip_vertical: piece.flip_vertical,
                       data: piece.data.clone(),
-                      content_type: piece.content_type.clone(),
+                      content_type: wordprocessing_shape_story_image_content_type(
+                        paragraph,
+                        piece.content_type.as_deref(),
+                      ),
                       metafile_background_color: piece.metafile_background_color,
                       alt_text: piece.alt_text.clone(),
                       hyperlink_url: piece.hyperlink_url.clone(),
@@ -31918,6 +32746,7 @@ impl<'a> TextFrameLayout<'a> {
                         y_pt: y + metrics.content_offset_y_pt,
                         width_pt: metrics.content_width_pt,
                         height_pt: metrics.content_height_pt,
+                        paragraph_alignment_locked: false,
                         fill_color: None,
                         fill_opacity: 1.0,
                         stroke: Some(BorderStyle::default()),
@@ -31943,7 +32772,17 @@ impl<'a> TextFrameLayout<'a> {
             }
           }
           let metrics = inline_image_metrics(image);
-          if x + metrics.frame_width_pt > line_right && x > line_left {
+          let fit_line_right = aligned_tab_provisional_line_right(pending_tab.as_ref(), line_right);
+          if x + metrics.frame_width_pt > fit_line_right && x > line_left {
+            apply_pending_aligned_tab(
+              current,
+              &mut pending_tab,
+              text_metrics,
+              y,
+              line_left,
+              line_right,
+            );
+            pending_tab = None;
             (flow, text_frame, y, line_left, line_right) = self.advance_line(
               TextLineAdvance {
                 current,
@@ -32035,6 +32874,10 @@ impl<'a> TextFrameLayout<'a> {
             y_pt: image_top + metrics.content_offset_y_pt,
             width_pt: metrics.content_width_pt,
             height_pt: metrics.content_height_pt,
+            inline_frame_left_gap_pt: metrics.content_offset_x_pt,
+            inline_frame_right_gap_pt: metrics.frame_width_pt
+              - metrics.content_offset_x_pt
+              - metrics.content_width_pt,
             inline_baseline_gap_pt: metrics.content_bottom_gap_pt,
             inline_baseline_participant: true,
             paragraph_alignment_locked: false,
@@ -32044,7 +32887,10 @@ impl<'a> TextFrameLayout<'a> {
             flip_horizontal: image.flip_horizontal,
             flip_vertical: image.flip_vertical,
             data: image.data.clone(),
-            content_type: image.content_type.clone(),
+            content_type: wordprocessing_shape_story_image_content_type(
+              paragraph,
+              image.content_type.as_deref(),
+            ),
             metafile_background_color: image.metafile_background_color,
             alt_text: image.alt_text.clone(),
             hyperlink_url: image.hyperlink_url.clone(),
@@ -32063,6 +32909,7 @@ impl<'a> TextFrameLayout<'a> {
               y_pt: y + metrics.content_offset_y_pt,
               width_pt: metrics.content_width_pt,
               height_pt: metrics.content_height_pt,
+              paragraph_alignment_locked: false,
               fill_color: None,
               fill_opacity: 1.0,
               stroke: Some(BorderStyle::default()),
@@ -32084,7 +32931,16 @@ impl<'a> TextFrameLayout<'a> {
             auto_script_spacing.reset();
           }
           ended_with_explicit_page_break = false;
-          text_state.set_position(InlineCursor::after_inline(inline_index));
+          let is_inline_horizontal_rule = shape.horizontal_rule.is_some()
+            && matches!(shape.placement, crate::docx::ImagePlacement::Inline);
+          text_state.set_position(if is_inline_horizontal_rule {
+            InlineCursor {
+              inline_index,
+              text_offset: 0,
+            }
+          } else {
+            InlineCursor::after_inline(inline_index)
+          });
           pending_tab = None;
           let place_shape = |current: &mut Page,
                              shape_flow: FlowContext,
@@ -32171,7 +33027,13 @@ impl<'a> TextFrameLayout<'a> {
                   ),
                 )),
               }));
-              finish_docx_shape_effects(&mut current.items, item_start, shape, shape_bounds);
+              finish_docx_shape_effects(
+                &mut current.items,
+                item_start,
+                shape,
+                shape_bounds,
+                shape_flow.fixed_output_raster_dpi,
+              );
               return (item_start, current.items.len());
             }
             if let InlineShapeGeometry::Polyline { points, closed } = &shape.geometry {
@@ -32220,7 +33082,13 @@ impl<'a> TextFrameLayout<'a> {
                   stroke: None,
                 }));
               }
-              finish_docx_shape_effects(&mut current.items, item_start, shape, shape_bounds);
+              finish_docx_shape_effects(
+                &mut current.items,
+                item_start,
+                shape,
+                shape_bounds,
+                shape_flow.fixed_output_raster_dpi,
+              );
               layout_shape_text_box(
                 current,
                 shape_flow,
@@ -32307,7 +33175,13 @@ impl<'a> TextFrameLayout<'a> {
                   }
                 }
               }
-              finish_docx_shape_effects(&mut current.items, item_start, shape, shape_bounds);
+              finish_docx_shape_effects(
+                &mut current.items,
+                item_start,
+                shape,
+                shape_bounds,
+                shape_flow.fixed_output_raster_dpi,
+              );
               layout_shape_text_box(
                 current,
                 shape_flow,
@@ -32373,6 +33247,7 @@ impl<'a> TextFrameLayout<'a> {
                 y_pt,
                 width_pt,
                 height_pt,
+                paragraph_alignment_locked: shape.horizontal_rule.is_some(),
                 fill_color: shape.fill_color,
                 fill_opacity: 1.0,
                 stroke: shape.stroke,
@@ -32406,6 +33281,7 @@ impl<'a> TextFrameLayout<'a> {
                     y_pt,
                     width_pt,
                     height_pt,
+                    paragraph_alignment_locked: shape.horizontal_rule.is_some(),
                     fill_color: Some(*color),
                     fill_opacity: 1.0,
                     stroke: None,
@@ -32414,7 +33290,21 @@ impl<'a> TextFrameLayout<'a> {
                 }
               }
             }
-            finish_docx_shape_effects(&mut current.items, item_start, shape, shape_bounds);
+            push_standard_horizontal_rule_bevel(
+              &mut current.items,
+              shape,
+              x_pt,
+              y_pt,
+              width_pt,
+              height_pt,
+            );
+            finish_docx_shape_effects(
+              &mut current.items,
+              item_start,
+              shape,
+              shape_bounds,
+              shape_flow.fixed_output_raster_dpi,
+            );
             if shape_has_invisible_auto_fit_textbox_bounds(shape, shape_flow) {
               // content even when the owning draw shape has no fill/stroke,
               // but that layout-only frame is not painted as a polypolygon.
@@ -32423,6 +33313,7 @@ impl<'a> TextFrameLayout<'a> {
                 y_pt,
                 width_pt,
                 height_pt,
+                paragraph_alignment_locked: false,
                 fill_color: None,
                 fill_opacity: 1.0,
                 stroke: Some(BorderStyle::default()),
@@ -32647,6 +33538,7 @@ impl<'a> TextFrameLayout<'a> {
                   width_pt: width,
                   height_pt: (shape_paint_y + height - y - BorderStyle::default().width_pt)
                     .max(height),
+                  paragraph_alignment_locked: false,
                   fill_color: None,
                   fill_opacity: 1.0,
                   stroke: Some(BorderStyle::default()),
@@ -32696,19 +33588,28 @@ impl<'a> TextFrameLayout<'a> {
                       shape_item_end,
                       influence_bounds,
                     );
-                    // A floating drawing is anchored to a character in the
-                    // already-open text line. Writer computes its fly base
-                    // with the owning text frame ignored before applying
-                    // avoidance (`SwTextFly::SetIgnoreCurrentFrame(true)`).
-                    // Office's stress017 repeating header consequently keeps
-                    // the following inline group on that anchor line. Body
-                    // stories retain ordinary top/bottom avoidance (for
-                    // example WPC_CurvedConnector2). Preserve this header
-                    // line, while the retained blocking exclusion moves later
-                    // lines and paragraphs below the drawing.
+                    // A top/bottom object blocks the complete text width only
+                    // inside its vertical band. Word keeps WPC_CurvedConnector2's
+                    // anchor line when the canvas starts 38.3pt below it, but
+                    // moves the same line below the canvas when its Top is 0.
+                    // Writer makes the same distinction through the rectangle
+                    // overlap check in SwTextFly and ignores the owning text
+                    // frame while computing the fly base. The repeating-slot
+                    // exception below additionally preserves an overlapping
+                    // open anchor line (stress017); the retained exclusion
+                    // still moves later lines and paragraphs.
                     if !keep_anchor_line {
                       let previous_y = y;
-                      y = y.max(shape_y + height + placement.margin_bottom_pt);
+                      let wrap_line_top =
+                        floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics);
+                      y = dodge_line_origin_wrap_exclusions(
+                        y,
+                        wrap_line_top,
+                        line_height,
+                        text_frame.default_line_left,
+                        text_frame.default_line_right,
+                        &wrap_exclusions,
+                      );
                       floating_wrap_advanced_line |= y > previous_y + LAYOUT_EPSILON_PT;
                       if y + text_frame.page_fit_height(base_line_height) > flow.content_bottom
                         && page_has_body_region_items(current, flow)
@@ -32914,115 +33815,284 @@ impl<'a> TextFrameLayout<'a> {
                 emitted = false;
                 pending_text_page_break = false;
               }
-              let frame_width = inline_shape_frame_width(shape);
-              let frame_height = inline_shape_frame_height(shape);
-              let mut compatibility_forced_shape_line = false;
-              if x + frame_width > line_right && x > line_left {
-                (flow, text_frame, y, line_left, line_right) = self.advance_line(
-                  TextLineAdvance {
+              if is_inline_horizontal_rule {
+                let line_has_content = x > line_left + LAYOUT_EPSILON_PT
+                  || line_item_start_index < current.items.len()
+                  || text_state.line_text_extents.has_text
+                  || text_state.line_inline_object_portion_height > LAYOUT_EPSILON_PT;
+                if line_has_content {
+                  (flow, text_frame, y, line_left, line_right) = self.advance_line(
+                    TextLineAdvance {
+                      current,
+                      pages,
+                      text_metrics: &mut *text_metrics,
+                      wrap_exclusions: &mut wrap_exclusions,
+                      state: &mut text_state,
+                      active: ActiveTextFrame {
+                        flow,
+                        frame: text_frame,
+                      },
+                      line_left,
+                      line_right,
+                      justify: justify_wrapped_lines,
+                      line_item_start_index: &mut line_item_start_index,
+                      line_has_form_widget: &mut line_has_form_widget,
+                      line_ended_with_discretionary_hyphen:
+                        &mut line_ended_with_discretionary_hyphen,
+                    },
+                    y,
+                    &mut line_height,
+                  );
+                  default_line_right = text_frame.default_line_right;
+                  paragraph_left = text_frame.paragraph_left;
+                  base_line_height = text_frame.base_line_height;
+                  line_used_shrink_fit = false;
+                  line_used_punctuation_fit = false;
+                  line_has_tab = false;
+                }
+
+                text_state.set_position(InlineCursor::after_inline(inline_index));
+                let frame_height = inline_shape_frame_height(shape);
+                let has_following_line_participant =
+                  top_bottom_anchor_has_following_line_participant(
+                    &paragraph.inlines,
+                    inline_index + 1,
+                  );
+                let object_portion_height =
+                  if flow.compatibility_mode < 15 && has_following_line_participant {
+                    legacy_nonfinal_horizontal_rule_host_line_height(frame_height)
+                  } else {
+                    inline_drawing_portion_line_height(
+                      frame_height,
+                      paragraph,
+                      text_frame,
+                      text_metrics,
+                    )
+                  };
+                text_state.line_inline_object_portion_height = text_state
+                  .line_inline_object_portion_height
+                  .max(object_portion_height);
+                let source_line_height =
+                  inline_drawing_line_height(frame_height, paragraph, text_frame, text_metrics);
+                if at_least_uses_separate_content_height(paragraph, flow) {
+                  text_state.line_content_height =
+                    text_state.line_content_height.max(source_line_height);
+                }
+                let object_line_metrics =
+                  inline_object_line_metrics_for_flow(source_line_height, paragraph, flow);
+                let object_line_height = line_height.max(object_line_metrics.height_pt);
+                reflow_first_line_for_inline_object |=
+                  first_line_inline_object_requires_paragraph_follow(FirstLineInlineObjectFit {
+                    page: current,
+                    flow,
+                    y,
+                    line_height,
+                    object_line_height,
+                    paragraph_item_start: start_item_index,
+                    line_content_item_start: text_state.line_content_item_start_index,
+                    has_finished_lines: !text_state.line_fragments.is_empty(),
+                    remains_on_start_page: pages.len() == start_pages_len,
+                    allow_reflow,
+                  });
+                if line_item_start_index == current.items.len()
+                  && let Some(next) = self.advance_for_inline_object(InlineObjectAdvance {
                     current,
                     pages,
-                    text_metrics: &mut *text_metrics,
+                    text_metrics,
                     wrap_exclusions: &mut wrap_exclusions,
                     state: &mut text_state,
-                    active: ActiveTextFrame {
+                    flow,
+                    y,
+                    object_line_height,
+                  })
+                {
+                  (flow, text_frame, y, line_left, line_right, line_height) = next;
+                  default_line_right = text_frame.default_line_right;
+                  paragraph_left = text_frame.paragraph_left;
+                  base_line_height = text_frame.base_line_height;
+                  line_item_start_index = current.items.len();
+                  line_has_form_widget = false;
+                  line_used_shrink_fit = false;
+                  line_used_punctuation_fit = false;
+                  line_has_tab = false;
+                }
+                let frame_width = inline_horizontal_rule_width(shape, line_left, line_right);
+                let rule_x = inline_horizontal_rule_x(shape, line_left, line_right, frame_width);
+                let nonfinal_host_line_height = has_following_line_participant
+                  .then(|| {
+                    nonfinal_inline_object_only_line_height(
+                      paragraph,
                       flow,
-                      frame: text_frame,
-                    },
-                    line_left,
-                    line_right,
-                    justify: justify_wrapped_lines,
-                    line_item_start_index: &mut line_item_start_index,
-                    line_has_form_widget: &mut line_has_form_widget,
-                    line_ended_with_discretionary_hyphen: &mut line_ended_with_discretionary_hyphen,
-                  },
+                      text_frame,
+                      object_portion_height,
+                      false,
+                    )
+                  })
+                  .flatten()
+                  .map(|metrics| metrics.height_pt);
+                let rule_y = inline_horizontal_rule_top(
                   y,
-                  &mut line_height,
-                );
-                default_line_right = text_frame.default_line_right;
-                paragraph_left = text_frame.paragraph_left;
-                base_line_height = text_frame.base_line_height;
-                x = line_left;
-                compatibility_forced_shape_line = true;
-                line_used_shrink_fit = false;
-                line_used_punctuation_fit = false;
-                line_has_tab = false;
-              }
-              let object_portion_height = inline_drawing_portion_line_height(
-                frame_height,
-                paragraph,
-                text_frame,
-                text_metrics,
-              );
-              text_state.line_inline_object_portion_height = text_state
-                .line_inline_object_portion_height
-                .max(object_portion_height);
-              let source_line_height =
-                inline_drawing_line_height(frame_height, paragraph, text_frame, text_metrics);
-              if at_least_uses_separate_content_height(paragraph, flow) {
-                text_state.line_content_height =
-                  text_state.line_content_height.max(source_line_height);
-              }
-              let object_line_metrics =
-                inline_object_line_metrics_for_flow(source_line_height, paragraph, flow);
-              let object_line_height = object_line_metrics.height_pt;
-              reflow_first_line_for_inline_object |=
-                first_line_inline_object_requires_paragraph_follow(FirstLineInlineObjectFit {
-                  page: current,
-                  flow,
-                  y,
-                  line_height,
-                  object_line_height,
-                  paragraph_item_start: start_item_index,
-                  line_content_item_start: text_state.line_content_item_start_index,
-                  has_finished_lines: !text_state.line_fragments.is_empty(),
-                  remains_on_start_page: pages.len() == start_pages_len,
-                  allow_reflow,
-                });
-              if line_item_start_index == current.items.len()
-                && let Some(next) = self.advance_for_inline_object(InlineObjectAdvance {
-                  current,
-                  pages,
+                  shape.height_pt,
+                  paragraph,
+                  text_frame,
                   text_metrics,
-                  wrap_exclusions: &mut wrap_exclusions,
-                  state: &mut text_state,
+                  nonfinal_host_line_height,
+                );
+                let _ = place_shape(
+                  current,
                   flow,
-                  y,
-                  object_line_height,
-                })
-              {
-                (flow, text_frame, y, line_left, line_right, line_height) = next;
-                default_line_right = text_frame.default_line_right;
-                paragraph_left = text_frame.paragraph_left;
-                base_line_height = text_frame.base_line_height;
-                x = line_left;
-                line_item_start_index = current.items.len();
-                line_has_form_widget = false;
-                line_used_shrink_fit = false;
-                line_used_punctuation_fit = false;
-                line_has_tab = false;
-              }
-              let object_starts_line = line_item_start_index == current.items.len();
-              let _ = place_shape(
-                current,
-                flow,
-                text_metrics,
-                x + inline_shape_content_offset_x(shape) + shape.offset_x_pt,
-                y + inline_shape_content_offset_y(shape)
-                  + shape.offset_y_pt
-                  + object_line_metrics.ascent_adjustment_pt,
-                shape.width_pt,
-                shape.height_pt,
-              );
-              x += frame_width;
-              line_height = if (legacy_inline_object_owns_line_box(paragraph, text_frame)
-                && object_starts_line)
-                || (flow.compatibility_mode < 15 && compatibility_forced_shape_line)
-              {
-                object_line_height.max(LAYOUT_EPSILON_PT)
+                  text_metrics,
+                  rule_x + inline_shape_content_offset_x(shape) + shape.offset_x_pt,
+                  rule_y + inline_shape_content_offset_y(shape) + shape.offset_y_pt,
+                  frame_width,
+                  shape.height_pt,
+                );
+                x = rule_x + frame_width;
+                line_height = line_height.max(object_line_metrics.height_pt);
+
+                if has_following_line_participant {
+                  (flow, text_frame, y, line_left, line_right) = self.advance_line(
+                    TextLineAdvance {
+                      current,
+                      pages,
+                      text_metrics: &mut *text_metrics,
+                      wrap_exclusions: &mut wrap_exclusions,
+                      state: &mut text_state,
+                      active: ActiveTextFrame {
+                        flow,
+                        frame: text_frame,
+                      },
+                      line_left,
+                      line_right,
+                      justify: justify_wrapped_lines,
+                      line_item_start_index: &mut line_item_start_index,
+                      line_has_form_widget: &mut line_has_form_widget,
+                      line_ended_with_discretionary_hyphen:
+                        &mut line_ended_with_discretionary_hyphen,
+                    },
+                    y,
+                    &mut line_height,
+                  );
+                  default_line_right = text_frame.default_line_right;
+                  paragraph_left = text_frame.paragraph_left;
+                  base_line_height = text_frame.base_line_height;
+                  x = line_left;
+                  line_used_shrink_fit = false;
+                  line_used_punctuation_fit = false;
+                  line_has_tab = false;
+                }
               } else {
-                line_height.max(object_line_height)
-              };
+                let frame_width = inline_shape_frame_width(shape);
+                let frame_height = inline_shape_frame_height(shape);
+                let mut compatibility_forced_shape_line = false;
+                if x + frame_width > line_right && x > line_left {
+                  (flow, text_frame, y, line_left, line_right) = self.advance_line(
+                    TextLineAdvance {
+                      current,
+                      pages,
+                      text_metrics: &mut *text_metrics,
+                      wrap_exclusions: &mut wrap_exclusions,
+                      state: &mut text_state,
+                      active: ActiveTextFrame {
+                        flow,
+                        frame: text_frame,
+                      },
+                      line_left,
+                      line_right,
+                      justify: justify_wrapped_lines,
+                      line_item_start_index: &mut line_item_start_index,
+                      line_has_form_widget: &mut line_has_form_widget,
+                      line_ended_with_discretionary_hyphen:
+                        &mut line_ended_with_discretionary_hyphen,
+                    },
+                    y,
+                    &mut line_height,
+                  );
+                  default_line_right = text_frame.default_line_right;
+                  paragraph_left = text_frame.paragraph_left;
+                  base_line_height = text_frame.base_line_height;
+                  x = line_left;
+                  compatibility_forced_shape_line = true;
+                  line_used_shrink_fit = false;
+                  line_used_punctuation_fit = false;
+                  line_has_tab = false;
+                }
+                let object_portion_height = inline_drawing_portion_line_height(
+                  frame_height,
+                  paragraph,
+                  text_frame,
+                  text_metrics,
+                );
+                text_state.line_inline_object_portion_height = text_state
+                  .line_inline_object_portion_height
+                  .max(object_portion_height);
+                let source_line_height =
+                  inline_drawing_line_height(frame_height, paragraph, text_frame, text_metrics);
+                if at_least_uses_separate_content_height(paragraph, flow) {
+                  text_state.line_content_height =
+                    text_state.line_content_height.max(source_line_height);
+                }
+                let object_line_metrics =
+                  inline_object_line_metrics_for_flow(source_line_height, paragraph, flow);
+                let object_line_height = object_line_metrics.height_pt;
+                reflow_first_line_for_inline_object |=
+                  first_line_inline_object_requires_paragraph_follow(FirstLineInlineObjectFit {
+                    page: current,
+                    flow,
+                    y,
+                    line_height,
+                    object_line_height,
+                    paragraph_item_start: start_item_index,
+                    line_content_item_start: text_state.line_content_item_start_index,
+                    has_finished_lines: !text_state.line_fragments.is_empty(),
+                    remains_on_start_page: pages.len() == start_pages_len,
+                    allow_reflow,
+                  });
+                if line_item_start_index == current.items.len()
+                  && let Some(next) = self.advance_for_inline_object(InlineObjectAdvance {
+                    current,
+                    pages,
+                    text_metrics,
+                    wrap_exclusions: &mut wrap_exclusions,
+                    state: &mut text_state,
+                    flow,
+                    y,
+                    object_line_height,
+                  })
+                {
+                  (flow, text_frame, y, line_left, line_right, line_height) = next;
+                  default_line_right = text_frame.default_line_right;
+                  paragraph_left = text_frame.paragraph_left;
+                  base_line_height = text_frame.base_line_height;
+                  x = line_left;
+                  line_item_start_index = current.items.len();
+                  line_has_form_widget = false;
+                  line_used_shrink_fit = false;
+                  line_used_punctuation_fit = false;
+                  line_has_tab = false;
+                }
+                let object_starts_line = line_item_start_index == current.items.len();
+                let _ = place_shape(
+                  current,
+                  flow,
+                  text_metrics,
+                  x + inline_shape_content_offset_x(shape) + shape.offset_x_pt,
+                  y + inline_shape_content_offset_y(shape)
+                    + shape.offset_y_pt
+                    + object_line_metrics.ascent_adjustment_pt,
+                  shape.width_pt,
+                  shape.height_pt,
+                );
+                x += frame_width;
+                line_height = if (legacy_inline_object_owns_line_box(paragraph, text_frame)
+                  && object_starts_line)
+                  || (flow.compatibility_mode < 15 && compatibility_forced_shape_line)
+                {
+                  object_line_height.max(LAYOUT_EPSILON_PT)
+                } else {
+                  line_height.max(object_line_height)
+                };
+              }
             }
           }
           if matches!(
@@ -33216,6 +34286,18 @@ impl<'a> TextFrameLayout<'a> {
         }
       }
     }
+    // SwTabPortion::FormatEOL() settles a center/right tab from the widths of
+    // every following line portion. That includes an inline drawing portion;
+    // do not discard a w:ptab merely because the paragraph ends with wp:inline
+    // instead of text (lvlPicBulletId footer).
+    apply_pending_aligned_tab(
+      current,
+      &mut pending_tab,
+      text_metrics,
+      y,
+      line_left,
+      line_right,
+    );
     if reflow_first_line_for_inline_object {
       // ECMA-376 Part 1 §20.4.2.8 makes an inline drawing participate in
       // the height and layout of its complete line. If a tall object appears
@@ -33678,7 +34760,15 @@ impl<'a> TextFrameLayout<'a> {
       );
       align_paragraph_items(
         &mut current.items[alignment_start_item_index..],
-        effective_paragraph_alignment(paragraph),
+        if paragraph_has_only_horizontal_rule_content(paragraph) {
+          // `o:hralign` owns the rule position independently from w:jc. The
+          // vector-only fallback in align_paragraph_items cannot recover that
+          // semantic owner after lowering, so leave an already-positioned
+          // horizontal-rule paragraph untouched.
+          ParagraphAlignment::Left
+        } else {
+          effective_paragraph_alignment(paragraph)
+        },
         text_metrics,
         default_line_right,
       );
@@ -33865,6 +34955,7 @@ fn split_auto_script_spacing_segments(
 struct CrossRunContinuation {
   fit_width_pt: f32,
   gdi_hinted_fit_width_pt: Option<f32>,
+  gdi_character_fit_width_pt: Option<f32>,
   source_start: InlineCursor,
   source_end: InlineCursor,
   western_forbidden_line_start_only: bool,
@@ -33951,6 +35042,7 @@ fn cross_run_unbreakable_continuation_width_for_compatibility(
   let mut remaining_source = continuation.len();
   let mut width = 0.0;
   let mut gdi_hinted_width = Some(0.0);
+  let mut gdi_character_width = Some(0.0);
   let mut source_start = None;
   let mut source_end = None;
   let mut outside_field_group = true;
@@ -33974,6 +35066,11 @@ fn cross_run_unbreakable_continuation_width_for_compatibility(
           .gdi_hinted_text_extent_pt(fit_text, &run.style, units::OFFICE_FIXED_OUTPUT_DPI)
           .map(|hinted_width| width + hinted_width)
       });
+      gdi_character_width = gdi_character_width.and_then(|width| {
+        text_metrics
+          .gdi_device_character_advances_pt(fit_text, &run.style, units::OFFICE_FIXED_OUTPUT_DPI)
+          .map(|advances| width + advances.iter().sum::<f32>())
+      });
       outside_field_group &= !run.style.wordprocessingml_field_group;
       remaining_fit -= fit_take;
     }
@@ -33991,6 +35088,7 @@ fn cross_run_unbreakable_continuation_width_for_compatibility(
   Some(CrossRunContinuation {
     fit_width_pt: width,
     gdi_hinted_fit_width_pt: gdi_hinted_width,
+    gdi_character_fit_width_pt: gdi_character_width,
     source_start,
     source_end,
     // This is deliberately distinct from w:overflowPunct. Writer's second
@@ -34461,7 +35559,7 @@ struct LineShrinkFit<'a> {
   width: f32,
   text: &'a str,
   line_right: f32,
-  device_fit: Option<SmartJustifyDeviceFit>,
+  device_fit: Option<GdiLineFitAdjustments>,
   items: &'a [PageItem],
   item_start: usize,
   chunk: &'a str,
@@ -34470,21 +35568,28 @@ struct LineShrinkFit<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct SmartJustifyDeviceFit {
+struct GdiLineFitAdjustments {
   original_x_adjustment_pt: f32,
   candidate_right_adjustment_pt: f32,
   retry_candidate_right_adjustment_pt: f32,
 }
 
-struct SmartJustifyDeviceFitInput<'a> {
+#[derive(Clone, Copy, Debug)]
+enum GdiLineFitMetric {
+  HintedRun,
+  IntegerCharacterAdvances,
+}
+
+struct GdiLineFitInput<'a> {
   items: &'a [PageItem],
   item_start: usize,
   chunk: &'a str,
   current_fit_text: &'a str,
   retry_current_fit_text: &'a str,
   style: &'a TextStyle,
+  metric: GdiLineFitMetric,
   continuation_fit_width_pt: f32,
-  continuation_hinted_fit_width_pt: Option<f32>,
+  continuation_device_fit_width_pt: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -34499,39 +35604,52 @@ struct SmartJustifyComparison {
   maximum_ratio: f32,
 }
 
-fn smart_justify_gdi_text_width_adjustment(
+fn gdi_text_width_adjustment(
   text: &str,
   style: &TextStyle,
+  metric: GdiLineFitMetric,
   text_metrics: &mut TextMetrics,
 ) -> Option<f32> {
   let natural_width_pt = text_metrics.measure_text(text, style);
-  text_metrics
-    .gdi_hinted_text_extent_pt(text, style, units::OFFICE_FIXED_OUTPUT_DPI)
-    .map(|hinted_width_pt| hinted_width_pt - natural_width_pt)
+  let device_width_pt = if text.is_empty() {
+    0.0
+  } else {
+    match metric {
+      GdiLineFitMetric::HintedRun => {
+        text_metrics.gdi_hinted_text_extent_pt(text, style, units::OFFICE_FIXED_OUTPUT_DPI)?
+      }
+      GdiLineFitMetric::IntegerCharacterAdvances => text_metrics
+        .gdi_device_character_advances_pt(text, style, units::OFFICE_FIXED_OUTPUT_DPI)?
+        .iter()
+        .sum(),
+    }
+  };
+  Some(device_width_pt - natural_width_pt)
 }
 
-fn smart_justify_gdi_appended_text_width_adjustment(
+fn gdi_appended_text_width_adjustment(
   preceding_text: &str,
   text: &str,
   style: &TextStyle,
+  metric: GdiLineFitMetric,
   text_metrics: &mut TextMetrics,
 ) -> Option<f32> {
   if preceding_text.is_empty() {
-    return smart_justify_gdi_text_width_adjustment(text, style, text_metrics);
+    return gdi_text_width_adjustment(text, style, metric, text_metrics);
   }
   if text.is_empty() {
-    return smart_justify_gdi_text_width_adjustment(preceding_text, style, text_metrics);
+    return gdi_text_width_adjustment(preceding_text, style, metric, text_metrics);
   }
   let mut combined = String::with_capacity(preceding_text.len() + text.len());
   combined.push_str(preceding_text);
   combined.push_str(text);
-  smart_justify_gdi_text_width_adjustment(&combined, style, text_metrics)
+  gdi_text_width_adjustment(&combined, style, metric, text_metrics)
 }
 
-fn smart_justify_device_fit(
-  input: SmartJustifyDeviceFitInput<'_>,
+fn gdi_line_fit_adjustments(
+  input: GdiLineFitInput<'_>,
   text_metrics: &mut TextMetrics,
-) -> Option<SmartJustifyDeviceFit> {
+) -> Option<GdiLineFitAdjustments> {
   let mut item_adjustment_pt = 0.0;
   for item in input.items.iter().skip(input.item_start) {
     let PageItem::Text(text) = item else {
@@ -34541,27 +35659,29 @@ fn smart_justify_device_fit(
       return None;
     }
     item_adjustment_pt +=
-      smart_justify_gdi_text_width_adjustment(&text.text, &text.style, text_metrics)?;
+      gdi_text_width_adjustment(&text.text, &text.style, input.metric, text_metrics)?;
   }
 
   let original_x_adjustment_pt = item_adjustment_pt
-    + smart_justify_gdi_text_width_adjustment(input.chunk, input.style, text_metrics)?;
-  let current_adjustment_pt = smart_justify_gdi_appended_text_width_adjustment(
+    + gdi_text_width_adjustment(input.chunk, input.style, input.metric, text_metrics)?;
+  let current_adjustment_pt = gdi_appended_text_width_adjustment(
     input.chunk,
     input.current_fit_text,
     input.style,
+    input.metric,
     text_metrics,
   )?;
-  let retry_current_adjustment_pt = smart_justify_gdi_appended_text_width_adjustment(
+  let retry_current_adjustment_pt = gdi_appended_text_width_adjustment(
     input.chunk,
     input.retry_current_fit_text,
     input.style,
+    input.metric,
     text_metrics,
   )?;
   let continuation_adjustment_pt =
-    input.continuation_hinted_fit_width_pt? - input.continuation_fit_width_pt;
+    input.continuation_device_fit_width_pt? - input.continuation_fit_width_pt;
 
-  Some(SmartJustifyDeviceFit {
+  Some(GdiLineFitAdjustments {
     original_x_adjustment_pt,
     candidate_right_adjustment_pt: item_adjustment_pt
       + current_adjustment_pt
@@ -34697,7 +35817,7 @@ fn smart_justify_fit_terminal_overhang(
   line_fits_with_word_space_shrink(
     LineShrinkFit {
       width: (fit.width - terminal_overhang_pt).max(0.0),
-      device_fit: fit.device_fit.map(|device_fit| SmartJustifyDeviceFit {
+      device_fit: fit.device_fit.map(|device_fit| GdiLineFitAdjustments {
         candidate_right_adjustment_pt: device_fit.retry_candidate_right_adjustment_pt,
         ..device_fit
       }),
@@ -35627,10 +36747,10 @@ fn item_locks_paragraph_alignment(item: &PageItem) -> bool {
     PageItem::Group(items) | PageItem::IndependentTextFrame(items) => {
       items.iter().any(item_locks_paragraph_alignment)
     }
+    PageItem::Rect(rect) => rect.paragraph_alignment_locked,
     PageItem::FloatingDrawing { .. }
     | PageItem::Text(_)
     | PageItem::LegacyFormCheckBox(_)
-    | PageItem::Rect(_)
     | PageItem::Fill(_)
     | PageItem::Line(_)
     | PageItem::Path(_)
@@ -36971,7 +38091,10 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
       text_metrics.measure_text(&text.text, &text.style)
         + text.text.matches(' ').count() as f32 * text.word_spacing_pt,
     )),
-    PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
+    PageItem::Image(image) => Some((
+      image.x_pt - image.inline_frame_left_gap_pt,
+      image.width_pt + image.inline_frame_left_gap_pt + image.inline_frame_right_gap_pt,
+    )),
     PageItem::LegacyFormCheckBox(check_box) => Some((check_box.x_pt, check_box.size_pt)),
     PageItem::Group(items)
     | PageItem::IndependentTextFrame(items)
@@ -37230,6 +38353,83 @@ fn inline_shape_frame_height(shape: &InlineShape) -> f32 {
     .inline_frame_size_pt
     .map_or(shape.height_pt, |(_, height_pt)| height_pt);
   (height_pt + shape.effect_top_pt + shape.effect_bottom_pt).max(0.0)
+}
+
+fn inline_horizontal_rule_width(shape: &InlineShape, line_left: f32, line_right: f32) -> f32 {
+  let available_width = (line_right - line_left).max(0.0);
+  match shape.horizontal_rule.map(|rule| rule.width) {
+    Some(InlineHorizontalRuleWidth::Percent(fraction)) => {
+      available_width * fraction.clamp(0.0, 1.0)
+    }
+    Some(InlineHorizontalRuleWidth::Fixed) | None => {
+      inline_shape_frame_width(shape).min(available_width)
+    }
+  }
+}
+
+fn inline_horizontal_rule_x(
+  shape: &InlineShape,
+  line_left: f32,
+  line_right: f32,
+  width_pt: f32,
+) -> f32 {
+  let remaining_width = (line_right - line_left - width_pt).max(0.0);
+  let offset = match shape.horizontal_rule.map(|rule| rule.alignment) {
+    Some(InlineHorizontalRuleAlignment::Center) => remaining_width / 2.0,
+    Some(InlineHorizontalRuleAlignment::Right) => remaining_width,
+    Some(InlineHorizontalRuleAlignment::Left) | None => 0.0,
+  };
+  line_left + offset
+}
+
+fn push_standard_horizontal_rule_bevel(
+  items: &mut Vec<PageItem>,
+  shape: &InlineShape,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+) {
+  let Some(rule) = shape.horizontal_rule else {
+    return;
+  };
+  if !rule.standard || rule.no_shade || width_pt <= 0.0 || height_pt <= 0.0 {
+    return;
+  }
+
+  // Word fixed output paints the standard VML HR with a device-independent
+  // 0.24pt system-color bevel. Office controls keep these edge colors fixed
+  // at gray 160/227 even when `fillcolor` supplies a different face color;
+  // `HorizontalLineFormat.NoShade=true` removes the bevel entirely.
+  const BEVEL_PT: f32 = 0.24;
+  const DARK: RgbColor = RgbColor {
+    r: 160,
+    g: 160,
+    b: 160,
+  };
+  const LIGHT: RgbColor = RgbColor {
+    r: 227,
+    g: 227,
+    b: 227,
+  };
+  let edge = BEVEL_PT.min(width_pt / 2.0).min(height_pt / 2.0);
+  let rect = |x_pt, y_pt, width_pt, height_pt, fill_color| {
+    PageItem::Rect(RectItem {
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+      paragraph_alignment_locked: true,
+      fill_color: Some(fill_color),
+      fill_opacity: 1.0,
+      stroke: None,
+      stroke_opacity: 1.0,
+    })
+  };
+  items.push(rect(x_pt, y_pt, width_pt, edge, DARK));
+  items.push(rect(x_pt, y_pt, edge, height_pt, DARK));
+  items.push(rect(x_pt + width_pt - edge, y_pt, edge, height_pt, LIGHT));
+  items.push(rect(x_pt, y_pt + height_pt - edge, width_pt, edge, LIGHT));
 }
 
 fn inline_shape_content_offset_x(shape: &InlineShape) -> f32 {
@@ -38218,6 +39418,7 @@ mod tests {
         y_pt: 0.0,
         width_pt: 1.0,
         height_pt: 1.0,
+        paragraph_alignment_locked: false,
         fill_color: None,
         fill_opacity: 1.0,
         stroke: None,
@@ -38478,6 +39679,8 @@ mod tests {
       y_pt: 20.0,
       width_pt: 72.0,
       height_pt: 36.0,
+      inline_frame_left_gap_pt: 0.0,
+      inline_frame_right_gap_pt: 0.0,
       inline_baseline_gap_pt: 0.0,
       inline_baseline_participant: true,
       paragraph_alignment_locked: false,
@@ -38835,6 +40038,7 @@ mod tests {
         y_pt: 10.0,
         width_pt: 20.0,
         height_pt: 20.0,
+        paragraph_alignment_locked: false,
         fill_color: None,
         fill_opacity: 1.0,
         stroke: None,
@@ -39708,6 +40912,288 @@ mod tests {
   }
 
   #[test]
+  fn word_static_3d_bitmap_uses_the_fixed_output_grid_edge_ownership() {
+    let source_bounds = common_rect(428.94043, 176.80142, 41.51921, 25.769213);
+    let bounds = wordprocessing_static_3d_bitmap_display_bounds(source_bounds);
+
+    assert!((bounds.origin.x.0 - 429.0).abs() < 0.001);
+    assert!((bounds.origin.y.0 - 176.88).abs() < 0.001);
+    assert!((bounds.size.width.0 - 41.4).abs() < 0.001);
+    assert!((bounds.size.height.0 - 25.68).abs() < 0.001);
+  }
+
+  #[test]
+  fn word_static_3d_bitmap_matches_office_position_controls() {
+    let x_cases = [
+      (-0.4, 161.28, 35.16),
+      (-0.3, 161.40, 35.04),
+      (-0.2, 161.52, 35.04),
+      (-0.1, 161.64, 35.04),
+      (0.0, 161.76, 35.04),
+      (0.1, 161.76, 35.16),
+      (0.2, 161.88, 35.16),
+      (0.3, 162.00, 35.16),
+      (0.4, 162.12, 35.04),
+      (0.5, 162.24, 35.04),
+    ];
+    for (delta, expected_left, expected_width) in x_cases {
+      let bounds = wordprocessing_static_3d_bitmap_display_bounds(common_rect(
+        161.64 + delta,
+        143.64,
+        35.22,
+        36.72,
+      ));
+      assert!(
+        (bounds.origin.x.0 - expected_left).abs() < 0.001,
+        "delta={delta}"
+      );
+      assert!(
+        (bounds.size.width.0 - expected_width).abs() < 0.001,
+        "delta={delta}"
+      );
+    }
+
+    let y_cases = [
+      (-0.4, 143.28, 36.60),
+      (-0.3, 143.40, 36.60),
+      (-0.2, 143.52, 36.60),
+      (-0.1, 143.64, 36.60),
+      (0.0, 143.76, 36.48),
+      (0.1, 143.76, 36.60),
+      (0.2, 143.88, 36.60),
+      (0.3, 144.00, 36.60),
+      (0.4, 144.12, 36.60),
+      (0.5, 144.24, 36.60),
+    ];
+    for (delta, expected_top, expected_height) in y_cases {
+      let bounds = wordprocessing_static_3d_bitmap_display_bounds(common_rect(
+        161.64,
+        143.64 + delta,
+        35.22,
+        36.72,
+      ));
+      assert!(
+        (bounds.origin.y.0 - expected_top).abs() < 0.001,
+        "delta={delta}"
+      );
+      assert!(
+        (bounds.size.height.0 - expected_height).abs() < 0.001,
+        "delta={delta}"
+      );
+    }
+  }
+
+  #[test]
+  fn word_screen_static_3d_allocation_follows_the_fixed_output_extent() {
+    let pixels_per_point = 96.0 / units::POINTS_PER_INCH;
+    let allocated_height = |height_pt: f32| {
+      let bounds = wordprocessing_screen_static_3d_raster_bounds(
+        common_rect(432.09, 178.14, 35.22, height_pt),
+        pixels_per_point,
+      );
+      (bounds.size.height.0 * pixels_per_point).round() as u32
+    };
+
+    // In the controlled Word Screen export, changing only Shape.Height by
+    // 1/8 device pixel keeps the 25-row XObject. The second 1/8 crosses the
+    // independently 600-DPI-quantized display extent and allocates row 26.
+    assert_eq!(allocated_height(19.47), 25);
+    assert_eq!(allocated_height(19.47 + 0.09375), 25);
+    assert_eq!(allocated_height(19.47 + 0.1875), 26);
+  }
+
+  #[test]
+  fn word_screen_static_3d_retargets_the_foreground_without_scaling_its_width() {
+    let content_bounds = common_rect(432.450_012, 178.5, 34.5, 18.75);
+    let static_display_bounds = common_rect(428.940_43, 176.801_42, 41.519_21, 25.769_213);
+    let pixels_per_point = 96.0 / units::POINTS_PER_INCH;
+    let raster_bounds =
+      wordprocessing_screen_static_3d_raster_bounds(static_display_bounds, pixels_per_point);
+
+    let target = wordprocessing_screen_static_3d_target(
+      content_bounds,
+      static_display_bounds,
+      raster_bounds,
+      pixels_per_point,
+      WordScreenStatic3dRasterSpace::EffectSurface,
+    );
+
+    assert_eq!(
+      (
+        target.source_mapping.width_px,
+        target.source_mapping.height_px,
+      ),
+      (55, 34)
+    );
+    assert!((target.display_bounds.origin.x.0 - 429.0).abs() < 0.001);
+    assert!((target.display_bounds.origin.y.0 - 176.88).abs() < 0.001);
+    assert!((target.model_surface.left_px - 5.0).abs() < 0.001);
+    assert!((target.model_surface.top_px - 2.5625).abs() < 0.001);
+    assert!((target.model_surface.width_px - 46.0).abs() < 0.001);
+    assert!((target.model_surface.height_px - 24.84375).abs() < 0.001);
+  }
+
+  #[test]
+  fn word_screen_static_3d_local_shape_normalizes_the_unquantized_effect_surface() {
+    let pixels_per_point = 96.0 / units::POINTS_PER_INCH;
+    let content_bounds = common_rect(432.45, 178.5, 34.5, 18.75);
+    let static_display_bounds = common_rect(432.09, 178.14, 35.22, 19.47);
+    let raster_bounds =
+      wordprocessing_screen_static_3d_raster_bounds(static_display_bounds, pixels_per_point);
+
+    let target = wordprocessing_screen_static_3d_target(
+      content_bounds,
+      static_display_bounds,
+      raster_bounds,
+      pixels_per_point,
+      WordScreenStatic3dRasterSpace::LocalShape,
+    );
+
+    assert_eq!(
+      (
+        target.geometry_mapping.width_px,
+        target.geometry_mapping.height_px,
+      ),
+      (46, 25)
+    );
+    let expected_scale_x = 46.0 / static_display_bounds.size.width.0;
+    let expected_scale_y = 25.0 / static_display_bounds.size.height.0;
+    assert!((target.geometry_mapping.scale_x - expected_scale_x).abs() < 0.001);
+    assert!((target.geometry_mapping.scale_y - expected_scale_y).abs() < 0.001);
+    assert!(
+      (target.model_surface.left_px
+        - (0.5
+          + (content_bounds.origin.x.0 - static_display_bounds.origin.x.0) * expected_scale_x))
+        .abs()
+        < 0.001
+    );
+    assert!(
+      (target.model_surface.top_px
+        - (0.5
+          + (content_bounds.origin.y.0 - static_display_bounds.origin.y.0) * expected_scale_y))
+        .abs()
+        < 0.001
+    );
+    assert!(
+      (target.model_surface.width_px - content_bounds.size.width.0 * expected_scale_x).abs() < 0.001
+    );
+    assert!(
+      (target.model_surface.height_px - content_bounds.size.height.0 * expected_scale_y).abs()
+        < 0.001
+    );
+    let source_left =
+      content_bounds.origin.x.0 * target.source_mapping.scale_x + target.source_mapping.translate_x;
+    let source_top =
+      content_bounds.origin.y.0 * target.source_mapping.scale_y + target.source_mapping.translate_y;
+    let source_right = source_left + content_bounds.size.width.0 * target.source_mapping.scale_x;
+    let source_bottom = source_top + content_bounds.size.height.0 * target.source_mapping.scale_y;
+    assert!((source_left - 1.0).abs() < 0.001);
+    assert!((source_top - 1.0).abs() < 0.001);
+    assert!((source_right - 46.0).abs() < 0.001);
+    assert!((source_bottom - 25.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn word_static_3d_local_bitmap_consumes_the_last_eight_sample_at_the_far_edge() {
+    let source_bounds = common_rect(432.09, 178.14, 35.22, 19.47);
+    let bounds = wordprocessing_static_3d_bitmap_display_bounds(source_bounds);
+
+    // The scene-only Office control is a 98x54 image, but its fixed-output
+    // placement ends at the last 7/8 sample rather than the next full pixel.
+    assert!((bounds.origin.x.0 - 432.12).abs() < 0.001);
+    assert!((bounds.origin.y.0 - 178.2).abs() < 0.001);
+    assert!((bounds.size.width.0 - 35.16).abs() < 0.001);
+    assert!((bounds.size.height.0 - 19.32).abs() < 0.001);
+  }
+
+  #[test]
+  fn word_static_3d_allocation_keeps_the_final_eight_sample_inside_its_pixel() {
+    let pixels_per_point = 200.0 / units::POINTS_PER_INCH;
+    let allocated_extent = |extent_px: f32| {
+      let bounds = wordprocessing_fixed_output_static_3d_allocation_bounds(
+        common_rect(
+          0.0,
+          0.0,
+          extent_px / pixels_per_point,
+          extent_px / pixels_per_point,
+        ),
+        pixels_per_point,
+      );
+      (bounds.size.width.0 * pixels_per_point).ceil() as u32
+    };
+
+    assert_eq!(allocated_extent(54.083_332), 54);
+    assert_eq!(allocated_extent(174.083_33), 174);
+    assert_eq!(allocated_extent(115.331_14), 116);
+    assert_eq!(allocated_extent(97.833_33), 98);
+  }
+
+  #[test]
+  fn empty_effect_list_keeps_an_independent_scene_3d_shape_visible() {
+    let effects = common::DrawingEffectSource::Resolved(
+      common::drawingml_image_effects::ImageEffectContainer {
+        kind: common::drawingml_image_effects::ImageEffectContainerKind::Sibling,
+        effects: Vec::new(),
+      },
+    );
+    let static3d = common::drawingml_3d::Static3dStyle {
+      scene: Box::new(a::Scene3DType {
+        camera: Box::new(a::Camera {
+          preset: a::PresetCameraValues::OrthographicFront,
+          ..a::Camera::default()
+        }),
+        light_rig: Box::new(a::LightRig {
+          rig: a::LightRigValues::ThreePoints,
+          direction: a::LightRigDirectionValues::Top,
+          ..a::LightRig::default()
+        }),
+        ..a::Scene3DType::default()
+      }),
+      shape: Box::new(a::Shape3DType::default()),
+      extrusion_color: None,
+      contour_color: None,
+    };
+    let bounds = common_rect(0.0, 0.0, 34.5, 18.75);
+    let mut items = vec![PageItem::Rect(RectItem {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 34.5,
+      height_pt: 18.75,
+      paragraph_alignment_locked: false,
+      fill_color: Some(RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      }),
+      fill_opacity: 1.0,
+      stroke: None,
+      stroke_opacity: 1.0,
+    })];
+
+    finish_docx_drawing_effects(
+      &mut items,
+      0,
+      DocxDrawingEffectHost {
+        effects: Some(&effects),
+        static3d: Some(&static3d),
+        rotation_degrees: 0.0,
+        visual_rotation_degrees: 0.0,
+        placement: crate::docx::ImagePlacement::Inline,
+        max_pixels_per_point: Some(200.0 / units::POINTS_PER_INCH),
+      },
+      bounds,
+    );
+
+    let [PageItem::Image(image)] = items.as_slice() else {
+      panic!("empty effectLst plus scene3d must lower the shape to one bitmap");
+    };
+    let decoded = image::load_from_memory(&image.data)
+      .expect("static 3-D bitmap PNG")
+      .into_rgba8();
+    assert!(decoded.pixels().any(|pixel| pixel[3] != 0));
+  }
+
+  #[test]
   fn word_text_effect_target_keeps_exact_origin_and_truncates_pixel_extent() {
     let target = wordprocessing_effect_bitmap_target(
       common::drawingml_image_effects::EffectOutputBounds {
@@ -40523,6 +42009,8 @@ mod tests {
       y_pt: 20.0,
       width_pt: 30.0,
       height_pt: 40.0,
+      inline_frame_left_gap_pt: 0.0,
+      inline_frame_right_gap_pt: 0.0,
       inline_baseline_gap_pt: 0.0,
       inline_baseline_participant: true,
       paragraph_alignment_locked: false,
@@ -40558,6 +42046,58 @@ mod tests {
       panic!("expected clip move");
     };
     assert_eq!((point.x.0, point.y.0), (25.0, 20.0));
+  }
+
+  #[test]
+  fn centered_inline_alignment_uses_the_outer_effect_extent_frame() {
+    let mut items = vec![PageItem::Image(ImageItem {
+      x_pt: 0.25,
+      y_pt: 20.0,
+      width_pt: 30.0,
+      height_pt: 40.0,
+      inline_frame_left_gap_pt: 0.25,
+      inline_frame_right_gap_pt: 0.75,
+      inline_baseline_gap_pt: 0.0,
+      inline_baseline_participant: true,
+      paragraph_alignment_locked: false,
+      crop: ImageCrop::default(),
+      clip_path: Vec::new(),
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      data: Bytes::new(),
+      content_type: None,
+      metafile_background_color: None,
+      alt_text: None,
+      hyperlink_url: None,
+      semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
+      metafile_native_size: false,
+      floating: false,
+      behind_text: false,
+    })];
+    let mut text_metrics = TextMetrics::new();
+
+    align_paragraph_items(
+      &mut items,
+      ParagraphAlignment::Center,
+      &mut text_metrics,
+      100.0,
+    );
+
+    let PageItem::Image(image) = &items[0] else {
+      panic!("expected image");
+    };
+    assert!((image.x_pt - 34.75).abs() < 0.001);
+    assert!(
+      ((image.x_pt - image.inline_frame_left_gap_pt)
+        + (image.width_pt + image.inline_frame_left_gap_pt + image.inline_frame_right_gap_pt)
+          / 2.0
+        - 50.0)
+        .abs()
+        < 0.001
+    );
   }
 
   #[test]
@@ -40597,6 +42137,8 @@ mod tests {
         y_pt: 0.0,
         width_pt: 100.0,
         height_pt: baseline_pt,
+        inline_frame_left_gap_pt: 0.0,
+        inline_frame_right_gap_pt: 0.0,
         inline_baseline_gap_pt: 0.0,
         inline_baseline_participant: true,
         paragraph_alignment_locked: false,
@@ -40631,6 +42173,59 @@ mod tests {
     };
     assert!((text.x_pt + text_width_pt - image.x_pt).abs() < 0.001);
     assert!((image.x_pt + image.width_pt - 300.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn paragraph_alignment_does_not_move_an_explicitly_positioned_rule_rectangle() {
+    let mut items = vec![
+      PageItem::Rect(RectItem {
+        x_pt: 10.0,
+        y_pt: 5.0,
+        width_pt: 20.0,
+        height_pt: 1.5,
+        paragraph_alignment_locked: true,
+        fill_color: Some(RgbColor { r: 0, g: 0, b: 0 }),
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      }),
+      PageItem::Text(Box::new(TextItem {
+        x_pt: 10.0,
+        y_pt: 20.0,
+        line_height_pt: DEFAULT_LINE_HEIGHT_PT,
+        line_metrics_participant: true,
+        wordprocessing_effect_host: None,
+        text: "following text".to_string(),
+        style: TextStyle::default(),
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        dynamic_field_line_anchor: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        word_spacing_pt: 0.0,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      })),
+    ];
+    let mut text_metrics = TextMetrics::new();
+
+    align_paragraph_items(
+      &mut items,
+      ParagraphAlignment::Right,
+      &mut text_metrics,
+      100.0,
+    );
+
+    let (PageItem::Rect(rule), PageItem::Text(text)) = (&items[0], &items[1]) else {
+      panic!("expected rule rectangle followed by text")
+    };
+    assert_eq!(rule.x_pt, 10.0);
+    assert!(text.x_pt > 10.0);
   }
 
   #[test]
@@ -40867,18 +42462,28 @@ mod tests {
   fn balanced_continuous_section_closes_at_frame_without_overlapping_content() {
     let frame_bottom = 151.94;
     assert_eq!(
-      balanced_section_frame_end_y(158.11, 10.0, frame_bottom),
+      balanced_section_frame_end_y(158.11, 10.0, frame_bottom, false),
       frame_bottom,
     );
     assert_eq!(
-      balanced_section_frame_end_y(165.0, 10.0, frame_bottom),
+      balanced_section_frame_end_y(165.0, 10.0, frame_bottom, false),
       165.0,
       "visible content beyond the balanced frame must keep the replay cursor",
     );
     assert_eq!(
-      balanced_section_frame_end_y(149.0, 0.0, frame_bottom),
+      balanced_section_frame_end_y(149.0, 0.0, frame_bottom, false),
       frame_bottom,
       "a short final column still hands off at the balanced frame edge",
+    );
+    assert_eq!(
+      balanced_section_frame_end_y(95.396_26, 10.0, 109.396_26, true),
+      119.396_26,
+      "a horizontal-rule paragraph keeps its lower spacing after the column frame",
+    );
+    assert_eq!(
+      balanced_section_frame_end_y(165.0, 10.0, frame_bottom, true),
+      165.0,
+      "spacing already present in an overflowing replay cursor is not added twice",
     );
   }
 
@@ -40951,6 +42556,55 @@ mod tests {
       &[InlineItem::LastRenderedPageBreak],
       0,
     ));
+  }
+
+  #[test]
+  fn top_bottom_wrap_moves_only_an_intersecting_text_line() {
+    let exclusion = WrapExclusion {
+      left_pt: 0.0,
+      right_pt: 500.0,
+      top_pt: 62.0,
+      bottom_pt: 222.0,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: true,
+      uses_contour: false,
+      owner: WrapExclusionOwner::Drawing,
+    };
+
+    assert_eq!(
+      dodge_text_wrap_exclusions(14.2, 15.45, 14.2, 405.4, &[exclusion]),
+      14.2
+    );
+    assert_eq!(
+      dodge_text_wrap_exclusions(50.0, 15.45, 14.2, 405.4, &[exclusion]),
+      222.0
+    );
+  }
+
+  #[test]
+  fn table_cell_wrap_compares_the_line_box_and_preserves_its_baseline_origin() {
+    let mut exclusion = WrapExclusion {
+      left_pt: 0.0,
+      right_pt: 500.0,
+      top_pt: 113.291_9,
+      bottom_pt: 227.291_9,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: true,
+      uses_contour: false,
+      owner: WrapExclusionOwner::Drawing,
+    };
+    let line_top = 96.791_9;
+    let baseline = 107.265_526;
+
+    let untouched =
+      dodge_line_origin_wrap_exclusions(baseline, line_top, 12.72, 76.25, 405.4, &[exclusion]);
+    assert!((untouched - baseline).abs() <= LAYOUT_EPSILON_PT);
+
+    exclusion.top_pt = 96.0;
+    exclusion.bottom_pt = 150.0;
+    let moved =
+      dodge_line_origin_wrap_exclusions(baseline, line_top, 12.72, 76.25, 405.4, &[exclusion]);
+    assert!((moved - (150.0 + baseline - line_top)).abs() <= LAYOUT_EPSILON_PT);
   }
 
   #[test]
@@ -43163,9 +44817,13 @@ mod tests {
       },
       &mut text_metrics,
     );
-    // Inheritance does not change the line-box multiple. A zero-leading
-    // typographic face owns the proportional excess below the text, while a
-    // legacy face with intrinsic leading keeps its centered baseline box.
+    // Inheritance does not change either the line-box multiple or the
+    // placement of its proportional excess. LibreOffice's
+    // LINE_SPACING_AS_GAP_BELOW path and Word controls at 240/259/276/360
+    // twips keep the last centered-textbox baseline fixed while moving the
+    // preceding baseline by the complete inter-line increment. That requires
+    // the increment below the visible line for both typographic and legacy
+    // metric faces.
     assert!((inherited_height - tall_natural_height * 1.5).abs() < 0.001);
     let zero_leading_extents = WordLineTextExtents {
       has_text: true,
@@ -43182,9 +44840,12 @@ mod tests {
       has_intrinsic_leading_above: true,
       ..zero_leading_extents
     };
-    assert_eq!(
-      inherited_frame.text_baseline_line_height_for_text(inherited_height, legacy_leading_extents),
-      inherited_height
+    assert!(
+      (inherited_frame
+        .text_baseline_line_height_for_text(inherited_height, legacy_leading_extents)
+        - tall_natural_height)
+        .abs()
+        < 0.001
     );
 
     let mut recovered = inherited.clone();
@@ -43217,13 +44878,15 @@ mod tests {
     compatible_shape_text.format.line_height_pt =
       Some(LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE);
     let compact_shape_frame = TextFrame::new(&compatible_shape_text, flow, &mut text_metrics);
-    assert_eq!(
-      compact_shape_frame.text_baseline_line_height_for_text(
+    assert!(
+      (compact_shape_frame.text_baseline_line_height_for_text(
         compact_shape_frame.base_line_height,
         legacy_leading_extents,
-      ),
-      compact_shape_frame.base_line_height,
-      "compatLnSpc does not move Word's ordinary 115% textbox baseline"
+      ) - compact_shape_frame.base_line_height
+        / (LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE))
+        .abs()
+        < 0.001,
+      "Word owns the ordinary inherited 115% increment below textbox text"
     );
 
     let mut blocked = inherited.clone();
@@ -44252,6 +45915,7 @@ mod tests {
       floating_table_cell_follow_top_inset_pt: 0.0,
       note_continuation_top_inset_pt: 0.0,
       inside_paragraph_frame: false,
+      fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
     };
     let mut text_metrics = TextMetrics::new();
     let large_style = paragraph_base_line_style(&large);
@@ -44345,6 +46009,7 @@ mod tests {
         floating_table_cell_follow_top_inset_pt: 0.0,
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
+        fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
       }
     }
 
@@ -44439,6 +46104,7 @@ mod tests {
         floating_table_cell_follow_top_inset_pt: 0.0,
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
+        fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
       }
     }
 
@@ -44636,6 +46302,215 @@ mod tests {
   }
 
   #[test]
+  fn wordprocessing_shape_story_converts_its_text_rect_top_to_a_baseline() {
+    let mut paragraph = Paragraph {
+      inlines: Vec::new(),
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        wordprocessing_shape_story: true,
+        ..ParagraphFormat::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let flow = FlowContext {
+      text_segmentation: TextSegmentation::TableCell,
+      horizontal_table_cell: false,
+      layout_cell_bounds: Some(FrameBounds {
+        x_pt: 76.25,
+        y_pt: 96.791_9,
+        width_pt: 339.95,
+        height_pt: 144.2,
+      }),
+      layout_cell_print_bounds: Some(FrameBounds {
+        x_pt: 76.25,
+        y_pt: 96.791_9,
+        width_pt: 329.15,
+        height_pt: 144.2,
+      }),
+      ..flow_context(
+        PageSetup::default(),
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        DEFAULT_TAB_STOP_PT,
+      )
+    };
+    let line_top = 157.619;
+    let mut text_metrics = TextMetrics::new();
+    let text_frame = TextFrame::new(&paragraph, flow, &mut text_metrics);
+    let expected_offset = table_cell_initial_baseline_offset(
+      &paragraph_base_line_style(&paragraph),
+      text_frame.base_line_height,
+      &mut text_metrics,
+    );
+    let blocks = [Block::paragraph(paragraph.clone())];
+    let baseline =
+      shape_text_box_initial_cursor_y(&blocks, flow, line_top, true, &mut text_metrics);
+    assert!((baseline - line_top - expected_offset).abs() <= LAYOUT_EPSILON_PT);
+    assert!(baseline > line_top + LAYOUT_EPSILON_PT);
+
+    paragraph.format.wordprocessing_shape_story = false;
+    let control = [Block::paragraph(paragraph.clone())];
+    assert_eq!(
+      shape_text_box_initial_cursor_y(&control, flow, line_top, true, &mut text_metrics),
+      line_top,
+    );
+
+    paragraph.format.wordprocessing_shape_story = true;
+    let non_overflow_control = [Block::paragraph(paragraph)];
+    assert_eq!(
+      shape_text_box_initial_cursor_y(
+        &non_overflow_control,
+        flow,
+        line_top,
+        false,
+        &mut text_metrics,
+      ),
+      line_top,
+    );
+
+    let body_owned_control_flow = FlowContext {
+      layout_cell_bounds: None,
+      layout_cell_print_bounds: None,
+      ..flow
+    };
+    assert_eq!(
+      shape_text_box_initial_cursor_y(
+        &blocks,
+        body_owned_control_flow,
+        line_top,
+        true,
+        &mut text_metrics,
+      ),
+      line_top,
+    );
+  }
+
+  #[test]
+  fn text_frame_table_starts_at_story_cursor_without_cell_baseline_carry() {
+    let style = TextStyle::default();
+    let mut paragraph = Paragraph {
+      inlines: vec![InlineItem::Text(TextRun {
+        text: "text before table".into(),
+        style: style.clone(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })],
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: style,
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        spacing_after_pt: 8.0,
+        ..ParagraphFormat::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let table = Table {
+      column_widths_pt: vec![100.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      layout: TableLayoutMode::AutoFit,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      right_to_left: false,
+      align_leading_cell_content: false,
+      in_header_footer: false,
+      placement: None,
+      allow_overlap: true,
+      split_allowed: true,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      page_break_before: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: Vec::new(),
+    };
+    let flow = FlowContext {
+      text_segmentation: TextSegmentation::TableCell,
+      ..flow_context(
+        PageSetup::default(),
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        DEFAULT_TAB_STOP_PT,
+      )
+    };
+    let mut text_metrics = TextMetrics::new();
+    let line_style = paragraph_base_line_style(&paragraph);
+    let line_height = paragraph_line_height_for_setup(
+      &paragraph,
+      &line_style,
+      flow.setup,
+      flow.text_segmentation,
+      &mut text_metrics,
+    );
+    let line_carry =
+      table_cell_initial_baseline_offset(&line_style, line_height, &mut text_metrics);
+    let ordinary = Block::paragraph(paragraph.clone());
+    let ordinary_spacing =
+      nested_table_preceding_paragraph_spacing(Some(&ordinary), &table, flow, &mut text_metrics);
+    assert!((ordinary_spacing.carried_before_pt - line_carry - 8.0).abs() <= LAYOUT_EPSILON_PT);
+    assert!((ordinary_spacing.carried_after_pt - line_carry - 8.0).abs() <= LAYOUT_EPSILON_PT);
+    assert!(!ordinary_spacing.direct_text_frame_story_owner);
+
+    paragraph.format.wordprocessing_shape_story = true;
+    let wordprocessing_shape = Block::paragraph(paragraph.clone());
+    let shape_spacing = nested_table_preceding_paragraph_spacing(
+      Some(&wordprocessing_shape),
+      &table,
+      flow,
+      &mut text_metrics,
+    );
+    assert_eq!(shape_spacing.carried_before_pt, 0.0);
+    assert_eq!(shape_spacing.carried_after_pt, 0.0);
+    assert!(shape_spacing.direct_text_frame_story_owner);
+
+    paragraph.format.wordprocessing_shape_story = false;
+    paragraph.format.word_text_frame_story = true;
+    let legacy_text_frame = Block::paragraph(paragraph);
+    let legacy_spacing = nested_table_preceding_paragraph_spacing(
+      Some(&legacy_text_frame),
+      &table,
+      flow,
+      &mut text_metrics,
+    );
+    assert_eq!(legacy_spacing.carried_before_pt, 0.0);
+    assert_eq!(legacy_spacing.carried_after_pt, 0.0);
+    assert!(legacy_spacing.direct_text_frame_story_owner);
+  }
+
+  #[test]
   fn split_table_cell_cursor_uses_owned_line_baselines() {
     let line = |index, y_pt| FrameFragment {
       kind: FrameFragmentKind::ParagraphLine,
@@ -44727,6 +46602,7 @@ mod tests {
       floating_table_cell_follow_top_inset_pt: 0.0,
       note_continuation_top_inset_pt: 0.0,
       inside_paragraph_frame: false,
+      fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
     };
     let paragraph = Paragraph {
       inlines: Vec::new(),
@@ -44819,6 +46695,7 @@ mod tests {
       y_pt: flow.content_top_pt,
       width_pt: 1.0,
       height_pt: 1.0,
+      paragraph_alignment_locked: false,
       fill_color: Some(RgbColor { r: 0, g: 0, b: 0 }),
       fill_opacity: 1.0,
       stroke: None,
@@ -44846,6 +46723,200 @@ mod tests {
     assert_eq!(next_flow.section_page_index, 1);
     assert!(next_y > next_flow.content_top_pt + 8.0);
     assert!(next_y < next_flow.content_top_pt + 40.0);
+  }
+
+  #[test]
+  fn unresolved_picture_bullet_uses_numbered_body_margin_without_painting_a_label() {
+    let flow = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let mut paragraph = Paragraph {
+      inlines: vec![InlineItem::Text(TextRun {
+        text: "Overview".into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })],
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        indent_left_pt: 18.75,
+        first_line_indent_pt: -18.0,
+        suppressed_picture_bullet_owns_numbering_margin: true,
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: Some(36.0),
+    };
+    let layout_text = |paragraph: &Paragraph| {
+      let mut page = empty_page(flow.setup, flow.section_index);
+      let mut pages = Vec::new();
+      let mut text_metrics = TextMetrics::new();
+      layout_paragraph(
+        paragraph,
+        flow,
+        ParagraphLayoutTarget {
+          current: &mut page,
+          pages: &mut pages,
+          anchor_pages: None,
+          text_metrics: &mut text_metrics,
+        },
+        flow.content_top_pt,
+        flow.content_top_pt,
+        0.0,
+      );
+      assert!(pages.is_empty());
+      page
+        .items
+        .into_iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) => Some(text),
+          _ => None,
+        })
+        .collect::<Vec<_>>()
+    };
+
+    let unresolved_picture_bullet = layout_text(&paragraph);
+    assert_eq!(unresolved_picture_bullet.len(), 1);
+    assert_eq!(unresolved_picture_bullet[0].text, "Overview");
+    assert!((unresolved_picture_bullet[0].x_pt - (flow.content_left_pt + 18.75)).abs() < 0.001);
+
+    paragraph
+      .format
+      .suppressed_picture_bullet_owns_numbering_margin = false;
+    let ordinary_hanging_paragraph = layout_text(&paragraph);
+    assert_eq!(ordinary_hanging_paragraph.len(), 1);
+    assert!((ordinary_hanging_paragraph[0].x_pt - (flow.content_left_pt + 0.75)).abs() < 0.001);
+  }
+
+  #[test]
+  fn right_positional_tab_aligns_a_terminal_inline_image_to_the_margin() {
+    let flow = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let positional_tab = |alignment| {
+      InlineItem::PositionalTab(PositionalTab {
+        alignment,
+        relative_to: PositionalTabBase::Margin,
+        leader: TabLeader::None,
+        style: TextStyle::default(),
+      })
+    };
+    let image_width_pt = 85.25;
+    let paragraph = Paragraph {
+      inlines: vec![
+        positional_tab(TabStopAlignment::Center),
+        positional_tab(TabStopAlignment::Right),
+        InlineItem::Image(crate::docx::InlineImage {
+          data: Bytes::new(),
+          content_type: Some("image/png".into()),
+          picture_frame: None,
+          picture_frame_clips_image: false,
+          effects: None,
+          static3d: None,
+          width_pt: image_width_pt,
+          height_pt: 32.5,
+          inline_offset_x_pt: 0.0,
+          inline_offset_y_pt: 0.0,
+          effect_left_pt: 0.0,
+          effect_top_pt: 0.0,
+          effect_right_pt: 0.0,
+          effect_bottom_pt: 0.0,
+          inline_baseline_gap_pt: None,
+          line_box: crate::docx::InlineImageLineBox::CharacterLike,
+          office_math_line_layout: None,
+          office_math_display_layout: None,
+          crop: ImageCrop::default(),
+          rotation_deg: 0.0,
+          flip_horizontal: false,
+          flip_vertical: false,
+          metafile_background_color: None,
+          alt_text: None,
+          hyperlink_url: None,
+          semantic_metafile_text: false,
+          metafile_semantic_text_includes_raster_backdrop: false,
+          signature_line: None,
+          semantic_metafile_font_family: None,
+          native_ole_equation: None,
+          metafile_native_size: false,
+          placement: crate::docx::ImagePlacement::Inline,
+        }),
+      ],
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat::default()),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let mut page = empty_page(flow.setup, flow.section_index);
+    let mut pages = Vec::new();
+    let mut text_metrics = TextMetrics::new();
+
+    layout_paragraph(
+      &paragraph,
+      flow,
+      ParagraphLayoutTarget {
+        current: &mut page,
+        pages: &mut pages,
+        anchor_pages: None,
+        text_metrics: &mut text_metrics,
+      },
+      flow.content_top_pt,
+      flow.content_top_pt,
+      0.0,
+    );
+
+    assert!(pages.is_empty());
+    let image = page
+      .items
+      .iter()
+      .find_map(|item| match item {
+        PageItem::Image(image) => Some(image),
+        _ => None,
+      })
+      .expect("right-tabbed inline image");
+    assert!(
+      (image.x_pt + image.width_pt - (flow.content_left_pt + flow.content_width)).abs() < 0.001
+    );
+    assert!(
+      (image.x_pt - (flow.content_left_pt + flow.content_width - image_width_pt)).abs() < 0.001
+    );
   }
 
   #[test]
@@ -44887,6 +46958,7 @@ mod tests {
       stroke_override: None,
       suppress_zero_relative_background: false,
       allow_outside_page: false,
+      horizontal_rule: None,
       placement: crate::docx::ImagePlacement::Floating(FloatingImagePlacement {
         horizontal_relative_to: HorizontalImageReference::Column,
         vertical_relative_to: VerticalImageReference::Page,
@@ -45833,6 +47905,103 @@ mod tests {
     table.layout = TableLayoutMode::AutoFit;
     table.preferred_width_pt = Some(640.0);
     assert_eq!(floating_autofit_grid_width_limit(&table, 648.0), None);
+  }
+
+  #[test]
+  fn inline_table_uses_fitting_side_of_floating_table_exclusion() {
+    let setup = PageSetup {
+      width_pt: 841.9,
+      margin_left_pt: 13.5,
+      margin_right_pt: 3.6,
+      ..Default::default()
+    };
+    let area = block_area(flow_context(
+      setup,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    ));
+    let table = Table {
+      column_widths_pt: vec![387.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      layout: TableLayoutMode::Fixed,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      right_to_left: false,
+      align_leading_cell_content: false,
+      in_header_footer: false,
+      placement: None,
+      allow_overlap: true,
+      split_allowed: false,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      page_break_before: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![TableRow {
+        cells: vec![TableCell {
+          blocks: Vec::new(),
+          shading: None,
+          borders: CellBordersModel::default(),
+          border_suppressions: CellBorderSuppressions::default(),
+          margins: CellMargins::zero(),
+          preferred_width_pt: None,
+          preferred_width_pct: None,
+          grid_span: 1,
+          vertical_merge_continue: false,
+          no_wrap: false,
+          fit_text: false,
+          hide_end_mark: false,
+          vertical_alignment: TableCellVerticalAlignment::Top,
+          text_rotation_deg: None,
+        }],
+        height_pt: Some(304.0),
+        exact_height: true,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: true,
+        cell_spacing_pt: None,
+        grid_before: 0,
+        grid_after: 0,
+        width_before_pt: None,
+        width_after_pt: None,
+        layout: None,
+        borders: None,
+        spacing_shading: None,
+        redline_color: None,
+      }],
+    };
+    let mut page = empty_page(setup, 0);
+    page.wrap_exclusions.push(WrapExclusion {
+      left_pt: 9.75,
+      right_pt: 414.75,
+      top_pt: 45.05,
+      bottom_pt: 350.885,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: false,
+      uses_contour: false,
+      owner: WrapExclusionOwner::FloatingTable,
+    });
+    let mut text_metrics = TextMetrics::new();
+    let mut layout = TableFrameLayout::new(&table, area, false, false, &mut text_metrics).unwrap();
+
+    let y = layout.resolve_wrap_position(&page, 72.0, layout.initial_dodge_height());
+
+    assert_eq!(y, 72.0);
+    assert!((layout.frame.left_pt - 414.75).abs() < LAYOUT_EPSILON_PT);
+    assert!((layout.frame.right_pt - 801.75).abs() < LAYOUT_EPSILON_PT);
+
+    let mut too_wide = table.clone();
+    too_wide.column_widths_pt[0] = 450.0;
+    let mut blocked =
+      TableFrameLayout::new(&too_wide, area, false, false, &mut text_metrics).unwrap();
+    let blocked_y = blocked.resolve_wrap_position(&page, 72.0, blocked.initial_dodge_height());
+    assert!((blocked_y - 350.885).abs() < LAYOUT_EPSILON_PT);
+    assert!((blocked.frame.left_pt - 13.5).abs() < LAYOUT_EPSILON_PT);
   }
 
   #[test]
@@ -47792,7 +49961,7 @@ mod tests {
       width: minimum_candidate_right_pt + shrink_capacity - x,
       text: "candidate",
       line_right,
-      device_fit: Some(SmartJustifyDeviceFit {
+      device_fit: Some(GdiLineFitAdjustments {
         original_x_adjustment_pt: 0.0,
         candidate_right_adjustment_pt: 0.0,
         retry_candidate_right_adjustment_pt: 0.0,
@@ -47814,6 +49983,55 @@ mod tests {
     assert!(!line_fits_with_word_space_shrink(
       fit(481.92),
       &mut text_metrics,
+    ));
+  }
+
+  #[test]
+  fn legacy_word_text_frame_line_fit_uses_gdi_integer_character_advances() {
+    let mut text_metrics = TextMetrics::new();
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      high_ansi_font_family: Some(Arc::from("Arial")),
+      font_size_pt: 8.0,
+      use_windows_font_metrics: true,
+      ..TextStyle::default()
+    };
+    let text = "Base Windows XP OS and";
+    let natural_width = text_metrics.measure_text(text, &style);
+    let device_fit = gdi_line_fit_adjustments(
+      GdiLineFitInput {
+        items: &[],
+        item_start: 0,
+        chunk: "",
+        current_fit_text: text,
+        retry_current_fit_text: text,
+        style: &style,
+        metric: GdiLineFitMetric::IntegerCharacterAdvances,
+        continuation_fit_width_pt: 0.0,
+        continuation_device_fit_width_pt: Some(0.0),
+      },
+      &mut text_metrics,
+    )
+    .expect("simple Arial GDI extent");
+    let device_width = natural_width + device_fit.candidate_right_adjustment_pt;
+    let device_character_width = text_metrics
+      .gdi_device_character_advances_pt(text, &style, units::OFFICE_FIXED_OUTPUT_DPI)
+      .expect("integer Arial character advances")
+      .iter()
+      .sum::<f32>();
+
+    assert!((device_width - device_character_width).abs() < 0.001);
+    assert!(device_width > natural_width + 0.3);
+    let controlled_line_right = (natural_width + device_width) / 2.0;
+    assert!(!text_overflows_line(
+      0.0,
+      natural_width,
+      controlled_line_right
+    ));
+    assert!(text_overflows_line(
+      0.0,
+      device_width,
+      controlled_line_right
     ));
   }
 
@@ -47962,6 +50180,8 @@ mod tests {
         y_pt: 0.0,
         width_pt: 120.0,
         height_pt: 120.0,
+        inline_frame_left_gap_pt: 0.0,
+        inline_frame_right_gap_pt: 0.0,
         inline_baseline_gap_pt: 0.0,
         inline_baseline_participant: true,
         paragraph_alignment_locked: false,
@@ -48053,6 +50273,8 @@ mod tests {
           y_pt,
           width_pt: 10.0,
           height_pt,
+          inline_frame_left_gap_pt: 0.0,
+          inline_frame_right_gap_pt: 0.0,
           inline_baseline_gap_pt: baseline_gap_pt,
           inline_baseline_participant: true,
           paragraph_alignment_locked: false,
@@ -48115,6 +50337,8 @@ mod tests {
         y_pt,
         width_pt: 10.0,
         height_pt,
+        inline_frame_left_gap_pt: 0.0,
+        inline_frame_right_gap_pt: 0.0,
         inline_baseline_gap_pt: 0.0,
         inline_baseline_participant: true,
         paragraph_alignment_locked: false,
@@ -48162,6 +50386,7 @@ mod tests {
         y_pt: 0.0,
         width_pt: 1.0,
         height_pt: 1.0,
+        paragraph_alignment_locked: false,
         fill_color: None,
         fill_opacity: 1.0,
         stroke: None,
@@ -48175,6 +50400,7 @@ mod tests {
       y_pt: 0.0,
       width_pt: 1.0,
       height_pt: 1.0,
+      paragraph_alignment_locked: false,
       fill_color: None,
       fill_opacity: 1.0,
       stroke: None,
@@ -48213,6 +50439,7 @@ mod tests {
         y_pt: 0.0,
         width_pt: 1.0,
         height_pt: 1.0,
+        paragraph_alignment_locked: false,
         fill_color: None,
         fill_opacity: 1.0,
         stroke: None,
@@ -48324,6 +50551,7 @@ mod tests {
         y_pt: 2.0,
         width_pt: 3.0,
         height_pt: 4.0,
+        paragraph_alignment_locked: false,
         fill_color: None,
         fill_opacity: 1.0,
         stroke: None,
@@ -48375,6 +50603,8 @@ mod tests {
       y_pt: 0.0,
       width_pt: 1.0,
       height_pt: 1.0,
+      inline_frame_left_gap_pt: 0.0,
+      inline_frame_right_gap_pt: 0.0,
       inline_baseline_gap_pt: 0.0,
       inline_baseline_participant: false,
       paragraph_alignment_locked: false,
@@ -48400,6 +50630,7 @@ mod tests {
       y_pt: 0.0,
       width_pt: 1.0,
       height_pt: 1.0,
+      paragraph_alignment_locked: false,
       fill_color: None,
       fill_opacity: 1.0,
       stroke: None,
@@ -48606,6 +50837,53 @@ mod tests {
     ) * 0.15;
     assert!((ordinary_next_y - legacy_next_y - ordinary_auto_spacing).abs() < 0.001);
 
+    let mut shape_story_picture = ordinary_picture.clone();
+    let InlineItem::Image(shape_story_image) = &mut shape_story_picture.inlines[0] else {
+      panic!("expected inline image");
+    };
+    shape_story_image.inline_baseline_gap_pt = None;
+    let shape_story_flow = FlowContext {
+      compatibility_mode: 15,
+      text_segmentation: TextSegmentation::TableCell,
+      layout_cell_bounds: None,
+      ..legacy_flow
+    };
+    let mut shape_story_metrics = TextMetrics::new();
+    let shape_story_frame = TextFrame::new(
+      &shape_story_picture,
+      shape_story_flow,
+      &mut shape_story_metrics,
+    );
+    assert_eq!(
+      word_textbox_inline_drawing_spacing_after(
+        &shape_story_picture,
+        shape_story_flow,
+        shape_story_frame,
+        8.0,
+        &mut shape_story_metrics,
+      ),
+      8.0,
+      "authored proportional line spacing remains in the centered story height",
+    );
+
+    shape_story_picture.format.line_height_pt = None;
+    shape_story_picture.format.line_height_set = false;
+    let single_shape_story_frame = TextFrame::new(
+      &shape_story_picture,
+      shape_story_flow,
+      &mut shape_story_metrics,
+    );
+    assert!(
+      word_textbox_inline_drawing_spacing_after(
+        &shape_story_picture,
+        shape_story_flow,
+        single_shape_story_frame,
+        8.0,
+        &mut shape_story_metrics,
+      ) < 8.0,
+      "the paragraph-mark ink descent still overlaps spacing after at single spacing",
+    );
+
     let (modern_top, modern_next_y) = layout(
       &paragraph,
       FlowContext {
@@ -48694,6 +50972,7 @@ mod tests {
         stroke_override: None,
         suppress_zero_relative_background: false,
         allow_outside_page: false,
+        horizontal_rule: None,
         placement: crate::docx::ImagePlacement::Inline,
         chart: None,
         text_warp: None,
@@ -48920,6 +51199,61 @@ mod tests {
     assert!((legacy_shared_estimated - legacy_shared_laid_out).abs() < LAYOUT_EPSILON_PT);
     assert!((modern_shared_estimated - modern_shared_laid_out).abs() < LAYOUT_EPSILON_PT);
     assert!((legacy_shared_laid_out - modern_shared_laid_out).abs() < LAYOUT_EPSILON_PT);
+
+    let mut horizontal_rule = shape(23.0);
+    horizontal_rule.height_pt = 1.5;
+    horizontal_rule.horizontal_rule = Some(crate::docx::InlineHorizontalRule {
+      width: InlineHorizontalRuleWidth::Percent(0.5),
+      alignment: InlineHorizontalRuleAlignment::Right,
+      standard: true,
+      no_shade: false,
+    });
+    assert!((inline_horizontal_rule_width(&horizontal_rule, 10.0, 110.0) - 50.0).abs() < 0.001);
+    assert!((inline_horizontal_rule_x(&horizontal_rule, 10.0, 110.0, 50.0) - 60.0).abs() < 0.001);
+
+    let text_only = paragraph(vec![text("beforeafter")]);
+    let rule_only = paragraph(vec![InlineItem::Shape(horizontal_rule.clone())]);
+    let mixed_rule = paragraph(vec![
+      text("before"),
+      InlineItem::Shape(horizontal_rule.clone()),
+      text("after"),
+    ]);
+    let mut ordinary_rectangle = horizontal_rule;
+    ordinary_rectangle.horizontal_rule = None;
+    let mixed_rectangle = paragraph(vec![
+      text("before"),
+      InlineItem::Shape(ordinary_rectangle),
+      text("after"),
+    ]);
+    let (_, text_line_height) = heights(&text_only, flow);
+    let (rule_estimated, rule_laid_out) = heights(&rule_only, flow);
+    let (mixed_rule_estimated, mixed_rule_laid_out) = heights(&mixed_rule, flow);
+    let (mixed_rectangle_estimated, mixed_rectangle_laid_out) = heights(&mixed_rectangle, flow);
+    assert!((rule_estimated - rule_laid_out).abs() < LAYOUT_EPSILON_PT);
+    assert!((mixed_rule_estimated - mixed_rule_laid_out).abs() < LAYOUT_EPSILON_PT);
+    assert!((mixed_rectangle_estimated - mixed_rectangle_laid_out).abs() < LAYOUT_EPSILON_PT);
+    assert!((rule_laid_out - text_line_height).abs() < LAYOUT_EPSILON_PT);
+    let mut rule_metrics = TextMetrics::new();
+    let rule_frame = TextFrame::new(&mixed_rule, flow, &mut rule_metrics);
+    let rule_portion_height = legacy_nonfinal_horizontal_rule_host_line_height(1.5);
+    assert!((rule_portion_height - 6.4).abs() < LAYOUT_EPSILON_PT);
+    assert!(
+      (legacy_nonfinal_horizontal_rule_host_line_height(6.0) - 10.9).abs() < LAYOUT_EPSILON_PT
+    );
+    let compact_nonfinal_rule_height = nonfinal_inline_object_only_line_height(
+      &mixed_rule,
+      flow,
+      rule_frame,
+      rule_portion_height,
+      false,
+    )
+    .expect("compatibility horizontal-rule line")
+    .height_pt;
+    assert!(
+      (mixed_rule_laid_out - (text_line_height * 2.0 + compact_nonfinal_rule_height)).abs()
+        < LAYOUT_EPSILON_PT
+    );
+    assert!((mixed_rectangle_laid_out - text_line_height).abs() < LAYOUT_EPSILON_PT);
   }
 
   #[test]
@@ -49188,6 +51522,7 @@ mod tests {
         stroke_override: None,
         suppress_zero_relative_background: false,
         allow_outside_page: false,
+        horizontal_rule: None,
         placement: crate::docx::ImagePlacement::Inline,
         chart: None,
         text_warp: None,

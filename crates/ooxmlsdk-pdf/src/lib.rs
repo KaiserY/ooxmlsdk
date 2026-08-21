@@ -38,9 +38,9 @@ pub use ooxmlsdk_layout::pptx::{
 pub use options::{
   PdfAttachment, PdfAttachmentAssociation, PdfDateTime, PdfDocumentKind, PdfFormOptions,
   PdfFormSubmitFormat, PdfGeneralOptions, PdfImageOptions, PdfLinkDefaultAction, PdfLinkOptions,
-  PdfMetadataOptions, PdfOptionAdjustment, PdfOptionFeature, PdfOptionSupport, PdfOptions,
-  PdfPageLayout, PdfSpreadsheetOptions, PdfStandard, PdfViewerMagnification, PdfViewerOptions,
-  PdfViewerPageMode, PdfWatermarkOptions, ResolvedPdfOptions, pdf_option_support,
+  PdfMetadataOptions, PdfOptimizeFor, PdfOptionAdjustment, PdfOptionFeature, PdfOptionSupport,
+  PdfOptions, PdfPageLayout, PdfSpreadsheetOptions, PdfStandard, PdfViewerMagnification,
+  PdfViewerOptions, PdfViewerPageMode, PdfWatermarkOptions, ResolvedPdfOptions, pdf_option_support,
 };
 
 /// Validate and normalize a requested option set for one OOXML document family.

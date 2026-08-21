@@ -598,6 +598,19 @@ pub(crate) struct ParagraphFormat {
   /// Paragraphs in an actual table nested inside the textbox remain ordinary
   /// table-cell stories and deliberately leave this false.
   pub wordprocessing_shape_story: bool,
+  /// The WPS text story belongs to a shape nested in `wpg:wgp`. Word realizes
+  /// bitmap children of that grouped drawing through the group's bitmap
+  /// surface before fixed-output compression. A top-level `wps:wsp` textbox
+  /// remains a direct picture consumer, so keep group ownership independent
+  /// from the general WPS story bit above.
+  pub wordprocessing_group_shape_story: bool,
+  /// A direct paragraph in a legacy VML `v:textbox` is formatted by Word's
+  /// text-frame path against integer GDI reference-device advances. Keep this
+  /// owner bit separate from the shared table-cell formatter so ordinary
+  /// body, table, and DrawingML text retain their own line-fit metrics.
+  /// Paragraphs in an actual table nested inside the textbox remain ordinary
+  /// table-cell stories and deliberately leave this false.
+  pub word_text_frame_story: bool,
   pub snap_to_grid: Option<bool>,
   pub line_vertical_alignment: Option<common::LineVerticalAlignment>,
   pub indent_left_pt: f32,
@@ -615,6 +628,11 @@ pub(crate) struct ParagraphFormat {
   pub tab_stops_set: bool,
   pub list_label_width_aware_tab: bool,
   pub list_label_uses_explicit_tab_stop: bool,
+  /// A visible picture-bullet level whose referenced image cannot be
+  /// resolved still owns Word's zero-width numbering margin. It paints
+  /// neither the image nor `w:lvlText`, but its body starts at the effective
+  /// numbered-paragraph text edge instead of the hanging label edge.
+  pub suppressed_picture_bullet_owns_numbering_margin: bool,
   pub list_label_justification: w::LevelJustificationValues,
   pub alignment: ParagraphAlignment,
   pub justification: ParagraphJustification,
@@ -1169,6 +1187,12 @@ pub(crate) struct InlineShape {
   pub stroke_override: Option<Box<common::Stroke<'static>>>,
   pub suppress_zero_relative_background: bool,
   pub allow_outside_page: bool,
+  /// Word's legacy VML horizontal-rule object is exposed as an inline shape,
+  /// but it owns a complete physical line and resolves its width against the
+  /// current text frame.  Keep that semantic object distinct from an
+  /// ordinary VML rectangle so layout can apply those contracts without
+  /// changing generic inline-shape behavior.
+  pub horizontal_rule: Option<InlineHorizontalRule>,
   pub placement: ImagePlacement,
   pub chart: Option<Box<InlineChart>>,
   pub text_warp: Option<Box<a::PresetTextWarp>>,
@@ -1192,6 +1216,31 @@ pub(crate) struct InlineShape {
   pub text_box_word_wrap: bool,
   pub text_box_clip_vertical_overflow: bool,
   pub text_vertical_alignment: TextBoxVerticalAlignment,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct InlineHorizontalRule {
+  pub width: InlineHorizontalRuleWidth,
+  pub alignment: InlineHorizontalRuleAlignment,
+  pub standard: bool,
+  pub no_shade: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum InlineHorizontalRuleWidth {
+  /// Fraction of the current paragraph line/frame width. VML stores this as
+  /// tenths of a percent (`o:hrpct=500` means 50%).
+  Percent(f32),
+  /// `o:hrpct=0` retains the authored CSS width.
+  Fixed,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum InlineHorizontalRuleAlignment {
+  #[default]
+  Left,
+  Center,
+  Right,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

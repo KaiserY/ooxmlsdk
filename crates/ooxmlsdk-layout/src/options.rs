@@ -31,6 +31,9 @@ pub struct LayoutOptions {
   /// absent or invalid, fields that require an absolute-to-local conversion
   /// preserve their cached results.
   pub field_update_time_zone: Option<String>,
+  /// Fixed-format bitmap working density requested by the caller.  `None`
+  /// retains the Office print-compatible 200-DPI default.
+  pub fixed_output_raster_dpi: Option<u32>,
   pub action: LayoutActionOptions,
   pub diagnostics: LayoutDiagnosticsOptions,
 }

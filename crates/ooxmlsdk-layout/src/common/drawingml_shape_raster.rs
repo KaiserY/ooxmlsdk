@@ -30,6 +30,24 @@ pub(crate) struct DrawingRaster {
   pub(crate) pixels_per_point: f32,
 }
 
+/// Explicit page-to-device mapping for a fixed-output raster surface.
+///
+/// Most DrawingML effect surfaces use one isotropic page-space density and a
+/// page-space bounding rectangle. Word's on-screen static-3-D surface is the
+/// exception: its allocated bitmap is tied to the separately quantized PDF
+/// display rectangle, while the foreground is re-realized at a subpixel
+/// offset inside that bitmap. Keep that mapping explicit instead of changing
+/// the authored page-space display list.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PageToRasterMapping {
+  pub(crate) width_px: u32,
+  pub(crate) height_px: u32,
+  pub(crate) scale_x: f32,
+  pub(crate) scale_y: f32,
+  pub(crate) translate_x: f32,
+  pub(crate) translate_y: f32,
+}
+
 /// Rasterizes one already-resolved 2-D Drawing shape for effects that require
 /// full-color pixels.
 ///
@@ -73,6 +91,44 @@ pub(crate) fn rasterize_vector_items_for_effects_at_pixels_per_point(
     false,
     pixels_per_point,
   )
+}
+
+pub(crate) fn rasterize_vector_items_for_effects_with_mapping(
+  items: &[DisplayItem<'static>],
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  pixels_per_point: f32,
+  mapping: PageToRasterMapping,
+) -> Option<DrawingRaster> {
+  let requirements = super::drawingml_image_effects::source_requirements(effects);
+  if requirements.children {
+    return None;
+  }
+  let image = rasterize_vector_items_impl_with_mapping(items, mapping)?;
+  let layer = |source_layer| {
+    let mut layer_items = Vec::new();
+    for item in items {
+      collect_source_layer_item(item, source_layer, &mut layer_items)?;
+    }
+    if layer_items.is_empty() {
+      Some(RgbaImage::new(mapping.width_px, mapping.height_px))
+    } else {
+      rasterize_vector_items_impl_with_mapping(&layer_items, mapping)
+    }
+  };
+  Some(DrawingRaster {
+    image,
+    fill_image: requirements
+      .fill
+      .then(|| layer(SourceLayer::Fill))
+      .flatten(),
+    line_image: requirements
+      .line
+      .then(|| layer(SourceLayer::Line))
+      .flatten(),
+    fill_line_image: None,
+    children_image: None,
+    pixels_per_point,
+  })
 }
 
 pub(crate) fn rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
@@ -126,6 +182,31 @@ pub(crate) fn static_3d_text_geometry(
     &outline.commands,
     raster_bounds,
     pixels_per_point,
+  )
+}
+
+pub(crate) fn static_3d_shape_geometry(
+  commands: &[PathCommand],
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+) -> Option<super::drawingml_3d::Static3dTextGeometry> {
+  super::drawingml_3d::Static3dTextGeometry::from_page_path(
+    commands,
+    raster_bounds,
+    pixels_per_point,
+  )
+}
+
+pub(crate) fn static_3d_shape_geometry_with_mapping(
+  commands: &[PathCommand],
+  mapping: PageToRasterMapping,
+) -> Option<super::drawingml_3d::Static3dTextGeometry> {
+  super::drawingml_3d::Static3dTextGeometry::from_page_path_with_mapping(
+    commands,
+    mapping.scale_x,
+    mapping.scale_y,
+    mapping.translate_x,
+    mapping.translate_y,
   )
 }
 
@@ -326,11 +407,29 @@ fn empty_raster_at_pixels_per_point(
   }
   Some((
     RgbaImage::new(
-      (width_pt * pixels_per_point).ceil().max(1.0) as u32,
-      (height_pt * pixels_per_point).ceil().max(1.0) as u32,
+      raster_pixel_extent(width_pt, pixels_per_point),
+      raster_pixel_extent(height_pt, pixels_per_point),
     ),
     pixels_per_point,
   ))
+}
+
+fn raster_pixel_extent(length_pt: f32, pixels_per_point: f32) -> u32 {
+  let extent_px = length_pt * pixels_per_point;
+  let nearest_px = extent_px.round();
+  // Pixel-aligned bounds are divided by the density in
+  // `align_rect_to_pixel_grid` and multiplied back here.  The f32 round trip
+  // can leave an integer extent a few ULPs above its source value (for
+  // example 116.00002), and a second unconditional ceil would allocate a
+  // spurious row or column.  Snap only representationally-near integers;
+  // genuine fractional coverage still rounds outward.
+  let rounding_tolerance = f32::EPSILON * extent_px.abs().max(1.0) * 4.0;
+  let outward_px = if (extent_px - nearest_px).abs() <= rounding_tolerance {
+    nearest_px
+  } else {
+    extent_px.ceil()
+  };
+  outward_px.max(1.0) as u32
 }
 
 fn effect_pixels_per_point(width_pt: f32, height_pt: f32) -> f32 {
@@ -433,8 +532,8 @@ fn rasterize_vector_items_impl_at_pixels_per_point(
   {
     return None;
   }
-  let width_px = (width_pt * pixels_per_point).ceil().max(1.0) as u32;
-  let height_px = (height_pt * pixels_per_point).ceil().max(1.0) as u32;
+  let width_px = raster_pixel_extent(width_pt, pixels_per_point);
+  let height_px = raster_pixel_extent(height_pt, pixels_per_point);
   let mut pixmap = Pixmap::new(width_px, height_px)?;
   let mut text_metrics = TextMetrics::new();
   let page_to_raster = SkTransform::from_row(
@@ -453,6 +552,111 @@ fn rasterize_vector_items_impl_at_pixels_per_point(
   let png = pixmap.encode_png().ok()?;
   let image = image::load_from_memory(&png).ok()?.to_rgba8();
   Some((image, pixels_per_point))
+}
+
+fn rasterize_vector_items_impl_with_mapping(
+  items: &[DisplayItem<'static>],
+  mapping: PageToRasterMapping,
+) -> Option<RgbaImage> {
+  if mapping.width_px == 0
+    || mapping.height_px == 0
+    || !mapping.scale_x.is_finite()
+    || !mapping.scale_y.is_finite()
+    || !mapping.translate_x.is_finite()
+    || !mapping.translate_y.is_finite()
+    || mapping.scale_x <= 0.0
+    || mapping.scale_y <= 0.0
+    || items.iter().any(|item| !supported_raster_item(item))
+  {
+    return None;
+  }
+
+  // tiny-skia's path scanner uses a 4x4 coverage grid. Word's fixed-output
+  // static-3-D surface exposes finer AntiAlias8x coverage (the controlled
+  // tdf97371 target has 112/105 alpha edges, neither representable by the
+  // native 4x4 grid). Realize this explicitly mapped, typically tiny surface
+  // at a bounded higher resolution and resolve premultiplied coverage. The
+  // shared effect-pixel budget keeps large shapes from multiplying memory.
+  let final_pixels = u64::from(mapping.width_px) * u64::from(mapping.height_px);
+  let budget_factor = ((f64::from(MAX_EFFECT_RASTER_PIXELS) / final_pixels as f64)
+    .sqrt()
+    .floor() as u32)
+    .clamp(1, 8);
+  if budget_factor > 1 {
+    let scale = budget_factor as f32;
+    let supersampled = rasterize_vector_items_impl_with_mapping_at_resolution(
+      items,
+      PageToRasterMapping {
+        width_px: mapping.width_px.checked_mul(budget_factor)?,
+        height_px: mapping.height_px.checked_mul(budget_factor)?,
+        scale_x: mapping.scale_x * scale,
+        scale_y: mapping.scale_y * scale,
+        translate_x: mapping.translate_x * scale,
+        translate_y: mapping.translate_y * scale,
+      },
+    )?;
+    return Some(resolve_supersampled_rgba(
+      &supersampled,
+      mapping.width_px,
+      mapping.height_px,
+      budget_factor,
+    ));
+  }
+
+  rasterize_vector_items_impl_with_mapping_at_resolution(items, mapping)
+}
+
+fn rasterize_vector_items_impl_with_mapping_at_resolution(
+  items: &[DisplayItem<'static>],
+  mapping: PageToRasterMapping,
+) -> Option<RgbaImage> {
+  let mut pixmap = Pixmap::new(mapping.width_px, mapping.height_px)?;
+  let mut text_metrics = TextMetrics::new();
+  let page_to_raster = SkTransform::from_row(
+    mapping.scale_x,
+    0.0,
+    0.0,
+    mapping.scale_y,
+    mapping.translate_x,
+    mapping.translate_y,
+  );
+  for item in items {
+    draw_display_item(&mut pixmap, item, page_to_raster, &mut text_metrics)?;
+  }
+
+  let png = pixmap.encode_png().ok()?;
+  image::load_from_memory(&png)
+    .ok()
+    .map(|image| image.to_rgba8())
+}
+
+fn resolve_supersampled_rgba(
+  source: &RgbaImage,
+  width: u32,
+  height: u32,
+  factor: u32,
+) -> RgbaImage {
+  let sample_count = u64::from(factor) * u64::from(factor);
+  RgbaImage::from_fn(width, height, |x, y| {
+    let mut alpha_sum = 0_u64;
+    let mut premultiplied_sum = [0_u64; 3];
+    for sample_y in y * factor..(y + 1) * factor {
+      for sample_x in x * factor..(x + 1) * factor {
+        let pixel = source.get_pixel(sample_x, sample_y);
+        let alpha = u64::from(pixel[3]);
+        alpha_sum += alpha;
+        for channel in 0..3 {
+          premultiplied_sum[channel] += u64::from(pixel[channel]) * alpha;
+        }
+      }
+    }
+    if alpha_sum == 0 {
+      return image::Rgba([0; 4]);
+    }
+    let alpha = ((alpha_sum + sample_count / 2) / sample_count).min(255) as u8;
+    let color = premultiplied_sum.map(|sum| ((sum + alpha_sum / 2) / alpha_sum).min(255) as u8);
+    image::Rgba([color[0], color[1], color[2], alpha])
+  })
 }
 
 fn supported_raster_item(item: &DisplayItem<'static>) -> bool {
@@ -1443,10 +1647,11 @@ fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
 #[cfg(test)]
 mod tests {
   use super::{
-    MAX_EFFECT_RASTER_PIXELS, SourceLayer, bounded_effect_raster_grid, collect_source_layer_item,
-    effect_pixels_per_point_with_max, rasterize_group_items_for_effects,
-    rasterize_group_items_for_effects_at_pixels_per_point, rasterize_vector_items,
-    rasterize_vector_items_for_effects,
+    MAX_EFFECT_RASTER_PIXELS, PageToRasterMapping, SourceLayer, bounded_effect_raster_grid,
+    collect_source_layer_item, effect_pixels_per_point_with_max, raster_pixel_extent,
+    rasterize_group_items_for_effects, rasterize_group_items_for_effects_at_pixels_per_point,
+    rasterize_vector_items, rasterize_vector_items_for_effects,
+    rasterize_vector_items_for_effects_with_mapping,
   };
   use bytes::Bytes;
   use image::codecs::png::PngEncoder;
@@ -1493,6 +1698,65 @@ mod tests {
     assert!(aligned.origin.y.0 <= -2.1);
     assert!(aligned.origin.x.0 + aligned.size.width.0 >= 15.5);
     assert!(aligned.origin.y.0 + aligned.size.height.0 >= 0.9);
+  }
+
+  #[test]
+  fn pixel_extent_does_not_ceil_an_aligned_integer_twice() {
+    let pixels_per_point = 200.0 / 72.0;
+
+    // The values are the 116-pixel Word static-3D target after an absolute
+    // page-space grid alignment.  Their f32 product lands just above 116.
+    assert_eq!(raster_pixel_extent(41.76001, pixels_per_point), 116);
+    assert_eq!(raster_pixel_extent(41.77, pixels_per_point), 117);
+  }
+
+  #[test]
+  fn screen_static_3d_mapping_matches_office_foreground_edge_coverage() {
+    let content = rect(0.0, 0.0, 34.5, 18.75);
+    let width_px = 46.0;
+    let height_px = 24.84375;
+    let mapping = PageToRasterMapping {
+      width_px: 55,
+      height_px: 34,
+      scale_x: width_px / content.size.width.0,
+      scale_y: height_px / content.size.height.0,
+      translate_x: 5.0,
+      translate_y: 2.5625,
+    };
+    let items = [DisplayItem::Rect(RectItem {
+      bounds: content,
+      fill: Fill::Solid(Color {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+      }),
+      stroke: None,
+    })];
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+
+    let raster =
+      rasterize_vector_items_for_effects_with_mapping(&items, &effects, 96.0 / 72.0, mapping)
+        .unwrap();
+
+    assert_eq!(
+      [
+        raster.image.get_pixel(4, 15)[3],
+        raster.image.get_pixel(5, 15)[3],
+        raster.image.get_pixel(50, 15)[3],
+        raster.image.get_pixel(51, 15)[3],
+        raster.image.get_pixel(27, 2)[3],
+        raster.image.get_pixel(27, 3)[3],
+        raster.image.get_pixel(27, 26)[3],
+        raster.image.get_pixel(27, 27)[3],
+      ],
+      // Office's final bottom-edge byte is 105; 104 is the nearest value on
+      // the bounded 32-sample coverage grid used here.
+      [0, 255, 255, 0, 112, 255, 255, 104]
+    );
   }
 
   #[test]

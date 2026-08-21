@@ -1665,6 +1665,7 @@ name = "ooxmlsdk-pdf"
 version = "0.13.0"
 dependencies = [
  "emfsdk",
+ "flate2",
  "hypher",
  "icu_segmenter",
  "image",

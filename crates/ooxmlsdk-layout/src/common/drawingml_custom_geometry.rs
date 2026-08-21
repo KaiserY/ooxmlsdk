@@ -183,8 +183,9 @@ fn drawing_path_fill_mode(value: a::PathFillModeValues) -> DrawingPathFillMode {
 }
 
 /// ECMA-376 Part 1 §20.1.9.4 anchors the ellipse at the current pen position
-/// and measures both angles clockwise in 60,000ths of a degree. Kurbo owns
-/// the tolerance-bounded conversion from this analytical arc to cubic Béziers.
+/// and measures both ray angles clockwise in 60,000ths of a degree. A ray
+/// angle is not the parametric angle of a non-circular ellipse: convert both
+/// ends before handing the analytical arc to Kurbo's cubic approximation.
 fn drawingml_arc(
   start: (f64, f64),
   radius_x: f64,
@@ -204,16 +205,45 @@ fn drawingml_arc(
 
   let start_radians = angle_radians(start_angle);
   let sweep_radians = angle_radians(sweep_angle);
+  let start_parameter = drawingml_ellipse_parameter_angle(start_radians, radius_x, radius_y);
+  let parameter_sweep =
+    drawingml_ellipse_parameter_sweep(start_radians, sweep_radians, radius_x, radius_y);
   Some(Arc::new(
     (
-      start.0 - radius_x * start_radians.cos(),
-      start.1 - radius_y * start_radians.sin(),
+      start.0 - radius_x * start_parameter.cos(),
+      start.1 - radius_y * start_parameter.sin(),
     ),
     (radius_x, radius_y),
-    start_radians,
-    sweep_radians,
+    start_parameter,
+    parameter_sweep,
     0.0,
   ))
+}
+
+fn drawingml_ellipse_parameter_angle(view_angle: f64, radius_x: f64, radius_y: f64) -> f64 {
+  (radius_x * view_angle.sin()).atan2(radius_y * view_angle.cos())
+}
+
+fn drawingml_ellipse_parameter_sweep(
+  start_view_angle: f64,
+  view_sweep: f64,
+  radius_x: f64,
+  radius_y: f64,
+) -> f64 {
+  let full_turns = (view_sweep / std::f64::consts::TAU).trunc();
+  let remainder = view_sweep - full_turns * std::f64::consts::TAU;
+  if remainder == 0.0 {
+    return full_turns * std::f64::consts::TAU;
+  }
+
+  let start = drawingml_ellipse_parameter_angle(start_view_angle, radius_x, radius_y);
+  let end = drawingml_ellipse_parameter_angle(start_view_angle + remainder, radius_x, radius_y);
+  let delta = if remainder > 0.0 {
+    (end - start).rem_euclid(std::f64::consts::TAU)
+  } else {
+    -((start - end).rem_euclid(std::f64::consts::TAU))
+  };
+  full_turns * std::f64::consts::TAU + delta
 }
 
 fn drawingml_arc_endpoint(
@@ -337,9 +367,10 @@ fn divided_builtin(value: &str, prefix: &str, base: f64) -> Option<f64> {
 mod tests {
   use std::collections::HashMap;
 
+  use kurbo::ParamCurve;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
-  use super::{formula, path_commands, paths};
+  use super::{drawingml_arc, formula, path_commands, paths};
   use crate::common::{DrawingPathFillMode, PathCommand, Point, Pt};
 
   #[test]
@@ -502,5 +533,53 @@ mod tests {
     assert!((end.x.0 - 10.0).abs() < 0.001);
     assert!((end.y.0 - 120.0).abs() < 0.001);
     assert_eq!(commands[3], PathCommand::Close);
+  }
+
+  #[test]
+  fn converts_non_cardinal_ray_angles_to_ellipse_parameters() {
+    let radius_x = 100.0;
+    let radius_y = 50.0;
+    let diagonal = std::f64::consts::FRAC_1_SQRT_2;
+    let ray_distance = 1.0 / ((diagonal / radius_x).powi(2) + (diagonal / radius_y).powi(2)).sqrt();
+    let offset = ray_distance * diagonal;
+    let arc = drawingml_arc(
+      (100.0 + offset, 50.0 + offset),
+      radius_x,
+      radius_y,
+      45.0 * 60_000.0,
+      90.0 * 60_000.0,
+    )
+    .expect("non-degenerate DrawingML arc");
+
+    assert!((arc.center.x - 100.0).abs() < 1e-9);
+    assert!((arc.center.y - 50.0).abs() < 1e-9);
+    let end = arc.eval(1.0);
+    assert!((end.x - (100.0 - offset)).abs() < 1e-9);
+    assert!((end.y - (50.0 + offset)).abs() < 1e-9);
+  }
+
+  #[test]
+  fn preserves_ray_angle_sweep_direction_across_a_full_turn() {
+    let radius_x = 100.0;
+    let radius_y = 50.0;
+    let start_view = 300.0_f64.to_radians();
+    let start_parameter = (radius_x * start_view.sin()).atan2(radius_y * start_view.cos());
+    let start = (
+      100.0 + radius_x * start_parameter.cos(),
+      50.0 + radius_y * start_parameter.sin(),
+    );
+    let arc = drawingml_arc(
+      start,
+      radius_x,
+      radius_y,
+      300.0 * 60_000.0,
+      150.0 * 60_000.0,
+    )
+    .expect("non-degenerate DrawingML arc");
+
+    assert!(arc.sweep_angle > 0.0);
+    let end = arc.eval(1.0);
+    assert!((end.x - 100.0).abs() < 1e-9);
+    assert!((end.y - 100.0).abs() < 1e-9);
   }
 }

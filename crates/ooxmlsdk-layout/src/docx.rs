@@ -22,7 +22,7 @@ use std::sync::Arc;
 use crate::common::{self, color_math};
 use bytes::Bytes;
 use image::{ImageEncoder, codecs::png::PngEncoder};
-use kurbo::Affine;
+use kurbo::{Affine, BezPath, Shape as KurboShape};
 use ooxmlsdk::parts::{
   main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
 };
@@ -155,6 +155,8 @@ const VML_DEFAULT_STROKE_WEIGHT_PT: f32 = 0.75;
 // rectangle used by SwFlyCntPortion, not just the authored CSS width. A
 // stroked child which reaches the group's leading edge expands that snap
 // rectangle by one exported fixed-output step (floattable-nested-rowspan).
+// Custom connector paths may escape their tiny authored shape rectangle; the
+// group transform adds that geometric overflow separately below (fdo73215).
 const LO_VML_INLINE_GROUP_EDGE_BOUND_PT: f32 = 0.72;
 // Word fixed output scales automatic w:vertAlign superscript/subscript text to
 // 65% of the authored size. Writer maps the same markup to its older 58%
@@ -593,6 +595,7 @@ pub fn layout_anchor_pages(
     default_document_language: options.default_document_language.clone(),
     field_update_datetime: options.field_update_datetime,
     field_update_time_zone: options.field_update_time_zone.clone(),
+    fixed_output_raster_dpi: options.fixed_output_raster_dpi,
     action: LayoutActionOptions {
       paint: false,
       ..options.action
@@ -11680,6 +11683,7 @@ fn push_drawing_textboxes_impl(
       styles,
       images,
       hyperlinks,
+      inside_wordprocessing_group: false,
     };
     let text_box_frames =
       drawing_graphic_data_choice_textbox_frames(child, placement, transform, textbox_context);
@@ -11793,6 +11797,7 @@ struct DrawingTextBoxImportContext<'a> {
   styles: &'a StylesCatalog,
   images: &'a ImageCatalog,
   hyperlinks: &'a HyperlinkCatalog,
+  inside_wordprocessing_group: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -12442,6 +12447,7 @@ fn text_box_frame_from_wordprocessing_shape(
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  inside_wordprocessing_group: bool,
 ) -> TextBoxFrameContent {
   // ECMA-376 Part 1 §20.4.2.38 defines w:txbxContent as a rich
   // WordprocessingML text-box story. The containing w:r is only the drawing
@@ -12473,7 +12479,7 @@ fn text_box_frame_from_wordprocessing_shape(
       wordprocessing_text_static3d(properties, &styles.theme_colors);
   }
   let mut blocks = textbox_blocks_with_base(content, story_style, styles, images, hyperlinks);
-  prepare_wordprocessing_shape_story(&mut blocks, styles);
+  prepare_wordprocessing_shape_story(&mut blocks, styles, inside_wordprocessing_group);
   let mut frame = TextBoxFrameContent::new(blocks);
   if let Some(color) = shape_text_color {
     apply_automatic_text_color_to_blocks(&mut frame.blocks, color, true);
@@ -12497,11 +12503,16 @@ fn text_box_frame_from_wordprocessing_shape(
   frame
 }
 
-fn prepare_wordprocessing_shape_story(blocks: &mut [Block], styles: &StylesCatalog) {
+fn prepare_wordprocessing_shape_story(
+  blocks: &mut [Block],
+  styles: &StylesCatalog,
+  inside_wordprocessing_group: bool,
+) {
   for block in blocks {
     match block {
       Block::Paragraph(paragraph) => {
         paragraph.format.wordprocessing_shape_story = true;
+        paragraph.format.wordprocessing_group_shape_story = inside_wordprocessing_group;
         if styles.uses_office_recovered_paragraph_defaults()
           && paragraph.format.line_height_pt.is_none()
         {
@@ -12516,10 +12527,25 @@ fn prepare_wordprocessing_shape_story(blocks: &mut [Block], styles: &StylesCatal
           paragraph.format.line_height_rule = LineHeightRule::Auto;
         }
       }
-      Block::Frame(frame) => prepare_wordprocessing_shape_story(&mut frame.blocks, styles),
+      Block::Frame(frame) => {
+        prepare_wordprocessing_shape_story(&mut frame.blocks, styles, inside_wordprocessing_group)
+      }
       // A table inside w:txbxContent creates real table-cell text frames.
       // table_model() already applies the independent missing-Styles table
       // recovery, and those paragraphs must retain table grid semantics.
+      Block::Table(_) => {}
+    }
+  }
+}
+
+fn prepare_word_text_frame_story(blocks: &mut [Block]) {
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => paragraph.format.word_text_frame_story = true,
+      Block::Frame(frame) => prepare_word_text_frame_story(&mut frame.blocks),
+      // A table inside v:textbox creates real table-cell text frames. Keep
+      // their compatibility state independent from the containing legacy
+      // text-frame story.
       Block::Table(_) => {}
     }
   }
@@ -12558,6 +12584,24 @@ fn wordprocessing_shape_actual_line_stroke(
     &styles.theme_lines,
     &styles.theme_colors,
   )
+}
+
+fn wordprocessing_shape_actual_static3d(
+  shape: &wps::WordprocessingShape,
+  properties: &DrawingMlShapeProperties,
+  styles: &StylesCatalog,
+) -> Option<common::drawingml_3d::Static3dStyle> {
+  let direct = properties.static3d(&styles.theme_colors);
+  if direct.is_some() || properties.has_direct_static3d_component() {
+    return direct;
+  }
+  shape.shape_style.as_ref().and_then(|style| {
+    drawingml_effect_reference_static3d(
+      &style.effect_reference,
+      &styles.theme_effects,
+      &styles.theme_colors,
+    )
+  })
 }
 
 fn wordprocessing_shape_textbox_text_rotation(shape: &wps::WordprocessingShape) -> Option<f32> {
@@ -12853,11 +12897,17 @@ fn wordprocessing_canvas_textbox_frames(
   transform: DrawingMlGroupTransform,
   context: DrawingTextBoxImportContext<'_>,
 ) -> Vec<InlineShape> {
+  let child_placement = drawingml_group_child_placement(placement, transform.fallback_size);
   canvas
     .wordprocessing_canvas_choice
     .iter()
     .flat_map(|choice| {
-      wordprocessing_canvas_choice_textbox_frames(choice, placement, transform, context.clone())
+      wordprocessing_canvas_choice_textbox_frames(
+        choice,
+        child_placement,
+        transform,
+        context.clone(),
+      )
     })
     .collect()
 }
@@ -12887,6 +12937,10 @@ fn wordprocessing_group_textbox_frames(
   transform: DrawingMlGroupTransform,
   context: DrawingTextBoxImportContext<'_>,
 ) -> Vec<InlineShape> {
+  let context = DrawingTextBoxImportContext {
+    inside_wordprocessing_group: true,
+    ..context
+  };
   let child_transform = drawingml_group_transform_from_properties(
     &group.group_shape_properties,
     transform.raw_coordinates,
@@ -12989,6 +13043,7 @@ fn wordprocessing_shape_textbox_frame(
     context.styles,
     context.images,
     context.hyperlinks,
+    context.inside_wordprocessing_group,
   );
   let auto_fit = wordprocessing_shape_textbox_uses_auto_fit(shape);
   let frame_stroke = wordprocessing_shape_textbox_frame_stroke(shape, auto_fit, placement);
@@ -13069,12 +13124,13 @@ fn wordprocessing_shape_textbox_frame(
     stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
+    horizontal_rule: None,
     placement,
     chart: None,
     text_warp,
     text_fill: text_fill.map(Box::new),
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
-    static3d: properties.static3d(&context.styles.theme_colors),
+    static3d: wordprocessing_shape_actual_static3d(shape, &properties, context.styles),
     text_upright: shape
       .text_body_properties
       .as_ref()
@@ -13154,6 +13210,17 @@ fn drawingml_preset_text_rectangle_insets(
       .unwrap_or(default)
   };
   match preset.preset {
+    a::ShapeTypeValues::Diamond => {
+      // presetShapeDefinitions.xml defines rect=(wd4,hd4,3w/4,3h/4).
+      // The symmetric inner rectangle is the largest axis-aligned box whose
+      // corners lie on the four diamond edges.
+      Some([
+        width_pt / 4.0,
+        height_pt / 4.0,
+        width_pt / 4.0,
+        height_pt / 4.0,
+      ])
+    }
     a::ShapeTypeValues::Ellipse => {
       // ECMA-376 presetShapeDefinitions.xml defines the ellipse text rect
       // from the 45-degree points on each semi-axis:
@@ -13185,6 +13252,14 @@ fn drawingml_preset_text_rectangle_insets(
       let adjustment = guide(0, 16_667.0).clamp(0.0, 50_000.0);
       let inset = short_side * adjustment / 100_000.0 * 29_289.0 / 100_000.0;
       Some([inset, inset, inset, inset])
+    }
+    a::ShapeTypeValues::Triangle => {
+      // presetShapeDefinitions.xml defines rect=(x1,vc,x3,b), where
+      // x1=w*a/200000 and x3=x1+w/2. The authored apex adjustment moves the
+      // lower-half text rectangle horizontally without changing its width.
+      let adjustment = guide(0, 50_000.0).clamp(0.0, 100_000.0);
+      let left = width_pt * adjustment / 200_000.0;
+      Some([left, height_pt / 2.0, width_pt / 2.0 - left, 0.0])
     }
     a::ShapeTypeValues::RightTriangle => {
       // presetShapeDefinitions.xml: rect=(wd12, 7h/12, 7w/12, 11h/12).
@@ -13768,6 +13843,7 @@ fn drawingml_generic_shape_shape(
     stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
+    horizontal_rule: None,
     placement,
     chart: None,
     text_warp: None,
@@ -13796,11 +13872,127 @@ fn wordprocessing_canvas_shapes(
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
 ) -> Vec<InlineItem> {
-  canvas
+  let child_placement = drawingml_group_child_placement(placement, transform.fallback_size);
+  let mut children = canvas
     .wordprocessing_canvas_choice
     .iter()
-    .flat_map(|choice| wordprocessing_canvas_choice_shapes(choice, placement, transform, context))
-    .collect()
+    .flat_map(|choice| {
+      wordprocessing_canvas_choice_shapes(choice, child_placement, transform, context)
+    })
+    .collect::<Vec<_>>();
+  let Some(background) =
+    wordprocessing_canvas_background_shape(canvas, placement, transform.fallback_size, context)
+  else {
+    return children;
+  };
+
+  // WordprocessingCanvasContext creates the canvas background as the first
+  // child CustomShape, sized from the hosting wp:extent.  Keeping that order
+  // is observable: the fill belongs behind every wpc child, while the host
+  // placement still owns the canvas position and wrapping.
+  children.insert(0, InlineItem::Shape(background));
+  children
+}
+
+fn wordprocessing_canvas_background_shape(
+  canvas: &wpc::WordprocessingCanvas,
+  placement: ImagePlacement,
+  host_extent_pt: Option<(f32, f32)>,
+  context: DrawingShapeImportContext<'_>,
+) -> Option<InlineShape> {
+  let (width_pt, height_pt) = host_extent_pt?;
+  if width_pt <= 0.0 || height_pt <= 0.0 {
+    return None;
+  }
+
+  let background_choice = canvas
+    .background_formatting
+    .as_deref()
+    .and_then(|background| background.background_formatting_choice1.as_ref());
+  let mut fill_image = None;
+  let fill_override = match background_choice {
+    Some(wpc::BackgroundFormattingChoice::NoFill(_)) => Some(common::Fill::None),
+    Some(wpc::BackgroundFormattingChoice::SolidFill(fill)) => {
+      resolve_drawingml_solid_fill(fill, &context.styles.theme_colors)
+        .map(|color| common::Fill::Solid(common_rgb(color.color, color.opacity)))
+    }
+    Some(wpc::BackgroundFormattingChoice::GradientFill(fill)) => {
+      drawingml_gradient_fill(fill, &context.styles.theme_colors)
+    }
+    Some(wpc::BackgroundFormattingChoice::BlipFill(fill)) => {
+      fill_image = drawingml_blip_shape_image_fill(fill, context.images);
+      None
+    }
+    Some(wpc::BackgroundFormattingChoice::PatternFill(fill)) => {
+      drawingml_pattern_fill(fill, &context.styles.theme_colors).map(common::Fill::Pattern)
+    }
+    Some(wpc::BackgroundFormattingChoice::GroupFill) | None => None,
+  };
+  let stroke_override = canvas
+    .whole_formatting
+    .as_deref()
+    .and_then(|whole| whole.outline.as_deref())
+    .and_then(|outline| drawingml_outline_common_stroke(outline, &context.styles.theme_colors));
+  let stroke = stroke_override
+    .as_ref()
+    .map(drawingml_border_style_from_common_stroke);
+  let stroke_pattern = stroke_override.as_ref().and_then(|stroke| stroke.pattern);
+  let has_visible_fill = fill_override
+    .as_ref()
+    .is_some_and(|fill| !matches!(fill, common::Fill::None))
+    || fill_image.is_some();
+  if !has_visible_fill && stroke_override.is_none() {
+    return None;
+  }
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    // The canvas background is a non-advancing first child of an inline
+    // host, so adding its paint layer does not introduce another character
+    // advance on top of the existing flattened WPC content.
+    inline_frame_size_pt: matches!(placement, ImagePlacement::Inline).then_some((0.0, 0.0)),
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
+    geometry: InlineShapeGeometry::Rectangle,
+    offset_x_pt: 0.0,
+    offset_y_pt: 0.0,
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
+    fill_color: None,
+    fill_pattern: None,
+    fill_override: fill_override.map(Box::new),
+    additional_fill_colors: Vec::new(),
+    fill_image,
+    stroke,
+    stroke_pattern,
+    stroke_override: stroke_override.map(Box::new),
+    suppress_zero_relative_background: false,
+    allow_outside_page: false,
+    horizontal_rule: None,
+    placement,
+    chart: None,
+    text_warp: None,
+    text_fill: None,
+    effects: None,
+    static3d: None,
+    text_upright: false,
+    text_box_writing_mode: TextBoxWritingMode::Horizontal,
+    word_text_frame: false,
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
+    text_box_resizes_to_fit: false,
+    text_box_word_wrap: true,
+    text_box_clip_vertical_overflow: false,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
+  })
 }
 
 fn wordprocessing_canvas_choice_shapes(
@@ -14183,12 +14375,13 @@ fn wordprocessing_shape_shape(
     stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
+    horizontal_rule: None,
     placement,
     chart: None,
     text_warp: None,
     text_fill: None,
     effects,
-    static3d: properties.static3d(&context.styles.theme_colors),
+    static3d: wordprocessing_shape_actual_static3d(shape, &properties, context.styles),
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: shape
@@ -14569,6 +14762,7 @@ fn drawingml_diagram_shape_shape(
     stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
+    horizontal_rule: None,
     placement,
     chart: None,
     text_warp: None,
@@ -16328,6 +16522,7 @@ fn chart_shape(
     stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
+    horizontal_rule: None,
     placement,
     chart: None,
     text_warp: None,
@@ -16809,25 +17004,48 @@ impl DrawingMlShapeProperties {
       - local_rotation_deg
   }
 
+  fn has_direct_static3d_component(&self) -> bool {
+    match self {
+      Self::Diagram(properties) => {
+        properties.scene3_d_type.is_some() || properties.shape3_d_type.is_some()
+      }
+      Self::Generic(properties) => {
+        properties.scene3_d_type.is_some() || properties.shape3_d_type.is_some()
+      }
+      Self::Wordprocessing(properties) => {
+        properties.scene3_d_type.is_some() || properties.shape3_d_type.is_some()
+      }
+      Self::Picture(properties) => {
+        properties.scene3_d_type.is_some() || properties.shape3_d_type.is_some()
+      }
+    }
+  }
+
   fn static3d(&self, theme_colors: &ThemeColors) -> Option<common::drawingml_3d::Static3dStyle> {
     let (scene, shape) = match self {
       Self::Diagram(properties) => (
         properties.scene3_d_type.as_deref()?,
-        properties.shape3_d_type.as_deref()?,
+        properties.shape3_d_type.as_deref(),
       ),
       Self::Generic(properties) => (
         properties.scene3_d_type.as_deref()?,
-        properties.shape3_d_type.as_deref()?,
+        properties.shape3_d_type.as_deref(),
       ),
       Self::Wordprocessing(properties) => (
         properties.scene3_d_type.as_deref()?,
-        properties.shape3_d_type.as_deref()?,
+        properties.shape3_d_type.as_deref(),
       ),
       Self::Picture(properties) => (
         properties.scene3_d_type.as_deref()?,
-        properties.shape3_d_type.as_deref()?,
+        properties.shape3_d_type.as_deref(),
       ),
     };
+    // Office's DrawingML renderer treats scene3d as the rasterization trigger:
+    // a missing sp3d supplies the neutral shape surface, while sp3d without a
+    // scene remains flat. This is observable in paired Word fixed-output
+    // exports and keeps direct scene-only markup from borrowing theme sp3d.
+    let default_shape = a::Shape3DType::default();
+    let shape = shape.unwrap_or(&default_shape);
     Some(drawingml_static3d_style(scene, shape, theme_colors))
   }
 }
@@ -16907,6 +17125,7 @@ fn anchor_wrap_polygon_shape(
     stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: false,
+    horizontal_rule: None,
     placement,
     chart: None,
     text_warp: None,
@@ -17370,6 +17589,7 @@ fn drawingml_picture_frame(
     stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: false,
     allow_outside_page: false,
+    horizontal_rule: None,
     placement,
     chart: None,
     text_warp: None,
@@ -17494,25 +17714,7 @@ fn wordprocessing_shape_image_fill(
   else {
     return None;
   };
-  let image_properties =
-    drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default(), Some(images))?;
-  let relationship_id = image_properties.relationship_id.as_deref()?;
-  let resource = images.by_relationship_id.get(relationship_id)?;
-  let image_data = image_data_with_effects(resource, &image_properties);
-
-  Some(InlineShapeImageFill {
-    data: image_data.data,
-    content_type: image_data.content_type,
-    crop: image_properties.crop,
-    rotation_deg: image_properties.rotation_deg,
-    flip_horizontal: image_properties.flip_horizontal,
-    flip_vertical: image_properties.flip_vertical,
-    rotate_with_shape: blip_fill
-      .rotate_with_shape
-      .as_ref()
-      .is_some_and(|value| value.as_bool()),
-    mode: drawingml_image_fill_mode(blip_fill),
-  })
+  drawingml_blip_shape_image_fill(blip_fill, images)
 }
 
 fn drawingml_diagram_shape_image_fill(
@@ -17524,25 +17726,7 @@ fn drawingml_diagram_shape_image_fill(
   else {
     return None;
   };
-  let image_properties =
-    drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default(), Some(images))?;
-  let relationship_id = image_properties.relationship_id.as_deref()?;
-  let resource = images.by_relationship_id.get(relationship_id)?;
-  let image_data = image_data_with_effects(resource, &image_properties);
-
-  Some(InlineShapeImageFill {
-    data: image_data.data,
-    content_type: image_data.content_type,
-    crop: image_properties.crop,
-    rotation_deg: image_properties.rotation_deg,
-    flip_horizontal: image_properties.flip_horizontal,
-    flip_vertical: image_properties.flip_vertical,
-    rotate_with_shape: blip_fill
-      .rotate_with_shape
-      .as_ref()
-      .is_some_and(|value| value.as_bool()),
-    mode: drawingml_image_fill_mode(blip_fill),
-  })
+  drawingml_blip_shape_image_fill(blip_fill, images)
 }
 
 fn drawingml_generic_shape_image_fill(
@@ -17554,6 +17738,13 @@ fn drawingml_generic_shape_image_fill(
   else {
     return None;
   };
+  drawingml_blip_shape_image_fill(blip_fill, images)
+}
+
+fn drawingml_blip_shape_image_fill(
+  blip_fill: &a::BlipFill,
+  images: &ImageCatalog,
+) -> Option<InlineShapeImageFill> {
   let image_properties =
     drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default(), Some(images))?;
   let relationship_id = image_properties.relationship_id.as_deref()?;
@@ -18253,6 +18444,22 @@ fn drawingml_effect_reference_effects(
   }
 }
 
+fn drawingml_effect_reference_static3d(
+  reference: &a::EffectReference,
+  theme_effects: &ThemeEffectStyles,
+  theme_colors: &ThemeColors,
+) -> Option<common::drawingml_3d::Static3dStyle> {
+  let index = usize::try_from(reference.index).ok()?;
+  let style = theme_effects.get(index)?;
+  let scene = style.scene3_d_type.as_deref()?;
+  // Theme effect styles follow the same scene-owned default as direct shape
+  // properties. Word rasterizes a scene-only effect style, but ignores an
+  // sp3d-only style because there is no camera/light scene to consume it.
+  let default_shape = a::Shape3DType::default();
+  let shape = style.shape3_d_type.as_deref().unwrap_or(&default_shape);
+  Some(drawingml_static3d_style(scene, shape, theme_colors))
+}
+
 fn drawingml_fill_reference_color(
   reference: &a::FillReference,
   theme_colors: &ThemeColors,
@@ -18767,6 +18974,39 @@ fn vml_image_file_shape_with_style(
   Some(shape)
 }
 
+fn vml_rectangle_horizontal_rule(rectangle: &v::Rectangle) -> Option<InlineHorizontalRule> {
+  if !rectangle.horizontal.is_some_and(|value| value.as_bool()) {
+    return None;
+  }
+
+  // Office's VML `o:hrpct` is stored in tenths of a percent. LibreOffice's
+  // VML import makes the same conversion in vmlshapecontext.cxx and treats an
+  // omitted value as 100%; an explicit zero selects the authored CSS width.
+  // The relative width remains tied to the paragraph/frame and therefore must
+  // be resolved later by layout, after column/table/textbox bounds are known.
+  let width = match rectangle.horizontal_percentage {
+    Some(value) if value.abs() <= f32::EPSILON => InlineHorizontalRuleWidth::Fixed,
+    Some(value) => InlineHorizontalRuleWidth::Percent(value.clamp(0.0, 1000.0) / 1000.0),
+    None => InlineHorizontalRuleWidth::Percent(1.0),
+  };
+  let alignment = match rectangle.horizontal_alignment.unwrap_or_default() {
+    o::HorizontalRuleAlignmentValues::Left => InlineHorizontalRuleAlignment::Left,
+    o::HorizontalRuleAlignmentValues::Center => InlineHorizontalRuleAlignment::Center,
+    o::HorizontalRuleAlignmentValues::Right => InlineHorizontalRuleAlignment::Right,
+  };
+
+  Some(InlineHorizontalRule {
+    width,
+    alignment,
+    standard: rectangle
+      .horizontal_standard
+      .is_some_and(|value| value.as_bool()),
+    no_shade: rectangle
+      .horizontal_no_shade
+      .is_some_and(|value| value.as_bool()),
+  })
+}
+
 fn vml_rectangle_shape(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<InlineShape> {
   vml_rectangle_shape_with_style(rectangle, rectangle.style.as_deref(), images)
 }
@@ -18805,6 +19045,7 @@ fn vml_rectangle_shape_with_style(
   });
   shape.stroke_override = crate::xlsx::vml_shape_common_stroke(&model).map(Box::new);
   apply_vml_model_wrap(&mut shape, &model);
+  shape.horizontal_rule = vml_rectangle_horizontal_rule(rectangle);
   Some(shape)
 }
 
@@ -18841,14 +19082,7 @@ fn vml_shape_shape_with_style(
   images: &ImageCatalog,
   shape_types: &[&v::Shapetype],
 ) -> Option<InlineShape> {
-  let shape_type = shape.r#type.as_deref().and_then(|reference| {
-    let id = reference.strip_prefix('#').unwrap_or(reference);
-    shape_types
-      .iter()
-      .copied()
-      .rev()
-      .find(|shape_type| shape_type.id.as_deref() == Some(id))
-  });
+  let shape_type = vml_shape_type_for_reference(shape, shape_types);
   let is_undeclared_picture_frame = shape_type.is_none()
     && shape.r#type.as_deref().is_some_and(|reference| {
       reference
@@ -19023,6 +19257,19 @@ fn vml_shape_shape_with_style(
   }
   apply_vml_model_wrap(&mut inline, &common_model);
   Some(inline)
+}
+
+fn vml_shape_type_for_reference<'a>(
+  shape: &v::Shape,
+  shape_types: &[&'a v::Shapetype],
+) -> Option<&'a v::Shapetype> {
+  let reference = shape.r#type.as_deref()?;
+  let id = reference.strip_prefix('#').unwrap_or(reference);
+  shape_types
+    .iter()
+    .copied()
+    .rev()
+    .find(|shape_type| shape_type.id.as_deref() == Some(id))
 }
 
 fn vml_shape_path(shape: &v::Shape) -> Option<&v::Path> {
@@ -20113,6 +20360,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<I
     stroke_override: stroke_override.map(Box::new),
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
+    horizontal_rule: None,
     placement: style.placement(),
     chart: None,
     text_warp: None,
@@ -20325,6 +20573,7 @@ fn vml_shape_frame(
     stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
+    horizontal_rule: None,
     placement: style.placement(),
     chart: None,
     text_warp: None,
@@ -20365,7 +20614,9 @@ fn vml_textbox_frame(
   let mut style = vml_image_style(shape_style);
   style.layout_in_cell = layout_in_cell;
   let (shape_width_pt, shape_height_pt) = style.size_pt?;
-  let mut frame = TextBoxFrameContent::new(textbox_blocks(content, styles, images, hyperlinks));
+  let mut blocks = textbox_blocks(content, styles, images, hyperlinks);
+  prepare_word_text_frame_story(&mut blocks);
+  let mut frame = TextBoxFrameContent::new(blocks);
   apply_vml_textbox_properties(shape_style, textbox, &mut frame);
   let auto_fit = vml_textbox_fits_shape_to_text(textbox);
 
@@ -20399,6 +20650,7 @@ fn vml_textbox_frame(
     stroke_override: None,
     suppress_zero_relative_background: false,
     allow_outside_page: style.absolute_position,
+    horizontal_rule: None,
     placement: style.placement(),
     chart: None,
     text_warp: None,
@@ -22074,13 +22326,13 @@ impl VmlGroupTransform {
   fn from_group(group: &v::Group) -> Option<Self> {
     let mut transform =
       Self::from_group_with_style_and_anchor(group, group.style.as_deref(), true)?;
-    if !vml_group_has_explicit_floating_position(group.style.as_deref())
-      && group
+    if !vml_group_has_explicit_floating_position(group.style.as_deref()) {
+      let shape_types = vml_group_shape_types(group);
+      transform.inline_leading_pt = group
         .group_choice
         .iter()
-        .any(|choice| vml_group_stroked_child_touches_leading_edge(choice, transform))
-    {
-      transform.inline_leading_pt = LO_VML_INLINE_GROUP_EDGE_BOUND_PT;
+        .filter_map(|choice| vml_group_stroked_child_leading_pt(choice, transform, &shape_types))
+        .fold(0.0, f32::max);
     }
     Some(transform)
   }
@@ -22611,10 +22863,14 @@ fn vml_vertical_alignment_style(alignment: VerticalImageAlignment) -> &'static s
   }
 }
 
-fn vml_group_stroked_child_touches_leading_edge(
+fn vml_group_stroked_child_leading_pt(
   choice: &v::GroupChoice,
   transform: VmlGroupTransform,
-) -> bool {
+  shape_types: &[&v::Shapetype],
+) -> Option<f32> {
+  if let v::GroupChoice::Shape(shape) = choice {
+    return vml_group_custom_shape_leading_pt(shape, transform, shape_types);
+  }
   let (model, style) = match choice {
     v::GroupChoice::Arc(shape) => (
       crate::xlsx::object_resources::vml_arc_model(shape),
@@ -22644,20 +22900,10 @@ fn vml_group_stroked_child_touches_leading_edge(
       crate::xlsx::object_resources::vml_round_rectangle_model(shape),
       shape.style.as_deref(),
     ),
-    // A custom v:shape can inherit `stroked` from an out-of-line shapetype.
-    // Count it only when the child itself explicitly authors the stroke;
-    // otherwise an unresolved picture-frame type would create false padding.
-    v::GroupChoice::Shape(shape) => {
-      let model = crate::xlsx::object_resources::vml_shape_model(shape, None);
-      if model.stroked_authored != Some(true) {
-        return false;
-      }
-      (model, shape.style.as_deref())
-    }
-    _ => return false,
+    _ => return None,
   };
   if !model.stroked {
-    return false;
+    return None;
   }
   let Some(style) = style.filter(|style| {
     style.split(';').any(|declaration| {
@@ -22669,12 +22915,90 @@ fn vml_group_stroked_child_touches_leading_edge(
       })
     })
   }) else {
-    return false;
+    return None;
   };
   let Some(style) = transform.child_style(Some(style)) else {
-    return false;
+    return None;
   };
-  vml_image_style(Some(&style)).horizontal_offset_pt <= f32::EPSILON
+  let leading_x = vml_image_style(Some(&style)).horizontal_offset_pt;
+  (leading_x <= f32::EPSILON).then_some((-leading_x).max(0.0) + LO_VML_INLINE_GROUP_EDGE_BOUND_PT)
+}
+
+fn vml_group_custom_shape_leading_pt(
+  shape: &v::Shape,
+  transform: VmlGroupTransform,
+  shape_types: &[&v::Shapetype],
+) -> Option<f32> {
+  let authored_style = shape.style.as_deref()?;
+  let transformed_style = transform.child_style(Some(authored_style))?;
+  let child = vml_image_style(Some(&transformed_style));
+  let shape_type = vml_shape_type_for_reference(shape, shape_types);
+  let model = crate::xlsx::object_resources::vml_shape_model(shape, shape_type);
+  if !model.stroked {
+    return None;
+  }
+
+  // SdrObjGroup::GetSnapRect() is the union of its children's snap
+  // rectangles. In particular an SdrEdgeObj uses its resolved connector path,
+  // which can escape a one-coordinate-unit VML shape frame by many points.
+  // Flatten the same resolved geometry used for paint before deciding whether
+  // the inline group needs leading room. Keep the old explicit-stroke frame
+  // fallback for ordinary custom shapes, while an inherited path is enough
+  // evidence to avoid treating an unresolved picture-frame type as painted.
+  let inline = vml_shape_shape_with_style(
+    shape,
+    Some(&transformed_style),
+    &ImageCatalog::default(),
+    shape_types,
+  );
+  let path_min_x = inline
+    .as_ref()
+    .and_then(|inline| vml_inline_shape_stroked_path_min_x(inline, child));
+  let leading_x = match (path_min_x, model.stroked_authored) {
+    (Some(path_min_x), Some(true)) => path_min_x.min(child.horizontal_offset_pt),
+    (Some(path_min_x), _) => path_min_x,
+    (None, Some(true)) => child.horizontal_offset_pt,
+    (None, _) => return None,
+  };
+  (leading_x <= f32::EPSILON).then_some((-leading_x).max(0.0) + LO_VML_INLINE_GROUP_EDGE_BOUND_PT)
+}
+
+fn vml_inline_shape_stroked_path_min_x(shape: &InlineShape, style: VmlImageStyle) -> Option<f32> {
+  let InlineShapeGeometry::Path { paths, .. } = &shape.geometry else {
+    return None;
+  };
+  let (width_pt, height_pt) = style.size_pt?;
+  let center_x = style.horizontal_offset_pt + width_pt / 2.0;
+  let center_y = style.vertical_offset_pt + height_pt / 2.0;
+  let orientation = Affine::translate((-f64::from(center_x), -f64::from(center_y)))
+    .then_scale_non_uniform(
+      if shape.flip_horizontal { -1.0 } else { 1.0 },
+      if shape.flip_vertical { -1.0 } else { 1.0 },
+    )
+    .then_rotate(f64::from(shape.rotation_deg.to_radians()))
+    .then_translate((f64::from(center_x), f64::from(center_y)).into());
+  let path_transform = orientation
+    * Affine::translate((
+      f64::from(style.horizontal_offset_pt),
+      f64::from(style.vertical_offset_pt),
+    ));
+
+  paths
+    .iter()
+    .filter(|path| path.stroke && !path.commands.is_empty())
+    .filter_map(|path| {
+      let commands = common::drawingml_geometry::transform_commands(
+        path.commands.iter().copied(),
+        path_transform,
+      );
+      let path = BezPath::from_vec(common::drawingml_geometry::mapped_path_elements(
+        &commands,
+        common::drawingml_geometry::kurbo_point,
+      ));
+      let bounds = path.bounding_box();
+      bounds.x0.is_finite().then_some(bounds.x0 as f32)
+    })
+    .reduce(f32::min)
 }
 
 pub(crate) fn vml_group_child_style(
@@ -27831,16 +28155,19 @@ impl NumberingCatalog {
     // visible portion; an authored paragraph w:tab can therefore still land
     // on that list tab (2120112713 and 2120112713_OpenBrace).
     let visible_numbering_symbol = !style.hidden;
+    format.suppressed_picture_bullet_owns_numbering_margin =
+      visible_numbering_symbol && picture_bullet && image.is_none();
     Some(NumberingLabel {
       // w:lvlPicBulletId selects the picture representation even when the
       // referenced VML shape has no usable graphic. Word leaves that marker
       // empty; it does not fall back to the textual w:lvlText bullet.
-      // Writer's SwTextFormatter::NewNumberPortion creates no numbering
-      // portion when the complete number plus follow text is empty.  This is
-      // distinct from an empty lvlText with the default tab suffix: that
-      // still produces a tab portion.  Without a portion, the paragraph text
-      // starts at the authored hanging first-line origin while its own w:tab
-      // can still advance to the level's left indent.
+      // The zero-width numbering owner still selects the effective body-text
+      // edge. Controlled Word PDF probes derived from lvlPicBulletId.docx put
+      // the first character at 90.744pt with the direct 18.75pt left indent,
+      // and at 108.02pt after that direct indent is removed and the level's
+      // 36pt left indent becomes effective. The level's tab is not emitted as
+      // a separate advance. Keep that ownership bit on ParagraphFormat while
+      // an authored w:tab can still use the level tab normally.
       text: (visible_numbering_symbol && !picture_bullet && !text.is_empty()).then_some(text),
       suppressed_non_numerical_text: (visible_numbering_symbol && !picture_bullet)
         .then_some(suppressed_non_numerical_text),
@@ -31529,6 +31856,7 @@ mod tests {
         styles: &StylesCatalog::default(),
         images: &ImageCatalog::default(),
         hyperlinks: &HyperlinkCatalog::default(),
+        inside_wordprocessing_group: false,
       },
     )
     .expect("WPS textbox frame");
@@ -31625,6 +31953,7 @@ mod tests {
         styles: &StylesCatalog::default(),
         images: &ImageCatalog::default(),
         hyperlinks: &HyperlinkCatalog::default(),
+        inside_wordprocessing_group: false,
       },
     )
     .expect("WPS textbox frame");
@@ -32044,6 +32373,54 @@ mod tests {
     )
     .expect("unpainted VML rectangle");
     assert!(vml_rectangle_shape(&unpainted, &ImageCatalog::default()).is_none());
+  }
+
+  #[test]
+  fn vml_horizontal_rule_retains_relative_width_alignment_and_shading_flags() {
+    let parse = |attributes: &str| {
+      let xml = format!(
+        r##"<v:rect xmlns:v="urn:schemas-microsoft-com:vml"
+            xmlns:o="urn:schemas-microsoft-com:office:office"
+            style="width:226.8pt;height:1.5pt" fillcolor="#aca899"
+            stroked="f" o:hr="t" {attributes}/>"##,
+      );
+      let rectangle = v::Rectangle::from_bytes(xml.as_bytes()).expect("VML horizontal rule");
+      vml_rectangle_shape(&rectangle, &ImageCatalog::default())
+        .expect("painted horizontal rule")
+        .horizontal_rule
+        .expect("horizontal-rule metadata")
+    };
+
+    let default_width = parse(r#"o:hralign="center" o:hrstd="t""#);
+    assert_eq!(default_width.width, InlineHorizontalRuleWidth::Percent(1.0));
+    assert_eq!(
+      default_width.alignment,
+      InlineHorizontalRuleAlignment::Center
+    );
+    assert!(default_width.standard);
+    assert!(!default_width.no_shade);
+
+    let relative = parse(r#"o:hrpct="500" o:hralign="right" o:hrnoshade="t""#);
+    assert_eq!(relative.width, InlineHorizontalRuleWidth::Percent(0.5));
+    assert_eq!(relative.alignment, InlineHorizontalRuleAlignment::Right);
+    assert!(!relative.standard);
+    assert!(relative.no_shade);
+
+    let fixed = parse(r#"o:hrpct="0""#);
+    assert_eq!(fixed.width, InlineHorizontalRuleWidth::Fixed);
+    assert_eq!(fixed.alignment, InlineHorizontalRuleAlignment::Left);
+
+    let ordinary = v::Rectangle::from_bytes(
+      br#"<v:rect xmlns:v="urn:schemas-microsoft-com:vml"
+          style="width:226.8pt;height:1.5pt"/>"#,
+    )
+    .expect("ordinary VML rectangle");
+    assert!(
+      vml_rectangle_shape(&ordinary, &ImageCatalog::default())
+        .expect("painted rectangle")
+        .horizontal_rule
+        .is_none()
+    );
   }
 
   #[test]
@@ -32854,6 +33231,11 @@ mod tests {
       fixed_frame.text_box_writing_mode,
       TextBoxWritingMode::TopToBottomRightToLeft
     );
+    let Block::Paragraph(fixed_paragraph) = &fixed_frame.text_box_blocks[0] else {
+      panic!("fixed VML textbox paragraph")
+    };
+    assert!(fixed_paragraph.format.word_text_frame_story);
+    assert!(!fixed_paragraph.format.wordprocessing_shape_story);
     assert!(!fixed_frame.text_box_auto_fit);
     assert!(!fixed_frame.text_box_resizes_to_fit);
 
@@ -33100,6 +33482,77 @@ mod tests {
     assert_eq!(placement.wrap, ImageWrapMode::TopBottom);
     assert!((frame.width_pt - 100.0).abs() < 0.001);
     assert!((frame.height_pt - 50.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn inline_vml_group_includes_connector_path_leading_overflow() {
+    let group = v::Group::from_bytes(
+      br##"<v:group xmlns:v="urn:schemas-microsoft-com:vml"
+          style="width:342pt;height:180.65pt;
+                 mso-position-horizontal-relative:char;
+                 mso-position-vertical-relative:line"
+          coordorigin="2785,-605" coordsize="6514,3468">
+        <v:shapetype id="_x0000_t34" coordsize="21600,21600"
+            adj="10800" path="m,l@0,0@0,21600,21600,21600e" filled="f">
+          <v:formulas><v:f eqn="val #0"/></v:formulas>
+        </v:shapetype>
+        <v:shape type="#_x0000_t34"
+            style="position:absolute;left:2956;top:291;width:1;height:495;
+                   rotation:180;flip:x"
+            adj="-7776000,-486628,77954400">
+          <v:stroke startarrow="block" endarrow="block"/>
+        </v:shape>
+      </v:group>"##,
+    )
+    .expect("inline VML connector group");
+    let transform = VmlGroupTransform::from_group(&group).expect("group transform");
+
+    // The child frame starts about 8.98pt inside the canvas, but its resolved
+    // elbow path runs about 18.90pt back toward the leading edge. The inline
+    // snap frame owns that overflow plus the calibrated 0.72pt stroke step.
+    assert!((transform.inline_leading_pt - 10.6429).abs() < 0.01);
+    let frame = vml_inline_group_frame(&group).expect("inline group frame");
+    assert!((frame.width_pt - 352.6429).abs() < 0.01);
+
+    let inset = v::Group::from_bytes(
+      br##"<v:group xmlns:v="urn:schemas-microsoft-com:vml"
+          style="width:342pt;height:180.65pt" coordorigin="2785,-605"
+          coordsize="6514,3468">
+        <v:shapetype id="_x0000_t34" coordsize="21600,21600"
+            adj="10800" path="m,l@0,0@0,21600,21600,21600e" filled="f">
+          <v:formulas><v:f eqn="val #0"/></v:formulas>
+        </v:shapetype>
+        <v:shape type="#_x0000_t34"
+            style="position:absolute;left:5000;top:291;width:1;height:495"
+            adj="-7776000,-486628,77954400">
+          <v:stroke startarrow="block" endarrow="block"/>
+        </v:shape>
+      </v:group>"##,
+    )
+    .expect("inset VML connector group");
+    assert_eq!(
+      VmlGroupTransform::from_group(&inset)
+        .expect("inset group transform")
+        .inline_leading_pt,
+      0.0
+    );
+
+    let edge = v::Group::from_bytes(
+      br#"<v:group xmlns:v="urn:schemas-microsoft-com:vml"
+          style="width:100pt;height:50pt" coordorigin="10,20"
+          coordsize="1000,500">
+        <v:rect style="position:absolute;left:10;top:20;width:200;height:100"/>
+      </v:group>"#,
+    )
+    .expect("edge-stroked VML group");
+    assert!(
+      (VmlGroupTransform::from_group(&edge)
+        .expect("edge group transform")
+        .inline_leading_pt
+        - LO_VML_INLINE_GROUP_EDGE_BOUND_PT)
+        .abs()
+        < 0.001
+    );
   }
 
   #[test]
@@ -34049,7 +34502,7 @@ mod tests {
   #[test]
   fn missing_picture_bullet_does_not_fall_back_to_level_text() {
     let level = w::Level::from_bytes(
-      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="&#xF0B7;"/><w:lvlPicBulletId w:val="7"/></w:lvl>"#,
+      br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="&#xF0B7;"/><w:lvlPicBulletId w:val="7"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl>"#,
     )
     .expect("picture bullet numbering level");
     let mut catalog = NumberingCatalog {
@@ -34070,23 +34523,34 @@ mod tests {
       ..Default::default()
     };
 
+    let mut format = ParagraphFormat {
+      indent_left_pt: 18.75,
+      indent_left_set: true,
+      ..Default::default()
+    };
     let label = catalog
       .next_label(
         NumberingReference {
           num_id: Some(5),
           level_index: Some(0),
         },
-        &mut ParagraphFormat::default(),
+        &mut format,
         &StylesCatalog::default(),
         TextStyle::default(),
         None,
-        NumberingFormatMergeContext::default(),
+        NumberingFormatMergeContext {
+          direct_indent_left: true,
+          ..Default::default()
+        },
       )
       .expect("numbering label");
 
     assert_eq!(label.text, None);
     assert_eq!(label.suppressed_non_numerical_text, None);
     assert!(label.image.is_none());
+    assert_eq!(format.indent_left_pt, 18.75);
+    assert_eq!(format.first_line_indent_pt, -18.0);
+    assert!(format.suppressed_picture_bullet_owns_numbering_margin);
   }
 
   #[test]
@@ -36128,6 +36592,7 @@ mod tests {
         styles: &styles,
         images: &images,
         hyperlinks: &hyperlinks,
+        inside_wordprocessing_group: false,
       },
     )
     .expect("wps textbox frame");
@@ -36157,6 +36622,7 @@ mod tests {
         styles: &styles,
         images: &images,
         hyperlinks: &hyperlinks,
+        inside_wordprocessing_group: false,
       },
     )
     .expect("clipped wps textbox frame");
@@ -36186,6 +36652,7 @@ mod tests {
         styles: &styles,
         images: &images,
         hyperlinks: &hyperlinks,
+        inside_wordprocessing_group: false,
       },
     )
     .expect("fixed WPS picture frame");
@@ -36286,6 +36753,7 @@ mod tests {
         styles: &styles,
         images: &images,
         hyperlinks: &hyperlinks,
+        inside_wordprocessing_group: false,
       },
     )
     .expect("textbox frame");
@@ -36293,6 +36761,10 @@ mod tests {
       panic!("one WPS textbox paragraph");
     };
     assert!(text_box_paragraph.format.wordprocessing_shape_story);
+    assert!(
+      !text_box_paragraph.format.wordprocessing_group_shape_story,
+      "a top-level WPS textbox is not owned by a WPG bitmap surface"
+    );
     assert_eq!(
       text_box_paragraph.format.line_height_pt,
       Some(OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE),
@@ -36311,6 +36783,7 @@ mod tests {
         styles: &authored_styles,
         images: &images,
         hyperlinks: &hyperlinks,
+        inside_wordprocessing_group: false,
       },
     )
     .expect("textbox with authored style context");
@@ -36356,6 +36829,7 @@ mod tests {
         styles: &styles,
         images: &images,
         hyperlinks: &hyperlinks,
+        inside_wordprocessing_group: false,
       },
     )
     .expect("textbox frame");
@@ -36780,6 +37254,133 @@ mod tests {
       cleared_effects.effects.is_empty(),
       "direct shape effects override the referenced theme effect"
     );
+  }
+
+  #[test]
+  fn wps_shape_inherits_theme_effect_reference_static_3d_and_direct_3d_wins() {
+    let effect_styles = a::EffectStyleList::from_bytes(
+      br#"<a:effectStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:effectStyle><a:effectLst/><a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d><a:sp3d><a:bevelT w="63500" h="25400"/></a:sp3d></a:effectStyle></a:effectStyleLst>"#,
+    )
+    .expect("typed theme effect styles with static 3-D");
+    let styles = StylesCatalog {
+      theme_effects: ThemeEffectStyles {
+        styles: effect_styles.effect_style,
+      },
+      ..Default::default()
+    };
+    let import = |direct_static_3d: &str| {
+      let xml = format!(
+        r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>{direct_static_3d}</wps:spPr><wps:style><a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef><a:effectRef idx="1"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></wps:style></wps:wsp>"#,
+      );
+      let wordprocessing_shape =
+        wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("typed WPS rectangle");
+      wordprocessing_shape_shape(
+        &wordprocessing_shape,
+        ImagePlacement::Inline,
+        DrawingMlGroupTransform::identity(),
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &ImageCatalog::default(),
+          hyperlinks: &HyperlinkCatalog::default(),
+          smartart_text_colors_by_model_id: None,
+        },
+      )
+      .expect("WPS rectangle")
+    };
+
+    let inherited = import("");
+    let inherited_3d = inherited
+      .static3d
+      .as_ref()
+      .expect("effectRef must carry the complete theme 3-D style");
+    assert_eq!(
+      inherited_3d.scene.camera.preset,
+      a::PresetCameraValues::OrthographicFront
+    );
+    assert_eq!(
+      inherited_3d
+        .shape
+        .bevel_top
+        .as_ref()
+        .and_then(|bevel| bevel.width)
+        .map(|width| width.to_emu()),
+      Some(63_500)
+    );
+    assert_eq!(
+      inherited_3d
+        .shape
+        .bevel_top
+        .as_ref()
+        .and_then(|bevel| bevel.height)
+        .map(|height| height.to_emu()),
+      Some(25_400)
+    );
+
+    let direct = import(
+      r#"<a:scene3d><a:camera prst="perspectiveLeft"/><a:lightRig rig="twoPt" dir="b"/></a:scene3d><a:sp3d extrusionH="12700"/>"#,
+    );
+    let direct_3d = direct
+      .static3d
+      .as_ref()
+      .expect("direct shape 3-D must remain authoritative");
+    assert_eq!(
+      direct_3d.scene.camera.preset,
+      a::PresetCameraValues::PerspectiveLeft
+    );
+    assert_eq!(
+      direct_3d
+        .shape
+        .extrusion_height
+        .map(|height| height.to_emu()),
+      Some(12_700)
+    );
+    assert!(direct_3d.shape.bevel_top.is_none());
+
+    let scene_only = import(
+      r#"<a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>"#,
+    );
+    let scene_only_3d = scene_only
+      .static3d
+      .as_ref()
+      .expect("scene3d alone must create the neutral 3-D shape surface");
+    assert_eq!(
+      scene_only_3d.scene.camera.preset,
+      a::PresetCameraValues::OrthographicFront
+    );
+    assert_eq!(*scene_only_3d.shape, a::Shape3DType::default());
+
+    let shape_only = import(r#"<a:sp3d extrusionH="12700"/>"#);
+    assert!(
+      shape_only.static3d.is_none(),
+      "sp3d without a camera/light scene must remain flat and must not mix with theme scene3d"
+    );
+  }
+
+  #[test]
+  fn theme_scene_only_effect_reference_supplies_a_neutral_3d_shape() {
+    let effect_styles = a::EffectStyleList::from_bytes(
+      br#"<a:effectStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:effectStyle><a:effectLst/><a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d></a:effectStyle></a:effectStyleLst>"#,
+    )
+    .expect("typed theme scene-only effect style");
+    let reference = a::EffectReference::from_bytes(
+      br#"<a:effectRef xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" idx="1"><a:schemeClr val="accent1"/></a:effectRef>"#,
+    )
+    .expect("typed effect reference");
+    let style = drawingml_effect_reference_static3d(
+      &reference,
+      &ThemeEffectStyles {
+        styles: effect_styles.effect_style,
+      },
+      &ThemeColors::default(),
+    )
+    .expect("theme scene3d alone must create static 3-D");
+
+    assert_eq!(
+      style.scene.camera.preset,
+      a::PresetCameraValues::OrthographicFront
+    );
+    assert_eq!(*style.shape, a::Shape3DType::default());
   }
 
   #[test]
@@ -40847,6 +41448,146 @@ mod tests {
   }
 
   #[test]
+  fn drawingml_wpc_canvas_prepends_host_extent_background_without_inline_advance() {
+    fn canvas(background: &str) -> wpc::WordprocessingCanvas {
+      let xml = format!(
+        r#"
+        <wpc:wpc xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+                 xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+                 xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          {background}
+          <wps:wsp>
+            <wps:cNvSpPr/>
+            <wps:spPr>
+              <a:xfrm><a:off x="12700" y="25400"/><a:ext cx="38100" cy="50800"/></a:xfrm>
+              <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+              <a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>
+            </wps:spPr>
+            <wps:bodyPr/>
+          </wps:wsp>
+        </wpc:wpc>
+        "#,
+      );
+      wpc::WordprocessingCanvas::from_bytes(xml.as_bytes()).expect("typed WPC canvas")
+    }
+
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let import = |canvas: &wpc::WordprocessingCanvas| {
+      wordprocessing_canvas_shapes(
+        canvas,
+        ImagePlacement::Inline,
+        DrawingMlGroupTransform::identity().with_fallback_size(Some((322.5, 188.1))),
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          smartart_text_colors_by_model_id: None,
+        },
+      )
+    };
+
+    let painted = canvas(
+      r#"
+        <wpc:bg><a:solidFill><a:srgbClr val="EEECE1"/></a:solidFill></wpc:bg>
+        <wpc:whole><a:ln w="12700"><a:solidFill><a:srgbClr val="112233"/></a:solidFill></a:ln></wpc:whole>
+      "#,
+    );
+    let items = import(&painted);
+    let [InlineItem::Shape(background), InlineItem::Shape(child)] = items.as_slice() else {
+      panic!("painted WPC background must precede the authored child");
+    };
+    assert_eq!(background.geometry, InlineShapeGeometry::Rectangle);
+    assert_eq!(background.inline_frame_size_pt, Some((0.0, 0.0)));
+    assert!((background.width_pt - 322.5).abs() < 0.001);
+    assert!((background.height_pt - 188.1).abs() < 0.001);
+    assert_eq!((background.offset_x_pt, background.offset_y_pt), (0.0, 0.0));
+    let Some(common::Fill::Solid(fill)) = background.fill_override.as_deref() else {
+      panic!("solid WPC background fill");
+    };
+    assert_eq!([fill.r, fill.g, fill.b, fill.a], [0xEE, 0xEC, 0xE1, 0xFF]);
+    let stroke = background
+      .stroke_override
+      .as_deref()
+      .expect("wpc:whole outline");
+    assert!((stroke.width.0 - 1.0).abs() < 0.001);
+    assert_eq!(
+      [
+        stroke.color.r,
+        stroke.color.g,
+        stroke.color.b,
+        stroke.color.a
+      ],
+      [0x11, 0x22, 0x33, 0xFF]
+    );
+    let Some(common::Fill::Solid(child_fill)) = child.fill_override.as_deref() else {
+      panic!("authored child remains second");
+    };
+    assert_eq!(
+      [child_fill.r, child_fill.g, child_fill.b],
+      [0xFF, 0x00, 0x00]
+    );
+
+    let anchor = wp::Anchor::from_bytes(
+      br#"
+      <wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+                 xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+                 xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                 behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">
+        <wp:extent cx="4023360" cy="2346960"/>
+        <wp:wrapNone/>
+        <a:graphic><a:graphicData uri="urn:test"/></a:graphic>
+        <wp14:sizeRelH relativeFrom="margin"><wp14:pctWidth>0</wp14:pctWidth></wp14:sizeRelH>
+        <wp14:sizeRelV relativeFrom="margin"><wp14:pctHeight>0</wp14:pctHeight></wp14:sizeRelV>
+      </wp:anchor>
+      "#,
+    )
+    .expect("zero-relative-size anchor");
+    let outer_placement = ImagePlacement::Floating(floating_image_placement(&anchor));
+    let items = wordprocessing_canvas_shapes(
+      &painted,
+      outer_placement,
+      DrawingMlGroupTransform::identity().with_fallback_size(Some((316.8, 184.8))),
+      DrawingShapeImportContext {
+        effect_extent: DrawingEffectExtent::default(),
+        styles: &styles,
+        images: &images,
+        hyperlinks: &hyperlinks,
+        smartart_text_colors_by_model_id: None,
+      },
+    );
+    let [InlineItem::Shape(background), InlineItem::Shape(child)] = items.as_slice() else {
+      panic!("floating WPC background and child");
+    };
+    let ImagePlacement::Floating(background_placement) = background.placement else {
+      panic!("floating WPC host background");
+    };
+    assert_eq!(background_placement.relative_width_pct, Some(0.0));
+    assert_eq!(background_placement.relative_height_pct, Some(0.0));
+    let ImagePlacement::Floating(child_placement) = child.placement else {
+      panic!("floating WPC child");
+    };
+    assert_eq!(child_placement.relative_width_pct, None);
+    assert_eq!(child_placement.relative_height_pct, None);
+    let child_host = child_placement
+      .alignment_extent
+      .expect("WPC child retains its host extent");
+    assert_eq!(child_host.relative_width_pct, Some(0.0));
+    assert_eq!(child_host.relative_height_pct, Some(0.0));
+
+    for background in ["", "<wpc:bg><a:noFill/></wpc:bg><wpc:whole/>"] {
+      let items = import(&canvas(background));
+      assert_eq!(
+        items.len(),
+        1,
+        "an unpainted canvas must not synthesize a visible child"
+      );
+    }
+  }
+
+  #[test]
   fn drawingml_wpg_group_maps_child_coordinates_to_points() {
     let xml = r#"
       <wpg:wgp xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
@@ -40881,10 +41622,16 @@ mod tests {
         styles: &styles,
         images: &images,
         hyperlinks: &hyperlinks,
+        inside_wordprocessing_group: false,
       },
     );
 
     assert_eq!(frames.len(), 1);
+    let [Block::Paragraph(group_paragraph)] = frames[0].text_box_blocks.as_slice() else {
+      panic!("one grouped WPS textbox paragraph");
+    };
+    assert!(group_paragraph.format.wordprocessing_shape_story);
+    assert!(group_paragraph.format.wordprocessing_group_shape_story);
     assert!((frames[0].offset_x_pt - 214.2).abs() < 0.5);
     assert!((frames[0].width_pt - 336.4).abs() < 0.5);
   }
@@ -41298,6 +42045,18 @@ mod tests {
   }
 
   #[test]
+  fn diamond_text_rectangle_is_inscribed_between_the_edge_midpoints() {
+    let preset = a::PresetGeometry::from_bytes(
+      br#"<a:prstGeom xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="diamond"><a:avLst/></a:prstGeom>"#,
+    )
+    .expect("diamond preset geometry");
+    assert_eq!(
+      drawingml_preset_text_rectangle_insets(&preset, 240.0, 120.0),
+      Some([60.0, 30.0, 60.0, 30.0]),
+    );
+  }
+
+  #[test]
   fn right_triangle_text_rectangle_stays_inside_the_face() {
     let preset = a::PresetGeometry::from_bytes(
       br#"<a:prstGeom xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="rtTriangle"><a:avLst/></a:prstGeom>"#,
@@ -41307,6 +42066,27 @@ mod tests {
       .expect("right-triangle text rectangle");
 
     assert_eq!(insets, [20.0, 70.0, 100.0, 10.0]);
+  }
+
+  #[test]
+  fn triangle_text_rectangle_uses_the_lower_half_and_apex_adjustment() {
+    let default_preset = a::PresetGeometry::from_bytes(
+      br#"<a:prstGeom xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="triangle"><a:avLst/></a:prstGeom>"#,
+    )
+    .expect("default triangle preset geometry");
+    assert_eq!(
+      drawingml_preset_text_rectangle_insets(&default_preset, 240.0, 120.0),
+      Some([60.0, 60.0, 60.0, 0.0]),
+    );
+
+    let adjusted_preset = a::PresetGeometry::from_bytes(
+      br#"<a:prstGeom xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="triangle"><a:avLst><a:gd name="adj" fmla="val 25000"/></a:avLst></a:prstGeom>"#,
+    )
+    .expect("adjusted triangle preset geometry");
+    assert_eq!(
+      drawingml_preset_text_rectangle_insets(&adjusted_preset, 240.0, 120.0),
+      Some([30.0, 60.0, 90.0, 0.0]),
+    );
   }
 
   #[test]

@@ -2551,6 +2551,7 @@ impl FontMetrics {
 pub struct VerticalMetrics {
   pub ascent_pt: f32,
   pub descent_pt: f32,
+  pub windows_line_height_pt: f32,
   pub internal_leading_pt: f32,
   pub external_leading_pt: f32,
   pub line_gap_pt: f32,
@@ -2573,6 +2574,7 @@ impl VerticalMetrics {
     Self {
       ascent_pt: self.ascent_pt * scale,
       descent_pt: self.descent_pt * scale,
+      windows_line_height_pt: self.windows_line_height_pt * scale,
       internal_leading_pt: self.internal_leading_pt * scale,
       external_leading_pt: self.external_leading_pt * scale,
       line_gap_pt: self.line_gap_pt * scale,
@@ -4149,31 +4151,38 @@ fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetri
         .fs_selection()
         .contains(SelectionFlags::USE_TYPO_METRICS)
   });
+  let (windows_ascent, windows_descent) = os2.as_ref().map_or((ascender, descender), |os2| {
+    if uses_typographic_metrics {
+      (
+        to_em(i32::from(os2.s_typo_ascender()).max(0)),
+        to_em((-i32::from(os2.s_typo_descender())).max(0)),
+      )
+    } else {
+      (
+        to_em(i32::from(os2.us_win_ascent())),
+        to_em(i32::from(os2.us_win_descent())),
+      )
+    }
+  });
   // Windows Office lays out the baseline from OS/2 Windows metrics unless
   // the face explicitly opts into typographic metrics. Keep that baseline
   // separate from the natural line box: usWinAscent was designed as a
   // clipping extent and can be larger than the typographic ascender.
-  let baseline_offset = os2.as_ref().map_or(ascender, |os2| {
-    let units = if uses_typographic_metrics {
-      i32::from(os2.s_typo_ascender())
-    } else {
-      i32::from(os2.us_win_ascent())
-    };
-    let units = units.max(0);
-    if units == 0 { ascender } else { to_em(units) }
-  });
+  let baseline_offset = if windows_ascent > 0.0 {
+    windows_ascent
+  } else {
+    ascender
+  };
   // IDWriteTextLayout's default DWRITE_LINE_METRICS baseline is not the
   // typographic baseline used by paragraph layout. DirectWrite starts with
   // its alignment-box ascent and adds its derived line gap. Wine's
   // Windows-conformance implementation derives that gap by preserving the
   // hhea total while substituting OS/2 Windows ascent/descent; fonts opting
   // into USE_TYPO_METRICS use their typographic ascent and line gap directly.
-  let directwrite_baseline_offset = os2.as_ref().map_or(ascender, |os2| {
+  let directwrite_baseline_offset = os2.as_ref().map_or(ascender, |_| {
     if uses_typographic_metrics {
       ascender + metrics.leading
     } else {
-      let windows_ascent = to_em(i32::from(os2.us_win_ascent()));
-      let windows_descent = to_em(i32::from(os2.us_win_descent()));
       directwrite_default_baseline_offset(
         ascender,
         descender,
@@ -4216,6 +4225,7 @@ fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetri
     vertical: VerticalMetrics {
       ascent_pt: ascender,
       descent_pt: descender,
+      windows_line_height_pt: (windows_ascent + windows_descent).max(ascender + descender),
       baseline_offset_pt: baseline_offset,
       directwrite_baseline_offset_pt: directwrite_baseline_offset,
       line_gap_pt: line_gap,
@@ -5479,6 +5489,7 @@ mod tests {
       vertical: VerticalMetrics {
         ascent_pt: 1.0,
         descent_pt: 0.25,
+        windows_line_height_pt: 1.375,
         baseline_offset_pt: 1.125,
         directwrite_baseline_offset_pt: 1.25,
         ..VerticalMetrics::default()
@@ -5496,6 +5507,7 @@ mod tests {
     let metrics = resolved.metrics_at_size(FontSize(12.0));
 
     assert_eq!(metrics.vertical.ascent_pt, 12.0);
+    assert_eq!(metrics.vertical.windows_line_height_pt, 16.5);
     assert_eq!(metrics.vertical.descent_pt, 3.0);
     assert_eq!(metrics.vertical.baseline_offset_pt, 13.5);
     assert_eq!(metrics.vertical.directwrite_baseline_offset_pt, 15.0);

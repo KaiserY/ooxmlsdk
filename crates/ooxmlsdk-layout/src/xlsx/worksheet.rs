@@ -44,11 +44,14 @@ const OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT: f32 = 50.05;
 // extents and from the 50.05pt cell grid: WithChart.xlsx independently exposes
 // eight printer-grid columns plus a 26-pixel marker as 419.40pt.
 const OFFICE_EXCEL12_DRAWING_HORIZONTAL_PIXEL_MM100: f64 = 26.0;
-// The same Excel 12 Calibri profile resolves an automatic default row to 113
-// dots on the 600dpi fixed-output device. Unlike horizontal drawing offsets,
-// row offsets remain ordinary EMUs.
-const OFFICE_EXCEL12_CALIBRI_11_AUTOMATIC_ROW_HEIGHT_PT: f32 =
-  113.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+// Excel 12 stores 15pt as an automatic-row cache for this Calibri 11 profile,
+// while Excel 16 exposes the recalculated worksheet row as 13.5pt. Fixed
+// output then scales each row independently and rounds it to the 600dpi
+// printer grid: 13.5pt becomes 113 dots at 100%, but 107 dots at 95%.
+// Preserve the logical row here; the print transform owns that final device
+// rounding so paper and worksheet scales do not accumulate a fractional dot
+// per preceding row.
+const OFFICE_EXCEL12_CALIBRI_11_AUTOMATIC_ROW_HEIGHT_PT: f32 = 13.5;
 // MS-XLSX §2.5.3 defines x14ac:dyDescent as the baseline distance from
 // the bottom of a cell in worksheet pixels. It is not extra row leading. The
 // Excel 16 Calibri 11 minor-theme .55 profile rebuilds its automatic row on
@@ -677,6 +680,86 @@ impl CalcSheet {
     }
   }
 
+  pub(crate) fn fixed_output_cell_rect(&self, address: CellAddress, scale: f32) -> CellRect {
+    let start = self.fixed_output_cell_rect_with_merge(address, false, scale);
+    let end = self
+      .merged_range_for_cell(address)
+      .filter(|range| range.start == address)
+      .map_or(address, |range| range.end);
+    CellRect {
+      width_pt: self.fixed_output_column_range_width_pt(address.col, end.col, scale),
+      height_pt: self.fixed_output_row_range_height_pt(address.row, end.row, scale),
+      ..start
+    }
+  }
+
+  pub(crate) fn fixed_output_range_rect(&self, range: CellRange, scale: f32) -> CellRect {
+    let start = self.fixed_output_cell_rect_with_merge(range.start, false, scale);
+    CellRect {
+      width_pt: self.fixed_output_column_range_width_pt(range.start.col, range.end.col, scale),
+      height_pt: self.fixed_output_row_range_height_pt(range.start.row, range.end.row, scale),
+      ..start
+    }
+  }
+
+  pub(crate) fn fixed_output_column_offset_pt(&self, column: u32, scale: f32) -> f32 {
+    self.geometry.fixed_output_column_offset_pt(
+      column,
+      scale,
+      self.metrics.legacy_excel12_calibri_fixed_output_grid,
+    )
+  }
+
+  pub(crate) fn fixed_output_row_offset_pt(&self, row: u32, scale: f32) -> f32 {
+    self.geometry.fixed_output_row_offset_pt(
+      row,
+      scale,
+      self.metrics.legacy_excel12_calibri_fixed_output_grid,
+    )
+  }
+
+  pub(crate) fn fixed_output_column_range_width_pt(&self, start: u32, end: u32, scale: f32) -> f32 {
+    self.geometry.fixed_output_column_range_width_pt(
+      start,
+      end,
+      scale,
+      self.metrics.legacy_excel12_calibri_fixed_output_grid,
+    )
+  }
+
+  pub(crate) fn fixed_output_row_range_height_pt(&self, start: u32, end: u32, scale: f32) -> f32 {
+    self.geometry.fixed_output_row_range_height_pt(
+      start,
+      end,
+      scale,
+      self.metrics.legacy_excel12_calibri_fixed_output_grid,
+    )
+  }
+
+  fn fixed_output_cell_rect_with_merge(
+    &self,
+    address: CellAddress,
+    include_merged_cell: bool,
+    scale: f32,
+  ) -> CellRect {
+    let x_pt = self.fixed_output_column_offset_pt(address.col, scale);
+    let y_pt = self.fixed_output_row_offset_pt(address.row, scale);
+    let end = if include_merged_cell {
+      self
+        .merged_range_for_cell(address)
+        .filter(|range| range.start == address)
+        .map_or(address, |range| range.end)
+    } else {
+      address
+    };
+    CellRect {
+      x_pt,
+      y_pt,
+      width_pt: self.fixed_output_column_range_width_pt(address.col, end.col, scale),
+      height_pt: self.fixed_output_row_range_height_pt(address.row, end.row, scale),
+    }
+  }
+
   pub(crate) fn marker_position_pt(
     &self,
     marker: &super::drawing::DrawingMarkerModel,
@@ -1087,6 +1170,38 @@ impl SheetGeometry {
     }
   }
 
+  fn fixed_output_column_offset_pt(
+    &self,
+    column: u32,
+    scale: f32,
+    quantize_each_column: bool,
+  ) -> f32 {
+    if !quantize_each_column {
+      return self.column_offset_pt(column) * scale;
+    }
+    let preceding_columns = column.saturating_sub(1) as usize;
+    self
+      .column_offsets_pt
+      .windows(2)
+      .take(preceding_columns)
+      .map(|offsets| units::quantize_points_to_office_print_grid((offsets[1] - offsets[0]) * scale))
+      .sum()
+  }
+
+  fn fixed_output_column_range_width_pt(
+    &self,
+    start: u32,
+    end: u32,
+    scale: f32,
+    quantize_each_column: bool,
+  ) -> f32 {
+    if start == 0 || end < start {
+      return 0.0;
+    }
+    self.fixed_output_column_offset_pt(end.saturating_add(1), scale, quantize_each_column)
+      - self.fixed_output_column_offset_pt(start, scale, quantize_each_column)
+  }
+
   fn row_height_pt(&self, row: u32) -> f32 {
     self
       .row_overrides
@@ -1106,6 +1221,39 @@ impl SheetGeometry {
       .checked_sub(1)
       .map_or(0.0, |index| self.row_overrides[index].cumulative_delta_pt);
     preceding_rows as f32 * self.default_row_height_pt + override_delta
+  }
+
+  fn fixed_output_row_offset_pt(&self, row: u32, scale: f32, quantize_each_row: bool) -> f32 {
+    if !quantize_each_row {
+      return self.row_offset_pt(row) * scale;
+    }
+    let preceding_rows = row.saturating_sub(1);
+    let default_height_pt =
+      units::quantize_points_to_office_print_grid(self.default_row_height_pt * scale);
+    let mut offset_pt = preceding_rows as f32 * default_height_pt;
+    for geometry in self
+      .row_overrides
+      .iter()
+      .take_while(|geometry| geometry.index <= preceding_rows)
+    {
+      let height_pt = units::quantize_points_to_office_print_grid(geometry.height_pt * scale);
+      offset_pt += height_pt - default_height_pt;
+    }
+    offset_pt
+  }
+
+  fn fixed_output_row_range_height_pt(
+    &self,
+    start: u32,
+    end: u32,
+    scale: f32,
+    quantize_each_row: bool,
+  ) -> f32 {
+    if start == 0 || end < start {
+      return 0.0;
+    }
+    self.fixed_output_row_offset_pt(end.saturating_add(1), scale, quantize_each_row)
+      - self.fixed_output_row_offset_pt(start, scale, quantize_each_row)
   }
 
   fn row_range_height_pt(&self, start: u32, end: u32) -> f32 {
@@ -2453,9 +2601,13 @@ mod tests {
     let mut metrics = SheetMetrics::default();
     metrics.format.mso_document = true;
     metrics.legacy_excel12_calibri_fixed_output_grid = true;
+    metrics.format.default_row_height =
+      f64::from(OFFICE_EXCEL12_CALIBRI_11_AUTOMATIC_ROW_HEIGHT_PT);
     let geometry = SheetGeometry::new(&metrics, &[], None, None);
     assert_eq!(geometry.column_width_pt(1), 50.04);
-    assert_eq!(OFFICE_EXCEL12_CALIBRI_11_AUTOMATIC_ROW_HEIGHT_PT, 13.56);
+    assert_eq!(geometry.default_row_height_pt, 13.5);
+    assert_eq!(geometry.fixed_output_row_offset_pt(12, 1.0, true), 149.16);
+    assert_eq!(geometry.fixed_output_row_offset_pt(12, 0.95, true), 141.24);
   }
 
   #[test]

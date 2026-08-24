@@ -67,6 +67,7 @@ pub(crate) enum ImageEffect {
     bounds_radius_scale: f32,
     spread_ratio: f32,
     spread_kernel: GlowSpreadKernel,
+    spread_radius_rounding: GlowSpreadRadiusRounding,
     blur_kernel: GlowBlurKernel,
     color: ResolvedEffectColor,
   },
@@ -106,7 +107,13 @@ pub(crate) enum ImageEffect {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum GlowSpreadKernel {
   Square,
-  Diamond,
+  Disk,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum GlowSpreadRadiusRounding {
+  Outward,
+  Inward,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -521,6 +528,7 @@ pub(crate) fn from_wordprocessing_text_effects(
     // masks are measurably closer to that kernel than the shared Gaussian.
     spread_ratio: 0.5,
     spread_kernel: GlowSpreadKernel::Square,
+    spread_radius_rounding: GlowSpreadRadiusRounding::Outward,
     blur_kernel: GlowBlurKernel::Stack,
     color: glow.color,
   });
@@ -1112,6 +1120,7 @@ fn glow(effect: &a::Glow, resolver: &impl ImageEffectColorResolver) -> Option<Im
     bounds_radius_scale: 1.0,
     spread_ratio: 1.0 / 3.0,
     spread_kernel: GlowSpreadKernel::Square,
+    spread_radius_rounding: GlowSpreadRadiusRounding::Outward,
     blur_kernel: GlowBlurKernel::Gaussian,
     color: resolver.glow(effect.glow_choice.as_ref()?)?,
   })
@@ -1761,6 +1770,85 @@ pub(crate) struct EffectOutputBounds {
   pub(crate) bottom_pt: f32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct EffectBitmapTarget {
+  pub(crate) left_px: u32,
+  pub(crate) top_px: u32,
+  pub(crate) width_px: u32,
+  pub(crate) height_px: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum EffectBitmapExtentRounding {
+  Truncate,
+  Ceil,
+}
+
+/// Maps an effect graph's independent output rectangle onto the working
+/// bitmap which also contains the unchanged source needed to evaluate it.
+/// Direct2D truncates the output extent after conversion to device pixels;
+/// the continuous graph origin remains the placement coordinate.
+pub(crate) fn effect_bitmap_target(
+  output_bounds: EffectOutputBounds,
+  working_bounds: EffectOutputBounds,
+  pixels_per_point: f32,
+  working_width_px: u32,
+  working_height_px: u32,
+) -> Option<EffectBitmapTarget> {
+  effect_bitmap_target_with_rounding(
+    output_bounds,
+    working_bounds,
+    pixels_per_point,
+    working_width_px,
+    working_height_px,
+    EffectBitmapExtentRounding::Truncate,
+  )
+}
+
+pub(crate) fn effect_bitmap_target_with_rounding(
+  output_bounds: EffectOutputBounds,
+  working_bounds: EffectOutputBounds,
+  pixels_per_point: f32,
+  working_width_px: u32,
+  working_height_px: u32,
+  extent_rounding: EffectBitmapExtentRounding,
+) -> Option<EffectBitmapTarget> {
+  if !pixels_per_point.is_finite()
+    || pixels_per_point <= 0.0
+    || working_width_px == 0
+    || working_height_px == 0
+  {
+    return None;
+  }
+
+  let round_extent = |value: f32| match extent_rounding {
+    EffectBitmapExtentRounding::Truncate => value as u32,
+    EffectBitmapExtentRounding::Ceil => value.ceil() as u32,
+  };
+  let output_width_px =
+    round_extent(((output_bounds.right_pt - output_bounds.left_pt) * pixels_per_point).max(0.0));
+  let output_height_px =
+    round_extent(((output_bounds.bottom_pt - output_bounds.top_pt) * pixels_per_point).max(0.0));
+  if output_width_px == 0 || output_height_px == 0 {
+    return None;
+  }
+
+  let left_px = ((output_bounds.left_pt - working_bounds.left_pt) * pixels_per_point)
+    .floor()
+    .clamp(0.0, working_width_px.saturating_sub(1) as f32) as u32;
+  let top_px = ((output_bounds.top_pt - working_bounds.top_pt) * pixels_per_point)
+    .floor()
+    .clamp(0.0, working_height_px.saturating_sub(1) as f32) as u32;
+  let width_px = output_width_px.min(working_width_px - left_px);
+  let height_px = output_height_px.min(working_height_px - top_px);
+  (width_px > 0 && height_px > 0).then_some(EffectBitmapTarget {
+    left_px,
+    top_px,
+    width_px,
+    height_px,
+  })
+}
+
 /// Clips the source-facing transparent border of a Word reflection surface.
 ///
 /// The reflection alpha ramp starts at the edge nearest the source. A soft
@@ -2369,6 +2457,66 @@ pub(crate) fn scale_outer_shadow_filter_radius(container: &mut ImageEffectContai
   }
 }
 
+/// Quantizes an outer shadow's geometric support to a fixed raster device.
+///
+/// WPF's `CMilBlurEffectDuce::GetScaledRadius` converts the local blur radius
+/// to `UINT` device pixels, while `CMilDropShadowEffectDuce::ApplyEffectSw`
+/// converts each scaled offset component to `int`. Word's 200-DPI legacy
+/// drawing surfaces expose the same integer boundary. Convert those device
+/// values back to the DrawingML 96-DPI coordinate baseline so the existing
+/// effect graph can continue to compose them with transforms and siblings.
+pub(crate) fn quantize_outer_shadow_geometry_for_raster(
+  container: &mut ImageEffectContainer,
+  device_dpi: f32,
+) {
+  let device_pixels_per_css_pixel = device_dpi / crate::units::CSS_PIXELS_PER_INCH;
+  if !device_pixels_per_css_pixel.is_finite() || device_pixels_per_css_pixel <= f32::EPSILON {
+    return;
+  }
+  for effect in &mut container.effects {
+    match effect {
+      ImageEffect::OuterShadow {
+        blur_radius_px,
+        distance_px,
+        raster_length_scale,
+        bounds_radius_scale,
+        direction_degrees,
+        ..
+      } => {
+        let effective_radius_scale = *bounds_radius_scale;
+        if effective_radius_scale.abs() > f32::EPSILON {
+          let local_radius = (*blur_radius_px * effective_radius_scale).trunc();
+          let device_radius = (local_radius * device_pixels_per_css_pixel).trunc();
+          *blur_radius_px = device_radius / device_pixels_per_css_pixel / effective_radius_scale;
+        }
+
+        let effective_distance_scale = *raster_length_scale;
+        if effective_distance_scale.abs() <= f32::EPSILON {
+          *distance_px = 0.0;
+          continue;
+        }
+        let direction = direction_degrees.to_radians();
+        let effective_distance = *distance_px * effective_distance_scale;
+        let offset_x = (direction.cos() * effective_distance * device_pixels_per_css_pixel).trunc()
+          / device_pixels_per_css_pixel;
+        let offset_y = (direction.sin() * effective_distance * device_pixels_per_css_pixel).trunc()
+          / device_pixels_per_css_pixel;
+        let quantized_distance = offset_x.hypot(offset_y);
+        *distance_px = quantized_distance / effective_distance_scale.abs();
+        if quantized_distance > f32::EPSILON {
+          *direction_degrees = offset_y.atan2(offset_x).to_degrees().rem_euclid(360.0);
+        }
+      }
+      ImageEffect::AlphaModulate(container)
+      | ImageEffect::Blend { container, .. }
+      | ImageEffect::Container(container) => {
+        quantize_outer_shadow_geometry_for_raster(container, device_dpi);
+      }
+      _ => {}
+    }
+  }
+}
+
 /// Uses Word's WPG glow spread while retaining the DrawingML Gaussian fringe.
 ///
 /// At Word's 0.4 px/pt group-effect raster density, a 36pt glow expands the
@@ -2570,6 +2718,7 @@ fn apply_to_image_with_source_context(
       raster_length_scale,
       spread_ratio,
       spread_kernel,
+      spread_radius_rounding,
       blur_kernel,
       color,
       ..
@@ -2580,6 +2729,7 @@ fn apply_to_image_with_source_context(
         *radius_px * *raster_length_scale,
         *spread_ratio,
         *spread_kernel,
+        *spread_radius_rounding,
         *blur_kernel,
         *color,
       );
@@ -3255,6 +3405,7 @@ fn glow_image(
   radius_px: f32,
   spread_ratio: f32,
   spread_kernel: GlowSpreadKernel,
+  spread_radius_rounding: GlowSpreadRadiusRounding,
   blur_kernel: GlowBlurKernel,
   color: ResolvedEffectColor,
 ) -> image::RgbaImage {
@@ -3263,14 +3414,16 @@ fn glow_image(
   });
   let glow_alpha = if radius_px > f32::EPSILON {
     let spread_radius = match blur_kernel {
-      GlowBlurKernel::Gaussian => (radius_px * spread_ratio.clamp(0.0, 1.0)).ceil() as usize,
+      GlowBlurKernel::Gaussian => {
+        quantized_glow_spread_radius(radius_px, spread_ratio, spread_radius_rounding)
+      }
       // GlowPrimitive2D ceils the device radius before passing half through
       // integer morphology and Stack Blur constructors.
       GlowBlurKernel::Stack => (radius_px.ceil() as usize) / 2,
     };
     let dilated = match spread_kernel {
       GlowSpreadKernel::Square => dilate_nontransparent_alpha(&alpha, spread_radius),
-      GlowSpreadKernel::Diamond => dilate_nontransparent_alpha_diamond(&alpha, spread_radius),
+      GlowSpreadKernel::Disk => dilate_nontransparent_alpha_disk(&alpha, spread_radius),
     };
     match blur_kernel {
       GlowBlurKernel::Gaussian => image::imageops::blur(&dilated, radius_px / 6.0),
@@ -3290,6 +3443,18 @@ fn glow_image(
     let alpha = ((u16::from(glow_alpha) * u16::from(color.alpha) + 127) / 255) as u8;
     image::Rgba([color.color.r, color.color.g, color.color.b, alpha])
   })
+}
+
+fn quantized_glow_spread_radius(
+  radius_px: f32,
+  spread_ratio: f32,
+  rounding: GlowSpreadRadiusRounding,
+) -> usize {
+  let radius = radius_px.max(0.0) * spread_ratio.clamp(0.0, 1.0);
+  (match rounding {
+    GlowSpreadRadiusRounding::Outward => radius.ceil(),
+    GlowSpreadRadiusRounding::Inward => radius.floor(),
+  }) as usize
 }
 
 pub(crate) fn stack_blur_alpha(alpha: &mut [u8], width: usize, height: usize, radius: usize) {
@@ -3350,58 +3515,6 @@ pub(crate) fn triangular_blur_line(input: &[u8], output: &mut [u8], radius: usiz
   }
 }
 
-fn dilate_nontransparent_alpha_diamond(
-  alpha: &image::GrayImage,
-  radius: usize,
-) -> image::GrayImage {
-  if radius == 0 {
-    return alpha.clone();
-  }
-  let width = alpha.width() as usize;
-  let height = alpha.height() as usize;
-  let stride = width + 1;
-  let mut differences = vec![0_i32; stride * height];
-  for y in 0..height {
-    let mut x = 0;
-    while x < width {
-      while x < width && alpha.get_pixel(x as u32, y as u32).0[0] == 0 {
-        x += 1;
-      }
-      if x == width {
-        break;
-      }
-      let run_start = x;
-      while x < width && alpha.get_pixel(x as u32, y as u32).0[0] != 0 {
-        x += 1;
-      }
-      let run_end = x;
-      for delta_y in -(radius as isize)..=radius as isize {
-        let destination_y = y as isize + delta_y;
-        if !(0..height as isize).contains(&destination_y) {
-          continue;
-        }
-        let horizontal_radius = radius - delta_y.unsigned_abs();
-        let left = run_start.saturating_sub(horizontal_radius);
-        let right = run_end.saturating_add(horizontal_radius).min(width);
-        let row = destination_y as usize * stride;
-        differences[row + left] += 1;
-        differences[row + right] -= 1;
-      }
-    }
-  }
-  let mut output = image::GrayImage::new(alpha.width(), alpha.height());
-  for y in 0..height {
-    let mut coverage = 0_i32;
-    for x in 0..width {
-      coverage += differences[y * stride + x];
-      if coverage > 0 {
-        output.get_pixel_mut(x as u32, y as u32).0[0] = u8::MAX;
-      }
-    }
-  }
-  output
-}
-
 fn dilate_nontransparent_alpha(alpha: &image::GrayImage, radius: usize) -> image::GrayImage {
   if radius == 0 {
     return alpha.clone();
@@ -3429,6 +3542,69 @@ fn dilate_nontransparent_alpha(alpha: &image::GrayImage, radius: usize) -> image
       - integral[bottom * integral_width + left];
     image::Luma([u8::from(sum > 0) * u8::MAX])
   })
+}
+
+fn dilate_nontransparent_alpha_disk(alpha: &image::GrayImage, radius: usize) -> image::GrayImage {
+  if radius == 0 {
+    return alpha.clone();
+  }
+  let width = alpha.width() as usize;
+  let height = alpha.height() as usize;
+  let radius = radius.min(width.max(height));
+  let radius_squared = (radius as u128) * (radius as u128);
+  let mut horizontal_radii = Vec::with_capacity(radius + 1);
+  let mut horizontal_radius = radius;
+  for delta_y in 0..=radius {
+    let delta_y_squared = (delta_y as u128) * (delta_y as u128);
+    while (horizontal_radius as u128) * (horizontal_radius as u128) + delta_y_squared
+      > radius_squared
+    {
+      horizontal_radius -= 1;
+    }
+    horizontal_radii.push(horizontal_radius);
+  }
+
+  let stride = width + 1;
+  let mut differences = vec![0_i32; stride * height];
+  for y in 0..height {
+    let mut x = 0;
+    while x < width {
+      while x < width && alpha.get_pixel(x as u32, y as u32).0[0] == 0 {
+        x += 1;
+      }
+      if x == width {
+        break;
+      }
+      let run_start = x;
+      while x < width && alpha.get_pixel(x as u32, y as u32).0[0] != 0 {
+        x += 1;
+      }
+      let run_end = x;
+      for delta_y in -(radius as isize)..=radius as isize {
+        let destination_y = y as isize + delta_y;
+        if !(0..height as isize).contains(&destination_y) {
+          continue;
+        }
+        let horizontal_radius = horizontal_radii[delta_y.unsigned_abs()];
+        let left = run_start.saturating_sub(horizontal_radius);
+        let right = run_end.saturating_add(horizontal_radius).min(width);
+        let row = destination_y as usize * stride;
+        differences[row + left] += 1;
+        differences[row + right] -= 1;
+      }
+    }
+  }
+  let mut output = image::GrayImage::new(alpha.width(), alpha.height());
+  for y in 0..height {
+    let mut coverage = 0_i32;
+    for x in 0..width {
+      coverage += differences[y * stride + x];
+      if coverage > 0 {
+        output.get_pixel_mut(x as u32, y as u32).0[0] = u8::MAX;
+      }
+    }
+  }
+  output
 }
 
 fn inner_shadow_image(
@@ -3947,26 +4123,76 @@ mod tests {
   use image::{Rgba, RgbaImage};
 
   use super::{
-    EffectOutputBounds, ImageEffect, ImageEffectBlendMode, ImageEffectColorResolver,
-    ImageEffectContainer, ImageEffectContainerKind, ImageEffectFill, ImageEffectGradientKind,
-    ImageEffectRelativeRect, ImageEffectSourceGeometry, ImageEffectSourceImages,
-    ImageEffectSourceReference, ImageEffectSourceRequirements, ImageEffectTransform,
-    ImageReflectionEffect, PixelBounds, ResolvedEffectColor, ShadowBlurKernel,
-    WordprocessingTextGlow, apply_container_to_padded_image,
+    EffectOutputBounds, GlowSpreadRadiusRounding, ImageEffect, ImageEffectBlendMode,
+    ImageEffectColorResolver, ImageEffectContainer, ImageEffectContainerKind, ImageEffectFill,
+    ImageEffectGradientKind, ImageEffectRelativeRect, ImageEffectSourceGeometry,
+    ImageEffectSourceImages, ImageEffectSourceReference, ImageEffectSourceRequirements,
+    ImageEffectTransform, ImageReflectionEffect, PixelBounds, ResolvedEffectColor,
+    ShadowBlurKernel, WordprocessingTextGlow, apply_container_to_padded_image,
     apply_container_to_padded_image_with_sources,
     apply_container_to_padded_image_with_sources_and_anchor, apply_to_image,
     container_output_bounds, container_output_bounds_with_anchor,
     container_output_bounds_with_anchors, effective_backdrop_blur_radius_px, from_effect_dag,
     from_effect_list, from_wordprocessing_text_effects, mso_brightness_contrast_component,
-    preserve_static_3d_shadow_source_alpha, reflection, reflection_image,
-    rotate_container_with_shape, sample_fill, source_requirements, suppress_soft_edge,
-    unchanged_foreground_backdrop, wordprocessing_reflection_canvas_bounds,
+    preserve_static_3d_shadow_source_alpha, quantize_outer_shadow_geometry_for_raster,
+    quantized_glow_spread_radius, reflection, reflection_image, rotate_container_with_shape,
+    sample_fill, source_requirements, suppress_soft_edge, unchanged_foreground_backdrop,
+    wordprocessing_reflection_canvas_bounds,
   };
   use crate::model::RgbColor;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
   use ooxmlsdk::units::DrawingmlPercentageValue;
 
   struct NoColorResolver;
+
+  #[test]
+  fn fixed_raster_outer_shadow_bounds_use_integer_device_radius_and_offsets() {
+    let mut effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![
+        ImageEffect::Identity,
+        ImageEffect::OuterShadow {
+          blur_radius_px: 4.0,
+          distance_px: 4.0,
+          raster_length_scale: 1.0,
+          bounds_radius_scale: 1.0,
+          blur_kernel: ShadowBlurKernel::Direct2dGaussian,
+          direction_degrees: 45.0,
+          transform: ImageEffectTransform {
+            scale_x: 1.0,
+            scale_y: 1.0,
+            skew_x: 0.0,
+            skew_y: 0.0,
+            shift_x_px: 0.0,
+            shift_y_px: 0.0,
+          },
+          alignment: (0.0, 0.0),
+          rotate_with_shape: true,
+          color: ResolvedEffectColor {
+            color: RgbColor { r: 0, g: 0, b: 0 },
+            alpha: 255,
+          },
+        },
+      ],
+    };
+    let source = EffectOutputBounds {
+      left_pt: 0.0,
+      top_pt: 0.0,
+      right_pt: 100.0,
+      bottom_pt: 40.0,
+    };
+    let continuous = container_output_bounds_with_anchor(&effects, source, source).unwrap();
+
+    quantize_outer_shadow_geometry_for_raster(&mut effects, 200.0);
+    let quantized = container_output_bounds_with_anchor(&effects, source, source).unwrap();
+
+    assert!((continuous.right_pt - 105.121_32).abs() < 0.001);
+    // 4 CSS pixels become floor(4 * 200/96) = 8 device pixels;
+    // each 45-degree offset component becomes floor(4/sqrt(2) * 200/96)
+    // = 5 device pixels. At 200 DPI the far-edge expansion is therefore
+    // (8 + 5) * 72/200 = 4.68pt.
+    assert!((quantized.right_pt - 104.68).abs() < 0.001);
+  }
 
   #[test]
   fn static_3d_shadow_preserves_realized_alpha_through_nested_effect_graphs() {
@@ -4082,6 +4308,7 @@ mod tests {
         bounds_radius_scale: 1.0,
         spread_ratio: 0.5,
         spread_kernel: super::GlowSpreadKernel::Square,
+        spread_radius_rounding: super::GlowSpreadRadiusRounding::Outward,
         blur_kernel: super::GlowBlurKernel::Stack,
         color,
       }],
@@ -4124,6 +4351,7 @@ mod tests {
           bounds_radius_scale: 1.0,
           spread_ratio: 0.5,
           spread_kernel: super::GlowSpreadKernel::Square,
+          spread_radius_rounding: super::GlowSpreadRadiusRounding::Outward,
           blur_kernel: super::GlowBlurKernel::Stack,
           color: ResolvedEffectColor {
             color: RgbColor { r: 1, g: 2, b: 3 },
@@ -4268,6 +4496,51 @@ mod tests {
   fn drawingml_shadow_blur_radius_maps_to_direct2d_standard_deviation() {
     assert_eq!(super::direct2d_gaussian_sigma(0.0), 0.0);
     assert!((super::direct2d_gaussian_sigma(6.0) - 2.0).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn glow_spread_radius_rounding_is_an_explicit_host_policy() {
+    assert_eq!(
+      quantized_glow_spread_radius(5.5, 0.5, GlowSpreadRadiusRounding::Outward),
+      3
+    );
+    assert_eq!(
+      quantized_glow_spread_radius(5.5, 0.5, GlowSpreadRadiusRounding::Inward),
+      2
+    );
+    assert_eq!(
+      quantized_glow_spread_radius(4.0, 0.5, GlowSpreadRadiusRounding::Inward),
+      2
+    );
+  }
+
+  #[test]
+  fn glow_spread_uses_a_separable_square_morphology_kernel() {
+    let source = image::GrayImage::from_fn(5, 5, |x, y| {
+      image::Luma([u8::from(x == 2 && y == 2) * u8::MAX])
+    });
+    let dilated = super::dilate_nontransparent_alpha(&source, 1);
+
+    for y in 1..=3 {
+      for x in 1..=3 {
+        assert_eq!(dilated.get_pixel(x, y).0[0], u8::MAX);
+      }
+    }
+    assert_eq!(dilated.get_pixel(0, 0).0[0], 0);
+    assert_eq!(dilated.get_pixel(4, 4).0[0], 0);
+  }
+
+  #[test]
+  fn disk_morphology_is_radial_between_diamond_and_square_topologies() {
+    let source = image::GrayImage::from_fn(9, 9, |x, y| {
+      image::Luma([u8::from(x == 4 && y == 4) * u8::MAX])
+    });
+    let dilated = super::dilate_nontransparent_alpha_disk(&source, 3);
+
+    assert_eq!(dilated.get_pixel(7, 4).0[0], u8::MAX);
+    assert_eq!(dilated.get_pixel(6, 6).0[0], u8::MAX);
+    assert_eq!(dilated.get_pixel(7, 5).0[0], 0);
+    assert_eq!(dilated.get_pixel(7, 7).0[0], 0);
   }
 
   #[test]

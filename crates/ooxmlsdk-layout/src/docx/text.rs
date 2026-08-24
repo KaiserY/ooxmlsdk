@@ -332,7 +332,7 @@ fn paragraph_model_with_base_impl<'a>(
   let blank_numbering_label = list_label
     .as_deref()
     .is_some_and(|label| label.chars().all(char::is_whitespace));
-  let list_label_tab_stop_pt = has_numbering_label
+  let mut list_label_tab_stop_pt = has_numbering_label
     .then(|| {
       // A direct paragraph indent is Word's persisted result of opening and
       // accepting the paragraph dialog for pseudo-numbering. In that state
@@ -386,6 +386,17 @@ fn paragraph_model_with_base_impl<'a>(
   if let Some(complex_fields) = complex_fields {
     complex_fields.finish_paragraph(&mut inlines, &mut field_events);
   }
+  if inlines.iter().any(|inline| {
+    matches!(
+      inline,
+      super::InlineItem::Text(run) if run.style.wordprocessingml_index_field_diagnostic
+    )
+  }) {
+    // Word places the generated empty-INDEX diagnostic one field-result
+    // advance below the cached Index paragraph's top border (tdf166436).
+    format.spacing_before_pt += 9.0;
+    format.spacing_before_set = true;
+  }
   if let Some(bold_override) = paragraph_mark_style.wordprocessingml_field_bold_override {
     for inline in &mut inlines {
       let super::InlineItem::Text(run) = inline else {
@@ -417,7 +428,10 @@ fn paragraph_model_with_base_impl<'a>(
     }));
   }
   let line_vertical_alignment = format.line_vertical_alignment.unwrap_or_default();
-  let use_windows_font_metrics = paragraph_uses_windows_font_metrics(&format);
+  let use_windows_font_metrics = paragraph_uses_windows_font_metrics(
+    &format,
+    paragraph_text_owns_line_metrics(&inlines, has_numbering_label),
+  );
   paragraph_mark_style.line_vertical_alignment = line_vertical_alignment;
   paragraph_mark_style.use_windows_font_metrics = use_windows_font_metrics;
   list_label_style.line_vertical_alignment = line_vertical_alignment;
@@ -480,6 +494,30 @@ fn paragraph_model_with_base_impl<'a>(
         *inline_offset += image_count;
       }
     }
+  }
+  let page_break_only_paragraph = inlines.iter().any(|inline| {
+    matches!(
+      inline,
+      super::InlineItem::PageBreak | super::InlineItem::ColumnBreak
+    )
+  }) && inlines.iter().all(|inline| {
+    matches!(
+      inline,
+      super::InlineItem::PageBreak
+        | super::InlineItem::ColumnBreak
+        | super::InlineItem::BookmarkStart(_)
+        | super::InlineItem::LastRenderedPageBreak
+    )
+  });
+  if page_break_only_paragraph {
+    // A list paragraph whose only body content is an authored page/column
+    // break carries the break, not a visible inherited numbering label. This
+    // is the final empty list paragraph in the Open-XML-SDK style/1.docx
+    // control; Word leaves its page empty instead of painting the level-1
+    // label (`o`).
+    list_label = None;
+    list_label_image = None;
+    list_label_tab_stop_pt = None;
   }
   let starts_after_last_rendered_page_break =
     super::paragraph_starts_after_last_rendered_page_break(&inlines);
@@ -562,16 +600,30 @@ fn wordprocessingml_cjk_text_metrics(text: &str, style: &TextStyle) -> bool {
     })
 }
 
-fn paragraph_uses_windows_font_metrics(format: &ParagraphFormat) -> bool {
+fn paragraph_text_owns_line_metrics(
+  inlines: &[super::InlineItem],
+  has_numbering_label: bool,
+) -> bool {
+  !has_numbering_label
+    && inlines
+      .iter()
+      .all(super::InlineItem::leaves_host_line_metrics_text_owned)
+}
+
+fn paragraph_uses_windows_font_metrics(
+  format: &ParagraphFormat,
+  text_owns_line_metrics: bool,
+) -> bool {
   const WORD_COMPACT_AUTO_LINE_MULTIPLE: f32 = 259.0 / units::WORD_LINE_HEIGHT_UNITS_PER_LINE;
 
-  // Word's built-in compact styles use an auto line value of 259/240. Office
-  // fixed output keeps those lines, compressed/single lines, and physical
-  // exact/atLeast boxes on the Windows alignment baseline. Larger automatic
-  // multiples own their extra leading as a gap below the visible line, so use
-  // the natural typographic baseline instead; OS/2 usWinAscent is a clipping
-  // extent and would otherwise move the first baseline into that gap.
-  !matches!(format.line_height_rule, LineHeightRule::Auto)
+  // A text-only Word line is positioned on its Windows alignment baseline;
+  // proportional excess remains the independent TextFrame gap below it. The
+  // font resolver still honors OS/2 USE_TYPO_METRICS. When numbering or an
+  // inline object participates in the line, however, that shared owner sets
+  // the common baseline. Preserve the established compact/physical-line
+  // boundary instead of applying usWinAscent a second time to the text run.
+  (text_owns_line_metrics && !(format.justification_set && format.justification.is_block()))
+    || !matches!(format.line_height_rule, LineHeightRule::Auto)
     || !format
       .line_height_pt
       .is_some_and(|multiple| multiple > WORD_COMPACT_AUTO_LINE_MULTIPLE)
@@ -668,6 +720,10 @@ fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::docx::{
+    FloatingImagePlacement, FloatingPaintOrder, HorizontalImageReference, ImagePlacement,
+    ImageWrapMode, ImageWrapSide, ParagraphAdjust, ParagraphJustification, VerticalImageReference,
+  };
 
   #[test]
   fn cjk_text_metrics_require_a_visible_east_asian_script() {
@@ -711,7 +767,7 @@ mod tests {
   }
 
   #[test]
-  fn proportional_auto_line_spacing_uses_typographic_baseline_metrics() {
+  fn proportional_auto_line_spacing_keeps_windows_baseline_metrics() {
     for line_units in [276.0, 360.0] {
       let format = ParagraphFormat {
         line_height_rule: LineHeightRule::Auto,
@@ -719,8 +775,53 @@ mod tests {
         ..Default::default()
       };
 
-      assert!(!paragraph_uses_windows_font_metrics(&format));
+      assert!(paragraph_uses_windows_font_metrics(&format, true));
+      assert!(!paragraph_uses_windows_font_metrics(&format, false));
+
+      let justified = ParagraphFormat {
+        justification: ParagraphJustification {
+          adjust: ParagraphAdjust::Block,
+          ..Default::default()
+        },
+        justification_set: true,
+        ..format
+      };
+      assert!(!paragraph_uses_windows_font_metrics(&justified, true));
     }
+  }
+
+  #[test]
+  fn only_inline_drawings_participate_in_host_line_metrics() {
+    assert!(ImagePlacement::Inline.participates_in_host_line_metrics());
+
+    let floating = ImagePlacement::Floating(FloatingImagePlacement {
+      horizontal_relative_to: HorizontalImageReference::Margin,
+      vertical_relative_to: VerticalImageReference::Paragraph,
+      horizontal_alignment: None,
+      vertical_alignment: None,
+      alignment_extent: None,
+      group_child_offset_x_pt: 0.0,
+      group_child_offset_y_pt: 0.0,
+      horizontal_offset_pt: 0.0,
+      vertical_offset_pt: 0.0,
+      horizontal_offset_pct: None,
+      vertical_offset_pct: None,
+      wrap: ImageWrapMode::None,
+      wrap_side: ImageWrapSide::BothSides,
+      behind_text: true,
+      layout_in_cell: true,
+      allow_overlap: true,
+      paint_order: FloatingPaintOrder::Unspecified,
+      relative_width_to: None,
+      relative_width_pct: None,
+      relative_height_to: None,
+      relative_height_pct: None,
+      margin_top_pt: 0.0,
+      margin_right_pt: 0.0,
+      margin_bottom_pt: 0.0,
+      margin_left_pt: 0.0,
+    });
+    assert!(!floating.participates_in_host_line_metrics());
   }
 
   #[test]
@@ -742,7 +843,7 @@ mod tests {
         ..Default::default()
       };
 
-      assert!(paragraph_uses_windows_font_metrics(&format));
+      assert!(paragraph_uses_windows_font_metrics(&format, false));
     }
   }
 }

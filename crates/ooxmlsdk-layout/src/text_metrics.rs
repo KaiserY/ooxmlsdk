@@ -159,6 +159,7 @@ pub struct ShapedText {
 pub struct TextVerticalMetrics {
   pub ascent_pt: f32,
   pub descent_pt: f32,
+  pub windows_line_height_pt: f32,
   pub line_gap_pt: f32,
   pub baseline_offset_pt: f32,
   pub directwrite_baseline_offset_pt: f32,
@@ -172,6 +173,10 @@ impl TextVerticalMetrics {
 
   pub fn line_height_pt(self) -> f32 {
     self.ink_height_pt() + self.line_gap_pt
+  }
+
+  pub fn windows_line_height_pt(self) -> f32 {
+    self.windows_line_height_pt.max(self.ink_height_pt())
   }
 
   pub fn leading_above_pt(self) -> f32 {
@@ -485,7 +490,13 @@ impl MeasureStyleKey {
   }
 }
 
-type GdiHintedExtentCache = HashMap<u32, HashMap<Arc<str>, Option<f32>>>;
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct GdiHintedTextExtents {
+  pub(crate) positioned_width_pt: f32,
+  pub(crate) unpositioned_width_pt: f32,
+}
+
+type GdiHintedExtentCache = HashMap<u32, HashMap<Arc<str>, Option<GdiHintedTextExtents>>>;
 
 #[derive(Debug, Default)]
 pub struct TextMetrics {
@@ -660,8 +671,28 @@ impl TextMetrics {
     style: &(impl FontStyleRef + ?Sized),
     device_dpi: f32,
   ) -> Option<f32> {
+    self
+      .gdi_hinted_text_extents_pt(text, style, device_dpi)
+      .map(|extents| extents.positioned_width_pt)
+  }
+
+  /// Returns both the shaped and unpositioned GDI-compatible hinted extents.
+  ///
+  /// `GetTextExtentPoint32W` accumulates the hinted advance of each
+  /// character without applying the pairs exposed by `GetKerningPairsW`.
+  /// DrawingML paint can independently enable kerning, so callers that model
+  /// a GDI measurement rectangle need both widths.
+  pub(crate) fn gdi_hinted_text_extents_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    device_dpi: f32,
+  ) -> Option<GdiHintedTextExtents> {
     if text.is_empty() {
-      return Some(0.0);
+      return Some(GdiHintedTextExtents {
+        positioned_width_pt: 0.0,
+        unpositioned_width_pt: 0.0,
+      });
     }
     if !device_dpi.is_finite()
       || device_dpi <= 0.0
@@ -680,7 +711,7 @@ impl TextMetrics {
       return *cached;
     }
 
-    let extent = self.compute_gdi_hinted_text_extent_pt(text, style, device_dpi);
+    let extent = self.compute_gdi_hinted_text_extents_pt(text, style, device_dpi);
     let text_key = self.measure_widths[style_index]
       .get_key_value(text)
       .map_or_else(|| Arc::from(text), |(text, _)| text.clone());
@@ -691,12 +722,12 @@ impl TextMetrics {
     extent
   }
 
-  fn compute_gdi_hinted_text_extent_pt(
+  fn compute_gdi_hinted_text_extents_pt(
     &mut self,
     text: &str,
     style: &(impl FontStyleRef + ?Sized),
     device_dpi: f32,
-  ) -> Option<f32> {
+  ) -> Option<GdiHintedTextExtents> {
     let shaped = self.shape_text(text, style)?;
     if shaped.font_faces.iter().any(|face| face.synthetic_bold) {
       return None;
@@ -726,7 +757,8 @@ impl TextMetrics {
     }
 
     let points_per_device_pixel = crate::units::POINTS_PER_INCH / device_dpi;
-    let mut width_pt = shaped.width_pt;
+    let mut positioned_width_pt = shaped.width_pt;
+    let mut unpositioned_width_pt = 0.0;
     for glyph in &shaped.glyphs {
       let ppem = gdi_device_ppem(glyph.font_size_pt, device_dpi)?;
       let face = shaped.font_faces.get(glyph.font_index)?;
@@ -745,12 +777,17 @@ impl TextMetrics {
         .draw(DrawSettings::hinted(instance, false), &mut NullPen)
         .ok()?
         .advance_width?;
-      width_pt += (hinted_advance - unhinted_advance) * points_per_device_pixel;
+      positioned_width_pt += (hinted_advance - unhinted_advance) * points_per_device_pixel;
+      unpositioned_width_pt += hinted_advance * points_per_device_pixel;
     }
-    let width_device_pixels = width_pt / points_per_device_pixel;
-    width_device_pixels
-      .is_finite()
-      .then_some(width_device_pixels.round() * points_per_device_pixel)
+    let positioned_device_pixels = positioned_width_pt / points_per_device_pixel;
+    let unpositioned_device_pixels = unpositioned_width_pt / points_per_device_pixel;
+    (positioned_device_pixels.is_finite() && unpositioned_device_pixels.is_finite()).then_some(
+      GdiHintedTextExtents {
+        positioned_width_pt: positioned_device_pixels.round() * points_per_device_pixel,
+        unpositioned_width_pt: unpositioned_device_pixels.round() * points_per_device_pixel,
+      },
+    )
   }
 
   /// Returns a uniform spacing adjustment when classic GDI's hinted device
@@ -980,6 +1017,7 @@ fn wordprocessingml_line_vertical_metrics(
   let additional_side_leading_pt = (required_side_leading_pt - metrics.leading_above_pt()).max(0.0);
   metrics.ascent_pt += additional_side_leading_pt;
   metrics.descent_pt += additional_side_leading_pt;
+  metrics.windows_line_height_pt += additional_side_leading_pt * 2.0;
   metrics.baseline_offset_pt += additional_side_leading_pt;
   metrics.directwrite_baseline_offset_pt += additional_side_leading_pt;
   metrics
@@ -991,6 +1029,7 @@ fn text_vertical_metrics_from_font_metrics(
   TextVerticalMetrics {
     ascent_pt: metrics.ascent_pt,
     descent_pt: metrics.descent_pt,
+    windows_line_height_pt: metrics.windows_line_height_pt,
     line_gap_pt: metrics.line_gap_pt,
     baseline_offset_pt: metrics.baseline_offset_pt,
     directwrite_baseline_offset_pt: metrics.directwrite_baseline_offset_pt,
@@ -1286,6 +1325,7 @@ fn approximate_vertical_metrics(font_size: f32) -> TextVerticalMetrics {
   TextVerticalMetrics {
     ascent_pt: font_size * FALLBACK_ASCENT_EM,
     descent_pt: font_size * FALLBACK_DESCENT_EM,
+    windows_line_height_pt: font_size * (FALLBACK_ASCENT_EM + FALLBACK_DESCENT_EM),
     line_gap_pt: font_size * FALLBACK_LINE_GAP_EM,
     baseline_offset_pt: font_size * (FALLBACK_ASCENT_EM + FALLBACK_LINE_GAP_EM / 2.0),
     directwrite_baseline_offset_pt: font_size * (FALLBACK_ASCENT_EM + FALLBACK_LINE_GAP_EM),
@@ -1469,6 +1509,7 @@ mod tests {
     let metrics = TextVerticalMetrics {
       ascent_pt: 20.0,
       descent_pt: 6.0,
+      windows_line_height_pt: 26.0,
       line_gap_pt: 0.0,
       baseline_offset_pt: 20.0,
       directwrite_baseline_offset_pt: 20.0,

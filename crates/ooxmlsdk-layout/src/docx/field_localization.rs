@@ -33,7 +33,19 @@ pub(super) fn localized_field_message(
       strings.field_bookmark_name_not_specified().to_string()
     }
     FieldMessage::MissingStyle(style_name) => strings.field_missing_style(style_name),
-    FieldMessage::EmptyTableOfContents => strings.field_empty_table_of_contents().to_string(),
+    FieldMessage::EmptyTableOfContents => {
+      // Word's en-US resource uses an all-caps fixed-format diagnostic for a
+      // clean empty TOC. Other UI resources, including the ko-KR fallback,
+      // retain sentence case (the paired redline-ends-before-toc control).
+      if ui_language
+        .and_then(crate::localization::canonical_locale)
+        .is_some_and(|locale| locale.to_string().eq_ignore_ascii_case("en-US"))
+      {
+        "NO TABLE OF CONTENTS ENTRIES FOUND.".to_string()
+      } else {
+        strings.field_empty_table_of_contents().to_string()
+      }
+    }
     FieldMessage::PageRefRelative { bookmark_is_above } => if bookmark_is_above {
       strings.field_above()
     } else {
@@ -55,6 +67,45 @@ pub(super) fn apply_generated_field_message_style(
       | FieldMessage::ReferenceSourceNotFound
       | FieldMessage::BookmarkNameNotSpecified
   );
+  if matches!(message, FieldMessage::EmptyTableOfContents) {
+    // Writer emits the empty-TOC diagnostic through its generated field error
+    // run. Keep it bold independently of the application resource locale.
+    style.bold = true;
+    style.complex_bold = Some(true);
+    if ui_language
+      .and_then(crate::localization::canonical_locale)
+      .is_some_and(|locale| locale.to_string().eq_ignore_ascii_case("en-US"))
+    {
+      // The en-US Word resource uses Arial for this generated diagnostic,
+      // even when the cached TOC paragraph carries another complex-script
+      // face (tdf155736_PageNumbers_footer.docx).
+      let family = Arc::<str>::from("Arial");
+      style.font_family = Some(family.clone());
+      style.high_ansi_font_family = Some(family.clone());
+      style.east_asia_font_family = Some(family.clone());
+      style.complex_font_family = Some(family.clone());
+      style.symbol_font_family = Some(family);
+      style.font_size_pt = 12.0;
+      style.complex_font_size_pt = Some(12.0);
+      style.fallback_font_family = None;
+      style.high_ansi_fallback_font_family = None;
+      style.east_asia_fallback_font_family = None;
+      style.complex_fallback_font_family = None;
+    }
+  }
+  if matches!(
+    message,
+    FieldMessage::UndefinedBookmark
+      | FieldMessage::ReferenceSourceNotFound
+      | FieldMessage::BookmarkNameNotSpecified
+  ) {
+    // Word's generated bookmark diagnostics use a bold application-resource
+    // run in every UI locale. An authored field-level w:b=false remains an
+    // explicit opt-out.
+    let bold = style.wordprocessingml_field_bold_override != Some(false);
+    style.bold = bold;
+    style.complex_bold = Some(bold);
+  }
   if OfficeStringCatalog::for_ui_language(ui_language).resource_locale()
     != OfficeResourceLocale::SimplifiedChinese
   {
@@ -95,18 +146,12 @@ pub(super) fn apply_generated_field_message_style(
 
       match message {
         FieldMessage::UndefinedBookmark => {
-          // Word's missing-bookmark resource is bold unless the effective
-          // WordprocessingML cascade explicitly disables w:b. A resolved
-          // default `false` is not equivalent to authored `w:b=false`.
-          let bold = style.wordprocessingml_field_bold_override != Some(false);
-          style.bold = bold;
-          style.complex_bold = Some(bold);
+          // The locale-independent generated diagnostic style was applied
+          // above; this branch only supplies its Simplified-Chinese slots.
         }
         FieldMessage::ReferenceSourceNotFound | FieldMessage::BookmarkNameNotSpecified => {
           // REF and NOTEREF use a bold Arial/SimSun resource pair.
           style.font_family = Some(Arc::<str>::from("Arial"));
-          style.bold = true;
-          style.complex_bold = Some(true);
           style.underline = false;
         }
         _ => unreachable!("matched generated reference diagnostic"),
@@ -126,9 +171,8 @@ pub(super) fn apply_generated_field_message_style(
       style.line_height_override_pt =
         Some(style.font_size_pt * WORD_ZH_STYLE_REF_ERROR_LINE_HEIGHT_PER_FONT_SIZE);
     }
-    FieldMessage::EmptyTableOfContents
-    | FieldMessage::PageRefRelative { .. }
-    | FieldMessage::PageRefOnPage(_) => {}
+    FieldMessage::EmptyTableOfContents => {}
+    FieldMessage::PageRefRelative { .. } | FieldMessage::PageRefOnPage(_) => {}
   }
 }
 

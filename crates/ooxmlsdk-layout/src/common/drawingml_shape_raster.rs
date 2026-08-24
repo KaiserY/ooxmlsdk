@@ -1,8 +1,8 @@
-use image::RgbaImage;
+use image::{RgbaImage, imageops::FilterType};
 use skrifa::{
   FontRef, GlyphId, MetadataProvider,
   instance::{LocationRef, Size},
-  outline::{DrawSettings, OutlinePen},
+  outline::{DrawSettings, HintingInstance, HintingOptions, OutlinePen, SmoothMode, Target},
   raw::TableProvider,
 };
 use tiny_skia::{
@@ -33,11 +33,12 @@ pub(crate) struct DrawingRaster {
 /// Explicit page-to-device mapping for a fixed-output raster surface.
 ///
 /// Most DrawingML effect surfaces use one isotropic page-space density and a
-/// page-space bounding rectangle. Word's on-screen static-3-D surface is the
-/// exception: its allocated bitmap is tied to the separately quantized PDF
-/// display rectangle, while the foreground is re-realized at a subpixel
-/// offset inside that bitmap. Keep that mapping explicit instead of changing
-/// the authored page-space display list.
+/// page-space bounding rectangle. Word's on-screen static-3-D surface and its
+/// legacy locked canvas are exceptions: the former is tied to a separately
+/// quantized PDF rectangle, while the latter fits an independently measured
+/// source range to a fixed bitmap extent and can therefore have unequal axis
+/// scales. Keep that mapping explicit instead of changing the authored
+/// page-space display list.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct PageToRasterMapping {
   pub(crate) width_px: u32,
@@ -46,6 +47,47 @@ pub(crate) struct PageToRasterMapping {
   pub(crate) scale_y: f32,
   pub(crate) translate_x: f32,
   pub(crate) translate_y: f32,
+  pub(crate) text_hinting: Option<(RasterTextHinting, f32)>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RasterTextHinting {
+  RoundedDevicePpem,
+  ExactDevicePpem,
+  RoundedDevicePpemPreserveLinear,
+  ExactDevicePpemPreserveLinear,
+  ExactDevicePpemAsymmetric,
+  ExactDevicePpemLight,
+  ExactDevicePpemLcd,
+  ExactDevicePpemMono,
+  GdiDeviceAdvances,
+  GdiDeviceAdvancesHinted,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RasterResolveFilter {
+  Nearest,
+  Triangle,
+  CatmullRom,
+  Lanczos3,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RasterSourceExtent {
+  Outward,
+  Floor,
+  Round,
+}
+
+impl RasterResolveFilter {
+  fn image_filter(self) -> FilterType {
+    match self {
+      Self::Nearest => FilterType::Nearest,
+      Self::Triangle => FilterType::Triangle,
+      Self::CatmullRom => FilterType::CatmullRom,
+      Self::Lanczos3 => FilterType::Lanczos3,
+    }
+  }
 }
 
 /// Rasterizes one already-resolved 2-D Drawing shape for effects that require
@@ -131,6 +173,129 @@ pub(crate) fn rasterize_vector_items_for_effects_with_mapping(
   })
 }
 
+pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
+  items: &[DisplayItem<'static>],
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  source_bounds: Rect,
+  source_pixels_per_point: f32,
+  target_width_px: u32,
+  target_height_px: u32,
+  filter: RasterResolveFilter,
+  extent: RasterSourceExtent,
+  text_hinting: Option<RasterTextHinting>,
+) -> Option<DrawingRaster> {
+  let requirements = super::drawingml_image_effects::source_requirements(effects);
+  if requirements.fill || requirements.line || requirements.children {
+    return None;
+  }
+  if source_bounds.size.width.0 <= 0.0
+    || source_bounds.size.height.0 <= 0.0
+    || !source_pixels_per_point.is_finite()
+    || source_pixels_per_point <= 0.0
+    || target_width_px == 0
+    || target_height_px == 0
+    || items.iter().any(|item| !supported_raster_item(item))
+  {
+    return None;
+  }
+
+  let source_extent = |length_pt: f32| {
+    let length_px = length_pt * source_pixels_per_point;
+    match extent {
+      RasterSourceExtent::Outward => raster_pixel_extent(length_pt, source_pixels_per_point),
+      RasterSourceExtent::Floor => length_px.floor().max(1.0) as u32,
+      RasterSourceExtent::Round => length_px.round().max(1.0) as u32,
+    }
+  };
+  let source_width_px = source_extent(source_bounds.size.width.0);
+  let source_height_px = source_extent(source_bounds.size.height.0);
+  let mut source = rasterize_vector_items_impl_with_mapping_at_resolution(
+    items,
+    PageToRasterMapping {
+      width_px: source_width_px,
+      height_px: source_height_px,
+      scale_x: source_pixels_per_point,
+      scale_y: source_pixels_per_point,
+      translate_x: -source_bounds.origin.x.0 * source_pixels_per_point,
+      translate_y: -source_bounds.origin.y.0 * source_pixels_per_point,
+      text_hinting: text_hinting.map(|mode| (mode, source_pixels_per_point)),
+    },
+  )?;
+  if std::env::var("OOXMLSDK_LOCKED_CANVAS_SOURCE_ALPHA_PROBE").as_deref() == Ok("wpf-gamma") {
+    apply_wpf_grayscale_alpha_correction(&mut source);
+  }
+  if let Ok(path) = std::env::var("OOXMLSDK_LOCKED_CANVAS_SOURCE_DUMP_PROBE") {
+    let _ = source.save(path);
+  }
+  Some(DrawingRaster {
+    image: resize_premultiplied_rgba(
+      &source,
+      target_width_px,
+      target_height_px,
+      filter.image_filter(),
+    ),
+    fill_image: None,
+    line_image: None,
+    fill_line_image: None,
+    children_image: None,
+    pixels_per_point: source_pixels_per_point,
+  })
+}
+
+fn apply_wpf_grayscale_alpha_correction(image: &mut RgbaImage) {
+  // WPF Gamma.cpp uses its hard-coded gamma 2.2 polynomial table for
+  // software grayscale glyph painting. Keep this temporary whole-surface
+  // probe beside the source-surface experiment; the retained implementation
+  // will apply the table only to independently rendered glyph primitives.
+  const G1: f32 = 0.2031;
+  const G2: f32 = -1.3864;
+  const G3: f32 = 1.9851;
+  const G4: f32 = -0.3501;
+  for pixel in image.pixels_mut() {
+    let alpha = pixel[3];
+    if matches!(alpha, 0 | 255) {
+      continue;
+    }
+    let a = f32::from(alpha) / 255.0;
+    let f1 = a + a * (1.0 - a) * (G2 * a + G4);
+    let f2 = a * (1.0 - a) * (G1 * a + G3);
+    let table_f1 = (f1 * 255.0).round().clamp(0.0, 255.0) as u16;
+    let table_f2 = (f2 * 255.0).round().clamp(0.0, 255.0) as u16;
+    let luminance = (u16::from(pixel[0]) + u16::from(pixel[1]) * 2 + u16::from(pixel[2])) >> 2;
+    pixel[3] = (table_f1 + ((table_f2 * luminance) >> 8)).min(255) as u8;
+  }
+}
+
+fn resize_premultiplied_rgba(
+  source: &RgbaImage,
+  width: u32,
+  height: u32,
+  filter: FilterType,
+) -> RgbaImage {
+  let associated = RgbaImage::from_fn(source.width(), source.height(), |x, y| {
+    let pixel = source.get_pixel(x, y);
+    let alpha = u16::from(pixel[3]);
+    image::Rgba([
+      ((u16::from(pixel[0]) * alpha + 127) / 255) as u8,
+      ((u16::from(pixel[1]) * alpha + 127) / 255) as u8,
+      ((u16::from(pixel[2]) * alpha + 127) / 255) as u8,
+      pixel[3],
+    ])
+  });
+  let mut resized = image::imageops::resize(&associated, width, height, filter);
+  for pixel in resized.pixels_mut() {
+    let alpha = u16::from(pixel[3]);
+    if alpha == 0 {
+      pixel.0[..3].fill(0);
+      continue;
+    }
+    for channel in &mut pixel.0[..3] {
+      *channel = ((u16::from(*channel) * 255 + alpha / 2) / alpha).min(255) as u8;
+    }
+  }
+  resized
+}
+
 pub(crate) fn rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
   items: &[DisplayItem<'static>],
   raster_bounds: Rect,
@@ -177,7 +342,7 @@ pub(crate) fn static_3d_text_geometry(
   pixels_per_point: f32,
 ) -> Option<super::drawingml_3d::Static3dTextGeometry> {
   let mut text_metrics = TextMetrics::new();
-  let outline = text_outline(item, &mut text_metrics)?;
+  let outline = text_outline(item, None, &mut text_metrics)?;
   super::drawingml_3d::Static3dTextGeometry::from_page_path(
     &outline.commands,
     raster_bounds,
@@ -546,7 +711,7 @@ fn rasterize_vector_items_impl_at_pixels_per_point(
   );
 
   for item in items {
-    draw_display_item(&mut pixmap, item, page_to_raster, &mut text_metrics)?;
+    draw_display_item(&mut pixmap, item, page_to_raster, None, &mut text_metrics)?;
   }
 
   let png = pixmap.encode_png().ok()?;
@@ -593,6 +758,7 @@ fn rasterize_vector_items_impl_with_mapping(
         scale_y: mapping.scale_y * scale,
         translate_x: mapping.translate_x * scale,
         translate_y: mapping.translate_y * scale,
+        text_hinting: mapping.text_hinting,
       },
     )?;
     return Some(resolve_supersampled_rgba(
@@ -621,7 +787,13 @@ fn rasterize_vector_items_impl_with_mapping_at_resolution(
     mapping.translate_y,
   );
   for item in items {
-    draw_display_item(&mut pixmap, item, page_to_raster, &mut text_metrics)?;
+    draw_display_item(
+      &mut pixmap,
+      item,
+      page_to_raster,
+      mapping.text_hinting,
+      &mut text_metrics,
+    )?;
   }
 
   let png = pixmap.encode_png().ok()?;
@@ -688,17 +860,18 @@ fn draw_display_item(
   pixmap: &mut Pixmap,
   item: &DisplayItem<'static>,
   page_to_raster: SkTransform,
+  text_hinting: Option<(RasterTextHinting, f32)>,
   text_metrics: &mut TextMetrics,
 ) -> Option<()> {
   match item {
-    DisplayItem::Text(text) => draw_text(pixmap, text, page_to_raster, text_metrics)?,
+    DisplayItem::Text(text) => draw_text(pixmap, text, page_to_raster, text_hinting, text_metrics)?,
     DisplayItem::Image(image) => draw_image(pixmap, image, page_to_raster)?,
     DisplayItem::Path(path) => draw_path(pixmap, path, page_to_raster)?,
     DisplayItem::Rect(rect) => draw_rect(pixmap, rect, page_to_raster)?,
     DisplayItem::Line(line) => draw_line(pixmap, line, page_to_raster)?,
     DisplayItem::Group(group) => {
       for child in &group.items {
-        draw_display_item(pixmap, child, page_to_raster, text_metrics)?;
+        draw_display_item(pixmap, child, page_to_raster, text_hinting, text_metrics)?;
       }
     }
     DisplayItem::Glyphs(_)
@@ -716,9 +889,10 @@ fn draw_text(
   pixmap: &mut Pixmap,
   item: &TextRun<'static>,
   page_to_raster: SkTransform,
+  text_hinting: Option<(RasterTextHinting, f32)>,
   text_metrics: &mut TextMetrics,
 ) -> Option<()> {
-  let outline = text_outline(item, text_metrics)?;
+  let outline = text_outline(item, text_hinting, text_metrics)?;
   let commands = outline.commands;
   if commands.is_empty() {
     return Some(());
@@ -811,6 +985,7 @@ struct RasterTextOutline {
 
 fn text_outline(
   item: &TextRun<'static>,
+  text_hinting: Option<(RasterTextHinting, f32)>,
   text_metrics: &mut TextMetrics,
 ) -> Option<RasterTextOutline> {
   if item.style.semantic_only || item.style.hidden || item.text.is_empty() {
@@ -835,9 +1010,24 @@ fn text_outline(
   };
   let baseline_y = item.origin.y.0 + baseline_offset;
   let horizontal_scale = item.style.horizontal_scale.unwrap_or(1.0);
+  let gdi_device_advances = text_hinting
+    .filter(|(mode, _)| {
+      !item.paragraph_bidi
+        && matches!(
+          mode,
+          RasterTextHinting::GdiDeviceAdvances | RasterTextHinting::GdiDeviceAdvancesHinted
+        )
+    })
+    .and_then(|(_, device_pixels_per_point)| {
+      text_metrics.gdi_device_character_advances_pt(
+        item.text.as_ref(),
+        &item.style,
+        device_pixels_per_point * crate::units::POINTS_PER_INCH,
+      )
+    });
   let mut commands = Vec::new();
   let mut cursor_x = item.origin.x.0;
-  for glyph in &shaped.glyphs {
+  for (glyph_index, glyph) in shaped.glyphs.iter().enumerate() {
     let face_data = shaped.font_faces.get(glyph.font_index)?;
     let face = FontRef::from_index(face_data.data.as_ref(), face_data.index).ok()?;
     let units_per_em = face
@@ -849,11 +1039,28 @@ fn text_outline(
     }
     let origin_x = cursor_x + glyph.x_offset_em * glyph.font_size_pt;
     let origin_y = baseline_y - glyph.y_offset_em * glyph.font_size_pt;
+    let hinted_ppem = text_hinting.and_then(|(mode, device_pixels_per_point)| {
+      let ppem = glyph.font_size_pt * device_pixels_per_point;
+      Some(match mode {
+        RasterTextHinting::RoundedDevicePpem
+        | RasterTextHinting::RoundedDevicePpemPreserveLinear => ppem.round(),
+        RasterTextHinting::ExactDevicePpem
+        | RasterTextHinting::ExactDevicePpemPreserveLinear
+        | RasterTextHinting::ExactDevicePpemAsymmetric
+        | RasterTextHinting::ExactDevicePpemLight
+        | RasterTextHinting::ExactDevicePpemLcd
+        | RasterTextHinting::ExactDevicePpemMono
+        | RasterTextHinting::GdiDeviceAdvancesHinted => ppem,
+        RasterTextHinting::GdiDeviceAdvances => return None,
+      })
+    });
     let mut outline = RasterGlyphOutline {
       commands: &mut commands,
       origin_x,
       origin_y,
-      scale: glyph.font_size_pt / units_per_em,
+      scale: hinted_ppem.map_or(glyph.font_size_pt / units_per_em, |ppem| {
+        glyph.font_size_pt / ppem
+      }),
       horizontal_scale,
       synthetic_italic: face_data.synthetic_italic,
       rotation_degrees: item.style.rotation_degrees,
@@ -861,12 +1068,61 @@ fn text_outline(
       current: None,
     };
     if let Some(glyph_outline) = face.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
-      let _ = glyph_outline.draw(
-        DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
-        &mut outline,
-      );
+      if let Some(ppem) = hinted_ppem {
+        let outlines = face.outline_glyphs();
+        let preserve_linear_metrics = text_hinting.is_some_and(|(mode, _)| {
+          matches!(
+            mode,
+            RasterTextHinting::RoundedDevicePpemPreserveLinear
+              | RasterTextHinting::ExactDevicePpemPreserveLinear
+          )
+        });
+        let target = match text_hinting.map(|(mode, _)| mode) {
+          Some(RasterTextHinting::ExactDevicePpemAsymmetric) => Target::Smooth {
+            mode: SmoothMode::Normal,
+            symmetric_rendering: false,
+            preserve_linear_metrics: false,
+          },
+          Some(RasterTextHinting::ExactDevicePpemLight) => Target::Smooth {
+            mode: SmoothMode::Light,
+            symmetric_rendering: true,
+            preserve_linear_metrics: false,
+          },
+          Some(RasterTextHinting::ExactDevicePpemLcd) => Target::Smooth {
+            mode: SmoothMode::Lcd,
+            symmetric_rendering: true,
+            preserve_linear_metrics: false,
+          },
+          Some(RasterTextHinting::ExactDevicePpemMono) => Target::Mono,
+          _ => Target::Smooth {
+            mode: SmoothMode::Normal,
+            symmetric_rendering: true,
+            preserve_linear_metrics,
+          },
+        };
+        let instance = HintingInstance::new(
+          &outlines,
+          Size::new(ppem),
+          LocationRef::default(),
+          HintingOptions {
+            target,
+            ..HintingOptions::default()
+          },
+        )
+        .ok()?;
+        let _ = glyph_outline.draw(DrawSettings::hinted(&instance, false), &mut outline);
+      } else {
+        let _ = glyph_outline.draw(
+          DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
+          &mut outline,
+        );
+      }
     }
-    cursor_x += glyph.x_advance_em * glyph.font_size_pt;
+    cursor_x += gdi_device_advances
+      .as_deref()
+      .and_then(|advances| advances.get(glyph_index))
+      .copied()
+      .unwrap_or(glyph.x_advance_em * glyph.font_size_pt);
     if item
       .text
       .get(glyph.text_range.clone())
@@ -1024,15 +1280,13 @@ fn draw_image(
     mask.fill_path(
       &clip_path,
       &mask_paint,
-      FillRule::Winding,
+      FillRule::EvenOdd,
       page_to_raster,
       None,
     );
   }
 
-  let pixels_per_point = page_to_raster.sx;
-  let raster_origin_x = -page_to_raster.tx / pixels_per_point;
-  let raster_origin_y = -page_to_raster.ty / pixels_per_point;
+  let raster_to_page = page_to_raster.invert()?;
   let center_x = item.bounds.origin.x.0 + width_pt * 0.5;
   let center_y = item.bounds.origin.y.0 + height_pt * 0.5;
   let angle = item.rotation_degrees.to_radians();
@@ -1041,13 +1295,14 @@ fn draw_image(
   let source_height = source.height() as f32;
 
   for y in 0..pixmap.height() {
-    let page_y = raster_origin_y + (y as f32 + 0.5) / pixels_per_point;
     for x in 0..pixmap.width() {
       let mask_alpha = mask.pixel(x, y)?.alpha();
       if mask_alpha == 0 {
         continue;
       }
-      let page_x = raster_origin_x + (x as f32 + 0.5) / pixels_per_point;
+      let page = raster_pixel_center_in_page(raster_to_page, x, y);
+      let page_x = page.x;
+      let page_y = page.y;
       let offset_x = page_x - center_x;
       let offset_y = page_y - center_y;
       let local_x = cos.mul_add(offset_x, sin * offset_y) + width_pt * 0.5;
@@ -1074,6 +1329,22 @@ fn draw_image(
     }
   }
   Some(())
+}
+
+#[inline]
+fn raster_pixel_center_in_page(raster_to_page: SkTransform, x: u32, y: u32) -> SkPoint {
+  let raster_x = x as f32 + 0.5;
+  let raster_y = y as f32 + 0.5;
+  SkPoint::from_xy(
+    raster_to_page.sx.mul_add(
+      raster_x,
+      raster_to_page.kx.mul_add(raster_y, raster_to_page.tx),
+    ),
+    raster_to_page.ky.mul_add(
+      raster_x,
+      raster_to_page.sy.mul_add(raster_y, raster_to_page.ty),
+    ),
+  )
 }
 
 fn bilinear_sample(source: &image::RgbaImage, x: f32, y: f32) -> image::Rgba<u8> {
@@ -1430,21 +1701,18 @@ fn composite_path_gradient_mask(
     Vec::new()
   };
   let stops = super::drawingml_gradient::resolved_stops(gradient);
-  let pixels_per_point = page_to_raster.sx;
-  let raster_origin_x = -page_to_raster.tx / pixels_per_point;
-  let raster_origin_y = -page_to_raster.ty / pixels_per_point;
+  let raster_to_page = page_to_raster.invert()?;
   for y in 0..pixmap.height() {
-    let page_y = raster_origin_y + (y as f32 + 0.5) / pixels_per_point;
     for x in 0..pixmap.width() {
       let mask_alpha = mask.pixel(x, y)?.alpha();
       if mask_alpha == 0 {
         continue;
       }
-      let page_x = raster_origin_x + (x as f32 + 0.5) / pixels_per_point;
+      let page = raster_pixel_center_in_page(raster_to_page, x, y);
       let point = super::drawingml_gradient::inverse_point(
         gradient_path.transform,
-        f64::from(page_x),
-        f64::from(page_y),
+        f64::from(page.x),
+        f64::from(page.y),
       )?;
       let position = super::drawingml_gradient::position(
         gradient_path,
@@ -1722,6 +1990,7 @@ mod tests {
       scale_y: height_px / content.size.height.0,
       translate_x: 5.0,
       translate_y: 2.5625,
+      text_hinting: None,
     };
     let items = [DisplayItem::Rect(RectItem {
       bounds: content,
@@ -1757,6 +2026,60 @@ mod tests {
       // the bounded 32-sample coverage grid used here.
       [0, 255, 255, 0, 112, 255, 255, 104]
     );
+  }
+
+  #[test]
+  fn anisotropic_mapping_uses_both_axes_when_sampling_images() {
+    let source = RgbaImage::from_pixel(1, 1, Rgba([240, 80, 20, 255]));
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(source.as_raw(), 1, 1, ColorType::Rgba8.into())
+      .unwrap();
+    let item = DisplayItem::Image(ImageItem {
+      bounds: rect(0.0, 0.0, 10.0, 10.0),
+      crop: Some(ImageCrop::default()),
+      clip_path: Vec::new(),
+      rotation_degrees: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      content_type: Cow::Borrowed("image/png"),
+      bytes: Bytes::from(png),
+      metafile_monochrome_dib_palette_override: None,
+      metafile_background_color: None,
+      metafile_external_header: None,
+      metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
+      relationship_id: None,
+      alt_text: None,
+      hyperlink_url: None,
+      semantic_metafile_text: false,
+      metafile_semantic_text_includes_raster_backdrop: false,
+      signature_line: None,
+      metafile_native_size: false,
+      floating: false,
+      behind_text: false,
+    });
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+    let raster = rasterize_vector_items_for_effects_with_mapping(
+      &[item],
+      &effects,
+      1.0,
+      PageToRasterMapping {
+        width_px: 20,
+        height_px: 30,
+        scale_x: 2.0,
+        scale_y: 3.0,
+        translate_x: 0.0,
+        translate_y: 0.0,
+        text_hinting: None,
+      },
+    )
+    .unwrap();
+
+    assert_eq!((raster.image.width(), raster.image.height()), (20, 30));
+    assert!(raster.image.pixels().all(|pixel| pixel[3] == 255));
   }
 
   #[test]
@@ -2014,6 +2337,7 @@ mod tests {
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
+      metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
       relationship_id: None,
       alt_text: None,
       hyperlink_url: None,

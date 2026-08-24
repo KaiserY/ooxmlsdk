@@ -28,7 +28,7 @@ use crate::docx::{
   FloatingImagePlacement, FloatingPaintOrder, FrameHeightRule, FrameHorizontalAlignment,
   FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
   HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
-  InlineChart, InlineDrawingGroupEffect, InlineHorizontalRuleAlignment, InlineHorizontalRuleWidth,
+  InlineChart, InlineDrawingGroup, InlineHorizontalRuleAlignment, InlineHorizontalRuleWidth,
   InlineItem, InlineShape, InlineShapeGeometry, InlineShapeImageFill, InlineShapeImageFillMode,
   LegacyTextRelief, LineBreakClear, LineHeightRule, LineNumbering, NoteNumberingSpec,
   NoteSeparatorMark, PRESERVED_WORD_TEXT_TAB, PageBottomHyphenation, PageSetup, ParagraphAlignment,
@@ -145,6 +145,24 @@ const WORD_SCREEN_STATIC_3D_LAST_SAMPLE_INSET_PX: f32 = 5.0 / 32.0;
 // writer uses the tag to apply Word's fixed-output JPEG color-plane policy.
 const WORD_STATIC_3D_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-static-3d+png";
+// Word's fixed output realizes a legacy DrawingML locked canvas as one
+// bitmap.  The independent fdo76249 width/height probes produce 220x194
+// pixels for a 79.35x70.165pt wp:extent: both axes use the same 200-DPI
+// surface and truncate the allocated pixel extent.
+const WORD_LOCKED_CANVAS_DPI: f32 = 200.0;
+// Internal transport tag for the completed locked-canvas PNG. The PDF writer
+// applies Word's generated-surface JPEG color-plane policy while retaining
+// the independently lossless alpha plane.
+const WORD_LOCKED_CANVAS_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-locked-canvas+png";
+// Legacy locked-canvas text is measured through the screen-compatible GDI
+// path before Word maps the complete canvas to its fixed 200-DPI bitmap.
+const WORD_LOCKED_CANVAS_TEXT_MEASURE_DPI: f32 = units::CSS_PIXELS_PER_INCH;
+// The 200-DPI locked-canvas allocation retains ten transparent device pixels
+// beyond the far edge of the GDI text rectangle. Controlled font-size,
+// alignment, inset, shadow, and root-extent probes keep this guard constant
+// while the measured text boundary changes independently.
+const WORD_LOCKED_CANVAS_TEXT_FAR_EDGE_GUARD_PX: f32 = 10.0;
 // Internal transport tag for a PNG drawn through a WPS text story. Word's
 // fixed-output writer realizes that child on the WPG 96-DPI bitmap surface
 // before applying the configured PDF image compression policy.
@@ -160,6 +178,7 @@ const WORD_LEGACY_FORM_CHECK_BOX_BORDER_DOTS: f32 = 6.0;
 const WORD_LEGACY_FORM_CHECK_BOX_MARK_DOTS: f32 = 4.0;
 const WORD_LEGACY_FORM_CHECK_BOX_MARK_OVERHANG_DOTS: f32 = 1.0;
 const WORD_LEGACY_SHADOW_OFFSET_PER_FONT_SIZE: f32 = 0.04;
+const WORD_VERTICAL_FRAME_SINGLE_LINE_HEIGHT_PER_FONT_SIZE: f32 = 1.25;
 const WORD_LEGACY_EFFECT_BLACK: RgbColor = RgbColor { r: 0, g: 0, b: 0 };
 const WORD_LEGACY_EFFECT_GRAY: RgbColor = RgbColor {
   r: 0x99,
@@ -207,6 +226,7 @@ impl WordLineTextExtents {
     style: &TextStyle,
     text: &str,
     script_sensitive_line_height: bool,
+    use_vertical_non_grid_line_spacing: bool,
     text_metrics: &mut TextMetrics,
   ) {
     let metrics = if script_sensitive_line_height {
@@ -245,12 +265,27 @@ impl WordLineTextExtents {
     } else {
       style.baseline_shift_pt
     };
+    let natural_line_height_pt = if use_vertical_non_grid_line_spacing {
+      // [MS-OI29500] §21.1.2.2.5 makes line spacing the horizontal
+      // column advance for vertical text. With no active `docGrid type=lines`,
+      // Word's paragraph-frame single-line basis is 125% of the authored font
+      // size, bounded below by the face's Windows font height. Controlled
+      // 10/11/12pt × 240/276 strict documents and a transitional grid/no-grid
+      // pair expose the same owner. Active line grids stay on their independent
+      // linePitch path in document_grid_line_metrics().
+      word_vertical_frame_single_line_height(
+        effective_font_size_pt(style, None),
+        metrics.windows_line_height_pt(),
+      )
+    } else {
+      metrics.line_height_pt()
+    };
     self.ascent_pt = self
       .ascent_pt
       .max((default_baseline_pt + line_shift_pt).max(0.0));
     self.descent_pt = self
       .descent_pt
-      .max((metrics.line_height_pt() - default_baseline_pt - line_shift_pt).max(0.0));
+      .max((natural_line_height_pt - default_baseline_pt - line_shift_pt).max(0.0));
   }
 
   fn height_pt(self) -> f32 {
@@ -260,6 +295,10 @@ impl WordLineTextExtents {
   fn uses_typographic_gap_below_baseline(self) -> bool {
     self.has_text && !self.has_intrinsic_leading_above
   }
+}
+
+fn word_vertical_frame_single_line_height(font_size_pt: f32, windows_line_height_pt: f32) -> f32 {
+  windows_line_height_pt.max(font_size_pt * WORD_VERTICAL_FRAME_SINGLE_LINE_HEIGHT_PER_FONT_SIZE)
 }
 
 fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
@@ -946,6 +985,9 @@ fn include_text_height(
     portion.style,
     portion.text,
     text_frame.script_sensitive_line_height,
+    flow.inside_paragraph_frame
+      && paragraph.format.vertical_text_flow.is_some()
+      && document_grid_line_metrics(1.0, paragraph, flow.setup, flow.text_segmentation).is_none(),
     text_metrics,
   );
   let text_height = line_text_extents.height_pt();
@@ -1025,21 +1067,10 @@ fn paragraph_line_spacing_base_covers_line_height(paragraph: &crate::docx::Parag
   if paragraph.list_label.is_some() || paragraph.list_label_image.is_some() {
     return false;
   }
-  paragraph.inlines.iter().all(|inline| {
-    matches!(
-      inline,
-      InlineItem::Text(_)
-        | InlineItem::ClearLineBreak(_)
-        | InlineItem::PositionalTab(_)
-        | InlineItem::Ruby(_)
-        | InlineItem::BookmarkStart(_)
-        | InlineItem::FormWidgetStart(_)
-        | InlineItem::FormWidgetEnd(_)
-        | InlineItem::LastRenderedPageBreak
-        | InlineItem::PageBreak
-        | InlineItem::ColumnBreak
-    )
-  })
+  paragraph
+    .inlines
+    .iter()
+    .all(InlineItem::leaves_host_line_metrics_text_owned)
 }
 
 fn proportional_auto_text_line_height(
@@ -1067,6 +1098,9 @@ fn include_text_content_height(
     portion.style,
     portion.text,
     text_frame.script_sensitive_line_height,
+    flow.inside_paragraph_frame
+      && paragraph.format.vertical_text_flow.is_some()
+      && document_grid_line_metrics(1.0, paragraph, flow.setup, flow.text_segmentation).is_none(),
     text_metrics,
   );
   content_height.max(line_text_extents.height_pt())
@@ -1228,6 +1262,7 @@ fn numbering_label_origin_pt(
   paragraph_bidi: bool,
 ) -> f32 {
   match justification {
+    w::LevelJustificationValues::Left if paragraph_bidi => anchor_x_pt - width_pt,
     w::LevelJustificationValues::Left => anchor_x_pt,
     w::LevelJustificationValues::Center => anchor_x_pt - width_pt / 2.0,
     w::LevelJustificationValues::Right => anchor_x_pt - width_pt,
@@ -1236,6 +1271,62 @@ fn numbering_label_origin_pt(
     w::LevelJustificationValues::End if paragraph_bidi => anchor_x_pt,
     w::LevelJustificationValues::End => anchor_x_pt - width_pt,
   }
+}
+
+fn numbering_label_anchor_pt(
+  first_line_left: f32,
+  default_line_left: f32,
+  default_line_right: f32,
+  justification: w::LevelJustificationValues,
+  paragraph_bidi: bool,
+) -> f32 {
+  if numbering_label_uses_rtl_leading_edge(justification, paragraph_bidi) {
+    // In an RTL paragraph, the numbering level's `start` edge is the leading
+    // edge on the right. The hanging indent places the numbering portion past
+    // the body's right edge; mirror the LTR first-line anchor around the
+    // paragraph's physical line bounds. ECMA-376 §17.3.1.6 makes the
+    // paragraph indentation logical, while §17.9.7 defines `start` relative
+    // to that leading edge.
+    default_line_right + (default_line_left - first_line_left)
+  } else {
+    first_line_left
+  }
+}
+
+fn numbering_label_uses_rtl_leading_edge(
+  justification: w::LevelJustificationValues,
+  paragraph_bidi: bool,
+) -> bool {
+  paragraph_bidi
+    && matches!(
+      justification,
+      w::LevelJustificationValues::Left | w::LevelJustificationValues::Start
+    )
+}
+
+fn take_rtl_leading_numbering_labels(
+  items: &mut Vec<PageItem>,
+  item_start: usize,
+) -> Vec<PageItem> {
+  let indices = items
+    .iter()
+    .enumerate()
+    .skip(item_start)
+    .filter_map(|(index, item)| match item {
+      PageItem::Text(text)
+        if text.style_ref_numbering_text.as_deref() == Some(text.text.as_str()) =>
+      {
+        Some(index)
+      }
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+  let mut labels = Vec::with_capacity(indices.len());
+  for index in indices.into_iter().rev() {
+    labels.push(items.remove(index));
+  }
+  labels.reverse();
+  labels
 }
 
 fn update_line_text_height(
@@ -3989,6 +4080,17 @@ struct WordScreenStatic3dTarget {
   model_surface: common::drawingml_3d::Static3dSurface,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct WordScreenStatic3dOutputTarget {
+  display_bounds: common::Rect,
+  left_px: u32,
+  top_px: u32,
+  width_px: u32,
+  height_px: u32,
+  viewport_translation_px: (f32, f32),
+  silhouette_translation_px: (f32, f32),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WordScreenStatic3dRasterSpace {
   LocalShape,
@@ -4069,6 +4171,7 @@ fn wordprocessing_screen_static_3d_target(
     scale_y,
     translate_x,
     translate_y,
+    text_hinting: None,
   };
   let source_mapping = if raster_space == WordScreenStatic3dRasterSpace::LocalShape {
     // The clean shape paint is realized as a separately snapped source mask:
@@ -4087,6 +4190,7 @@ fn wordprocessing_screen_static_3d_target(
       scale_y,
       translate_x: 1.0 - content_bounds.origin.x.0 * scale_x,
       translate_y: 1.0 - content_bounds.origin.y.0 * scale_y,
+      text_hinting: None,
     }
   } else {
     geometry_mapping
@@ -4102,6 +4206,81 @@ fn wordprocessing_screen_static_3d_target(
       height_px,
     },
   }
+}
+
+fn wordprocessing_screen_static_3d_output_target(
+  content_bounds: common::Rect,
+  working_raster_bounds: common::Rect,
+  pixels_per_point: f32,
+  projection: common::drawingml_3d::Static3dProjection,
+  shape: &a::Shape3DType,
+  working_width_px: u32,
+  working_height_px: u32,
+) -> Option<WordScreenStatic3dOutputTarget> {
+  let projected = common::drawingml_3d::projected_output_bounds(
+    projection,
+    shape,
+    content_bounds.size.width.0,
+    content_bounds.size.height.0,
+  );
+  let projected_width = projected.right_pt - projected.left_pt;
+  let projected_height = projected.bottom_pt - projected.top_pt;
+  if !projected_width.is_finite()
+    || !projected_height.is_finite()
+    || projected_width <= 0.0
+    || projected_height <= 0.0
+  {
+    return None;
+  }
+
+  // Keep the complete unprojected shape in the working bitmap so the 3-D
+  // stage can sample its paint and geometry. Word exports only the projected
+  // GetImageLocalBounds range, with the same one-device-pixel guard used by
+  // the full working surface. This distinction is observable when an
+  // orthographic side camera contracts a 34.5-pt shape to its 16-pt depth.
+  let projected_raster_bounds = common_rect(
+    content_bounds.origin.x.0 + projected.left_pt - WORD_STATIC_3D_RASTER_EDGE_GUARD_PT,
+    content_bounds.origin.y.0 + projected.top_pt - WORD_STATIC_3D_RASTER_EDGE_GUARD_PT,
+    projected_width + WORD_STATIC_3D_RASTER_EDGE_GUARD_PT * 2.0,
+    projected_height + WORD_STATIC_3D_RASTER_EDGE_GUARD_PT * 2.0,
+  );
+  let display_bounds = wordprocessing_static_3d_bitmap_display_bounds(projected_raster_bounds);
+  let output_raster_bounds =
+    wordprocessing_screen_static_3d_raster_bounds(projected_raster_bounds, pixels_per_point);
+  let exact_left_px = ((projected_raster_bounds.origin.x.0 - working_raster_bounds.origin.x.0)
+    * pixels_per_point)
+    .clamp(0.0, working_width_px as f32);
+  let exact_top_px = ((projected_raster_bounds.origin.y.0 - working_raster_bounds.origin.y.0)
+    * pixels_per_point)
+    .clamp(0.0, working_height_px as f32);
+  let left_px = exact_left_px.floor() as u32;
+  let top_px = exact_top_px.floor() as u32;
+  let width_px = (output_raster_bounds.size.width.0 * pixels_per_point)
+    .round()
+    .max(1.0) as u32;
+  let height_px = (output_raster_bounds.size.height.0 * pixels_per_point)
+    .round()
+    .max(1.0) as u32;
+  let width_px = width_px.min(working_width_px.saturating_sub(left_px));
+  let height_px = height_px.min(working_height_px.saturating_sub(top_px));
+  (width_px > 0 && height_px > 0).then_some(WordScreenStatic3dOutputTarget {
+    display_bounds,
+    left_px,
+    top_px,
+    width_px,
+    height_px,
+    // The exported XObject starts at the continuous projected bounds, while
+    // the source bitmap can only be cropped at an integer device pixel. This
+    // translation maps the continuous surface into that integer crop. D3D9's
+    // transformed screen coordinates use integer pixel centers, so the
+    // half-pixel extent phase is carried independently below instead of
+    // moving every shared bevel boundary.
+    viewport_translation_px: (left_px as f32 - exact_left_px, top_px as f32 - exact_top_px),
+    silhouette_translation_px: (
+      if left_px > 0 { 0.5 } else { 0.0 },
+      if top_px > 0 { 0.5 } else { 0.0 },
+    ),
+  })
 }
 
 fn wordprocessing_fixed_output_static_3d_allocation_bounds(
@@ -4354,6 +4533,24 @@ fn finish_docx_drawing_effects(
   let Some(mut raster) = raster else {
     return;
   };
+  let screen_output_target = if screen_static_3d && raster_effects.effects.is_empty() {
+    host
+      .static3d
+      .zip(static_projection)
+      .and_then(|(style, projection)| {
+        wordprocessing_screen_static_3d_output_target(
+          content_bounds,
+          raster_bounds,
+          raster.pixels_per_point,
+          projection,
+          &style.shape,
+          raster.image.width(),
+          raster.image.height(),
+        )
+      })
+  } else {
+    None
+  };
   let shape_geometry = if shape_clip.is_empty() {
     None
   } else {
@@ -4373,7 +4570,31 @@ fn finish_docx_drawing_effects(
       },
     )
   };
+  let shape_material_geometry = if shape_clip.is_empty() {
+    None
+  } else {
+    screen_target.map_or_else(
+      || shape_geometry.clone(),
+      |target| {
+        common::drawingml_shape_raster::static_3d_shape_geometry_with_mapping(
+          &shape_clip,
+          target.source_mapping,
+        )
+      },
+    )
+  };
   if let Some((style, projection)) = host.static3d.zip(static_projection) {
+    let projection = screen_output_target.map_or(projection, |target| {
+      projection
+        .with_viewport_translation_px(
+          target.viewport_translation_px.0,
+          target.viewport_translation_px.1,
+        )
+        .with_silhouette_translation_px(
+          target.silhouette_translation_px.0,
+          target.silhouette_translation_px.1,
+        )
+    });
     let options = common::drawingml_3d::Static3dRenderOptions {
       extrusion_color: style.extrusion_color.or(automatic_extrusion_color),
       contour_color: style.contour_color,
@@ -4392,6 +4613,7 @@ fn finish_docx_drawing_effects(
       common::drawingml_3d::apply_static_3d_shape_geometry(
         &mut raster.image,
         geometry,
+        shape_material_geometry.as_ref().unwrap_or(geometry),
         &style.scene,
         projection,
         &style.shape,
@@ -4441,6 +4663,21 @@ fn finish_docx_drawing_effects(
       },
     );
   }
+  if let Some(target) = screen_output_target
+    && (target.left_px != 0
+      || target.top_px != 0
+      || target.width_px != raster.image.width()
+      || target.height_px != raster.image.height())
+  {
+    raster.image = image::imageops::crop_imm(
+      &raster.image,
+      target.left_px,
+      target.top_px,
+      target.width_px,
+      target.height_px,
+    )
+    .to_image();
+  }
   let effect_item_bounds = backdrop_output_bounds
     .and_then(|output| {
       let pixels_per_point = raster.pixels_per_point;
@@ -4481,8 +4718,13 @@ fn finish_docx_drawing_effects(
     // the device-grid extent.  For tdf97371 this maps the 116x72 working
     // bitmap to the reference 41.40x25.68pt XObject rectangle without moving
     // the floating bevel samples inside that bitmap.
-    screen_target.map_or_else(
-      || wordprocessing_static_3d_bitmap_display_bounds(static_display_bounds),
+    screen_output_target.map_or_else(
+      || {
+        screen_target.map_or_else(
+          || wordprocessing_static_3d_bitmap_display_bounds(static_display_bounds),
+          |target| target.display_bounds,
+        )
+      },
       |target| target.display_bounds,
     )
   } else {
@@ -4545,10 +4787,353 @@ fn finish_docx_drawing_effects(
   }
 }
 
+fn finish_docx_locked_canvas_viewport(
+  items: &mut Vec<PageItem>,
+  content_start: usize,
+  group: &InlineDrawingGroup,
+  text_metrics: &mut TextMetrics,
+) {
+  let Some(viewport) = group.locked_canvas_viewport else {
+    return;
+  };
+  if items.len() <= content_start || viewport.width_pt <= 0.0 || viewport.height_pt <= 0.0 {
+    return;
+  }
+
+  // The legacy host asks GDI for a padded logical text rectangle before
+  // applying DrawingML effects. Preserve that layout-only range separately:
+  // materializing the effect replaces the run with tight glyph/effect paint,
+  // but Word still uses the original GDI rectangle to fit the whole canvas.
+  let legacy_text_bounds = locked_canvas_text_source_bounds(&items[content_start..], text_metrics);
+  materialize_wordprocessing_text_effects_in_items(&mut items[content_start..], text_metrics);
+  let paint_bounds = page_items_bounds(&items[content_start..], text_metrics);
+  let Some((left, top, right, bottom)) = union_page_item_bounds(paint_bounds, legacy_text_bounds)
+  else {
+    return;
+  };
+  let source_width_pt = right - left;
+  let source_height_pt = bottom - top;
+  if source_width_pt <= f32::EPSILON || source_height_pt <= f32::EPSILON {
+    return;
+  }
+
+  let pixels_per_point = WORD_LOCKED_CANVAS_DPI / units::POINTS_PER_INCH;
+  // Word truncates both device extents after mapping wp:extent to its 200-DPI
+  // canvas.  This is distinct from an effect bitmap's outward ceil, which
+  // must retain fractional blur/stroke coverage.
+  let width_px = (viewport.width_pt * pixels_per_point).floor().max(1.0) as u32;
+  let height_px = (viewport.height_pt * pixels_per_point).floor().max(1.0) as u32;
+  let scale_x = width_px as f32 / source_width_pt;
+  let scale_y = height_px as f32 / source_height_pt;
+  let display_items = items[content_start..]
+    .iter()
+    .cloned()
+    .map(into_common_page_item)
+    .collect::<Vec<_>>();
+  let identity = common::drawingml_image_effects::ImageEffectContainer {
+    kind: common::drawingml_image_effects::ImageEffectContainerKind::Tree,
+    effects: vec![common::drawingml_image_effects::ImageEffect::Identity],
+  };
+  let source_surface = match std::env::var("OOXMLSDK_LOCKED_CANVAS_SOURCE_SURFACE_PROBE").as_deref()
+  {
+    Ok("nearest") => Some((
+      common::drawingml_shape_raster::RasterResolveFilter::Nearest,
+      common::drawingml_shape_raster::RasterSourceExtent::Outward,
+    )),
+    Ok("triangle") => Some((
+      common::drawingml_shape_raster::RasterResolveFilter::Triangle,
+      common::drawingml_shape_raster::RasterSourceExtent::Outward,
+    )),
+    Ok("triangle-floor") => Some((
+      common::drawingml_shape_raster::RasterResolveFilter::Triangle,
+      common::drawingml_shape_raster::RasterSourceExtent::Floor,
+    )),
+    Ok("triangle-round") => Some((
+      common::drawingml_shape_raster::RasterResolveFilter::Triangle,
+      common::drawingml_shape_raster::RasterSourceExtent::Round,
+    )),
+    Ok("catmull-rom") => Some((
+      common::drawingml_shape_raster::RasterResolveFilter::CatmullRom,
+      common::drawingml_shape_raster::RasterSourceExtent::Outward,
+    )),
+    Ok("lanczos3") => Some((
+      common::drawingml_shape_raster::RasterResolveFilter::Lanczos3,
+      common::drawingml_shape_raster::RasterSourceExtent::Outward,
+    )),
+    _ => None,
+  };
+  let source_surface_dpi = std::env::var("OOXMLSDK_LOCKED_CANVAS_SOURCE_DPI_PROBE")
+    .ok()
+    .and_then(|value| value.parse::<f32>().ok())
+    .filter(|value| value.is_finite() && *value > 0.0)
+    .unwrap_or(WORD_LOCKED_CANVAS_TEXT_MEASURE_DPI);
+  let source_text_hinting =
+    match std::env::var("OOXMLSDK_LOCKED_CANVAS_SOURCE_TEXT_HINT_PROBE").as_deref() {
+      Ok("round") => Some(common::drawingml_shape_raster::RasterTextHinting::RoundedDevicePpem),
+      Ok("exact") => Some(common::drawingml_shape_raster::RasterTextHinting::ExactDevicePpem),
+      Ok("linear-round") => {
+        Some(common::drawingml_shape_raster::RasterTextHinting::RoundedDevicePpemPreserveLinear)
+      }
+      Ok("linear-exact") => {
+        Some(common::drawingml_shape_raster::RasterTextHinting::ExactDevicePpemPreserveLinear)
+      }
+      Ok("asymmetric") => {
+        Some(common::drawingml_shape_raster::RasterTextHinting::ExactDevicePpemAsymmetric)
+      }
+      Ok("light") => Some(common::drawingml_shape_raster::RasterTextHinting::ExactDevicePpemLight),
+      Ok("lcd") => Some(common::drawingml_shape_raster::RasterTextHinting::ExactDevicePpemLcd),
+      Ok("mono") => Some(common::drawingml_shape_raster::RasterTextHinting::ExactDevicePpemMono),
+      Ok("gdi-advances") => {
+        Some(common::drawingml_shape_raster::RasterTextHinting::GdiDeviceAdvances)
+      }
+      Ok("gdi-advances-hinted") => {
+        Some(common::drawingml_shape_raster::RasterTextHinting::GdiDeviceAdvancesHinted)
+      }
+      _ => None,
+    };
+  let raster = source_surface
+    .and_then(|(filter, extent)| {
+      common::drawingml_shape_raster::rasterize_vector_items_for_effects_via_source_surface(
+        &display_items,
+        &identity,
+        common_rect(left, top, source_width_pt, source_height_pt),
+        source_surface_dpi / units::POINTS_PER_INCH,
+        width_px,
+        height_px,
+        filter,
+        extent,
+        source_text_hinting,
+      )
+    })
+    .or_else(|| {
+      common::drawingml_shape_raster::rasterize_vector_items_for_effects_with_mapping(
+        &display_items,
+        &identity,
+        pixels_per_point,
+        common::drawingml_shape_raster::PageToRasterMapping {
+          width_px,
+          height_px,
+          scale_x,
+          scale_y,
+          translate_x: -left * scale_x,
+          translate_y: -top * scale_y,
+          text_hinting: match std::env::var("OOXMLSDK_LOCKED_CANVAS_TEXT_HINT_PROBE").as_deref() {
+            Ok("round") => Some((
+              common::drawingml_shape_raster::RasterTextHinting::RoundedDevicePpem,
+              scale_y,
+            )),
+            Ok("exact") => Some((
+              common::drawingml_shape_raster::RasterTextHinting::ExactDevicePpem,
+              scale_y,
+            )),
+            Ok("linear-round") => Some((
+              common::drawingml_shape_raster::RasterTextHinting::RoundedDevicePpemPreserveLinear,
+              scale_y,
+            )),
+            Ok("linear-exact") => Some((
+              common::drawingml_shape_raster::RasterTextHinting::ExactDevicePpemPreserveLinear,
+              scale_y,
+            )),
+            _ => None,
+          },
+        },
+      )
+    });
+  let Some(raster) = raster else {
+    return;
+  };
+  let Some(png) = encode_wordprocessing_effect_bitmap_png(&raster.image) else {
+    return;
+  };
+  let (floating, behind_text) = match group.placement {
+    crate::docx::ImagePlacement::Inline => (false, false),
+    crate::docx::ImagePlacement::Floating(placement) => (true, placement.behind_text),
+  };
+  items.truncate(content_start);
+  items.push(PageItem::Image(ImageItem {
+    x_pt: left,
+    y_pt: top,
+    width_pt: viewport.width_pt,
+    height_pt: viewport.height_pt,
+    inline_frame_left_gap_pt: 0.0,
+    inline_frame_right_gap_pt: 0.0,
+    inline_baseline_gap_pt: 0.0,
+    inline_baseline_participant: false,
+    paragraph_alignment_locked: false,
+    crop: ImageCrop::default(),
+    clip_path: Vec::new(),
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
+    data: Bytes::from(png),
+    content_type: Some(WORD_LOCKED_CANVAS_BITMAP_CONTENT_TYPE.to_string()),
+    metafile_background_color: None,
+    alt_text: None,
+    hyperlink_url: None,
+    semantic_metafile_text: false,
+    metafile_semantic_text_includes_raster_backdrop: false,
+    signature_line: None,
+    metafile_native_size: false,
+    floating,
+    behind_text,
+  }));
+}
+
+fn locked_canvas_text_source_bounds(
+  items: &[PageItem],
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32, f32, f32)> {
+  let mut bounds = None;
+  for item in items {
+    let item_bounds = match item {
+      PageItem::Text(text) => locked_canvas_text_item_source_bounds(text, text_metrics),
+      PageItem::Group(items)
+      | PageItem::IndependentTextFrame(items)
+      | PageItem::FloatingDrawing { items, .. } => {
+        locked_canvas_text_source_bounds(items, text_metrics)
+      }
+      PageItem::Image(_)
+      | PageItem::LegacyFormCheckBox(_)
+      | PageItem::Rect(_)
+      | PageItem::Fill(_)
+      | PageItem::Line(_)
+      | PageItem::Path(_)
+      | PageItem::Polyline(_) => None,
+    };
+    bounds = union_page_item_bounds(bounds, item_bounds);
+  }
+  bounds
+}
+
+fn locked_canvas_text_item_source_bounds(
+  text: &TextItem,
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32, f32, f32)> {
+  if text.text.trim().is_empty() || text.line_height_pt <= f32::EPSILON {
+    return None;
+  }
+
+  let fallback_width_pt = text_metrics.measure_text(&text.text, &text.style);
+  let hinted_extents = text_metrics.gdi_hinted_text_extents_pt(
+    &text.text,
+    &text.style,
+    WORD_LOCKED_CANVAS_TEXT_MEASURE_DPI,
+  );
+  let positioned_width_pt = hinted_extents
+    .map(|extents| extents.positioned_width_pt)
+    .unwrap_or(fallback_width_pt);
+  let unpositioned_width_pt = hinted_extents
+    .map(|extents| extents.unpositioned_width_pt)
+    .unwrap_or(fallback_width_pt);
+  if positioned_width_pt <= f32::EPSILON || unpositioned_width_pt <= f32::EPSILON {
+    return None;
+  }
+
+  // System.Windows.Forms TextRenderer uses DrawText's default
+  // GlyphOverhangPadding. dotnet/winforms TextExtensions computes its base
+  // overhang as Font.Height/6, rounds the left margin outward, and uses 3/2
+  // of that value for the right margin. Wine's GDI+ MeasureString likewise
+  // documents the em/6 compatibility margin. TextExtensions delegates the
+  // unpadded extent to GetTextExtentPoint32W. Controlled Windows 57--69pt
+  // Rockwell runs prove that API returns the sum of the individual hinted
+  // character widths even while GetKerningPairsW exposes active AT/NA pairs.
+  // DrawingML paint retains those pairs, so a centered GDI measurement frame
+  // is wider on both sides by half the unpositioned/positioned difference.
+  let text_measure_padding_pt = locked_canvas_text_measure_padding_pt(text.line_height_pt);
+  let text_measure_width_pt = unpositioned_width_pt + text_measure_padding_pt;
+  let far_edge_guard_pt =
+    WORD_LOCKED_CANVAS_TEXT_FAR_EDGE_GUARD_PX * units::POINTS_PER_INCH / WORD_LOCKED_CANVAS_DPI;
+  let (text_left, top, _, bottom) =
+    text_item_logical_bounds(text, text_measure_width_pt, text_metrics);
+  let (left, right) = locked_canvas_gdi_measurement_horizontal_bounds(
+    text_left,
+    positioned_width_pt,
+    unpositioned_width_pt,
+    text_measure_padding_pt,
+  );
+  let effect_source = common::drawingml_image_effects::EffectOutputBounds {
+    left_pt: left,
+    top_pt: top,
+    right_pt: right,
+    bottom_pt: bottom,
+  };
+  let output = text
+    .style
+    .drawingml_text_effects
+    .as_ref()
+    .and_then(|effects| {
+      let mut device_effects = effects.clone();
+      common::drawingml_image_effects::quantize_outer_shadow_geometry_for_raster(
+        &mut device_effects,
+        WORD_LOCKED_CANVAS_DPI,
+      );
+      common::drawingml_image_effects::container_output_bounds_with_anchor(
+        &device_effects,
+        effect_source,
+        effect_source,
+      )
+    })
+    .unwrap_or(effect_source);
+  let mut bounds = (
+    effect_source.left_pt.min(output.left_pt),
+    effect_source.top_pt.min(output.top_pt),
+    effect_source.right_pt.max(output.right_pt),
+    effect_source.bottom_pt.max(output.bottom_pt),
+  );
+  bounds.2 += far_edge_guard_pt;
+  if let Some((center_x, center_y)) = text.rotation_center_pt
+    && text.style.rotation_deg.abs() > f32::EPSILON
+  {
+    let rotated = rotate_frame_bounds(
+      FrameBounds {
+        x_pt: bounds.0,
+        y_pt: bounds.1,
+        width_pt: bounds.2 - bounds.0,
+        height_pt: bounds.3 - bounds.1,
+      },
+      center_x,
+      center_y,
+      text.style.rotation_deg,
+    );
+    bounds = (
+      rotated.x_pt,
+      rotated.y_pt,
+      rotated.x_pt + rotated.width_pt,
+      rotated.y_pt + rotated.height_pt,
+    );
+  }
+  Some(bounds)
+}
+
+fn locked_canvas_text_measure_padding_pt(line_height_pt: f32) -> f32 {
+  let font_height_px = (line_height_pt * WORD_LOCKED_CANVAS_TEXT_MEASURE_DPI
+    / units::POINTS_PER_INCH)
+    .round()
+    .max(1.0);
+  let overhang_px = font_height_px / 6.0;
+  let left_padding_px = overhang_px.ceil();
+  let right_padding_px = (overhang_px * 1.5).ceil();
+  (left_padding_px + right_padding_px) * units::POINTS_PER_INCH
+    / WORD_LOCKED_CANVAS_TEXT_MEASURE_DPI
+}
+
+fn locked_canvas_gdi_measurement_horizontal_bounds(
+  text_left_pt: f32,
+  positioned_width_pt: f32,
+  unpositioned_width_pt: f32,
+  padding_pt: f32,
+) -> (f32, f32) {
+  let center_shift_pt = (unpositioned_width_pt - positioned_width_pt) / 2.0;
+  (
+    text_left_pt - center_shift_pt,
+    text_left_pt + unpositioned_width_pt + padding_pt - center_shift_pt,
+  )
+}
+
 fn finish_docx_group_effects(
   items: &mut Vec<PageItem>,
   content_start: usize,
-  group: &InlineDrawingGroupEffect,
+  group: &InlineDrawingGroup,
   text_metrics: &mut TextMetrics,
 ) {
   if items.len() <= content_start {
@@ -4559,7 +5144,10 @@ fn finish_docx_group_effects(
     return;
   };
   let content_bounds = common_rect(left, top, right - left, bottom - top);
-  let mut effects = match &group.effects {
+  let Some(group_effects) = group.effects.as_ref() else {
+    return;
+  };
+  let mut effects = match group_effects {
     common::DrawingEffectSource::List {
       resolved: Some(value),
       ..
@@ -5061,6 +5649,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: item.metafile_background_color,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
@@ -8195,7 +8784,7 @@ fn materialize_wordprocessing_text_effects_in_items(
         right_pt: relative_right,
         bottom_pt: relative_bottom,
       };
-      if let Some(target) = wordprocessing_effect_bitmap_target(
+      if let Some(target) = common::drawingml_image_effects::effect_bitmap_target(
         output_bounds,
         working_bounds,
         raster.pixels_per_point,
@@ -8288,53 +8877,6 @@ fn encode_wordprocessing_effect_bitmap_png(image: &image::RgbaImage) -> Option<V
     )
     .ok()?;
   Some(png.into_inner())
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct WordprocessingEffectBitmapTarget {
-  left_px: u32,
-  top_px: u32,
-  width_px: u32,
-  height_px: u32,
-}
-
-fn wordprocessing_effect_bitmap_target(
-  output_bounds: common::drawingml_image_effects::EffectOutputBounds,
-  working_bounds: common::drawingml_image_effects::EffectOutputBounds,
-  pixels_per_point: f32,
-  working_width_px: u32,
-  working_height_px: u32,
-) -> Option<WordprocessingEffectBitmapTarget> {
-  if !pixels_per_point.is_finite()
-    || pixels_per_point <= 0.0
-    || working_width_px == 0
-    || working_height_px == 0
-  {
-    return None;
-  }
-
-  let output_width_px =
-    ((output_bounds.right_pt - output_bounds.left_pt) * pixels_per_point).max(0.0) as u32;
-  let output_height_px =
-    ((output_bounds.bottom_pt - output_bounds.top_pt) * pixels_per_point).max(0.0) as u32;
-  if output_width_px == 0 || output_height_px == 0 {
-    return None;
-  }
-
-  let left_px = ((output_bounds.left_pt - working_bounds.left_pt) * pixels_per_point)
-    .floor()
-    .clamp(0.0, working_width_px.saturating_sub(1) as f32) as u32;
-  let top_px = ((output_bounds.top_pt - working_bounds.top_pt) * pixels_per_point)
-    .floor()
-    .clamp(0.0, working_height_px.saturating_sub(1) as f32) as u32;
-  let width_px = output_width_px.min(working_width_px - left_px);
-  let height_px = output_height_px.min(working_height_px - top_px);
-  (width_px > 0 && height_px > 0).then_some(WordprocessingEffectBitmapTarget {
-    left_px,
-    top_px,
-    width_px,
-    height_px,
-  })
 }
 
 fn wordprocessing_text_effect_baseline_shift(
@@ -10199,6 +10741,25 @@ fn page_items_bounds(
   bounds
 }
 
+fn union_page_item_bounds(
+  first: Option<(f32, f32, f32, f32)>,
+  second: Option<(f32, f32, f32, f32)>,
+) -> Option<(f32, f32, f32, f32)> {
+  match (first, second) {
+    (
+      Some((left, top, right, bottom)),
+      Some((other_left, other_top, other_right, other_bottom)),
+    ) => Some((
+      left.min(other_left),
+      top.min(other_top),
+      right.max(other_right),
+      bottom.max(other_bottom),
+    )),
+    (Some(bounds), None) | (None, Some(bounds)) => Some(bounds),
+    (None, None) => None,
+  }
+}
+
 fn item_vertical_bounds(item: &PageItem) -> (f32, f32) {
   match item {
     PageItem::Text(text) => (text.y_pt, text.y_pt + text.line_height_pt),
@@ -11493,6 +12054,9 @@ fn estimated_paragraph_content_extents(
         x = 0.0;
       }
       InlineItem::PositionalTab(tab) => {
+        if tab.advance_left_pt.is_some() {
+          continue;
+        }
         let (base_left, base_right) = match tab.relative_to {
           PositionalTabBase::Margin => (-indent_left_pt, content_width + indent_right_pt),
           PositionalTabBase::Indent => (
@@ -14419,9 +14983,24 @@ fn repeating_slot_blocks_for_page<'a>(
 ) -> (&'a [Block], &'a [Block]) {
   let first_page_in_section = page.section_page_index == 0;
   let section = document.sections.get(page.section_index);
-  let title_page = section
+  let section_title_page = section
     .map(|section| section.title_page)
     .unwrap_or(document.title_page);
+  // A continuous section can reuse the document's first physical page while
+  // replacing `Page.section_index`. The page is still governed by the first
+  // section's title-page header/footer choice. This is the Word behavior
+  // exercised by a paragraph-level sectPr followed by a continuous sectPr
+  // (and is also why the first-page slot must not be selected from the later
+  // section alone).
+  let title_page = if page_number == 1 && page.section_index > 0 {
+    document
+      .sections
+      .first()
+      .map(|section| section.title_page)
+      .unwrap_or(document.title_page)
+  } else {
+    section_title_page
+  };
   let (default_header, default_footer, first_header, first_footer, even_header, even_footer) =
     section
       .map(|section| {
@@ -15608,6 +16187,7 @@ fn resolve_dynamic_field_text(
       from_bottom,
       numbering_only,
       suppress_non_numerical,
+      full_context,
     }) => {
       if let Some(value) = resolve_style_ref(
         context.style_ref_candidates,
@@ -15619,6 +16199,7 @@ fn resolve_dynamic_field_text(
           from_bottom: *from_bottom,
           numbering_only: *numbering_only,
           suppress_non_numerical: *suppress_non_numerical,
+          full_context: *full_context,
           ui_language: context.ui_language,
         },
       ) {
@@ -15934,6 +16515,7 @@ struct StyleRefCandidate {
   keys: Vec<Arc<str>>,
   text: Arc<str>,
   numbering_text: Option<Arc<str>>,
+  full_numbering_text: Option<Arc<str>>,
 }
 
 fn style_ref_candidates_by_page(pages: &[Page]) -> Vec<Vec<StyleRefCandidate>> {
@@ -15951,11 +16533,23 @@ fn style_ref_candidates_by_page(pages: &[Page]) -> Vec<Vec<StyleRefCandidate>> {
         let Some(style_ref_text) = &text.style_ref_text else {
           continue;
         };
+        let full_numbering_text = page.items.iter().find_map(|item| {
+          let PageItem::Text(numbering) = item else {
+            return None;
+          };
+          (f32::abs(numbering.y_pt - text.y_pt) < 0.01
+            && numbering.style_ref_keys.is_empty()
+            && numbering.dynamic_field.is_none()
+            && numbering.style_ref_numbering_text.as_deref() == Some(numbering.text.as_str())
+            && numbering.text != text.text)
+            .then(|| Arc::<str>::from(numbering.text.as_str()))
+        });
         if candidates.iter().any(|candidate: &StyleRefCandidate| {
           f32::abs(candidate.y_pt - text.y_pt) < 0.01
             && candidate.keys == text.style_ref_keys
             && candidate.text == *style_ref_text
             && candidate.numbering_text.as_deref() == text.style_ref_numbering_text.as_deref()
+            && candidate.full_numbering_text == full_numbering_text
         }) {
           continue;
         }
@@ -15964,6 +16558,7 @@ fn style_ref_candidates_by_page(pages: &[Page]) -> Vec<Vec<StyleRefCandidate>> {
           keys: text.style_ref_keys.clone(),
           text: style_ref_text.clone(),
           numbering_text: text.style_ref_numbering_text.clone(),
+          full_numbering_text,
         });
       }
       candidates.sort_by(|a, b| a.y_pt.total_cmp(&b.y_pt));
@@ -15980,6 +16575,7 @@ struct StyleRefRequest<'a> {
   from_bottom: bool,
   numbering_only: bool,
   suppress_non_numerical: bool,
+  full_context: bool,
   ui_language: Option<&'a str>,
 }
 
@@ -16060,13 +16656,21 @@ fn resolve_style_ref_from_candidates<'a>(
     })
     .map(|candidate| {
       if request.numbering_only {
-        let numbering = candidate
-          .numbering_text
-          .as_deref()
-          .unwrap_or_default()
-          .to_string();
+        let numbering = if request.full_context && !request.suppress_non_numerical {
+          candidate
+            .full_numbering_text
+            .as_ref()
+            .or(candidate.numbering_text.as_ref())
+        } else {
+          candidate.numbering_text.as_ref()
+        }
+        .map_or_else(String::new, |value| value.to_string());
         if request.suppress_non_numerical {
-          numbering
+          candidate
+            .numbering_text
+            .as_deref()
+            .unwrap_or_default()
+            .to_string()
         } else {
           numbering
             .trim_end_matches(style_ref_numbering_edge_delimiter)
@@ -22771,6 +23375,7 @@ fn paragraph_content_width_range(
         minimum = minimum.max(width);
       }
       InlineItem::NoteReferenceMark(_) => {}
+      InlineItem::PositionalTab(tab) if tab.advance_left_pt.is_some() => {}
       InlineItem::PositionalTab(_) => {
         current_line += DEFAULT_TAB_STOP_PT;
         minimum = minimum.max(DEFAULT_TAB_STOP_PT);
@@ -29689,6 +30294,7 @@ impl<'a> TextFrameLayout<'a> {
     let mut pending_text_page_break = false;
     let mut ended_with_explicit_page_break = leading_break_was_page;
     let mut pending_tab: Option<PendingAlignedTab> = None;
+    let mut pending_advance_logical_x: Option<f32> = None;
     let mut text_state = TextFrameState::new();
     if first_inline_index != 0 {
       text_state.set_position(InlineCursor::after_inline(first_inline_index - 1));
@@ -29840,7 +30446,13 @@ impl<'a> TextFrameLayout<'a> {
         default_line_left
       } else {
         numbering_label_origin_pt(
-          first_line_left,
+          numbering_label_anchor_pt(
+            first_line_left,
+            default_line_left,
+            default_line_right,
+            paragraph.format.list_label_justification,
+            paragraph.format.bidi,
+          ),
           label_width,
           paragraph.format.list_label_justification,
           paragraph.format.bidi,
@@ -29902,6 +30514,15 @@ impl<'a> TextFrameLayout<'a> {
         if let Some(tab_stop_pt) = paragraph.list_label_tab_stop_pt {
           x = x.max(flow.content_left_pt + tab_stop_pt);
         }
+      } else if numbering_label_uses_rtl_leading_edge(
+        paragraph.format.list_label_justification,
+        paragraph.format.bidi,
+      ) {
+        // The label is on the RTL leading edge, outside the body line. Its
+        // authored tab/follow belongs to the body edge; applying the LTR
+        // overflow-from-label-end rule would start a second line before the
+        // paragraph text (Office's RTL bullet control).
+        x = default_line_left;
       } else {
         let label_end = label_x + label_width;
         let label_overflows_reserved_hanging_space = label_end > default_line_left;
@@ -29968,7 +30589,13 @@ impl<'a> TextFrameLayout<'a> {
       let image_count = label_image.replacement_text.chars().count();
       let label_width = metrics.frame_width_pt * image_count as f32;
       let label_x = numbering_label_origin_pt(
-        first_line_left,
+        numbering_label_anchor_pt(
+          first_line_left,
+          default_line_left,
+          default_line_right,
+          paragraph.format.list_label_justification,
+          paragraph.format.bidi,
+        ),
         label_width,
         paragraph.format.list_label_justification,
         paragraph.format.bidi,
@@ -30060,7 +30687,7 @@ impl<'a> TextFrameLayout<'a> {
     let mut line_has_form_widget = false;
     let mut line_ended_with_discretionary_hyphen = false;
     let mut tab_over_margin_active = false;
-    let mut drawing_group_effects = Vec::<(usize, InlineDrawingGroupEffect)>::new();
+    let mut drawing_group_effects = Vec::<(usize, InlineDrawingGroup)>::new();
     let mut track_bottom_hyphenation_slots = Vec::<HyphenationBottomSlot>::new();
     let mut auto_script_spacing = AutoScriptSpacingState::default();
     let mut reflow_first_line_for_inline_object = false;
@@ -30083,8 +30710,14 @@ impl<'a> TextFrameLayout<'a> {
         InlineItem::DrawingGroupEnd => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           if let Some((content_start, group)) = drawing_group_effects.pop() {
-            let content_bounds = page_items_bounds(&current.items[content_start..], text_metrics);
+            finish_docx_locked_canvas_viewport(
+              &mut current.items,
+              content_start,
+              &group,
+              text_metrics,
+            );
             finish_docx_group_effects(&mut current.items, content_start, &group, text_metrics);
+            let content_bounds = page_items_bounds(&current.items[content_start..], text_metrics);
             let group_item_end = current.items.len();
             let (group_item_start, group_item_end) = match group.placement {
               crate::docx::ImagePlacement::Floating(placement)
@@ -30225,10 +30858,24 @@ impl<'a> TextFrameLayout<'a> {
             default_line_right = text_frame.default_line_right;
             paragraph_left = text_frame.paragraph_left;
             base_line_height = text_frame.base_line_height;
-            x = line_left;
+            x = if inline_index == 0 {
+              text_frame.first_line_left
+            } else {
+              line_left
+            };
             line_item_start_index = current.items.len();
             line_has_form_widget = false;
             pending_text_page_break = false;
+          }
+          if let Some(distance_pt) = tab.advance_left_pt {
+            // Word ADVANCE \l is a zero-width cursor move. It must not set
+            // tab state or emit a tab glyph; the next authored inline owns the
+            // moved position (WordOK.docx).
+            pending_tab = None;
+            text_state.set_position(InlineCursor::after_inline(inline_index));
+            x -= distance_pt;
+            pending_advance_logical_x = Some(x);
+            continue;
           }
           apply_pending_aligned_tab(
             current,
@@ -30648,6 +31295,7 @@ impl<'a> TextFrameLayout<'a> {
             line_used_punctuation_fit = false;
             line_has_tab = false;
           }
+          let advance_logical_x = pending_advance_logical_x.take();
           let mut chunk = String::new();
           let mut chunk_x = x;
           let meta = text_chunk_meta(
@@ -31920,6 +32568,12 @@ impl<'a> TextFrameLayout<'a> {
               line_left,
               line_right,
             );
+          }
+          if let Some(logical_x) = advance_logical_x {
+            // The control shifts the next authored text portion only. Keep
+            // the logical cursor at the post-text position so a following
+            // ordinary tab does not inherit the temporary visual offset.
+            x = logical_x;
           }
         }
         InlineItem::FormWidgetStart(widget_id) => {
@@ -34272,10 +34926,24 @@ impl<'a> TextFrameLayout<'a> {
             text_metrics,
             &mut wrap_exclusions,
           );
+          if inline_index == 0 && flow.compatibility_mode < 15 {
+            // Word 2010 applies a paragraph's before-spacing once after a
+            // leading column break when no visible run preceded the break.
+            // LibreOffice's tdf153964_topMarginAfterBreak14 and the paired
+            // first-indent control expose this compat14-only ownership; a
+            // break after visible text must not apply the spacing again.
+            y += paragraph.format.spacing_before_pt;
+            (line_left, line_right) =
+              self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+          }
           default_line_right = text_frame.default_line_right;
           paragraph_left = text_frame.paragraph_left;
           base_line_height = text_frame.base_line_height;
-          x = line_left;
+          x = if inline_index == 0 {
+            text_frame.first_line_left
+          } else {
+            line_left
+          };
           line_item_start_index = current.items.len();
           line_has_form_widget = false;
           emitted = column_emitted;
@@ -34753,6 +35421,12 @@ impl<'a> TextFrameLayout<'a> {
     let alignment_start_item_index =
       text_state.current_page_item_start(start_item_index, start_pages_len, pages.len());
     if alignment_start_item_index <= current.items.len() {
+      let rtl_leading_numbering_labels = numbering_label_uses_rtl_leading_edge(
+        paragraph.format.list_label_justification,
+        paragraph.format.bidi,
+      )
+      .then(|| take_rtl_leading_numbering_labels(&mut current.items, alignment_start_item_index))
+      .unwrap_or_default();
       trim_word_compatible_trailing_blanks(
         &mut current.items[alignment_start_item_index..],
         paragraph,
@@ -34772,6 +35446,7 @@ impl<'a> TextFrameLayout<'a> {
         text_metrics,
         default_line_right,
       );
+      current.items.extend(rtl_leading_numbering_labels);
     }
     if start_item_index <= current.items.len() {
       let decoration_baseline_offset_pt =
@@ -36639,6 +37314,14 @@ fn trim_word_compatible_trailing_blanks(
       let PageItem::Text(text) = &mut items[index] else {
         unreachable!("line was restricted to text items")
       };
+      if text.style.wordprocessingml_address_block_placeholder
+        && text.text.chars().last().is_some_and(char::is_whitespace)
+      {
+        // Word's ADDRESSBLOCK placeholder carries one fixed-output trailing
+        // blank (tdf129520/tdf134264). Keep its advance while leaving the
+        // visible normalized text unchanged.
+        break;
+      }
       let visible_len = text.text.trim_end_matches(char::is_whitespace).len();
       text.text.truncate(visible_len);
       if !text.text.is_empty() {
@@ -39058,6 +39741,10 @@ fn push_table_border_line(
   y2: f32,
   border: BorderStyle,
 ) {
+  if !border.compound && border.dash_pattern == BorderDashPattern::FineDashed {
+    push_word_table_fine_dashed_border(page, x1, y1, x2, y2, border);
+    return;
+  }
   if !border.compound && border.dash_pattern == BorderDashPattern::Solid {
     // Word's fixed-format writer emits every simple solid table rule as a
     // device-grid fill rectangle, not a centerline stroke. Writer likewise
@@ -39095,6 +39782,290 @@ fn push_table_border_line(
     return;
   }
   push_styled_line(page, x1, y1, x2, y2, border);
+}
+
+#[derive(Clone, Copy, Debug)]
+struct WordTableFineDashPattern {
+  thickness_pt: f32,
+  period_pt: f32,
+  sample_extent_pt: f32,
+  sample_count: u32,
+  on_sample_count: u32,
+  cross_sample_count: u32,
+}
+
+fn word_table_fine_dash_sample_counts(period_pt: f32) -> (u32, u32) {
+  let sample_count = ((period_pt * units::OFFICE_FIXED_OUTPUT_RASTER_DPI / units::POINTS_PER_INCH
+    + 0.000_1)
+    .floor() as u32)
+    .max(1);
+  let on_sample_count = ((sample_count * 4 + 2) / 5).clamp(1, sample_count);
+  (sample_count, on_sample_count)
+}
+
+fn word_table_fine_dash_pattern(width_pt: f32) -> WordTableFineDashPattern {
+  // [MS-DOC] BrcType 0x16 defines dashSmallGap as the small-gap dashed
+  // border. Word's fixed-format table painter realizes that logical 4:1
+  // pattern on its bitmap device instead of serializing a PDF stroke. Exact
+  // Print-profile Office controls at 0.25/0.5/0.75/1.0 pt produce periods of
+  // 3/6/10/13 samples at the shared 200-DPI fixed-output raster rate. The
+  // cross-axis thickness is independently rounded to the 600-DPI print grid.
+  // This is the same device-space contract documented for Win32 cosmetic
+  // pens; Wine's DIB pen path likewise advances and clips the dash one device
+  // sample at a time.
+  let printer_dot_pt = units::POINTS_PER_INCH / WORD_FIXED_OUTPUT_DPI;
+  let thickness_pt = units::quantize_points_to_office_print_grid(width_pt).max(printer_dot_pt);
+  let period_pt = thickness_pt * 5.0;
+  let (sample_count, on_sample_count) = word_table_fine_dash_sample_counts(period_pt);
+  let sample_extent_pt = period_pt / sample_count as f32;
+  let cross_sample_count =
+    ((thickness_pt * units::OFFICE_FIXED_OUTPUT_RASTER_DPI / units::POINTS_PER_INCH + 0.000_1)
+      .floor() as u32)
+      .max(1);
+  WordTableFineDashPattern {
+    thickness_pt,
+    period_pt,
+    sample_extent_pt,
+    sample_count,
+    on_sample_count,
+    cross_sample_count,
+  }
+}
+
+fn encode_word_table_border_bitmap(
+  width_px: u32,
+  height_px: u32,
+  color: RgbColor,
+  mut alpha: impl FnMut(u32, u32) -> u8,
+) -> Option<Bytes> {
+  let mut rgba = Vec::with_capacity(width_px as usize * height_px as usize * 4);
+  for y in 0..height_px {
+    for x in 0..width_px {
+      rgba.extend_from_slice(&[color.r, color.g, color.b, alpha(x, y)]);
+    }
+  }
+  let mut png = Cursor::new(Vec::new());
+  PngEncoder::new(&mut png)
+    .write_image(&rgba, width_px, height_px, ColorType::Rgba8.into())
+    .ok()?;
+  Some(Bytes::from(png.into_inner()))
+}
+
+fn word_table_fine_dash_phase(tile_start_pt: f32, pattern: WordTableFineDashPattern) -> u32 {
+  ((f64::from(tile_start_pt) / f64::from(pattern.sample_extent_pt)).floor() as i64)
+    .rem_euclid(i64::from(pattern.sample_count)) as u32
+}
+
+fn word_table_fine_dash_bitmap(
+  pattern: WordTableFineDashPattern,
+  phase: u32,
+  axis_sample_count: u32,
+  horizontal: bool,
+  color: RgbColor,
+) -> Option<Bytes> {
+  let axis_sample_count = axis_sample_count.clamp(1, pattern.sample_count);
+  let (width_px, height_px) = if horizontal {
+    (axis_sample_count, pattern.cross_sample_count)
+  } else {
+    (pattern.cross_sample_count, axis_sample_count)
+  };
+  encode_word_table_border_bitmap(width_px, height_px, color, |x, y| {
+    let axis_sample = if horizontal { x } else { y };
+    let style_sample = (phase + axis_sample) % pattern.sample_count;
+    if style_sample < pattern.on_sample_count {
+      u8::MAX
+    } else {
+      0
+    }
+  })
+}
+
+fn push_word_table_border_bitmap(
+  page: &mut Page,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  data: Bytes,
+) {
+  if width_pt <= f32::EPSILON || height_pt <= f32::EPSILON {
+    return;
+  }
+  page.items.push(PageItem::Image(ImageItem {
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    inline_frame_left_gap_pt: 0.0,
+    inline_frame_right_gap_pt: 0.0,
+    inline_baseline_gap_pt: 0.0,
+    inline_baseline_participant: false,
+    paragraph_alignment_locked: false,
+    crop: ImageCrop::default(),
+    clip_path: Vec::new(),
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
+    data,
+    content_type: Some("image/png".to_string()),
+    metafile_background_color: None,
+    alt_text: None,
+    hyperlink_url: None,
+    semantic_metafile_text: false,
+    metafile_semantic_text_includes_raster_backdrop: false,
+    signature_line: None,
+    metafile_native_size: false,
+    floating: false,
+    behind_text: false,
+  }));
+}
+
+fn push_word_table_border_axis_bitmap(
+  page: &mut Page,
+  horizontal: bool,
+  axis_start_pt: f32,
+  cross_start_pt: f32,
+  axis_extent_pt: f32,
+  cross_extent_pt: f32,
+  data: Bytes,
+) {
+  if horizontal {
+    push_word_table_border_bitmap(
+      page,
+      axis_start_pt,
+      cross_start_pt,
+      axis_extent_pt,
+      cross_extent_pt,
+      data,
+    );
+  } else {
+    push_word_table_border_bitmap(
+      page,
+      cross_start_pt,
+      axis_start_pt,
+      cross_extent_pt,
+      axis_extent_pt,
+      data,
+    );
+  }
+}
+
+fn push_word_table_fine_dashed_border(
+  page: &mut Page,
+  x1: f32,
+  y1: f32,
+  x2: f32,
+  y2: f32,
+  border: BorderStyle,
+) {
+  let pattern = word_table_fine_dash_pattern(border.width_pt);
+  let horizontal = (y2 - y1).abs() <= (x2 - x1).abs();
+  let (axis_start_pt, axis_end_pt, cross_center_pt) = if horizontal {
+    (x1.min(x2), x1.max(x2), (y1 + y2) / 2.0)
+  } else {
+    (y1.min(y2), y1.max(y2), (x1 + x2) / 2.0)
+  };
+  if axis_end_pt - axis_start_pt <= f32::EPSILON {
+    return;
+  }
+
+  // Office writes a solid bitmap sample at each table-border junction, then
+  // repeats non-interpolated RGBA tiles between the two junctions. The
+  // intrinsic cross-axis bitmap size follows the 200-DPI sample allocation,
+  // while its displayed thickness retains the independently quantized
+  // 600-DPI printer extent.
+  let Some(corner) = encode_word_table_border_bitmap(
+    pattern.cross_sample_count,
+    pattern.cross_sample_count,
+    border.color,
+    |_, _| u8::MAX,
+  ) else {
+    return;
+  };
+  let half_thickness_pt = pattern.thickness_pt / 2.0;
+  let cross_start_pt = cross_center_pt - half_thickness_pt;
+  push_word_table_border_axis_bitmap(
+    page,
+    horizontal,
+    axis_start_pt - half_thickness_pt,
+    cross_start_pt,
+    pattern.thickness_pt,
+    pattern.thickness_pt,
+    corner.clone(),
+  );
+  push_word_table_border_axis_bitmap(
+    page,
+    horizontal,
+    axis_end_pt - half_thickness_pt,
+    cross_start_pt,
+    pattern.thickness_pt,
+    pattern.thickness_pt,
+    corner,
+  );
+
+  let tile_start_pt = axis_start_pt + half_thickness_pt;
+  let tile_end_pt = axis_end_pt - half_thickness_pt;
+  if tile_end_pt - tile_start_pt <= f32::EPSILON {
+    return;
+  }
+
+  // Win32 defines cosmetic-pen styles in device units. ReactOS's EngLineTo
+  // independently derives the style offset from the destination-surface
+  // translation and advances the style index per pixel; Wine's DIB path does
+  // the same. Office's 0.4-pt position/width sweeps expose that page-anchored
+  // phase directly: floor(tile_start/sample_extent) modulo the tile length.
+  let phase = word_table_fine_dash_phase(tile_start_pt, pattern);
+  let Some(full_tile) = word_table_fine_dash_bitmap(
+    pattern,
+    phase,
+    pattern.sample_count,
+    horizontal,
+    border.color,
+  ) else {
+    return;
+  };
+  let mut next_tile_start_pt = tile_start_pt;
+  while next_tile_start_pt + pattern.period_pt <= tile_end_pt + 0.000_1 {
+    push_word_table_border_axis_bitmap(
+      page,
+      horizontal,
+      next_tile_start_pt,
+      cross_start_pt,
+      pattern.period_pt,
+      pattern.thickness_pt,
+      full_tile.clone(),
+    );
+    next_tile_start_pt += pattern.period_pt;
+  }
+
+  let remainder_pt = tile_end_pt - next_tile_start_pt;
+  if remainder_pt <= f32::EPSILON {
+    return;
+  }
+  // Controlled column-width interpolation produces 1/2/5-sample final
+  // tiles at 0.24/0.72/1.92-pt residual extents. Nearest-sample allocation
+  // explains all controls, including the less-than-one-sample 0.24-pt tail;
+  // the final bitmap is then stretched to the exact residual extent.
+  let trailing_sample_count = ((remainder_pt / pattern.sample_extent_pt + 0.5 + 0.000_1).floor()
+    as u32)
+    .clamp(1, pattern.sample_count);
+  if let Some(trailing_tile) = word_table_fine_dash_bitmap(
+    pattern,
+    phase,
+    trailing_sample_count,
+    horizontal,
+    border.color,
+  ) {
+    push_word_table_border_axis_bitmap(
+      page,
+      horizontal,
+      next_tile_start_pt,
+      cross_start_pt,
+      remainder_pt,
+      pattern.thickness_pt,
+      trailing_tile,
+    );
+  }
 }
 
 fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border: BorderStyle) {
@@ -39174,6 +40145,16 @@ fn push_line_item(
 #[cfg(test)]
 mod tests {
   use super::*;
+  use ooxmlsdk::units::CoordinateValue;
+
+  #[test]
+  fn vertical_frame_single_line_height_uses_word_basis_and_windows_floor() {
+    assert_eq!(
+      word_vertical_frame_single_line_height(11.0, 13.427_734),
+      13.75
+    );
+    assert_eq!(word_vertical_frame_single_line_height(11.0, 14.3), 14.3);
+  }
 
   #[test]
   fn positive_relative_shape_size_owns_the_outer_effect_frame() {
@@ -40489,12 +41470,14 @@ mod tests {
         keys: vec![standard_key.clone(), custom_key.clone()],
         text: Arc::<str>::from("first"),
         numbering_text: Some(Arc::<str>::from("1")),
+        full_numbering_text: None,
       },
       StyleRefCandidate {
         y_pt: 200.0,
         keys: vec![standard_key, custom_key],
         text: Arc::<str>::from("second"),
         numbering_text: Some(Arc::<str>::from("2.")),
+        full_numbering_text: None,
       },
     ]];
 
@@ -40509,6 +41492,7 @@ mod tests {
           from_bottom: false,
           numbering_only: false,
           suppress_non_numerical: false,
+          full_context: false,
           ui_language: Some("zh-CN"),
         },
       ),
@@ -40525,6 +41509,7 @@ mod tests {
           from_bottom: false,
           numbering_only: false,
           suppress_non_numerical: false,
+          full_context: false,
           ui_language: Some("zh-CN"),
         },
       ),
@@ -40541,6 +41526,7 @@ mod tests {
           from_bottom: false,
           numbering_only: false,
           suppress_non_numerical: false,
+          full_context: false,
           ui_language: Some("zh-CN"),
         },
       ),
@@ -40557,6 +41543,7 @@ mod tests {
           from_bottom: false,
           numbering_only: true,
           suppress_non_numerical: false,
+          full_context: false,
           ui_language: Some("zh-CN"),
         },
       ),
@@ -40613,6 +41600,7 @@ mod tests {
           from_bottom: false,
           numbering_only: false,
           suppress_non_numerical: false,
+          full_context: false,
           ui_language: None,
         },
       ),
@@ -41075,7 +42063,8 @@ mod tests {
         < 0.001
     );
     assert!(
-      (target.model_surface.width_px - content_bounds.size.width.0 * expected_scale_x).abs() < 0.001
+      (target.model_surface.width_px - content_bounds.size.width.0 * expected_scale_x).abs()
+        < 0.001
     );
     assert!(
       (target.model_surface.height_px - content_bounds.size.height.0 * expected_scale_y).abs()
@@ -41091,6 +42080,97 @@ mod tests {
     assert!((source_top - 1.0).abs() < 0.001);
     assert!((source_right - 46.0).abs() < 0.001);
     assert!((source_bottom - 25.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn word_screen_static_3d_exports_the_projected_side_view_not_the_working_surface() {
+    let content_bounds = common_rect(234.0, 144.0, 34.5, 36.0);
+    let working_raster_bounds = common_rect(233.64, 143.64, 34.5, 36.0);
+    let mut scene = a::Scene3DType::default();
+    scene.camera = Box::new(a::Camera {
+      preset: a::PresetCameraValues::OrthographicFront,
+      rotation: Some(a::Rotation {
+        latitude: 0,
+        longitude: 16_200_000,
+        revolution: 0,
+      }),
+      ..a::Camera::default()
+    });
+    let shape = a::Shape3DType {
+      extrusion_height: Some(CoordinateValue::Emu(152_400)),
+      bevel_top: Some(a::BevelTop {
+        width: Some(CoordinateValue::Emu(0)),
+        height: Some(CoordinateValue::Emu(25_400)),
+        preset: Some(a::BevelPresetValues::Angle),
+      }),
+      bevel_bottom: Some(a::BevelBottom {
+        width: Some(CoordinateValue::Emu(0)),
+        height: Some(CoordinateValue::Emu(25_400)),
+        preset: Some(a::BevelPresetValues::Angle),
+      }),
+      ..a::Shape3DType::default()
+    };
+    let target = wordprocessing_screen_static_3d_output_target(
+      content_bounds,
+      working_raster_bounds,
+      96.0 / units::POINTS_PER_INCH,
+      common::drawingml_3d::camera_projection(&scene, 0.0),
+      &shape,
+      46,
+      48,
+    )
+    .expect("positive projected side-view target");
+
+    // Office Screen emits a 22x48 XObject at this independently quantized
+    // 600-DPI rectangle. The full 46x48 bitmap remains only the input to the
+    // 3-D stage; its first pixel is the transparent leading guard.
+    assert_eq!(
+      (
+        target.left_px,
+        target.top_px,
+        target.width_px,
+        target.height_px
+      ),
+      (1, 0, 22, 48)
+    );
+    assert!((target.display_bounds.origin.x.0 - 234.96).abs() < 0.001);
+    assert!((target.display_bounds.origin.y.0 - 143.76).abs() < 0.001);
+    assert!((target.display_bounds.size.width.0 - 16.56).abs() < 0.001);
+    assert!((target.display_bounds.size.height.0 - 36.48).abs() < 0.001);
+    assert!((target.viewport_translation_px.0 + 2.0 / 3.0).abs() < 0.001);
+    assert!(target.viewport_translation_px.1.abs() < 0.001);
+    assert_eq!(target.silhouette_translation_px, (0.5, 0.0));
+
+    let flat_shape = a::Shape3DType {
+      extrusion_height: Some(CoordinateValue::Emu(152_400)),
+      ..a::Shape3DType::default()
+    };
+    let flat_target = wordprocessing_screen_static_3d_output_target(
+      content_bounds,
+      working_raster_bounds,
+      96.0 / units::POINTS_PER_INCH,
+      common::drawingml_3d::camera_projection(&scene, 0.0),
+      &flat_shape,
+      46,
+      48,
+    )
+    .expect("positive flat side-view target");
+
+    // The otherwise identical no-bevel control starts exactly seven device
+    // pixels into the working surface. Its integer crop still addresses the
+    // center of that first retained pixel.
+    assert_eq!(
+      (
+        flat_target.left_px,
+        flat_target.top_px,
+        flat_target.width_px,
+        flat_target.height_px,
+      ),
+      (7, 0, 16, 48)
+    );
+    assert!(flat_target.viewport_translation_px.0.abs() < 0.001);
+    assert!(flat_target.viewport_translation_px.1.abs() < 0.001);
+    assert_eq!(flat_target.silhouette_translation_px, (0.5, 0.0));
   }
 
   #[test]
@@ -41195,7 +42275,7 @@ mod tests {
 
   #[test]
   fn word_text_effect_target_keeps_exact_origin_and_truncates_pixel_extent() {
-    let target = wordprocessing_effect_bitmap_target(
+    let target = common::drawingml_image_effects::effect_bitmap_target(
       common::drawingml_image_effects::EffectOutputBounds {
         left_pt: -1.3,
         top_pt: 2.2,
@@ -41220,13 +42300,32 @@ mod tests {
     // start therefore must not turn into an independently ceiled far edge.
     assert_eq!(
       target,
-      WordprocessingEffectBitmapTarget {
+      common::drawingml_image_effects::EffectBitmapTarget {
         left_px: 12,
         top_px: 12,
         width_px: 77,
         height_px: 35,
       }
     );
+  }
+
+  #[test]
+  fn locked_canvas_text_measure_uses_gdi_overhang_padding() {
+    // The fdo76249 66pt Rockwell control has a 103px screen font height.
+    // TextRenderer therefore contributes ceil(103/6) + ceil(103/4) = 44px,
+    // independently matching the 33pt Office MeasureText/default-format
+    // excess over its no-padding GDI extent.
+    let padding_pt = locked_canvas_text_measure_padding_pt(77.504_875);
+    assert!((padding_pt - 33.0).abs() < 0.0001);
+
+    // GetTextExtentPoint32W measures the unpositioned 418px run while
+    // DrawingML paints the same centered run at its 412px kerned extent.
+    // The measurement frame therefore gains three 96-DPI pixels on each
+    // side, instead of fitting the fixture with a far-edge-only constant.
+    let (left_pt, right_pt) =
+      locked_canvas_gdi_measurement_horizontal_bounds(100.0, 309.0, 313.5, padding_pt);
+    assert!((left_pt - 97.75).abs() < 0.0001);
+    assert!((right_pt - 444.25).abs() < 0.0001);
   }
 
   #[test]
@@ -44465,6 +45564,76 @@ mod tests {
   }
 
   #[test]
+  fn fine_dashed_table_border_samples_scale_across_word_widths() {
+    for (width_pt, thickness_pt, sample_count, on_sample_count, period_pt) in [
+      (0.25, 0.24, 3, 2, 1.2),
+      (0.5, 0.48, 6, 5, 2.4),
+      (0.75, 0.72, 10, 8, 3.6),
+      (1.0, 0.96, 13, 10, 4.8),
+    ] {
+      let pattern = word_table_fine_dash_pattern(width_pt);
+      assert!((pattern.thickness_pt - thickness_pt).abs() < 0.000_1);
+      assert_eq!(pattern.sample_count, sample_count);
+      assert_eq!(pattern.on_sample_count, on_sample_count);
+      assert!((pattern.period_pt - period_pt).abs() < 0.000_1);
+    }
+  }
+
+  #[test]
+  fn fine_dashed_table_border_materializes_page_anchored_bitmap_tiles() {
+    let mut page = empty_page(PageSetup::default(), 0);
+    push_table_border_line(
+      &mut page,
+      66.6,
+      72.25,
+      69.6,
+      72.25,
+      BorderStyle {
+        width_pt: 0.5,
+        dash_pattern: BorderDashPattern::FineDashed,
+        ..BorderStyle::default()
+      },
+    );
+
+    let images = page
+      .items
+      .iter()
+      .map(|item| match item {
+        PageItem::Image(image) => image,
+        item => panic!("expected materialized fine-dash bitmap, got {item:?}"),
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(images.len(), 4);
+    assert!((images[0].x_pt - 66.36).abs() < 0.000_1);
+    assert!((images[1].x_pt - 69.36).abs() < 0.000_1);
+    assert!((images[2].x_pt - 66.84).abs() < 0.000_1);
+    assert!((images[2].width_pt - 2.4).abs() < 0.000_1);
+    assert!((images[3].x_pt - 69.24).abs() < 0.000_1);
+    assert!((images[3].width_pt - 0.12).abs() < 0.000_1);
+    for image in &images {
+      assert!((image.y_pt - 72.01).abs() < 0.000_1);
+      assert!((image.height_pt - 0.48).abs() < 0.000_1);
+    }
+
+    let full_tile = image::load_from_memory(&images[2].data)
+      .expect("fine-dash PNG should decode")
+      .to_rgba8();
+    assert_eq!(full_tile.dimensions(), (6, 1));
+    assert_eq!(
+      full_tile
+        .pixels()
+        .map(|pixel| pixel.0[3])
+        .collect::<Vec<_>>(),
+      [0, 255, 255, 255, 255, 255]
+    );
+    let trailing_tile = image::load_from_memory(&images[3].data)
+      .expect("trailing fine-dash PNG should decode")
+      .to_rgba8();
+    assert_eq!(trailing_tile.dimensions(), (1, 1));
+    assert_eq!(trailing_tile.get_pixel(0, 0).0[3], 0);
+  }
+
+  #[test]
   fn compound_vertical_border_paints_two_parallel_strokes() {
     let mut page = empty_page(PageSetup::default(), 0);
     push_styled_line(
@@ -45326,6 +46495,20 @@ mod tests {
       numbering_label_origin_pt(90.0, 5.3, w::LevelJustificationValues::End, true),
       90.0
     );
+  }
+
+  #[test]
+  fn rtl_start_numbering_anchor_mirrors_the_hanging_indent() {
+    let anchor =
+      numbering_label_anchor_pt(15.3, 72.0, 177.5, w::LevelJustificationValues::Start, true);
+    assert!((anchor - 234.2).abs() < 0.001);
+    assert_eq!(
+      numbering_label_anchor_pt(72.0, 72.0, 177.5, w::LevelJustificationValues::Start, false,),
+      72.0
+    );
+    let left_origin =
+      numbering_label_origin_pt(234.2, 8.24, w::LevelJustificationValues::Left, true);
+    assert!((left_origin - 225.96).abs() < 0.001);
   }
 
   #[test]
@@ -46825,6 +48008,7 @@ mod tests {
         relative_to: PositionalTabBase::Margin,
         leader: TabLeader::None,
         style: TextStyle::default(),
+        advance_left_pt: None,
       })
     };
     let image_width_pt = 85.25;

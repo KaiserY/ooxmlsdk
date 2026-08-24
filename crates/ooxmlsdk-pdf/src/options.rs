@@ -331,8 +331,23 @@ impl PdfOptions {
         PdfOptimizeFor::Print => 200,
         PdfOptimizeFor::Screen => 96,
       }),
+      fixed_output_forbids_transparency: self.fixed_output_forbids_transparency(),
       ..Default::default()
     }
+  }
+
+  fn fixed_output_forbids_transparency(&self) -> bool {
+    let office_fixed_output = matches!(
+      self.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(_)
+    );
+    // The public A2/A3/A4 profiles retain their own transparency semantics.
+    // Office's fixed-output reference adapter is different: Word and
+    // PowerPoint expose only UseISO19005_1, so every archival request in that
+    // profile is realized through the application's PDF/A-1 branch.
+    self.standards.iter().any(|standard| {
+      standard.forbids_transparency() || (office_fixed_output && standard.is_archival())
+    })
   }
 
   pub(crate) fn canonical_document_language(&self) -> Option<String> {
@@ -607,6 +622,10 @@ impl PdfStandard {
 
   pub(crate) const fn is_archival(self) -> bool {
     !self.is_version() && !matches!(self, Self::PdfUa1)
+  }
+
+  const fn forbids_transparency(self) -> bool {
+    matches!(self, Self::PdfA1a | Self::PdfA1b)
   }
 
   const fn requires_tagging(self) -> bool {
@@ -949,6 +968,10 @@ pub struct PdfImageOptions {
   pub jpeg_quality: Option<u8>,
   pub reduce_resolution: bool,
   pub max_resolution_dpi: Option<u32>,
+  /// Selects whether raster realization follows the explicit public image
+  /// options or a Microsoft Office application's fixed-output quality
+  /// profile.
+  pub optimization_policy: PdfImageOptimizationPolicy,
 }
 
 impl Default for PdfImageOptions {
@@ -958,8 +981,23 @@ impl Default for PdfImageOptions {
       jpeg_quality: None,
       reduce_resolution: false,
       max_resolution_dpi: Some(300),
+      optimization_policy: PdfImageOptimizationPolicy::Requested,
     }
   }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PdfImageOptimizationPolicy {
+  /// Apply `use_lossless_compression`, `jpeg_quality`, and the requested
+  /// downsampling ceiling directly.
+  #[default]
+  Requested,
+  /// Reproduce the selected Office application's fixed-output raster policy.
+  /// Word, Excel, and PowerPoint expose one Print/Screen quality selector
+  /// rather than independent JPEG and maximum-resolution arguments, so that
+  /// selector owns both decisions. The document kind remains explicit because
+  /// the applications do not share every raster realization detail.
+  MicrosoftOfficeFixedOutput(PdfDocumentKind),
 }
 
 #[derive(Clone, Debug)]
@@ -1111,6 +1149,63 @@ pub struct PdfSpreadsheetOptions {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn layout_transparency_constraint_distinguishes_requested_and_office_profiles() {
+    for standard in [PdfStandard::PdfA1a, PdfStandard::PdfA1b] {
+      let mut options = PdfOptions {
+        standards: vec![standard],
+        ..PdfOptions::default()
+      };
+      assert!(
+        options
+          .take_layout_options()
+          .fixed_output_forbids_transparency
+      );
+    }
+
+    for standard in [
+      PdfStandard::Pdf17,
+      PdfStandard::PdfA2b,
+      PdfStandard::PdfA3b,
+      PdfStandard::PdfA4,
+      PdfStandard::PdfUa1,
+    ] {
+      let mut options = PdfOptions {
+        standards: vec![standard],
+        ..PdfOptions::default()
+      };
+      assert!(
+        !options
+          .take_layout_options()
+          .fixed_output_forbids_transparency
+      );
+    }
+
+    let mut office_pdf_a3 = PdfOptions {
+      standards: vec![PdfStandard::PdfA3a],
+      ..PdfOptions::default()
+    };
+    office_pdf_a3.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    assert!(
+      office_pdf_a3
+        .take_layout_options()
+        .fixed_output_forbids_transparency
+    );
+
+    let mut office_pdf_ua = PdfOptions {
+      standards: vec![PdfStandard::Pdf17, PdfStandard::PdfUa1],
+      ..PdfOptions::default()
+    };
+    office_pdf_ua.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    assert!(
+      !office_pdf_ua
+        .take_layout_options()
+        .fixed_output_forbids_transparency
+    );
+  }
 
   #[test]
   fn pdf_ua_request_is_resolved_to_effective_tagging_and_outline_options() {

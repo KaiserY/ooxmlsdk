@@ -348,6 +348,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     metafile_monochrome_dib_palette_override: item.metafile_monochrome_dib_palette_override,
     metafile_background_color: item.metafile_background_color,
     metafile_external_header: item.metafile_external_header,
+    metafile_fixed_output_profile: item.metafile_fixed_output_profile,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
@@ -402,27 +403,39 @@ fn print_page_items(
   // Keeping the stages separate avoids rounding 90% × 95% to 86%.
   let zoom_scale = fixed_output_content_scale(page.zoom, page.paper_scale_percent);
   let heading_width = if page.page_settings.print_headings {
-    page.sheet.column_width_pt(1) * zoom_scale
+    page
+      .sheet
+      .fixed_output_column_range_width_pt(1, 1, zoom_scale)
   } else {
     0.0
   };
   let heading_height = if page.page_settings.print_headings {
-    page.sheet.row_height_pt(1) * zoom_scale
+    page
+      .sheet
+      .fixed_output_row_range_height_pt(1, 1, zoom_scale)
   } else {
     0.0
   };
   let repeat_width = effective_repeated_columns(page)
-    .map(|range| page.sheet.range_rect(range).width_pt * zoom_scale)
+    .map(|range| {
+      page
+        .sheet
+        .fixed_output_range_rect(range, zoom_scale)
+        .width_pt
+    })
     .unwrap_or(0.0);
   let repeat_height = effective_repeated_rows(page)
-    .map(|range| page.sheet.range_rect(range).height_pt * zoom_scale)
+    .map(|range| {
+      page
+        .sheet
+        .fixed_output_range_rect(range, zoom_scale)
+        .height_pt
+    })
     .unwrap_or(0.0);
   let area_size = page
     .area
-    .map(|area| page.sheet.range_rect(area))
-    .map_or((0.0, 0.0), |rect| {
-      (rect.width_pt * zoom_scale, rect.height_pt * zoom_scale)
-    });
+    .map(|area| page.sheet.fixed_output_range_rect(area, zoom_scale))
+    .map_or((0.0, 0.0), |rect| (rect.width_pt, rect.height_pt));
   let horizontal_centering = calc_axis_centering_offset(
     page.page_settings.horizontal_centered,
     setup.width_pt - setup.margin_left_pt - setup.margin_right_pt,
@@ -648,8 +661,13 @@ impl DrawingAreaRenderLayout {
         height_pt: (setup.height_pt - setup.margin_top_pt - setup.margin_bottom_pt).max(0.0),
       },
       |area| {
-        let source = page.sheet.range_rect(area);
-        self.page_transform(page).rect(source)
+        let rect = page.sheet.fixed_output_range_rect(area, self.zoom_scale);
+        CellRect {
+          x_pt: self.origin_x_pt,
+          y_pt: self.origin_y_pt,
+          width_pt: rect.width_pt,
+          height_pt: rect.height_pt,
+        }
       },
     )
   }
@@ -662,10 +680,8 @@ fn push_print_drawing_area(
   setup: PageSetup,
   layout: DrawingAreaRenderLayout,
 ) {
-  let mut drawing_items = print_page_image_items(import, page, layout);
-  drawing_items.extend(print_page_shape_items(import, page, layout));
-  drawing_items.extend(print_page_diagram_items(page, layout));
-  drawing_items.extend(print_page_drawing_text_items(import, page, setup, layout));
+  let mut drawing_items = print_page_drawingml_items(import, page, setup, layout);
+  drawing_items.extend(print_page_vml_image_items(page, layout));
   drawing_items.extend(print_page_vml_shape_items(page, layout));
   drawing_items.extend(print_page_vml_text_items(page, layout));
   if drawing_items.is_empty() {
@@ -693,12 +709,72 @@ fn push_print_drawing_area(
   });
 }
 
+fn print_page_drawingml_items(
+  import: &ExcelImport,
+  page: &CalcPrintPage<'_>,
+  setup: PageSetup,
+  layout: DrawingAreaRenderLayout,
+) -> Vec<PageItem> {
+  let mut items = Vec::new();
+  let page_transform = layout.page_transform(page);
+  let mut page_clip_rect = layout.clip_rect(page, setup);
+  if page.sheet.uses_indexed_scatter_print_grid() {
+    page_clip_rect.width_pt += super::print::INDEXED_SCATTER_HORIZONTAL_CLIP_EXTENSION_PT;
+  }
+  for drawing in &page.sheet.resources.drawings {
+    for anchor in &drawing.anchors {
+      if anchor.object.hidden
+        || !anchor.print_with_sheet
+        || !drawing_anchor_intersects_area(page.sheet, layout.area, anchor)
+      {
+        continue;
+      }
+      let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
+        continue;
+      };
+      if width_pt <= 0.0 || height_pt <= 0.0 {
+        continue;
+      }
+      let source_rect = CellRect {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+      };
+      let drawing_rect = page_transform.rect(source_rect);
+      if push_page_drawing_anchor_image_items(
+        &mut items,
+        import,
+        drawing,
+        anchor,
+        drawing_rect,
+        layout.zoom_scale,
+      ) {
+        continue;
+      }
+      push_page_drawing_anchor_shape_items(import, drawing, &mut items, anchor, drawing_rect);
+      push_page_drawing_anchor_diagram_items(drawing, &mut items, anchor, drawing_rect);
+      push_page_drawing_anchor_text_items(
+        import,
+        drawing,
+        &mut items,
+        anchor,
+        source_rect,
+        drawing_rect,
+        page_transform,
+        page_clip_rect,
+        layout.zoom_scale,
+      );
+    }
+  }
+  items
+}
+
 fn print_page_vml_shape_items(
   page: &CalcPrintPage<'_>,
   layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_transform = layout.page_transform(page);
   for shape in page
     .sheet
     .resources
@@ -715,13 +791,9 @@ fn print_page_vml_shape_items(
     {
       continue;
     }
-    let Some((x_pt, y_pt, width_pt, height_pt)) = vml_shape_rect(page.sheet, shape) else {
+    let Some(rect) = fixed_output_vml_shape_rect(page, layout, shape) else {
       continue;
     };
-    if width_pt <= 0.0 || height_pt <= 0.0 {
-      continue;
-    }
-    let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
     match legacy_vml_form_control_kind(shape) {
       Some(LegacyVmlFormControlKind::Checkbox) => {
         push_vml_checkbox_items(&mut items, shape, rect);
@@ -753,7 +825,7 @@ fn print_page_vml_shape_items(
         shape,
         transform * Affine::scale_non_uniform(f64::from(rect.width_pt), f64::from(rect.height_pt)),
       );
-      let stroke = vml_shape_common_stroke(shape);
+      let stroke = fixed_output_vml_stroke(shape, layout.zoom_scale);
       for path in paths {
         let closed = path
           .commands
@@ -893,6 +965,7 @@ fn push_vml_control_snapshot_image(items: &mut Vec<PageItem>, rect: CellRect, da
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: None,
@@ -961,6 +1034,7 @@ fn push_vml_group_box_text_item(
     x_pt: rect.x_pt + leading_inset,
     y_pt: text_top,
     line_height_pt: line_height,
+    drawingml_text_effect_anchor: None,
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text: shape.text.clone(),
@@ -1237,6 +1311,7 @@ fn push_vml_checkable_control_text_item(
     x_pt: rect.x_pt + leading_inset + aligned_x,
     y_pt: text_top,
     line_height_pt: line_height,
+    drawingml_text_effect_anchor: None,
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text: shape.text.clone(),
@@ -2430,21 +2505,22 @@ fn render_cell_area(
   layout: CellAreaRenderLayout,
   text_metrics: &mut TextMetrics,
 ) {
-  let area_rect = page.sheet.range_rect(area);
-  let page_transform = SheetPageTransform::new(
-    layout.origin_x_pt,
-    layout.origin_y_pt,
-    layout.zoom_scale,
-    area_rect,
-  );
-  let page_clip_rect = page_transform.rect(area_rect);
+  let area_rect = page.sheet.fixed_output_range_rect(area, layout.zoom_scale);
+  let page_clip_rect = CellRect {
+    x_pt: layout.origin_x_pt,
+    y_pt: layout.origin_y_pt,
+    width_pt: area_rect.width_pt,
+    height_pt: area_rect.height_pt,
+  };
   let occupied_cells = calc_occupied_text_cells(cells);
   let mut deferred_edit_text_items = Vec::new();
   for cell in cells {
     if page.sheet.is_covered_merged_cell(cell.address) {
       continue;
     }
-    let rect = page.sheet.cell_rect(cell.address);
+    let rect = page
+      .sheet
+      .fixed_output_cell_rect(cell.address, layout.zoom_scale);
     if rect.width_pt <= 0.0 || rect.height_pt <= 0.0 {
       continue;
     }
@@ -2453,7 +2529,12 @@ fn render_cell_area(
       y_pt,
       width_pt,
       height_pt,
-    } = page_transform.rect(rect);
+    } = CellRect {
+      x_pt: layout.origin_x_pt + rect.x_pt - area_rect.x_pt,
+      y_pt: layout.origin_y_pt + rect.y_pt - area_rect.y_pt,
+      width_pt: rect.width_pt,
+      height_pt: rect.height_pt,
+    };
     // FillInfo retains one column on either side of ScOutputData's logical
     // range, but DrawStrings and DrawEdit paint only through mnX2. The extra
     // cell remains useful as occupied/overflow context and may contribute
@@ -2839,6 +2920,7 @@ fn render_cell_icon_set(
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: None,
@@ -2900,7 +2982,9 @@ fn calc_cell_output_area(
       )
     {
       right_col += 1;
-      let column_width_pt = context.sheet.column_width_pt(right_col) * zoom_scale;
+      let column_width_pt = context
+        .sheet
+        .fixed_output_column_range_width_pt(right_col, right_col, zoom_scale);
       if column_width_pt <= f32::EPSILON {
         break;
       }
@@ -2918,7 +3002,9 @@ fn calc_cell_output_area(
       )
     {
       left_col -= 1;
-      let column_width_pt = context.sheet.column_width_pt(left_col) * zoom_scale;
+      let column_width_pt = context
+        .sheet
+        .fixed_output_column_range_width_pt(left_col, left_col, zoom_scale);
       if column_width_pt <= f32::EPSILON {
         break;
       }
@@ -3263,6 +3349,7 @@ fn render_cell_rich_text(
       x_pt,
       y_pt: y_pt + common_baseline_offset_pt - run_baseline_offset_pt,
       line_height_pt: line_height,
+      drawingml_text_effect_anchor: None,
       paint_clip: None,
       discard_if_horizontally_clipped: false,
       text,
@@ -3589,6 +3676,7 @@ fn render_cell_text(
       x_pt: cell_text_x_pt(rect, full_line_width_pt, options.horizontal_alignment, 0.0),
       y_pt,
       line_height_pt: line_height,
+      drawingml_text_effect_anchor: None,
       paint_clip: None,
       discard_if_horizontally_clipped: false,
       text: line.to_string(),
@@ -3912,6 +4000,7 @@ fn styled_header_text_with_line_height(
     x_pt,
     y_pt,
     line_height_pt,
+    drawingml_text_effect_anchor: None,
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text,
@@ -3936,49 +4025,30 @@ fn column_label(mut col: u32) -> String {
   label.iter().rev().collect()
 }
 
-fn print_page_image_items(
+fn push_page_drawing_anchor_image_items(
+  items: &mut Vec<PageItem>,
   import: &ExcelImport,
-  page: &CalcPrintPage<'_>,
-  layout: DrawingAreaRenderLayout,
-) -> Vec<PageItem> {
-  let mut items = Vec::new();
-  let page_transform = layout.page_transform(page);
-  for drawing in &page.sheet.resources.drawings {
-    for anchor in &drawing.anchors {
-      if anchor.object.hidden || !anchor.print_with_sheet {
-        continue;
-      }
-      if !drawing_anchor_intersects_area(page.sheet, layout.area, anchor) {
-        continue;
-      }
-      let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
-        continue;
-      };
-      if width_pt <= 0.0 || height_pt <= 0.0 {
-        continue;
-      }
-      let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
-      if super::drawing::is_web_extension_graphic_frame(&anchor.object) {
-        let Some(object_id) = anchor.object.id else {
-          continue;
-        };
-        let Some(relationship_id) = drawing.web_extension_fallback_images.get(&object_id) else {
-          continue;
-        };
-        let Some(resource) = drawing.image_resources.get(relationship_id) else {
-          continue;
-        };
-        let Some(placeholder_data) = web_extension_placeholder_png(resource) else {
-          continue;
-        };
-        let placeholder_size = XLSX_WEB_EXTENSION_PLACEHOLDER_SIZE_PT * layout.zoom_scale;
-        let placeholder = ImageItem {
+  drawing: &super::drawing::DrawingResourceCatalog,
+  anchor: &super::drawing::DrawingAnchorModel,
+  rect: CellRect,
+  zoom_scale: f32,
+) -> bool {
+  if super::drawing::is_web_extension_graphic_frame(&anchor.object) {
+    let placeholder = anchor
+      .object
+      .id
+      .and_then(|object_id| drawing.web_extension_fallback_images.get(&object_id))
+      .and_then(|relationship_id| drawing.image_resources.get(relationship_id))
+      .and_then(web_extension_placeholder_png)
+      .map(|placeholder_data| {
+        let placeholder_size = XLSX_WEB_EXTENSION_PLACEHOLDER_SIZE_PT * zoom_scale;
+        ImageItem {
           x_pt: rect.x_pt
             + (rect.width_pt - placeholder_size) / 2.0
-            + XLSX_WEB_EXTENSION_HOST_OFFSET_X_PT * layout.zoom_scale,
+            + XLSX_WEB_EXTENSION_HOST_OFFSET_X_PT * zoom_scale,
           y_pt: rect.y_pt
             + (rect.height_pt - placeholder_size) / 2.0
-            + XLSX_WEB_EXTENSION_HOST_OFFSET_Y_PT * layout.zoom_scale,
+            + XLSX_WEB_EXTENSION_HOST_OFFSET_Y_PT * zoom_scale,
           width_pt: placeholder_size,
           height_pt: placeholder_size,
           crop: ImageCrop::default(),
@@ -3991,6 +4061,7 @@ fn print_page_image_items(
           metafile_monochrome_dib_palette_override: None,
           metafile_background_color: None,
           metafile_external_header: None,
+          metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
           metafile_semantic_text_includes_raster_backdrop: false,
           alt_text: anchor
             .object
@@ -4000,63 +4071,72 @@ fn print_page_image_items(
           hyperlink_url: None,
           floating: false,
           behind_text: false,
-        };
-        // Excel's fixed-format stream paints the content-add-in placeholder
-        // twice at the same bounds. Preserve that observable multiset: the
-        // strict golden contract intentionally detects a missing occurrence.
-        items.push(PageItem::Image(placeholder.clone()));
-        items.push(PageItem::Image(placeholder));
-        continue;
-      }
-      if anchor.object.kind == super::drawing::DrawingObjectKind::GroupShape {
-        push_group_image_items(
-          &mut items,
-          import,
-          drawing,
-          &anchor.object,
-          rect,
-          Affine::IDENTITY,
-        );
-        continue;
-      }
-      if !matches!(
-        anchor.object.kind,
-        super::drawing::DrawingObjectKind::Picture
-          | super::drawing::DrawingObjectKind::Shape
-          | super::drawing::DrawingObjectKind::ConnectionShape
-      ) {
-        continue;
-      }
-      let Some(relationship_id) = anchor.object.relationship_id.as_deref() else {
-        continue;
-      };
-      let Some(resource) = drawing.image_resources.get(relationship_id) else {
-        continue;
-      };
-      let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
-      let clip_path = drawing_object_clip_path(rect, &anchor.object);
-      let (image_data, image_content_type) =
-        xlsx_image_data_with_effects(import, drawing, resource, &anchor.object);
-      items.extend(drawingml_image_fill_items(
-        &anchor.object,
-        DrawingMlImageFillInput {
-          rect,
-          clip_path,
-          authored_rotation_deg: drawing_object_visual_rotation_degrees(&anchor.object),
-          authored_flip_horizontal: anchor.object.flip_horizontal,
-          authored_flip_vertical: anchor.object.flip_vertical,
-          data: image_data,
-          content_type: image_content_type,
-          alt_text: anchor
-            .object
-            .description
-            .clone()
-            .or_else(|| anchor.object.name.clone()),
-          hyperlink_url: hyperlink_url.as_deref().map(ToString::to_string),
-        },
-      ));
+        }
+      });
+    if let Some(placeholder) = placeholder {
+      // Excel's fixed-format stream paints the content-add-in placeholder
+      // twice at the same bounds. Preserve that observable multiset: the
+      // strict golden contract intentionally detects a missing occurrence.
+      items.push(PageItem::Image(placeholder.clone()));
+      items.push(PageItem::Image(placeholder));
     }
+    return true;
   }
+  if anchor.object.kind == super::drawing::DrawingObjectKind::GroupShape {
+    push_group_image_items(
+      items,
+      import,
+      drawing,
+      &anchor.object,
+      rect,
+      Affine::IDENTITY,
+    );
+    return false;
+  }
+  if !matches!(
+    anchor.object.kind,
+    super::drawing::DrawingObjectKind::Picture
+      | super::drawing::DrawingObjectKind::Shape
+      | super::drawing::DrawingObjectKind::ConnectionShape
+  ) {
+    return false;
+  }
+  let Some(relationship_id) = anchor.object.relationship_id.as_deref() else {
+    return false;
+  };
+  let Some(resource) = drawing.image_resources.get(relationship_id) else {
+    return false;
+  };
+  let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
+  let clip_path = drawing_object_clip_path(rect, &anchor.object);
+  let (image_data, image_content_type) =
+    xlsx_image_data_with_effects(import, drawing, resource, &anchor.object);
+  items.extend(drawingml_image_fill_items(
+    &anchor.object,
+    DrawingMlImageFillInput {
+      rect,
+      clip_path,
+      authored_rotation_deg: drawing_object_visual_rotation_degrees(&anchor.object),
+      authored_flip_horizontal: anchor.object.flip_horizontal,
+      authored_flip_vertical: anchor.object.flip_vertical,
+      data: image_data,
+      content_type: image_content_type,
+      alt_text: anchor
+        .object
+        .description
+        .clone()
+        .or_else(|| anchor.object.name.clone()),
+      hyperlink_url: hyperlink_url.as_deref().map(ToString::to_string),
+    },
+  ));
+  false
+}
+
+fn print_page_vml_image_items(
+  page: &CalcPrintPage<'_>,
+  layout: DrawingAreaRenderLayout,
+) -> Vec<PageItem> {
+  let mut items = Vec::new();
   for drawing in &page.sheet.resources.object_resources.vml_drawings {
     for shape in &drawing.shapes {
       if shape.hidden || !shape.print_object {
@@ -4075,17 +4155,14 @@ fn print_page_image_items(
       let Some(resource) = drawing.image_resources.get(relationship_id) else {
         continue;
       };
-      let Some((x_pt, y_pt, width_pt, height_pt)) = vml_shape_rect(page.sheet, shape) else {
+      let Some(rect) = fixed_output_vml_shape_rect(page, layout, shape) else {
         continue;
       };
-      if width_pt <= 0.0 || height_pt <= 0.0 {
-        continue;
-      }
-      let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
       items.extend(vml_image_items(
         shape,
         resource,
         rect,
+        layout.zoom_scale,
         page
           .sheet
           .uses_legacy_excel12_vml_picture_snapshot_grid(shape),
@@ -4250,6 +4327,7 @@ fn drawingml_image_fill_items(
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
+      metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
       metafile_semantic_text_includes_raster_backdrop: false,
       alt_text: alt_text.clone(),
       hyperlink_url: hyperlink_url.clone(),
@@ -4302,6 +4380,7 @@ fn vml_image_items(
   shape: &super::object_resources::VmlShapeModel,
   resource: &super::drawing::ImageResource,
   mut rect: CellRect,
+  fixed_output_scale: f32,
   legacy_excel12_snapshot_grid: bool,
 ) -> Vec<PageItem> {
   let is_fill = shape.image_relationship_id.is_none() && shape.fill_image_relationship_id.is_some();
@@ -4376,6 +4455,11 @@ fn vml_image_items(
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
+      metafile_fixed_output_profile: if is_embedded_picture {
+        crate::common::MetafileFixedOutputProfile::ExcelVmlPicture
+      } else {
+        crate::common::MetafileFixedOutputProfile::Default
+      },
       metafile_semantic_text_includes_raster_backdrop: false,
       alt_text: None,
       hyperlink_url: None,
@@ -4388,18 +4472,9 @@ fn vml_image_items(
     if !is_embedded_picture {
       return vec![image];
     }
-    let commands = vec![
-      common::PathCommand::MoveTo(common_point(rect.x_pt, rect.y_pt)),
-      common::PathCommand::LineTo(common_point(rect.x_pt + rect.width_pt, rect.y_pt)),
-      common::PathCommand::LineTo(common_point(
-        rect.x_pt + rect.width_pt,
-        rect.y_pt + rect.height_pt,
-      )),
-      common::PathCommand::LineTo(common_point(rect.x_pt, rect.y_pt + rect.height_pt)),
-      common::PathCommand::Close,
-    ];
+    let commands = rectangular_path_commands(rect);
     let fill = vml_shape_common_fill(shape, transform);
-    let stroke = vml_shape_common_stroke(shape);
+    let stroke = fixed_output_vml_stroke(shape, fixed_output_scale);
     let mut output = Vec::with_capacity(3);
     if !matches!(fill, common::Fill::None) {
       output.push(PageItem::Path(common::PathItem {
@@ -4413,10 +4488,21 @@ fn vml_image_items(
     }
     output.push(image);
     if let Some(stroke) = stroke {
+      // Excel paints the VML Pict border outside the image host: the inner
+      // edge of the centered stroke coincides with the image bounds.  The
+      // surrounding worksheet drawing-area clip is then applied to the
+      // complete frame.  Expanding the centreline by half the realized width
+      // preserves both facts without choosing individual sides to suppress.
+      let stroke_rect = outset_rect(rect, stroke.width.0 * 0.5);
       output.push(PageItem::Path(common::PathItem {
-        bounds: common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
+        bounds: common_rect(
+          stroke_rect.x_pt,
+          stroke_rect.y_pt,
+          stroke_rect.width_pt,
+          stroke_rect.height_pt,
+        ),
         points: Vec::new(),
-        commands,
+        commands: rectangular_path_commands(stroke_rect),
         closed: true,
         fill: common::Fill::None,
         stroke: Some(stroke),
@@ -4518,6 +4604,49 @@ fn vml_image_items(
   }
 }
 
+fn fixed_output_vml_stroke(
+  shape: &super::object_resources::VmlShapeModel,
+  scale: f32,
+) -> Option<common::Stroke<'static>> {
+  let mut stroke = vml_shape_common_stroke(shape)?;
+  let scale = if scale.is_finite() && scale > 0.0 {
+    scale
+  } else {
+    1.0
+  };
+  stroke.width.0 *= scale;
+  stroke.dash_offset.0 *= scale;
+  if let Some(dash) = stroke.dash.as_mut() {
+    for length in dash {
+      length.0 *= scale;
+    }
+  }
+  Some(stroke)
+}
+
+fn outset_rect(rect: CellRect, outset_pt: f32) -> CellRect {
+  let outset_pt = outset_pt.max(0.0);
+  CellRect {
+    x_pt: rect.x_pt - outset_pt,
+    y_pt: rect.y_pt - outset_pt,
+    width_pt: rect.width_pt + 2.0 * outset_pt,
+    height_pt: rect.height_pt + 2.0 * outset_pt,
+  }
+}
+
+fn rectangular_path_commands(rect: CellRect) -> Vec<common::PathCommand> {
+  vec![
+    common::PathCommand::MoveTo(common_point(rect.x_pt, rect.y_pt)),
+    common::PathCommand::LineTo(common_point(rect.x_pt + rect.width_pt, rect.y_pt)),
+    common::PathCommand::LineTo(common_point(
+      rect.x_pt + rect.width_pt,
+      rect.y_pt + rect.height_pt,
+    )),
+    common::PathCommand::LineTo(common_point(rect.x_pt, rect.y_pt + rect.height_pt)),
+    common::PathCommand::Close,
+  ]
+}
+
 fn excel_vml_picture_fixed_output_rect(
   rect: CellRect,
   legacy_excel12_snapshot_grid: bool,
@@ -4566,198 +4695,176 @@ fn parse_vml_fill_image_size(value: &str, rect: CellRect) -> Option<(f32, f32)> 
   ))
 }
 
-fn print_page_shape_items(
+fn push_page_drawing_anchor_shape_items(
   import: &ExcelImport,
-  page: &CalcPrintPage<'_>,
-  layout: DrawingAreaRenderLayout,
-) -> Vec<PageItem> {
-  let mut items = Vec::new();
-  let page_transform = layout.page_transform(page);
-  for (drawing, anchor) in page
-    .sheet
-    .resources
-    .drawings
-    .iter()
-    .flat_map(|drawing| drawing.anchors.iter().map(move |anchor| (drawing, anchor)))
-  {
-    if anchor.object.hidden || !anchor.print_with_sheet {
-      continue;
-    }
-    if !drawing_anchor_intersects_area(page.sheet, layout.area, anchor) {
-      continue;
-    }
-    if !matches!(
-      anchor.object.kind,
-      super::drawing::DrawingObjectKind::Shape
-        | super::drawing::DrawingObjectKind::GroupShape
-        | super::drawing::DrawingObjectKind::ConnectionShape
-    ) {
-      continue;
-    }
-    let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
-      continue;
-    };
-    if width_pt <= 0.0 || height_pt <= 0.0 {
-      continue;
-    }
-    let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
-    if anchor.object.kind == super::drawing::DrawingObjectKind::GroupShape {
-      push_group_shape_items(
-        import,
-        drawing,
-        &mut items,
-        &anchor.object,
-        rect,
-        Affine::IDENTITY,
-        None,
-      );
-      continue;
-    }
-    let item_start = items.len();
-    let shape_transform = drawing_object_path_transform(rect, &anchor.object);
-    let transformed_bounds = common::drawingml_geometry::transform_rect_bounds(
-      KurboRect::new(
-        f64::from(rect.x_pt),
-        f64::from(rect.y_pt),
-        f64::from(rect.x_pt + rect.width_pt),
-        f64::from(rect.y_pt + rect.height_pt),
+  drawing: &super::drawing::DrawingResourceCatalog,
+  items: &mut Vec<PageItem>,
+  anchor: &super::drawing::DrawingAnchorModel,
+  rect: CellRect,
+) {
+  if !matches!(
+    anchor.object.kind,
+    super::drawing::DrawingObjectKind::Shape
+      | super::drawing::DrawingObjectKind::GroupShape
+      | super::drawing::DrawingObjectKind::ConnectionShape
+  ) {
+    return;
+  }
+  if anchor.object.kind == super::drawing::DrawingObjectKind::GroupShape {
+    push_group_shape_items(
+      import,
+      drawing,
+      items,
+      &anchor.object,
+      rect,
+      Affine::IDENTITY,
+      None,
+    );
+    return;
+  }
+  let item_start = items.len();
+  let shape_transform = drawing_object_path_transform(rect, &anchor.object);
+  let transformed_bounds = common::drawingml_geometry::transform_rect_bounds(
+    KurboRect::new(
+      f64::from(rect.x_pt),
+      f64::from(rect.y_pt),
+      f64::from(rect.x_pt + rect.width_pt),
+      f64::from(rect.y_pt + rect.height_pt),
+    ),
+    shape_transform,
+  );
+  let path_bounds = common_rect(
+    transformed_bounds.x0 as f32,
+    transformed_bounds.y0 as f32,
+    transformed_bounds.width() as f32,
+    transformed_bounds.height() as f32,
+  );
+  if let Some(geometry) = anchor.object.geometry.as_ref() {
+    let (paths, outline) = match geometry {
+      super::drawing::DrawingGeometryModel::Custom { geometry, outline } => (
+        common::drawingml_custom_geometry::paths(
+          geometry,
+          rect.x_pt,
+          rect.y_pt,
+          rect.width_pt,
+          rect.height_pt,
+        ),
+        outline.as_deref(),
       ),
-      shape_transform,
-    );
-    let path_bounds = common_rect(
-      transformed_bounds.x0 as f32,
-      transformed_bounds.y0 as f32,
-      transformed_bounds.width() as f32,
-      transformed_bounds.height() as f32,
-    );
-    if let Some(geometry) = anchor.object.geometry.as_ref() {
-      let (paths, outline) = match geometry {
-        super::drawing::DrawingGeometryModel::Custom { geometry, outline } => (
-          common::drawingml_custom_geometry::paths(
-            geometry,
-            rect.x_pt,
-            rect.y_pt,
-            rect.width_pt,
-            rect.height_pt,
-          ),
-          outline.as_deref(),
+      super::drawing::DrawingGeometryModel::Preset { geometry, outline } => (
+        common::drawingml_preset_geometry::paths(
+          Some(geometry),
+          rect.x_pt,
+          rect.y_pt,
+          rect.width_pt,
+          rect.height_pt,
         ),
-        super::drawing::DrawingGeometryModel::Preset { geometry, outline } => (
-          common::drawingml_preset_geometry::paths(
-            Some(geometry),
-            rect.x_pt,
-            rect.y_pt,
-            rect.width_pt,
-            rect.height_pt,
-          ),
-          outline.as_deref(),
-        ),
-      };
-      let Some(paths) = paths else {
-        continue;
-      };
-      let stroke = shape_stroke(import, &anchor.object);
-      for mut path in paths {
-        path.commands = common::drawingml_geometry::transform_commands(
-          std::mem::take(&mut path.commands),
-          shape_transform,
-        );
-        let closed = path
-          .commands
-          .iter()
-          .any(|command| matches!(command, common::PathCommand::Close));
-        items.push(PageItem::Path(common::PathItem {
-          bounds: path_bounds,
-          points: Vec::new(),
-          commands: path.commands,
-          closed,
-          fill: path.fill_mode.apply_to_fill(drawing_object_common_fill(
-            import,
-            &anchor.object,
-            rect,
-            shape_transform,
-          )),
-          stroke: if path.stroke {
-            stroke.map(|stroke| {
-              drawing_object_common_stroke(
-                import,
-                &anchor.object,
-                stroke,
-                rect,
-                shape_transform,
-                outline,
-              )
-            })
-          } else {
-            None
-          },
-        }));
-      }
-      finish_xlsx_shape_effects(
-        (import, drawing),
-        &mut items,
-        item_start,
-        &anchor.object,
-        path_bounds,
-        affine_rotation_degrees(shape_transform),
-        false,
-      );
-      continue;
-    }
-    if anchor.object.fill_pattern.is_some()
-      || anchor.object.fill_gradient.is_some()
-      || anchor.object.line_pattern.is_some()
-      || anchor.object.line_gradient.is_some()
-      || anchor.object.shape_style_refs.is_some()
-      || drawing_object_has_path_transform(&anchor.object)
-    {
-      let stroke = shape_stroke(import, &anchor.object).map(|stroke| {
-        drawing_object_common_stroke(import, &anchor.object, stroke, rect, shape_transform, None)
-      });
-      let commands = common::drawingml_geometry::transform_commands(
-        vec![
-          common::PathCommand::MoveTo(common_point(rect.x_pt, rect.y_pt)),
-          common::PathCommand::LineTo(common_point(rect.x_pt + rect.width_pt, rect.y_pt)),
-          common::PathCommand::LineTo(common_point(
-            rect.x_pt + rect.width_pt,
-            rect.y_pt + rect.height_pt,
-          )),
-          common::PathCommand::LineTo(common_point(rect.x_pt, rect.y_pt + rect.height_pt)),
-          common::PathCommand::Close,
-        ],
+        outline.as_deref(),
+      ),
+    };
+    let Some(paths) = paths else {
+      return;
+    };
+    let stroke = shape_stroke(import, &anchor.object);
+    for mut path in paths {
+      path.commands = common::drawingml_geometry::transform_commands(
+        std::mem::take(&mut path.commands),
         shape_transform,
       );
+      let closed = path
+        .commands
+        .iter()
+        .any(|command| matches!(command, common::PathCommand::Close));
       items.push(PageItem::Path(common::PathItem {
         bounds: path_bounds,
         points: Vec::new(),
-        commands,
-        closed: true,
-        fill: drawing_object_common_fill(import, &anchor.object, rect, shape_transform),
-        stroke,
-      }));
-    } else {
-      items.push(PageItem::Rect(RectItem {
-        x_pt: rect.x_pt,
-        y_pt: rect.y_pt,
-        width_pt: rect.width_pt,
-        height_pt: rect.height_pt,
-        fill_color: drawing_object_solid_fill_color(import, &anchor.object),
-        fill_opacity: 1.0,
-        stroke: shape_stroke(import, &anchor.object),
-        stroke_opacity: 1.0,
+        commands: path.commands,
+        closed,
+        fill: path.fill_mode.apply_to_fill(drawing_object_common_fill(
+          import,
+          &anchor.object,
+          rect,
+          shape_transform,
+        )),
+        stroke: if path.stroke {
+          stroke.map(|stroke| {
+            drawing_object_common_stroke(
+              import,
+              &anchor.object,
+              stroke,
+              rect,
+              shape_transform,
+              outline,
+            )
+          })
+        } else {
+          None
+        },
       }));
     }
     finish_xlsx_shape_effects(
       (import, drawing),
-      &mut items,
+      items,
       item_start,
       &anchor.object,
       path_bounds,
       affine_rotation_degrees(shape_transform),
       false,
     );
+    return;
   }
-  items
+  if anchor.object.fill_pattern.is_some()
+    || anchor.object.fill_gradient.is_some()
+    || anchor.object.line_pattern.is_some()
+    || anchor.object.line_gradient.is_some()
+    || anchor.object.shape_style_refs.is_some()
+    || drawing_object_has_path_transform(&anchor.object)
+  {
+    let stroke = shape_stroke(import, &anchor.object).map(|stroke| {
+      drawing_object_common_stroke(import, &anchor.object, stroke, rect, shape_transform, None)
+    });
+    let commands = common::drawingml_geometry::transform_commands(
+      vec![
+        common::PathCommand::MoveTo(common_point(rect.x_pt, rect.y_pt)),
+        common::PathCommand::LineTo(common_point(rect.x_pt + rect.width_pt, rect.y_pt)),
+        common::PathCommand::LineTo(common_point(
+          rect.x_pt + rect.width_pt,
+          rect.y_pt + rect.height_pt,
+        )),
+        common::PathCommand::LineTo(common_point(rect.x_pt, rect.y_pt + rect.height_pt)),
+        common::PathCommand::Close,
+      ],
+      shape_transform,
+    );
+    items.push(PageItem::Path(common::PathItem {
+      bounds: path_bounds,
+      points: Vec::new(),
+      commands,
+      closed: true,
+      fill: drawing_object_common_fill(import, &anchor.object, rect, shape_transform),
+      stroke,
+    }));
+  } else {
+    items.push(PageItem::Rect(RectItem {
+      x_pt: rect.x_pt,
+      y_pt: rect.y_pt,
+      width_pt: rect.width_pt,
+      height_pt: rect.height_pt,
+      fill_color: drawing_object_solid_fill_color(import, &anchor.object),
+      fill_opacity: 1.0,
+      stroke: shape_stroke(import, &anchor.object),
+      stroke_opacity: 1.0,
+    }));
+  }
+  finish_xlsx_shape_effects(
+    (import, drawing),
+    items,
+    item_start,
+    &anchor.object,
+    path_bounds,
+    affine_rotation_degrees(shape_transform),
+    false,
+  );
 }
 
 fn push_group_shape_items(
@@ -5244,6 +5351,7 @@ fn finish_xlsx_shape_effects(
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: object.description.clone().or_else(|| object.name.clone()),
     hyperlink_url: None,
@@ -5352,77 +5460,59 @@ fn drawing_object_visual_rotation_degrees(object: &super::drawing::DrawingObject
     .map_or(object.rotation_deg, |_| 0.0)
 }
 
-fn print_page_diagram_items(
-  page: &CalcPrintPage<'_>,
-  layout: DrawingAreaRenderLayout,
-) -> Vec<PageItem> {
-  let mut items = Vec::new();
-  let page_transform = layout.page_transform(page);
-  for drawing in &page.sheet.resources.drawings {
-    for anchor in &drawing.anchors {
-      if anchor.object.hidden
-        || !anchor.print_with_sheet
-        || anchor.object.kind != super::drawing::DrawingObjectKind::GraphicFrame
-      {
-        continue;
-      }
-      if !drawing_anchor_intersects_area(page.sheet, layout.area, anchor) {
-        continue;
-      }
-      let Some(relationship_id) = anchor.object.relationship_id.as_deref() else {
-        continue;
-      };
-      let Some(data) = drawing
-        .diagrams
-        .data_parts
-        .iter()
-        .find(|data| data.relationship_id.as_deref() == Some(relationship_id))
-        .or_else(|| drawing.diagrams.data_parts.first())
-      else {
-        continue;
-      };
-      let Some(data_model) = data.data_model.as_deref() else {
-        continue;
-      };
-      let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
-        continue;
-      };
-      if width_pt <= 0.0 || height_pt <= 0.0 {
-        continue;
-      }
-      let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
-      let bounds = shared_diagram::DiagramBounds {
-        x: rect.x_pt,
-        y: rect.y_pt,
-        width: rect.width_pt,
-        height: rect.height_pt,
-      };
-      if let Some(drawing) = persisted_diagram_drawing(&drawing.diagrams, data_model)
-        && push_persisted_diagram_items(&mut items, drawing, bounds)
-      {
-        continue;
-      }
-      for shape in shared_diagram::layout_shapes(
-        data_model,
-        drawing
-          .diagrams
-          .layout_parts
-          .iter()
-          .find_map(|layout| layout.layout.as_deref()),
-        None,
-        None,
-        bounds,
-        RgbColor {
-          r: 0x4f,
-          g: 0x81,
-          b: 0xbd,
-        },
-      ) {
-        push_diagram_shape_items(&mut items, &shape);
-      }
-    }
+fn push_page_drawing_anchor_diagram_items(
+  drawing: &super::drawing::DrawingResourceCatalog,
+  items: &mut Vec<PageItem>,
+  anchor: &super::drawing::DrawingAnchorModel,
+  rect: CellRect,
+) {
+  if anchor.object.kind != super::drawing::DrawingObjectKind::GraphicFrame {
+    return;
   }
-  items
+  let Some(relationship_id) = anchor.object.relationship_id.as_deref() else {
+    return;
+  };
+  let Some(data) = drawing
+    .diagrams
+    .data_parts
+    .iter()
+    .find(|data| data.relationship_id.as_deref() == Some(relationship_id))
+    .or_else(|| drawing.diagrams.data_parts.first())
+  else {
+    return;
+  };
+  let Some(data_model) = data.data_model.as_deref() else {
+    return;
+  };
+  let bounds = shared_diagram::DiagramBounds {
+    x: rect.x_pt,
+    y: rect.y_pt,
+    width: rect.width_pt,
+    height: rect.height_pt,
+  };
+  if let Some(persisted) = persisted_diagram_drawing(&drawing.diagrams, data_model)
+    && push_persisted_diagram_items(items, persisted, bounds)
+  {
+    return;
+  }
+  for shape in shared_diagram::layout_shapes(
+    data_model,
+    drawing
+      .diagrams
+      .layout_parts
+      .iter()
+      .find_map(|layout| layout.layout.as_deref()),
+    None,
+    None,
+    bounds,
+    RgbColor {
+      r: 0x4f,
+      g: 0x81,
+      b: 0xbd,
+    },
+  ) {
+    push_diagram_shape_items(items, &shape);
+  }
 }
 
 fn persisted_diagram_drawing<'a>(
@@ -5851,84 +5941,59 @@ fn diagram_text_body_text(text_body: &shared_diagram::DiagramTextBody) -> String
     .join("\n")
 }
 
-fn print_page_drawing_text_items(
+fn push_page_drawing_anchor_text_items(
   import: &ExcelImport,
-  page: &CalcPrintPage<'_>,
-  setup: PageSetup,
-  layout: DrawingAreaRenderLayout,
-) -> Vec<PageItem> {
-  let mut items = Vec::new();
-  let page_transform = layout.page_transform(page);
-  let mut page_clip_rect = layout.clip_rect(page, setup);
-  if page.sheet.uses_indexed_scatter_print_grid() {
-    page_clip_rect.width_pt += super::print::INDEXED_SCATTER_HORIZONTAL_CLIP_EXTENSION_PT;
+  drawing: &super::drawing::DrawingResourceCatalog,
+  items: &mut Vec<PageItem>,
+  anchor: &super::drawing::DrawingAnchorModel,
+  source_rect: CellRect,
+  drawing_rect: CellRect,
+  page_transform: SheetPageTransform,
+  page_clip_rect: CellRect,
+  zoom_scale: f32,
+) {
+  let text_rect = page_transform.rect(if anchor.object.text_upright {
+    drawing_object_visual_bounds(source_rect, &anchor.object)
+  } else {
+    source_rect
+  });
+  if anchor.object.kind == super::drawing::DrawingObjectKind::GroupShape {
+    push_group_text_items(
+      import,
+      drawing,
+      items,
+      &anchor.object,
+      drawing_rect,
+      Affine::IDENTITY,
+    );
+    return;
   }
-  for drawing in &page.sheet.resources.drawings {
-    for anchor in &drawing.anchors {
-      if anchor.object.hidden || !anchor.print_with_sheet {
-        continue;
-      }
-      if !drawing_anchor_intersects_area(page.sheet, layout.area, anchor) {
-        continue;
-      }
-      let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
-        continue;
-      };
-      if width_pt <= 0.0 || height_pt <= 0.0 {
-        continue;
-      }
-      let source_rect = CellRect {
-        x_pt,
-        y_pt,
-        width_pt,
-        height_pt,
-      };
-      let drawing_rect = page_transform.rect(source_rect);
-      let text_rect = page_transform.rect(if anchor.object.text_upright {
-        drawing_object_visual_bounds(source_rect, &anchor.object)
-      } else {
-        source_rect
-      });
-      if anchor.object.kind == super::drawing::DrawingObjectKind::GroupShape {
-        push_group_text_items(
-          import,
-          drawing,
-          &mut items,
-          &anchor.object,
-          drawing_rect,
-          Affine::IDENTITY,
-        );
-        continue;
-      }
-      if let Some(chart_items) = lower_drawing_chart(
-        import,
-        drawing,
-        anchor,
-        drawing_rect,
-        page_clip_rect,
-        layout.zoom_scale,
-      ) && !chart_items.is_empty()
-      {
-        items.extend(chart_items);
-        continue;
-      }
-      let text = drawing_anchor_text(drawing, anchor);
-      if text.trim().is_empty() {
-        continue;
-      }
-      let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
-      render_drawing_text(
-        &mut items,
-        &text,
-        text_rect,
-        drawing_object_text_style(import, &anchor.object),
-        Some(drawing_object_text_layout(&anchor.object)),
-        anchor.object.text_warp.as_deref(),
-        hyperlink_url.as_deref(),
-      );
-    }
+  if let Some(chart_items) = lower_drawing_chart(
+    import,
+    drawing,
+    anchor,
+    drawing_rect,
+    page_clip_rect,
+    zoom_scale,
+  ) && !chart_items.is_empty()
+  {
+    items.extend(chart_items);
+    return;
   }
-  items
+  let text = drawing_anchor_text(drawing, anchor);
+  if text.trim().is_empty() {
+    return;
+  }
+  let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
+  render_drawing_text(
+    items,
+    &text,
+    text_rect,
+    drawing_object_text_style(import, &anchor.object),
+    Some(drawing_object_text_layout(&anchor.object)),
+    anchor.object.text_warp.as_deref(),
+    hyperlink_url.as_deref(),
+  );
 }
 
 fn push_group_text_items(
@@ -8868,6 +8933,7 @@ fn render_drawing_text(
       x_pt: x,
       y_pt: y,
       line_height_pt: line_height,
+      drawingml_text_effect_anchor: None,
       paint_clip: None,
       discard_if_horizontally_clipped: false,
       text: line.to_string(),
@@ -9006,7 +9072,6 @@ fn print_page_vml_text_items(
   layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_transform = layout.page_transform(page);
   for shape in page
     .sheet
     .resources
@@ -9032,10 +9097,9 @@ fn print_page_vml_text_items(
     if text.trim().is_empty() {
       continue;
     }
-    let Some((x_pt, y_pt, width_pt, height_pt)) = vml_shape_rect(page.sheet, shape) else {
+    let Some(rect) = fixed_output_vml_shape_rect(page, layout, shape) else {
       continue;
     };
-    let rect = page_transform.rect_from_xywh(x_pt, y_pt, width_pt, height_pt);
     render_drawing_text(
       &mut items,
       text,
@@ -9178,6 +9242,107 @@ fn vml_anchor_y(
   });
   let y = cell.y_pt + sheet.vml_anchor_offset_pt(shape, offset_px);
   y.min(next_cell.y_pt - units::twips_to_points(1.0))
+}
+
+fn fixed_output_vml_shape_rect(
+  page: &CalcPrintPage<'_>,
+  layout: DrawingAreaRenderLayout,
+  shape: &super::object_resources::VmlShapeModel,
+) -> Option<CellRect> {
+  // ClientData anchors are expressed in worksheet cells, so the printer map
+  // rounds every intervening row/column after applying the combined print
+  // scale. Mapping one accumulated logical rectangle through an affine scale
+  // loses that per-cell device rounding and makes distant VML objects drift.
+  // Modern objectPr anchors retain their established DrawingML owner path.
+  if page.sheet.object_anchor_rect_pt(shape).is_none()
+    && let Some(anchor) = shape.anchor
+  {
+    let x1 = fixed_output_vml_anchor_x(
+      page.sheet,
+      shape,
+      anchor.from_col,
+      anchor.from_col_offset_px,
+      layout.zoom_scale,
+    );
+    let y1 = fixed_output_vml_anchor_y(
+      page.sheet,
+      shape,
+      anchor.from_row,
+      anchor.from_row_offset_px,
+      layout.zoom_scale,
+    );
+    let x2 = fixed_output_vml_anchor_x(
+      page.sheet,
+      shape,
+      anchor.to_col,
+      anchor.to_col_offset_px,
+      layout.zoom_scale,
+    );
+    let y2 = fixed_output_vml_anchor_y(
+      page.sheet,
+      shape,
+      anchor.to_row,
+      anchor.to_row_offset_px,
+      layout.zoom_scale,
+    );
+    if x2 < x1 || y2 < y1 {
+      return None;
+    }
+    let source_start = layout
+      .area
+      .map_or(CellAddress { col: 1, row: 1 }, |area| area.start);
+    let source_x = page
+      .sheet
+      .fixed_output_column_offset_pt(source_start.col, layout.zoom_scale);
+    let source_y = page
+      .sheet
+      .fixed_output_row_offset_pt(source_start.row, layout.zoom_scale);
+    let rect = CellRect {
+      x_pt: layout.origin_x_pt + x1 - source_x,
+      y_pt: layout.origin_y_pt + y1 - source_y,
+      width_pt: x2 - x1,
+      height_pt: y2 - y1,
+    };
+    return (rect.width_pt > 0.0 && rect.height_pt > 0.0).then_some(rect);
+  }
+
+  let (x_pt, y_pt, width_pt, height_pt) = vml_shape_rect(page.sheet, shape)?;
+  if width_pt <= 0.0 || height_pt <= 0.0 {
+    return None;
+  }
+  Some(
+    layout
+      .page_transform(page)
+      .rect_from_xywh(x_pt, y_pt, width_pt, height_pt),
+  )
+}
+
+fn fixed_output_vml_anchor_x(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+  zero_based_col: u32,
+  offset_px: i32,
+  scale: f32,
+) -> f32 {
+  let col = zero_based_col.saturating_add(1);
+  let base = sheet.fixed_output_column_offset_pt(col, scale);
+  let next = sheet.fixed_output_column_offset_pt(col.saturating_add(1), scale);
+  let x = base + sheet.vml_anchor_offset_pt(shape, offset_px) * scale;
+  x.min(next - units::twips_to_points(1.0) * scale)
+}
+
+fn fixed_output_vml_anchor_y(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+  zero_based_row: u32,
+  offset_px: i32,
+  scale: f32,
+) -> f32 {
+  let row = zero_based_row.saturating_add(1);
+  let base = sheet.fixed_output_row_offset_pt(row, scale);
+  let next = sheet.fixed_output_row_offset_pt(row.saturating_add(1), scale);
+  let y = base + sheet.vml_anchor_offset_pt(shape, offset_px) * scale;
+  y.min(next - units::twips_to_points(1.0) * scale)
 }
 
 fn vml_style_rect(style: &str) -> Option<(f32, f32, f32, f32)> {
@@ -10929,6 +11094,46 @@ mod drawing_page_tests {
         common::PathCommand::CubicTo { .. }
       ]
     ));
+  }
+
+  #[test]
+  fn fixed_output_vml_stroke_scales_physical_width_and_dash_lengths() {
+    let shape = super::super::object_resources::VmlShapeModel {
+      stroked: true,
+      stroke_weight: Some("2pt".into()),
+      stroke_dash_style: Some("dash".into()),
+      ..Default::default()
+    };
+
+    let authored = vml_shape_common_stroke(&shape).expect("authored stroke");
+    let fixed = fixed_output_vml_stroke(&shape, 0.95).expect("fixed-output stroke");
+
+    assert!((fixed.width.0 - 1.9).abs() < 1.0e-6);
+    let authored_dash = authored.dash.expect("authored dash");
+    let fixed_dash = fixed.dash.expect("fixed-output dash");
+    assert_eq!(authored_dash.len(), fixed_dash.len());
+    for (authored, fixed) in authored_dash.iter().zip(&fixed_dash) {
+      assert!((fixed.0 - authored.0 * 0.95).abs() < 1.0e-6);
+    }
+  }
+
+  #[test]
+  fn embedded_vml_picture_stroke_centreline_is_outside_the_image_host() {
+    let image_rect = CellRect {
+      x_pt: 50.4,
+      y_pt: 237.72,
+      width_pt: 14.82,
+      height_pt: 26.82,
+    };
+    let stroke_width_pt = 0.75 * 0.95;
+
+    let stroke_rect = outset_rect(image_rect, stroke_width_pt * 0.5);
+
+    assert!((stroke_rect.x_pt - 50.043_75).abs() < 1.0e-5);
+    assert!((stroke_rect.y_pt - 237.363_75).abs() < 1.0e-5);
+    assert!((stroke_rect.width_pt - 15.532_5).abs() < 1.0e-5);
+    assert!((stroke_rect.height_pt - 27.532_5).abs() < 1.0e-5);
+    assert!((stroke_rect.x_pt + stroke_width_pt * 0.5 - image_rect.x_pt).abs() < 1.0e-5);
   }
 
   #[test]

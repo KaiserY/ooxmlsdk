@@ -22,6 +22,12 @@ enum MsPaperSize {
 
 const DEFAULT_PRINT_SCALE_PERCENT: u32 = 100;
 const OFFICE_LETTER_TO_DEFAULT_A4_SCALE_PERCENT: u32 = 95;
+// Excel fixed-format output exposes the physical A4 MediaBox on the 600dpi
+// device, but its Letter-to-default-A4 worksheet transform centers against an
+// imageable vertical span 23 dots shorter than that physical page. Independent
+// top/bottom-margin interpolation keeps the expected +0.975/-0.025 slopes,
+// proving this is a device-span term rather than a VML/object adjustment.
+const OFFICE_DEFAULT_A4_IMAGEABLE_HEIGHT_TRIM_DOTS: f32 = 23.0;
 
 // [MS-RPRN] 2.2.2.1 describes the public DEVMODEW prefix written by Office
 // into the Printer Settings part ([MS-OE376] 2.1.36). Driver-private bytes may
@@ -561,6 +567,11 @@ impl CalcPageSettings {
     if matches!(self.orientation, Some(x::OrientationValues::Landscape)) {
       std::mem::swap(&mut size.0, &mut size.1);
     }
+    // GetDeviceCaps reports physical printer dimensions in integer device
+    // units. Office's fixed-format MediaBox follows the same 600dpi grid
+    // (A4 is 4,961 x 7,016 dots), not the unrounded millimetre conversion.
+    size.0 = units::quantize_points_to_office_print_grid(size.0);
+    size.1 = units::quantize_points_to_office_print_grid(size.1);
     size
   }
 
@@ -620,7 +631,9 @@ impl CalcPageSettings {
     let (_, requested_height) = requested.page_size_pt();
     let vertical_margins =
       (self.margin_top_in + self.margin_bottom_in) as f32 * units::POINTS_PER_INCH;
-    let output_body = (output_height - vertical_margins).max(0.0);
+    let imageable_trim_pt = OFFICE_DEFAULT_A4_IMAGEABLE_HEIGHT_TRIM_DOTS * units::POINTS_PER_INCH
+      / units::OFFICE_FIXED_OUTPUT_DPI;
+    let output_body = (output_height - vertical_margins - imageable_trim_pt).max(0.0);
     let requested_body = (requested_height - vertical_margins).max(0.0) * scale;
     ((output_body - requested_body) / 2.0).max(0.0)
   }
@@ -835,8 +848,9 @@ mod tests {
     assert_eq!(settings.printer_default_paper_scale_percent(), 95);
     assert_eq!(settings.fixed_output_paper_scale_percent(false), 95);
     assert_eq!(settings.fixed_output_paper_scale_percent(true), 95);
-    assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
-    assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
+    assert_eq!(width, 595.32);
+    assert_eq!(height, 841.92);
+    assert!((settings.printer_default_paper_body_offset_y_pt(0.95) - 40.68).abs() < 1.0e-4);
   }
 
   #[test]
@@ -1039,8 +1053,14 @@ mod tests {
     let (width, height) = settings.page_size_pt();
 
     assert!(width > height);
-    assert!((width - units::millimeters_to_points(297.0)).abs() < 0.01);
-    assert!((height - units::millimeters_to_points(210.0)).abs() < 0.01);
+    assert_eq!(
+      width,
+      units::quantize_points_to_office_print_grid(units::millimeters_to_points(297.0))
+    );
+    assert_eq!(
+      height,
+      units::quantize_points_to_office_print_grid(units::millimeters_to_points(210.0))
+    );
   }
 
   #[test]
@@ -1055,8 +1075,8 @@ mod tests {
 
     let (width, height) = CalcPageSettings::from_worksheet(&worksheet, false, None).page_size_pt();
 
-    assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
-    assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
+    assert_eq!(width, 595.32);
+    assert_eq!(height, 841.92);
   }
 
   #[test]
@@ -1090,8 +1110,8 @@ mod tests {
 
     let (width, height) = CalcPageSettings::from_worksheet(&worksheet, false, None).page_size_pt();
 
-    assert!((width - units::millimeters_to_points(210.0)).abs() < 0.01);
-    assert!((height - units::millimeters_to_points(297.0)).abs() < 0.01);
+    assert_eq!(width, 595.32);
+    assert_eq!(height, 841.92);
   }
 
   #[test]
@@ -1115,7 +1135,13 @@ mod tests {
 
     let (width, height) = CalcPageSettings::from_worksheet(&worksheet, false, None).page_size_pt();
 
-    assert!((width - units::millimeters_to_points(297.0)).abs() < 0.01);
-    assert!((height - units::millimeters_to_points(420.0)).abs() < 0.01);
+    assert_eq!(
+      width,
+      units::quantize_points_to_office_print_grid(units::millimeters_to_points(297.0))
+    );
+    assert_eq!(
+      height,
+      units::quantize_points_to_office_print_grid(units::millimeters_to_points(420.0))
+    );
   }
 }

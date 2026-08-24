@@ -134,13 +134,19 @@ impl CustomXmlBindings {
   }
 
   pub(super) fn value_for_sdt(&self, properties: &w::SdtProperties) -> Option<String> {
-    if let Some(binding) = sdt_data_binding(properties)
-      && let Some(value) = self.value(
-        binding.store_item_id.as_deref().unwrap_or(""),
-        &binding.x_path,
-      )
-    {
-      return Some(value);
+    if let Some(binding) = sdt_data_binding(properties) {
+      let store_item_id = binding.store_item_id.as_deref().unwrap_or("");
+      if let Some(value) = if store_item_id.is_empty() {
+        // When storeItemID is omitted, prefixMappings still selects the
+        // intended custom-XML namespace. Matching local names alone can pick
+        // a newer unrelated store first (tdf#147724: 2007 `ABC` vs 2020
+        // `HERUNTERLADEN`).
+        self.value_for_binding_namespace(binding)
+      } else {
+        self.value(store_item_id, &binding.x_path)
+      } {
+        return Some(value);
+      }
     }
 
     let tag = sdt_tag(properties)?;
@@ -167,6 +173,26 @@ impl CustomXmlBindings {
       .entries
       .iter()
       .find_map(|entry| custom_xml_xpath_value(&entry.xml, xpath))
+  }
+
+  fn value_for_binding_namespace(&self, binding: &w::DataBinding) -> Option<String> {
+    let prefix = binding
+      .x_path
+      .split("name()='")
+      .nth(1)
+      .and_then(|value| value.split(':').next())
+      .filter(|prefix| !prefix.is_empty())?;
+    let mappings = binding.prefix_mappings.as_deref()?;
+    let namespace = mappings.split_whitespace().find_map(|mapping| {
+      let mapping = mapping.strip_prefix("xmlns:")?;
+      let (mapping_prefix, uri) = mapping.split_once('=')?;
+      (mapping_prefix == prefix).then(|| uri.trim_matches(['\'', '"']).to_owned())
+    })?;
+    self
+      .entries
+      .iter()
+      .filter(|entry| entry.xml.contains(&namespace))
+      .find_map(|entry| custom_xml_xpath_value(&entry.xml, &binding.x_path))
   }
 }
 

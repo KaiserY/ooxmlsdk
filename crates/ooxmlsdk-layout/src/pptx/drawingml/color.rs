@@ -1603,6 +1603,48 @@ mod tests {
   }
 
   #[test]
+  fn saturation_modulation_clips_after_the_transformed_rgb_is_resolved() {
+    let effect_color = Color::Scheme(SchemeColor {
+      value: a::SchemeColorValues::Accent4,
+      transformations: vec![
+        ColorTransformation {
+          kind: ColorTransformationKind::SatMod,
+          value: Some(175_000),
+        },
+        ColorTransformation {
+          kind: ColorTransformationKind::Alpha,
+          value: Some(40_000),
+        },
+      ],
+    });
+    let resolved = effect_color
+      .resolve_rgb_with_theme_style_precision(
+        &mut |token| {
+          (token == a::SchemeColorValues::Accent4).then(|| {
+            Color::RgbHex(RgbHexColor {
+              value: "FFC000".to_string(),
+              transformations: Vec::new(),
+            })
+          })
+        },
+        None,
+      )
+      .expect("resolved effect color");
+
+    // Office stores this exact shape-glow color as black-matte RGB
+    // [102, 96, 0] with alpha 102, which unpremultiplies to [255, 240, 0].
+    assert_eq!(
+      resolved,
+      ResolvedColor {
+        r: 255,
+        g: 240,
+        b: 0,
+        alpha: 40_000,
+      }
+    );
+  }
+
+  #[test]
   fn excel_tint_keeps_luminance_transformations_in_hsl_space() {
     let color = ResolvedColor::from_hex("1CC5D5").expect("valid theme color");
     assert_eq!(

@@ -34,6 +34,13 @@ pub struct LayoutOptions {
   /// Fixed-format bitmap working density requested by the caller.  `None`
   /// retains the Office print-compatible 200-DPI default.
   pub fixed_output_raster_dpi: Option<u32>,
+  /// Whether the fixed-output conformance profile forbids transparent paint.
+  ///
+  /// This is an output constraint rather than a source-document property.
+  /// Callers targeting profiles such as PDF/A-1 set it so layout can follow
+  /// the producing application's profile-specific drawing behavior before
+  /// the backend serializes the fixed pages.
+  pub fixed_output_forbids_transparency: bool,
   pub action: LayoutActionOptions,
   pub diagnostics: LayoutDiagnosticsOptions,
 }

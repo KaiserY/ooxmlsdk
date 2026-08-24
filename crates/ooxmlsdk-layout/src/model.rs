@@ -127,6 +127,11 @@ pub struct TextStyle {
   pub east_asia_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   pub complex_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   pub font_size_pt: f32,
+  /// DrawingML em size before PowerPoint's fixed-output 600-DPI font-size
+  /// quantization. Character effects use this authored/scaled size when
+  /// selecting their intermediate raster density, independently of the
+  /// quantized size used for glyph layout.
+  pub(crate) drawingml_effect_font_size_pt: Option<f32>,
   pub complex_font_size_pt: Option<f32>,
   /// Complex-script formatting selected by WordprocessingML `w:cs`.
   /// `None` leaves script selection to the Unicode content.
@@ -218,12 +223,19 @@ pub struct TextStyle {
   /// advance before repeating a leader; persisted numeric results do not use
   /// that diagnostic boundary policy.
   pub(crate) wordprocessingml_generated_field_diagnostic: bool,
+  /// The INDEX field's empty-result diagnostic owns a distinct paragraph
+  /// top advance from ordinary cached field text.
+  pub(crate) wordprocessingml_index_field_diagnostic: bool,
   /// The run is displayed as part of a Word field result.
   ///
   /// This is layout context rather than authored character formatting.
   /// Writer's `SwTextGuess` excludes every field portion from hanging
   /// punctuation even when `w:overflowPunct` is otherwise enabled.
   pub(crate) wordprocessingml_field_group: bool,
+  /// Office keeps the field-generated trailing blank after an ADDRESSBLOCK
+  /// placeholder in the fixed PDF stream; it is a layout advance, not visible
+  /// normalized paragraph text.
+  pub(crate) wordprocessingml_address_block_placeholder: bool,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
@@ -274,6 +286,7 @@ impl Default for TextStyle {
       east_asia_font_pitch: None,
       complex_font_pitch: None,
       font_size_pt: 11.0,
+      drawingml_effect_font_size_pt: None,
       complex_font_size_pt: None,
       complex_script: None,
       right_to_left: None,
@@ -311,7 +324,9 @@ impl Default for TextStyle {
       drawingml_text_static3d: None,
       wordprocessingml_field_bold_override: None,
       wordprocessingml_generated_field_diagnostic: false,
+      wordprocessingml_index_field_diagnostic: false,
       wordprocessingml_field_group: false,
+      wordprocessingml_address_block_placeholder: false,
       bold: false,
       italic: false,
       underline: false,
@@ -330,6 +345,24 @@ impl Default for TextStyle {
       underline_color: None,
     }
   }
+}
+
+/// Resolves the Office DrawingML `kern` attribute to the minimum point size
+/// used by the shaping layer. The schema stores hundredths of a point.
+///
+/// [MS-OI29500] Part 1 §21.1.2.3.9 records that Office disables kerning
+/// when the attribute is omitted, rather than using ECMA-376's zero-point
+/// default. Omission is therefore left to the host's inherited style. Office
+/// fixed-output controls additionally show that an explicit zero disables
+/// kerning, while positive values are inclusive minimum sizes.
+pub(crate) fn drawingml_kerning_minimum_size_pt(value: Option<i32>) -> Option<f32> {
+  value.map(|value| {
+    if value <= 0 {
+      f32::INFINITY
+    } else {
+      value as f32 / 100.0
+    }
+  })
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -446,6 +479,7 @@ pub enum DynamicFieldKind {
     from_bottom: bool,
     numbering_only: bool,
     suppress_non_numerical: bool,
+    full_context: bool,
   },
 }
 
@@ -501,6 +535,10 @@ pub(crate) struct TextItem {
   pub x_pt: f32,
   pub y_pt: f32,
   pub line_height_pt: f32,
+  /// Logical bounds of the complete laid-out DrawingML line whose character
+  /// cell controls run-level effect alignment. Glyph ink remains the effect
+  /// source; this rectangle is only the scale/skew/offset anchor.
+  pub drawingml_text_effect_anchor: Option<common::Rect>,
   pub paint_clip: Option<common::Rect>,
   pub discard_if_horizontally_clipped: bool,
   pub text: String,
@@ -537,6 +575,7 @@ pub(crate) struct ImageItem {
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   pub metafile_background_color: Option<[u8; 3]>,
   pub metafile_external_header: Option<crate::render::emf_wmf::WmfExternalHeader>,
+  pub metafile_fixed_output_profile: common::MetafileFixedOutputProfile,
   pub metafile_semantic_text_includes_raster_backdrop: bool,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
@@ -759,7 +798,7 @@ pub(crate) fn common_rgb(color: RgbColor, opacity: f32) -> common::Color {
 
 #[cfg(test)]
 mod tests {
-  use super::{TextStyle, common_text_style};
+  use super::{TextStyle, common_text_style, drawingml_kerning_minimum_size_pt};
 
   #[test]
   fn common_text_style_preserves_layout_font_size() {
@@ -775,5 +814,16 @@ mod tests {
     assert_eq!(layout_style.complex_font_size_pt, Some(20.0));
     assert_eq!(paint_style.font_size.0, 11.0);
     assert_eq!(paint_style.complex_font_size.expect("complex size").0, 20.0);
+  }
+
+  #[test]
+  fn drawingml_kerning_preserves_inheritance_and_office_zero_semantics() {
+    assert_eq!(drawingml_kerning_minimum_size_pt(None), None);
+    assert_eq!(
+      drawingml_kerning_minimum_size_pt(Some(0)),
+      Some(f32::INFINITY)
+    );
+    assert_eq!(drawingml_kerning_minimum_size_pt(Some(1200)), Some(12.0));
+    assert_eq!(drawingml_kerning_minimum_size_pt(Some(6601)), Some(66.01));
   }
 }

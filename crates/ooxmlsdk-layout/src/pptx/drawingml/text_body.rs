@@ -23,6 +23,7 @@ pub(crate) struct TextBody {
 pub(crate) struct TextBodyDisplayProperties {
   pub(crate) word_wrap: bool,
   pub(crate) use_first_last_paragraph_spacing: bool,
+  pub(crate) compatible_line_spacing: bool,
   pub(crate) horizontal_overflow: Option<a::TextHorizontalOverflowValues>,
   pub(crate) vertical_overflow: Option<a::TextVerticalOverflowValues>,
   pub(crate) clip_vertical_overflow: bool,
@@ -146,7 +147,7 @@ impl TextBody {
     for (body_properties, list_style) in definitions.into_iter().flatten() {
       let mut overlay = Self::from_parts(body_properties, Some(list_style), &[]);
       if let Some(inherited) = merged.as_ref() {
-        overlay.inherit_body_properties(inherited);
+        overlay.inherit_body_properties(inherited, true);
         if let Some(source_style) = overlay.list_style.take() {
           let mut merged_style = inherited.list_style.clone().unwrap_or_default();
           merged_style.merge_from(&source_style);
@@ -186,7 +187,7 @@ impl TextBody {
     // this by cloning the placeholder TextBody before parsing the local
     // p:txBody; its TextBodyPropertiesContext replaces insets only when the
     // corresponding a:bodyPr attribute is present.
-    self.inherit_body_properties(inherited);
+    self.inherit_body_properties(inherited, true);
     if !self.has_list_style {
       self.list_style.clone_from(&inherited.list_style);
     }
@@ -195,11 +196,15 @@ impl TextBody {
   pub(crate) fn inherit_theme_body_properties(&mut self, inherited: &Self) {
     // Theme lstStyle is merged below the presentation/master/placeholder
     // styles by PptShape. Only missing bodyPr attributes participate in this
-    // second fallback (MS-OE376, 2.1.1300).
-    self.inherit_body_properties(inherited);
+    // second fallback (MS-OI29500, 2.1.1379). wrap is the exception in
+    // PowerPoint fixed output: an omitted local bodyPr@wrap uses its schema
+    // default `square`, even when theme txDef/lnDef/spDef authors `none`.
+    // LibreOffice's TextBodyPropertiesContext independently resolves the
+    // omitted local attribute to XML_square before applying shape properties.
+    self.inherit_body_properties(inherited, false);
   }
 
-  fn inherit_body_properties(&mut self, inherited: &Self) {
+  fn inherit_body_properties(&mut self, inherited: &Self, inherit_wrap: bool) {
     let has_direct_anchor = self
       .body_properties
       .as_deref()
@@ -219,7 +224,9 @@ impl TextBody {
         .horizontal_overflow
         .or(inherited_properties.horizontal_overflow);
       properties.vertical = properties.vertical.or(inherited_properties.vertical);
-      properties.wrap = properties.wrap.or(inherited_properties.wrap);
+      if inherit_wrap {
+        properties.wrap = properties.wrap.or(inherited_properties.wrap);
+      }
       properties.left_inset = properties.left_inset.or(inherited_properties.left_inset);
       properties.top_inset = properties.top_inset.or(inherited_properties.top_inset);
       properties.right_inset = properties.right_inset.or(inherited_properties.right_inset);
@@ -267,6 +274,12 @@ impl Default for TextBodyDisplayProperties {
     Self {
       word_wrap: true,
       use_first_last_paragraph_spacing: false,
+      // ECMA-376 describes omitted bodyPr@compatLnSpc as false, but
+      // PowerPoint fixed output retains the legacy line-height contract when
+      // the attribute is absent. Exact Office 16 controls across direct and
+      // master spcPct at 10%, 20%, and 30% all make absent identical to true;
+      // an explicit false is the standard text-size branch.
+      compatible_line_spacing: true,
       horizontal_overflow: None,
       vertical_overflow: None,
       clip_vertical_overflow: false,
@@ -299,6 +312,10 @@ impl TextBodyDisplayProperties {
       use_first_last_paragraph_spacing: properties
         .use_paragraph_spacing
         .is_some_and(|value| value.as_bool()),
+      compatible_line_spacing: properties
+        .compatible_line_spacing
+        .as_ref()
+        .is_none_or(|value| value.as_bool()),
       horizontal_overflow: properties.horizontal_overflow,
       vertical_overflow: properties.vertical_overflow,
       clip_vertical_overflow: matches!(
@@ -613,6 +630,96 @@ mod tests {
     assert_eq!(properties.top_inset, inherited_properties.top_inset);
     assert_eq!(properties.right_inset, inherited_properties.right_inset);
     assert_eq!(properties.bottom_inset, inherited_properties.bottom_inset);
+  }
+
+  #[test]
+  fn compatible_line_spacing_is_resolved_after_placeholder_inheritance() {
+    let inherited_properties = a::BodyProperties {
+      compatible_line_spacing: Some(ooxmlsdk::simple_type::BooleanValue::True),
+      ..a::BodyProperties::default()
+    };
+    let inherited = TextBody::from_parts(&inherited_properties, None, &[]);
+    let mut direct = TextBody::from_parts(&a::BodyProperties::default(), None, &[]);
+
+    direct.inherit_placeholder_body_properties(&inherited);
+
+    assert!(direct.display_properties.compatible_line_spacing);
+  }
+
+  #[test]
+  fn missing_compatible_line_spacing_keeps_powerpoint_legacy_spacing() {
+    use ooxmlsdk::simple_type::BooleanValue;
+
+    for (authored, expected) in [
+      (None, true),
+      (Some(BooleanValue::False), false),
+      (Some(BooleanValue::True), true),
+    ] {
+      let display = TextBodyDisplayProperties::from_body_properties(&a::BodyProperties {
+        compatible_line_spacing: authored.clone(),
+        ..a::BodyProperties::default()
+      });
+
+      assert_eq!(
+        display.compatible_line_spacing, expected,
+        "authored compatLnSpc {authored:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn theme_wrap_does_not_override_the_local_body_property_default() {
+    let theme = TextBody::from_parts(
+      &a::BodyProperties {
+        wrap: Some(a::TextWrappingValues::None),
+        ..a::BodyProperties::default()
+      },
+      None,
+      &[],
+    );
+
+    for (local_wrap, expected_word_wrap) in [
+      (None, true),
+      (Some(a::TextWrappingValues::None), false),
+      (Some(a::TextWrappingValues::Square), true),
+    ] {
+      let mut direct = TextBody::from_parts(
+        &a::BodyProperties {
+          wrap: local_wrap,
+          ..a::BodyProperties::default()
+        },
+        None,
+        &[],
+      );
+
+      direct.inherit_theme_body_properties(&theme);
+
+      assert_eq!(
+        direct.body_properties.as_deref().and_then(|body| body.wrap),
+        local_wrap
+      );
+      assert_eq!(
+        direct.display_properties.word_wrap, expected_word_wrap,
+        "local wrap {local_wrap:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn placeholder_wrap_still_participates_in_the_presentation_cascade() {
+    let inherited = TextBody::from_parts(
+      &a::BodyProperties {
+        wrap: Some(a::TextWrappingValues::None),
+        ..a::BodyProperties::default()
+      },
+      None,
+      &[],
+    );
+    let mut direct = TextBody::from_parts(&a::BodyProperties::default(), None, &[]);
+
+    direct.inherit_placeholder_body_properties(&inherited);
+
+    assert!(!direct.display_properties.word_wrap);
   }
 
   #[test]

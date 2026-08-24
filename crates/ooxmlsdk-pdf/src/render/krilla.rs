@@ -45,15 +45,16 @@ use smallvec::SmallVec;
 
 use super::fonts::FontSet;
 use super::form_widgets::{collect_form_widget_annotations, inject_form_widget_annotations};
-use super::image::ImageSet;
+use super::image::{ImageSet, finalize_raster_image_xobjects};
 use super::settings::{requests_tagging, serialize_settings};
 use super::viewer::apply_viewer_preferences;
 use crate::error::{PdfError, Result};
 use crate::options::{
-  PdfAttachmentAssociation, PdfDateTime, PdfLinkDefaultAction, PdfOptions, PdfPageLayout,
+  PdfAttachmentAssociation, PdfDateTime, PdfImageOptimizationPolicy, PdfLinkDefaultAction,
+  PdfOptimizeFor, PdfOptions, PdfPageLayout,
 };
 use crate::{
-  PdfConversionDiagnostics, PdfConversionOutput, PdfFontAudit, PdfFontAuditIssue,
+  PdfConversionDiagnostics, PdfConversionOutput, PdfDocumentKind, PdfFontAudit, PdfFontAuditIssue,
   PdfFontAuditIssueKind, PdfFontAuditOutput, PdfFontFaceDiagnostics, PdfGlyphBoundsDiagnostics,
   PdfGlyphDiagnostics, PdfGlyphRunDiagnostics, PdfPageDiagnostics, PdfTextPortionDiagnostics,
   PdfTextPortionKind, PdfTextRunDiagnostics,
@@ -589,6 +590,11 @@ fn render_inner(
   let pdf = pdf
     .finish()
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))?;
+  let pdf = finalize_raster_image_xobjects(
+    pdf,
+    images.black_matte_rasters(),
+    images.native_indexed_pngs(),
+  )?;
   let pdf = fonts.restore_office_font_metadata(pdf)?;
   let pdf = inject_form_widget_annotations(pdf, form_widget_annotations)?;
   let pdf = apply_viewer_preferences(pdf, options)?;
@@ -673,6 +679,7 @@ struct ImageItem<'doc> {
   metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   metafile_background_color: Option<[u8; 3]>,
   metafile_external_header: Option<ooxmlsdk_layout::render::emf_wmf::WmfExternalHeader>,
+  metafile_fixed_output_profile: common::MetafileFixedOutputProfile,
   alt_text: Option<Cow<'doc, str>>,
   hyperlink_url: Option<Cow<'doc, str>>,
   semantic_metafile_text: bool,
@@ -746,6 +753,7 @@ struct PolylineItem<'doc> {
   closed: bool,
   fill: &'doc common::Fill<'static>,
   stroke: Option<&'doc common::Stroke<'static>>,
+  separate_fill_and_stroke: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -1909,6 +1917,7 @@ impl<'doc> PaintDocument<'doc> {
     text_metrics: &mut TextMetrics,
     ui_language: Option<&str>,
   ) -> Self {
+    let separate_path_fill_and_stroke = document.engine_kind == common::LayoutEngineKind::Pptx;
     let pages = document
       .pages
       .iter()
@@ -1920,8 +1929,13 @@ impl<'doc> PaintDocument<'doc> {
           .iter()
           .enumerate()
           .filter_map(|(item_index, item)| {
-            page_item_from_common(item, ui_language, text_metrics)
-              .map(|item| (item, source_line_owners.get(item_index).copied().flatten()))
+            page_item_from_common(
+              item,
+              ui_language,
+              text_metrics,
+              separate_path_fill_and_stroke,
+            )
+            .map(|item| (item, source_line_owners.get(item_index).copied().flatten()))
           })
           .collect::<Vec<_>>();
         let (layout_items, line_owners) = coalesced_writer_text_items(page_items, text_metrics);
@@ -2138,12 +2152,12 @@ fn expand_metafile_semantic_text_item<'doc>(
           items,
         };
       }
-      let paint_native_text = image.metafile_semantic_text_includes_raster_backdrop;
+      let include_raster_backdrop_text = image.metafile_semantic_text_includes_raster_backdrop;
       let localize_signature_ui_text = image
         .signature_line
         .as_ref()
         .is_some_and(|properties| properties.state == common::SignatureLineState::Unsigned);
-      let solid_rects = if paint_native_text {
+      let solid_rects = if include_raster_backdrop_text {
         ooxmlsdk_layout::render::emf_wmf::extract_metafile_solid_rects_with_options(
           &image.data,
           image.content_type.as_deref(),
@@ -2172,7 +2186,7 @@ fn expand_metafile_semantic_text_item<'doc>(
         })
       })
       .collect::<Vec<_>>();
-      let bitmap_layers = if paint_native_text {
+      let bitmap_layers = if include_raster_backdrop_text {
         ooxmlsdk_layout::render::emf_wmf::extract_metafile_bitmap_layers_with_options(
           &image.data,
           image.content_type.as_deref(),
@@ -2205,6 +2219,7 @@ fn expand_metafile_semantic_text_item<'doc>(
           metafile_monochrome_dib_palette_override: None,
           metafile_background_color: None,
           metafile_external_header: None,
+          metafile_fixed_output_profile: common::MetafileFixedOutputProfile::Default,
           alt_text: None,
           hyperlink_url: None,
           semantic_metafile_text: false,
@@ -2214,13 +2229,14 @@ fn expand_metafile_semantic_text_item<'doc>(
         })
       })
       .collect::<Vec<_>>();
-      let semantic_runs =
-        ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs_with_options(
-          &image.data,
-          image.content_type.as_deref(),
-          image.metafile_semantic_text_includes_raster_backdrop,
-          extraction_options,
-        )
+      let semantic_runs = ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs_with_options(
+        &image.data,
+        image.content_type.as_deref(),
+        include_raster_backdrop_text,
+        extraction_options,
+      );
+      let paint_native_text = include_raster_backdrop_text;
+      let semantic_runs = semantic_runs
         .into_iter()
         .map(|mut run| {
           run.font_family = localized_metafile_ui_font_family(
@@ -2247,6 +2263,7 @@ fn expand_metafile_semantic_text_item<'doc>(
               italic: run.italic,
               semantic_only: !paint_native_text,
               metafile_reference_baseline: true,
+              rotation_deg: run.rotation_degrees,
               opacity: 1.0,
               semantic_character_advances_pt: run.advances.map(|advances| {
                 advances
@@ -2487,6 +2504,7 @@ fn page_item_from_common<'doc>(
   item: &'doc common::DisplayItem<'static>,
   ui_language: Option<&str>,
   text_metrics: &mut TextMetrics,
+  separate_path_fill_and_stroke: bool,
 ) -> Option<PageItem<'doc>> {
   match item {
     common::DisplayItem::Text(text) => Some(PageItem::Text(Box::new(text_item_from_common(text)))),
@@ -2506,10 +2524,20 @@ fn page_item_from_common<'doc>(
       items: group
         .items
         .iter()
-        .filter_map(|item| page_item_from_common(item, ui_language, text_metrics))
+        .filter_map(|item| {
+          page_item_from_common(
+            item,
+            ui_language,
+            text_metrics,
+            separate_path_fill_and_stroke,
+          )
+        })
         .collect(),
     }),
-    common::DisplayItem::Path(path) => Some(PageItem::Polyline(polyline_from_common(path))),
+    common::DisplayItem::Path(path) => Some(PageItem::Polyline(polyline_from_common(
+      path,
+      separate_path_fill_and_stroke,
+    ))),
     common::DisplayItem::Rect(rect) => Some(PageItem::Rect(rect_item_from_common(rect))),
     common::DisplayItem::Line(line) => Some(PageItem::Line(line_item_from_common(line))),
     common::DisplayItem::LinkArea(link) => Some(PageItem::LinkArea(link_area_from_common(link))),
@@ -2733,6 +2761,7 @@ fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> Imag
     metafile_monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
     metafile_background_color: image.metafile_background_color,
     metafile_external_header: image.metafile_external_header,
+    metafile_fixed_output_profile: image.metafile_fixed_output_profile,
     alt_text: image
       .alt_text
       .as_ref()
@@ -2795,7 +2824,10 @@ fn signature_line_properties_from_common<'doc>(
   }
 }
 
-fn polyline_from_common<'doc>(path: &'doc common::PathItem<'static>) -> PolylineItem<'doc> {
+fn polyline_from_common<'doc>(
+  path: &'doc common::PathItem<'static>,
+  separate_fill_and_stroke: bool,
+) -> PolylineItem<'doc> {
   let x_pt = path.bounds.origin.x.0;
   let y_pt = path.bounds.origin.y.0;
   PolylineItem {
@@ -2808,6 +2840,7 @@ fn polyline_from_common<'doc>(path: &'doc common::PathItem<'static>) -> Polyline
     closed: path.closed,
     fill: &path.fill,
     stroke: path.stroke.as_ref(),
+    separate_fill_and_stroke,
   }
 }
 
@@ -4509,7 +4542,75 @@ fn krilla_blend_mode(mode: common::BlendMode) -> BlendMode {
   }
 }
 
-fn office_fixed_output_raster_pixels(points: f32, visible_fraction: f32) -> u32 {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FixedOutputRasterAllocation {
+  FloorExtent,
+  PowerPointScreenEndpoints,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MetafilePlaybackRectangle {
+  Canvas,
+  PowerPointScreenEndpoints,
+  ExcelVmlPicture,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct MetafileFixedOutputRasterProfile {
+  raster_dpi: u32,
+  allocation: FixedOutputRasterAllocation,
+  playback_rectangle: MetafilePlaybackRectangle,
+}
+
+// The configured Office reference environment uses Windows ClearType
+// contrast 1200. GDI applies SPI_GETFONTSMOOTHINGCONTRAST / 1000 as the
+// device-space gamma when classic EMF/WMF text is replayed into a color DIB.
+const OFFICE_REFERENCE_GDI_FONT_SMOOTHING_CONTRAST: u16 = 1200;
+
+impl MetafileFixedOutputRasterProfile {
+  fn playback_size(self, canvas_width: u32, canvas_height: u32) -> (u32, u32) {
+    match self.playback_rectangle {
+      MetafilePlaybackRectangle::Canvas => (canvas_width, canvas_height),
+      MetafilePlaybackRectangle::PowerPointScreenEndpoints => (
+        canvas_width.saturating_sub(1).max(1),
+        canvas_height.saturating_sub(1).max(1),
+      ),
+      MetafilePlaybackRectangle::ExcelVmlPicture => (canvas_width, canvas_height),
+    }
+  }
+
+  fn text_playback_size(self, canvas_width: u32, canvas_height: u32) -> (u32, u32) {
+    let playback = self.playback_size(canvas_width, canvas_height);
+    match self.playback_rectangle {
+      // Excel's VML fixed-output host allocates an N-pixel image but exposes
+      // the inclusive right endpoint to the GDI font mapper. Native EMF
+      // controls at widths N-1, N, and N+1 show that only the N+1 text axis
+      // produces the Office glyph outlines; non-text records retain the
+      // ordinary N-pixel playback rectangle.
+      MetafilePlaybackRectangle::ExcelVmlPicture => (canvas_width.saturating_add(1), playback.1),
+      _ => playback,
+    }
+  }
+
+  fn monochrome_text_playback_size(self, canvas_width: u32, canvas_height: u32) -> (u32, u32) {
+    match self.playback_rectangle {
+      // GDI+ realizes Excel's VML color bitmap through the inclusive font
+      // endpoint above, but its one-bit transparency surface retains the
+      // ordinary destination rectangle. Native transparent replay at N-1,
+      // N, and N+1 differs from the Office SMask by 8, 53, and 57 samples,
+      // respectively.
+      MetafilePlaybackRectangle::ExcelVmlPicture => self.playback_size(canvas_width, canvas_height),
+      _ => self.text_playback_size(canvas_width, canvas_height),
+    }
+  }
+}
+
+fn fixed_output_raster_pixels(
+  points: f32,
+  visible_fraction: f32,
+  raster_dpi: u32,
+  allocation: FixedOutputRasterAllocation,
+) -> u32 {
   let print_dots =
     (points.max(0.0) / visible_fraction) * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH;
   let nearest_print_dot = print_dots.round();
@@ -4523,20 +4624,91 @@ fn office_fixed_output_raster_pixels(points: f32, visible_fraction: f32) -> u32 
   } else {
     print_dots
   };
-  (print_dots * units::OFFICE_FIXED_OUTPUT_RASTER_DPI / units::OFFICE_FIXED_OUTPUT_DPI)
-    .floor()
-    .clamp(1.0, u32::MAX as f32) as u32
+  let raster_pixels = print_dots * raster_dpi as f32 / units::OFFICE_FIXED_OUTPUT_DPI;
+  let raster_pixels = match allocation {
+    FixedOutputRasterAllocation::FloorExtent => raster_pixels.floor(),
+    FixedOutputRasterAllocation::PowerPointScreenEndpoints => {
+      // PowerPoint's Screen path supplies a GDI destination rectangle whose
+      // right/bottom coordinates are inclusive. A fractional endpoint reaches
+      // the containing sample; an exact N-pixel extent therefore owns N-1
+      // samples. This is the same ceil(extent)-1 rule used by ordinary Office
+      // Screen bitmaps.
+      raster_pixels.ceil() - 1.0
+    }
+  };
+  raster_pixels.clamp(1.0, u32::MAX as f32) as u32
+}
+
+fn metafile_fixed_output_raster_profile(
+  image: &ImageItem<'_>,
+  options: &PdfOptions,
+) -> MetafileFixedOutputRasterProfile {
+  if matches!(
+    options.images.optimization_policy,
+    PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Xlsx)
+  ) && options.optimize_for == PdfOptimizeFor::Screen
+    && image.metafile_fixed_output_profile == common::MetafileFixedOutputProfile::ExcelVmlPicture
+  {
+    return MetafileFixedOutputRasterProfile {
+      raster_dpi: units::CSS_PIXELS_PER_INCH as u32,
+      allocation: FixedOutputRasterAllocation::FloorExtent,
+      playback_rectangle: MetafilePlaybackRectangle::ExcelVmlPicture,
+    };
+  }
+  match options.images.optimization_policy {
+    PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Xlsx) => {
+      // Excel replays VML metafiles on the same 200-DPI printer surface for
+      // both fixed-format quality values. Screen image quality is a downstream
+      // output policy and must not change the EMF playback device context.
+      // This also lets recovered EMF text remain native while unrecovered
+      // records share the same printer-grid realization.
+      MetafileFixedOutputRasterProfile {
+        raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32,
+        allocation: FixedOutputRasterAllocation::FloorExtent,
+        playback_rectangle: MetafilePlaybackRectangle::Canvas,
+      }
+    }
+    PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(_) => match options.optimize_for {
+      PdfOptimizeFor::Print => MetafileFixedOutputRasterProfile {
+        raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32,
+        allocation: FixedOutputRasterAllocation::FloorExtent,
+        playback_rectangle: MetafilePlaybackRectangle::Canvas,
+      },
+      PdfOptimizeFor::Screen => MetafileFixedOutputRasterProfile {
+        raster_dpi: units::CSS_PIXELS_PER_INCH as u32,
+        allocation: FixedOutputRasterAllocation::PowerPointScreenEndpoints,
+        playback_rectangle: MetafilePlaybackRectangle::PowerPointScreenEndpoints,
+      },
+    },
+    PdfImageOptimizationPolicy::Requested if options.images.reduce_resolution => {
+      MetafileFixedOutputRasterProfile {
+        raster_dpi: options
+          .images
+          .max_resolution_dpi
+          .unwrap_or(units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32)
+          .clamp(72, units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32),
+        allocation: FixedOutputRasterAllocation::FloorExtent,
+        playback_rectangle: MetafilePlaybackRectangle::Canvas,
+      }
+    }
+    PdfImageOptimizationPolicy::Requested => MetafileFixedOutputRasterProfile {
+      raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32,
+      allocation: FixedOutputRasterAllocation::FloorExtent,
+      playback_rectangle: MetafilePlaybackRectangle::Canvas,
+    },
+  }
 }
 
 fn metafile_render_options_for_image(
   image: &ImageItem<'_>,
   options: &PdfOptions,
 ) -> ooxmlsdk_layout::render::emf_wmf::RenderOptions {
-  let configured_dpi = options
-    .images
-    .max_resolution_dpi
-    .unwrap_or(300)
-    .clamp(72, 600);
+  let raster_profile = metafile_fixed_output_raster_profile(image, options);
+  let raster_dpi = raster_profile.raster_dpi;
+  let powerpoint_screen_fixed_output = matches!(
+    options.images.optimization_policy,
+    PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx)
+  ) && options.optimize_for == PdfOptimizeFor::Screen;
   let visible_width = (1.0 - image.crop.left - image.crop.right).max(f32::EPSILON);
   let visible_height = (1.0 - image.crop.top - image.crop.bottom).max(f32::EPSILON);
   let target_size = if image.metafile_semantic_text_includes_raster_backdrop {
@@ -4547,38 +4719,88 @@ fn metafile_render_options_for_image(
     // second time by the PDF image matrix.
     None
   } else {
-    // Office fixed output rasterizes vector metafile previews at 200 DPI,
-    // independently of both the producer's screen-sized import bitmap and
-    // the configured bitmap downsampling ceiling. The ceiling applies to
-    // existing raster samples; it does not turn an EMF playback viewport into
-    // a lower-resolution source bitmap. In configured Office output,
-    // tdf136841.docx remains 157x157 at a requested 96 DPI and VML-hosted
-    // tdf135653.docx remains 214x137 at a requested 150 DPI. Both use the
-    // floor of the uncropped viewport dimensions.
+    // The Office reference profile owns metafile playback density through its
+    // Print/Screen selector (200/96 DPI); it has no independent bitmap-DPI
+    // argument. The public Requested profile instead treats an explicitly
+    // lower max-resolution value as a ceiling on the ordinary 200-DPI
+    // playback surface. In configured Print output, tdf136841.docx remains
+    // 157x157 at a requested 96 DPI and VML-hosted tdf135653.docx remains
+    // 214x137 at a requested 150 DPI. The 45541_Footer PowerPoint Screen
+    // control independently emits its full-slide WMF preview at 959x719.
     Some((
-      office_fixed_output_raster_pixels(image.width_pt, visible_width),
-      office_fixed_output_raster_pixels(image.height_pt, visible_height),
+      fixed_output_raster_pixels(
+        image.width_pt,
+        visible_width,
+        raster_dpi,
+        raster_profile.allocation,
+      ),
+      fixed_output_raster_pixels(
+        image.height_pt,
+        visible_height,
+        raster_dpi,
+        raster_profile.allocation,
+      ),
     ))
   };
-  let raster_budget_dpi = configured_dpi.max(units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32);
+  let target_pixels = target_size
+    .map(|(width, height)| width.saturating_mul(height))
+    .unwrap_or_default();
+  let raster_budget_pixels = raster_dpi
+    .saturating_mul(raster_dpi)
+    .saturating_mul(64)
+    .max(target_pixels)
+    .min(16_000_000);
+  let transparent_background = powerpoint_screen_fixed_output
+    || image.metafile_background_color.is_some()
+    || image.metafile_semantic_text_includes_raster_backdrop
+    || (image.semantic_metafile_text
+      && ooxmlsdk_layout::render::emf_wmf::metafile_text_requires_raster_backdrop(
+        &image.data,
+        image.content_type.as_deref(),
+      ));
+  let playback_size =
+    target_size.map(|(width, height)| raster_profile.playback_size(width, height));
+  let text_playback_size =
+    target_size.map(|(width, height)| raster_profile.text_playback_size(width, height));
+  let monochrome_text_playback_size =
+    target_size.map(|(width, height)| raster_profile.monochrome_text_playback_size(width, height));
   ooxmlsdk_layout::render::emf_wmf::RenderOptions {
     target_width_px: target_size.map(|size| size.0),
     target_height_px: target_size.map(|size| size.1),
-    max_pixels: Some(
-      raster_budget_dpi
-        .saturating_mul(raster_budget_dpi)
-        .saturating_mul(64),
-    ),
-    transparent_background: image.metafile_background_color.is_some()
-      || image.metafile_semantic_text_includes_raster_backdrop
-      || (image.semantic_metafile_text
-        && ooxmlsdk_layout::render::emf_wmf::metafile_text_requires_raster_backdrop(
-          &image.data,
-          image.content_type.as_deref(),
-        )),
+    max_pixels: Some(raster_budget_pixels),
+    font_smoothing_contrast: matches!(
+      options.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(_)
+    )
+    .then_some(OFFICE_REFERENCE_GDI_FONT_SMOOTHING_CONTRAST),
+    playback_width_px: playback_size.map(|size| size.0),
+    playback_height_px: playback_size.map(|size| size.1),
+    text_playback_width_px: text_playback_size.map(|size| size.0),
+    text_playback_height_px: text_playback_size.map(|size| size.1),
+    monochrome_text_playback_width_px: monochrome_text_playback_size.map(|size| size.0),
+    monochrome_text_playback_height_px: monochrome_text_playback_size.map(|size| size.1),
+    // Office Screen replays onto a transparent fixed-output surface. An
+    // opaque metafile background still paints opaque samples, while an
+    // inclusive destination rectangle leaves its rightmost column and bottom
+    // row outside closed-shape fills. PowerPoint preserves those untouched
+    // samples in the image SMask instead of flattening them to white.
+    transparent_background,
     background_color: None,
     monochrome_dib_palette_override: image.metafile_monochrome_dib_palette_override,
-    filter_high_frequency_pattern_brushes: true,
+    // A Print preview is replayed on the 200-DPI surface and later sampled by
+    // the fixed-output consumer, so one-pixel pattern brushes need the box
+    // filter. PowerPoint Screen owns the final 96-DPI device surface and
+    // preserves that one-pixel dither instead.
+    filter_high_frequency_pattern_brushes: matches!(
+      options.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Xlsx)
+    ) || image
+      .metafile_semantic_text_includes_raster_backdrop
+      || !matches!(
+        options.images.optimization_policy,
+        PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(_)
+      )
+      || options.optimize_for != PdfOptimizeFor::Screen,
     suppress_text: image.metafile_semantic_text_includes_raster_backdrop,
     suppress_solid_pattern_rects: image.metafile_semantic_text_includes_raster_backdrop,
     suppress_bitmap_layers: image.metafile_semantic_text_includes_raster_backdrop,
@@ -4858,6 +5080,7 @@ fn draw_text_item(
     small_caps_semantic_text.as_ref(),
     item.style.font_family.as_deref(),
   );
+  let glyph_semantic_text = word_no_break_hyphen_semantic_text(glyph_semantic_text.as_ref());
   for portion in &text.portions {
     let semantic_clipped = if item.style.semantic_only {
       push_paint_clip(
@@ -4970,7 +5193,8 @@ fn draw_text_item(
       && text_has_visible_glyph_paint(&item.style)
       && let Some(glyphs) = &portion.glyphs
     {
-      for run in glyphs {
+      let variation_glyphs = merge_variation_selector_font_runs(glyphs, item.text.as_ref());
+      for run in variation_glyphs.as_ref() {
         let remapped_glyphs = remap_glyph_text_ranges(
           &run.glyphs,
           item.text.as_ref(),
@@ -5356,6 +5580,7 @@ fn draw_unwarped_path_gradient_glyphs(
     closed: true,
     fill: &resolved_fill,
     stroke: None,
+    separate_fill_and_stroke: false,
   };
   draw_path_gradient_raster(surface, &path, &gradient_frame)
 }
@@ -5716,6 +5941,7 @@ fn draw_warped_glyphs(
       closed: true,
       fill,
       stroke: None,
+      separate_fill_and_stroke: false,
     };
     if draw_path_gradient_raster(surface, &path, &gradient_frame) {
       return true;
@@ -5896,6 +6122,29 @@ fn word_small_caps_semantic_text(text: &str, small_caps: bool) -> Cow<'_, str> {
   Cow::Owned(uppercase)
 }
 
+fn word_no_break_hyphen_semantic_text(text: &str) -> Cow<'_, str> {
+  if !text.contains('\u{2011}') {
+    return Cow::Borrowed(text);
+  }
+
+  // Word preserves the no-break behavior in layout, but its fixed-format
+  // ToUnicode mapping exposes the displayed hyphen as U+002D. Keep the
+  // shaped U+2011 glyph and change only the one-scalar PDF semantic mapping;
+  // the range remapper below preserves the original glyph cluster. This is
+  // observable in the Office `w:noBreakHyphen` control while avoiding a
+  // layout regression that would make the character breakable.
+  Cow::Owned(
+    text
+      .chars()
+      .map(|character| {
+        (character == '\u{2011}')
+          .then_some('-')
+          .unwrap_or(character)
+      })
+      .collect(),
+  )
+}
+
 fn remap_glyph_text_ranges<'a>(
   glyphs: &'a [PaintGlyph],
   source_text: &str,
@@ -5937,6 +6186,71 @@ fn remap_glyph_text_ranges<'a>(
   Some(Cow::Owned(remapped))
 }
 
+fn merge_variation_selector_font_runs<'a>(
+  glyph_runs: &'a PaintGlyphFontRuns,
+  source_text: &str,
+) -> Cow<'a, PaintGlyphFontRuns> {
+  let mut merged = glyph_runs.clone();
+  let mut changed = false;
+  let mut run_index = 0;
+  while run_index < merged.len() {
+    let mut glyph_index = 0;
+    while glyph_index < merged[run_index].glyphs.len() {
+      let glyph = &merged[run_index].glyphs[glyph_index];
+      let selector = source_text
+        .get(glyph.text_range.clone())
+        .is_some_and(|text| {
+          !text.is_empty() && text.chars().all(is_unicode_text_presentation_selector)
+        });
+      let zero_width_no_ink = glyph.x_advance.abs() <= f32::EPSILON
+        && (glyph.glyph_id.to_u32() == 0
+          || glyph.bounds_em.is_some_and(|bounds| {
+            bounds.x_min_em.abs() <= f32::EPSILON
+              && bounds.y_min_em.abs() <= f32::EPSILON
+              && bounds.x_max_em.abs() <= f32::EPSILON
+              && bounds.y_max_em.abs() <= f32::EPSILON
+          }));
+      if !(selector && zero_width_no_ink) {
+        glyph_index += 1;
+        continue;
+      }
+      let previous = if glyph_index > 0 {
+        Some((run_index, glyph_index - 1))
+      } else {
+        (0..run_index).rev().find_map(|previous_run| {
+          merged[previous_run]
+            .glyphs
+            .len()
+            .checked_sub(1)
+            .map(|previous_glyph| (previous_run, previous_glyph))
+        })
+      };
+      let Some((previous_run, previous_glyph)) = previous else {
+        glyph_index += 1;
+        continue;
+      };
+      let selector_end = glyph.text_range.end;
+      merged[previous_run].glyphs[previous_glyph].text_range.end = selector_end;
+      merged[run_index].glyphs.remove(glyph_index);
+      changed = true;
+    }
+    if merged[run_index].glyphs.is_empty() {
+      merged.remove(run_index);
+    } else {
+      run_index += 1;
+    }
+  }
+  if changed {
+    Cow::Owned(merged)
+  } else {
+    Cow::Borrowed(glyph_runs)
+  }
+}
+
+fn is_unicode_text_presentation_selector(character: char) -> bool {
+  character == '\u{fe0e}'
+}
+
 fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Cow<'a, str> {
   let symbol = font_family.is_some_and(|family| {
     family.eq_ignore_ascii_case("Symbol") || family.eq_ignore_ascii_case("SymbolMT")
@@ -5945,10 +6259,23 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
   let wingdings_2 = font_family.is_some_and(|family| {
     family.eq_ignore_ascii_case("Wingdings 2") || family.eq_ignore_ascii_case("Wingdings2")
   });
+  let wingdings_3 = font_family.is_some_and(|family| {
+    family.eq_ignore_ascii_case("Wingdings 3") || family.eq_ignore_ascii_case("Wingdings3")
+  });
+  let webdings = font_family.is_some_and(|family| family.eq_ignore_ascii_case("Webdings"));
   let mt_extra = font_family.is_some_and(|family| {
     family.eq_ignore_ascii_case("MT Extra") || family.eq_ignore_ascii_case("MTExtra")
   });
-  if !(symbol || wingdings || wingdings_2 || mt_extra) {
+  let bookshelf_symbol_7 =
+    font_family.is_some_and(|family| family.eq_ignore_ascii_case("Bookshelf Symbol 7"));
+  if !(symbol
+    || wingdings
+    || wingdings_2
+    || wingdings_3
+    || webdings
+    || mt_extra
+    || bookshelf_symbol_7)
+  {
     return Cow::Borrowed(text);
   }
 
@@ -5957,7 +6284,10 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
   // 1 section 17.3.3.30 defines F000-offset storage as a legacy glyph selector,
   // not the character's portable semantics. LibreOffice fontcvt.cxx supplies
   // the Adobe Symbol mappings; Unicode WG2 N4363 supplies the unique modern
-  // Unicode mappings for the Wingdings families.
+  // Unicode mappings for the Webdings/Wingdings families. ICU4X identifies
+  // the authored U+F000 transport range as General_Category=Private_Use; it
+  // supplies no portable character semantics by itself. WG2 N4363 records the
+  // contextual source indexes and standardized characters needed here.
   //
   // PowerPoint's PDF export maps Wingdings 0x6E to U+25FC, 0x76 to U+2756,
   // 0xA7 to U+25AA, and 0xE0 to U+2192.
@@ -5971,6 +6301,10 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
         '\u{f020}' if symbol => '\u{0020}',
         '\u{f02a}' if symbol => '\u{2217}',
         '\u{f02d}' if symbol => '\u{2212}',
+        // LibreOffice's Symbol conversion table maps the transport byte
+        // 0x28 (U+F028 in OOXML text) to the ordinary left parenthesis;
+        // Word's PDF ToUnicode map exposes the same character.
+        '\u{f028}' if symbol => '\u{0028}',
         '\u{f031}' if symbol => '\u{0031}',
         '\u{f05e}' if symbol => '\u{22a5}',
         '\u{f061}' if symbol => '\u{03b1}',
@@ -6002,6 +6336,9 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
         '\u{f0f6}' if symbol => '\u{239e}',
         '\u{f0f7}' if symbol => '\u{239f}',
         '\u{f0f8}' if symbol => '\u{23a0}',
+        // Word's fixed output retains the Bookshelf Symbol 7 glyph for this
+        // authored `o` but exposes its private transport value in ToUnicode.
+        '\u{006f}' if bookshelf_symbol_7 => '\u{f06f}',
         '\u{f04a}' if wingdings => '\u{263a}',
         '\u{f04c}' if wingdings => '\u{2639}',
         '\u{f04d}' if wingdings => '\u{1f4a3}',
@@ -6033,6 +6370,15 @@ fn symbol_font_semantic_text<'a>(text: &'a str, font_family: Option<&str>) -> Co
         '\u{f020}' if wingdings => '\u{2002}',
         '\u{f097}' if wingdings_2 => '\u{2981}',
         '\u{f0a3}' if wingdings_2 => '\u{25a1}',
+        // N4363 indexes Webdings by its source byte: w-0103 (0x67) is
+        // U+2B1B BLACK LARGE SQUARE and w-0110 (0x6E) is U+2B24 BLACK
+        // LARGE CIRCLE. A PowerPoint WMF control contains both selectors;
+        // changing only the semantic character must retain the Webdings glyph.
+        '\u{f067}' if webdings => '\u{2b1b}',
+        '\u{f06e}' if webdings => '\u{2b24}',
+        // N4363 w-3125 is Wingdings 3 byte 0x7D and standardizes as U+1F782
+        // BLACK RIGHT-POINTING ISOSCELES RIGHT TRIANGLE.
+        '\u{f07d}' if wingdings_3 => '\u{1f782}',
         // LibreOffice's aMTExtraTab maps the MathType preview font's three
         // ellipsis glyph selectors to these standardized math characters.
         '\u{f04c}' if mt_extra => '\u{22ef}',
@@ -6373,10 +6719,24 @@ fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem<'_>) {
       let stroke = polyline
         .stroke
         .map(|stroke| path_stroke_from_common(surface, stroke, polyline));
-      if fill.is_some() || stroke.is_some() {
-        surface.set_fill(fill);
-        surface.set_stroke(stroke);
-        surface.draw_path(&path);
+      match (fill, stroke) {
+        (Some(fill), Some(stroke)) if polyline.separate_fill_and_stroke => {
+          // PowerPoint fixed output submits the fill and outline as distinct
+          // paint operations. This matters at antialiased boundaries and also
+          // mirrors its separate f*/S content-stream operators.
+          surface.set_fill(Some(fill));
+          surface.set_stroke(None);
+          surface.draw_path(&path);
+          surface.set_fill(None);
+          surface.set_stroke(Some(stroke));
+          surface.draw_path(&path);
+        }
+        (fill, stroke) if fill.is_some() || stroke.is_some() => {
+          surface.set_fill(fill);
+          surface.set_stroke(stroke);
+          surface.draw_path(&path);
+        }
+        _ => {}
       }
     }
   }
@@ -8108,7 +8468,7 @@ fn draw_transformed_image_content(
   }
   let mut pop_count = 0;
   if let Some(clip) = path_from_commands(image.clip_path) {
-    surface.push_clip_path(&clip, &krilla::paint::FillRule::NonZero);
+    surface.push_clip_path(&clip, &krilla::paint::FillRule::EvenOdd);
     pop_count += 1;
   }
 
@@ -8338,7 +8698,15 @@ fn shaped_pdf_glyphs(
   word_spacing_pt: f32,
   text_metrics: &mut TextMetrics,
 ) -> Option<PaintGlyphRun> {
-  let shaped = text_metrics.shape_text(text, style)?;
+  // U+FE0E selects the text presentation of the preceding emoji, but it is
+  // not itself a drawable character. Keep it in the semantic source while
+  // shaping the base emoji alone so the selector cannot redirect the whole
+  // cluster to a symbol fallback face (Pandoc test/command/11113.docx).
+  let shaping_text_storage = text
+    .strip_suffix('\u{fe0e}')
+    .map(|prefix| format!("{prefix}\u{fe0f}"));
+  let shaping_text = shaping_text_storage.as_deref().unwrap_or(text);
+  let shaped = text_metrics.shape_text(shaping_text, style)?;
   let semantic_advances = style
     .semantic_character_advances_pt
     .as_deref()
@@ -8362,7 +8730,7 @@ fn shaped_pdf_glyphs(
       });
       last_run = Some(run_key);
     }
-    let is_word_space = text
+    let is_word_space = shaping_text
       .get(glyph.text_range.clone())
       .is_some_and(|cluster| cluster.contains(' '));
     let word_spacing_em = if is_word_space {
@@ -8394,6 +8762,15 @@ fn shaped_pdf_glyphs(
         }),
       });
     x_offset_pt += advance_pt;
+  }
+  if shaping_text.len() < text.len()
+    && let Some(glyph) = font_runs
+      .iter_mut()
+      .rev()
+      .find_map(|run| run.glyphs.last_mut())
+    && glyph.text_range.end == shaping_text.len()
+  {
+    glyph.text_range.end = text.len();
   }
   Some(PaintGlyphRun {
     width_pt: x_offset_pt,
@@ -8469,6 +8846,7 @@ fn text_outline_fill(
     closed: true,
     fill: &resolved_fill,
     stroke: None,
+    separate_fill_and_stroke: false,
   };
   path_fill_from_common(surface, &resolved_fill, &path)
 }
@@ -8491,6 +8869,7 @@ fn text_stroke_from_common(
     closed: true,
     fill: &common::Fill::None,
     stroke: Some(stroke),
+    separate_fill_and_stroke: false,
   };
   path_stroke_from_common(surface, stroke, &path)
 }
@@ -8592,18 +8971,19 @@ mod tests {
     PaintDocument, PaintGlyph, PaintItem, PaintLineOwner, PaintTextPortionKind, TextItem,
     TextMetrics, TextStyle as PaintTextStyle, common_writer_line_baselines, conversion_font_audit,
     draw_office_math_text, gamma_correct_gradient_color, glyph_requires_pdf_paint,
-    localized_metafile_ui_font_family, metafile_render_options_for_image,
-    normalized_path_gradient_focus, office_math_semantic_glyph_id, office_math_svg_text_marker,
-    pdf_metadata, pdf_page_dimension, remap_glyph_text_ranges, render,
-    semantic_advance_for_text_range, shaped_pdf_glyphs, source_range_requires_visible_glyph,
-    stroke_end_dimensions, symbol_font_semantic_text, synthetic_italic_text_transform,
-    text_portion_ranges, text_requires_glyph_outlines, text_stroke_with_fill,
-    text_style_from_common, visually_ordered_text_portion_ranges, word_small_caps_semantic_text,
+    is_unicode_text_presentation_selector, localized_metafile_ui_font_family,
+    metafile_render_options_for_image, normalized_path_gradient_focus,
+    office_math_semantic_glyph_id, office_math_svg_text_marker, pdf_metadata, pdf_page_dimension,
+    remap_glyph_text_ranges, render, semantic_advance_for_text_range, shaped_pdf_glyphs,
+    source_range_requires_visible_glyph, stroke_end_dimensions, symbol_font_semantic_text,
+    synthetic_italic_text_transform, text_portion_ranges, text_requires_glyph_outlines,
+    text_stroke_with_fill, text_style_from_common, visually_ordered_text_portion_ranges,
+    word_no_break_hyphen_semantic_text, word_small_caps_semantic_text,
     word_unsigned_signature_line_items, writer_item_line_metrics,
   };
   use crate::options::{
-    PdfAttachment, PdfAttachmentAssociation, PdfDocumentKind, PdfLinkDefaultAction, PdfOptions,
-    PdfStandard,
+    PdfAttachment, PdfAttachmentAssociation, PdfDocumentKind, PdfImageOptimizationPolicy,
+    PdfLinkDefaultAction, PdfOptimizeFor, PdfOptions, PdfStandard,
   };
   use krilla::Document;
   use krilla::geom::Size;
@@ -8857,6 +9237,7 @@ mod tests {
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
+      metafile_fixed_output_profile: common::MetafileFixedOutputProfile::Default,
       alt_text: None,
       hyperlink_url: None,
       semantic_metafile_text: false,
@@ -8868,6 +9249,11 @@ mod tests {
 
     assert_eq!(fixed_output.target_width_px, Some(400));
     assert_eq!(fixed_output.target_height_px, Some(100));
+    assert_eq!(fixed_output.playback_width_px, Some(400));
+    assert_eq!(fixed_output.playback_height_px, Some(100));
+    assert_eq!(fixed_output.text_playback_width_px, Some(400));
+    assert_eq!(fixed_output.text_playback_height_px, Some(100));
+    assert_eq!(fixed_output.font_smoothing_contrast, None);
     assert!(!fixed_output.transparent_background);
 
     let mut pdf_options = PdfOptions::default();
@@ -8878,17 +9264,77 @@ mod tests {
 
     pdf_options.images.max_resolution_dpi = Some(96);
     let low_bitmap_ceiling = metafile_render_options_for_image(&image, &pdf_options);
-    assert_eq!(low_bitmap_ceiling.target_width_px, Some(400));
-    assert_eq!(low_bitmap_ceiling.target_height_px, Some(100));
+    assert_eq!(low_bitmap_ceiling.target_width_px, Some(192));
+    assert_eq!(low_bitmap_ceiling.target_height_px, Some(48));
+    assert_eq!(low_bitmap_ceiling.playback_width_px, Some(192));
+    assert_eq!(low_bitmap_ceiling.playback_height_px, Some(48));
     assert_eq!(
       low_bitmap_ceiling.max_pixels,
-      Some(
-        (ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32)
-          .saturating_pow(2)
-          .saturating_mul(64)
-      )
+      Some((ooxmlsdk_layout::units::CSS_PIXELS_PER_INCH as u32).saturating_pow(2) * 64)
     );
 
+    pdf_options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    pdf_options.optimize_for = PdfOptimizeFor::Screen;
+    let office_screen = metafile_render_options_for_image(&image, &pdf_options);
+    assert_eq!(office_screen.target_width_px, Some(191));
+    assert_eq!(office_screen.target_height_px, Some(47));
+    assert_eq!(office_screen.playback_width_px, Some(190));
+    assert_eq!(office_screen.playback_height_px, Some(46));
+    assert_eq!(office_screen.font_smoothing_contrast, Some(1200));
+    assert!(office_screen.transparent_background);
+    assert!(!office_screen.filter_high_frequency_pattern_brushes);
+
+    let mut full_slide_preview = image.clone();
+    full_slide_preview.width_pt = 720.0;
+    full_slide_preview.height_pt = 540.0;
+    full_slide_preview.crop = ImageCrop::default();
+    let office_screen = metafile_render_options_for_image(&full_slide_preview, &pdf_options);
+    assert_eq!(office_screen.target_width_px, Some(959));
+    assert_eq!(office_screen.target_height_px, Some(719));
+    assert_eq!(office_screen.playback_width_px, Some(958));
+    assert_eq!(office_screen.playback_height_px, Some(718));
+
+    pdf_options.optimize_for = PdfOptimizeFor::Print;
+    let office_print = metafile_render_options_for_image(&image, &pdf_options);
+    assert_eq!(office_print.target_width_px, Some(400));
+    assert_eq!(office_print.target_height_px, Some(100));
+    assert_eq!(office_print.playback_width_px, Some(400));
+    assert_eq!(office_print.playback_height_px, Some(100));
+    assert_eq!(office_print.font_smoothing_contrast, Some(1200));
+    assert!(!office_print.transparent_background);
+    assert!(office_print.filter_high_frequency_pattern_brushes);
+
+    pdf_options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Xlsx);
+    pdf_options.optimize_for = PdfOptimizeFor::Screen;
+    let excel_screen_icon = metafile_render_options_for_image(&image, &pdf_options);
+    assert_eq!(excel_screen_icon.target_width_px, Some(400));
+    assert_eq!(excel_screen_icon.target_height_px, Some(100));
+    assert_eq!(excel_screen_icon.playback_width_px, Some(400));
+    assert_eq!(excel_screen_icon.playback_height_px, Some(100));
+    assert_eq!(excel_screen_icon.font_smoothing_contrast, Some(1200));
+    assert!(!excel_screen_icon.suppress_text);
+    assert!(excel_screen_icon.filter_high_frequency_pattern_brushes);
+
+    let mut excel_vml_picture = image.clone();
+    excel_vml_picture.metafile_fixed_output_profile =
+      common::MetafileFixedOutputProfile::ExcelVmlPicture;
+    let excel_vml_picture = metafile_render_options_for_image(&excel_vml_picture, &pdf_options);
+    assert_eq!(excel_vml_picture.target_width_px, Some(192));
+    assert_eq!(excel_vml_picture.target_height_px, Some(48));
+    assert_eq!(excel_vml_picture.playback_width_px, Some(192));
+    assert_eq!(excel_vml_picture.playback_height_px, Some(48));
+    assert_eq!(excel_vml_picture.text_playback_width_px, Some(193));
+    assert_eq!(excel_vml_picture.text_playback_height_px, Some(48));
+    assert_eq!(
+      excel_vml_picture.monochrome_text_playback_width_px,
+      Some(192)
+    );
+    assert_eq!(
+      excel_vml_picture.monochrome_text_playback_height_px,
+      Some(48)
+    );
     let mut vml_preview = image;
     vml_preview.width_pt = 77.25;
     vml_preview.height_pt = 49.5;
@@ -9957,6 +10403,7 @@ mod tests {
         metafile_monochrome_dib_palette_override: None,
         metafile_background_color: None,
         metafile_external_header: None,
+        metafile_fixed_output_profile: common::MetafileFixedOutputProfile::Default,
         relationship_id: None,
         alt_text: None,
         hyperlink_url: Some("https://example.test/image".into()),
@@ -9991,6 +10438,78 @@ mod tests {
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 446.5) - 446.52).abs() < 0.001);
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 793.5) - 793.56).abs() < 0.001);
     assert!((pdf_page_dimension(LayoutEngineKind::Pptx, 595.5) - 595.56).abs() < 0.001);
+  }
+
+  #[test]
+  fn powerpoint_paths_submit_fill_and_stroke_as_separate_pdf_operations() {
+    let mut document = tagged_test_document();
+    let bounds = common::Rect {
+      origin: common::Point {
+        x: Pt(20.0),
+        y: Pt(20.0),
+      },
+      size: common::Size {
+        width: Pt(40.0),
+        height: Pt(30.0),
+      },
+    };
+    document.pages[0].items = vec![DisplayItem::Path(common::PathItem {
+      bounds,
+      commands: vec![
+        common::PathCommand::MoveTo(bounds.origin),
+        common::PathCommand::LineTo(common::Point {
+          x: Pt(60.0),
+          y: Pt(20.0),
+        }),
+        common::PathCommand::LineTo(common::Point {
+          x: Pt(60.0),
+          y: Pt(50.0),
+        }),
+        common::PathCommand::LineTo(common::Point {
+          x: Pt(20.0),
+          y: Pt(50.0),
+        }),
+        common::PathCommand::Close,
+      ],
+      closed: true,
+      fill: common::Fill::Solid(Color {
+        r: 10,
+        g: 20,
+        b: 30,
+        a: 255,
+      }),
+      stroke: Some(common::Stroke {
+        width: Pt(1.0),
+        color: Color {
+          r: 40,
+          g: 50,
+          b: 60,
+          a: 255,
+        },
+        ..common::Stroke::default()
+      }),
+      ..common::PathItem::default()
+    })];
+
+    let mut operators = |engine_kind| {
+      document.engine_kind = engine_kind;
+      let bytes = render(&document, &PdfOptions::default()).unwrap();
+      let pdf = lopdf::Document::load_mem(&bytes).unwrap();
+      let page_id = pdf.get_pages()[&1];
+      lopdf::content::Content::decode(&pdf.get_page_content(page_id))
+        .unwrap()
+        .operations
+        .into_iter()
+        .map(|operation| operation.operator)
+        .collect::<Vec<_>>()
+    };
+    let powerpoint = operators(LayoutEngineKind::Pptx);
+    assert!(powerpoint.iter().any(|operator| operator == "f*"));
+    assert!(powerpoint.iter().any(|operator| operator == "S"));
+    assert!(!powerpoint.iter().any(|operator| operator == "B*"));
+
+    let writer = operators(LayoutEngineKind::Docx);
+    assert!(writer.iter().any(|operator| operator == "B*"));
   }
 
   #[test]
@@ -10054,6 +10573,19 @@ mod tests {
       "Xxxx Xxxx"
     );
     assert_eq!(word_small_caps_semantic_text("ı", true), "ı");
+  }
+
+  #[test]
+  fn word_no_break_hyphen_exposes_office_pdf_semantic_dash() {
+    assert_eq!(word_no_break_hyphen_semantic_text("A\u{2011}B"), "A-B");
+    assert_eq!(word_no_break_hyphen_semantic_text("A-B"), "A-B");
+  }
+
+  #[test]
+  fn unicode_text_presentation_selector_is_preserved_as_a_control() {
+    assert!(is_unicode_text_presentation_selector('\u{fe0e}'));
+    assert!(!is_unicode_text_presentation_selector('\u{fe0f}'));
+    assert!(!is_unicode_text_presentation_selector('😊'));
   }
 
   #[test]
@@ -10222,6 +10754,30 @@ mod tests {
   }
 
   #[test]
+  fn unicode_wg2_webdings_geometric_mappings_are_font_specific() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f067}\u{f06e}", Some("Webdings")),
+      "\u{2b1b}\u{2b24}"
+    );
+    assert_eq!(
+      symbol_font_semantic_text("\u{f067}\u{f06e}", Some("Wingdings")),
+      "\u{f067}\u{25fc}"
+    );
+  }
+
+  #[test]
+  fn unicode_wg2_wingdings_3_triangle_mapping_is_font_specific() {
+    assert_eq!(
+      symbol_font_semantic_text("\u{f07d}", Some("Wingdings 3")),
+      "\u{1f782}"
+    );
+    assert_eq!(
+      symbol_font_semantic_text("\u{f07d}", Some("Calibri")),
+      "\u{f07d}"
+    );
+  }
+
+  #[test]
   fn symbol_font_bullet_uses_standardized_pdf_unicode() {
     assert_eq!(
       symbol_font_semantic_text("\u{f0b7}", Some("Symbol")),
@@ -10243,6 +10799,24 @@ mod tests {
       symbol_font_semantic_text("\u{f02d}", Some("Symbol")),
       "\u{2212}"
     );
+  }
+
+  #[test]
+  fn symbol_font_parenthesis_transport_uses_standardized_pdf_unicode() {
+    assert_eq!(symbol_font_semantic_text("\u{f028}", Some("Symbol")), "(");
+    assert_eq!(
+      symbol_font_semantic_text("\u{f028}", Some("Calibri")),
+      "\u{f028}"
+    );
+  }
+
+  #[test]
+  fn bookshelf_symbol_seven_o_uses_office_private_pdf_unicode() {
+    assert_eq!(
+      symbol_font_semantic_text("o", Some("Bookshelf Symbol 7")),
+      "\u{f06f}"
+    );
+    assert_eq!(symbol_font_semantic_text("o", Some("Calibri")), "o");
   }
 
   #[test]

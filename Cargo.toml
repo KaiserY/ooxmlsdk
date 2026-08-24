@@ -78,6 +78,7 @@ image = { version = "0.25.10", default-features = false, features = [
   "png",
   "jpeg",
   "gif",
+  "tiff",
   "webp",
 ] }
 jpeg-encoder = "0.7.1"
@@ -108,6 +109,3 @@ usvg = { version = "0.47.0", default-features = false, features = ["text"] }
 winnow = "1.0.4"
 writeable = "0.6.3"
 yoke = { version = "0.8.3", features = ["derive"] }
-
-[profile.dev]
-incremental = false

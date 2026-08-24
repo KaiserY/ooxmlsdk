@@ -809,6 +809,10 @@ pub(crate) struct PositionalTab {
   pub relative_to: PositionalTabBase,
   pub leader: TabLeader,
   pub style: TextStyle,
+  /// A zero-width Word ADVANCE field control. Ordinary positional tabs keep
+  /// this unset; the field moves the following inline content without
+  /// contributing a tab glyph or tab advance.
+  pub advance_left_pt: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -974,7 +978,7 @@ pub(crate) enum InlineItem {
   LegacyFormCheckBox(LegacyFormCheckBox),
   Image(InlineImage),
   Shape(InlineShape),
-  DrawingGroupStart(InlineDrawingGroupEffect),
+  DrawingGroupStart(InlineDrawingGroup),
   DrawingGroupEnd,
   BookmarkStart(String),
   FormWidgetStart(u32),
@@ -982,6 +986,33 @@ pub(crate) enum InlineItem {
   LastRenderedPageBreak,
   PageBreak,
   ColumnBreak,
+}
+
+impl InlineItem {
+  /// Whether this item leaves the host line's vertical metrics owned by its
+  /// text portions. Floating drawings remain independent paint/wrap objects;
+  /// only character-like drawings participate in the line box.
+  pub(crate) fn leaves_host_line_metrics_text_owned(&self) -> bool {
+    match self {
+      Self::Text(_)
+      | Self::ClearLineBreak(_)
+      | Self::PositionalTab(_)
+      | Self::Ruby(_)
+      | Self::BookmarkStart(_)
+      | Self::FormWidgetStart(_)
+      | Self::FormWidgetEnd(_)
+      | Self::LastRenderedPageBreak
+      | Self::PageBreak
+      | Self::ColumnBreak
+      | Self::DrawingGroupEnd => true,
+      Self::Image(image) => !image.placement.participates_in_host_line_metrics(),
+      Self::Shape(shape) => !shape.placement.participates_in_host_line_metrics(),
+      Self::DrawingGroupStart(group) => !group.placement.participates_in_host_line_metrics(),
+      Self::NoteReferenceMark(_) | Self::NoteSeparatorMark(_) | Self::LegacyFormCheckBox(_) => {
+        false
+      }
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1018,10 +1049,24 @@ pub(crate) struct LegacyFormCheckBox {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct InlineDrawingGroupEffect {
-  pub effects: common::DrawingEffectSource,
+pub(crate) struct InlineDrawingGroup {
+  /// Effects owned by a WPG/group container.  A locked canvas uses the same
+  /// begin/end ownership boundary without necessarily carrying a group
+  /// effect, so keep the two concerns independent.
+  pub effects: Option<common::DrawingEffectSource>,
+  /// Fixed-output viewport owned by a legacy DrawingML locked canvas.
+  /// Children are first laid out in the authored `ext/chExt` coordinate
+  /// space; layout then fits their realized paint union into this host
+  /// extent as one object.
+  pub locked_canvas_viewport: Option<InlineLockedCanvasViewport>,
   pub rotation_deg: f32,
   pub placement: ImagePlacement,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct InlineLockedCanvasViewport {
+  pub width_pt: f32,
+  pub height_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -1376,6 +1421,16 @@ pub(crate) enum ImagePlacement {
   #[default]
   Inline,
   Floating(FloatingImagePlacement),
+}
+
+impl ImagePlacement {
+  /// ECMA-376 Part 1 §20.4.2.3 defines `wp:anchor` as a floating object
+  /// not positioned in line with text, while §20.4.2.8 makes `wp:inline`
+  /// character-like. LibreOffice mirrors that split by creating a
+  /// `SwFlyCntPortion` only for `FLY_AS_CHAR` objects.
+  pub(crate) fn participates_in_host_line_metrics(self) -> bool {
+    matches!(self, Self::Inline)
+  }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -85,13 +85,50 @@ macro_rules! merge_paragraph_properties {
   }};
 }
 
-impl TextListParagraphStyleRef<'_> {
+impl<'a> TextListParagraphStyleRef<'a> {
   pub(crate) fn to_owned_style(self) -> TextListParagraphStyle {
     match self {
       TextListParagraphStyleRef::Default(properties) => {
         TextListParagraphStyle::Default(Box::new(properties.clone()))
       }
       TextListParagraphStyleRef::Level(style) => TextListParagraphStyle::Level(style.clone()),
+    }
+  }
+
+  pub(crate) fn default_run_properties(self) -> Option<&'a a::DefaultRunProperties> {
+    match self {
+      TextListParagraphStyleRef::Default(properties) => {
+        properties.default_run_properties.as_deref()
+      }
+      TextListParagraphStyleRef::Level(style) => match &style.paragraph_properties {
+        TextListLevelParagraphProperties::Level1(properties) => {
+          properties.default_run_properties.as_deref()
+        }
+        TextListLevelParagraphProperties::Level2(properties) => {
+          properties.default_run_properties.as_deref()
+        }
+        TextListLevelParagraphProperties::Level3(properties) => {
+          properties.default_run_properties.as_deref()
+        }
+        TextListLevelParagraphProperties::Level4(properties) => {
+          properties.default_run_properties.as_deref()
+        }
+        TextListLevelParagraphProperties::Level5(properties) => {
+          properties.default_run_properties.as_deref()
+        }
+        TextListLevelParagraphProperties::Level6(properties) => {
+          properties.default_run_properties.as_deref()
+        }
+        TextListLevelParagraphProperties::Level7(properties) => {
+          properties.default_run_properties.as_deref()
+        }
+        TextListLevelParagraphProperties::Level8(properties) => {
+          properties.default_run_properties.as_deref()
+        }
+        TextListLevelParagraphProperties::Level9(properties) => {
+          properties.default_run_properties.as_deref()
+        }
+      },
     }
   }
 }
@@ -596,5 +633,30 @@ mod tests {
       style.paragraph_style_for_level(Some(1)),
       Some(TextListParagraphStyleRef::Level(level)) if level.level == 2
     ));
+  }
+
+  #[test]
+  fn paragraph_level_exposes_its_inherited_default_run_properties() {
+    let style = TextListStyle {
+      levels: vec![TextListLevelStyle::new(
+        1,
+        TextListLevelParagraphProperties::Level1(Box::new(a::Level1ParagraphProperties {
+          default_run_properties: Some(Box::new(a::DefaultRunProperties {
+            kerning: Some(1200),
+            ..Default::default()
+          })),
+          ..Default::default()
+        })),
+      )],
+      ..Default::default()
+    };
+
+    assert_eq!(
+      style
+        .paragraph_style_for_level(Some(0))
+        .and_then(TextListParagraphStyleRef::default_run_properties)
+        .and_then(|properties| properties.kerning),
+      Some(1200)
+    );
   }
 }

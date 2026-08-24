@@ -184,6 +184,19 @@ pub struct GlyphRun<'doc> {
   pub source: Option<DisplaySource<'doc>>,
 }
 
+/// Host-specific fixed-output treatment for a metafile image.
+///
+/// The profile identifies an Office feature boundary, not a source filename.
+/// It lets PDF export retain device-rectangle semantics that are not encoded
+/// in the EMF/WMF bytes themselves.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum MetafileFixedOutputProfile {
+  #[default]
+  Default,
+  /// Excel VML `ObjectType="Pict"` replacement graphics, including OLE icons.
+  ExcelVmlPicture,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ImageItem<'doc> {
   pub bounds: Rect,
@@ -202,6 +215,7 @@ pub struct ImageItem<'doc> {
   pub metafile_background_color: Option<[u8; 3]>,
   /// External physical playback header for a non-placeable WMF preview.
   pub metafile_external_header: Option<crate::render::emf_wmf::WmfExternalHeader>,
+  pub metafile_fixed_output_profile: MetafileFixedOutputProfile,
   pub relationship_id: Option<Cow<'doc, str>>,
   pub alt_text: Option<Cow<'doc, str>>,
   pub hyperlink_url: Option<Cow<'doc, str>>,

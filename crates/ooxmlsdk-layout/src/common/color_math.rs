@@ -1,5 +1,5 @@
 use color::{ColorSpace, Hsl, OpaqueColor, Srgb};
-use ooxmlsdk::units::DRAWINGML_PERCENT_SCALE;
+use ooxmlsdk::units::{DRAWINGML_PERCENT_SCALE, DRAWINGML_POSITIVE_FIXED_ANGLE_MAX_EXCLUSIVE};
 
 /// Shared color-space representation used only after OOXML integer values have
 /// crossed their schema/Office compatibility boundary.
@@ -60,6 +60,149 @@ impl HslColor {
   pub(crate) fn apply_luminance_offset(&mut self, amount: f32) {
     self.lightness = (self.lightness + amount).clamp(0.0, 1.0);
   }
+}
+
+/// DrawingML's integer HSL transform state.
+///
+/// OOXML stores hue in 1/60000-degree units and saturation/luminance in
+/// thousandths of one percent. Office-compatible transform pipelines quantize
+/// each HSL conversion and each following modulation in that integer domain;
+/// retaining a floating HSL value until the final RGB conversion can move an
+/// 8-bit channel by one at non-primary colors.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct DrawingmlHslColor {
+  pub(crate) hue: i32,
+  pub(crate) saturation: i32,
+  pub(crate) lightness: i32,
+}
+
+impl DrawingmlHslColor {
+  pub(crate) fn from_srgb8(rgb: [u8; 3]) -> Self {
+    let [r, g, b] = rgb.map(|channel| f64::from(channel) / 255.0);
+    let minimum = r.min(g).min(b);
+    let maximum = r.max(g).max(b);
+    let spread = maximum - minimum;
+    let lightness = (((minimum + maximum) * 0.5 * f64::from(DRAWINGML_PERCENT_SCALE)) + 0.5) as i32;
+    let hue_degrees = if spread == 0.0 {
+      0.0
+    } else if maximum == r {
+      ((g - b) / spread * 60.0 + 360.0) % 360.0
+    } else if maximum == g {
+      (b - r) / spread * 60.0 + 120.0
+    } else {
+      (r - g) / spread * 60.0 + 240.0
+    };
+    let hue = ((hue_degrees * 60_000.0 + 0.5) as i32)
+      .rem_euclid(DRAWINGML_POSITIVE_FIXED_ANGLE_MAX_EXCLUSIVE);
+    let saturation = if lightness == 0 || lightness == DRAWINGML_PERCENT_SCALE {
+      0
+    } else if lightness <= DRAWINGML_PERCENT_SCALE / 2 {
+      (spread / (minimum + maximum) * f64::from(DRAWINGML_PERCENT_SCALE) + 0.5) as i32
+    } else {
+      (spread / (2.0 - maximum - minimum) * f64::from(DRAWINGML_PERCENT_SCALE) + 0.5) as i32
+    };
+    Self {
+      hue,
+      saturation,
+      lightness,
+    }
+  }
+
+  pub(crate) fn to_srgb8(self) -> [u8; 3] {
+    let mut rgb = [0.0; 3];
+    if self.saturation == 0 || self.lightness == DRAWINGML_PERCENT_SCALE {
+      rgb.fill(f64::from(self.lightness) / f64::from(DRAWINGML_PERCENT_SCALE));
+    } else if self.lightness > 0 {
+      let hue = f64::from(self.hue) / f64::from(DRAWINGML_POSITIVE_FIXED_ANGLE_MAX_EXCLUSIVE) * 6.0;
+      rgb = if hue <= 1.0 {
+        [1.0, hue, 0.0]
+      } else if hue <= 2.0 {
+        [2.0 - hue, 1.0, 0.0]
+      } else if hue <= 3.0 {
+        [0.0, 1.0, hue - 2.0]
+      } else if hue <= 4.0 {
+        [0.0, 4.0 - hue, 1.0]
+      } else if hue <= 5.0 {
+        [hue - 4.0, 0.0, 1.0]
+      } else {
+        [1.0, 0.0, 6.0 - hue]
+      };
+      let saturation = f64::from(self.saturation) / f64::from(DRAWINGML_PERCENT_SCALE);
+      for channel in &mut rgb {
+        *channel = (*channel - 0.5) * saturation + 0.5;
+      }
+      let luminance = 2.0 * f64::from(self.lightness) / f64::from(DRAWINGML_PERCENT_SCALE) - 1.0;
+      if luminance < 0.0 {
+        let shade = luminance + 1.0;
+        for channel in &mut rgb {
+          *channel *= shade;
+        }
+      } else if luminance > 0.0 {
+        let tint = 1.0 - luminance;
+        for channel in &mut rgb {
+          *channel = 1.0 - (1.0 - *channel) * tint;
+        }
+      }
+    }
+    rgb.map(drawingml_hsl_channel_to_u8)
+  }
+
+  pub(crate) fn apply_hue_mod(&mut self, value: i32) {
+    self.hue = mod_drawingml_value(
+      self.hue,
+      value,
+      DRAWINGML_POSITIVE_FIXED_ANGLE_MAX_EXCLUSIVE,
+    );
+  }
+
+  pub(crate) fn set_saturation(&mut self, value: i32) {
+    self.saturation = value.clamp(0, DRAWINGML_PERCENT_SCALE);
+  }
+
+  pub(crate) fn offset_saturation(&mut self, value: i32) {
+    self.saturation = (self.saturation + value).clamp(0, DRAWINGML_PERCENT_SCALE);
+  }
+
+  pub(crate) fn modulate_saturation(&mut self, value: i32) {
+    self.saturation = mod_drawingml_value(self.saturation, value, DRAWINGML_PERCENT_SCALE);
+  }
+
+  pub(crate) fn set_lightness(&mut self, value: i32) {
+    self.lightness = value.clamp(0, DRAWINGML_PERCENT_SCALE);
+    self.clear_saturation_at_luminance_extreme();
+  }
+
+  pub(crate) fn offset_lightness(&mut self, value: i32) {
+    self.lightness = (self.lightness + value).clamp(0, DRAWINGML_PERCENT_SCALE);
+    self.clear_saturation_at_luminance_extreme();
+  }
+
+  pub(crate) fn modulate_lightness(&mut self, value: i32) {
+    self.lightness = mod_drawingml_value(self.lightness, value, DRAWINGML_PERCENT_SCALE);
+    self.clear_saturation_at_luminance_extreme();
+  }
+
+  fn clear_saturation_at_luminance_extreme(&mut self) {
+    if self.lightness == 0 || self.lightness == DRAWINGML_PERCENT_SCALE {
+      self.saturation = 0;
+    }
+  }
+}
+
+fn mod_drawingml_value(value: i32, modulation: i32, maximum: i32) -> i32 {
+  (i64::from(value) * i64::from(modulation) / i64::from(DRAWINGML_PERCENT_SCALE))
+    .clamp(0, i64::from(maximum)) as i32
+}
+
+fn drawingml_hsl_channel_to_u8(channel: f64) -> u8 {
+  let scaled = channel.clamp(0.0, 1.0) * 255.0;
+  let nearest_integer = scaled.round();
+  let mathematical_value = if (scaled - nearest_integer).abs() <= 1.0e-9 {
+    nearest_integer
+  } else {
+    scaled.floor()
+  };
+  mathematical_value as u8
 }
 
 pub(crate) fn srgb_to_linear_channel(value: f32) -> f32 {
@@ -193,6 +336,22 @@ mod tests {
     ] {
       assert_eq!(HslColor::from_srgb8(rgb).to_srgb8(), rgb);
     }
+  }
+
+  #[test]
+  fn drawingml_integer_hsl_preserves_transform_step_quantization() {
+    let mut ecma_green = DrawingmlHslColor::from_srgb8([0, 255, 0]);
+    ecma_green.modulate_saturation(20_000);
+    assert_eq!(ecma_green.to_srgb8(), [0x66, 0x99, 0x66]);
+
+    let tinted = drawingml_tint_srgb8([0xE7, 0xE6, 0xE6], 85_000);
+    let mut fill = DrawingmlHslColor::from_srgb8(tinted);
+    fill.modulate_saturation(155_000);
+    assert_eq!(fill.to_srgb8(), [235, 233, 233]);
+
+    let mut outline = DrawingmlHslColor::from_srgb8([0x44, 0x54, 0x6A]);
+    outline.modulate_saturation(155_000);
+    assert_eq!(outline.to_srgb8(), [57, 82, 116]);
   }
 
   #[test]

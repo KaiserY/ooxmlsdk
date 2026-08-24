@@ -446,6 +446,22 @@ pub(crate) fn effective_font_size_pt(
   }
 }
 
+fn font_size_reaches_kerning_minimum(font_size_pt: f32, minimum_size_pt: f32) -> bool {
+  if !minimum_size_pt.is_finite() {
+    return false;
+  }
+  if !font_size_pt.is_finite() {
+    return font_size_pt.is_sign_positive();
+  }
+  // DrawingML stores both `sz` and `kern` in hundredths of a point, but a
+  // group transform can turn an authored equality such as 66.00 == 66.00
+  // into adjacent f32 values. Keep the comparison inclusive as specified,
+  // while limiting the tolerance to ordinary floating-point accumulation;
+  // a real one-hundredth-point counterexample must remain below threshold.
+  let tolerance = 16.0 * f32::EPSILON * font_size_pt.abs().max(minimum_size_pt.abs()).max(1.0);
+  font_size_pt + tolerance >= minimum_size_pt
+}
+
 fn effective_bold(style: &(impl FontStyleRef + ?Sized), _script: Option<TextScript>) -> bool {
   if uses_complex_run_properties(style) {
     style.complex_bold().unwrap_or(false)
@@ -639,9 +655,9 @@ impl FontStyleRef for TextStyle {
   }
 
   fn kerning_enabled(&self) -> bool {
-    self
-      .kerning_minimum_size_pt
-      .is_none_or(|minimum| effective_font_size_pt(self, None) + f32::EPSILON >= minimum)
+    self.kerning_minimum_size_pt.is_none_or(|minimum| {
+      font_size_reaches_kerning_minimum(effective_font_size_pt(self, None), minimum)
+    })
   }
 
   fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
@@ -842,9 +858,9 @@ impl FontStyleRef for common::TextStyle<'_> {
   }
 
   fn kerning_enabled(&self) -> bool {
-    self
-      .kerning_minimum_size
-      .is_none_or(|minimum| effective_font_size_pt(self, None) + f32::EPSILON >= minimum.0)
+    self.kerning_minimum_size.is_none_or(|minimum| {
+      font_size_reaches_kerning_minimum(effective_font_size_pt(self, None), minimum.0)
+    })
   }
 
   fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
@@ -2094,6 +2110,20 @@ mod tests {
 
     style.font_size_pt = 12.0;
     assert_eq!(font_request(&style, None).features[0].value, 1);
+
+    style.font_size_pt = 65.999_99;
+    style.kerning_minimum_size_pt = Some(66.0);
+    assert_eq!(font_request(&style, None).features[0].value, 1);
+
+    style.font_size_pt = 65.99;
+    assert_eq!(font_request(&style, None).features[0].value, 0);
+
+    style.font_size_pt = 66.0;
+    style.kerning_minimum_size_pt = Some(66.01);
+    assert_eq!(font_request(&style, None).features[0].value, 0);
+
+    style.kerning_minimum_size_pt = Some(f32::INFINITY);
+    assert_eq!(font_request(&style, None).features[0].value, 0);
   }
 
   #[test]

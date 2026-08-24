@@ -155,6 +155,7 @@ fn collect_sdt_run(sdt: &w::SdtRun, events: &mut Vec<ParagraphFieldEvent>) {
 }
 
 fn collect_inserted_run(inserted: &w::InsertedRun, events: &mut Vec<ParagraphFieldEvent>) {
+  let event_start = events.len();
   for choice in &inserted.inserted_run_choice {
     match choice {
       w::InsertedRunChoice::WRun(run) => collect_run(run, events),
@@ -164,6 +165,19 @@ fn collect_inserted_run(inserted: &w::InsertedRun, events: &mut Vec<ParagraphFie
       w::InsertedRunChoice::MoveToRun(moved) => collect_move_to_run(moved, events),
       w::InsertedRunChoice::BookmarkStart(bookmark) => collect_bookmark_start(bookmark, events),
       w::InsertedRunChoice::BookmarkEnd(bookmark) => collect_bookmark_end(bookmark, events),
+      _ => {}
+    }
+  }
+  // A field carried by an insertion redline is part of the newly authored
+  // story. Writer recalculates an inserted TOC when it is loaded even when
+  // the field's own dirty bit is absent (redline-ends-before-toc.docx). Keep
+  // explicit locked fields protected below; only mark the field events in
+  // this inserted run dirty so an ordinary cached TOC remains unchanged.
+  for event in &mut events[event_start..] {
+    match event {
+      ParagraphFieldEvent::Begin { dirty, .. } | ParagraphFieldEvent::Simple { dirty, .. } => {
+        *dirty = true
+      }
       _ => {}
     }
   }
@@ -849,7 +863,13 @@ pub(super) fn refresh_tables_of_contents(
     // the current field result. That result may legitimately be empty. Its
     // absence is not an implicit update request: a TOC is recalculated only
     // when its begin character is dirty or settings request field updates.
-    if span.locked || (!span.dirty && !update_fields_on_open) {
+    // Word's empty-result placeholder is a narrow exception: a cached TOC
+    // paragraph containing only a blank run (the empty hyperlink cache in
+    // tdf155736_PageNumbers_footer.docx) is replaced by the fixed-format
+    // "NO TABLE OF CONTENTS ENTRIES FOUND." diagnostic even when the field is
+    // not marked dirty. A genuinely empty cached field remains untouched.
+    let has_empty_result_placeholder = toc_span_has_empty_result_placeholder(sections, &scan, span);
+    if span.locked || (!span.dirty && !update_fields_on_open && !has_empty_result_placeholder) {
       continue;
     }
 
@@ -892,9 +912,15 @@ pub(super) fn refresh_tables_of_contents(
     }
 
     if blocks.is_empty() {
+      let empty_template = templates.get(&1).or_else(|| {
+        templates
+          .iter()
+          .min_by_key(|(level, _)| *level)
+          .map(|(_, paragraph)| paragraph)
+      });
       blocks.push(Block::paragraph(build_empty_toc_result(
         &span.spec,
-        templates.get(&1),
+        empty_template,
         styles,
         page,
         ui_language,
@@ -1852,8 +1878,6 @@ fn empty_toc_paragraph(styles: &StylesCatalog, level: u8) -> Paragraph {
     // Word's latent TOC styles indent successive levels by 180 twips.
     format.indent_left_pt = f32::from(level.saturating_sub(1)) * 9.0;
     format.indent_left_set = true;
-    format.spacing_after_pt = 0.0;
-    format.spacing_after_set = true;
   }
   let mut base_style = styles.run_style_with_base(
     Some(&style_id),
@@ -2021,9 +2045,14 @@ fn build_empty_toc_result(
   paragraph.list_label = None;
   paragraph.list_label_hyperlink_url = None;
   let text = localized_field_message(FieldMessage::EmptyTableOfContents, ui_language);
+  let mut style = paragraph.base_style.clone();
+  // Writer's generated empty-TOC diagnostic is an application error run, not
+  // ordinary TOC1 cached text. Its fixed PDF output is bold even when the
+  // cached TOC paragraph was plain (redline-ends-before-toc.docx).
+  apply_generated_field_message_style(&mut style, FieldMessage::EmptyTableOfContents, ui_language);
   paragraph.inlines.push(InlineItem::Text(TextRun {
     text,
-    style: paragraph.base_style.clone(),
+    style,
     hyperlink_url: None,
     dynamic_field: None,
     style_ref_keys: Vec::new(),
@@ -2032,6 +2061,27 @@ fn build_empty_toc_result(
     preserve_text_portion: false,
   }));
   paragraph
+}
+
+fn toc_span_has_empty_result_placeholder(
+  sections: &[ImportedSection],
+  scan: &StoryScan,
+  span: &TocSpan,
+) -> bool {
+  (span.start_ordinal.saturating_add(1)..=span.end_ordinal).any(|ordinal| {
+    paragraph(sections, scan, ordinal).is_some_and(|paragraph| {
+      let has_cached_content = paragraph
+        .field_events
+        .iter()
+        .any(|event| matches!(event, ParagraphFieldEvent::Content));
+      let has_visible_content = paragraph.inlines.iter().any(|inline| match inline {
+        InlineItem::Text(run) => !run.text.trim().is_empty(),
+        InlineItem::BookmarkStart(_) => false,
+        _ => true,
+      });
+      has_cached_content && !has_visible_content
+    })
+  })
 }
 
 fn replace_toc_span(

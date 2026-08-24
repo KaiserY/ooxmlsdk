@@ -20,7 +20,7 @@ use crate::model::{
   BorderStyle, ImageCrop, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PageSetup,
   PdfTextSegmentation, RectItem, RgbColor, RgbColor as LayoutRgbColor, TextItem, TextStyle,
   common_page_setup, common_point, common_rect, common_rgb, common_stroke_from_border,
-  common_text_style,
+  common_text_style, drawingml_kerning_minimum_size_pt,
 };
 use crate::options::{FieldUpdateDateTime, LayoutOptions};
 use crate::render::chart as shared_chart;
@@ -86,6 +86,60 @@ const MISSING_PICTURE_BORDER_INSET_PT: f32 = 0.06;
 const MISSING_PICTURE_ICON_OFFSET_PT: f32 = 0.84;
 const MISSING_PICTURE_ICON_WIDTH_PT: f32 = 1.68;
 const MISSING_PICTURE_ICON_HEIGHT_PT: f32 = 1.92;
+const POWERPOINT_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX: f32 = 16.0;
+
+#[derive(Clone, Copy, Debug)]
+struct PptxFixedOutputProfile {
+  raster_dpi: f32,
+  forbids_transparency: bool,
+}
+
+impl PptxFixedOutputProfile {
+  fn from_layout_options(options: &LayoutOptions) -> Self {
+    Self {
+      raster_dpi: options
+        .fixed_output_raster_dpi
+        .filter(|dpi| *dpi > 0)
+        .unwrap_or(units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32) as f32,
+      forbids_transparency: options.fixed_output_forbids_transparency,
+    }
+  }
+
+  fn pixels_per_point(self) -> f32 {
+    self.raster_dpi / units::POINTS_PER_INCH
+  }
+
+  fn simple_shape_glow_pixels_per_point(self, radius_pt: f32) -> f32 {
+    // Office selects the shape-glow raster tier against a 200-DPI reference
+    // surface, independently of whether the final fixed-output intent is
+    // Print (200 DPI) or Screen (96 DPI). Exact-config interpolation places
+    // the tier edges at 5.76 and 11.52pt: each tier keeps the authored radius
+    // at or below 16 reference pixels. The selected divisor is then applied
+    // to the configured output density (11pt => 100/48 DPI respectively).
+    let reference_radius_px =
+      radius_pt.max(0.0) * units::OFFICE_FIXED_OUTPUT_RASTER_DPI / units::POINTS_PER_INCH;
+    let tier_position = reference_radius_px / POWERPOINT_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX;
+    let nearest_tier = tier_position.round();
+    let integer_tolerance = f32::EPSILON * tier_position.abs().max(1.0) * 8.0;
+    let divisor = if (tier_position - nearest_tier).abs() <= integer_tolerance {
+      nearest_tier
+    } else {
+      tier_position.ceil()
+    }
+    .max(1.0);
+    self.pixels_per_point() / divisor
+  }
+}
+
+impl Default for PptxFixedOutputProfile {
+  fn default() -> Self {
+    Self {
+      raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+      forbids_transparency: false,
+    }
+  }
+}
+
 // Microsoft Office fixed-output evidence:
 // - smartart-missing-bullet.pptx scales the synthesized 22.5 pt indent with
 //   the SmartArt font scale;
@@ -106,6 +160,7 @@ pub(crate) fn lower_to_layout_document(
     options.format_locale.as_deref(),
     options.default_document_language.as_deref(),
   );
+  let fixed_output = PptxFixedOutputProfile::from_layout_options(options);
   let pages = import
     .draw_pages
     .iter()
@@ -114,7 +169,7 @@ pub(crate) fn lower_to_layout_document(
     .map(|(page_index, slide)| {
       (
         slide.size.to_page_setup(),
-        lower_slide_items_with_summary(import, slide, page_index, &locales, None),
+        lower_slide_items_with_summary(import, slide, page_index, &locales, fixed_output, None),
       )
     })
     .collect();
@@ -223,7 +278,10 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
 }
 
 fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
-  let semantic_metafile_text = supports_semantic_metafile_text(item.content_type.as_deref());
+  let semantic_metafile_text = supports_semantic_metafile_text(
+    item.content_type.as_deref(),
+    item.metafile_semantic_text_includes_raster_backdrop,
+  );
   common::ImageItem {
     bounds: common_rect(item.x_pt, item.y_pt, item.width_pt, item.height_pt),
     crop: Some(common::ImageCrop {
@@ -244,6 +302,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
     metafile_monochrome_dib_palette_override: item.metafile_monochrome_dib_palette_override,
     metafile_background_color: item.metafile_background_color,
     metafile_external_header: item.metafile_external_header,
+    metafile_fixed_output_profile: item.metafile_fixed_output_profile,
     relationship_id: None,
     alt_text: item.alt_text.map(Cow::Owned),
     hyperlink_url: item.hyperlink_url.map(Cow::Owned),
@@ -257,20 +316,25 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
   }
 }
 
-fn supports_semantic_metafile_text(content_type: Option<&str>) -> bool {
-  content_type.is_some_and(|content_type| {
-    matches!(
-      content_type.to_ascii_lowercase().as_str(),
-      "image/emf"
-        | "image/x-emf"
-        | "application/emf"
-        | "application/x-emf"
-        | "image/wmf"
-        | "image/x-wmf"
-        | "application/wmf"
-        | "application/x-wmf"
-    )
-  })
+fn supports_semantic_metafile_text(
+  content_type: Option<&str>,
+  metafile_semantic_text_includes_raster_backdrop: bool,
+) -> bool {
+  let Some(content_type) = content_type else {
+    return false;
+  };
+  match content_type.to_ascii_lowercase().as_str() {
+    "image/emf" | "image/x-emf" | "application/emf" | "application/x-emf" => true,
+    // PowerPoint fixed output treats an ordinary WMF picture or OLE preview
+    // as graphics: the source-backed 0/45/90-degree lfEscapement matrix has
+    // no extractable Office text at any angle. Native ActiveX thumbnails are
+    // the counterexample; their slide importer sets the backdrop flag because
+    // PowerPoint lifts those WMF text records into the PDF form.
+    "image/wmf" | "image/x-wmf" | "application/wmf" | "application/x-wmf" => {
+      metafile_semantic_text_includes_raster_backdrop
+    }
+    _ => false,
+  }
 }
 
 fn common_rect_item(item: RectItem) -> common::RectItem<'static> {
@@ -328,7 +392,14 @@ pub(crate) fn inspect_layout_summary(import: &PowerPointImport) -> PptxLayoutSum
   collect_master_text_shapes(import, &mut summary);
   let locales = OfficeLocaleContext::default();
   for (page_index, slide) in import.draw_pages.iter().enumerate() {
-    let _ = lower_slide_items_with_summary(import, slide, page_index, &locales, Some(&mut summary));
+    let _ = lower_slide_items_with_summary(
+      import,
+      slide,
+      page_index,
+      &locales,
+      PptxFixedOutputProfile::default(),
+      Some(&mut summary),
+    );
   }
   summary
 }
@@ -698,6 +769,7 @@ fn lower_slide_items_with_summary(
   slide: &SlidePersist,
   page_index: usize,
   locales: &OfficeLocaleContext,
+  fixed_output: PptxFixedOutputProfile,
   summary: Option<&mut PptxLayoutSummary>,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
@@ -717,12 +789,13 @@ fn lower_slide_items_with_summary(
       page_index,
       locales,
       inherited_scene3d: None,
+      fixed_output,
     },
     &slide.shapes,
     &mut items,
     summary,
   );
-  materialize_drawingml_text_effects(&mut items, &mut TextMetrics::new());
+  materialize_drawingml_text_effects(&mut items, &mut TextMetrics::new(), fixed_output);
   lift_pptx_semantic_text_overlays(&mut items);
   items
 }
@@ -919,6 +992,7 @@ fn lower_shape(
     import,
     slide,
     locales,
+    fixed_output,
     ..
   } = context;
   let enabled_slide_number_field = inherited_slide_number_field_is_enabled(slide, shape);
@@ -946,10 +1020,11 @@ fn lower_shape(
       shape,
       offset,
       Some(shape_visual_start),
+      fixed_output,
       items,
     );
   } else {
-    lower_shape_bounds(import, slide, shape, offset, None, items);
+    lower_shape_bounds(import, slide, shape, offset, None, fixed_output, items);
   }
   lower_shape_hyperlink(shape, offset, items);
   let _has_structured_media_identity = shape.media.as_ref().is_some_and(|media| {
@@ -977,7 +1052,7 @@ fn lower_shape(
   if let Some(table) = &shape.table_properties
     && shape.service_name == ShapeService::Table
   {
-    lower_table(import, shape, offset, table, items);
+    lower_table(import, shape, offset, table, context.fixed_output, items);
   }
 
   if shape.service_name == ShapeService::Chart
@@ -1058,6 +1133,7 @@ fn lower_shape(
       ShapeEffectRasterContext {
         import,
         slide,
+        fixed_output,
         source: Some(source),
         scene3d: shape.scene3d.as_ref(),
         shape3d: shape.shape3d.as_ref(),
@@ -2416,6 +2492,7 @@ fn chart_text_style(
         RunCommon {
           language: properties.language.as_deref(),
           font_size: properties.font_size,
+          kerning: properties.kerning,
           bold: properties.bold.as_ref().map(|value| value.as_bool()),
           italic: properties.italic.as_ref().map(|value| value.as_bool()),
           underline: properties.underline,
@@ -2453,6 +2530,9 @@ fn chart_text_style(
     // default by 120%. A direct title txPr or rich run size replaces that
     // automatic style size rather than being scaled again.
     style.font_size_pt *= POWERPOINT_AUTOMATIC_CHART_TITLE_SCALE;
+    if let Some(effect_font_size_pt) = &mut style.drawingml_effect_font_size_pt {
+      *effect_font_size_pt *= POWERPOINT_AUTOMATIC_CHART_TITLE_SCALE;
+    }
   }
   style.font_size_pt = units::quantize_points_to_office_print_grid(style.font_size_pt);
   style
@@ -3278,6 +3358,7 @@ struct PptxLoweringContext<'a> {
   page_index: usize,
   locales: &'a OfficeLocaleContext,
   inherited_scene3d: Option<&'a a::Scene3DType>,
+  fixed_output: PptxFixedOutputProfile,
 }
 
 fn lower_diagram(
@@ -3464,6 +3545,7 @@ fn lower_diagram(
       finish_diagram_model_shape_effects(
         context.import,
         context.slide,
+        context.fixed_output,
         diagram_shape.shape_properties.as_deref(),
         shape_bounds,
         diagram_shape.shape_rotation_deg,
@@ -3624,6 +3706,7 @@ fn lower_diagram_drawing(
     text_orders: &text_orders,
     text_fills: &text_fills,
     page_index: context.page_index,
+    fixed_output: context.fixed_output,
   };
   let drawing_bounds = shared_diagram::DiagramBounds {
     x: frame.x_pt,
@@ -3679,6 +3762,7 @@ struct DiagramDrawingLoweringContext<'a> {
   text_orders: &'a HashMap<String, usize>,
   text_fills: &'a HashMap<String, RgbColor>,
   page_index: usize,
+  fixed_output: PptxFixedOutputProfile,
 }
 
 fn lower_diagram_drawing_group(
@@ -3808,6 +3892,7 @@ fn lower_diagram_drawing_shape(
   finish_diagram_drawing_shape_effects(
     context.import,
     context.slide,
+    context.fixed_output,
     &shape.shape_properties,
     bounds,
     items,
@@ -3861,6 +3946,7 @@ fn lower_diagram_drawing_shape(
     },
     TextLoweringRuntime {
       slide: Some(context.slide),
+      fixed_output: context.fixed_output,
       ..TextLoweringRuntime::default()
     },
     None,
@@ -4252,6 +4338,7 @@ fn diagram_blip_placeholder_image_item(bounds: shared_diagram::DiagramBounds) ->
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: None,
@@ -4381,6 +4468,16 @@ fn diagram_gradient_fill(
   gradient_fill_for_optional_slide(import, Some(slide), fill, bounds)
 }
 
+fn powerpoint_fixed_output_linear_gradient_interpolation(
+  stop_count: usize,
+) -> common::GradientInterpolation {
+  if stop_count == 2 {
+    common::GradientInterpolation::PowerPointGammaSigma
+  } else {
+    common::GradientInterpolation::LinearSrgb
+  }
+}
+
 fn gradient_fill_for_optional_slide(
   import: &PowerPointImport,
   slide: Option<&SlidePersist>,
@@ -4410,11 +4507,12 @@ fn gradient_fill_for_optional_slide(
     return None;
   }
   let definition_bounds = common_rect(bounds.x, bounds.y, bounds.width, bounds.height);
-  let (angle_degrees, scaled, path) = match fill.gradient_fill_choice.as_ref()? {
+  let (angle_degrees, scaled, path, interpolation) = match fill.gradient_fill_choice.as_ref()? {
     a::GradientFillChoice::LinearGradientFill(linear) => (
       Some(linear.angle.unwrap_or_default() as f32 / 60_000.0),
       linear.scaled.as_ref().is_some_and(|value| value.as_bool()),
       None,
+      powerpoint_fixed_output_linear_gradient_interpolation(stops.len()),
     ),
     a::GradientFillChoice::PathGradientFill(path) => {
       let mut path = common::drawingml_gradient::resolve_path_gradient(
@@ -4432,7 +4530,12 @@ fn gradient_fill_for_optional_slide(
       if path.kind == common::GradientPathKind::Circle {
         path.transform = common::office_circle_gradient_transform(path.transform);
       }
-      (None, false, Some(path))
+      (
+        None,
+        false,
+        Some(path),
+        common::GradientInterpolation::LinearSrgb,
+      )
     }
   };
   Some(common::Fill::Gradient(common::GradientFill {
@@ -4440,7 +4543,7 @@ fn gradient_fill_for_optional_slide(
     angle_degrees,
     definition_bounds: Some(definition_bounds),
     line: None,
-    interpolation: common::GradientInterpolation::LinearSrgb,
+    interpolation,
     scaled,
     rotate_with_shape: None,
     path,
@@ -4492,6 +4595,7 @@ fn diagram_model_shape_suppresses_fill(properties: &dgm::ShapeProperties) -> boo
 fn finish_diagram_model_shape_effects(
   import: &PowerPointImport,
   slide: &SlidePersist,
+  fixed_output: PptxFixedOutputProfile,
   properties: Option<&dgm::ShapeProperties>,
   bounds: shared_diagram::DiagramBounds,
   rotation_degrees: f32,
@@ -4518,6 +4622,7 @@ fn finish_diagram_model_shape_effects(
     ShapeEffectRasterContext {
       import,
       slide,
+      fixed_output,
       source,
       scene3d: properties.scene3_d_type.as_deref(),
       shape3d: properties.shape3_d_type.as_deref(),
@@ -5369,6 +5474,7 @@ fn diagram_shape_suppresses_fill(properties: &dsp::ShapeProperties) -> bool {
 fn finish_diagram_drawing_shape_effects(
   import: &PowerPointImport,
   slide: &SlidePersist,
+  fixed_output: PptxFixedOutputProfile,
   properties: &dsp::ShapeProperties,
   bounds: shared_diagram::DiagramBounds,
   items: &mut Vec<PageItem>,
@@ -5397,6 +5503,7 @@ fn finish_diagram_drawing_shape_effects(
     ShapeEffectRasterContext {
       import,
       slide,
+      fixed_output,
       source,
       scene3d: properties.scene3_d_type.as_deref(),
       shape3d: properties.shape3_d_type.as_deref(),
@@ -5673,6 +5780,7 @@ fn lower_legacy_vml_fill_image(shape: &Shape, offset: DisplayOffset, items: &mut
       metafile_monochrome_dib_palette_override: fill.resource.monochrome_dib_palette_override,
       metafile_background_color: None,
       metafile_external_header: None,
+      metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
       metafile_semantic_text_includes_raster_backdrop: false,
       alt_text: shape
         .description
@@ -5891,6 +5999,7 @@ fn lower_picture(
     metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
     metafile_background_color: None,
     metafile_external_header: resource.metafile_external_header,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: resource
       .metafile_semantic_text_includes_raster_backdrop,
     alt_text: shape
@@ -5975,6 +6084,7 @@ fn lower_empty_blip_fill_placeholder(
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: shape
       .description
@@ -6029,6 +6139,7 @@ fn lower_table(
   shape: &Shape,
   offset: DisplayOffset,
   table: &TableProperties,
+  fixed_output: PptxFixedOutputProfile,
   items: &mut Vec<PageItem>,
 ) {
   // table grid and row heights as the visible TableShape size.
@@ -6134,6 +6245,7 @@ fn lower_table(
             width_pt: cell_width,
             height_pt: table_cell_display_height(cell, row_index, &row_heights),
           },
+          fixed_output,
           items,
         );
       }
@@ -6469,6 +6581,7 @@ fn lower_table_cell(
   style_part: Option<&TableStylePart>,
   table_background: Option<common::Fill<'static>>,
   frame: TextFrame,
+  fixed_output: PptxFixedOutputProfile,
   items: &mut Vec<PageItem>,
 ) {
   if frame.width_pt <= 0.0 || frame.height_pt <= 0.0 {
@@ -6518,6 +6631,7 @@ fn lower_table_cell(
       },
       &text_body,
       style_part.map(|style| &style.text),
+      fixed_output,
       items,
     );
   }
@@ -6823,6 +6937,7 @@ fn lower_shape_bounds(
   shape: &Shape,
   offset: DisplayOffset,
   content_start_override: Option<usize>,
+  fixed_output: PptxFixedOutputProfile,
   items: &mut Vec<PageItem>,
 ) {
   if shape.service_name == ShapeService::Group
@@ -7071,6 +7186,7 @@ fn lower_shape_bounds(
   .then_some(ShapeEffectRasterContext {
     import,
     slide,
+    fixed_output,
     source: effect_source,
     scene3d: shape.scene3d.as_ref(),
     shape3d: shape.shape3d.as_ref(),
@@ -7244,6 +7360,7 @@ enum ShapeEffectSource<'a> {
 struct ShapeEffectRasterContext<'a> {
   import: &'a PowerPointImport,
   slide: &'a SlidePersist,
+  fixed_output: PptxFixedOutputProfile,
   source: Option<ShapeEffectSource<'a>>,
   scene3d: Option<&'a a::Scene3DType>,
   shape3d: Option<&'a a::Shape3DType>,
@@ -7359,11 +7476,32 @@ fn finish_shape_effect_raster(
   );
   let simple_glow =
     simple_shape_glow(&effects).filter(|_| context.scene3d.is_none() && context.shape3d.is_none());
+  let simple_glow_pixels_per_point = simple_glow.as_ref().and_then(|effect| {
+    let ImageEffect::Glow { radius_px, .. } = effect else {
+      return None;
+    };
+    let radius_pt = *radius_px * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH;
+    Some(
+      context
+        .fixed_output
+        .simple_shape_glow_pixels_per_point(radius_pt),
+    )
+  });
   let behind_effects = fixed_effect_list
     .then(|| shape_behind_effects(&effects))
     .flatten()
     .filter(|_| context.scene3d.is_none() && context.shape3d.is_none());
   let preserve_vector_source = behind_effects.is_some();
+  let display_items = items[content_start..]
+    .iter()
+    .cloned()
+    .map(common_display_item)
+    .collect::<Vec<_>>();
+  let source_stroke_outset_pt = if simple_glow.is_some() && !context.children_source {
+    effect_source_stroke_outset_pt(&display_items)
+  } else {
+    0.0
+  };
   let output_bounds = if effects.effects.is_empty() {
     // Static 3-D is independent from a:effectLst/a:effectDag. Most authored
     // scene3d shapes have no effect container at all, so the synthetic empty
@@ -7398,12 +7536,16 @@ fn finish_shape_effect_raster(
       )
     })
     .unwrap_or_default();
-  let relative_left = output_bounds.left_pt.min(0.0) - static_padding.left_pt;
-  let relative_top = output_bounds.top_pt.min(0.0) - static_padding.top_pt;
-  let relative_right =
-    output_bounds.right_pt.max(context.bounds.size.width.0) + static_padding.right_pt;
-  let relative_bottom =
-    output_bounds.bottom_pt.max(context.bounds.size.height.0) + static_padding.bottom_pt;
+  let relative_left =
+    output_bounds.left_pt.min(0.0) - static_padding.left_pt - source_stroke_outset_pt;
+  let relative_top =
+    output_bounds.top_pt.min(0.0) - static_padding.top_pt - source_stroke_outset_pt;
+  let relative_right = output_bounds.right_pt.max(context.bounds.size.width.0)
+    + static_padding.right_pt
+    + source_stroke_outset_pt;
+  let relative_bottom = output_bounds.bottom_pt.max(context.bounds.size.height.0)
+    + static_padding.bottom_pt
+    + source_stroke_outset_pt;
   let raster_bounds = common::Rect {
     origin: common::Point {
       x: common::Pt(context.bounds.origin.x.0 + relative_left),
@@ -7414,24 +7556,26 @@ fn finish_shape_effect_raster(
       height: common::Pt(relative_bottom - relative_top),
     },
   };
+  let simple_glow_exclusion_clip = if simple_glow.is_some() && !context.children_source {
+    simple_shape_glow_exclusion_clip_path(&display_items, raster_bounds)
+  } else {
+    Vec::new()
+  };
   let mut semantic_overlays = Vec::new();
   collect_pptx_semantic_text_overlays(
     &items[content_start..],
     &mut semantic_overlays,
     &mut TextMetrics::new(),
   );
-  let display_items = items[content_start..]
-    .iter()
-    .cloned()
-    .map(common_display_item)
-    .collect::<Vec<_>>();
   let automatic_extrusion_color =
     common::drawingml_3d::automatic_extrusion_color_from_items(&display_items);
-  let raster = if simple_glow.is_some() && !context.children_source {
+  let raster = if let Some(pixels_per_point) = simple_glow_pixels_per_point
+    && !context.children_source
+  {
     common::drawingml_shape_raster::rasterize_fill_layer_at_pixels_per_point(
       &display_items,
       raster_bounds,
-      138.0 / 297.6,
+      pixels_per_point,
     )
   } else if context.scene3d.is_some() && context.shape3d.is_some() && !context.children_source {
     // PowerPoint fixed output consistently stores static picture-3D surfaces
@@ -7462,18 +7606,24 @@ fn finish_shape_effect_raster(
     return false;
   };
   if let Some(glow) = simple_glow {
-    // PowerPoint fixed output keeps a simple shape glow in a low-resolution
-    // image behind the original vector shape. The Office reference for
-    // shape-text-glow-effect.pptx stores a 138 px mask over a 297.6 pt box.
+    // PowerPoint fixed output keeps a simple shape glow in a tiered-density
+    // image behind the original vector shape. The tier divisor is shared by
+    // otherwise-identical Print and Screen exports, while the base density
+    // follows the configured fixed-output intent.
     let mut glow = glow;
     if let common::drawingml_image_effects::ImageEffect::Glow {
       spread_ratio,
       spread_kernel,
+      spread_radius_rounding,
       ..
     } = &mut glow
     {
       *spread_ratio = 0.5;
-      *spread_kernel = common::drawingml_image_effects::GlowSpreadKernel::Diamond;
+      // PowerPoint's fixed-output glow expands radially: its diagonal coverage
+      // falls between diamond and square morphology for ellipse, rectangle,
+      // and rounded-rectangle controls.
+      *spread_kernel = common::drawingml_image_effects::GlowSpreadKernel::Disk;
+      *spread_radius_rounding = common::drawingml_image_effects::GlowSpreadRadiusRounding::Inward;
     }
     effects = common::drawingml_image_effects::ImageEffectContainer {
       kind: common::drawingml_image_effects::ImageEffectContainerKind::Sibling,
@@ -7559,7 +7709,7 @@ fn finish_shape_effect_raster(
     width_pt: raster_bounds.size.width.0,
     height_pt: raster_bounds.size.height.0,
     crop: ImageCrop::default(),
-    clip_path: Vec::new(),
+    clip_path: simple_glow_exclusion_clip,
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
@@ -7568,6 +7718,7 @@ fn finish_shape_effect_raster(
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: None,
@@ -7636,6 +7787,86 @@ fn simple_shape_glow(
     return None;
   }
   Some(glow.clone())
+}
+
+fn effect_source_stroke_outset_pt(items: &[common::DisplayItem<'_>]) -> f32 {
+  fn closed_shape_outset(stroke: &common::Stroke<'_>) -> f32 {
+    if stroke.alignment == Some(common::StrokeAlignment::Inside) {
+      0.0
+    } else {
+      stroke.width.0.max(0.0) * 0.5
+    }
+  }
+
+  items.iter().fold(0.0_f32, |outset, item| {
+    let item_outset = match item {
+      common::DisplayItem::Path(path) => path.stroke.as_ref().map_or(0.0, closed_shape_outset),
+      common::DisplayItem::Rect(rect) => rect.stroke.as_ref().map_or(0.0, closed_shape_outset),
+      common::DisplayItem::Line(line) => line.stroke.width.0.max(0.0) * 0.5,
+      common::DisplayItem::Group(group) => effect_source_stroke_outset_pt(&group.items),
+      _ => 0.0,
+    };
+    outset.max(item_outset)
+  })
+}
+
+fn simple_shape_glow_exclusion_clip_path(
+  items: &[common::DisplayItem<'_>],
+  raster_bounds: common::Rect,
+) -> Vec<common::PathCommand> {
+  fn rect_commands(bounds: common::Rect) -> Vec<common::PathCommand> {
+    let left = bounds.origin.x;
+    let top = bounds.origin.y;
+    let right = common::Pt(bounds.origin.x.0 + bounds.size.width.0);
+    let bottom = common::Pt(bounds.origin.y.0 + bounds.size.height.0);
+    vec![
+      common::PathCommand::MoveTo(common::Point { x: left, y: top }),
+      common::PathCommand::LineTo(common::Point { x: right, y: top }),
+      common::PathCommand::LineTo(common::Point {
+        x: right,
+        y: bottom,
+      }),
+      common::PathCommand::LineTo(common::Point { x: left, y: bottom }),
+      common::PathCommand::Close,
+    ]
+  }
+
+  let mut fill_contour = None;
+  for item in items {
+    let commands = match item {
+      common::DisplayItem::Path(path) if !matches!(path.fill, common::Fill::None) => {
+        Some(path.commands.clone())
+      }
+      common::DisplayItem::Rect(rect) if !matches!(rect.fill, common::Fill::None) => {
+        Some(rect_commands(rect.bounds))
+      }
+      common::DisplayItem::Image(image) => Some(if image.clip_path.is_empty() {
+        rect_commands(image.bounds)
+      } else {
+        image.clip_path.clone()
+      }),
+      _ => None,
+    };
+    let Some(commands) = commands.filter(|commands| !commands.is_empty()) else {
+      continue;
+    };
+    // One leaf shape has one independently painted fill geometry. Refuse to
+    // XOR unrelated overlapping fills; those require a future union model.
+    if fill_contour.replace(commands).is_some() {
+      return Vec::new();
+    }
+  }
+  let Some(fill_contour) = fill_contour else {
+    return Vec::new();
+  };
+
+  // PowerPoint fixed output paints the glow bitmap through an even-odd clip
+  // made from the bitmap extent and the shape's actual fill contour. A
+  // no-fill shape deliberately has no inner contour, so its stroked glow is
+  // not erased from the interior.
+  let mut clip = rect_commands(raster_bounds);
+  clip.extend(fill_contour);
+  clip
 }
 
 fn effect_copy_items(items: &[PageItem]) -> Vec<PageItem> {
@@ -7960,11 +8191,7 @@ fn shape_gradient_path(
           gradient_line,
           scaled,
           None,
-          if follows_shape_transform {
-            common::GradientInterpolation::PowerPointGammaSigma
-          } else {
-            common::GradientInterpolation::LinearSrgb
-          },
+          powerpoint_fixed_output_linear_gradient_interpolation(stops.len()),
         )
       }
       a::GradientFillChoice::PathGradientFill(path) => {
@@ -8358,6 +8585,7 @@ fn blip_fill_image_items_from_resource(
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: placement.alt_text,
     hyperlink_url: placement.hyperlink_url,
@@ -8414,6 +8642,7 @@ fn tiled_blip_fill_image_items(
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
+      metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
       metafile_semantic_text_includes_raster_backdrop: false,
       alt_text: placement.alt_text.clone(),
       hyperlink_url: placement.hyperlink_url.clone(),
@@ -8497,14 +8726,15 @@ impl PptxImageEffectColorResolver<'_> {
   fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
     let color = color?;
     let paint = match (self.slide, self.chart_resource) {
-      (Some(slide), Some(chart_resource)) => display_paint_for_chart_color_with_placeholder(
+      (Some(slide), Some(chart_resource)) => display_paint_for_chart_color_with_placeholder_policy(
         self.import,
         slide,
         chart_resource,
         &color,
         self.placeholder_color.as_ref(),
+        true,
       ),
-      _ => display_paint_for_optional_slide(
+      _ => display_paint_for_optional_slide_with_transform_precision(
         self.import,
         self.slide,
         &color,
@@ -8828,6 +9058,7 @@ fn lower_text_body(
       slide: Some(context.slide),
       image_resources: Some(&context.slide.image_resources),
       page_index: context.page_index,
+      fixed_output: context.fixed_output,
     },
     text_box,
     word_art_target_frame,
@@ -8854,6 +9085,7 @@ fn lower_text_body_at_with_table_style(
   frame: TextFrame,
   text_body: &TextBody,
   table_text_style: Option<&TableStyleTextProperties>,
+  fixed_output: PptxFixedOutputProfile,
   items: &mut Vec<PageItem>,
 ) {
   lower_text_body_at_with_style(
@@ -8865,7 +9097,10 @@ fn lower_text_body_at_with_table_style(
       table_cell: true,
       ..TextStyleLoweringInputs::default()
     },
-    TextLoweringRuntime::default(),
+    TextLoweringRuntime {
+      fixed_output,
+      ..TextLoweringRuntime::default()
+    },
     None,
     items,
   );
@@ -8895,6 +9130,7 @@ fn lower_text_body_at_with_font_ref(
       image_resources: context.image_resources,
       page_index: context.page_index,
       slide: context.slide,
+      fixed_output: context.fixed_output,
     },
     summary,
     items,
@@ -8907,6 +9143,7 @@ struct TextBodyLoweringContext<'a> {
   slide: Option<&'a SlidePersist>,
   image_resources: Option<&'a HashMap<String, ImageResource>>,
   page_index: usize,
+  fixed_output: PptxFixedOutputProfile,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -8926,6 +9163,7 @@ struct TextLoweringRuntime<'a> {
   image_resources: Option<&'a HashMap<String, ImageResource>>,
   page_index: usize,
   slide: Option<&'a SlidePersist>,
+  fixed_output: PptxFixedOutputProfile,
 }
 
 fn lower_text_body_at_with_style(
@@ -9054,7 +9292,11 @@ fn lower_text_body_at_with_style_and_scale(
   // evaluated. This preserves DrawingML's inner-text-then-outer-shape
   // composition order; the slide-wide pass also catches chart text produced
   // outside this text-body lowerer.
-  materialize_drawingml_text_effects(&mut items[item_start..], &mut text_metrics);
+  materialize_drawingml_text_effects(
+    &mut items[item_start..],
+    &mut text_metrics,
+    runtime.fixed_output,
+  );
 }
 
 fn apply_word_art_transform(
@@ -9127,10 +9369,14 @@ fn apply_text_camera_z_rotation(
   }
 }
 
-fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut TextMetrics) {
+fn materialize_drawingml_text_effects(
+  items: &mut [PageItem],
+  text_metrics: &mut TextMetrics,
+  fixed_output: PptxFixedOutputProfile,
+) {
   for item in items {
     if let PageItem::Group { items, .. } = item {
-      materialize_drawingml_text_effects(items, text_metrics);
+      materialize_drawingml_text_effects(items, text_metrics, fixed_output);
       continue;
     }
     let PageItem::Text(text) = item else {
@@ -9149,6 +9395,9 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
         effects: Vec::new(),
       },
     );
+    if fixed_output.forbids_transparency {
+      omit_powerpoint_text_outer_shadow_for_transparency_conformance(&mut effects);
+    }
     let static3d = text.style.drawingml_text_static3d.clone();
     if effects.effects.is_empty() && static3d.is_none() {
       continue;
@@ -9161,15 +9410,31 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
       text.style.rotation_deg,
     );
     let simple_text_glow = simple_shape_glow(&effects).filter(|_| static3d.is_none());
-    let preserve_visible_text = simple_text_glow.is_some()
-      && !text.style.pdf_glyph_outlines
-      && text.style.outline_width_pt <= f32::EPSILON;
+    // ECMA-376 Part 1 section 20.1.8.26 makes the unchanged main shape the
+    // last sibling of an effectLst. PowerPoint exports that foreground as
+    // searchable vector text and emits only the preceding effect branches as
+    // the image XObject. Keep an effectDag or static-3-D text body flattened:
+    // neither has an independently unchanged foreground branch.
+    let separable_backdrop = static3d
+      .is_none()
+      .then(|| common::drawingml_image_effects::unchanged_foreground_backdrop(&effects))
+      .flatten();
+    let preserve_visible_text = separable_backdrop.is_some()
+      || (simple_text_glow.is_some()
+        && !text.style.pdf_glyph_outlines
+        && text.style.outline_width_pt <= f32::EPSILON);
     let transparent_semantic_style = simple_text_glow.is_some() && !preserve_visible_text;
-    let Some(output_bounds) =
-      common::drawingml_image_effects::container_output_bounds(&effects, ink_width, ink_height)
-    else {
-      continue;
-    };
+    let crops_to_effect_output = separable_backdrop.is_some();
+    let mut raster_effects = separable_backdrop.unwrap_or_else(|| effects.clone());
+    if !crops_to_effect_output
+      && preserve_visible_text
+      && let Some(glow) = simple_text_glow
+    {
+      raster_effects = common::drawingml_image_effects::ImageEffectContainer {
+        kind: common::drawingml_image_effects::ImageEffectContainerKind::Sibling,
+        effects: vec![glow],
+      };
+    }
     let static_padding = static3d
       .as_ref()
       .map(|style| {
@@ -9181,10 +9446,84 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
         )
       })
       .unwrap_or_default();
-    let relative_left = output_bounds.left_pt.min(0.0) - static_padding.left_pt;
-    let relative_top = output_bounds.top_pt.min(0.0) - static_padding.top_pt;
-    let relative_right = output_bounds.right_pt.max(ink_width) + static_padding.right_pt;
-    let relative_bottom = output_bounds.bottom_pt.max(ink_height) + static_padding.bottom_pt;
+    let paint_source_bounds = common::drawingml_image_effects::EffectOutputBounds {
+      left_pt: -static_padding.left_pt,
+      top_pt: -static_padding.top_pt,
+      right_pt: ink_width + static_padding.right_pt,
+      bottom_pt: ink_height + static_padding.bottom_pt,
+    };
+    let fallback_anchor = {
+      let baseline = text.y_pt + pptx_text_baseline_offset(text, text_metrics);
+      let advance_width_pt = text_metrics.measure_text(&text.text, &text.style);
+      common::Rect {
+        origin: common::Point {
+          x: common::Pt(text.x_pt),
+          y: common::Pt(baseline - text.line_height_pt),
+        },
+        size: common::Size {
+          width: common::Pt(advance_width_pt.max(f32::EPSILON)),
+          height: common::Pt(text.line_height_pt.max(f32::EPSILON)),
+        },
+      }
+    };
+    let anchor = text.drawingml_text_effect_anchor.unwrap_or(fallback_anchor);
+    let anchor_bounds = common::drawingml_image_effects::EffectOutputBounds {
+      left_pt: anchor.origin.x.0 - ink_left,
+      top_pt: anchor.origin.y.0 - ink_top,
+      right_pt: anchor.origin.x.0 + anchor.size.width.0 - ink_left,
+      bottom_pt: anchor.origin.y.0 + anchor.size.height.0 - ink_top,
+    };
+    let effect_source_bounds = if crops_to_effect_output {
+      powerpoint_text_effect_source_bounds(text, ink_left, ink_top, text_metrics)
+    } else {
+      paint_source_bounds
+    };
+    let raster_divisor = if crops_to_effect_output {
+      prepare_powerpoint_text_effect_raster(
+        &mut raster_effects,
+        text
+          .style
+          .drawingml_effect_font_size_pt
+          .unwrap_or(text.style.font_size_pt),
+      )
+    } else {
+      1.0
+    };
+    let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds_with_anchor(
+      &raster_effects,
+      effect_source_bounds,
+      anchor_bounds,
+    ) else {
+      continue;
+    };
+    let (final_relative_left, final_relative_top, final_relative_right, final_relative_bottom) =
+      if crops_to_effect_output {
+        (
+          output_bounds.left_pt,
+          output_bounds.top_pt,
+          output_bounds.right_pt,
+          output_bounds.bottom_pt,
+        )
+      } else {
+        (
+          output_bounds.left_pt.min(effect_source_bounds.left_pt),
+          output_bounds.top_pt.min(effect_source_bounds.top_pt),
+          output_bounds.right_pt.max(effect_source_bounds.right_pt),
+          output_bounds.bottom_pt.max(effect_source_bounds.bottom_pt),
+        )
+      };
+    // The source must remain on the working surface even when the exported
+    // XObject is cropped to a disjoint transformed shadow.
+    let relative_left = final_relative_left
+      .min(effect_source_bounds.left_pt)
+      .min(0.0);
+    let relative_top = final_relative_top.min(effect_source_bounds.top_pt).min(0.0);
+    let relative_right = final_relative_right
+      .max(effect_source_bounds.right_pt)
+      .max(ink_width);
+    let relative_bottom = final_relative_bottom
+      .max(effect_source_bounds.bottom_pt)
+      .max(ink_height);
     let raster_bounds = common::Rect {
       origin: common::Point {
         x: common::Pt(ink_left + relative_left),
@@ -9200,19 +9539,22 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
     let automatic_extrusion_color = common::drawingml_3d::automatic_extrusion_color_from_items(
       std::slice::from_ref(&source_item),
     );
+    let effect_pixels_per_point = fixed_output.pixels_per_point() / raster_divisor;
     let Some(mut raster) =
       common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_pixels_per_point(
         std::slice::from_ref(&source_item),
         raster_bounds,
-        &effects,
-        96.0 / 72.0,
+        &raster_effects,
+        effect_pixels_per_point,
       )
     else {
       continue;
     };
-    // Office fixed output emits character-effect images at approximately its
-    // 96-DPI drawing baseline (the reference fixture stores 252 px over
-    // 181.08 pt), independently of larger shape-effect raster caps.
+    // PowerPoint applies the ExportAsFixedFormat intent to character effects:
+    // Print and Screen start at 200 and 96 DPI respectively, after which the
+    // authored blur selects the shared raster divisor above. Keep this at the
+    // layout/effect boundary so PDF image policy does not reinterpret an
+    // already evaluated effect graph.
     if let Some(style) = static3d.as_ref() {
       common::drawingml_3d::apply_static_3d(
         &mut raster.image,
@@ -9232,27 +9574,37 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
         },
       );
     }
-    if preserve_visible_text && let Some(glow) = simple_text_glow {
-      effects = common::drawingml_image_effects::ImageEffectContainer {
-        kind: common::drawingml_image_effects::ImageEffectContainerKind::Sibling,
-        effects: vec![glow],
-      };
-    }
     // PowerPoint reserves the full authored character-glow radius in the
     // effect bitmap but paints only the inner third as the glow filter. This
     // leaves transparent padding visible in its fixed-output image box.
-    common::drawingml_image_effects::scale_glow_filter_radius(&mut effects, 1.0 / 3.0);
+    common::drawingml_image_effects::scale_glow_filter_radius(&mut raster_effects, 1.0 / 3.0);
     common::drawingml_image_effects::scale_container_pixel_lengths(
-      &mut effects,
+      &mut raster_effects,
       raster.pixels_per_point / (96.0 / 72.0),
     );
-    common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+    common::drawingml_image_effects::apply_container_to_padded_image_with_sources_and_anchor(
       &mut raster.image,
-      &effects,
-      -relative_left * raster.pixels_per_point,
-      -relative_top * raster.pixels_per_point,
-      ink_width * raster.pixels_per_point,
-      ink_height * raster.pixels_per_point,
+      &raster_effects,
+      common::drawingml_image_effects::ImageEffectSourceGeometry {
+        paint_left_px: -relative_left * raster.pixels_per_point,
+        paint_top_px: -relative_top * raster.pixels_per_point,
+        paint_width_px: ink_width * raster.pixels_per_point,
+        paint_height_px: ink_height * raster.pixels_per_point,
+        shadow_anchor_left_px: (anchor.origin.x.0 - raster_bounds.origin.x.0)
+          * raster.pixels_per_point,
+        shadow_anchor_top_px: (anchor.origin.y.0 - raster_bounds.origin.y.0)
+          * raster.pixels_per_point,
+        shadow_anchor_width_px: anchor.size.width.0 * raster.pixels_per_point,
+        shadow_anchor_height_px: anchor.size.height.0 * raster.pixels_per_point,
+        anchor_left_px: (anchor.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+        anchor_top_px: (anchor.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
+        anchor_width_px: anchor.size.width.0 * raster.pixels_per_point,
+        anchor_height_px: anchor.size.height.0 * raster.pixels_per_point,
+        ramp_left_px: (anchor.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+        ramp_top_px: (anchor.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
+        ramp_width_px: anchor.size.width.0 * raster.pixels_per_point,
+        ramp_height_px: anchor.size.height.0 * raster.pixels_per_point,
+      },
       common::drawingml_image_effects::ImageEffectSourceImages {
         fill: raster.fill_image.as_ref(),
         line: raster.line_image.as_ref(),
@@ -9260,6 +9612,51 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
         children: raster.children_image.as_ref(),
       },
     );
+    let mut image_bounds = raster_bounds;
+    if crops_to_effect_output {
+      let output_bounds = common::drawingml_image_effects::EffectOutputBounds {
+        left_pt: final_relative_left,
+        top_pt: final_relative_top,
+        right_pt: final_relative_right,
+        bottom_pt: final_relative_bottom,
+      };
+      let working_bounds = common::drawingml_image_effects::EffectOutputBounds {
+        left_pt: relative_left,
+        top_pt: relative_top,
+        right_pt: relative_right,
+        bottom_pt: relative_bottom,
+      };
+      if let Some(target) = common::drawingml_image_effects::effect_bitmap_target_with_rounding(
+        output_bounds,
+        working_bounds,
+        raster.pixels_per_point,
+        raster.image.width(),
+        raster.image.height(),
+        common::drawingml_image_effects::EffectBitmapExtentRounding::Ceil,
+      ) {
+        if target.left_px != 0
+          || target.top_px != 0
+          || target.width_px != raster.image.width()
+          || target.height_px != raster.image.height()
+        {
+          raster.image = image::imageops::crop_imm(
+            &raster.image,
+            target.left_px,
+            target.top_px,
+            target.width_px,
+            target.height_px,
+          )
+          .to_image();
+        }
+        image_bounds.origin.x.0 = ink_left + final_relative_left;
+        image_bounds.origin.y.0 = ink_top + final_relative_top;
+        // PowerPoint allocates the tiered bitmap with an outward pixel extent,
+        // but places it with the independent continuous effect rectangle.
+        // Deriving the PDF size back from pixels makes Print and Screen drift.
+        image_bounds.size.width.0 = final_relative_right - final_relative_left;
+        image_bounds.size.height.0 = final_relative_bottom - final_relative_top;
+      }
+    }
     let mut png = Cursor::new(Vec::new());
     if PngEncoder::new(&mut png)
       .write_image(
@@ -9273,10 +9670,10 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
       continue;
     }
     let mut group_items = vec![PageItem::Image(ImageItem {
-      x_pt: raster_bounds.origin.x.0,
-      y_pt: raster_bounds.origin.y.0,
-      width_pt: raster_bounds.size.width.0,
-      height_pt: raster_bounds.size.height.0,
+      x_pt: image_bounds.origin.x.0,
+      y_pt: image_bounds.origin.y.0,
+      width_pt: image_bounds.size.width.0,
+      height_pt: image_bounds.size.height.0,
       crop: ImageCrop::default(),
       clip_path: Vec::new(),
       rotation_deg: 0.0,
@@ -9287,6 +9684,7 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
+      metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
       metafile_semantic_text_includes_raster_backdrop: false,
       alt_text: None,
       hyperlink_url: text.hyperlink_url.clone(),
@@ -9302,17 +9700,7 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
       let preserve_semantic_overlay = pptx_text_preserves_semantic_overlay(&source_text);
       let mut semantic_text = source_text;
       semantic_text.y_pt += pptx_text_baseline_offset(&semantic_text, text_metrics);
-      semantic_text.style.semantic_only = true;
-      semantic_text.style.drawingml_text_effects = None;
-      semantic_text.style.drawingml_text_static3d = None;
-      semantic_text.style.color = RgbColor { r: 0, g: 0, b: 0 };
-      if transparent_semantic_style {
-        semantic_text.style.opacity = 0.0;
-      }
-      semantic_text.style.outline_color = None;
-      semantic_text.style.outline_width_pt = 0.0;
-      semantic_text.style.pdf_glyph_outlines = false;
-      semantic_text.style.pdf_glyph_outline_options = None;
+      prepare_pptx_semantic_overlay_style(&mut semantic_text.style, transparent_semantic_style);
       if preserve_semantic_overlay {
         group_items.push(PageItem::Text(semantic_text));
       }
@@ -9328,6 +9716,41 @@ fn materialize_drawingml_text_effects(items: &mut [PageItem], text_metrics: &mut
   }
 }
 
+fn omit_powerpoint_text_outer_shadow_for_transparency_conformance(
+  effects: &mut common::drawingml_image_effects::ImageEffectContainer,
+) {
+  // The campaign contains three fixed-output references produced from the
+  // same Text_withShadow_100chars.pptx bytes. PowerPoint omits rPr/effectLst
+  // outerShdw only for PDF/A-1; changing Tagged PDF alone retains it. The
+  // 45541 Header/Footer pair independently exercises the same branch. Keep
+  // the evidence boundary at the top-level effect list: bevel/static 3-D,
+  // glow, reflection, and nested effect DAG semantics are not changed here.
+  if effects.kind != common::drawingml_image_effects::ImageEffectContainerKind::Sibling {
+    return;
+  }
+  effects
+    .effects
+    .retain(|effect| !matches!(effect, ImageEffect::OuterShadow { .. }));
+}
+
+fn prepare_pptx_semantic_overlay_style(style: &mut TextStyle, transparent: bool) {
+  // PowerPoint keeps the authored foreground color on searchable text whose
+  // visible character effects are painted separately. The Office PDF for
+  // 45541_Footer retains distinct yellow, cyan, red, and black text colors
+  // across the same outer-shadow path. The clip makes this copy semantic-only;
+  // replacing its color with black loses producer-visible style information.
+  style.semantic_only = true;
+  style.drawingml_text_effects = None;
+  style.drawingml_text_static3d = None;
+  if transparent {
+    style.opacity = 0.0;
+  }
+  style.outline_color = None;
+  style.outline_width_pt = 0.0;
+  style.pdf_glyph_outlines = false;
+  style.pdf_glyph_outline_options = None;
+}
+
 fn pptx_text_baseline_offset(text: &TextItem, text_metrics: &mut TextMetrics) -> f32 {
   if text.style.use_windows_font_metrics {
     text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
@@ -9337,6 +9760,174 @@ fn pptx_text_baseline_offset(text: &TextItem, text_metrics: &mut TextMetrics) ->
     )
   } else {
     text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+  }
+}
+
+const POWERPOINT_TEXT_EFFECT_HORIZONTAL_GUARD_EM: f32 = 0.6;
+const POWERPOINT_TEXT_EFFECT_TOP_GUARD_EM: f32 = 0.05;
+const POWERPOINT_TEXT_EFFECT_BOTTOM_GUARD_EM: f32 = 0.85;
+const POWERPOINT_TEXT_EFFECT_REFERENCE_FONT_PPEM: f32 = 43.0;
+const POWERPOINT_TEXT_EFFECT_TIER_LINEAR_PT: f32 = 5.175;
+const POWERPOINT_TEXT_EFFECT_TIER_QUADRATIC_PT: f32 = 0.075;
+
+fn powerpoint_text_effect_source_bounds(
+  text: &TextItem,
+  ink_left: f32,
+  ink_top: f32,
+  text_metrics: &mut TextMetrics,
+) -> common::drawingml_image_effects::EffectOutputBounds {
+  // PowerPoint's character-effect input is a transparent guarded character
+  // cell, not the tight glyph ink and not the complete text frame. Exact
+  // fixed-output controls at 16/20/24/28/32/40/48pt and one/two/four effect
+  // characters keep a 0.6em horizontal guard, plus 0.05em above and 0.85em
+  // below the run's own line cell. The independently stored full physical
+  // line remains the alignment anchor for scale, skew, and offset.
+  let font_size_pt = text.style.font_size_pt.max(f32::EPSILON);
+  let baseline = text.y_pt + pptx_text_baseline_offset(text, text_metrics);
+  let advance_width_pt = text_metrics.measure_text(&text.text, &text.style);
+  common::drawingml_image_effects::EffectOutputBounds {
+    left_pt: text.x_pt - font_size_pt * POWERPOINT_TEXT_EFFECT_HORIZONTAL_GUARD_EM - ink_left,
+    top_pt: baseline
+      - text.line_height_pt
+      - font_size_pt * POWERPOINT_TEXT_EFFECT_TOP_GUARD_EM
+      - ink_top,
+    right_pt: text.x_pt
+      + advance_width_pt
+      + font_size_pt * POWERPOINT_TEXT_EFFECT_HORIZONTAL_GUARD_EM
+      - ink_left,
+    bottom_pt: baseline + font_size_pt * POWERPOINT_TEXT_EFFECT_BOTTOM_GUARD_EM - ink_top,
+  }
+}
+
+fn prepare_powerpoint_text_effect_raster(
+  container: &mut common::drawingml_image_effects::ImageEffectContainer,
+  effect_font_size_pt: f32,
+) -> f32 {
+  fn prepare(
+    container: &mut common::drawingml_image_effects::ImageEffectContainer,
+    maximum_authored_blur_pt: &mut f32,
+  ) {
+    for effect in &mut container.effects {
+      match effect {
+        ImageEffect::OuterShadow {
+          blur_radius_px,
+          raster_length_scale,
+          bounds_radius_scale,
+          ..
+        } => {
+          // PowerPoint quantizes run-level shadow blur to half-point steps.
+          // Its character-effect contract then applies blur and distance at
+          // half the authored length. This is deliberately scoped to rPr
+          // effect surfaces; shape and Word effect graphs have independent
+          // length contracts.
+          let blur_pt = *blur_radius_px * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH;
+          let quantized_blur_pt = (blur_pt * 2.0).round() / 2.0;
+          *maximum_authored_blur_pt = maximum_authored_blur_pt.max(blur_pt);
+          *blur_radius_px = quantized_blur_pt * units::CSS_PIXELS_PER_INCH / units::POINTS_PER_INCH;
+          *raster_length_scale *= 0.5;
+          *bounds_radius_scale *= 0.5;
+        }
+        ImageEffect::AlphaModulate(nested)
+        | ImageEffect::Blend {
+          container: nested, ..
+        }
+        | ImageEffect::Container(nested) => prepare(nested, maximum_authored_blur_pt),
+        _ => {}
+      }
+    }
+  }
+
+  let mut maximum_authored_blur_pt = 0.0_f32;
+  prepare(container, &mut maximum_authored_blur_pt);
+
+  // Direct2D's balanced Gaussian blur may pre-scale its input, while WPF's
+  // BlurEffect first applies the element scale to an integer local kernel.
+  // PowerPoint exposes the corresponding character-effect scale in fixed
+  // output. Exact-config controls keep the tier unchanged when only the run
+  // width or line suffix changes, but cross it at 14/15pt for a 9pt blur,
+  // 26.6/26.7pt for 6pt, and 40/41pt for 4.5pt. Those boundaries share the
+  // authored em after it is rounded to a 96-DPI ppem; the 600-DPI font size
+  // used for glyph layout is a later, independent quantity. The 32pt controls
+  // place the first three cumulative blur boundaries at 5.25, 10.65, and
+  // 16.20pt, i.e. an arithmetic 0.15pt growth in successive tier widths.
+  // Keep Print/Screen selection outside this rule: intent supplies the base
+  // DPI and this divisor selects the same intermediate-surface tier.
+  let effect_ppem = (effect_font_size_pt.max(f32::EPSILON) * units::CSS_PIXELS_PER_INCH
+    / units::POINTS_PER_INCH)
+    .round()
+    .max(1.0);
+  let em_scale = (effect_ppem / POWERPOINT_TEXT_EFFECT_REFERENCE_FONT_PPEM)
+    .cbrt()
+    .powi(2);
+  let scaled_blur_pt = maximum_authored_blur_pt * em_scale;
+  let linear = POWERPOINT_TEXT_EFFECT_TIER_LINEAR_PT;
+  let quadratic = POWERPOINT_TEXT_EFFECT_TIER_QUADRATIC_PT;
+  let positive_root =
+    (-linear + (linear * linear + 4.0 * quadratic * scaled_blur_pt).sqrt()) / (2.0 * quadratic);
+  positive_root.ceil().max(1.0)
+}
+
+fn assign_drawingml_text_effect_line_anchor(
+  items: &mut [PageItem],
+  text_metrics: &mut TextMetrics,
+) {
+  // ECMA-376 Part 1 section 20.1.8.45 defines `algn` as the origin for
+  // shadow scale, skew, and offset, but does not select the character-level
+  // rectangle. An exact PowerPoint fixed-output matrix supplies that missing
+  // boundary: changing only the text-frame width leaves the shadow unchanged,
+  // extending a no-effect suffix on the same physical line moves it, and text
+  // after either a soft break or paragraph break does not. Absent `algn`
+  // matches explicit `b`, while explicit `ctr` is the opposite-state control.
+  // The anchor is therefore the union of the complete physical line's
+  // character cells, independently of each effect run's tight glyph ink.
+  let mut bounds: Option<(f32, f32, f32, f32)> = None;
+  for item in items.iter() {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    let advance_width_pt = text_metrics.measure_text(&text.text, &text.style);
+    let baseline = text.y_pt + pptx_text_baseline_offset(text, text_metrics);
+    // Win32 TEXTMETRIC defines a text cell as ascent above and descent below
+    // the baseline. PowerPoint retains the laid-out DrawingML line height but
+    // places that cell below the baseline by the selected face's descent. A
+    // 16/24/32/40/48pt transform matrix independently pins this translation:
+    // it moves bottom and center alignment by the same font-relative amount.
+    let descent = text_metrics
+      .line_vertical_metrics_for_text(&text.text, &text.style)
+      .descent_pt;
+    let logical = (
+      text.x_pt,
+      baseline - text.line_height_pt + descent,
+      text.x_pt + advance_width_pt,
+      baseline + descent,
+    );
+    bounds = Some(match bounds {
+      Some((left, top, right, bottom)) => (
+        left.min(logical.0),
+        top.min(logical.1),
+        right.max(logical.2),
+        bottom.max(logical.3),
+      ),
+      None => logical,
+    });
+  }
+  let Some((left, top, right, bottom)) = bounds else {
+    return;
+  };
+  let anchor = common::Rect {
+    origin: common::Point {
+      x: common::Pt(left),
+      y: common::Pt(top),
+    },
+    size: common::Size {
+      width: common::Pt((right - left).max(f32::EPSILON)),
+      height: common::Pt((bottom - top).max(f32::EPSILON)),
+    },
+  };
+  for item in items {
+    if let PageItem::Text(text) = item {
+      text.drawingml_text_effect_anchor = Some(anchor);
+    }
   }
 }
 
@@ -9488,6 +10079,7 @@ fn text_base_style(
   base_font_size_pt: Option<f32>,
 ) -> TextStyle {
   let options = TextLoweringOptions::from_text_body(text_body);
+  let base_font_size_pt = base_font_size_pt.unwrap_or(DEFAULT_TEXT_FONT_SIZE_PT);
   let vectorize_without_semantic_overlay = text_body
     .display_properties
     .text_area_rotation
@@ -9508,7 +10100,8 @@ fn text_base_style(
   let mut base_style = TextStyle {
     font_family: Some(Arc::from(theme_latin)),
     fallback_font_family: Some(Arc::from(theme_latin)),
-    font_size_pt: base_font_size_pt.unwrap_or(DEFAULT_TEXT_FONT_SIZE_PT),
+    font_size_pt: base_font_size_pt,
+    drawingml_effect_font_size_pt: Some(base_font_size_pt),
     use_windows_font_metrics: true,
     rotation_deg: options.rotation_deg,
     // PowerPoint's fixed-format writer emits bodyPr text-area rotation and
@@ -10002,6 +10595,7 @@ struct TextLoweringOptions {
   font_scale: f32,
   line_scale: f32,
   use_first_last_paragraph_spacing: bool,
+  compatible_line_spacing: bool,
   round_font_size_to_pt: bool,
   rotation_deg: f32,
   rotation_center_pt: Option<(f32, f32)>,
@@ -10029,6 +10623,7 @@ impl TextLoweringOptions {
       use_first_last_paragraph_spacing: text_body
         .display_properties
         .use_first_last_paragraph_spacing,
+      compatible_line_spacing: text_body.display_properties.compatible_line_spacing,
       round_font_size_to_pt: text_body.display_properties.auto_fit == TextAutoFit::Shape,
       rotation_deg: text_body.display_properties.rotation_degrees(),
       rotation_center_pt: None,
@@ -10224,13 +10819,50 @@ fn lower_paragraph(
     &mut paragraph_base_style,
   );
   apply_text_scale(&mut paragraph_base_style, context.options);
+  paragraph_style.apply_diagram_autofit_spacing_scale(paragraph, context.options);
+  let mut bullet = paragraph_style.bullet(paragraph);
+  let column_width = context.options.column_width(context.frame);
+  let paragraph_leading_offset = paragraph_style.left_offset(
+    bullet.label.is_some()
+      || (bullet.auto_number.is_some() && paragraph_has_printable_run(paragraph)),
+  );
+  // ECMA-376 Part 1 §21.1.2.2.7 defines marL and marR in addition to the
+  // text-body insets. They therefore reduce the paragraph's line box as well
+  // as moving its origin; using the full column width lets indented text run
+  // past the right edge before wrapping.
+  let paragraph_width = paragraph_style.available_width(column_width, paragraph_leading_offset);
+  let mut text_segments = layout_paragraph_text_segments(
+    TextLineLayoutContext {
+      import: context.import,
+      slide: context.slide,
+      base_style: &paragraph_base_style,
+      options: context.options,
+      column_width: paragraph_width,
+      slide_number: context.slide_number,
+      east_asian_line_break: paragraph_style.east_asian_line_break,
+      latin_line_break: paragraph_style.latin_line_break,
+      default_tab_size_pt: paragraph_style.default_tab_size_pt,
+      tab_stops: &paragraph_style.tab_stops,
+      hanging_punctuation: paragraph_style.hanging_punctuation,
+    },
+    paragraph,
+    text_metrics,
+  );
+  for segment in &mut text_segments {
+    for text_line in &mut segment.lines {
+      reorder_text_line_bidi(text_line, paragraph_style.right_to_left, text_metrics);
+    }
+  }
+  let edge_font_sizes =
+    paragraph_edge_font_sizes(&text_segments, paragraph_base_style.font_size_pt);
   if paragraph_index > 0 || context.options.use_first_last_paragraph_spacing {
-    cursor.y_pt += paragraph_style
-      .space_before
-      .points(paragraph_base_style.font_size_pt);
+    cursor.y_pt += paragraph_style.spacing_points(
+      paragraph_style.space_before,
+      edge_font_sizes.first_pt,
+      context.options,
+    );
     advance_text_column_if_needed(cursor, context.frame, *context.options);
   }
-  let column_width = context.options.column_width(context.frame);
   let logical_column_index = cursor
     .column_index
     .min(context.options.column_count.saturating_sub(1));
@@ -10248,7 +10880,6 @@ fn lower_paragraph(
   {
     return;
   }
-  let mut bullet = paragraph_style.bullet(paragraph);
   auto_numbering.resolve(paragraph, &mut bullet);
   if let Some((width, height)) = paragraph_graphic_bullet_size_100mm(
     paragraph,
@@ -10269,48 +10900,16 @@ fn lower_paragraph(
     &paragraph_style,
     &bullet,
   );
-  paragraph_style.apply_diagram_autofit_spacing_scale(paragraph, context.options);
-  let paragraph_leading_offset = paragraph_style.left_offset(bullet.label.is_some());
   let paragraph_x = cursor.x_pt
     + if paragraph_style.right_to_left {
       paragraph_style.right_margin_pt
     } else {
       paragraph_leading_offset
     };
-  // ECMA-376 Part 1 §21.1.2.2.7 defines marL and marR in addition to the
-  // text-body insets. They therefore reduce the paragraph's line box as well
-  // as moving its origin; using the full column width lets indented text run
-  // past the right edge before wrapping.
-  let paragraph_width = paragraph_style.available_width(column_width, paragraph_leading_offset);
-  let mut segment_start = 0usize;
-  let mut is_first_segment = true;
-
-  loop {
-    let segment_end = paragraph.runs[segment_start..]
-      .iter()
-      .position(|run| run.kind == TextRunKind::Break)
-      .map(|offset| segment_start + offset)
-      .unwrap_or(paragraph.runs.len());
-    let mut text_lines = layout_text_lines(
-      TextLineLayoutContext {
-        import: context.import,
-        slide: context.slide,
-        base_style: &paragraph_base_style,
-        options: context.options,
-        column_width: paragraph_width,
-        slide_number: context.slide_number,
-        east_asian_line_break: paragraph_style.east_asian_line_break,
-        latin_line_break: paragraph_style.latin_line_break,
-        default_tab_size_pt: paragraph_style.default_tab_size_pt,
-        tab_stops: &paragraph_style.tab_stops,
-        hanging_punctuation: paragraph_style.hanging_punctuation,
-      },
-      &paragraph.runs[segment_start..segment_end],
-      text_metrics,
-    );
-    for text_line in &mut text_lines {
-      reorder_text_line_bidi(text_line, paragraph_style.right_to_left, text_metrics);
-    }
+  for (segment_index, segment) in text_segments.iter().enumerate() {
+    let segment_start = segment.start;
+    let segment_end = segment.end;
+    let text_lines = &segment.lines;
     let is_soft_break_empty_line =
       segment_start == segment_end && (segment_start > 0 || segment_end < paragraph.runs.len());
     let alignment = if context.options.anchor_center {
@@ -10322,6 +10921,7 @@ fn lower_paragraph(
     };
 
     for (line_index, text_line) in text_lines.iter().enumerate() {
+      let line_item_start = items.len();
       let line_adjustment = paragraph_line_adjustment(
         alignment,
         line_index + 1 == text_lines.len(),
@@ -10375,7 +10975,7 @@ fn lower_paragraph(
         None
       };
 
-      if is_first_segment
+      if segment_index == 0
         && line_index == 0
         && let Some(label) = bullet.label.as_deref()
       {
@@ -10552,22 +11152,19 @@ fn lower_paragraph(
         run_x = adjusted_run_right.unwrap_or(run_x + line_run.width_pt);
       }
 
+      assign_drawingml_text_effect_line_anchor(&mut items[line_item_start..], text_metrics);
       cursor.y_pt += max_line_height;
       advance_text_column_if_needed(cursor, context.frame, *context.options);
     }
-
-    if segment_end == paragraph.runs.len() {
-      break;
-    }
-    segment_start = segment_end + 1;
-    is_first_segment = false;
   }
   if paragraph_index + 1 < context.paragraph_count
     || context.options.use_first_last_paragraph_spacing
   {
-    cursor.y_pt += paragraph_style
-      .space_after
-      .points(paragraph_base_style.font_size_pt);
+    cursor.y_pt += paragraph_style.spacing_points(
+      paragraph_style.space_after,
+      edge_font_sizes.last_pt,
+      context.options,
+    );
     advance_text_column_if_needed(cursor, context.frame, *context.options);
   }
 }
@@ -10585,6 +11182,69 @@ struct TextLineLayoutContext<'a> {
   default_tab_size_pt: f32,
   tab_stops: &'a [ParagraphTabStop],
   hanging_punctuation: bool,
+}
+
+struct TextLineSegment<'a> {
+  start: usize,
+  end: usize,
+  lines: Vec<TextLine<'a>>,
+}
+
+#[derive(Clone, Copy)]
+struct ParagraphEdgeFontSizes {
+  first_pt: f32,
+  last_pt: f32,
+}
+
+fn layout_paragraph_text_segments<'a>(
+  context: TextLineLayoutContext<'_>,
+  paragraph: &'a TextParagraph,
+  text_metrics: &mut TextMetrics,
+) -> Vec<TextLineSegment<'a>> {
+  let mut segments = Vec::new();
+  let mut start = 0usize;
+  loop {
+    let end = paragraph.runs[start..]
+      .iter()
+      .position(|run| run.kind == TextRunKind::Break)
+      .map(|offset| start + offset)
+      .unwrap_or(paragraph.runs.len());
+    segments.push(TextLineSegment {
+      start,
+      end,
+      lines: layout_text_lines(context, &paragraph.runs[start..end], text_metrics),
+    });
+    if end == paragraph.runs.len() {
+      break;
+    }
+    start = end + 1;
+  }
+  segments
+}
+
+fn paragraph_edge_font_sizes(
+  segments: &[TextLineSegment<'_>],
+  fallback_font_size_pt: f32,
+) -> ParagraphEdgeFontSizes {
+  let line_font_size = |line: &TextLine<'_>| {
+    line
+      .runs
+      .iter()
+      .map(|run| run.style.font_size_pt)
+      .reduce(f32::max)
+      .unwrap_or(fallback_font_size_pt)
+  };
+  let first_pt = segments
+    .first()
+    .and_then(|segment| segment.lines.first())
+    .map(&line_font_size)
+    .unwrap_or(fallback_font_size_pt);
+  let last_pt = segments
+    .last()
+    .and_then(|segment| segment.lines.last())
+    .map(line_font_size)
+    .unwrap_or(fallback_font_size_pt);
+  ParagraphEdgeFontSizes { first_pt, last_pt }
 }
 
 fn layout_text_lines<'a>(
@@ -11447,6 +12107,17 @@ fn styled_text_run(
 }
 
 fn apply_text_scale(style: &mut TextStyle, options: &TextLoweringOptions) {
+  let effect_font_size_pt = style
+    .drawingml_effect_font_size_pt
+    .unwrap_or(style.font_size_pt);
+  style.drawingml_effect_font_size_pt = Some(
+    scaled_text_font_size_before_print_grid(
+      effect_font_size_pt,
+      options.font_scale,
+      options.round_font_size_to_pt,
+    )
+    .max(MINIMUM_TEXT_FONT_SIZE_PT),
+  );
   style.font_size_pt = scaled_text_font_size_pt(
     style.font_size_pt,
     options.font_scale,
@@ -11456,14 +12127,22 @@ fn apply_text_scale(style: &mut TextStyle, options: &TextLoweringOptions) {
   style.baseline_shift_pt *= options.font_scale;
 }
 
-fn scaled_text_font_size_pt(font_size_pt: f32, font_scale: f32, round_to_pt: bool) -> f32 {
-  let scaled = if round_to_pt {
+fn scaled_text_font_size_before_print_grid(
+  font_size_pt: f32,
+  font_scale: f32,
+  round_to_pt: bool,
+) -> f32 {
+  if round_to_pt {
     // setRoundFontSizeToPt(true) for AUTOFIT; editeng then rounds the
     // unscaled font size and the scaled font size to the nearest point.
     (font_size_pt.round() * font_scale).round()
   } else {
     font_size_pt * font_scale
-  };
+  }
+}
+
+fn scaled_text_font_size_pt(font_size_pt: f32, font_scale: f32, round_to_pt: bool) -> f32 {
+  let scaled = scaled_text_font_size_before_print_grid(font_size_pt, font_scale, round_to_pt);
   // PowerPoint's PDF path lays out type on its 600 dpi print grid. Preserve
   // that device-space quantization before shaping: e.g. 40 pt becomes
   // 333/600 in and 20 pt becomes 167/600 in, matching the emitted Office PDF
@@ -11591,6 +12270,7 @@ fn push_text_item(
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
     line_height_pt: placement.line_height_pt,
+    drawingml_text_effect_anchor: None,
     paint_clip: None,
     discard_if_horizontally_clipped: false,
     text,
@@ -11817,6 +12497,7 @@ fn bullet_graphic_item(
     metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
     metafile_background_color: None,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: shape_hyperlink_url.map(ToString::to_string),
@@ -11897,7 +12578,7 @@ fn estimate_wrapped_text_body_height(
   let column_width = context.options.column_width(context.frame).max(1.0);
   let mut height = 0.0;
   for (paragraph_index, paragraph) in text_body.paragraphs.iter().enumerate() {
-    let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
+    let mut paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
     let mut paragraph_base_style = context.base_style.clone();
     paragraph_style.apply_master_default_run_style(
       context.import,
@@ -11918,30 +12599,43 @@ fn estimate_wrapped_text_body_height(
       &mut paragraph_base_style,
     );
     apply_text_scale(&mut paragraph_base_style, context.options);
+    paragraph_style.apply_diagram_autofit_spacing_scale(paragraph, context.options);
+    let bullet = paragraph_style.bullet(paragraph);
+    let paragraph_leading_offset = paragraph_style.left_offset(
+      bullet.label.is_some()
+        || (bullet.auto_number.is_some() && paragraph_has_printable_run(paragraph)),
+    );
+    let paragraph_width = paragraph_style
+      .available_width(column_width, paragraph_leading_offset)
+      .max(1.0);
+    let text_segments = layout_paragraph_text_segments(
+      TextLineLayoutContext {
+        import: context.import,
+        slide: context.slide,
+        base_style: &paragraph_base_style,
+        options: context.options,
+        column_width: paragraph_width,
+        slide_number: context.slide_number,
+        east_asian_line_break: paragraph_style.east_asian_line_break,
+        latin_line_break: paragraph_style.latin_line_break,
+        default_tab_size_pt: paragraph_style.default_tab_size_pt,
+        tab_stops: &paragraph_style.tab_stops,
+        hanging_punctuation: paragraph_style.hanging_punctuation,
+      },
+      paragraph,
+      text_metrics,
+    );
+    let edge_font_sizes =
+      paragraph_edge_font_sizes(&text_segments, paragraph_base_style.font_size_pt);
     if paragraph_index > 0 || context.options.use_first_last_paragraph_spacing {
-      height += paragraph_style
-        .space_before
-        .points(paragraph_base_style.font_size_pt);
-    }
-    for runs in paragraph.runs.split(|run| run.kind == TextRunKind::Break) {
-      let lines = layout_text_lines(
-        TextLineLayoutContext {
-          import: context.import,
-          slide: context.slide,
-          base_style: &paragraph_base_style,
-          options: context.options,
-          column_width,
-          slide_number: context.slide_number,
-          east_asian_line_break: paragraph_style.east_asian_line_break,
-          latin_line_break: paragraph_style.latin_line_break,
-          default_tab_size_pt: paragraph_style.default_tab_size_pt,
-          tab_stops: &paragraph_style.tab_stops,
-          hanging_punctuation: paragraph_style.hanging_punctuation,
-        },
-        runs,
-        text_metrics,
+      height += paragraph_style.spacing_points(
+        paragraph_style.space_before,
+        edge_font_sizes.first_pt,
+        context.options,
       );
-      for line in lines {
+    }
+    for segment in text_segments {
+      for line in segment.lines {
         let line_height = if line.runs.is_empty() {
           paragraph_style.line_height(&paragraph_base_style, context.options)
         } else {
@@ -11955,9 +12649,11 @@ fn estimate_wrapped_text_body_height(
     if paragraph_index + 1 < text_body.paragraphs.len()
       || context.options.use_first_last_paragraph_spacing
     {
-      height += paragraph_style
-        .space_after
-        .points(paragraph_base_style.font_size_pt);
+      height += paragraph_style.spacing_points(
+        paragraph_style.space_after,
+        edge_font_sizes.last_pt,
+        context.options,
+      );
     }
   }
   height
@@ -12107,6 +12803,7 @@ fn push_math_ole_preview_item(
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     metafile_semantic_text_includes_raster_backdrop: false,
     alt_text: None,
     hyperlink_url: None,
@@ -12348,9 +13045,17 @@ enum BulletSize {
 fn apply_character_bullet_size(style: &mut TextStyle, size: BulletSize) {
   match size {
     BulletSize::FollowText => {}
-    BulletSize::Percent(percent) => style.font_size_pt *= percent / 100.0,
+    BulletSize::Percent(percent) => {
+      let scale = percent / 100.0;
+      style.font_size_pt *= scale;
+      if let Some(effect_font_size_pt) = &mut style.drawingml_effect_font_size_pt {
+        *effect_font_size_pt *= scale;
+      }
+    }
     BulletSize::Points100(points100) => {
-      style.font_size_pt = sdk_units::points100_to_points(points100) as f32;
+      let font_size_pt = sdk_units::points100_to_points(points100) as f32;
+      style.font_size_pt = font_size_pt;
+      style.drawingml_effect_font_size_pt = Some(font_size_pt);
     }
   }
 }
@@ -12812,6 +13517,27 @@ impl ParagraphDisplayStyle {
 
   fn line_height(&self, style: &TextStyle, options: &TextLoweringOptions) -> f32 {
     self.line_height_with_scale(style, options.line_scale)
+  }
+
+  fn spacing_points(
+    &self,
+    spacing: ParagraphSpacing,
+    font_size_pt: f32,
+    options: &TextLoweringOptions,
+  ) -> f32 {
+    let percentage_basis = if options.compatible_line_spacing {
+      // ECMA-376 Part 1 §21.1.2.2.11 defines spcPct against the largest
+      // text size. PowerPoint fixed output instead keeps the legacy PPT
+      // contract for absent/true bodyPr@compatLnSpc; explicit false selects
+      // the standard branch. [MS-PPT] §2.2.20 defines positive ParaSpacing
+      // against the text line height. That is the natural text cell height,
+      // independent of this paragraph's explicit lnSpc percentage; Office's
+      // 90% lnSpc + 20% spcBef path applies the two percentages separately.
+      font_size_pt * DEFAULT_TEXT_LINE_HEIGHT_SCALE * options.line_scale
+    } else {
+      font_size_pt
+    };
+    spacing.points(percentage_basis)
   }
 
   fn soft_break_empty_line_height(&self, style: &TextStyle, options: &TextLoweringOptions) -> f32 {
@@ -13642,6 +14368,7 @@ fn apply_drawingml_run_properties(
     RunCommon {
       language: properties.language.as_deref(),
       font_size: properties.font_size,
+      kerning: properties.kerning,
       bold: properties.bold.as_ref().map(|value| value.as_bool()),
       italic: properties.italic.as_ref().map(|value| value.as_bool()),
       underline: properties.underline,
@@ -13705,6 +14432,7 @@ fn apply_default_run_properties(
     RunCommon {
       language: properties.language.as_deref(),
       font_size: properties.font_size,
+      kerning: properties.kerning,
       bold: properties.bold.as_ref().map(|value| value.as_bool()),
       italic: properties.italic.as_ref().map(|value| value.as_bool()),
       underline: properties.underline,
@@ -13793,6 +14521,7 @@ fn drawingml_default_run_effects(
 struct RunCommon<'a> {
   language: Option<&'a str>,
   font_size: Option<i32>,
+  kerning: Option<i32>,
   bold: Option<bool>,
   italic: Option<bool>,
   underline: Option<a::TextUnderlineValues>,
@@ -13811,7 +14540,12 @@ fn apply_run_common(import: &PowerPointImport, properties: RunCommon<'_>, style:
     style.language = Some(Arc::from(language));
   }
   if let Some(font_size) = properties.font_size {
-    style.font_size_pt = ooxmlsdk::units::drawingml_text_size_to_points(font_size) as f32;
+    let font_size_pt = ooxmlsdk::units::drawingml_text_size_to_points(font_size) as f32;
+    style.font_size_pt = font_size_pt;
+    style.drawingml_effect_font_size_pt = Some(font_size_pt);
+  }
+  if let Some(minimum_size_pt) = drawingml_kerning_minimum_size_pt(properties.kerning) {
+    style.kerning_minimum_size_pt = Some(minimum_size_pt);
   }
   if let Some(bold) = properties.bold {
     style.bold = bold;
@@ -14455,6 +15189,34 @@ fn display_paint_for_optional_slide(
   }
 }
 
+fn display_paint_for_optional_slide_with_transform_precision(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  color: &Color,
+  placeholder_color: Option<&Color>,
+) -> Option<DisplayPaint> {
+  // DrawingML effect colors use the same ordered color-transform pipeline as
+  // format-scheme styles. In particular, ECMA-376 defines satMod=200% as
+  // doubling saturation; Office keeps that intermediate value above 100%
+  // until the resulting sRGB channels are clipped.
+  let mut scheme_resolver = |token| match slide {
+    Some(slide) => import
+      .get_scheme_color_record_for_slide(slide, token)
+      .cloned(),
+    None => import.get_scheme_color_record(token).cloned(),
+  };
+  let color =
+    color.resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?;
+  Some(DisplayPaint {
+    color: RgbColor {
+      r: color.r,
+      g: color.g,
+      b: color.b,
+    },
+    opacity: color_opacity(color.alpha),
+  })
+}
+
 fn color_opacity(alpha: i32) -> f32 {
   alpha.clamp(0, 100_000) as f32 / 100_000.0
 }
@@ -14464,11 +15226,552 @@ mod tests {
   use super::*;
 
   #[test]
-  fn metafile_images_enable_a_searchable_text_overlay() {
-    assert!(supports_semantic_metafile_text(Some("image/x-emf")));
-    assert!(supports_semantic_metafile_text(Some("IMAGE/WMF")));
-    assert!(!supports_semantic_metafile_text(Some("image/png")));
-    assert!(!supports_semantic_metafile_text(None));
+  fn pptx_fixed_output_profile_carries_the_layout_bitmap_intent() {
+    let mut options = LayoutOptions {
+      fixed_output_raster_dpi: Some(96),
+      fixed_output_forbids_transparency: true,
+      ..LayoutOptions::default()
+    };
+    let screen = PptxFixedOutputProfile::from_layout_options(&options);
+    assert_eq!(screen.raster_dpi, 96.0);
+    assert_eq!(screen.pixels_per_point(), 96.0 / units::POINTS_PER_INCH);
+    assert_eq!(
+      screen.simple_shape_glow_pixels_per_point(11.0),
+      48.0 / units::POINTS_PER_INCH
+    );
+    assert_eq!(
+      screen.simple_shape_glow_pixels_per_point(5.76),
+      96.0 / units::POINTS_PER_INCH
+    );
+    assert_eq!(
+      screen.simple_shape_glow_pixels_per_point(5.77),
+      48.0 / units::POINTS_PER_INCH
+    );
+    assert_eq!(
+      screen.simple_shape_glow_pixels_per_point(11.52),
+      48.0 / units::POINTS_PER_INCH
+    );
+    assert_eq!(
+      screen.simple_shape_glow_pixels_per_point(11.53),
+      32.0 / units::POINTS_PER_INCH
+    );
+    assert!(screen.forbids_transparency);
+
+    options.fixed_output_raster_dpi = Some(200);
+    let print = PptxFixedOutputProfile::from_layout_options(&options);
+    assert_eq!(print.raster_dpi, 200.0);
+    assert_eq!(print.pixels_per_point(), 200.0 / units::POINTS_PER_INCH);
+    assert_eq!(
+      print.simple_shape_glow_pixels_per_point(11.0),
+      100.0 / units::POINTS_PER_INCH
+    );
+    assert_eq!(
+      print.simple_shape_glow_pixels_per_point(5.76),
+      200.0 / units::POINTS_PER_INCH
+    );
+    assert_eq!(
+      print.simple_shape_glow_pixels_per_point(5.77),
+      100.0 / units::POINTS_PER_INCH
+    );
+    assert_eq!(
+      print.simple_shape_glow_pixels_per_point(11.52),
+      100.0 / units::POINTS_PER_INCH
+    );
+    assert!(
+      (print.simple_shape_glow_pixels_per_point(11.53) - (200.0 / 3.0) / units::POINTS_PER_INCH)
+        .abs()
+        < f32::EPSILON
+    );
+
+    options.fixed_output_raster_dpi = Some(0);
+    assert_eq!(
+      PptxFixedOutputProfile::from_layout_options(&options).raster_dpi,
+      units::OFFICE_FIXED_OUTPUT_RASTER_DPI
+    );
+  }
+
+  #[test]
+  fn shape_effect_source_bounds_include_only_the_visible_stroke_outset() {
+    let item = |alignment| {
+      common::DisplayItem::Rect(common::RectItem {
+        stroke: Some(common::Stroke {
+          width: common::Pt(1.0),
+          alignment,
+          ..common::Stroke::default()
+        }),
+        ..common::RectItem::default()
+      })
+    };
+
+    assert_eq!(
+      effect_source_stroke_outset_pt(&[item(Some(common::StrokeAlignment::Center))]),
+      0.5
+    );
+    assert_eq!(
+      effect_source_stroke_outset_pt(&[item(Some(common::StrokeAlignment::Inside))]),
+      0.0
+    );
+  }
+
+  #[test]
+  fn simple_shape_glow_excludes_only_one_actual_fill_contour() {
+    let raster_bounds = common::Rect {
+      origin: common::Point {
+        x: common::Pt(1.0),
+        y: common::Pt(2.0),
+      },
+      size: common::Size {
+        width: common::Pt(30.0),
+        height: common::Pt(40.0),
+      },
+    };
+    let shape_bounds = common::Rect {
+      origin: common::Point {
+        x: common::Pt(10.0),
+        y: common::Pt(12.0),
+      },
+      size: common::Size {
+        width: common::Pt(8.0),
+        height: common::Pt(9.0),
+      },
+    };
+    let item = |fill| {
+      common::DisplayItem::Rect(common::RectItem {
+        bounds: shape_bounds,
+        fill,
+        ..common::RectItem::default()
+      })
+    };
+    let filled = item(common::Fill::Solid(common::Color {
+      r: 1,
+      g: 2,
+      b: 3,
+      a: 255,
+    }));
+    let clip = simple_shape_glow_exclusion_clip_path(&[filled.clone()], raster_bounds);
+    assert_eq!(clip.len(), 10);
+    assert_eq!(clip[0], common::PathCommand::MoveTo(raster_bounds.origin));
+    assert_eq!(clip[5], common::PathCommand::MoveTo(shape_bounds.origin));
+
+    assert!(
+      simple_shape_glow_exclusion_clip_path(&[item(common::Fill::None)], raster_bounds).is_empty()
+    );
+    assert!(
+      simple_shape_glow_exclusion_clip_path(&[filled.clone(), filled], raster_bounds).is_empty()
+    );
+  }
+
+  #[test]
+  fn drawingml_text_effect_anchor_is_shared_only_within_one_physical_line() {
+    let mut items = Vec::new();
+    let placement = |x_pt, y_pt| TextItemPlacement {
+      x_pt,
+      y_pt,
+      line_height_pt: 20.0,
+      rotation_center_pt: None,
+      paragraph_bidi: false,
+    };
+    let style = TextStyle {
+      font_size_pt: 16.0,
+      ..TextStyle::default()
+    };
+    push_text_item(
+      &mut items,
+      placement(10.0, 20.0),
+      "effect".to_string(),
+      style.clone(),
+      None,
+    );
+    push_text_item(
+      &mut items,
+      placement(80.0, 20.0),
+      "no-effect suffix".to_string(),
+      style.clone(),
+      None,
+    );
+
+    let mut text_metrics = TextMetrics::new();
+    let (expected_anchor_top, expected_anchor_bottom) = match &items[0] {
+      PageItem::Text(text) => {
+        let baseline = text.y_pt + pptx_text_baseline_offset(text, &mut text_metrics);
+        let descent = text_metrics
+          .line_vertical_metrics_for_text(&text.text, &text.style)
+          .descent_pt;
+        (baseline - text.line_height_pt + descent, baseline + descent)
+      }
+      _ => unreachable!(),
+    };
+    assign_drawingml_text_effect_line_anchor(&mut items, &mut text_metrics);
+    let first_line_anchor = match (&items[0], &items[1]) {
+      (PageItem::Text(first), PageItem::Text(second)) => {
+        assert_eq!(
+          first.drawingml_text_effect_anchor,
+          second.drawingml_text_effect_anchor
+        );
+        first.drawingml_text_effect_anchor.unwrap()
+      }
+      _ => unreachable!(),
+    };
+    assert_eq!(first_line_anchor.origin.x.0, 10.0);
+    assert!(first_line_anchor.size.width.0 > 70.0);
+    assert!((first_line_anchor.origin.y.0 - expected_anchor_top).abs() < 0.000_1);
+    assert!(
+      (first_line_anchor.origin.y.0 + first_line_anchor.size.height.0 - expected_anchor_bottom)
+        .abs()
+        < 0.000_1
+    );
+
+    let second_line_start = items.len();
+    push_text_item(
+      &mut items,
+      placement(10.0, 60.0),
+      "next physical line".to_string(),
+      style,
+      None,
+    );
+    assign_drawingml_text_effect_line_anchor(&mut items[second_line_start..], &mut text_metrics);
+    let second_line_anchor = match &items[second_line_start] {
+      PageItem::Text(text) => text.drawingml_text_effect_anchor.unwrap(),
+      _ => unreachable!(),
+    };
+    assert_eq!(second_line_anchor.origin.x.0, first_line_anchor.origin.x.0);
+    assert!(second_line_anchor.origin.y.0 > first_line_anchor.origin.y.0);
+    assert_ne!(second_line_anchor, first_line_anchor);
+  }
+
+  #[test]
+  fn powerpoint_text_effect_source_uses_the_guarded_run_cell() {
+    let style = TextStyle {
+      font_size_pt: 32.0,
+      ..TextStyle::default()
+    };
+    let mut items = Vec::new();
+    push_text_item(
+      &mut items,
+      TextItemPlacement {
+        x_pt: 54.0,
+        y_pt: 168.0,
+        line_height_pt: 38.4,
+        rotation_center_pt: None,
+        paragraph_bidi: false,
+      },
+      "AB".to_string(),
+      style,
+      None,
+    );
+    let PageItem::Text(text) = &items[0] else {
+      unreachable!();
+    };
+    let mut text_metrics = TextMetrics::new();
+    let (ink_left, ink_top, _, _) =
+      pptx_text_item_ink_bounds(text, &mut text_metrics).expect("glyph ink");
+    let advance = text_metrics.measure_text(&text.text, &text.style);
+    let source = powerpoint_text_effect_source_bounds(text, ink_left, ink_top, &mut text_metrics);
+
+    assert!(
+      ((source.right_pt - source.left_pt)
+        - (advance + 32.0 * 2.0 * POWERPOINT_TEXT_EFFECT_HORIZONTAL_GUARD_EM))
+        .abs()
+        < 0.000_1
+    );
+    assert!(
+      ((source.bottom_pt - source.top_pt)
+        - (38.4
+          + 32.0 * (POWERPOINT_TEXT_EFFECT_TOP_GUARD_EM + POWERPOINT_TEXT_EFFECT_BOTTOM_GUARD_EM)))
+        .abs()
+        < 0.000_1
+    );
+  }
+
+  #[test]
+  fn powerpoint_text_shadow_quantizes_lengths_and_selects_blur_tiers() {
+    let shadow = |blur_pt: f32| {
+      let mut effects = common::drawingml_image_effects::offset_outer_shadow_with_identity(
+        0.0,
+        20.0,
+        ResolvedEffectColor {
+          color: RgbColor { r: 0, g: 0, b: 0 },
+          alpha: 255,
+        },
+      );
+      effects.effects.truncate(1);
+      let ImageEffect::OuterShadow { blur_radius_px, .. } = &mut effects.effects[0] else {
+        unreachable!();
+      };
+      *blur_radius_px = blur_pt * units::CSS_PIXELS_PER_INCH / units::POINTS_PER_INCH;
+      effects
+    };
+
+    for (blur_pt, expected_quantized_pt) in [
+      (5.01, 5.0),
+      (5.39, 5.5),
+      (10.51, 10.5),
+      (10.79, 11.0),
+      (16.19, 16.0),
+    ] {
+      let mut effects = shadow(blur_pt);
+      prepare_powerpoint_text_effect_raster(&mut effects, 32.0);
+      let ImageEffect::OuterShadow {
+        blur_radius_px,
+        raster_length_scale,
+        bounds_radius_scale,
+        ..
+      } = &effects.effects[0]
+      else {
+        unreachable!();
+      };
+      assert!(
+        (*blur_radius_px * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH
+          - expected_quantized_pt)
+          .abs()
+          < 0.000_1
+      );
+      assert_eq!(*raster_length_scale, 0.5);
+      assert_eq!(*bounds_radius_scale, 0.5);
+    }
+
+    for (font_size_pt, blur_pt, expected_divisor) in [
+      (32.0, 5.2, 1.0),
+      (32.0, 5.3, 2.0),
+      (32.0, 10.6, 2.0),
+      (32.0, 10.7, 3.0),
+      (14.0, 9.0, 1.0),
+      (15.0, 9.0, 2.0),
+      (26.6, 6.0, 1.0),
+      (26.7, 6.0, 2.0),
+      (40.0, 4.5, 1.0),
+      (41.0, 4.5, 2.0),
+      (26.0, 12.0, 2.0),
+      (27.0, 12.0, 3.0),
+    ] {
+      let mut effects = shadow(blur_pt);
+      assert_eq!(
+        prepare_powerpoint_text_effect_raster(&mut effects, font_size_pt),
+        expected_divisor,
+        "font={font_size_pt}, blur={blur_pt}",
+      );
+    }
+  }
+
+  #[test]
+  fn powerpoint_text_effect_font_size_precedes_the_print_grid() {
+    let options = TextLoweringOptions {
+      font_scale: 1.0,
+      line_scale: 1.0,
+      use_first_last_paragraph_spacing: false,
+      compatible_line_spacing: false,
+      round_font_size_to_pt: false,
+      rotation_deg: 0.0,
+      rotation_center_pt: None,
+      column_count: 1,
+      column_spacing_pt: 0.0,
+      right_to_left_columns: false,
+      word_wrap: true,
+      clip_vertical_overflow: false,
+      clip_bottom_extension_pt: 0.0,
+      anchor_center: false,
+    };
+
+    for (authored_font_size_pt, expected_layout_font_size_pt) in [(26.6, 26.64), (26.7, 26.76)] {
+      let mut style = TextStyle {
+        font_size_pt: authored_font_size_pt,
+        drawingml_effect_font_size_pt: Some(authored_font_size_pt),
+        ..TextStyle::default()
+      };
+      apply_text_scale(&mut style, &options);
+      assert!(
+        (style.drawingml_effect_font_size_pt.unwrap() - authored_font_size_pt).abs() < 0.000_1
+      );
+      assert!((style.font_size_pt - expected_layout_font_size_pt).abs() < 0.000_1);
+    }
+  }
+
+  #[test]
+  fn powerpoint_text_effect_bitmap_ceil_does_not_change_continuous_extent() {
+    let output = common::drawingml_image_effects::EffectOutputBounds {
+      left_pt: -1.25,
+      top_pt: 2.0,
+      right_pt: 36.31,
+      bottom_pt: 18.21,
+    };
+    let target = common::drawingml_image_effects::effect_bitmap_target_with_rounding(
+      output,
+      common::drawingml_image_effects::EffectOutputBounds {
+        left_pt: -4.0,
+        top_pt: 0.0,
+        right_pt: 40.0,
+        bottom_pt: 22.0,
+      },
+      2.0,
+      88,
+      44,
+      common::drawingml_image_effects::EffectBitmapExtentRounding::Ceil,
+    )
+    .expect("positive PowerPoint effect target");
+
+    assert_eq!(target.width_px, 76);
+    assert_eq!(target.height_px, 33);
+    assert!(((output.right_pt - output.left_pt) - 37.56).abs() < 0.000_1);
+    assert!(((output.bottom_pt - output.top_pt) - 16.21).abs() < 0.000_1);
+  }
+
+  #[test]
+  fn compatible_line_spacing_uses_line_height_for_percentage_paragraph_spacing() {
+    let paragraph = ParagraphDisplayStyle {
+      line_spacing: ParagraphLineSpacing::Percent(0.9),
+      ..ParagraphDisplayStyle::default()
+    };
+    let style = TextStyle {
+      font_size_pt: 32.0,
+      ..TextStyle::default()
+    };
+    let compatible = TextLoweringOptions::from_text_body(&TextBody::default());
+    let standard = TextLoweringOptions {
+      compatible_line_spacing: false,
+      ..compatible
+    };
+
+    let standard_points = paragraph.spacing_points(
+      ParagraphSpacing::Percent(0.2),
+      style.font_size_pt,
+      &standard,
+    );
+    let compatible_points = paragraph.spacing_points(
+      ParagraphSpacing::Percent(0.2),
+      style.font_size_pt,
+      &compatible,
+    );
+    assert!((standard_points - 6.4).abs() < 0.000_1);
+    assert!((compatible_points - 7.68).abs() < 0.000_1);
+    assert!(
+      (paragraph.spacing_points(ParagraphSpacing::Percent(0.2), 48.0, &compatible) - 11.52).abs()
+        < 0.000_1
+    );
+    assert!((paragraph.line_height(&style, &compatible) - 34.56).abs() < 0.000_1);
+
+    for options in [&standard, &compatible] {
+      assert_eq!(
+        paragraph.spacing_points(ParagraphSpacing::Points(5.0), style.font_size_pt, options),
+        5.0
+      );
+    }
+  }
+
+  #[test]
+  fn paragraph_spacing_uses_the_largest_run_on_each_edge_line() {
+    let run = TextRun {
+      text: "edge".to_string(),
+      kind: TextRunKind::Run,
+      hyperlink_url: None,
+      field_type: None,
+      run_properties: None,
+      field_paragraph_properties: None,
+    };
+    let line_run = |font_size_pt| TextLineRun {
+      run: &run,
+      text: "edge".to_string(),
+      width_pt: 1.0,
+      style: TextStyle {
+        font_size_pt,
+        ..TextStyle::default()
+      },
+      kind: TextLineRunKind::Text,
+    };
+    let segments = vec![
+      TextLineSegment {
+        start: 0,
+        end: 0,
+        lines: vec![TextLine {
+          runs: vec![line_run(12.0), line_run(48.0)],
+          width_pt: 2.0,
+        }],
+      },
+      TextLineSegment {
+        start: 0,
+        end: 0,
+        lines: vec![TextLine {
+          runs: vec![line_run(20.0)],
+          width_pt: 1.0,
+        }],
+      },
+    ];
+
+    let edges = paragraph_edge_font_sizes(&segments, 32.0);
+
+    assert_eq!(edges.first_pt, 48.0);
+    assert_eq!(edges.last_pt, 20.0);
+  }
+
+  #[test]
+  fn semantic_metafile_overlay_distinguishes_ordinary_wmf_from_activex() {
+    assert!(supports_semantic_metafile_text(Some("image/x-emf"), false));
+    assert!(!supports_semantic_metafile_text(Some("IMAGE/WMF"), false));
+    assert!(supports_semantic_metafile_text(Some("IMAGE/WMF"), true));
+    assert!(!supports_semantic_metafile_text(Some("image/png"), true));
+    assert!(!supports_semantic_metafile_text(None, true));
+  }
+
+  #[test]
+  fn semantic_text_overlay_retains_the_authored_foreground_color() {
+    let authored_color = RgbColor {
+      r: 0xf0,
+      g: 0xfc,
+      b: 0x02,
+    };
+    let mut style = TextStyle {
+      color: authored_color,
+      outline_color: Some(RgbColor { r: 1, g: 2, b: 3 }),
+      outline_width_pt: 2.0,
+      pdf_glyph_outlines: true,
+      ..TextStyle::default()
+    };
+
+    prepare_pptx_semantic_overlay_style(&mut style, false);
+
+    assert!(style.semantic_only);
+    assert_eq!(style.color, authored_color);
+    assert_eq!(style.opacity, 1.0);
+    assert_eq!(style.outline_color, None);
+    assert_eq!(style.outline_width_pt, 0.0);
+    assert!(!style.pdf_glyph_outlines);
+  }
+
+  #[test]
+  fn transparency_conformance_omits_only_top_level_text_outer_shadow() {
+    let color = ResolvedEffectColor {
+      color: RgbColor { r: 1, g: 2, b: 3 },
+      alpha: 128,
+    };
+    let mut effects =
+      common::drawingml_image_effects::offset_outer_shadow_with_identity(2.0, 3.0, color);
+    effects.effects.insert(
+      1,
+      ImageEffect::Glow {
+        radius_px: 4.0,
+        raster_length_scale: 1.0,
+        bounds_radius_scale: 1.0,
+        spread_ratio: 0.0,
+        spread_kernel: common::drawingml_image_effects::GlowSpreadKernel::Square,
+        spread_radius_rounding: common::drawingml_image_effects::GlowSpreadRadiusRounding::Outward,
+        blur_kernel: common::drawingml_image_effects::GlowBlurKernel::Gaussian,
+        color,
+      },
+    );
+
+    omit_powerpoint_text_outer_shadow_for_transparency_conformance(&mut effects);
+
+    assert_eq!(effects.effects.len(), 2);
+    assert!(matches!(effects.effects[0], ImageEffect::Glow { .. }));
+    assert!(matches!(effects.effects[1], ImageEffect::Identity));
+
+    let mut effect_dag =
+      common::drawingml_image_effects::offset_outer_shadow_with_identity(2.0, 3.0, color);
+    effect_dag.kind = common::drawingml_image_effects::ImageEffectContainerKind::Tree;
+    omit_powerpoint_text_outer_shadow_for_transparency_conformance(&mut effect_dag);
+    assert!(matches!(
+      effect_dag.effects[0],
+      ImageEffect::OuterShadow { .. }
+    ));
   }
 
   #[test]
@@ -14918,6 +16221,22 @@ mod tests {
     assert!((transform.m22 - 5.0).abs() < f32::EPSILON);
     assert!((transform.dx.0 + 1.0).abs() < f32::EPSILON);
     assert!((transform.dy.0 + 0.5).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn powerpoint_two_stop_linear_gradient_uses_fixed_output_gamma_sigma() {
+    assert_eq!(
+      powerpoint_fixed_output_linear_gradient_interpolation(2),
+      common::GradientInterpolation::PowerPointGammaSigma
+    );
+  }
+
+  #[test]
+  fn powerpoint_multistop_linear_gradient_keeps_authored_stop_interpolation() {
+    assert_eq!(
+      powerpoint_fixed_output_linear_gradient_interpolation(3),
+      common::GradientInterpolation::LinearSrgb
+    );
   }
 
   #[test]

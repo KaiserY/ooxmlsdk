@@ -7959,6 +7959,7 @@ mod tests {
     let vertical = TextVerticalMetrics {
       ascent_pt: 9.0,
       descent_pt: 3.0,
+      windows_line_height_pt: 12.0,
       line_gap_pt: 2.0,
       baseline_offset_pt: 9.0,
       directwrite_baseline_offset_pt: 11.0,

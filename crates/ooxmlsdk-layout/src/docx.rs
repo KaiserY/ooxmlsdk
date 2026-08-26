@@ -751,37 +751,6 @@ fn text_style_with_color(styles: &StylesCatalog, color: RgbColor) -> TextStyle {
   style
 }
 
-fn apply_drawingml_shade(color: RgbColor, amount: f32) -> RgbColor {
-  let red = drawingml_rgb_component_to_crgb(color.r);
-  let green = drawingml_rgb_component_to_crgb(color.g);
-  let blue = drawingml_rgb_component_to_crgb(color.b);
-  RgbColor {
-    r: drawingml_crgb_component_to_rgb(((red as f32) * amount) as i32),
-    g: drawingml_crgb_component_to_rgb(((green as f32) * amount) as i32),
-    b: drawingml_crgb_component_to_rgb(((blue as f32) * amount) as i32),
-  }
-}
-
-fn apply_drawingml_tint(color: RgbColor, amount: f32) -> RgbColor {
-  let scale = sdk_units::DRAWINGML_PERCENT_SCALE as f32;
-  let red = drawingml_rgb_component_to_crgb(color.r);
-  let green = drawingml_rgb_component_to_crgb(color.g);
-  let blue = drawingml_rgb_component_to_crgb(color.b);
-  RgbColor {
-    r: drawingml_crgb_component_to_rgb((scale - (scale - red as f32) * amount) as i32),
-    g: drawingml_crgb_component_to_rgb((scale - (scale - green as f32) * amount) as i32),
-    b: drawingml_crgb_component_to_rgb((scale - (scale - blue as f32) * amount) as i32),
-  }
-}
-
-fn drawingml_rgb_component_to_crgb(value: u8) -> i32 {
-  color_math::drawingml_srgb8_to_scrgb(value)
-}
-
-fn drawingml_crgb_component_to_rgb(value: i32) -> u8 {
-  color_math::drawingml_scrgb_to_srgb8(value)
-}
-
 fn even_and_odd_headers(package: &WordprocessingDocument, main: &MainDocumentPart) -> bool {
   main
     .document_settings_part(package)
@@ -11855,6 +11824,14 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
 }
 
 fn floating_picture_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
+  floating_wordprocessing_twip_host_placement(anchor)
+}
+
+fn floating_wordprocessing_shape_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
+  floating_wordprocessing_twip_host_placement(anchor)
+}
+
+fn floating_wordprocessing_twip_host_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
   floating_image_placement_with_coordinate_converter(anchor, wordprocessing_twip_host_emu_to_points)
 }
 
@@ -12199,6 +12176,11 @@ fn push_drawing_textboxes_impl(
 
   let placement = match drawing.drawing_choice.as_ref() {
     Some(w::DrawingChoice::Inline(_)) => ImagePlacement::Inline,
+    Some(w::DrawingChoice::Anchor(anchor))
+      if drawing_graphic_data_uses_wordprocessing_twip_host_placement(graphic_data) =>
+    {
+      ImagePlacement::Floating(floating_wordprocessing_shape_placement(anchor))
+    }
     Some(w::DrawingChoice::Anchor(anchor)) => {
       ImagePlacement::Floating(floating_image_placement(anchor))
     }
@@ -12219,10 +12201,7 @@ fn push_drawing_textboxes_impl(
       hyperlinks,
       inside_wordprocessing_group: false,
     };
-    let child_transform = if matches!(
-      child,
-      a::GraphicDataChoice::WordprocessingShape(_) | a::GraphicDataChoice::XmlAny(_)
-    ) {
+    let child_transform = if graphic_data_choice_is_wordprocessing_shape(child) {
       wordprocessing_transform
     } else {
       transform
@@ -13677,6 +13656,7 @@ fn wordprocessing_shape_textbox_frame(
     text_fill: text_fill.map(Box::new),
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: wordprocessing_shape_actual_static3d(shape, &properties, context.styles),
+    wordprocessing_shape_host: true,
     text_upright: shape
       .text_body_properties
       .as_ref()
@@ -13943,9 +13923,14 @@ fn push_drawing_shapes_impl(
     .as_ref()
     .filter(|properties| properties.source_rectangle_crop)
     .map(|properties| properties.crop);
+  let wordprocessing_twip_host =
+    drawing_graphic_data_uses_wordprocessing_twip_host_placement(graphic_data);
 
   let placement = match drawing.drawing_choice.as_ref() {
     Some(w::DrawingChoice::Inline(_)) => ImagePlacement::Inline,
+    Some(w::DrawingChoice::Anchor(anchor)) if wordprocessing_twip_host => {
+      ImagePlacement::Floating(floating_wordprocessing_twip_host_placement(anchor))
+    }
     Some(w::DrawingChoice::Anchor(anchor)) => {
       ImagePlacement::Floating(floating_image_placement(anchor))
     }
@@ -14008,10 +13993,7 @@ fn push_drawing_shapes_impl(
         }
       }
       _ => {
-        let choice_transform = if matches!(
-          choice,
-          a::GraphicDataChoice::WordprocessingShape(_) | a::GraphicDataChoice::XmlAny(_)
-        ) {
+        let choice_transform = if graphic_data_choice_is_wordprocessing_shape(choice) {
           wordprocessing_transform
         } else {
           transform
@@ -14079,6 +14061,23 @@ fn drawing_graphic_data_choice_shapes(
       .collect(),
     _ => Vec::new(),
   }
+}
+
+fn graphic_data_choice_is_wordprocessing_shape(choice: &a::GraphicDataChoice) -> bool {
+  match choice {
+    a::GraphicDataChoice::WordprocessingShape(_) => true,
+    a::GraphicDataChoice::XmlAny(xml) => strict_wordprocessing_shape(xml).is_some(),
+    _ => false,
+  }
+}
+
+fn drawing_graphic_data_uses_wordprocessing_twip_host_placement(
+  graphic_data: &a::GraphicData,
+) -> bool {
+  graphic_data.graphic_data_choice.iter().any(|choice| {
+    matches!(choice, a::GraphicDataChoice::WordprocessingGroup(_))
+      || graphic_data_choice_is_wordprocessing_shape(choice)
+  })
 }
 
 fn drawingml_locked_canvas_shapes(
@@ -14575,6 +14574,7 @@ fn drawingml_generic_shape_shape(
     text_fill: None,
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: properties.static3d(&context.styles.theme_colors),
+    wordprocessing_shape_host: false,
     text_upright: text_shape.is_some_and(|text_shape| {
       text_shape
         .text_body
@@ -14723,6 +14723,7 @@ fn wordprocessing_canvas_background_shape(
     text_fill: None,
     effects: None,
     static3d: None,
+    wordprocessing_shape_host: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -14873,6 +14874,7 @@ fn wrap_wordprocessing_group_effects(
         chart_color_map: None,
         placeholder_color: None,
         word_group_glow: true,
+        word_shape_fixed_output_outer_shadow: false,
       };
       match choice {
         wpg::GroupShapePropertiesChoice2::EffectList(source) => common::DrawingEffectSource::List {
@@ -15127,6 +15129,7 @@ fn wordprocessing_shape_shape(
     text_fill: None,
     effects,
     static3d: wordprocessing_shape_actual_static3d(shape, &properties, context.styles),
+    wordprocessing_shape_host: true,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: shape
@@ -15297,6 +15300,7 @@ fn wrap_diagram_group_effects(
         chart_color_map: None,
         placeholder_color: None,
         word_group_glow: false,
+        word_shape_fixed_output_outer_shadow: false,
       };
       match choice {
         dsp::GroupShapePropertiesChoice2::EffectList(source) => common::DrawingEffectSource::List {
@@ -15515,6 +15519,7 @@ fn drawingml_diagram_shape_shape(
     text_fill: None,
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: properties.static3d(&context.styles.theme_colors),
+    wordprocessing_shape_host: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -15617,7 +15622,7 @@ fn drawingml_gvml_text_body_frame(
         let (text, properties) = match choice {
           a::ParagraphChoice::Run(run) => (run.text.as_str(), run.run_properties.as_deref()),
           a::ParagraphChoice::Field(field) => (
-            field.text.as_ref().map(|text| text.as_str()).unwrap_or(""),
+            field.text.as_deref().unwrap_or(""),
             field.run_properties.as_deref(),
           ),
           a::ParagraphChoice::Break(line_break) => ("\n", line_break.run_properties.as_deref()),
@@ -15900,6 +15905,7 @@ fn drawingml_gvml_run_effects(
     chart_color_map: None,
     placeholder_color: None,
     word_group_glow: false,
+    word_shape_fixed_output_outer_shadow: false,
   };
   match effect {
     a::RunPropertiesChoice2::EffectList(list) => {
@@ -15923,6 +15929,7 @@ fn drawingml_gvml_default_run_effects(
     chart_color_map: None,
     placeholder_color: None,
     word_group_glow: false,
+    word_shape_fixed_output_outer_shadow: false,
   };
   match effect {
     a::DefaultRunPropertiesChoice2::EffectList(list) => {
@@ -16083,13 +16090,9 @@ fn diagram_style_text_fill_color(
     .as_ref()?
     .text_fill_color_list_choice
     .iter()
-    .find_map(|choice| match choice {
-      dgm::TextFillColorListChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
-      dgm::TextFillColorListChoice::SchemeColor(color) => {
-        resolve_drawingml_scheme_color(color, theme_colors)
-      }
-      dgm::TextFillColorListChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
-      _ => None,
+    .find_map(|choice| {
+      let color = Color::from_diagram_text_fill_color_choice(choice)?;
+      resolved_docx_drawing_color(color, theme_colors).map(|resolved| resolved.color)
     })
 }
 
@@ -16294,6 +16297,7 @@ fn chart_space_shapes(
     chart_color_map: chart_space.color_map_override.as_deref(),
     placeholder_color: chart_effect_placeholder,
     word_group_glow: false,
+    word_shape_fixed_output_outer_shadow: false,
   };
   let data_point_effect_style = shared_chart::chart_shape_effects_from_theme_style(
     shared_chart::automatic_chart_data_point_effect_style_index(chart_style_id)
@@ -17124,7 +17128,8 @@ fn word_chart_solid_fill_color(
   color_map: Option<&c::ColorMapOverride>,
 ) -> Option<RgbColor> {
   let color = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
-  let color = docx_chart_image_color_with_placeholder(color, theme_colors, color_map, None)?;
+  let color =
+    resolve_docx_chart_drawingml_color_with_placeholder(color, theme_colors, color_map, None)?;
   Some(RgbColor {
     r: color.r,
     g: color.g,
@@ -17200,7 +17205,6 @@ fn word_automatic_chart_marker_stroke_style(
     outline,
     theme_colors,
     Some(&placeholder),
-    true,
     color_map,
   )
   .map_or(
@@ -17607,13 +17611,15 @@ fn wordprocessing_shape_extent_points(value_emu: i64) -> f32 {
 }
 
 fn wordprocessing_twip_host_emu_to_points(value_emu: i64) -> f32 {
-  // Word removes the sub-twip EMU remainder for the outer picture host and
-  // for the fallback transform of a top-level WordprocessingShape. Integer
-  // division is deliberately toward zero: the controlled negative picture
-  // offset changes -8.2369pt to -8.20pt, while its positive extent changes
-  // 132.1043pt to 132.10pt. Other DrawingML hosts and nested transforms keep
-  // full EMU precision; in particular, shape position offsets are not part of
-  // this conversion boundary.
+  // Word removes the sub-twip EMU remainder for outer picture,
+  // WordprocessingShape and WordprocessingGroup hosts, and for the fallback
+  // transform of a top-level WordprocessingShape. Integer division is
+  // deliberately toward zero: the
+  // controlled negative picture offset changes -8.2369pt to -8.20pt, while
+  // the WPG position matrix maps -0.01pt to -0.05pt and +0.01pt to zero. The
+  // 23-case standalone WPS position matrix likewise makes a raw offset and
+  // its toward-zero twip control byte-identical. Nested DrawingML transforms
+  // keep full EMU precision and remain outside this conversion boundary.
   (value_emu / 635) as f32 / units::TWIPS_PER_POINT
 }
 
@@ -17699,6 +17705,7 @@ fn chart_shape(
     text_fill: None,
     effects: None,
     static3d: None,
+    wordprocessing_shape_host: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -18102,6 +18109,7 @@ impl DrawingMlShapeProperties {
     theme_colors: &ThemeColors,
     images: Option<&ImageCatalog>,
   ) -> Option<common::DrawingEffectSource> {
+    let word_shape_fixed_output_outer_shadow = matches!(self, Self::Wordprocessing(_));
     let resolve_dag = |source: Box<a::EffectDag>| {
       let resolved = common::drawingml_image_effects::from_effect_dag(
         &source,
@@ -18113,6 +18121,7 @@ impl DrawingMlShapeProperties {
           chart_color_map: None,
           placeholder_color: None,
           word_group_glow: false,
+          word_shape_fixed_output_outer_shadow,
         },
       );
       common::DrawingEffectSource::Dag {
@@ -18131,6 +18140,7 @@ impl DrawingMlShapeProperties {
           chart_color_map: None,
           placeholder_color: None,
           word_group_glow: false,
+          word_shape_fixed_output_outer_shadow,
         },
       );
       common::DrawingEffectSource::List {
@@ -18255,6 +18265,7 @@ fn drawingml_static3d_style(
     chart_color_map: None,
     placeholder_color: None,
     word_group_glow: false,
+    word_shape_fixed_output_outer_shadow: false,
   };
   let extrusion_color = shape
     .extrusion_color
@@ -18325,6 +18336,7 @@ fn anchor_wrap_polygon_shape(
     text_fill: None,
     effects: None,
     static3d: None,
+    wordprocessing_shape_host: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -18789,6 +18801,7 @@ fn drawingml_picture_frame(
     text_fill: None,
     effects: None,
     static3d: None,
+    wordprocessing_shape_host: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -19022,18 +19035,12 @@ fn drawingml_chart_pattern_fill_with_placeholder(
   placeholder_color: Option<&Color>,
 ) -> Option<common::PatternFill> {
   drawingml_pattern_fill_with_color_resolver(fill, |color| {
-    docx_chart_image_color_with_placeholder(color, theme_colors, color_map, placeholder_color)
-  })
-}
-
-fn drawingml_chart_theme_pattern_fill_with_placeholder(
-  fill: &a::PatternFill,
-  theme_colors: &ThemeColors,
-  color_map: Option<&c::ColorMapOverride>,
-  placeholder_color: Option<&Color>,
-) -> Option<common::PatternFill> {
-  drawingml_pattern_fill_with_color_resolver(fill, |color| {
-    docx_chart_theme_color_with_placeholder(color, theme_colors, color_map, placeholder_color)
+    resolve_docx_chart_drawingml_color_with_placeholder(
+      color,
+      theme_colors,
+      color_map,
+      placeholder_color,
+    )
   })
 }
 
@@ -19087,12 +19094,7 @@ fn drawingml_gradient_fill_with_placeholder(
   placeholder_color: Option<&Color>,
 ) -> Option<common::Fill<'static>> {
   drawingml_gradient_fill_with_color_resolver(fill, |authored| {
-    if let Some(placeholder_color) = placeholder_color {
-      docx_image_color_with_placeholder(authored, theme_colors, Some(placeholder_color))
-    } else {
-      let color = resolved_docx_drawing_color(authored, theme_colors)?;
-      Some(common_rgb(color.color, color.opacity))
-    }
+    resolve_docx_drawingml_color_with_placeholder(authored, theme_colors, placeholder_color)
   })
 }
 
@@ -19103,18 +19105,12 @@ fn drawingml_chart_gradient_fill_with_placeholder(
   placeholder_color: Option<&Color>,
 ) -> Option<common::Fill<'static>> {
   drawingml_gradient_fill_with_color_resolver(fill, |authored| {
-    docx_chart_image_color_with_placeholder(authored, theme_colors, color_map, placeholder_color)
-  })
-}
-
-fn drawingml_chart_theme_gradient_fill_with_placeholder(
-  fill: &a::GradientFill,
-  theme_colors: &ThemeColors,
-  color_map: Option<&c::ColorMapOverride>,
-  placeholder_color: Option<&Color>,
-) -> Option<common::Fill<'static>> {
-  drawingml_gradient_fill_with_color_resolver(fill, |authored| {
-    docx_chart_theme_color_with_placeholder(authored, theme_colors, color_map, placeholder_color)
+    resolve_docx_chart_drawingml_color_with_placeholder(
+      authored,
+      theme_colors,
+      color_map,
+      placeholder_color,
+    )
   })
 }
 
@@ -19222,7 +19218,12 @@ fn drawingml_chart_shape_common_style(
       .as_ref()
       .and_then(Color::from_solid_fill_choice)
       .and_then(|color| {
-        docx_chart_image_color_with_placeholder(color, theme_colors, chart_color_map, None)
+        resolve_docx_chart_drawingml_color_with_placeholder(
+          color,
+          theme_colors,
+          chart_color_map,
+          None,
+        )
       })
       .map_or(common::ShapeStyleValue::Unspecified, |color| {
         common::ShapeStyleValue::Paint(common::Fill::Solid(color))
@@ -19254,17 +19255,13 @@ fn drawingml_chart_shape_common_style(
     {
       common::ShapeStyleValue::NoPaint
     }
-    Some(outline) => drawingml_outline_common_stroke_with_placeholder(
-      outline,
-      theme_colors,
-      None,
-      false,
-      chart_color_map,
-    )
-    .map_or(
-      common::ShapeStyleValue::Unspecified,
-      common::ShapeStyleValue::Paint,
-    ),
+    Some(outline) => {
+      drawingml_outline_common_stroke_with_placeholder(outline, theme_colors, None, chart_color_map)
+        .map_or(
+          common::ShapeStyleValue::Unspecified,
+          common::ShapeStyleValue::Paint,
+        )
+    }
   };
   common::ShapeStyle { fill, stroke }
 }
@@ -19285,7 +19282,12 @@ fn drawingml_chart_area_common_style(
       .as_ref()
       .and_then(Color::from_solid_fill_choice)
       .and_then(|color| {
-        docx_chart_image_color_with_placeholder(color, theme_colors, chart_color_map, None)
+        resolve_docx_chart_drawingml_color_with_placeholder(
+          color,
+          theme_colors,
+          chart_color_map,
+          None,
+        )
       })
       .map_or(common::ShapeStyleValue::Unspecified, |color| {
         common::ShapeStyleValue::Paint(common::Fill::Solid(color))
@@ -19317,17 +19319,13 @@ fn drawingml_chart_area_common_style(
     {
       common::ShapeStyleValue::NoPaint
     }
-    Some(outline) => drawingml_outline_common_stroke_with_placeholder(
-      outline,
-      theme_colors,
-      None,
-      false,
-      chart_color_map,
-    )
-    .map_or(
-      common::ShapeStyleValue::Unspecified,
-      common::ShapeStyleValue::Paint,
-    ),
+    Some(outline) => {
+      drawingml_outline_common_stroke_with_placeholder(outline, theme_colors, None, chart_color_map)
+        .map_or(
+          common::ShapeStyleValue::Unspecified,
+          common::ShapeStyleValue::Paint,
+        )
+    }
   };
   common::ShapeStyle { fill, stroke }
 }
@@ -19359,7 +19357,7 @@ fn drawingml_first_gradient_fill_color(
 }
 
 fn resolved_docx_drawing_color(color: Color, theme_colors: &ThemeColors) -> Option<ResolvedColor> {
-  let color = docx_image_color(color, theme_colors)?;
+  let color = resolve_docx_drawingml_color(color, theme_colors)?;
   Some(ResolvedColor {
     color: RgbColor {
       r: color.r,
@@ -19573,10 +19571,6 @@ fn drawingml_actual_line_stroke(
   theme_colors: &ThemeColors,
 ) -> Option<common::Stroke<'static>> {
   let actual = drawingml_actual_line_outline(direct, reference, theme_lines)?;
-  let inherits_theme_paint = reference.is_some()
-    && direct
-      .and_then(|outline| outline.outline_choice1.as_ref())
-      .is_none();
   let placeholder_color = reference
     .and_then(|reference| reference.line_reference_choice.as_ref())
     .and_then(Color::from_line_reference_choice);
@@ -19584,7 +19578,6 @@ fn drawingml_actual_line_stroke(
     &actual,
     theme_colors,
     placeholder_color.as_ref(),
-    inherits_theme_paint,
     None,
   )
 }
@@ -19618,6 +19611,7 @@ fn drawingml_effect_reference_effects(
       .as_ref()
       .and_then(Color::from_effect_reference_choice),
     word_group_glow: false,
+    word_shape_fixed_output_outer_shadow: false,
   };
   match style.effect_style_choice.as_ref()? {
     a::EffectStyleChoice::EffectList(source) => {
@@ -19659,17 +19653,8 @@ fn drawingml_fill_reference_color(
   reference: &a::FillReference,
   theme_colors: &ThemeColors,
 ) -> Option<RgbColor> {
-  match reference.fill_reference_choice.as_ref()? {
-    a::FillReferenceChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
-    a::FillReferenceChoice::SystemColor(color) => {
-      color.last_color.as_deref().and_then(parse_hex_color)
-    }
-    a::FillReferenceChoice::SchemeColor(color) => {
-      resolve_drawingml_scheme_color(color, theme_colors)
-    }
-    a::FillReferenceChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
-    _ => None,
-  }
+  let color = Color::from_fill_reference_choice(reference.fill_reference_choice.as_ref()?)?;
+  resolved_docx_drawing_color(color, theme_colors).map(|resolved| resolved.color)
 }
 
 fn drawingml_fill_reference_common_fill(
@@ -19696,7 +19681,7 @@ fn drawingml_theme_fill_common_fill(
     ThemeFillStyle::None => Some(common::Fill::None),
     ThemeFillStyle::Solid(fill) => {
       let color = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
-      docx_chart_theme_color_with_placeholder(
+      resolve_docx_chart_drawingml_color_with_placeholder(
         color,
         theme_colors,
         chart_color_map,
@@ -19704,14 +19689,14 @@ fn drawingml_theme_fill_common_fill(
       )
       .map(common::Fill::Solid)
     }
-    ThemeFillStyle::Gradient(fill) => drawingml_chart_theme_gradient_fill_with_placeholder(
+    ThemeFillStyle::Gradient(fill) => drawingml_chart_gradient_fill_with_placeholder(
       fill,
       theme_colors,
       chart_color_map,
       placeholder_color,
     ),
     ThemeFillStyle::Blip(fill) => Some(drawingml_blip_common_fill(fill)),
-    ThemeFillStyle::Pattern(fill) => drawingml_chart_theme_pattern_fill_with_placeholder(
+    ThemeFillStyle::Pattern(fill) => drawingml_chart_pattern_fill_with_placeholder(
       fill,
       theme_colors,
       chart_color_map,
@@ -19728,31 +19713,21 @@ fn drawingml_font_reference_color(
   reference: &a::FontReference,
   theme_colors: &ThemeColors,
 ) -> Option<RgbColor> {
-  match reference.font_reference_choice.as_ref()? {
-    a::FontReferenceChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
-    a::FontReferenceChoice::SystemColor(color) => {
-      color.last_color.as_deref().and_then(parse_hex_color)
-    }
-    a::FontReferenceChoice::SchemeColor(color) => {
-      resolve_drawingml_scheme_color(color, theme_colors)
-    }
-    a::FontReferenceChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
-    _ => None,
-  }
+  let color = Color::from_font_reference_choice(reference.font_reference_choice.as_ref()?)?;
+  resolved_docx_drawing_color(color, theme_colors).map(|resolved| resolved.color)
 }
 
 fn drawingml_outline_common_stroke(
   outline: &a::Outline,
   theme_colors: &ThemeColors,
 ) -> Option<common::Stroke<'static>> {
-  drawingml_outline_common_stroke_with_placeholder(outline, theme_colors, None, false, None)
+  drawingml_outline_common_stroke_with_placeholder(outline, theme_colors, None, None)
 }
 
 fn drawingml_outline_common_stroke_with_placeholder(
   outline: &a::Outline,
   theme_colors: &ThemeColors,
   placeholder_color: Option<&Color>,
-  preserve_theme_saturation_overflow: bool,
   chart_color_map: Option<&c::ColorMapOverride>,
 ) -> Option<common::Stroke<'static>> {
   let width_pt = outline
@@ -19764,57 +19739,30 @@ fn drawingml_outline_common_stroke_with_placeholder(
     a::OutlineChoice::NoFill(_) => return None,
     a::OutlineChoice::SolidFill(fill) => {
       let authored = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
-      let color = if preserve_theme_saturation_overflow {
-        docx_chart_theme_color_with_placeholder(
-          authored,
-          theme_colors,
-          chart_color_map,
-          placeholder_color,
-        )?
-      } else {
-        docx_chart_image_color_with_placeholder(
-          authored,
-          theme_colors,
-          chart_color_map,
-          placeholder_color,
-        )?
-      };
+      let color = resolve_docx_chart_drawingml_color_with_placeholder(
+        authored,
+        theme_colors,
+        chart_color_map,
+        placeholder_color,
+      )?;
       (color, None, None)
     }
     a::OutlineChoice::PatternFill(fill) => {
-      let pattern = if preserve_theme_saturation_overflow {
-        drawingml_chart_theme_pattern_fill_with_placeholder(
-          fill,
-          theme_colors,
-          chart_color_map,
-          placeholder_color,
-        )?
-      } else {
-        drawingml_chart_pattern_fill_with_placeholder(
-          fill,
-          theme_colors,
-          chart_color_map,
-          placeholder_color,
-        )?
-      };
+      let pattern = drawingml_chart_pattern_fill_with_placeholder(
+        fill,
+        theme_colors,
+        chart_color_map,
+        placeholder_color,
+      )?;
       (pattern.foreground, Some(pattern), None)
     }
     a::OutlineChoice::GradientFill(fill) => {
-      let resolved = if preserve_theme_saturation_overflow {
-        drawingml_chart_theme_gradient_fill_with_placeholder(
-          fill,
-          theme_colors,
-          chart_color_map,
-          placeholder_color,
-        )?
-      } else {
-        drawingml_chart_gradient_fill_with_placeholder(
-          fill,
-          theme_colors,
-          chart_color_map,
-          placeholder_color,
-        )?
-      };
+      let resolved = drawingml_chart_gradient_fill_with_placeholder(
+        fill,
+        theme_colors,
+        chart_color_map,
+        placeholder_color,
+      )?;
       let common::Fill::Gradient(gradient) = resolved else {
         return None;
       };
@@ -21562,6 +21510,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<I
     text_fill: None,
     effects: None,
     static3d: None,
+    wordprocessing_shape_host: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -21775,6 +21724,7 @@ fn vml_shape_frame(
     text_fill: None,
     effects: None,
     static3d: None,
+    wordprocessing_shape_host: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -21852,6 +21802,7 @@ fn vml_textbox_frame(
     text_fill: None,
     effects: None,
     static3d: None,
+    wordprocessing_shape_host: false,
     // Word keeps legacy custom-shape textbox text unrotated unless its
     // separate RotateText property is set. LibreOffice's WW8/VML bridge
     // compensates both the object angle and FlipV for this default while
@@ -24100,7 +24051,7 @@ fn vml_group_stroked_child_leading_pt(
   if !model.stroked {
     return None;
   }
-  let Some(style) = style.filter(|style| {
+  let style = style.filter(|style| {
     style.split(';').any(|declaration| {
       declaration.split_once(':').is_some_and(|(name, _)| {
         matches!(
@@ -24109,12 +24060,8 @@ fn vml_group_stroked_child_leading_pt(
         )
       })
     })
-  }) else {
-    return None;
-  };
-  let Some(style) = transform.child_style(Some(style)) else {
-    return None;
-  };
+  })?;
+  let style = transform.child_style(Some(style))?;
   let leading_x = vml_image_style(Some(&style)).horizontal_offset_pt;
   (leading_x <= f32::EPSILON).then_some((-leading_x).max(0.0) + LO_VML_INLINE_GROUP_EDGE_BOUND_PT)
 }
@@ -24725,11 +24672,12 @@ struct DocxImageEffectColorResolver<'a> {
   chart_color_map: Option<&'a c::ColorMapOverride>,
   placeholder_color: Option<Color>,
   word_group_glow: bool,
+  word_shape_fixed_output_outer_shadow: bool,
 }
 
 impl DocxImageEffectColorResolver<'_> {
   fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
-    let color = docx_chart_image_color_with_placeholder(
+    let color = resolve_docx_chart_drawingml_color_with_placeholder(
       color?,
       self.theme_colors,
       self.chart_color_map,
@@ -24742,6 +24690,33 @@ impl DocxImageEffectColorResolver<'_> {
         b: color.b,
       },
       alpha: color.a,
+    })
+  }
+
+  fn resolve_word_fixed_output_effect(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
+    let mut scheme_resolver = |value| {
+      let color = if let Some(color_map) = self.chart_color_map {
+        let mapped = shared_chart::scheme_color_token(Some(color_map), value)?;
+        resolve_drawingml_color_scheme_index(mapped, self.theme_colors)?
+      } else {
+        resolve_drawingml_scheme_color_value(value, self.theme_colors)?
+      };
+      Some(Color::RgbHex(RgbHexColor {
+        value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+        transformations: Vec::new(),
+      }))
+    };
+    let color = color?.resolve_rgb_for_word_fixed_output_effect(
+      &mut scheme_resolver,
+      self.placeholder_color.as_ref(),
+    )?;
+    Some(ResolvedEffectColor {
+      color: RgbColor {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+      },
+      alpha: drawingml_opacity_to_alpha(color.alpha),
     })
   }
 }
@@ -24805,7 +24780,12 @@ impl ImageEffectColorResolver for DocxImageEffectColorResolver<'_> {
   }
 
   fn outer_shadow(&self, choice: &a::OuterShadowChoice) -> Option<ResolvedEffectColor> {
-    self.resolve(Color::from_outer_shadow_choice(choice))
+    let color = Color::from_outer_shadow_choice(choice);
+    if self.word_shape_fixed_output_outer_shadow {
+      self.resolve_word_fixed_output_effect(color)
+    } else {
+      self.resolve(color)
+    }
   }
 
   fn preset_shadow(&self, choice: &a::PresetShadowChoice) -> Option<ResolvedEffectColor> {
@@ -25053,73 +25033,72 @@ fn apply_image_effects_from_blip(
         chart_color_map: None,
         placeholder_color: None,
         word_group_glow: false,
+        word_shape_fixed_output_outer_shadow: false,
       },
     ));
 }
 
-fn docx_image_color(color: Color, theme_colors: &ThemeColors) -> Option<common::Color> {
-  docx_image_color_with_placeholder(color, theme_colors, None)
+// Word applies one ordered DrawingML color-transform pipeline to direct and
+// inherited solid, gradient, pattern, and line paints. In particular, it
+// retains intermediate precision and allows saturation above 100% until the
+// final sRGB channel clip; carrier, host, and an explicit no-op tint do not
+// change that rule.
+fn resolve_docx_drawingml_color(color: Color, theme_colors: &ThemeColors) -> Option<common::Color> {
+  resolve_docx_drawingml_color_with_placeholder(color, theme_colors, None)
 }
 
-fn docx_image_color_with_placeholder(
+fn resolve_docx_drawingml_color_with_placeholder(
   color: Color,
   theme_colors: &ThemeColors,
   placeholder_color: Option<&Color>,
 ) -> Option<common::Color> {
-  docx_image_color_with_placeholder_policy(color, theme_colors, placeholder_color, false)
-}
-
-fn docx_chart_image_color_with_placeholder(
-  color: Color,
-  theme_colors: &ThemeColors,
-  color_map: Option<&c::ColorMapOverride>,
-  placeholder_color: Option<&Color>,
-) -> Option<common::Color> {
-  docx_chart_color_with_placeholder_policy(color, theme_colors, color_map, placeholder_color, false)
-}
-
-fn docx_chart_theme_color_with_placeholder(
-  color: Color,
-  theme_colors: &ThemeColors,
-  color_map: Option<&c::ColorMapOverride>,
-  placeholder_color: Option<&Color>,
-) -> Option<common::Color> {
-  docx_chart_color_with_placeholder_policy(color, theme_colors, color_map, placeholder_color, true)
-}
-
-fn docx_chart_color_with_placeholder_policy(
-  color: Color,
-  theme_colors: &ThemeColors,
-  color_map: Option<&c::ColorMapOverride>,
-  placeholder_color: Option<&Color>,
-  preserve_saturation_overflow: bool,
-) -> Option<common::Color> {
-  if color_map.is_none() {
-    return if preserve_saturation_overflow {
-      docx_image_color_with_placeholder_policy(color, theme_colors, placeholder_color, true)
-    } else {
-      docx_image_color_with_placeholder(color, theme_colors, placeholder_color)
-    };
-  }
   let mut scheme_resolver = |value| {
-    let mapped = shared_chart::scheme_color_token(color_map, value)?;
+    let color = resolve_drawingml_scheme_color_value(value, theme_colors)?;
+    Some(Color::RgbHex(RgbHexColor {
+      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+      transformations: Vec::new(),
+    }))
+  };
+  let color =
+    color.resolve_rgb_preserving_transform_precision(&mut scheme_resolver, placeholder_color)?;
+  Some(common::Color {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+    a: drawingml_opacity_to_alpha(color.alpha),
+  })
+}
+
+fn resolve_docx_chart_drawingml_color_with_placeholder(
+  color: Color,
+  theme_colors: &ThemeColors,
+  color_map: Option<&c::ColorMapOverride>,
+  placeholder_color: Option<&Color>,
+) -> Option<common::Color> {
+  let Some(color_map) = color_map else {
+    return resolve_docx_drawingml_color_with_placeholder(color, theme_colors, placeholder_color);
+  };
+  let mut scheme_resolver = |value| {
+    let mapped = shared_chart::scheme_color_token(Some(color_map), value)?;
     let color = resolve_drawingml_color_scheme_index(mapped, theme_colors)?;
     Some(Color::RgbHex(RgbHexColor {
       value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
       transformations: Vec::new(),
     }))
   };
-  let color = if preserve_saturation_overflow {
-    color.resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?
-  } else {
-    color.resolve_rgb(&mut scheme_resolver, placeholder_color)?
-  };
+  let color =
+    color.resolve_rgb_preserving_transform_precision(&mut scheme_resolver, placeholder_color)?;
   Some(common::Color {
     r: color.r,
     g: color.g,
     b: color.b,
-    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
+    a: drawingml_opacity_to_alpha(color.alpha),
   })
+}
+
+fn drawingml_opacity_to_alpha(opacity: i32) -> u8 {
+  let opacity = opacity.clamp(0, 100_000) as u32;
+  ((opacity * u32::from(u8::MAX) + 50_000) / 100_000) as u8
 }
 
 fn resolve_drawingml_color_scheme_index(
@@ -25142,76 +25121,6 @@ fn resolve_drawingml_color_scheme_index(
   }
 }
 
-fn docx_image_color_with_placeholder_policy(
-  color: Color,
-  theme_colors: &ThemeColors,
-  placeholder_color: Option<&Color>,
-  preserve_saturation_overflow: bool,
-) -> Option<common::Color> {
-  let mut scheme_resolver = |value| {
-    let color = resolve_drawingml_scheme_color_value(value, theme_colors)?;
-    Some(Color::RgbHex(RgbHexColor {
-      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
-      transformations: Vec::new(),
-    }))
-  };
-  let color = if preserve_saturation_overflow {
-    color.resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?
-  } else {
-    color.resolve_rgb(&mut scheme_resolver, placeholder_color)?
-  };
-  Some(common::Color {
-    r: color.r,
-    g: color.g,
-    b: color.b,
-    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
-  })
-}
-
-fn resolve_drawingml_scheme_color(
-  color: &a::SchemeColor,
-  theme_colors: &ThemeColors,
-) -> Option<RgbColor> {
-  let mut resolved = resolve_drawingml_scheme_color_value(color.val, theme_colors)?;
-  for transform in &color.scheme_color_choice {
-    match transform {
-      a::SchemeColorChoice::Tint(value) => {
-        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
-          resolved = apply_drawingml_tint(resolved, amount);
-        }
-      }
-      a::SchemeColorChoice::Shade(value) => {
-        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
-          resolved = apply_drawingml_shade(resolved, amount);
-        }
-      }
-      a::SchemeColorChoice::SaturationModulation(value) => {
-        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
-          let mut hsl = hsl_color(resolved);
-          hsl.apply_saturation_mod(amount);
-          resolved = rgb_color(hsl);
-        }
-      }
-      a::SchemeColorChoice::LuminanceModulation(value) => {
-        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
-          let mut hsl = hsl_color(resolved);
-          hsl.apply_luminance_mod(amount);
-          resolved = rgb_color(hsl);
-        }
-      }
-      a::SchemeColorChoice::LuminanceOffset(value) => {
-        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
-          let mut hsl = hsl_color(resolved);
-          hsl.apply_luminance_offset(amount);
-          resolved = rgb_color(hsl);
-        }
-      }
-      _ => {}
-    }
-  }
-  Some(resolved)
-}
-
 fn resolve_drawingml_scheme_color_value(
   value: a::SchemeColorValues,
   theme_colors: &ThemeColors,
@@ -25230,18 +25139,6 @@ fn resolve_drawingml_scheme_color_value(
     a::SchemeColorValues::Hyperlink => theme_colors.hyperlink,
     a::SchemeColorValues::FollowedHyperlink => theme_colors.followed_hyperlink,
     a::SchemeColorValues::PhColor => None,
-  }
-}
-
-fn drawingml_preset_color_value(value: a::PresetColorValues) -> Option<RgbColor> {
-  match value {
-    a::PresetColorValues::White => Some(RgbColor {
-      r: 255,
-      g: 255,
-      b: 255,
-    }),
-    a::PresetColorValues::Black => Some(RgbColor { r: 0, g: 0, b: 0 }),
-    _ => None,
   }
 }
 
@@ -37587,6 +37484,77 @@ mod tests {
   }
 
   #[test]
+  fn drawingml_style_references_consume_every_color_choice_and_its_transforms() {
+    let theme_colors = ThemeColors {
+      accent1: Some(RgbColor {
+        r: 0x12,
+        g: 0x34,
+        b: 0x56,
+      }),
+      ..ThemeColors::default()
+    };
+    let choices = [
+      (
+        r#"<a:srgbClr val="000000"><a:tint val="50000"/></a:srgbClr>"#,
+        RgbColor {
+          r: 0xbc,
+          g: 0xbc,
+          b: 0xbc,
+        },
+      ),
+      (
+        r#"<a:scrgbClr r="100000" g="0" b="0"/>"#,
+        RgbColor { r: 255, g: 0, b: 0 },
+      ),
+      (
+        r#"<a:hslClr hue="14400000" sat="100000" lum="50000"/>"#,
+        RgbColor { r: 0, g: 0, b: 255 },
+      ),
+      (
+        r#"<a:schemeClr val="accent1"/>"#,
+        RgbColor {
+          r: 0x12,
+          g: 0x34,
+          b: 0x56,
+        },
+      ),
+      (r#"<a:prstClr val="red"/>"#, RgbColor { r: 255, g: 0, b: 0 }),
+      (
+        r#"<a:sysClr val="windowText" lastClr="00FF00"/>"#,
+        RgbColor { r: 0, g: 255, b: 0 },
+      ),
+    ];
+
+    for (choice, expected) in choices {
+      let fill = a::FillReference::from_bytes(
+        format!(
+          r#"<a:fillRef xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" idx="1">{choice}</a:fillRef>"#,
+        )
+        .as_bytes(),
+      )
+      .expect("fill reference color choice");
+      assert_eq!(
+        drawingml_fill_reference_color(&fill, &theme_colors),
+        Some(expected),
+        "fillRef must consume {choice}"
+      );
+
+      let font = a::FontReference::from_bytes(
+        format!(
+          r#"<a:fontRef xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" idx="minor">{choice}</a:fontRef>"#,
+        )
+        .as_bytes(),
+      )
+      .expect("font reference color choice");
+      assert_eq!(
+        drawingml_font_reference_color(&font, &theme_colors),
+        Some(expected),
+        "fontRef must consume {choice}"
+      );
+    }
+  }
+
+  #[test]
   fn diagram_shape_font_reference_is_only_a_fallback_for_mapped_text_color() {
     let font_reference = a::FontReference::from_bytes(
       br#"<a:fontRef xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" idx="minor"><a:schemeClr val="lt1"/></a:fontRef>"#,
@@ -38386,7 +38354,7 @@ mod tests {
   }
 
   #[test]
-  fn wps_inherited_theme_line_keeps_word_saturation_overflow() {
+  fn wps_direct_and_inherited_lines_keep_word_transform_precision() {
     let themed = a::Outline::from_bytes(
       br##"<a:ln xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="9525">
         <a:solidFill><a:schemeClr val="phClr"><a:satMod val="120000"/></a:schemeClr></a:solidFill>
@@ -38442,7 +38410,7 @@ mod tests {
         direct_stroke.color.g,
         direct_stroke.color.b,
       ],
-      [0xff, 0x38, 0x8c]
+      [0xff, 0x24, 0x89]
     );
   }
 
@@ -38536,6 +38504,27 @@ mod tests {
   }
 
   #[test]
+  fn drawingml_opacity_rounds_to_the_nearest_eight_bit_alpha() {
+    let office_boundaries = [
+      (0, 0),
+      (1, 0),
+      (195, 0),
+      (196, 0),
+      (197, 1),
+      (391, 1),
+      (392, 1),
+      (393, 1),
+      (38_000, 97),
+      (50_000, 128),
+      (99_999, 255),
+      (100_000, 255),
+    ];
+    for (opacity, expected) in office_boundaries {
+      assert_eq!(drawingml_opacity_to_alpha(opacity), expected, "{opacity}");
+    }
+  }
+
+  #[test]
   fn wps_shape_inherits_theme_effect_reference_and_direct_effect_list_clears_it() {
     let effect_styles = a::EffectStyleList::from_bytes(
       br#"<a:effectStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:effectStyle><a:effectLst><a:outerShdw blurRad="40000" dist="20000" dir="5400000" rotWithShape="0"><a:schemeClr val="phClr"><a:alpha val="50000"/></a:schemeClr></a:outerShdw></a:effectLst></a:effectStyle></a:effectStyleLst>"#,
@@ -38600,7 +38589,7 @@ mod tests {
           g: 129,
           b: 189,
         },
-        alpha: 127,
+        alpha: 128,
       },
       "theme phClr must use the effectRef color"
     );
@@ -38974,24 +38963,30 @@ mod tests {
   }
 
   #[test]
-  fn floating_shape_and_picture_hosts_use_their_proven_coordinate_grids() {
+  fn floating_generic_picture_wps_and_wpg_hosts_use_their_proven_coordinate_grids() {
     let anchor = wp::Anchor::from_bytes(
       br#"<wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" behindDoc="0" distT="0" distB="0" distL="0" distR="0" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>704718</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>299277</wp:posOffset></wp:positionV><wp:extent cx="1794295" cy="1173192"/><wp:wrapNone/><wp:docPr id="1" name="controlled host"/><a:graphic><a:graphicData uri="urn:unused"/></a:graphic></wp:anchor>"#,
     )
     .expect("floating anchor");
 
-    let shape = floating_image_placement(&anchor);
+    let generic = floating_image_placement(&anchor);
     let picture = floating_picture_placement(&anchor);
+    let wordprocessing_shape = floating_wordprocessing_shape_placement(&anchor);
+    let wordprocessing_group = floating_wordprocessing_twip_host_placement(&anchor);
 
-    assert!((shape.horizontal_offset_pt - 55.489_605).abs() < 0.000_01);
-    assert!((shape.vertical_offset_pt - 23.565_119).abs() < 0.000_01);
+    assert!((generic.horizontal_offset_pt - 55.489_605).abs() < 0.000_01);
+    assert!((generic.vertical_offset_pt - 23.565_119).abs() < 0.000_01);
     assert!((picture.horizontal_offset_pt - 55.45).abs() < 0.000_01);
     assert!((picture.vertical_offset_pt - 23.55).abs() < 0.000_01);
+    assert!((wordprocessing_shape.horizontal_offset_pt - 55.45).abs() < 0.000_01);
+    assert!((wordprocessing_shape.vertical_offset_pt - 23.55).abs() < 0.000_01);
+    assert!((wordprocessing_group.horizontal_offset_pt - 55.45).abs() < 0.000_01);
+    assert!((wordprocessing_group.vertical_offset_pt - 23.55).abs() < 0.000_01);
   }
 
   #[test]
   fn paragraph_relative_wps_textbox_keeps_anchor_and_shape_offsets_separate() {
-    let drawing_xml = br#"<w:drawing xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wp:anchor behindDoc="0" distT="0" distB="0" distL="0" distR="0" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>408305</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>204470</wp:posOffset></wp:positionV><wp:extent cx="4972050" cy="1152525"/><wp:wrapNone/><wp:docPr id="1" name="Text Frame 1"/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="4971960" cy="1152360"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="0"><a:noFill/></a:ln></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>Test text box</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr wrap="square" lIns="0" rIns="0" tIns="0" bIns="0" anchor="t"><a:noAutofit/></wps:bodyPr></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing>"#;
+    let drawing_xml = br#"<w:drawing xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wp:anchor behindDoc="0" distT="0" distB="0" distL="0" distR="0" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>408306</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>204471</wp:posOffset></wp:positionV><wp:extent cx="4972050" cy="1152525"/><wp:wrapNone/><wp:docPr id="1" name="Text Frame 1"/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="4971960" cy="1152360"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="0"><a:noFill/></a:ln></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>Test text box</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr wrap="square" lIns="0" rIns="0" tIns="0" bIns="0" anchor="t"><a:noAutofit/></wps:bodyPr></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing>"#;
     let drawing = w::Drawing::from_bytes(drawing_xml).expect("floating WPS textbox");
     let mut inlines = Vec::new();
 
@@ -39009,7 +39004,9 @@ mod tests {
     let ImagePlacement::Floating(placement) = shape.placement else {
       panic!("expected floating WPS textbox");
     };
-    assert!((placement.vertical_offset_pt - 16.1).abs() < 0.001);
+    assert!((placement.horizontal_offset_pt - 32.15).abs() < 0.000_01);
+    assert!((placement.vertical_offset_pt - 16.1).abs() < 0.000_01);
+    assert!(shape.wordprocessing_shape_host);
     assert!((shape.offset_y_pt - 0.0).abs() < 0.001);
     assert!((shape.text_inset_top_pt - 0.0).abs() < 0.001);
   }
@@ -43542,14 +43539,14 @@ mod tests {
     }
     let (spread_ratio, spread_kernel, blur_kernel) =
       glow_profile(resolved).expect("resolved WPG glow");
-    assert!((spread_ratio - 0.4).abs() < f32::EPSILON);
+    assert!((spread_ratio - 0.5).abs() < f32::EPSILON);
     assert_eq!(
       spread_kernel,
-      common::drawingml_image_effects::GlowSpreadKernel::Square
+      common::drawingml_image_effects::GlowSpreadKernel::AlphaOutset
     );
     assert_eq!(
       blur_kernel,
-      common::drawingml_image_effects::GlowBlurKernel::Gaussian
+      common::drawingml_image_effects::GlowBlurKernel::WordGroupGaussian
     );
 
     let empty = group("<a:effectLst/>");
@@ -45945,6 +45942,44 @@ mod tests {
     assert_eq!(
       gradient.interpolation,
       common::GradientInterpolation::LinearSrgb
+    );
+  }
+
+  #[test]
+  fn word_drawingml_gradient_keeps_ordered_transform_precision() {
+    let fill = a::GradientFill::from_bytes(
+      br#"<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:gsLst><a:gs pos="0"><a:schemeClr val="accent1"/></a:gs><a:gs pos="50000"><a:schemeClr val="accent1"><a:tint val="44500"/><a:satMod val="160000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="accent5"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill>"#,
+    )
+    .expect("Word DrawingML gradient");
+    let theme_colors = ThemeColors {
+      accent1: Some(RgbColor {
+        r: 0xff,
+        g: 0x38,
+        b: 0x8c,
+      }),
+      accent5: Some(RgbColor {
+        r: 0x00,
+        g: 0x5b,
+        b: 0xd3,
+      }),
+      ..ThemeColors::default()
+    };
+
+    let common::Fill::Gradient(gradient) =
+      drawingml_gradient_fill(&fill, &theme_colors).expect("resolved Word gradient")
+    else {
+      panic!("expected gradient fill");
+    };
+
+    assert_eq!(gradient.stops.len(), 3);
+    assert_eq!(
+      gradient.stops[1].color,
+      common::Color {
+        r: 0xff,
+        g: 0xb6,
+        b: 0xce,
+        a: u8::MAX,
+      }
     );
   }
 

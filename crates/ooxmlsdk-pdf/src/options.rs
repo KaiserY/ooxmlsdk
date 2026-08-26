@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::{fmt, mem};
+use std::{collections::BTreeSet, fmt, mem};
 
 use crate::error::{PdfError, Result};
 
@@ -813,7 +813,58 @@ fn resolve_metadata(options: &PdfOptions) -> Result<()> {
       validate_pdf_date_time(date, "attachment modification date")?;
     }
   }
+  validate_attachments(&options.attachments)?;
   Ok(())
+}
+
+pub(crate) fn validate_attachments(attachments: &[PdfAttachment]) -> Result<()> {
+  let mut paths = BTreeSet::new();
+  for attachment in attachments {
+    if attachment.path.is_empty() {
+      return Err(PdfError::Options(
+        "attachment path must not be empty".to_string(),
+      ));
+    }
+    if attachment.description.is_empty() {
+      return Err(PdfError::Options(format!(
+        "attachment '{}' must have a description",
+        attachment.path
+      )));
+    }
+    if !valid_attachment_mime_type(&attachment.mime_type) {
+      return Err(PdfError::Options(format!(
+        "attachment '{}' has invalid MIME type '{}'",
+        attachment.path, attachment.mime_type
+      )));
+    }
+    if !paths.insert(attachment.path.as_str()) {
+      return Err(PdfError::Options(format!(
+        "attachment path '{}' is present more than once",
+        attachment.path
+      )));
+    }
+  }
+  Ok(())
+}
+
+fn valid_attachment_mime_type(mime_type: &str) -> bool {
+  let mut parts = mime_type.split('/');
+  let Some(type_part) = parts.next() else {
+    return false;
+  };
+  let Some(subtype_part) = parts.next() else {
+    return false;
+  };
+  parts.next().is_none()
+    && valid_attachment_mime_part(type_part)
+    && valid_attachment_mime_part(subtype_part)
+}
+
+fn valid_attachment_mime_part(part: &str) -> bool {
+  !part.is_empty()
+    && part
+      .bytes()
+      .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'+' | b'.'))
 }
 
 fn validate_pdf_date_time(value: PdfDateTime, label: &str) -> Result<()> {
@@ -1376,6 +1427,58 @@ mod tests {
     assert!(matches!(
       invalid.resolve_for(PdfDocumentKind::Pptx),
       Err(PdfError::Options(message)) if message.contains("invalid metadata creation date")
+    ));
+  }
+
+  #[test]
+  fn attachment_validation_is_backend_independent_and_preserves_mime_boundaries() {
+    let attachment = |path: &str, mime_type: &str, description: &str| PdfAttachment {
+      path: path.to_string(),
+      mime_type: mime_type.to_string(),
+      description: description.to_string(),
+      association: PdfAttachmentAssociation::Unspecified,
+      data: Arc::from(&b"data"[..]),
+      modification_date: None,
+      compress: None,
+    };
+
+    validate_attachments(&[
+      attachment("source.txt", "text/plain", "Source"),
+      attachment(
+        "数据.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Data",
+      ),
+    ])
+    .unwrap();
+
+    for mime_type in [
+      "",
+      "text",
+      "text/",
+      "/plain",
+      "text/plain/extra",
+      "text/plain*",
+    ] {
+      assert!(matches!(
+        validate_attachments(&[attachment("source.txt", mime_type, "Source")]),
+        Err(PdfError::Options(message)) if message.contains("invalid MIME type")
+      ));
+    }
+    assert!(matches!(
+      validate_attachments(&[attachment("", "text/plain", "Source")]),
+      Err(PdfError::Options(message)) if message == "attachment path must not be empty"
+    ));
+    assert!(matches!(
+      validate_attachments(&[attachment("source.txt", "text/plain", "")]),
+      Err(PdfError::Options(message)) if message.contains("must have a description")
+    ));
+    assert!(matches!(
+      validate_attachments(&[
+        attachment("source.txt", "text/plain", "First"),
+        attachment("source.txt", "text/plain", "Second"),
+      ]),
+      Err(PdfError::Options(message)) if message.contains("present more than once")
     ));
   }
 

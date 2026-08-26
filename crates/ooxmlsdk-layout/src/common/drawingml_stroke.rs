@@ -217,7 +217,12 @@ pub(crate) fn apply_outline_style(stroke: &mut Stroke<'_>, outline: &a::Outline)
     Some(a::OutlineChoice3::Miter(miter)) => Some(StrokeJoin::Miter {
       limit: miter.limit.map(|limit| limit.as_ratio() as f32),
     }),
-    None => None,
+    // DrawingML's absent join is an application default, not the generic
+    // renderer's miter default. Word's omitted control emits a round PDF join,
+    // and LibreOffice's OOXML importer independently returns LineJoint_ROUND
+    // for an unrecognized/absent join token. Resolve that host default here so
+    // non-DrawingML callers may continue to use `Stroke::join == None`.
+    None => Some(StrokeJoin::Round),
   };
   stroke.head_end = outline.head_end.as_ref().map(|end| StrokeEnd {
     kind: end.r#type.map(line_end).unwrap_or(StrokeEndKind::None),
@@ -408,19 +413,20 @@ pub(crate) fn stroke_end_marker_bounds(path: &PathItem<'_>, stroke: &Stroke<'_>)
   bounds
 }
 
-/// Returns the visible bounds of a DrawingML path stroke, including line-end
-/// markers.
+/// Returns the authored widened geometry of a DrawingML path stroke,
+/// including line-end markers. Paint opacity is deliberately not consulted.
 ///
 /// Direct2D's `ID2D1Geometry::GetWidenedBounds` is the reference contract for
-/// an effect source made from vector primitives.  Microsoft's
-/// `GeometryRealizationSample` uses that widened result (rather than the fill
-/// geometry bounds) when allocating a stroked opacity mask.  Keep the same
-/// distinction here so a shadow/glow receives the complete alpha of the line,
-/// including cap, join, dash, and marker geometry.
-pub(crate) fn path_stroke_bounds(path: &PathItem<'_>, stroke: &Stroke<'_>) -> Option<Rect> {
-  if stroke.width.0 <= 0.0
-    || stroke.color.a == 0 && stroke.pattern.is_none() && stroke.gradient.is_none()
-  {
+/// allocating a vector effect surface. Microsoft's `GeometryRealizationSample`
+/// likewise separates the widened allocation bounds from the opacity mask
+/// drawn into that allocation. Word's simple-WPG-glow controls make that split
+/// observable: a zero-opacity 2pt line adds no glow alpha, but reserves the
+/// same effect surface as every positive-opacity control.
+pub(crate) fn path_stroke_geometry_bounds(
+  path: &PathItem<'_>,
+  stroke: &Stroke<'_>,
+) -> Option<Rect> {
+  if stroke.width.0 <= 0.0 {
     return None;
   }
 
@@ -457,24 +463,56 @@ pub(crate) fn path_stroke_bounds(path: &PathItem<'_>, stroke: &Stroke<'_>) -> Op
   bounds
 }
 
+/// Returns the painted bounds of a DrawingML path stroke. Unlike
+/// [`path_stroke_geometry_bounds`], a fully unpainted stroke has no visible
+/// bounds and contributes no effect-source alpha.
+pub(crate) fn path_stroke_bounds(path: &PathItem<'_>, stroke: &Stroke<'_>) -> Option<Rect> {
+  if stroke.color.a == 0 && stroke.pattern.is_none() && stroke.gradient.is_none() {
+    return None;
+  }
+  path_stroke_geometry_bounds(path, stroke)
+}
+
+#[derive(Clone, Copy)]
+enum DisplayStrokeBoundsKind {
+  Painted,
+  AuthoredGeometry,
+}
+
+fn selected_path_stroke_bounds(
+  path: &PathItem<'_>,
+  stroke: &Stroke<'_>,
+  kind: DisplayStrokeBoundsKind,
+) -> Option<Rect> {
+  match kind {
+    DisplayStrokeBoundsKind::Painted => path_stroke_bounds(path, stroke),
+    DisplayStrokeBoundsKind::AuthoredGeometry => path_stroke_geometry_bounds(path, stroke),
+  }
+}
+
 /// Collects widened stroke bounds for every vector item in an effect source.
 /// This deliberately excludes text outline measurement: Word text effects
 /// have a separate glyph-ink boundary, while DrawingML shape/group effects
 /// feed Path/Rect/Line primitives through this vector source.
-pub(crate) fn display_items_stroke_bounds(items: &[DisplayItem<'_>]) -> Option<Rect> {
+fn display_items_stroke_bounds_with_kind(
+  items: &[DisplayItem<'_>],
+  kind: DisplayStrokeBoundsKind,
+) -> Option<Rect> {
   let mut bounds = None;
   for item in items {
     let item_bounds = match item {
       DisplayItem::Path(path) => path
         .stroke
         .as_ref()
-        .and_then(|stroke| path_stroke_bounds(path, stroke)),
+        .and_then(|stroke| selected_path_stroke_bounds(path, stroke, kind)),
       DisplayItem::Rect(rect) => rect
         .stroke
         .as_ref()
-        .and_then(|stroke| path_stroke_bounds(&rectangle_path(rect.bounds), stroke)),
-      DisplayItem::Line(line) => path_stroke_bounds(&line_path(line.start, line.end), &line.stroke),
-      DisplayItem::Group(group) => display_items_stroke_bounds(&group.items),
+        .and_then(|stroke| selected_path_stroke_bounds(&rectangle_path(rect.bounds), stroke, kind)),
+      DisplayItem::Line(line) => {
+        selected_path_stroke_bounds(&line_path(line.start, line.end), &line.stroke, kind)
+      }
+      DisplayItem::Group(group) => display_items_stroke_bounds_with_kind(&group.items, kind),
       DisplayItem::Text(_)
       | DisplayItem::Glyphs(_)
       | DisplayItem::Image(_)
@@ -486,6 +524,17 @@ pub(crate) fn display_items_stroke_bounds(items: &[DisplayItem<'_>]) -> Option<R
     bounds = union_optional_rect(bounds, item_bounds);
   }
   bounds
+}
+
+pub(crate) fn display_items_stroke_bounds(items: &[DisplayItem<'_>]) -> Option<Rect> {
+  display_items_stroke_bounds_with_kind(items, DisplayStrokeBoundsKind::Painted)
+}
+
+/// Collects authored widened stroke geometry for effect-surface allocation.
+/// Fully transparent lines are included here even though they remain excluded
+/// from [`display_items_stroke_bounds`] and from the raster source's alpha.
+pub(crate) fn display_items_stroke_geometry_bounds(items: &[DisplayItem<'_>]) -> Option<Rect> {
+  display_items_stroke_bounds_with_kind(items, DisplayStrokeBoundsKind::AuthoredGeometry)
 }
 
 fn rectangle_path(bounds: Rect) -> PathItem<'static> {
@@ -975,6 +1024,25 @@ mod tests {
     ));
     assert_eq!(suppressed.width.map(i64::from), Some(25_400));
   }
+
+  #[test]
+  fn complete_drawingml_outline_uses_round_join_when_omitted() {
+    let outline = a::Outline::default();
+    let mut complete = Stroke::default();
+    apply_outline_style(&mut complete, &outline);
+    assert_eq!(complete.join, Some(StrokeJoin::Round));
+
+    // A partial direct outline has no authority to erase an inherited join.
+    // This path deliberately remains distinct from terminal outline
+    // conversion above.
+    let mut inherited = Stroke {
+      join: Some(StrokeJoin::Miter { limit: Some(8.0) }),
+      ..Stroke::default()
+    };
+    apply_outline_style_over_inherited(&mut inherited, &outline);
+    assert_eq!(inherited.join, Some(StrokeJoin::Miter { limit: Some(8.0) }));
+  }
+
   use crate::common::{Color, Fill};
 
   fn rectangle_path() -> PathItem<'static> {
@@ -1115,6 +1183,22 @@ mod tests {
 
     let mut transparent = visible_stroke(4.0);
     transparent.color.a = 0;
+    assert!(path_stroke_bounds(&path, &transparent).is_none());
+  }
+
+  #[test]
+  fn transparent_stroke_geometry_still_allocates_the_authored_widened_bounds() {
+    let path = rectangle_path();
+    let visible = visible_stroke(4.0);
+    let mut transparent = visible.clone();
+    transparent.color.a = 0;
+
+    let expected = path_stroke_geometry_bounds(&path, &visible).expect("visible geometry bounds");
+    assert_rect_close(
+      path_stroke_geometry_bounds(&path, &transparent)
+        .expect("transparent authored geometry bounds"),
+      expected,
+    );
     assert!(path_stroke_bounds(&path, &transparent).is_none());
   }
 

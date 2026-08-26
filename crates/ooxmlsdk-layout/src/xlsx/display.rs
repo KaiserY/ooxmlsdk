@@ -759,11 +759,13 @@ fn print_page_drawingml_items(
         drawing,
         &mut items,
         anchor,
-        source_rect,
-        drawing_rect,
-        page_transform,
-        page_clip_rect,
-        layout.zoom_scale,
+        DrawingAnchorPageGeometry {
+          source_rect,
+          drawing_rect,
+          page_transform,
+          page_clip_rect,
+          zoom_scale: layout.zoom_scale,
+        },
       );
     }
   }
@@ -5941,17 +5943,29 @@ fn diagram_text_body_text(text_body: &shared_diagram::DiagramTextBody) -> String
     .join("\n")
 }
 
-fn push_page_drawing_anchor_text_items(
-  import: &ExcelImport,
-  drawing: &super::drawing::DrawingResourceCatalog,
-  items: &mut Vec<PageItem>,
-  anchor: &super::drawing::DrawingAnchorModel,
+#[derive(Clone, Copy)]
+struct DrawingAnchorPageGeometry {
   source_rect: CellRect,
   drawing_rect: CellRect,
   page_transform: SheetPageTransform,
   page_clip_rect: CellRect,
   zoom_scale: f32,
+}
+
+fn push_page_drawing_anchor_text_items(
+  import: &ExcelImport,
+  drawing: &super::drawing::DrawingResourceCatalog,
+  items: &mut Vec<PageItem>,
+  anchor: &super::drawing::DrawingAnchorModel,
+  geometry: DrawingAnchorPageGeometry,
 ) {
+  let DrawingAnchorPageGeometry {
+    source_rect,
+    drawing_rect,
+    page_transform,
+    page_clip_rect,
+    zoom_scale,
+  } = geometry;
   let text_rect = page_transform.rect(if anchor.object.text_upright {
     drawing_object_visual_bounds(source_rect, &anchor.object)
   } else {
@@ -8517,7 +8531,7 @@ fn xlsx_chart_color_with_placeholder_policy(
     }))
   };
   let color = if preserve_saturation_overflow {
-    color.resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?
+    color.resolve_rgb_preserving_transform_precision(&mut scheme_resolver, placeholder_color)?
   } else {
     color.resolve_rgb(&mut scheme_resolver, placeholder_color)?
   };

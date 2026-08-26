@@ -108,6 +108,9 @@ pub(crate) enum ImageEffect {
 pub(crate) enum GlowSpreadKernel {
   Square,
   Disk,
+  /// Office's positive `alphaOutset` graph: alpha ceiling, the internal
+  /// three-box alpha blur, then a second alpha ceiling.
+  AlphaOutset,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -119,6 +122,14 @@ pub(crate) enum GlowSpreadRadiusRounding {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum GlowBlurKernel {
   Gaussian,
+  /// A standalone WordprocessingShape glow uses a finite Gaussian with
+  /// `sigma = R / 6`, support `floor(R / 2)`, and an A8 intermediate between
+  /// its horizontal and vertical passes.
+  WordShapeGaussian,
+  /// Word's WPG glow uses the public DrawingML blur stage after alphaOutset.
+  /// Its finite Gaussian is separable, materializes an A8 horizontal pass,
+  /// then runs the vertical pass over those quantized samples.
+  WordGroupGaussian,
   Stack,
 }
 
@@ -149,6 +160,33 @@ pub(crate) struct ImageEffectSourceImages<'a> {
   pub(crate) line: Option<&'a image::RgbaImage>,
   pub(crate) fill_line: Option<&'a image::RgbaImage>,
   pub(crate) children: Option<&'a image::RgbaImage>,
+}
+
+/// Corrects continuous effect lengths from the requested raster density to
+/// the actual per-axis pitch of the materialized effect bitmap.
+///
+/// Word rounds the bitmap width and height independently, so the PDF matrix
+/// can map the two axes at slightly different pixels-per-point values. Each
+/// effect profile owns whether this scale applies to a continuous sigma or an
+/// alpha-outset radius; discrete kernel support is independently quantized.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct AlphaOutsetSurfaceScale {
+  pub(crate) x: f32,
+  pub(crate) y: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ImageEffectContentBounds {
+  pub(crate) left_px: f32,
+  pub(crate) top_px: f32,
+  pub(crate) width_px: f32,
+  pub(crate) height_px: f32,
+}
+
+impl Default for AlphaOutsetSurfaceScale {
+  fn default() -> Self {
+    Self { x: 1.0, y: 1.0 }
+  }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -183,6 +221,61 @@ pub(crate) struct ImageEffectSourceRequirements {
 pub(crate) struct ImageEffectContainer {
   pub(crate) kind: ImageEffectContainerKind,
   pub(crate) effects: Vec<ImageEffect>,
+}
+
+/// Geometry of an outer-shadow branch whose affine component is an identity
+/// and whose only spatial transform is the DrawingML distance/direction pair.
+///
+/// Such a branch can use an expanded fixed-output work surface whose final
+/// crop is independent of the translated input range. Scaled and skewed
+/// shadows require a more general inverse effect mapping and are deliberately
+/// excluded from this profile.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct SimpleOuterShadowTranslation {
+  pub(crate) blur_radius_px: f32,
+  pub(crate) offset_x_px: f32,
+  pub(crate) offset_y_px: f32,
+}
+
+pub(crate) fn simple_outer_shadow_translation(
+  container: &ImageEffectContainer,
+) -> Option<SimpleOuterShadowTranslation> {
+  let [
+    ImageEffect::OuterShadow {
+      blur_radius_px,
+      distance_px,
+      raster_length_scale,
+      bounds_radius_scale,
+      direction_degrees,
+      transform,
+      ..
+    },
+  ] = container.effects.as_slice()
+  else {
+    return None;
+  };
+  if transform.scale_x != 1.0
+    || transform.scale_y != 1.0
+    || transform.skew_x != 0.0
+    || transform.skew_y != 0.0
+    || transform.shift_x_px != 0.0
+    || transform.shift_y_px != 0.0
+  {
+    return None;
+  }
+  let blur_radius_px = *blur_radius_px * *bounds_radius_scale;
+  let distance_px = *distance_px * *raster_length_scale;
+  let direction = direction_degrees.to_radians();
+  let offset_x_px = direction.cos() * distance_px;
+  let offset_y_px = direction.sin() * distance_px;
+  if !blur_radius_px.is_finite() || !offset_x_px.is_finite() || !offset_y_px.is_finite() {
+    return None;
+  }
+  Some(SimpleOuterShadowTranslation {
+    blur_radius_px,
+    offset_x_px,
+    offset_y_px,
+  })
 }
 
 /// Builds a sharp outer-shadow branch while preserving the original vector
@@ -1690,6 +1783,7 @@ pub(crate) fn apply_container_to_padded_image(
     geometry,
     geometry,
     ImageEffectSourceImages::default(),
+    AlphaOutsetSurfaceScale::default(),
   );
 }
 
@@ -1702,7 +1796,34 @@ pub(crate) fn apply_container_to_padded_image_with_sources(
   content_height_px: f32,
   sources: ImageEffectSourceImages<'_>,
 ) {
-  apply_container_to_padded_image_with_sources_and_anchor(
+  apply_container_to_padded_image_with_sources_and_alpha_outset_scale(
+    image,
+    container,
+    ImageEffectContentBounds {
+      left_px: content_left_px,
+      top_px: content_top_px,
+      width_px: content_width_px,
+      height_px: content_height_px,
+    },
+    sources,
+    AlphaOutsetSurfaceScale::default(),
+  );
+}
+
+pub(crate) fn apply_container_to_padded_image_with_sources_and_alpha_outset_scale(
+  image: &mut image::RgbaImage,
+  container: &ImageEffectContainer,
+  content_bounds: ImageEffectContentBounds,
+  sources: ImageEffectSourceImages<'_>,
+  alpha_outset_surface_scale: AlphaOutsetSurfaceScale,
+) {
+  let ImageEffectContentBounds {
+    left_px: content_left_px,
+    top_px: content_top_px,
+    width_px: content_width_px,
+    height_px: content_height_px,
+  } = content_bounds;
+  apply_container_to_padded_image_with_sources_and_anchor_and_alpha_outset_scale(
     image,
     container,
     ImageEffectSourceGeometry {
@@ -1724,6 +1845,7 @@ pub(crate) fn apply_container_to_padded_image_with_sources(
       ramp_height_px: content_height_px,
     },
     sources,
+    alpha_outset_surface_scale,
   );
 }
 
@@ -1732,6 +1854,22 @@ pub(crate) fn apply_container_to_padded_image_with_sources_and_anchor(
   container: &ImageEffectContainer,
   geometry: ImageEffectSourceGeometry,
   sources: ImageEffectSourceImages<'_>,
+) {
+  apply_container_to_padded_image_with_sources_and_anchor_and_alpha_outset_scale(
+    image,
+    container,
+    geometry,
+    sources,
+    AlphaOutsetSurfaceScale::default(),
+  );
+}
+
+fn apply_container_to_padded_image_with_sources_and_anchor_and_alpha_outset_scale(
+  image: &mut image::RgbaImage,
+  container: &ImageEffectContainer,
+  geometry: ImageEffectSourceGeometry,
+  sources: ImageEffectSourceImages<'_>,
+  alpha_outset_surface_scale: AlphaOutsetSurfaceScale,
 ) {
   let geometry = EffectGeometry {
     paint: PixelBounds {
@@ -1759,7 +1897,14 @@ pub(crate) fn apply_container_to_padded_image_with_sources_and_anchor(
       bottom: geometry.ramp_top_px + geometry.ramp_height_px,
     },
   };
-  *image = apply_container_with_bounds(image, container, geometry, geometry, sources);
+  *image = apply_container_with_bounds(
+    image,
+    container,
+    geometry,
+    geometry,
+    sources,
+    alpha_outset_surface_scale,
+  );
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -2517,27 +2662,62 @@ pub(crate) fn quantize_outer_shadow_geometry_for_raster(
   }
 }
 
-/// Uses Word's WPG glow spread while retaining the DrawingML Gaussian fringe.
+/// Uses Word's complete WPG glow alpha graph.
 ///
-/// At Word's 0.4 px/pt group-effect raster density, a 36pt glow expands the
-/// source alpha by six pixels before blur; the generic one-third profile
-/// expands it by five.
+/// A pre-registered Office matrix over eight radii and eight disjoint source
+/// topologies makes built-in `glow(R)` byte-identical to the explicit chain
+/// `alphaOutset(R/2) -> blur(R/2, grow=1)` in all 64 pairs.  The alpha-outset
+/// stage is kept distinct from the later public Gaussian blur because their
+/// numerical kernels are independently observable.
 pub(crate) fn use_word_group_glow_profile(container: &mut ImageEffectContainer) {
   for effect in &mut container.effects {
     match effect {
       ImageEffect::Glow {
         spread_ratio,
         spread_kernel,
+        spread_radius_rounding,
         blur_kernel,
         ..
       } => {
-        *spread_ratio = 0.4;
-        *spread_kernel = GlowSpreadKernel::Square;
-        *blur_kernel = GlowBlurKernel::Gaussian;
+        *spread_ratio = 0.5;
+        *spread_kernel = GlowSpreadKernel::AlphaOutset;
+        *spread_radius_rounding = GlowSpreadRadiusRounding::Inward;
+        *blur_kernel = GlowBlurKernel::WordGroupGaussian;
       }
       ImageEffect::AlphaModulate(container)
       | ImageEffect::Blend { container, .. }
       | ImageEffect::Container(container) => use_word_group_glow_profile(container),
+      _ => {}
+    }
+  }
+}
+
+/// Uses Word's standalone WPS glow alpha graph.
+///
+/// Independent fixed-output radius, alpha, and source-coverage controls make
+/// this the same explicit `alphaOutset(R/2) -> blur(R/2, grow=1)` topology as a
+/// WPG glow, but with a distinct public Gaussian. The WPS Gaussian derives its
+/// sigma from the unquantized authored radius rather than from its integer
+/// support. Keeping it separate prevents WPG and shape-host calibration from
+/// changing one another.
+pub(crate) fn use_word_shape_glow_profile(container: &mut ImageEffectContainer) {
+  for effect in &mut container.effects {
+    match effect {
+      ImageEffect::Glow {
+        spread_ratio,
+        spread_kernel,
+        spread_radius_rounding,
+        blur_kernel,
+        ..
+      } => {
+        *spread_ratio = 0.5;
+        *spread_kernel = GlowSpreadKernel::AlphaOutset;
+        *spread_radius_rounding = GlowSpreadRadiusRounding::Inward;
+        *blur_kernel = GlowBlurKernel::WordShapeGaussian;
+      }
+      ImageEffect::AlphaModulate(container)
+      | ImageEffect::Blend { container, .. }
+      | ImageEffect::Container(container) => use_word_shape_glow_profile(container),
       _ => {}
     }
   }
@@ -2659,7 +2839,14 @@ fn apply_to_image_with_bounds(
     anchor: content_bounds,
     ramp: content_bounds,
   };
-  apply_to_image_with_source_context(image, effects, geometry, geometry, sources);
+  apply_to_image_with_source_context(
+    image,
+    effects,
+    geometry,
+    geometry,
+    sources,
+    AlphaOutsetSurfaceScale::default(),
+  );
 }
 
 fn apply_to_image_with_source_context(
@@ -2668,6 +2855,7 @@ fn apply_to_image_with_source_context(
   source_geometry: EffectGeometry,
   root_geometry: EffectGeometry,
   sources: ImageEffectSourceImages<'_>,
+  alpha_outset_surface_scale: AlphaOutsetSurfaceScale,
 ) {
   let mut current_geometry = source_geometry;
   for effect in effects {
@@ -2682,8 +2870,14 @@ fn apply_to_image_with_source_context(
       continue;
     }
     if let ImageEffect::AlphaModulate(container) = effect {
-      let modulation =
-        apply_container_with_bounds(image, container, effect_source, root_geometry, sources);
+      let modulation = apply_container_with_bounds(
+        image,
+        container,
+        effect_source,
+        root_geometry,
+        sources,
+        alpha_outset_surface_scale,
+      );
       for (pixel, modulation_pixel) in image.pixels_mut().zip(modulation.pixels()) {
         pixel.0[3] = ((u16::from(pixel.0[3]) * u16::from(modulation_pixel.0[3]) + 127) / 255) as u8;
       }
@@ -2694,15 +2888,28 @@ fn apply_to_image_with_source_context(
       blend_mode,
     } = effect
     {
-      let blended =
-        apply_container_with_bounds(image, container, effect_source, root_geometry, sources);
+      let blended = apply_container_with_bounds(
+        image,
+        container,
+        effect_source,
+        root_geometry,
+        sources,
+        alpha_outset_surface_scale,
+      );
       for (base, overlay) in image.pixels_mut().zip(blended.pixels()) {
         blend_rgba_pixel(base, overlay, *blend_mode);
       }
       continue;
     }
     if let ImageEffect::Container(container) = effect {
-      *image = apply_container_with_bounds(image, container, effect_source, root_geometry, sources);
+      *image = apply_container_with_bounds(
+        image,
+        container,
+        effect_source,
+        root_geometry,
+        sources,
+        alpha_outset_surface_scale,
+      );
       continue;
     }
     if let ImageEffect::FillOverlay { fill, blend_mode } = effect {
@@ -2726,12 +2933,15 @@ fn apply_to_image_with_source_context(
     {
       *image = glow_image(
         image,
-        *radius_px * *raster_length_scale,
-        *spread_ratio,
-        *spread_kernel,
-        *spread_radius_rounding,
-        *blur_kernel,
-        *color,
+        GlowImageOptions {
+          radius_px: *radius_px * *raster_length_scale,
+          spread_ratio: *spread_ratio,
+          spread_kernel: *spread_kernel,
+          spread_radius_rounding: *spread_radius_rounding,
+          blur_kernel: *blur_kernel,
+          color: *color,
+          alpha_outset_surface_scale,
+        },
       );
       continue;
     }
@@ -2831,7 +3041,11 @@ fn apply_to_image_with_source_context(
       continue;
     }
     if let ImageEffect::AlphaOutset(radius_px) = effect {
-      apply_alpha_outset(image, *radius_px);
+      apply_alpha_outset(
+        image,
+        *radius_px * alpha_outset_surface_scale.x,
+        *radius_px * alpha_outset_surface_scale.y,
+      );
       continue;
     }
     for pixel in image.pixels_mut() {
@@ -3020,6 +3234,7 @@ fn apply_container(
     geometry,
     geometry,
     ImageEffectSourceImages::default(),
+    AlphaOutsetSurfaceScale::default(),
   )
 }
 
@@ -3029,6 +3244,7 @@ fn apply_container_with_bounds<'a>(
   source_geometry: EffectGeometry,
   root_geometry: EffectGeometry,
   sources: ImageEffectSourceImages<'a>,
+  alpha_outset_surface_scale: AlphaOutsetSurfaceScale,
 ) -> image::RgbaImage {
   let sources = ImageEffectSourceImages {
     fill_line: sources.fill_line.or(Some(source)),
@@ -3043,6 +3259,7 @@ fn apply_container_with_bounds<'a>(
         source_geometry,
         root_geometry,
         sources,
+        alpha_outset_surface_scale,
       );
       output
     }
@@ -3058,6 +3275,7 @@ fn apply_container_with_bounds<'a>(
           source_geometry,
           root_geometry,
           sources,
+          alpha_outset_surface_scale,
         );
         composite_source_over(&mut output, &branch);
       }
@@ -3400,35 +3618,117 @@ fn blend_rgba_pixel(
   );
 }
 
-fn glow_image(
-  source: &image::RgbaImage,
+#[derive(Clone, Copy)]
+struct GlowImageOptions {
   radius_px: f32,
   spread_ratio: f32,
   spread_kernel: GlowSpreadKernel,
   spread_radius_rounding: GlowSpreadRadiusRounding,
   blur_kernel: GlowBlurKernel,
   color: ResolvedEffectColor,
-) -> image::RgbaImage {
+  alpha_outset_surface_scale: AlphaOutsetSurfaceScale,
+}
+
+fn glow_image(source: &image::RgbaImage, options: GlowImageOptions) -> image::RgbaImage {
+  let GlowImageOptions {
+    radius_px,
+    spread_ratio,
+    spread_kernel,
+    spread_radius_rounding,
+    blur_kernel,
+    color,
+    alpha_outset_surface_scale,
+  } = options;
   let alpha = image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
     image::Luma([source.get_pixel(x, y).0[3]])
   });
   let glow_alpha = if radius_px > f32::EPSILON {
-    let spread_radius = match blur_kernel {
-      GlowBlurKernel::Gaussian => {
-        quantized_glow_spread_radius(radius_px, spread_ratio, spread_radius_rounding)
-      }
-      // GlowPrimitive2D ceils the device radius before passing half through
-      // integer morphology and Stack Blur constructors.
-      GlowBlurKernel::Stack => (radius_px.ceil() as usize) / 2,
-    };
-    let dilated = match spread_kernel {
-      GlowSpreadKernel::Square => dilate_nontransparent_alpha(&alpha, spread_radius),
-      GlowSpreadKernel::Disk => dilate_nontransparent_alpha_disk(&alpha, spread_radius),
-    };
     match blur_kernel {
-      GlowBlurKernel::Gaussian => image::imageops::blur(&dilated, radius_px / 6.0),
+      GlowBlurKernel::Gaussian => {
+        let spread = match spread_kernel {
+          GlowSpreadKernel::Square => dilate_nontransparent_alpha(
+            &alpha,
+            quantized_glow_spread_radius(radius_px, spread_ratio, spread_radius_rounding),
+          ),
+          GlowSpreadKernel::Disk => dilate_nontransparent_alpha_disk(
+            &alpha,
+            quantized_glow_spread_radius(radius_px, spread_ratio, spread_radius_rounding),
+          ),
+          GlowSpreadKernel::AlphaOutset => alpha_outset_mask(
+            &alpha,
+            radius_px * spread_ratio * alpha_outset_surface_scale.x,
+            radius_px * spread_ratio * alpha_outset_surface_scale.y,
+            true,
+          ),
+        };
+        // Win2D's local official documentation defines the finite Gaussian
+        // radius as three standard deviations.  The Office equivalence above
+        // assigns half of R to this public blur, hence sigma = R / 6.
+        image::imageops::blur(&spread, radius_px / 6.0)
+      }
+      GlowBlurKernel::WordShapeGaussian => {
+        let spread = match spread_kernel {
+          GlowSpreadKernel::Square => dilate_nontransparent_alpha(
+            &alpha,
+            quantized_glow_spread_radius(radius_px, spread_ratio, spread_radius_rounding),
+          ),
+          GlowSpreadKernel::Disk => dilate_nontransparent_alpha_disk(
+            &alpha,
+            quantized_glow_spread_radius(radius_px, spread_ratio, spread_radius_rounding),
+          ),
+          GlowSpreadKernel::AlphaOutset => alpha_outset_mask(
+            &alpha,
+            radius_px * spread_ratio * alpha_outset_surface_scale.x,
+            radius_px * spread_ratio * alpha_outset_surface_scale.y,
+            true,
+          ),
+        };
+        let blur_radius_x =
+          word_shape_glow_blur_device_radius(radius_px * alpha_outset_surface_scale.x);
+        let blur_radius_y =
+          word_shape_glow_blur_device_radius(radius_px * alpha_outset_surface_scale.y);
+        finite_gaussian_blur_alpha_with_sigma(
+          &spread,
+          blur_radius_x,
+          radius_px / 6.0 * alpha_outset_surface_scale.x,
+          blur_radius_y,
+          radius_px / 6.0 * alpha_outset_surface_scale.y,
+        )
+      }
+      GlowBlurKernel::WordGroupGaussian => {
+        let spread = match spread_kernel {
+          GlowSpreadKernel::Square => dilate_nontransparent_alpha(
+            &alpha,
+            quantized_glow_spread_radius(radius_px, spread_ratio, spread_radius_rounding),
+          ),
+          GlowSpreadKernel::Disk => dilate_nontransparent_alpha_disk(
+            &alpha,
+            quantized_glow_spread_radius(radius_px, spread_ratio, spread_radius_rounding),
+          ),
+          GlowSpreadKernel::AlphaOutset => alpha_outset_mask(
+            &alpha,
+            radius_px * spread_ratio * alpha_outset_surface_scale.x,
+            radius_px * spread_ratio * alpha_outset_surface_scale.y,
+            true,
+          ),
+        };
+        let blur_radius = word_group_public_blur_device_radius(radius_px * 0.5);
+        finite_gaussian_blur_alpha(&spread, blur_radius, blur_radius)
+      }
       GlowBlurKernel::Stack => {
-        let mut blurred = dilated;
+        // GlowPrimitive2D ceils the device radius before passing half through
+        // integer morphology and Stack Blur constructors.
+        let spread_radius = (radius_px.ceil() as usize) / 2;
+        let mut blurred = match spread_kernel {
+          GlowSpreadKernel::Square => dilate_nontransparent_alpha(&alpha, spread_radius),
+          GlowSpreadKernel::Disk => dilate_nontransparent_alpha_disk(&alpha, spread_radius),
+          GlowSpreadKernel::AlphaOutset => alpha_outset_mask(
+            &alpha,
+            radius_px * spread_ratio * alpha_outset_surface_scale.x,
+            radius_px * spread_ratio * alpha_outset_surface_scale.y,
+            true,
+          ),
+        };
         let width = blurred.width() as usize;
         let height = blurred.height() as usize;
         stack_blur_alpha(blurred.as_mut(), width, height, spread_radius.max(2));
@@ -3445,12 +3745,170 @@ fn glow_image(
   })
 }
 
+/// Quantizes the public blur support in Word's standalone WPS glow graph.
+/// Office radius controls at both 200-DPI and 100-DPI surface tiers pin the
+/// support to half the mapped glow radius, truncated toward zero.
+fn word_shape_glow_blur_device_radius(radius_px: f32) -> usize {
+  if radius_px.is_finite() {
+    (radius_px.max(0.0) * 0.5).floor() as usize
+  } else {
+    0
+  }
+}
+
+/// Quantizes Word's public blur support after the authored length is mapped to
+/// device pixels.  The corresponding Microsoft WPF implementation converts
+/// the scaled radius to an unsigned integer, which truncates a positive value.
+fn word_group_public_blur_device_radius(radius_px: f32) -> usize {
+  if radius_px.is_finite() {
+    radius_px.max(0.0).floor() as usize
+  } else {
+    0
+  }
+}
+
+fn normalized_gaussian_kernel(radius: usize, sigma: f32) -> Vec<f32> {
+  if radius == 0 || !sigma.is_finite() || sigma <= f32::EPSILON {
+    return vec![1.0];
+  }
+  let sigma = f64::from(sigma);
+  let mut kernel = Vec::with_capacity(radius.saturating_mul(2).saturating_add(1));
+  let mut sum = 0.0_f64;
+  for index in 0..=radius.saturating_mul(2) {
+    let offset = index as f64 - radius as f64;
+    let weight = (-(offset * offset) / (2.0 * sigma * sigma)).exp();
+    kernel.push(weight);
+    sum += weight;
+  }
+  kernel
+    .into_iter()
+    .map(|weight| (weight / sum) as f32)
+    .collect()
+}
+
+fn direct2d_gaussian_blur_alpha(alpha: &image::GrayImage, blur_radius_px: f32) -> image::GrayImage {
+  if !blur_radius_px.is_finite() || blur_radius_px <= f32::EPSILON {
+    return alpha.clone();
+  }
+  let radius = blur_radius_px.floor() as usize;
+  if radius == 0 {
+    return alpha.clone();
+  }
+  let kernel = normalized_gaussian_kernel(radius, direct2d_gaussian_sigma(blur_radius_px));
+  let width = alpha.width() as usize;
+  let height = alpha.height() as usize;
+  if width == 0 || height == 0 {
+    return alpha.clone();
+  }
+
+  // Direct2D defines a finite kernel radius of three standard deviations.
+  // Preserve floating-point precision between the two separable passes; an
+  // intermediate A8 quantization removes the low outer taps that Word retains
+  // in fixed output. Soft-border samples outside the effect surface are
+  // transparent rather than clamped.
+  let mut horizontal = vec![0.0_f32; width * height];
+  for y in 0..height {
+    for x in 0..width {
+      let mut sum = 0.0_f32;
+      for (sample_index, weight) in kernel.iter().copied().enumerate() {
+        let source_x = x as isize + sample_index as isize - radius as isize;
+        if (0..width as isize).contains(&source_x) {
+          sum += f32::from(alpha.as_raw()[y * width + source_x as usize]) * weight;
+        }
+      }
+      horizontal[y * width + x] = sum;
+    }
+  }
+
+  let mut output = vec![0_u8; width * height];
+  for y in 0..height {
+    for x in 0..width {
+      let mut sum = 0.0_f32;
+      for (sample_index, weight) in kernel.iter().copied().enumerate() {
+        let source_y = y as isize + sample_index as isize - radius as isize;
+        if (0..height as isize).contains(&source_y) {
+          sum += horizontal[source_y as usize * width + x] * weight;
+        }
+      }
+      output[y * width + x] = sum.round().clamp(0.0, 255.0) as u8;
+    }
+  }
+
+  image::GrayImage::from_raw(alpha.width(), alpha.height(), output)
+    .expect("Direct2D Gaussian output preserves the input dimensions")
+}
+
+fn finite_gaussian_blur_alpha(
+  alpha: &image::GrayImage,
+  radius_x: usize,
+  radius_y: usize,
+) -> image::GrayImage {
+  finite_gaussian_blur_alpha_with_sigma(
+    alpha,
+    radius_x,
+    radius_x as f32 / 3.0,
+    radius_y,
+    radius_y as f32 / 3.0,
+  )
+}
+
+fn finite_gaussian_blur_alpha_with_sigma(
+  alpha: &image::GrayImage,
+  radius_x: usize,
+  sigma_x: f32,
+  radius_y: usize,
+  sigma_y: f32,
+) -> image::GrayImage {
+  let width = alpha.width() as usize;
+  let height = alpha.height() as usize;
+  if width == 0 || height == 0 || (radius_x == 0 && radius_y == 0) {
+    return alpha.clone();
+  }
+
+  let horizontal_kernel = normalized_gaussian_kernel(radius_x, sigma_x);
+  let mut horizontal = vec![0_u8; width * height];
+  for y in 0..height {
+    for x in 0..width {
+      let mut sum = 0.0_f32;
+      for (sample_index, weight) in horizontal_kernel.iter().copied().enumerate() {
+        let offset = sample_index as isize - radius_x as isize;
+        let source_x = x as isize - offset;
+        if (0..width as isize).contains(&source_x) {
+          sum += f32::from(alpha.as_raw()[y * width + source_x as usize]) * weight;
+        }
+      }
+      horizontal[y * width + x] = sum.round().clamp(0.0, 255.0) as u8;
+    }
+  }
+
+  let vertical_kernel = normalized_gaussian_kernel(radius_y, sigma_y);
+  let mut output = vec![0_u8; width * height];
+  for y in 0..height {
+    for x in 0..width {
+      let mut sum = 0.0_f32;
+      for (sample_index, weight) in vertical_kernel.iter().copied().enumerate() {
+        let offset = sample_index as isize - radius_y as isize;
+        let source_y = y as isize - offset;
+        if (0..height as isize).contains(&source_y) {
+          sum += f32::from(horizontal[source_y as usize * width + x]) * weight;
+        }
+      }
+      output[y * width + x] = sum.round().clamp(0.0, 255.0) as u8;
+    }
+  }
+
+  image::GrayImage::from_raw(alpha.width(), alpha.height(), output)
+    .expect("finite Gaussian output preserves the input dimensions")
+}
+
 fn quantized_glow_spread_radius(
   radius_px: f32,
   spread_ratio: f32,
   rounding: GlowSpreadRadiusRounding,
 ) -> usize {
-  let radius = radius_px.max(0.0) * spread_ratio.clamp(0.0, 1.0);
+  let source_radius = radius_px.max(0.0);
+  let spread_ratio = spread_ratio.clamp(0.0, 1.0);
+  let radius = source_radius * spread_ratio;
   (match rounding {
     GlowSpreadRadiusRounding::Outward => radius.ceil(),
     GlowSpreadRadiusRounding::Inward => radius.floor(),
@@ -3683,9 +4141,8 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
     + radians.cos() * distance_px;
   transform.shift_y_px = anchor_y - transform.skew_y * anchor_x - transform.scale_y * anchor_y
     + radians.sin() * distance_px;
-  let transformed = affine_image(source, transform);
   let alpha = image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
-    image::Luma([transformed.get_pixel(x, y).0[3]])
+    image::Luma([source.get_pixel(x, y).0[3]])
   });
   let alpha = if blur_radius_px > f32::EPSILON {
     match blur_kernel {
@@ -3697,13 +4154,10 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
         // translucent images; their partial alpha is content, not a sampling
         // edge.
         let pixel_center_mask = axis_aligned_opaque_pixel_center_mask(&alpha);
-        image::imageops::blur(
-          pixel_center_mask.as_ref().unwrap_or(&alpha),
-          direct2d_gaussian_sigma(blur_radius_px),
-        )
+        direct2d_gaussian_blur_alpha(pixel_center_mask.as_ref().unwrap_or(&alpha), blur_radius_px)
       }
       ShadowBlurKernel::Direct2dGaussianPreserveSourceAlpha => {
-        image::imageops::blur(&alpha, direct2d_gaussian_sigma(blur_radius_px))
+        direct2d_gaussian_blur_alpha(&alpha, blur_radius_px)
       }
       ShadowBlurKernel::StackTwice => {
         let mut alpha = alpha;
@@ -3733,6 +4187,12 @@ fn outer_shadow_image(source: &image::RgbaImage, options: OuterShadowOptions) ->
   } else {
     alpha
   };
+  // Direct2D's documented drop-shadow graph feeds the source into the Shadow
+  // effect first, then feeds that output into a 2-D affine transform.  The
+  // order is observable on a discrete surface: translating first creates
+  // fractional coverage that a later mask snap or Gaussian pass consumes.
+  // Apply the documented LINEAR/SOFT affine stage only after the alpha blur.
+  let alpha = affine_gray_image(&alpha, transform);
   image::RgbaImage::from_fn(source.width(), source.height(), |x, y| {
     image::Rgba([
       color.color.r,
@@ -3999,6 +4459,27 @@ fn affine_image(source: &image::RgbaImage, transform: ImageEffectTransform) -> i
   })
 }
 
+fn affine_gray_image(
+  source: &image::GrayImage,
+  transform: ImageEffectTransform,
+) -> image::GrayImage {
+  let determinant = transform
+    .scale_x
+    .mul_add(transform.scale_y, -transform.skew_x * transform.skew_y);
+  if determinant.abs() <= f32::EPSILON {
+    return image::GrayImage::from_pixel(source.width(), source.height(), image::Luma([0]));
+  }
+  image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
+    let destination_x = x as f32 + 0.5 - transform.shift_x_px;
+    let destination_y = y as f32 + 0.5 - transform.shift_y_px;
+    let source_x =
+      (transform.scale_y * destination_x - transform.skew_x * destination_y) / determinant - 0.5;
+    let source_y =
+      (-transform.skew_y * destination_x + transform.scale_x * destination_y) / determinant - 0.5;
+    bilinear_sample_gray(source, source_x, source_y)
+  })
+}
+
 fn bilinear_sample(source: &image::RgbaImage, x: f32, y: f32) -> image::Rgba<u8> {
   if x < -0.5 || y < -0.5 || x > source.width() as f32 - 0.5 || y > source.height() as f32 - 0.5 {
     return image::Rgba([0; 4]);
@@ -4033,20 +4514,150 @@ fn bilinear_sample(source: &image::RgbaImage, x: f32, y: f32) -> image::Rgba<u8>
   image::Rgba(output)
 }
 
-fn apply_alpha_outset(image: &mut image::RgbaImage, radius_px: f32) {
-  if radius_px.abs() <= f32::EPSILON {
+fn bilinear_sample_gray(source: &image::GrayImage, x: f32, y: f32) -> image::Luma<u8> {
+  if x < -0.5 || y < -0.5 || x > source.width() as f32 - 0.5 || y > source.height() as f32 - 0.5 {
+    return image::Luma([0]);
+  }
+  let x0 = x.floor() as i64;
+  let y0 = y.floor() as i64;
+  let x_amount = x - x.floor();
+  let y_amount = y - y.floor();
+  let sample = |sample_x: i64, sample_y: i64| {
+    if sample_x < 0
+      || sample_y < 0
+      || sample_x >= i64::from(source.width())
+      || sample_y >= i64::from(source.height())
+    {
+      0
+    } else {
+      source.get_pixel(sample_x as u32, sample_y as u32).0[0]
+    }
+  };
+  let top_left = sample(x0, y0);
+  let top_right = sample(x0 + 1, y0);
+  let bottom_left = sample(x0, y0 + 1);
+  let bottom_right = sample(x0 + 1, y0 + 1);
+  let top = f32::from(top_left) + (f32::from(top_right) - f32::from(top_left)) * x_amount;
+  let bottom =
+    f32::from(bottom_left) + (f32::from(bottom_right) - f32::from(bottom_left)) * x_amount;
+  image::Luma([(top + (bottom - top) * y_amount).round().clamp(0.0, 255.0) as u8])
+}
+
+fn alpha_outset_box_radii(radius: usize) -> [usize; 3] {
+  let quotient = radius / 3;
+  let remainder = radius % 3;
+  let mut radii = [quotient; 3];
+  for radius in radii.iter_mut().skip(3 - remainder) {
+    *radius += 1;
+  }
+  radii
+}
+
+fn rounded_box_blur_axis(
+  source: &image::GrayImage,
+  radius: usize,
+  horizontal: bool,
+) -> image::GrayImage {
+  if radius == 0 || source.width() == 0 || source.height() == 0 {
+    return source.clone();
+  }
+  let radius = radius.min(u32::MAX as usize);
+  let divisor = radius as u64 * 2 + 1;
+  let mut output = image::GrayImage::new(source.width(), source.height());
+  if horizontal {
+    let length = source.width() as usize;
+    for y in 0..source.height() {
+      let mut sum = (0..=radius.min(length - 1))
+        .map(|x| u64::from(source.get_pixel(x as u32, y).0[0]))
+        .sum::<u64>();
+      for x in 0..length {
+        output.put_pixel(
+          x as u32,
+          y,
+          image::Luma([((sum + divisor / 2) / divisor) as u8]),
+        );
+        if x >= radius {
+          sum -= u64::from(source.get_pixel((x - radius) as u32, y).0[0]);
+        }
+        let incoming = x.saturating_add(radius).saturating_add(1);
+        if incoming < length {
+          sum += u64::from(source.get_pixel(incoming as u32, y).0[0]);
+        }
+      }
+    }
+  } else {
+    let length = source.height() as usize;
+    for x in 0..source.width() {
+      let mut sum = (0..=radius.min(length - 1))
+        .map(|y| u64::from(source.get_pixel(x, y as u32).0[0]))
+        .sum::<u64>();
+      for y in 0..length {
+        output.put_pixel(
+          x,
+          y as u32,
+          image::Luma([((sum + divisor / 2) / divisor) as u8]),
+        );
+        if y >= radius {
+          sum -= u64::from(source.get_pixel(x, (y - radius) as u32).0[0]);
+        }
+        let incoming = y.saturating_add(radius).saturating_add(1);
+        if incoming < length {
+          sum += u64::from(source.get_pixel(x, incoming as u32).0[0]);
+        }
+      }
+    }
+  }
+  output
+}
+
+fn alpha_outset_device_radius(radius_px: f32) -> usize {
+  if !radius_px.is_finite() {
+    return 0;
+  }
+  radius_px.abs().floor().min(u32::MAX as f32) as usize
+}
+
+fn alpha_outset_mask(
+  source: &image::GrayImage,
+  radius_x_px: f32,
+  radius_y_px: f32,
+  positive: bool,
+) -> image::GrayImage {
+  let mut output = image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
+    image::Luma([u8::from(source.get_pixel(x, y).0[0] > 0) * u8::MAX])
+  });
+  let radius_x = alpha_outset_device_radius(radius_x_px);
+  let radius_y = alpha_outset_device_radius(radius_y_px);
+  // Office's internal alpha blur is not the public DrawingML blur.  The
+  // positive/negative K1-K8 calibration and blind K9-K16 holdouts agree on
+  // three ascending horizontal boxes followed by three ascending vertical
+  // boxes, with byte rounding after every pass.
+  for radius in alpha_outset_box_radii(radius_x) {
+    output = rounded_box_blur_axis(&output, radius, true);
+  }
+  for radius in alpha_outset_box_radii(radius_y) {
+    output = rounded_box_blur_axis(&output, radius, false);
+  }
+  image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
+    let alpha = output.get_pixel(x, y).0[0];
+    image::Luma([u8::from(if positive {
+      alpha > 0
+    } else {
+      alpha == u8::MAX
+    }) * u8::MAX])
+  })
+}
+
+fn apply_alpha_outset(image: &mut image::RgbaImage, radius_x_px: f32, radius_y_px: f32) {
+  if radius_x_px.abs() <= f32::EPSILON && radius_y_px.abs() <= f32::EPSILON {
     return;
   }
-  let mut alpha = image::GrayImage::from_fn(image.width(), image.height(), |x, y| {
-    image::Luma([u8::from(image.get_pixel(x, y).0[3] > 0) * u8::MAX])
+  let alpha = image::GrayImage::from_fn(image.width(), image.height(), |x, y| {
+    image::Luma([image.get_pixel(x, y).0[3]])
   });
-  alpha = image::imageops::blur(&alpha, radius_px.abs());
-  for (pixel, blurred) in image.pixels_mut().zip(alpha.pixels()) {
-    pixel.0[3] = if radius_px > 0.0 {
-      u8::from(blurred.0[0] > 0) * u8::MAX
-    } else {
-      u8::from(blurred.0[0] == u8::MAX) * u8::MAX
-    };
+  let alpha = alpha_outset_mask(&alpha, radius_x_px, radius_y_px, radius_x_px > 0.0);
+  for (pixel, alpha) in image.pixels_mut().zip(alpha.pixels()) {
+    pixel.0[3] = alpha.0[0];
   }
 }
 
@@ -4144,6 +4755,50 @@ mod tests {
   use ooxmlsdk::units::DrawingmlPercentageValue;
 
   struct NoColorResolver;
+
+  #[test]
+  fn simple_outer_shadow_translation_profiles_only_identity_affine_branches() {
+    let shadow = ImageEffect::OuterShadow {
+      blur_radius_px: 8.0,
+      distance_px: 12.0,
+      raster_length_scale: 0.5,
+      bounds_radius_scale: 2.0,
+      blur_kernel: ShadowBlurKernel::Direct2dGaussian,
+      direction_degrees: 45.0,
+      transform: ImageEffectTransform {
+        scale_x: 1.0,
+        scale_y: 1.0,
+        skew_x: 0.0,
+        skew_y: 0.0,
+        shift_x_px: 0.0,
+        shift_y_px: 0.0,
+      },
+      alignment: (0.0, 0.0),
+      rotate_with_shape: false,
+      color: ResolvedEffectColor {
+        color: RgbColor { r: 0, g: 0, b: 0 },
+        alpha: u8::MAX,
+      },
+    };
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![shadow.clone()],
+    };
+    let translation = super::simple_outer_shadow_translation(&effects).unwrap();
+    assert_eq!(translation.blur_radius_px, 16.0);
+    assert!((translation.offset_x_px - 3.0 * std::f32::consts::SQRT_2).abs() < 0.001);
+    assert!((translation.offset_y_px - 3.0 * std::f32::consts::SQRT_2).abs() < 0.001);
+    let mut scaled = shadow;
+    let ImageEffect::OuterShadow { transform, .. } = &mut scaled else {
+      unreachable!()
+    };
+    transform.scale_x = 0.75;
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![scaled],
+    };
+    assert!(super::simple_outer_shadow_translation(&effects).is_none());
+  }
 
   #[test]
   fn fixed_raster_outer_shadow_bounds_use_integer_device_radius_and_offsets() {
@@ -4499,6 +5154,94 @@ mod tests {
   }
 
   #[test]
+  fn direct2d_gaussian_retains_every_sample_inside_three_sigma() {
+    let mut source = image::GrayImage::new(9, 9);
+    for y in 0..source.height() {
+      source.put_pixel(4, y, image::Luma([u8::MAX]));
+    }
+
+    let blurred = super::direct2d_gaussian_blur_alpha(&source, 2.099_737_6);
+    assert_eq!(
+      blurred
+        .rows()
+        .nth(4)
+        .unwrap()
+        .map(|value| value[0])
+        .collect::<Vec<_>>(),
+      [0, 0, 2, 52, 145, 52, 2, 0, 0,]
+    );
+
+    let subpixel = super::direct2d_gaussian_blur_alpha(&source, 0.999);
+    assert_eq!(subpixel, source);
+  }
+
+  #[test]
+  fn outer_shadow_runs_direct2d_shadow_before_affine_transform() {
+    let source = image::RgbaImage::from_fn(9, 9, |x, y| {
+      let alpha = if (3..=5).contains(&x) && (3..=5).contains(&y) {
+        if x == 4 && y == 4 { u8::MAX } else { 192 }
+      } else if (2..=6).contains(&x) && (2..=6).contains(&y) {
+        64
+      } else {
+        0
+      };
+      image::Rgba([0, 0, 0, alpha])
+    });
+    let transform = ImageEffectTransform {
+      scale_x: 1.0,
+      scale_y: 1.0,
+      skew_x: 0.0,
+      skew_y: 0.0,
+      shift_x_px: 0.5,
+      shift_y_px: 0.0,
+    };
+    let actual = super::outer_shadow_image(
+      &source,
+      super::OuterShadowOptions {
+        blur_radius_px: 2.099_737_6,
+        blur_kernel: ShadowBlurKernel::Direct2dGaussian,
+        distance_px: 0.5,
+        direction_degrees: 0.0,
+        transform: ImageEffectTransform {
+          shift_x_px: 0.0,
+          ..transform
+        },
+        alignment: (0.0, 0.0),
+        color: ResolvedEffectColor {
+          color: RgbColor { r: 0, g: 0, b: 0 },
+          alpha: u8::MAX,
+        },
+        anchor_bounds: PixelBounds {
+          left: 0.0,
+          top: 0.0,
+          right: 9.0,
+          bottom: 9.0,
+        },
+      },
+    );
+    let actual_alpha =
+      image::GrayImage::from_fn(9, 9, |x, y| image::Luma([actual.get_pixel(x, y).0[3]]));
+    let source_alpha =
+      image::GrayImage::from_fn(9, 9, |x, y| image::Luma([source.get_pixel(x, y).0[3]]));
+    let snapped = super::axis_aligned_opaque_pixel_center_mask(&source_alpha).unwrap();
+    let blurred = super::direct2d_gaussian_blur_alpha(&snapped, 2.099_737_6);
+    let documented_graph = super::affine_gray_image(&blurred, transform);
+
+    let translated_source = super::affine_gray_image(&source_alpha, transform);
+    let translated_pixel_center_mask =
+      super::axis_aligned_opaque_pixel_center_mask(&translated_source);
+    let reversed_graph = super::direct2d_gaussian_blur_alpha(
+      translated_pixel_center_mask
+        .as_ref()
+        .unwrap_or(&translated_source),
+      2.099_737_6,
+    );
+
+    assert_eq!(actual_alpha, documented_graph);
+    assert_ne!(actual_alpha, reversed_graph);
+  }
+
+  #[test]
   fn glow_spread_radius_rounding_is_an_explicit_host_policy() {
     assert_eq!(
       quantized_glow_spread_radius(5.5, 0.5, GlowSpreadRadiusRounding::Outward),
@@ -4512,6 +5255,230 @@ mod tests {
       quantized_glow_spread_radius(4.0, 0.5, GlowSpreadRadiusRounding::Inward),
       2
     );
+  }
+
+  #[test]
+  fn word_group_glow_uses_the_pinned_alpha_outset_then_blur_graph() {
+    let color = ResolvedEffectColor {
+      color: RgbColor { r: 1, g: 2, b: 3 },
+      alpha: 255,
+    };
+    let mut effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![ImageEffect::Glow {
+        radius_px: 15.0,
+        raster_length_scale: 1.0,
+        bounds_radius_scale: 1.0,
+        spread_ratio: 1.0 / 3.0,
+        spread_kernel: super::GlowSpreadKernel::Disk,
+        spread_radius_rounding: super::GlowSpreadRadiusRounding::Outward,
+        blur_kernel: super::GlowBlurKernel::Stack,
+        color,
+      }],
+    };
+
+    super::use_word_group_glow_profile(&mut effects);
+
+    assert!(matches!(
+      effects.effects.as_slice(),
+      [ImageEffect::Glow {
+        spread_ratio,
+        spread_kernel: super::GlowSpreadKernel::AlphaOutset,
+        spread_radius_rounding: super::GlowSpreadRadiusRounding::Inward,
+        blur_kernel: super::GlowBlurKernel::WordGroupGaussian,
+        ..
+      }] if (*spread_ratio - 0.5).abs() <= f32::EPSILON
+    ));
+  }
+
+  #[test]
+  fn word_shape_glow_uses_the_pinned_alpha_outset_then_finite_gaussian_graph() {
+    let color = ResolvedEffectColor {
+      color: RgbColor { r: 1, g: 2, b: 3 },
+      alpha: 255,
+    };
+    let mut effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![ImageEffect::Glow {
+        radius_px: 15.0,
+        raster_length_scale: 1.0,
+        bounds_radius_scale: 1.0,
+        spread_ratio: 1.0 / 3.0,
+        spread_kernel: super::GlowSpreadKernel::Disk,
+        spread_radius_rounding: super::GlowSpreadRadiusRounding::Outward,
+        blur_kernel: super::GlowBlurKernel::Stack,
+        color,
+      }],
+    };
+
+    super::use_word_shape_glow_profile(&mut effects);
+
+    assert!(matches!(
+      effects.effects.as_slice(),
+      [ImageEffect::Glow {
+        spread_ratio,
+        spread_kernel: super::GlowSpreadKernel::AlphaOutset,
+        spread_radius_rounding: super::GlowSpreadRadiusRounding::Inward,
+        blur_kernel: super::GlowBlurKernel::WordShapeGaussian,
+        ..
+      }] if (*spread_ratio - 0.5).abs() <= f32::EPSILON
+    ));
+
+    // Office's 200-DPI radius controls from 0.12pt through the 5.76pt tier
+    // boundary expose the integer support independently of the Gaussian
+    // sigma and alpha-outset footprint.
+    for (radius_px, expected) in [
+      (1.0 / 3.0, 0),
+      (25.0 / 9.0, 1),
+      (50.0 / 9.0, 2),
+      (25.0 / 3.0, 4),
+      (100.0 / 9.0, 5),
+      (125.0 / 9.0, 6),
+      (575.0 / 36.0, 7),
+      (16.0, 8),
+    ] {
+      assert_eq!(
+        quantized_glow_spread_radius(radius_px, 0.5, super::GlowSpreadRadiusRounding::Inward,),
+        expected,
+      );
+    }
+  }
+
+  #[test]
+  fn word_shape_gaussian_matches_the_office_radius_five_edge_profile() {
+    let mapped_radius = 5.0 * 200.0 / 72.0;
+    assert_eq!(super::word_shape_glow_blur_device_radius(mapped_radius), 6);
+
+    // This is the straight edge after the independently calibrated
+    // alphaOutset stage. The expected values are the 100%-alpha Office PDF
+    // samples from the radius-five control, including both zero outer taps.
+    let spread = image::GrayImage::from_fn(32, 1, |x, _| image::Luma([u8::from(x >= 8) * u8::MAX]));
+    let actual =
+      super::finite_gaussian_blur_alpha_with_sigma(&spread, 6, mapped_radius / 6.0, 0, 0.0);
+    assert_eq!(
+      &actual.as_raw()[..15],
+      &[
+        0, 0, 2, 6, 16, 35, 65, 105, 150, 190, 220, 239, 249, 253, 255
+      ]
+    );
+  }
+
+  #[test]
+  fn word_shape_gaussian_scales_each_axis_support_at_the_half_terminal_sample() {
+    let pixels_per_point = 100.0 / 72.0;
+    let vertical_surface_scale = 86.5 / 86.0;
+    let below_transition = 10.02 * pixels_per_point;
+    let above_transition = 10.03 * pixels_per_point;
+    assert_eq!(
+      super::word_shape_glow_blur_device_radius(below_transition * vertical_surface_scale),
+      6
+    );
+    assert_eq!(
+      super::word_shape_glow_blur_device_radius(above_transition * vertical_surface_scale),
+      7
+    );
+
+    // The r=10.03 Office surface owns seven transparent support pixels before
+    // the solid alphaOutset edge, so x=0 is the first exported surface sample.
+    let spread = image::GrayImage::from_fn(32, 1, |x, _| image::Luma([u8::from(x >= 7) * u8::MAX]));
+    let actual = super::finite_gaussian_blur_alpha_with_sigma(
+      &spread,
+      7,
+      above_transition / 6.0 * vertical_surface_scale,
+      0,
+      0.0,
+    );
+    assert_eq!(
+      &actual.as_raw()[..15],
+      &[
+        0, 2, 7, 17, 36, 66, 106, 149, 189, 219, 238, 248, 253, 255, 255
+      ]
+    );
+  }
+
+  #[test]
+  fn word_group_public_blur_matches_the_office_finite_gaussian_control() {
+    assert_eq!(super::word_group_public_blur_device_radius(0.0), 0);
+    assert_eq!(super::word_group_public_blur_device_radius(3.999_999), 3);
+    assert_eq!(super::word_group_public_blur_device_radius(4.0), 4);
+
+    // Office training control B4/l3.  The source was independently exported
+    // through clrRepl, alphaCeiling, and alphaFloor controls before the blur
+    // target was inspected.  The frozen model then passed 32 dense holdouts.
+    let mut source = image::GrayImage::new(11, 11);
+    for (x, y, alpha) in [
+      (4, 4, 75),
+      (5, 4, 152),
+      (6, 4, 75),
+      (4, 5, 174),
+      (5, 5, 222),
+      (6, 5, 61),
+      (4, 6, 73),
+      (5, 6, 52),
+    ] {
+      source.put_pixel(x, y, image::Luma([alpha]));
+    }
+    let expected = [
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+      0, 0, 0, 1, 2, 2, 2, 1, 0, 0, 0, //
+      0, 0, 2, 5, 9, 11, 8, 4, 1, 0, 0, //
+      0, 1, 5, 14, 26, 30, 23, 12, 4, 1, 0, //
+      0, 2, 9, 26, 47, 54, 40, 20, 6, 1, 0, //
+      0, 2, 11, 31, 54, 61, 44, 21, 6, 1, 0, //
+      0, 2, 8, 24, 41, 44, 31, 14, 4, 1, 0, //
+      0, 1, 4, 12, 20, 21, 14, 6, 2, 0, 0, //
+      0, 0, 1, 4, 6, 6, 4, 2, 0, 0, 0, //
+      0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ];
+
+    let actual = super::finite_gaussian_blur_alpha(&source, 4, 4);
+    assert_eq!(actual.as_raw(), expected.as_slice());
+  }
+
+  #[test]
+  fn alpha_outset_internal_blur_splits_each_axis_into_ascending_boxes() {
+    for (radius, expected) in [
+      (0, [0, 0, 0]),
+      (1, [0, 0, 1]),
+      (2, [0, 1, 1]),
+      (3, [1, 1, 1]),
+      (4, [1, 1, 2]),
+      (5, [1, 2, 2]),
+      (8, [2, 3, 3]),
+      (16, [5, 5, 6]),
+    ] {
+      assert_eq!(super::alpha_outset_box_radii(radius), expected);
+    }
+    assert_eq!(super::alpha_outset_device_radius(8.999_999), 8);
+    assert_eq!(super::alpha_outset_device_radius(9.0), 9);
+    assert_eq!(super::alpha_outset_device_radius(-9.999), 9);
+  }
+
+  #[test]
+  fn alpha_outset_rounds_each_box_pass_and_handles_axes_independently() {
+    let line = image::GrayImage::from_raw(3, 1, vec![254, 0, 0]).unwrap();
+    assert_eq!(
+      super::rounded_box_blur_axis(&line, 1, true).into_raw(),
+      vec![85, 85, 0]
+    );
+
+    let single = image::GrayImage::from_fn(9, 9, |x, y| {
+      image::Luma([u8::from(x == 4 && y == 4) * u8::MAX])
+    });
+    let anisotropic = super::alpha_outset_mask(&single, 1.999, 2.001, true);
+    assert_eq!(
+      anisotropic.pixels().filter(|pixel| pixel.0[0] > 0).count(),
+      15
+    );
+
+    let rectangle = image::GrayImage::from_fn(9, 9, |x, y| {
+      image::Luma([u8::from((2..=6).contains(&x) && (2..=6).contains(&y)) * u8::MAX])
+    });
+    let positive = super::alpha_outset_mask(&rectangle, 1.0, 1.0, true);
+    let negative = super::alpha_outset_mask(&rectangle, -1.0, -1.0, false);
+    assert_eq!(positive.pixels().filter(|pixel| pixel.0[0] > 0).count(), 49);
+    assert_eq!(negative.pixels().filter(|pixel| pixel.0[0] > 0).count(), 9);
   }
 
   #[test]
@@ -4850,7 +5817,7 @@ mod tests {
     eroded.get_pixel_mut(0, 0).0[3] = 0;
     apply_to_image(&mut eroded, &[ImageEffect::AlphaOutset(-1.0)]);
     assert_eq!(eroded.get_pixel(0, 1).0[3], 0);
-    assert_eq!(eroded.get_pixel(4, 4).0[3], u8::MAX);
+    assert_eq!(eroded.get_pixel(2, 2).0[3], u8::MAX);
   }
 
   #[test]

@@ -48,18 +48,6 @@ impl HslColor {
   pub(crate) fn apply_shade(&mut self, amount: f32) {
     self.lightness = (self.lightness * amount).clamp(0.0, 1.0);
   }
-
-  pub(crate) fn apply_saturation_mod(&mut self, amount: f32) {
-    self.saturation = (self.saturation * amount).clamp(0.0, 1.0);
-  }
-
-  pub(crate) fn apply_luminance_mod(&mut self, amount: f32) {
-    self.lightness = (self.lightness * amount).clamp(0.0, 1.0);
-  }
-
-  pub(crate) fn apply_luminance_offset(&mut self, amount: f32) {
-    self.lightness = (self.lightness + amount).clamp(0.0, 1.0);
-  }
 }
 
 /// DrawingML's integer HSL transform state.
@@ -144,7 +132,7 @@ impl DrawingmlHslColor {
         }
       }
     }
-    rgb.map(drawingml_hsl_channel_to_u8)
+    rgb.map(drawingml_srgb_unit_to_u8)
   }
 
   pub(crate) fn apply_hue_mod(&mut self, value: i32) {
@@ -194,7 +182,7 @@ fn mod_drawingml_value(value: i32, modulation: i32, maximum: i32) -> i32 {
     .clamp(0, i64::from(maximum)) as i32
 }
 
-fn drawingml_hsl_channel_to_u8(channel: f64) -> u8 {
+pub(crate) fn drawingml_srgb_unit_to_u8(channel: f64) -> u8 {
   let scaled = channel.clamp(0.0, 1.0) * 255.0;
   let nearest_integer = scaled.round();
   let mathematical_value = if (scaled - nearest_integer).abs() <= 1.0e-9 {

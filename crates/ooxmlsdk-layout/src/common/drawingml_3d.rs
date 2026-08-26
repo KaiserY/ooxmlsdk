@@ -4,7 +4,7 @@ use image::{Rgba, RgbaImage};
 use kurbo::{PathEl, flatten};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use smallvec::SmallVec;
-use tiny_skia::{FillRule, Mask, Paint, PathBuilder, Pixmap, Transform};
+use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Transform};
 
 use super::{DisplayItem, PathCommand, Point, Rect, drawingml_geometry};
 use crate::model::RgbColor;
@@ -1038,6 +1038,13 @@ enum Static3dGeometryLighting {
   Text,
 }
 
+#[derive(Clone, Copy)]
+struct Static3dGeometryInput<'a> {
+  geometry: Option<&'a Static3dTextGeometry>,
+  material_geometry: Option<&'a Static3dTextGeometry>,
+  lighting: Static3dGeometryLighting,
+}
+
 /// Lowers DrawingML static 3-D to a bounded RGBA layer. This follows the
 /// DrawingML painter order: back/extruded faces, contour/bevel, then the
 /// original front face. The caller supplies a padded image and resolved theme
@@ -1056,9 +1063,11 @@ pub(crate) fn apply_static_3d(
     projection,
     shape,
     options,
-    None,
-    None,
-    Static3dGeometryLighting::Shape,
+    Static3dGeometryInput {
+      geometry: None,
+      material_geometry: None,
+      lighting: Static3dGeometryLighting::Shape,
+    },
   );
 }
 
@@ -1077,9 +1086,11 @@ pub(crate) fn apply_static_3d_shape_geometry(
     projection,
     shape,
     options,
-    Some(geometry),
-    Some(material_geometry),
-    Static3dGeometryLighting::Shape,
+    Static3dGeometryInput {
+      geometry: Some(geometry),
+      material_geometry: Some(material_geometry),
+      lighting: Static3dGeometryLighting::Shape,
+    },
   );
 }
 
@@ -1097,9 +1108,11 @@ pub(crate) fn apply_static_3d_text(
     projection,
     shape,
     options,
-    Some(geometry),
-    Some(geometry),
-    Static3dGeometryLighting::Text,
+    Static3dGeometryInput {
+      geometry: Some(geometry),
+      material_geometry: Some(geometry),
+      lighting: Static3dGeometryLighting::Text,
+    },
   );
 }
 
@@ -1184,10 +1197,13 @@ fn apply_static_3d_impl(
   projection: Static3dProjection,
   shape: &a::Shape3DType,
   options: Static3dRenderOptions,
-  text_geometry: Option<&Static3dTextGeometry>,
-  material_geometry: Option<&Static3dTextGeometry>,
-  geometry_lighting: Static3dGeometryLighting,
+  geometry_input: Static3dGeometryInput<'_>,
 ) {
+  let Static3dGeometryInput {
+    geometry: text_geometry,
+    material_geometry,
+    lighting: geometry_lighting,
+  } = geometry_input;
   let Static3dRenderOptions {
     extrusion_color,
     contour_color,
@@ -1538,12 +1554,14 @@ fn apply_static_3d_impl(
       composite_text_solid_surfaces(
         &mut solid,
         &front_face,
-        geometry,
-        material_geometry,
-        planar_geometry,
-        &text_surface_triangles,
-        options,
-        geometry_lighting,
+        TextSolidSurfaceInput {
+          source_geometry: geometry,
+          material_geometry,
+          planar_geometry,
+          triangles: &text_surface_triangles,
+          options,
+          geometry_lighting,
+        },
       );
       if contour_radius_px > 0 {
         let contour = contour_color.unwrap_or(Static3dColor {
@@ -2745,9 +2763,11 @@ fn plane_homography(
   // projection. Adding dx/dy times the denominator row is equivalent for
   // both parallel and perspective cameras and cannot alter model-space
   // normals or material coordinates.
-  for column in 0..3 {
-    matrix[0][column] += projection.viewport_translation_x_px * matrix[2][column];
-    matrix[1][column] += projection.viewport_translation_y_px * matrix[2][column];
+  let denominator_row = matrix[2];
+  let [x_row, y_row, _] = &mut matrix;
+  for ((x, y), denominator) in x_row.iter_mut().zip(y_row).zip(denominator_row) {
+    *x += projection.viewport_translation_x_px * denominator;
+    *y += projection.viewport_translation_y_px * denominator;
   }
   matrix
 }
@@ -4028,161 +4048,6 @@ impl Default for TextSurfaceRasterSample {
   }
 }
 
-#[derive(Clone, Copy, Debug)]
-struct TextSurfaceRasterFragment {
-  coverage: f32,
-  visibility_depth: f32,
-  color: [f32; 4],
-}
-
-fn interpolate_text_surface_vertex(
-  first: TextSurfaceVertex,
-  second: TextSurfaceVertex,
-  amount: f32,
-) -> TextSurfaceVertex {
-  let amount = amount.clamp(0.0, 1.0);
-  TextSurfaceVertex {
-    point: (
-      first.point.0 + (second.point.0 - first.point.0) * amount,
-      first.point.1 + (second.point.1 - first.point.1) * amount,
-    ),
-    visibility_depth: first.visibility_depth
-      + (second.visibility_depth - first.visibility_depth) * amount,
-    color: std::array::from_fn(|channel| {
-      first.color[channel] + (second.color[channel] - first.color[channel]) * amount
-    }),
-  }
-}
-
-fn clip_text_surface_polygon(
-  input: &[TextSurfaceVertex],
-  axis: usize,
-  boundary: f32,
-  keep_greater: bool,
-) -> SmallVec<[TextSurfaceVertex; 8]> {
-  let mut output = SmallVec::new();
-  let Some(&last) = input.last() else {
-    return output;
-  };
-  let distance = |vertex: TextSurfaceVertex| {
-    let coordinate = if axis == 0 {
-      vertex.point.0
-    } else {
-      vertex.point.1
-    };
-    if keep_greater {
-      coordinate - boundary
-    } else {
-      boundary - coordinate
-    }
-  };
-  let mut previous = last;
-  let mut previous_distance = distance(previous);
-  let mut previous_inside = previous_distance >= 0.0;
-  for &current in input {
-    let current_distance = distance(current);
-    let current_inside = current_distance >= 0.0;
-    if current_inside != previous_inside {
-      let denominator = previous_distance - current_distance;
-      if denominator.abs() > f32::EPSILON {
-        output.push(interpolate_text_surface_vertex(
-          previous,
-          current,
-          previous_distance / denominator,
-        ));
-      }
-    }
-    if current_inside {
-      output.push(current);
-    }
-    previous = current;
-    previous_distance = current_distance;
-    previous_inside = current_inside;
-  }
-  output
-}
-
-fn clipped_text_surface_triangle_fragment(
-  triangle: TextSurfaceTriangle,
-  pixel_x: i32,
-  pixel_y: i32,
-  translation: (f32, f32),
-) -> Option<TextSurfaceRasterFragment> {
-  let mut polygon = SmallVec::<[TextSurfaceVertex; 8]>::new();
-  polygon.extend(triangle.vertices.map(|mut vertex| {
-    vertex.point.0 += translation.0;
-    vertex.point.1 += translation.1;
-    vertex
-  }));
-  for (axis, boundary, keep_greater) in [
-    (0, pixel_x as f32, true),
-    (0, pixel_x as f32 + 1.0, false),
-    (1, pixel_y as f32, true),
-    (1, pixel_y as f32 + 1.0, false),
-  ] {
-    polygon = clip_text_surface_polygon(&polygon, axis, boundary, keep_greater);
-    if polygon.len() < 3 {
-      return None;
-    }
-  }
-
-  let origin = polygon[0];
-  let mut coverage = 0.0_f32;
-  let mut depth_moment = 0.0_f32;
-  let mut color_moment = [0.0_f32; 4];
-  for index in 1..polygon.len() - 1 {
-    let second = polygon[index];
-    let third = polygon[index + 1];
-    let area = text_surface_edge(origin.point, second.point, third.point).abs() * 0.5;
-    if area <= f32::EPSILON {
-      continue;
-    }
-    coverage += area;
-    depth_moment +=
-      area * (origin.visibility_depth + second.visibility_depth + third.visibility_depth) / 3.0;
-    for (channel, moment) in color_moment.iter_mut().enumerate() {
-      *moment +=
-        area * (origin.color[channel] + second.color[channel] + third.color[channel]) / 3.0;
-    }
-  }
-  if coverage <= f32::EPSILON {
-    return None;
-  }
-  Some(TextSurfaceRasterFragment {
-    coverage: coverage.clamp(0.0, 1.0),
-    visibility_depth: depth_moment / coverage,
-    color: color_moment.map(|moment| moment / coverage),
-  })
-}
-
-fn text_surface_triangle_bounds(
-  triangles: &[TextSurfaceTriangle],
-  translation: (f32, f32),
-) -> Option<(f32, f32, f32, f32)> {
-  triangles
-    .iter()
-    .flat_map(|triangle| triangle.vertices)
-    .map(|vertex| {
-      (
-        vertex.point.0 + translation.0,
-        vertex.point.1 + translation.1,
-      )
-    })
-    .fold(None, |bounds, point| {
-      Some(bounds.map_or(
-        (point.0, point.1, point.0, point.1),
-        |(left, top, right, bottom): (f32, f32, f32, f32)| {
-          (
-            left.min(point.0),
-            top.min(point.1),
-            right.max(point.0),
-            bottom.max(point.1),
-          )
-        },
-      ))
-    })
-}
-
 fn text_surface_quad_projection_key(quad: &[TextSurfaceTriangle]) -> [u64; 4] {
   let mut vertices = SmallVec::<[u64; 4]>::new();
   for vertex in quad.iter().flat_map(|triangle| triangle.vertices) {
@@ -4312,333 +4177,6 @@ fn translate_text_surface_coverage_masks(
   translated
 }
 
-fn merge_text_surface_bounds(
-  first: Option<(f32, f32, f32, f32)>,
-  second: Option<(f32, f32, f32, f32)>,
-) -> Option<(f32, f32, f32, f32)> {
-  match (first, second) {
-    (Some(first), Some(second)) => Some((
-      first.0.min(second.0),
-      first.1.min(second.1),
-      first.2.max(second.2),
-      first.3.max(second.3),
-    )),
-    (Some(bounds), None) | (None, Some(bounds)) => Some(bounds),
-    (None, None) => None,
-  }
-}
-
-fn composite_shape_solid_surfaces(
-  destination: &mut RgbaImage,
-  source: &RgbaImage,
-  source_geometry: &Static3dTextGeometry,
-  material_geometry: &Static3dTextGeometry,
-  planar_geometry: &Static3dTextGeometry,
-  triangles: &[TextSurfaceTriangle],
-  options: ProjectedImageOptions,
-) {
-  let ProjectedImageOptions {
-    projection,
-    z: planar_z,
-    bounds: _,
-    model_surface,
-    pixels_per_point,
-    tint: _,
-  } = options;
-  let center_x = model_surface.left_px + model_surface.width_px * 0.5;
-  let center_y = model_surface.top_px + model_surface.height_px * 0.5;
-  let model_width = model_surface.width_px.max(1.0);
-  let model_height = model_surface.height_px.max(1.0);
-  let planar_matrix = plane_homography(
-    projection,
-    planar_z,
-    model_width,
-    model_height,
-    pixels_per_point,
-  );
-  let planar_inverse = inverse_3x3(planar_matrix);
-  let silhouette_translation = (
-    projection.silhouette_translation_x_px,
-    projection.silhouette_translation_y_px,
-  );
-  let project_planar = |point: (f32, f32), translation: (f32, f32)| {
-    let projected = map_homogeneous(planar_matrix, point.0 - center_x, point.1 - center_y);
-    (
-      center_x + projected.0 + translation.0,
-      center_y + projected.1 + translation.1,
-    )
-  };
-  let planar_bounds = |translation| {
-    planar_geometry
-      .contours
-      .iter()
-      .flat_map(|contour| contour.points.iter().copied())
-      .map(|point| project_planar(point, translation))
-      .fold(None, |bounds, point| {
-        Some(bounds.map_or(
-          (point.0, point.1, point.0, point.1),
-          |(left, top, right, bottom): (f32, f32, f32, f32)| {
-            (
-              left.min(point.0),
-              top.min(point.1),
-              right.max(point.0),
-              bottom.max(point.1),
-            )
-          },
-        ))
-      })
-  };
-  let surface_bounds = merge_text_surface_bounds(
-    text_surface_triangle_bounds(triangles, (0.0, 0.0)),
-    planar_bounds((0.0, 0.0)),
-  );
-  let silhouette_bounds = merge_text_surface_bounds(
-    text_surface_triangle_bounds(triangles, silhouette_translation),
-    planar_bounds(silhouette_translation),
-  );
-  let Some((left, top, right, bottom)) =
-    merge_text_surface_bounds(surface_bounds, silhouette_bounds)
-  else {
-    return;
-  };
-  let left = (left.floor() as i32).clamp(0, destination.width() as i32);
-  let top = (top.floor() as i32).clamp(0, destination.height() as i32);
-  let right = (right.ceil() as i32).clamp(0, destination.width() as i32);
-  let bottom = (bottom.ceil() as i32).clamp(0, destination.height() as i32);
-  if right <= left || bottom <= top {
-    return;
-  }
-  let raster_width = (right - left) as usize;
-  let raster_height = (bottom - top) as usize;
-  let mut fragments =
-    vec![SmallVec::<[TextSurfaceRasterFragment; 2]>::new(); raster_width * raster_height];
-  let mut silhouette_coverage = vec![0.0_f32; raster_width * raster_height];
-  let same_silhouette_phase = silhouette_translation.0.abs() <= f32::EPSILON
-    && silhouette_translation.1.abs() <= f32::EPSILON;
-  let fully_occluded_triangles = fully_occluded_text_surface_triangles(triangles);
-
-  // Skia's analytic path rasterizer describes the equivalent operation as
-  // intersecting each edge-bounded trapezoid with the destination pixel and
-  // integrating its area. Triangles are already convex, so clipping them to
-  // the unit pixel cell gives the same ground-truth coverage directly. This
-  // visits each boundary cell once instead of retaining 32 depth/color
-  // samples for every pixel, and complementary shared edges sum to one.
-  for (triangle_index, &triangle) in triangles.iter().enumerate() {
-    if fully_occluded_triangles[triangle_index] {
-      continue;
-    }
-    let [first, second, third] = triangle.vertices;
-    let signed_area = text_surface_edge(first.point, second.point, third.point);
-    if signed_area.abs() <= 1.0e-6 {
-      continue;
-    }
-    let triangle_left = first.point.0.min(second.point.0).min(third.point.0).floor() as i32;
-    let triangle_top = first.point.1.min(second.point.1).min(third.point.1).floor() as i32;
-    let triangle_right = first.point.0.max(second.point.0).max(third.point.0).ceil() as i32;
-    let triangle_bottom = first.point.1.max(second.point.1).max(third.point.1).ceil() as i32;
-    for pixel_y in triangle_top.max(top)..triangle_bottom.min(bottom) {
-      for pixel_x in triangle_left.max(left)..triangle_right.min(right) {
-        let Some(mut fragment) =
-          clipped_text_surface_triangle_fragment(triangle, pixel_x, pixel_y, (0.0, 0.0))
-        else {
-          continue;
-        };
-        // Direct3D 9 shades an MSAA pixel once at its integer pixel center and
-        // replicates the result to the covered samples. Keep that interpolation
-        // rule while replacing only the coverage calculation.
-        let center = (pixel_x as f32, pixel_y as f32);
-        let first_weight = text_surface_edge(second.point, third.point, center) / signed_area;
-        let second_weight = text_surface_edge(third.point, first.point, center) / signed_area;
-        let third_weight = text_surface_edge(first.point, second.point, center) / signed_area;
-        fragment.color = std::array::from_fn(|channel| {
-          first.color[channel] * first_weight
-            + second.color[channel] * second_weight
-            + third.color[channel] * third_weight
-        });
-        let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
-        if same_silhouette_phase {
-          silhouette_coverage[local_pixel] =
-            (silhouette_coverage[local_pixel] + fragment.coverage).min(1.0);
-        }
-        fragments[local_pixel].push(fragment);
-      }
-    }
-
-    if !same_silhouette_phase {
-      let triangle_left = (first.point.0 + silhouette_translation.0)
-        .min(second.point.0 + silhouette_translation.0)
-        .min(third.point.0 + silhouette_translation.0)
-        .floor() as i32;
-      let triangle_top = (first.point.1 + silhouette_translation.1)
-        .min(second.point.1 + silhouette_translation.1)
-        .min(third.point.1 + silhouette_translation.1)
-        .floor() as i32;
-      let triangle_right = (first.point.0 + silhouette_translation.0)
-        .max(second.point.0 + silhouette_translation.0)
-        .max(third.point.0 + silhouette_translation.0)
-        .ceil() as i32;
-      let triangle_bottom = (first.point.1 + silhouette_translation.1)
-        .max(second.point.1 + silhouette_translation.1)
-        .max(third.point.1 + silhouette_translation.1)
-        .ceil() as i32;
-      for pixel_y in triangle_top.max(top)..triangle_bottom.min(bottom) {
-        for pixel_x in triangle_left.max(left)..triangle_right.min(right) {
-          let Some(fragment) = clipped_text_surface_triangle_fragment(
-            triangle,
-            pixel_x,
-            pixel_y,
-            silhouette_translation,
-          ) else {
-            continue;
-          };
-          let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
-          silhouette_coverage[local_pixel] =
-            (silhouette_coverage[local_pixel] + fragment.coverage).min(1.0);
-        }
-      }
-    }
-  }
-
-  let projected_planar_path =
-    |translation| text_geometry_path(planar_geometry, |point| project_planar(point, translation));
-  let rasterize_planar_mask = |translation| {
-    let path = projected_planar_path(translation)?;
-    let mut mask = Mask::new(destination.width(), destination.height())?;
-    mask.fill_path(&path, FillRule::Winding, true, Transform::identity());
-    Some(mask)
-  };
-  let surface_planar_mask = rasterize_planar_mask((0.0, 0.0));
-  if let (Some(planar_inverse), Some(source_path), Some(planar_mask)) = (
-    planar_inverse,
-    text_geometry_path(material_geometry, |point| point),
-    surface_planar_mask.as_ref(),
-  ) && let Some(source_mask) = text_geometry_mask(source.width(), source.height(), &source_path)
-  {
-    for pixel_y in top..bottom {
-      for pixel_x in left..right {
-        let mask_index = pixel_y as usize * destination.width() as usize + pixel_x as usize;
-        let coverage = f32::from(planar_mask.data()[mask_index]) / 255.0;
-        if coverage <= f32::EPSILON {
-          continue;
-        }
-        let target = (pixel_x as f32, pixel_y as f32);
-        let source_local =
-          map_homogeneous(planar_inverse, target.0 - center_x, target.1 - center_y);
-        let source_point = (center_x + source_local.0, center_y + source_local.1);
-        let material_point = source_geometry.map_point_to(material_geometry, source_point);
-        let Some(mut color) =
-          sample_bilinear(source, material_point.0 - 0.5, material_point.1 - 0.5)
-        else {
-          continue;
-        };
-        let Some(source_coverage) =
-          sample_pixmap_alpha(&source_mask, material_point.0 - 0.5, material_point.1 - 0.5)
-        else {
-          continue;
-        };
-        if source_coverage <= f32::EPSILON {
-          continue;
-        }
-        let paint_opacity = (f32::from(color[3]) / 255.0 / source_coverage).clamp(0.0, 1.0);
-        if paint_opacity <= f32::EPSILON {
-          continue;
-        }
-        color[3] = (paint_opacity * 255.0).round().clamp(0.0, 255.0) as u8;
-        let model_point = [source_local.0, source_local.1, planar_z];
-        let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
-        fragments[local_pixel].push(TextSurfaceRasterFragment {
-          coverage,
-          visibility_depth: text_surface_visibility_depth(
-            projection,
-            model_point,
-            pixels_per_point,
-          ),
-          color: color.0.map(f32::from),
-        });
-        if same_silhouette_phase {
-          silhouette_coverage[local_pixel] = (silhouette_coverage[local_pixel] + coverage).min(1.0);
-        }
-      }
-    }
-  }
-
-  if !same_silhouette_phase && let Some(mask) = rasterize_planar_mask(silhouette_translation) {
-    for pixel_y in top..bottom {
-      for pixel_x in left..right {
-        let mask_index = pixel_y as usize * destination.width() as usize + pixel_x as usize;
-        let coverage = f32::from(mask.data()[mask_index]) / 255.0;
-        if coverage <= f32::EPSILON {
-          continue;
-        }
-        let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
-        silhouette_coverage[local_pixel] = (silhouette_coverage[local_pixel] + coverage).min(1.0);
-      }
-    }
-  }
-
-  for local_y in 0..raster_height {
-    for local_x in 0..raster_width {
-      let pixel_index = local_y * raster_width + local_x;
-      let pixel_fragments = &mut fragments[pixel_index];
-      if pixel_fragments.is_empty() {
-        continue;
-      }
-      let total_coverage = pixel_fragments
-        .iter()
-        .map(|fragment| fragment.coverage)
-        .sum::<f32>();
-      if total_coverage > 1.000_1 {
-        pixel_fragments.sort_unstable_by(|first, second| {
-          second.visibility_depth.total_cmp(&first.visibility_depth)
-        });
-      }
-      let mut remaining_coverage = 1.0_f32;
-      let mut geometry_coverage = 0.0_f32;
-      let mut alpha_sum = 0.0_f32;
-      let mut premultiplied = [0.0_f32; 3];
-      for fragment in pixel_fragments.iter() {
-        let coverage = if total_coverage > 1.000_1 {
-          fragment.coverage.min(remaining_coverage)
-        } else {
-          fragment.coverage
-        };
-        if coverage <= f32::EPSILON {
-          continue;
-        }
-        geometry_coverage += coverage;
-        remaining_coverage = (remaining_coverage - coverage).max(0.0);
-        let alpha = (fragment.color[3] / 255.0).clamp(0.0, 1.0) * coverage;
-        alpha_sum += alpha;
-        for (accumulator, channel) in premultiplied.iter_mut().zip(&fragment.color) {
-          *accumulator += channel.clamp(0.0, 255.0) * alpha;
-        }
-      }
-      if alpha_sum <= f32::EPSILON || geometry_coverage <= f32::EPSILON {
-        continue;
-      }
-      let authored_opacity = (alpha_sum / geometry_coverage).clamp(0.0, 1.0);
-      let alpha = authored_opacity * silhouette_coverage[pixel_index].clamp(0.0, 1.0);
-      if alpha <= f32::EPSILON {
-        continue;
-      }
-      let resolved_rgb =
-        premultiplied.map(|channel| (channel / alpha_sum).round().clamp(0.0, 255.0) as u8);
-      blend_over(
-        destination.get_pixel_mut(
-          (left as usize + local_x) as u32,
-          (top as usize + local_y) as u32,
-        ),
-        Rgba([
-          resolved_rgb[0],
-          resolved_rgb[1],
-          resolved_rgb[2],
-          (alpha * 255.0).round().clamp(0.0, 255.0) as u8,
-        ]),
-      );
-    }
-  }
-}
-
 fn text_surface_edge(a: (f32, f32), b: (f32, f32), point: (f32, f32)) -> f32 {
   (b.0 - a.0) * (point.1 - a.1) - (b.1 - a.1) * (point.0 - a.0)
 }
@@ -4690,16 +4228,28 @@ fn text_geometry_contains(geometry: &Static3dTextGeometry, point: (f32, f32)) ->
   winding != 0
 }
 
+struct TextSolidSurfaceInput<'a> {
+  source_geometry: &'a Static3dTextGeometry,
+  material_geometry: &'a Static3dTextGeometry,
+  planar_geometry: &'a Static3dTextGeometry,
+  triangles: &'a [TextSurfaceTriangle],
+  options: ProjectedImageOptions,
+  geometry_lighting: Static3dGeometryLighting,
+}
+
 fn composite_text_solid_surfaces(
   destination: &mut RgbaImage,
   source: &RgbaImage,
-  source_geometry: &Static3dTextGeometry,
-  material_geometry: &Static3dTextGeometry,
-  planar_geometry: &Static3dTextGeometry,
-  triangles: &[TextSurfaceTriangle],
-  options: ProjectedImageOptions,
-  geometry_lighting: Static3dGeometryLighting,
+  input: TextSolidSurfaceInput<'_>,
 ) {
+  let TextSolidSurfaceInput {
+    source_geometry,
+    material_geometry,
+    planar_geometry,
+    triangles,
+    options,
+    geometry_lighting,
+  } = input;
   // GDI+'s ordinary AntiAlias mode is the 8x4 box filter (also exposed as
   // SmoothingModeAntiAlias8x4), not a square 4x4 grid. Office controls with a
   // rectangular circle bevel independently preserve the four-sample
@@ -4842,12 +4392,11 @@ fn composite_text_solid_surfaces(
           // Direct3D MSAA interpolates vertex attributes once at the integer
           // pixel center—even when that center requires extrapolation—and
           // replicates the shader result to every covered sub-sample.
-          let mut color = [0.0; 4];
-          for channel in 0..4 {
-            color[channel] = first.color[channel] * center_first_weight
+          let color = std::array::from_fn(|channel| {
+            first.color[channel] * center_first_weight
               + second.color[channel] * center_second_weight
-              + third.color[channel] * center_third_weight;
-          }
+              + third.color[channel] * center_third_weight
+          });
           Some(color)
         } else {
           None
@@ -5722,14 +5271,14 @@ mod tests {
   use super::{
     BevelOptions, ProjectedImageOptions, Static3dColor, Static3dGeometryLighting,
     Static3dRenderOptions, Static3dStyleParts, Static3dSurface, Static3dTextGeometry,
-    TextSurfaceTriangle, TextSurfaceVertex, apply_static_3d, bevel_distance_field,
-    bevel_profile_sample, bevel_terminal_inset, camera_projection, circle_bevel_profile,
-    composite_bevel, composite_text_solid_surfaces, legacy_material_diffuse_shade, light_rig,
-    light_rig_surface_shade, lighting_surface_normal, mask_static_3d_text_surface_paint,
-    material_diffuse_shade, output_padding, project_static_3d_front_face,
-    projected_front_region_output_bounds, projected_output_bounds, projected_region_output_bounds,
-    resolve_bevel, resolve_static_3d_style, sample_bilinear, sample_bilinear_clamped,
-    shade_fixed_gouraud_channel_with_specular, shade_gouraud_channel,
+    TextSolidSurfaceInput, TextSurfaceTriangle, TextSurfaceVertex, apply_static_3d,
+    bevel_distance_field, bevel_profile_sample, bevel_terminal_inset, camera_projection,
+    circle_bevel_profile, composite_bevel, composite_text_solid_surfaces,
+    legacy_material_diffuse_shade, light_rig, light_rig_surface_shade, lighting_surface_normal,
+    mask_static_3d_text_surface_paint, material_diffuse_shade, output_padding,
+    project_static_3d_front_face, projected_front_region_output_bounds, projected_output_bounds,
+    projected_region_output_bounds, resolve_bevel, resolve_static_3d_style, sample_bilinear,
+    sample_bilinear_clamped, shade_fixed_gouraud_channel_with_specular, shade_gouraud_channel,
     shaded_geometry_pixel_with_specular, text_3d_contour_edge_normals, text_geometry_contains,
     text_geometry_mask, text_geometry_path, transformed_bevel_surface_normal,
   };
@@ -5799,24 +5348,26 @@ mod tests {
     composite_text_solid_surfaces(
       &mut destination,
       &source,
-      &geometry,
-      &geometry,
-      &geometry,
-      triangles,
-      ProjectedImageOptions {
-        projection,
-        z: 0.0,
-        bounds: (0, 0, 0, 0),
-        model_surface: Static3dSurface {
-          left_px: 0.0,
-          top_px: 0.0,
-          width_px: 1.0,
-          height_px: 1.0,
+      TextSolidSurfaceInput {
+        source_geometry: &geometry,
+        material_geometry: &geometry,
+        planar_geometry: &geometry,
+        triangles,
+        options: ProjectedImageOptions {
+          projection,
+          z: 0.0,
+          bounds: (0, 0, 0, 0),
+          model_surface: Static3dSurface {
+            left_px: 0.0,
+            top_px: 0.0,
+            width_px: 1.0,
+            height_px: 1.0,
+          },
+          pixels_per_point: 1.0,
+          tint: None,
         },
-        pixels_per_point: 1.0,
-        tint: None,
+        geometry_lighting,
       },
-      geometry_lighting,
     );
     destination
   }
@@ -5848,16 +5399,16 @@ mod tests {
     let physical = Static3dTextGeometry {
       contours: Vec::new(),
       solid_on_right: true,
-      page_plane_scale_x: 1.306_076_05,
-      page_plane_scale_y: 1.307_189_46,
+      page_plane_scale_x: 1.306_076,
+      page_plane_scale_y: 1.307_189_5,
       page_plane_translate_x: -304.651_6,
       page_plane_translate_y: -187.264_7,
     };
     let material = Static3dTextGeometry {
       contours: Vec::new(),
       solid_on_right: true,
-      page_plane_scale_x: 1.304_347_87,
-      page_plane_scale_y: 1.305_555_58,
+      page_plane_scale_x: 1.304_347_9,
+      page_plane_scale_y: 1.305_555_6,
       page_plane_translate_x: -304.217_4,
       page_plane_translate_y: -187.0,
     };

@@ -60,7 +60,8 @@ zmij = "1.0.23"
 criterion = "0.8.2"
 encoding_rs = "0.8.35"
 flate2 = "1.1.0"
-lopdf = "0.44.0"
+pdf-writer = "0.15.0"
+subsetter = { version = "0.2.6", features = ["variable-fonts"] }
 pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
 png = "0.18.1"
 toml = "1.1.4"
@@ -81,15 +82,12 @@ image = { version = "0.25.10", default-features = false, features = [
   "tiff",
   "webp",
 ] }
-jpeg-encoder = "0.7.1"
-jiff = "0.2.35"
-krilla = { version = "0.8.2", default-features = false, features = [
-  "raster-images",
-  "pdf",
-  "rayon",
-  "simple-text",
+jpeg-decoder = { version = "0.3.2", default-features = false, features = [
+  "platform_independent",
 ] }
-krilla-svg = "0.8.1"
+jpeg-encoder = "0.7.1"
+zune-jpeg = "0.5.15"
+jiff = "0.2.35"
 kurbo = "0.13.1"
 libm = "0.2.16"
 num-complex = "0.4.6"
@@ -100,12 +98,20 @@ parley = { version = "0.11.0", default-features = false, features = [
   "complex-scripts",
 ] }
 rustfft = "6.4.1"
+resvg = { version = "0.47.0", default-features = false, features = [
+  "raster-images",
+] }
 statrs = { version = "0.18.0", default-features = false }
 skrifa = "0.46.0"
 unicode-bidi = "0.3.18"
 unicode-math-class = "0.1.0"
 unicode-script = "0.5.8"
-usvg = { version = "0.47.0", default-features = false, features = ["text"] }
+usvg = { version = "0.47.0", default-features = false, features = [
+  "system-fonts",
+  "text",
+] }
+uuid = { version = "1.23.5", features = ["v5"] }
 winnow = "1.0.4"
 writeable = "0.6.3"
+xmp-writer = "0.3.3"
 yoke = { version = "0.8.3", features = ["derive"] }

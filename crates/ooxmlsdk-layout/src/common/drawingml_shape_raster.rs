@@ -19,6 +19,29 @@ use crate::text_metrics::TextMetrics;
 
 const MAX_EFFECT_RASTER_PIXELS: f32 = 250_000.0;
 const MAX_EFFECT_PIXELS_PER_POINT: f32 = 2.0;
+const OFFICE_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX: f32 = 16.0;
+
+/// Selects Office's fixed-output working density for a simple shape glow.
+///
+/// Office evaluates the authored radius against a 200-DPI reference surface,
+/// then chooses the smallest integer divisor that keeps the radius at or
+/// below 16 reference pixels. The divisor is applied to the configured output
+/// density, so Print and Screen keep the same tier boundaries while producing
+/// different bitmap densities.
+pub(crate) fn office_simple_glow_pixels_per_point(output_dpi: f32, radius_pt: f32) -> f32 {
+  let reference_radius_px = radius_pt.max(0.0) * crate::units::OFFICE_FIXED_OUTPUT_RASTER_DPI
+    / crate::units::POINTS_PER_INCH;
+  let tier_position = reference_radius_px / OFFICE_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX;
+  let nearest_tier = tier_position.round();
+  let integer_tolerance = f32::EPSILON * tier_position.abs().max(1.0) * 8.0;
+  let divisor = if (tier_position - nearest_tier).abs() <= integer_tolerance {
+    nearest_tier
+  } else {
+    tier_position.ceil()
+  }
+  .max(1.0);
+  output_dpi / crate::units::POINTS_PER_INCH / divisor
+}
 
 #[derive(Debug)]
 pub(crate) struct DrawingRaster {
@@ -75,8 +98,67 @@ pub(crate) enum RasterResolveFilter {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RasterSourceExtent {
   Outward,
+  InclusiveFarEdge,
   Floor,
   Round,
+}
+
+/// Selects how non-text vector primitives contribute coverage to an effect
+/// source bitmap.
+///
+/// Direct2D keeps primitive and text antialiasing as independent state.  The
+/// aliased mode therefore applies to paths, rectangles, lines, markers, and
+/// image clip geometry, while glyph outlines retain their text-specific
+/// rasterization policy.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RasterPrimitiveAntialiasing {
+  PerPrimitive,
+  Aliased,
+}
+
+/// Host policy for realizing a standalone WordprocessingShape before a
+/// fixed-output effect is evaluated.
+///
+/// Word's glow controls explicitly pin primitive coverage to pixel centers,
+/// while an outer shadow consumes Direct2D's default per-primitive coverage.
+/// Keep those independently observed source graphs separate even though both
+/// later pass through the balanced-blur surface tiers.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum WordShapeEffectSourceProfile {
+  Glow,
+  OuterShadow,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RasterSourceSurface {
+  pub(crate) bounds: Rect,
+  pub(crate) pixels_per_point: f32,
+  pub(crate) extent: RasterSourceExtent,
+  pub(crate) text_hinting: Option<RasterTextHinting>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RasterTargetSurface {
+  pub(crate) width_px: u32,
+  pub(crate) height_px: u32,
+  pub(crate) filter: RasterResolveFilter,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct WordShapeEffectSurface {
+  pub(crate) profile: WordShapeEffectSourceProfile,
+  pub(crate) base_bounds: Rect,
+  pub(crate) content_bounds: Rect,
+  pub(crate) base_pixels_per_point: f32,
+  pub(crate) target_width_px: u32,
+  pub(crate) target_height_px: u32,
+  pub(crate) target_pixels_per_point: f32,
+}
+
+impl RasterPrimitiveAntialiasing {
+  fn enabled(self) -> bool {
+    matches!(self, Self::PerPrimitive)
+  }
 }
 
 impl RasterResolveFilter {
@@ -126,13 +208,118 @@ pub(crate) fn rasterize_vector_items_for_effects_at_pixels_per_point(
   effects: &super::drawingml_image_effects::ImageEffectContainer,
   pixels_per_point: f32,
 ) -> Option<DrawingRaster> {
-  rasterize_vector_items_for_effects_impl_at_pixels_per_point(
+  rasterize_vector_items_for_effects_at_pixels_per_point_with_extent(
+    items,
+    raster_bounds,
+    effects,
+    pixels_per_point,
+    RasterSourceExtent::Outward,
+  )
+}
+
+pub(crate) fn rasterize_vector_items_for_effects_at_pixels_per_point_with_extent(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  pixels_per_point: f32,
+  extent: RasterSourceExtent,
+) -> Option<DrawingRaster> {
+  rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing(
+    items,
+    raster_bounds,
+    effects,
+    pixels_per_point,
+    extent,
+    RasterPrimitiveAntialiasing::PerPrimitive,
+  )
+}
+
+pub(crate) fn rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  pixels_per_point: f32,
+  extent: RasterSourceExtent,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<DrawingRaster> {
+  rasterize_vector_items_for_effects_impl_at_pixels_per_point_with_antialiasing(
     items,
     raster_bounds,
     effects,
     false,
     pixels_per_point,
+    extent,
+    primitive_antialiasing,
   )
+}
+
+fn rasterize_vector_items_for_effects_impl_at_pixels_per_point_with_antialiasing(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  items_are_children_source: bool,
+  pixels_per_point: f32,
+  extent: RasterSourceExtent,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<DrawingRaster> {
+  let requirements = super::drawingml_image_effects::source_requirements(effects);
+  // A logical children source can only be produced while retaining the host
+  // group's child display list. A leaf-shape raster must fail strictly here so
+  // callers keep the original vector content rather than substituting an
+  // empty source.
+  if requirements.children && !items_are_children_source {
+    return None;
+  }
+  let (image, pixels_per_point) =
+    rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
+      items,
+      raster_bounds,
+      pixels_per_point,
+      extent,
+      primitive_antialiasing,
+    )?;
+  let fill_image = if requirements.fill && items_are_children_source {
+    Some(empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point, extent)?.0)
+  } else if requirements.fill {
+    Some(rasterize_source_layer_at_pixels_per_point(
+      items,
+      raster_bounds,
+      SourceLayer::Fill,
+      pixels_per_point,
+      extent,
+      primitive_antialiasing,
+    )?)
+    .map(|layer| layer.0)
+  } else {
+    None
+  };
+  let line_image = if requirements.line && items_are_children_source {
+    Some(empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point, extent)?.0)
+  } else if requirements.line {
+    Some(rasterize_source_layer_at_pixels_per_point(
+      items,
+      raster_bounds,
+      SourceLayer::Line,
+      pixels_per_point,
+      extent,
+      primitive_antialiasing,
+    )?)
+    .map(|layer| layer.0)
+  } else {
+    None
+  };
+  Some(DrawingRaster {
+    children_image: (requirements.children && items_are_children_source).then(|| image.clone()),
+    fill_line_image: if requirements.fill_line && items_are_children_source {
+      Some(empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point, extent)?.0)
+    } else {
+      None
+    },
+    image,
+    fill_image,
+    line_image,
+    pixels_per_point,
+  })
 }
 
 pub(crate) fn rasterize_vector_items_for_effects_with_mapping(
@@ -176,14 +363,20 @@ pub(crate) fn rasterize_vector_items_for_effects_with_mapping(
 pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
   items: &[DisplayItem<'static>],
   effects: &super::drawingml_image_effects::ImageEffectContainer,
-  source_bounds: Rect,
-  source_pixels_per_point: f32,
-  target_width_px: u32,
-  target_height_px: u32,
-  filter: RasterResolveFilter,
-  extent: RasterSourceExtent,
-  text_hinting: Option<RasterTextHinting>,
+  source_surface: RasterSourceSurface,
+  target_surface: RasterTargetSurface,
 ) -> Option<DrawingRaster> {
+  let RasterSourceSurface {
+    bounds: source_bounds,
+    pixels_per_point: source_pixels_per_point,
+    extent,
+    text_hinting,
+  } = source_surface;
+  let RasterTargetSurface {
+    width_px: target_width_px,
+    height_px: target_height_px,
+    filter,
+  } = target_surface;
   let requirements = super::drawingml_image_effects::source_requirements(effects);
   if requirements.fill || requirements.line || requirements.children {
     return None;
@@ -203,6 +396,9 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
     let length_px = length_pt * source_pixels_per_point;
     match extent {
       RasterSourceExtent::Outward => raster_pixel_extent(length_pt, source_pixels_per_point),
+      RasterSourceExtent::InclusiveFarEdge => {
+        inclusive_far_edge_raster_pixel_extent(length_pt, source_pixels_per_point)
+      }
       RasterSourceExtent::Floor => length_px.floor().max(1.0) as u32,
       RasterSourceExtent::Round => length_px.round().max(1.0) as u32,
     }
@@ -240,6 +436,168 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
     children_image: None,
     pixels_per_point: source_pixels_per_point,
   })
+}
+
+/// Rasterizes a standalone WordprocessingShape backdrop from its
+/// base-resolution source surface before resolving to the balanced-blur
+/// surface tier.
+///
+/// Word first realizes the shape at the fixed-output base density. Its
+/// balanced Gaussian implementation then pre-scales that source when the
+/// selected effect tier is lower. Keeping these two surfaces distinct is
+/// observable at every fractional source edge and at the 200-to-100-DPI tier
+/// boundary.
+pub(crate) fn rasterize_word_shape_effect_source_via_base_surface(
+  items: &[DisplayItem<'static>],
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  surface: WordShapeEffectSurface,
+) -> Option<DrawingRaster> {
+  let WordShapeEffectSurface {
+    profile,
+    base_bounds: base_surface_bounds,
+    content_bounds,
+    base_pixels_per_point,
+    target_width_px,
+    target_height_px,
+    target_pixels_per_point,
+  } = surface;
+  let requirements = super::drawingml_image_effects::source_requirements(effects);
+  if requirements != super::drawingml_image_effects::ImageEffectSourceRequirements::default()
+    || target_width_px == 0
+    || target_height_px == 0
+    || !target_pixels_per_point.is_finite()
+    || target_pixels_per_point <= 0.0
+  {
+    return None;
+  }
+
+  let primitive_antialiasing = match profile {
+    WordShapeEffectSourceProfile::Glow => RasterPrimitiveAntialiasing::Aliased,
+    WordShapeEffectSourceProfile::OuterShadow => RasterPrimitiveAntialiasing::PerPrimitive,
+  };
+  let (mut source, _) =
+    rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
+      items,
+      base_surface_bounds,
+      base_pixels_per_point,
+      RasterSourceExtent::InclusiveFarEdge,
+      primitive_antialiasing,
+    )?;
+  if profile == WordShapeEffectSourceProfile::Glow {
+    normalize_word_shape_uniform_rect_source(
+      &mut source,
+      base_surface_bounds,
+      content_bounds,
+      base_pixels_per_point,
+    );
+  }
+  let image = if source.dimensions() == (target_width_px, target_height_px) {
+    source
+  } else {
+    // Direct2D's official balanced Gaussian contract uses trilinear filtering
+    // for its internal pre-scale. `image::FilterType::Triangle` is not that
+    // filter: on minification it widens its reconstruction support by the
+    // scale ratio. Use the four neighboring texels at mapped pixel centers,
+    // matching Direct2D's linear sampling stage while preserving associated
+    // alpha through the interpolation. The source was allocated with an
+    // inclusive far edge, so its terminal sample owns half a pixel rather than
+    // a complete interval. The independent WPS shadow phase controls select
+    // this same `extent - 0.5` mapping on both axes.
+    resize_inclusive_far_edge_premultiplied_linear(&source, target_width_px, target_height_px)
+  };
+  Some(DrawingRaster {
+    image,
+    fill_image: None,
+    line_image: None,
+    fill_line_image: None,
+    children_image: None,
+    pixels_per_point: target_pixels_per_point,
+  })
+}
+
+fn resize_inclusive_far_edge_premultiplied_linear(
+  source: &RgbaImage,
+  width: u32,
+  height: u32,
+) -> RgbaImage {
+  let scale_x = (source.width() as f32 - 0.5).max(0.0) / width as f32;
+  let scale_y = (source.height() as f32 - 0.5).max(0.0) / height as f32;
+  RgbaImage::from_fn(width, height, |x, y| {
+    let source_x = (x as f32 + 0.5).mul_add(scale_x, -0.5);
+    let source_y = (y as f32 + 0.5).mul_add(scale_y, -0.5);
+    bilinear_sample(source, source_x, source_y)
+  })
+}
+
+fn normalize_word_shape_uniform_rect_source(
+  source: &mut RgbaImage,
+  source_bounds: Rect,
+  content_bounds: Rect,
+  pixels_per_point: f32,
+) {
+  let Some(color) = uniform_nontransparent_rectangle_color(source) else {
+    return;
+  };
+  let near_sample = |value: f32| {
+    let boundary = f64::from(value) - 0.5;
+    let nearest = boundary.round();
+    let tolerance = f64::from(f32::EPSILON) * boundary.abs().max(1.0) * 16.0;
+    if (boundary - nearest).abs() <= tolerance {
+      nearest as i64
+    } else {
+      boundary.ceil() as i64
+    }
+  };
+  let left = near_sample((content_bounds.origin.x.0 - source_bounds.origin.x.0) * pixels_per_point);
+  let top = near_sample((content_bounds.origin.y.0 - source_bounds.origin.y.0) * pixels_per_point);
+  let width = (content_bounds.size.width.0 * pixels_per_point)
+    .round()
+    .max(1.0) as i64;
+  let height = (content_bounds.size.height.0 * pixels_per_point)
+    .round()
+    .max(1.0) as i64;
+  let right = left.saturating_add(width);
+  let bottom = top.saturating_add(height);
+  for (x, y, pixel) in source.enumerate_pixels_mut() {
+    *pixel = if i64::from(x) >= left
+      && i64::from(x) < right
+      && i64::from(y) >= top
+      && i64::from(y) < bottom
+    {
+      color
+    } else {
+      image::Rgba([0; 4])
+    };
+  }
+}
+
+fn uniform_nontransparent_rectangle_color(source: &RgbaImage) -> Option<image::Rgba<u8>> {
+  let mut left = source.width();
+  let mut top = source.height();
+  let mut right = 0;
+  let mut bottom = 0;
+  let mut color = None;
+  for (x, y, pixel) in source.enumerate_pixels() {
+    if pixel[3] == 0 {
+      continue;
+    }
+    if color.is_some_and(|color| color != *pixel) {
+      return None;
+    }
+    color = Some(*pixel);
+    left = left.min(x);
+    top = top.min(y);
+    right = right.max(x);
+    bottom = bottom.max(y);
+  }
+  let color = color?;
+  for (x, y, pixel) in source.enumerate_pixels() {
+    let inside = x >= left && x <= right && y >= top && y <= bottom;
+    if inside != (*pixel == color) {
+      return None;
+    }
+  }
+  Some(color)
 }
 
 fn apply_wpf_grayscale_alpha_correction(image: &mut RgbaImage) {
@@ -389,12 +747,29 @@ pub(crate) fn rasterize_group_items_for_effects_at_pixels_per_point(
   effects: &super::drawingml_image_effects::ImageEffectContainer,
   pixels_per_point: f32,
 ) -> Option<DrawingRaster> {
+  rasterize_group_items_for_effects_at_pixels_per_point_with_extent(
+    items,
+    raster_bounds,
+    effects,
+    pixels_per_point,
+    RasterSourceExtent::Outward,
+  )
+}
+
+pub(crate) fn rasterize_group_items_for_effects_at_pixels_per_point_with_extent(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  pixels_per_point: f32,
+  extent: RasterSourceExtent,
+) -> Option<DrawingRaster> {
   rasterize_vector_items_for_effects_impl_at_pixels_per_point(
     items,
     raster_bounds,
     effects,
     true,
     pixels_per_point,
+    extent,
   )
 }
 
@@ -412,6 +787,7 @@ fn rasterize_vector_items_for_effects_impl(
     effects,
     items_are_children_source,
     pixels_per_point,
+    RasterSourceExtent::Outward,
   )
 }
 
@@ -421,55 +797,17 @@ fn rasterize_vector_items_for_effects_impl_at_pixels_per_point(
   effects: &super::drawingml_image_effects::ImageEffectContainer,
   items_are_children_source: bool,
   pixels_per_point: f32,
+  extent: RasterSourceExtent,
 ) -> Option<DrawingRaster> {
-  let requirements = super::drawingml_image_effects::source_requirements(effects);
-  // A logical children source can only be produced while retaining the host
-  // group's child display list. A leaf-shape raster must fail strictly here so
-  // callers keep the original vector content rather than substituting an
-  // empty source.
-  if requirements.children && !items_are_children_source {
-    return None;
-  }
-  let (image, pixels_per_point) =
-    rasterize_vector_items_impl_at_pixels_per_point(items, raster_bounds, pixels_per_point)?;
-  let fill_image = if requirements.fill && items_are_children_source {
-    Some(empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point)?.0)
-  } else if requirements.fill {
-    Some(rasterize_source_layer_at_pixels_per_point(
-      items,
-      raster_bounds,
-      SourceLayer::Fill,
-      pixels_per_point,
-    )?)
-    .map(|layer| layer.0)
-  } else {
-    None
-  };
-  let line_image = if requirements.line && items_are_children_source {
-    Some(empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point)?.0)
-  } else if requirements.line {
-    Some(rasterize_source_layer_at_pixels_per_point(
-      items,
-      raster_bounds,
-      SourceLayer::Line,
-      pixels_per_point,
-    )?)
-    .map(|layer| layer.0)
-  } else {
-    None
-  };
-  Some(DrawingRaster {
-    children_image: (requirements.children && items_are_children_source).then(|| image.clone()),
-    fill_line_image: if requirements.fill_line && items_are_children_source {
-      Some(empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point)?.0)
-    } else {
-      None
-    },
-    image,
-    fill_image,
-    line_image,
+  rasterize_vector_items_for_effects_impl_at_pixels_per_point_with_antialiasing(
+    items,
+    raster_bounds,
+    effects,
+    items_are_children_source,
     pixels_per_point,
-  })
+    extent,
+    RasterPrimitiveAntialiasing::PerPrimitive,
+  )
 }
 
 #[derive(Clone, Copy)]
@@ -483,6 +821,8 @@ fn rasterize_source_layer_at_pixels_per_point(
   raster_bounds: Rect,
   layer: SourceLayer,
   pixels_per_point: f32,
+  extent: RasterSourceExtent,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<(RgbaImage, f32)> {
   let mut layer_items = Vec::new();
   for item in items {
@@ -490,10 +830,16 @@ fn rasterize_source_layer_at_pixels_per_point(
   }
   if layer_items.is_empty() {
     let (image, pixels_per_point) =
-      empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point)?;
+      empty_raster_at_pixels_per_point(raster_bounds, pixels_per_point, extent)?;
     return Some((image, pixels_per_point));
   }
-  rasterize_vector_items_impl_at_pixels_per_point(&layer_items, raster_bounds, pixels_per_point)
+  rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
+    &layer_items,
+    raster_bounds,
+    pixels_per_point,
+    extent,
+    primitive_antialiasing,
+  )
 }
 
 fn collect_source_layer_item(
@@ -563,6 +909,7 @@ fn collect_source_layer_item(
 fn empty_raster_at_pixels_per_point(
   raster_bounds: Rect,
   pixels_per_point: f32,
+  extent: RasterSourceExtent,
 ) -> Option<(RgbaImage, f32)> {
   let width_pt = raster_bounds.size.width.0;
   let height_pt = raster_bounds.size.height.0;
@@ -572,14 +919,14 @@ fn empty_raster_at_pixels_per_point(
   }
   Some((
     RgbaImage::new(
-      raster_pixel_extent(width_pt, pixels_per_point),
-      raster_pixel_extent(height_pt, pixels_per_point),
+      raster_source_extent(width_pt, pixels_per_point, extent),
+      raster_source_extent(height_pt, pixels_per_point, extent),
     ),
     pixels_per_point,
   ))
 }
 
-fn raster_pixel_extent(length_pt: f32, pixels_per_point: f32) -> u32 {
+pub(crate) fn raster_pixel_extent(length_pt: f32, pixels_per_point: f32) -> u32 {
   let extent_px = length_pt * pixels_per_point;
   let nearest_px = extent_px.round();
   // Pixel-aligned bounds are divided by the density in
@@ -595,6 +942,34 @@ fn raster_pixel_extent(length_pt: f32, pixels_per_point: f32) -> u32 {
     extent_px.ceil()
   };
   outward_px.max(1.0) as u32
+}
+
+pub(crate) fn inclusive_far_edge_raster_pixel_extent(length_pt: f32, pixels_per_point: f32) -> u32 {
+  // Word's standalone-WPS effect surface includes the sample on an exactly
+  // aligned terminal boundary. The radius-6 width/height sweeps distinguish
+  // this from both ordinary outward ceil and round: 294.48pt at 100 DPI is
+  // exactly 409 pixels logically but allocates 410, and 54pt allocates 76.
+  let extent_px = length_pt * pixels_per_point;
+  let nearest_px = extent_px.round();
+  let rounding_tolerance = f32::EPSILON * extent_px.abs().max(1.0) * 4.0;
+  let stable_extent_px = if (extent_px - nearest_px).abs() <= rounding_tolerance {
+    nearest_px
+  } else {
+    extent_px
+  };
+  (stable_extent_px.floor() + 1.0).max(1.0) as u32
+}
+
+fn raster_source_extent(length_pt: f32, pixels_per_point: f32, extent: RasterSourceExtent) -> u32 {
+  let length_px = length_pt * pixels_per_point;
+  match extent {
+    RasterSourceExtent::Outward => raster_pixel_extent(length_pt, pixels_per_point),
+    RasterSourceExtent::InclusiveFarEdge => {
+      inclusive_far_edge_raster_pixel_extent(length_pt, pixels_per_point)
+    }
+    RasterSourceExtent::Floor => length_px.floor().max(1.0) as u32,
+    RasterSourceExtent::Round => length_px.round().max(1.0) as u32,
+  }
 }
 
 fn effect_pixels_per_point(width_pt: f32, height_pt: f32) -> f32 {
@@ -687,6 +1062,36 @@ fn rasterize_vector_items_impl_at_pixels_per_point(
   raster_bounds: Rect,
   pixels_per_point: f32,
 ) -> Option<(RgbaImage, f32)> {
+  rasterize_vector_items_impl_at_pixels_per_point_with_extent(
+    items,
+    raster_bounds,
+    pixels_per_point,
+    RasterSourceExtent::Outward,
+  )
+}
+
+fn rasterize_vector_items_impl_at_pixels_per_point_with_extent(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+  extent: RasterSourceExtent,
+) -> Option<(RgbaImage, f32)> {
+  rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
+    items,
+    raster_bounds,
+    pixels_per_point,
+    extent,
+    RasterPrimitiveAntialiasing::PerPrimitive,
+  )
+}
+
+fn rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+  extent: RasterSourceExtent,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<(RgbaImage, f32)> {
   let width_pt = raster_bounds.size.width.0;
   let height_pt = raster_bounds.size.height.0;
   if width_pt <= 0.0
@@ -697,8 +1102,8 @@ fn rasterize_vector_items_impl_at_pixels_per_point(
   {
     return None;
   }
-  let width_px = raster_pixel_extent(width_pt, pixels_per_point);
-  let height_px = raster_pixel_extent(height_pt, pixels_per_point);
+  let width_px = raster_source_extent(width_pt, pixels_per_point, extent);
+  let height_px = raster_source_extent(height_pt, pixels_per_point, extent);
   let mut pixmap = Pixmap::new(width_px, height_px)?;
   let mut text_metrics = TextMetrics::new();
   let page_to_raster = SkTransform::from_row(
@@ -711,7 +1116,14 @@ fn rasterize_vector_items_impl_at_pixels_per_point(
   );
 
   for item in items {
-    draw_display_item(&mut pixmap, item, page_to_raster, None, &mut text_metrics)?;
+    draw_display_item(
+      &mut pixmap,
+      item,
+      page_to_raster,
+      None,
+      primitive_antialiasing,
+      &mut text_metrics,
+    )?;
   }
 
   let png = pixmap.encode_png().ok()?;
@@ -792,6 +1204,7 @@ fn rasterize_vector_items_impl_with_mapping_at_resolution(
       item,
       page_to_raster,
       mapping.text_hinting,
+      RasterPrimitiveAntialiasing::PerPrimitive,
       &mut text_metrics,
     )?;
   }
@@ -861,17 +1274,25 @@ fn draw_display_item(
   item: &DisplayItem<'static>,
   page_to_raster: SkTransform,
   text_hinting: Option<(RasterTextHinting, f32)>,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
   text_metrics: &mut TextMetrics,
 ) -> Option<()> {
   match item {
     DisplayItem::Text(text) => draw_text(pixmap, text, page_to_raster, text_hinting, text_metrics)?,
-    DisplayItem::Image(image) => draw_image(pixmap, image, page_to_raster)?,
-    DisplayItem::Path(path) => draw_path(pixmap, path, page_to_raster)?,
-    DisplayItem::Rect(rect) => draw_rect(pixmap, rect, page_to_raster)?,
-    DisplayItem::Line(line) => draw_line(pixmap, line, page_to_raster)?,
+    DisplayItem::Image(image) => draw_image(pixmap, image, page_to_raster, primitive_antialiasing)?,
+    DisplayItem::Path(path) => draw_path(pixmap, path, page_to_raster, primitive_antialiasing)?,
+    DisplayItem::Rect(rect) => draw_rect(pixmap, rect, page_to_raster, primitive_antialiasing)?,
+    DisplayItem::Line(line) => draw_line(pixmap, line, page_to_raster, primitive_antialiasing)?,
     DisplayItem::Group(group) => {
       for child in &group.items {
-        draw_display_item(pixmap, child, page_to_raster, text_hinting, text_metrics)?;
+        draw_display_item(
+          pixmap,
+          child,
+          page_to_raster,
+          text_hinting,
+          primitive_antialiasing,
+          text_metrics,
+        )?;
       }
     }
     DisplayItem::Glyphs(_)
@@ -922,6 +1343,7 @@ fn draw_text(
     bounds,
     Some(&commands),
     page_to_raster,
+    true,
   )?;
   let mut stroke = item
     .style
@@ -973,6 +1395,7 @@ fn draw_text(
       bounds,
       Some(&commands),
       page_to_raster,
+      true,
     )?;
   }
   Some(())
@@ -1246,6 +1669,7 @@ fn draw_image(
   pixmap: &mut Pixmap,
   item: &ImageItem<'static>,
   page_to_raster: SkTransform,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
   let raster_data = crate::render::emf_wmf::decode_metafile_as_raster(
     item.bytes.as_ref(),
@@ -1276,7 +1700,7 @@ fn draw_image(
     let clip_path = path_from_commands(&item.clip_path, &[], true)?;
     let mut mask_paint = Paint::default();
     mask_paint.set_color_rgba8(255, 255, 255, 255);
-    mask_paint.anti_alias = true;
+    mask_paint.anti_alias = primitive_antialiasing.enabled();
     mask.fill_path(
       &clip_path,
       &mask_paint,
@@ -1420,6 +1844,7 @@ fn draw_path(
   pixmap: &mut Pixmap,
   item: &PathItem<'static>,
   page_to_raster: SkTransform,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
   let path = path_from_commands(&item.commands, &item.points, item.closed)?;
   draw_fill(
@@ -1429,6 +1854,7 @@ fn draw_path(
     item.bounds,
     Some(&item.commands),
     page_to_raster,
+    primitive_antialiasing.enabled(),
   )?;
   if let Some(stroke) = &item.stroke {
     let shortened_path = shortened_straight_stroke_path(item, stroke);
@@ -1439,8 +1865,15 @@ fn draw_path(
       item.bounds,
       Some(&item.commands),
       page_to_raster,
+      primitive_antialiasing.enabled(),
     )?;
-    draw_stroke_end_markers(pixmap, item, stroke, page_to_raster)?;
+    draw_stroke_end_markers(
+      pixmap,
+      item,
+      stroke,
+      page_to_raster,
+      primitive_antialiasing.enabled(),
+    )?;
   }
   Some(())
 }
@@ -1450,9 +1883,10 @@ fn draw_stroke_end_markers(
   item: &PathItem<'static>,
   stroke: &Stroke<'static>,
   page_to_raster: SkTransform,
+  anti_alias: bool,
 ) -> Option<()> {
   let mut paint = solid_paint(stroke.color);
-  paint.anti_alias = true;
+  paint.anti_alias = anti_alias;
   for polygon in super::drawingml_stroke::stroke_end_marker_polygons(item, stroke) {
     let [first, rest @ ..] = polygon.as_slice() else {
       continue;
@@ -1529,6 +1963,7 @@ fn draw_rect(
   pixmap: &mut Pixmap,
   item: &RectItem<'static>,
   page_to_raster: SkTransform,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
   let left = item.bounds.origin.x.0;
   let top = item.bounds.origin.y.0;
@@ -1541,9 +1976,25 @@ fn draw_rect(
   builder.line_to(left, bottom);
   builder.close();
   let path = builder.finish()?;
-  draw_fill(pixmap, &path, &item.fill, item.bounds, None, page_to_raster)?;
+  draw_fill(
+    pixmap,
+    &path,
+    &item.fill,
+    item.bounds,
+    None,
+    page_to_raster,
+    primitive_antialiasing.enabled(),
+  )?;
   if let Some(stroke) = &item.stroke {
-    draw_stroke(pixmap, &path, stroke, item.bounds, None, page_to_raster)?;
+    draw_stroke(
+      pixmap,
+      &path,
+      stroke,
+      item.bounds,
+      None,
+      page_to_raster,
+      primitive_antialiasing.enabled(),
+    )?;
   }
   Some(())
 }
@@ -1552,6 +2003,7 @@ fn draw_line(
   pixmap: &mut Pixmap,
   item: &LineItem<'static>,
   page_to_raster: SkTransform,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
   let mut builder = PathBuilder::new();
   builder.move_to(item.start.x.0, item.start.y.0);
@@ -1567,7 +2019,15 @@ fn draw_line(
       height: super::Pt((item.end.y.0 - item.start.y.0).abs()),
     },
   };
-  draw_stroke(pixmap, &path, &item.stroke, bounds, None, page_to_raster)
+  draw_stroke(
+    pixmap,
+    &path,
+    &item.stroke,
+    bounds,
+    None,
+    page_to_raster,
+    primitive_antialiasing.enabled(),
+  )
 }
 
 fn path_from_commands(
@@ -1616,28 +2076,29 @@ fn draw_fill(
   bounds: Rect,
   commands: Option<&[PathCommand]>,
   page_to_raster: SkTransform,
+  anti_alias: bool,
 ) -> Option<()> {
   match fill {
     Fill::None => Some(()),
     Fill::Solid(color) => {
       let mut paint = solid_paint(*color);
-      paint.anti_alias = true;
+      paint.anti_alias = anti_alias;
       pixmap.fill_path(path, &paint, FillRule::EvenOdd, page_to_raster, None);
       Some(())
     }
     Fill::Gradient(gradient) if gradient.path.is_none() => {
       let mut paint = linear_gradient_paint(gradient, bounds)?;
-      paint.anti_alias = true;
+      paint.anti_alias = anti_alias;
       pixmap.fill_path(path, &paint, FillRule::EvenOdd, page_to_raster, None);
       Some(())
     }
     Fill::Gradient(gradient) => {
-      draw_path_gradient(pixmap, path, gradient, commands, page_to_raster)
+      draw_path_gradient(pixmap, path, gradient, commands, page_to_raster, anti_alias)
     }
     Fill::Pattern(pattern) => {
       let tile = pattern_tile(*pattern, page_to_raster.sx)?;
       let paint = Paint {
-        anti_alias: true,
+        anti_alias,
         shader: Pattern::new(
           tile.as_ref(),
           SpreadMode::Repeat,
@@ -1663,11 +2124,12 @@ fn draw_path_gradient(
   gradient: &GradientFill<'static>,
   commands: Option<&[PathCommand]>,
   page_to_raster: SkTransform,
+  anti_alias: bool,
 ) -> Option<()> {
   let mut mask = Pixmap::new(pixmap.width(), pixmap.height())?;
   let mut paint = Paint::default();
   paint.set_color_rgba8(255, 255, 255, 255);
-  paint.anti_alias = true;
+  paint.anti_alias = anti_alias;
   mask.fill_path(clip_path, &paint, FillRule::EvenOdd, page_to_raster, None);
   composite_path_gradient_mask(pixmap, &mask, gradient, commands, page_to_raster)
 }
@@ -1739,6 +2201,7 @@ fn draw_stroke(
   bounds: Rect,
   commands: Option<&[PathCommand]>,
   page_to_raster: SkTransform,
+  anti_alias: bool,
 ) -> Option<()> {
   if stroke.width.0 <= 0.0
     || stroke.color.a == 0 && stroke.pattern.is_none() && stroke.gradient.is_none()
@@ -1774,18 +2237,18 @@ fn draw_stroke(
       let mut mask = Pixmap::new(pixmap.width(), pixmap.height())?;
       let mut paint = Paint::default();
       paint.set_color_rgba8(255, 255, 255, 255);
-      paint.anti_alias = true;
+      paint.anti_alias = anti_alias;
       mask.stroke_path(path, &paint, &sk_stroke, page_to_raster, None);
       composite_path_gradient_mask(pixmap, &mask, gradient, commands, page_to_raster)?;
     } else {
       let mut paint = linear_gradient_paint(gradient, bounds)?;
-      paint.anti_alias = true;
+      paint.anti_alias = anti_alias;
       pixmap.stroke_path(path, &paint, &sk_stroke, page_to_raster, None);
     }
   } else if let Some(pattern) = stroke.pattern {
     let tile = pattern_tile(pattern, page_to_raster.sx)?;
     let paint = Paint {
-      anti_alias: true,
+      anti_alias,
       shader: Pattern::new(
         tile.as_ref(),
         SpreadMode::Repeat,
@@ -1801,7 +2264,7 @@ fn draw_stroke(
     pixmap.stroke_path(path, &paint, &sk_stroke, page_to_raster, None);
   } else {
     let mut paint = solid_paint(stroke.color);
-    paint.anti_alias = true;
+    paint.anti_alias = anti_alias;
     pixmap.stroke_path(path, &paint, &sk_stroke, page_to_raster, None);
   }
   Some(())
@@ -1915,11 +2378,17 @@ fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
 #[cfg(test)]
 mod tests {
   use super::{
-    MAX_EFFECT_RASTER_PIXELS, PageToRasterMapping, SourceLayer, bounded_effect_raster_grid,
-    collect_source_layer_item, effect_pixels_per_point_with_max, raster_pixel_extent,
-    rasterize_group_items_for_effects, rasterize_group_items_for_effects_at_pixels_per_point,
-    rasterize_vector_items, rasterize_vector_items_for_effects,
+    MAX_EFFECT_RASTER_PIXELS, PageToRasterMapping, RasterPrimitiveAntialiasing, RasterSourceExtent,
+    SourceLayer, WordShapeEffectSourceProfile, bounded_effect_raster_grid,
+    collect_source_layer_item, effect_pixels_per_point_with_max,
+    office_simple_glow_pixels_per_point, raster_pixel_extent, rasterize_group_items_for_effects,
+    rasterize_group_items_for_effects_at_pixels_per_point,
+    rasterize_group_items_for_effects_at_pixels_per_point_with_extent, rasterize_vector_items,
+    rasterize_vector_items_for_effects,
+    rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing,
     rasterize_vector_items_for_effects_with_mapping,
+    rasterize_word_shape_effect_source_via_base_surface,
+    resize_inclusive_far_edge_premultiplied_linear,
   };
   use bytes::Bytes;
   use image::codecs::png::PngEncoder;
@@ -1957,6 +2426,35 @@ mod tests {
   }
 
   #[test]
+  fn office_simple_glow_density_keeps_exact_reference_tier_edges() {
+    let print = crate::units::OFFICE_FIXED_OUTPUT_RASTER_DPI;
+    let samples = [
+      (5.75, 200.0),
+      (5.76, 200.0),
+      (5.77, 100.0),
+      (11.51, 100.0),
+      (11.52, 100.0),
+      (11.53, 200.0 / 3.0),
+      (17.27, 200.0 / 3.0),
+      (17.28, 200.0 / 3.0),
+      (17.29, 50.0),
+      (34.55, 200.0 / 6.0),
+      (34.56, 200.0 / 6.0),
+      (34.57, 200.0 / 7.0),
+      (36.0, 200.0 / 7.0),
+      (48.0, 200.0 / 9.0),
+    ];
+    for (radius_pt, expected_dpi) in samples {
+      let actual_dpi =
+        office_simple_glow_pixels_per_point(print, radius_pt) * crate::units::POINTS_PER_INCH;
+      assert!(
+        (actual_dpi - expected_dpi).abs() < 0.0001,
+        "radius={radius_pt}, actual_dpi={actual_dpi}"
+      );
+    }
+  }
+
+  #[test]
   fn effect_grid_encloses_fractional_and_negative_logical_bounds() {
     let (aligned, pixels_per_point) = bounded_effect_raster_grid(rect(10.3, -2.1, 5.2, 3.0), 2.0);
 
@@ -1976,6 +2474,108 @@ mod tests {
     // page-space grid alignment.  Their f32 product lands just above 116.
     assert_eq!(raster_pixel_extent(41.76001, pixels_per_point), 116);
     assert_eq!(raster_pixel_extent(41.77, pixels_per_point), 117);
+  }
+
+  #[test]
+  fn aliased_effect_source_uses_pixel_center_and_excludes_the_far_edge() {
+    let surface = rect(188.4, 116.16, 292.98, 52.02);
+    let item = DisplayItem::Rect(RectItem {
+      bounds: rect(193.5, 121.3, 282.95, 41.85),
+      fill: Fill::Solid(Color {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 51,
+      }),
+      stroke: None,
+    });
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+
+    let raster =
+      rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing(
+        &[item],
+        surface,
+        &effects,
+        200.0 / 72.0,
+        RasterSourceExtent::InclusiveFarEdge,
+        RasterPrimitiveAntialiasing::Aliased,
+      )
+      .unwrap();
+
+    assert_eq!((raster.image.width(), raster.image.height()), (814, 145));
+    assert_eq!(
+      [
+        raster.image.get_pixel(13, 72)[3],
+        raster.image.get_pixel(14, 72)[3],
+        raster.image.get_pixel(799, 72)[3],
+        raster.image.get_pixel(800, 72)[3],
+      ],
+      [0, 51, 51, 0]
+    );
+  }
+
+  #[test]
+  fn word_shape_glow_and_shadow_keep_independent_primitive_coverage() {
+    let surface = rect(0.0, 0.0, 4.0, 3.0);
+    let content = rect(0.2, 0.2, 2.5, 1.5);
+    let item = DisplayItem::Rect(RectItem {
+      bounds: content,
+      fill: Fill::Solid(Color {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+      }),
+      stroke: None,
+    });
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+    let pixels_per_point = 4.0;
+    let width =
+      super::inclusive_far_edge_raster_pixel_extent(surface.size.width.0, pixels_per_point);
+    let height =
+      super::inclusive_far_edge_raster_pixel_extent(surface.size.height.0, pixels_per_point);
+    let raster = |profile| {
+      rasterize_word_shape_effect_source_via_base_surface(
+        std::slice::from_ref(&item),
+        &effects,
+        super::WordShapeEffectSurface {
+          profile,
+          base_bounds: surface,
+          content_bounds: content,
+          base_pixels_per_point: pixels_per_point,
+          target_width_px: width,
+          target_height_px: height,
+          target_pixels_per_point: pixels_per_point,
+        },
+      )
+      .unwrap()
+      .image
+    };
+    let glow = raster(WordShapeEffectSourceProfile::Glow);
+    let shadow = raster(WordShapeEffectSourceProfile::OuterShadow);
+
+    assert!(glow.pixels().all(|pixel| matches!(pixel[3], 0 | 255)));
+    assert!(shadow.pixels().any(|pixel| (1..=254).contains(&pixel[3])));
+    assert_ne!(glow, shadow);
+  }
+
+  #[test]
+  fn inclusive_far_edge_linear_resize_uses_half_terminal_sample() {
+    let source = RgbaImage::from_fn(5, 1, |x, _| {
+      let alpha = [0, 64, 128, 192, 255][x as usize];
+      Rgba([255, 255, 255, alpha])
+    });
+
+    let resized = resize_inclusive_far_edge_premultiplied_linear(&source, 2, 1);
+
+    assert_eq!(resized.get_pixel(0, 0)[3], 40);
+    assert_eq!(resized.get_pixel(1, 0)[3], 184);
   }
 
   #[test]
@@ -2305,6 +2905,39 @@ mod tests {
         .as_ref()
         .map(|image| (image.width(), image.height())),
       Some((30, 30))
+    );
+
+    let office_glow_bounds = Rect {
+      origin: Point::default(),
+      size: Size {
+        width: Pt(164.000_02),
+        height: Pt(138.5),
+      },
+    };
+    let office_glow_density = 200.0 / 72.0 / 7.0;
+    let outward = rasterize_group_items_for_effects_at_pixels_per_point(
+      std::slice::from_ref(&item),
+      office_glow_bounds,
+      &effects,
+      office_glow_density,
+    )
+    .unwrap();
+    assert_eq!((outward.image.width(), outward.image.height()), (66, 55));
+    let rounded = rasterize_group_items_for_effects_at_pixels_per_point_with_extent(
+      std::slice::from_ref(&item),
+      office_glow_bounds,
+      &effects,
+      office_glow_density,
+      RasterSourceExtent::Round,
+    )
+    .unwrap();
+    assert_eq!((rounded.image.width(), rounded.image.height()), (65, 55));
+    assert_eq!(
+      rounded
+        .children_image
+        .as_ref()
+        .map(|image| (image.width(), image.height())),
+      Some((65, 55))
     );
   }
 

@@ -4,11 +4,10 @@ const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
 
 /// The subset of a PNG which a PDF image XObject can consume directly.
 ///
-/// This follows the representation implemented by krilla after 0.8.2: the
-/// concatenated IDAT zlib stream is paired with PDF's PNG predictor, while an
-/// indexed palette becomes an `/Indexed` color space. Keeping the bridge here
-/// avoids vendoring or replacing the PDF backend before that support reaches a
-/// released krilla version.
+/// The concatenated IDAT zlib stream is paired with PDF's PNG predictor, while
+/// an indexed palette becomes an `/Indexed` color space. The direct writer
+/// consumes this validated representation without decoding and recompressing
+/// the source samples.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct NativeIndexedPng {
   pub width: u32,

@@ -168,6 +168,37 @@ const WORD_LOCKED_CANVAS_TEXT_FAR_EDGE_GUARD_PX: f32 = 10.0;
 // before applying the configured PDF image compression policy.
 const WORD_SHAPE_STORY_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-shape-story+png";
+// Internal transport tag for a Word WPG backdrop whose RGB samples are
+// already associated with a black matte. The PDF writer uses the tag to keep
+// the exact color and alpha planes and install `/Matte [0 0 0]` on the SMask.
+const WORD_GROUP_GLOW_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-group-glow+png";
+// Internal transport tag for a standalone WPS glow whose RGB samples are
+// already associated with a black matte. It has its own tag because the WPS
+// and WPG bitmap-surface quantizers are independently evidenced and must not
+// become interchangeable merely because their PDF transport is identical.
+const WORD_SHAPE_GLOW_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-shape-glow+png";
+// Internal transport tag for a standalone WPS outer shadow whose RGB samples
+// are already associated with a black matte. Keep it distinct from glow: the
+// two effects share the PDF soft-mask contract, but their Office raster
+// surfaces and quantizers are independently evidenced.
+const WORD_SHAPE_SHADOW_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-shape-shadow+png";
+// Internal transport tag for Word's device-sampled table-border tiles. The
+// fully transparent samples deliberately retain the border color: Office
+// writes that same straight RGB plane beside its binary SMask, so a PDF
+// viewer's edge sampling stays in the border hue instead of introducing a
+// black fringe.
+const WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-table-border+png";
+// Word clips the far end of a vertical table rule after adding a sub-pixel
+// device-space ownership bias. The 376/384/390/394-twip row-height x
+// 1410..1421-twip page-origin Office matrix isolates the common interval to
+// 0.7556..0.7561 of a 600-DPI device dot. Keep the midpoint in device space:
+// applying a point-space approximation moves two controls across the floor
+// threshold because the A4 logical and fixed-output extents differ.
+const WORD_TABLE_VERTICAL_BORDER_END_BIAS_DOTS: f64 = 0.755_85;
 // Word fixed output snaps the legacy field glyph to its 600-DPI printer grid.
 // The independent 10-point Arial (checkboxes.docx), 11-point Calibri
 // (n766477.docx), and colored 10-point Open Sans fallback (tdf92472.docx)
@@ -3459,10 +3490,11 @@ fn finish_docx_shape_effects(
     DocxDrawingEffectHost {
       effects: shape.effects.as_ref(),
       static3d: shape.static3d.as_ref(),
+      wordprocessing_shape_host: shape.wordprocessing_shape_host,
       rotation_degrees: shape.rotation_deg,
       visual_rotation_degrees: inline_shape_visual_rotation_degrees(shape),
       placement: shape.placement,
-      max_pixels_per_point: Some(fixed_output_raster_dpi / units::POINTS_PER_INCH),
+      fixed_output_base_pixels_per_point: Some(fixed_output_raster_dpi / units::POINTS_PER_INCH),
     },
     content_bounds,
   );
@@ -3480,10 +3512,11 @@ fn finish_docx_image_effects(
     DocxDrawingEffectHost {
       effects: image.effects.as_ref(),
       static3d: image.static3d.as_ref(),
+      wordprocessing_shape_host: false,
       rotation_degrees: image.rotation_deg,
       visual_rotation_degrees: image.static3d.as_ref().map_or(image.rotation_deg, |_| 0.0),
       placement: image.placement,
-      max_pixels_per_point: None,
+      fixed_output_base_pixels_per_point: None,
     },
     content_bounds,
   );
@@ -3951,10 +3984,11 @@ fn image_effect_content_bounds(item: &ImageItem) -> common::Rect {
 struct DocxDrawingEffectHost<'a> {
   effects: Option<&'a common::DrawingEffectSource>,
   static3d: Option<&'a common::drawingml_3d::Static3dStyle>,
+  wordprocessing_shape_host: bool,
   rotation_degrees: f32,
   visual_rotation_degrees: f32,
   placement: crate::docx::ImagePlacement,
-  max_pixels_per_point: Option<f32>,
+  fixed_output_base_pixels_per_point: Option<f32>,
 }
 
 fn drawing_effect_content_bounds_with_markers(
@@ -4000,34 +4034,54 @@ fn union_common_rect(first: common::Rect, second: common::Rect) -> common::Rect 
 
 fn wordprocessing_drawing_effect_max_pixels_per_point(
   backdrop_effects: Option<&common::drawingml_image_effects::ImageEffectContainer>,
+  fixed_output_base_pixels_per_point: f32,
 ) -> f32 {
   let Some(backdrop_effects) = backdrop_effects else {
     // Inner shadow, soft edge, authored blur, and static 3-D modify the
     // foreground itself. Word's fixed output materializes those complete
     // surfaces at 200 DPI; shape-effect-preservation.docx supplies independent
     // inner-shadow and soft-edge counterexamples to the separated shadows.
-    return wordprocessing_drawing_backdrop_pixels_per_point(0.0);
+    return wordprocessing_drawing_backdrop_pixels_per_point(
+      0.0,
+      fixed_output_base_pixels_per_point,
+    );
   };
   let effective_blur_radius_px =
     common::drawingml_image_effects::effective_backdrop_blur_radius_px(backdrop_effects);
 
-  wordprocessing_drawing_backdrop_pixels_per_point(effective_blur_radius_px)
+  wordprocessing_drawing_backdrop_pixels_per_point(
+    effective_blur_radius_px,
+    fixed_output_base_pixels_per_point,
+  )
 }
 
-fn wordprocessing_drawing_backdrop_pixels_per_point(effective_blur_radius_px: f32) -> f32 {
-  const WORD_EFFECT_BASE_DPI: f32 = 200.0;
-  const DIRECT2D_BACKDROP_BLUR_PRESCALE_STEP_PX: f32 = 4.0;
+fn wordprocessing_drawing_backdrop_pixels_per_point(
+  effective_blur_radius_px: f32,
+  fixed_output_base_pixels_per_point: f32,
+) -> f32 {
+  const DIRECT2D_BACKDROP_BLUR_PRESCALE_STEP_PX: f32 = 3.84;
 
   // Direct2D's balanced Gaussian/shadow effects pre-scale their working image
-  // at small blur radii. Word exposes that internal boundary in fixed-output
-  // PDFs: sharp shadows use 200 DPI, while 4/5, 6/8, and 9-point shape-shadow
-  // radii use 100, 200/3, and 50 DPI respectively. In DrawingML's 96-DPI
-  // coordinate space those samples are exactly successive four-pixel bands.
-  // Glow uses half its authored radius as the filter radius, matching
-  // LibreOffice GlowPrimitive2D and Word's 8-point-glow 100-DPI counterexample.
-  let prescale_divisor =
-    1.0 + (effective_blur_radius_px / DIRECT2D_BACKDROP_BLUR_PRESCALE_STEP_PX).floor();
-  WORD_EFFECT_BASE_DPI / prescale_divisor.max(1.0) / units::POINTS_PER_INCH
+  // at undocumented thresholds. Word's fixed-output surface dimensions pin
+  // the threshold to a 1.28-DIP standard-deviation interval, or a 3.84-DIP
+  // kernel-radius interval. DrawingML boundary controls at 36_575/36_576/
+  // 36_577, 73_151/73_152/73_153, and 109_727/109_728/109_729 EMUs prove that
+  // an exact multiple remains in the preceding tier; therefore this is ceil,
+  // not `1 + floor`. The broader Screen/Print, radius, and shape-size matrix
+  // establishes that the resulting divisor applies to the selected 96- or
+  // 200-DPI export profile and is independent of bitmap extent. Glow uses half
+  // its authored radius as the filter radius, matching LibreOffice's
+  // GlowPrimitive2D and Word's independent glow control.
+  let raw_tier = effective_blur_radius_px.max(0.0) / DIRECT2D_BACKDROP_BLUR_PRESCALE_STEP_PX;
+  let nearest_integer = raw_tier.round();
+  let round_trip_tolerance = f32::EPSILON * raw_tier.abs().max(1.0) * 2.0;
+  let stable_tier = if (raw_tier - nearest_integer).abs() <= round_trip_tolerance {
+    nearest_integer
+  } else {
+    raw_tier
+  };
+  let prescale_divisor = stable_tier.ceil();
+  fixed_output_base_pixels_per_point / prescale_divisor.max(1.0)
 }
 
 fn wordprocessing_static_3d_bitmap_display_bounds(raster_bounds: common::Rect) -> common::Rect {
@@ -4341,6 +4395,9 @@ fn finish_docx_drawing_effects(
   if effects.effects.is_empty() && host.static3d.is_none() {
     return;
   }
+  if host.wordprocessing_shape_host {
+    common::drawingml_image_effects::use_word_shape_glow_profile(&mut effects);
+  }
   common::drawingml_image_effects::rotate_container_with_shape(
     &mut effects,
     host.visual_rotation_degrees,
@@ -4351,6 +4408,36 @@ fn finish_docx_drawing_effects(
     .is_none()
     .then(|| separable_backdrop.clone())
     .flatten();
+  let simple_wordprocessing_shape_glow_radius_pt = host
+    .wordprocessing_shape_host
+    .then(|| backdrop_effects.as_ref().and_then(simple_glow_radius_pt))
+    .flatten();
+  let simple_wordprocessing_shape_shadow_blur_radius_pt = host
+    .wordprocessing_shape_host
+    .then(|| {
+      backdrop_effects
+        .as_ref()
+        .and_then(simple_outer_shadow_blur_radius_pt)
+    })
+    .flatten();
+  let simple_wordprocessing_shape_shadow_translation_pt = host
+    .wordprocessing_shape_host
+    .then(|| {
+      backdrop_effects.as_ref().and_then(|effects| {
+        common::drawingml_image_effects::simple_outer_shadow_translation(effects).map(
+          |translation| {
+            let pixels_to_points = units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH;
+            (
+              translation.offset_x_px * pixels_to_points,
+              translation.offset_y_px * pixels_to_points,
+            )
+          },
+        )
+      })
+    })
+    .flatten();
+  let preassociated_wordprocessing_shape_shadow =
+    simple_wordprocessing_shape_shadow_blur_radius_pt.is_some();
   let raster_effects = backdrop_effects.as_ref().unwrap_or(&effects);
   let mut display_items = items[content_start..]
     .iter()
@@ -4419,12 +4506,85 @@ fn finish_docx_drawing_effects(
     output_bounds.right_pt.max(content_bounds.size.width.0) + static_padding.right_pt;
   let relative_bottom =
     output_bounds.bottom_pt.max(content_bounds.size.height.0) + static_padding.bottom_pt;
-  let requested_max_pixels_per_point =
-    wordprocessing_drawing_effect_max_pixels_per_point(backdrop_effects.as_ref());
-  let max_pixels_per_point = host
-    .max_pixels_per_point
-    .map_or(requested_max_pixels_per_point, |value| {
-      requested_max_pixels_per_point.min(value)
+  let fixed_output_base_pixels_per_point = host
+    .fixed_output_base_pixels_per_point
+    .unwrap_or(units::OFFICE_FIXED_OUTPUT_RASTER_DPI / units::POINTS_PER_INCH);
+  let max_pixels_per_point = wordprocessing_drawing_effect_max_pixels_per_point(
+    backdrop_effects.as_ref(),
+    fixed_output_base_pixels_per_point,
+  );
+  let wordprocessing_shape_glow_surface_bounds =
+    simple_wordprocessing_shape_glow_radius_pt.map(|radius| {
+      wordprocessing_shape_glow_bitmap_display_bounds(
+        content_bounds,
+        radius,
+        fixed_output_base_pixels_per_point,
+        max_pixels_per_point,
+      )
+    });
+  let wordprocessing_shape_glow_base_surface_bounds = simple_wordprocessing_shape_glow_radius_pt
+    .map(|radius| {
+      let mut bounds = wordprocessing_shape_glow_bitmap_display_bounds(
+        content_bounds,
+        radius,
+        fixed_output_base_pixels_per_point,
+        fixed_output_base_pixels_per_point,
+      );
+      if max_pixels_per_point + f32::EPSILON < fixed_output_base_pixels_per_point {
+        // The displayed XObject reserves half a 600-DPI dot from its far
+        // edge, but Direct2D applies an active balanced-blur pre-scale to the
+        // untrimmed base surface. Keep that transport inset out of the
+        // internal source grid. A divisor-one effect has no internal
+        // pre-scale and consumes the displayed surface directly.
+        let half_printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI * 0.5;
+        bounds.size.width.0 += half_printer_dot_pt;
+        bounds.size.height.0 += half_printer_dot_pt;
+      }
+      bounds
+    });
+  let wordprocessing_shape_shadow_surface_bounds =
+    simple_wordprocessing_shape_shadow_blur_radius_pt
+      .filter(|radius| *radius > f32::EPSILON)
+      .zip(backdrop_output_bounds)
+      .map(|(radius, output)| {
+        wordprocessing_shape_shadow_bitmap_display_bounds(
+          content_bounds,
+          output,
+          radius,
+          max_pixels_per_point,
+        )
+      });
+  let wordprocessing_shape_shadow_base_display_bounds =
+    simple_wordprocessing_shape_shadow_blur_radius_pt
+      .filter(|radius| *radius > f32::EPSILON)
+      .zip(backdrop_output_bounds)
+      .map(|(radius, output)| {
+        wordprocessing_shape_shadow_bitmap_display_bounds(
+          content_bounds,
+          output,
+          radius,
+          fixed_output_base_pixels_per_point,
+        )
+      });
+  let wordprocessing_shape_shadow_work_surface = wordprocessing_shape_shadow_surface_bounds
+    .zip(wordprocessing_shape_shadow_base_display_bounds)
+    .zip(simple_wordprocessing_shape_shadow_translation_pt)
+    .map(|((display_bounds, base_display_bounds), offset)| {
+      wordprocessing_shape_shadow_work_surface(
+        display_bounds,
+        base_display_bounds,
+        offset,
+        fixed_output_base_pixels_per_point,
+        max_pixels_per_point,
+      )
+    });
+  let wordprocessing_shape_effect_surface_bounds =
+    wordprocessing_shape_glow_surface_bounds.or(wordprocessing_shape_shadow_surface_bounds);
+  let wordprocessing_shape_effect_base_surface_bounds =
+    wordprocessing_shape_glow_base_surface_bounds.or_else(|| {
+      wordprocessing_shape_shadow_work_surface
+        .map(|surface| surface.base_bounds)
+        .or(wordprocessing_shape_shadow_base_display_bounds)
     });
   let effect_bounds = common::Rect {
     origin: common::Point {
@@ -4479,16 +4639,25 @@ fn finish_docx_drawing_effects(
   }
   let automatic_extrusion_color =
     common::drawingml_3d::automatic_extrusion_color_from_items(&display_items);
-  let (aligned_raster_bounds, pixels_per_point) =
+  let (aligned_raster_bounds, pixels_per_point) = if let Some(surface_bounds) =
+    wordprocessing_shape_effect_surface_bounds
+  {
+    let (_, bounded_pixels_per_point) = common::drawingml_shape_raster::bounded_effect_raster_grid(
+      surface_bounds,
+      max_pixels_per_point,
+    );
+    (surface_bounds, bounded_pixels_per_point)
+  } else {
     common::drawingml_shape_raster::bounded_effect_raster_grid(
       raw_raster_bounds,
       max_pixels_per_point,
-    );
+    )
+  };
   // Static-3D Word output preserves the floating GetImageLocalBounds origin:
   // the one-pixel guard above makes tdf97371's model surface begin at 9.75px
   // in its 116x72 bitmap.  Aligning the absolute page rectangle instead moves
   // that boundary by half a pixel (to 10.25px) and changes every bevel-edge
-  // sample.  Ordinary 2-D effects retain the Direct2D floor/ceil grid used to
+  // sample. Ordinary 2-D effects retain the Direct2D floor/ceil grid used to
   // enclose fractional strokes and blur coverage.
   let raster_bounds = if screen_static_3d {
     wordprocessing_screen_static_3d_raster_bounds(raw_raster_bounds, pixels_per_point)
@@ -4521,6 +4690,40 @@ fn finish_docx_drawing_effects(
       raster_effects,
       pixels_per_point,
       target.source_mapping,
+    )
+  } else if let Some(base_surface_bounds) = wordprocessing_shape_effect_base_surface_bounds {
+    common::drawingml_shape_raster::rasterize_word_shape_effect_source_via_base_surface(
+      &display_items,
+      raster_effects,
+      common::drawingml_shape_raster::WordShapeEffectSurface {
+        profile: if wordprocessing_shape_shadow_surface_bounds.is_some() {
+          common::drawingml_shape_raster::WordShapeEffectSourceProfile::OuterShadow
+        } else {
+          common::drawingml_shape_raster::WordShapeEffectSourceProfile::Glow
+        },
+        base_bounds: base_surface_bounds,
+        content_bounds,
+        base_pixels_per_point: fixed_output_base_pixels_per_point,
+        target_width_px: wordprocessing_shape_shadow_work_surface.map_or_else(
+          || {
+            common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+              raster_allocation_bounds.size.width.0,
+              pixels_per_point,
+            )
+          },
+          |surface| surface.work_width_px,
+        ),
+        target_height_px: wordprocessing_shape_shadow_work_surface.map_or_else(
+          || {
+            common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+              raster_allocation_bounds.size.height.0,
+              pixels_per_point,
+            )
+          },
+          |surface| surface.work_height_px,
+        ),
+        target_pixels_per_point: pixels_per_point,
+      },
     )
   } else {
     common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_pixels_per_point(
@@ -4636,32 +4839,78 @@ fn finish_docx_drawing_effects(
       raster.pixels_per_point / (96.0 / 72.0),
     );
     let source_surface = screen_target.map(|target| target.model_surface);
-    common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
-      &mut raster.image,
-      &scaled_effects,
-      source_surface.map_or_else(
-        || (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
-        |surface| surface.left_px,
-      ),
-      source_surface.map_or_else(
-        || (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
-        |surface| surface.top_px,
-      ),
-      source_surface.map_or(
-        content_bounds.size.width.0 * raster.pixels_per_point,
-        |surface| surface.width_px,
-      ),
-      source_surface.map_or(
-        content_bounds.size.height.0 * raster.pixels_per_point,
-        |surface| surface.height_px,
-      ),
-      common::drawingml_image_effects::ImageEffectSourceImages {
-        fill: raster.fill_image.as_ref(),
-        line: raster.line_image.as_ref(),
-        fill_line: raster.fill_line_image.as_ref(),
-        children: raster.children_image.as_ref(),
-      },
+    let work_offset_x_px =
+      wordprocessing_shape_shadow_work_surface.map_or(0.0, |surface| surface.crop_left_px as f32);
+    let work_offset_y_px =
+      wordprocessing_shape_shadow_work_surface.map_or(0.0, |surface| surface.crop_top_px as f32);
+    let source_left_px = source_surface.map_or_else(
+      || (content_bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
+      |surface| surface.left_px,
+    ) + work_offset_x_px;
+    let source_top_px = source_surface.map_or_else(
+      || (content_bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
+      |surface| surface.top_px,
+    ) + work_offset_y_px;
+    let source_width_px = source_surface.map_or(
+      content_bounds.size.width.0 * raster.pixels_per_point,
+      |surface| surface.width_px,
     );
+    let source_height_px = source_surface.map_or(
+      content_bounds.size.height.0 * raster.pixels_per_point,
+      |surface| surface.height_px,
+    );
+    let sources = common::drawingml_image_effects::ImageEffectSourceImages {
+      fill: raster.fill_image.as_ref(),
+      line: raster.line_image.as_ref(),
+      fill_line: raster.fill_line_image.as_ref(),
+      children: raster.children_image.as_ref(),
+    };
+    if let Some(surface_bounds) = wordprocessing_shape_glow_surface_bounds {
+      let effect_surface_scale = common::drawingml_image_effects::AlphaOutsetSurfaceScale {
+        x: wordprocessing_shape_glow_effect_surface_axis_scale(
+          raster.image.width(),
+          surface_bounds.size.width.0,
+          raster.pixels_per_point,
+        ),
+        y: wordprocessing_shape_glow_effect_surface_axis_scale(
+          raster.image.height(),
+          surface_bounds.size.height.0,
+          raster.pixels_per_point,
+        ),
+      };
+      common::drawingml_image_effects::apply_container_to_padded_image_with_sources_and_alpha_outset_scale(
+        &mut raster.image,
+        &scaled_effects,
+        common::drawingml_image_effects::ImageEffectContentBounds {
+          left_px: source_left_px,
+          top_px: source_top_px,
+          width_px: source_width_px,
+          height_px: source_height_px,
+        },
+        sources,
+        effect_surface_scale,
+      );
+    } else {
+      common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+        &mut raster.image,
+        &scaled_effects,
+        source_left_px,
+        source_top_px,
+        source_width_px,
+        source_height_px,
+        sources,
+      );
+    }
+  }
+  if let Some(surface) = wordprocessing_shape_shadow_work_surface {
+    raster.image = image::imageops::crop_imm(
+      &raster.image,
+      surface.crop_left_px,
+      surface.crop_top_px,
+      surface.crop_width_px,
+      surface.crop_height_px,
+    )
+    .to_image();
   }
   if let Some(target) = screen_output_target
     && (target.left_px != 0
@@ -4678,39 +4927,42 @@ fn finish_docx_drawing_effects(
     )
     .to_image();
   }
-  let effect_item_bounds = backdrop_output_bounds
-    .and_then(|output| {
-      let pixels_per_point = raster.pixels_per_point;
-      let output_left = content_bounds.origin.x.0 + output.left_pt;
-      let output_top = content_bounds.origin.y.0 + output.top_pt;
-      let output_right = content_bounds.origin.x.0 + output.right_pt;
-      let output_bottom = content_bounds.origin.y.0 + output.bottom_pt;
-      let left_px = ((output_left - raster_bounds.origin.x.0) * pixels_per_point)
-        .floor()
-        .clamp(0.0, raster.image.width() as f32) as u32;
-      let top_px = ((output_top - raster_bounds.origin.y.0) * pixels_per_point)
-        .floor()
-        .clamp(0.0, raster.image.height() as f32) as u32;
-      let right_px = ((output_right - raster_bounds.origin.x.0) * pixels_per_point)
-        .ceil()
-        .clamp(left_px as f32, raster.image.width() as f32) as u32;
-      let bottom_px = ((output_bottom - raster_bounds.origin.y.0) * pixels_per_point)
-        .ceil()
-        .clamp(top_px as f32, raster.image.height() as f32) as u32;
-      let width_px = right_px.saturating_sub(left_px);
-      let height_px = bottom_px.saturating_sub(top_px);
-      (width_px > 0 && height_px > 0).then(|| {
-        raster.image =
-          image::imageops::crop_imm(&raster.image, left_px, top_px, width_px, height_px).to_image();
-        common_rect(
-          raster_bounds.origin.x.0 + left_px as f32 / pixels_per_point,
-          raster_bounds.origin.y.0 + top_px as f32 / pixels_per_point,
-          width_px as f32 / pixels_per_point,
-          height_px as f32 / pixels_per_point,
-        )
+  let effect_item_bounds = wordprocessing_shape_effect_surface_bounds.unwrap_or_else(|| {
+    backdrop_output_bounds
+      .and_then(|output| {
+        let pixels_per_point = raster.pixels_per_point;
+        let output_left = content_bounds.origin.x.0 + output.left_pt;
+        let output_top = content_bounds.origin.y.0 + output.top_pt;
+        let output_right = content_bounds.origin.x.0 + output.right_pt;
+        let output_bottom = content_bounds.origin.y.0 + output.bottom_pt;
+        let left_px = ((output_left - raster_bounds.origin.x.0) * pixels_per_point)
+          .floor()
+          .clamp(0.0, raster.image.width() as f32) as u32;
+        let top_px = ((output_top - raster_bounds.origin.y.0) * pixels_per_point)
+          .floor()
+          .clamp(0.0, raster.image.height() as f32) as u32;
+        let right_px = ((output_right - raster_bounds.origin.x.0) * pixels_per_point)
+          .ceil()
+          .clamp(left_px as f32, raster.image.width() as f32) as u32;
+        let bottom_px = ((output_bottom - raster_bounds.origin.y.0) * pixels_per_point)
+          .ceil()
+          .clamp(top_px as f32, raster.image.height() as f32) as u32;
+        let width_px = right_px.saturating_sub(left_px);
+        let height_px = bottom_px.saturating_sub(top_px);
+        (width_px > 0 && height_px > 0).then(|| {
+          raster.image =
+            image::imageops::crop_imm(&raster.image, left_px, top_px, width_px, height_px)
+              .to_image();
+          common_rect(
+            raster_bounds.origin.x.0 + left_px as f32 / pixels_per_point,
+            raster_bounds.origin.y.0 + top_px as f32 / pixels_per_point,
+            width_px as f32 / pixels_per_point,
+            height_px as f32 / pixels_per_point,
+          )
+        })
       })
-    })
-    .unwrap_or(raster_bounds);
+      .unwrap_or(raster_bounds)
+  });
   let effect_item_bounds = if host.static3d.is_some() {
     // Office creates the shape bitmap on the independent 200-DPI surface
     // above, then positions it on Word's 600-DPI printer grid.  The archived
@@ -4730,6 +4982,10 @@ fn finish_docx_drawing_effects(
   } else {
     effect_item_bounds
   };
+  let preblended_wordprocessing_shape_glow = wordprocessing_shape_glow_surface_bounds.is_some();
+  if preblended_wordprocessing_shape_glow || preassociated_wordprocessing_shape_shadow {
+    associate_wordprocessing_effect_rgb_with_black_matte(&mut raster.image);
+  }
   let mut png = Cursor::new(Vec::new());
   if PngEncoder::new(&mut png)
     .write_image(
@@ -4761,6 +5017,10 @@ fn finish_docx_drawing_effects(
     content_type: Some(
       if host.static3d.is_some() {
         WORD_STATIC_3D_BITMAP_CONTENT_TYPE
+      } else if preblended_wordprocessing_shape_glow {
+        WORD_SHAPE_GLOW_BITMAP_CONTENT_TYPE
+      } else if preassociated_wordprocessing_shape_shadow {
+        WORD_SHAPE_SHADOW_BITMAP_CONTENT_TYPE
       } else {
         "image/png"
       }
@@ -4896,13 +5156,17 @@ fn finish_docx_locked_canvas_viewport(
       common::drawingml_shape_raster::rasterize_vector_items_for_effects_via_source_surface(
         &display_items,
         &identity,
-        common_rect(left, top, source_width_pt, source_height_pt),
-        source_surface_dpi / units::POINTS_PER_INCH,
-        width_px,
-        height_px,
-        filter,
-        extent,
-        source_text_hinting,
+        common::drawingml_shape_raster::RasterSourceSurface {
+          bounds: common_rect(left, top, source_width_pt, source_height_pt),
+          pixels_per_point: source_surface_dpi / units::POINTS_PER_INCH,
+          extent,
+          text_hinting: source_text_hinting,
+        },
+        common::drawingml_shape_raster::RasterTargetSurface {
+          width_px,
+          height_px,
+          filter,
+        },
       )
     })
     .or_else(|| {
@@ -5130,11 +5394,322 @@ fn locked_canvas_gdi_measurement_horizontal_bounds(
   )
 }
 
+fn simple_glow_radius_pt(
+  effects: &common::drawingml_image_effects::ImageEffectContainer,
+) -> Option<f32> {
+  let [common::drawingml_image_effects::ImageEffect::Glow { radius_px, .. }] =
+    effects.effects.as_slice()
+  else {
+    return None;
+  };
+  Some(*radius_px * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH)
+}
+
+fn simple_outer_shadow_blur_radius_pt(
+  effects: &common::drawingml_image_effects::ImageEffectContainer,
+) -> Option<f32> {
+  let [
+    common::drawingml_image_effects::ImageEffect::OuterShadow {
+      blur_radius_px,
+      bounds_radius_scale,
+      ..
+    },
+  ] = effects.effects.as_slice()
+  else {
+    return None;
+  };
+  Some(*blur_radius_px * *bounds_radius_scale * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH)
+}
+
+fn wordprocessing_glow_display_radius_pt(glow_radius_pt: f32) -> f32 {
+  let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let radius_quantum_pt = printer_dot_pt * 2.0;
+  let radius_position = glow_radius_pt.max(0.0) / radius_quantum_pt;
+  let nearest_radius_step = radius_position.round();
+  let integer_tolerance = f32::EPSILON * radius_position.abs().max(1.0) * 8.0;
+  let radius_steps = if (radius_position - nearest_radius_step).abs() <= integer_tolerance {
+    nearest_radius_step
+  } else {
+    radius_position.ceil()
+  };
+  radius_steps * radius_quantum_pt
+}
+
+fn wordprocessing_group_glow_bitmap_display_bounds(
+  content_bounds: common::Rect,
+  glow_radius_pt: f32,
+) -> common::Rect {
+  #[derive(Clone, Copy)]
+  enum SourceEdge {
+    Minimum,
+    Maximum,
+  }
+
+  fn quantize_source_edge(value_pt: f32, edge: SourceEdge) -> f32 {
+    // Preserve the sub-half-dot remainder through the page-to-printer
+    // transform. The r=0.1 debug control has y=86.6999969pt, or
+    // 722.4999746 dots in f64; doing the multiply in f32 first collapses this
+    // to an exact 722.5 and selects the wrong printer row. The opposite-side
+    // and shifted-position controls retain their independently positive
+    // remainders. At a true half dot, bounds round outward: the base Y minimum
+    // selects 722 while the h_p012 X maximum selects 1753. The tolerance only
+    // restores a half that could move by one f32 ULP; it does not bias values
+    // on either side of the midpoint.
+    let dot_position = f64::from(value_pt) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+      / f64::from(units::POINTS_PER_INCH);
+    let lower_dot = dot_position.floor();
+    let half_distance = (dot_position - lower_dot - 0.5).abs();
+    let half_tolerance = f64::from(f32::EPSILON) * dot_position.abs().max(1.0) * 8.0;
+    let dots = if half_distance <= half_tolerance {
+      match edge {
+        SourceEdge::Minimum => lower_dot,
+        SourceEdge::Maximum => lower_dot + 1.0,
+      }
+    } else {
+      dot_position.round()
+    };
+    (dots * f64::from(units::POINTS_PER_INCH) / f64::from(units::OFFICE_FIXED_OUTPUT_DPI)) as f32
+  }
+
+  let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  // Keep the authored source surface and the effect's output growth separate.
+  // Win2D obtains an effect graph's final range from GetImageWorldBounds, while
+  // Direct2D specifies centered output growth for both morphology and a soft
+  // Gaussian blur. Word makes both stages observable on its 600-DPI PDF grid:
+  // the position controls quantize each widened source edge and reserve one
+  // printer dot, whereas all 36 radius controls normalize to the same source
+  // rectangle only when the display radius is ceiled in two-printer-dot
+  // increments. Exact 0.24pt boundaries retain their current step.
+  let display_radius_pt = wordprocessing_glow_display_radius_pt(glow_radius_pt);
+
+  let left = quantize_source_edge(content_bounds.origin.x.0, SourceEdge::Minimum)
+    - printer_dot_pt
+    - display_radius_pt;
+  let top = quantize_source_edge(content_bounds.origin.y.0, SourceEdge::Minimum)
+    - printer_dot_pt
+    - display_radius_pt;
+  let right = quantize_source_edge(
+    content_bounds.origin.x.0 + content_bounds.size.width.0,
+    SourceEdge::Maximum,
+  ) + printer_dot_pt
+    + display_radius_pt;
+  let bottom = quantize_source_edge(
+    content_bounds.origin.y.0 + content_bounds.size.height.0,
+    SourceEdge::Maximum,
+  ) + printer_dot_pt
+    + display_radius_pt;
+  common_rect(left, top, right - left, bottom - top)
+}
+
+fn wordprocessing_shape_glow_bitmap_display_bounds(
+  content_bounds: common::Rect,
+  glow_radius_pt: f32,
+  fixed_output_base_pixels_per_point: f32,
+  effect_pixels_per_point: f32,
+) -> common::Rect {
+  #[derive(Clone, Copy)]
+  enum SourceEdge {
+    Minimum,
+    MaximumHorizontal,
+    MaximumVertical,
+  }
+
+  fn quantize_source_edge(value_pt: f32, edge: SourceEdge) -> f32 {
+    let dot_position = f64::from(value_pt) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+      / f64::from(units::POINTS_PER_INCH);
+    let lower_dot = dot_position.floor();
+    let half_distance = (dot_position - lower_dot - 0.5).abs();
+    let half_tolerance = f64::from(f32::EPSILON) * dot_position.abs().max(1.0) * 8.0;
+    let dots = if half_distance <= half_tolerance {
+      // The standalone-WPS horizontal/vertical position and extent matrices
+      // exercise exact half-dot edges independently. Minimum edges and the
+      // downward vertical maximum select the next dot; the horizontal far
+      // edge selects the preceding dot. Keep the axis ownership explicit:
+      // collapsing it into one generic rectangle rounding rule falsifies the
+      // -5-height and +5-horizontal controls in opposite directions.
+      match edge {
+        SourceEdge::Minimum | SourceEdge::MaximumVertical => lower_dot + 1.0,
+        SourceEdge::MaximumHorizontal => lower_dot,
+      }
+    } else {
+      dot_position.round()
+    };
+    (dots * f64::from(units::POINTS_PER_INCH) / f64::from(units::OFFICE_FIXED_OUTPUT_DPI)) as f32
+  }
+
+  let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let display_radius_pt = wordprocessing_glow_display_radius_pt(glow_radius_pt);
+  // Balanced Gaussian blur may pre-scale its intermediate bitmap. Microsoft
+  // documents that the mode has internal pre-scaling and that image bounds
+  // reflect the context DPI, but not its exact edge rounding. The controlled
+  // WPS radius triples at 5.76, 11.52, 17.28, and 34.56pt pin the missing
+  // contract: the near edge is stable, while every additional pre-scale tier
+  // consumes half of one base-resolution pixel from the far edge. Divisors
+  // 1, 2, 3, 4, 6, 7, and 9 all follow the same progression.
+  let prescale_divisor = (fixed_output_base_pixels_per_point / effect_pixels_per_point)
+    .round()
+    .max(1.0);
+  let far_edge_inset_pt =
+    printer_dot_pt / 2.0 + (prescale_divisor - 1.0) * 0.5 / fixed_output_base_pixels_per_point;
+  let left = quantize_source_edge(content_bounds.origin.x.0, SourceEdge::Minimum)
+    - printer_dot_pt
+    - display_radius_pt;
+  let top = quantize_source_edge(content_bounds.origin.y.0, SourceEdge::Minimum)
+    - printer_dot_pt
+    - display_radius_pt;
+  let right = quantize_source_edge(
+    content_bounds.origin.x.0 + content_bounds.size.width.0,
+    SourceEdge::MaximumHorizontal,
+  ) - far_edge_inset_pt
+    + display_radius_pt;
+  let bottom = quantize_source_edge(
+    content_bounds.origin.y.0 + content_bounds.size.height.0,
+    SourceEdge::MaximumVertical,
+  ) - far_edge_inset_pt
+    + display_radius_pt;
+  common_rect(left, top, right - left, bottom - top)
+}
+
+fn wordprocessing_shape_shadow_bitmap_display_bounds(
+  content_bounds: common::Rect,
+  output_bounds: common::drawingml_image_effects::EffectOutputBounds,
+  blur_radius_pt: f32,
+  effect_pixels_per_point: f32,
+) -> common::Rect {
+  fn quantize_source_edge(value_pt: f32) -> f32 {
+    let dot_position = f64::from(value_pt) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+      / f64::from(units::POINTS_PER_INCH);
+    let dots = dot_position.round();
+    (dots * f64::from(units::POINTS_PER_INCH) / f64::from(units::OFFICE_FIXED_OUTPUT_DPI)) as f32
+  }
+
+  let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let radius_position = blur_radius_pt.max(0.0) / printer_dot_pt;
+  let nearest_radius_dot = radius_position.round();
+  let integer_tolerance = f32::EPSILON * radius_position.abs().max(1.0) * 8.0;
+  let radius_dots = if (radius_position - nearest_radius_dot).abs() <= integer_tolerance {
+    nearest_radius_dot
+  } else {
+    radius_position.ceil()
+  };
+  // The WPS shadow surface owns one complete 600-DPI guard dot beyond the
+  // upward-quantized DrawingML blur radius. The exact-config 0.1/1/2/2.88/
+  // 3/4/5/6/8/9/12pt radius matrix keeps this rule across all five balanced
+  // pre-scale tiers. A zero-radius shadow is emitted as vectors by Word and
+  // never enters this bitmap path.
+  let display_radius_pt = (radius_dots + 1.0) * printer_dot_pt;
+  let far_edge_inset_pt = 0.5 / effect_pixels_per_point.max(f32::EPSILON);
+
+  // `output_bounds` already includes transform, alignment, rotation policy,
+  // distance, and the authored blur radius. Remove only that continuous blur
+  // to recover the moved source edges, quantize those edges on Word's printer
+  // grid, then install the independently observed display radius. This keeps
+  // local sample count separate from page/world phase.
+  let moved_left = content_bounds.origin.x.0 + output_bounds.left_pt + blur_radius_pt;
+  let moved_top = content_bounds.origin.y.0 + output_bounds.top_pt + blur_radius_pt;
+  let moved_right = content_bounds.origin.x.0 + output_bounds.right_pt - blur_radius_pt;
+  let moved_bottom = content_bounds.origin.y.0 + output_bounds.bottom_pt - blur_radius_pt;
+  let left = quantize_source_edge(moved_left) - display_radius_pt;
+  let top = quantize_source_edge(moved_top) - display_radius_pt;
+  let right = quantize_source_edge(moved_right) + display_radius_pt - far_edge_inset_pt;
+  let bottom = quantize_source_edge(moved_bottom) + display_radius_pt - far_edge_inset_pt;
+  common_rect(left, top, right - left, bottom - top)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct WordprocessingShapeShadowWorkSurface {
+  base_bounds: common::Rect,
+  work_width_px: u32,
+  work_height_px: u32,
+  crop_left_px: u32,
+  crop_top_px: u32,
+  crop_width_px: u32,
+  crop_height_px: u32,
+}
+
+fn wordprocessing_shape_shadow_work_surface(
+  display_bounds: common::Rect,
+  base_display_bounds: common::Rect,
+  offset_pt: (f32, f32),
+  base_pixels_per_point: f32,
+  target_pixels_per_point: f32,
+) -> WordprocessingShapeShadowWorkSurface {
+  let crop_width_px = common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+    display_bounds.size.width.0,
+    target_pixels_per_point,
+  );
+  let crop_height_px = common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+    display_bounds.size.height.0,
+    target_pixels_per_point,
+  );
+  let crop_left_px = (offset_pt.0.max(0.0) * target_pixels_per_point).ceil() as u32;
+  let crop_top_px = (offset_pt.1.max(0.0) * target_pixels_per_point).ceil() as u32;
+  let crop_right_px = ((-offset_pt.0).max(0.0) * target_pixels_per_point).ceil() as u32;
+  let crop_bottom_px = ((-offset_pt.1).max(0.0) * target_pixels_per_point).ceil() as u32;
+  let prescale_divisor = (base_pixels_per_point / target_pixels_per_point)
+    .round()
+    .max(1.0);
+  let base_left_padding_pt = crop_left_px as f32 * prescale_divisor / base_pixels_per_point;
+  let base_top_padding_pt = crop_top_px as f32 * prescale_divisor / base_pixels_per_point;
+  let base_right_padding_pt = crop_right_px as f32 * prescale_divisor / base_pixels_per_point;
+  let base_bottom_padding_pt = crop_bottom_px as f32 * prescale_divisor / base_pixels_per_point;
+  WordprocessingShapeShadowWorkSurface {
+    base_bounds: common_rect(
+      base_display_bounds.origin.x.0 - base_left_padding_pt,
+      base_display_bounds.origin.y.0 - base_top_padding_pt,
+      base_display_bounds.size.width.0 + base_left_padding_pt + base_right_padding_pt,
+      base_display_bounds.size.height.0 + base_top_padding_pt + base_bottom_padding_pt,
+    ),
+    work_width_px: crop_width_px + crop_left_px + crop_right_px,
+    work_height_px: crop_height_px + crop_top_px + crop_bottom_px,
+    crop_left_px,
+    crop_top_px,
+    crop_width_px,
+    crop_height_px,
+  }
+}
+
+fn wordprocessing_shape_glow_effect_surface_axis_scale(
+  pixel_extent: u32,
+  point_extent: f32,
+  pixels_per_point: f32,
+) -> f32 {
+  // The WPS base-to-effect pre-scale uses an inclusive far-edge source
+  // allocation. Its terminal sample owns half a pixel rather than a complete
+  // additional interval. Radius controls from 9.95pt through 10.05pt hold the
+  // 421x87 PDF surface constant and pin the vertical alphaOutset transition to
+  // (87 - 0.5) / 86 at 10.03pt.
+  let effective_pixel_extent = (pixel_extent as f32 - 0.5).max(0.0);
+  let scale = effective_pixel_extent / point_extent / pixels_per_point;
+  if scale.is_finite() && scale > f32::EPSILON {
+    scale
+  } else {
+    1.0
+  }
+}
+
+fn associate_wordprocessing_effect_rgb_with_black_matte(image: &mut image::RgbaImage) {
+  // Direct2D effect targets carry premultiplied color. Word writes that color
+  // plane beside the unchanged soft mask and records `/Matte [0 0 0]` on the
+  // SMask: the independently accepted WPG/WPS glow controls and the WPS
+  // outer-shadow color matrix all retain A as the soft-mask plane while RGB
+  // follows the resolved effect color times A. Preserve those two observed
+  // planes; the PDF writer installs the matching Matte marker so consumers
+  // remove the association before compositing.
+  for pixel in image.pixels_mut() {
+    let alpha = u16::from(pixel.0[3]);
+    for channel in &mut pixel.0[..3] {
+      *channel = (u16::from(*channel) * alpha / 255) as u8;
+    }
+  }
+}
+
 fn finish_docx_group_effects(
   items: &mut Vec<PageItem>,
   content_start: usize,
   group: &InlineDrawingGroup,
   text_metrics: &mut TextMetrics,
+  fixed_output_raster_dpi: f32,
 ) {
   if items.len() <= content_start {
     return;
@@ -5143,7 +5718,7 @@ fn finish_docx_group_effects(
   else {
     return;
   };
-  let content_bounds = common_rect(left, top, right - left, bottom - top);
+  let mut content_bounds = common_rect(left, top, right - left, bottom - top);
   let Some(group_effects) = group.effects.as_ref() else {
     return;
   };
@@ -5165,8 +5740,25 @@ fn finish_docx_group_effects(
   common::drawingml_image_effects::rotate_container_with_shape(&mut effects, group.rotation_deg);
   let backdrop_effects = common::drawingml_image_effects::unchanged_foreground_backdrop(&effects);
   let raster_effects = backdrop_effects.as_ref().unwrap_or(&effects);
-  let straight_pdf_glow_alpha =
+  let preblended_pdf_glow =
     backdrop_effects.is_some() && common::drawingml_image_effects::contains_glow(raster_effects);
+  let simple_glow_radius_pt = backdrop_effects.as_ref().and_then(simple_glow_radius_pt);
+  let display_items = items[content_start..]
+    .iter()
+    .cloned()
+    .map(into_common_page_item)
+    .collect::<Vec<_>>();
+  if backdrop_effects.is_some()
+    && let Some(stroke_bounds) =
+      common::drawingml_stroke::display_items_stroke_geometry_bounds(&display_items)
+  {
+    // Keep effect-surface allocation separate from source alpha. Across the
+    // complete 3-shape x 6-fill-alpha x 6-line-alpha Office matrix, strict-zero
+    // line alpha contributes no glow samples, yet every one of the 108 PDFs
+    // retains the same 258x187 effect surface. Reserve the authored widened
+    // line geometry here; raster painting below continues to honor opacity.
+    content_bounds = union_common_rect(content_bounds, stroke_bounds);
+  }
   let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
     &effects,
     content_bounds.size.width.0,
@@ -5188,22 +5780,47 @@ fn finish_docx_group_effects(
       height: common::Pt(relative_bottom - relative_top),
     },
   };
-  let display_items = items[content_start..]
-    .iter()
-    .cloned()
-    .map(into_common_page_item)
-    .collect::<Vec<_>>();
-  // Word fixed output stores a WPG glow backdrop at 0.4 px/pt (28.8 DPI);
-  // tdf156902_GlowOnGroup.docx is a 162pt x 136.5pt effect surface encoded as
-  // a 65x55 RGB/SMask pair, followed by unchanged vector children.
+  let simple_glow_surface_bounds = simple_glow_radius_pt
+    .map(|radius| wordprocessing_group_glow_bitmap_display_bounds(content_bounds, radius));
+  // A simple WPG glow uses the same 200-DPI/16-reference-pixel tier contract
+  // as a simple DrawingML shape glow. The controlled 0.01pt triples around
+  // 5.76, 11.52, 17.28, and 34.56pt retain the lower tier at the exact edge
+  // and switch immediately above it. Preserve the calibrated fallback for
+  // other separable group-effect graphs until their independently authored
+  // combinations establish a density owner.
   const WORD_GROUP_GLOW_PIXELS_PER_POINT: f32 = 0.4;
   let raster = if backdrop_effects.is_some() {
-    common::drawingml_shape_raster::rasterize_group_items_for_effects_at_pixels_per_point(
-      &display_items,
-      raster_bounds,
-      raster_effects,
-      WORD_GROUP_GLOW_PIXELS_PER_POINT,
-    )
+    let pixels_per_point =
+      simple_glow_radius_pt.map_or(WORD_GROUP_GLOW_PIXELS_PER_POINT, |radius| {
+        common::drawingml_shape_raster::office_simple_glow_pixels_per_point(
+          fixed_output_raster_dpi,
+          radius,
+        )
+      });
+    if simple_glow_radius_pt.is_some() {
+      // Word realizes the source against the fixed-output display surface,
+      // not a page-position-invariant local effect rectangle.  The controlled
+      // position probes retain four stable alpha hashes as the independently
+      // quantized display edges move past the source, whereas a transform
+      // rooted at `raster_bounds` is byte-identical for every position.  The
+      // display surface also owns the bitmap extent: all 24 width/height
+      // controls from 0.1pt through 48pt equal
+      // `round(display_extent * selected_density)`.
+      common::drawingml_shape_raster::rasterize_group_items_for_effects_at_pixels_per_point_with_extent(
+        &display_items,
+        simple_glow_surface_bounds.unwrap_or(raster_bounds),
+        raster_effects,
+        pixels_per_point,
+        common::drawingml_shape_raster::RasterSourceExtent::Round,
+      )
+    } else {
+      common::drawingml_shape_raster::rasterize_group_items_for_effects_at_pixels_per_point(
+        &display_items,
+        raster_bounds,
+        raster_effects,
+        pixels_per_point,
+      )
+    }
   } else {
     common::drawingml_shape_raster::rasterize_group_items_for_effects(
       &display_items,
@@ -5219,29 +5836,38 @@ fn finish_docx_group_effects(
     &mut raster_effects,
     raster.pixels_per_point / (96.0 / 72.0),
   );
-  common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+  let effect_surface_bounds = simple_glow_surface_bounds.unwrap_or(raster_bounds);
+  let alpha_outset_axis_scale = |pixel_extent: u32, point_extent: f32| {
+    let scale = pixel_extent as f32 / point_extent / raster.pixels_per_point;
+    if scale.is_finite() && scale > f32::EPSILON {
+      scale
+    } else {
+      1.0
+    }
+  };
+  let alpha_outset_surface_scale = common::drawingml_image_effects::AlphaOutsetSurfaceScale {
+    x: alpha_outset_axis_scale(raster.image.width(), effect_surface_bounds.size.width.0),
+    y: alpha_outset_axis_scale(raster.image.height(), effect_surface_bounds.size.height.0),
+  };
+  common::drawingml_image_effects::apply_container_to_padded_image_with_sources_and_alpha_outset_scale(
     &mut raster.image,
     &raster_effects,
-    -relative_left * raster.pixels_per_point,
-    -relative_top * raster.pixels_per_point,
-    content_bounds.size.width.0 * raster.pixels_per_point,
-    content_bounds.size.height.0 * raster.pixels_per_point,
+    common::drawingml_image_effects::ImageEffectContentBounds {
+      left_px: -relative_left * raster.pixels_per_point,
+      top_px: -relative_top * raster.pixels_per_point,
+      width_px: content_bounds.size.width.0 * raster.pixels_per_point,
+      height_px: content_bounds.size.height.0 * raster.pixels_per_point,
+    },
     common::drawingml_image_effects::ImageEffectSourceImages {
       fill: raster.fill_image.as_ref(),
       line: raster.line_image.as_ref(),
       fill_line: raster.fill_line_image.as_ref(),
       children: raster.children_image.as_ref(),
     },
+    alpha_outset_surface_scale,
   );
-  if straight_pdf_glow_alpha {
-    // Word stores this WPG glow's RGB preblended against black without a
-    // /Matte entry. A PDF viewer therefore applies the SMask a second time.
-    // Keep Krilla's standards-compliant straight RGB and encode the visible
-    // equivalent in alpha instead of copying the malformed color storage.
-    for pixel in raster.image.pixels_mut() {
-      let alpha = u16::from(pixel.0[3]);
-      pixel.0[3] = ((alpha * alpha + 127) / 255) as u8;
-    }
+  if preblended_pdf_glow {
+    associate_wordprocessing_effect_rgb_with_black_matte(&mut raster.image);
   }
   let mut png = Cursor::new(Vec::new());
   if PngEncoder::new(&mut png)
@@ -5255,16 +5881,26 @@ fn finish_docx_group_effects(
   {
     return;
   }
-  let sample_edge_outset_pt = if straight_pdf_glow_alpha {
-    0.5 / raster.pixels_per_point
+  let effect_item_bounds = if let Some(bounds) = simple_glow_surface_bounds {
+    bounds
   } else {
-    0.0
+    let sample_edge_outset_pt = if preblended_pdf_glow {
+      0.5 / raster.pixels_per_point
+    } else {
+      0.0
+    };
+    common_rect(
+      raster_bounds.origin.x.0 - sample_edge_outset_pt,
+      raster_bounds.origin.y.0 - sample_edge_outset_pt,
+      raster_bounds.size.width.0 + sample_edge_outset_pt * 2.0,
+      raster_bounds.size.height.0 + sample_edge_outset_pt * 2.0,
+    )
   };
   let effect_item = PageItem::Image(ImageItem {
-    x_pt: raster_bounds.origin.x.0 - sample_edge_outset_pt,
-    y_pt: raster_bounds.origin.y.0 - sample_edge_outset_pt,
-    width_pt: raster_bounds.size.width.0 + sample_edge_outset_pt * 2.0,
-    height_pt: raster_bounds.size.height.0 + sample_edge_outset_pt * 2.0,
+    x_pt: effect_item_bounds.origin.x.0,
+    y_pt: effect_item_bounds.origin.y.0,
+    width_pt: effect_item_bounds.size.width.0,
+    height_pt: effect_item_bounds.size.height.0,
     inline_frame_left_gap_pt: 0.0,
     inline_frame_right_gap_pt: 0.0,
     inline_baseline_gap_pt: 0.0,
@@ -5276,7 +5912,14 @@ fn finish_docx_group_effects(
     flip_horizontal: false,
     flip_vertical: false,
     data: Bytes::from(png.into_inner()),
-    content_type: Some("image/png".to_string()),
+    content_type: Some(
+      if preblended_pdf_glow {
+        WORD_GROUP_GLOW_BITMAP_CONTENT_TYPE
+      } else {
+        "image/png"
+      }
+      .to_string(),
+    ),
     metafile_background_color: None,
     alt_text: None,
     hyperlink_url: None,
@@ -19305,6 +19948,7 @@ struct PendingBorderSegment {
   x_pt: f32,
   start_y_pt: f32,
   end_y_pt: f32,
+  ends_at_table_bottom: bool,
   border: BorderStyle,
 }
 
@@ -21077,12 +21721,25 @@ fn extend_border_segment(
     return;
   };
   match pending {
+    // Word materializes each row's dashSmallGap edge as its own bitmap-tile
+    // group even when adjacent rows have the same border and no insideH
+    // rule. The row-split Office matrix keeps the dash phase page-anchored,
+    // but never coalesces the two image groups.
+    Some(current)
+      if (!current.border.compound
+        && current.border.dash_pattern == BorderDashPattern::FineDashed)
+        || (!next.border.compound && next.border.dash_pattern == BorderDashPattern::FineDashed) =>
+    {
+      flush_border_segment(page, pending);
+      *pending = Some(next);
+    }
     Some(current)
       if f32::abs(current.x_pt - next.x_pt) < 0.01
         && current.border == next.border
         && f32::abs(current.end_y_pt - next.start_y_pt) < LAYOUT_EPSILON_PT =>
     {
       current.end_y_pt = next.end_y_pt;
+      current.ends_at_table_bottom = next.ends_at_table_bottom;
     }
     Some(_) => {
       flush_border_segment(page, pending);
@@ -21098,6 +21755,17 @@ fn flush_border_segment(page: &mut Page, pending: &mut Option<PendingBorderSegme
   let Some(segment) = pending.take() else {
     return;
   };
+  if !segment.border.compound && segment.border.dash_pattern == BorderDashPattern::FineDashed {
+    push_word_table_fine_dashed_vertical_border(
+      page,
+      segment.x_pt,
+      segment.start_y_pt,
+      segment.end_y_pt,
+      segment.ends_at_table_bottom,
+      segment.border,
+    );
+    return;
+  }
   push_table_border_line(
     page,
     segment.x_pt,
@@ -21570,34 +22238,123 @@ impl RowFrame<'_, '_> {
     paint
   }
 
+  fn horizontal_border_junction(
+    &self,
+    grid_boundary: usize,
+    top_edge: bool,
+    intersects_grid_boundary: bool,
+  ) -> HorizontalTableBorderJunction {
+    if !intersects_grid_boundary {
+      return HorizontalTableBorderJunction::internal(None, None);
+    }
+
+    let current = vertical_border_at_grid_boundary(self.table, self.row, grid_boundary);
+    let separated = self.cell_spacing_pt() > 0.0;
+    if top_edge {
+      if self.row_index == 0 || separated {
+        HorizontalTableBorderJunction::horizontal_outer(None, current)
+      } else {
+        let above = self
+          .table
+          .rows
+          .get(self.row_index - 1)
+          .and_then(|row| vertical_border_at_grid_boundary(self.table, row, grid_boundary));
+        HorizontalTableBorderJunction::internal(above, current)
+      }
+    } else if self.row_index + 1 == self.table.rows.len() || separated {
+      HorizontalTableBorderJunction::horizontal_outer(current, None)
+    } else {
+      let below = self
+        .table
+        .rows
+        .get(self.row_index + 1)
+        .and_then(|row| vertical_border_at_grid_boundary(self.table, row, grid_boundary));
+      HorizontalTableBorderJunction::internal(current, below)
+    }
+  }
+
   fn paint_horizontal_borders(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
     let row_borders = row_table_borders(self.table, self.row);
     if self.table_frame.full_width_horizontal_borders {
       if self.row_index == 0
         && let Some(border) = row_borders.and_then(|borders| borders.top)
       {
-        let inset = border.width_pt / 2.0;
-        push_table_border_line(
-          current,
-          self.table_frame.left_pt + inset,
-          horizontal_table_border_center(row_top, border),
-          self.table_frame.right_pt - inset,
-          horizontal_table_border_center(row_top, border),
-          border,
-        );
+        let border_y = horizontal_table_border_center(row_top, border);
+        if !border.compound && border.dash_pattern == BorderDashPattern::FineDashed {
+          let leading = self
+            .row
+            .cells
+            .first()
+            .and_then(|_| vertical_border(self.table, self.row, 0, true));
+          let trailing = self
+            .row
+            .cells
+            .len()
+            .checked_sub(1)
+            .and_then(|cell_index| vertical_border(self.table, self.row, cell_index, false));
+          push_word_table_fine_dashed_horizontal_border(
+            current,
+            self.table_frame.left_pt,
+            border_y,
+            self.table_frame.right_pt,
+            border,
+            HorizontalTableBorderEdge::Upper,
+            (
+              HorizontalTableBorderJunction::horizontal_outer(None, leading),
+              HorizontalTableBorderJunction::horizontal_outer(None, trailing),
+            ),
+          );
+        } else {
+          let inset = border.width_pt / 2.0;
+          push_table_border_line(
+            current,
+            self.table_frame.left_pt + inset,
+            border_y,
+            self.table_frame.right_pt - inset,
+            border_y,
+            border,
+          );
+        }
       }
       if self.row_index + 1 == self.table.rows.len()
         && let Some(border) = row_borders.and_then(|borders| borders.bottom)
       {
-        let inset = border.width_pt / 2.0;
-        push_table_border_line(
-          current,
-          self.table_frame.left_pt + inset,
-          horizontal_table_border_center(row_bottom, border),
-          self.table_frame.right_pt - inset,
-          horizontal_table_border_center(row_bottom, border),
-          border,
-        );
+        let border_y = horizontal_table_border_center(row_bottom, border);
+        if !border.compound && border.dash_pattern == BorderDashPattern::FineDashed {
+          let leading = self
+            .row
+            .cells
+            .first()
+            .and_then(|_| vertical_border(self.table, self.row, 0, true));
+          let trailing = self
+            .row
+            .cells
+            .len()
+            .checked_sub(1)
+            .and_then(|cell_index| vertical_border(self.table, self.row, cell_index, false));
+          push_word_table_fine_dashed_horizontal_border(
+            current,
+            self.table_frame.left_pt,
+            border_y,
+            self.table_frame.right_pt,
+            border,
+            HorizontalTableBorderEdge::Lower,
+            (
+              HorizontalTableBorderJunction::horizontal_outer(leading, None),
+              HorizontalTableBorderJunction::horizontal_outer(trailing, None),
+            ),
+          );
+        } else {
+          let inset = border.width_pt / 2.0;
+          push_table_border_line(
+            current,
+            self.table_frame.left_pt + inset,
+            border_y,
+            self.table_frame.right_pt - inset,
+            border_y,
+            border,
+          );
+        }
       }
     }
 
@@ -21628,14 +22385,36 @@ impl RowFrame<'_, '_> {
         let (border_left, border_right) =
           self.inset_horizontal_border_for_bounds(left_pt, right_pt, border);
         let border_y = horizontal_table_border_center(row_top, border);
-        push_table_border_line(
-          current,
-          border_left,
-          border_y,
-          border_right,
-          border_y,
-          border,
-        );
+        if !border.compound && border.dash_pattern == BorderDashPattern::FineDashed {
+          let leading_junction = self.horizontal_border_junction(
+            grid_index,
+            true,
+            (border_left - left_pt).abs() < LAYOUT_EPSILON_PT,
+          );
+          let trailing_junction = self.horizontal_border_junction(
+            grid_index + span,
+            true,
+            (border_right - right_pt).abs() < LAYOUT_EPSILON_PT,
+          );
+          push_word_table_fine_dashed_horizontal_border(
+            current,
+            border_left,
+            border_y,
+            border_right,
+            border,
+            HorizontalTableBorderEdge::Upper,
+            (leading_junction, trailing_junction),
+          );
+        } else {
+          push_table_border_line(
+            current,
+            border_left,
+            border_y,
+            border_right,
+            border_y,
+            border,
+          );
+        }
       }
 
       let continues_into_next = self
@@ -21652,14 +22431,36 @@ impl RowFrame<'_, '_> {
         let (border_left, border_right) =
           self.inset_horizontal_border_for_bounds(border_left, border_right, border);
         let border_y = horizontal_table_border_center(row_bottom, border);
-        push_table_border_line(
-          current,
-          border_left,
-          border_y,
-          border_right,
-          border_y,
-          border,
-        );
+        if !border.compound && border.dash_pattern == BorderDashPattern::FineDashed {
+          let leading_junction = self.horizontal_border_junction(
+            grid_index,
+            false,
+            (border_left - left_pt).abs() < LAYOUT_EPSILON_PT,
+          );
+          let trailing_junction = self.horizontal_border_junction(
+            grid_index + span,
+            false,
+            (border_right - right_pt).abs() < LAYOUT_EPSILON_PT,
+          );
+          push_word_table_fine_dashed_horizontal_border(
+            current,
+            border_left,
+            border_y,
+            border_right,
+            border,
+            HorizontalTableBorderEdge::Lower,
+            (leading_junction, trailing_junction),
+          );
+        } else {
+          push_table_border_line(
+            current,
+            border_left,
+            border_y,
+            border_right,
+            border_y,
+            border,
+          );
+        }
       }
 
       left_pt = right_pt + cell_spacing_pt;
@@ -21681,6 +22482,7 @@ impl RowFrame<'_, '_> {
       // grid coordinate overpaints the corner.
       start_y_pt: row_top + row_top_border_space_extent(self.table, self.row_index, self.row),
       end_y_pt: row_bottom,
+      ends_at_table_bottom: self.row_index + 1 == self.table.rows.len(),
       border,
     })
   }
@@ -21693,6 +22495,7 @@ impl RowFrame<'_, '_> {
       x_pt: self.table_frame.right_pt,
       start_y_pt: row_top + row_top_border_space_extent(self.table, self.row_index, self.row),
       end_y_pt: row_bottom,
+      ends_at_table_bottom: self.row_index + 1 == self.table.rows.len(),
       border,
     })
   }
@@ -21929,12 +22732,13 @@ impl CellFrame<'_, '_> {
       return;
     }
     if let Some(border) = vertical_border(self.table, self.row, self.cell_index, false) {
-      push_table_border_line(
+      push_cell_vertical_border_line(
         current,
+        self.table,
+        self.row,
+        self.row_index,
         self.left_pt + self.width_pt,
-        row_top,
-        self.left_pt + self.width_pt,
-        row_bottom,
+        row_top..row_bottom,
         border,
       );
     }
@@ -21951,21 +22755,23 @@ impl CellFrame<'_, '_> {
       return;
     }
     if let Some(border) = vertical_border(self.table, self.row, self.cell_index, true) {
-      push_table_border_line(
+      push_cell_vertical_border_line(
         current,
+        self.table,
+        self.row,
+        self.row_index,
         self.left_pt,
-        row_top,
-        self.left_pt,
-        row_bottom,
+        row_top..row_bottom,
         border,
       );
     } else if let Some(border) = cell.borders.left {
-      push_table_border_line(
+      push_cell_vertical_border_line(
         current,
+        self.table,
+        self.row,
+        self.row_index,
         self.left_pt,
-        row_top,
-        self.left_pt,
-        row_bottom,
+        row_top..row_bottom,
         border,
       );
     }
@@ -22497,6 +23303,32 @@ fn vertical_border(
       })
     }
   }
+}
+
+fn vertical_border_at_grid_boundary(
+  table: &Table,
+  row: &TableRow,
+  grid_boundary: usize,
+) -> Option<BorderStyle> {
+  let mut grid_index = row.grid_before;
+  for (cell_index, cell) in row.cells.iter().enumerate() {
+    if grid_boundary == grid_index {
+      // The following cell owns a collapsed internal boundary: its leading
+      // resolver sees both its own edge and the preceding cell's trailing
+      // edge and applies the border-conflict priority rule.
+      return vertical_border(table, row, cell_index, true);
+    }
+    grid_index = grid_index.saturating_add(cell.grid_span.max(1));
+  }
+  if grid_boundary == grid_index {
+    return row
+      .cells
+      .len()
+      .checked_sub(1)
+      .and_then(|cell_index| vertical_border(table, row, cell_index, false));
+  }
+  // A grid position inside a spanning cell has no authored vertical edge.
+  None
 }
 
 fn row_table_borders(table: &Table, row: &TableRow) -> Option<TableBordersModel> {
@@ -28357,12 +29189,11 @@ fn floating_shape_metrics(
       shape.effect_bottom_pt,
     ],
   );
-  let metrics = FloatingShapeMetrics {
+  FloatingShapeMetrics {
     group_scale_x,
     group_scale_y,
     ..metrics
-  };
-  metrics
+  }
 }
 
 fn floating_shape_metrics_with_auto_fit(
@@ -30716,8 +31547,20 @@ impl<'a> TextFrameLayout<'a> {
               &group,
               text_metrics,
             );
-            finish_docx_group_effects(&mut current.items, content_start, &group, text_metrics);
+            // ECMA-376 Part 1 §20.4.2.6 defines wp:effectExtent as the
+            // additional range around the actual DrawingML object used for
+            // wrapping. Capture that object range after any locked-canvas host
+            // replacement, but before materializing group effects: the floating
+            // placement margins already own effectExtent, so measuring the
+            // materialized glow/shadow here would add the effect range twice.
             let content_bounds = page_items_bounds(&current.items[content_start..], text_metrics);
+            finish_docx_group_effects(
+              &mut current.items,
+              content_start,
+              &group,
+              text_metrics,
+              flow.fixed_output_raster_dpi,
+            );
             let group_item_end = current.items.len();
             let (group_item_start, group_item_end) = match group.placement {
               crate::docx::ImagePlacement::Floating(placement)
@@ -35421,12 +36264,14 @@ impl<'a> TextFrameLayout<'a> {
     let alignment_start_item_index =
       text_state.current_page_item_start(start_item_index, start_pages_len, pages.len());
     if alignment_start_item_index <= current.items.len() {
-      let rtl_leading_numbering_labels = numbering_label_uses_rtl_leading_edge(
+      let rtl_leading_numbering_labels = if numbering_label_uses_rtl_leading_edge(
         paragraph.format.list_label_justification,
         paragraph.format.bidi,
-      )
-      .then(|| take_rtl_leading_numbering_labels(&mut current.items, alignment_start_item_index))
-      .unwrap_or_default();
+      ) {
+        take_rtl_leading_numbering_labels(&mut current.items, alignment_start_item_index)
+      } else {
+        Vec::new()
+      };
       trim_word_compatible_trailing_blanks(
         &mut current.items[alignment_start_item_index..],
         paragraph,
@@ -39784,6 +40629,41 @@ fn push_table_border_line(
   push_styled_line(page, x1, y1, x2, y2, border);
 }
 
+fn push_cell_vertical_border_line(
+  page: &mut Page,
+  table: &Table,
+  row: &TableRow,
+  row_index: usize,
+  x_pt: f32,
+  row_span_pt: std::ops::Range<f32>,
+  border: BorderStyle,
+) {
+  let row_top_pt = row_span_pt.start;
+  let row_bottom_pt = row_span_pt.end;
+  if row_cell_spacing_pt(table, row) <= 0.0
+    && !border.compound
+    && border.dash_pattern == BorderDashPattern::FineDashed
+  {
+    // Collapsed internal and outer vertical edges share Word's row-owned
+    // device painter. The exact-config 1..3-row x 1..2-column x insideH/V
+    // Office factorial adds the internal rule without changing the outer
+    // groups: every fine-dashed vertical segment begins below its horizontal
+    // intersection, keeps page-anchored phase, and has no private corner
+    // image. Keeping insideV on the generic centerline path instead starts it
+    // half a rule early and makes both intersections spuriously solid.
+    push_word_table_fine_dashed_vertical_border(
+      page,
+      x_pt,
+      row_top_pt + row_top_border_space_extent(table, row_index, row),
+      row_bottom_pt,
+      row_index + 1 == table.rows.len(),
+      border,
+    );
+    return;
+  }
+  push_table_border_line(page, x_pt, row_top_pt, x_pt, row_bottom_pt, border);
+}
+
 #[derive(Clone, Copy, Debug)]
 struct WordTableFineDashPattern {
   thickness_pt: f32,
@@ -39792,6 +40672,9 @@ struct WordTableFineDashPattern {
   sample_count: u32,
   on_sample_count: u32,
   cross_sample_count: u32,
+  thickness_dot_count: u32,
+  period_dot_count: u32,
+  on_dot_count: u32,
 }
 
 fn word_table_fine_dash_sample_counts(period_pt: f32) -> (u32, u32) {
@@ -39822,6 +40705,10 @@ fn word_table_fine_dash_pattern(width_pt: f32) -> WordTableFineDashPattern {
     ((thickness_pt * units::OFFICE_FIXED_OUTPUT_RASTER_DPI / units::POINTS_PER_INCH + 0.000_1)
       .floor() as u32)
       .max(1);
+  let thickness_dot_count =
+    ((thickness_pt * WORD_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).round() as u32).max(1);
+  let period_dot_count = thickness_dot_count * 5;
+  let on_dot_count = thickness_dot_count * 4;
   WordTableFineDashPattern {
     thickness_pt,
     period_pt,
@@ -39829,6 +40716,51 @@ fn word_table_fine_dash_pattern(width_pt: f32) -> WordTableFineDashPattern {
     sample_count,
     on_sample_count,
     cross_sample_count,
+    thickness_dot_count,
+    period_dot_count,
+    on_dot_count,
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct WordTableDeviceAxis {
+  logical_extent_pt: f64,
+  output_extent_pt: f64,
+  device_extent_dots: i64,
+}
+
+impl WordTableDeviceAxis {
+  fn new(logical_extent_pt: f32) -> Option<Self> {
+    if !logical_extent_pt.is_finite() || logical_extent_pt <= f32::EPSILON {
+      return None;
+    }
+    let logical_extent_pt = f64::from(logical_extent_pt);
+    let device_extent_dots = (logical_extent_pt * f64::from(WORD_FIXED_OUTPUT_DPI)
+      / f64::from(units::POINTS_PER_INCH))
+    .floor() as i64;
+    if device_extent_dots <= 0 {
+      return None;
+    }
+    let output_extent_pt = f64::from(units::quantize_points_to_office_print_grid(
+      logical_extent_pt as f32,
+    ));
+    Some(Self {
+      logical_extent_pt,
+      output_extent_pt,
+      device_extent_dots,
+    })
+  }
+
+  fn logical_to_device_dot(self, position_pt: f32) -> i64 {
+    self.logical_to_device_position(position_pt).floor() as i64
+  }
+
+  fn logical_to_device_position(self, position_pt: f32) -> f64 {
+    f64::from(position_pt) * self.device_extent_dots as f64 / self.logical_extent_pt
+  }
+
+  fn device_dot_to_output_pt(self, device_dot: f64) -> f32 {
+    (device_dot * self.output_extent_pt / self.device_extent_dots as f64) as f32
   }
 }
 
@@ -39880,6 +40812,71 @@ fn word_table_fine_dash_bitmap(
   })
 }
 
+fn word_table_fine_dash_device_bitmap(
+  pattern: WordTableFineDashPattern,
+  phase_dot: i64,
+  axis_extent_dot_count: u32,
+  axis_sample_count: u32,
+  horizontal: bool,
+  color: RgbColor,
+) -> Option<Bytes> {
+  let axis_sample_count = axis_sample_count.clamp(1, pattern.sample_count);
+  let (width_px, height_px) = if horizontal {
+    (axis_sample_count, pattern.cross_sample_count)
+  } else {
+    (pattern.cross_sample_count, axis_sample_count)
+  };
+  let period_dot_count = i64::from(pattern.period_dot_count);
+  encode_word_table_border_bitmap(width_px, height_px, color, |x, y| {
+    let axis_sample = if horizontal { x } else { y };
+    // Office advances dashSmallGap on the 600-DPI printer grid, then emits a
+    // compact one-bit tile. For a 0.5-point full period the 20-dot destination
+    // is sampled at [0, 3, 7, 10, 13, 17], exactly round(j * 20 / 6). The
+    // caller supplies the source extent: horizontal boundary tiles retain the
+    // full-period sampler established by Matrix F, while a vertical tail uses
+    // its independently established destination extent.
+    let source_dot_offset = (u64::from(axis_sample) * u64::from(axis_extent_dot_count)
+      + u64::from(axis_sample_count / 2))
+      / u64::from(axis_sample_count);
+    let style_dot = (phase_dot + source_dot_offset as i64).rem_euclid(period_dot_count);
+    if style_dot < i64::from(pattern.on_dot_count) {
+      u8::MAX
+    } else {
+      0
+    }
+  })
+}
+
+fn word_table_fine_dash_tail_sample_count(
+  pattern: WordTableFineDashPattern,
+  phase_dot: i64,
+  extent_dot_count: u32,
+) -> u32 {
+  let nominal = ((u64::from(extent_dot_count) * u64::from(pattern.sample_count)
+    + u64::from(pattern.period_dot_count / 2))
+    / u64::from(pattern.period_dot_count)) as u32;
+  let nominal = nominal.clamp(1, pattern.sample_count);
+
+  // The compact-mask allocator retains page phase at the two nearest-sample
+  // thresholds below. This table is not inferred from one document: the
+  // 376/384/390/394 height x 1410..1421 origin matrix, the independent
+  // fixed-origin height sweep, the two-row split sweep, and table-floating's
+  // three rows jointly exercise 61 positive/negative segments. Other widths
+  // and extents stay on the ordinary nearest allocation until an equivalent
+  // phase sweep establishes a different threshold.
+  if pattern.period_dot_count == 20 && pattern.sample_count == 6 {
+    match (
+      phase_dot.rem_euclid(i64::from(pattern.period_dot_count)),
+      extent_dot_count,
+    ) {
+      (10 | 14, 12) => return 3,
+      (12 | 16, 18) => return 6,
+      _ => {}
+    }
+  }
+  nominal
+}
+
 fn push_word_table_border_bitmap(
   page: &mut Page,
   x_pt: f32,
@@ -39907,7 +40904,7 @@ fn push_word_table_border_bitmap(
     flip_horizontal: false,
     flip_vertical: false,
     data,
-    content_type: Some("image/png".to_string()),
+    content_type: Some(WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE.to_string()),
     metafile_background_color: None,
     alt_text: None,
     hyperlink_url: None,
@@ -40063,6 +41060,375 @@ fn push_word_table_fine_dashed_border(
       cross_start_pt,
       remainder_pt,
       pattern.thickness_pt,
+      trailing_tile,
+    );
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HorizontalTableBorderEdge {
+  Upper,
+  Lower,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct HorizontalTableBorderJunction {
+  is_horizontal_outer: bool,
+  above: Option<BorderStyle>,
+  below: Option<BorderStyle>,
+}
+
+impl HorizontalTableBorderJunction {
+  const fn internal(above: Option<BorderStyle>, below: Option<BorderStyle>) -> Self {
+    Self {
+      is_horizontal_outer: false,
+      above,
+      below,
+    }
+  }
+
+  const fn horizontal_outer(above: Option<BorderStyle>, below: Option<BorderStyle>) -> Self {
+    Self {
+      is_horizontal_outer: true,
+      above,
+      below,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct HorizontalTableBorderJunctionGeometry {
+  start_dot: f64,
+  extent_dots: f64,
+  solid: bool,
+}
+
+fn word_table_border_thickness_dot_count(border: BorderStyle) -> u32 {
+  let thickness_pt = units::quantize_points_to_office_print_grid(border.width_pt)
+    .max(units::POINTS_PER_INCH / WORD_FIXED_OUTPUT_DPI);
+  ((thickness_pt * WORD_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).round() as u32).max(1)
+}
+
+fn horizontal_table_border_junction_geometry(
+  edge_dot: f64,
+  edge: HorizontalTableBorderEdge,
+  junction: HorizontalTableBorderJunction,
+  horizontal_thickness_dots: u32,
+) -> HorizontalTableBorderJunctionGeometry {
+  let horizontal_thickness_dots = f64::from(horizontal_thickness_dots);
+  let above_width_dots = junction
+    .above
+    .map_or(0, word_table_border_thickness_dot_count);
+  let below_width_dots = junction
+    .below
+    .map_or(0, word_table_border_thickness_dot_count);
+  let continuous_perpendicular = above_width_dots > 0 && above_width_dots == below_width_dots;
+  let perpendicular_width_dots = f64::from(above_width_dots.max(below_width_dots));
+  let has_perpendicular = perpendicular_width_dots > 0.0;
+
+  if has_perpendicular {
+    // SwTabFramePainter passes both perpendicular styles to the frame-border
+    // connector. Exact-config Office controls make the resulting device
+    // geometry observable: a one-sided table-edge junction starts at the
+    // perpendicular rule's left edge and remains one horizontal thickness
+    // wide; an internal continuous rule spans max(horizontal, vertical); and
+    // unequal device widths above/below reserve max(vertical) plus one
+    // horizontal thickness. Matrix S proves that equal quantized widths merge
+    // even when their line styles differ.
+    let extent_dots = if junction.is_horizontal_outer {
+      horizontal_thickness_dots
+    } else if continuous_perpendicular {
+      horizontal_thickness_dots.max(perpendicular_width_dots)
+    } else {
+      perpendicular_width_dots + horizontal_thickness_dots
+    };
+    return HorizontalTableBorderJunctionGeometry {
+      start_dot: edge_dot - perpendicular_width_dots / 2.0,
+      extent_dots,
+      solid: true,
+    };
+  }
+
+  // With no perpendicular rule, keep the independently frozen upper/lower
+  // ownership. Matrix F observes the lower residual 1.5 horizontal widths
+  // before the snapped boundary, including both transparent and opaque phase
+  // samples. A physically outer endpoint whose vertical rule is suppressed
+  // follows this sampled path rather than creating an invented solid corner.
+  let start_dot = match edge {
+    HorizontalTableBorderEdge::Upper => edge_dot,
+    HorizontalTableBorderEdge::Lower => edge_dot - horizontal_thickness_dots * 1.5,
+  };
+  HorizontalTableBorderJunctionGeometry {
+    start_dot,
+    extent_dots: horizontal_thickness_dots,
+    solid: false,
+  }
+}
+
+fn push_word_table_fine_dashed_horizontal_border(
+  page: &mut Page,
+  x1: f32,
+  y: f32,
+  x2: f32,
+  border: BorderStyle,
+  edge: HorizontalTableBorderEdge,
+  junctions: (HorizontalTableBorderJunction, HorizontalTableBorderJunction),
+) {
+  let (leading_junction, trailing_junction) = junctions;
+  let Some(device_axis) = WordTableDeviceAxis::new(page.setup.width_pt) else {
+    push_word_table_fine_dashed_border(page, x1, y, x2, y, border);
+    return;
+  };
+  let (logical_start_pt, logical_end_pt, leading_junction, trailing_junction) = if x1 <= x2 {
+    (x1, x2, leading_junction, trailing_junction)
+  } else {
+    (x2, x1, trailing_junction, leading_junction)
+  };
+  if logical_end_pt - logical_start_pt <= f32::EPSILON {
+    return;
+  }
+
+  let pattern = word_table_fine_dash_pattern(border.width_pt);
+  // The table painter's logical edge is one twip to the right of the frame
+  // boundary carried by layout. This is not an empirical constant applied to
+  // one document: the fixed-total split sweep and the independent tblInd
+  // sweep select the same logical coordinate before the page transform.
+  let painter_edge_adjustment_pt = 1.0 / units::TWIPS_PER_POINT;
+  let leading_edge_dot =
+    device_axis.logical_to_device_dot(logical_start_pt + painter_edge_adjustment_pt) as f64;
+  let trailing_edge_dot =
+    device_axis.logical_to_device_dot(logical_end_pt + painter_edge_adjustment_pt) as f64;
+  let leading_geometry = horizontal_table_border_junction_geometry(
+    leading_edge_dot,
+    edge,
+    leading_junction,
+    pattern.thickness_dot_count,
+  );
+  let trailing_geometry = horizontal_table_border_junction_geometry(
+    trailing_edge_dot,
+    edge,
+    trailing_junction,
+    pattern.thickness_dot_count,
+  );
+  let tile_start_dot = leading_geometry.start_dot + leading_geometry.extent_dots;
+  let tile_end_dot = trailing_geometry.start_dot;
+  if tile_end_dot <= tile_start_dot {
+    return;
+  }
+
+  let cross_start_pt = y - pattern.thickness_pt / 2.0;
+  let solid_corner = || {
+    encode_word_table_border_bitmap(
+      pattern.cross_sample_count,
+      pattern.cross_sample_count,
+      border.color,
+      |_, _| u8::MAX,
+    )
+  };
+  let sampled_corner = |start_dot: f64| {
+    word_table_fine_dash_device_bitmap(
+      pattern,
+      start_dot.floor() as i64,
+      pattern.period_dot_count,
+      pattern.cross_sample_count,
+      true,
+      border.color,
+    )
+  };
+
+  if let Some(corner) = if leading_geometry.solid {
+    solid_corner()
+  } else {
+    sampled_corner(leading_geometry.start_dot)
+  } {
+    let start_pt = device_axis.device_dot_to_output_pt(leading_geometry.start_dot);
+    let end_pt = device_axis
+      .device_dot_to_output_pt(leading_geometry.start_dot + leading_geometry.extent_dots);
+    push_word_table_border_axis_bitmap(
+      page,
+      true,
+      start_pt,
+      cross_start_pt,
+      end_pt - start_pt,
+      pattern.thickness_pt,
+      corner,
+    );
+  }
+  if let Some(corner) = if trailing_geometry.solid {
+    solid_corner()
+  } else {
+    sampled_corner(trailing_geometry.start_dot)
+  } {
+    let start_pt = device_axis.device_dot_to_output_pt(trailing_geometry.start_dot);
+    let end_pt = device_axis
+      .device_dot_to_output_pt(trailing_geometry.start_dot + trailing_geometry.extent_dots);
+    push_word_table_border_axis_bitmap(
+      page,
+      true,
+      start_pt,
+      cross_start_pt,
+      end_pt - start_pt,
+      pattern.thickness_pt,
+      corner,
+    );
+  }
+  let period_dots = f64::from(pattern.period_dot_count);
+  let Some(full_tile) = word_table_fine_dash_device_bitmap(
+    pattern,
+    tile_start_dot.floor() as i64,
+    pattern.period_dot_count,
+    pattern.sample_count,
+    true,
+    border.color,
+  ) else {
+    return;
+  };
+  let mut next_tile_start_dot = tile_start_dot;
+  while next_tile_start_dot + period_dots <= tile_end_dot + f64::EPSILON {
+    let start_pt = device_axis.device_dot_to_output_pt(next_tile_start_dot);
+    let end_pt = device_axis.device_dot_to_output_pt(next_tile_start_dot + period_dots);
+    push_word_table_border_axis_bitmap(
+      page,
+      true,
+      start_pt,
+      cross_start_pt,
+      end_pt - start_pt,
+      pattern.thickness_pt,
+      full_tile.clone(),
+    );
+    next_tile_start_dot += period_dots;
+  }
+
+  let remainder_dots = tile_end_dot - next_tile_start_dot;
+  if remainder_dots <= f64::EPSILON {
+    return;
+  }
+  let trailing_sample_count = (remainder_dots * f64::from(pattern.sample_count) / period_dots)
+    .round()
+    .clamp(1.0, f64::from(pattern.sample_count)) as u32;
+  // A partial bitmap is resampled across its own destination extent. Matrix
+  // F's fixed-total split controls distinguish this from truncating the
+  // 20-dot full-period sampler: at phase 7, 13/15-dot four-sample tails are
+  // `1110` (the full-period alternative is `1101`), and an 18-dot six-sample
+  // tail is `111001` (not `111011`). The independent three-column regression
+  // and Letter-page insideH/V factorial retain the same rule.
+  if let Some(trailing_tile) = word_table_fine_dash_device_bitmap(
+    pattern,
+    next_tile_start_dot.floor() as i64,
+    remainder_dots.round() as u32,
+    trailing_sample_count,
+    true,
+    border.color,
+  ) {
+    let start_pt = device_axis.device_dot_to_output_pt(next_tile_start_dot);
+    let end_pt = device_axis.device_dot_to_output_pt(tile_end_dot);
+    push_word_table_border_axis_bitmap(
+      page,
+      true,
+      start_pt,
+      cross_start_pt,
+      end_pt - start_pt,
+      pattern.thickness_pt,
+      trailing_tile,
+    );
+  }
+}
+
+fn push_word_table_fine_dashed_vertical_border(
+  page: &mut Page,
+  x: f32,
+  y1: f32,
+  y2: f32,
+  ends_at_table_bottom: bool,
+  border: BorderStyle,
+) {
+  let (logical_start_y_pt, logical_end_y_pt) = if y1 <= y2 { (y1, y2) } else { (y2, y1) };
+  if logical_end_y_pt - logical_start_y_pt <= f32::EPSILON {
+    return;
+  }
+  let (Some(vertical_axis), Some(horizontal_axis)) = (
+    WordTableDeviceAxis::new(page.setup.height_pt),
+    WordTableDeviceAxis::new(page.setup.width_pt),
+  ) else {
+    push_word_table_fine_dashed_border(page, x, y1, x, y2, border);
+    return;
+  };
+
+  let pattern = word_table_fine_dash_pattern(border.width_pt);
+  let painter_edge_adjustment_pt = 1.0 / units::TWIPS_PER_POINT;
+  let tile_start_dot =
+    vertical_axis.logical_to_device_dot(logical_start_y_pt + painter_edge_adjustment_pt);
+  let end_bias_dots = if ends_at_table_bottom {
+    WORD_TABLE_VERTICAL_BORDER_END_BIAS_DOTS
+  } else {
+    0.0
+  };
+  let tile_end_dot =
+    (vertical_axis.logical_to_device_position(logical_end_y_pt) + end_bias_dots).floor() as i64;
+  if tile_end_dot <= tile_start_dot {
+    return;
+  }
+
+  // Use the same cumulative page-x transform as the horizontal outer corner.
+  // Horizontal borders own both intersections, so the vertical group begins
+  // directly with its first dashed tile and emits no solid corner image.
+  let center_x_dot = horizontal_axis.logical_to_device_dot(x + painter_edge_adjustment_pt) as f64;
+  let half_thickness_dots = f64::from(pattern.thickness_dot_count) / 2.0;
+  let cross_start_dot = center_x_dot - half_thickness_dots;
+  let cross_end_dot = cross_start_dot + f64::from(pattern.thickness_dot_count);
+  let cross_start_pt = horizontal_axis.device_dot_to_output_pt(cross_start_dot);
+  let cross_extent_pt = horizontal_axis.device_dot_to_output_pt(cross_end_dot) - cross_start_pt;
+
+  let period_dots = i64::from(pattern.period_dot_count);
+  let Some(full_tile) = word_table_fine_dash_device_bitmap(
+    pattern,
+    tile_start_dot,
+    pattern.period_dot_count,
+    pattern.sample_count,
+    false,
+    border.color,
+  ) else {
+    return;
+  };
+  let mut next_tile_start_dot = tile_start_dot;
+  while next_tile_start_dot + period_dots <= tile_end_dot {
+    let start_pt = vertical_axis.device_dot_to_output_pt(next_tile_start_dot as f64);
+    let end_pt = vertical_axis.device_dot_to_output_pt((next_tile_start_dot + period_dots) as f64);
+    push_word_table_border_axis_bitmap(
+      page,
+      false,
+      start_pt,
+      cross_start_pt,
+      end_pt - start_pt,
+      cross_extent_pt,
+      full_tile.clone(),
+    );
+    next_tile_start_dot += period_dots;
+  }
+
+  let remainder_dots = (tile_end_dot - next_tile_start_dot) as u32;
+  if remainder_dots == 0 {
+    return;
+  }
+  let trailing_sample_count =
+    word_table_fine_dash_tail_sample_count(pattern, next_tile_start_dot, remainder_dots);
+  if let Some(trailing_tile) = word_table_fine_dash_device_bitmap(
+    pattern,
+    next_tile_start_dot,
+    remainder_dots,
+    trailing_sample_count,
+    false,
+    border.color,
+  ) {
+    let start_pt = vertical_axis.device_dot_to_output_pt(next_tile_start_dot as f64);
+    let end_pt = vertical_axis.device_dot_to_output_pt(tile_end_dot as f64);
+    push_word_table_border_axis_bitmap(
+      page,
+      false,
+      start_pt,
+      cross_start_pt,
+      end_pt - start_pt,
+      cross_extent_pt,
       trailing_tile,
     );
   }
@@ -41868,35 +43234,73 @@ mod tests {
   }
 
   #[test]
-  fn word_drawing_backdrop_density_tracks_direct2d_prescale_bands() {
-    let samples = [
-      // Sharp outer shadows remain at Word's 200-DPI base surface.
-      (0.0, 200.0),
-      // ptab/draw-shape-inline-effect and the 5-point picture shadow.
-      (50_800.0 / 9_525.0, 100.0),
-      (63_500.0 / 9_525.0, 100.0),
-      // AlphaMod's 6-point and WPC_Shadow's 8-point shadows.
-      (76_200.0 / 9_525.0, 200.0 / 3.0),
-      (101_600.0 / 9_525.0, 200.0 / 3.0),
-      // shape-effect-preservation's 9-point shadow.
-      (114_300.0 / 9_525.0, 50.0),
+  fn word_drawing_backdrop_density_divides_the_selected_export_profile() {
+    let radius_tiers = [
+      (0.0, 1.0),
+      (1.0, 1.0),
+      (2.0, 1.0),
+      (3.0, 2.0),
+      (4.0, 2.0),
+      (5.0, 2.0),
+      (6.0, 3.0),
+      (7.0, 3.0),
+      (8.0, 3.0),
+      (9.0, 4.0),
+      (10.0, 4.0),
+      (11.0, 4.0),
+      (12.0, 5.0),
     ];
-    for (radius_px, expected_dpi) in samples {
-      let actual = wordprocessing_drawing_backdrop_pixels_per_point(radius_px);
+    for base_dpi in [96.0, 200.0] {
+      let base_pixels_per_point = base_dpi / units::POINTS_PER_INCH;
+      for (radius_pt, divisor) in radius_tiers {
+        let radius_px = radius_pt * units::CSS_PIXELS_PER_INCH / units::POINTS_PER_INCH;
+        let actual =
+          wordprocessing_drawing_backdrop_pixels_per_point(radius_px, base_pixels_per_point);
+        let expected_dpi = base_dpi / divisor;
+        assert!(
+          (actual - expected_dpi / units::POINTS_PER_INCH).abs() < 0.0001,
+          "base_dpi={base_dpi}, radius_pt={radius_pt}, actual_dpi={}",
+          actual * units::POINTS_PER_INCH
+        );
+      }
+    }
+
+    // `blurRad` is stored in integer EMUs. These exact Office controls guard
+    // both sides and the inclusive upper edge of three successive tiers. The
+    // third exact multiple is not exactly representable after the f32
+    // EMU-to-DIP conversion, so this also guards the round-trip stabilization.
+    let boundary_tiers = [
+      (36_575, 1.0),
+      (36_576, 1.0),
+      (36_577, 2.0),
+      (73_151, 2.0),
+      (73_152, 2.0),
+      (73_153, 3.0),
+      (109_727, 3.0),
+      (109_728, 3.0),
+      (109_729, 4.0),
+    ];
+    for (blur_radius_emu, divisor) in boundary_tiers {
+      let radius_px = blur_radius_emu as f32 / 9_525.0;
+      let actual = wordprocessing_drawing_backdrop_pixels_per_point(radius_px, 1.0);
       assert!(
-        (actual - expected_dpi / units::POINTS_PER_INCH).abs() < 0.0001,
-        "radius={radius_px}, actual_dpi={}",
-        actual * units::POINTS_PER_INCH
+        (actual - 1.0 / divisor).abs() < f32::EPSILON,
+        "blur_radius_emu={blur_radius_emu}"
       );
     }
 
     // A foreground-modifying effect has no separated backdrop and therefore
-    // keeps the 200-DPI surface rather than entering the blur prescaler.
-    assert!(
-      (wordprocessing_drawing_effect_max_pixels_per_point(None) - 200.0 / units::POINTS_PER_INCH)
-        .abs()
-        < f32::EPSILON
-    );
+    // keeps the selected profile's base surface rather than entering the blur
+    // prescaler.
+    for base_dpi in [96.0, 200.0] {
+      let base_pixels_per_point = base_dpi / units::POINTS_PER_INCH;
+      assert!(
+        (wordprocessing_drawing_effect_max_pixels_per_point(None, base_pixels_per_point,)
+          - base_pixels_per_point)
+          .abs()
+          < f32::EPSILON
+      );
+    }
   }
 
   #[test]
@@ -41908,6 +43312,598 @@ mod tests {
     assert!((bounds.origin.y.0 - 176.88).abs() < 0.001);
     assert!((bounds.size.width.0 - 41.4).abs() < 0.001);
     assert!((bounds.size.height.0 - 25.68).abs() < 0.001);
+  }
+
+  #[test]
+  fn word_group_glow_bitmap_matches_fixed_output_position_controls() {
+    let content = common_rect(118.2, 86.7, 92.000_02, 66.5);
+    let bounds = wordprocessing_group_glow_bitmap_display_bounds(content, 36.0);
+    assert!((bounds.origin.x.0 - 82.08).abs() < 0.001);
+    assert!((bounds.origin.y.0 - 50.52).abs() < 0.001);
+    assert!((bounds.size.width.0 - 164.28).abs() < 0.001);
+    assert!((bounds.size.height.0 - 138.84).abs() < 0.001);
+
+    let x_cases = [
+      (-0.15, 81.96, 164.16),
+      (-0.10, 81.96, 164.28),
+      (-0.05, 82.08, 164.16),
+      (0.00, 82.08, 164.28),
+      (0.05, 82.08, 164.28),
+      (0.10, 82.20, 164.28),
+    ];
+    for (delta, expected_left, expected_width) in x_cases {
+      let bounds = wordprocessing_group_glow_bitmap_display_bounds(
+        common_rect(
+          content.origin.x.0 + delta,
+          content.origin.y.0,
+          content.size.width.0,
+          content.size.height.0,
+        ),
+        36.0,
+      );
+      assert!(
+        (bounds.origin.x.0 - expected_left).abs() < 0.001,
+        "delta={delta}"
+      );
+      assert!(
+        (bounds.size.width.0 - expected_width).abs() < 0.001,
+        "delta={delta}"
+      );
+    }
+
+    let y_cases = [
+      (-0.10, 50.52, 138.72),
+      (-0.05, 50.52, 138.72),
+      (0.00, 50.52, 138.84),
+      (0.05, 50.64, 138.72),
+    ];
+    for (delta, expected_top, expected_height) in y_cases {
+      let bounds = wordprocessing_group_glow_bitmap_display_bounds(
+        common_rect(
+          content.origin.x.0,
+          content.origin.y.0 + delta,
+          content.size.width.0,
+          content.size.height.0,
+        ),
+        36.0,
+      );
+      assert!(
+        (bounds.origin.y.0 - expected_top).abs() < 0.001,
+        "delta={delta}"
+      );
+      assert!(
+        (bounds.size.height.0 - expected_height).abs() < 0.001,
+        "delta={delta}"
+      );
+    }
+  }
+
+  #[test]
+  fn word_group_glow_bitmap_matches_fixed_output_radius_controls() {
+    let content = common_rect(118.2, 86.7, 92.000_02, 66.5);
+    let cases = [
+      (0.10, 0.24),
+      (1.00, 1.20),
+      (2.00, 2.16),
+      (4.00, 4.08),
+      (5.75, 5.76),
+      (5.76, 5.76),
+      (5.77, 6.00),
+      (5.99, 6.00),
+      (6.00, 6.00),
+      (6.01, 6.24),
+      (8.00, 8.16),
+      (10.00, 10.08),
+      (11.51, 11.52),
+      (11.52, 11.52),
+      (11.53, 11.76),
+      (11.99, 12.00),
+      (12.00, 12.00),
+      (12.01, 12.24),
+      (16.00, 16.08),
+      (17.27, 17.28),
+      (17.28, 17.28),
+      (17.29, 17.52),
+      (17.99, 18.00),
+      (18.00, 18.00),
+      (18.01, 18.24),
+      (20.00, 20.16),
+      (24.00, 24.00),
+      (28.00, 28.08),
+      (34.55, 34.56),
+      (34.56, 34.56),
+      (34.57, 34.80),
+      (35.99, 36.00),
+      (36.00, 36.00),
+      (36.01, 36.24),
+      (48.00, 48.00),
+    ];
+    for (radius_pt, expected_display_radius_pt) in cases {
+      let bounds = wordprocessing_group_glow_bitmap_display_bounds(content, radius_pt);
+      let expected = common_rect(
+        118.08 - expected_display_radius_pt,
+        86.52 - expected_display_radius_pt,
+        92.28 + expected_display_radius_pt * 2.0,
+        66.84 + expected_display_radius_pt * 2.0,
+      );
+      assert!(
+        (bounds.origin.x.0 - expected.origin.x.0).abs() < 0.001,
+        "radius={radius_pt}, actual={bounds:?}, expected={expected:?}"
+      );
+      assert!(
+        (bounds.origin.y.0 - expected.origin.y.0).abs() < 0.001,
+        "radius={radius_pt}, actual={bounds:?}, expected={expected:?}"
+      );
+      assert!(
+        (bounds.size.width.0 - expected.size.width.0).abs() < 0.001,
+        "radius={radius_pt}, actual={bounds:?}, expected={expected:?}"
+      );
+      assert!(
+        (bounds.size.height.0 - expected.size.height.0).abs() < 0.001,
+        "radius={radius_pt}, actual={bounds:?}, expected={expected:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn word_shape_shadow_bitmap_matches_fixed_output_surface_matrices() {
+    let content = common_rect(275.6, 81.8, 85.4, 72.8);
+    let output = |radius_pt: f32| {
+      let offset_pt = 9.0 / std::f32::consts::SQRT_2;
+      common::drawingml_image_effects::EffectOutputBounds {
+        left_pt: offset_pt - radius_pt,
+        top_pt: offset_pt - radius_pt,
+        right_pt: content.size.width.0 + offset_pt + radius_pt,
+        bottom_pt: content.size.height.0 + offset_pt + radius_pt,
+      }
+    };
+    let effect_pixels_per_point = 32.0 / units::POINTS_PER_INCH;
+    let bounds = wordprocessing_shape_shadow_bitmap_display_bounds(
+      content,
+      output(8.0),
+      8.0,
+      effect_pixels_per_point,
+    );
+    assert!((bounds.origin.x.0 - 273.84).abs() < 0.001);
+    assert!((bounds.origin.y.0 - 80.04).abs() < 0.001);
+    assert!((bounds.size.width.0 - 100.515).abs() < 0.001);
+    assert!((bounds.size.height.0 - 87.915).abs() < 0.001);
+    assert_eq!(
+      common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+        bounds.size.width.0,
+        effect_pixels_per_point,
+      ),
+      45
+    );
+    assert_eq!(
+      common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+        bounds.size.height.0,
+        effect_pixels_per_point,
+      ),
+      40
+    );
+
+    // The final PDF crop is expressed in moved-shadow coordinates. The work
+    // surface extends by whole pixels in the inverse direction while retaining
+    // the original fractional effect translation, so a near-zero blur keeps
+    // the complete source frame without changing its sampling phase.
+    let offset_pt = 9.0 / std::f32::consts::SQRT_2;
+    let near_zero_display = wordprocessing_shape_shadow_bitmap_display_bounds(
+      content,
+      output(0.1),
+      0.1,
+      96.0 / units::POINTS_PER_INCH,
+    );
+    let pixels_per_point = 96.0 / units::POINTS_PER_INCH;
+    let near_zero_work = wordprocessing_shape_shadow_work_surface(
+      near_zero_display,
+      near_zero_display,
+      (offset_pt, offset_pt),
+      pixels_per_point,
+      pixels_per_point,
+    );
+    assert!((near_zero_display.origin.x.0 - 281.76).abs() < 0.001);
+    assert!((near_zero_work.base_bounds.origin.x.0 - 275.01).abs() < 0.001);
+    assert!((near_zero_work.base_bounds.origin.y.0 - 81.21).abs() < 0.001);
+    assert_eq!(
+      (near_zero_work.crop_left_px, near_zero_work.crop_top_px),
+      (9, 9)
+    );
+    assert_eq!(
+      (near_zero_work.work_width_px, near_zero_work.work_height_px),
+      (123, 107)
+    );
+    assert_eq!(
+      (near_zero_work.crop_width_px, near_zero_work.crop_height_px),
+      (114, 98)
+    );
+
+    // Moving either the WPS child or the containing WPC anchor changes the
+    // printer-grid phase but never the local sample count. These controls are
+    // selected from the independent +/- quarter-pixel interpolation matrices.
+    for (left, expected_left, expected_width) in [
+      (273.35, 271.56, 100.635),
+      (273.91, 272.16, 100.515),
+      (276.16, 274.32, 100.635),
+      (277.29, 275.52, 100.515),
+    ] {
+      let shifted = common_rect(
+        left,
+        content.origin.y.0,
+        content.size.width.0,
+        content.size.height.0,
+      );
+      let bounds = wordprocessing_shape_shadow_bitmap_display_bounds(
+        shifted,
+        output(8.0),
+        8.0,
+        effect_pixels_per_point,
+      );
+      assert!((bounds.origin.x.0 - expected_left).abs() < 0.001);
+      assert!((bounds.size.width.0 - expected_width).abs() < 0.001);
+    }
+
+    // Removing the 2pt line changes only painted source bounds. The Office
+    // fill-only control is 44x39 at this same effect configuration.
+    let fill_content = common_rect(276.6, 82.8, 83.4, 70.8);
+    let offset_pt = 9.0 / std::f32::consts::SQRT_2;
+    let fill_output = common::drawingml_image_effects::EffectOutputBounds {
+      left_pt: offset_pt - 8.0,
+      top_pt: offset_pt - 8.0,
+      right_pt: fill_content.size.width.0 + offset_pt + 8.0,
+      bottom_pt: fill_content.size.height.0 + offset_pt + 8.0,
+    };
+    let bounds = wordprocessing_shape_shadow_bitmap_display_bounds(
+      fill_content,
+      fill_output,
+      8.0,
+      effect_pixels_per_point,
+    );
+    assert!((bounds.origin.x.0 - 274.8).abs() < 0.001);
+    assert!((bounds.origin.y.0 - 81.0).abs() < 0.001);
+    assert!((bounds.size.width.0 - 98.595).abs() < 0.001);
+    assert!((bounds.size.height.0 - 85.995).abs() < 0.001);
+    assert_eq!(
+      common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+        bounds.size.width.0,
+        effect_pixels_per_point,
+      ),
+      44
+    );
+    assert_eq!(
+      common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+        bounds.size.height.0,
+        effect_pixels_per_point,
+      ),
+      39
+    );
+
+    let radius_cases = [
+      (0.10, 1.0, 281.76, 87.96, 85.425, 72.825),
+      (1.00, 1.0, 280.80, 87.00, 87.345, 74.745),
+      (2.00, 1.0, 279.84, 86.04, 89.265, 76.665),
+      (2.88, 1.0, 279.00, 85.20, 90.945, 78.345),
+      (3.00, 2.0, 278.88, 85.08, 90.810, 78.210),
+      (4.00, 2.0, 277.80, 84.00, 92.970, 80.370),
+      (5.00, 2.0, 276.84, 83.04, 94.890, 82.290),
+      (6.00, 3.0, 275.88, 82.08, 96.435, 83.835),
+      (8.00, 3.0, 273.84, 80.04, 100.515, 87.915),
+      (9.00, 4.0, 272.88, 79.08, 102.060, 89.460),
+      (12.00, 5.0, 269.88, 76.08, 107.685, 95.085),
+    ];
+    for (radius, divisor, left, top, width, height) in radius_cases {
+      let pixels_per_point = (96.0 / units::POINTS_PER_INCH) / divisor;
+      let bounds = wordprocessing_shape_shadow_bitmap_display_bounds(
+        content,
+        output(radius),
+        radius,
+        pixels_per_point,
+      );
+      assert!(
+        (bounds.origin.x.0 - left).abs() < 0.002
+          && (bounds.origin.y.0 - top).abs() < 0.002
+          && (bounds.size.width.0 - width).abs() < 0.002
+          && (bounds.size.height.0 - height).abs() < 0.002,
+        "radius={radius}, divisor={divisor}, actual={bounds:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn word_shape_glow_bitmap_matches_fixed_output_surface_matrices() {
+    let base_pixels_per_point = 200.0 / units::POINTS_PER_INCH;
+    let content = common_rect(193.5, 121.3, 282.95, 41.85);
+    let bounds = wordprocessing_shape_glow_bitmap_display_bounds(
+      content,
+      5.0,
+      base_pixels_per_point,
+      base_pixels_per_point,
+    );
+    assert!((bounds.origin.x.0 - 188.4).abs() < 0.001);
+    assert!((bounds.origin.y.0 - 116.16).abs() < 0.001);
+    assert!((bounds.size.width.0 - 292.98).abs() < 0.001);
+    assert!((bounds.size.height.0 - 52.02).abs() < 0.001);
+    assert_eq!(
+      common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+        bounds.size.width.0,
+        base_pixels_per_point,
+      ),
+      814
+    );
+    assert_eq!(
+      common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+        bounds.size.height.0,
+        base_pixels_per_point,
+      ),
+      145
+    );
+
+    let width_cases = [
+      (-5, 292.74),
+      (-4, 292.86),
+      (-3, 292.86),
+      (-2, 292.98),
+      (-1, 292.98),
+      (0, 292.98),
+      (1, 293.10),
+      (2, 293.10),
+      (3, 293.22),
+      (4, 293.22),
+      (5, 293.22),
+      (6, 293.34),
+    ];
+    for (twip_delta, expected_width) in width_cases {
+      let bounds = wordprocessing_shape_glow_bitmap_display_bounds(
+        common_rect(
+          content.origin.x.0,
+          content.origin.y.0,
+          content.size.width.0 + twip_delta as f32 / units::TWIPS_PER_POINT,
+          content.size.height.0,
+        ),
+        5.0,
+        base_pixels_per_point,
+        base_pixels_per_point,
+      );
+      assert!(
+        (bounds.size.width.0 - expected_width).abs() < 0.001,
+        "width twip delta={twip_delta}, actual={bounds:?}"
+      );
+    }
+
+    let height_cases = [
+      (-5, 51.78),
+      (-4, 51.78),
+      (-3, 51.78),
+      (-2, 51.90),
+      (-1, 51.90),
+      (0, 52.02),
+      (1, 52.02),
+      (2, 52.02),
+      (3, 52.14),
+      (4, 52.14),
+      (5, 52.26),
+      (6, 52.26),
+    ];
+    for (twip_delta, expected_height) in height_cases {
+      let bounds = wordprocessing_shape_glow_bitmap_display_bounds(
+        common_rect(
+          content.origin.x.0,
+          content.origin.y.0,
+          content.size.width.0,
+          content.size.height.0 + twip_delta as f32 / units::TWIPS_PER_POINT,
+        ),
+        5.0,
+        base_pixels_per_point,
+        base_pixels_per_point,
+      );
+      assert!(
+        (bounds.size.height.0 - expected_height).abs() < 0.001,
+        "height twip delta={twip_delta}, actual={bounds:?}"
+      );
+    }
+
+    let radius6_pixels_per_point = base_pixels_per_point / 2.0;
+    let radius6_width_cases = [
+      (-5, 294.48),
+      (-4, 294.60),
+      (-3, 294.60),
+      (-2, 294.72),
+      (-1, 294.72),
+      (0, 294.72),
+      (1, 294.84),
+      (2, 294.84),
+      (3, 294.96),
+      (4, 294.96),
+      (5, 294.96),
+      (6, 295.08),
+    ];
+    for (twip_delta, expected_width) in radius6_width_cases {
+      let bounds = wordprocessing_shape_glow_bitmap_display_bounds(
+        common_rect(
+          content.origin.x.0,
+          content.origin.y.0,
+          content.size.width.0 + twip_delta as f32 / units::TWIPS_PER_POINT,
+          content.size.height.0,
+        ),
+        6.0,
+        base_pixels_per_point,
+        radius6_pixels_per_point,
+      );
+      assert!((bounds.size.width.0 - expected_width).abs() < 0.001);
+      assert_eq!(
+        common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+          bounds.size.width.0,
+          radius6_pixels_per_point,
+        ),
+        410,
+        "radius=6 width twip delta={twip_delta}"
+      );
+    }
+
+    let radius6_height_cases = [
+      (-5, 53.52, 75),
+      (-4, 53.52, 75),
+      (-3, 53.52, 75),
+      (-2, 53.64, 75),
+      (-1, 53.64, 75),
+      (0, 53.76, 75),
+      (1, 53.76, 75),
+      (2, 53.76, 75),
+      (3, 53.88, 75),
+      (4, 53.88, 75),
+      (5, 54.00, 76),
+      (6, 54.00, 76),
+    ];
+    for (twip_delta, expected_height, expected_height_px) in radius6_height_cases {
+      let bounds = wordprocessing_shape_glow_bitmap_display_bounds(
+        common_rect(
+          content.origin.x.0,
+          content.origin.y.0,
+          content.size.width.0,
+          content.size.height.0 + twip_delta as f32 / units::TWIPS_PER_POINT,
+        ),
+        6.0,
+        base_pixels_per_point,
+        radius6_pixels_per_point,
+      );
+      assert!((bounds.size.height.0 - expected_height).abs() < 0.001);
+      assert_eq!(
+        common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+          bounds.size.height.0,
+          radius6_pixels_per_point,
+        ),
+        expected_height_px,
+        "radius=6 height twip delta={twip_delta}"
+      );
+    }
+
+    let horizontal_position_cases = [
+      (-5, 188.04, 293.10),
+      (-4, 188.16, 293.10),
+      (-3, 188.16, 293.10),
+      (-2, 188.28, 293.10),
+      (-1, 188.28, 293.10),
+      (0, 188.40, 292.98),
+      (1, 188.40, 293.10),
+      (2, 188.40, 293.10),
+      (3, 188.52, 293.10),
+      (4, 188.52, 293.10),
+      (5, 188.64, 292.98),
+    ];
+    for (twip_delta, expected_left, expected_width) in horizontal_position_cases {
+      let bounds = wordprocessing_shape_glow_bitmap_display_bounds(
+        common_rect(
+          content.origin.x.0 + twip_delta as f32 / units::TWIPS_PER_POINT,
+          content.origin.y.0,
+          content.size.width.0,
+          content.size.height.0,
+        ),
+        5.0,
+        base_pixels_per_point,
+        base_pixels_per_point,
+      );
+      assert!(
+        (bounds.origin.x.0 - expected_left).abs() < 0.001
+          && (bounds.size.width.0 - expected_width).abs() < 0.001,
+        "horizontal twip delta={twip_delta}, actual={bounds:?}"
+      );
+    }
+
+    let vertical_position_cases = [
+      (-5, 115.92, 52.02),
+      (-4, 115.92, 52.02),
+      (-3, 116.04, 51.90),
+      (-2, 116.04, 52.02),
+      (-1, 116.04, 52.02),
+      (0, 116.16, 52.02),
+      (1, 116.16, 52.02),
+      (2, 116.28, 51.90),
+      (3, 116.28, 52.02),
+      (4, 116.40, 51.90),
+      (5, 116.40, 52.02),
+    ];
+    for (twip_delta, expected_top, expected_height) in vertical_position_cases {
+      let bounds = wordprocessing_shape_glow_bitmap_display_bounds(
+        common_rect(
+          content.origin.x.0,
+          content.origin.y.0 + twip_delta as f32 / units::TWIPS_PER_POINT,
+          content.size.width.0,
+          content.size.height.0,
+        ),
+        5.0,
+        base_pixels_per_point,
+        base_pixels_per_point,
+      );
+      assert!(
+        (bounds.origin.y.0 - expected_top).abs() < 0.001
+          && (bounds.size.height.0 - expected_height).abs() < 0.001,
+        "vertical twip delta={twip_delta}, actual={bounds:?}"
+      );
+    }
+
+    let radius_tier_cases = [
+      (5.76, 1.0, 187.68, 115.44, 294.42, 53.46, 818, 149),
+      (5.77, 2.0, 187.44, 115.20, 294.72, 53.76, 410, 75),
+      (11.52, 2.0, 181.92, 109.68, 305.76, 64.80, 425, 91),
+      (11.53, 3.0, 181.68, 109.44, 306.06, 65.10, 284, 61),
+      (17.28, 3.0, 176.16, 103.92, 317.10, 76.14, 294, 71),
+      (17.29, 4.0, 175.92, 103.68, 317.40, 76.44, 221, 54),
+      (34.56, 6.0, 158.88, 86.64, 351.12, 110.16, 163, 52),
+      (34.57, 7.0, 158.64, 86.40, 351.42, 110.46, 140, 44),
+      (48.00, 9.0, 145.44, 73.20, 377.46, 136.50, 117, 43),
+    ];
+    for (radius, divisor, left, top, width, height, width_px, height_px) in radius_tier_cases {
+      let pixels_per_point = base_pixels_per_point / divisor;
+      let bounds = wordprocessing_shape_glow_bitmap_display_bounds(
+        content,
+        radius,
+        base_pixels_per_point,
+        pixels_per_point,
+      );
+      assert!(
+        (bounds.origin.x.0 - left).abs() < 0.002
+          && (bounds.origin.y.0 - top).abs() < 0.002
+          && (bounds.size.width.0 - width).abs() < 0.002
+          && (bounds.size.height.0 - height).abs() < 0.002,
+        "radius={radius}, divisor={divisor}, actual={bounds:?}"
+      );
+      assert_eq!(
+        common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+          bounds.size.width.0,
+          pixels_per_point,
+        ),
+        width_px,
+        "radius={radius}, divisor={divisor} width"
+      );
+      assert_eq!(
+        common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+          bounds.size.height.0,
+          pixels_per_point,
+        ),
+        height_px,
+        "radius={radius}, divisor={divisor} height"
+      );
+    }
+  }
+
+  #[test]
+  fn word_shape_glow_effect_surface_scale_owns_half_of_the_terminal_sample() {
+    let pixels_per_point = 100.0 / units::POINTS_PER_INCH;
+    for (pixel_extent, point_extent, expected) in [
+      (75, 53.76, 0.997_767_87),
+      (81, 58.08, 0.997_933_86),
+      (87, 61.92, 1.005_814),
+    ] {
+      let actual = wordprocessing_shape_glow_effect_surface_axis_scale(
+        pixel_extent,
+        point_extent,
+        pixels_per_point,
+      );
+      assert!(
+        (actual - expected).abs() < 0.000_001,
+        "pixel extent={pixel_extent}, point extent={point_extent}, actual={actual}"
+      );
+    }
   }
 
   #[test]
@@ -41992,7 +43988,7 @@ mod tests {
 
   #[test]
   fn word_screen_static_3d_retargets_the_foreground_without_scaling_its_width() {
-    let content_bounds = common_rect(432.450_012, 178.5, 34.5, 18.75);
+    let content_bounds = common_rect(432.45, 178.5, 34.5, 18.75);
     let static_display_bounds = common_rect(428.940_43, 176.801_42, 41.519_21, 25.769_213);
     let pixels_per_point = 96.0 / units::POINTS_PER_INCH;
     let raster_bounds =
@@ -42087,7 +44083,7 @@ mod tests {
     let content_bounds = common_rect(234.0, 144.0, 34.5, 36.0);
     let working_raster_bounds = common_rect(233.64, 143.64, 34.5, 36.0);
     let mut scene = a::Scene3DType::default();
-    scene.camera = Box::new(a::Camera {
+    *scene.camera = a::Camera {
       preset: a::PresetCameraValues::OrthographicFront,
       rotation: Some(a::Rotation {
         latitude: 0,
@@ -42095,7 +44091,7 @@ mod tests {
         revolution: 0,
       }),
       ..a::Camera::default()
-    });
+    };
     let shape = a::Shape3DType {
       extrusion_height: Some(CoordinateValue::Emu(152_400)),
       bevel_top: Some(a::BevelTop {
@@ -42256,10 +44252,11 @@ mod tests {
       DocxDrawingEffectHost {
         effects: Some(&effects),
         static3d: Some(&static3d),
+        wordprocessing_shape_host: false,
         rotation_degrees: 0.0,
         visual_rotation_degrees: 0.0,
         placement: crate::docx::ImagePlacement::Inline,
-        max_pixels_per_point: Some(200.0 / units::POINTS_PER_INCH),
+        fixed_output_base_pixels_per_point: Some(200.0 / units::POINTS_PER_INCH),
       },
       bounds,
     );
@@ -42340,6 +44337,21 @@ mod tests {
     // The PDF exporter owns the Direct2D premultiply/JPEG/black-Matte chain;
     // layout consumers receive the ordinary straight-alpha source.
     assert_eq!(decoded.get_pixel(0, 0).0, [146, 208, 80, 92]);
+  }
+
+  #[test]
+  fn word_black_matte_effect_transport_preblends_rgb_but_keeps_alpha() {
+    let mut image = image::RgbaImage::from_fn(3, 1, |x, _| match x {
+      0 => image::Rgba([255, 144, 4, 128]),
+      1 => image::Rgba([17, 33, 65, 0]),
+      _ => image::Rgba([17, 33, 65, 255]),
+    });
+
+    associate_wordprocessing_effect_rgb_with_black_matte(&mut image);
+
+    assert_eq!(image.get_pixel(0, 0).0, [128, 72, 2, 128]);
+    assert_eq!(image.get_pixel(1, 0).0, [0, 0, 0, 0]);
+    assert_eq!(image.get_pixel(2, 0).0, [17, 33, 65, 255]);
   }
 
   #[test]
@@ -45565,18 +47577,515 @@ mod tests {
 
   #[test]
   fn fine_dashed_table_border_samples_scale_across_word_widths() {
-    for (width_pt, thickness_pt, sample_count, on_sample_count, period_pt) in [
-      (0.25, 0.24, 3, 2, 1.2),
-      (0.5, 0.48, 6, 5, 2.4),
-      (0.75, 0.72, 10, 8, 3.6),
-      (1.0, 0.96, 13, 10, 4.8),
+    for (width_pt, thickness_pt, sample_count, on_sample_count, period_pt, thickness_dots) in [
+      (0.25, 0.24, 3, 2, 1.2, 2),
+      (0.5, 0.48, 6, 5, 2.4, 4),
+      (0.75, 0.72, 10, 8, 3.6, 6),
+      (1.0, 0.96, 13, 10, 4.8, 8),
     ] {
       let pattern = word_table_fine_dash_pattern(width_pt);
       assert!((pattern.thickness_pt - thickness_pt).abs() < 0.000_1);
       assert_eq!(pattern.sample_count, sample_count);
       assert_eq!(pattern.on_sample_count, on_sample_count);
       assert!((pattern.period_pt - period_pt).abs() < 0.000_1);
+      assert_eq!(pattern.thickness_dot_count, thickness_dots);
+      assert_eq!(pattern.period_dot_count, thickness_dots * 5);
+      assert_eq!(pattern.on_dot_count, thickness_dots * 4);
     }
+  }
+
+  #[test]
+  fn word_table_device_axis_matches_the_office_a4_split_sweep() {
+    let axis =
+      WordTableDeviceAxis::new(11906.0 / units::TWIPS_PER_POINT).expect("A4 printer-device axis");
+    assert_eq!(axis.device_extent_dots, 4960);
+    assert!((axis.output_extent_pt - 595.32).abs() < 0.000_1);
+
+    for (split_twips, expected_dot, expected_pdf_x) in [
+      (3055, 1818, 218.21),
+      (3060, 1820, 218.45),
+      (3064, 1822, 218.69),
+      (3068, 1823, 218.81),
+      (3069, 1824, 218.93),
+      (3070, 1824, 218.93),
+      (3071, 1825, 219.05),
+      (3072, 1825, 219.05),
+      (3076, 1827, 219.29),
+      (3080, 1828, 219.41),
+      (3085, 1830, 219.65),
+    ] {
+      let logical_x_pt = (1310 + split_twips) as f32 / units::TWIPS_PER_POINT;
+      assert_eq!(axis.logical_to_device_dot(logical_x_pt), expected_dot);
+      assert!(
+        (axis.device_dot_to_output_pt(expected_dot as f64) - expected_pdf_x).abs() < 0.01,
+        "split={split_twips}"
+      );
+    }
+  }
+
+  #[test]
+  fn word_table_device_dash_resampling_matches_office_masks() {
+    let pattern = word_table_fine_dash_pattern(0.5);
+    for (phase_dot, expected) in [
+      (2, [255, 255, 255, 255, 255, 0]),
+      (4, [255, 255, 255, 255, 0, 255]),
+      (6, [255, 255, 255, 0, 0, 255]),
+      (7, [255, 255, 255, 0, 255, 255]),
+      (8, [255, 255, 255, 0, 255, 255]),
+      (9, [255, 255, 0, 0, 255, 255]),
+      (11, [255, 255, 0, 255, 255, 255]),
+      (12, [255, 255, 0, 255, 255, 255]),
+      (14, [255, 0, 255, 255, 255, 255]),
+    ] {
+      let tile = word_table_fine_dash_device_bitmap(
+        pattern,
+        phase_dot,
+        pattern.period_dot_count,
+        pattern.sample_count,
+        true,
+        RgbColor::default(),
+      )
+      .expect("device-sampled fine-dash tile");
+      let tile = image::load_from_memory(&tile)
+        .expect("fine-dash PNG")
+        .to_rgba8();
+      assert_eq!(
+        tile.pixels().map(|pixel| pixel.0[3]).collect::<Vec<_>>(),
+        expected,
+        "phase_dot={phase_dot}"
+      );
+    }
+  }
+
+  #[test]
+  fn word_table_horizontal_tail_resamples_its_own_extent() {
+    let pattern = word_table_fine_dash_pattern(0.5);
+    for (extent_dot_count, sample_count, expected, full_period_counterexample) in [
+      (13, 4, vec![255, 255, 255, 0], vec![255, 255, 0, 255]),
+      (
+        18,
+        6,
+        vec![255, 255, 255, 0, 0, 255],
+        vec![255, 255, 255, 0, 255, 255],
+      ),
+    ] {
+      let tail = word_table_fine_dash_device_bitmap(
+        pattern,
+        7,
+        extent_dot_count,
+        sample_count,
+        true,
+        RgbColor::default(),
+      )
+      .expect("extent-resampled horizontal tail");
+      let tail = image::load_from_memory(&tail)
+        .expect("horizontal tail PNG")
+        .to_rgba8();
+      let alpha = tail.pixels().map(|pixel| pixel.0[3]).collect::<Vec<_>>();
+      assert_eq!(alpha, expected);
+
+      let full_period = word_table_fine_dash_device_bitmap(
+        pattern,
+        7,
+        pattern.period_dot_count,
+        sample_count,
+        true,
+        RgbColor::default(),
+      )
+      .expect("full-period counterexample");
+      let full_period = image::load_from_memory(&full_period)
+        .expect("full-period PNG")
+        .to_rgba8();
+      assert_eq!(
+        full_period
+          .pixels()
+          .map(|pixel| pixel.0[3])
+          .collect::<Vec<_>>(),
+        full_period_counterexample
+      );
+    }
+  }
+
+  #[test]
+  fn word_table_vertical_tail_allocation_keeps_office_phase_thresholds() {
+    let pattern = word_table_fine_dash_pattern(0.5);
+    for (phase_dot, extent_dot_count, expected_sample_count) in [
+      (10, 12, 3),
+      (12, 12, 4),
+      (14, 12, 3),
+      (18, 12, 4),
+      (12, 18, 6),
+      (13, 18, 5),
+      (14, 18, 5),
+      (15, 18, 5),
+      (16, 18, 6),
+      (13, 19, 6),
+      (14, 19, 6),
+      (14, 17, 5),
+      (18, 11, 3),
+      (1, 3, 1),
+    ] {
+      assert_eq!(
+        word_table_fine_dash_tail_sample_count(pattern, phase_dot, extent_dot_count),
+        expected_sample_count,
+        "phase={phase_dot}, extent={extent_dot_count}"
+      );
+    }
+  }
+
+  #[test]
+  fn word_table_vertical_dash_uses_page_grid_without_corner_images() {
+    let setup = PageSetup {
+      width_pt: 11906.0 / units::TWIPS_PER_POINT,
+      height_pt: 16838.0 / units::TWIPS_PER_POINT,
+      ..Default::default()
+    };
+    let mut page = empty_page(setup, 0);
+    push_word_table_fine_dashed_vertical_border(
+      &mut page,
+      1309.0 / units::TWIPS_PER_POINT,
+      1425.0 / units::TWIPS_PER_POINT,
+      1791.0 / units::TWIPS_PER_POINT,
+      true,
+      BorderStyle {
+        width_pt: 0.5,
+        color: RgbColor {
+          r: 0,
+          g: 112,
+          b: 192,
+        },
+        dash_pattern: BorderDashPattern::FineDashed,
+        ..BorderStyle::default()
+      },
+    );
+
+    let images = page
+      .items
+      .iter()
+      .map(|item| match item {
+        PageItem::Image(image) => image,
+        item => panic!("expected vertical bitmap tile, got {item:?}"),
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(images.len(), 8);
+    let horizontal_axis = WordTableDeviceAxis::new(setup.width_pt).expect("horizontal page axis");
+    let vertical_axis = WordTableDeviceAxis::new(setup.height_pt).expect("vertical page axis");
+    assert!((images[0].x_pt - horizontal_axis.device_dot_to_output_pt(543.0)).abs() < 0.000_1);
+    assert!((images[0].y_pt - vertical_axis.device_dot_to_output_pt(594.0)).abs() < 0.000_1);
+    assert!((images[0].width_pt - 0.48).abs() < 0.01);
+    assert!(
+      (images[0].height_pt
+        - (vertical_axis.device_dot_to_output_pt(614.0)
+          - vertical_axis.device_dot_to_output_pt(594.0)))
+      .abs()
+        < 0.000_1
+    );
+    assert!(
+      (images[7].height_pt
+        - (vertical_axis.device_dot_to_output_pt(746.0)
+          - vertical_axis.device_dot_to_output_pt(734.0)))
+      .abs()
+        < 0.000_1
+    );
+
+    let tail = image::load_from_memory(&images[7].data)
+      .expect("vertical tail PNG")
+      .to_rgba8();
+    assert_eq!(tail.dimensions(), (1, 3));
+    assert_eq!(
+      tail.pixels().map(|pixel| pixel.0[3]).collect::<Vec<_>>(),
+      [255, 0, 255]
+    );
+  }
+
+  #[test]
+  fn word_table_collapsed_inside_vertical_dash_uses_the_row_owned_device_painter() {
+    fn empty_cell() -> TableCell {
+      TableCell {
+        blocks: Vec::new(),
+        shading: None,
+        borders: CellBordersModel::default(),
+        border_suppressions: CellBorderSuppressions::default(),
+        margins: CellMargins::default(),
+        preferred_width_pt: None,
+        preferred_width_pct: None,
+        grid_span: 1,
+        vertical_merge_continue: false,
+        no_wrap: false,
+        fit_text: false,
+        hide_end_mark: false,
+        vertical_alignment: TableCellVerticalAlignment::Top,
+        text_rotation_deg: None,
+      }
+    }
+
+    fn row() -> TableRow {
+      TableRow {
+        cells: vec![empty_cell(), empty_cell()],
+        height_pt: None,
+        exact_height: false,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: false,
+        cell_spacing_pt: None,
+        grid_before: 0,
+        grid_after: 0,
+        width_before_pt: None,
+        width_after_pt: None,
+        layout: None,
+        borders: None,
+        spacing_shading: None,
+        redline_color: None,
+      }
+    }
+
+    let border = BorderStyle {
+      width_pt: 0.5,
+      dash_pattern: BorderDashPattern::FineDashed,
+      ..BorderStyle::default()
+    };
+    let table = Table {
+      column_widths_pt: vec![239.4, 239.4],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      layout: TableLayoutMode::AutoFit,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      right_to_left: false,
+      align_leading_cell_content: true,
+      in_header_footer: false,
+      placement: None,
+      allow_overlap: true,
+      split_allowed: true,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      page_break_before: false,
+      starts_after_last_rendered_page_break: false,
+      borders: Some(TableBordersModel {
+        top: Some(border),
+        right: Some(border),
+        bottom: Some(border),
+        left: Some(border),
+        inside_horizontal: Some(border),
+        inside_vertical: Some(border),
+      }),
+      cell_spacing_pt: 0.0,
+      rows: vec![row(), row()],
+    };
+    let setup = PageSetup {
+      width_pt: 612.0,
+      height_pt: 792.0,
+      ..Default::default()
+    };
+    let mut collapsed = empty_page(setup, 0);
+    push_cell_vertical_border_line(
+      &mut collapsed,
+      &table,
+      &table.rows[0],
+      0,
+      306.0,
+      72.0..85.927_734,
+      border,
+    );
+    let collapsed_images = collapsed
+      .items
+      .iter()
+      .map(|item| match item {
+        PageItem::Image(image) => image,
+        item => panic!("collapsed insideV device tile, got {item:?}"),
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(collapsed_images.len(), 6);
+    assert!((collapsed_images[0].y_pt - 72.48).abs() < 0.000_1);
+    assert!((collapsed_images[0].x_pt - 305.76).abs() < 0.000_1);
+
+    let mut separated_table = table.clone();
+    separated_table.cell_spacing_pt = 1.0;
+    let mut separated = empty_page(setup, 0);
+    push_cell_vertical_border_line(
+      &mut separated,
+      &separated_table,
+      &separated_table.rows[0],
+      0,
+      306.0,
+      72.0..85.927_734,
+      border,
+    );
+    let separated_images = separated
+      .items
+      .iter()
+      .map(|item| match item {
+        PageItem::Image(image) => image,
+        item => panic!("separated-cell fine-dash image, got {item:?}"),
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(separated_images.len(), 8);
+    assert!((separated_images[0].y_pt - 71.76).abs() < 0.000_1);
+  }
+
+  #[test]
+  fn word_table_upper_and_lower_seams_keep_distinct_device_ownership() {
+    let setup = PageSetup {
+      width_pt: 11906.0 / units::TWIPS_PER_POINT,
+      height_pt: 16838.0 / units::TWIPS_PER_POINT,
+      ..Default::default()
+    };
+    let border = BorderStyle {
+      width_pt: 0.5,
+      dash_pattern: BorderDashPattern::FineDashed,
+      ..BorderStyle::default()
+    };
+    let left_pt = 1309.0 / units::TWIPS_PER_POINT;
+    let seam_pt = (1309.0 + 3070.0) / units::TWIPS_PER_POINT;
+
+    let mut upper = empty_page(setup, 0);
+    push_word_table_fine_dashed_horizontal_border(
+      &mut upper,
+      left_pt,
+      71.1,
+      seam_pt,
+      border,
+      HorizontalTableBorderEdge::Upper,
+      (
+        HorizontalTableBorderJunction::horizontal_outer(None, Some(border)),
+        HorizontalTableBorderJunction::internal(None, None),
+      ),
+    );
+    let upper_seam = match &upper.items[1] {
+      PageItem::Image(image) => image,
+      item => panic!("upper seam image, got {item:?}"),
+    };
+    assert!((upper_seam.x_pt - 218.93).abs() < 0.01);
+    let upper_alpha = image::load_from_memory(&upper_seam.data)
+      .expect("upper seam PNG")
+      .to_rgba8();
+    assert_eq!(upper_alpha.get_pixel(0, 0).0[3], 255);
+
+    let mut lower = empty_page(setup, 0);
+    push_word_table_fine_dashed_horizontal_border(
+      &mut lower,
+      left_pt,
+      85.1,
+      seam_pt,
+      border,
+      HorizontalTableBorderEdge::Lower,
+      (
+        HorizontalTableBorderJunction::horizontal_outer(Some(border), None),
+        HorizontalTableBorderJunction::internal(None, None),
+      ),
+    );
+    let lower_seam = match &lower.items[1] {
+      PageItem::Image(image) => image,
+      item => panic!("lower seam image, got {item:?}"),
+    };
+    assert!((lower_seam.x_pt - 218.21).abs() < 0.01);
+    let lower_alpha = image::load_from_memory(&lower_seam.data)
+      .expect("lower seam PNG")
+      .to_rgba8();
+    assert_eq!(lower_alpha.get_pixel(0, 0).0[3], 0);
+  }
+
+  #[test]
+  fn word_table_horizontal_junction_consumes_perpendicular_border_state() {
+    let horizontal = BorderStyle {
+      width_pt: 0.5,
+      dash_pattern: BorderDashPattern::FineDashed,
+      ..BorderStyle::default()
+    };
+    let thin_vertical = BorderStyle {
+      width_pt: 0.25,
+      ..horizontal
+    };
+    let medium_vertical = BorderStyle {
+      width_pt: 0.5,
+      ..horizontal
+    };
+    let wide_vertical = BorderStyle {
+      width_pt: 1.0,
+      ..horizontal
+    };
+
+    // Matrix O: none/nil preserve the edge-specific sampled ownership, while
+    // every visible style shifts to the perpendicular rule's left edge using
+    // only its quantized width.
+    let no_vertical_upper = horizontal_table_border_junction_geometry(
+      2550.0,
+      HorizontalTableBorderEdge::Upper,
+      HorizontalTableBorderJunction::internal(None, None),
+      4,
+    );
+    let no_vertical_lower = horizontal_table_border_junction_geometry(
+      2550.0,
+      HorizontalTableBorderEdge::Lower,
+      HorizontalTableBorderJunction::internal(None, None),
+      4,
+    );
+    assert_eq!(no_vertical_upper.start_dot, 2550.0);
+    assert_eq!(no_vertical_lower.start_dot, 2544.0);
+    assert!(!no_vertical_upper.solid);
+    assert!(!no_vertical_lower.solid);
+
+    for (vertical, expected_start) in [
+      (thin_vertical, 2549.0),
+      (medium_vertical, 2548.0),
+      (wide_vertical, 2546.0),
+    ] {
+      let upper = horizontal_table_border_junction_geometry(
+        2550.0,
+        HorizontalTableBorderEdge::Upper,
+        HorizontalTableBorderJunction::horizontal_outer(None, Some(vertical)),
+        4,
+      );
+      let lower = horizontal_table_border_junction_geometry(
+        2550.0,
+        HorizontalTableBorderEdge::Lower,
+        HorizontalTableBorderJunction::horizontal_outer(Some(vertical), None),
+        4,
+      );
+      assert_eq!(upper.start_dot, expected_start);
+      assert_eq!(lower.start_dot, expected_start);
+      assert_eq!(upper.extent_dots, 4.0);
+      assert_eq!(lower.extent_dots, 4.0);
+      assert!(upper.solid);
+      assert!(lower.solid);
+    }
+
+    // Matrix P: equal device widths above/below merge into max(horizontal,
+    // vertical), whereas unequal widths retain a separate horizontal connector
+    // extent.
+    let continuous = horizontal_table_border_junction_geometry(
+      2550.0,
+      HorizontalTableBorderEdge::Lower,
+      HorizontalTableBorderJunction::internal(Some(wide_vertical), Some(wide_vertical)),
+      4,
+    );
+    assert_eq!(continuous.start_dot, 2546.0);
+    assert_eq!(continuous.extent_dots, 8.0);
+
+    // Matrix S: the merge key is equal quantized width, not full border-style
+    // identity. Word gives dashSmallGap/single/dotted the same junction
+    // geometry throughout the 4x4 same-width factorial.
+    let solid_vertical = BorderStyle {
+      dash_pattern: BorderDashPattern::Solid,
+      ..medium_vertical
+    };
+    let different_styles = horizontal_table_border_junction_geometry(
+      2550.0,
+      HorizontalTableBorderEdge::Lower,
+      HorizontalTableBorderJunction::internal(Some(medium_vertical), Some(solid_vertical)),
+      4,
+    );
+    assert_eq!(different_styles.start_dot, 2548.0);
+    assert_eq!(different_styles.extent_dots, 4.0);
+
+    let discontinuous = horizontal_table_border_junction_geometry(
+      2550.0,
+      HorizontalTableBorderEdge::Lower,
+      HorizontalTableBorderJunction::internal(Some(thin_vertical), Some(medium_vertical)),
+      4,
+    );
+    assert_eq!(discontinuous.start_dot, 2548.0);
+    assert_eq!(discontinuous.extent_dots, 8.0);
   }
 
   #[test]
@@ -48175,6 +50684,7 @@ mod tests {
       text_fill: None,
       effects: None,
       static3d: None,
+      wordprocessing_shape_host: false,
       text_upright: false,
       text_box_writing_mode: TextBoxWritingMode::Horizontal,
       word_text_frame: false,
@@ -52163,6 +54673,7 @@ mod tests {
         text_fill: None,
         effects: None,
         static3d: None,
+        wordprocessing_shape_host: false,
         text_upright: false,
         text_box_writing_mode: TextBoxWritingMode::Horizontal,
         word_text_frame: false,
@@ -52713,6 +55224,7 @@ mod tests {
         text_fill: None,
         effects: None,
         static3d: None,
+        wordprocessing_shape_host: false,
         text_upright: false,
         text_box_writing_mode: TextBoxWritingMode::Horizontal,
         word_text_frame: false,

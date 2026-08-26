@@ -154,10 +154,5 @@ fn chart_default_run_properties_color(
 }
 
 fn drawingml_solid_fill_color(fill: &a::SolidFill, theme_colors: &ThemeColors) -> Option<RgbColor> {
-  match fill.solid_fill_choice.as_ref()? {
-    a::SolidFillChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
-    a::SolidFillChoice::SchemeColor(color) => resolve_drawingml_scheme_color(color, theme_colors),
-    a::SolidFillChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
-    _ => None,
-  }
+  resolve_drawingml_solid_fill(fill, theme_colors).map(|resolved| resolved.color)
 }

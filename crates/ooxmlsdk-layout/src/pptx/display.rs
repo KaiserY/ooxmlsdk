@@ -86,8 +86,6 @@ const MISSING_PICTURE_BORDER_INSET_PT: f32 = 0.06;
 const MISSING_PICTURE_ICON_OFFSET_PT: f32 = 0.84;
 const MISSING_PICTURE_ICON_WIDTH_PT: f32 = 1.68;
 const MISSING_PICTURE_ICON_HEIGHT_PT: f32 = 1.92;
-const POWERPOINT_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX: f32 = 16.0;
-
 #[derive(Clone, Copy, Debug)]
 struct PptxFixedOutputProfile {
   raster_dpi: f32,
@@ -116,18 +114,7 @@ impl PptxFixedOutputProfile {
     // the tier edges at 5.76 and 11.52pt: each tier keeps the authored radius
     // at or below 16 reference pixels. The selected divisor is then applied
     // to the configured output density (11pt => 100/48 DPI respectively).
-    let reference_radius_px =
-      radius_pt.max(0.0) * units::OFFICE_FIXED_OUTPUT_RASTER_DPI / units::POINTS_PER_INCH;
-    let tier_position = reference_radius_px / POWERPOINT_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX;
-    let nearest_tier = tier_position.round();
-    let integer_tolerance = f32::EPSILON * tier_position.abs().max(1.0) * 8.0;
-    let divisor = if (tier_position - nearest_tier).abs() <= integer_tolerance {
-      nearest_tier
-    } else {
-      tier_position.ceil()
-    }
-    .max(1.0);
-    self.pixels_per_point() / divisor
+    common::drawingml_shape_raster::office_simple_glow_pixels_per_point(self.raster_dpi, radius_pt)
   }
 }
 
@@ -2808,7 +2795,7 @@ fn display_paint_for_chart_color_with_placeholder_policy(
   let color = if preserve_saturation_overflow {
     color
       .clone()
-      .resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?
+      .resolve_rgb_preserving_transform_precision(&mut scheme_resolver, placeholder_color)?
   } else {
     color
       .clone()
@@ -3546,9 +3533,11 @@ fn lower_diagram(
         context.import,
         context.slide,
         context.fixed_output,
-        diagram_shape.shape_properties.as_deref(),
-        shape_bounds,
-        diagram_shape.shape_rotation_deg,
+        DiagramModelShapeEffectSpec {
+          properties: diagram_shape.shape_properties.as_deref(),
+          bounds: shape_bounds,
+          rotation_degrees: diagram_shape.shape_rotation_deg,
+        },
         &mut drawing_items,
         shape_content_start,
       );
@@ -4592,16 +4581,26 @@ fn diagram_model_shape_suppresses_fill(properties: &dgm::ShapeProperties) -> boo
   )
 }
 
+#[derive(Clone, Copy)]
+struct DiagramModelShapeEffectSpec<'a> {
+  properties: Option<&'a dgm::ShapeProperties>,
+  bounds: shared_diagram::DiagramBounds,
+  rotation_degrees: f32,
+}
+
 fn finish_diagram_model_shape_effects(
   import: &PowerPointImport,
   slide: &SlidePersist,
   fixed_output: PptxFixedOutputProfile,
-  properties: Option<&dgm::ShapeProperties>,
-  bounds: shared_diagram::DiagramBounds,
-  rotation_degrees: f32,
+  spec: DiagramModelShapeEffectSpec<'_>,
   items: &mut Vec<PageItem>,
   content_start: usize,
 ) {
+  let DiagramModelShapeEffectSpec {
+    properties,
+    bounds,
+    rotation_degrees,
+  } = spec;
   let Some(properties) = properties else {
     return;
   };
@@ -15206,7 +15205,7 @@ fn display_paint_for_optional_slide_with_transform_precision(
     None => import.get_scheme_color_record(token).cloned(),
   };
   let color =
-    color.resolve_rgb_with_theme_style_precision(&mut scheme_resolver, placeholder_color)?;
+    color.resolve_rgb_preserving_transform_precision(&mut scheme_resolver, placeholder_color)?;
   Some(DisplayPaint {
     color: RgbColor {
       r: color.r,
@@ -15348,7 +15347,7 @@ mod tests {
       b: 3,
       a: 255,
     }));
-    let clip = simple_shape_glow_exclusion_clip_path(&[filled.clone()], raster_bounds);
+    let clip = simple_shape_glow_exclusion_clip_path(std::slice::from_ref(&filled), raster_bounds);
     assert_eq!(clip.len(), 10);
     assert_eq!(clip[0], common::PathCommand::MoveTo(raster_bounds.origin));
     assert_eq!(clip[5], common::PathCommand::MoveTo(shape_bounds.origin));

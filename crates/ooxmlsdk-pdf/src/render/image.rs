@@ -11,12 +11,7 @@ use image::{
   ColorType, DynamicImage, GenericImageView, ImageDecoder, ImageEncoder,
   ImageFormat as RasterImageFormat, ImageReader, Rgba, imageops::FilterType,
 };
-use jpeg_encoder::{
-  ColorType as JpegColorType, Encoder as JpegEncoder, ImageBuffer as JpegImageBuffer,
-  JpegColorType as JpegComponentColorType, SamplingFactor, rgb_to_ycbcr,
-};
-use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
-use lopdf::{Document as LopdfDocument, Object as LopdfObject};
+use jpeg_encoder::{ColorType as JpegColorType, Encoder as JpegEncoder, SamplingFactor};
 use rustc_hash::FxHashMap as HashMap;
 
 use crate::error::{PdfError, Result};
@@ -31,6 +26,14 @@ const WORD_LOCKED_CANVAS_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-locked-canvas+png";
 const WORD_SHAPE_STORY_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-shape-story+png";
+const WORD_GROUP_GLOW_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-group-glow+png";
+const WORD_SHAPE_GLOW_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-shape-glow+png";
+const WORD_SHAPE_SHADOW_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-shape-shadow+png";
+const WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-table-border+png";
 const SOURCE_RECTANGLE_CROP_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.source-rectangle-crop+png";
 const OFFICE_SMALL_RASTER_UNCOMPRESSED_RGB_BYTES: u64 = 64 * 1024;
@@ -49,238 +52,119 @@ pub(super) struct NativeIndexedPngReplacement {
   decoded_rgb: Vec<u8>,
 }
 
-pub(super) fn finalize_raster_image_xobjects(
-  pdf: Vec<u8>,
-  black_matte_rasters: &BTreeSet<BlackMatteRasterFingerprint>,
-  native_indexed_pngs: &[NativeIndexedPngReplacement],
-) -> Result<Vec<u8>> {
-  let mut document =
-    LopdfDocument::load_mem(&pdf).map_err(|error| PdfError::Lopdf(error.to_string()))?;
-  let changed = install_native_indexed_pngs(&mut document, native_indexed_pngs)
-    + mark_black_matte_soft_masks(&mut document, black_matte_rasters);
-  if changed == 0 {
-    return Ok(pdf);
-  }
+/// Backend-neutral raster selected by the image policy.
+///
+/// Decoding, resampling, JPEG selection, hidden-color cleanup, interpolation,
+/// ICC ownership, and matte association happen once. Cloning and identity
+/// lookup remain O(1) even for large images.
+#[derive(Clone, Debug)]
+pub(super) struct PreparedRasterImage(Arc<PreparedRasterImageInner>);
 
-  let mut output = Vec::new();
-  document
-    .save_to(&mut output)
-    .map_err(|error| PdfError::Lopdf(error.to_string()))?;
-  Ok(output)
+#[derive(Debug)]
+struct PreparedRasterImageInner {
+  direct: DirectRasterImage,
 }
 
-fn install_native_indexed_pngs(
-  document: &mut LopdfDocument,
-  replacements: &[NativeIndexedPngReplacement],
-) -> usize {
-  let mut installed = vec![false; replacements.len()];
-  let mut changed = 0;
-  for object in document.objects.values_mut() {
-    let LopdfObject::Stream(image) = object else {
-      continue;
-    };
-    if !pdf_dictionary_name_is(&image.dict, b"Subtype", b"Image")
-      || !pdf_dictionary_name_is(&image.dict, b"ColorSpace", b"DeviceRGB")
-      || !pdf_dictionary_name_is(&image.dict, b"Filter", b"FlateDecode")
-      || pdf_dictionary_i64(&image.dict, b"BitsPerComponent") != Some(8)
-      || image.dict.has(b"SMask")
-      || image.dict.has(b"Decode")
-      || image.dict.has(b"DecodeParms")
-    {
-      continue;
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum DirectRasterColorSpace {
+  Gray,
+  Rgb,
+  Cmyk,
+}
+
+impl DirectRasterColorSpace {
+  pub(super) const fn components(self) -> i32 {
+    match self {
+      Self::Gray => 1,
+      Self::Rgb => 3,
+      Self::Cmyk => 4,
     }
+  }
 
-    let Some(width) =
-      pdf_dictionary_i64(&image.dict, b"Width").and_then(|value| u32::try_from(value).ok())
-    else {
-      continue;
+  fn accepts_icc(self, profile: &[u8]) -> bool {
+    let expected = match self {
+      Self::Gray => b"GRAY".as_slice(),
+      Self::Rgb => b"RGB ".as_slice(),
+      Self::Cmyk => b"CMYK".as_slice(),
     };
-    let Some(height) =
-      pdf_dictionary_i64(&image.dict, b"Height").and_then(|value| u32::try_from(value).ok())
-    else {
-      continue;
-    };
-    let Some(decoded_len) = usize::try_from(width)
-      .ok()
-      .and_then(|width| {
-        usize::try_from(height)
-          .ok()
-          .and_then(|height| width.checked_mul(height))
-      })
-      .and_then(|pixels| pixels.checked_mul(3))
-    else {
-      continue;
-    };
-    let Ok(decoded_rgb) = image.decompressed_content_with_limit(decoded_len) else {
-      continue;
-    };
-    if decoded_rgb.len() != decoded_len {
-      continue;
+    let declared_length = profile
+      .get(..4)
+      .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
+      .map(u32::from_be_bytes)
+      .and_then(|length| usize::try_from(length).ok());
+    profile.get(16..20) == Some(expected)
+      && profile.get(36..40) == Some(b"acsp")
+      && declared_length.is_some_and(|length| length >= 132 && length == profile.len())
+  }
+}
+
+#[derive(Clone, Debug)]
+pub(super) enum DirectRasterEncoding {
+  /// Unencoded component samples. The direct writer compresses each color and
+  /// alpha plane once when it writes the shared image object.
+  Sampled { pixels: Arc<PdfRasterPixels> },
+  /// A complete baseline/progressive JPEG stream consumed by `/DCTDecode`.
+  Dct {
+    data: Arc<[u8]>,
+    icc_profile: Option<Arc<[u8]>>,
+    invert_cmyk: bool,
+  },
+  /// A validated indexed PNG IDAT stream consumed through PDF's PNG predictor.
+  IndexedPng {
+    data: Arc<[u8]>,
+    palette: Arc<[u8]>,
+    icc_profile: Option<Arc<[u8]>>,
+  },
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct DirectRasterImage {
+  pub(super) width: u32,
+  pub(super) height: u32,
+  pub(super) color_space: DirectRasterColorSpace,
+  pub(super) bits_per_component: u8,
+  pub(super) encoding: DirectRasterEncoding,
+  pub(super) interpolate: bool,
+  /// Present only when the sampled color plane is associated with this matte.
+  /// PDF writes the value on the linked soft-mask image, not on the parent.
+  pub(super) matte: Option<[f32; 3]>,
+}
+
+impl DirectRasterImage {
+  pub(super) fn icc_profile(&self) -> Option<&[u8]> {
+    let profile = match &self.encoding {
+      DirectRasterEncoding::Sampled { pixels } => pixels.icc_profile.as_deref(),
+      DirectRasterEncoding::Dct { icc_profile, .. }
+      | DirectRasterEncoding::IndexedPng { icc_profile, .. } => icc_profile.as_deref(),
+    }?;
+    self.color_space.accepts_icc(profile).then_some(profile)
+  }
+
+  pub(super) fn alpha(&self) -> Option<&[u8]> {
+    match &self.encoding {
+      DirectRasterEncoding::Sampled { pixels } => pixels.alpha.as_deref(),
+      DirectRasterEncoding::Dct { .. } | DirectRasterEncoding::IndexedPng { .. } => None,
     }
-
-    let Some((replacement_index, replacement)) =
-      replacements
-        .iter()
-        .enumerate()
-        .find(|(index, replacement)| {
-          !installed[*index]
-            && replacement.png.width == width
-            && replacement.png.height == height
-            && replacement.decoded_rgb == decoded_rgb
-        })
-    else {
-      continue;
-    };
-
-    let palette_entries = replacement.png.palette.len() / 3;
-    let Some(palette_high) = palette_entries
-      .checked_sub(1)
-      .and_then(|value| i64::try_from(value).ok())
-    else {
-      continue;
-    };
-    let mut decode_parameters = lopdf::Dictionary::new();
-    decode_parameters.set("Predictor", LopdfObject::Integer(15));
-    decode_parameters.set("Colors", LopdfObject::Integer(1));
-    decode_parameters.set(
-      "BitsPerComponent",
-      LopdfObject::Integer(replacement.png.bit_depth as i64),
-    );
-    decode_parameters.set("Columns", LopdfObject::Integer(i64::from(width)));
-    image.dict.set(
-      "ColorSpace",
-      LopdfObject::Array(vec![
-        LopdfObject::Name(b"Indexed".to_vec()),
-        LopdfObject::Name(b"DeviceRGB".to_vec()),
-        LopdfObject::Integer(palette_high),
-        LopdfObject::String(
-          replacement.png.palette.clone(),
-          lopdf::StringFormat::Literal,
-        ),
-      ]),
-    );
-    image.dict.set(
-      "BitsPerComponent",
-      LopdfObject::Integer(replacement.png.bit_depth as i64),
-    );
-    image
-      .dict
-      .set("Filter", LopdfObject::Name(b"FlateDecode".to_vec()));
-    image
-      .dict
-      .set("DecodeParms", LopdfObject::Dictionary(decode_parameters));
-    image.set_content(replacement.png.idat.clone());
-    image.allows_compression = false;
-    installed[replacement_index] = true;
-    changed += 1;
   }
-  changed
 }
 
-fn mark_black_matte_soft_masks(
-  document: &mut LopdfDocument,
-  authorized: &BTreeSet<BlackMatteRasterFingerprint>,
-) -> usize {
-  let mask_ids = black_matte_soft_mask_ids(document, authorized);
-  let changed = mask_ids.len();
-  for mask_id in mask_ids {
-    let Some(LopdfObject::Stream(mask)) = document.objects.get_mut(&mask_id) else {
-      continue;
-    };
-    mask.dict.set(
-      "Matte",
-      LopdfObject::Array(vec![
-        LopdfObject::Integer(0),
-        LopdfObject::Integer(0),
-        LopdfObject::Integer(0),
-      ]),
-    );
-  }
-  changed
-}
-
-fn black_matte_soft_mask_ids(
-  document: &LopdfDocument,
-  authorized: &BTreeSet<BlackMatteRasterFingerprint>,
-) -> BTreeSet<lopdf::ObjectId> {
-  document
-    .objects
-    .values()
-    .filter_map(|object| black_matte_soft_mask_id(document, object, authorized))
-    .collect()
-}
-
-fn black_matte_soft_mask_id(
-  document: &LopdfDocument,
-  object: &LopdfObject,
-  authorized: &BTreeSet<BlackMatteRasterFingerprint>,
-) -> Option<lopdf::ObjectId> {
-  let LopdfObject::Stream(image) = object else {
-    return None;
-  };
-  if !pdf_dictionary_name_is(&image.dict, b"Subtype", b"Image")
-    || pdf_dictionary_i64(&image.dict, b"BitsPerComponent") != Some(8)
-    || image.dict.has(b"Decode")
-  {
-    return None;
+impl PreparedRasterImage {
+  pub(super) fn new(direct: DirectRasterImage) -> Self {
+    Self(Arc::new(PreparedRasterImageInner { direct }))
   }
 
-  let width = usize::try_from(pdf_dictionary_i64(&image.dict, b"Width")?).ok()?;
-  let height = usize::try_from(pdf_dictionary_i64(&image.dict, b"Height")?).ok()?;
-  let pixel_count = width.checked_mul(height)?;
-  let color_len = pixel_count.checked_mul(3)?;
-  if pixel_count == 0 {
-    return None;
+  pub(super) fn direct(&self) -> &DirectRasterImage {
+    &self.0.direct
   }
 
-  let mask_id = image
-    .dict
-    .get(b"SMask")
-    .and_then(LopdfObject::as_reference)
-    .ok()?;
-  let LopdfObject::Stream(mask) = document.objects.get(&mask_id)? else {
-    return None;
-  };
-  if !pdf_dictionary_name_is(&mask.dict, b"Subtype", b"Image")
-    || !pdf_dictionary_name_is(&mask.dict, b"ColorSpace", b"DeviceGray")
-    || pdf_dictionary_i64(&mask.dict, b"BitsPerComponent") != Some(8)
-    || pdf_dictionary_i64(&mask.dict, b"Width") != i64::try_from(width).ok()
-    || pdf_dictionary_i64(&mask.dict, b"Height") != i64::try_from(height).ok()
-    || mask.dict.has(b"Decode")
-    || mask.dict.has(b"Matte")
-  {
-    return None;
+  pub(super) fn identity(&self) -> usize {
+    Arc::as_ptr(&self.0) as usize
   }
 
-  let alpha = mask.decompressed_content().ok()?;
-  let color = image.decompressed_content().ok()?;
-  // A PDF/A backend commonly replaces literal DeviceRGB with an ICCBased
-  // three-component space. The decoded byte count is the authoritative
-  // component contract here: grayscale and CMYK cannot satisfy exactly
-  // `3 * width * height`, while the recorded fingerprint still proves the
-  // particular partial-alpha associated plane before Matte is installed.
-  if alpha.len() != pixel_count || color.len() != color_len {
-    return None;
+  #[cfg(test)]
+  fn size(&self) -> (u32, u32) {
+    (self.0.direct.width, self.0.direct.height)
   }
-
-  // PDF Reference 1.5 §7.5.4 defines Matte as the color against which the
-  // parent samples were preblended. A binary alpha plane does not prove that
-  // representation: straight and associated samples agree at source sample
-  // points but produce different colors when a PDF consumer resamples the
-  // image. Require the exact fingerprint recorded where this renderer
-  // actually constructs a black-associated RGB plane.
-  let saw_transparent = alpha.iter().any(|alpha| *alpha < 255);
-  let saw_visible = alpha.iter().any(|alpha| *alpha > 0);
-  if !saw_transparent || !saw_visible {
-    return None;
-  }
-  let fingerprint = black_matte_raster_fingerprint(
-    u32::try_from(width).ok()?,
-    u32::try_from(height).ok()?,
-    &color,
-    &alpha,
-  );
-  authorized.contains(&fingerprint).then_some(mask_id)
 }
 
 fn black_matte_raster_fingerprint(
@@ -302,21 +186,12 @@ fn black_matte_raster_fingerprint(
   }
 }
 
-fn pdf_dictionary_name_is(dictionary: &lopdf::Dictionary, key: &[u8], expected: &[u8]) -> bool {
-  dictionary
-    .get(key)
-    .and_then(LopdfObject::as_name)
-    .is_ok_and(|value| value == expected)
-}
-
-fn pdf_dictionary_i64(dictionary: &lopdf::Dictionary, key: &[u8]) -> Option<i64> {
-  dictionary.get(key).and_then(LopdfObject::as_i64).ok()
-}
-
 #[derive(Default)]
 pub(super) struct ImageSet {
   rasters: HashMap<(usize, usize), Vec<CachedRaster>>,
-  svgs: HashMap<(usize, usize), Arc<usvg::Tree>>,
+  svgs: HashMap<(usize, usize), Arc<super::direct_svg::PreparedSvg>>,
+  svg_rasters: HashMap<(usize, usize, u32, u32), PreparedRasterImage>,
+  office_math_svgs: HashMap<(usize, usize), Arc<super::direct_svg::PreparedOfficeMathSvg>>,
   black_matte_rasters: BTreeSet<BlackMatteRasterFingerprint>,
   native_indexed_pngs: Vec<NativeIndexedPngReplacement>,
 }
@@ -325,7 +200,7 @@ struct CachedRaster {
   content_type: Option<String>,
   metafile_render_options: Option<emf_wmf::RenderOptions>,
   export_options: RasterExportOptions,
-  image: Image,
+  image: PreparedRasterImage,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -334,7 +209,9 @@ struct RasterExportOptions {
   jpeg_quality: Option<u8>,
   max_size_px: Option<RasterPixelLimits>,
   downsample_trigger_px: Option<RasterPixelLimits>,
-  word_print_jpeg_max_size_px: Option<RasterPixelLimits>,
+  word_print_jpeg_downsample_trigger_px: Option<RasterPixelLimits>,
+  exact_downsample_trigger: bool,
+  use_word_print_jpeg_gdiplus_resampler: bool,
   allow_interpolation: bool,
   profile: RasterExportProfile,
 }
@@ -384,15 +261,29 @@ impl RasterExportProfile {
       }
     )
   }
+
+  fn is_word(self) -> bool {
+    matches!(
+      self,
+      Self::MicrosoftOfficeFixedOutput {
+        document_kind: PdfDocumentKind::Docx,
+        ..
+      }
+    )
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum RasterOwner {
   Source,
   MaterializedSourceRectangleCrop,
+  WordGroupGlow,
+  WordShapeGlow,
+  WordShapeShadow,
   WordLockedCanvas,
   WordShapeStory,
   WordStatic3d,
+  WordTableBorder,
   MetafilePreview,
 }
 
@@ -402,6 +293,18 @@ impl RasterOwner {
       .is_some_and(|value| value.eq_ignore_ascii_case(SOURCE_RECTANGLE_CROP_BITMAP_CONTENT_TYPE))
     {
       Self::MaterializedSourceRectangleCrop
+    } else if content_type
+      .is_some_and(|value| value.eq_ignore_ascii_case(WORD_GROUP_GLOW_BITMAP_CONTENT_TYPE))
+    {
+      Self::WordGroupGlow
+    } else if content_type
+      .is_some_and(|value| value.eq_ignore_ascii_case(WORD_SHAPE_GLOW_BITMAP_CONTENT_TYPE))
+    {
+      Self::WordShapeGlow
+    } else if content_type
+      .is_some_and(|value| value.eq_ignore_ascii_case(WORD_SHAPE_SHADOW_BITMAP_CONTENT_TYPE))
+    {
+      Self::WordShapeShadow
     } else if content_type
       .is_some_and(|value| value.eq_ignore_ascii_case(WORD_LOCKED_CANVAS_BITMAP_CONTENT_TYPE))
     {
@@ -414,6 +317,10 @@ impl RasterOwner {
       .is_some_and(|value| value.eq_ignore_ascii_case(WORD_STATIC_3D_BITMAP_CONTENT_TYPE))
     {
       Self::WordStatic3d
+    } else if content_type
+      .is_some_and(|value| value.eq_ignore_ascii_case(WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE))
+    {
+      Self::WordTableBorder
     } else {
       Self::Source
     }
@@ -476,6 +383,19 @@ impl RasterPixelLimits {
   }
 }
 
+pub(super) fn office_fixed_output_raster_dimensions(
+  width_pt: f32,
+  height_pt: f32,
+  dpi: u32,
+) -> Option<(u32, u32)> {
+  let (width, height) =
+    RasterPixelLimits::from_office_fixed_output_display_size(width_pt, height_pt, dpi)?.pixels();
+  let dimension = |value: f64| {
+    (value.is_finite() && value >= 1.0 && value <= f64::from(u32::MAX)).then_some(value as u32)
+  };
+  Some((dimension(width)?, dimension(height)?))
+}
+
 impl RasterExportOptions {
   fn new(options: &PdfOptions, display_width_pt: f32, display_height_pt: f32) -> Self {
     let profile = RasterExportProfile::from_options(options);
@@ -491,8 +411,10 @@ impl RasterExportOptions {
     // Word's WdExportOptimizeFor, Excel's XlFixedFormatQuality, and
     // PowerPoint's fixed-format Intent expose one 96-DPI Screen / 200-DPI
     // Print host profile. Controlled exports show that the same selector owns
-    // JPEG quality (60/75) and the 150/300-DPI reduction trigger. PowerPoint
-    // Print is the one fixed-output exception: setting UseISO19005_1 changes
+    // JPEG quality (60/75). Word's ordinary JPEG path has independently
+    // measured 150-DPI Screen and 275-DPI Print reduction boundaries; other
+    // raster owners retain their separately established trigger policy.
+    // PowerPoint Print is the one fixed-output exception: setting UseISO19005_1 changes
     // its photographic encoder from quality 75 to quality 90. An exact
     // PDF/A-off/on Office task pair emits identical 250x250 h2v2 images at
     // those two quantization levels; Screen remains quality 60 in both modes.
@@ -522,7 +444,7 @@ impl RasterExportOptions {
       }
     });
     let downsample_trigger_px = office_fixed_output
-      .then(|| match options.optimize_for {
+      .then_some(match options.optimize_for {
         PdfOptimizeFor::Screen => 150,
         PdfOptimizeFor::Print => 300,
       })
@@ -556,10 +478,12 @@ impl RasterExportOptions {
       },
       max_size_px,
       downsample_trigger_px,
-      word_print_jpeg_max_size_px: profile
+      word_print_jpeg_downsample_trigger_px: profile
         .is_word_print()
-        .then(|| RasterPixelLimits::from_display_size(display_width_pt, display_height_pt, 220))
+        .then(|| RasterPixelLimits::from_display_size(display_width_pt, display_height_pt, 275))
         .flatten(),
+      exact_downsample_trigger: false,
+      use_word_print_jpeg_gdiplus_resampler: false,
       // ISO 19005 forbids the image Interpolate key with a true value.
       // Preserve Office's ordinary-PDF smoothing policy, but force the
       // explicitly false archival form for every PDF/A profile.
@@ -569,10 +493,16 @@ impl RasterExportOptions {
   }
 
   fn for_raster_format(mut self, format: RasterImageFormat) -> Self {
-    if self.profile.is_word_print() && format == RasterImageFormat::Jpeg {
-      // Word Print uses a 220-DPI photographic target while lossless and
-      // indexed raster formats use the 200-DPI GDI target.
-      self.max_size_px = self.word_print_jpeg_max_size_px;
+    if self.profile.is_word() && format == RasterImageFormat::Jpeg {
+      // Exact Word ladders place the first ordinary-JPEG reduction at the
+      // selected density itself: 150 DPI for Screen and 275 DPI for Print.
+      // The four-pixel tolerance belongs to other raster-owner policies and
+      // must not pull the JPEG boundary below those measured values.
+      self.exact_downsample_trigger = true;
+      if self.profile.is_word_print() {
+        self.downsample_trigger_px = self.word_print_jpeg_downsample_trigger_px;
+        self.use_word_print_jpeg_gdiplus_resampler = true;
+      }
     }
     self
   }
@@ -580,7 +510,8 @@ impl RasterExportOptions {
   fn without_downsampling(mut self) -> Self {
     self.max_size_px = None;
     self.downsample_trigger_px = None;
-    self.word_print_jpeg_max_size_px = None;
+    self.word_print_jpeg_downsample_trigger_px = None;
+    self.use_word_print_jpeg_gdiplus_resampler = false;
     self
   }
 
@@ -588,8 +519,11 @@ impl RasterExportOptions {
     let max_size = self.max_size_px?;
     if let Some(trigger) = self.downsample_trigger_px {
       let (trigger_width, trigger_height) = trigger.pixels();
-      let reaches_trigger =
-        f64::from(size.0) + 4.0 >= trigger_width || f64::from(size.1) + 4.0 >= trigger_height;
+      let reaches_trigger = if self.exact_downsample_trigger {
+        f64::from(size.0) >= trigger_width || f64::from(size.1) >= trigger_height
+      } else {
+        f64::from(size.0) + 4.0 >= trigger_width || f64::from(size.1) + 4.0 >= trigger_height
+      };
       if !reaches_trigger {
         return None;
       }
@@ -603,15 +537,112 @@ impl RasterExportOptions {
 }
 
 impl ImageSet {
-  pub(super) fn black_matte_rasters(&self) -> &BTreeSet<BlackMatteRasterFingerprint> {
-    &self.black_matte_rasters
+  pub(super) fn svg(&mut self, data: &[u8]) -> Result<Arc<super::direct_svg::PreparedSvg>> {
+    let key = image_data_key(data);
+    if let Some(scene) = self.svgs.get(&key) {
+      return Ok(scene.clone());
+    }
+    let scene = Arc::new(super::direct_svg::prepare_svg(data, svg_options())?);
+    self.svgs.insert(key, scene.clone());
+    Ok(scene)
   }
 
-  pub(super) fn native_indexed_pngs(&self) -> &[NativeIndexedPngReplacement] {
-    &self.native_indexed_pngs
+  pub(super) fn rasterized_svg(
+    &mut self,
+    data: &[u8],
+    scene: &super::direct_svg::PreparedSvg,
+    options: &PdfOptions,
+    display_width_pt: f32,
+    display_height_pt: f32,
+  ) -> Result<PreparedRasterImage> {
+    let (width, height) = svg_raster_dimensions(options, display_width_pt, display_height_pt)?;
+    let interpolate =
+      RasterExportOptions::new(options, display_width_pt, display_height_pt).allow_interpolation;
+    let data_key = image_data_key(data);
+    let key = (data_key.0, data_key.1, width, height);
+    if let Some(image) = self.svg_rasters.get(&key) {
+      return Ok(image.clone());
+    }
+
+    let tree = scene.tree();
+    let tree_size = tree.size();
+    if !tree_size.width().is_finite()
+      || !tree_size.height().is_finite()
+      || tree_size.width() <= 0.0
+      || tree_size.height() <= 0.0
+    {
+      return Err(PdfError::Image(
+        "SVG image has an invalid intrinsic size".to_string(),
+      ));
+    }
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(width, height).ok_or_else(|| {
+      PdfError::Image(format!(
+        "could not allocate {width}x{height} SVG raster fallback"
+      ))
+    })?;
+    resvg::render(
+      tree,
+      resvg::tiny_skia::Transform::from_scale(
+        width as f32 / tree_size.width(),
+        height as f32 / tree_size.height(),
+      ),
+      &mut pixmap.as_mut(),
+    );
+
+    // tiny-skia stores premultiplied sRGB RGBA. PDF's sampled image and SMask
+    // require independent straight RGB and alpha planes.
+    let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
+    let mut alpha = Vec::with_capacity(width as usize * height as usize);
+    let mut has_transparency = false;
+    for pixel in pixmap.data().chunks_exact(4) {
+      let a = u16::from(pixel[3]);
+      has_transparency |= a != 255;
+      for channel in &pixel[..3] {
+        let unassociated = (u16::from(*channel) * 255 + a / 2)
+          .checked_div(a)
+          .unwrap_or_default();
+        rgb.push(unassociated.min(255) as u8);
+      }
+      alpha.push(pixel[3]);
+    }
+    let image = PreparedRasterImage::new(DirectRasterImage {
+      width,
+      height,
+      color_space: DirectRasterColorSpace::Rgb,
+      bits_per_component: 8,
+      encoding: DirectRasterEncoding::Sampled {
+        pixels: Arc::new(PdfRasterPixels {
+          width,
+          height,
+          rgb,
+          alpha: has_transparency.then_some(alpha),
+          icc_profile: None,
+        }),
+      },
+      interpolate,
+      matte: None,
+    });
+    self.svg_rasters.insert(key, image.clone());
+    Ok(image)
   }
 
-  pub(super) fn raster(
+  pub(super) fn office_math_svg(
+    &mut self,
+    data: &[u8],
+  ) -> Result<Arc<super::direct_svg::PreparedOfficeMathSvg>> {
+    let key = image_data_key(data);
+    if let Some(scene) = self.office_math_svgs.get(&key) {
+      return Ok(scene.clone());
+    }
+    let scene = Arc::new(super::direct_svg::prepare_office_math_svg(
+      data,
+      svg_options(),
+    )?);
+    self.office_math_svgs.insert(key, scene.clone());
+    Ok(scene)
+  }
+
+  pub(super) fn raster_direct(
     &mut self,
     data: &[u8],
     content_type: Option<&str>,
@@ -619,7 +650,26 @@ impl ImageSet {
     metafile_render_options: Option<emf_wmf::RenderOptions>,
     display_width_pt: f32,
     display_height_pt: f32,
-  ) -> Result<Image> {
+  ) -> Result<PreparedRasterImage> {
+    self.prepared_raster(
+      data,
+      content_type,
+      options,
+      metafile_render_options,
+      display_width_pt,
+      display_height_pt,
+    )
+  }
+
+  fn prepared_raster(
+    &mut self,
+    data: &[u8],
+    content_type: Option<&str>,
+    options: &PdfOptions,
+    metafile_render_options: Option<emf_wmf::RenderOptions>,
+    display_width_pt: f32,
+    display_height_pt: f32,
+  ) -> Result<PreparedRasterImage> {
     let export_options = RasterExportOptions::new(options, display_width_pt, display_height_pt);
     let key = image_data_key(data);
     if let Some(image) = self.rasters.get(&key).and_then(|images| {
@@ -647,25 +697,44 @@ impl ImageSet {
     });
     Ok(image)
   }
-
-  pub(super) fn svg(&mut self, data: &[u8]) -> Result<Arc<usvg::Tree>> {
-    let key = image_data_key(data);
-    if let Some(tree) = self.svgs.get(&key) {
-      return Ok(tree.clone());
-    }
-    let tree = Arc::new(
-      usvg::Tree::from_data(data, svg_options())
-        .map_err(|err| PdfError::Krilla(format!("failed to decode SVG image: {err}")))?,
-    );
-    self.svgs.insert(key, tree.clone());
-    Ok(tree)
-  }
 }
 
-fn image_data_key(data: &[u8]) -> (usize, usize) {
-  // ImageItem owns its Arc-backed bytes for the whole render. Using that stable
-  // allocation identity avoids hashing large images on every repeated draw.
-  (data.as_ptr() as usize, data.len())
+fn svg_raster_dimensions(
+  options: &PdfOptions,
+  display_width_pt: f32,
+  display_height_pt: f32,
+) -> Result<(u32, u32)> {
+  const MAX_SVG_RASTER_DIMENSION: f64 = 16_384.0;
+  const MAX_SVG_RASTER_PIXELS: f64 = 16_777_216.0;
+
+  if !display_width_pt.is_finite()
+    || !display_height_pt.is_finite()
+    || display_width_pt <= 0.0
+    || display_height_pt <= 0.0
+  {
+    return Err(PdfError::Image(
+      "SVG image has invalid display dimensions".to_string(),
+    ));
+  }
+  let dpi = match options.optimize_for {
+    PdfOptimizeFor::Print => f64::from(ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_RASTER_DPI),
+    PdfOptimizeFor::Screen => f64::from(ooxmlsdk_layout::units::CSS_PIXELS_PER_INCH),
+  };
+  let mut width = (f64::from(display_width_pt) * dpi
+    / f64::from(ooxmlsdk_layout::units::POINTS_PER_INCH))
+  .ceil()
+  .clamp(1.0, MAX_SVG_RASTER_DIMENSION);
+  let mut height = (f64::from(display_height_pt) * dpi
+    / f64::from(ooxmlsdk_layout::units::POINTS_PER_INCH))
+  .ceil()
+  .clamp(1.0, MAX_SVG_RASTER_DIMENSION);
+  let pixels = width * height;
+  if pixels > MAX_SVG_RASTER_PIXELS {
+    let scale = (MAX_SVG_RASTER_PIXELS / pixels).sqrt();
+    width = (width * scale).floor().max(1.0);
+    height = (height * scale).floor().max(1.0);
+  }
+  Ok((width as u32, height as u32))
 }
 
 fn svg_options() -> &'static usvg::Options<'static> {
@@ -677,6 +746,12 @@ fn svg_options() -> &'static usvg::Options<'static> {
   })
 }
 
+fn image_data_key(data: &[u8]) -> (usize, usize) {
+  // ImageItem owns its Arc-backed bytes for the whole render. Using that stable
+  // allocation identity avoids hashing large images on every repeated draw.
+  (data.as_ptr() as usize, data.len())
+}
+
 fn decode_image(
   data: &[u8],
   content_type: Option<&str>,
@@ -684,7 +759,7 @@ fn decode_image(
   metafile_render_options: Option<emf_wmf::RenderOptions>,
   black_matte_rasters: &mut BTreeSet<BlackMatteRasterFingerprint>,
   native_indexed_pngs: &mut Vec<NativeIndexedPngReplacement>,
-) -> Result<Image> {
+) -> Result<PreparedRasterImage> {
   let owner = RasterOwner::from_content_type(content_type);
   if owner == RasterOwner::MaterializedSourceRectangleCrop {
     // `a:srcRect` has already been rounded against and materialized from the
@@ -708,6 +783,16 @@ fn decode_image(
     );
   }
 
+  if matches!(
+    owner,
+    RasterOwner::WordGroupGlow | RasterOwner::WordShapeGlow | RasterOwner::WordShapeShadow
+  ) {
+    return export_wordprocessing_black_matte_effect_image(
+      decode_dynamic_image(data, RasterImageFormat::Png)?,
+      black_matte_rasters,
+    );
+  }
+
   if owner == RasterOwner::WordLockedCanvas {
     return export_wordprocessing_locked_canvas_image(
       decode_dynamic_image(data, RasterImageFormat::Png)?,
@@ -723,6 +808,15 @@ fn decode_image(
     );
   }
 
+  if owner == RasterOwner::WordTableBorder {
+    let raster = decode_dynamic_image(data, RasterImageFormat::Png)?;
+    return prepare_sampled_image(
+      PdfRasterImage::from_dynamic_preserving_hidden_rgb(raster.image, raster.icc_profile),
+      false,
+      None,
+    );
+  }
+
   let metafile_raster = match metafile_render_options {
     Some(render_options) => {
       emf_wmf::decode_metafile_as_raster_with_options(data, content_type, render_options)
@@ -730,7 +824,7 @@ fn decode_image(
     None => emf_wmf::decode_metafile_as_raster(data, content_type),
   };
   if let Some(raster) = metafile_raster
-    .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF image: {err}")))?
+    .map_err(|err| PdfError::Image(format!("failed to decode EMF/WMF image: {err}")))?
   {
     return match raster.content_type {
       "image/jpeg"
@@ -744,27 +838,24 @@ fn decode_image(
           black_matte_rasters,
         )
       }
-      "image/jpeg" => Image::from_jpeg(raster.data.into(), export_options.allow_interpolation)
-        .map_err(PdfError::Krilla),
+      "image/jpeg" => prepare_native_jpeg_image(raster.data, export_options.allow_interpolation),
       "image/png" => {
         let image = decode_png_relaxed(&raster.data)
-          .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF PNG: {err}")))?;
+          .map_err(|err| PdfError::Image(format!("failed to decode EMF/WMF PNG: {err}")))?;
         // Office fixed output keeps generated metafile previews lossless and
         // marks their image XObjects `/Interpolate false`. Do not apply the
         // ordinary source-bitmap downsampling/JPEG policy to a completed GDI
         // replay; the PDF image matrix consumes that device surface directly
         // and preserves its reconstructed soft mask.
-        Image::from_custom(image, false).map_err(PdfError::Krilla)
+        prepare_sampled_image(image, false, None)
       }
-      content_type => Err(PdfError::Krilla(format!(
+      content_type => Err(PdfError::Image(format!(
         "unsupported EMF/WMF raster content type: {content_type}"
       ))),
     };
   }
 
-  let format = content_type
-    .and_then(image_format_from_content_type)
-    .or_else(|| image::guess_format(data).ok());
+  let format = raster_format(data, content_type);
 
   if let Some(format) = format {
     let format_export_options = export_options.for_raster_format(format);
@@ -772,8 +863,15 @@ fn decode_image(
     let plan = RasterPlan::new(format, metadata, owner, format_export_options);
     match plan.realization {
       RasterRealization::Decoded => {
+        let raster = if format == RasterImageFormat::Jpeg
+          && format_export_options.use_word_print_jpeg_gdiplus_resampler
+        {
+          decode_word_print_jpeg(data)?
+        } else {
+          decode_dynamic_image(data, format)?
+        };
         return export_decoded_image(
-          decode_dynamic_image(data, format)?,
+          raster,
           format,
           format_export_options,
           owner,
@@ -781,22 +879,26 @@ fn decode_image(
         );
       }
       RasterRealization::NativeJpeg => {
-        if let Ok(image) = Image::from_jpeg(
-          data.to_vec().into(),
-          format_export_options.allow_interpolation,
-        ) {
+        if let Ok(image) =
+          prepare_native_jpeg_image(data.to_vec(), format_export_options.allow_interpolation)
+        {
           // Krilla reads and embeds the JPEG's native ICC profile while
           // keeping the compressed image stream intact.
           return Ok(image);
         }
       }
       RasterRealization::NativePng => {
-        if let Ok(image) = Image::from_png(data.to_vec().into(), false) {
+        let indexed = format_export_options
+          .profile
+          .is_office_fixed_output()
+          .then(|| NativeIndexedPng::parse(data))
+          .flatten();
+        if let Ok(image) = prepare_native_png_image(data.to_vec(), false, indexed.clone()) {
           if format_export_options.profile.is_office_fixed_output()
-            && let Some(png) = NativeIndexedPng::parse(data)
+            && let Some(png) = indexed
           {
             // Full decoding validates the PNG stream and provides an exact
-            // match key for the sampled RGB XObject emitted by krilla 0.8.2.
+            // match key for one sampled RGB PDF image object.
             // The finalizer then swaps only that proven object to the source
             // IDAT/palette representation.
             let decoded_rgb = decode_dynamic_image(data, RasterImageFormat::Png)?
@@ -819,10 +921,10 @@ fn decode_image(
   if matches!(format, Some(RasterImageFormat::Png))
     && let Ok(image) = decode_png_relaxed(data)
   {
-    return Image::from_custom(image, false).map_err(PdfError::Krilla);
+    return prepare_sampled_image(image, false, None);
   }
 
-  let format = format.ok_or_else(|| PdfError::Krilla("unknown raster image format".to_string()))?;
+  let format = format.ok_or_else(|| PdfError::Image("unknown raster image format".to_string()))?;
   let raster = decode_dynamic_image(data, format)?;
   export_decoded_image(
     raster,
@@ -872,9 +974,13 @@ fn should_try_jpeg(
       // Generated metafile previews remain lossless; only an existing JPEG
       // preview participates in the host's JPEG recompression profile.
       RasterOwner::MetafilePreview => format == RasterImageFormat::Jpeg,
-      RasterOwner::WordLockedCanvas | RasterOwner::WordShapeStory | RasterOwner::WordStatic3d => {
-        false
-      }
+      RasterOwner::WordGroupGlow
+      | RasterOwner::WordShapeGlow
+      | RasterOwner::WordShapeShadow
+      | RasterOwner::WordLockedCanvas
+      | RasterOwner::WordShapeStory
+      | RasterOwner::WordStatic3d
+      | RasterOwner::WordTableBorder => false,
     },
   }
 }
@@ -1068,11 +1174,11 @@ struct DecodedRasterImage {
 fn decode_dynamic_image(data: &[u8], format: RasterImageFormat) -> Result<DecodedRasterImage> {
   let mut decoder = ImageReader::with_format(Cursor::new(data), format)
     .into_decoder()
-    .map_err(|err| PdfError::Krilla(format!("failed to open raster image: {err}")))?;
+    .map_err(|err| PdfError::Image(format!("failed to open raster image: {err}")))?;
   let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
   let icc_profile = decoder.icc_profile().unwrap_or_default();
   let mut image = DynamicImage::from_decoder(decoder)
-    .map_err(|err| PdfError::Krilla(format!("failed to decode raster image: {err}")))?;
+    .map_err(|err| PdfError::Image(format!("failed to decode raster image: {err}")))?;
   image.apply_orientation(orientation);
   let jpeg_has_real_physical_resolution = format == RasterImageFormat::Jpeg
     && jpeg_metadata(data).is_some_and(JpegMetadata::has_real_physical_resolution);
@@ -1083,17 +1189,214 @@ fn decode_dynamic_image(data: &[u8], format: RasterImageFormat) -> Result<Decode
   })
 }
 
+fn decode_word_print_jpeg(data: &[u8]) -> Result<DecodedRasterImage> {
+  let mut metadata_decoder = ImageReader::with_format(Cursor::new(data), RasterImageFormat::Jpeg)
+    .into_decoder()
+    .map_err(|err| PdfError::Image(format!("failed to open JPEG image: {err}")))?;
+  let orientation = metadata_decoder
+    .orientation()
+    .unwrap_or(Orientation::NoTransforms);
+  let icc_profile = metadata_decoder.icc_profile().unwrap_or_default();
+
+  let mut image = if let Some(image) = super::jpeg_islow::decode_rgb(data) {
+    DynamicImage::ImageRgb8(image)
+  } else {
+    let mut decoder = jpeg_decoder::Decoder::new(Cursor::new(data));
+    let pixels = decoder
+      .decode()
+      .map_err(|err| PdfError::Image(format!("failed to decode Word Print JPEG image: {err}")))?;
+    let info = decoder
+      .info()
+      .ok_or_else(|| PdfError::Image("Word Print JPEG has no image information".to_string()))?;
+    let dimensions = (u32::from(info.width), u32::from(info.height));
+    match info.pixel_format {
+      jpeg_decoder::PixelFormat::L8 => {
+        image::GrayImage::from_raw(dimensions.0, dimensions.1, pixels).map(DynamicImage::ImageLuma8)
+      }
+      jpeg_decoder::PixelFormat::RGB24 => {
+        image::RgbImage::from_raw(dimensions.0, dimensions.1, pixels).map(DynamicImage::ImageRgb8)
+      }
+      // Keep the established decoder for formats whose GDI+ conversion has
+      // not been isolated. Native JPEG embedding never enters this path.
+      jpeg_decoder::PixelFormat::L16 | jpeg_decoder::PixelFormat::CMYK32 => {
+        return decode_dynamic_image(data, RasterImageFormat::Jpeg);
+      }
+    }
+    .ok_or_else(|| PdfError::Image("Word Print JPEG has an invalid pixel buffer".to_string()))?
+  };
+
+  // System.Drawing's default Bitmap resize matches libjpeg's accurate integer
+  // decoded source plane in the controlled JPEG matrix. Apply the package's
+  // EXIF transform before that already-proven resize, as the ordinary decoder
+  // does, while retaining its ICC ownership.
+  image.apply_orientation(orientation);
+  Ok(DecodedRasterImage {
+    image,
+    icc_profile,
+    jpeg_has_real_physical_resolution: jpeg_metadata(data)
+      .is_some_and(JpegMetadata::has_real_physical_resolution),
+  })
+}
+
+fn prepare_sampled_image(
+  image: PdfRasterImage,
+  interpolate: bool,
+  matte: Option<[f32; 3]>,
+) -> Result<PreparedRasterImage> {
+  let direct = DirectRasterImage {
+    width: image.pixels.width,
+    height: image.pixels.height,
+    color_space: DirectRasterColorSpace::Rgb,
+    bits_per_component: 8,
+    encoding: DirectRasterEncoding::Sampled {
+      pixels: image.pixels.clone(),
+    },
+    interpolate,
+    matte,
+  };
+  Ok(PreparedRasterImage::new(direct))
+}
+
+fn prepare_native_png_image(
+  data: Vec<u8>,
+  interpolate: bool,
+  indexed: Option<NativeIndexedPng>,
+) -> Result<PreparedRasterImage> {
+  let decoded = decode_dynamic_image(&data, RasterImageFormat::Png)?;
+  let sampled = PdfRasterImage::from_dynamic_with_icc(decoded.image, decoded.icc_profile);
+  let direct = if let Some(indexed) = indexed {
+    DirectRasterImage {
+      width: indexed.width,
+      height: indexed.height,
+      color_space: DirectRasterColorSpace::Rgb,
+      bits_per_component: indexed.bit_depth as u8,
+      encoding: DirectRasterEncoding::IndexedPng {
+        data: indexed.idat.into(),
+        palette: indexed.palette.into(),
+        icc_profile: sampled.pixels.icc_profile.clone().map(Into::into),
+      },
+      interpolate,
+      matte: None,
+    }
+  } else {
+    DirectRasterImage {
+      width: sampled.pixels.width,
+      height: sampled.pixels.height,
+      color_space: DirectRasterColorSpace::Rgb,
+      bits_per_component: 8,
+      encoding: DirectRasterEncoding::Sampled {
+        pixels: sampled.pixels,
+      },
+      interpolate,
+      matte: None,
+    }
+  };
+  Ok(PreparedRasterImage::new(direct))
+}
+
+#[derive(Debug)]
+struct DirectJpegMetadata {
+  width: u32,
+  height: u32,
+  color_space: DirectRasterColorSpace,
+  invert_cmyk: bool,
+  icc_profile: Option<Vec<u8>>,
+}
+
+fn direct_jpeg_metadata(data: &[u8]) -> Result<DirectJpegMetadata> {
+  use zune_jpeg::zune_core::colorspace::ColorSpace;
+
+  let mut decoder = zune_jpeg::JpegDecoder::new(Cursor::new(data));
+  decoder
+    .decode_headers()
+    .map_err(|error| PdfError::Image(format!("failed to read JPEG headers: {error}")))?;
+  let (width, height) = decoder
+    .dimensions()
+    .ok_or_else(|| PdfError::Image("JPEG has no dimensions".to_string()))?;
+  let input = decoder
+    .input_colorspace()
+    .ok_or_else(|| PdfError::Image("JPEG has no input color space".to_string()))?;
+  let (color_space, invert_cmyk) = match input {
+    ColorSpace::Luma => (DirectRasterColorSpace::Gray, false),
+    ColorSpace::RGB | ColorSpace::YCbCr => (DirectRasterColorSpace::Rgb, false),
+    ColorSpace::CMYK | ColorSpace::YCCK => (DirectRasterColorSpace::Cmyk, true),
+    _ => {
+      return Err(PdfError::Image(format!(
+        "unsupported JPEG input color space {input:?}"
+      )));
+    }
+  };
+  Ok(DirectJpegMetadata {
+    width: u32::try_from(width)
+      .map_err(|_| PdfError::Image("JPEG width exceeds u32".to_string()))?,
+    height: u32::try_from(height)
+      .map_err(|_| PdfError::Image("JPEG height exceeds u32".to_string()))?,
+    color_space,
+    invert_cmyk,
+    icc_profile: decoder.icc_profile(),
+  })
+}
+
+fn prepare_native_jpeg_image(data: Vec<u8>, interpolate: bool) -> Result<PreparedRasterImage> {
+  let metadata = direct_jpeg_metadata(&data)?;
+  let direct = DirectRasterImage {
+    width: metadata.width,
+    height: metadata.height,
+    color_space: metadata.color_space,
+    bits_per_component: 8,
+    encoding: DirectRasterEncoding::Dct {
+      data: data.into(),
+      icc_profile: metadata.icc_profile.map(Into::into),
+      invert_cmyk: metadata.invert_cmyk,
+    },
+    interpolate,
+    matte: None,
+  };
+  Ok(PreparedRasterImage::new(direct))
+}
+
+fn prepare_encoded_jpeg_image(
+  data: Vec<u8>,
+  icc_profile: Option<Vec<u8>>,
+  interpolate: bool,
+) -> Result<PreparedRasterImage> {
+  let metadata = direct_jpeg_metadata(&data)?;
+  let direct = DirectRasterImage {
+    width: metadata.width,
+    height: metadata.height,
+    color_space: metadata.color_space,
+    bits_per_component: 8,
+    encoding: DirectRasterEncoding::Dct {
+      data: data.into(),
+      icc_profile: icc_profile.map(Into::into),
+      invert_cmyk: metadata.invert_cmyk,
+    },
+    interpolate,
+    matte: None,
+  };
+  Ok(PreparedRasterImage::new(direct))
+}
+
 fn export_decoded_image(
   mut raster: DecodedRasterImage,
   format: RasterImageFormat,
   export_options: RasterExportOptions,
   owner: RasterOwner,
   black_matte_rasters: &mut BTreeSet<BlackMatteRasterFingerprint>,
-) -> Result<Image> {
+) -> Result<PreparedRasterImage> {
   let mut resized = false;
   if let Some(target_size) = export_options.downsample_size(raster.image.dimensions()) {
     raster.image = resize_for_export(raster.image, target_size, export_options);
     resized = true;
+  }
+  if resized && format == RasterImageFormat::Jpeg && export_options.profile.is_office_fixed_output()
+  {
+    // Controlled Word Print/Screen matrices vary ICC, Photoshop 8BIM, JFIF
+    // density, and the display-DPI boundary while keeping the JPEG scan bytes
+    // fixed. Every reduced result discards the source profile and declares the
+    // PDF image as DeviceRGB; an ICCBased resource changes the RGB result.
+    // Requested exports still preserve the caller's profile below.
+    raster.icc_profile = None;
   }
 
   let mut interpolate = raster_interpolation(format, export_options);
@@ -1101,9 +1404,11 @@ fn export_decoded_image(
     let quality = export_options.jpeg_quality.unwrap_or(90);
     let rgba = raster.image.to_rgba8();
     let has_alpha = rgba.pixels().any(|pixel| pixel[3] != u8::MAX);
-    let jpeg_source = has_alpha
-      .then(|| DynamicImage::ImageRgba8(apply_black_matte(&rgba)))
-      .unwrap_or_else(|| raster.image.clone());
+    let jpeg_source = if has_alpha {
+      DynamicImage::ImageRgba8(apply_black_matte(&rgba))
+    } else {
+      raster.image.clone()
+    };
     let jpeg_rgba = jpeg_source.to_rgba8();
     if !office_fixed_output_prefers_lossless(
       &jpeg_rgba,
@@ -1135,18 +1440,17 @@ fn export_decoded_image(
           // sample points. If interpolation is enabled, PDF's interpolation
           // order remains a separate backend-level distinction.
           let rgb = remove_black_matte(compressed_rgb, &rgba);
-          return Image::from_custom(
+          return prepare_sampled_image(
             PdfRasterImage::from_rgb_with_alpha(rgb, &rgba, raster.icc_profile),
             export_options.allow_interpolation,
-          )
-          .map_err(PdfError::Krilla);
+            None,
+          );
         }
-        return Image::from_jpeg_with_icc(
-          jpeg.into(),
-          raster.icc_profile.map(Into::into),
+        return prepare_encoded_jpeg_image(
+          jpeg,
+          raster.icc_profile,
           export_options.allow_interpolation,
-        )
-        .map_err(PdfError::Krilla);
+        );
       }
     }
 
@@ -1186,20 +1490,24 @@ fn export_decoded_image(
       alpha,
     ));
   }
-  Image::from_custom(pdf_raster, interpolate).map_err(PdfError::Krilla)
+  prepare_sampled_image(
+    pdf_raster,
+    interpolate,
+    screen_resized_with_alpha.then_some([0.0, 0.0, 0.0]),
+  )
 }
 
 fn export_wordprocessing_locked_canvas_image(
   raster: DecodedRasterImage,
   export_options: RasterExportOptions,
   black_matte_rasters: &mut BTreeSet<BlackMatteRasterFingerprint>,
-) -> Result<Image> {
+) -> Result<PreparedRasterImage> {
   if export_options.use_lossless_compression || export_options.jpeg_quality.is_none() {
-    return Image::from_custom(
+    return prepare_sampled_image(
       PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile),
       false,
-    )
-    .map_err(PdfError::Krilla);
+      None,
+    );
   }
 
   let rgba = raster.image.to_rgba8();
@@ -1215,11 +1523,11 @@ fn export_wordprocessing_locked_canvas_image(
   // black as a palette-dominant source would incorrectly force this surface
   // onto the ordinary PNG/lossless classifier.
   if jpeg.len() >= deflated_rgb_size(&premultiplied) {
-    return Image::from_custom(
+    return prepare_sampled_image(
       PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(rgba), raster.icc_profile),
       false,
-    )
-    .map_err(PdfError::Krilla);
+      None,
+    );
   }
   let compressed_rgb = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)?
     .image
@@ -1236,13 +1544,39 @@ fn export_wordprocessing_locked_canvas_image(
       alpha,
     ));
   }
-  Image::from_custom(pdf_raster, export_options.allow_interpolation).map_err(PdfError::Krilla)
+  prepare_sampled_image(
+    pdf_raster,
+    export_options.allow_interpolation,
+    Some([0.0, 0.0, 0.0]),
+  )
+}
+
+fn export_wordprocessing_black_matte_effect_image(
+  raster: DecodedRasterImage,
+  black_matte_rasters: &mut BTreeSet<BlackMatteRasterFingerprint>,
+) -> Result<PreparedRasterImage> {
+  // Adobe PDF Reference 1.6, soft-mask images, requires a Matte entry when
+  // the parent color samples are preblended. Word's independently controlled
+  // WPG/WPS glow and WPS outer-shadow outputs supply black-associated RGB,
+  // the unchanged A8 mask, `/Interpolate false`, and `/Matte [0 0 0]`. The
+  // layout transport is already associated, so preserve it without a second
+  // premultiply or source-image resampling.
+  let pdf_raster = PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile);
+  if let Some(alpha) = pdf_raster.pixels.alpha.as_deref() {
+    black_matte_rasters.insert(black_matte_raster_fingerprint(
+      pdf_raster.pixels.width,
+      pdf_raster.pixels.height,
+      &pdf_raster.pixels.rgb,
+      alpha,
+    ));
+  }
+  prepare_sampled_image(pdf_raster, false, Some([0.0, 0.0, 0.0]))
 }
 
 fn export_wordprocessing_static_3d_image(
   mut raster: DecodedRasterImage,
   export_options: RasterExportOptions,
-) -> Result<Image> {
+) -> Result<PreparedRasterImage> {
   if let Some(max_size) = export_options.max_size_px
     && let Some(target_size) = downsample_size(raster.image.dimensions(), max_size)
   {
@@ -1250,11 +1584,11 @@ fn export_wordprocessing_static_3d_image(
   }
 
   if export_options.use_lossless_compression {
-    return Image::from_custom(
+    return prepare_sampled_image(
       PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile),
       false,
-    )
-    .map_err(PdfError::Krilla);
+      None,
+    );
   }
 
   let rgba = raster.image.to_rgba8();
@@ -1269,11 +1603,11 @@ fn export_wordprocessing_static_3d_image(
   // same PDF options.  Compare the two representations Word actually writes:
   // an h2v2 JPEG and a level-6 deflate of the black-matted RGB plane.
   if jpeg.len() >= deflated_rgb_size(&premultiplied) {
-    return Image::from_custom(
+    return prepare_sampled_image(
       PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(rgba), raster.icc_profile),
       false,
-    )
-    .map_err(PdfError::Krilla);
+      None,
+    );
   }
   let compressed_rgb = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)?
     .image
@@ -1285,17 +1619,17 @@ fn export_wordprocessing_static_3d_image(
   // points; `/Interpolate true` would additionally require the PDF backend to
   // preserve Matte's associated-color interpolation order.
   let rgb = remove_black_matte(compressed_rgb, &rgba);
-  Image::from_custom(
+  prepare_sampled_image(
     PdfRasterImage::from_rgb_with_alpha(rgb, &rgba, raster.icc_profile),
     export_options.allow_interpolation,
+    None,
   )
-  .map_err(PdfError::Krilla)
 }
 
 fn export_wordprocessing_shape_story_image(
   mut raster: DecodedRasterImage,
   export_options: RasterExportOptions,
-) -> Result<Image> {
+) -> Result<PreparedRasterImage> {
   if let Some(max_size) = export_options.max_size_px
     && let Some(target_size) = downsample_size(raster.image.dimensions(), max_size)
   {
@@ -1304,11 +1638,11 @@ fn export_wordprocessing_shape_story_image(
 
   let rgba = resample_wordprocessing_shape_story_bitmap(&raster.image.to_rgba8());
   if export_options.use_lossless_compression {
-    return Image::from_custom(
+    return prepare_sampled_image(
       PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(rgba), raster.icc_profile),
       export_options.allow_interpolation,
-    )
-    .map_err(PdfError::Krilla);
+      None,
+    );
   }
 
   let premultiplied = apply_black_matte(&rgba);
@@ -1324,18 +1658,18 @@ fn export_wordprocessing_shape_story_image(
     // matte before storing the JPEG-decoded samples as ordinary RGB+alpha.
     // PDF compositing then reproduces the same single alpha multiplication.
     let rgb = remove_black_matte(compressed_rgb, &rgba);
-    return Image::from_custom(
+    return prepare_sampled_image(
       PdfRasterImage::from_rgb_with_alpha(rgb, &rgba, raster.icc_profile),
       export_options.allow_interpolation,
-    )
-    .map_err(PdfError::Krilla);
+      None,
+    );
   }
 
-  Image::from_custom(
+  prepare_sampled_image(
     PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(rgba), raster.icc_profile),
     false,
+    None,
   )
-  .map_err(PdfError::Krilla)
 }
 
 fn resample_wordprocessing_shape_story_bitmap(source: &image::RgbaImage) -> image::RgbaImage {
@@ -1581,8 +1915,7 @@ fn downsample_size(size: (u32, u32), max_size: RasterPixelLimits) -> Option<(u32
     return None;
   }
 
-  let scale =
-    (f64::from(max_width) / f64::from(width)).min(f64::from(max_height) / f64::from(height));
+  let scale = (max_width / f64::from(width)).min(max_height / f64::from(height));
   let target_width = (f64::from(width) * scale).round() as u32;
   let target_height = (f64::from(height) * scale).round() as u32;
   (target_width > 0 && target_height > 0).then_some((target_width, target_height))
@@ -1616,11 +1949,145 @@ fn resize_for_export(
   target_size: (u32, u32),
   export_options: RasterExportOptions,
 ) -> DynamicImage {
-  if export_options.profile.is_office_screen() {
+  if export_options.use_word_print_jpeg_gdiplus_resampler {
+    resize_for_word_print_jpeg(image, target_size)
+  } else if export_options.profile.is_office_screen() {
     resize_for_office_screen(image, target_size)
   } else {
     resize_for_pdf(image, target_size)
   }
+}
+
+const GDIPLUS_FIXED_ONE: i64 = 1 << 16;
+const GDIPLUS_FIXED_HALF: i64 = GDIPLUS_FIXED_ONE / 2;
+const GDIPLUS_BITMAP_AREA_THRESHOLD: u32 = 420;
+
+#[derive(Clone, Copy, Debug)]
+struct GdiplusAreaSpan {
+  left: i64,
+  right: i64,
+  first: u32,
+  last: u32,
+}
+
+#[derive(Debug)]
+struct GdiplusAreaAxis {
+  spans: Vec<GdiplusAreaSpan>,
+  reciprocal: u64,
+}
+
+fn resize_for_word_print_jpeg(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
+  let source_size = image.dimensions();
+  if source_size.0.max(source_size.1) < GDIPLUS_BITMAP_AREA_THRESHOLD {
+    return resize_for_office_screen(image, target_size);
+  }
+  resize_for_gdiplus_fixed_area(image, target_size)
+}
+
+fn resize_for_gdiplus_fixed_area(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
+  let source = image.to_rgba8();
+  let (source_width, source_height) = source.dimensions();
+  let (target_width, target_height) = target_size;
+  let Some(horizontal_axis) = gdiplus_area_axis(source_width, target_width) else {
+    return DynamicImage::ImageRgba8(source);
+  };
+  let Some(vertical_axis) = gdiplus_area_axis(source_height, target_height) else {
+    return DynamicImage::ImageRgba8(source);
+  };
+
+  // `Bitmap(Image, width, height)` is the byte-exact producer for every
+  // reduced Word Print JPEG in the controlled host/content/scale matrix. Its
+  // large-bitmap path is a separable pixel-area scaler, implemented with two
+  // independently truncated 16.16 factors. An exact impulse/ramp/checker
+  // matrix fixes all observable arithmetic below: source coverage uses
+  // `floor(src * 2^16 / dst)`, normalization uses
+  // `floor(dst * 2^16 / src)`, and each pass rounds the Q32 product once.
+  let mut horizontal = image::RgbaImage::new(target_width, source_height);
+  for y in 0..source_height {
+    for (x, span) in (0..target_width).zip(&horizontal_axis.spans) {
+      let mut components = [0_u128; 4];
+      for source_x in span.first..=span.last {
+        let weight = gdiplus_area_overlap(*span, source_x);
+        let pixel = source.get_pixel(source_x, y);
+        for (component, sample) in components.iter_mut().zip(pixel.0) {
+          *component += u128::from(sample) * u128::from(weight);
+        }
+      }
+      horizontal.put_pixel(
+        x,
+        y,
+        Rgba(
+          components.map(|component| gdiplus_area_component(component, horizontal_axis.reciprocal)),
+        ),
+      );
+    }
+  }
+
+  let mut output = image::RgbaImage::new(target_width, target_height);
+  for (y, span) in (0..target_height).zip(&vertical_axis.spans) {
+    for x in 0..target_width {
+      let mut components = [0_u128; 4];
+      for source_y in span.first..=span.last {
+        let weight = gdiplus_area_overlap(*span, source_y);
+        let pixel = horizontal.get_pixel(x, source_y);
+        for (component, sample) in components.iter_mut().zip(pixel.0) {
+          *component += u128::from(sample) * u128::from(weight);
+        }
+      }
+      output.put_pixel(
+        x,
+        y,
+        Rgba(
+          components.map(|component| gdiplus_area_component(component, vertical_axis.reciprocal)),
+        ),
+      );
+    }
+  }
+  DynamicImage::ImageRgba8(output)
+}
+
+fn gdiplus_area_axis(source: u32, target: u32) -> Option<GdiplusAreaAxis> {
+  if source == 0 || target == 0 || target > source {
+    return None;
+  }
+  let fixed_one = u64::try_from(GDIPLUS_FIXED_ONE).ok()?;
+  let step = u64::from(source).checked_mul(fixed_one)? / u64::from(target);
+  let reciprocal = u64::from(target).checked_mul(fixed_one)? / u64::from(source);
+  let step = i64::try_from(step).ok()?;
+  if step <= 0 || reciprocal == 0 {
+    return None;
+  }
+
+  let mut spans = Vec::with_capacity(usize::try_from(target).ok()?);
+  for destination in 0..target {
+    let left = (-GDIPLUS_FIXED_HALF).checked_add(i64::from(destination).checked_mul(step)?)?;
+    let right = left.checked_add(step)?;
+    let first = (left + GDIPLUS_FIXED_HALF)
+      .div_euclid(GDIPLUS_FIXED_ONE)
+      .clamp(0, i64::from(source - 1)) as u32;
+    let last = (right + GDIPLUS_FIXED_HALF - 1)
+      .div_euclid(GDIPLUS_FIXED_ONE)
+      .clamp(0, i64::from(source - 1)) as u32;
+    spans.push(GdiplusAreaSpan {
+      left,
+      right,
+      first,
+      last,
+    });
+  }
+  Some(GdiplusAreaAxis { spans, reciprocal })
+}
+
+fn gdiplus_area_overlap(span: GdiplusAreaSpan, sample: u32) -> u64 {
+  let center = i64::from(sample) * GDIPLUS_FIXED_ONE;
+  let left = span.left.max(center - GDIPLUS_FIXED_HALF);
+  let right = span.right.min(center + GDIPLUS_FIXED_HALF);
+  u64::try_from((right - left).max(0)).unwrap_or(0)
+}
+
+fn gdiplus_area_component(accumulated: u128, reciprocal: u64) -> u8 {
+  let value = (accumulated * u128::from(reciprocal) + (1_u128 << 31)) >> 32;
+  u8::try_from(value).unwrap_or(u8::MAX)
 }
 
 fn resize_for_office_screen(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
@@ -1730,9 +2197,9 @@ fn encode_jpeg(image: &image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
   let rgb = image.to_rgb8();
   let (width, height) = rgb.dimensions();
   let width = u16::try_from(width)
-    .map_err(|_| PdfError::Krilla("JPEG width exceeds 65535 pixels".to_string()))?;
+    .map_err(|_| PdfError::Image("JPEG width exceeds 65535 pixels".to_string()))?;
   let height = u16::try_from(height)
-    .map_err(|_| PdfError::Krilla("JPEG height exceeds 65535 pixels".to_string()))?;
+    .map_err(|_| PdfError::Image("JPEG height exceeds 65535 pixels".to_string()))?;
   let mut jpeg = Vec::new();
   let mut encoder = JpegEncoder::new(&mut jpeg, quality);
   // Office fixed-format JPEG XObjects use conventional 4:2:0 chroma
@@ -1741,87 +2208,14 @@ fn encode_jpeg(image: &image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
   encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
   encoder
     .encode(rgb.as_raw(), width, height, JpegColorType::Rgb)
-    .map_err(|err| PdfError::Krilla(format!("failed to encode JPEG image: {err}")))?;
+    .map_err(|err| PdfError::Image(format!("failed to encode JPEG image: {err}")))?;
   Ok(jpeg)
-}
-
-struct H2V2BoxRgbImage<'a> {
-  data: &'a [u8],
-  width: u16,
-  height: u16,
-}
-
-impl H2V2BoxRgbImage<'_> {
-  fn ycbcr(&self, x: u16, y: u16) -> (u8, u8, u8) {
-    let index = (usize::from(y) * usize::from(self.width) + usize::from(x)) * 3;
-    rgb_to_ycbcr(self.data[index], self.data[index + 1], self.data[index + 2])
-  }
-
-  fn h2v2_chroma(&self, x: u16, y: u16) -> (u8, u8) {
-    let next_x = x.saturating_add(1).min(self.width - 1);
-    let next_y = y.saturating_add(1).min(self.height - 1);
-    let (_, cb00, cr00) = self.ycbcr(x, y);
-    let (_, cb01, cr01) = self.ycbcr(next_x, y);
-    let (_, cb10, cr10) = self.ycbcr(x, next_y);
-    let (_, cb11, cr11) = self.ycbcr(next_x, next_y);
-    // libjpeg's h2v2_downsample alternates the rounding bias so exact halves
-    // do not introduce a systematic upward bias. The pattern restarts on
-    // each output row. jpeg-encoder samples the even input coordinates for
-    // 4:2:0, so put the filtered value at those coordinates.
-    let bias = if (x / 2).is_multiple_of(2) { 1 } else { 2 };
-    let average = |a: u8, b: u8, c: u8, d: u8| {
-      ((u16::from(a) + u16::from(b) + u16::from(c) + u16::from(d) + bias) >> 2) as u8
-    };
-    (
-      average(cb00, cb01, cb10, cb11),
-      average(cr00, cr01, cr10, cr11),
-    )
-  }
-}
-
-impl JpegImageBuffer for H2V2BoxRgbImage<'_> {
-  fn get_jpeg_color_type(&self) -> JpegComponentColorType {
-    JpegComponentColorType::Ycbcr
-  }
-
-  fn width(&self) -> u16 {
-    self.width
-  }
-
-  fn height(&self) -> u16 {
-    self.height
-  }
-
-  fn fill_buffers(&self, y: u16, buffers: &mut [Vec<u8>; 4]) {
-    for x in 0..self.width {
-      let (luma, mut cb, mut cr) = self.ycbcr(x, y);
-      if x.is_multiple_of(2) && y.is_multiple_of(2) {
-        (cb, cr) = self.h2v2_chroma(x, y);
-      }
-      buffers[0].push(luma);
-      buffers[1].push(cb);
-      buffers[2].push(cr);
-    }
-  }
 }
 
 fn encode_office_h2v2_jpeg(image: &image::RgbaImage, quality: u8) -> Result<Vec<u8>> {
-  let rgb = DynamicImage::ImageRgba8(image.clone()).to_rgb8();
-  let width = u16::try_from(rgb.width())
-    .map_err(|_| PdfError::Krilla("JPEG width exceeds 65535 pixels".to_string()))?;
-  let height = u16::try_from(rgb.height())
-    .map_err(|_| PdfError::Krilla("JPEG height exceeds 65535 pixels".to_string()))?;
-  let mut jpeg = Vec::new();
-  let mut encoder = JpegEncoder::new(&mut jpeg, quality);
-  encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
-  encoder
-    .encode_image(H2V2BoxRgbImage {
-      data: rgb.as_raw(),
-      width,
-      height,
-    })
-    .map_err(|err| PdfError::Krilla(format!("failed to encode Office JPEG image: {err}")))?;
-  Ok(jpeg)
+  super::jpeg_islow_encoder::encode_rgba_h2v2(image, quality).ok_or_else(|| {
+    PdfError::Image("failed to encode bounded Office baseline JPEG image".to_string())
+  })
 }
 
 /// Reproduce PowerPoint's fixed-output treatment of bitmap pixels lifted from
@@ -1841,7 +2235,7 @@ pub(super) fn powerpoint_activex_bitmap_png(data: &[u8], quality: u8) -> Result<
   if opaque {
     PngEncoder::new(&mut output)
       .write_image(recompressed.as_raw(), width, height, ColorType::Rgb8.into())
-      .map_err(|err| PdfError::Krilla(format!("failed to encode ActiveX bitmap PNG: {err}")))?;
+      .map_err(|err| PdfError::Image(format!("failed to encode ActiveX bitmap PNG: {err}")))?;
   } else {
     let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
     for (color, source) in recompressed.pixels().zip(original.pixels()) {
@@ -1849,7 +2243,7 @@ pub(super) fn powerpoint_activex_bitmap_png(data: &[u8], quality: u8) -> Result<
     }
     PngEncoder::new(&mut output)
       .write_image(&rgba, width, height, ColorType::Rgba8.into())
-      .map_err(|err| PdfError::Krilla(format!("failed to encode ActiveX bitmap PNG: {err}")))?;
+      .map_err(|err| PdfError::Image(format!("failed to encode ActiveX bitmap PNG: {err}")))?;
   }
   Ok(output)
 }
@@ -1886,22 +2280,47 @@ fn image_format_from_content_type(content_type: &str) -> Option<RasterImageForma
   }
 }
 
+fn raster_format(data: &[u8], content_type: Option<&str>) -> Option<RasterImageFormat> {
+  // Office and LibreOffice discover an image decoder from the stream's
+  // identifying bytes. The package media type remains the fallback for
+  // formats whose bytes are not recognized, so malformed declared PNGs still
+  // fail through the PNG decoder instead of being accepted as unknown data.
+  image::guess_format(data)
+    .ok()
+    .or_else(|| content_type.and_then(image_format_from_content_type))
+}
+
 #[derive(Clone, Debug)]
 struct PdfRasterImage {
   pixels: Arc<PdfRasterPixels>,
 }
 
-#[derive(Debug)]
-struct PdfRasterPixels {
-  width: u32,
-  height: u32,
-  rgb: Vec<u8>,
-  alpha: Option<Vec<u8>>,
-  icc_profile: Option<Vec<u8>>,
+#[derive(Debug, PartialEq)]
+pub(super) struct PdfRasterPixels {
+  pub(super) width: u32,
+  pub(super) height: u32,
+  pub(super) rgb: Vec<u8>,
+  pub(super) alpha: Option<Vec<u8>>,
+  pub(super) icc_profile: Option<Vec<u8>>,
 }
 
 impl PdfRasterImage {
   fn from_dynamic_with_icc(image: image::DynamicImage, icc_profile: Option<Vec<u8>>) -> Self {
+    Self::from_dynamic_with_icc_and_hidden_rgb(image, icc_profile, false)
+  }
+
+  fn from_dynamic_preserving_hidden_rgb(
+    image: image::DynamicImage,
+    icc_profile: Option<Vec<u8>>,
+  ) -> Self {
+    Self::from_dynamic_with_icc_and_hidden_rgb(image, icc_profile, true)
+  }
+
+  fn from_dynamic_with_icc_and_hidden_rgb(
+    image: image::DynamicImage,
+    icc_profile: Option<Vec<u8>>,
+    preserve_hidden_rgb: bool,
+  ) -> Self {
     let (width, height) = image.dimensions();
     let rgba = image.to_rgba8();
     let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
@@ -1909,7 +2328,12 @@ impl PdfRasterImage {
     let mut opaque = true;
 
     for Rgba([r, g, b, a]) in rgba.pixels() {
-      rgb.extend_from_slice(&visible_rgb(*r, *g, *b, *a));
+      let sample = if preserve_hidden_rgb {
+        [*r, *g, *b]
+      } else {
+        visible_rgb(*r, *g, *b, *a)
+      };
+      rgb.extend_from_slice(&sample);
       alpha.push(*a);
       opaque &= *a == u8::MAX;
     }
@@ -2013,37 +2437,10 @@ impl Hash for PdfRasterImage {
   }
 }
 
-impl CustomImage for PdfRasterImage {
-  fn color_channel(&self) -> &[u8] {
-    &self.pixels.rgb
-  }
-
-  fn alpha_channel(&self) -> Option<&[u8]> {
-    self.pixels.alpha.as_deref()
-  }
-
-  fn bits_per_component(&self) -> BitsPerComponent {
-    BitsPerComponent::Eight
-  }
-
-  fn size(&self) -> (u32, u32) {
-    (self.pixels.width, self.pixels.height)
-  }
-
-  fn icc_profile(&self) -> Option<&[u8]> {
-    self.pixels.icc_profile.as_deref()
-  }
-
-  fn color_space(&self) -> ImageColorspace {
-    ImageColorspace::Rgb
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
   use image::codecs::{jpeg::JpegEncoder as ImageJpegEncoder, tiff::TiffEncoder};
-  use lopdf::dictionary;
 
   fn indexed_test_png(unit: Option<png::Unit>, transparent: bool) -> Vec<u8> {
     const WIDTH: u32 = 300;
@@ -2071,6 +2468,32 @@ mod tests {
     encoded
   }
 
+  fn assert_sampled_image(
+    actual: &PreparedRasterImage,
+    expected: &PdfRasterImage,
+    interpolate: bool,
+  ) {
+    let direct = actual.direct();
+    assert_eq!(direct.width, expected.pixels.width);
+    assert_eq!(direct.height, expected.pixels.height);
+    assert_eq!(direct.color_space, DirectRasterColorSpace::Rgb);
+    assert_eq!(direct.bits_per_component, 8);
+    assert_eq!(direct.interpolate, interpolate);
+    let DirectRasterEncoding::Sampled { pixels } = &direct.encoding else {
+      panic!("expected sampled raster, got {:?}", direct.encoding);
+    };
+    assert_eq!(pixels.as_ref(), expected.pixels.as_ref());
+  }
+
+  fn assert_dct_image(actual: &PreparedRasterImage, expected: &[u8], interpolate: bool) {
+    let direct = actual.direct();
+    assert_eq!(direct.interpolate, interpolate);
+    let DirectRasterEncoding::Dct { data, .. } = &direct.encoding else {
+      panic!("expected DCT raster, got {:?}", direct.encoding);
+    };
+    assert_eq!(data.as_ref(), expected);
+  }
+
   #[test]
   fn tiff_content_types_route_to_the_enabled_decoder() {
     let pixels = [0_u8, 64, 128, 255];
@@ -2090,6 +2513,57 @@ mod tests {
     );
     let decoded = decode_dynamic_image(&encoded, RasterImageFormat::Tiff).unwrap();
     assert_eq!(decoded.image.to_luma8().as_raw(), &pixels);
+  }
+
+  #[test]
+  fn raster_signature_precedes_a_conflicting_package_media_type() {
+    let source = image::RgbImage::from_fn(8, 8, |x, y| {
+      image::Rgb([(x * 31) as u8, (y * 31) as u8, ((x + y) * 15) as u8])
+    });
+    let mut jpeg = Vec::new();
+    ImageJpegEncoder::new(&mut jpeg)
+      .write_image(source.as_raw(), 8, 8, ColorType::Rgb8.into())
+      .unwrap();
+    let png = indexed_test_png(None, false);
+
+    assert_eq!(
+      raster_format(&jpeg, Some("image/png")),
+      Some(RasterImageFormat::Jpeg)
+    );
+    assert_eq!(
+      raster_format(&png, Some("image/jpeg")),
+      Some(RasterImageFormat::Png)
+    );
+
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    let decoded = decode_image(
+      &jpeg,
+      Some("image/png"),
+      RasterExportOptions::new(&options, 72.0, 72.0),
+      None,
+      &mut BTreeSet::new(),
+      &mut Vec::new(),
+    )
+    .unwrap();
+    assert_eq!((decoded.direct().width, decoded.direct().height), (8, 8));
+  }
+
+  #[test]
+  fn raster_media_type_remains_the_fallback_when_no_signature_matches() {
+    let unrecognized = b"not an image signature";
+    assert_eq!(
+      raster_format(unrecognized, Some("image/png")),
+      Some(RasterImageFormat::Png)
+    );
+    assert_eq!(raster_format(unrecognized, None), None);
+
+    let error = match decode_dynamic_image(unrecognized, RasterImageFormat::Png) {
+      Ok(_) => panic!("unrecognized bytes unexpectedly decoded as PNG"),
+      Err(error) => error.to_string(),
+    };
+    assert!(error.contains("Png"), "unexpected decoder error: {error}");
   }
 
   #[test]
@@ -2144,11 +2618,13 @@ mod tests {
     assert_eq!(print.max_size_px.unwrap().pixels(), (199.0, 199.0));
     assert_eq!(print.downsample_size((295, 295)), None);
     assert_eq!(print.downsample_size((300, 300)), Some((199, 199)));
+    assert!(!print.use_word_print_jpeg_gdiplus_resampler);
     let print_jpeg = print.for_raster_format(RasterImageFormat::Jpeg);
+    assert!(print_jpeg.use_word_print_jpeg_gdiplus_resampler);
     let (jpeg_width, jpeg_height) = print_jpeg.max_size_px.unwrap().pixels();
-    assert!((jpeg_width - 220.0).abs() < 0.001);
-    assert!((jpeg_height - 220.0).abs() < 0.001);
-    assert_eq!(print_jpeg.downsample_size((300, 300)), Some((220, 220)));
+    assert_eq!((jpeg_width, jpeg_height), (199.0, 199.0));
+    assert_eq!(print_jpeg.downsample_size((274, 274)), None);
+    assert_eq!(print_jpeg.downsample_size((275, 275)), Some((199, 199)));
 
     options.optimize_for = PdfOptimizeFor::Screen;
     let screen = RasterExportOptions::new(&options, 72.0, 72.0);
@@ -2156,6 +2632,10 @@ mod tests {
     assert_eq!(screen.max_size_px.unwrap().pixels(), (95.0, 95.0));
     assert_eq!(screen.downsample_size((144, 144)), None);
     assert_eq!(screen.downsample_size((150, 150)), Some((95, 95)));
+    let screen_jpeg = screen.for_raster_format(RasterImageFormat::Jpeg);
+    assert!(!screen_jpeg.use_word_print_jpeg_gdiplus_resampler);
+    assert_eq!(screen_jpeg.downsample_size((149, 149)), None);
+    assert_eq!(screen_jpeg.downsample_size((150, 150)), Some((95, 95)));
 
     let frame_surface = RasterExportOptions::new(&options, 103.75, 19.0);
     assert_eq!(frame_surface.downsample_size((316, 58)), Some((138, 25)));
@@ -2168,6 +2648,7 @@ mod tests {
         RasterExportOptions::new(&options, 72.0, 72.0).for_raster_format(RasterImageFormat::Jpeg);
       assert_eq!(print.jpeg_quality, Some(75));
       assert_eq!(print.max_size_px.unwrap().pixels(), (199.0, 199.0));
+      assert!(!print.use_word_print_jpeg_gdiplus_resampler);
     }
 
     options.images.optimization_policy =
@@ -2388,72 +2869,19 @@ mod tests {
       &mut Vec::new(),
     )
     .unwrap();
-    let expected = Image::from_png(physical.into(), false).unwrap();
-    assert_eq!(actual, expected);
-  }
-
-  #[test]
-  fn native_indexed_png_finalizer_installs_source_palette_and_idat() {
-    let source = indexed_test_png(Some(png::Unit::Meter), false);
-    let png = NativeIndexedPng::parse(&source).unwrap();
-    let decoded_rgb = decode_dynamic_image(&source, RasterImageFormat::Png)
-      .unwrap()
-      .image
-      .to_rgb8()
-      .into_raw();
-    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(&decoded_rgb).unwrap();
-    let sampled_rgb = encoder.finish().unwrap();
-
-    let mut document = LopdfDocument::new();
-    let image_id = document.add_object(lopdf::Stream::new(
-      dictionary! {
-        "Type" => LopdfObject::Name(b"XObject".to_vec()),
-        "Subtype" => LopdfObject::Name(b"Image".to_vec()),
-        "ColorSpace" => LopdfObject::Name(b"DeviceRGB".to_vec()),
-        "BitsPerComponent" => LopdfObject::Integer(8),
-        "Width" => LopdfObject::Integer(i64::from(png.width)),
-        "Height" => LopdfObject::Integer(i64::from(png.height)),
-        "Filter" => LopdfObject::Name(b"FlateDecode".to_vec()),
-      },
-      sampled_rgb,
-    ));
-    let replacement = NativeIndexedPngReplacement {
-      png: png.clone(),
-      decoded_rgb,
+    let expected = NativeIndexedPng::parse(&physical).unwrap();
+    let direct = actual.direct();
+    assert_eq!(
+      (direct.width, direct.height),
+      (expected.width, expected.height)
+    );
+    assert_eq!(direct.bits_per_component, expected.bit_depth as u8);
+    assert!(!direct.interpolate);
+    let DirectRasterEncoding::IndexedPng { data, palette, .. } = &direct.encoding else {
+      panic!("expected indexed PNG, got {:?}", direct.encoding);
     };
-
-    assert_eq!(
-      install_native_indexed_pngs(&mut document, &[replacement]),
-      1
-    );
-    let LopdfObject::Stream(image) = document.objects.get(&image_id).unwrap() else {
-      unreachable!()
-    };
-    assert_eq!(image.content, png.idat);
-    assert_eq!(
-      pdf_dictionary_i64(&image.dict, b"BitsPerComponent"),
-      Some(1)
-    );
-    let color_space = image.dict.get(b"ColorSpace").unwrap().as_array().unwrap();
-    assert_eq!(color_space[0].as_name().unwrap(), b"Indexed");
-    assert_eq!(color_space[1].as_name().unwrap(), b"DeviceRGB");
-    assert_eq!(color_space[2].as_i64().unwrap(), 1);
-    assert_eq!(color_space[3].as_str().unwrap(), png.palette);
-    let decode_parameters = image.dict.get(b"DecodeParms").unwrap().as_dict().unwrap();
-    assert_eq!(
-      pdf_dictionary_i64(decode_parameters, b"Predictor"),
-      Some(15)
-    );
-    assert_eq!(pdf_dictionary_i64(decode_parameters, b"Colors"), Some(1));
-    assert_eq!(
-      pdf_dictionary_i64(decode_parameters, b"BitsPerComponent"),
-      Some(1)
-    );
-    assert_eq!(
-      pdf_dictionary_i64(decode_parameters, b"Columns"),
-      Some(i64::from(png.width))
-    );
+    assert_eq!(data.as_ref(), expected.idat.as_slice());
+    assert_eq!(palette.as_ref(), expected.palette.as_slice());
   }
 
   #[test]
@@ -2484,13 +2912,8 @@ mod tests {
       &mut Vec::new(),
     )
     .unwrap();
-    let expected = Image::from_custom(
-      PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(source), None),
-      false,
-    )
-    .unwrap();
-
-    assert_eq!(actual, expected);
+    let expected = PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(source), None);
+    assert_sampled_image(&actual, &expected, false);
   }
 
   #[test]
@@ -2518,14 +2941,8 @@ mod tests {
       &mut BTreeSet::new(),
     )
     .unwrap();
-    let expected = Image::from_jpeg_with_icc(
-      encode_office_h2v2_jpeg(&source, 75).unwrap().into(),
-      None,
-      true,
-    )
-    .unwrap();
-
-    assert_eq!(actual, expected);
+    let expected = encode_office_h2v2_jpeg(&source, 75).unwrap();
+    assert_dct_image(&actual, &expected, true);
   }
 
   #[test]
@@ -2557,6 +2974,58 @@ mod tests {
   }
 
   #[test]
+  fn word_print_jpeg_large_bitmap_scaler_matches_gdiplus_q16_area_coverage() {
+    let mut source = image::RgbaImage::from_pixel(443, 1, Rgba([0, 0, 0, 255]));
+    source.put_pixel(100, 0, Rgba([255, 0, 0, 255]));
+    source.put_pixel(101, 0, Rgba([0, 255, 0, 255]));
+    source.put_pixel(102, 0, Rgba([0, 0, 255, 255]));
+
+    let reduced = resize_for_word_print_jpeg(DynamicImage::ImageRgba8(source), (315, 1)).to_rgba8();
+    let non_black = reduced
+      .enumerate_pixels()
+      .filter(|(_, _, pixel)| pixel.0[..3] != [0, 0, 0])
+      .map(|(x, y, pixel)| (x, y, pixel.0))
+      .collect::<Vec<_>>();
+    assert_eq!(
+      non_black,
+      vec![
+        (71, 0, [181, 47, 0, 255]),
+        (72, 0, [0, 135, 120, 255]),
+        (73, 0, [0, 0, 61, 255]),
+      ]
+    );
+    assert!(reduced.pixels().all(|pixel| pixel[3] == 255));
+  }
+
+  #[test]
+  fn word_print_jpeg_bitmap_scaler_switches_on_either_420_pixel_axis() {
+    let target = (298, 1);
+    let below = DynamicImage::ImageRgba8(image::RgbaImage::from_fn(419, 1, |x, _| {
+      Rgba([(x & 1) as u8 * 255, (x % 7) as u8 * 31, 19, 255])
+    }));
+    assert_eq!(
+      resize_for_word_print_jpeg(below.clone(), target).to_rgba8(),
+      resize_for_office_screen(below, target).to_rgba8()
+    );
+
+    let wide = DynamicImage::ImageRgba8(image::RgbaImage::from_fn(420, 1, |x, _| {
+      Rgba([(x & 1) as u8 * 255, (x % 7) as u8 * 31, 19, 255])
+    }));
+    assert_eq!(
+      resize_for_word_print_jpeg(wide.clone(), target).to_rgba8(),
+      resize_for_gdiplus_fixed_area(wide, target).to_rgba8()
+    );
+
+    let tall = DynamicImage::ImageRgba8(image::RgbaImage::from_fn(1, 420, |_, y| {
+      Rgba([(y & 1) as u8 * 255, (y % 7) as u8 * 31, 19, 255])
+    }));
+    assert_eq!(
+      resize_for_word_print_jpeg(tall.clone(), (1, 298)).to_rgba8(),
+      resize_for_gdiplus_fixed_area(tall, (1, 298)).to_rgba8()
+    );
+  }
+
+  #[test]
   fn configured_jpeg_policy_reencodes_an_ordinary_opaque_png_color_plane() {
     let source = image::RgbImage::from_fn(39, 29, |x, y| {
       let value = (x + y * 39)
@@ -2573,7 +3042,9 @@ mod tests {
       jpeg_quality: Some(60),
       max_size_px: None,
       downsample_trigger_px: None,
-      word_print_jpeg_max_size_px: None,
+      word_print_jpeg_downsample_trigger_px: None,
+      exact_downsample_trigger: false,
+      use_word_print_jpeg_gdiplus_resampler: false,
       allow_interpolation: false,
       profile: RasterExportProfile::Requested,
     };
@@ -2592,10 +3063,8 @@ mod tests {
       &mut Vec::new(),
     )
     .unwrap();
-    let expected_jpeg = encode_jpeg(&DynamicImage::ImageRgb8(source), 60).unwrap();
-    let expected = Image::from_jpeg_with_icc(expected_jpeg.into(), None, false).unwrap();
-
-    assert_eq!(actual, expected);
+    let expected = encode_jpeg(&DynamicImage::ImageRgb8(source), 60).unwrap();
+    assert_dct_image(&actual, &expected, false);
 
     let lossless = RasterExportOptions {
       use_lossless_compression: true,
@@ -2621,7 +3090,9 @@ mod tests {
       jpeg_quality: Some(75),
       max_size_px: None,
       downsample_trigger_px: None,
-      word_print_jpeg_max_size_px: None,
+      word_print_jpeg_downsample_trigger_px: None,
+      exact_downsample_trigger: false,
+      use_word_print_jpeg_gdiplus_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::Requested,
     };
@@ -2635,13 +3106,8 @@ mod tests {
       &mut Vec::new(),
     )
     .unwrap();
-    let expected = Image::from_custom(
-      PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgb8(source), None),
-      false,
-    )
-    .unwrap();
-
-    assert_eq!(actual, expected);
+    let expected = PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgb8(source), None);
+    assert_sampled_image(&actual, &expected, false);
   }
 
   #[test]
@@ -2667,36 +3133,72 @@ mod tests {
     let image =
       PdfRasterImage::from_dynamic_with_icc(DynamicImage::new_rgb8(1, 1), Some(profile.clone()));
 
-    assert_eq!(CustomImage::icc_profile(&image), Some(profile.as_slice()));
+    assert_eq!(
+      image.pixels.icc_profile.as_deref(),
+      Some(profile.as_slice())
+    );
   }
 
   #[test]
-  fn office_h2v2_jpeg_averages_each_chroma_block() {
-    let data = [
-      255, 0, 0, 0, 255, 0, // red, green
-      0, 0, 255, 255, 255, 255, // blue, white
-    ];
-    let image = H2V2BoxRgbImage {
-      data: &data,
-      width: 2,
-      height: 2,
-    };
-    let converted = [
-      rgb_to_ycbcr(255, 0, 0),
-      rgb_to_ycbcr(0, 255, 0),
-      rgb_to_ycbcr(0, 0, 255),
-      rgb_to_ycbcr(255, 255, 255),
-    ];
-    let average = |component: usize| {
-      ((converted
-        .iter()
-        .map(|pixel| u16::from([pixel.0, pixel.1, pixel.2][component]))
-        .sum::<u16>()
-        + 1)
-        >> 2) as u8
+  fn office_reduced_jpeg_discards_pdf_icc_but_requested_export_preserves_it() {
+    let source = image::RgbImage::from_fn(300, 300, |x, y| {
+      let value = (x + y * 300)
+        .wrapping_mul(1_664_525)
+        .wrapping_add(1_013_904_223);
+      image::Rgb([value as u8, (value >> 8) as u8, (value >> 16) as u8])
+    });
+    let mut profile = vec![0_u8; 132];
+    profile[..4].copy_from_slice(&132_u32.to_be_bytes());
+    profile[16..20].copy_from_slice(b"RGB ");
+    profile[36..40].copy_from_slice(b"acsp");
+    let raster = || DecodedRasterImage {
+      image: DynamicImage::ImageRgb8(source.clone()),
+      icc_profile: Some(profile.clone()),
+      jpeg_has_real_physical_resolution: false,
     };
 
-    assert_eq!(image.h2v2_chroma(0, 0), (average(1), average(2)));
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    let office =
+      RasterExportOptions::new(&options, 72.0, 72.0).for_raster_format(RasterImageFormat::Jpeg);
+    let reduced = export_decoded_image(
+      raster(),
+      RasterImageFormat::Jpeg,
+      office,
+      RasterOwner::Source,
+      &mut BTreeSet::new(),
+    )
+    .unwrap();
+    assert_eq!(reduced.size(), (199, 199));
+    let DirectRasterEncoding::Dct { icc_profile, .. } = &reduced.direct().encoding else {
+      panic!("expected DCT raster, got {:?}", reduced.direct().encoding);
+    };
+    assert!(icc_profile.is_none());
+
+    let requested = RasterExportOptions {
+      use_lossless_compression: false,
+      jpeg_quality: Some(75),
+      max_size_px: None,
+      downsample_trigger_px: None,
+      word_print_jpeg_downsample_trigger_px: None,
+      exact_downsample_trigger: false,
+      use_word_print_jpeg_gdiplus_resampler: false,
+      allow_interpolation: true,
+      profile: RasterExportProfile::Requested,
+    };
+    let preserved = export_decoded_image(
+      raster(),
+      RasterImageFormat::Jpeg,
+      requested,
+      RasterOwner::Source,
+      &mut BTreeSet::new(),
+    )
+    .unwrap();
+    let DirectRasterEncoding::Dct { icc_profile, .. } = &preserved.direct().encoding else {
+      panic!("expected DCT raster, got {:?}", preserved.direct().encoding);
+    };
+    assert_eq!(icc_profile.as_deref(), Some(profile.as_slice()));
   }
 
   #[test]
@@ -2739,7 +3241,9 @@ mod tests {
       jpeg_quality: Some(75),
       max_size_px: None,
       downsample_trigger_px: None,
-      word_print_jpeg_max_size_px: None,
+      word_print_jpeg_downsample_trigger_px: None,
+      exact_downsample_trigger: false,
+      use_word_print_jpeg_gdiplus_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::Requested,
     };
@@ -2753,13 +3257,8 @@ mod tests {
       export_options,
     )
     .unwrap();
-    let expected = Image::from_custom(
-      PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(source), None),
-      false,
-    )
-    .unwrap();
-
-    assert_eq!(actual, expected);
+    let expected = PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(source), None);
+    assert_sampled_image(&actual, &expected, false);
   }
 
   #[test]
@@ -2780,7 +3279,9 @@ mod tests {
       jpeg_quality: Some(75),
       max_size_px: None,
       downsample_trigger_px: None,
-      word_print_jpeg_max_size_px: None,
+      word_print_jpeg_downsample_trigger_px: None,
+      exact_downsample_trigger: false,
+      use_word_print_jpeg_gdiplus_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::Requested,
     };
@@ -2801,17 +3302,12 @@ mod tests {
       .unwrap()
       .image
       .to_rgb8();
-    let expected = Image::from_custom(
-      PdfRasterImage::from_rgb_with_alpha(
-        remove_black_matte(compressed_rgb, &source),
-        &source,
-        None,
-      ),
-      true,
-    )
-    .unwrap();
-
-    assert_eq!(actual, expected);
+    let expected = PdfRasterImage::from_rgb_with_alpha(
+      remove_black_matte(compressed_rgb, &source),
+      &source,
+      None,
+    );
+    assert_sampled_image(&actual, &expected, true);
   }
 
   #[test]
@@ -2853,15 +3349,15 @@ mod tests {
     let mut images = ImageSet::default();
 
     images
-      .raster(&jpeg, Some("image/jpeg"), &options, Some(first), 72.0, 72.0)
+      .raster_direct(&jpeg, Some("image/jpeg"), &options, Some(first), 72.0, 72.0)
       .unwrap();
     images
-      .raster(&jpeg, Some("image/jpeg"), &options, Some(first), 72.0, 72.0)
+      .raster_direct(&jpeg, Some("image/jpeg"), &options, Some(first), 72.0, 72.0)
       .unwrap();
     assert_eq!(images.rasters.values().map(Vec::len).sum::<usize>(), 1);
 
     images
-      .raster(
+      .raster_direct(
         &jpeg,
         Some("image/jpeg"),
         &options,
@@ -2890,10 +3386,10 @@ mod tests {
     let mut images = ImageSet::default();
 
     let full = images
-      .raster(&jpeg, Some("image/jpeg"), &options, None, 60.0, 60.0)
+      .raster_direct(&jpeg, Some("image/jpeg"), &options, None, 60.0, 60.0)
       .unwrap();
     let reduced = images
-      .raster(&jpeg, Some("image/jpeg"), &options, None, 30.0, 30.0)
+      .raster_direct(&jpeg, Some("image/jpeg"), &options, None, 30.0, 30.0)
       .unwrap();
 
     assert_eq!(full.size(), (60, 60));
@@ -2935,7 +3431,9 @@ mod tests {
       jpeg_quality: None,
       max_size_px: RasterPixelLimits::from_display_size(263.25, 213.0, 96),
       downsample_trigger_px: None,
-      word_print_jpeg_max_size_px: None,
+      word_print_jpeg_downsample_trigger_px: None,
+      exact_downsample_trigger: false,
+      use_word_print_jpeg_gdiplus_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::Requested,
     };
@@ -3017,90 +3515,81 @@ mod tests {
     );
   }
 
-  fn binary_soft_mask_document(color: Vec<u8>, alpha: Vec<u8>) -> (LopdfDocument, lopdf::ObjectId) {
-    assert_eq!(color.len(), alpha.len() * 3);
-    let width = i64::try_from(alpha.len()).unwrap();
-    let mut document = LopdfDocument::new();
-    let mask_id = document.add_object(lopdf::Stream::new(
-      lopdf::dictionary! {
-        "Type" => LopdfObject::Name(b"XObject".to_vec()),
-        "Subtype" => LopdfObject::Name(b"Image".to_vec()),
-        "ColorSpace" => LopdfObject::Name(b"DeviceGray".to_vec()),
-        "BitsPerComponent" => LopdfObject::Integer(8),
-        "Width" => LopdfObject::Integer(width),
-        "Height" => LopdfObject::Integer(1),
-      },
-      alpha,
-    ));
-    document.add_object(lopdf::Stream::new(
-      lopdf::dictionary! {
-        "Type" => LopdfObject::Name(b"XObject".to_vec()),
-        "Subtype" => LopdfObject::Name(b"Image".to_vec()),
-        "ColorSpace" => LopdfObject::Name(b"DeviceRGB".to_vec()),
-        "BitsPerComponent" => LopdfObject::Integer(8),
-        "Width" => LopdfObject::Integer(width),
-        "Height" => LopdfObject::Integer(1),
-        "SMask" => LopdfObject::Reference(mask_id),
-      },
-      color,
-    ));
-    (document, mask_id)
-  }
-
   #[test]
-  fn black_matte_soft_masks_require_an_exact_associated_plane_fingerprint() {
-    let binary_color = vec![0, 0, 0, 10, 20, 30];
-    let binary_alpha = vec![0, 255];
-    let (mut binary, mask_id) =
-      binary_soft_mask_document(binary_color.clone(), binary_alpha.clone());
-    assert_eq!(
-      mark_black_matte_soft_masks(&mut binary, &BTreeSet::new()),
-      0
-    );
-    let LopdfObject::Stream(mask) = binary.objects.get(&mask_id).unwrap() else {
-      unreachable!()
-    };
-    assert!(!mask.dict.has(b"Matte"));
-
-    let binary_fingerprint = black_matte_raster_fingerprint(2, 1, &binary_color, &binary_alpha);
-    assert_eq!(
-      mark_black_matte_soft_masks(&mut binary, &[binary_fingerprint].into()),
-      1
-    );
-    let LopdfObject::Stream(mask) = binary.objects.get(&mask_id).unwrap() else {
-      unreachable!()
-    };
-    assert_eq!(
-      mask.dict.get(b"Matte").unwrap().as_array().unwrap().len(),
-      3
-    );
-
-    let (partial, _) = binary_soft_mask_document(vec![0, 0, 0, 10, 20, 30], vec![0, 254]);
-    assert!(black_matte_soft_mask_ids(&partial, &BTreeSet::new()).is_empty());
-
-    let premultiplied_color = vec![0, 0, 0, 40, 50, 60];
-    let premultiplied_alpha = vec![0, 128];
-    let (mut premultiplied, _) =
-      binary_soft_mask_document(premultiplied_color.clone(), premultiplied_alpha.clone());
-    let authorized = [black_matte_raster_fingerprint(
-      2,
+  fn word_table_border_preserves_fully_transparent_hidden_rgb() {
+    let source = image::RgbaImage::from_raw(
+      3,
       1,
-      &premultiplied_color,
-      &premultiplied_alpha,
-    )]
-    .into();
-    assert_eq!(
-      mark_black_matte_soft_masks(&mut premultiplied, &authorized),
-      1
-    );
+      vec![0, 112, 192, 255, 0, 112, 192, 0, 0, 112, 192, 255],
+    )
+    .unwrap();
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(source.as_raw(), 3, 1, ColorType::Rgba8.into())
+      .unwrap();
 
-    let (hidden_white, _) =
-      binary_soft_mask_document(vec![255, 255, 255, 10, 20, 30], vec![0, 255]);
-    assert!(black_matte_soft_mask_ids(&hidden_white, &authorized).is_empty());
+    let actual = decode_image(
+      &png,
+      Some(WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE),
+      RasterExportOptions::new(&PdfOptions::default(), 1.2, 0.48),
+      None,
+      &mut BTreeSet::new(),
+      &mut Vec::new(),
+    )
+    .unwrap();
+    let direct = actual.direct();
+    assert!(!direct.interpolate);
+    let DirectRasterEncoding::Sampled { pixels } = &direct.encoding else {
+      panic!(
+        "expected sampled table-border raster, got {:?}",
+        direct.encoding
+      );
+    };
+    assert_eq!(pixels.rgb, vec![0, 112, 192, 0, 112, 192, 0, 112, 192]);
+    assert_eq!(pixels.alpha.as_deref(), Some([255, 0, 255].as_slice()));
+    assert_eq!(
+      RasterOwner::from_content_type(Some(WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE)),
+      RasterOwner::WordTableBorder
+    );
   }
 
   #[test]
-  fn jpeg_exif_orientation_is_applied_before_pdf_embedding() {
+  fn word_black_matte_effect_transports_register_only_their_associated_planes() {
+    assert_eq!(
+      RasterOwner::from_content_type(Some(WORD_GROUP_GLOW_BITMAP_CONTENT_TYPE)),
+      RasterOwner::WordGroupGlow
+    );
+    assert_eq!(
+      RasterOwner::from_content_type(Some(WORD_SHAPE_GLOW_BITMAP_CONTENT_TYPE)),
+      RasterOwner::WordShapeGlow
+    );
+    assert_eq!(
+      RasterOwner::from_content_type(Some(WORD_SHAPE_SHADOW_BITMAP_CONTENT_TYPE)),
+      RasterOwner::WordShapeShadow
+    );
+    assert_eq!(
+      RasterOwner::from_content_type(Some("image/png")),
+      RasterOwner::Source
+    );
+
+    let rgba = image::RgbaImage::from_raw(2, 1, vec![0, 0, 0, 0, 40, 50, 60, 128]).unwrap();
+    let expected = black_matte_raster_fingerprint(2, 1, &[0, 0, 0, 40, 50, 60], &[0, 128]);
+    let mut authorized = BTreeSet::new();
+    export_wordprocessing_black_matte_effect_image(
+      DecodedRasterImage {
+        image: DynamicImage::ImageRgba8(rgba),
+        icc_profile: None,
+        jpeg_has_real_physical_resolution: false,
+      },
+      &mut authorized,
+    )
+    .unwrap();
+
+    assert_eq!(authorized, [expected].into());
+  }
+
+  #[test]
+  fn jpeg_exif_orientation_is_applied_by_both_decoded_export_paths() {
     let mut jpeg = Vec::new();
     ImageJpegEncoder::new(&mut jpeg)
       .encode(
@@ -3122,8 +3611,10 @@ mod tests {
     oriented.extend_from_slice(&jpeg[2..]);
 
     let image = decode_dynamic_image(&oriented, RasterImageFormat::Jpeg).unwrap();
+    let word_print_image = decode_word_print_jpeg(&oriented).unwrap();
 
     assert_eq!(image.image.dimensions(), (1, 2));
+    assert_eq!(word_print_image.image.dimensions(), (1, 2));
   }
 
   #[test]

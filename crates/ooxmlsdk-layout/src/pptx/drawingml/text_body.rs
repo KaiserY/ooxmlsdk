@@ -656,7 +656,7 @@ mod tests {
       (Some(BooleanValue::True), true),
     ] {
       let display = TextBodyDisplayProperties::from_body_properties(&a::BodyProperties {
-        compatible_line_spacing: authored.clone(),
+        compatible_line_spacing: authored,
         ..a::BodyProperties::default()
       });
 

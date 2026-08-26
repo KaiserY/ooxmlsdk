@@ -12,8 +12,8 @@ pub enum PdfError {
   #[error(transparent)]
   Layout(#[from] ooxmlsdk_layout::error::LayoutError),
 
-  #[error("krilla failed to produce PDF output: {0}")]
-  Krilla(String),
+  #[error("PDF image processing failed: {0}")]
+  Image(String),
 
   #[error("invalid PDF options: {0}")]
   Options(String),
@@ -25,6 +25,9 @@ pub enum PdfError {
     reason: &'static str,
   },
 
-  #[error("lopdf failed to patch PDF output: {0}")]
-  Lopdf(String),
+  #[error("direct PDF writer failed: {0}")]
+  Writer(String),
+
+  #[error("direct PDF writer does not yet support {feature}")]
+  DirectWriterUnsupported { feature: &'static str },
 }

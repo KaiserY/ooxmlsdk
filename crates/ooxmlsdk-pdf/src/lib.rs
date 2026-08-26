@@ -3,7 +3,7 @@
 //! The crate is intentionally split from layout:
 //!
 //! 1. `ooxmlsdk-layout` extracts and lays out Office packages.
-//! 2. This crate converts the layout display list to PDF through `krilla`.
+//! 2. This crate converts the layout display list to PDF.
 
 mod diagnostics;
 mod error;
@@ -93,7 +93,7 @@ where
   let mut options = resolve_pdf_options(PdfDocumentKind::Docx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::docx::layout_document(&document, &layout_options)?;
-  render::krilla::render_with_diagnostics(&pages, &options)
+  render::render_with_diagnostics(&pages, &options)
 }
 
 /// Convert a DOCX stream and return a bounded font-integrity audit.
@@ -112,7 +112,7 @@ where
   let mut options = resolve_pdf_options(PdfDocumentKind::Docx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::docx::layout_document(&document, &layout_options)?;
-  render::krilla::render_with_font_audit(&pages, &options)
+  render::render_with_font_audit(&pages, &options)
 }
 
 /// Convert an opened Wordprocessing document into PDF bytes.
@@ -123,7 +123,7 @@ pub fn convert_wordprocessing_document(
   let mut options = resolve_pdf_options(PdfDocumentKind::Docx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::docx::layout_document(document, &layout_options)?;
-  render::krilla::render(&pages, &options)
+  render::render(&pages, &options)
 }
 
 /// Inspect DOCX layout line boxes without rendering to PDF.
@@ -208,7 +208,7 @@ where
   let document = SpreadsheetDocument::new_with_settings(reader, settings)?;
   let mut options = resolve_pdf_options(PdfDocumentKind::Xlsx, &options)?.into_effective();
   let pages = xlsx::layout(&document, &mut options)?;
-  render::krilla::render_with_diagnostics(&pages, &options)
+  render::render_with_diagnostics(&pages, &options)
 }
 
 /// Convert an XLSX stream and return a bounded font-integrity audit.
@@ -226,7 +226,7 @@ where
   let document = SpreadsheetDocument::new_with_settings(reader, settings)?;
   let mut options = resolve_pdf_options(PdfDocumentKind::Xlsx, &options)?.into_effective();
   let pages = xlsx::layout(&document, &mut options)?;
-  render::krilla::render_with_font_audit(&pages, &options)
+  render::render_with_font_audit(&pages, &options)
 }
 
 /// Convert an opened spreadsheet document into PDF bytes.
@@ -236,7 +236,7 @@ pub fn convert_spreadsheet_document(
 ) -> Result<Vec<u8>> {
   let mut options = resolve_pdf_options(PdfDocumentKind::Xlsx, &options)?.into_effective();
   let pages = xlsx::layout(document, &mut options)?;
-  render::krilla::render(&pages, &options)
+  render::render(&pages, &options)
 }
 
 /// Convert a PPTX stream into PDF bytes.
@@ -274,7 +274,7 @@ where
   let mut options = resolve_pdf_options(PdfDocumentKind::Pptx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::pptx::layout_document(&document, &layout_options)?;
-  render::krilla::render_with_diagnostics(&pages, &options)
+  render::render_with_diagnostics(&pages, &options)
 }
 
 /// Convert a PPTX stream and return a bounded font-integrity audit.
@@ -293,7 +293,7 @@ where
   let mut options = resolve_pdf_options(PdfDocumentKind::Pptx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::pptx::layout_document(&document, &layout_options)?;
-  render::krilla::render_with_font_audit(&pages, &options)
+  render::render_with_font_audit(&pages, &options)
 }
 
 /// Convert an opened presentation document into PDF bytes.
@@ -304,5 +304,5 @@ pub fn convert_presentation_document(
   let mut options = resolve_pdf_options(PdfDocumentKind::Pptx, &options)?.into_effective();
   let layout_options = options.take_layout_options();
   let pages = ooxmlsdk_layout::pptx::layout_document(document, &layout_options)?;
-  render::krilla::render(&pages, &options)
+  render::render(&pages, &options)
 }

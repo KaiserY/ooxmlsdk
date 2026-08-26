@@ -53,7 +53,6 @@ pub struct PdfFontAuditIssue {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PdfFontAuditIssueKind {
   FontParse,
-  KrillaFontLoad,
   MissingShapedGlyphs,
   MissingGlyph,
   PortionTextRange,
@@ -67,7 +66,6 @@ impl PdfFontAuditIssueKind {
   pub fn as_str(self) -> &'static str {
     match self {
       Self::FontParse => "font-parse",
-      Self::KrillaFontLoad => "krilla-font-load",
       Self::MissingShapedGlyphs => "missing-shaped-glyphs",
       Self::MissingGlyph => "missing-glyph",
       Self::PortionTextRange => "portion-text-range",

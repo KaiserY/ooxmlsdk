@@ -340,11 +340,11 @@ impl Color {
     self.resolve_rgb_standard(scheme_resolver, placeholder_color)
   }
 
-  /// Resolves an inherited DrawingML theme style without quantizing to 8-bit
-  /// sRGB between ordered color transformations. Office keeps that precision
-  /// across the format scheme's `shade`/`tint` and HSL transforms and permits
-  /// `satMod` to exceed 100% before clipping the resulting sRGB channels.
-  pub(crate) fn resolve_rgb_with_theme_style_precision<F>(
+  /// Resolves ordered DrawingML color transformations without quantizing to
+  /// 8-bit sRGB between steps. Office keeps that precision across direct and
+  /// inherited `shade`/`tint` and HSL transforms, and permits `satMod` to
+  /// exceed 100% before clipping the final sRGB channels.
+  pub(crate) fn resolve_rgb_preserving_transform_precision<F>(
     &self,
     scheme_resolver: &mut F,
     placeholder_color: Option<&Color>,
@@ -353,8 +353,25 @@ impl Color {
     F: FnMut(a::SchemeColorValues) -> Option<Color>,
   {
     self
-      .resolve_precise_theme_style(scheme_resolver, placeholder_color)
+      .resolve_preserving_transform_precision(scheme_resolver, placeholder_color)
       .map(PreciseResolvedColor::into_resolved)
+  }
+
+  /// Resolves the same precise transform graph but uses Word's fixed-output
+  /// device-surface truncation for the final sRGB byte boundary. This is not
+  /// the general DrawingML quantizer: direct and inherited paints retain the
+  /// nearest-byte contract exposed by `resolve_rgb_preserving_transform_precision`.
+  pub(crate) fn resolve_rgb_for_word_fixed_output_effect<F>(
+    &self,
+    scheme_resolver: &mut F,
+    placeholder_color: Option<&Color>,
+  ) -> Option<ResolvedColor>
+  where
+    F: FnMut(a::SchemeColorValues) -> Option<Color>,
+  {
+    self
+      .resolve_preserving_transform_precision(scheme_resolver, placeholder_color)
+      .map(PreciseResolvedColor::into_word_fixed_output_effect)
   }
 
   fn resolve_rgb_standard<F>(
@@ -412,7 +429,7 @@ impl Color {
     Some(color)
   }
 
-  fn resolve_precise_theme_style<F>(
+  fn resolve_preserving_transform_precision<F>(
     &self,
     scheme_resolver: &mut F,
     placeholder_color: Option<&Color>,
@@ -454,7 +471,8 @@ impl Color {
         } else {
           scheme_resolver(color.value)
         }?;
-        let mut resolved = base.resolve_precise_theme_style(scheme_resolver, placeholder_color)?;
+        let mut resolved =
+          base.resolve_preserving_transform_precision(scheme_resolver, placeholder_color)?;
         resolved.apply_transformations(&color.transformations);
         return Some(resolved);
       }
@@ -628,6 +646,19 @@ impl PreciseResolvedColor {
       r: channel(channels[0]),
       g: channel(channels[1]),
       b: channel(channels[2]),
+      alpha: self.alpha.clamp(0, COLOR_PERCENT_MAX),
+    }
+  }
+
+  fn into_word_fixed_output_effect(mut self) -> ResolvedColor {
+    self.ensure_srgb();
+    let PreciseColorSpace::Srgb(channels) = self.space else {
+      unreachable!("color conversion must finish in sRGB")
+    };
+    ResolvedColor {
+      r: color_math::drawingml_srgb_unit_to_u8(channels[0]),
+      g: color_math::drawingml_srgb_unit_to_u8(channels[1]),
+      b: color_math::drawingml_srgb_unit_to_u8(channels[2]),
       alpha: self.alpha.clamp(0, COLOR_PERCENT_MAX),
     }
   }
@@ -1575,7 +1606,7 @@ mod tests {
   }
 
   #[test]
-  fn theme_style_keeps_precision_between_scrgb_shade_and_hsl_saturation() {
+  fn ordered_transforms_keep_precision_between_scrgb_shade_and_hsl_saturation() {
     let themed = Color::Scheme(SchemeColor {
       value: a::SchemeColorValues::PhColor,
       transformations: vec![
@@ -1594,12 +1625,34 @@ mod tests {
       transformations: Vec::new(),
     });
     let resolved = themed
-      .resolve_rgb_with_theme_style_precision(&mut |_| None, Some(&placeholder))
+      .resolve_rgb_preserving_transform_precision(&mut |_| None, Some(&placeholder))
       .expect("resolved phClr theme style");
 
     // Office applies the shade in linear scRGB and does not quantize to u8
     // before converting the retained value to HSL for satMod.
     assert_eq!(resolved, ResolvedColor::new(0x2C, 0x5D, 0x98));
+  }
+
+  #[test]
+  fn word_fixed_output_effect_truncates_only_the_final_fractional_srgb_channel() {
+    let transformed = Color::RgbHex(RgbHexColor {
+      value: "FFFFFF".to_string(),
+      transformations: vec![ColorTransformation {
+        kind: ColorTransformationKind::LumMod,
+        value: Some(50_000),
+      }],
+    })
+    .resolve_rgb_for_word_fixed_output_effect(&mut |_| None, None)
+    .expect("resolved luminance modulation");
+    let authored = Color::RgbHex(RgbHexColor {
+      value: "808080".to_string(),
+      transformations: Vec::new(),
+    })
+    .resolve_rgb_for_word_fixed_output_effect(&mut |_| None, None)
+    .expect("resolved explicit sRGB bytes");
+
+    assert_eq!(transformed, ResolvedColor::new(0x7f, 0x7f, 0x7f));
+    assert_eq!(authored, ResolvedColor::new(0x80, 0x80, 0x80));
   }
 
   #[test]
@@ -1618,7 +1671,7 @@ mod tests {
       ],
     });
     let resolved = effect_color
-      .resolve_rgb_with_theme_style_precision(
+      .resolve_rgb_preserving_transform_precision(
         &mut |token| {
           (token == a::SchemeColorValues::Accent4).then(|| {
             Color::RgbHex(RgbHexColor {

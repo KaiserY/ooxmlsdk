@@ -1244,6 +1244,12 @@ pub(crate) struct InlineShape {
   pub text_fill: Option<Box<common::Fill<'static>>>,
   pub effects: Option<common::DrawingEffectSource>,
   pub static3d: Option<common::drawingml_3d::Static3dStyle>,
+  /// Whether this leaf is hosted by `wps:wsp`.
+  ///
+  /// WordprocessingShape fixed output owns a distinct 600-DPI effect-surface
+  /// quantization contract. Keep that provenance after import instead of
+  /// inferring it later from fill, textbox, or effect content.
+  pub wordprocessing_shape_host: bool,
   pub text_upright: bool,
   pub text_box_writing_mode: TextBoxWritingMode,
   /// Whether the WPS non-visual properties explicitly mark this shape as a

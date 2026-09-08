@@ -664,42 +664,46 @@ impl PreciseResolvedColor {
   }
 
   fn apply_transformations(&mut self, transformations: &[ColorTransformation]) {
-    for transformation in transformations {
-      let value = transformation.value.unwrap_or(0);
-      match transformation.kind {
-        ColorTransformationKind::Red => self.set_scrgb_component(0, drawingml_ratio(value)),
-        ColorTransformationKind::RedMod => self.mod_scrgb_component(0, value),
-        ColorTransformationKind::RedOff => self.offset_scrgb_component(0, value),
-        ColorTransformationKind::Green => self.set_scrgb_component(1, drawingml_ratio(value)),
-        ColorTransformationKind::GreenMod => self.mod_scrgb_component(1, value),
-        ColorTransformationKind::GreenOff => self.offset_scrgb_component(1, value),
-        ColorTransformationKind::Blue => self.set_scrgb_component(2, drawingml_ratio(value)),
-        ColorTransformationKind::BlueMod => self.mod_scrgb_component(2, value),
-        ColorTransformationKind::BlueOff => self.offset_scrgb_component(2, value),
-        ColorTransformationKind::Alpha => self.alpha = clamp_percent(value),
-        ColorTransformationKind::AlphaMod => {
-          self.alpha = mod_value(self.alpha, value, COLOR_PERCENT_MAX);
-        }
-        ColorTransformationKind::AlphaOff => {
-          self.alpha = offset_value(self.alpha, value, COLOR_PERCENT_MAX);
-        }
-        ColorTransformationKind::Shade => self.apply_scrgb_shade(value),
-        ColorTransformationKind::Tint => self.apply_scrgb_tint(value),
-        ColorTransformationKind::Gray => self.apply_gray(),
-        ColorTransformationKind::Comp => self.apply_complement(),
-        ColorTransformationKind::Inv => self.apply_scrgb_inverse(),
-        ColorTransformationKind::Gamma => self.apply_scrgb_gamma(false),
-        ColorTransformationKind::InvGamma => self.apply_scrgb_gamma(true),
-        ColorTransformationKind::Hue
-        | ColorTransformationKind::HueMod
-        | ColorTransformationKind::HueOff
-        | ColorTransformationKind::Sat
-        | ColorTransformationKind::SatMod
-        | ColorTransformationKind::SatOff
-        | ColorTransformationKind::Lum
-        | ColorTransformationKind::LumMod
-        | ColorTransformationKind::LumOff => self.apply_hsl_transform(transformation.kind, value),
+    for &transformation in transformations {
+      self.apply_transformation(transformation);
+    }
+  }
+
+  fn apply_transformation(&mut self, transformation: ColorTransformation) {
+    let value = transformation.value.unwrap_or(0);
+    match transformation.kind {
+      ColorTransformationKind::Red => self.set_scrgb_component(0, drawingml_ratio(value)),
+      ColorTransformationKind::RedMod => self.mod_scrgb_component(0, value),
+      ColorTransformationKind::RedOff => self.offset_scrgb_component(0, value),
+      ColorTransformationKind::Green => self.set_scrgb_component(1, drawingml_ratio(value)),
+      ColorTransformationKind::GreenMod => self.mod_scrgb_component(1, value),
+      ColorTransformationKind::GreenOff => self.offset_scrgb_component(1, value),
+      ColorTransformationKind::Blue => self.set_scrgb_component(2, drawingml_ratio(value)),
+      ColorTransformationKind::BlueMod => self.mod_scrgb_component(2, value),
+      ColorTransformationKind::BlueOff => self.offset_scrgb_component(2, value),
+      ColorTransformationKind::Alpha => self.alpha = clamp_percent(value),
+      ColorTransformationKind::AlphaMod => {
+        self.alpha = mod_value(self.alpha, value, COLOR_PERCENT_MAX);
       }
+      ColorTransformationKind::AlphaOff => {
+        self.alpha = offset_value(self.alpha, value, COLOR_PERCENT_MAX);
+      }
+      ColorTransformationKind::Shade => self.apply_scrgb_shade(value),
+      ColorTransformationKind::Tint => self.apply_scrgb_tint(value),
+      ColorTransformationKind::Gray => self.apply_gray(),
+      ColorTransformationKind::Comp => self.apply_complement(),
+      ColorTransformationKind::Inv => self.apply_scrgb_inverse(),
+      ColorTransformationKind::Gamma => self.apply_scrgb_gamma(false),
+      ColorTransformationKind::InvGamma => self.apply_scrgb_gamma(true),
+      ColorTransformationKind::Hue
+      | ColorTransformationKind::HueMod
+      | ColorTransformationKind::HueOff
+      | ColorTransformationKind::Sat
+      | ColorTransformationKind::SatMod
+      | ColorTransformationKind::SatOff
+      | ColorTransformationKind::Lum
+      | ColorTransformationKind::LumMod
+      | ColorTransformationKind::LumOff => self.apply_hsl_transform(transformation.kind, value),
     }
   }
 
@@ -859,6 +863,22 @@ impl PreciseResolvedColor {
       *saturation = 0.0;
     }
   }
+}
+
+/// Applies a fixed-output effect color graph to an already resolved sRGB
+/// base without an intermediate 8-bit boundary. This adapter is shared by
+/// DrawingML and Word 2010 effect hosts; opacity remains the responsibility of
+/// the host because W14 assigns different semantics to its `alpha` child.
+pub(crate) fn resolve_word_fixed_output_effect_rgb(
+  rgb: [u8; 3],
+  transformations: impl IntoIterator<Item = ColorTransformation>,
+) -> [u8; 3] {
+  let mut color = PreciseResolvedColor::from_resolved(ResolvedColor::new(rgb[0], rgb[1], rgb[2]));
+  for transformation in transformations {
+    color.apply_transformation(transformation);
+  }
+  let resolved = color.into_word_fixed_output_effect();
+  [resolved.r, resolved.g, resolved.b]
 }
 
 fn drawingml_ratio(value: i32) -> f64 {

@@ -62,7 +62,10 @@ use crate::model::{common_rgb, drawingml_kerning_minimum_size_pt};
 use crate::options::{
   FieldUpdateDateTime, LayoutActionOptions, LayoutDiagnosticsOptions, LayoutOptions,
 };
-use crate::pptx::drawingml::color::{Color, RgbHexColor};
+use crate::pptx::drawingml::color::{
+  Color, ColorTransformation, ColorTransformationKind, RgbHexColor,
+  resolve_word_fixed_output_effect_rgb,
+};
 use crate::pptx::drawingml::text_list_style::TextListStyle;
 use crate::render::chart as shared_chart;
 use crate::render::math as shared_math;
@@ -583,6 +586,14 @@ pub fn layout_document(
   package: &WordprocessingDocument,
   options: &LayoutOptions,
 ) -> Result<crate::common::LayoutDocument<'static>> {
+  if options
+    .native_picture_dpi
+    .is_some_and(|dpi| !(200..=1200).contains(&dpi))
+  {
+    return Err(crate::LayoutError::InvalidInput(
+      "native picture density must be between 200 and 1200 DPI".into(),
+    ));
+  }
   let document = extract(package, options)?;
   Ok(layout::layout_common_document(&document, options))
 }
@@ -600,6 +611,7 @@ pub fn layout_anchor_pages(
     field_update_datetime: options.field_update_datetime,
     field_update_time_zone: options.field_update_time_zone.clone(),
     fixed_output_raster_dpi: options.fixed_output_raster_dpi,
+    native_picture_dpi: options.native_picture_dpi,
     fixed_output_forbids_transparency: options.fixed_output_forbids_transparency,
     action: LayoutActionOptions {
       paint: false,
@@ -12200,8 +12212,11 @@ fn push_drawing_textboxes_impl(
       images,
       hyperlinks,
       inside_wordprocessing_group: false,
+      wordprocessing_canvas_has_background_paint: false,
     };
-    let child_transform = if graphic_data_choice_is_wordprocessing_shape(child) {
+    let child_transform = if matches!(child, a::GraphicDataChoice::WordprocessingGroup(_)) {
+      transform.with_realized_host_extent(wordprocessing_transform.fallback_size)
+    } else if graphic_data_choice_is_wordprocessing_shape(child) {
       wordprocessing_transform
     } else {
       transform
@@ -12285,6 +12300,8 @@ fn merge_textbox_frame_into_owning_shape(
   shape.text_vertical_alignment = text_box_frame.text_vertical_alignment;
   shape.text_box_writing_mode = text_box_frame.text_box_writing_mode;
   shape.text_fill = text_box_frame.text_fill.take();
+  shape.wordprocessing_canvas_has_background_paint |=
+    text_box_frame.wordprocessing_canvas_has_background_paint;
   Ok(())
 }
 
@@ -12323,6 +12340,7 @@ struct DrawingTextBoxImportContext<'a> {
   images: &'a ImageCatalog,
   hyperlinks: &'a HyperlinkCatalog,
   inside_wordprocessing_group: bool,
+  wordprocessing_canvas_has_background_paint: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -12332,6 +12350,7 @@ struct DrawingShapeImportContext<'a> {
   images: &'a ImageCatalog,
   hyperlinks: &'a HyperlinkCatalog,
   smartart_text_colors_by_model_id: Option<&'a HashMap<String, RgbColor>>,
+  wordprocessing_canvas_has_background_paint: bool,
 }
 
 fn autofit_textbox_placement(placement: ImagePlacement) -> ImagePlacement {
@@ -12520,6 +12539,7 @@ fn drawingml_w14_gradient_fill(
         false,
         Some(common::GradientPath {
           kind,
+          context: common::GradientPathContext::WordprocessingText,
           fill_to,
           transform: common::Transform::default(),
           mirror_tile: false,
@@ -13097,6 +13117,12 @@ fn wordprocessing_shape_actual_line_stroke(
   shape: &wps::WordprocessingShape,
   styles: &StylesCatalog,
 ) -> Option<common::Stroke<'static>> {
+  let preset = shape.shape_properties.as_deref().and_then(|properties| {
+    match properties.shape_properties_choice1.as_ref()? {
+      wps::ShapePropertiesChoice::PresetGeometry(geometry) => Some(geometry.preset),
+      wps::ShapePropertiesChoice::CustomGeometry(_) => None,
+    }
+  });
   drawingml_actual_line_stroke(
     shape
       .shape_properties
@@ -13108,6 +13134,7 @@ fn wordprocessing_shape_actual_line_stroke(
       .map(|style| style.line_reference.as_ref()),
     &styles.theme_lines,
     &styles.theme_colors,
+    preset,
   )
 }
 
@@ -13422,6 +13449,15 @@ fn wordprocessing_canvas_textbox_frames(
   transform: DrawingMlGroupTransform,
   context: DrawingTextBoxImportContext<'_>,
 ) -> Vec<InlineShape> {
+  let context = DrawingTextBoxImportContext {
+    wordprocessing_canvas_has_background_paint: wordprocessing_canvas_background_paint(
+      canvas,
+      context.styles,
+      context.images,
+    )
+    .is_some(),
+    ..context
+  };
   let child_placement = drawingml_group_child_placement(placement, transform.fallback_size);
   canvas
     .wordprocessing_canvas_choice
@@ -13657,6 +13693,7 @@ fn wordprocessing_shape_textbox_frame(
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: wordprocessing_shape_actual_static3d(shape, &properties, context.styles),
     wordprocessing_shape_host: true,
+    wordprocessing_canvas_has_background_paint: context.wordprocessing_canvas_has_background_paint,
     text_upright: shape
       .text_body_properties
       .as_ref()
@@ -13987,13 +14024,16 @@ fn push_drawing_shapes_impl(
             images,
             hyperlinks,
             smartart_text_colors_by_model_id: None,
+            wordprocessing_canvas_has_background_paint: false,
           },
         ) {
           inlines.extend(diagram_shapes);
         }
       }
       _ => {
-        let choice_transform = if graphic_data_choice_is_wordprocessing_shape(choice) {
+        let choice_transform = if matches!(choice, a::GraphicDataChoice::WordprocessingGroup(_)) {
+          transform.with_realized_host_extent(wordprocessing_transform.fallback_size)
+        } else if graphic_data_choice_is_wordprocessing_shape(choice) {
           wordprocessing_transform
         } else {
           transform
@@ -14008,6 +14048,7 @@ fn push_drawing_shapes_impl(
             images,
             hyperlinks,
             smartart_text_colors_by_model_id: None,
+            wordprocessing_canvas_has_background_paint: false,
           },
         ));
       }
@@ -14075,8 +14116,14 @@ fn drawing_graphic_data_uses_wordprocessing_twip_host_placement(
   graphic_data: &a::GraphicData,
 ) -> bool {
   graphic_data.graphic_data_choice.iter().any(|choice| {
-    matches!(choice, a::GraphicDataChoice::WordprocessingGroup(_))
-      || graphic_data_choice_is_wordprocessing_shape(choice)
+    // The locked canvas has a WordprocessingML host too. Its outer anchor
+    // drops sub-twip EMU remainders; the nested DrawingML coordinates retain
+    // their original precision. Office positive/negative posOffset controls
+    // cross the boundary at +/-635 EMU, not at a half-twip rounding boundary.
+    matches!(
+      choice,
+      a::GraphicDataChoice::WordprocessingGroup(_) | a::GraphicDataChoice::LockedCanvas(_)
+    ) || graphic_data_choice_is_wordprocessing_shape(choice)
   })
 }
 
@@ -14443,11 +14490,12 @@ fn drawingml_generic_shape_shape(
   let fill_image = picture_fill
     .and_then(|fill| drawingml_blip_shape_image_fill(fill, context.images))
     .or_else(|| drawingml_generic_shape_image_fill(shape_properties, context.images));
-  let stroke_override = drawingml_actual_line_stroke(
+  let mut stroke_override = drawingml_actual_line_stroke(
     shape_properties.outline.as_deref(),
     shape_style.map(|style| style.line_reference.as_ref()),
     &context.styles.theme_lines,
     &context.styles.theme_colors,
+    properties.preset_geometry().map(|geometry| geometry.preset),
   );
   let stroke = stroke_override
     .as_ref()
@@ -14509,6 +14557,51 @@ fn drawingml_generic_shape_shape(
   );
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt);
+  if transform.legacy_locked_canvas
+    && let Some(stroke) = stroke_override.as_mut()
+    && let Some(outline) = drawingml_actual_line_outline(
+      shape_properties.outline.as_deref(),
+      shape_style.map(|style| style.line_reference.as_ref()),
+      &context.styles.theme_lines,
+    )
+  {
+    let rotation = properties
+      .transform2_d()
+      .and_then(|xfrm| xfrm.rotation)
+      .unwrap_or_default();
+    let unit = if transform.raw_coordinates {
+      1.0
+    } else {
+      1.0 / 12_700.0
+    };
+    let local = Affine::scale_non_uniform(
+      unit
+        * if properties.flip_horizontal() {
+          -1.0
+        } else {
+          1.0
+        },
+      unit
+        * if properties.flip_vertical() {
+          -1.0
+        } else {
+          1.0
+        },
+    )
+    .then_rotate(sdk_units::drawingml_angle_to_degrees(rotation).to_radians());
+    let emu_to_points = drawingml_physical_pen_basis(transform.native_affine * local);
+    stroke.drawingml_device = Some(Box::new(common::DrawingMlDeviceStroke {
+      width_emu: outline
+        .width
+        .map(i64::from)
+        .unwrap_or(DRAWINGML_DEFAULT_LINE_WIDTH_EMU),
+      emu_to_points,
+      snap: common::drawingml_device_stroke::is_quarter_turn(
+        transform.composed_native_rotation(rotation),
+      ),
+      realized_width_emu: None,
+    }));
+  }
   if has_path_geometry
     && let Some(path_geometry) =
       drawingml_path_geometry_from_properties(&properties, width_pt, height_pt)
@@ -14575,6 +14668,7 @@ fn drawingml_generic_shape_shape(
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: properties.static3d(&context.styles.theme_colors),
     wordprocessing_shape_host: false,
+    wordprocessing_canvas_has_background_paint: false,
     text_upright: text_shape.is_some_and(|text_shape| {
       text_shape
         .text_body
@@ -14616,16 +14710,25 @@ fn wordprocessing_canvas_shapes(
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
 ) -> Vec<InlineItem> {
+  let background_paint =
+    wordprocessing_canvas_background_paint(canvas, context.styles, context.images);
+  let child_context = DrawingShapeImportContext {
+    wordprocessing_canvas_has_background_paint: background_paint.is_some(),
+    ..context
+  };
   let child_placement = drawingml_group_child_placement(placement, transform.fallback_size);
   let mut children = canvas
     .wordprocessing_canvas_choice
     .iter()
     .flat_map(|choice| {
-      wordprocessing_canvas_choice_shapes(choice, child_placement, transform, context)
+      wordprocessing_canvas_choice_shapes(choice, child_placement, transform, child_context)
     })
     .collect::<Vec<_>>();
+  let Some(background_paint) = background_paint else {
+    return children;
+  };
   let Some(background) =
-    wordprocessing_canvas_background_shape(canvas, placement, transform.fallback_size, context)
+    wordprocessing_canvas_background_shape(placement, transform.fallback_size, background_paint)
   else {
     return children;
   };
@@ -14638,17 +14741,17 @@ fn wordprocessing_canvas_shapes(
   children
 }
 
-fn wordprocessing_canvas_background_shape(
-  canvas: &wpc::WordprocessingCanvas,
-  placement: ImagePlacement,
-  host_extent_pt: Option<(f32, f32)>,
-  context: DrawingShapeImportContext<'_>,
-) -> Option<InlineShape> {
-  let (width_pt, height_pt) = host_extent_pt?;
-  if width_pt <= 0.0 || height_pt <= 0.0 {
-    return None;
-  }
+struct WordprocessingCanvasBackgroundPaint {
+  fill_override: Option<common::Fill<'static>>,
+  fill_image: Option<InlineShapeImageFill>,
+  stroke_override: Option<common::Stroke<'static>>,
+}
 
+fn wordprocessing_canvas_background_paint(
+  canvas: &wpc::WordprocessingCanvas,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) -> Option<WordprocessingCanvasBackgroundPaint> {
   let background_choice = canvas
     .background_formatting
     .as_deref()
@@ -14657,18 +14760,18 @@ fn wordprocessing_canvas_background_shape(
   let fill_override = match background_choice {
     Some(wpc::BackgroundFormattingChoice::NoFill(_)) => Some(common::Fill::None),
     Some(wpc::BackgroundFormattingChoice::SolidFill(fill)) => {
-      resolve_drawingml_solid_fill(fill, &context.styles.theme_colors)
+      resolve_drawingml_solid_fill(fill, &styles.theme_colors)
         .map(|color| common::Fill::Solid(common_rgb(color.color, color.opacity)))
     }
     Some(wpc::BackgroundFormattingChoice::GradientFill(fill)) => {
-      drawingml_gradient_fill(fill, &context.styles.theme_colors)
+      drawingml_gradient_fill(fill, &styles.theme_colors)
     }
     Some(wpc::BackgroundFormattingChoice::BlipFill(fill)) => {
-      fill_image = drawingml_blip_shape_image_fill(fill, context.images);
+      fill_image = drawingml_blip_shape_image_fill(fill, images);
       None
     }
     Some(wpc::BackgroundFormattingChoice::PatternFill(fill)) => {
-      drawingml_pattern_fill(fill, &context.styles.theme_colors).map(common::Fill::Pattern)
+      drawingml_pattern_fill(fill, &styles.theme_colors).map(common::Fill::Pattern)
     }
     Some(wpc::BackgroundFormattingChoice::GroupFill) | None => None,
   };
@@ -14676,18 +14779,43 @@ fn wordprocessing_canvas_background_shape(
     .whole_formatting
     .as_deref()
     .and_then(|whole| whole.outline.as_deref())
-    .and_then(|outline| drawingml_outline_common_stroke(outline, &context.styles.theme_colors));
-  let stroke = stroke_override
-    .as_ref()
-    .map(drawingml_border_style_from_common_stroke);
-  let stroke_pattern = stroke_override.as_ref().and_then(|stroke| stroke.pattern);
-  let has_visible_fill = fill_override
+    .and_then(|outline| drawingml_outline_common_stroke(outline, &styles.theme_colors));
+  let has_fill_paint = fill_override
     .as_ref()
     .is_some_and(|fill| !matches!(fill, common::Fill::None))
     || fill_image.is_some();
-  if !has_visible_fill && stroke_override.is_none() {
+  if !has_fill_paint && stroke_override.is_none() {
     return None;
   }
+
+  // Deliberately do not inspect alpha here. The fixed-output positive and
+  // negative controls distinguish `a:noFill` from a solid fill with
+  // `a:alpha val="0"`; both opaque and fully transparent authored paint create
+  // Word's canvas background child and select the same shadow-edge contract.
+  Some(WordprocessingCanvasBackgroundPaint {
+    fill_override,
+    fill_image,
+    stroke_override,
+  })
+}
+
+fn wordprocessing_canvas_background_shape(
+  placement: ImagePlacement,
+  host_extent_pt: Option<(f32, f32)>,
+  paint: WordprocessingCanvasBackgroundPaint,
+) -> Option<InlineShape> {
+  let (width_pt, height_pt) = host_extent_pt?;
+  if width_pt <= 0.0 || height_pt <= 0.0 {
+    return None;
+  }
+  let stroke = paint
+    .stroke_override
+    .as_ref()
+    .map(drawingml_border_style_from_common_stroke);
+  let stroke_pattern = paint
+    .stroke_override
+    .as_ref()
+    .and_then(|stroke| stroke.pattern);
 
   Some(InlineShape {
     width_pt,
@@ -14708,12 +14836,12 @@ fn wordprocessing_canvas_background_shape(
     flip_vertical: false,
     fill_color: None,
     fill_pattern: None,
-    fill_override: fill_override.map(Box::new),
+    fill_override: paint.fill_override.map(Box::new),
     additional_fill_colors: Vec::new(),
-    fill_image,
+    fill_image: paint.fill_image,
     stroke,
     stroke_pattern,
-    stroke_override: stroke_override.map(Box::new),
+    stroke_override: paint.stroke_override.map(Box::new),
     suppress_zero_relative_background: false,
     allow_outside_page: false,
     horizontal_rule: None,
@@ -14724,6 +14852,7 @@ fn wordprocessing_canvas_background_shape(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_canvas_has_background_paint: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -15130,6 +15259,7 @@ fn wordprocessing_shape_shape(
     effects,
     static3d: wordprocessing_shape_actual_static3d(shape, &properties, context.styles),
     wordprocessing_shape_host: true,
+    wordprocessing_canvas_has_background_paint: context.wordprocessing_canvas_has_background_paint,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: shape
@@ -15434,6 +15564,7 @@ fn drawingml_diagram_shape_shape(
       .map(|style| style.line_reference.as_ref()),
     &context.styles.theme_lines,
     &context.styles.theme_colors,
+    properties.preset_geometry().map(|geometry| geometry.preset),
   );
   let stroke = stroke_override
     .as_ref()
@@ -15520,6 +15651,7 @@ fn drawingml_diagram_shape_shape(
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: properties.static3d(&context.styles.theme_colors),
     wordprocessing_shape_host: false,
+    wordprocessing_canvas_has_background_paint: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -17706,6 +17838,7 @@ fn chart_shape(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_canvas_has_background_paint: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -17722,9 +17855,31 @@ fn chart_shape(
   }
 }
 
+/// DrawingML line widths are physical EMUs, not group `chExt` coordinate units.
+/// Keep the transformed axis directions without scaling the pen by an arbitrary
+/// child-coordinate basis (e.g. 163 child units spanning 103188 EMUs).
+fn drawingml_physical_pen_basis(transform: Affine) -> [f64; 4] {
+  let [a, b, c, d, _, _] = transform.as_coeffs();
+  let x = a.hypot(b);
+  let y = c.hypot(d);
+  if !x.is_finite() || !y.is_finite() || x == 0.0 || y == 0.0 {
+    return [0.0; 4];
+  }
+  [
+    a / x / 12_700.0,
+    b / x / 12_700.0,
+    c / y / 12_700.0,
+    d / y / 12_700.0,
+  ]
+}
+
 #[derive(Clone, Copy, Debug)]
 struct DrawingMlGroupTransform {
   affine: Affine,
+  // Keep the pen's original-unit linear transform separate from f32 layout
+  // geometry. Device-width half-pixel decisions consume this precision.
+  native_affine: Affine,
+  native_rotation_units: i32,
   raw_coordinates: bool,
   fallback_size: Option<(f32, f32)>,
   host_extent_controls_geometry: bool,
@@ -17743,6 +17898,8 @@ impl DrawingMlGroupTransform {
   fn identity() -> Self {
     Self {
       affine: Affine::IDENTITY,
+      native_affine: Affine::IDENTITY,
+      native_rotation_units: 0,
       raw_coordinates: false,
       fallback_size: None,
       host_extent_controls_geometry: false,
@@ -17808,8 +17965,19 @@ impl DrawingMlGroupTransform {
       )
       .then_rotate(f64::from(xfrm.rotation_deg.to_radians()))
       .then_translate((f64::from(center_x), f64::from(center_y)).into());
+    let native_child = xfrm
+      .native_linear
+      .map_or(orientation * child_coordinates, |m| {
+        Affine::new([m[0], m[1], m[2], m[3], 0.0, 0.0])
+      });
+    let native_rotation = xfrm
+      .rotation_units
+      .unwrap_or_else(|| (f64::from(xfrm.rotation_deg) * 60_000.0).round() as i32);
+    let native_rotation_units = self.composed_native_rotation(native_rotation);
     Self {
       affine: self.affine * orientation * child_coordinates,
+      native_affine: self.native_affine * native_child,
+      native_rotation_units,
       raw_coordinates: true,
       fallback_size: None,
       host_extent_controls_geometry: false,
@@ -17817,10 +17985,45 @@ impl DrawingMlGroupTransform {
     }
   }
 
+  fn with_realized_host_extent(mut self, realized: Option<(f32, f32)>) -> Self {
+    let (Some((source_width, source_height)), Some((width, height))) =
+      (self.fallback_size, realized)
+    else {
+      return self;
+    };
+    if source_width <= 0.0 || source_height <= 0.0 || width <= 0.0 || height <= 0.0 {
+      return self;
+    }
+    // Realize the WordprocessingML host in integer twips, then retain all
+    // authored DrawingML group/child transforms inside that normalized frame.
+    // Unequal wp:extent and a:xfrm ext controls distinguish this affine from
+    // replacing the group extent or rounding each child independently.
+    self.affine *= Affine::scale_non_uniform(
+      f64::from(width) / f64::from(source_width),
+      f64::from(height) / f64::from(source_height),
+    );
+    self.native_affine *= Affine::scale_non_uniform(
+      f64::from(width) / f64::from(source_width),
+      f64::from(height) / f64::from(source_height),
+    );
+    self.fallback_size = realized;
+    self
+  }
+
   fn rotation_degrees(self) -> f32 {
     let horizontal =
       common::drawingml_geometry::transform_vector(kurbo::Vec2::new(1.0, 0.0), self.affine);
     horizontal.y.atan2(horizontal.x).to_degrees() as f32
+  }
+
+  fn composed_native_rotation(self, rotation: i32) -> i32 {
+    let direction = if self.native_affine.determinant() < 0.0 {
+      -1_i64
+    } else {
+      1
+    };
+    (i64::from(self.native_rotation_units) + direction * i64::from(rotation)).rem_euclid(21_600_000)
+      as i32
   }
 
   fn authored_point_scale(self) -> (f32, f32) {
@@ -17894,6 +18097,8 @@ struct DrawingMlMappedRect {
 #[derive(Clone, Copy, Debug, Default)]
 struct DrawingMlGroupXfrm {
   rotation_deg: f32,
+  rotation_units: Option<i32>,
+  native_linear: Option<[f64; 4]>,
   flip_horizontal: bool,
   flip_vertical: bool,
   offset_x_pt: f32,
@@ -18292,6 +18497,7 @@ fn drawingml_static3d_style(
     shape: Box::new(shape.clone()),
     extrusion_color,
     contour_color,
+    wordprocessing_effect_plane_z_pt: None,
   }
 }
 
@@ -18337,6 +18543,7 @@ fn anchor_wrap_polygon_shape(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_canvas_has_background_paint: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -18521,6 +18728,7 @@ fn drawingml_group_transform_from_model(
   raw_coordinates: bool,
 ) -> DrawingMlGroupXfrm {
   let mut group = DrawingMlGroupXfrm {
+    rotation_units: Some(transform.rotation.unwrap_or_default()),
     rotation_deg: transform
       .rotation
       .map(|value| sdk_units::drawingml_angle_to_degrees(value) as f32)
@@ -18562,6 +18770,35 @@ fn drawingml_group_transform_from_model(
     if group.child_height == 0.0 {
       group.child_height = extents.cy.to_emu() as f32;
     }
+    let child_width = transform
+      .child_extents
+      .as_ref()
+      .map(|v| v.cx.to_emu())
+      .filter(|v| *v != 0)
+      .unwrap_or_else(|| extents.cx.to_emu());
+    let child_height = transform
+      .child_extents
+      .as_ref()
+      .map(|v| v.cy.to_emu())
+      .filter(|v| *v != 0)
+      .unwrap_or_else(|| extents.cy.to_emu());
+    let point_scale = if raw_coordinates { 1.0 } else { 1.0 / 12_700.0 };
+    let ratio = |extent: i64, child: i64| {
+      if child == 0 {
+        point_scale
+      } else {
+        (extent as f64 / child as f64) * point_scale
+      }
+    };
+    let native = Affine::scale_non_uniform(
+      ratio(extents.cx.to_emu(), child_width) * if group.flip_horizontal { -1.0 } else { 1.0 },
+      ratio(extents.cy.to_emu(), child_height) * if group.flip_vertical { -1.0 } else { 1.0 },
+    )
+    .then_rotate(
+      sdk_units::drawingml_angle_to_degrees(transform.rotation.unwrap_or_default()).to_radians(),
+    );
+    let [a, b, c, d, _, _] = native.as_coeffs();
+    group.native_linear = Some([a, b, c, d]);
   }
 
   group
@@ -18802,6 +19039,7 @@ fn drawingml_picture_frame(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_canvas_has_background_paint: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -19569,17 +19807,20 @@ fn drawingml_actual_line_stroke(
   reference: Option<&a::LineReference>,
   theme_lines: &ThemeLineStyles,
   theme_colors: &ThemeColors,
+  preset: Option<a::ShapeTypeValues>,
 ) -> Option<common::Stroke<'static>> {
   let actual = drawingml_actual_line_outline(direct, reference, theme_lines)?;
   let placeholder_color = reference
     .and_then(|reference| reference.line_reference_choice.as_ref())
     .and_then(Color::from_line_reference_choice);
-  drawingml_outline_common_stroke_with_placeholder(
+  let mut stroke = drawingml_outline_common_stroke_with_placeholder(
     &actual,
     theme_colors,
     placeholder_color.as_ref(),
     None,
-  )
+  )?;
+  common::drawingml_stroke::apply_office_preset_shape_round_join_exception(&mut stroke, preset);
+  Some(stroke)
 }
 
 fn drawingml_actual_line_outline(
@@ -21511,6 +21752,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<I
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_canvas_has_background_paint: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -21725,6 +21967,7 @@ fn vml_shape_frame(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_canvas_has_background_paint: false,
     text_upright: false,
     text_box_writing_mode: TextBoxWritingMode::Horizontal,
     word_text_frame: false,
@@ -21803,6 +22046,7 @@ fn vml_textbox_frame(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_canvas_has_background_paint: false,
     // Word keeps legacy custom-shape textbox text unrotated unless its
     // separate RotateText property is set. LibreOffice's WW8/VML bridge
     // compensates both the object angle and FlipV for this default while
@@ -27225,6 +27469,90 @@ fn opacity_from_w14_scheme_transforms(transforms: &[w14::SchemeColorChoice]) -> 
   )
 }
 
+fn w14_solid_fill_has_authored_transparency(fill: &w14::SolidColorFillProperties) -> bool {
+  fill
+    .solid_color_fill_properties_choice
+    .as_ref()
+    .is_some_and(|choice| match choice {
+      w14::SolidColorFillPropertiesChoice::RgbColorModelHex(color) => {
+        w14_rgb_transforms_have_authored_transparency(&color.rgb_color_model_hex_choice)
+      }
+      w14::SolidColorFillPropertiesChoice::SchemeColor(color) => {
+        w14_scheme_transforms_have_authored_transparency(&color.scheme_color_choice)
+      }
+    })
+}
+
+fn w14_gradient_fill_has_authored_transparency(fill: &w14::GradientFillProperties) -> bool {
+  fill.gradient_stop_list.as_ref().is_some_and(|list| {
+    list.gradient_stop.iter().any(|stop| {
+      stop
+        .gradient_stop_choice
+        .as_ref()
+        .is_some_and(|choice| match choice {
+          w14::GradientStopChoice::RgbColorModelHex(color) => {
+            w14_rgb_transforms_have_authored_transparency(&color.rgb_color_model_hex_choice)
+          }
+          w14::GradientStopChoice::SchemeColor(color) => {
+            w14_scheme_transforms_have_authored_transparency(&color.scheme_color_choice)
+          }
+        })
+    })
+  })
+}
+
+pub(super) fn wordprocessing_text_fill_has_authored_transparency(
+  fill: &w14::FillTextEffect,
+) -> bool {
+  match fill.fill_text_effect_choice.as_ref() {
+    Some(w14::FillTextEffectChoice::SolidColorFillProperties(fill)) => {
+      w14_solid_fill_has_authored_transparency(fill)
+    }
+    Some(w14::FillTextEffectChoice::GradientFillProperties(fill)) => {
+      w14_gradient_fill_has_authored_transparency(fill)
+    }
+    Some(w14::FillTextEffectChoice::NoFillEmpty) | None => false,
+  }
+}
+
+pub(super) fn wordprocessing_text_outline_has_authored_transparency(
+  outline: &w14::TextOutlineEffect,
+) -> bool {
+  match outline.text_outline_effect_choice1.as_ref() {
+    Some(w14::TextOutlineEffectChoice::SolidColorFillProperties(fill)) => {
+      w14_solid_fill_has_authored_transparency(fill)
+    }
+    Some(w14::TextOutlineEffectChoice::GradientFillProperties(fill)) => {
+      w14_gradient_fill_has_authored_transparency(fill)
+    }
+    Some(w14::TextOutlineEffectChoice::NoFillEmpty) | None => false,
+  }
+}
+
+fn w14_rgb_transforms_have_authored_transparency(
+  transforms: &[w14::RgbColorModelHexChoice],
+) -> bool {
+  transforms
+    .iter()
+    .rev()
+    .find_map(|transform| match transform {
+      w14::RgbColorModelHexChoice::Alpha(value) => Some(value.val),
+      _ => None,
+    })
+    .is_some_and(|alpha| alpha > 0)
+}
+
+fn w14_scheme_transforms_have_authored_transparency(transforms: &[w14::SchemeColorChoice]) -> bool {
+  transforms
+    .iter()
+    .rev()
+    .find_map(|transform| match transform {
+      w14::SchemeColorChoice::Alpha(value) => Some(value.val),
+      _ => None,
+    })
+    .is_some_and(|alpha| alpha > 0)
+}
+
 fn opacity_from_w14_alpha(alpha: Option<i32>) -> f32 {
   // Keep this Word 2010 color path distinct from DrawingML `a:alpha`.
   // Word's fixed-format output consumes the w14 child as transparency: in
@@ -27248,6 +27576,26 @@ enum W14ColorTransform {
   Luminance(i32),
   LuminanceOffset(i32),
   LuminanceMod(i32),
+}
+
+impl W14ColorTransform {
+  fn into_drawingml(self) -> ColorTransformation {
+    let (kind, value) = match self {
+      Self::Tint(value) => (ColorTransformationKind::Tint, value),
+      Self::Shade(value) => (ColorTransformationKind::Shade, value),
+      Self::HueMod(value) => (ColorTransformationKind::HueMod, value),
+      Self::Saturation(value) => (ColorTransformationKind::Sat, value),
+      Self::SaturationOffset(value) => (ColorTransformationKind::SatOff, value),
+      Self::SaturationMod(value) => (ColorTransformationKind::SatMod, value),
+      Self::Luminance(value) => (ColorTransformationKind::Lum, value),
+      Self::LuminanceOffset(value) => (ColorTransformationKind::LumOff, value),
+      Self::LuminanceMod(value) => (ColorTransformationKind::LumMod, value),
+    };
+    ColorTransformation {
+      kind,
+      value: Some(value),
+    }
+  }
 }
 
 #[derive(Clone, Copy)]
@@ -27379,6 +27727,39 @@ fn apply_w14_rgb_transforms(
 
 fn apply_w14_scheme_transforms(color: RgbColor, transforms: &[w14::SchemeColorChoice]) -> RgbColor {
   apply_w14_color_transforms(
+    color,
+    transforms.iter().filter_map(w14_scheme_color_transform),
+  )
+}
+
+fn apply_w14_fixed_output_effect_transforms(
+  color: RgbColor,
+  transforms: impl IntoIterator<Item = W14ColorTransform>,
+) -> RgbColor {
+  let [r, g, b] = resolve_word_fixed_output_effect_rgb(
+    [color.r, color.g, color.b],
+    transforms
+      .into_iter()
+      .map(W14ColorTransform::into_drawingml),
+  );
+  RgbColor { r, g, b }
+}
+
+fn apply_w14_rgb_effect_transforms(
+  color: RgbColor,
+  transforms: &[w14::RgbColorModelHexChoice],
+) -> RgbColor {
+  apply_w14_fixed_output_effect_transforms(
+    color,
+    transforms.iter().filter_map(w14_rgb_color_transform),
+  )
+}
+
+fn apply_w14_scheme_effect_transforms(
+  color: RgbColor,
+  transforms: &[w14::SchemeColorChoice],
+) -> RgbColor {
+  apply_w14_fixed_output_effect_transforms(
     color,
     transforms.iter().filter_map(w14_scheme_color_transform),
   )
@@ -28540,6 +28921,9 @@ fn merge_numbering_format_values(
 }
 
 fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
+  if values.wordprocessing_run_color.is_some() {
+    target.wordprocessing_run_color = values.wordprocessing_run_color;
+  }
   if values.font_family.is_some() {
     target.font_family = values.font_family.clone();
   }
@@ -28726,9 +29110,6 @@ fn merge_style_values(target: &mut TextStyle, values: &TextStyle) {
   }
   if values.text_reflection.is_some() {
     target.text_reflection = values.text_reflection;
-  }
-  if values.wordprocessing_text_3d {
-    target.wordprocessing_text_3d = true;
   }
   if let Some(source) = values.wordprocessing_text_3d_parts.as_ref() {
     if let Some(target) = target.wordprocessing_text_3d_parts.as_mut() {
@@ -32224,6 +32605,67 @@ mod tests {
   }
 
   #[test]
+  fn word_2010_fixed_output_effect_saturation_clips_after_rgb_conversion() {
+    let transforms = [w14::SchemeColorChoice::SaturationModulation(
+      w14::SaturationModulation { val: 175_000 },
+    )];
+
+    // A 6-base x 2-color-model x 5-satMod x 4-alpha Office matrix fixes this
+    // host policy: W14 effect saturation may exceed 100%, and only the final
+    // sRGB channels are clipped. The orange and blue controls also disprove a
+    // Direct2D luminance-matrix interpretation of the isolated orange sample.
+    assert_eq!(
+      apply_w14_scheme_effect_transforms(
+        RgbColor {
+          r: 0xed,
+          g: 0x7d,
+          b: 0x31,
+        },
+        &transforms,
+      ),
+      RgbColor {
+        r: 0xff,
+        g: 0x6f,
+        b: 0x00,
+      }
+    );
+    assert_eq!(
+      apply_w14_scheme_effect_transforms(
+        RgbColor {
+          r: 0x5b,
+          g: 0x9b,
+          b: 0xd5,
+        },
+        &transforms,
+      ),
+      RgbColor {
+        r: 0x2d,
+        g: 0x9d,
+        b: 0xff,
+      }
+    );
+
+    let rgb_transforms = [w14::RgbColorModelHexChoice::SaturationModulation(
+      w14::SaturationModulation { val: 175_000 },
+    )];
+    assert_eq!(
+      apply_w14_rgb_effect_transforms(
+        RgbColor {
+          r: 0x70,
+          g: 0xad,
+          b: 0x47,
+        },
+        &rgb_transforms,
+      ),
+      RgbColor {
+        r: 0x68,
+        g: 0xd3,
+        b: 0x20,
+      }
+    );
+  }
+
+  #[test]
   fn word_2010_color_transforms_cover_rgb_and_hsl_operations_in_order() {
     let green = RgbColor { r: 0, g: 255, b: 0 };
     assert_eq!(
@@ -33023,6 +33465,7 @@ mod tests {
         images: &ImageCatalog::default(),
         hyperlinks: &HyperlinkCatalog::default(),
         inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("WPS textbox frame");
@@ -33120,6 +33563,7 @@ mod tests {
         images: &ImageCatalog::default(),
         hyperlinks: &HyperlinkCatalog::default(),
         inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("WPS textbox frame");
@@ -37443,6 +37887,184 @@ mod tests {
   }
 
   #[test]
+  fn wordprocessing_group_host_extent_precedes_child_scaling() {
+    let group = DrawingMlGroupXfrm {
+      width_pt: units::emu_to_points(3_147_646),
+      height_pt: units::emu_to_points(2_154_115),
+      child_offset_y: -1.0,
+      child_width: 2_004_647.0,
+      child_height: 2_154_115.0,
+      ..Default::default()
+    };
+    let parent = DrawingMlGroupTransform::identity()
+      .with_fallback_size(Some((group.width_pt, group.height_pt)));
+    let mapped = parent
+      .with_realized_host_extent(Some((
+        wordprocessing_shape_extent_points(3_147_646),
+        wordprocessing_shape_extent_points(2_154_115),
+      )))
+      .child(group);
+    // Check the affine itself without conflating its arithmetic with the
+    // extra Single conversions in Word's COM property getter. Independent
+    // Office path controls establish its device coordinates. Child width
+    // remains continuous across +/-1 EMU.
+    for (width_emu, expected_width) in [
+      (1_801_494.0, 222.687_7_f32),
+      (1_801_495.0, 222.687_82_f32),
+      (1_801_496.0, 222.687_94_f32),
+    ] {
+      let rect = mapped.map_rect(
+        (128_682.0, 313_057.0, width_emu, 1_569_085.0),
+        (0.0, false, false),
+      );
+      assert_eq!(rect.width_pt, expected_width);
+      assert!((rect.height_pt - 123.53882).abs() < 0.00002);
+    }
+    let full = mapped.map_rect((0.0, -1.0, 2_004_647.0, 2_154_115.0), (0.0, false, false));
+    assert_eq!((full.width_pt, full.height_pt), (247.8, 169.6));
+    // Neither generic DrawingML nor a nested WPG inherits the outer host's
+    // realized extent. In particular, do not truncate each nested transform.
+    let generic = parent.child(group);
+    assert_eq!(
+      generic.affine,
+      DrawingMlGroupTransform::identity().child(group).affine
+    );
+    assert!(mapped.raw_coordinates);
+    assert!(mapped.fallback_size.is_none());
+  }
+
+  #[test]
+  fn wordprocessing_group_host_normalization_preserves_unequal_group_extent() {
+    // Exact-config Office controls independently change the host and inner
+    // group extent. Replacing either with the other fails these controls.
+    for (host_emu, group_emu, expected_child_width) in [
+      (3_147_646, 3_211_146, 227.18031311035156),
+      (3_211_146, 3_147_646, 222.68865966796875),
+      (3_211_146, 3_211_146, 227.1811065673828),
+    ] {
+      let transform = DrawingMlGroupTransform::identity()
+        .with_fallback_size(Some((units::emu_to_points(host_emu), 10.0)))
+        .with_realized_host_extent(Some((wordprocessing_shape_extent_points(host_emu), 10.0)))
+        .child(DrawingMlGroupXfrm {
+          width_pt: units::emu_to_points(group_emu),
+          height_pt: 10.0,
+          child_width: 2_004_647.0,
+          child_height: 127_000.0,
+          ..Default::default()
+        });
+      let rect = transform.map_rect(
+        (128_682.0, 0.0, 1_801_495.0, 127_000.0),
+        (0.0, false, false),
+      );
+      assert!((f64::from(rect.width_pt) - expected_child_width).abs() < 0.0001);
+    }
+  }
+
+  #[test]
+  fn device_stroke_physical_width_is_independent_of_group_coordinate_units() {
+    for (x, y) in [
+      (1.0, 1.0),
+      (103_188.0 / 163.0, 2_459_038.0 / 3873.0),
+      (12700.0, 25400.0),
+    ] {
+      for angle in [0.0_f64, 90.0, 270.0, 300.0] {
+        let transform = Affine::scale_non_uniform(x, y).then_rotate(angle.to_radians());
+        let [a, b, c, d] = drawingml_physical_pen_basis(transform);
+        assert!((a.hypot(b) * 12700.0 - 1.0).abs() < 1.0e-12);
+        assert!((c.hypot(d) * 12700.0 - 1.0).abs() < 1.0e-12);
+        assert!(
+          (a.atan2(-b) - transform.as_coeffs()[0].atan2(-transform.as_coeffs()[1])).abs() < 1.0e-12
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn device_stroke_import_keeps_raw_emu_scale_and_integer_angle() {
+    let group = a::TransformGroup::from_bytes(br#"<a:xfrm xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:off x="0" y="0"/><a:ext cx="1753908" cy="753776"/><a:chOff x="4246852" y="3000372"/><a:chExt cx="1753908" cy="753776"/></a:xfrm>"#).unwrap();
+    let transform = DrawingMlGroupTransform::identity()
+      .within_legacy_locked_canvas()
+      .child(drawingml_group_transform_from_model(&group, false));
+    let [a, b, c, d, _, _] = transform.native_affine.as_coeffs();
+    assert_eq!([a, b, c, d], [1.0 / 12_700.0, 0.0, 0.0, 1.0 / 12_700.0]);
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    for (rotation, snap) in [
+      (16_200_000, true),
+      (16_199_999, false),
+      (16_200_001, false),
+      (15_000_000, false),
+    ] {
+      let properties = a::ShapeProperties::from_bytes(format!(r#"<a:spPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:xfrm rot="{rotation}" flipH="1"><a:off x="5286380" y="3000372"/><a:ext cx="714380" cy="714380"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom><a:ln w="3810"><a:solidFill><a:srgbClr val="4A7EBB"/></a:solidFill></a:ln></a:spPr>"#).as_bytes()).unwrap();
+      let shape = drawingml_generic_shape_shape(
+        &properties,
+        None,
+        None,
+        None,
+        ImagePlacement::Inline,
+        transform,
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
+        },
+      )
+      .unwrap();
+      let mut source = shape.stroke_override.unwrap().drawingml_device.unwrap();
+      assert_eq!(source.width_emu, 3810);
+      assert_eq!(source.snap, snap, "raw angle {rotation}");
+      source
+        .realize(
+          600.0,
+          common::drawingml_device_stroke::TransformPrecision::Paint,
+        )
+        .unwrap();
+      if snap {
+        assert_eq!(source.realized_width_emu.unwrap() as f32, 3048.0);
+      } else {
+        assert!((source.realized_width_emu.unwrap() - 3810.0).abs() < 0.001);
+      }
+    }
+  }
+
+  #[test]
+  fn locked_canvas_uses_twip_host_placement_without_quantizing_generic_drawings() {
+    let canvas = a::GraphicData {
+      graphic_data_choice: vec![a::GraphicDataChoice::LockedCanvas(Default::default())],
+      ..Default::default()
+    };
+    assert!(drawing_graphic_data_uses_wordprocessing_twip_host_placement(&canvas));
+    assert!(
+      !drawing_graphic_data_uses_wordprocessing_twip_host_placement(&a::GraphicData::default())
+    );
+    for (emu, points) in [
+      (4_114_800, 324.0),
+      (4_114_801, 324.0),
+      (4_115_117, 324.0),
+      (4_115_118, 324.0),
+      (4_115_223, 324.0),
+      (4_115_434, 324.0),
+      (4_115_435, 324.05),
+      (-1, 0.0),
+      (-317, 0.0),
+      (-634, 0.0),
+      (-635, -0.05),
+      (-636, -0.05),
+    ] {
+      assert_eq!(wordprocessing_twip_host_emu_to_points(emu), points);
+    }
+    // Child transforms are not WordprocessingML host coordinates.
+    assert_eq!(
+      drawingml_coordinate_to_points(4_115_223, false),
+      units::emu_to_points(4_115_223)
+    );
+  }
+
+  #[test]
   fn drawing_image_properties_preserve_external_link_placeholders() {
     let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:nvPicPr><pic:cNvPr id="1" name="Picture 1"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:link="rId5"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr/></pic:pic>"#;
 
@@ -37924,6 +38546,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("wps textbox frame");
@@ -37954,6 +38577,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("clipped wps textbox frame");
@@ -37984,6 +38608,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("fixed WPS picture frame");
@@ -38070,6 +38695,7 @@ mod tests {
           images: &images,
           hyperlinks: &hyperlinks,
           smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
         },
       )
       .is_none(),
@@ -38085,6 +38711,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("textbox frame");
@@ -38115,6 +38742,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("textbox with authored style context");
@@ -38149,6 +38777,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         smartart_text_colors_by_model_id: None,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("visual shape");
@@ -38161,6 +38790,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("textbox frame");
@@ -38223,6 +38853,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         smartart_text_colors_by_model_id: None,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("custom geometry shape");
@@ -38459,6 +39090,7 @@ mod tests {
         images: &ImageCatalog::default(),
         hyperlinks: &HyperlinkCatalog::default(),
         smartart_text_colors_by_model_id: None,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("zero-width straight connector");
@@ -38525,6 +39157,59 @@ mod tests {
   }
 
   #[test]
+  fn wps_import_applies_the_office_preset_round_join_exception() {
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let import = |preset: &str, join: &str| {
+      let xml = format!(
+        r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="{preset}"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="336699"/></a:solidFill><a:ln w="9525"><a:solidFill><a:srgbClr val="000000"/></a:solidFill>{join}</a:ln></wps:spPr></wps:wsp>"#
+      );
+      let source = wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("typed WPS shape");
+      wordprocessing_shape_shape(
+        &source,
+        ImagePlacement::Inline,
+        DrawingMlGroupTransform::identity(),
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
+        },
+      )
+      .expect("visible WPS shape")
+      .stroke_override
+      .expect("resolved WPS outline")
+      .join
+    };
+
+    assert_eq!(
+      import("star5", "<a:round/>"),
+      Some(common::StrokeJoin::Miter { limit: Some(8.0) })
+    );
+    assert_eq!(
+      import("star5", "<a:bevel/>"),
+      Some(common::StrokeJoin::Bevel)
+    );
+    for preset in [
+      "star6",
+      "star7",
+      "roundRect",
+      "ellipse",
+      "triangle",
+      "frame",
+    ] {
+      assert_eq!(
+        import(preset, "<a:round/>"),
+        Some(common::StrokeJoin::Round),
+        "{preset}"
+      );
+    }
+  }
+
+  #[test]
   fn wps_shape_inherits_theme_effect_reference_and_direct_effect_list_clears_it() {
     let effect_styles = a::EffectStyleList::from_bytes(
       br#"<a:effectStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:effectStyle><a:effectLst><a:outerShdw blurRad="40000" dist="20000" dir="5400000" rotWithShape="0"><a:schemeClr val="phClr"><a:alpha val="50000"/></a:schemeClr></a:outerShdw></a:effectLst></a:effectStyle></a:effectStyleLst>"#,
@@ -38560,6 +39245,7 @@ mod tests {
           images: &ImageCatalog::default(),
           hyperlinks: &HyperlinkCatalog::default(),
           smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
         },
       )
       .expect("WPS star")
@@ -38636,6 +39322,7 @@ mod tests {
           images: &ImageCatalog::default(),
           hyperlinks: &HyperlinkCatalog::default(),
           smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
         },
       )
       .expect("WPS rectangle")
@@ -38750,6 +39437,7 @@ mod tests {
         images: &ImageCatalog::default(),
         hyperlinks: &HyperlinkCatalog::default(),
         smartart_text_colors_by_model_id: None,
+        wordprocessing_canvas_has_background_paint: false,
       },
     )
     .expect("custom geometry shape");
@@ -42939,6 +43627,7 @@ mod tests {
           images: &images,
           hyperlinks: &hyperlinks,
           smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
         },
       )
     };
@@ -42954,6 +43643,8 @@ mod tests {
       panic!("painted WPC background must precede the authored child");
     };
     assert_eq!(background.geometry, InlineShapeGeometry::Rectangle);
+    assert!(!background.wordprocessing_canvas_has_background_paint);
+    assert!(child.wordprocessing_canvas_has_background_paint);
     assert_eq!(background.inline_frame_size_pt, Some((0.0, 0.0)));
     assert!((background.width_pt - 322.5).abs() < 0.001);
     assert!((background.height_pt - 188.1).abs() < 0.001);
@@ -43010,6 +43701,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         smartart_text_colors_by_model_id: None,
+        wordprocessing_canvas_has_background_paint: false,
       },
     );
     let [InlineItem::Shape(background), InlineItem::Shape(child)] = items.as_slice() else {
@@ -43031,6 +43723,21 @@ mod tests {
     assert_eq!(child_host.relative_width_pct, Some(0.0));
     assert_eq!(child_host.relative_height_pct, Some(0.0));
 
+    let transparent = canvas(
+      r#"
+        <wpc:bg><a:solidFill><a:srgbClr val="FFFFFF"><a:alpha val="0"/></a:srgbClr></a:solidFill></wpc:bg>
+      "#,
+    );
+    let items = import(&transparent);
+    let [InlineItem::Shape(background), InlineItem::Shape(child)] = items.as_slice() else {
+      panic!("transparent authored WPC background must remain distinct from noFill");
+    };
+    let Some(common::Fill::Solid(fill)) = background.fill_override.as_deref() else {
+      panic!("transparent solid WPC background fill");
+    };
+    assert_eq!(fill.a, 0);
+    assert!(child.wordprocessing_canvas_has_background_paint);
+
     for background in ["", "<wpc:bg><a:noFill/></wpc:bg><wpc:whole/>"] {
       let items = import(&canvas(background));
       assert_eq!(
@@ -43038,6 +43745,10 @@ mod tests {
         1,
         "an unpainted canvas must not synthesize a visible child"
       );
+      let [InlineItem::Shape(child)] = items.as_slice() else {
+        unreachable!("one authored WPC child");
+      };
+      assert!(!child.wordprocessing_canvas_has_background_paint);
     }
   }
 
@@ -43077,6 +43788,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
       },
     );
 
@@ -43138,6 +43850,7 @@ mod tests {
           images: &images,
           hyperlinks: &hyperlinks,
           smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
         },
       )
     };
@@ -43227,6 +43940,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         smartart_text_colors_by_model_id: None,
+        wordprocessing_canvas_has_background_paint: false,
       },
     );
 
@@ -43362,6 +44076,7 @@ mod tests {
         images: &images,
         hyperlinks: &hyperlinks,
         smartart_text_colors_by_model_id: None,
+        wordprocessing_canvas_has_background_paint: false,
       },
     );
 
@@ -43490,6 +44205,7 @@ mod tests {
           images: &images,
           hyperlinks: &hyperlinks,
           smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
         },
       )
     };
@@ -45922,6 +46638,43 @@ mod tests {
   }
 
   #[test]
+  fn word_2010_outline_retains_authored_transparency_before_rgba8_quantization() {
+    let outline = |alpha: Option<i32>| {
+      let alpha = alpha.map_or_else(String::new, |value| {
+        format!(r#"<w14:alpha w14:val="{value}"/>"#)
+      });
+      w14::TextOutlineEffect::from_bytes(
+        format!(
+          r#"<w14:textOutline xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" w14:w="25400"><w14:solidFill><w14:srgbClr w14:val="0070C0">{alpha}</w14:srgbClr></w14:solidFill></w14:textOutline>"#
+        )
+        .as_bytes(),
+      )
+      .expect("Word 2010 text outline")
+    };
+
+    assert!(!wordprocessing_text_outline_has_authored_transparency(
+      &outline(None)
+    ));
+    assert!(!wordprocessing_text_outline_has_authored_transparency(
+      &outline(Some(0))
+    ));
+    assert!(wordprocessing_text_outline_has_authored_transparency(
+      &outline(Some(1))
+    ));
+    assert!(wordprocessing_text_outline_has_authored_transparency(
+      &outline(Some(100_000))
+    ));
+
+    let gradient = w14::TextOutlineEffect::from_bytes(
+      br#"<w14:textOutline xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" w14:w="25400"><w14:gradFill><w14:gsLst><w14:gs w14:pos="0"><w14:srgbClr w14:val="FFFFFF"/></w14:gs><w14:gs w14:pos="100000"><w14:schemeClr w14:val="accent1"><w14:alpha w14:val="1"/></w14:schemeClr></w14:gs></w14:gsLst><w14:lin w14:ang="0"/></w14:gradFill></w14:textOutline>"#,
+    )
+    .expect("Word 2010 gradient text outline");
+    assert!(wordprocessing_text_outline_has_authored_transparency(
+      &gradient
+    ));
+  }
+
+  #[test]
   fn drawingml_gradient_preserves_percentage_hsl_and_rotation_semantics() {
     let fill = a::GradientFill::from_bytes(
       br#"<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="0"><a:gsLst><a:gs pos="0"><a:scrgbClr r="100000" g="0" b="0"><a:alpha val="50000"/></a:scrgbClr></a:gs><a:gs pos="100000"><a:hslClr hue="14400000" sat="100000" lum="50000"/></a:gs></a:gsLst><a:lin ang="0"/></a:gradFill>"#,
@@ -46281,13 +47034,37 @@ mod tests {
 
     assert!(style.pdf_glyph_outlines);
     assert!(style.opacity <= f32::EPSILON);
-    assert!(
-      style
-        .pdf_glyph_outline_options
-        .as_deref()
-        .expect("outlined no-fill options")
-        .semantic_text_overlay
+    let options = style
+      .pdf_glyph_outline_options
+      .as_deref()
+      .expect("outlined no-fill options");
+    assert!(options.semantic_text_overlay);
+    assert_eq!(options.fill, Some(common::Fill::None));
+    assert!(!options.outline_has_authored_transparency);
+  }
+
+  #[test]
+  fn word_2010_bevel_defaults_do_not_inherit_drawingml_extents() {
+    let properties = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:props3d><w14:bevelT w14:w="25400"/><w14:bevelB w14:h="7"/></w14:props3d></w:rPr>"#,
+    )
+    .expect("Word 2010 bevel defaults");
+    let style = properties::run_style(
+      Some(&properties),
+      TextStyle::default(),
+      &StylesCatalog::default(),
     );
+    let shape = style
+      .wordprocessing_text_3d_parts
+      .as_ref()
+      .and_then(|parts| parts.shape.as_deref())
+      .expect("Word 2010 props3d shape");
+    let top = shape.bevel_top.as_ref().expect("top bevel");
+    let bottom = shape.bevel_bottom.as_ref().expect("bottom bevel");
+    assert_eq!(top.width.map(|value| value.to_emu()), Some(25_400));
+    assert_eq!(top.height.map(|value| value.to_emu()), Some(0));
+    assert_eq!(bottom.width.map(|value| value.to_emu()), Some(0));
+    assert_eq!(bottom.height.map(|value| value.to_emu()), Some(7));
   }
 
   #[test]
@@ -46324,6 +47101,17 @@ mod tests {
         b: 192
       })
     );
-    assert!(inherited.wordprocessing_text_3d);
+    let inherited_3d = common::drawingml_3d::resolve_static_3d_style(
+      inherited.drawingml_text_static3d.as_ref(),
+      inherited.wordprocessing_text_3d_parts.as_ref(),
+    )
+    .expect("inherited positive extrusion activates Word 3-D text");
+    assert_eq!(
+      inherited_3d
+        .shape
+        .extrusion_height
+        .map(|height| height.to_emu()),
+      Some(57_150)
+    );
   }
 }

@@ -316,6 +316,15 @@ impl PdfOptions {
   }
 
   pub(crate) fn take_layout_options(&mut self) -> ooxmlsdk_layout::options::LayoutOptions {
+    self.layout_options()
+  }
+
+  /// Derive the layout inputs without performing layout or encoding a PDF.
+  ///
+  /// Use effective options returned by [`crate::resolve_pdf_options`]. A native
+  /// picture producer may explicitly select a different working raster density
+  /// on the returned value; this does not change the PDF export options.
+  pub fn layout_options(&self) -> ooxmlsdk_layout::options::LayoutOptions {
     ooxmlsdk_layout::options::LayoutOptions {
       source_file_name: self.source_file_name.clone(),
       ui_language: self.ui_language.clone(),

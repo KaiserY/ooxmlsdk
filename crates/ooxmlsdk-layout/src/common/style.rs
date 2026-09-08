@@ -38,6 +38,10 @@ pub struct Color {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Stroke<'doc> {
   pub width: Pt,
+  /// Original DrawingML pen frame, retained for device-space realization.
+  /// Ordinary vector output consumes `width`; legacy device rasterization
+  /// must not reconstruct integer EMUs from that rounded point value.
+  pub drawingml_device: Option<Box<DrawingMlDeviceStroke>>,
   pub color: Color,
   /// Explicit physical dash lengths. DrawingML preset dash names are retained
   /// separately because their expansion depends on line width and cap style.
@@ -57,6 +61,17 @@ pub struct Stroke<'doc> {
   /// coordinate system as the owning path.
   pub gradient: Option<GradientFill<'doc>>,
   pub source_style_id: Option<Cow<'doc, str>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawingMlDeviceStroke {
+  pub width_emu: i64,
+  /// Linear mapping from authored EMUs to page points, before device rounding.
+  /// Translation is irrelevant to pen realization and remains with geometry.
+  pub emu_to_points: [f64; 4],
+  pub snap: bool,
+  /// Set only by the source-surface owner, using its actual device transform.
+  pub realized_width_emu: Option<f64>,
 }
 
 /// One authored DrawingML shape-style component after host color resolution.
@@ -433,6 +448,9 @@ pub struct GradientFill<'doc> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GradientPath {
   pub kind: GradientPathKind,
+  /// Producer/host context needed when fixed-output implementations lower
+  /// path gradients differently for text and drawing objects.
+  pub context: GradientPathContext,
   /// Insets from the corresponding sides of the shape bounds, expressed as
   /// ratios. Positive values inset and negative values outset the focus path.
   pub fill_to: RelativeRect,
@@ -472,6 +490,85 @@ pub fn office_circle_gradient_transform(transform: super::Transform) -> super::T
     dx: Pt(center_x - (m11 + m21) * 0.5),
     dy: Pt(center_y - (m12 + m22) * 0.5),
   }
+}
+
+/// Resolves the fixed-output circle used for a path-gradient owner.
+///
+/// Drawing objects use the circumscribed circle centered on their transformed
+/// rectangle. Wordprocessing text instead places the circle at the center of
+/// `fillToRect` and grows it to the farthest transformed container corner.
+/// The latter is observable in Word's PDF output even when the focus point is
+/// outside the text container.
+pub fn office_circle_gradient_path(mut path: GradientPath) -> GradientPath {
+  if path.kind != GradientPathKind::Circle || path.mirror_tile {
+    return path;
+  }
+  if path.context != GradientPathContext::WordprocessingText {
+    path.transform = office_circle_gradient_transform(path.transform);
+    return path;
+  }
+
+  let right = (1.0 - path.fill_to.right).max(path.fill_to.left);
+  let bottom = (1.0 - path.fill_to.bottom).max(path.fill_to.top);
+  let focus_x = (path.fill_to.left + right) * 0.5;
+  let focus_y = (path.fill_to.top + bottom) * 0.5;
+  let transform_point = |x: f32, y: f32| super::Point {
+    x: Pt(
+      path
+        .transform
+        .m11
+        .mul_add(x, path.transform.m21.mul_add(y, path.transform.dx.0)),
+    ),
+    y: Pt(
+      path
+        .transform
+        .m12
+        .mul_add(x, path.transform.m22.mul_add(y, path.transform.dy.0)),
+    ),
+  };
+  let focus = transform_point(focus_x, focus_y);
+  let radius = [
+    transform_point(0.0, 0.0),
+    transform_point(1.0, 0.0),
+    transform_point(1.0, 1.0),
+    transform_point(0.0, 1.0),
+  ]
+  .into_iter()
+  .map(|corner| (corner.x.0 - focus.x.0).hypot(corner.y.0 - focus.y.0))
+  .max_by(f32::total_cmp)
+  .unwrap_or_default();
+  if !focus.x.0.is_finite()
+    || !focus.y.0.is_finite()
+    || !radius.is_finite()
+    || radius <= f32::EPSILON
+  {
+    path.transform = office_circle_gradient_transform(path.transform);
+    return path;
+  }
+
+  let diameter = radius * 2.0;
+  path.fill_to = RelativeRect {
+    left: 0.5,
+    top: 0.5,
+    right: 0.5,
+    bottom: 0.5,
+  };
+  path.transform = super::Transform {
+    m11: diameter,
+    m12: 0.0,
+    m21: 0.0,
+    m22: diameter,
+    dx: Pt(focus.x.0 - radius),
+    dy: Pt(focus.y.0 - radius),
+  };
+  path
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum GradientPathContext {
+  #[default]
+  DrawingObject,
+  WordprocessingText,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

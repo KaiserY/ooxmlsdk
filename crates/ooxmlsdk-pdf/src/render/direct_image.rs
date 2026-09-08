@@ -162,7 +162,10 @@ fn validate_image(image: &DirectRasterImage) -> Result<()> {
       }
     }
     DirectRasterEncoding::Dct {
-      data, invert_cmyk, ..
+      data,
+      invert_cmyk,
+      alpha,
+      ..
     } => {
       if image.bits_per_component != 8 {
         return Err(PdfError::Writer(
@@ -176,6 +179,16 @@ fn validate_image(image: &DirectRasterImage) -> Result<()> {
       }
       if data.is_empty() {
         return Err(PdfError::Writer("JPEG image stream is empty".to_string()));
+      }
+      if let Some(alpha) = alpha {
+        let pixel_count = width
+          .checked_mul(height)
+          .ok_or_else(|| PdfError::Writer("image sample count overflows usize".to_string()))?;
+        if image.color_space != DirectRasterColorSpace::Rgb || alpha.len() != pixel_count {
+          return Err(PdfError::Writer(
+            "JPEG soft-mask samples require matching 8-bit RGB dimensions".to_string(),
+          ));
+        }
       }
     }
     DirectRasterEncoding::IndexedPng { data, palette, .. } => {
@@ -196,7 +209,7 @@ fn validate_image(image: &DirectRasterImage) -> Result<()> {
   if let Some(matte) = image.matte {
     if image.alpha().is_none() || image.color_space != DirectRasterColorSpace::Rgb {
       return Err(PdfError::Writer(
-        "image Matte requires an RGB sampled image with a soft mask".to_string(),
+        "image Matte requires an RGB image with a soft mask".to_string(),
       ));
     }
     if matte
@@ -290,7 +303,7 @@ fn write_image_object(pdf: &mut Pdf, object: &ImageObject) -> Result<()> {
     mask.height(image.height as i32);
     mask.color_space().device_gray();
     mask.bits_per_component(i32::from(image.bits_per_component));
-    if image.interpolate {
+    if image.soft_mask_interpolate {
       mask.interpolate(true);
     }
     if let Some(matte) = image.matte {
@@ -367,6 +380,7 @@ mod tests {
       bits_per_component: 8,
       encoding: DirectRasterEncoding::Sampled { pixels },
       interpolate: false,
+      soft_mask_interpolate: false,
       matte,
     })
   }
@@ -390,9 +404,29 @@ mod tests {
         data: Arc::from([0xff, 0xd8, 0xff, 0xd9]),
         icc_profile: icc_profile.map(Into::into),
         invert_cmyk,
+        alpha: None,
       },
       interpolate,
+      soft_mask_interpolate: false,
       matte: None,
+    })
+  }
+
+  fn dct_with_soft_mask(soft_mask_interpolate: bool) -> PreparedRasterImage {
+    prepared(DirectRasterImage {
+      width: 2,
+      height: 1,
+      color_space: DirectRasterColorSpace::Rgb,
+      bits_per_component: 8,
+      encoding: DirectRasterEncoding::Dct {
+        data: Arc::from([0xff, 0xd8, 0xff, 0xd9]),
+        icc_profile: None,
+        invert_cmyk: false,
+        alpha: Some(Arc::from([32, 224])),
+      },
+      interpolate: true,
+      soft_mask_interpolate,
+      matte: Some([0.0, 0.0, 0.0]),
     })
   }
 
@@ -412,6 +446,7 @@ mod tests {
         icc_profile: icc_profile.map(Into::into),
       },
       interpolate: false,
+      soft_mask_interpolate: false,
       matte: None,
     })
   }
@@ -485,6 +520,18 @@ mod tests {
         .windows(4)
         .any(|window| window == [0xff, 0xd8, 0xff, 0xd9])
     );
+  }
+
+  #[test]
+  fn dct_rgb_carries_an_independent_noninterpolated_soft_mask_and_matte() {
+    let pdf = serialized(dct_with_soft_mask(false));
+    let text = String::from_utf8_lossy(&pdf);
+    assert_eq!(text.matches("/Subtype/Image").count(), 2);
+    assert!(text.contains("/Filter/DCTDecode"));
+    assert!(text.contains("/SMask 2 0 R"));
+    assert!(text.contains("/ColorSpace/DeviceGray"));
+    assert!(text.contains("/Matte[0 0 0]"));
+    assert_eq!(text.matches("/Interpolate true").count(), 1);
   }
 
   #[test]
@@ -587,10 +634,23 @@ mod tests {
   }
 
   #[test]
+  fn dct_alpha_length_must_match_the_pixel_count() {
+    let mut direct = dct_with_soft_mask(false).direct().clone();
+    let DirectRasterEncoding::Dct { alpha, .. } = &mut direct.encoding else {
+      unreachable!();
+    };
+    *alpha = Some(Arc::from([255]));
+    let error = register_error(prepared(direct));
+    assert!(
+      matches!(error, PdfError::Writer(message) if message.contains("matching 8-bit RGB dimensions"))
+    );
+  }
+
+  #[test]
   fn matte_requires_a_soft_mask() {
     let error = register_error(sampled(None, Some([0.0, 0.0, 0.0])));
     assert!(
-      matches!(error, PdfError::Writer(message) if message.contains("requires an RGB sampled image with a soft mask"))
+      matches!(error, PdfError::Writer(message) if message.contains("requires an RGB image with a soft mask"))
     );
   }
 

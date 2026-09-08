@@ -541,6 +541,14 @@ pub enum LineVerticalAlignment {
   Bottom,
 }
 
+/// Font sizes used to measure logical text cells before output-device font
+/// realization. The complex-script override must travel with the primary size.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LayoutFontSizes {
+  pub primary: Pt,
+  pub complex: Option<Pt>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextStyle<'doc> {
   pub font_family: Option<Cow<'doc, str>>,
@@ -573,6 +581,9 @@ pub struct TextStyle<'doc> {
   pub complex_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   pub font_size: Pt,
   pub complex_font_size: Option<Pt>,
+  /// Preserve logical measurement when output font sizes are quantized.
+  /// Glyph paint continues to use `font_size` / `complex_font_size`.
+  pub layout_font_sizes: Option<LayoutFontSizes>,
   pub complex_script: Option<bool>,
   pub right_to_left: Option<bool>,
   /// Resolved Unicode bidi level for a directionally uniform text portion.
@@ -644,14 +655,38 @@ impl TextStyle<'_> {
   }
 }
 
+/// Logical width used to resolve a glyph paint whose source did not provide
+/// an authored definition rectangle.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PdfGlyphDefinitionWidthBasis {
+  /// Preserve the generic DrawingML fallback used by vectorized shape text.
+  #[default]
+  AtLeastFontSize,
+  /// Use the shaped, page-visible text advance without a one-em floor.
+  TextAdvance,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PdfGlyphOutlineOptions {
   pub semantic_text_overlay: bool,
+  pub definition_width_basis: PdfGlyphDefinitionWidthBasis,
+  /// Extra logical advance appended to an unresolved glyph-paint definition
+  /// rectangle without moving or reshaping the visible glyphs. Word uses
+  /// this for the terminal paragraph-mark cell when it shares the trailing
+  /// run's text fill, font slot, and font size.
+  pub definition_trailing_advance: Pt,
   /// Vector paint for outlined DrawingML text. WordArt text fills live on the
   /// WordprocessingML run rather than the owning shape, so retaining the
   /// resolved fill here lets the PDF backend clip the authored gradient or
   /// pattern to the warped glyph outlines.
   pub fill: Option<Fill<'static>>,
+  /// The Word 2010 text fill carries a nonzero authored `w14:alpha`
+  /// transparency transform.
+  ///
+  /// This source state is independent from resolved 8-bit opacity. Word's
+  /// static-3-D material path changes texture routes for any positive authored
+  /// value, including values which still quantize to an opaque texel.
+  pub fill_has_authored_transparency: bool,
   /// Vector paint for a DrawingML character outline. This stays independent
   /// from `fill`: w14:textOutline and a:rPr/a:ln may use a gradient while the
   /// glyph interior uses a solid color (or the reverse).
@@ -660,12 +695,29 @@ pub struct PdfGlyphOutlineOptions {
   /// beside the glyph paint preserves preset/custom dashes, cap, join, and
   /// miter semantics when text is vectorized or rasterized for WordArt.
   pub outline_stroke: Option<Stroke<'static>>,
+  /// The Word 2010 outline color carries a nonzero authored `w14:alpha`
+  /// transparency transform.
+  ///
+  /// Keep this source state independently of the resolved 8-bit alpha. Word's
+  /// static-3-D text material path distinguishes an omitted/zero transform
+  /// from any positive value, including values which still quantize to 255.
+  pub outline_has_authored_transparency: bool,
   /// Page-space transform applied only to visible vector glyphs.
   pub transform: Option<crate::common::Transform>,
   /// Non-affine DrawingML WordArt mapping applied after shaping. A one-path
   /// preset follows a centerline; a multi-path preset interpolates piecewise
   /// across every authored warp boundary.
   pub text_warp: Option<Arc<TextWarp>>,
+}
+
+impl PdfGlyphOutlineOptions {
+  pub fn unresolved_definition_width(&self, text_advance: Pt, font_size: Pt) -> Pt {
+    let base = match self.definition_width_basis {
+      PdfGlyphDefinitionWidthBasis::AtLeastFontSize => text_advance.0.max(font_size.0),
+      PdfGlyphDefinitionWidthBasis::TextAdvance => text_advance.0,
+    };
+    Pt(base + self.definition_trailing_advance.0)
+  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1075,6 +1127,32 @@ mod tests {
         b: 210,
         a: 77,
       }
+    );
+  }
+
+  #[test]
+  fn unresolved_glyph_definition_width_keeps_word_and_drawingml_bases_distinct() {
+    let text_advance = Pt(22.992_188);
+    let font_size = Pt(48.0);
+    let trailing_advance = Pt(9.0);
+
+    let drawingml = PdfGlyphOutlineOptions {
+      definition_trailing_advance: trailing_advance,
+      ..Default::default()
+    };
+    assert_eq!(
+      drawingml.unresolved_definition_width(text_advance, font_size),
+      Pt(57.0)
+    );
+
+    let word = PdfGlyphOutlineOptions {
+      definition_width_basis: PdfGlyphDefinitionWidthBasis::TextAdvance,
+      definition_trailing_advance: trailing_advance,
+      ..Default::default()
+    };
+    assert_eq!(
+      word.unresolved_definition_width(text_advance, font_size),
+      Pt(31.992_188)
     );
   }
 }

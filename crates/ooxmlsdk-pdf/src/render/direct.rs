@@ -1371,6 +1371,7 @@ fn missing_linked_image_icon() -> PreparedRasterImage {
           }),
         },
         interpolate: false,
+        soft_mask_interpolate: false,
         matte: None,
       })
     })
@@ -2232,6 +2233,24 @@ struct GlyphOutlinePaintContext<'a, 'text> {
   options: Option<&'a common::PdfGlyphOutlineOptions>,
 }
 
+fn resolved_glyph_outline_gradient(
+  gradient: &common::GradientFill<'static>,
+  bounds: common::Rect,
+) -> common::GradientFill<'static> {
+  let mut gradient = gradient.clone();
+  let unresolved = gradient.definition_bounds.is_none();
+  gradient.definition_bounds.get_or_insert(bounds);
+  if let Some(path) = &mut gradient.path
+    && unresolved
+  {
+    path.transform = common::bind_path_transform_to_bounds(path.transform, bounds);
+    if path.kind == common::GradientPathKind::Circle {
+      *path = common::office_circle_gradient_path(*path);
+    }
+  }
+  gradient
+}
+
 fn write_glyph_outline_fill(
   content: &mut Content,
   context: GlyphOutlinePaintContext<'_, '_>,
@@ -2250,8 +2269,9 @@ fn write_glyph_outline_fill(
     common::Fill::Solid(color) => paint_solid_glyph_fill(content, path, *color, writer, true),
     common::Fill::Gradient(gradient) => {
       let bounds = outlined_glyph_paint_bounds(text, portion, font_size_pt, options)?;
+      let gradient = resolved_glyph_outline_gradient(gradient, bounds);
       match writer.resources.gradients.register_pattern(
-        gradient,
+        &gradient,
         bounds,
         bounds,
         Some(path.commands()),
@@ -2361,12 +2381,13 @@ fn write_glyph_outline_stroke(
     }
     common::Fill::Gradient(gradient) => {
       let bounds = outlined_glyph_paint_bounds(text, portion, font_size_pt, options)?;
+      let gradient = resolved_glyph_outline_gradient(gradient, bounds);
       let expanded = path.expanded_stroke(&stroke.style)?;
       if expanded.is_empty() {
         return Ok(());
       }
       match writer.resources.gradients.register_pattern(
-        gradient,
+        &gradient,
         bounds,
         bounds,
         Some(expanded.commands()),
@@ -2426,6 +2447,10 @@ fn outlined_glyph_paint_bounds(
   font_size_pt: f32,
   options: Option<&common::PdfGlyphOutlineOptions>,
 ) -> Result<common::Rect> {
+  let definition_width =
+    options.map_or(common::Pt(portion.width_pt.max(font_size_pt)), |options| {
+      options.unresolved_definition_width(common::Pt(portion.width_pt), common::Pt(font_size_pt))
+    });
   let bounds = options
     .and_then(|options| options.text_warp.as_deref())
     .map(|warp| warp.paint_bounds)
@@ -2435,7 +2460,7 @@ fn outlined_glyph_paint_bounds(
         y: common::Pt(text.item.y_pt),
       },
       size: common::Size {
-        width: common::Pt(portion.width_pt.max(font_size_pt)),
+        width: definition_width,
         height: common::Pt(text.item.line_height_pt.max(font_size_pt)),
       },
     });
@@ -2929,10 +2954,7 @@ enum PositionedTextItem {
 }
 
 fn direct_text_requires_glyph_outlines(style: &super::paint::TextStyle<'_>) -> bool {
-  !style.semantic_only
-    && (style.pdf_glyph_outlines
-      || style.pdf_glyph_outline_options.is_some()
-      || (style.opacity > f32::EPSILON && style.opacity < 1.0 - f32::EPSILON))
+  super::paint::text_requires_glyph_outlines(style)
 }
 
 fn ensure_ordinary_text_supported(text: &super::paint::PaintText<'_>) -> Result<()> {
@@ -5786,6 +5808,7 @@ mod tests {
       stops: stops.clone(),
       path: Some(common::GradientPath {
         kind: common::GradientPathKind::Circle,
+        context: common::GradientPathContext::DrawingObject,
         fill_to: common::RelativeRect::default(),
         transform: common::Transform::default(),
         mirror_tile: false,
@@ -5815,6 +5838,117 @@ mod tests {
     ));
   }
 
+  fn glyph_path_gradient(
+    kind: common::GradientPathKind,
+    transform: common::Transform,
+    definition_bounds: Option<common::Rect>,
+  ) -> common::GradientFill<'static> {
+    common::GradientFill {
+      definition_bounds,
+      path: Some(common::GradientPath {
+        kind,
+        context: common::GradientPathContext::WordprocessingText,
+        fill_to: common::RelativeRect::default(),
+        transform,
+        mirror_tile: false,
+      }),
+      ..Default::default()
+    }
+  }
+
+  fn glyph_gradient_bounds() -> common::Rect {
+    common::Rect {
+      origin: common::Point {
+        x: Pt(20.0),
+        y: Pt(30.0),
+      },
+      size: Size {
+        width: Pt(100.0),
+        height: Pt(50.0),
+      },
+    }
+  }
+
+  #[test]
+  fn direct_writer_binds_unresolved_glyph_circle_gradient_to_outline_bounds() {
+    let bounds = glyph_gradient_bounds();
+    let mut gradient = glyph_path_gradient(
+      common::GradientPathKind::Circle,
+      common::Transform::default(),
+      None,
+    );
+    gradient.path.as_mut().unwrap().fill_to = common::RelativeRect {
+      left: 0.5,
+      top: 1.3,
+      right: 0.5,
+      bottom: -0.3,
+    };
+    let resolved = resolved_glyph_outline_gradient(&gradient, bounds);
+    let path = resolved.path.expect("bound circle gradient path");
+    let diameter = 2.0 * 65.0_f32.hypot(50.0);
+
+    assert_eq!(resolved.definition_bounds, Some(bounds));
+    assert_eq!(
+      path.fill_to,
+      common::RelativeRect {
+        left: 0.5,
+        top: 0.5,
+        right: 0.5,
+        bottom: 0.5,
+      }
+    );
+    assert!((path.transform.m11 - diameter).abs() < 1.0e-4);
+    assert!((path.transform.m22 - diameter).abs() < 1.0e-4);
+    assert!((path.transform.dx.0 + path.transform.m11 * 0.5 - 70.0).abs() < 1.0e-4);
+    assert!((path.transform.dy.0 + path.transform.m22 * 0.5 - 95.0).abs() < 1.0e-4);
+  }
+
+  #[test]
+  fn direct_writer_does_not_rebind_resolved_glyph_path_gradient() {
+    let bounds = glyph_gradient_bounds();
+    let gradient = glyph_path_gradient(
+      common::GradientPathKind::Circle,
+      common::Transform {
+        m11: 120.0,
+        m12: 0.0,
+        m21: 0.0,
+        m22: 120.0,
+        dx: Pt(10.0),
+        dy: Pt(20.0),
+      },
+      Some(bounds),
+    );
+
+    assert_eq!(resolved_glyph_outline_gradient(&gradient, bounds), gradient);
+  }
+
+  #[test]
+  fn direct_writer_binds_unresolved_glyph_raster_gradient_to_outline_bounds() {
+    let bounds = glyph_gradient_bounds();
+    let resolved = resolved_glyph_outline_gradient(
+      &glyph_path_gradient(
+        common::GradientPathKind::Rectangle,
+        common::Transform::default(),
+        None,
+      ),
+      bounds,
+    );
+    let path = resolved.path.expect("bound rectangle gradient path");
+
+    assert_eq!(resolved.definition_bounds, Some(bounds));
+    assert_eq!(
+      path.transform,
+      common::Transform {
+        m11: 100.0,
+        m12: 0.0,
+        m21: 0.0,
+        m22: 50.0,
+        dx: Pt(20.0),
+        dy: Pt(30.0),
+      }
+    );
+  }
+
   #[test]
   fn direct_writer_keeps_office_and_requested_path_gradient_owners_distinct() {
     let bounds = common::Rect {
@@ -5842,6 +5976,7 @@ mod tests {
       ],
       path: Some(common::GradientPath {
         kind: common::GradientPathKind::Circle,
+        context: common::GradientPathContext::DrawingObject,
         fill_to: common::RelativeRect {
           left: 0.2,
           top: 0.5,
@@ -5912,6 +6047,7 @@ mod tests {
       ],
       path: Some(common::GradientPath {
         kind: common::GradientPathKind::Rectangle,
+        context: common::GradientPathContext::DrawingObject,
         fill_to: common::RelativeRect {
           left: 0.5,
           top: 0.5,
@@ -7393,6 +7529,97 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_restores_scaled_visible_portion_and_definition_widths() {
+    let measure = |horizontal_scale: f32, character_spacing_pt: f32| {
+      let document = text_document(
+        "abcdef",
+        common::TextStyle {
+          font_family: Some("Liberation Serif".into()),
+          font_size: Pt(12.0),
+          horizontal_scale: Some(horizontal_scale),
+          character_spacing: Pt(character_spacing_pt),
+          pdf_glyph_outlines: true,
+          pdf_glyph_outline_options: Some(Arc::new(common::PdfGlyphOutlineOptions {
+            definition_trailing_advance: Pt(9.0),
+            ..Default::default()
+          })),
+          color: color(0, 0, 0, u8::MAX),
+          ..Default::default()
+        },
+      );
+      let options = uncompressed_options();
+      let paint = super::super::paint::prepare_for_direct(&document, &options);
+      let super::super::paint::PaintItem::Text(text) = &paint.pages[0].items[0] else {
+        unreachable!();
+      };
+      assert_eq!(text.portions.len(), 1);
+      let portion = &text.portions[0];
+      let bounds = outlined_glyph_paint_bounds(
+        text,
+        portion,
+        12.0,
+        text.item.style.pdf_glyph_outline_options.as_ref(),
+      )
+      .unwrap();
+      (portion.width_pt, bounds.size.width.0)
+    };
+
+    let (natural_width, natural_definition_width) = measure(1.0, 0.0);
+    assert!((natural_definition_width - natural_width - 9.0).abs() <= 1.0e-4);
+    for horizontal_scale in [0.75, 1.25, 1.5, 2.0, 3.0, 6.0] {
+      let (visible_width, definition_width) = measure(horizontal_scale, 0.0);
+      assert!((visible_width - natural_width * horizontal_scale).abs() <= 1.0e-4);
+      assert!((definition_width - visible_width - 9.0).abs() <= 1.0e-4);
+    }
+
+    let (scaled_spaced_width, scaled_spaced_definition_width) = measure(1.5, 2.0);
+    assert!((scaled_spaced_width - (natural_width * 1.5 + 12.0)).abs() <= 1.0e-4);
+    assert!((scaled_spaced_definition_width - scaled_spaced_width - 9.0).abs() <= 1.0e-4);
+  }
+
+  #[test]
+  fn direct_writer_scopes_word_text_advance_definition_width_without_one_em_floor() {
+    let measure = |definition_width_basis| {
+      let document = text_document(
+        "a",
+        common::TextStyle {
+          font_family: Some("Liberation Serif".into()),
+          font_size: Pt(48.0),
+          pdf_glyph_outlines: true,
+          pdf_glyph_outline_options: Some(Arc::new(common::PdfGlyphOutlineOptions {
+            definition_width_basis,
+            definition_trailing_advance: Pt(9.0),
+            ..Default::default()
+          })),
+          color: color(0, 0, 0, u8::MAX),
+          ..Default::default()
+        },
+      );
+      let options = uncompressed_options();
+      let paint = super::super::paint::prepare_for_direct(&document, &options);
+      let super::super::paint::PaintItem::Text(text) = &paint.pages[0].items[0] else {
+        unreachable!();
+      };
+      let portion = &text.portions[0];
+      let bounds = outlined_glyph_paint_bounds(
+        text,
+        portion,
+        48.0,
+        text.item.style.pdf_glyph_outline_options.as_ref(),
+      )
+      .unwrap();
+      (portion.width_pt, bounds.size.width.0)
+    };
+
+    let (text_advance, word_width) = measure(common::PdfGlyphDefinitionWidthBasis::TextAdvance);
+    assert!(text_advance < 48.0);
+    assert!((word_width - text_advance - 9.0).abs() <= 1.0e-4);
+
+    let (_, drawingml_width) = measure(common::PdfGlyphDefinitionWidthBasis::AtLeastFontSize);
+    assert!((drawingml_width - 57.0).abs() <= 1.0e-4);
+  }
+
+  #[test]
   fn direct_writer_rejects_invalid_horizontal_and_independent_vertical_text_scaling() {
     for horizontal_scale in [0.0, -1.0, f32::NAN, f32::INFINITY] {
       let document = text_document(
@@ -8030,6 +8257,32 @@ mod tests {
     assert_eq!(text.portions[0].glyph_runs.len(), 1);
     assert_eq!(text.portions[0].glyph_runs[0].glyphs.len(), 4);
     assert!(String::from_utf8_lossy(&output.pdf).contains("/Subtype/Type0"));
+  }
+
+  #[test]
+  fn direct_writer_keeps_opaque_text_with_paint_metadata_as_pdf_text() {
+    for outlined in [false, true] {
+      let document = text_document(
+        "first second",
+        common::TextStyle {
+          font_family: Some("Liberation Serif".into()),
+          font_size: Pt(12.0),
+          color: color(0, 0, 0, u8::MAX),
+          pdf_glyph_outlines: outlined,
+          pdf_glyph_outline_options: Some(Arc::new(common::PdfGlyphOutlineOptions {
+            fill: Some(common::Fill::Solid(color(0, 0, 0, u8::MAX))),
+            outline_fill: Some(common::Fill::None),
+            ..Default::default()
+          })),
+          ..Default::default()
+        },
+      );
+      let output = render_with_font_audit(&document, &uncompressed_options()).unwrap();
+      let pdf = String::from_utf8_lossy(&output.pdf);
+      assert_eq!(pdf.contains("/ToUnicode"), !outlined);
+      assert_eq!(pdf.contains("/Subtype/Type0"), !outlined);
+      assert_eq!(output.audit.painted_text_portion_count > 0, !outlined);
+    }
   }
 
   #[test]

@@ -236,6 +236,62 @@ pub(crate) fn apply_outline_style(stroke: &mut Stroke<'_>, outline: &a::Outline)
   });
 }
 
+/// Applies Office's preset-shape exception to DrawingML round joins.
+///
+/// ECMA-376 Part 1 §20.1.8.52 defines `a:round` as a round line join, while
+/// [MS-OE376] Part 4 §5.1.10.52 lists the preset shapes for which Office uses
+/// a mitered join even when round is authored. The same Office default table
+/// gives an omitted miter limit as 800% of the line width. Keep this at the
+/// resolved-stroke boundary so foreground paint, effect-source rasterization,
+/// and widened logical bounds consume one identical join.
+pub(crate) fn apply_office_preset_shape_round_join_exception(
+  stroke: &mut Stroke<'_>,
+  preset: Option<a::ShapeTypeValues>,
+) {
+  if stroke.join == Some(StrokeJoin::Round)
+    && preset.is_some_and(office_preset_shape_uses_miter_for_round_join)
+  {
+    stroke.join = Some(StrokeJoin::Miter { limit: Some(8.0) });
+  }
+}
+
+fn office_preset_shape_uses_miter_for_round_join(preset: a::ShapeTypeValues) -> bool {
+  matches!(
+    preset,
+    a::ShapeTypeValues::Cube
+      | a::ShapeTypeValues::Moon
+      | a::ShapeTypeValues::Chevron
+      | a::ShapeTypeValues::EllipseRibbon
+      | a::ShapeTypeValues::EllipseRibbon2
+      | a::ShapeTypeValues::Plus
+      | a::ShapeTypeValues::RightArrow
+      | a::ShapeTypeValues::StripedRightArrow
+      | a::ShapeTypeValues::NotchedRightArrow
+      | a::ShapeTypeValues::LeftArrowCallout
+      | a::ShapeTypeValues::LeftRightArrowCallout
+      | a::ShapeTypeValues::UpDownArrowCallout
+      | a::ShapeTypeValues::QuadArrowCallout
+      | a::ShapeTypeValues::Star4
+      | a::ShapeTypeValues::Star5
+      | a::ShapeTypeValues::Star8
+      | a::ShapeTypeValues::Star10
+      | a::ShapeTypeValues::Star12
+      | a::ShapeTypeValues::Star16
+      | a::ShapeTypeValues::Star24
+      | a::ShapeTypeValues::Star32
+      | a::ShapeTypeValues::UpArrow
+      | a::ShapeTypeValues::DownArrow
+      | a::ShapeTypeValues::UpDownArrow
+      | a::ShapeTypeValues::LeftUpArrow
+      | a::ShapeTypeValues::BentUpArrow
+      | a::ShapeTypeValues::MathPlus
+      | a::ShapeTypeValues::MathMinus
+      | a::ShapeTypeValues::MathMultiply
+      | a::ShapeTypeValues::MathEqual
+      | a::ShapeTypeValues::MathNotEqual
+  )
+}
+
 /// Applies only line-style fields explicitly present on `outline` over an
 /// already resolved inherited stroke.
 ///
@@ -1041,6 +1097,80 @@ mod tests {
     };
     apply_outline_style_over_inherited(&mut inherited, &outline);
     assert_eq!(inherited.join, Some(StrokeJoin::Miter { limit: Some(8.0) }));
+  }
+
+  #[test]
+  fn office_preset_round_join_exception_matches_the_documented_shape_set() {
+    let documented = [
+      a::ShapeTypeValues::Cube,
+      a::ShapeTypeValues::Moon,
+      a::ShapeTypeValues::Chevron,
+      a::ShapeTypeValues::EllipseRibbon,
+      a::ShapeTypeValues::EllipseRibbon2,
+      a::ShapeTypeValues::Plus,
+      a::ShapeTypeValues::RightArrow,
+      a::ShapeTypeValues::StripedRightArrow,
+      a::ShapeTypeValues::NotchedRightArrow,
+      a::ShapeTypeValues::LeftArrowCallout,
+      a::ShapeTypeValues::LeftRightArrowCallout,
+      a::ShapeTypeValues::UpDownArrowCallout,
+      a::ShapeTypeValues::QuadArrowCallout,
+      a::ShapeTypeValues::Star4,
+      a::ShapeTypeValues::Star5,
+      a::ShapeTypeValues::Star8,
+      a::ShapeTypeValues::Star10,
+      a::ShapeTypeValues::Star12,
+      a::ShapeTypeValues::Star16,
+      a::ShapeTypeValues::Star24,
+      a::ShapeTypeValues::Star32,
+      a::ShapeTypeValues::UpArrow,
+      a::ShapeTypeValues::DownArrow,
+      a::ShapeTypeValues::UpDownArrow,
+      a::ShapeTypeValues::LeftUpArrow,
+      a::ShapeTypeValues::BentUpArrow,
+      a::ShapeTypeValues::MathPlus,
+      a::ShapeTypeValues::MathMinus,
+      a::ShapeTypeValues::MathMultiply,
+      a::ShapeTypeValues::MathEqual,
+      a::ShapeTypeValues::MathNotEqual,
+    ];
+    for preset in documented {
+      let mut stroke = Stroke {
+        join: Some(StrokeJoin::Round),
+        ..Stroke::default()
+      };
+      apply_office_preset_shape_round_join_exception(&mut stroke, Some(preset));
+      assert_eq!(
+        stroke.join,
+        Some(StrokeJoin::Miter { limit: Some(8.0) }),
+        "{preset:?}"
+      );
+    }
+
+    for preset in [
+      a::ShapeTypeValues::RoundRectangle,
+      a::ShapeTypeValues::Ellipse,
+      a::ShapeTypeValues::Triangle,
+      a::ShapeTypeValues::Frame,
+      a::ShapeTypeValues::Star6,
+      a::ShapeTypeValues::Star7,
+    ] {
+      let mut stroke = Stroke {
+        join: Some(StrokeJoin::Round),
+        ..Stroke::default()
+      };
+      apply_office_preset_shape_round_join_exception(&mut stroke, Some(preset));
+      assert_eq!(stroke.join, Some(StrokeJoin::Round), "{preset:?}");
+    }
+
+    for join in [StrokeJoin::Bevel, StrokeJoin::Miter { limit: Some(3.0) }] {
+      let mut stroke = Stroke {
+        join: Some(join),
+        ..Stroke::default()
+      };
+      apply_office_preset_shape_round_join_exception(&mut stroke, Some(a::ShapeTypeValues::Star5));
+      assert_eq!(stroke.join, Some(join));
+    }
   }
 
   use crate::common::{Color, Fill};

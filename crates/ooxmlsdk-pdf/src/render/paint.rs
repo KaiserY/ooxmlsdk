@@ -20,7 +20,7 @@ use crate::{
 };
 use ooxmlsdk_layout::common;
 use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef};
-use ooxmlsdk_layout::text_metrics::TextMetrics;
+use ooxmlsdk_layout::text_metrics::{TextMetrics, TextVerticalMetrics};
 
 // Historical fixed-output calibration retained from the DOCX numbering/font
 // parity path. No matching LibreOffice source constant has been identified;
@@ -232,11 +232,13 @@ pub(super) struct TextStyle<'doc> {
   pub(super) explicit_symbol_character: bool,
   font_size_pt: f32,
   complex_font_size_pt: Option<f32>,
+  layout_font_sizes: Option<common::LayoutFontSizes>,
   complex_script: Option<bool>,
   right_to_left: Option<bool>,
   resolved_bidi_level: Option<u8>,
   kerning_minimum_size_pt: Option<f32>,
   ligatures: Option<common::OpenTypeLigatures>,
+  open_type_features: common::OpenTypeFeatureSettings,
   pub(super) horizontal_scale: Option<f32>,
   semantic_character_advances_pt: Option<Arc<[f32]>>,
   character_spacing_pt: f32,
@@ -473,6 +475,10 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn ligatures(&self) -> Option<common::OpenTypeLigatures> {
     self.ligatures
+  }
+
+  fn open_type_features(&self) -> common::OpenTypeFeatureSettings {
+    self.open_type_features
   }
 
   fn horizontal_scale(&self) -> f32 {
@@ -2506,11 +2512,13 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     explicit_symbol_character: style.explicit_symbol_character,
     font_size_pt: style.font_size.0,
     complex_font_size_pt: style.complex_font_size.map(|size| size.0),
+    layout_font_sizes: style.layout_font_sizes,
     complex_script: style.complex_script,
     right_to_left: style.right_to_left,
     resolved_bidi_level: style.resolved_bidi_level(),
     kerning_minimum_size_pt: style.kerning_minimum_size.map(|size| size.0),
     ligatures: style.ligatures,
+    open_type_features: style.open_type_features,
     horizontal_scale: style.horizontal_scale,
     semantic_character_advances_pt: style.semantic_character_advances_pt.clone(),
     character_spacing_pt: style.character_spacing.0,
@@ -2926,12 +2934,29 @@ impl<'doc> PaintText<'doc> {
     let text_box_y_pt =
       baseline_y - vertical_metrics.ascent_pt - vertical_metrics.leading_above_pt();
     let text_box_height_pt = vertical_metrics.line_height_pt();
-    let highlight = text_ref.style.highlight.map(|color| PaintRect {
-      x_pt: text_ref.x_pt,
-      y_pt: text_box_y_pt,
-      width_pt,
-      height_pt: text_box_height_pt,
-      color,
+    let highlight_glyphs = text_ref.style.highlight.and_then(|_| {
+      text_highlight_glyphs(
+        &text_ref.text,
+        &text_ref.style,
+        text_ref.word_spacing_pt,
+        text_metrics,
+      )
+    });
+    let highlight = text_ref.style.highlight.map(|color| {
+      let (top_pt, height_pt) = text_highlight_vertical_bounds(
+        baseline_y,
+        vertical_metrics,
+        text_ref.style.use_windows_font_metrics,
+      );
+      PaintRect {
+        x_pt: text_ref.x_pt,
+        y_pt: top_pt,
+        width_pt: highlight_glyphs
+          .as_ref()
+          .map_or(width_pt, |run| run.width_pt),
+        height_pt,
+        color,
+      }
     });
     let decoration_metrics = text_metrics.text_decoration_metrics(&text_ref.style);
     let decoration_start_x_pt = text_ref.decoration_span_start_x_pt.unwrap_or(text_ref.x_pt);
@@ -2971,6 +2996,7 @@ impl<'doc> PaintText<'doc> {
         page_width_pt,
         clip: paint_clip,
         glyphs: glyphs.map(|run| run.font_runs),
+        highlight_glyphs: highlight_glyphs.map(|run| run.font_runs),
         highlight,
         underline,
         strikethrough,
@@ -2997,6 +3023,7 @@ struct PaintTextPortionSource<'a, 'doc> {
   page_width_pt: f32,
   clip: Option<PaintClipRect>,
   glyphs: Option<PaintGlyphFontRuns>,
+  highlight_glyphs: Option<PaintGlyphFontRuns>,
   highlight: Option<PaintRect>,
   underline: Option<PaintStrokeLine>,
   strikethrough: Option<PaintStrokeLine>,
@@ -3014,17 +3041,20 @@ fn text_paint_portions<'doc>(
     page_width_pt,
     clip,
     glyphs,
+    highlight_glyphs,
     highlight,
     underline,
     strikethrough,
     link,
   } = source;
   let ranges = visually_ordered_text_portion_ranges(text);
+  let horizontal_scale = text.style.horizontal_scale.unwrap_or(1.0).max(f32::EPSILON);
   let can_move_glyphs =
     glyphs.is_some() && ranges.len() == 1 && ranges[0].1 == (0..text.text.len());
   let mut glyphs = glyphs;
   let mut portions = Vec::with_capacity(ranges.len().max(1));
   let mut x_pt = text.x_pt;
+  let mut highlight_x_pt = text.x_pt;
   for (kind, range) in ranges {
     let portion_clip = paint_clip_for_portion(clip, &kind, page_width_pt);
     let portion_glyphs = if can_move_glyphs {
@@ -3036,10 +3066,17 @@ fn text_paint_portions<'doc>(
     };
     let portion_width = portion_glyphs
       .as_ref()
-      .map(|glyphs| glyph_runs_width_pt(glyphs))
+      .map(|glyphs| glyph_runs_visible_width_pt(glyphs, horizontal_scale))
       .unwrap_or_else(|| {
         text_metrics.measure_text(&text.text[range.start..range.end], &text.style)
       });
+    let highlight_width = highlight_glyphs.as_ref().map_or(portion_width, |glyphs| {
+      if range == (0..text.text.len()) {
+        glyph_runs_visible_width_pt(glyphs, horizontal_scale)
+      } else {
+        glyph_runs_visible_width_pt(&glyphs_for_text_range(glyphs, &range), horizontal_scale)
+      }
+    });
     portions.push(PaintTextPortion {
       kind,
       text_range: range,
@@ -3050,7 +3087,7 @@ fn text_paint_portions<'doc>(
       glyphs: portion_glyphs.filter(|glyphs| !glyphs.is_empty()),
       highlight: highlight
         .as_ref()
-        .map(|rect| paint_rect_for_portion(rect, x_pt, portion_width)),
+        .map(|rect| paint_rect_for_portion(rect, highlight_x_pt, highlight_width)),
       underline: underline
         .as_ref()
         .map(|line| paint_line_for_portion(line, x_pt, portion_width)),
@@ -3062,6 +3099,7 @@ fn text_paint_portions<'doc>(
         .map(|link| paint_link_for_portion(link, x_pt, portion_width)),
     });
     x_pt += portion_width;
+    highlight_x_pt += highlight_width;
   }
   if portions.is_empty() {
     let portion_clip = paint_clip_for_portion(clip, &PaintTextPortionKind::Text, page_width_pt);
@@ -3278,7 +3316,12 @@ fn glyphs_for_text_range(glyphs: &[PaintGlyphFontRun], range: &Range<usize>) -> 
   output
 }
 
-fn glyph_runs_width_pt(glyphs: &[PaintGlyphFontRun]) -> f32 {
+fn glyph_runs_visible_width_pt(glyphs: &[PaintGlyphFontRun], horizontal_scale: f32) -> f32 {
+  // Paint glyph coordinates are normalized back to the pre-transform text
+  // surface so the direct writer can scale their outlines, offsets, and
+  // advances exactly once. Portion geometry, however, is page-visible state:
+  // highlights, links, decorations, following portions, and unresolved paint
+  // definitions all consume the transformed advance.
   glyphs
     .iter()
     .map(|run| {
@@ -3288,7 +3331,32 @@ fn glyph_runs_width_pt(glyphs: &[PaintGlyphFontRun]) -> f32 {
         .map(|glyph| glyph.x_advance * run.font_size_pt)
         .sum::<f32>()
     })
-    .sum()
+    .sum::<f32>()
+    * horizontal_scale
+}
+
+fn text_highlight_vertical_bounds(
+  baseline_y_pt: f32,
+  metrics: TextVerticalMetrics,
+  use_windows_font_metrics: bool,
+) -> (f32, f32) {
+  if use_windows_font_metrics && metrics.baseline_offset_pt > 0.0 {
+    // The opaque character cell follows the same metrics as its baseline:
+    // TEXTMETRIC tmAscent above it and tmHeight (ascent + descent) in total.
+    // Typographic ascent plus half-leading is a different alignment box.
+    // Mixing the latter with a Windows baseline displaced WML highlights
+    // even when the glyphs themselves were correctly placed. Office PDF
+    // body/WPS/group controls corroborate both Calibri and Consolas cells.
+    (
+      baseline_y_pt - metrics.baseline_offset_pt,
+      metrics.windows_line_height_pt(),
+    )
+  } else {
+    (
+      baseline_y_pt - metrics.ascent_pt - metrics.leading_above_pt(),
+      metrics.line_height_pt(),
+    )
+  }
 }
 
 fn paint_rect_for_portion(rect: &PaintRect, x_pt: f32, width_pt: f32) -> PaintRect {
@@ -3670,7 +3738,7 @@ pub(super) fn text_has_visible_glyph_paint(style: &TextStyle<'_>) -> bool {
       && style.outline_opacity > f32::EPSILON)
 }
 
-fn text_requires_glyph_outlines(style: &TextStyle<'_>) -> bool {
+pub(super) fn text_requires_glyph_outlines(style: &TextStyle<'_>) -> bool {
   // Office's fixed-format writers convert translucent glyphs to paths. This
   // preserves the alpha compositing result without exposing those glyphs as
   // PDF text; both Word's w14:textFill alpha and PowerPoint's DrawingML alpha
@@ -3681,6 +3749,28 @@ fn text_requires_glyph_outlines(style: &TextStyle<'_>) -> bool {
   !style.semantic_only
     && (style.pdf_glyph_outlines
       || (style.opacity > f32::EPSILON && style.opacity < 1.0 - f32::EPSILON))
+}
+
+fn text_highlight_glyphs(
+  text: &str,
+  style: &TextStyle<'_>,
+  word_spacing_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> Option<PaintGlyphRun> {
+  let sizes = style.layout_font_sizes?;
+  if sizes.primary.0 == style.font_size_pt
+    && sizes.complex.map(|size| size.0) == style.complex_font_size_pt
+  {
+    return None;
+  }
+  // The highlight covers the laid-out character cells, not the advances
+  // remeasured at the rounded output em. Shape at the logical sizes instead
+  // of scaling the final width: character spacing, justification and explicit
+  // GDI advances are independent of the em, and scripts can use different ems.
+  let mut logical_style = style.clone();
+  logical_style.font_size_pt = sizes.primary.0;
+  logical_style.complex_font_size_pt = sizes.complex.map(|size| size.0);
+  shaped_pdf_glyphs(text, &logical_style, word_spacing_pt, text_metrics)
 }
 
 fn shaped_pdf_glyphs(
@@ -3806,10 +3896,143 @@ mod tests {
 
   use super::{
     PaintGlyph, display_item_paint_owner_origin, remap_glyph_text_ranges,
-    symbol_font_semantic_text, table_cell_clip_bounds, word_no_break_hyphen_semantic_text,
-    word_small_caps_semantic_text,
+    symbol_font_semantic_text, table_cell_clip_bounds, text_style_from_common,
+    word_no_break_hyphen_semantic_text, word_small_caps_semantic_text,
   };
   use ooxmlsdk_layout::common;
+
+  #[test]
+  fn highlight_width_uses_layout_sizes_without_scaling_absolute_spacing() {
+    use super::{TextMetrics, TextStyle, shaped_pdf_glyphs, text_highlight_glyphs};
+
+    let mut metrics = TextMetrics::new();
+    for text in ["darkYellow", "i Wm", "אב cd"] {
+      for spacing in [0.0, 1.5] {
+        for scale in [0.8, 1.0, 1.2] {
+          let logical = TextStyle {
+            font_family: Some(Cow::Borrowed("Arial")),
+            font_size_pt: 11.0,
+            complex_font_size_pt: Some(14.0),
+            character_spacing_pt: spacing,
+            horizontal_scale: Some(scale),
+            ..Default::default()
+          };
+          let expected = shaped_pdf_glyphs(text, &logical, spacing, &mut metrics)
+            .expect("test font must shape")
+            .width_pt;
+          let painted = TextStyle {
+            font_size_pt: 11.04,
+            complex_font_size_pt: Some(14.04),
+            layout_font_sizes: Some(common::LayoutFontSizes {
+              primary: common::Pt(11.0),
+              complex: Some(common::Pt(14.0)),
+            }),
+            ..logical
+          };
+          assert_eq!(
+            text_highlight_glyphs(text, &painted, spacing, &mut metrics)
+              .expect("logical highlight glyphs")
+              .width_pt,
+            expected
+          );
+          assert_eq!(painted.font_size_pt, 11.04);
+          assert_eq!(painted.complex_font_size_pt, Some(14.04));
+        }
+      }
+    }
+    let plain = TextStyle::default();
+    assert!(text_highlight_glyphs("x", &plain, 0.0, &mut metrics).is_none());
+  }
+
+  #[test]
+  fn highlight_layout_width_survives_paint_portion_segmentation() {
+    let common::DisplayItem::Text(mut run) = text_item(point(10.0, 20.0), None, 0.0) else {
+      unreachable!()
+    };
+    run.text = Cow::Borrowed("one-two");
+    run.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+    run.style.font_family = Some(Cow::Borrowed("Arial"));
+    run.style.font_size = common::Pt(11.04);
+    run.style.highlight = Some(common::Color {
+      r: 255,
+      g: 255,
+      b: 0,
+      a: 255,
+    });
+    run.style.layout_font_sizes = Some(common::LayoutFontSizes {
+      primary: common::Pt(11.0),
+      complex: None,
+    });
+    let mut metrics = super::TextMetrics::new();
+    let text = super::text_item_from_common(&run);
+    let expected = super::text_highlight_glyphs(&text.text, &text.style, 0.0, &mut metrics)
+      .expect("logical glyphs")
+      .width_pt;
+    let painted = super::PaintText::from_layout_text(text, None, None, 600.0, &mut metrics);
+    assert_eq!(painted.portions.len(), 3);
+    let mut end = 10.0;
+    for portion in &painted.portions {
+      let rect = portion.highlight.expect("every portion highlighted");
+      assert!((rect.x_pt - end).abs() < 0.0001);
+      end += rect.width_pt;
+    }
+    assert!((end - 10.0 - expected).abs() < 0.0001);
+    let mut original_run = run.clone();
+    original_run.style.layout_font_sizes = None;
+    let unchanged = super::PaintText::from_layout_text(
+      super::text_item_from_common(&original_run),
+      None,
+      None,
+      600.0,
+      &mut metrics,
+    );
+    assert_eq!(painted.width_pt, unchanged.width_pt);
+    assert_eq!(painted.baseline_y, unchanged.baseline_y);
+    for (actual, original) in painted.portions.iter().zip(&unchanged.portions) {
+      assert_eq!(actual.x_pt, original.x_pt);
+      assert_eq!(actual.width_pt, original.width_pt);
+    }
+  }
+
+  #[test]
+  fn highlight_bounds_keep_windows_and_typographic_metrics_independent() {
+    use ooxmlsdk_layout::text_metrics::TextVerticalMetrics;
+
+    // Deliberately unequal alignment boxes, so half-leading cannot
+    // accidentally produce the Windows result. Scale without a fitted offset.
+    for scale in [0.5, 1.0, 2.0, 4.0] {
+      let metrics = TextVerticalMetrics {
+        ascent_pt: 8.0 * scale,
+        descent_pt: 2.0 * scale,
+        windows_line_height_pt: 13.0 * scale,
+        line_gap_pt: 2.0 * scale,
+        baseline_offset_pt: 10.5 * scale,
+        directwrite_baseline_offset_pt: 11.0 * scale,
+        wordprocessingml_cjk_line_metrics: false,
+      };
+      for baseline in [0.0, 20.0, 100.0] {
+        assert_eq!(
+          super::text_highlight_vertical_bounds(baseline, metrics, true),
+          (baseline - 10.5 * scale, 13.0 * scale)
+        );
+        assert_eq!(
+          super::text_highlight_vertical_bounds(baseline, metrics, false),
+          (baseline - 9.0 * scale, 12.0 * scale)
+        );
+        assert_eq!(
+          super::text_highlight_vertical_bounds(
+            baseline,
+            TextVerticalMetrics {
+              baseline_offset_pt: 0.0,
+              ..metrics
+            },
+            true
+          ),
+          (baseline - 9.0 * scale, 12.0 * scale)
+        );
+      }
+    }
+  }
 
   fn point(x: f32, y: f32) -> common::Point {
     common::Point {
@@ -3945,6 +4168,32 @@ mod tests {
     assert_eq!(remapped[0].text_range, 0..4);
     assert_eq!(remapped[1].text_range, 4..5);
     assert!(remap_glyph_text_ranges(&[glyph(0..1)], "A", "AA").is_none());
+  }
+
+  #[test]
+  fn pdf_paint_style_preserves_word_opentype_features() {
+    let mut stylistic_sets = common::OpenTypeStylisticSets::default();
+    stylistic_sets.enable(7);
+    let mut open_type_features = common::OpenTypeFeatureSettings::default();
+    open_type_features.number_form = Some(common::OpenTypeNumberForm::OldStyle);
+    open_type_features.number_spacing = Some(common::OpenTypeNumberSpacing::Proportional);
+    open_type_features.contextual_alternates = Some(true);
+    open_type_features.stylistic_sets = Some(stylistic_sets);
+    let common_style = common::TextStyle {
+      open_type_features,
+      ..Default::default()
+    };
+
+    let paint_style = text_style_from_common(&common_style);
+
+    assert_eq!(
+      paint_style.open_type_features,
+      common_style.open_type_features
+    );
+    assert_ne!(
+      paint_style,
+      text_style_from_common(&common::TextStyle::default())
+    );
   }
 
   #[test]

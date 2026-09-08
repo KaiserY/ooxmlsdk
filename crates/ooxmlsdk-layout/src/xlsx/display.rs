@@ -1592,6 +1592,7 @@ pub(crate) fn vml_shape_common_fill(
         // LibreOffice maps VML gradientRadial to DrawingML's rectangular
         // path gradient, not to an ellipse.
         kind: common::GradientPathKind::Rectangle,
+        context: common::GradientPathContext::DrawingObject,
         fill_to: common::RelativeRect {
           left: focus_x.clamp(0.0, 1.0),
           top: focus_y.clamp(0.0, 1.0),
@@ -5324,6 +5325,9 @@ fn finish_xlsx_shape_effects(
       line: raster.line_image.as_ref(),
       fill_line: raster.fill_line_image.as_ref(),
       children: raster.children_image.as_ref(),
+      effect_mask: None,
+      reflection_paint: None,
+      bounds: Default::default(),
     },
   );
   let mut png = Cursor::new(Vec::new());

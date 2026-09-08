@@ -34,6 +34,11 @@ pub struct LayoutOptions {
   /// Fixed-format bitmap working density requested by the caller.  `None`
   /// retains the Office print-compatible 200-DPI default.
   pub fixed_output_raster_dpi: Option<u32>,
+  /// Explicit native Word text-picture realization density, independent of
+  /// fixed-output PDF settings. When present, glyphs, 3-D surfaces and text
+  /// effects are rasterized together before a lossless PNG is produced.
+  /// `None` preserves the existing fixed-output pipeline.
+  pub native_picture_dpi: Option<u32>,
   /// Whether the fixed-output conformance profile forbids transparent paint.
   ///
   /// This is an output constraint rather than a source-document property.

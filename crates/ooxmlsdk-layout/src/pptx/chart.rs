@@ -4451,6 +4451,9 @@ fn chart_shape_effect_image(
         line: raster.line_image.as_ref(),
         fill_line: raster.fill_line_image.as_ref(),
         children: raster.children_image.as_ref(),
+        effect_mask: None,
+        reflection_paint: None,
+        bounds: Default::default(),
       },
     );
   }
@@ -16615,6 +16618,7 @@ mod tests {
       crate::common::GradientFill {
         path: Some(crate::common::GradientPath {
           kind: crate::common::GradientPathKind::Rectangle,
+          context: crate::common::GradientPathContext::DrawingObject,
           fill_to: crate::common::RelativeRect::default(),
           transform: crate::common::Transform::default(),
           mirror_tile: false,
@@ -16674,6 +16678,7 @@ mod tests {
     let gradient = crate::common::GradientFill {
       path: Some(crate::common::GradientPath {
         kind: crate::common::GradientPathKind::Circle,
+        context: crate::common::GradientPathContext::DrawingObject,
         fill_to: crate::common::RelativeRect {
           left: 0.5,
           top: 0.5,

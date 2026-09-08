@@ -316,6 +316,7 @@ fn pattern_tile_image(
     // Office preserves the authored hatch lattice. Interpolation would blend
     // foreground and background cells and alter both density and RGB output.
     interpolate: false,
+    soft_mask_interpolate: false,
     matte: None,
   }))
 }

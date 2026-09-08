@@ -1,4 +1,8 @@
-use image::{RgbaImage, imageops::FilterType};
+use image::{
+  RgbaImage,
+  imageops::{FilterType, replace},
+};
+use kurbo::{Affine, BezPath, Point as KurboPoint, Shape as KurboShape};
 use skrifa::{
   FontRef, GlyphId, MetadataProvider,
   instance::{LocationRef, Size},
@@ -7,19 +11,22 @@ use skrifa::{
 };
 use tiny_skia::{
   Color as SkColor, FillRule, FilterQuality, GradientStop as SkGradientStop, LineCap, LineJoin,
-  LinearGradient, Paint, Path, PathBuilder, Pattern, Pixmap, Point as SkPoint,
-  PremultipliedColorU8, SpreadMode, Stroke as SkStroke, StrokeDash, Transform as SkTransform,
+  LinearGradient, Mask, Paint, Path, PathBuilder, PathSegment, PathStroker, Pattern, Pixmap,
+  Point as SkPoint, PremultipliedColorU8, Rect as SkRect, SpreadMode, Stroke as SkStroke,
+  StrokeDash, Transform as SkTransform,
 };
 
 use super::{
   Color, DisplayItem, Fill, GradientFill, ImageItem, LineItem, PathCommand, PathItem, PatternFill,
-  Pt, Rect, RectItem, Stroke, TextRun,
+  Pt, Rect, RectItem, Stroke, StrokeAlignment, TextRun,
 };
 use crate::text_metrics::TextMetrics;
 
 const MAX_EFFECT_RASTER_PIXELS: f32 = 250_000.0;
 const MAX_EFFECT_PIXELS_PER_POINT: f32 = 2.0;
 const OFFICE_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX: f32 = 16.0;
+const OFFICE_ANTIALIAS_8X4_HORIZONTAL_SAMPLES: u32 = 8;
+const OFFICE_ANTIALIAS_8X4_VERTICAL_SAMPLES: u32 = 4;
 
 /// Selects Office's fixed-output working density for a simple shape glow.
 ///
@@ -89,6 +96,7 @@ pub(crate) enum RasterTextHinting {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RasterResolveFilter {
+  Native,
   Nearest,
   Triangle,
   CatmullRom,
@@ -114,6 +122,12 @@ pub(crate) enum RasterSourceExtent {
 pub(crate) enum RasterPrimitiveAntialiasing {
   PerPrimitive,
   Aliased,
+  /// Resolve the standard four-sample lattice independently for each path.
+  /// Text retains its separate rasterization policy.
+  Direct2dStandard4,
+  /// GDI+ `SmoothingModeAntiAlias8x4`: sample an aliased 8x4 source grid and
+  /// average its 32 samples with a premultiplied box resolve.
+  OfficeAntiAlias8x4,
 }
 
 /// Host policy for realizing a standalone WordprocessingShape before a
@@ -132,9 +146,10 @@ pub(crate) enum WordShapeEffectSourceProfile {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RasterSourceSurface {
   pub(crate) bounds: Rect,
-  pub(crate) pixels_per_point: f32,
+  pub(crate) dpi: f64,
   pub(crate) extent: RasterSourceExtent,
   pub(crate) text_hinting: Option<RasterTextHinting>,
+  pub(crate) primitive_antialiasing: RasterPrimitiveAntialiasing,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -157,18 +172,29 @@ pub(crate) struct WordShapeEffectSurface {
 
 impl RasterPrimitiveAntialiasing {
   fn enabled(self) -> bool {
-    matches!(self, Self::PerPrimitive)
+    matches!(self, Self::PerPrimitive | Self::Direct2dStandard4)
+  }
+
+  fn sample_factors(self) -> (u32, u32) {
+    match self {
+      Self::OfficeAntiAlias8x4 => (
+        OFFICE_ANTIALIAS_8X4_HORIZONTAL_SAMPLES,
+        OFFICE_ANTIALIAS_8X4_VERTICAL_SAMPLES,
+      ),
+      Self::PerPrimitive | Self::Aliased | Self::Direct2dStandard4 => (1, 1),
+    }
   }
 }
 
 impl RasterResolveFilter {
-  fn image_filter(self) -> FilterType {
-    match self {
+  fn image_filter(self) -> Option<FilterType> {
+    Some(match self {
+      Self::Native => return None,
       Self::Nearest => FilterType::Nearest,
       Self::Triangle => FilterType::Triangle,
       Self::CatmullRom => FilterType::CatmullRom,
       Self::Lanczos3 => FilterType::Lanczos3,
-    }
+    })
   }
 }
 
@@ -251,6 +277,69 @@ pub(crate) fn rasterize_vector_items_for_effects_at_pixels_per_point_with_extent
     extent,
     primitive_antialiasing,
   )
+}
+
+/// Realizes a vector effect input at one fixed-output density and resolves it
+/// onto the lower-density effect surface through Direct2D-style DPI
+/// compensation.
+///
+/// This is distinct from rasterizing the display list directly at the target
+/// density: fractional vector coverage is first quantized on the source
+/// surface, then the associated-alpha pixels are linearly sampled at physical
+/// pixel centers. Every separately addressable effect source is resolved by
+/// the same mapping so fill/line references cannot drift from the root input.
+pub(crate) fn rasterize_vector_items_for_effects_via_dpi_compensated_source_surface(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  source_pixels_per_point: f32,
+  target_pixels_per_point: f32,
+  extent: RasterSourceExtent,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<DrawingRaster> {
+  if !target_pixels_per_point.is_finite() || target_pixels_per_point <= 0.0 {
+    return None;
+  }
+  let target_width_px =
+    raster_source_extent(raster_bounds.size.width.0, target_pixels_per_point, extent);
+  let target_height_px =
+    raster_source_extent(raster_bounds.size.height.0, target_pixels_per_point, extent);
+  let raster = rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing(
+    items,
+    raster_bounds,
+    effects,
+    source_pixels_per_point,
+    extent,
+    primitive_antialiasing,
+  )?;
+  let resolve = |image: RgbaImage| {
+    if (source_pixels_per_point - target_pixels_per_point).abs() <= f32::EPSILON
+      && image.dimensions() == (target_width_px, target_height_px)
+    {
+      Some(image)
+    } else {
+      super::drawingml_image_effects::dpi_compensate_linear_hard(
+        &image,
+        source_pixels_per_point,
+        target_pixels_per_point,
+        target_width_px,
+        target_height_px,
+      )
+    }
+  };
+  let resolve_optional = |image: Option<RgbaImage>| match image {
+    Some(image) => Some(Some(resolve(image)?)),
+    None => Some(None),
+  };
+
+  Some(DrawingRaster {
+    image: resolve(raster.image)?,
+    fill_image: resolve_optional(raster.fill_image)?,
+    line_image: resolve_optional(raster.line_image)?,
+    fill_line_image: resolve_optional(raster.fill_line_image)?,
+    children_image: resolve_optional(raster.children_image)?,
+    pixels_per_point: target_pixels_per_point,
+  })
 }
 
 fn rasterize_vector_items_for_effects_impl_at_pixels_per_point_with_antialiasing(
@@ -368,10 +457,12 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
 ) -> Option<DrawingRaster> {
   let RasterSourceSurface {
     bounds: source_bounds,
-    pixels_per_point: source_pixels_per_point,
+    dpi: source_dpi,
     extent,
     text_hinting,
+    primitive_antialiasing,
   } = source_surface;
+  let source_pixels_per_point = (source_dpi / 72.0) as f32;
   let RasterTargetSurface {
     width_px: target_width_px,
     height_px: target_height_px,
@@ -405,7 +496,23 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
   };
   let source_width_px = source_extent(source_bounds.size.width.0);
   let source_height_px = source_extent(source_bounds.size.height.0);
-  let mut source = rasterize_vector_items_impl_with_mapping_at_resolution(
+  // Reject an unbounded source before allocating. Malformed/zero group extents
+  // can leave an unfitted coordinate range here; the fixed-output owner can
+  // still render it with its bounded viewport mapping. Never silently lower
+  // the requested source density or label an upscaled image as native output.
+  const MAX_NATIVE_SOURCE_PIXELS: u64 = 16_000_000;
+  if u64::from(source_width_px) * u64::from(source_height_px) > MAX_NATIVE_SOURCE_PIXELS {
+    return None;
+  }
+  let mut realized_items;
+  let items = if primitive_antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
+    realized_items = items.to_vec();
+    realize_source_device_strokes(&mut realized_items, source_dpi)?;
+    realized_items.as_slice()
+  } else {
+    items
+  };
+  let mut source = rasterize_vector_items_at_mapping(
     items,
     PageToRasterMapping {
       width_px: source_width_px,
@@ -416,6 +523,7 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
       translate_y: -source_bounds.origin.y.0 * source_pixels_per_point,
       text_hinting: text_hinting.map(|mode| (mode, source_pixels_per_point)),
     },
+    primitive_antialiasing,
   )?;
   if std::env::var("OOXMLSDK_LOCKED_CANVAS_SOURCE_ALPHA_PROBE").as_deref() == Ok("wpf-gamma") {
     apply_wpf_grayscale_alpha_correction(&mut source);
@@ -424,18 +532,37 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
     let _ = source.save(path);
   }
   Some(DrawingRaster {
-    image: resize_premultiplied_rgba(
-      &source,
-      target_width_px,
-      target_height_px,
-      filter.image_filter(),
-    ),
+    image: if let Some(filter) = filter.image_filter() {
+      resize_premultiplied_rgba(&source, target_width_px, target_height_px, filter)
+    } else {
+      source
+    },
     fill_image: None,
     line_image: None,
     fill_line_image: None,
     children_image: None,
     pixels_per_point: source_pixels_per_point,
   })
+}
+
+fn realize_source_device_strokes(items: &mut [DisplayItem<'static>], dpi: f64) -> Option<()> {
+  use super::drawingml_device_stroke::TransformPrecision;
+  for item in items {
+    let stroke = match item {
+      DisplayItem::Path(path) => path.stroke.as_mut(),
+      DisplayItem::Rect(rect) => rect.stroke.as_mut(),
+      DisplayItem::Line(line) => Some(&mut line.stroke),
+      DisplayItem::Group(group) => {
+        realize_source_device_strokes(&mut group.items, dpi)?;
+        None
+      }
+      _ => None,
+    };
+    if let Some(source) = stroke.and_then(|stroke| stroke.drawingml_device.as_mut()) {
+      source.realize(dpi, TransformPrecision::Paint)?;
+    }
+  }
+  Some(())
 }
 
 /// Rasterizes a standalone WordprocessingShape backdrop from its
@@ -660,17 +787,297 @@ pub(crate) fn rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
   effects: &super::drawingml_image_effects::ImageEffectContainer,
   max_pixels_per_point: f32,
 ) -> Option<DrawingRaster> {
+  rasterize_vector_items_for_effects_at_bounded_pixels_per_point_with_antialiasing(
+    items,
+    raster_bounds,
+    effects,
+    max_pixels_per_point,
+    RasterPrimitiveAntialiasing::PerPrimitive,
+  )
+}
+
+pub(crate) fn rasterize_vector_items_for_effects_at_bounded_pixels_per_point_with_antialiasing(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  max_pixels_per_point: f32,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<DrawingRaster> {
   let pixels_per_point = effect_pixels_per_point_with_max(
     raster_bounds.size.width.0,
     raster_bounds.size.height.0,
     max_pixels_per_point,
   );
-  rasterize_vector_items_for_effects_at_pixels_per_point(
+  rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing(
     items,
     raster_bounds,
     effects,
     pixels_per_point,
+    RasterSourceExtent::Outward,
+    primitive_antialiasing,
   )
+}
+
+/// Rasterizes an effect source in its own stable coordinate system.
+///
+/// Direct2D effect inputs are images with local bounds.  Their pixels must not
+/// inherit the origin of a later glow, shadow, or reflection output surface:
+/// changing an effect radius would otherwise move the vector sample lattice
+/// before the effect is evaluated.  The one-device-pixel guard reproduces the
+/// source allocation used by Word's near-zero spatial-effect branch; the
+/// caller-provided display bounds then select the local bitmap transported into
+/// the independently allocated effect output.
+pub(crate) fn rasterize_vector_items_for_effects_as_local_source_at_pixels_per_point_with_antialiasing(
+  items: &[DisplayItem<'static>],
+  source_bounds: Rect,
+  source_display_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  pixels_per_point: f32,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<DrawingRaster> {
+  if !pixels_per_point.is_finite()
+    || pixels_per_point <= 0.0
+    || source_bounds.size.width.0 <= 0.0
+    || source_bounds.size.height.0 <= 0.0
+    || source_display_bounds.size.width.0 <= 0.0
+    || source_display_bounds.size.height.0 <= 0.0
+  {
+    return None;
+  }
+
+  let guard_pt = 1.0 / pixels_per_point;
+  let local_raster_bounds = Rect {
+    origin: super::Point {
+      x: Pt(source_bounds.origin.x.0 - guard_pt),
+      y: Pt(source_bounds.origin.y.0 - guard_pt),
+    },
+    size: super::Size {
+      width: Pt(source_bounds.size.width.0 + guard_pt * 2.0),
+      height: Pt(source_bounds.size.height.0 + guard_pt * 2.0),
+    },
+  };
+  let raster = rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing(
+    items,
+    local_raster_bounds,
+    effects,
+    pixels_per_point,
+    RasterSourceExtent::Outward,
+    primitive_antialiasing,
+  )?;
+
+  let rounded_nonnegative = |value: f32| {
+    value
+      .is_finite()
+      .then(|| value.round())
+      .filter(|value| *value >= 0.0)
+      .map(|value| value as u32)
+  };
+  let crop_left = rounded_nonnegative(
+    (source_display_bounds.origin.x.0 - local_raster_bounds.origin.x.0) * pixels_per_point,
+  )?;
+  let crop_top = rounded_nonnegative(
+    (source_display_bounds.origin.y.0 - local_raster_bounds.origin.y.0) * pixels_per_point,
+  )?;
+  let crop_width =
+    rounded_nonnegative(source_display_bounds.size.width.0 * pixels_per_point)?.max(1);
+  let crop_height =
+    rounded_nonnegative(source_display_bounds.size.height.0 * pixels_per_point)?.max(1);
+
+  crop_drawing_raster(raster, crop_left, crop_top, crop_width, crop_height)
+}
+
+fn crop_drawing_raster(
+  mut raster: DrawingRaster,
+  left: u32,
+  top: u32,
+  width: u32,
+  height: u32,
+) -> Option<DrawingRaster> {
+  let crop = |image: RgbaImage| {
+    let right = left.checked_add(width)?;
+    let bottom = top.checked_add(height)?;
+    if right > image.width() || bottom > image.height() {
+      return None;
+    }
+    Some(image::imageops::crop_imm(&image, left, top, width, height).to_image())
+  };
+  let crop_optional = |image: Option<RgbaImage>| match image {
+    Some(image) => Some(Some(crop(image)?)),
+    None => Some(None),
+  };
+  raster.image = crop(raster.image)?;
+  raster.fill_image = crop_optional(raster.fill_image)?;
+  raster.line_image = crop_optional(raster.line_image)?;
+  raster.fill_line_image = crop_optional(raster.fill_line_image)?;
+  raster.children_image = crop_optional(raster.children_image)?;
+  Some(raster)
+}
+
+/// Places every logical source plane at the same coordinate on a transparent
+/// effect working surface.  `replace` is intentional: the destination is an
+/// allocation boundary, not another compositing operation.
+pub(crate) fn place_drawing_raster_on_transparent_surface(
+  mut raster: DrawingRaster,
+  width: u32,
+  height: u32,
+  left: u32,
+  top: u32,
+) -> Option<DrawingRaster> {
+  let place = |image: RgbaImage| {
+    let right = left.checked_add(image.width())?;
+    let bottom = top.checked_add(image.height())?;
+    if width == 0 || height == 0 || right > width || bottom > height {
+      return None;
+    }
+    let mut output = RgbaImage::new(width, height);
+    replace(&mut output, &image, i64::from(left), i64::from(top));
+    Some(output)
+  };
+  let place_optional = |image: Option<RgbaImage>| match image {
+    Some(image) => Some(Some(place(image)?)),
+    None => Some(None),
+  };
+  raster.image = place(raster.image)?;
+  raster.fill_image = place_optional(raster.fill_image)?;
+  raster.line_image = place_optional(raster.line_image)?;
+  raster.fill_line_image = place_optional(raster.fill_line_image)?;
+  raster.children_image = place_optional(raster.children_image)?;
+  Some(raster)
+}
+
+/// Paint directly on the independently allocated 3-D material bitmap. This
+/// does not resize a completed effect source or change the geometry grid.
+pub(crate) fn rasterize_text_surface_material_texture(
+  item: &TextRun<'static>,
+  plan: super::drawingml_3d::TextMaterialTexturePlan,
+) -> Option<super::drawingml_3d::TextMaterialTexture> {
+  let mut pixmap = Pixmap::new(plan.width, plan.height)?;
+  let mut text_metrics = TextMetrics::new();
+  let outline = text_outline(item, None, &mut text_metrics)?;
+  let clip_path = path_from_commands(&outline.commands, &[], true)?;
+  let fill = text_fill_material_item(item);
+  let line = text_surface_outline_item(item);
+  // GDI+ resolves coverage for FillPath and DrawPath independently, then
+  // composites them. Resolving after both draws instead correlates their
+  // samples and gives the wrong alpha along their shared boundary.
+  // Bands bound temporary memory without reducing the requested density.
+  let sample_width = plan.width.checked_mul(8)?;
+  for top in (0..plan.height).step_by(64) {
+    let rows = (plan.height - top).min(64);
+    let mut samples = Pixmap::new(sample_width, rows * 4)?;
+    let t = plan.page_to_texture;
+    // This GDI+ target explicitly selects PixelOffsetModeHalf. The shared
+    // 8x4 helpers store PixelOffsetModeNone's integer-centered samples, so
+    // compensate their half-pixel storage origin here, not in glyph/page UV.
+    // Other effect sources retain their independently observed pixel mode.
+    let transform = SkTransform::from_row(
+      t.sx * 8.0,
+      t.ky * 4.0,
+      t.kx * 8.0,
+      t.sy * 4.0,
+      t.tx * 8.0 - 4.0,
+      t.ty * 4.0 - (top * 4) as f32 - 2.0,
+    );
+    draw_text(
+      &mut samples,
+      &fill,
+      transform,
+      None,
+      RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+      &mut text_metrics,
+    )?;
+    composite_material_sample_band(&mut pixmap, &samples, top);
+    samples.fill(SkColor::TRANSPARENT);
+    draw_text(
+      &mut samples,
+      &line,
+      transform,
+      None,
+      RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+      &mut text_metrics,
+    )?;
+    let mask = office_8x4_sample_mask(&samples, &clip_path, FillRule::EvenOdd, transform)?;
+    samples.apply_mask(&mask);
+    composite_material_sample_band(&mut pixmap, &samples, top);
+  }
+  plan.finish(pixmap)
+}
+
+fn text_surface_outline_item(item: &TextRun<'static>) -> TextRun<'static> {
+  let mut line = item.clone();
+  let options = line
+    .style
+    .pdf_glyph_outline_options
+    .get_or_insert_with(|| std::sync::Arc::new(Default::default()));
+  let options = std::sync::Arc::make_mut(options);
+  options.fill = Some(Fill::None);
+  if matches!(options.outline_fill, Some(Fill::None)) {
+    options.outline_stroke = None;
+    line.style.outline_color = None;
+    line.style.outline_width = Pt(0.0);
+    return line;
+  }
+  // Word expands the positive source-paint pen BEFORE constructing the GDI+
+  // pen and applying its inner-half compound band. Exact-option controls span
+  // Example/E/HIl, 18..48pt fonts, .5..6pt widths, centered/inset alignment,
+  // and zero/noFill stopping cases. Both the physical material texture and
+  // the independent reflection source use this paint; ordinary glyph strokes
+  // and solid 3-D contour geometry must retain their authored widths.
+  // This is a source-space paint allowance, not a final-raster pixel or a
+  // texture-size adjustment. The actual pen normalizer leaves it unchanged.
+  const SOURCE_PAINT_EXPANSION_PT: f32 = 0.12;
+  if line.style.outline_width.0.is_finite() && line.style.outline_width.0 > 0.0 {
+    line.style.outline_width.0 += SOURCE_PAINT_EXPANSION_PT;
+  }
+  // Office's material pen uses an inner-half compound band on the original
+  // closed glyph path, despite PenAlignmentCenter. A centered full stroke
+  // incorrectly introduces translucent material outside the glyph. An
+  // explicitly inset authored outline keeps its complete width inside.
+  if let Some(stroke) = options.outline_stroke.as_mut() {
+    if stroke.width.0.is_finite() && stroke.width.0 > 0.0 {
+      stroke.width.0 += SOURCE_PAINT_EXPANSION_PT;
+    }
+    if stroke.alignment == Some(StrokeAlignment::Inside) {
+      stroke.width.0 *= 2.0;
+    }
+  }
+  line
+}
+
+fn composite_material_sample_band(pixmap: &mut Pixmap, samples: &Pixmap, top: u32) {
+  composite_raster_sample_band(pixmap, samples, top, 8, 4);
+}
+
+fn composite_raster_sample_band(
+  pixmap: &mut Pixmap,
+  samples: &Pixmap,
+  top: u32,
+  horizontal_samples: u32,
+  vertical_samples: u32,
+) {
+  let sample_width = samples.width();
+  let rows = samples.height() / vertical_samples;
+  let sample_count = horizontal_samples * vertical_samples;
+  for y in 0..rows {
+    for x in 0..pixmap.width() {
+      let mut sum = [0_u32; 4];
+      for dy in 0..vertical_samples {
+        for dx in 0..horizontal_samples {
+          let offset = (((y * vertical_samples + dy) * sample_width + x * horizontal_samples + dx)
+            * 4) as usize;
+          for (total, byte) in sum.iter_mut().zip(&samples.data()[offset..offset + 4]) {
+            *total += u32::from(*byte);
+          }
+        }
+      }
+      let source = sum.map(|value| ((value + sample_count / 2) / sample_count) as u8);
+      let inverse_alpha = 255 - u32::from(source[3]);
+      let offset = (((top + y) * pixmap.width() + x) * 4) as usize;
+      for (byte, source) in pixmap.data_mut()[offset..offset + 4].iter_mut().zip(source) {
+        *byte = (u32::from(source) + (u32::from(*byte) * inverse_alpha + 127) / 255).min(255) as u8;
+      }
+    }
+  }
 }
 
 pub(crate) fn rasterize_fill_layer_at_pixels_per_point(
@@ -694,18 +1101,673 @@ pub(crate) fn rasterize_fill_layer_at_pixels_per_point(
   })
 }
 
+/// Paints the glyph interior with the authored character-outline material.
+///
+/// Word's effective W14 static-3-D path has one deliberately narrow material
+/// exception: `textFill/noFill` plus a fully opaque positive-width outline
+/// colors the complete raw-glyph face. This helper changes paint ownership
+/// only; the caller still supplies the original glyph geometry to the 3-D
+/// tessellator, so the outline never widens the physical solid.
+pub(crate) fn rasterize_text_outline_material_layer_at_pixels_per_point(
+  item: &TextRun<'static>,
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+) -> Option<DrawingRaster> {
+  let material = text_outline_material_item(item)?;
+  let (image, pixels_per_point) = rasterize_vector_items_impl_at_pixels_per_point(
+    &[DisplayItem::Text(material)],
+    raster_bounds,
+    pixels_per_point,
+  )?;
+  Some(DrawingRaster {
+    image,
+    fill_image: None,
+    line_image: None,
+    fill_line_image: None,
+    children_image: None,
+    pixels_per_point,
+  })
+}
+
+/// Rasterizes only the character-outline geometry with opaque white paint.
+///
+/// The alpha channel is a paint-independent coverage attribute for W14's
+/// text material mesh. Keeping authored opacity in the separate outline
+/// material layer avoids multiplying transparency twice when the line is
+/// composited over `textFill` on a bevel vertex.
+pub(crate) fn rasterize_text_outline_coverage_layer_at_pixels_per_point(
+  item: &TextRun<'static>,
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+) -> Option<DrawingRaster> {
+  let material = text_outline_coverage_item(item)?;
+  if !pixels_per_point.is_finite()
+    || pixels_per_point <= 0.0
+    || raster_bounds.size.width.0 <= 0.0
+    || raster_bounds.size.height.0 <= 0.0
+  {
+    return None;
+  }
+  // This is a material coverage attribute, subsequently interpolated by the
+  // static-3-D renderer. Preserve subpixel edge differences with the same
+  // bounded high-resolution realization as other explicitly mapped surfaces;
+  // the ordinary 4x4 scanner can quantize distinct edges to the same alpha.
+  // Keep its conventional pixel-centre mapping (not GDI+ sample storage).
+  let image = rasterize_vector_items_impl_with_mapping(
+    &[DisplayItem::Text(material)],
+    PageToRasterMapping {
+      width_px: raster_pixel_extent(raster_bounds.size.width.0, pixels_per_point),
+      height_px: raster_pixel_extent(raster_bounds.size.height.0, pixels_per_point),
+      scale_x: pixels_per_point,
+      scale_y: pixels_per_point,
+      translate_x: -raster_bounds.origin.x.0 * pixels_per_point,
+      translate_y: -raster_bounds.origin.y.0 * pixels_per_point,
+      text_hinting: None,
+    },
+  )?;
+  Some(DrawingRaster {
+    image,
+    fill_image: None,
+    line_image: None,
+    fill_line_image: None,
+    children_image: None,
+    pixels_per_point,
+  })
+}
+
+/// Paints the raw glyph interior with `textFill` while omitting the
+/// independently authored character outline.
+///
+/// Word maps fill and outline to separate fixed-width regions of a W14 text
+/// bevel. Keeping this layer independent prevents the outline antialias fringe
+/// from becoming an implicit, bevel-width-dependent fill texture.
+pub(crate) fn rasterize_text_fill_material_layer_at_pixels_per_point(
+  item: &TextRun<'static>,
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+) -> Option<DrawingRaster> {
+  let material = text_fill_material_item(item);
+  let (image, pixels_per_point) = rasterize_vector_items_impl_at_pixels_per_point(
+    &[DisplayItem::Text(material)],
+    raster_bounds,
+    pixels_per_point,
+  )?;
+  Some(DrawingRaster {
+    image,
+    fill_image: None,
+    line_image: None,
+    fill_line_image: None,
+    children_image: None,
+    pixels_per_point,
+  })
+}
+
+fn text_fill_material_item(item: &TextRun<'static>) -> TextRun<'static> {
+  let mut material = item.clone();
+  material.style.outline_color = None;
+  material.style.outline_width = Pt(0.0);
+  if let Some(options) = material.style.pdf_glyph_outline_options.as_mut() {
+    let options = std::sync::Arc::make_mut(options);
+    options.outline_fill = None;
+    options.outline_stroke = None;
+    options.outline_has_authored_transparency = false;
+  }
+  material
+}
+
+/// The unlit reflection source includes its own 3-D contour paint. It is not
+/// the shaded/extruded foreground, nor the white coverage-only shadow caster.
+/// The raw-glyph interior owns fill and the inward part of the character
+/// outline; the exterior owns the outward part of the 3-D contour. Exact
+/// zero-blur Office reflection controls distinguish these regions from a
+/// centered contour painted over an ordinary, outward-growing text outline.
+pub(crate) fn rasterize_static_3d_text_reflection_source(
+  item: &TextRun<'static>,
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+  contour_width: Pt,
+  contour_color: Color,
+  antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<RgbaImage> {
+  if !pixels_per_point.is_finite()
+    || pixels_per_point <= 0.0
+    || raster_bounds.size.width.0 <= 0.0
+    || raster_bounds.size.height.0 <= 0.0
+  {
+    return None;
+  }
+  let width = raster_source_extent(
+    raster_bounds.size.width.0,
+    pixels_per_point,
+    RasterSourceExtent::Outward,
+  );
+  let height = raster_source_extent(
+    raster_bounds.size.height.0,
+    pixels_per_point,
+    RasterSourceExtent::Outward,
+  );
+  rasterize_static_3d_text_reflection_source_with_mapping(
+    item,
+    PageToRasterMapping {
+      width_px: width,
+      height_px: height,
+      scale_x: pixels_per_point,
+      scale_y: pixels_per_point,
+      translate_x: -raster_bounds.origin.x.0 * pixels_per_point,
+      translate_y: -raster_bounds.origin.y.0 * pixels_per_point,
+      text_hinting: None,
+    },
+    contour_width,
+    contour_color,
+    antialiasing,
+  )
+}
+
+/// Realizes reflection paint directly on its source texture lattice. Each
+/// axis, the page origin, and the sample-coverage policy are independent of
+/// the final scene bitmap. Do not implement this by resizing an isotropic
+/// glyph bitmap: material/contour intersection precedes coverage resolve.
+pub(crate) fn rasterize_static_3d_text_reflection_source_with_mapping(
+  item: &TextRun<'static>,
+  mapping: PageToRasterMapping,
+  contour_width: Pt,
+  contour_color: Color,
+  antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<RgbaImage> {
+  if !valid_raster_mapping(mapping) || mapping.text_hinting.is_some() {
+    // This source partitions continuous, unhinted raw-glyph geometry.
+    // A hinted font bitmap cannot substitute for that geometry contract.
+    return None;
+  }
+  let (width, height) = (mapping.width_px, mapping.height_px);
+  let mut output = Pixmap::new(width, height)?;
+  let mut text_metrics = TextMetrics::new();
+  let outline = text_outline(item, None, &mut text_metrics)?;
+  let path = path_from_commands(&outline.commands, &[], true)?;
+  let fill = text_fill_material_item(item);
+  let line = text_surface_outline_item(item);
+  let contour = static_3d_text_reflection_contour_item(item, contour_width, contour_color);
+  let (sx, sy, sample_mode) = match antialiasing {
+    // Preserve the ordinary scanner's 4x4 pixel-centred coverage contract,
+    // but intersect geometry at sample resolution, not two resolved alphas.
+    RasterPrimitiveAntialiasing::PerPrimitive | RasterPrimitiveAntialiasing::Direct2dStandard4 => {
+      (4, 4, RasterPrimitiveAntialiasing::Aliased)
+    }
+    RasterPrimitiveAntialiasing::Aliased => (1, 1, RasterPrimitiveAntialiasing::Aliased),
+    RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 => (8, 4, antialiasing),
+  };
+  for top in (0..height).step_by(64) {
+    let rows = (height - top).min(64);
+    let mut samples = Pixmap::new(width.checked_mul(sx)?, rows * sy)?;
+    let transform = SkTransform::from_row(
+      mapping.scale_x * sx as f32,
+      0.0,
+      0.0,
+      mapping.scale_y * sy as f32,
+      mapping.translate_x * sx as f32,
+      mapping.translate_y * sy as f32 - (top * sy) as f32,
+    );
+    let inside = if sample_mode == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
+      office_8x4_sample_mask(&samples, &path, FillRule::EvenOdd, transform)?
+    } else {
+      let mut mask = Mask::new(samples.width(), samples.height())?;
+      mask.fill_path(&path, FillRule::EvenOdd, false, transform);
+      mask
+    };
+    let mut outside = inside.clone();
+    for value in outside.data_mut() {
+      *value = 255 - *value;
+    }
+    for (paint, clip) in [
+      (Some(&fill), None),
+      (Some(&line), Some(&inside)),
+      (contour.as_ref(), Some(&outside)),
+    ] {
+      let Some(paint) = paint else {
+        continue;
+      };
+      samples.fill(SkColor::TRANSPARENT);
+      draw_text(
+        &mut samples,
+        paint,
+        transform,
+        None,
+        sample_mode,
+        &mut text_metrics,
+      )?;
+      if let Some(clip) = clip {
+        samples.apply_mask(clip);
+      }
+      composite_raster_sample_band(&mut output, &samples, top, sx, sy);
+    }
+  }
+  pixmap_into_rgba(output)
+}
+
+pub(crate) fn static_3d_text_reflection_contour_item(
+  item: &TextRun<'static>,
+  width: Pt,
+  color: Color,
+) -> Option<TextRun<'static>> {
+  if !width.0.is_finite() || width.0 <= 0.0 || color.a == 0 {
+    return None;
+  }
+  let mut contour = item.clone();
+  contour.style.outline_color = Some(color);
+  contour.style.outline_width = width;
+  let options = contour
+    .style
+    .pdf_glyph_outline_options
+    .get_or_insert_with(Default::default);
+  let options = std::sync::Arc::make_mut(options);
+  options.fill = Some(Fill::None);
+  options.outline_fill = Some(Fill::Solid(color));
+  options.outline_stroke = Some(Stroke {
+    width,
+    color,
+    alignment: Some(StrokeAlignment::Center),
+    join: Some(super::StrokeJoin::Round),
+    ..Stroke::default()
+  });
+  options.outline_has_authored_transparency = color.a < 255;
+  Some(contour)
+}
+
+/// Boundary paint for the existing root effect source. Its full centered
+/// coverage must not be replaced by the reflected material's exterior clip.
+pub(crate) fn rasterize_static_3d_text_contour_effect_source(
+  item: &TextRun<'static>,
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+  width: Pt,
+  color: Color,
+  antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<RgbaImage> {
+  let contour = static_3d_text_reflection_contour_item(item, width, color)?;
+  rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
+    &[DisplayItem::Text(contour)],
+    raster_bounds,
+    pixels_per_point,
+    RasterSourceExtent::Outward,
+    antialiasing,
+  )
+  .map(|(image, _)| image)
+}
+
+/// Realizes the opaque front-plane caster of effective W14 3-D text.
+///
+/// Character outline paint is an interior material of the solid, whereas
+/// `contourW` contributes a separate solid boundary (MS-OI29500 20.1.5.6).
+/// Native Word shadow-colour pairs over two texts, four contour widths and
+/// three character-outline opacities distinguish these two sources: changing
+/// contour width grows the caster; changing character-outline opacity does
+/// not introduce a translucent ring around the opaque face. Extrusion-depth
+/// controls keep that front-plane silhouette, apart from foreground occlusion.
+///
+/// This contract is established for opaque fills. Retain the existing source
+/// for nonuniform/translucent or missing fills until their material ownership
+/// is established independently; do not infer opacity from coverage pixels.
+pub(crate) fn rasterize_opaque_static_3d_text_shadow_source(
+  item: &TextRun<'static>,
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+  contour_width: Pt,
+  contour_alpha: u8,
+) -> Option<DrawingRaster> {
+  let material = opaque_static_3d_text_effect_item(item, contour_width, contour_alpha)?;
+  rasterize_static_3d_text_effect_mask(&material, raster_bounds, pixels_per_point)
+}
+
+/// Realizes a prepared glyph/contour mask without invoking 3-D material paint.
+pub(crate) fn rasterize_static_3d_text_effect_mask(
+  material: &TextRun<'static>,
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+) -> Option<DrawingRaster> {
+  // Coverage filters read alpha only; retain the authored fill so gradient
+  // realization, font selection and source-grid policy stay unchanged.
+  let (image, pixels_per_point) = rasterize_vector_items_impl_at_pixels_per_point(
+    &[DisplayItem::Text(material.clone())],
+    raster_bounds,
+    pixels_per_point,
+  )?;
+  Some(DrawingRaster {
+    image,
+    fill_image: None,
+    line_image: None,
+    fill_line_image: None,
+    children_image: None,
+    pixels_per_point,
+  })
+}
+
+pub(crate) fn opaque_static_3d_text_effect_item(
+  item: &TextRun<'static>,
+  contour_width: Pt,
+  contour_alpha: u8,
+) -> Option<TextRun<'static>> {
+  let fill_opacity = item
+    .style
+    .pdf_glyph_outline_options
+    .as_deref()
+    .and_then(|options| options.fill.as_ref())
+    .map_or(Some(f32::from(item.color.a) / 255.0), uniform_fill_opacity);
+  if fill_opacity != Some(1.0) || !contour_width.0.is_finite() {
+    return None;
+  }
+  let mut material = text_fill_material_item(item);
+  if contour_width.0 > 0.0 && contour_alpha != 0 {
+    let color = Color {
+      r: 255,
+      g: 255,
+      b: 255,
+      a: contour_alpha,
+    };
+    material.style.outline_color = Some(color);
+    material.style.outline_width = contour_width;
+    let options = material
+      .style
+      .pdf_glyph_outline_options
+      .get_or_insert_with(Default::default);
+    let options = std::sync::Arc::make_mut(options);
+    options.outline_fill = Some(Fill::Solid(color));
+    options.outline_stroke = Some(Stroke {
+      width: contour_width,
+      color,
+      alignment: Some(StrokeAlignment::Center),
+      join: Some(super::StrokeJoin::Round),
+      ..Stroke::default()
+    });
+    options.outline_has_authored_transparency = contour_alpha < 255;
+  }
+  Some(material)
+}
+
+fn text_outline_coverage_item(item: &TextRun<'static>) -> Option<TextRun<'static>> {
+  let mut material = item.clone();
+  let mut options = material.style.pdf_glyph_outline_options.as_deref()?.clone();
+  let mut stroke = options.outline_stroke.clone().or_else(|| {
+    material
+      .style
+      .outline_color
+      .filter(|_| material.style.outline_width.0 > f32::EPSILON)
+      .map(|color| Stroke {
+        width: material.style.outline_width,
+        color,
+        ..Stroke::default()
+      })
+  })?;
+  if stroke.width.0 <= f32::EPSILON {
+    return None;
+  }
+  let authored_fill = options.outline_fill.as_ref().cloned().unwrap_or_else(|| {
+    if let Some(gradient) = stroke.gradient.clone() {
+      Fill::Gradient(gradient)
+    } else if let Some(pattern) = stroke.pattern {
+      Fill::Pattern(pattern)
+    } else {
+      Fill::Solid(stroke.color)
+    }
+  });
+  if !fill_has_visible_alpha(&authored_fill) {
+    return None;
+  }
+
+  let opaque = Color {
+    r: 255,
+    g: 255,
+    b: 255,
+    a: 255,
+  };
+  stroke.color = opaque;
+  stroke.gradient = None;
+  stroke.pattern = None;
+  material.color = opaque;
+  material.style.outline_color = Some(opaque);
+  material.style.outline_width = stroke.width;
+  options.fill = Some(Fill::None);
+  options.fill_has_authored_transparency = false;
+  options.outline_fill = Some(Fill::Solid(opaque));
+  options.outline_stroke = Some(stroke);
+  options.outline_has_authored_transparency = false;
+  material.style.pdf_glyph_outline_options = Some(std::sync::Arc::new(options));
+  Some(material)
+}
+
+fn text_outline_material_item(item: &TextRun<'static>) -> Option<TextRun<'static>> {
+  let mut material = item.clone();
+  let mut options = material.style.pdf_glyph_outline_options.as_deref()?.clone();
+  let stroke = options.outline_stroke.clone().or_else(|| {
+    material
+      .style
+      .outline_color
+      .filter(|_| material.style.outline_width.0 > f32::EPSILON)
+      .map(|color| Stroke {
+        width: material.style.outline_width,
+        color,
+        ..Stroke::default()
+      })
+  })?;
+  if stroke.width.0 <= f32::EPSILON {
+    return None;
+  }
+  let fill = options.outline_fill.clone().unwrap_or_else(|| {
+    if let Some(gradient) = stroke.gradient.clone() {
+      Fill::Gradient(gradient)
+    } else if let Some(pattern) = stroke.pattern {
+      Fill::Pattern(pattern)
+    } else {
+      Fill::Solid(stroke.color)
+    }
+  });
+  if matches!(fill, Fill::None) {
+    return None;
+  }
+
+  material.color = stroke.color;
+  material.style.outline_color = None;
+  material.style.outline_width = Pt(0.0);
+  options.fill = Some(fill);
+  options.fill_has_authored_transparency = options.outline_has_authored_transparency;
+  options.outline_fill = None;
+  options.outline_stroke = None;
+  options.outline_has_authored_transparency = false;
+  material.style.pdf_glyph_outline_options = Some(std::sync::Arc::new(options));
+  Some(material)
+}
+
 pub(crate) fn static_3d_text_geometry(
   item: &TextRun<'static>,
   raster_bounds: Rect,
   pixels_per_point: f32,
-) -> Option<super::drawingml_3d::Static3dTextGeometry> {
+) -> Option<super::drawingml_3d::Static3dTextGeometryPaths> {
   let mut text_metrics = TextMetrics::new();
   let outline = text_outline(item, None, &mut text_metrics)?;
-  super::drawingml_3d::Static3dTextGeometry::from_page_path(
+  let geometry = super::drawingml_3d::Static3dTextGeometryPaths::from_page_path_for_direct3d9(
     &outline.commands,
     raster_bounds,
     pixels_per_point,
+  )?;
+  let outline_material_inset_px = static_3d_text_outline_material_inset_px(item, pixels_per_point);
+  let outline_has_authored_transparency = item
+    .style
+    .pdf_glyph_outline_options
+    .as_deref()
+    .is_some_and(|options| options.outline_has_authored_transparency);
+  let fill_has_authored_transparency = item
+    .style
+    .pdf_glyph_outline_options
+    .as_deref()
+    .is_some_and(|options| options.fill_has_authored_transparency);
+  let (fill_uniform_paint_opacity, outline_uniform_paint_opacity) =
+    static_3d_text_material_opacities(item);
+  Some(
+    geometry
+      .with_uniform_paint_opacity(uniform_static_3d_text_paint_opacity(item))
+      .with_front_material_opacities(fill_uniform_paint_opacity, outline_uniform_paint_opacity)
+      .with_front_outline_material_inset_px(outline_material_inset_px)
+      .with_front_fill_authored_transparency(fill_has_authored_transparency)
+      .with_front_outline_authored_transparency(outline_has_authored_transparency),
   )
+}
+
+/// Resolves the inward material region contributed by a visible W14 text
+/// outline on Word's raw-glyph static-3-D solid.
+///
+/// [MS-DOCX] 2.6.3.36 makes a missing `algn` centered by default, while
+/// 2.6.4.11 defines `ctr` around the source path and `in` wholly inside it.
+/// Word clips the centered line's outward half to the raw glyph solid, so its
+/// bevel material boundary is one half of the authored width. Exact-config
+/// Office controls independently hold the physical glyph support fixed while
+/// moving this material boundary with outline width. An entirely transparent
+/// outline is the negative control and must not split the fill material.
+fn static_3d_text_outline_material_inset_px(
+  item: &TextRun<'static>,
+  pixels_per_point: f32,
+) -> Option<f32> {
+  if !pixels_per_point.is_finite() || pixels_per_point <= f32::EPSILON {
+    return None;
+  }
+  let options = item.style.pdf_glyph_outline_options.as_deref();
+  let stroke = options
+    .and_then(|value| value.outline_stroke.as_ref())
+    .cloned()
+    .or_else(|| {
+      item
+        .style
+        .outline_color
+        .filter(|_| item.style.outline_width.0 > f32::EPSILON)
+        .map(|color| Stroke {
+          width: item.style.outline_width,
+          color,
+          ..Stroke::default()
+        })
+    })?;
+  if !stroke.width.0.is_finite() || stroke.width.0 <= f32::EPSILON {
+    return None;
+  }
+
+  let outline_fill = options
+    .and_then(|value| value.outline_fill.as_ref())
+    .cloned()
+    .unwrap_or_else(|| {
+      if let Some(gradient) = stroke.gradient.clone() {
+        Fill::Gradient(gradient)
+      } else if let Some(pattern) = stroke.pattern {
+        Fill::Pattern(pattern)
+      } else {
+        Fill::Solid(stroke.color)
+      }
+    });
+  if !fill_has_visible_alpha(&outline_fill) {
+    return None;
+  }
+
+  let inward_fraction = match stroke.alignment {
+    Some(StrokeAlignment::Inside) => 1.0,
+    Some(StrokeAlignment::Center) | None => 0.5,
+  };
+  Some(stroke.width.0 * pixels_per_point * inward_fraction)
+}
+
+fn fill_has_visible_alpha(fill: &Fill<'_>) -> bool {
+  match fill {
+    Fill::None => false,
+    Fill::Solid(color) => color.a != 0,
+    Fill::Gradient(gradient) => gradient.stops.iter().any(|stop| stop.color.a != 0),
+    Fill::Pattern(pattern) => pattern.foreground.a != 0 || pattern.background.a != 0,
+    // Theme and image fills cannot occur in CT_TextOutlineEffect, but retain
+    // their conservative visible-paint semantics for legacy callers.
+    Fill::Theme(_) | Fill::Image { .. } => true,
+  }
+}
+
+/// Returns a paint's authored opacity when it is constant over the complete
+/// material. Coverage is deliberately absent from this value: the WPF glyph
+/// painter applies coverage after selecting BGR/PBGRA from the authored paint
+/// state, so recovering opacity from an antialiased material bitmap would
+/// multiply coverage from two independently rasterized paths.
+fn uniform_fill_opacity(fill: &Fill<'_>) -> Option<f32> {
+  let alpha = match fill {
+    Fill::None => 0,
+    Fill::Solid(color) => color.a,
+    Fill::Gradient(gradient) => {
+      let alpha = gradient.stops.first()?.color.a;
+      gradient
+        .stops
+        .iter()
+        .all(|stop| stop.color.a == alpha)
+        .then_some(alpha)?
+    }
+    Fill::Pattern(pattern) => {
+      (pattern.foreground.a == pattern.background.a).then_some(pattern.foreground.a)?
+    }
+    Fill::Theme(_) | Fill::Image { .. } => return None,
+  };
+  Some(f32::from(alpha) / 255.0)
+}
+
+/// Carries independently authored fill and outline opacity into the W14 text
+/// material mesh whenever each paint is position-independent in alpha. The
+/// paint selection mirrors `draw_text` and `text_outline_material_item`.
+fn static_3d_text_material_opacities(item: &TextRun<'static>) -> (Option<f32>, Option<f32>) {
+  let options = item.style.pdf_glyph_outline_options.as_deref();
+  let fill_opacity = options
+    .and_then(|value| value.fill.as_ref())
+    .map_or(Some(f32::from(item.color.a) / 255.0), uniform_fill_opacity);
+
+  let stroke = options
+    .and_then(|value| value.outline_stroke.clone())
+    .or_else(|| {
+      item
+        .style
+        .outline_color
+        .filter(|_| item.style.outline_width.0 > f32::EPSILON)
+        .map(|color| Stroke {
+          width: item.style.outline_width,
+          color,
+          ..Stroke::default()
+        })
+    });
+  let outline_opacity = stroke
+    .filter(|stroke| stroke.width.0 > f32::EPSILON)
+    .and_then(|stroke| {
+      if let Some(fill) = options.and_then(|value| value.outline_fill.as_ref()) {
+        uniform_fill_opacity(fill)
+      } else if let Some(gradient) = stroke.gradient.as_ref() {
+        uniform_fill_opacity(&Fill::Gradient(gradient.clone()))
+      } else if let Some(pattern) = stroke.pattern {
+        uniform_fill_opacity(&Fill::Pattern(pattern))
+      } else {
+        Some(f32::from(stroke.color.a) / 255.0)
+      }
+    });
+
+  (fill_opacity, outline_opacity)
+}
+
+/// Returns authored opacity only when it is independent of position and of
+/// a second text paint. `draw_text` uses this same fill-selection rule. More
+/// complex sources retain the raster recovery path until their opacity map is
+/// produced by the same renderer as their RGBA material bitmap.
+fn uniform_static_3d_text_paint_opacity(item: &TextRun<'static>) -> Option<f32> {
+  let options = item.style.pdf_glyph_outline_options.as_deref();
+  let has_outline = options
+    .and_then(|value| value.outline_stroke.as_ref())
+    .is_some_and(|stroke| stroke.width.0 > f32::EPSILON)
+    || (item.style.outline_width.0 > f32::EPSILON && item.style.outline_color.is_some());
+  if has_outline {
+    return None;
+  }
+  let color = match options.and_then(|value| value.fill.as_ref()) {
+    Some(Fill::Solid(color)) => *color,
+    Some(Fill::None) => return Some(0.0),
+    Some(Fill::Theme(_) | Fill::Gradient(_) | Fill::Image { .. } | Fill::Pattern(_)) => {
+      return None;
+    }
+    None => item.color,
+  };
+  Some(f32::from(color.a) / 255.0)
 }
 
 pub(crate) fn static_3d_shape_geometry(
@@ -860,15 +1922,7 @@ fn collect_source_layer_item(
       Some(DisplayItem::Rect(rect))
     }
     (SourceLayer::Fill, DisplayItem::Text(text)) => {
-      let mut text = text.clone();
-      text.style.outline_color = None;
-      text.style.outline_width = Pt(0.0);
-      if let Some(options) = text.style.pdf_glyph_outline_options.as_mut() {
-        let options = std::sync::Arc::make_mut(options);
-        options.outline_fill = None;
-        options.outline_stroke = None;
-      }
-      Some(DisplayItem::Text(text))
+      Some(DisplayItem::Text(text_fill_material_item(text)))
     }
     (SourceLayer::Line, DisplayItem::Path(path)) => {
       let mut path = path.clone();
@@ -976,7 +2030,7 @@ fn effect_pixels_per_point(width_pt: f32, height_pt: f32) -> f32 {
   effect_pixels_per_point_with_max(width_pt, height_pt, MAX_EFFECT_PIXELS_PER_POINT)
 }
 
-fn effect_pixels_per_point_with_max(
+pub(crate) fn effect_pixels_per_point_with_max(
   width_pt: f32,
   height_pt: f32,
   max_pixels_per_point: f32,
@@ -1104,15 +2158,60 @@ fn rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
   }
   let width_px = raster_source_extent(width_pt, pixels_per_point, extent);
   let height_px = raster_source_extent(height_pt, pixels_per_point, extent);
-  let mut pixmap = Pixmap::new(width_px, height_px)?;
+  let image = rasterize_vector_items_at_mapping(
+    items,
+    PageToRasterMapping {
+      width_px,
+      height_px,
+      scale_x: pixels_per_point,
+      scale_y: pixels_per_point,
+      translate_x: -raster_bounds.origin.x.0 * pixels_per_point,
+      translate_y: -raster_bounds.origin.y.0 * pixels_per_point,
+      text_hinting: None,
+    },
+    primitive_antialiasing,
+  )?;
+  Some((image, pixels_per_point))
+}
+
+fn valid_raster_mapping(mapping: PageToRasterMapping) -> bool {
+  mapping.width_px > 0
+    && mapping.height_px > 0
+    && mapping.scale_x.is_finite()
+    && mapping.scale_x > 0.0
+    && mapping.scale_y.is_finite()
+    && mapping.scale_y > 0.0
+    && mapping.translate_x.is_finite()
+    && mapping.translate_y.is_finite()
+}
+
+/// Paints vectors on exactly the supplied lattice and primitive sample grid.
+/// Unlike the high-density convenience entry point, this does not choose an
+/// extra supersampling factor or resize a previously realized bitmap. Surface
+/// allocation/budget policy belongs to the caller that selected this mapping.
+pub(crate) fn rasterize_vector_items_at_mapping(
+  items: &[DisplayItem<'static>],
+  mapping: PageToRasterMapping,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
+) -> Option<RgbaImage> {
+  if !valid_raster_mapping(mapping) || items.iter().any(|item| !supported_raster_item(item)) {
+    return None;
+  }
+  let (width_px, height_px) = (mapping.width_px, mapping.height_px);
+  let (horizontal_sample_factor, vertical_sample_factor) = primitive_antialiasing.sample_factors();
+  let source_width_px = width_px.checked_mul(horizontal_sample_factor)?;
+  let source_height_px = height_px.checked_mul(vertical_sample_factor)?;
+  let horizontal_scale = horizontal_sample_factor as f32;
+  let vertical_scale = vertical_sample_factor as f32;
+  let mut pixmap = Pixmap::new(source_width_px, source_height_px)?;
   let mut text_metrics = TextMetrics::new();
   let page_to_raster = SkTransform::from_row(
-    pixels_per_point,
+    mapping.scale_x * horizontal_scale,
     0.0,
     0.0,
-    pixels_per_point,
-    -raster_bounds.origin.x.0 * pixels_per_point,
-    -raster_bounds.origin.y.0 * pixels_per_point,
+    mapping.scale_y * vertical_scale,
+    mapping.translate_x * horizontal_scale,
+    mapping.translate_y * vertical_scale,
   );
 
   for item in items {
@@ -1120,15 +2219,25 @@ fn rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
       &mut pixmap,
       item,
       page_to_raster,
-      None,
+      mapping.text_hinting,
       primitive_antialiasing,
       &mut text_metrics,
     )?;
   }
 
-  let png = pixmap.encode_png().ok()?;
-  let image = image::load_from_memory(&png).ok()?.to_rgba8();
-  Some((image, pixels_per_point))
+  let image = pixmap_into_rgba(pixmap)?;
+  let image = if horizontal_sample_factor == 1 && vertical_sample_factor == 1 {
+    image
+  } else {
+    resolve_box_filtered_rgba(
+      &image,
+      width_px,
+      height_px,
+      horizontal_sample_factor,
+      vertical_sample_factor,
+    )
+  };
+  Some(image)
 }
 
 fn rasterize_vector_items_impl_with_mapping(
@@ -1173,10 +2282,11 @@ fn rasterize_vector_items_impl_with_mapping(
         text_hinting: mapping.text_hinting,
       },
     )?;
-    return Some(resolve_supersampled_rgba(
+    return Some(resolve_box_filtered_rgba(
       &supersampled,
       mapping.width_px,
       mapping.height_px,
+      budget_factor,
       budget_factor,
     ));
   }
@@ -1209,24 +2319,34 @@ fn rasterize_vector_items_impl_with_mapping_at_resolution(
     )?;
   }
 
-  let png = pixmap.encode_png().ok()?;
-  image::load_from_memory(&png)
-    .ok()
-    .map(|image| image.to_rgba8())
+  pixmap_into_rgba(pixmap)
 }
 
-fn resolve_supersampled_rgba(
+fn pixmap_into_rgba(pixmap: Pixmap) -> Option<RgbaImage> {
+  let (width, height) = (pixmap.width(), pixmap.height());
+  // tiny-skia's PNG encoder uses this exact demultiplication before encoding.
+  // Transfer its buffer directly: an in-memory effect source needs neither
+  // PNG compression nor a second allocation and decode of the same pixels.
+  RgbaImage::from_raw(width, height, pixmap.take_demultiplied())
+}
+
+fn resolve_box_filtered_rgba(
   source: &RgbaImage,
   width: u32,
   height: u32,
-  factor: u32,
+  horizontal_factor: u32,
+  vertical_factor: u32,
 ) -> RgbaImage {
-  let sample_count = u64::from(factor) * u64::from(factor);
+  debug_assert!(horizontal_factor > 0);
+  debug_assert!(vertical_factor > 0);
+  debug_assert_eq!(source.width(), width * horizontal_factor);
+  debug_assert_eq!(source.height(), height * vertical_factor);
+  let sample_count = u64::from(horizontal_factor) * u64::from(vertical_factor);
   RgbaImage::from_fn(width, height, |x, y| {
     let mut alpha_sum = 0_u64;
     let mut premultiplied_sum = [0_u64; 3];
-    for sample_y in y * factor..(y + 1) * factor {
-      for sample_x in x * factor..(x + 1) * factor {
+    for sample_y in y * vertical_factor..(y + 1) * vertical_factor {
+      for sample_x in x * horizontal_factor..(x + 1) * horizontal_factor {
         let pixel = source.get_pixel(sample_x, sample_y);
         let alpha = u64::from(pixel[3]);
         alpha_sum += alpha;
@@ -1278,7 +2398,14 @@ fn draw_display_item(
   text_metrics: &mut TextMetrics,
 ) -> Option<()> {
   match item {
-    DisplayItem::Text(text) => draw_text(pixmap, text, page_to_raster, text_hinting, text_metrics)?,
+    DisplayItem::Text(text) => draw_text(
+      pixmap,
+      text,
+      page_to_raster,
+      text_hinting,
+      primitive_antialiasing,
+      text_metrics,
+    )?,
     DisplayItem::Image(image) => draw_image(pixmap, image, page_to_raster, primitive_antialiasing)?,
     DisplayItem::Path(path) => draw_path(pixmap, path, page_to_raster, primitive_antialiasing)?,
     DisplayItem::Rect(rect) => draw_rect(pixmap, rect, page_to_raster, primitive_antialiasing)?,
@@ -1311,21 +2438,32 @@ fn draw_text(
   item: &TextRun<'static>,
   page_to_raster: SkTransform,
   text_hinting: Option<(RasterTextHinting, f32)>,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
   text_metrics: &mut TextMetrics,
 ) -> Option<()> {
+  let primitive_antialiasing = match primitive_antialiasing {
+    RasterPrimitiveAntialiasing::Direct2dStandard4 => RasterPrimitiveAntialiasing::PerPrimitive,
+    other => other,
+  };
   let outline = text_outline(item, text_hinting, text_metrics)?;
   let commands = outline.commands;
   if commands.is_empty() {
     return Some(());
   }
   let path = path_from_commands(&commands, &[], true)?;
+  let definition_width = item.style.pdf_glyph_outline_options.as_ref().map_or(
+    super::Pt(outline.width_pt.max(item.style.font_size.0)),
+    |options| {
+      options.unresolved_definition_width(super::Pt(outline.width_pt), item.style.font_size)
+    },
+  );
   let bounds = Rect {
     origin: super::Point {
       x: item.origin.x,
       y: item.origin.y,
     },
     size: super::Size {
-      width: super::Pt(outline.width_pt.max(item.style.font_size.0)),
+      width: definition_width,
       height: super::Pt(item.line_height.0.max(item.style.font_size.0)),
     },
   };
@@ -1336,15 +2474,26 @@ fn draw_text(
     .and_then(|options| options.fill.clone())
     .unwrap_or(Fill::Solid(item.color));
   resolve_text_raster_fill(&mut fill, bounds);
-  draw_fill(
-    pixmap,
-    &path,
-    &fill,
-    bounds,
-    Some(&commands),
-    page_to_raster,
-    true,
-  )?;
+  if primitive_antialiasing == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
+    draw_office_8x4_fill(
+      pixmap,
+      &path,
+      &fill,
+      bounds,
+      Some(&commands),
+      page_to_raster,
+    )?;
+  } else {
+    draw_fill(
+      pixmap,
+      &path,
+      &fill,
+      bounds,
+      Some(&commands),
+      page_to_raster,
+      primitive_antialiasing,
+    )?;
+  }
   let mut stroke = item
     .style
     .pdf_glyph_outline_options
@@ -1388,15 +2537,26 @@ fn draw_text(
     }
   }
   if let Some(stroke) = &stroke {
-    draw_stroke(
-      pixmap,
-      &path,
-      stroke,
-      bounds,
-      Some(&commands),
-      page_to_raster,
-      true,
-    )?;
+    if primitive_antialiasing == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
+      draw_office_8x4_stroke(
+        pixmap,
+        &path,
+        stroke,
+        bounds,
+        Some(&commands),
+        page_to_raster,
+      )?;
+    } else {
+      draw_stroke(
+        pixmap,
+        &path,
+        stroke,
+        bounds,
+        Some(&commands),
+        page_to_raster,
+        primitive_antialiasing,
+      )?;
+    }
   }
   Some(())
 }
@@ -1572,7 +2732,7 @@ fn resolve_text_raster_fill(fill: &mut Fill<'static>, bounds: Rect) {
     path.transform =
       super::drawingml_gradient::bind_path_transform_to_bounds(path.transform, bounds);
     if path.kind == super::GradientPathKind::Circle {
-      path.transform = super::office_circle_gradient_transform(path.transform);
+      *path = super::office_circle_gradient_path(*path);
     }
   }
 }
@@ -1701,13 +2861,19 @@ fn draw_image(
     let mut mask_paint = Paint::default();
     mask_paint.set_color_rgba8(255, 255, 255, 255);
     mask_paint.anti_alias = primitive_antialiasing.enabled();
-    mask.fill_path(
-      &clip_path,
-      &mask_paint,
-      FillRule::EvenOdd,
-      page_to_raster,
-      None,
-    );
+    if primitive_antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
+      let coverage =
+        direct2d_four_sample_mask(pixmap, &clip_path, FillRule::EvenOdd, page_to_raster)?;
+      paint_sample_mask(&mut mask, &coverage, mask_paint, page_to_raster)?;
+    } else {
+      mask.fill_path(
+        &clip_path,
+        &mask_paint,
+        FillRule::EvenOdd,
+        page_to_raster,
+        None,
+      );
+    }
   }
 
   let raster_to_page = page_to_raster.invert()?;
@@ -1854,9 +3020,25 @@ fn draw_path(
     item.bounds,
     Some(&item.commands),
     page_to_raster,
-    primitive_antialiasing.enabled(),
+    primitive_antialiasing,
   )?;
   if let Some(stroke) = &item.stroke {
+    if primitive_antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4
+      && stroke
+        .drawingml_device
+        .as_ref()
+        .is_some_and(|source| source.realized_width_emu.is_some())
+    {
+      return draw_device_stroke(
+        pixmap,
+        &path,
+        stroke,
+        item.bounds,
+        Some(&item.commands),
+        Some(item),
+        page_to_raster,
+      );
+    }
     let shortened_path = shortened_straight_stroke_path(item, stroke);
     draw_stroke(
       pixmap,
@@ -1865,15 +3047,9 @@ fn draw_path(
       item.bounds,
       Some(&item.commands),
       page_to_raster,
-      primitive_antialiasing.enabled(),
+      primitive_antialiasing,
     )?;
-    draw_stroke_end_markers(
-      pixmap,
-      item,
-      stroke,
-      page_to_raster,
-      primitive_antialiasing.enabled(),
-    )?;
+    draw_stroke_end_markers(pixmap, item, stroke, page_to_raster, primitive_antialiasing)?;
   }
   Some(())
 }
@@ -1883,10 +3059,10 @@ fn draw_stroke_end_markers(
   item: &PathItem<'static>,
   stroke: &Stroke<'static>,
   page_to_raster: SkTransform,
-  anti_alias: bool,
+  antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
   let mut paint = solid_paint(stroke.color);
-  paint.anti_alias = anti_alias;
+  paint.anti_alias = antialiasing.enabled();
   for polygon in super::drawingml_stroke::stroke_end_marker_polygons(item, stroke) {
     let [first, rest @ ..] = polygon.as_slice() else {
       continue;
@@ -1898,7 +3074,12 @@ fn draw_stroke_end_markers(
     }
     builder.close();
     let path = builder.finish()?;
-    pixmap.fill_path(&path, &paint, FillRule::EvenOdd, page_to_raster, None);
+    if antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
+      let mask = direct2d_four_sample_mask(pixmap, &path, FillRule::EvenOdd, page_to_raster)?;
+      paint_sample_mask(pixmap, &mask, paint.clone(), page_to_raster)?;
+    } else {
+      pixmap.fill_path(&path, &paint, FillRule::EvenOdd, page_to_raster, None);
+    }
   }
   for marker in super::drawingml_stroke::stroked_open_arrow_markers(item, stroke) {
     let [first, middle, last] = marker.points;
@@ -1913,7 +3094,13 @@ fn draw_stroke_end_markers(
       line_join: LineJoin::Miter,
       ..SkStroke::default()
     };
-    pixmap.stroke_path(&path, &paint, &sk_stroke, page_to_raster, None);
+    if antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
+      let expanded = expanded_stroke_path(&path, &sk_stroke, page_to_raster)?;
+      let mask = direct2d_four_sample_mask(pixmap, &expanded, FillRule::Winding, page_to_raster)?;
+      paint_sample_mask(pixmap, &mask, paint.clone(), page_to_raster)?;
+    } else {
+      pixmap.stroke_path(&path, &paint, &sk_stroke, page_to_raster, None);
+    }
   }
   Some(())
 }
@@ -1983,7 +3170,7 @@ fn draw_rect(
     item.bounds,
     None,
     page_to_raster,
-    primitive_antialiasing.enabled(),
+    primitive_antialiasing,
   )?;
   if let Some(stroke) = &item.stroke {
     draw_stroke(
@@ -1993,7 +3180,7 @@ fn draw_rect(
       item.bounds,
       None,
       page_to_raster,
-      primitive_antialiasing.enabled(),
+      primitive_antialiasing,
     )?;
   }
   Some(())
@@ -2026,7 +3213,7 @@ fn draw_line(
     bounds,
     None,
     page_to_raster,
-    primitive_antialiasing.enabled(),
+    primitive_antialiasing,
   )
 }
 
@@ -2076,8 +3263,16 @@ fn draw_fill(
   bounds: Rect,
   commands: Option<&[PathCommand]>,
   page_to_raster: SkTransform,
-  anti_alias: bool,
+  antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
+  if antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
+    if matches!(fill, Fill::None) {
+      return Some(());
+    }
+    let mask = direct2d_four_sample_mask(pixmap, path, FillRule::EvenOdd, page_to_raster)?;
+    return paint_fill_mask(pixmap, &mask, fill, bounds, commands, page_to_raster);
+  }
+  let anti_alias = antialiasing.enabled();
   match fill {
     Fill::None => Some(()),
     Fill::Solid(color) => {
@@ -2118,6 +3313,214 @@ fn draw_fill(
   }
 }
 
+/// Rasterizes Word's fixed-output text-effect path samples on the GDI+
+/// `SmoothingModeAntiAlias8x4` grid.
+///
+/// GDI+ locates `PixelOffsetModeNone` samples at device-grid coordinates,
+/// while tiny-skia's aliased scanner classifies pixel centers.  Use the fast
+/// tiny-skia mask to identify the narrow boundary band, then replace only that
+/// band with exact Bézier winding tests at integer device coordinates.  The
+/// surrounding 8x4 surface remains binary and is resolved by the shared
+/// premultiplied box filter.
+fn office_8x4_sample_mask(
+  pixmap: &Pixmap,
+  path: &Path,
+  fill_rule: FillRule,
+  page_to_raster: SkTransform,
+) -> Option<Mask> {
+  let transformed = path
+    .clone()
+    .transform(office_8x4_storage_transform(page_to_raster))?;
+  let mut mask = Mask::new(pixmap.width(), pixmap.height())?;
+  mask.fill_path(&transformed, fill_rule, false, SkTransform::identity());
+  let preliminary = mask.data().to_vec();
+  let exact_path = tiny_path_as_kurbo(&transformed);
+  let width = pixmap.width() as usize;
+  let height = pixmap.height() as usize;
+
+  for y in 0..height {
+    for x in 0..width {
+      let index = y * width + x;
+      let preliminary_alpha = preliminary[index];
+      let mut boundary = false;
+      for offset_y in -1_i32..=1 {
+        for offset_x in -1_i32..=1 {
+          if offset_x == 0 && offset_y == 0 {
+            continue;
+          }
+          let neighbor_x = x as i32 + offset_x;
+          let neighbor_y = y as i32 + offset_y;
+          let neighbor_alpha = if neighbor_x < 0
+            || neighbor_y < 0
+            || neighbor_x >= width as i32
+            || neighbor_y >= height as i32
+          {
+            0
+          } else {
+            preliminary[neighbor_y as usize * width + neighbor_x as usize]
+          };
+          if neighbor_alpha != preliminary_alpha {
+            boundary = true;
+            break;
+          }
+        }
+        if boundary {
+          break;
+        }
+      }
+      if !boundary {
+        continue;
+      }
+
+      let winding = exact_path.winding(KurboPoint::new(x as f64, y as f64));
+      let inside = match fill_rule {
+        FillRule::Winding => winding != 0,
+        FillRule::EvenOdd => winding.rem_euclid(2) != 0,
+      };
+      mask.data_mut()[index] = if inside { 255 } else { 0 };
+    }
+  }
+  Some(mask)
+}
+
+fn tiny_path_as_kurbo(path: &Path) -> BezPath {
+  let mut output = BezPath::new();
+  for segment in path.segments() {
+    match segment {
+      PathSegment::MoveTo(point) => {
+        output.move_to(KurboPoint::new(f64::from(point.x), f64::from(point.y)));
+      }
+      PathSegment::LineTo(point) => {
+        output.line_to(KurboPoint::new(f64::from(point.x), f64::from(point.y)));
+      }
+      PathSegment::QuadTo(control, end) => {
+        output.quad_to(
+          KurboPoint::new(f64::from(control.x), f64::from(control.y)),
+          KurboPoint::new(f64::from(end.x), f64::from(end.y)),
+        );
+      }
+      PathSegment::CubicTo(control1, control2, end) => {
+        output.curve_to(
+          KurboPoint::new(f64::from(control1.x), f64::from(control1.y)),
+          KurboPoint::new(f64::from(control2.x), f64::from(control2.y)),
+          KurboPoint::new(f64::from(end.x), f64::from(end.y)),
+        );
+      }
+      PathSegment::Close => output.close_path(),
+    }
+  }
+  output
+}
+
+fn office_8x4_storage_transform(mut page_to_raster: SkTransform) -> SkTransform {
+  // A GDI+ device pixel is centered on its integer coordinate.  Its 8x4 box
+  // therefore spans samples [-4..3] x [-2..1] in the high-resolution storage
+  // grid, while a conventional array block spans [0..7] x [0..3].
+  page_to_raster.tx += OFFICE_ANTIALIAS_8X4_HORIZONTAL_SAMPLES as f32 * 0.5;
+  page_to_raster.ty += OFFICE_ANTIALIAS_8X4_VERTICAL_SAMPLES as f32 * 0.5;
+  page_to_raster
+}
+
+fn office_8x4_sample_transform(mut page_to_raster: SkTransform) -> SkTransform {
+  page_to_raster = office_8x4_storage_transform(page_to_raster);
+  // tiny-skia shades storage pixels at their centers; the extra half sample
+  // evaluates paint at the integer-coordinate GDI+ sample represented there.
+  page_to_raster.tx += 0.5;
+  page_to_raster.ty += 0.5;
+  page_to_raster
+}
+
+fn paint_sample_mask(
+  pixmap: &mut Pixmap,
+  mask: &Mask,
+  mut paint: Paint<'_>,
+  page_to_raster: SkTransform,
+) -> Option<()> {
+  paint.anti_alias = false;
+  paint.shader.transform(page_to_raster);
+  let rect = SkRect::from_xywh(0.0, 0.0, pixmap.width() as f32, pixmap.height() as f32)?;
+  pixmap.fill_rect(rect, &paint, SkTransform::identity(), Some(mask));
+  Some(())
+}
+
+fn draw_office_8x4_fill(
+  pixmap: &mut Pixmap,
+  path: &Path,
+  fill: &Fill<'static>,
+  bounds: Rect,
+  commands: Option<&[PathCommand]>,
+  page_to_raster: SkTransform,
+) -> Option<()> {
+  if matches!(fill, Fill::None) {
+    return Some(());
+  }
+  let mask = office_8x4_sample_mask(pixmap, path, FillRule::EvenOdd, page_to_raster)?;
+  paint_fill_mask(
+    pixmap,
+    &mask,
+    fill,
+    bounds,
+    commands,
+    office_8x4_sample_transform(page_to_raster),
+  )
+}
+
+fn direct2d_four_sample_mask(
+  pixmap: &Pixmap,
+  path: &Path,
+  fill_rule: FillRule,
+  page_to_raster: SkTransform,
+) -> Option<Mask> {
+  let transformed = path.clone().transform(page_to_raster)?;
+  super::drawingml_direct2d_raster::standard_four_sample_mask(
+    &tiny_path_as_kurbo(&transformed),
+    pixmap.width(),
+    pixmap.height(),
+    fill_rule,
+  )
+}
+
+fn paint_fill_mask(
+  pixmap: &mut Pixmap,
+  mask: &Mask,
+  fill: &Fill<'static>,
+  bounds: Rect,
+  commands: Option<&[PathCommand]>,
+  page_to_raster: SkTransform,
+) -> Option<()> {
+  match fill {
+    Fill::None => Some(()),
+    Fill::Solid(color) => paint_sample_mask(pixmap, mask, solid_paint(*color), page_to_raster),
+    Fill::Gradient(gradient) if gradient.path.is_none() => paint_sample_mask(
+      pixmap,
+      mask,
+      linear_gradient_paint(gradient, bounds)?,
+      page_to_raster,
+    ),
+    Fill::Gradient(gradient) => {
+      composite_path_gradient_byte_mask(pixmap, mask, gradient, commands, page_to_raster)
+    }
+    Fill::Pattern(pattern) => {
+      let tile = pattern_tile(*pattern, page_to_raster.sx)?;
+      let paint = Paint {
+        shader: Pattern::new(
+          tile.as_ref(),
+          SpreadMode::Repeat,
+          FilterQuality::Nearest,
+          1.0,
+          SkTransform::from_translate(
+            pattern_origin(bounds.origin.x.0, pattern.tile_size_points()),
+            pattern_origin(bounds.origin.y.0, pattern.tile_size_points()),
+          ),
+        ),
+        ..Paint::default()
+      };
+      paint_sample_mask(pixmap, mask, paint, page_to_raster)
+    }
+    Fill::Theme(_) | Fill::Image { .. } => None,
+  }
+}
+
 fn draw_path_gradient(
   pixmap: &mut Pixmap,
   clip_path: &Path,
@@ -2140,6 +3543,31 @@ fn composite_path_gradient_mask(
   gradient: &GradientFill<'static>,
   commands: Option<&[PathCommand]>,
   page_to_raster: SkTransform,
+) -> Option<()> {
+  composite_path_gradient_with_alpha(pixmap, gradient, commands, page_to_raster, |x, y| {
+    mask.pixel(x, y).map(|pixel| pixel.alpha())
+  })
+}
+
+fn composite_path_gradient_byte_mask(
+  pixmap: &mut Pixmap,
+  mask: &Mask,
+  gradient: &GradientFill<'static>,
+  commands: Option<&[PathCommand]>,
+  page_to_raster: SkTransform,
+) -> Option<()> {
+  let width = mask.width() as usize;
+  composite_path_gradient_with_alpha(pixmap, gradient, commands, page_to_raster, |x, y| {
+    mask.data().get(y as usize * width + x as usize).copied()
+  })
+}
+
+fn composite_path_gradient_with_alpha(
+  pixmap: &mut Pixmap,
+  gradient: &GradientFill<'static>,
+  commands: Option<&[PathCommand]>,
+  page_to_raster: SkTransform,
+  mut mask_alpha_at: impl FnMut(u32, u32) -> Option<u8>,
 ) -> Option<()> {
   let gradient_path = gradient.path?;
   if gradient.stops.is_empty() {
@@ -2166,7 +3594,7 @@ fn composite_path_gradient_mask(
   let raster_to_page = page_to_raster.invert()?;
   for y in 0..pixmap.height() {
     for x in 0..pixmap.width() {
-      let mask_alpha = mask.pixel(x, y)?.alpha();
+      let mask_alpha = mask_alpha_at(x, y)?;
       if mask_alpha == 0 {
         continue;
       }
@@ -2201,37 +3629,28 @@ fn draw_stroke(
   bounds: Rect,
   commands: Option<&[PathCommand]>,
   page_to_raster: SkTransform,
-  anti_alias: bool,
+  antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
+  if antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4
+    && stroke
+      .drawingml_device
+      .as_ref()
+      .is_some_and(|source| source.realized_width_emu.is_some())
+  {
+    return draw_device_stroke(pixmap, path, stroke, bounds, commands, None, page_to_raster);
+  }
   if stroke.width.0 <= 0.0
     || stroke.color.a == 0 && stroke.pattern.is_none() && stroke.gradient.is_none()
   {
     return Some(());
   }
-  let dash = stroke.resolved_dash().and_then(|values| {
-    StrokeDash::new(
-      values.into_iter().map(|value| value.0).collect(),
-      stroke.dash_offset.0,
-    )
-  });
-  let sk_stroke = SkStroke {
-    width: stroke.width.0,
-    miter_limit: match stroke.join {
-      Some(super::StrokeJoin::Miter { limit: Some(limit) }) => limit,
-      _ => SkStroke::default().miter_limit,
-    },
-    line_cap: match stroke.cap {
-      Some(super::StrokeCap::Round) => LineCap::Round,
-      Some(super::StrokeCap::Square) => LineCap::Square,
-      Some(super::StrokeCap::Flat) | None => LineCap::Butt,
-    },
-    line_join: match stroke.join {
-      Some(super::StrokeJoin::Round) => LineJoin::Round,
-      Some(super::StrokeJoin::Bevel) => LineJoin::Bevel,
-      Some(super::StrokeJoin::Miter { .. }) | None => LineJoin::Miter,
-    },
-    dash,
-  };
+  let sk_stroke = resolved_sk_stroke(stroke);
+  if antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
+    let expanded = expanded_stroke_path(path, &sk_stroke, page_to_raster)?;
+    let mask = direct2d_four_sample_mask(pixmap, &expanded, FillRule::Winding, page_to_raster)?;
+    return paint_stroke_mask(pixmap, &mask, stroke, bounds, commands, page_to_raster);
+  }
+  let anti_alias = antialiasing.enabled();
   if let Some(gradient) = stroke.gradient.as_ref() {
     if gradient.path.is_some() {
       let mut mask = Pixmap::new(pixmap.width(), pixmap.height())?;
@@ -2266,6 +3685,184 @@ fn draw_stroke(
     let mut paint = solid_paint(stroke.color);
     paint.anti_alias = anti_alias;
     pixmap.stroke_path(path, &paint, &sk_stroke, page_to_raster, None);
+  }
+  Some(())
+}
+
+/// Widen in the original pen frame, resolve its mask on the device lattice,
+/// then paint in the original page frame. This retains anisotropic pens
+/// without moving gradients/patterns or inferring a shape axis from its path.
+fn draw_device_stroke(
+  pixmap: &mut Pixmap,
+  path: &Path,
+  stroke: &Stroke<'static>,
+  bounds: Rect,
+  commands: Option<&[PathCommand]>,
+  item: Option<&PathItem<'static>>,
+  page_to_raster: SkTransform,
+) -> Option<()> {
+  if stroke.color.a == 0 && stroke.pattern.is_none() && stroke.gradient.is_none() {
+    return Some(());
+  }
+  let source = stroke.drawingml_device.as_ref()?;
+  let [a, b, c, d] = source.emu_to_points.map(|value| value * 12_700.0);
+  let local_to_page = Affine::new([a, b, c, d, 0.0, 0.0]);
+  if local_to_page.determinant() == 0.0 || !local_to_page.is_finite() {
+    return None;
+  }
+  let page_to_local = local_to_page.inverse();
+  let local_to_raster = page_to_raster.pre_concat(SkTransform::from_row(
+    a as f32, b as f32, c as f32, d as f32, 0.0, 0.0,
+  ));
+  let mut realized = stroke.clone();
+  // The native paint object stores the helper's result in f32 EMUs before
+  // widening. Preserve that boundary before converting to local point units.
+  realized.width = super::Pt(source.realized_width_emu? as f32 / 12_700.0);
+  realized.drawingml_device = None;
+  let local_commands = super::drawingml_geometry::path_elements_to_commands(
+    (page_to_local * tiny_path_as_kurbo(path)).iter(),
+  );
+  let local_path = path_from_commands(&local_commands, &[], false)?;
+  let local_item = item.map(|item| {
+    let mut local = item.clone();
+    local.commands =
+      super::drawingml_geometry::transform_commands(item.commands.clone(), page_to_local);
+    local.points = item
+      .points
+      .iter()
+      .map(|point| super::drawingml_geometry::transform_point(*point, page_to_local))
+      .collect();
+    local.stroke = Some(realized.clone());
+    local
+  });
+  let shortened = local_item
+    .as_ref()
+    .and_then(|item| shortened_straight_stroke_path(item, &realized));
+  let expanded = expanded_stroke_path(
+    shortened.as_ref().unwrap_or(&local_path),
+    &resolved_sk_stroke(&realized),
+    local_to_raster,
+  )?;
+  let mask = direct2d_four_sample_mask(pixmap, &expanded, FillRule::Winding, local_to_raster)?;
+  paint_stroke_mask(pixmap, &mask, stroke, bounds, commands, page_to_raster)?;
+  if let Some(item) = local_item.as_ref() {
+    draw_stroke_end_markers(
+      pixmap,
+      item,
+      &realized,
+      local_to_raster,
+      RasterPrimitiveAntialiasing::Direct2dStandard4,
+    )?;
+  }
+  Some(())
+}
+
+fn resolved_sk_stroke(stroke: &Stroke<'static>) -> SkStroke {
+  let dash = stroke.resolved_dash().and_then(|values| {
+    StrokeDash::new(
+      values.into_iter().map(|value| value.0).collect(),
+      stroke.dash_offset.0,
+    )
+  });
+  SkStroke {
+    width: stroke.width.0,
+    miter_limit: match stroke.join {
+      Some(super::StrokeJoin::Miter { limit: Some(limit) }) => limit,
+      _ => SkStroke::default().miter_limit,
+    },
+    line_cap: match stroke.cap {
+      Some(super::StrokeCap::Round) => LineCap::Round,
+      Some(super::StrokeCap::Square) => LineCap::Square,
+      Some(super::StrokeCap::Flat) | None => LineCap::Butt,
+    },
+    line_join: match stroke.join {
+      Some(super::StrokeJoin::Round) => LineJoin::Round,
+      Some(super::StrokeJoin::Bevel) => LineJoin::Bevel,
+      Some(super::StrokeJoin::Miter { .. }) | None => LineJoin::Miter,
+    },
+    dash,
+  }
+}
+
+fn expanded_stroke_path(
+  path: &Path,
+  stroke: &SkStroke,
+  page_to_raster: SkTransform,
+) -> Option<Path> {
+  let resolution_scale = PathStroker::compute_resolution_scale(&page_to_raster);
+  let dashed;
+  let centerline = if let Some(dash) = stroke.dash.as_ref() {
+    dashed = path.dash(dash, resolution_scale)?;
+    &dashed
+  } else {
+    path
+  };
+  PathStroker::new().stroke(centerline, stroke, resolution_scale)
+}
+
+fn draw_office_8x4_stroke(
+  pixmap: &mut Pixmap,
+  path: &Path,
+  stroke: &Stroke<'static>,
+  bounds: Rect,
+  commands: Option<&[PathCommand]>,
+  page_to_raster: SkTransform,
+) -> Option<()> {
+  if stroke.width.0 <= 0.0
+    || stroke.color.a == 0 && stroke.pattern.is_none() && stroke.gradient.is_none()
+  {
+    return Some(());
+  }
+  let sk_stroke = resolved_sk_stroke(stroke);
+  let stroked_path = expanded_stroke_path(path, &sk_stroke, page_to_raster)?;
+  let mask = office_8x4_sample_mask(pixmap, &stroked_path, FillRule::Winding, page_to_raster)?;
+  paint_stroke_mask(
+    pixmap,
+    &mask,
+    stroke,
+    bounds,
+    commands,
+    office_8x4_sample_transform(page_to_raster),
+  )
+}
+
+fn paint_stroke_mask(
+  pixmap: &mut Pixmap,
+  mask: &Mask,
+  stroke: &Stroke<'static>,
+  bounds: Rect,
+  commands: Option<&[PathCommand]>,
+  page_to_raster: SkTransform,
+) -> Option<()> {
+  if let Some(gradient) = stroke.gradient.as_ref() {
+    if gradient.path.is_some() {
+      composite_path_gradient_byte_mask(pixmap, mask, gradient, commands, page_to_raster)?;
+    } else {
+      paint_sample_mask(
+        pixmap,
+        mask,
+        linear_gradient_paint(gradient, bounds)?,
+        page_to_raster,
+      )?;
+    }
+  } else if let Some(pattern) = stroke.pattern {
+    let tile = pattern_tile(pattern, page_to_raster.sx)?;
+    let paint = Paint {
+      shader: Pattern::new(
+        tile.as_ref(),
+        SpreadMode::Repeat,
+        FilterQuality::Nearest,
+        1.0,
+        SkTransform::from_translate(
+          pattern_origin(bounds.origin.x.0, pattern.tile_size_points()),
+          pattern_origin(bounds.origin.y.0, pattern.tile_size_points()),
+        ),
+      ),
+      ..Paint::default()
+    };
+    paint_sample_mask(pixmap, mask, paint, page_to_raster)?;
+  } else {
+    paint_sample_mask(pixmap, mask, solid_paint(stroke.color), page_to_raster)?;
   }
   Some(())
 }
@@ -2377,32 +3974,108 @@ fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
+  #[test]
+  fn material_texture_resolves_each_paint_before_source_over() {
+    let mut result = tiny_skia::Pixmap::new(1, 2).unwrap();
+    let mut samples = tiny_skia::Pixmap::new(8, 4).unwrap();
+    // Half-covered opaque fill, then the same half-covered 60%-opaque
+    // outline. Correlated sample composition would incorrectly give 128.
+    for pixel in samples.data_mut()[..16 * 4].chunks_exact_mut(4) {
+      pixel.copy_from_slice(&[128, 64, 32, 255]);
+    }
+    super::composite_material_sample_band(&mut result, &samples, 1);
+    assert_eq!(result.pixel(0, 1).unwrap().alpha(), 128);
+    for pixel in samples.data_mut()[..16 * 4].chunks_exact_mut(4) {
+      pixel.copy_from_slice(&[120, 60, 12, 153]);
+    }
+    super::composite_material_sample_band(&mut result, &samples, 1);
+    assert_eq!(result.pixel(0, 1).unwrap().alpha(), 166);
+    assert_eq!(result.pixel(0, 0).unwrap().alpha(), 0);
+  }
+
   use super::{
     MAX_EFFECT_RASTER_PIXELS, PageToRasterMapping, RasterPrimitiveAntialiasing, RasterSourceExtent,
     SourceLayer, WordShapeEffectSourceProfile, bounded_effect_raster_grid,
-    collect_source_layer_item, effect_pixels_per_point_with_max,
-    office_simple_glow_pixels_per_point, raster_pixel_extent, rasterize_group_items_for_effects,
+    collect_source_layer_item, effect_pixels_per_point_with_max, office_8x4_sample_mask,
+    office_simple_glow_pixels_per_point, place_drawing_raster_on_transparent_surface,
+    raster_pixel_extent, rasterize_group_items_for_effects,
     rasterize_group_items_for_effects_at_pixels_per_point,
     rasterize_group_items_for_effects_at_pixels_per_point_with_extent, rasterize_vector_items,
     rasterize_vector_items_for_effects,
+    rasterize_vector_items_for_effects_as_local_source_at_pixels_per_point_with_antialiasing,
     rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing,
+    rasterize_vector_items_for_effects_via_dpi_compensated_source_surface,
     rasterize_vector_items_for_effects_with_mapping,
     rasterize_word_shape_effect_source_via_base_surface,
-    resize_inclusive_far_edge_premultiplied_linear,
+    resize_inclusive_far_edge_premultiplied_linear, resolve_box_filtered_rgba,
+    resolve_text_raster_fill, static_3d_text_outline_material_inset_px, text_outline_material_item,
   };
   use bytes::Bytes;
   use image::codecs::png::PngEncoder;
   use image::{ColorType, ImageEncoder, Rgba, RgbaImage};
   use std::borrow::Cow;
   use std::sync::Arc;
+  use tiny_skia::{FillRule as SkFillRule, PathBuilder as SkPathBuilder, Pixmap as SkPixmap};
+
+  #[test]
+  fn native_source_rejects_unbounded_group_coordinates_before_allocation() {
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Tree,
+      effects: vec![ImageEffect::Identity],
+    };
+    for (width, height) in [(2_143_141.5, 1_428_761.4), (f32::INFINITY, 100.0)] {
+      assert!(
+        super::rasterize_vector_items_for_effects_via_source_surface(
+          &[],
+          &effects,
+          super::RasterSourceSurface {
+            bounds: rect(0.0, 0.0, width, height),
+            dpi: 600.0,
+            extent: RasterSourceExtent::Outward,
+            text_hinting: None,
+            primitive_antialiasing: RasterPrimitiveAntialiasing::Direct2dStandard4,
+          },
+          super::RasterTargetSurface {
+            width_px: 468,
+            height_px: 312,
+            filter: super::RasterResolveFilter::Native,
+          },
+        )
+        .is_none()
+      );
+    }
+  }
+
+  #[test]
+  fn pixmap_transfer_matches_png_roundtrip_for_every_alpha_and_channel_value() {
+    let mut pixmap = SkPixmap::new(256, 256).unwrap();
+    for alpha in 0..=255u8 {
+      for channel in 0..=255u8 {
+        pixmap.pixels_mut()[usize::from(alpha) * 256 + usize::from(channel)] =
+          tiny_skia::PremultipliedColorU8::from_rgba(
+            channel.min(alpha),
+            (255 - channel).min(alpha),
+            channel.rotate_left(3).min(alpha),
+            alpha,
+          )
+          .unwrap();
+      }
+    }
+    let png = pixmap.encode_png().unwrap();
+    let expected = image::load_from_memory(&png).unwrap().to_rgba8();
+    let original_buffer = pixmap.data().as_ptr();
+    let actual = super::pixmap_into_rgba(pixmap).unwrap();
+    assert_eq!(actual.as_raw().as_ptr(), original_buffer);
+    assert_eq!(actual, expected);
+  }
 
   use crate::common::drawingml_image_effects::{
     ImageEffect, ImageEffectContainer, ImageEffectContainerKind, ImageEffectSourceReference,
   };
   use crate::common::{
-    Color, DisplayItem, Fill, GradientFill, GradientPath, GradientPathKind, GradientStop,
-    ImageCrop, ImageItem, PathCommand, PathItem, PdfGlyphOutlineOptions, Point, Pt, Rect, RectItem,
-    RelativeRect, Size, Stroke, TextRun, TextStyle, Transform,
+    Color, DisplayItem, Fill, GradientFill, GradientPath, GradientPathContext, GradientPathKind,
+    GradientStop, ImageCrop, ImageItem, PathCommand, PathItem, PdfGlyphOutlineOptions, Point, Pt,
+    Rect, RectItem, RelativeRect, Size, Stroke, StrokeAlignment, TextRun, TextStyle, Transform,
   };
 
   fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
@@ -2413,6 +4086,40 @@ mod tests {
         height: Pt(height),
       },
     }
+  }
+
+  #[test]
+  fn text_raster_fill_uses_word_focus_and_farthest_container_corner() {
+    let bounds = rect(20.0, 30.0, 100.0, 50.0);
+    let mut fill = Fill::Gradient(GradientFill {
+      path: Some(GradientPath {
+        kind: GradientPathKind::Circle,
+        context: GradientPathContext::WordprocessingText,
+        fill_to: RelativeRect {
+          left: 0.5,
+          top: 1.3,
+          right: 0.5,
+          bottom: -0.3,
+        },
+        transform: Transform::default(),
+        mirror_tile: false,
+      }),
+      ..Default::default()
+    });
+
+    resolve_text_raster_fill(&mut fill, bounds);
+
+    let Fill::Gradient(gradient) = fill else {
+      unreachable!();
+    };
+    let path = gradient.path.unwrap();
+    let radius = 65.0_f32.hypot(50.0);
+    assert_eq!(gradient.definition_bounds, Some(bounds));
+    assert_eq!(path.fill_to.left, 0.5);
+    assert_eq!(path.fill_to.top, 0.5);
+    assert!((path.transform.m11 - radius * 2.0).abs() < 1.0e-4);
+    assert!((path.transform.dx.0 + radius - 70.0).abs() < 1.0e-4);
+    assert!((path.transform.dy.0 + radius - 95.0).abs() < 1.0e-4);
   }
 
   #[test]
@@ -2477,6 +4184,201 @@ mod tests {
   }
 
   #[test]
+  fn device_stroke_source_consumer_matches_office_width_plateaus() {
+    for (width_emu, row_mass) in [
+      (0, 383),
+      (1270, 383),
+      (3810, 637),
+      (9525, 2041),
+      (19050, 4207),
+    ] {
+      let mut items = vec![DisplayItem::Path(PathItem {
+        bounds: rect(1.2, 0.0, 4.8, 4.8),
+        points: vec![
+          super::super::Point {
+            x: Pt(1.2),
+            y: Pt(0.0),
+          },
+          super::super::Point {
+            x: Pt(6.0),
+            y: Pt(4.8),
+          },
+        ],
+        stroke: Some(Stroke {
+          width: Pt(width_emu as f32 / 12_700.0),
+          color: Color {
+            a: 255,
+            ..Default::default()
+          },
+          drawingml_device: Some(Box::new(super::super::DrawingMlDeviceStroke {
+            width_emu,
+            emu_to_points: [0.0, 1.0 / 12_700.0, 1.0 / 12_700.0, 0.0],
+            snap: true,
+            realized_width_emu: None,
+          })),
+          ..Default::default()
+        }),
+        ..Default::default()
+      })];
+      super::realize_source_device_strokes(&mut items, 600.0).unwrap();
+      let image = super::rasterize_vector_items_at_mapping(
+        &items,
+        PageToRasterMapping {
+          width_px: 64,
+          height_px: 40,
+          scale_x: 600.0 / 72.0,
+          scale_y: 600.0 / 72.0,
+          translate_x: 0.0,
+          translate_y: 0.0,
+          text_hinting: None,
+        },
+        RasterPrimitiveAntialiasing::Direct2dStandard4,
+      )
+      .unwrap();
+      assert_eq!(
+        (0..64)
+          .map(|x| u32::from(image.get_pixel(x, 20)[3]))
+          .sum::<u32>(),
+        row_mass,
+        "width {width_emu} EMU"
+      );
+    }
+  }
+
+  #[test]
+  fn direct2d_four_sample_resolves_each_path_before_compositing() {
+    let item = DisplayItem::Rect(RectItem {
+      bounds: rect(0.0, 0.0, 0.5, 1.0),
+      fill: Fill::Solid(Color {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+      }),
+      stroke: None,
+    });
+    let mapping = PageToRasterMapping {
+      width_px: 1,
+      height_px: 1,
+      scale_x: 1.0,
+      scale_y: 1.0,
+      translate_x: 0.0,
+      translate_y: 0.0,
+      text_hinting: None,
+    };
+    let single = super::rasterize_vector_items_at_mapping(
+      std::slice::from_ref(&item),
+      mapping,
+      RasterPrimitiveAntialiasing::Direct2dStandard4,
+    )
+    .unwrap();
+    let repeated = super::rasterize_vector_items_at_mapping(
+      &[item.clone(), item],
+      mapping,
+      RasterPrimitiveAntialiasing::Direct2dStandard4,
+    )
+    .unwrap();
+    assert_eq!(single.get_pixel(0, 0)[3], 128);
+    // Once-per-scene sample resolve would incorrectly remain 128.
+    assert_eq!(repeated.get_pixel(0, 0)[3], 192);
+  }
+
+  #[test]
+  fn exact_mapping_raster_preserves_axis_scales_origin_and_sample_policy() {
+    let item = DisplayItem::Rect(RectItem {
+      bounds: rect(2.0, 3.0, 4.0, 5.0),
+      fill: Fill::Solid(Color {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+      }),
+      stroke: None,
+    });
+    for (scale_x, scale_y) in [(2.0, 3.0), (3.0, 2.0)] {
+      for antialiasing in [
+        RasterPrimitiveAntialiasing::Aliased,
+        RasterPrimitiveAntialiasing::PerPrimitive,
+        RasterPrimitiveAntialiasing::Direct2dStandard4,
+        RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+      ] {
+        let mapping = PageToRasterMapping {
+          width_px: 32,
+          height_px: 32,
+          scale_x,
+          scale_y,
+          translate_x: 1.0,
+          translate_y: 2.0,
+          text_hinting: None,
+        };
+        let image = super::rasterize_vector_items_at_mapping(
+          std::slice::from_ref(&item),
+          mapping,
+          antialiasing,
+        )
+        .unwrap();
+        for (x, y, pixel) in image.enumerate_pixels() {
+          let inside = (1.0 + 2.0 * scale_x..1.0 + 6.0 * scale_x).contains(&(x as f32))
+            && (2.0 + 3.0 * scale_y..2.0 + 8.0 * scale_y).contains(&(y as f32));
+          assert_eq!(pixel[3], if inside { 255 } else { 0 }, "{x},{y}");
+        }
+      }
+    }
+    let valid = PageToRasterMapping {
+      width_px: 32,
+      height_px: 32,
+      scale_x: 2.0,
+      scale_y: 3.0,
+      translate_x: 1.0,
+      translate_y: 2.0,
+      text_hinting: None,
+    };
+    for invalid in [
+      PageToRasterMapping {
+        width_px: 0,
+        ..valid
+      },
+      PageToRasterMapping {
+        height_px: 0,
+        ..valid
+      },
+      PageToRasterMapping {
+        scale_x: 0.0,
+        ..valid
+      },
+      PageToRasterMapping {
+        scale_y: -1.0,
+        ..valid
+      },
+      PageToRasterMapping {
+        scale_x: f32::NAN,
+        ..valid
+      },
+      PageToRasterMapping {
+        scale_y: f32::INFINITY,
+        ..valid
+      },
+      PageToRasterMapping {
+        translate_x: f32::NAN,
+        ..valid
+      },
+      PageToRasterMapping {
+        translate_y: f32::INFINITY,
+        ..valid
+      },
+    ] {
+      assert!(
+        super::rasterize_vector_items_at_mapping(
+          std::slice::from_ref(&item),
+          invalid,
+          RasterPrimitiveAntialiasing::Aliased,
+        )
+        .is_none()
+      );
+    }
+  }
+
+  #[test]
   fn aliased_effect_source_uses_pixel_center_and_excludes_the_far_edge() {
     let surface = rect(188.4, 116.16, 292.98, 52.02);
     let item = DisplayItem::Rect(RectItem {
@@ -2515,6 +4417,62 @@ mod tests {
       ],
       [0, 51, 51, 0]
     );
+  }
+
+  #[test]
+  fn local_effect_source_is_independent_of_page_translation() {
+    let pixels_per_point = 200.0 / 72.0;
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+    let raster = |dx: f32, dy: f32| {
+      let source = rect(10.13 + dx, 20.17 + dy, 4.2, 3.3);
+      let display = rect(10.01 + dx, 20.05 + dy, 4.44, 3.54);
+      let item = DisplayItem::Rect(RectItem {
+        bounds: source,
+        fill: Fill::Solid(Color {
+          r: 240,
+          g: 80,
+          b: 20,
+          a: 255,
+        }),
+        stroke: None,
+      });
+      rasterize_vector_items_for_effects_as_local_source_at_pixels_per_point_with_antialiasing(
+        &[item],
+        source,
+        display,
+        &effects,
+        pixels_per_point,
+        RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+      )
+      .unwrap()
+      .image
+    };
+
+    assert_eq!(raster(0.0, 0.0), raster(0.12, 0.24));
+  }
+
+  #[test]
+  fn local_effect_source_padding_leaves_odd_terminal_pixel_on_far_edge() {
+    let source = RgbaImage::from_pixel(2, 2, Rgba([10, 20, 30, 40]));
+    let raster = super::DrawingRaster {
+      image: source.clone(),
+      fill_image: Some(source),
+      line_image: None,
+      fill_line_image: None,
+      children_image: None,
+      pixels_per_point: 1.0,
+    };
+
+    let padded = place_drawing_raster_on_transparent_surface(raster, 5, 4, 1, 1).unwrap();
+
+    assert_eq!(padded.image.get_pixel(0, 1), &Rgba([0, 0, 0, 0]));
+    assert_eq!(padded.image.get_pixel(1, 1), &Rgba([10, 20, 30, 40]));
+    assert_eq!(padded.image.get_pixel(2, 2), &Rgba([10, 20, 30, 40]));
+    assert_eq!(padded.image.get_pixel(3, 2), &Rgba([0, 0, 0, 0]));
+    assert_eq!(padded.fill_image.as_ref().unwrap(), &padded.image);
   }
 
   #[test]
@@ -2576,6 +4534,98 @@ mod tests {
 
     assert_eq!(resized.get_pixel(0, 0)[3], 40);
     assert_eq!(resized.get_pixel(1, 0)[3], 184);
+  }
+
+  #[test]
+  fn dpi_compensated_effect_source_preserves_physical_pixel_center_mapping() {
+    let bounds = rect(0.0, 0.0, 2.0, 1.0);
+    let item = DisplayItem::Rect(RectItem {
+      bounds: rect(0.25, 0.0, 1.0, 1.0),
+      fill: Fill::Solid(Color {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+      }),
+      stroke: None,
+    });
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+
+    let source =
+      rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing(
+        std::slice::from_ref(&item),
+        bounds,
+        &effects,
+        2.0,
+        RasterSourceExtent::Outward,
+        RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+      )
+      .unwrap();
+    let expected = crate::common::drawingml_image_effects::dpi_compensate_linear_hard(
+      &source.image,
+      2.0,
+      1.0,
+      2,
+      1,
+    )
+    .unwrap();
+    let resolved = rasterize_vector_items_for_effects_via_dpi_compensated_source_surface(
+      &[item],
+      bounds,
+      &effects,
+      2.0,
+      1.0,
+      RasterSourceExtent::Outward,
+      RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+    )
+    .unwrap();
+
+    assert_eq!(resolved.image, expected);
+    assert_eq!(resolved.image.dimensions(), (2, 1));
+    assert!((resolved.pixels_per_point - 1.0).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn horizontal_box_resolve_averages_in_premultiplied_color_space() {
+    let source = RgbaImage::from_raw(
+      4,
+      1,
+      vec![255, 0, 0, 255, 0, 255, 0, 0, 255, 0, 0, 64, 0, 0, 255, 192],
+    )
+    .unwrap();
+
+    let resolved = resolve_box_filtered_rgba(&source, 2, 1, 2, 1);
+
+    assert_eq!(resolved.get_pixel(0, 0), &Rgba([255, 0, 0, 128]));
+    assert_eq!(resolved.get_pixel(1, 0), &Rgba([64, 0, 191, 128]));
+  }
+
+  #[test]
+  fn office_8x4_samples_include_near_grid_edges_and_exclude_far_edges() {
+    let mut builder = SkPathBuilder::new();
+    builder.move_to(-4.0, -2.0);
+    builder.line_to(4.0, -2.0);
+    builder.line_to(4.0, 2.0);
+    builder.line_to(-4.0, 2.0);
+    builder.close();
+    let path = builder.finish().unwrap();
+    let pixmap = SkPixmap::new(10, 6).unwrap();
+
+    let mask = office_8x4_sample_mask(
+      &pixmap,
+      &path,
+      SkFillRule::EvenOdd,
+      tiny_skia::Transform::identity(),
+    )
+    .unwrap();
+
+    assert_eq!(mask.data()[0], 255);
+    assert_eq!(mask.data()[3 * 10 + 7], 255);
+    assert_eq!(mask.data()[8], 0);
+    assert_eq!(mask.data()[4 * 10], 0);
   }
 
   #[test]
@@ -2697,6 +4747,8 @@ mod tests {
       a: 180,
     };
     let style = TextStyle {
+      font_family: Some("Liberation Serif".into()),
+      font_size: Pt(12.0),
       outline_color: Some(outline_color),
       outline_width: Pt(2.0),
       pdf_glyph_outline_options: Some(Arc::new(PdfGlyphOutlineOptions {
@@ -2746,6 +4798,158 @@ mod tests {
     assert_eq!(fill_options.outline_fill, None);
     assert_eq!(fill_options.outline_stroke, None);
 
+    let DisplayItem::Text(authored) = &item else {
+      unreachable!()
+    };
+    for width in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+      assert!(
+        super::static_3d_text_reflection_contour_item(authored, Pt(width), outline_color).is_none()
+      );
+    }
+    for width in [0.5, 1.0, 2.0] {
+      for alpha in [0, 64, 255] {
+        let color = Color {
+          a: alpha,
+          ..outline_color
+        };
+        let contour = super::static_3d_text_reflection_contour_item(authored, Pt(width), color);
+        if alpha == 0 {
+          assert!(contour.is_none());
+          continue;
+        }
+        let contour = contour.unwrap();
+        assert_eq!(contour.origin, authored.origin);
+        assert_eq!(contour.text, authored.text);
+        let options = contour.style.pdf_glyph_outline_options.as_ref().unwrap();
+        assert_eq!(options.fill, Some(Fill::None));
+        assert_eq!(options.outline_fill, Some(Fill::Solid(color)));
+        let stroke = options.outline_stroke.as_ref().unwrap();
+        assert_eq!(stroke.width, Pt(width));
+        assert_eq!(stroke.color, color);
+        assert_eq!(
+          stroke.alignment,
+          Some(super::super::StrokeAlignment::Center)
+        );
+        assert_eq!(stroke.join, Some(super::super::StrokeJoin::Round));
+      }
+    }
+    for width in [0.0, 0.5, 1.0, 2.0] {
+      let caster = super::opaque_static_3d_text_effect_item(authored, Pt(width), 255).unwrap();
+      assert_eq!(caster.style.outline_width, Pt(width));
+      assert_eq!(caster.origin, authored.origin);
+      assert_eq!(caster.text, authored.text);
+      let options = caster.style.pdf_glyph_outline_options.as_ref().unwrap();
+      assert_eq!(options.fill, Some(Fill::Solid(fill_color)));
+      if width == 0.0 {
+        assert!(options.outline_stroke.is_none());
+      } else {
+        let stroke = options.outline_stroke.as_ref().unwrap();
+        assert_eq!(stroke.color.a, 255);
+        assert_eq!(stroke.join, Some(super::super::StrokeJoin::Round));
+        assert_eq!(stroke.width, Pt(width));
+      }
+    }
+    let mut translucent = authored.clone();
+    for fill in [Fill::None, Fill::Solid(outline_color)] {
+      let options = Arc::make_mut(
+        translucent
+          .style
+          .pdf_glyph_outline_options
+          .as_mut()
+          .unwrap(),
+      );
+      options.fill = Some(fill);
+      // Non-opaque ownership is not inferred from the opaque caster rule.
+      assert!(super::opaque_static_3d_text_effect_item(&translucent, Pt(1.0), 255).is_none());
+    }
+    assert!(super::opaque_static_3d_text_effect_item(authored, Pt(f32::NAN), 255).is_none());
+    // Independent construction must not modify the original character paint.
+    assert_eq!(authored.style.outline_width, Pt(2.0));
+    assert_eq!(authored.style.outline_color, Some(outline_color));
+
+    // The reflected raw-glyph interior must never acquire contour colour,
+    // including through a translucent character outline. Check the partition
+    // on aliased samples so coverage interpolation cannot hide an overlap.
+    let reflection_bounds = rect(-3.0, -3.0, 84.0, 24.0);
+    for (scale_x, scale_y) in [(4.0, 4.0), (2.0, 5.0), (5.0, 2.0)] {
+      let mapping = PageToRasterMapping {
+        width_px: (84.0 * scale_x) as u32,
+        height_px: (24.0 * scale_y) as u32,
+        scale_x,
+        scale_y,
+        translate_x: -reflection_bounds.origin.x.0 * scale_x,
+        translate_y: -reflection_bounds.origin.y.0 * scale_y,
+        text_hinting: None,
+      };
+      // Use the source's same clipping bands for this ownership oracle.
+      // A whole-canvas scan is not a pixel-exact oracle for a clipped scan:
+      // the scanner can split curves differently at the band boundary.
+      // This checks material/contour ownership, not band-size invariance.
+      let mut glyph = RgbaImage::new(mapping.width_px, mapping.height_px);
+      for top in (0..mapping.height_px).step_by(64) {
+        let band = super::rasterize_vector_items_at_mapping(
+          &[DisplayItem::Text(super::text_fill_material_item(authored))],
+          PageToRasterMapping {
+            height_px: (mapping.height_px - top).min(64),
+            translate_y: mapping.translate_y - top as f32,
+            ..mapping
+          },
+          RasterPrimitiveAntialiasing::Aliased,
+        )
+        .unwrap();
+        image::imageops::replace(&mut glyph, &band, 0, i64::from(top));
+      }
+      for width in [0.0, 0.5, 1.0, 2.0] {
+        let make = |value| {
+          super::rasterize_static_3d_text_reflection_source_with_mapping(
+            authored,
+            mapping,
+            Pt(width),
+            Color {
+              r: value,
+              g: value,
+              b: value,
+              a: 255,
+            },
+            super::RasterPrimitiveAntialiasing::Aliased,
+          )
+          .unwrap()
+        };
+        let black = make(0);
+        let white = make(255);
+        let mut exterior_response = 0;
+        for (index, ((b, w), g)) in black
+          .pixels()
+          .zip(white.pixels())
+          .zip(glyph.pixels())
+          .enumerate()
+        {
+          assert_eq!(b.0[3], w.0[3]);
+          if g.0[3] != 0 {
+            assert_eq!(
+              b,
+              w,
+              "contour must not recolor the raw glyph interior: scale={scale_x},{scale_y}, width={width}, pixel={},{}",
+              index as u32 % glyph.width(),
+              index as u32 / glyph.width()
+            );
+          } else if width == 0.0 {
+            assert_eq!(
+              b.0[3], 0,
+              "character material cannot grow outside its solid"
+            );
+          } else if b != w {
+            exterior_response += 1;
+          }
+        }
+        if width == 0.0 {
+          assert_eq!(black, white);
+        } else {
+          assert!(exterior_response > 0);
+        }
+      }
+    }
+
     let mut line_layer = Vec::new();
     collect_source_layer_item(&item, SourceLayer::Line, &mut line_layer).unwrap();
     let DisplayItem::Text(line_text) = &line_layer[0] else {
@@ -2757,6 +4961,232 @@ mod tests {
     assert_eq!(line_options.fill, Some(Fill::None));
     assert_eq!(line_options.outline_fill, Some(Fill::Solid(outline_color)));
     assert!(line_options.outline_stroke.is_some());
+
+    let material = text_outline_material_item(match &item {
+      DisplayItem::Text(text) => text,
+      _ => unreachable!(),
+    })
+    .expect("positive text outline material");
+    assert_eq!(material.style.outline_color, None);
+    assert_eq!(material.style.outline_width, Pt(0.0));
+    let material_options = material.style.pdf_glyph_outline_options.as_ref().unwrap();
+    assert_eq!(material_options.fill, Some(Fill::Solid(outline_color)));
+    assert_eq!(material_options.outline_fill, None);
+    assert_eq!(material_options.outline_stroke, None);
+
+    let DisplayItem::Text(text) = &item else {
+      unreachable!();
+    };
+    let bounds = rect(-2.0, -2.0, 80.0, 20.0);
+    let coverage =
+      super::rasterize_text_outline_coverage_layer_at_pixels_per_point(text, bounds, 2.0).unwrap();
+    // Coverage is a geometric attribute: authored RGB and partial opacity
+    // must not change it, while a wholly invisible outline has no layer.
+    for alpha in [1, 127, 255] {
+      let mut recolored = text.clone();
+      let options = Arc::make_mut(recolored.style.pdf_glyph_outline_options.as_mut().unwrap());
+      options.outline_fill = Some(Fill::Solid(Color {
+        r: 240,
+        g: 20,
+        b: 90,
+        a: alpha,
+      }));
+      let actual =
+        super::rasterize_text_outline_coverage_layer_at_pixels_per_point(&recolored, bounds, 2.0)
+          .unwrap();
+      assert_eq!(coverage.image, actual.image);
+    }
+    let mut invisible = text.clone();
+    Arc::make_mut(invisible.style.pdf_glyph_outline_options.as_mut().unwrap()).outline_fill =
+      Some(Fill::None);
+    assert!(
+      super::rasterize_text_outline_coverage_layer_at_pixels_per_point(&invisible, bounds, 2.0,)
+        .is_none()
+    );
+    assert!(
+      coverage.image.pixels().any(|pixel| {
+        let alpha = f32::from(pixel[3]);
+        let grid_alpha = (alpha * 16.0 / 255.0).round() * 255.0 / 16.0;
+        (alpha - grid_alpha).abs() > 2.0
+      }),
+      "material coverage must retain more than 4x4 quantized edge levels"
+    );
+  }
+
+  #[test]
+  fn static_3d_text_outline_material_keeps_geometry_and_source_paint_separate() {
+    let outline_color = Color {
+      r: 20,
+      g: 80,
+      b: 220,
+      a: 153,
+    };
+    let mut item = TextRun {
+      text: Cow::Borrowed("III"),
+      origin: Point::default(),
+      line_height: Pt(12.0),
+      line_metrics_participant: true,
+      paint_clip: None,
+      style: TextStyle {
+        outline_color: Some(outline_color),
+        outline_width: Pt(2.0),
+        pdf_glyph_outline_options: Some(Arc::new(PdfGlyphOutlineOptions {
+          outline_fill: Some(Fill::Solid(outline_color)),
+          outline_stroke: Some(Stroke {
+            width: Pt(2.0),
+            color: outline_color,
+            ..Stroke::default()
+          }),
+          ..PdfGlyphOutlineOptions::default()
+        })),
+        ..TextStyle::default()
+      },
+      font_id: None,
+      color: Color::default(),
+      rotation_center: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: false,
+      pdf_text_segmentation: Default::default(),
+      source: None,
+    };
+    let pixels_per_point = 200.0 / 72.0;
+
+    // Paint realization must not alter the input used by physical geometry.
+    // The inset operation follows expansion, not the other way around.
+    for size in [18.0, 24.0, 36.0, 48.0] {
+      for width in [0.0, 0.5, 1.0, 2.0, 4.0, 4.4, 4.6, 5.0, 6.0] {
+        for alignment in [
+          None,
+          Some(StrokeAlignment::Center),
+          Some(StrokeAlignment::Inside),
+        ] {
+          let mut input = item.clone();
+          input.style.font_size = Pt(size);
+          input.style.outline_width = Pt(width);
+          let options = Arc::make_mut(input.style.pdf_glyph_outline_options.as_mut().unwrap());
+          let stroke = options.outline_stroke.as_mut().unwrap();
+          stroke.width = Pt(width);
+          stroke.alignment = alignment;
+          let result = super::text_surface_outline_item(&input);
+          let options = result.style.pdf_glyph_outline_options.as_ref().unwrap();
+          let expanded = if width == 0.0 { 0.0 } else { width + 0.12 };
+          let expected = if alignment == Some(StrokeAlignment::Inside) {
+            2.0 * expanded
+          } else {
+            expanded
+          };
+          assert_eq!(options.fill, Some(Fill::None));
+          assert_eq!(options.outline_stroke.as_ref().unwrap().width, Pt(expected));
+          assert_eq!(result.style.outline_width, Pt(expanded));
+          assert_eq!(input.style.outline_width, Pt(width));
+          assert_eq!(
+            input
+              .style
+              .pdf_glyph_outline_options
+              .as_ref()
+              .unwrap()
+              .outline_stroke
+              .as_ref()
+              .unwrap()
+              .width,
+            Pt(width)
+          );
+        }
+      }
+    }
+    let mut no_fill = item.clone();
+    Arc::make_mut(no_fill.style.pdf_glyph_outline_options.as_mut().unwrap()).outline_fill =
+      Some(Fill::None);
+    let suppressed = super::text_surface_outline_item(&no_fill);
+    assert!(suppressed.style.outline_color.is_none());
+    assert_eq!(suppressed.style.outline_width, Pt(0.0));
+    assert!(
+      suppressed
+        .style
+        .pdf_glyph_outline_options
+        .as_ref()
+        .unwrap()
+        .outline_stroke
+        .is_none()
+    );
+    let mut fallback = item.clone();
+    fallback.style.pdf_glyph_outline_options = None;
+    let expanded_fallback = super::text_surface_outline_item(&fallback);
+    assert_eq!(expanded_fallback.style.outline_width, Pt(2.12));
+    assert_eq!(fallback.style.outline_width, Pt(2.0));
+
+    assert_eq!(
+      super::static_3d_text_material_opacities(&item),
+      (Some(f32::from(item.color.a) / 255.0), Some(153.0 / 255.0))
+    );
+    assert_eq!(super::uniform_static_3d_text_paint_opacity(&item), None);
+
+    // [MS-DOCX] makes an omitted alignment centered, so only half of the
+    // authored two-point line lies inside the physical glyph face.
+    let centered = static_3d_text_outline_material_inset_px(&item, pixels_per_point).unwrap();
+    assert!((centered - pixels_per_point).abs() < 0.000_1);
+
+    let options = Arc::make_mut(item.style.pdf_glyph_outline_options.as_mut().unwrap());
+    options.outline_stroke.as_mut().unwrap().alignment = Some(StrokeAlignment::Inside);
+    let inside = static_3d_text_outline_material_inset_px(&item, pixels_per_point).unwrap();
+    assert!((inside - 2.0 * pixels_per_point).abs() < 0.000_1);
+
+    let options = Arc::make_mut(item.style.pdf_glyph_outline_options.as_mut().unwrap());
+    options.outline_fill = Some(Fill::Solid(Color {
+      a: 0,
+      ..outline_color
+    }));
+    assert_eq!(
+      static_3d_text_outline_material_inset_px(&item, pixels_per_point),
+      None
+    );
+    assert_eq!(super::static_3d_text_material_opacities(&item).1, Some(0.0));
+  }
+
+  #[test]
+  fn uniform_material_opacity_is_independent_of_gradient_rgb_and_coverage() {
+    for alpha in [0, 1, 102, 153, 254, 255] {
+      let mut gradient = GradientFill {
+        stops: vec![
+          GradientStop {
+            position: 0.0,
+            color: Color {
+              r: 0,
+              g: 80,
+              b: 255,
+              a: alpha,
+            },
+            scheme: None,
+          },
+          GradientStop {
+            position: 1.0,
+            color: Color {
+              r: 255,
+              g: 20,
+              b: 0,
+              a: alpha,
+            },
+            scheme: None,
+          },
+        ],
+        ..GradientFill::default()
+      };
+      assert_eq!(
+        super::uniform_fill_opacity(&Fill::Gradient(gradient.clone())),
+        Some(f32::from(alpha) / 255.0)
+      );
+      gradient.stops[1].color.a = alpha.wrapping_add(1);
+      assert_eq!(super::uniform_fill_opacity(&Fill::Gradient(gradient)), None);
+    }
+    assert_eq!(super::uniform_fill_opacity(&Fill::None), Some(0.0));
+    assert_eq!(
+      super::uniform_fill_opacity(&Fill::Gradient(GradientFill::default())),
+      None
+    );
   }
 
   #[test]
@@ -3041,6 +5471,7 @@ mod tests {
         ],
         path: Some(GradientPath {
           kind: GradientPathKind::Rectangle,
+          context: GradientPathContext::DrawingObject,
           fill_to: RelativeRect {
             left: 0.4,
             top: 0.4,

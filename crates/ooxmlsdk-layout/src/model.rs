@@ -81,6 +81,19 @@ pub(crate) enum LegacyTextRelief {
   Engraved,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum WordprocessingRunColor {
+  #[default]
+  Automatic,
+  Rgb(RgbColor),
+  Theme {
+    slot:
+      ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ThemeColorValues,
+    tint: Option<u8>,
+    shade: Option<u8>,
+  },
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
   pub font_family: Option<Arc<str>>,
@@ -189,13 +202,10 @@ pub struct TextStyle {
   pub(crate) text_glow: Option<common::drawingml_image_effects::WordprocessingTextGlow>,
   pub(crate) text_shadow: Option<common::drawingml_image_effects::WordprocessingTextShadow>,
   pub(crate) text_reflection: Option<common::drawingml_image_effects::WordprocessingTextReflection>,
-  /// A Word 2010 `w14:scene3d` or `w14:props3d` is present in the effective
-  /// run style. Word's fixed-format writer flattens this text together with
-  /// its fill, outline, and 2-D effects instead of retaining a text object.
-  pub(crate) wordprocessing_text_3d: bool,
   /// Complete `w14:scene3d`/`w14:props3d` run data. The two elements inherit
   /// independently and are combined with a DrawingML text body's 3-D scene
-  /// only at fixed-output materialization time.
+  /// only at fixed-output materialization time. The resolved style is also
+  /// the single source of truth for whether Word's 3-D bitmap path is active.
   pub(crate) wordprocessing_text_3d_parts: Option<common::drawingml_3d::Static3dStyleParts>,
   /// Resolved legacy WordprocessingML `w:outline` toggle. This remains
   /// separate from DrawingML/w14 outlines until fixed-output materialization
@@ -245,6 +255,9 @@ pub struct TextStyle {
   pub hidden: bool,
   pub rotation_deg: f32,
   pub color: RgbColor,
+  /// Ordinary WML color before w14 replaces visible paint. None denotes an
+  /// absent override; effect-run aggregation compares this independently.
+  pub(crate) wordprocessing_run_color: Option<WordprocessingRunColor>,
   /// Whether the WordprocessingML text color is still automatic and may
   /// adapt to an inherited run background.
   pub(crate) color_is_automatic: bool,
@@ -315,7 +328,6 @@ impl Default for TextStyle {
       text_glow: None,
       text_shadow: None,
       text_reflection: None,
-      wordprocessing_text_3d: false,
       wordprocessing_text_3d_parts: None,
       legacy_outline: false,
       legacy_shadow: false,
@@ -336,6 +348,7 @@ impl Default for TextStyle {
       hidden: false,
       rotation_deg: 0.0,
       color: RgbColor { r: 0, g: 0, b: 0 },
+      wordprocessing_run_color: None,
       color_is_automatic: true,
       opacity: 1.0,
       outline_color: None,
@@ -704,6 +717,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     complex_font_pitch: style.complex_font_pitch,
     font_size: common::Pt(style.font_size_pt),
     complex_font_size: style.complex_font_size_pt.map(common::Pt),
+    layout_font_sizes: None,
     complex_script: style.complex_script,
     right_to_left: style.right_to_left,
     resolved_bidi_level: style.resolved_bidi_level,

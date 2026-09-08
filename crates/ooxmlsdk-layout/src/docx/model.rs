@@ -1250,6 +1250,14 @@ pub(crate) struct InlineShape {
   /// quantization contract. Keep that provenance after import instead of
   /// inferring it later from fill, textbox, or effect content.
   pub wordprocessing_shape_host: bool,
+  /// Whether the nearest `wpc:wpc` host owns background paint through
+  /// `wpc:bg` or `wpc:whole`.
+  ///
+  /// This is authored-paint state, not a visibility test: Word's fixed PDF
+  /// output distinguishes `a:noFill` from an explicitly transparent solid
+  /// fill when placing a WPS shadow bitmap. Preserve the state from import so
+  /// effect layout does not have to infer it from flattened sibling shapes.
+  pub wordprocessing_canvas_has_background_paint: bool,
   pub text_upright: bool,
   pub text_box_writing_mode: TextBoxWritingMode,
   /// Whether the WPS non-visual properties explicitly mark this shape as a

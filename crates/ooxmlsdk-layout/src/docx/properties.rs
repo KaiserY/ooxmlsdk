@@ -2,11 +2,12 @@ use super::{
   LO_SUBSCRIPT_BASELINE_SHIFT_SCALE, LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE, LegacyTextRelief,
   MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat, ParagraphProps, RunProps, RunStyleOverrides,
   StylesCatalog, TextStyle, ThemeColors, ThemeFonts, WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE,
-  apply_w14_rgb_transforms, apply_w14_scheme_transforms, automatic_text_color_for_background,
-  drawingml_text_effect_common_fill, drawingml_text_outline_effect_common_fill,
-  merge_paragraph_format_with_theme, opacity_from_w14_rgb_transforms,
-  opacity_from_w14_scheme_transforms, parse_hex_color, resolve_run_color, resolve_text_fill,
-  resolve_text_outline, text_background_shading_fill, wordprocessing_text_outline_common_stroke,
+  apply_w14_rgb_effect_transforms, apply_w14_scheme_effect_transforms,
+  automatic_text_color_for_background, drawingml_text_effect_common_fill,
+  drawingml_text_outline_effect_common_fill, merge_paragraph_format_with_theme,
+  opacity_from_w14_rgb_transforms, opacity_from_w14_scheme_transforms, parse_hex_color,
+  resolve_run_color, resolve_text_fill, resolve_text_outline, text_background_shading_fill,
+  wordprocessing_text_outline_common_stroke,
 };
 use crate::common;
 use crate::units;
@@ -16,6 +17,38 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as 
 use ooxmlsdk::sdk::SdkEnum;
 use ooxmlsdk::units::CoordinateValue;
 use std::sync::Arc;
+
+fn ordinary_run_color_identity(
+  color: &w::Color,
+  theme_colors: &ThemeColors,
+) -> Option<crate::model::WordprocessingRunColor> {
+  use crate::model::WordprocessingRunColor;
+  if let Some(slot) = color.theme_color
+    && theme_colors.resolve_wordprocessing(slot).is_some()
+  {
+    let tint = color
+      .theme_tint
+      .as_deref()
+      .and_then(|v| u8::from_str_radix(v, 16).ok());
+    let shade = color
+      .theme_tint
+      .is_none()
+      .then(|| {
+        color
+          .theme_shade
+          .as_deref()
+          .and_then(|v| u8::from_str_radix(v, 16).ok())
+      })
+      .flatten();
+    return Some(WordprocessingRunColor::Theme { slot, tint, shade });
+  }
+  let value = color.val.as_deref()?;
+  if value.eq_ignore_ascii_case("auto") {
+    Some(WordprocessingRunColor::Automatic)
+  } else {
+    parse_hex_color(value).map(WordprocessingRunColor::Rgb)
+  }
+}
 
 pub(super) fn paragraph_format(
   styles: &StylesCatalog,
@@ -339,6 +372,9 @@ fn merge_run_style_with_policy(
     );
   }
   if let Some(color) = properties.color() {
+    if let Some(identity) = ordinary_run_color_identity(color, theme_colors) {
+      style.wordprocessing_run_color = Some(identity);
+    }
     if let Some(rgb) = resolve_run_color(color, theme_colors) {
       style.color = rgb;
       style.color_is_automatic = false;
@@ -369,12 +405,23 @@ fn merge_run_style_with_policy(
     )
   });
   if let Some(fill_effect) = properties.text_fill() {
+    let fill_has_authored_transparency =
+      super::wordprocessing_text_fill_has_authored_transparency(fill_effect);
     match drawingml_text_effect_common_fill(fill_effect, theme_colors) {
       Some(common::Fill::None) => {
         // w14:textFill supersedes w:color. Keep the run for layout and for an
         // independently authored outline, but do not paint its interior.
         style.opacity = 0.0;
         style.color_is_automatic = false;
+        let mut options = style
+          .pdf_glyph_outline_options
+          .as_deref()
+          .cloned()
+          .unwrap_or_default();
+        options.definition_width_basis = common::PdfGlyphDefinitionWidthBasis::TextAdvance;
+        options.fill = Some(common::Fill::None);
+        options.fill_has_authored_transparency = false;
+        style.pdf_glyph_outline_options = Some(Arc::new(options));
       }
       Some(fill @ common::Fill::Gradient(_)) => {
         // Word's fixed-format writer clips the authored gradient to glyph
@@ -388,16 +435,31 @@ fn merge_run_style_with_policy(
           .cloned()
           .unwrap_or_default();
         options.semantic_text_overlay = true;
+        // Word binds an unresolved w14 text-fill definition to the run's
+        // shaped advance. The generic DrawingML one-em floor is not part of
+        // this WordprocessingML coordinate space.
+        options.definition_width_basis = common::PdfGlyphDefinitionWidthBasis::TextAdvance;
         options.fill = Some(fill);
+        options.fill_has_authored_transparency = fill_has_authored_transparency;
         style.pdf_glyph_outline_options = Some(Arc::new(options));
       }
-      Some(common::Fill::Solid(_)) | None => {
+      Some(fill @ common::Fill::Solid(_)) => {
         if let Some(resolved) = resolve_text_fill(fill_effect, theme_colors) {
           style.color = resolved.color;
           style.color_is_automatic = false;
           style.opacity = resolved.opacity;
         }
+        let mut options = style
+          .pdf_glyph_outline_options
+          .as_deref()
+          .cloned()
+          .unwrap_or_default();
+        options.definition_width_basis = common::PdfGlyphDefinitionWidthBasis::TextAdvance;
+        options.fill = Some(fill);
+        options.fill_has_authored_transparency = fill_has_authored_transparency;
+        style.pdf_glyph_outline_options = Some(Arc::new(options));
       }
+      None => {}
       Some(common::Fill::Pattern(_))
       | Some(common::Fill::Theme(_))
       | Some(common::Fill::Image { .. }) => {
@@ -406,6 +468,8 @@ fn merge_run_style_with_policy(
     }
   }
   if let Some(outline_effect) = properties.text_outline() {
+    let outline_has_authored_transparency =
+      super::wordprocessing_text_outline_has_authored_transparency(outline_effect);
     style.outline_width_pt = outline_effect
       .line_width
       .map(|width| units::emu_to_points(width as i64))
@@ -418,6 +482,7 @@ fn merge_run_style_with_policy(
           let mut options = options.clone();
           options.outline_fill = None;
           options.outline_stroke = None;
+          options.outline_has_authored_transparency = false;
           style.pdf_glyph_outline_options = Some(Arc::new(options));
         }
       }
@@ -435,9 +500,10 @@ fn merge_run_style_with_policy(
         options.outline_fill = Some(fill);
         options.outline_stroke =
           wordprocessing_text_outline_common_stroke(outline_effect, theme_colors);
+        options.outline_has_authored_transparency = outline_has_authored_transparency;
         style.pdf_glyph_outline_options = Some(Arc::new(options));
       }
-      Some(common::Fill::Solid(_)) | None => {
+      Some(fill @ common::Fill::Solid(_)) => {
         if let Some(resolved) = resolve_text_outline(outline_effect, theme_colors) {
           style.outline_color = Some(resolved.color);
           style.outline_opacity = resolved.opacity;
@@ -454,11 +520,14 @@ fn merge_run_style_with_policy(
           // and TextEffects_Groupshapes), while noFill still needs it for the
           // independently painted outline (fdo80897).
           options.semantic_text_overlay = has_solid_text_fill || style.opacity <= f32::EPSILON;
+          options.outline_fill = Some(fill);
           options.outline_stroke =
             wordprocessing_text_outline_common_stroke(outline_effect, theme_colors);
+          options.outline_has_authored_transparency = outline_has_authored_transparency;
           style.pdf_glyph_outline_options = Some(Arc::new(options));
         }
       }
+      None => {}
       Some(common::Fill::Pattern(_))
       | Some(common::Fill::Theme(_))
       | Some(common::Fill::Image { .. }) => {}
@@ -473,6 +542,7 @@ fn merge_run_style_with_policy(
     style.text_glow = Some(common::drawingml_image_effects::WordprocessingTextGlow {
       radius_px: glow.glow_radius.unwrap_or_default() as f32 / 9_525.0,
       raster_length_scale: 1.0,
+      geometry_length_scale: 1.0,
       color,
     });
   }
@@ -486,6 +556,7 @@ fn merge_run_style_with_policy(
       blur_radius_px: shadow.blur_radius.unwrap_or_default() as f32 / 9_525.0,
       distance_px: shadow.distance_from_text.unwrap_or_default() as f32 / 9_525.0,
       raster_length_scale: 1.0,
+      geometry_length_scale: 1.0,
       direction_degrees: shadow.direction_angle.unwrap_or_default() as f32 / 60_000.0,
       scale_x: shadow.horizontal_scaling_factor.unwrap_or(100_000) as f32 / 100_000.0,
       scale_y: shadow.vertical_scaling_factor.unwrap_or(100_000) as f32 / 100_000.0,
@@ -499,11 +570,14 @@ fn merge_run_style_with_policy(
     style.text_reflection = Some(
       common::drawingml_image_effects::WordprocessingTextReflection {
         blur_radius_px: reflection.blur_radius.unwrap_or_default() as f32 / 9_525.0,
+        raster_length_scale: 1.0,
+        geometry_length_scale: 1.0,
         start_opacity: reflection.starting_opacity.unwrap_or(100_000) as f32 / 100_000.0,
         start_position: reflection.start_position.unwrap_or_default() as f32 / 100_000.0,
         end_opacity: reflection.ending_opacity.unwrap_or_default() as f32 / 100_000.0,
         end_position: reflection.end_position.unwrap_or(100_000) as f32 / 100_000.0,
         distance_px: reflection.distance_from_text.unwrap_or_default() as f32 / 9_525.0,
+        distance_length_scale: 1.0,
         direction_degrees: reflection.direction_angle.unwrap_or_default() as f32 / 60_000.0,
         fade_direction_degrees: reflection.fade_direction.unwrap_or_default() as f32 / 60_000.0,
         scale_x: reflection.horizontal_scaling_factor.unwrap_or(100_000) as f32 / 100_000.0,
@@ -514,17 +588,15 @@ fn merge_run_style_with_policy(
       },
     );
   }
-  if let Some(scene) = properties.text_scene_3d() {
-    style.wordprocessing_text_3d = true;
-    if let Some(scene) = wordprocessing_text_scene_3d(scene) {
-      style
-        .wordprocessing_text_3d_parts
-        .get_or_insert_default()
-        .scene = Some(Box::new(scene));
-    }
+  if let Some(scene) = properties.text_scene_3d()
+    && let Some(scene) = wordprocessing_text_scene_3d(scene)
+  {
+    style
+      .wordprocessing_text_3d_parts
+      .get_or_insert_default()
+      .scene = Some(Box::new(scene));
   }
   if let Some(properties) = properties.text_properties_3d() {
-    style.wordprocessing_text_3d = true;
     let (shape, extrusion_color, contour_color) =
       wordprocessing_text_shape_3d(properties, theme_colors);
     let parts = style.wordprocessing_text_3d_parts.get_or_insert_default();
@@ -897,16 +969,19 @@ fn wordprocessing_text_shape_3d(
     // [MS-DOCX] §2.6.3.23 specifies black when contourClr is absent.
     .unwrap_or(default_color);
   let bevel_top = properties.bevel_top.as_ref().map(|bevel| a::BevelTop {
-    width: bevel.width.map(CoordinateValue::Emu),
-    height: bevel.height.map(CoordinateValue::Emu),
+    // [MS-DOCX] CT_Bevel defaults both coordinates to zero. Materialize those
+    // W14 defaults before adapting to DrawingML, whose CT_Bevel instead
+    // defaults omitted coordinates to 76200 EMU.
+    width: Some(CoordinateValue::Emu(bevel.width.unwrap_or_default())),
+    height: Some(CoordinateValue::Emu(bevel.height.unwrap_or_default())),
     preset: bevel.preset_profile_type.as_ref().and_then(cast_sdk_enum),
   });
   let bevel_bottom = properties
     .bevel_bottom
     .as_ref()
     .map(|bevel| a::BevelBottom {
-      width: bevel.width.map(CoordinateValue::Emu),
-      height: bevel.height.map(CoordinateValue::Emu),
+      width: Some(CoordinateValue::Emu(bevel.width.unwrap_or_default())),
+      height: Some(CoordinateValue::Emu(bevel.height.unwrap_or_default())),
       preset: bevel.preset_profile_type.as_ref().and_then(cast_sdk_enum),
     });
   (
@@ -934,7 +1009,7 @@ fn resolve_w14_rgb_effect_color(
   color: &w14::RgbColorModelHex,
 ) -> Option<common::drawingml_image_effects::ResolvedEffectColor> {
   Some(common::drawingml_image_effects::ResolvedEffectColor {
-    color: apply_w14_rgb_transforms(
+    color: apply_w14_rgb_effect_transforms(
       parse_hex_color(color.val.as_str())?,
       &color.rgb_color_model_hex_choice,
     ),
@@ -949,7 +1024,7 @@ fn resolve_w14_scheme_effect_color(
   theme_colors: &ThemeColors,
 ) -> Option<common::drawingml_image_effects::ResolvedEffectColor> {
   Some(common::drawingml_image_effects::ResolvedEffectColor {
-    color: apply_w14_scheme_transforms(
+    color: apply_w14_scheme_effect_transforms(
       theme_colors.resolve_word2010(color.val)?,
       &color.scheme_color_choice,
     ),
@@ -1000,6 +1075,10 @@ fn resolve_word_run_font(
 }
 
 fn highlight_color(value: w::HighlightColorValues) -> Option<super::RgbColor> {
+  // ECMA-376 Part 1 §17.18.40 defines this palette explicitly. In particular,
+  // it is not the legacy indexed Word/RTF palette (128-valued dark colors,
+  // gray 128/192). Office fixed output uses these RGB values in body text,
+  // standalone WPS textboxes and grouped WPS textboxes alike.
   Some(match value {
     w::HighlightColorValues::Black => super::RgbColor { r: 0, g: 0, b: 0 },
     w::HighlightColorValues::Blue => super::RgbColor { r: 0, g: 0, b: 255 },
@@ -1025,33 +1104,33 @@ fn highlight_color(value: w::HighlightColorValues) -> Option<super::RgbColor> {
       g: 255,
       b: 255,
     },
-    w::HighlightColorValues::DarkBlue => super::RgbColor { r: 0, g: 0, b: 128 },
+    w::HighlightColorValues::DarkBlue => super::RgbColor { r: 0, g: 0, b: 139 },
     w::HighlightColorValues::DarkCyan => super::RgbColor {
       r: 0,
-      g: 128,
-      b: 128,
+      g: 139,
+      b: 139,
     },
-    w::HighlightColorValues::DarkGreen => super::RgbColor { r: 0, g: 128, b: 0 },
+    w::HighlightColorValues::DarkGreen => super::RgbColor { r: 0, g: 100, b: 0 },
     w::HighlightColorValues::DarkMagenta => super::RgbColor {
       r: 128,
       g: 0,
       b: 128,
     },
-    w::HighlightColorValues::DarkRed => super::RgbColor { r: 128, g: 0, b: 0 },
+    w::HighlightColorValues::DarkRed => super::RgbColor { r: 139, g: 0, b: 0 },
     w::HighlightColorValues::DarkYellow => super::RgbColor {
       r: 128,
       g: 128,
       b: 0,
     },
     w::HighlightColorValues::DarkGray => super::RgbColor {
-      r: 128,
-      g: 128,
-      b: 128,
+      r: 169,
+      g: 169,
+      b: 169,
     },
     w::HighlightColorValues::LightGray => super::RgbColor {
-      r: 192,
-      g: 192,
-      b: 192,
+      r: 211,
+      g: 211,
+      b: 211,
     },
     w::HighlightColorValues::None => return None,
   })
@@ -1060,6 +1139,64 @@ fn highlight_color(value: w::HighlightColorValues) -> Option<super::RgbColor> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn word_highlight_palette_matches_ecma_and_office() {
+    use w::HighlightColorValues as H;
+
+    // Complete §17.18.40 table, including unchanged colors and explicit none.
+    // Exercise the importing merger, not just the color helper.
+    for (token, rgb) in [
+      (H::Black, Some([0, 0, 0])),
+      (H::Blue, Some([0, 0, 255])),
+      (H::Cyan, Some([0, 255, 255])),
+      (H::DarkBlue, Some([0, 0, 139])),
+      (H::DarkCyan, Some([0, 139, 139])),
+      (H::DarkGray, Some([169, 169, 169])),
+      (H::DarkGreen, Some([0, 100, 0])),
+      (H::DarkMagenta, Some([128, 0, 128])),
+      (H::DarkRed, Some([139, 0, 0])),
+      (H::DarkYellow, Some([128, 128, 0])),
+      (H::Green, Some([0, 255, 0])),
+      (H::LightGray, Some([211, 211, 211])),
+      (H::Magenta, Some([255, 0, 255])),
+      (H::None, None),
+      (H::Red, Some([255, 0, 0])),
+      (H::White, Some([255, 255, 255])),
+      (H::Yellow, Some([255, 255, 0])),
+    ] {
+      let inherited = Some(crate::model::RgbColor { r: 1, g: 2, b: 3 });
+      let mut style = TextStyle {
+        highlight: inherited,
+        ..TextStyle::default()
+      };
+      let empty = w::RunProperties::default();
+      merge_run_style(
+        &mut style,
+        Some(RunProps::Direct(&empty)),
+        &ThemeFonts::default(),
+        &ThemeColors::default(),
+      );
+      assert_eq!(style.highlight, inherited);
+      let properties = w::RunProperties {
+        run_properties_choice: vec![w::RunPropertiesChoice::Highlight(w::Highlight {
+          val: token,
+        })],
+        ..w::RunProperties::default()
+      };
+      merge_run_style(
+        &mut style,
+        Some(RunProps::Direct(&properties)),
+        &ThemeFonts::default(),
+        &ThemeColors::default(),
+      );
+      assert_eq!(
+        style.highlight,
+        rgb.map(|[r, g, b]| crate::model::RgbColor { r, g, b }),
+        "{token:?}"
+      );
+    }
+  }
 
   #[test]
   fn word_2010_effect_alignment_defaults_none_to_center() {

@@ -165,6 +165,7 @@ pub(super) fn rasterize(
       }),
     },
     interpolate: false,
+    soft_mask_interpolate: false,
     matte: None,
   }))
 }

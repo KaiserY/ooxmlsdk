@@ -5946,6 +5946,9 @@ fn data_point_effect_backdrop(
       line: raster.line_image.as_ref(),
       fill_line: raster.fill_line_image.as_ref(),
       children: raster.children_image.as_ref(),
+      effect_mask: None,
+      reflection_paint: None,
+      bounds: Default::default(),
     },
   );
   let mut png = Cursor::new(Vec::new());

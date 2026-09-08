@@ -33,6 +33,7 @@ ooxmlsdk-fonts = { workspace = true }
 ooxmlsdk-formula = { workspace = true }
 olecfsdk = { workspace = true }
 parley = { workspace = true }
+png = { workspace = true }
 quick-xml = { workspace = true }
 rustc-hash = { workspace = true }
 skrifa = { workspace = true }

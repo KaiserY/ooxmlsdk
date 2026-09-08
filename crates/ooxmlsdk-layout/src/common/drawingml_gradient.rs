@@ -58,6 +58,7 @@ pub(crate) fn resolve_path_gradient(
     resolve_path_gradient_tile(fill_to_shape, tile, shape_transform);
   GradientPath {
     kind,
+    context: super::GradientPathContext::DrawingObject,
     fill_to,
     transform,
     mirror_tile,
@@ -67,7 +68,7 @@ pub(crate) fn resolve_path_gradient(
 /// Binds a path-gradient transform expressed in owning-shape unit space to
 /// final page bounds. This composes rather than replaces the transform so an
 /// authored `tileRect` remains observable after deferred host layout.
-pub(crate) fn bind_path_transform_to_bounds(normalized: Transform, bounds: Rect) -> Transform {
+pub fn bind_path_transform_to_bounds(normalized: Transform, bounds: Rect) -> Transform {
   Transform {
     m11: bounds.size.width.0 * normalized.m11,
     m12: bounds.size.height.0 * normalized.m12,

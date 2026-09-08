@@ -380,6 +380,8 @@ struct MeasureStyleKey {
   complex_italic: Option<bool>,
   small_caps: bool,
   kerning_enabled: bool,
+  ligatures: Option<crate::common::OpenTypeLigatures>,
+  open_type_features: crate::common::OpenTypeFeatureSettings,
   wordprocessingml_font_slots: bool,
   wordprocessingml_cjk_line_metrics: bool,
   wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
@@ -424,6 +426,8 @@ impl MeasureStyleKey {
       complex_italic: style.complex_italic(),
       small_caps: style.small_caps(),
       kerning_enabled: style.kerning_enabled(),
+      ligatures: style.ligatures(),
+      open_type_features: style.open_type_features(),
       wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
       wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics(),
       wordprocessingml_font_hint: style.wordprocessingml_font_hint(),
@@ -469,6 +473,8 @@ impl MeasureStyleKey {
       && self.complex_italic == style.complex_italic()
       && self.small_caps == style.small_caps()
       && self.kerning_enabled == style.kerning_enabled()
+      && self.ligatures == style.ligatures()
+      && self.open_type_features == style.open_type_features()
       && self.wordprocessingml_font_slots == style.wordprocessingml_font_slots()
       && self.wordprocessingml_cjk_line_metrics == style.wordprocessingml_cjk_line_metrics()
       && self.wordprocessingml_font_hint == style.wordprocessingml_font_hint()
@@ -1435,6 +1441,30 @@ mod tests {
     assert_eq!(first, second);
     assert_eq!(metrics.measure_styles.len(), 1);
     assert_eq!(metrics.measure_widths[0].len(), 1);
+  }
+
+  #[test]
+  fn measurement_cache_keys_every_shaping_feature() {
+    let plain = test_style();
+    let mut old_style = plain.clone();
+    old_style.open_type_features.number_form = Some(crate::common::OpenTypeNumberForm::OldStyle);
+    old_style.open_type_features.number_spacing =
+      Some(crate::common::OpenTypeNumberSpacing::Proportional);
+    let mut ligatures = plain.clone();
+    ligatures.ligatures = Some(crate::common::OpenTypeLigatures {
+      standard: true,
+      ..Default::default()
+    });
+    let mut metrics = TextMetrics::new();
+
+    let plain_index = metrics.measure_style_index(&plain);
+    let old_style_index = metrics.measure_style_index(&old_style);
+    let ligature_index = metrics.measure_style_index(&ligatures);
+
+    assert_ne!(plain_index, old_style_index);
+    assert_ne!(plain_index, ligature_index);
+    assert_ne!(old_style_index, ligature_index);
+    assert_eq!(old_style_index, metrics.measure_style_index(&old_style));
   }
 
   #[test]

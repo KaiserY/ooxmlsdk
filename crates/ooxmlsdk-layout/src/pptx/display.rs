@@ -7687,6 +7687,9 @@ fn finish_shape_effect_raster(
         line: raster.line_image.as_ref(),
         fill_line: raster.fill_line_image.as_ref(),
         children: raster.children_image.as_ref(),
+        effect_mask: None,
+        reflection_paint: None,
+        bounds: Default::default(),
       },
     );
   }
@@ -9609,6 +9612,9 @@ fn materialize_drawingml_text_effects(
         line: raster.line_image.as_ref(),
         fill_line: raster.fill_line_image.as_ref(),
         children: raster.children_image.as_ref(),
+        effect_mask: None,
+        reflection_paint: None,
+        bounds: Default::default(),
       },
     );
     let mut image_bounds = raster_bounds;
@@ -9811,6 +9817,7 @@ fn prepare_powerpoint_text_effect_raster(
         ImageEffect::OuterShadow {
           blur_radius_px,
           raster_length_scale,
+          distance_length_scale,
           bounds_radius_scale,
           ..
         } => {
@@ -9824,6 +9831,7 @@ fn prepare_powerpoint_text_effect_raster(
           *maximum_authored_blur_pt = maximum_authored_blur_pt.max(blur_pt);
           *blur_radius_px = quantized_blur_pt * units::CSS_PIXELS_PER_INCH / units::POINTS_PER_INCH;
           *raster_length_scale *= 0.5;
+          *distance_length_scale *= 0.5;
           *bounds_radius_scale *= 0.5;
         }
         ImageEffect::AlphaModulate(nested)
@@ -10111,9 +10119,13 @@ fn text_base_style(
     pdf_glyph_outline_options: pdf_glyph_outlines.then(|| {
       Arc::new(common::PdfGlyphOutlineOptions {
         semantic_text_overlay: !vectorize_without_semantic_overlay,
+        definition_width_basis: common::PdfGlyphDefinitionWidthBasis::AtLeastFontSize,
+        definition_trailing_advance: common::Pt(0.0),
         fill: None,
+        fill_has_authored_transparency: false,
         outline_fill: None,
         outline_stroke: None,
+        outline_has_authored_transparency: false,
         transform: None,
         text_warp: None,
       })
@@ -10176,6 +10188,7 @@ fn drawingml_text_static3d(
     shape: shape.clone(),
     extrusion_color,
     contour_color,
+    wordprocessing_effect_plane_z_pt: None,
   })
 }
 
@@ -15513,6 +15526,7 @@ mod tests {
       let ImageEffect::OuterShadow {
         blur_radius_px,
         raster_length_scale,
+        distance_length_scale,
         bounds_radius_scale,
         ..
       } = &effects.effects[0]
@@ -15526,6 +15540,7 @@ mod tests {
           < 0.000_1
       );
       assert_eq!(*raster_length_scale, 0.5);
+      assert_eq!(*distance_length_scale, 0.5);
       assert_eq!(*bounds_radius_scale, 0.5);
     }
 
@@ -15749,6 +15764,7 @@ mod tests {
         radius_px: 4.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
+        bounds_radius_offset_px: 0.0,
         spread_ratio: 0.0,
         spread_kernel: common::drawingml_image_effects::GlowSpreadKernel::Square,
         spread_radius_rounding: common::drawingml_image_effects::GlowSpreadRadiusRounding::Outward,

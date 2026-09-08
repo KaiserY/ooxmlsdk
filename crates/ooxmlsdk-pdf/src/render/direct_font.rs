@@ -543,12 +543,7 @@ impl DirectFont {
     cid.widths().consecutive(0, widths).finish();
     cid.finish();
 
-    let mut flags = FontFlags::empty();
-    flags.set(FontFlags::SERIF, self.metadata.serif);
-    flags.set(FontFlags::FIXED_PITCH, self.metadata.monospaced);
-    flags.set(FontFlags::ITALIC, self.metadata.italic_angle != 0.0);
-    flags.insert(FontFlags::SYMBOLIC);
-    flags.insert(FontFlags::SMALL_CAP);
+    let flags = font_descriptor_flags(&self.metadata);
     let mut descriptor = pdf.font_descriptor(self.objects.descriptor);
     descriptor
       .name(Name(base_name.as_bytes()))
@@ -615,6 +610,19 @@ impl DirectFont {
       &self.metadata.postscript_name[..end]
     )
   }
+}
+
+fn font_descriptor_flags(metadata: &FontMetadata) -> FontFlags {
+  let mut flags = FontFlags::empty();
+  flags.set(FontFlags::SERIF, metadata.serif);
+  flags.set(FontFlags::FIXED_PITCH, metadata.monospaced);
+  flags.set(FontFlags::ITALIC, metadata.italic_angle != 0.0);
+  flags.insert(FontFlags::SYMBOLIC);
+  // PDF 1.7 section 5.7 defines SmallCap as a property of the embedded
+  // typeface: its lowercase glyphs must themselves be scaled uppercase
+  // designs. A regular face stays regular even when the layout has already
+  // selected or synthesized small-cap glyphs.
+  flags
 }
 
 impl FontMetadata {
@@ -740,4 +748,44 @@ fn deflate(data: &[u8]) -> Result<Vec<u8>> {
   encoder
     .finish()
     .map_err(|error| PdfError::Writer(format!("font compression failed: {error}")))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{FontMetadata, font_descriptor_flags};
+  use pdf_writer::types::FontFlags;
+
+  fn metadata() -> FontMetadata {
+    FontMetadata {
+      postscript_name: "TestSans".to_string(),
+      is_cff: false,
+      bbox: [0.0; 4],
+      ascent: 0.0,
+      descent: 0.0,
+      cap_height: 0.0,
+      italic_angle: 0.0,
+      stem_v: 0.0,
+      serif: false,
+      monospaced: false,
+    }
+  }
+
+  #[test]
+  fn regular_face_is_not_mislabeled_as_small_caps() {
+    let flags = font_descriptor_flags(&metadata());
+    assert!(flags.contains(FontFlags::SYMBOLIC));
+    assert!(!flags.contains(FontFlags::SMALL_CAP));
+  }
+
+  #[test]
+  fn descriptor_flags_preserve_intrinsic_face_traits() {
+    let mut metadata = metadata();
+    metadata.serif = true;
+    metadata.monospaced = true;
+    metadata.italic_angle = -12.0;
+    let flags = font_descriptor_flags(&metadata);
+    assert!(flags.contains(FontFlags::SERIF));
+    assert!(flags.contains(FontFlags::FIXED_PITCH));
+    assert!(flags.contains(FontFlags::ITALIC));
+  }
 }

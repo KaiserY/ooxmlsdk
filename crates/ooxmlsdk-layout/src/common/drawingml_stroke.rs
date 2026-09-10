@@ -771,11 +771,12 @@ fn path_endpoints(path: &PathItem<'_>) -> Option<PathEndpoints> {
     return None;
   }
   if path.commands.is_empty() {
-    let [first, second, ..] = path.points.as_slice() else {
+    let [first, ..] = path.points.as_slice() else {
       return None;
     };
-    let penultimate = path.points[path.points.len() - 2];
     let last = path.points[path.points.len() - 1];
+    let second = path.points.iter().find(|point| *point != first)?;
+    let penultimate = path.points.iter().rev().find(|point| **point != last)?;
     return Some(PathEndpoints {
       start: (first.x.0, first.y.0),
       start_outward: normalized_direction(second.x.0, second.y.0, first.x.0, first.y.0)?,
@@ -796,8 +797,12 @@ fn path_endpoints(path: &PathItem<'_>) -> Option<PathEndpoints> {
       PathCommand::LineTo(point) => {
         let start = current?;
         let end = (point.x.0, point.y.0);
-        first_tangent.get_or_insert((start, end));
-        last_tangent = Some((start, end));
+        // A collapsed connector segment does not replace the adjacent
+        // nonzero tangent used by the endpoint decoration.
+        if start != end {
+          first_tangent.get_or_insert((start, end));
+          last_tangent = Some((start, end));
+        }
         current = Some(end);
       }
       PathCommand::CubicTo {
@@ -995,6 +1000,52 @@ fn marker_polygon(
 mod tests {
   use super::*;
   use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn marker_endpoint_directions_ignore_repeated_vertices() {
+    let start = Point {
+      x: Pt(0.0),
+      y: Pt(0.0),
+    };
+    let corner = Point {
+      x: Pt(10.0),
+      y: Pt(0.0),
+    };
+    let end = Point {
+      x: Pt(10.0),
+      y: Pt(10.0),
+    };
+    for leading in 1..=3 {
+      for trailing in 1..=3 {
+        let mut points = vec![start; leading];
+        points.push(corner);
+        points.extend(std::iter::repeat_n(end, trailing));
+        let mut path = PathItem {
+          bounds: Rect::default(),
+          points: points.clone(),
+          commands: Vec::new(),
+          closed: false,
+          fill: crate::common::Fill::None,
+          stroke: None,
+        };
+        let check = |path: &PathItem<'_>| {
+          let endpoints = path_endpoints(path).expect("nondegenerate path");
+          assert_eq!(endpoints.start, (0.0, 0.0));
+          assert_eq!(endpoints.end, (10.0, 10.0));
+          assert_eq!(endpoints.start_outward, (-1.0, 0.0));
+          assert_eq!(endpoints.end_outward, (0.0, 1.0));
+        };
+        check(&path);
+        let commands = std::iter::once(PathCommand::MoveTo(start))
+          .chain(points.iter().skip(1).copied().map(PathCommand::LineTo))
+          .collect::<Vec<_>>();
+        path.commands = commands;
+        check(&path);
+        path.closed = true;
+        assert!(path_endpoints(&path).is_none());
+      }
+    }
+  }
 
   #[test]
   fn actual_outline_merge_preserves_unmodified_theme_fields() {

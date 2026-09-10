@@ -132,7 +132,7 @@ fn blur_channels_xy<const N: usize>(
     }
   }
   let mut bytes = vec![0_u8; source.len()];
-  for (index, pixel) in bytes.chunks_exact_mut(N).enumerate() {
+  for (index, pixel) in bytes.as_chunks_mut::<N>().0.iter_mut().enumerate() {
     let (x, y) = (index % width, index / width);
     let mut output = horizontal[y * width + x].map(|v| v * ky[ry]);
     for (i, &weight) in ky[..ry].iter().enumerate() {

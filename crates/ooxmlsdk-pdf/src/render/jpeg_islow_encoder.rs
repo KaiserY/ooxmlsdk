@@ -7,7 +7,7 @@
 //! choices can change Office-visible coefficients. This module keeps the
 //! generic encoder for other profiles while reproducing the fixed-output path.
 
-use image::RgbaImage;
+use image::{GrayImage, RgbaImage};
 
 const ZIGZAG: [usize; 64] = [
   0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27, 20,
@@ -151,6 +151,49 @@ impl<'a> BitWriter<'a> {
       self.write(ones, padding);
     }
   }
+}
+
+/// A grayscale scan has one 8x8 block per MCU, no chroma planes and no dummy
+/// interleaved blocks. Keep the accurate FDCT/quantization shared with RGB.
+pub(super) fn encode_gray(image: &GrayImage, quality: u8) -> Option<Vec<u8>> {
+  let width = usize::try_from(image.width()).ok()?;
+  let height = usize::try_from(image.height()).ok()?;
+  if width == 0 || height == 0 || width > usize::from(u16::MAX) || height > usize::from(u16::MAX) {
+    return None;
+  }
+  let quantization = scaled_quantization(&LUMA_QUANTIZATION, quality);
+  let dc = HuffmanTable::new(&LUMA_DC_COUNTS, &DC_VALUES)?;
+  let ac = HuffmanTable::new(&LUMA_AC_COUNTS, &LUMA_AC_VALUES)?;
+  let mut output = Vec::new();
+  output.extend_from_slice(&[0xff, 0xd8]);
+  write_segment(&mut output, 0xe0, b"JFIF\0\x01\x01\0\0\x01\0\x01\0\0")?;
+  write_quantization(&mut output, 0, &quantization)?;
+  let mut frame = vec![8];
+  frame.extend_from_slice(&(height as u16).to_be_bytes());
+  frame.extend_from_slice(&(width as u16).to_be_bytes());
+  frame.extend_from_slice(&[1, 1, 0x11, 0]);
+  write_segment(&mut output, 0xc0, &frame)?;
+  write_huffman(&mut output, 0x00, &LUMA_DC_COUNTS, &DC_VALUES)?;
+  write_huffman(&mut output, 0x10, &LUMA_AC_COUNTS, &LUMA_AC_VALUES)?;
+  write_segment(&mut output, 0xda, &[1, 1, 0, 0, 63, 0])?;
+  let mut bits = BitWriter::new(&mut output);
+  let mut predictor = 0;
+  for block_y in 0..height.div_ceil(8) {
+    for block_x in 0..width.div_ceil(8) {
+      let block = quantized_block(
+        image.as_raw(),
+        width,
+        height,
+        block_x,
+        block_y,
+        &quantization,
+      );
+      write_block(&mut bits, &block, &mut predictor, &dc, &ac)?;
+    }
+  }
+  bits.finish();
+  output.extend_from_slice(&[0xff, 0xd9]);
+  Some(output)
 }
 
 pub(super) fn encode_rgba_h2v2(image: &RgbaImage, quality: u8) -> Option<Vec<u8>> {
@@ -598,6 +641,43 @@ fn write_segment(output: &mut Vec<u8>, marker: u8, payload: &[u8]) -> Option<()>
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn gray_scan_has_no_chroma_or_interleaved_padding() {
+    for (width, height) in [(1, 1), (2, 2), (8, 8), (9, 17), (19, 7)] {
+      for value in [0, 64, 128, 255] {
+        let source = GrayImage::from_pixel(width, height, image::Luma([value]));
+        let encoded = encode_gray(&source, 100).unwrap();
+        let decoded = super::super::jpeg_islow::decode_gray(&encoded).unwrap();
+        assert_eq!(decoded, source);
+        assert!(super::super::jpeg_islow::decode_rgb(&encoded).is_none());
+        // An independent decoder also sees a single component and correct
+        // dimensions, including the partial final block in each axis.
+        let mut decoder = jpeg_decoder::Decoder::new(std::io::Cursor::new(&encoded));
+        assert_eq!(decoder.decode().unwrap(), *source.as_raw());
+        assert_eq!(
+          decoder.info().unwrap().pixel_format,
+          jpeg_decoder::PixelFormat::L8
+        );
+
+        // Sampling factors do not multiply MCUs in a noninterleaved scan.
+        let mut nonunit_sampling = encoded.clone();
+        let sof = nonunit_sampling
+          .windows(2)
+          .position(|v| v == [0xff, 0xc0])
+          .unwrap();
+        nonunit_sampling[sof + 11] = 0x22;
+        assert_eq!(
+          super::super::jpeg_islow::decode_gray(&nonunit_sampling).unwrap(),
+          source
+        );
+      }
+    }
+    assert!(encode_gray(&GrayImage::new(0, 1), 75).is_none());
+    assert!(encode_gray(&GrayImage::new(1, 0), 75).is_none());
+    assert!(encode_gray(&GrayImage::new(65536, 1), 75).is_none());
+    assert!(super::super::jpeg_islow::decode_gray(&[]).is_none());
+  }
 
   #[test]
   fn exact_quantization_matches_ijg_division_at_reciprocal_boundaries() {

@@ -2868,12 +2868,31 @@ impl<'doc> PaintText<'doc> {
       }
     }
     let text_ref = &text;
-    let glyphs = shaped_pdf_glyphs(
+    let mut glyphs = shaped_pdf_glyphs(
       &text_ref.text,
       &text_ref.style,
       text_ref.word_spacing_pt,
       text_metrics,
     );
+    let has_text_warp = text_ref
+      .style
+      .pdf_glyph_outline_options
+      .as_ref()
+      .is_some_and(|options| options.text_warp.is_some());
+    let layout_glyphs = (has_text_warp || text_ref.style.highlight.is_some())
+      .then(|| {
+        text_layout_glyphs(
+          &text_ref.text,
+          &text_ref.style,
+          text_ref.word_spacing_pt,
+          text_metrics,
+        )
+      })
+      .flatten();
+    if has_text_warp && let (Some(paint), Some(layout)) = (glyphs.as_mut(), layout_glyphs.as_ref())
+    {
+      retain_layout_glyph_positions(paint, layout);
+    }
     let width_pt = glyphs
       .as_ref()
       .map(|run| run.width_pt)
@@ -2934,14 +2953,7 @@ impl<'doc> PaintText<'doc> {
     let text_box_y_pt =
       baseline_y - vertical_metrics.ascent_pt - vertical_metrics.leading_above_pt();
     let text_box_height_pt = vertical_metrics.line_height_pt();
-    let highlight_glyphs = text_ref.style.highlight.and_then(|_| {
-      text_highlight_glyphs(
-        &text_ref.text,
-        &text_ref.style,
-        text_ref.word_spacing_pt,
-        text_metrics,
-      )
-    });
+    let highlight_glyphs = text_ref.style.highlight.and(layout_glyphs);
     let highlight = text_ref.style.highlight.map(|color| {
       let (top_pt, height_pt) = text_highlight_vertical_bounds(
         baseline_y,
@@ -3751,7 +3763,66 @@ pub(super) fn text_requires_glyph_outlines(style: &TextStyle<'_>) -> bool {
       || (style.opacity > f32::EPSILON && style.opacity < 1.0 - f32::EPSILON))
 }
 
-fn text_highlight_glyphs(
+/// Preserve laid-out glyph positions independently of the realized paint em.
+/// WordArt's deformation source retains the authored layout positions while
+/// enclosing the realized outlines. Replacing its advances with the rounded
+/// PDF font's advances accumulates a new error
+/// inside every XML run. Office size/run-segmentation controls distinguish the
+/// two owners; the glyph outlines themselves keep their realized font sizes.
+fn retain_layout_glyph_positions(paint: &mut PaintGlyphRun, layout: &PaintGlyphRun) {
+  let positions = layout
+    .font_runs
+    .iter()
+    .flat_map(|run| {
+      let mut x = run.x_offset_pt;
+      run.glyphs.iter().map(move |glyph| {
+        let position = (run, glyph, x);
+        x += glyph.x_advance * run.font_size_pt;
+        position
+      })
+    })
+    .collect::<Vec<_>>();
+  let compatible = paint
+    .font_runs
+    .iter()
+    .map(|run| run.glyphs.len())
+    .sum::<usize>()
+    == positions.len()
+    && paint
+      .font_runs
+      .iter()
+      .flat_map(|run| run.glyphs.iter().map(move |glyph| (run, glyph)))
+      .zip(&positions)
+      .all(
+        |((paint_run, paint_glyph), (layout_run, layout_glyph, _))| {
+          paint_run.font_face.id() == layout_run.font_face.id()
+            && paint_glyph.glyph_id == layout_glyph.glyph_id
+            && paint_glyph.text_range == layout_glyph.text_range
+        },
+      );
+  // A different shaping topology is not a one-to-one position transfer. Never
+  // partially rewrite a run or assign another cluster's placement to a glyph.
+  if !compatible {
+    return;
+  }
+  let mut positions = positions.into_iter();
+  for run in &mut paint.font_runs {
+    for (index, glyph) in run.glyphs.iter_mut().enumerate() {
+      let (layout_run, layout_glyph, x) = positions.next().expect("glyph counts were checked");
+      if index == 0 {
+        run.x_offset_pt = x;
+      }
+      let scale = layout_run.font_size_pt / run.font_size_pt;
+      glyph.x_advance = layout_glyph.x_advance * scale;
+      glyph.y_advance = layout_glyph.y_advance * scale;
+      glyph.x_offset = layout_glyph.x_offset * scale;
+      glyph.y_offset = layout_glyph.y_offset * scale;
+    }
+  }
+  paint.width_pt = layout.width_pt;
+}
+
+fn text_layout_glyphs(
   text: &str,
   style: &TextStyle<'_>,
   word_spacing_pt: f32,
@@ -3763,8 +3834,8 @@ fn text_highlight_glyphs(
   {
     return None;
   }
-  // The highlight covers the laid-out character cells, not the advances
-  // remeasured at the rounded output em. Shape at the logical sizes instead
+  // Logical character cells are not the advances remeasured at the rounded
+  // output em. Shape at the logical sizes instead
   // of scaling the final width: character spacing, justification and explicit
   // GDI advances are independent of the em, and scripts can use different ems.
   let mut logical_style = style.clone();
@@ -3902,8 +3973,95 @@ mod tests {
   use ooxmlsdk_layout::common;
 
   #[test]
+  fn wordart_positions_keep_layout_advances_and_realized_glyph_sizes() {
+    use super::{TextMetrics, TextStyle, retain_layout_glyph_positions, shaped_pdf_glyphs};
+
+    let mut metrics = TextMetrics::new();
+    for text in ["abc Transform", "This is a longer second line.", "אב i Wm"] {
+      for (size, realized) in [(10.0, 9.96), (11.0, 11.04), (12.0, 12.0), (14.0, 14.04)] {
+        for spacing in [0.0, 1.5] {
+          for horizontal_scale in [0.8, 1.0, 1.2] {
+            let style = TextStyle {
+              font_family: Some(Cow::Borrowed("Courier New")),
+              font_size_pt: size,
+              character_spacing_pt: spacing,
+              horizontal_scale: Some(horizontal_scale),
+              ..Default::default()
+            };
+            let layout = shaped_pdf_glyphs(text, &style, spacing, &mut metrics).unwrap();
+            let mut paint = shaped_pdf_glyphs(
+              text,
+              &TextStyle {
+                font_size_pt: realized,
+                ..style
+              },
+              spacing,
+              &mut metrics,
+            )
+            .unwrap();
+            let paint_sizes = paint
+              .font_runs
+              .iter()
+              .map(|run| run.font_size_pt)
+              .collect::<Vec<_>>();
+            retain_layout_glyph_positions(&mut paint, &layout);
+            assert_eq!(paint.width_pt, layout.width_pt);
+            assert_eq!(
+              paint
+                .font_runs
+                .iter()
+                .map(|run| run.font_size_pt)
+                .collect::<Vec<_>>(),
+              paint_sizes,
+            );
+            let advances = |run: &super::PaintGlyphRun| {
+              run
+                .font_runs
+                .iter()
+                .flat_map(|font| {
+                  font
+                    .glyphs
+                    .iter()
+                    .map(move |glyph| glyph.x_advance * font.font_size_pt)
+                })
+                .collect::<Vec<_>>()
+            };
+            for (actual, expected) in advances(&paint).into_iter().zip(advances(&layout)) {
+              assert!((actual - expected).abs() < 0.00001);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn wordart_position_transfer_rejects_different_clusters_without_partial_changes() {
+    let mut metrics = super::TextMetrics::new();
+    let style = super::TextStyle {
+      font_family: Some(Cow::Borrowed("Arial")),
+      font_size_pt: 11.0,
+      ..Default::default()
+    };
+    let layout = super::shaped_pdf_glyphs("abc", &style, 0.0, &mut metrics).unwrap();
+    let mut paint = super::shaped_pdf_glyphs(
+      "xyz",
+      &super::TextStyle {
+        font_size_pt: 11.04,
+        ..style
+      },
+      0.0,
+      &mut metrics,
+    )
+    .unwrap();
+    let before = format!("{paint:?}");
+    super::retain_layout_glyph_positions(&mut paint, &layout);
+    assert_eq!(format!("{paint:?}"), before);
+  }
+
+  #[test]
   fn highlight_width_uses_layout_sizes_without_scaling_absolute_spacing() {
-    use super::{TextMetrics, TextStyle, shaped_pdf_glyphs, text_highlight_glyphs};
+    use super::{TextMetrics, TextStyle, shaped_pdf_glyphs, text_layout_glyphs};
 
     let mut metrics = TextMetrics::new();
     for text in ["darkYellow", "i Wm", "אב cd"] {
@@ -3930,7 +4088,7 @@ mod tests {
             ..logical
           };
           assert_eq!(
-            text_highlight_glyphs(text, &painted, spacing, &mut metrics)
+            text_layout_glyphs(text, &painted, spacing, &mut metrics)
               .expect("logical highlight glyphs")
               .width_pt,
             expected
@@ -3941,7 +4099,7 @@ mod tests {
       }
     }
     let plain = TextStyle::default();
-    assert!(text_highlight_glyphs("x", &plain, 0.0, &mut metrics).is_none());
+    assert!(text_layout_glyphs("x", &plain, 0.0, &mut metrics).is_none());
   }
 
   #[test]
@@ -3965,7 +4123,7 @@ mod tests {
     });
     let mut metrics = super::TextMetrics::new();
     let text = super::text_item_from_common(&run);
-    let expected = super::text_highlight_glyphs(&text.text, &text.style, 0.0, &mut metrics)
+    let expected = super::text_layout_glyphs(&text.text, &text.style, 0.0, &mut metrics)
       .expect("logical glyphs")
       .width_pt;
     let painted = super::PaintText::from_layout_text(text, None, None, 600.0, &mut metrics);

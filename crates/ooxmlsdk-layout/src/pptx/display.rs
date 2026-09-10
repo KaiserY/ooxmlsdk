@@ -116,6 +116,15 @@ impl PptxFixedOutputProfile {
     // to the configured output density (11pt => 100/48 DPI respectively).
     common::drawingml_shape_raster::office_simple_glow_pixels_per_point(self.raster_dpi, radius_pt)
   }
+
+  fn simple_shape_shadow_pixels_per_point(self, public_radius_px: f32) -> f32 {
+    // PowerPoint's fixed-output shadow uses the shared balanced-blur tiers,
+    // not the separate, twice-as-wide simple-glow tier. Both orientations
+    // and pen widths retain exact 36576/73152 EMU in the preceding tier.
+    self.pixels_per_point()
+      / common::drawingml_image_effects::direct2d_balanced_blur_prescale_divisor(public_radius_px)
+        as f32
+  }
 }
 
 impl Default for PptxFixedOutputProfile {
@@ -952,6 +961,10 @@ impl DisplayOffset {
     units::emu_to_points_f32(vector.y as f32)
   }
 
+  fn scale_x(self) -> f32 {
+    self.0.as_coeffs()[0] as f32
+  }
+
   fn scale_y(self) -> f32 {
     self.0.as_coeffs()[3] as f32
   }
@@ -1000,7 +1013,7 @@ fn lower_shape(
     // the default p:blipFill, with the outline in front. Stage the bitmap
     // here; lower_shape_bounds reorders the complete surface before applying
     // effects and static 3-D.
-    lower_picture(import, slide, shape, offset, items);
+    lower_picture(import, slide, shape, offset, fixed_output, items);
     lower_shape_bounds(
       import,
       slide,
@@ -1062,6 +1075,7 @@ fn lower_shape(
   }
 
   if let Some(text_body) = &shape.text_body {
+    let text_start = items.len();
     lower_text_body(
       context,
       shape,
@@ -1071,6 +1085,7 @@ fn lower_shape(
       items,
       summary.as_deref_mut(),
     );
+    lower_shape_text_shadow(context, shape, offset, own_item_start, text_start, items);
   }
   for item in &mut items[own_item_start..] {
     if let PageItem::Text(text) = item
@@ -1131,6 +1146,88 @@ fn lower_shape(
       },
     );
   }
+}
+
+/// Shape shadows consume decorated text as well as the shape's fill/line.
+/// This is not character-style inheritance: an empty rPr effect list cannot
+/// suppress it, and a character shadow/glow is itself part of this source.
+/// Keep the resulting backdrop behind the shape foreground, independently of
+/// the character effects which lower_text_body has already materialized.
+fn lower_shape_text_shadow(
+  context: PptxLoweringContext<'_>,
+  shape: &Shape,
+  offset: DisplayOffset,
+  shape_start: usize,
+  text_start: usize,
+  items: &mut Vec<PageItem>,
+) {
+  if context.fixed_output.forbids_transparency || shape.service_name == ShapeService::Group {
+    return;
+  }
+  let Some(shadow) = shape
+    .actual_effect_properties
+    .as_ref()
+    .filter(|properties| properties.effect_dag.is_none())
+    .and_then(|properties| properties.effect_list.as_ref())
+    .and_then(|effects| effects.outer_shadow.as_ref())
+  else {
+    return;
+  };
+  let mut source = effect_copy_items(&items[text_start..]);
+  if source.is_empty() {
+    return;
+  }
+  let effects = a::EffectList {
+    outer_shadow: Some(shadow.clone()),
+    ..Default::default()
+  };
+  let frame = TextFrame {
+    x_pt: offset.x_pt(shape.position.x),
+    y_pt: offset.y_pt(shape.position.y),
+    width_pt: offset.width_pt(shape.size.cx),
+    height_pt: offset.height_pt(shape.size.cy),
+  };
+  let source_count = source.len();
+  if !finish_shape_effect_raster(
+    &mut source,
+    0,
+    ShapeEffectRasterContext {
+      import: context.import,
+      slide: context.slide,
+      fixed_output: context.fixed_output,
+      source: Some(ShapeEffectSource::List(&effects)),
+      scene3d: None,
+      shape3d: None,
+      bounds: transformed_shape_bounds(frame, shape),
+      rotation_degrees: shape_visual_rotation_degrees(shape),
+      camera_shape_rotation_degrees: shape.rotation,
+      children_source: false,
+    },
+  ) || source.len() != source_count + 1
+  {
+    return;
+  }
+  let PageItem::Image(mut backdrop) = source.remove(0) else {
+    return;
+  };
+  // Office excludes the actual shape fill, even when it is translucent.
+  // Previously generated backdrop images are not foreground fill geometry.
+  let foreground = items[shape_start..text_start]
+    .iter()
+    .filter(|item| matches!(item, PageItem::Path(_) | PageItem::Rect(_)))
+    .cloned()
+    .map(common_display_item)
+    .collect::<Vec<_>>();
+  backdrop.clip_path = simple_shape_glow_exclusion_clip_path(
+    &foreground,
+    common_rect(
+      backdrop.x_pt,
+      backdrop.y_pt,
+      backdrop.width_pt,
+      backdrop.height_pt,
+    ),
+  );
+  items.insert(shape_start, PageItem::Image(backdrop));
 }
 
 fn is_uninstantiated_placeholder(shape: &Shape) -> bool {
@@ -1365,6 +1462,23 @@ fn lower_chart(
         }
       })
       .collect();
+    let chart_effect_resolver = PptxImageEffectColorResolver {
+      import,
+      slide: Some(slide),
+      chart_resource: Some(chart_resource),
+      placeholder_color: Some(Color::Scheme(SchemeColor {
+        value: a::SchemeColorValues::Dark1,
+        transformations: Vec::new(),
+      })),
+    };
+    let theme_effects = shared_chart::chart_shape_effects_from_theme_style(
+      shared_chart::automatic_chart_data_point_effect_style_index(chart_style_id).and_then(
+        |index| chart_format_scheme(import, slide, chart_resource)?.get_effect_style_source(index),
+      ),
+      &chart_effect_resolver,
+    );
+    let point_image_effects =
+      shared_chart::radial_chart_image_effects(&chart, theme_effects, &chart_effect_resolver);
     let data_label_style = chart_text_style(
       label_text_style_context,
       data_label_properties,
@@ -1404,6 +1518,7 @@ fn lower_chart(
         data_label_rich_text_styles,
         point_colors,
         point_styles,
+        point_image_effects,
         data_label_fill_colors: chart
           .data_labels
           .iter()
@@ -3354,6 +3469,44 @@ fn lower_diagram(
   offset: DisplayOffset,
   record: &GraphicDataRecord,
   items: &mut Vec<PageItem>,
+  summary: Option<&mut PptxLayoutSummary>,
+) {
+  let border = record
+    .diagram_data_resource
+    .as_ref()
+    .and_then(|data| data.model.whole.as_deref())
+    .and_then(|whole| whole.outline.as_deref())
+    .and_then(|outline| {
+      let bounds = shared_diagram::DiagramBounds {
+        x: offset.x_pt(shape.position.x),
+        y: offset.y_pt(shape.position.y),
+        width: offset.width_pt(shape.size.cx),
+        height: offset.height_pt(shape.size.cy),
+      };
+      let mut stroke = diagram_outline(context.import, context.slide, outline, bounds)?;
+      if outline.width.is_none() {
+        stroke.width = common::Pt(0.75);
+      }
+      Some(diagram_fallback_rectangle_path(
+        bounds,
+        common::Fill::None,
+        Some(stroke),
+      ))
+    });
+  lower_diagram_contents(context, shape, offset, record, items, summary);
+  // CT_WholeE2oFormatting applies to the entire diagram, independently of
+  // its cached drawing. Office paints this frame after the diagram content.
+  if let Some(border) = border {
+    items.push(PageItem::Path(border));
+  }
+}
+
+fn lower_diagram_contents(
+  context: PptxLoweringContext<'_>,
+  shape: &Shape,
+  offset: DisplayOffset,
+  record: &GraphicDataRecord,
+  items: &mut Vec<PageItem>,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) {
   let Some(data_resource) = record.diagram_data_resource.as_ref() else {
@@ -4458,9 +4611,13 @@ fn diagram_gradient_fill(
 }
 
 fn powerpoint_fixed_output_linear_gradient_interpolation(
-  stop_count: usize,
+  stops: &[common::GradientStop<'_>],
 ) -> common::GradientInterpolation {
-  if stop_count == 2 {
+  // The two-color sigma brush requires both boundary stops. An interior
+  // endpoint adds a constant-color boundary segment, so Office uses the
+  // preset multicolor/linear interpolation path even with two authored stops.
+  // MCGR_Border_restoration and endpoint controls distinguish these branches.
+  if matches!(stops, [first, last] if first.position == 0.0 && last.position == 1.0) {
     common::GradientInterpolation::PowerPointGammaSigma
   } else {
     common::GradientInterpolation::LinearSrgb
@@ -4483,7 +4640,8 @@ fn gradient_fill_for_optional_slide(
         .gradient_stop_choice
         .as_ref()
         .and_then(Color::from_gradient_stop_choice)?;
-      let paint = display_paint_for_optional_slide(import, slide, &color, None)?;
+      let paint =
+        display_paint_for_optional_slide_with_transform_precision(import, slide, &color, None)?;
       Some(common::GradientStop {
         position: stop.position.as_ratio() as f32,
         color: common_rgb(paint.color, paint.opacity),
@@ -4501,7 +4659,7 @@ fn gradient_fill_for_optional_slide(
       Some(linear.angle.unwrap_or_default() as f32 / 60_000.0),
       linear.scaled.as_ref().is_some_and(|value| value.as_bool()),
       None,
-      powerpoint_fixed_output_linear_gradient_interpolation(stops.len()),
+      powerpoint_fixed_output_linear_gradient_interpolation(&stops),
     ),
     a::GradientFillChoice::PathGradientFill(path) => {
       let mut path = common::drawingml_gradient::resolve_path_gradient(
@@ -4693,11 +4851,48 @@ fn diagram_outline(
 fn diagram_drawing_shape_path_items(
   properties: &dsp::ShapeProperties,
   bounds: shared_diagram::DiagramBounds,
-  fill: common::Fill<'static>,
+  mut fill: common::Fill<'static>,
   stroke: Option<common::Stroke<'static>>,
 ) -> Option<Vec<common::PathItem<'static>>> {
+  let paths = shared_diagram::drawing_shape_paths(properties, bounds)?;
+  let rotation = properties
+    .transform2_d
+    .as_deref()
+    .and_then(|transform| transform.rotation)
+    .unwrap_or_default();
+  if rotation != 0
+    && let Some(dsp::ShapePropertiesChoice2::GradientFill(source)) =
+      properties.shape_properties_choice2.as_ref()
+    && let common::Fill::Gradient(gradient) = &mut fill
+    && gradient.path.is_none()
+  {
+    if source
+      .rotate_with_shape
+      .as_ref()
+      .is_none_or(|value| value.as_bool())
+    {
+      let transform = Affine::rotate_about(
+        (f64::from(rotation) / 60_000.0).to_radians(),
+        (
+          f64::from(bounds.x + bounds.width / 2.0),
+          f64::from(bounds.y + bounds.height / 2.0),
+        ),
+      );
+      let (start, end) = linear_gradient_line(
+        common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
+        gradient.angle_degrees.unwrap_or_default(),
+        gradient.scaled,
+      );
+      gradient.line = Some((
+        transform_point(start, transform),
+        transform_point(end, transform),
+      ));
+    } else {
+      gradient.definition_bounds = drawing_paths_bounds(&paths).or(gradient.definition_bounds);
+    }
+  }
   Some(
-    shared_diagram::drawing_shape_paths(properties, bounds)?
+    paths
       .into_iter()
       .map(|path| {
         let closed = path
@@ -5911,6 +6106,7 @@ fn lower_picture(
   slide: &SlidePersist,
   shape: &Shape,
   offset: DisplayOffset,
+  fixed_output: PptxFixedOutputProfile,
   items: &mut Vec<PageItem>,
 ) {
   let Some(picture) = &shape.picture else {
@@ -5939,16 +6135,20 @@ fn lower_picture(
     &picture.blip_choices,
   );
   let custom_geometry = shape.custom_shape_properties.geometry.is_some();
-  let (data, content_type, crop, flip_horizontal, flip_vertical) =
-    if custom_geometry && (picture.crop != ImageCrop::default() || shape.flip_h || shape.flip_v) {
-      transform_image_data_to_png(&image_data.data, picture.crop, shape.flip_h, shape.flip_v)
+  // xfrm flips belong to the final picture transform, independently of the
+  // already transformed clip geometry. Office keeps the original bitmap
+  // orientation and flips its PDF image matrix. Baking a flip before resize
+  // and JPEG encoding changes sampling phase and chroma/DCT block alignment.
+  let (mut data, mut content_type, crop, flip_horizontal, flip_vertical) =
+    if custom_geometry && picture.crop != ImageCrop::default() {
+      transform_image_data_to_png(&image_data.data, picture.crop, false, false)
         .map(|data| {
           (
             data.into(),
             Some("image/png".into()),
             ImageCrop::default(),
-            false,
-            false,
+            shape.flip_h,
+            shape.flip_v,
           )
         })
         .unwrap_or_else(|| {
@@ -5973,12 +6173,40 @@ fn lower_picture(
         shape.flip_v,
       )
     };
-  let frame = TextFrame {
+  let mut frame = TextFrame {
     x_pt: offset.x_pt(shape.position.x),
     y_pt: offset.y_pt(shape.position.y),
     width_pt: offset.width_pt(shape.size.cx),
     height_pt: offset.height_pt(shape.size.cy),
   };
+  if !custom_geometry
+    && crop == ImageCrop::default()
+    && let Some(viewport_emu) = shape
+      .graphic_data
+      .as_ref()
+      .and_then(|graphic| graphic.model3d_object_viewport_emu)
+      .filter(|size| *size > 0)
+  {
+    let viewport = [
+      offset.width_pt(viewport_emu),
+      offset.height_pt(viewport_emu),
+    ];
+    let scale = [offset.scale_x(), offset.scale_y()];
+    if let Some(raster) = super::model3d::realize_object_preview(
+      &data,
+      &resource.data,
+      viewport.map(f64::from),
+      scale.map(f64::from),
+      f64::from(fixed_output.raster_dpi),
+    ) {
+      frame.x_pt += (frame.width_pt - viewport[0]) / 2.0;
+      frame.y_pt += (frame.height_pt - viewport[1]) / 2.0;
+      frame.width_pt = viewport[0];
+      frame.height_pt = viewport[1];
+      data = raster;
+      content_type = Some(super::model3d::BITMAP_CONTENT_TYPE.to_string());
+    }
+  }
   items.push(PageItem::Image(ImageItem {
     x_pt: frame.x_pt,
     y_pt: frame.y_pt,
@@ -7375,6 +7603,112 @@ type ShapeEffectOverlays = (
   Option<ImageItem>,
 );
 
+#[derive(Clone, Copy, Debug)]
+struct PowerPointStatic3dRasterTarget {
+  surface_bounds: common::Rect,
+  display_bounds: common::Rect,
+  /// Paint, alpha and effect-source coordinates, with pixel-edge origins.
+  mapping: common::drawingml_shape_raster::PageToRasterMapping,
+  /// Physical mesh coordinates, with Direct3D 9 integer-pixel centers.
+  geometry_mapping: common::drawingml_shape_raster::PageToRasterMapping,
+}
+
+fn powerpoint_static_3d_raster_target(
+  source: common::Rect,
+  effects: &common::drawingml_image_effects::ImageEffectContainer,
+  pixels_per_point: f32,
+) -> Option<PowerPointStatic3dRasterTarget> {
+  use common::drawingml_image_effects::EffectOutputBounds;
+  if source.size.width.0 <= 0.0 || source.size.height.0 <= 0.0 {
+    return None;
+  }
+  let printer_dot = f64::from(units::POINTS_PER_INCH) / f64::from(units::OFFICE_FIXED_OUTPUT_DPI);
+  let edge = |value: f32, rounding: fn(f64) -> f64| {
+    (rounding(f64::from(value) / printer_dot) * printer_dot) as f32
+  };
+  // The 3-D antialiasing guard belongs to the 96-DPI scene, independently
+  // of Screen/Print. PowerPoint position/width/profile controls distinguish
+  // it from half an output pixel. WPF's 3-D render target similarly retains
+  // AA bounds before allocating its integer destination rectangle.
+  let guard = 0.5 * units::POINTS_PER_CSS_PIXEL;
+  let scene = EffectOutputBounds {
+    left_pt: edge(source.origin.x.0 - guard, f64::ceil),
+    top_pt: edge(source.origin.y.0 - guard, f64::ceil),
+    right_pt: edge(source.origin.x.0 + source.size.width.0 + guard, f64::floor),
+    bottom_pt: edge(source.origin.y.0 + source.size.height.0 + guard, f64::floor),
+  };
+  let output = if effects.effects.is_empty() {
+    scene
+  } else {
+    let backdrop = common::drawingml_image_effects::unchanged_foreground_backdrop(effects)?;
+    let shadow = common::drawingml_image_effects::simple_outer_shadow_translation(&backdrop)?;
+    // Each effect parameter is realized before composing its bounds. Rounding
+    // blur+distance together carries a half-dot into the opposite edge.
+    let points = units::POINTS_PER_CSS_PIXEL;
+    let radius = edge(shadow.blur_radius_px * points, f64::round);
+    let dx = edge(shadow.offset_x_px * points, f64::round);
+    let dy = edge(shadow.offset_y_px * points, f64::round);
+    EffectOutputBounds {
+      left_pt: scene.left_pt + dx - radius,
+      top_pt: scene.top_pt + dy - radius,
+      right_pt: scene.right_pt + dx + radius,
+      bottom_pt: scene.bottom_pt + dy + radius,
+    }
+  };
+  let left = edge(output.left_pt.min(scene.left_pt), f64::round);
+  let top = edge(output.top_pt.min(scene.top_pt), f64::round);
+  let right = edge(output.right_pt.max(scene.right_pt), f64::round);
+  let bottom = edge(output.bottom_pt.max(scene.bottom_pt), f64::round);
+  let scale = f64::from(pixels_per_point);
+  if !scale.is_finite() || scale <= 0.0 || right <= left || bottom <= top {
+    return None;
+  }
+  // Allocate the two world edges, not ceil(width*dpi). Translating an
+  // otherwise identical shape can add or remove a destination sample.
+  let width = (f64::from(right) * scale).ceil() - (f64::from(left) * scale).floor();
+  let height = (f64::from(bottom) * scale).ceil() - (f64::from(top) * scale).floor();
+  if !width.is_finite()
+    || !height.is_finite()
+    || width < 1.0
+    || height < 1.0
+    || width * height > 16_777_216.0
+  {
+    return None;
+  }
+  let surface_bounds = crate::model::common_rect(left, top, right - left, bottom - top);
+  let inset = 0.5 / pixels_per_point;
+  let display_bounds = crate::model::common_rect(
+    left,
+    top,
+    (right - left - inset).max(inset),
+    (bottom - top - inset).max(inset),
+  );
+  let scale_x = width as f32 / surface_bounds.size.width.0;
+  let scale_y = height as f32 / surface_bounds.size.height.0;
+  let mapping = common::drawingml_shape_raster::PageToRasterMapping {
+    width_px: width as u32,
+    height_px: height as u32,
+    scale_x,
+    scale_y,
+    translate_x: -left * scale_x,
+    translate_y: -top * scale_y,
+    text_hinting: None,
+  };
+  Some(PowerPointStatic3dRasterTarget {
+    surface_bounds,
+    display_bounds,
+    mapping,
+    // As in Static3dTextGeometry::from_page_path_for_direct3d9, physical
+    // vertices address integer pixel centers. The paint/alpha raster keeps
+    // its independent half-integer centers; never move that mask with them.
+    geometry_mapping: common::drawingml_shape_raster::PageToRasterMapping {
+      translate_x: mapping.translate_x - 0.5,
+      translate_y: mapping.translate_y - 0.5,
+      ..mapping
+    },
+  })
+}
+
 fn finish_shape_effects(
   items: &mut Vec<PageItem>,
   content_start: usize,
@@ -7463,6 +7797,20 @@ fn finish_shape_effect_raster(
       effects: Vec::new(),
     },
   };
+  if context.fixed_output.forbids_transparency
+    && context.scene3d.is_none()
+    && context.shape3d.is_none()
+  {
+    omit_powerpoint_outer_shadow_for_transparency_conformance(&mut effects);
+    if matches!(effects.effects.as_slice(), [ImageEffect::Container(main)]
+        if main.kind == common::drawingml_image_effects::ImageEffectContainerKind::Tree
+          && main.effects.as_slice() == [ImageEffect::Identity])
+    {
+      // The effect list is now only its unchanged foreground. Mark it handled
+      // without rasterizing it or letting the legacy path reintroduce shadow.
+      return true;
+    }
+  }
   if context.scene3d.is_some() || context.shape3d.is_some() {
     common::drawingml_image_effects::suppress_soft_edge(&mut effects);
   }
@@ -7486,21 +7834,109 @@ fn finish_shape_effect_raster(
         .simple_shape_glow_pixels_per_point(radius_pt),
     )
   });
-  let behind_effects = fixed_effect_list
+  let mut behind_effects = fixed_effect_list
     .then(|| shape_behind_effects(&effects))
     .flatten()
     .filter(|_| context.scene3d.is_none() && context.shape3d.is_none());
+  let simple_shadow_pixels_per_point = behind_effects
+    .as_ref()
+    .and_then(common::drawingml_image_effects::simple_outer_shadow_translation)
+    .map(|shadow| {
+      context
+        .fixed_output
+        .simple_shape_shadow_pixels_per_point(shadow.blur_radius_px)
+    });
+  let simple_reflection_radius = behind_effects
+    .as_ref()
+    .and_then(common::drawingml_image_effects::simple_reflection_blur_radius);
+  // Reflection and shadow use the same balanced Gaussian density tiers.
+  // The configured Screen/Print source density must not fall back to the
+  // generic preview budget just because this backdrop also retains RGB.
+  let simple_backdrop_pixels_per_point = simple_shadow_pixels_per_point.or_else(|| {
+    simple_reflection_radius.map(|radius| {
+      context
+        .fixed_output
+        .simple_shape_shadow_pixels_per_point(radius)
+    })
+  });
   let preserve_vector_source = behind_effects.is_some();
-  let display_items = items[content_start..]
+  let mut display_items = items[content_start..]
     .iter()
     .cloned()
     .map(common_display_item)
     .collect::<Vec<_>>();
+  if !context.children_source
+    && context.scene3d.is_some()
+    && context
+      .shape3d
+      .and_then(|shape| shape.extrusion_height)
+      .is_some_and(|height| height.to_emu() > 0)
+  {
+    realize_powerpoint_extruded_source_strokes(&mut display_items);
+  }
   let source_stroke_outset_pt = if simple_glow.is_some() && !context.children_source {
     effect_source_stroke_outset_pt(&display_items)
   } else {
     0.0
   };
+  let anchor_bounds = common::drawingml_image_effects::EffectOutputBounds {
+    left_pt: 0.0,
+    top_pt: 0.0,
+    right_pt: context.bounds.size.width.0,
+    bottom_pt: context.bounds.size.height.0,
+  };
+  let static_3d_leaf_source =
+    context.scene3d.is_some() && context.shape3d.is_some() && !context.children_source;
+  // Backdrops and 3-D sources consume the complete painted primitive,
+  // including its widened stroke. Clipping a centered line to the logical
+  // frame before projection loses its outer half and miter tips, and changes
+  // the boundary coverage used by the extruded side surfaces.
+  // Its logical shape rectangle still owns alignment, scale and reflection
+  // ramps. Simple glow has an independently realized fill/outset path above.
+  let paint_bounds = if (behind_effects.is_some() || static_3d_leaf_source) && simple_glow.is_none()
+  {
+    shape_paint_bounds(&display_items, context.bounds)
+  } else {
+    anchor_bounds
+  };
+  let line_surface_bounds = behind_effects
+    .as_ref()
+    .and_then(common::drawingml_image_effects::simple_outer_shadow_translation)
+    .filter(|shadow| shadow.blur_radius_px > 0.0 && !context.children_source)
+    .and_then(|_| powerpoint_line_shadow_surface_bounds(&display_items, context.bounds));
+  let line_source = line_surface_bounds.and_then(|_| {
+    let (start, end, stroke) =
+      common::drawingml_shape_raster::powerpoint_shadow_line(&display_items)?;
+    (stroke.gradient.is_none()
+      && stroke.pattern.is_none()
+      && (start.x == end.x || start.y == end.y))
+      .then_some(())
+  });
+  let transformed_vector_source =
+    common::drawingml_shape_raster::supports_powerpoint_blurred_vector_source(&display_items);
+  let static_target = context
+    .scene3d
+    .zip(context.shape3d)
+    .filter(|(scene, _)| {
+      !context.children_source
+        // A stroked or multi-path source needs its independently widened
+        // solid topology; do not reinterpret that bitmap as one fill mesh.
+        && matches!(display_items.as_slice(), [common::DisplayItem::Path(path)]
+          if path.closed && path.stroke.is_none() && !matches!(path.fill, common::Fill::None))
+        && common::drawingml_3d::projection_preserves_source_plane_coverage(
+          common::drawingml_3d::camera_projection(scene, context.camera_shape_rotation_degrees),
+        )
+    })
+    .and_then(|_| {
+      powerpoint_static_3d_raster_target(
+        context.bounds,
+        &effects,
+        context.fixed_output.pixels_per_point(),
+      )
+    });
+  // Allocation bounds are not necessarily the tight ink bounds. Keep the
+  // latter for effect paint/ramp ownership and the former for the surface.
+  let surface_bounds = line_surface_bounds.unwrap_or(paint_bounds);
   let output_bounds = if effects.effects.is_empty() {
     // Static 3-D is independent from a:effectLst/a:effectDag. Most authored
     // scene3d shapes have no effect container at all, so the synthetic empty
@@ -7514,15 +7950,50 @@ fn finish_shape_effect_raster(
       bottom_pt: context.bounds.size.height.0,
     }
   } else {
-    let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
+    let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds_with_anchor(
       &effects,
-      context.bounds.size.width.0,
-      context.bounds.size.height.0,
+      surface_bounds,
+      anchor_bounds,
     ) else {
       return false;
     };
     output_bounds
   };
+  let backdrop_sample_bounds = simple_backdrop_pixels_per_point
+    .zip(behind_effects.as_ref())
+    .and_then(|(pixels_per_point, backdrop)| {
+      let radius_px = common::drawingml_image_effects::simple_outer_shadow_translation(backdrop)
+        .map(|shadow| shadow.blur_radius_px)
+        .or(simple_reflection_radius)?;
+      // PowerPoint also rasterizes a zero-radius shadow. It retains the
+      // printer guard and far sample inset; only Word's vector-only zero-
+      // radius route bypasses this shared output-range calculation.
+      if context.children_source {
+        return None;
+      }
+      let output = common::drawingml_image_effects::container_output_bounds_with_anchor(
+        backdrop,
+        surface_bounds,
+        anchor_bounds,
+      )?;
+      Some(
+        common::drawingml_shape_raster::office_shape_shadow_bitmap_sample_bounds(
+          context.bounds,
+          output,
+          radius_px * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH,
+          pixels_per_point,
+        ),
+      )
+    });
+  let reflection_source_transform = (!context.children_source)
+    .then_some(behind_effects.as_mut())
+    .flatten()
+    .and_then(|backdrop| {
+      common::drawingml_image_effects::bake_powerpoint_reflection_source_transform(
+        backdrop,
+        context.bounds,
+      )
+    });
   let static_padding = context
     .scene3d
     .zip(context.shape3d)
@@ -7535,17 +8006,39 @@ fn finish_shape_effect_raster(
       )
     })
     .unwrap_or_default();
-  let relative_left =
-    output_bounds.left_pt.min(0.0) - static_padding.left_pt - source_stroke_outset_pt;
-  let relative_top =
-    output_bounds.top_pt.min(0.0) - static_padding.top_pt - source_stroke_outset_pt;
-  let relative_right = output_bounds.right_pt.max(context.bounds.size.width.0)
+  let mut relative_left = output_bounds.left_pt.min(paint_bounds.left_pt)
+    - static_padding.left_pt
+    - source_stroke_outset_pt;
+  let mut relative_top =
+    output_bounds.top_pt.min(paint_bounds.top_pt) - static_padding.top_pt - source_stroke_outset_pt;
+  let mut relative_right = output_bounds.right_pt.max(paint_bounds.right_pt)
     + static_padding.right_pt
     + source_stroke_outset_pt;
-  let relative_bottom = output_bounds.bottom_pt.max(context.bounds.size.height.0)
+  let mut relative_bottom = output_bounds.bottom_pt.max(paint_bounds.bottom_pt)
     + static_padding.bottom_pt
     + source_stroke_outset_pt;
-  let raster_bounds = common::Rect {
+  if let Some(sample) = backdrop_sample_bounds {
+    relative_left = relative_left.min(sample.origin.x.0 - context.bounds.origin.x.0);
+    relative_top = relative_top.min(sample.origin.y.0 - context.bounds.origin.y.0);
+    relative_right =
+      relative_right.max(sample.origin.x.0 + sample.size.width.0 - context.bounds.origin.x.0);
+    relative_bottom =
+      relative_bottom.max(sample.origin.y.0 + sample.size.height.0 - context.bounds.origin.y.0);
+    if let Some(shadow) = behind_effects
+      .as_ref()
+      .and_then(common::drawingml_image_effects::simple_outer_shadow_translation)
+    {
+      // Shadow blurs the source before applying its output translation.
+      // The untranslated blur is an intermediate image: enclosing only the
+      // painted source and final shadow clips that image before it can move.
+      let radius_pt = shadow.blur_radius_px * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH;
+      relative_left = relative_left.min(paint_bounds.left_pt - radius_pt);
+      relative_top = relative_top.min(paint_bounds.top_pt - radius_pt);
+      relative_right = relative_right.max(paint_bounds.right_pt + radius_pt);
+      relative_bottom = relative_bottom.max(paint_bounds.bottom_pt + radius_pt);
+    }
+  }
+  let mut raster_bounds = common::Rect {
     origin: common::Point {
       x: common::Pt(context.bounds.origin.x.0 + relative_left),
       y: common::Pt(context.bounds.origin.y.0 + relative_top),
@@ -7555,11 +8048,56 @@ fn finish_shape_effect_raster(
       height: common::Pt(relative_bottom - relative_top),
     },
   };
-  let simple_glow_exclusion_clip = if simple_glow.is_some() && !context.children_source {
-    simple_shape_glow_exclusion_clip_path(&display_items, raster_bounds)
-  } else {
-    Vec::new()
-  };
+  if let Some(target) = static_target {
+    raster_bounds = target.surface_bounds;
+    relative_left = raster_bounds.origin.x.0 - context.bounds.origin.x.0;
+    relative_top = raster_bounds.origin.y.0 - context.bounds.origin.y.0;
+  }
+  if let Some((sample, pixels_per_point)) =
+    backdrop_sample_bounds.zip(simple_backdrop_pixels_per_point)
+  {
+    // Extra working padding must add whole pixels on the output lattice.
+    // Otherwise extending the canvas changes input coverage and the final
+    // integer crop silently selects a different physical source position.
+    let sharp = behind_effects
+      .as_ref()
+      .and_then(common::drawingml_image_effects::simple_outer_shadow_translation)
+      .is_some_and(|shadow| shadow.blur_radius_px == 0.0);
+    raster_bounds = if sharp
+      || reflection_source_transform.is_some()
+      || simple_shadow_pixels_per_point.is_some()
+        && (line_source.is_some() || transformed_vector_source)
+    {
+      sample
+    } else {
+      shape_shadow_working_bounds(raster_bounds, sample, pixels_per_point)
+    };
+    relative_left = raster_bounds.origin.x.0 - context.bounds.origin.x.0;
+    relative_top = raster_bounds.origin.y.0 - context.bounds.origin.y.0;
+  }
+  let opaque_shadow_fill = simple_shadow_pixels_per_point.is_some()
+    && display_items.iter().any(|item| match item {
+      common::DisplayItem::Path(path) => {
+        matches!(path.fill, common::Fill::Solid(color) if color.a == 255)
+      }
+      common::DisplayItem::Rect(rect) => {
+        matches!(rect.fill, common::Fill::Solid(color) if color.a == 255)
+      }
+      _ => false,
+    });
+  let simple_glow_exclusion_clip =
+    if (simple_glow.is_some() || opaque_shadow_fill) && !context.children_source {
+      if opaque_shadow_fill {
+        // A complement clip is relative to the page, not the image extent.
+        // Sharp shadows can retain alpha at the terminal bitmap sample;
+        // clipping again at that edge applies coverage a second time.
+        shape_shadow_exclusion_clip_path(&display_items, context.slide.size)
+      } else {
+        simple_shape_glow_exclusion_clip_path(&display_items, raster_bounds)
+      }
+    } else {
+      Vec::new()
+    };
   let mut semantic_overlays = Vec::new();
   collect_pptx_semantic_text_overlays(
     &items[content_start..],
@@ -7568,7 +8106,89 @@ fn finish_shape_effect_raster(
   );
   let automatic_extrusion_color =
     common::drawingml_3d::automatic_extrusion_color_from_items(&display_items);
-  let raster = if let Some(pixels_per_point) = simple_glow_pixels_per_point
+  let sharp_shadow_translation = behind_effects
+    .as_ref()
+    .and_then(common::drawingml_image_effects::simple_outer_shadow_translation)
+    .filter(|shadow| shadow.blur_radius_px == 0.0 && !context.children_source);
+  let line_shadow_translation = line_source
+    .and(behind_effects.as_ref())
+    .and_then(common::drawingml_image_effects::simple_outer_shadow_translation);
+  let transformed_shadow_translation = behind_effects
+    .as_ref()
+    .and_then(common::drawingml_image_effects::simple_outer_shadow_translation)
+    .filter(|shadow| {
+      shadow.blur_radius_px > 0.0
+        && !context.children_source
+        && line_source.is_none()
+        && transformed_vector_source
+    });
+  let mut reflection_raster_scale = common::drawingml_image_effects::EffectRasterScale::default();
+  let mut uniform_static_raster_grid = false;
+  let raster = if let Some(target) = static_target {
+    reflection_raster_scale = common::drawingml_image_effects::EffectRasterScale {
+      x: target.mapping.scale_x / context.fixed_output.pixels_per_point(),
+      y: target.mapping.scale_y / context.fixed_output.pixels_per_point(),
+    };
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_with_mapping(
+      &display_items,
+      &effects,
+      context.fixed_output.pixels_per_point(),
+      target.mapping,
+    )
+  } else if let Some(shadow) = line_shadow_translation.as_ref() {
+    let points_per_css_pixel = units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH;
+    common::drawingml_shape_raster::rasterize_powerpoint_blurred_line_source(
+      &display_items,
+      raster_bounds,
+      (
+        shadow.offset_x_px * points_per_css_pixel,
+        shadow.offset_y_px * points_per_css_pixel,
+      ),
+      simple_backdrop_pixels_per_point.unwrap_or(context.fixed_output.pixels_per_point()),
+    )
+    .map(|(raster, scale)| {
+      reflection_raster_scale = scale;
+      raster
+    })
+  } else if let Some(shadow) = transformed_shadow_translation.as_ref() {
+    common::drawingml_shape_raster::rasterize_powerpoint_blurred_vector_source(
+      &display_items,
+      raster_bounds,
+      (
+        shadow.offset_x_px * units::POINTS_PER_CSS_PIXEL,
+        shadow.offset_y_px * units::POINTS_PER_CSS_PIXEL,
+      ),
+      simple_backdrop_pixels_per_point.unwrap_or(context.fixed_output.pixels_per_point()),
+    )
+    .map(|(raster, scale)| {
+      reflection_raster_scale = scale;
+      raster
+    })
+  } else if let Some(transform) = reflection_source_transform {
+    common::drawingml_shape_raster::rasterize_powerpoint_transformed_backdrop_source(
+      &display_items,
+      raster_bounds,
+      transform,
+      context.fixed_output.pixels_per_point(),
+      simple_backdrop_pixels_per_point.unwrap_or(context.fixed_output.pixels_per_point()),
+    )
+    .map(|(raster, scale)| {
+      reflection_raster_scale = scale;
+      raster
+    })
+  } else if let Some(shadow) = sharp_shadow_translation.as_ref() {
+    let points_per_css_pixel = units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH;
+    common::drawingml_shape_raster::rasterize_powerpoint_sharp_shadow_source(
+      &display_items,
+      raster_bounds,
+      (
+        shadow.offset_x_px * points_per_css_pixel,
+        shadow.offset_y_px * points_per_css_pixel,
+      ),
+      context.fixed_output.pixels_per_point(),
+      context.rotation_degrees.rem_euclid(90.0) == 0.0,
+    )
+  } else if let Some(pixels_per_point) = simple_glow_pixels_per_point
     && !context.children_source
   {
     common::drawingml_shape_raster::rasterize_fill_layer_at_pixels_per_point(
@@ -7576,17 +8196,32 @@ fn finish_shape_effect_raster(
       raster_bounds,
       pixels_per_point,
     )
-  } else if context.scene3d.is_some() && context.shape3d.is_some() && !context.children_source {
-    // PowerPoint fixed output consistently stores static picture-3D surfaces
-    // at about 200 DPI (tdf170095, Scene3d_pureImage, and
-    // Scene3d_cropped_image). Retain the shared 250,000-pixel budget so large
-    // objects do not become more expensive; only the small-shape sampling cap
-    // differs from ordinary DrawingML image effects.
-    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
+  } else if let Some(pixels_per_point) = simple_backdrop_pixels_per_point
+    && !context.children_source
+  {
+    // Resolve the configured-density source into the balanced-blur tier.
+    // Repainting directly at that lower density changes primitive coverage
+    // before the Gaussian has received its input.
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_via_dpi_compensated_source_surface(
       &display_items,
       raster_bounds,
       &effects,
-      200.0 / 72.0,
+      context.fixed_output.pixels_per_point(),
+      pixels_per_point,
+      common::drawingml_shape_raster::RasterSourceExtent::Outward,
+      common::drawingml_shape_raster::RasterPrimitiveAntialiasing::PerPrimitive,
+    )
+  } else if static_3d_leaf_source {
+    // Fixed output retains its configured density above the preview budget:
+    // Scene3d_isometricRightUp has a 741x684, 200-DPI Office RGB/alpha surface.
+    // The 250,000-pixel preview cap reduced its source to about 125 DPI before
+    // projection. The fixed-output rasterizer retains its allocation guard.
+    uniform_static_raster_grid = true;
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_fixed_output_pixels_per_point(
+      &display_items,
+      raster_bounds,
+      &effects,
+      context.fixed_output.pixels_per_point(),
     )
   } else if context.children_source {
     common::drawingml_shape_raster::rasterize_group_items_for_effects(
@@ -7630,6 +8265,14 @@ fn finish_shape_effect_raster(
     };
   } else if let Some(behind_effects) = behind_effects {
     effects = behind_effects;
+    common::drawingml_image_effects::configure_powerpoint_reflection(&mut effects);
+    if (sharp_shadow_translation.is_some()
+      || line_shadow_translation.is_some()
+      || transformed_shadow_translation.is_some())
+      && let [ImageEffect::OuterShadow { distance_px, .. }] = effects.effects.as_mut_slice()
+    {
+      *distance_px = 0.0;
+    }
   }
   if let Some((scene, shape)) = context.scene3d.zip(context.shape3d) {
     let extrusion_color = shape
@@ -7652,36 +8295,155 @@ fn finish_shape_effect_raster(
         color: color.color,
         alpha: color.alpha,
       });
-    common::drawingml_3d::apply_static_3d(
-      &mut raster.image,
-      scene,
-      common::drawingml_3d::camera_projection(scene, context.camera_shape_rotation_degrees),
-      shape,
-      common::drawingml_3d::Static3dRenderOptions {
-        extrusion_color: extrusion_color.or(automatic_extrusion_color),
-        contour_color,
-        pixels_per_point: raster.pixels_per_point,
-        model_surface: Some(common::drawingml_3d::Static3dSurface {
+    let options = common::drawingml_3d::Static3dRenderOptions {
+      extrusion_color: extrusion_color.or(automatic_extrusion_color),
+      contour_color,
+      pixels_per_point: raster.pixels_per_point,
+      model_surface: Some(static_target.map_or_else(
+        || common::drawingml_3d::Static3dSurface {
           left_px: (context.bounds.origin.x.0 - raster_bounds.origin.x.0) * raster.pixels_per_point,
           top_px: (context.bounds.origin.y.0 - raster_bounds.origin.y.0) * raster.pixels_per_point,
           width_px: context.bounds.size.width.0 * raster.pixels_per_point,
           height_px: context.bounds.size.height.0 * raster.pixels_per_point,
-        }),
-      },
-    );
+        },
+        |target| common::drawingml_3d::Static3dSurface {
+          left_px: context.bounds.origin.x.0 * target.geometry_mapping.scale_x
+            + target.geometry_mapping.translate_x,
+          top_px: context.bounds.origin.y.0 * target.geometry_mapping.scale_y
+            + target.geometry_mapping.translate_y,
+          width_px: context.bounds.size.width.0 * target.mapping.scale_x,
+          height_px: context.bounds.size.height.0 * target.mapping.scale_y,
+        },
+      )),
+    };
+    let geometry = static_target
+      .and_then(|target| {
+        let [common::DisplayItem::Path(path)] = display_items.as_slice() else {
+          return None;
+        };
+        let geometry = common::drawingml_shape_raster::static_3d_shape_geometry_with_mapping(
+          &path.commands,
+          target.geometry_mapping,
+        )?;
+        let material = common::drawingml_shape_raster::static_3d_shape_geometry_with_mapping(
+          &path.commands,
+          target.mapping,
+        )?;
+        Some((geometry, material))
+      })
+      .or_else(|| {
+        // Preserve an authored vector face through projection and depth
+        // ownership, including a picture's extruded preset/custom clip.
+        // A flat clipped picture is different: the Office zero-depth control
+        // retains its image-mask coverage rather than an extruded mesh.
+        if context.children_source {
+          return None;
+        }
+        let commands = match display_items.as_slice() {
+          [common::DisplayItem::Path(path)]
+            if path.closed && path.stroke.is_none() && !matches!(path.fill, common::Fill::None) =>
+          {
+            &path.commands
+          }
+          [common::DisplayItem::Image(image)]
+            if !image.clip_path.is_empty()
+              && shape
+                .extrusion_height
+                .is_some_and(|height| height.to_emu() > 0) =>
+          {
+            &image.clip_path
+          }
+          _ => return None,
+        };
+        let geometry = common::drawingml_shape_raster::static_3d_shape_geometry(
+          commands,
+          raster_bounds,
+          raster.pixels_per_point,
+        )?;
+        let material = geometry.clone();
+        Some((geometry, material))
+      });
+    let projection =
+      common::drawingml_3d::camera_projection(scene, context.camera_shape_rotation_degrees);
+    if let Some((geometry, material)) = geometry.as_ref() {
+      common::drawingml_3d::apply_static_3d_shape_geometry(
+        &mut raster.image,
+        common::drawingml_3d::Static3dShapeSurface {
+          two_sided_extrusion: matches!(display_items.as_slice(), [common::DisplayItem::Image(_)]),
+          geometry,
+          material_geometry: material,
+          uniform_paint_opacity: match display_items.as_slice() {
+            [common::DisplayItem::Path(path)] if static_target.is_none() => match path.fill {
+              common::Fill::Solid(color) => Some(f32::from(color.a) / 255.0),
+              _ => None,
+            },
+            [common::DisplayItem::Image(image)] => image::load_from_memory(&image.bytes)
+              .ok()
+              .and_then(|source| uniform_image_paint_opacity(&source)),
+            _ => None,
+          },
+          // Projected fixed-output vector solids resolve the geometric
+          // mesh on an eight-sample target. Their texture remains separate;
+          // a flat image's clip mask must not be quantized to this coverage.
+          rasterization: if static_target.is_some() {
+            common::drawingml_3d::Static3dShapeRasterization::SourceAntialias
+          } else {
+            common::drawingml_3d::Static3dShapeRasterization::Multisample8
+          },
+        },
+        scene,
+        projection,
+        shape,
+        options,
+      );
+    } else {
+      let source_boundary = common::drawingml_shape_raster::static_3d_raster_source_boundary(
+        &display_items,
+        raster_bounds,
+        raster.pixels_per_point,
+      );
+      common::drawingml_3d::apply_static_3d_with_source_boundary(
+        &mut raster.image,
+        scene,
+        // The source bitmap uses pixel-edge coordinates; PowerPoint's
+        // projected 3-D viewport uses Direct3D 9 integer pixel centers.
+        // Retained meshes select that convention through their sample grid
+        // or geometry_mapping above. The raster fallback needs the same
+        // conversion after projection, without shifting texture coordinates,
+        // normals, camera angles, or the physical source rectangle.
+        projection.with_viewport_translation_px(-0.5, -0.5),
+        shape,
+        options,
+        source_boundary.as_ref(),
+      );
+    }
   }
   if !effects.effects.is_empty() {
     common::drawingml_image_effects::scale_container_pixel_lengths(
       &mut effects,
       raster.pixels_per_point / (96.0 / 72.0),
     );
-    common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
+    if common::drawingml_image_effects::apply_container_to_padded_image_with_sources_on_raster(
       &mut raster.image,
       &effects,
-      -relative_left * raster.pixels_per_point,
-      -relative_top * raster.pixels_per_point,
-      context.bounds.size.width.0 * raster.pixels_per_point,
-      context.bounds.size.height.0 * raster.pixels_per_point,
+      common::drawingml_image_effects::ImageEffectSourceGeometry {
+        paint_left_px: (paint_bounds.left_pt - relative_left) * raster.pixels_per_point,
+        paint_top_px: (paint_bounds.top_pt - relative_top) * raster.pixels_per_point,
+        paint_width_px: (paint_bounds.right_pt - paint_bounds.left_pt) * raster.pixels_per_point,
+        paint_height_px: (paint_bounds.bottom_pt - paint_bounds.top_pt) * raster.pixels_per_point,
+        shadow_anchor_left_px: -relative_left * raster.pixels_per_point,
+        shadow_anchor_top_px: -relative_top * raster.pixels_per_point,
+        shadow_anchor_width_px: context.bounds.size.width.0 * raster.pixels_per_point,
+        shadow_anchor_height_px: context.bounds.size.height.0 * raster.pixels_per_point,
+        anchor_left_px: -relative_left * raster.pixels_per_point,
+        anchor_top_px: -relative_top * raster.pixels_per_point,
+        anchor_width_px: context.bounds.size.width.0 * raster.pixels_per_point,
+        anchor_height_px: context.bounds.size.height.0 * raster.pixels_per_point,
+        ramp_left_px: -relative_left * raster.pixels_per_point,
+        ramp_top_px: -relative_top * raster.pixels_per_point,
+        ramp_width_px: context.bounds.size.width.0 * raster.pixels_per_point,
+        ramp_height_px: context.bounds.size.height.0 * raster.pixels_per_point,
+      },
       common::drawingml_image_effects::ImageEffectSourceImages {
         fill: raster.fill_image.as_ref(),
         line: raster.line_image.as_ref(),
@@ -7691,7 +8453,65 @@ fn finish_shape_effect_raster(
         reflection_paint: None,
         bounds: Default::default(),
       },
-    );
+      reflection_raster_scale,
+    )
+    .is_none()
+    {
+      return false;
+    }
+  }
+  let mut image_bounds = if let Some(target) = static_target {
+    target.display_bounds
+  } else if uniform_static_raster_grid {
+    // This source is painted/projected at a uniform density, then allocated
+    // with outward integer extents. Compressing it back into the fractional
+    // requested extent changes every projected coordinate. Preserve the
+    // actual sample spacing; explicitly mapped targets above own their own
+    // independent display transform.
+    raster.bounds_at_pixel_density(raster_bounds.origin)
+  } else {
+    raster_bounds
+  };
+  if let Some(sample) = backdrop_sample_bounds {
+    let bounds = |rect: common::Rect| common::drawingml_image_effects::EffectOutputBounds {
+      left_pt: rect.origin.x.0,
+      top_pt: rect.origin.y.0,
+      right_pt: rect.origin.x.0 + rect.size.width.0,
+      bottom_pt: rect.origin.y.0 + rect.size.height.0,
+    };
+    if let Some(target) = common::drawingml_image_effects::effect_bitmap_target_with_rounding_modes(
+      bounds(sample),
+      bounds(raster_bounds),
+      raster.pixels_per_point,
+      raster.image.width(),
+      raster.image.height(),
+      common::drawingml_image_effects::EffectBitmapTargetRounding {
+        // Working padding is integral on this sample lattice. Recover that
+        // integer after the f32 page-coordinate round trip; floor would turn
+        // e.g. 2.99996 into a one-pixel crop displacement.
+        offset_x: common::drawingml_image_effects::EffectBitmapOffsetRounding::Nearest,
+        offset_y: common::drawingml_image_effects::EffectBitmapOffsetRounding::Nearest,
+        extent: common::drawingml_image_effects::EffectBitmapExtentRounding::Ceil,
+      },
+    ) {
+      raster.image = image::imageops::crop_imm(
+        &raster.image,
+        target.left_px,
+        target.top_px,
+        target.width_px,
+        target.height_px,
+      )
+      .to_image();
+      image_bounds = sample;
+      if line_surface_bounds.is_some() {
+        image_bounds = powerpoint_line_shadow_image_bounds(
+          sample,
+          raster.image.width(),
+          raster.image.height(),
+          raster.pixels_per_point,
+        );
+      }
+    }
   }
   let mut png = Cursor::new(Vec::new());
   if PngEncoder::new(&mut png)
@@ -7706,17 +8526,21 @@ fn finish_shape_effect_raster(
     return false;
   }
   let effect_image = PageItem::Image(ImageItem {
-    x_pt: raster_bounds.origin.x.0,
-    y_pt: raster_bounds.origin.y.0,
-    width_pt: raster_bounds.size.width.0,
-    height_pt: raster_bounds.size.height.0,
+    x_pt: image_bounds.origin.x.0,
+    y_pt: image_bounds.origin.y.0,
+    width_pt: image_bounds.size.width.0,
+    height_pt: image_bounds.size.height.0,
     crop: ImageCrop::default(),
     clip_path: simple_glow_exclusion_clip,
     rotation_deg: 0.0,
     flip_horizontal: false,
     flip_vertical: false,
     data: Bytes::from(png.into_inner()),
-    content_type: Some("image/png".to_string()),
+    content_type: Some(if context.scene3d.is_some() && context.shape3d.is_some() {
+      "application/vnd.ooxmlsdk.powerpoint-static-3d+png".to_string()
+    } else {
+      "image/png".to_string()
+    }),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -7735,6 +8559,39 @@ fn finish_shape_effect_raster(
   items.push(effect_image);
   items.extend(semantic_overlays);
   true
+}
+
+fn realize_powerpoint_extruded_source_strokes(items: &mut [common::DisplayItem<'_>]) {
+  // PowerPoint retains the authored Line.Weight, but its extruded source
+  // realizes positive outlines at no less than 1 pt. Exact-config Screen
+  // and Print controls at .01/.5/.75/1 pt have byte-identical A8; 1.01 pt
+  // changes it, as do 1.5/2/2.01/2.5 pt. Zero-depth controls do not clamp.
+  // Apply this before both widened bounds and source painting. Keep absent
+  // strokes absent, and leave non-extruded vectors and their XML untouched.
+  for item in items {
+    let stroke = match item {
+      common::DisplayItem::Path(path) => path.stroke.as_mut(),
+      common::DisplayItem::Rect(rect) => rect.stroke.as_mut(),
+      common::DisplayItem::Line(line) => Some(&mut line.stroke),
+      _ => None,
+    };
+    if let Some(stroke) = stroke
+      && stroke.width.0 > 0.0
+    {
+      stroke.width.0 = stroke.width.0.max(1.0);
+    }
+  }
+}
+
+fn uniform_image_paint_opacity(image: &image::DynamicImage) -> Option<f32> {
+  if !image.color().has_alpha() {
+    return Some(1.0);
+  }
+  let mut pixels = image.pixels();
+  let alpha = pixels.next()?.2[3];
+  pixels
+    .all(|(_, _, pixel)| pixel[3] == alpha)
+    .then_some(f32::from(alpha) / 255.0)
 }
 
 fn shape_behind_effects(
@@ -7769,6 +8626,38 @@ fn shape_behind_effects(
     kind: ImageEffectContainerKind::Sibling,
     effects: behind,
   })
+}
+
+fn shape_shadow_working_bounds(
+  required: common::Rect,
+  sample: common::Rect,
+  pixels_per_point: f32,
+) -> common::Rect {
+  let axis = |near: f32, length: f32, origin: f32, sample_length: f32| {
+    let scale = f64::from(pixels_per_point);
+    let far =
+      (f64::from(near) + f64::from(length)).max(f64::from(origin) + f64::from(sample_length));
+    let near = f64::from(near).min(f64::from(origin));
+    let first = ((near - f64::from(origin)) * scale).floor();
+    let last = ((far - f64::from(origin)) * scale).ceil();
+    (
+      (f64::from(origin) + first / scale) as f32,
+      ((last - first) / scale) as f32,
+    )
+  };
+  let (left, width) = axis(
+    required.origin.x.0,
+    required.size.width.0,
+    sample.origin.x.0,
+    sample.size.width.0,
+  );
+  let (top, height) = axis(
+    required.origin.y.0,
+    required.size.height.0,
+    sample.origin.y.0,
+    sample.size.height.0,
+  );
+  common_rect(left, top, width, height)
 }
 
 fn simple_shape_glow(
@@ -7810,6 +8699,105 @@ fn effect_source_stroke_outset_pt(items: &[common::DisplayItem<'_>]) -> f32 {
     };
     outset.max(item_outset)
   })
+}
+
+fn shape_paint_bounds(
+  items: &[common::DisplayItem<'_>],
+  frame: common::Rect,
+) -> common::drawingml_image_effects::EffectOutputBounds {
+  let mut bounds = common::drawingml_image_effects::EffectOutputBounds {
+    left_pt: 0.0,
+    top_pt: 0.0,
+    right_pt: frame.size.width.0,
+    bottom_pt: frame.size.height.0,
+  };
+  if let Some(stroke) = common::drawingml_stroke::display_items_stroke_bounds(items) {
+    bounds.left_pt = bounds.left_pt.min(stroke.origin.x.0 - frame.origin.x.0);
+    bounds.top_pt = bounds.top_pt.min(stroke.origin.y.0 - frame.origin.y.0);
+    bounds.right_pt = bounds
+      .right_pt
+      .max(stroke.origin.x.0 + stroke.size.width.0 - frame.origin.x.0);
+    bounds.bottom_pt = bounds
+      .bottom_pt
+      .max(stroke.origin.y.0 + stroke.size.height.0 - frame.origin.y.0);
+  }
+  bounds
+}
+
+/// PowerPoint's blurred straight-line source reserves conservative cap bounds,
+/// independently of the visible stroke. Flat caps retain the terminal pen disk;
+/// square caps reserve their circumscribed disk at both ends. The terminal disk
+/// follows path direction, including flips, rather than a page-right outset.
+/// Same-options Office width/cap/flip/H/V and 15/30/45/60-degree controls establish
+/// this allocation contract. It must not change foreground caps or widened ink.
+fn powerpoint_line_shadow_surface_bounds(
+  items: &[common::DisplayItem<'_>],
+  frame: common::Rect,
+) -> Option<common::drawingml_image_effects::EffectOutputBounds> {
+  let (start, end, stroke) = common::drawingml_shape_raster::powerpoint_shadow_line(items)?;
+  let dx = end.x.0 - start.x.0;
+  let dy = end.y.0 - start.y.0;
+  let length = dx.hypot(dy);
+  if !length.is_finite() || length <= f32::EPSILON {
+    return None;
+  }
+  let half_width = stroke.width.0 * 0.5;
+  let nx = -dy / length * half_width;
+  let ny = dx / length * half_width;
+  let mut bounds = common::drawingml_image_effects::EffectOutputBounds {
+    left_pt: f32::INFINITY,
+    top_pt: f32::INFINITY,
+    right_pt: f32::NEG_INFINITY,
+    bottom_pt: f32::NEG_INFINITY,
+  };
+  let mut include = |x: f32, y: f32| {
+    bounds.left_pt = bounds.left_pt.min(x - frame.origin.x.0);
+    bounds.top_pt = bounds.top_pt.min(y - frame.origin.y.0);
+    bounds.right_pt = bounds.right_pt.max(x - frame.origin.x.0);
+    bounds.bottom_pt = bounds.bottom_pt.max(y - frame.origin.y.0);
+  };
+  for point in [start, end] {
+    include(point.x.0 - nx, point.y.0 - ny);
+    include(point.x.0 + nx, point.y.0 + ny);
+  }
+  let cap = stroke.cap.unwrap_or(common::StrokeCap::Flat);
+  let radius = if cap == common::StrokeCap::Square {
+    half_width * std::f32::consts::SQRT_2
+  } else {
+    half_width
+  };
+  for point in [Some(end), (cap != common::StrokeCap::Flat).then_some(start)]
+    .into_iter()
+    .flatten()
+  {
+    include(point.x.0 - radius, point.y.0 - radius);
+    include(point.x.0 + radius, point.y.0 + radius);
+  }
+  Some(bounds)
+}
+
+/// The placed image stops half an *actual* sample before the source range's
+/// far edge. Integer allocation can make that step differ from nominal DPI.
+fn powerpoint_line_shadow_image_bounds(
+  sample: common::Rect,
+  width: u32,
+  height: u32,
+  pixels_per_point: f32,
+) -> common::Rect {
+  let half_nominal_sample = 0.5 / pixels_per_point;
+  common_rect(
+    sample.origin.x.0,
+    sample.origin.y.0,
+    (sample.size.width.0 + half_nominal_sample) * (1.0 - 0.5 / width as f32),
+    (sample.size.height.0 + half_nominal_sample) * (1.0 - 0.5 / height as f32),
+  )
+}
+
+fn shape_shadow_exclusion_clip_path(
+  items: &[common::DisplayItem<'_>],
+  page: super::slide::SlideSize,
+) -> Vec<common::PathCommand> {
+  simple_shape_glow_exclusion_clip_path(items, common_rect(0.0, 0.0, page.width_pt, page.height_pt))
 }
 
 fn simple_shape_glow_exclusion_clip_path(
@@ -8105,6 +9093,29 @@ fn shape_line_stroke(
   Some(stroke)
 }
 
+fn drawing_paths_bounds(paths: &[common::DrawingPath]) -> Option<common::Rect> {
+  // For a page-fixed gradient, Office fits the brush to the transformed
+  // geometry, not the transformed frame corners. A rotated chevron is the
+  // distinguishing counterexample; curves need their analytical extrema.
+  let bounds = paths
+    .iter()
+    .filter(|path| !path.commands.is_empty())
+    .map(|path| {
+      let path = kurbo::BezPath::from_vec(common::drawingml_geometry::mapped_path_elements(
+        &path.commands,
+        |point| kurbo::Point::new(f64::from(point.x.0), f64::from(point.y.0)),
+      ));
+      kurbo::Shape::bounding_box(&path)
+    })
+    .reduce(|a, b| a.union(b))?;
+  Some(common_rect(
+    bounds.x0 as f32,
+    bounds.y0 as f32,
+    bounds.width() as f32,
+    bounds.height() as f32,
+  ))
+}
+
 fn shape_gradient_path(
   import: &PowerPointImport,
   slide: &SlidePersist,
@@ -8114,7 +9125,7 @@ fn shape_gradient_path(
   line: Option<&DisplayStroke>,
 ) -> Option<Vec<common::PathItem<'static>>> {
   let resolved_background;
-  let (effective_fill, definition_bounds) = if matches!(fill.kind, FillKind::SlideBackground) {
+  let (effective_fill, mut definition_bounds) = if matches!(fill.kind, FillKind::SlideBackground) {
     resolved_background = resolved_slide_background_fill(import, slide)?;
     (
       &resolved_background,
@@ -8139,9 +9150,9 @@ fn shape_gradient_path(
         .gradient_stop_choice
         .as_ref()
         .and_then(Color::from_gradient_stop_choice)?;
-      let paint = display_paint_for_slide(
+      let paint = display_paint_for_optional_slide_with_transform_precision(
         import,
-        slide,
+        Some(slide),
         &color,
         effective_fill.placeholder_color.as_ref(),
       )?;
@@ -8171,9 +9182,16 @@ fn shape_gradient_path(
   let follows_shape_transform = (rotate_with_shape || shape.scene3d.is_some())
     && has_shape_transform
     && !matches!(fill.kind, FillKind::SlideBackground);
+  let paths = shape_drawing_paths(shape, frame)?;
   let (angle_degrees, gradient_line, scaled, path, interpolation) =
     match gradient.gradient_fill_choice.as_ref()? {
       a::GradientFillChoice::LinearGradientFill(linear) => {
+        if has_shape_transform
+          && !follows_shape_transform
+          && !matches!(fill.kind, FillKind::SlideBackground)
+        {
+          definition_bounds = drawing_paths_bounds(&paths).unwrap_or(definition_bounds);
+        }
         let scaled = linear.scaled.as_ref().is_some_and(|value| value.as_bool());
         let local_angle_degrees = linear.angle.unwrap_or_default() as f32 / 60_000.0;
         let gradient_line = follows_shape_transform.then(|| {
@@ -8193,7 +9211,7 @@ fn shape_gradient_path(
           gradient_line,
           scaled,
           None,
-          powerpoint_fixed_output_linear_gradient_interpolation(stops.len()),
+          powerpoint_fixed_output_linear_gradient_interpolation(&stops),
         )
       }
       a::GradientFillChoice::PathGradientFill(path) => {
@@ -8225,7 +9243,7 @@ fn shape_gradient_path(
     path,
   });
   Some(
-    shape_drawing_paths(shape, frame)?
+    paths
       .into_iter()
       .map(|path| {
         let closed = path
@@ -8893,32 +9911,15 @@ fn transform_image_data_to_png(
   if width == 0 || height == 0 {
     return None;
   }
-  // lclCropGraphic rounds the srcRect-derived quotients against bitmap pixels
-  // and creates a cropped bitmap before assigning it as custom-shape fill.
-  let left = ((width as f32) * crop.left)
-    .round()
-    .clamp(0.0, width as f32) as u32;
-  let top = ((height as f32) * crop.top)
-    .round()
-    .clamp(0.0, height as f32) as u32;
-  let right = ((width as f32) * crop.right)
-    .round()
-    .clamp(0.0, width as f32) as u32;
-  let bottom = ((height as f32) * crop.bottom)
-    .round()
-    .clamp(0.0, height as f32) as u32;
-  if left + right >= width || top + bottom >= height {
+  let (left, cropped_width) =
+    common::drawingml_image_crop::source_interval(width, crop.left, crop.right);
+  let (top, cropped_height) =
+    common::drawingml_image_crop::source_interval(height, crop.top, crop.bottom);
+  if cropped_width == 0 || cropped_height == 0 {
     return None;
   }
 
-  image = image::imageops::crop_imm(
-    &image,
-    left,
-    top,
-    width - left - right,
-    height - top - bottom,
-  )
-  .to_image();
+  image = image::imageops::crop_imm(&image, left, top, cropped_width, cropped_height).to_image();
   // lclMirrorGraphic mirrors custom-shape fill bitmaps directly instead of
   // relying on a shape-level bitmap flip.
   if flip_horizontal {
@@ -9017,30 +10018,7 @@ fn lower_text_body(
   summary: Option<&mut PptxLayoutSummary>,
 ) {
   let item_start = items.len();
-  let adjusted_text_body;
   let visible_shape_rotation = shape_visual_rotation_degrees(shape);
-  let text_body = if visible_shape_rotation.abs() > f32::EPSILON
-    && text_body
-      .display_properties
-      .text_camera_z_rotation
-      .is_some()
-  {
-    adjusted_text_body = {
-      let mut text_body = text_body.clone();
-      let shape_rotation = (visible_shape_rotation * 60_000.0).round() as i32;
-      text_body.display_properties.text_area_rotation = Some(
-        text_body
-          .display_properties
-          .text_area_rotation
-          .unwrap_or_default()
-          + shape_rotation,
-      );
-      text_body
-    };
-    &adjusted_text_body
-  } else {
-    text_body
-  };
   let text_box = text_box_metrics(shape, offset, text_body);
   // A preset text warp is shape geometry, so its paths use the outer shape
   // coordinate space. The bodyPr insets still constrain ordinary paragraph
@@ -9061,6 +10039,11 @@ fn lower_text_body(
       image_resources: Some(&context.slide.image_resources),
       page_index: context.page_index,
       fixed_output: context.fixed_output,
+      camera_text_shape_rotation_deg: text_body
+        .display_properties
+        .text_camera_z_rotation
+        .is_some()
+        .then_some(visible_shape_rotation),
     },
     text_box,
     word_art_target_frame,
@@ -9126,6 +10109,7 @@ fn lower_text_body_at_with_font_ref(
       font_reference,
       shape_hyperlink_url,
       word_art_target_frame: Some(word_art_target_frame),
+      camera_text_shape_rotation_deg: context.camera_text_shape_rotation_deg,
       ..TextStyleLoweringInputs::default()
     },
     TextLoweringRuntime {
@@ -9146,6 +10130,7 @@ struct TextBodyLoweringContext<'a> {
   image_resources: Option<&'a HashMap<String, ImageResource>>,
   page_index: usize,
   fixed_output: PptxFixedOutputProfile,
+  camera_text_shape_rotation_deg: Option<f32>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -9158,6 +10143,7 @@ struct TextStyleLoweringInputs<'a> {
   auto_fit_font_scale: Option<f32>,
   rotation_center_pt: Option<(f32, f32)>,
   word_art_target_frame: Option<TextFrame>,
+  camera_text_shape_rotation_deg: Option<f32>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -9290,6 +10276,21 @@ fn lower_text_body_at_with_style_and_scale(
     text_body.display_properties.camera_z_rotation_degrees(),
     &mut text_metrics,
   );
+  if let Some(rotation_deg) = style_inputs.camera_text_shape_rotation_deg {
+    let shape_frame = style_inputs.word_art_target_frame.unwrap_or(frame);
+    // Camera revolution rotates the laid-out content about its own center;
+    // the owning xfrm rotates that result about the outer shape center, not
+    // the inset text frame. Adding their angles while replacing the pivot
+    // loses the translation between these independent coordinate systems.
+    rotate_text_items_about(
+      &mut items[item_start..],
+      (
+        shape_frame.x_pt + shape_frame.width_pt / 2.0,
+        shape_frame.y_pt + shape_frame.height_pt / 2.0,
+      ),
+      rotation_deg,
+    );
+  }
   // Materialize character effects before the owning shape's effect graph is
   // evaluated. This preserves DrawingML's inner-text-then-outer-shape
   // composition order; the slide-wide pass also catches chart text produced
@@ -9371,6 +10372,29 @@ fn apply_text_camera_z_rotation(
   }
 }
 
+fn rotate_text_items_about(items: &mut [PageItem], center: (f32, f32), rotation_deg: f32) {
+  if rotation_deg.rem_euclid(360.0).abs() <= f32::EPSILON {
+    return;
+  }
+  for item in items {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    let old_center = text.rotation_center_pt.unwrap_or((text.x_pt, text.y_pt));
+    let new_center = rotate_point(
+      old_center.0,
+      old_center.1,
+      center.0,
+      center.1,
+      rotation_deg.to_radians(),
+    );
+    text.x_pt += new_center.0 - old_center.0;
+    text.y_pt += new_center.1 - old_center.1;
+    text.rotation_center_pt = Some(new_center);
+    text.style.rotation_deg += rotation_deg;
+  }
+}
+
 fn materialize_drawingml_text_effects(
   items: &mut [PageItem],
   text_metrics: &mut TextMetrics,
@@ -9398,7 +10422,7 @@ fn materialize_drawingml_text_effects(
       },
     );
     if fixed_output.forbids_transparency {
-      omit_powerpoint_text_outer_shadow_for_transparency_conformance(&mut effects);
+      omit_powerpoint_outer_shadow_for_transparency_conformance(&mut effects);
     }
     let static3d = text.style.drawingml_text_static3d.clone();
     if effects.effects.is_empty() && static3d.is_none() {
@@ -9721,13 +10745,16 @@ fn materialize_drawingml_text_effects(
   }
 }
 
-fn omit_powerpoint_text_outer_shadow_for_transparency_conformance(
+fn omit_powerpoint_outer_shadow_for_transparency_conformance(
   effects: &mut common::drawingml_image_effects::ImageEffectContainer,
 ) {
   // The campaign contains three fixed-output references produced from the
   // same Text_withShadow_100chars.pptx bytes. PowerPoint omits rPr/effectLst
   // outerShdw only for PDF/A-1; changing Tagged PDF alone retains it. The
   // 45541 Header/Footer pair independently exercises the same branch. Keep
+  // the same rule for shape effect lists: line, gradient rectangle and title
+  // frame PDF/A-1 on/off controls all omit the shadow while retaining source
+  // vectors. The fixed-output profile belongs to both consumers. Keep
   // the evidence boundary at the top-level effect list: bevel/static 3-D,
   // glow, reflection, and nested effect DAG semantics are not changed here.
   if effects.kind != common::drawingml_image_effects::ImageEffectContainerKind::Sibling {
@@ -10674,13 +11701,31 @@ fn rotated_text_area_center(frame: TextFrame, rotation_deg: f32) -> Option<(f32,
 }
 
 fn text_box_metrics(shape: &Shape, offset: DisplayOffset, text_body: &TextBody) -> TextFrame {
-  text_body_frame(
-    offset.x_pt(shape.position.x),
-    offset.y_pt(shape.position.y),
-    offset.width_pt(shape.size.cx),
-    offset.height_pt(shape.size.cy),
-    text_body,
-  )
+  let width = shape.size.cx as f64;
+  let height = shape.size.cy as f64;
+  let rectangle = match shape.custom_shape_properties.geometry.as_ref() {
+    Some(CustomShapeGeometry::Custom(geometry)) => {
+      custom_geometry::text_rectangle(geometry, width, height)
+    }
+    Some(CustomShapeGeometry::Preset(preset)) => {
+      preset_geometry::text_rectangle(preset, width, height)
+    }
+    None => None,
+  };
+  let shape_left = offset.x_pt(shape.position.x);
+  let shape_top = offset.y_pt(shape.position.y);
+  let shape_width = offset.width_pt(shape.size.cx);
+  let shape_height = offset.height_pt(shape.size.cy);
+  let (left, top, text_width, text_height) =
+    rectangle.map_or((shape_left, shape_top, shape_width, shape_height), |rect| {
+      (
+        shape_left + shape_width * (rect.x0 / width) as f32,
+        shape_top + shape_height * (rect.y0 / height) as f32,
+        shape_width * (rect.width() / width) as f32,
+        shape_height * (rect.height() / height) as f32,
+      )
+    });
+  text_body_frame(left, top, text_width, text_height, text_body)
 }
 
 fn text_body_frame(
@@ -12246,7 +13291,11 @@ fn aligned_paragraph_x(
 ) -> f32 {
   match alignment {
     a::TextAlignmentTypeValues::Center => {
-      paragraph_x + ((column_width - line_width) / 2.0).max(0.0)
+      // Keep the center fixed even when a glyph overflows a narrow or collapsed
+      // text frame. Clamping this signed offset incorrectly left-aligns it.
+      // Office width/alignment controls establish that right-aligned overflow
+      // remains clamped, so it deliberately retains its separate policy below.
+      paragraph_x + (column_width - line_width) / 2.0
     }
     a::TextAlignmentTypeValues::Right => paragraph_x + (column_width - line_width).max(0.0),
     a::TextAlignmentTypeValues::Left
@@ -15207,10 +16256,11 @@ fn display_paint_for_optional_slide_with_transform_precision(
   color: &Color,
   placeholder_color: Option<&Color>,
 ) -> Option<DisplayPaint> {
-  // DrawingML effect colors use the same ordered color-transform pipeline as
-  // format-scheme styles. In particular, ECMA-376 defines satMod=200% as
-  // doubling saturation; Office keeps that intermediate value above 100%
-  // until the resulting sRGB channels are clipped.
+  // Office gradient/effect colors retain precision across ordered transforms,
+  // like format-scheme styles. Office's fixed-output saturation overflow is
+  // observable in both effect images and gradient function endpoints (for
+  // example tdf125551); ECMA-376's satMod attribute prose instead specifies
+  // a 100% limit. Keep this Office behavior explicit, not a normative claim.
   let mut scheme_resolver = |token| match slide {
     Some(slide) => import
       .get_scheme_color_record_for_slide(slide, token)
@@ -15236,6 +16286,139 @@ fn color_opacity(alpha: i32) -> f32 {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn extruded_source_stroke_minimum_preserves_absence_and_wider_lines() {
+    for (authored, realized) in [
+      (0.0, 0.0),
+      (0.01, 1.0),
+      (0.5, 1.0),
+      (0.75, 1.0),
+      (1.0, 1.0),
+      (1.01, 1.01),
+      (1.5, 1.5),
+      (2.5, 2.5),
+    ] {
+      let stroke = common::Stroke {
+        width: common::Pt(authored),
+        ..Default::default()
+      };
+      let mut items = [
+        common::DisplayItem::Path(common::PathItem {
+          stroke: Some(stroke.clone()),
+          ..Default::default()
+        }),
+        common::DisplayItem::Rect(common::RectItem {
+          stroke: Some(stroke.clone()),
+          ..Default::default()
+        }),
+        common::DisplayItem::Line(common::LineItem {
+          start: common_point(0.0, 0.0),
+          end: common_point(10.0, 0.0),
+          stroke: stroke.clone(),
+          kind: common::LineKind::Stroke,
+        }),
+        common::DisplayItem::Path(common::PathItem::default()),
+      ];
+      realize_powerpoint_extruded_source_strokes(&mut items);
+      let expected = common::Stroke {
+        width: common::Pt(realized),
+        ..stroke
+      };
+      assert!(
+        matches!(&items[0], common::DisplayItem::Path(path) if path.stroke.as_ref() == Some(&expected))
+      );
+      assert!(
+        matches!(&items[1], common::DisplayItem::Rect(rect) if rect.stroke.as_ref() == Some(&expected))
+      );
+      assert!(matches!(&items[2], common::DisplayItem::Line(line) if line.stroke == expected));
+      assert!(matches!(&items[3], common::DisplayItem::Path(path) if path.stroke.is_none()));
+    }
+  }
+
+  #[test]
+  fn picture_paint_opacity_does_not_include_rasterized_clip_coverage() {
+    let rgb = image::DynamicImage::ImageRgb8(image::RgbImage::new(3, 2));
+    assert_eq!(uniform_image_paint_opacity(&rgb), Some(1.0));
+    for alpha in [0, 64, 128, 255] {
+      let mut source = image::RgbaImage::from_pixel(3, 2, image::Rgba([16, 32, 48, alpha]));
+      source.put_pixel(0, 0, image::Rgba([250, 150, 50, alpha]));
+      assert_eq!(
+        uniform_image_paint_opacity(&source.clone().into()),
+        Some(f32::from(alpha) / 255.0)
+      );
+      source.put_pixel(2, 1, image::Rgba([16, 32, 48, alpha.wrapping_add(1)]));
+      assert_eq!(uniform_image_paint_opacity(&source.into()), None);
+    }
+  }
+
+  #[test]
+  fn powerpoint_static_3d_grid_retains_world_phase_and_scene_aa_guard() {
+    use common::drawingml_image_effects::{ImageEffectContainer, ImageEffectContainerKind};
+    let empty = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![],
+    };
+    let frame = |shift: f32, width_scale: f32| {
+      crate::model::common_rect(
+        4_114_483.0 / 12_700.0 + shift,
+        476_592.0 / 12_700.0 + shift,
+        813_661.0 / 12_700.0 * width_scale,
+        5_749_202.0 / 12_700.0,
+      )
+    };
+    // Original-config Office position controls: extent alone is unchanged.
+    for (shift, expected) in [(0.0, (87, 606)), (0.25, (88, 606)), (0.5, (87, 605))] {
+      let target =
+        powerpoint_static_3d_raster_target(frame(shift, 1.0), &empty, 96.0 / 72.0).unwrap();
+      assert_eq!(
+        (target.mapping.width_px, target.mapping.height_px),
+        expected
+      );
+      assert_eq!(target.geometry_mapping.scale_x, target.mapping.scale_x);
+      assert_eq!(target.geometry_mapping.scale_y, target.mapping.scale_y);
+      assert_eq!(
+        target.geometry_mapping.translate_x,
+        target.mapping.translate_x - 0.5
+      );
+      assert_eq!(
+        target.geometry_mapping.translate_y,
+        target.mapping.translate_y - 0.5
+      );
+    }
+    let mut shadow = common::drawingml_image_effects::offset_outer_shadow_with_identity(
+      0.0,
+      2.2 / units::POINTS_PER_CSS_PIXEL,
+      ResolvedEffectColor {
+        color: RgbColor { r: 0, g: 0, b: 0 },
+        alpha: 82,
+      },
+    );
+    let ImageEffect::OuterShadow { blur_radius_px, .. } = &mut shadow.effects[0] else {
+      unreachable!()
+    };
+    *blur_radius_px = 3.5 / units::POINTS_PER_CSS_PIXEL;
+    for (width_scale, dpi, expected) in [
+      (0.5, 96.0, (54, 615)),
+      (1.0, 96.0, (97, 615)),
+      (2.0, 96.0, (182, 615)),
+      (0.5, 200.0, (111, 1280)),
+      (1.0, 200.0, (200, 1280)),
+      (2.0, 200.0, (378, 1280)),
+    ] {
+      let target =
+        powerpoint_static_3d_raster_target(frame(0.0, width_scale), &shadow, dpi / 72.0).unwrap();
+      assert_eq!(
+        (target.mapping.width_px, target.mapping.height_px),
+        expected
+      );
+      assert!((target.display_bounds.origin.x.0 - 320.16).abs() < 0.001);
+      assert!((target.display_bounds.origin.y.0 - 35.88).abs() < 0.001);
+      assert!((target.display_bounds.size.height.0 - (460.32 - 36.0 / dpi)).abs() < 0.001);
+    }
+    assert!(powerpoint_static_3d_raster_target(frame(0.0, 1.0), &empty, 0.0).is_none());
+    assert!(powerpoint_static_3d_raster_target(frame(0.0, 0.0), &empty, 96.0 / 72.0).is_none());
+  }
 
   #[test]
   fn pptx_fixed_output_profile_carries_the_layout_bitmap_intent() {
@@ -15303,6 +16486,405 @@ mod tests {
   }
 
   #[test]
+  fn powerpoint_shape_shadow_uses_balanced_not_glow_density_tiers() {
+    let profile = PptxFixedOutputProfile {
+      raster_dpi: 96.0,
+      forbids_transparency: false,
+    };
+    for (radius_emu, divisor) in [
+      (0, 1),
+      (12700, 1),
+      (36575, 1),
+      (36576, 1),
+      (36577, 2),
+      (40000, 2),
+      (73151, 2),
+      (73152, 2),
+      (73153, 3),
+      (152400, 5),
+      (304800, 9),
+    ] {
+      assert_eq!(
+        profile.simple_shape_shadow_pixels_per_point(radius_emu as f32 / 9525.0),
+        profile.pixels_per_point() / divisor as f32,
+        "radius={radius_emu} EMU",
+      );
+    }
+  }
+
+  #[test]
+  fn powerpoint_reflection_keeps_configured_density_and_own_sample_range() {
+    use common::drawingml_image_effects::EffectOutputBounds;
+    let profile = PptxFixedOutputProfile {
+      raster_dpi: 96.0,
+      forbids_transparency: false,
+    };
+    for (height, radius, expected, dimensions) in [
+      (78.0, 0.0, [605.4, 107.88, 84.345, 77.865], (113, 104)),
+      (78.0, 0.5, [604.8, 107.28, 85.545, 79.065], (115, 106)),
+      (78.0, 3.0, [602.4, 104.88, 89.970, 83.490], (60, 56)),
+      (78.0, 6.0, [599.4, 101.88, 95.595, 89.115], (43, 40)),
+      (156.0, 0.0, [605.4, 185.88, 84.345, 155.865], (113, 208)),
+      (156.0, 0.5, [604.8, 185.28, 85.545, 157.065], (115, 210)),
+      (156.0, 3.0, [602.4, 182.88, 89.970, 161.490], (60, 108)),
+      (156.0, 6.0, [599.4, 179.88, 95.595, 167.115], (43, 75)),
+    ] {
+      let density = profile.simple_shape_shadow_pixels_per_point(radius * 96.0 / 72.0);
+      let sample = common::drawingml_shape_raster::office_shape_shadow_bitmap_sample_bounds(
+        common_rect(605.5, 30.0, 84.5, height),
+        EffectOutputBounds {
+          left_pt: -radius,
+          top_pt: height - radius,
+          right_pt: 84.5 + radius,
+          bottom_pt: 2.0 * height + radius,
+        },
+        radius,
+        density,
+      );
+      for (actual, expected) in [
+        sample.origin.x.0,
+        sample.origin.y.0,
+        sample.size.width.0,
+        sample.size.height.0,
+      ]
+      .into_iter()
+      .zip(expected)
+      {
+        assert!(
+          (actual - expected).abs() < 0.0001,
+          "{height}/{radius}: {actual} != {expected}"
+        );
+      }
+      assert_eq!(
+        (
+          (sample.size.width.0 * density).ceil() as u32,
+          (sample.size.height.0 * density).ceil() as u32
+        ),
+        dimensions
+      );
+    }
+  }
+
+  #[test]
+  fn powerpoint_unblurred_shadow_keeps_printer_boundary_ownership() {
+    use common::drawingml_image_effects::EffectOutputBounds;
+    let distance = 11.0 / 2.0_f32.sqrt();
+    for (dx, dy, expected) in [
+      (0.0, 0.0, [181.56, 201.36, 266.94, 29.94]),
+      (0.06, 0.0, [181.56, 201.36, 266.94, 29.94]),
+      (0.09, 0.0, [181.68, 201.36, 266.82, 29.94]),
+      (0.12, 0.0, [181.68, 201.36, 266.94, 29.94]),
+      (0.0, 0.06, [181.56, 201.48, 266.94, 29.82]),
+      (0.0, 0.12, [181.56, 201.48, 266.94, 29.94]),
+    ] {
+      let frame = common_rect(
+        2213113.0 / 12700.0 + dx,
+        2464904.0 / 12700.0 + dy,
+        3379304.0 / 12700.0,
+        369332.0 / 12700.0,
+      );
+      let sample = common::drawingml_shape_raster::office_shape_shadow_bitmap_sample_bounds(
+        frame,
+        EffectOutputBounds {
+          left_pt: distance - 0.375,
+          top_pt: distance - 0.375,
+          right_pt: frame.size.width.0 + distance + 0.375,
+          bottom_pt: frame.size.height.0 + distance + 0.375,
+        },
+        0.0,
+        200.0 / 72.0,
+      );
+      for (actual, expected) in [
+        sample.origin.x.0,
+        sample.origin.y.0,
+        sample.size.width.0,
+        sample.size.height.0,
+      ]
+      .into_iter()
+      .zip(expected)
+      {
+        assert!((actual - expected).abs() < 0.0001, "{actual} vs {expected}");
+      }
+    }
+  }
+
+  #[test]
+  fn powerpoint_shape_shadow_working_padding_preserves_the_sample_lattice() {
+    let pixels_per_point = 48.0 / 72.0;
+    let source = common_rect(92.8504, 247.8504, 126.2992, 8.2992);
+    for (dx, dy) in [
+      (0.0, 0.0),
+      (3.0, 0.0),
+      (0.0, 3.0),
+      (-15.0, 0.0),
+      (0.0, 15.0),
+    ] {
+      let sample = common_rect(92.64 + dx, 249.24 + dy, 125.97, 7.89);
+      let working = shape_shadow_working_bounds(source, sample, pixels_per_point);
+      for (near, length, sample_near, sample_length, source_near, source_length) in [
+        (
+          working.origin.x.0,
+          working.size.width.0,
+          sample.origin.x.0,
+          sample.size.width.0,
+          source.origin.x.0,
+          source.size.width.0,
+        ),
+        (
+          working.origin.y.0,
+          working.size.height.0,
+          sample.origin.y.0,
+          sample.size.height.0,
+          source.origin.y.0,
+          source.size.height.0,
+        ),
+      ] {
+        assert!(near <= sample_near + 0.0001);
+        assert!(near <= source_near + 0.0001);
+        assert!(near + length >= sample_near + sample_length - 0.0001);
+        assert!(near + length >= source_near + source_length - 0.0001);
+        let offset = (sample_near - near) * pixels_per_point;
+        assert!((offset - offset.round()).abs() < 0.0001);
+        let extent = length * pixels_per_point;
+        assert!((extent - extent.round()).abs() < 0.0001);
+      }
+    }
+  }
+
+  #[test]
+  fn powerpoint_shape_shadow_crop_recovers_integral_padding_after_page_round_trip() {
+    use common::drawingml_image_effects::{
+      EffectBitmapExtentRounding, EffectBitmapOffsetRounding, EffectBitmapTargetRounding,
+      EffectOutputBounds, effect_bitmap_target_with_rounding_modes,
+    };
+    let pixels_per_point = 100.0 / 72.0;
+    for sample_left in [461.4, 487.68, 513.84, 540.12, 566.4] {
+      let sample = common_rect(sample_left, 503.52, 25.68, 26.28);
+      let required = common_rect(sample_left - 2.0, 501.54, 27.8, 28.3);
+      let working = shape_shadow_working_bounds(required, sample, pixels_per_point);
+      let bounds = |rect: common::Rect| EffectOutputBounds {
+        left_pt: rect.origin.x.0,
+        top_pt: rect.origin.y.0,
+        right_pt: rect.origin.x.0 + rect.size.width.0,
+        bottom_pt: rect.origin.y.0 + rect.size.height.0,
+      };
+      let target = effect_bitmap_target_with_rounding_modes(
+        bounds(sample),
+        bounds(working),
+        pixels_per_point,
+        40,
+        40,
+        EffectBitmapTargetRounding {
+          offset_x: EffectBitmapOffsetRounding::Nearest,
+          offset_y: EffectBitmapOffsetRounding::Nearest,
+          extent: EffectBitmapExtentRounding::Ceil,
+        },
+      )
+      .unwrap();
+      assert_eq!((target.left_px, target.top_px), (3, 3));
+      assert_eq!((target.width_px, target.height_px), (36, 37));
+    }
+  }
+
+  #[test]
+  fn powerpoint_shape_shadow_output_grid_keeps_working_and_display_bounds_separate() {
+    let frame = common_rect(380.36362, 189.63638, 199.27274, 160.72726);
+    let output = common::drawingml_image_effects::EffectOutputBounds {
+      left_pt: -4.5,
+      top_pt: -3.0,
+      right_pt: frame.size.width.0 + 4.5,
+      bottom_pt: frame.size.height.0 + 6.0,
+    };
+    let sample = common::drawingml_shape_raster::office_shape_shadow_bitmap_sample_bounds(
+      frame,
+      output,
+      4.5,
+      48.0 / 72.0,
+    );
+    for (actual, expected) in [
+      (sample.origin.x.0, 375.72),
+      (sample.origin.y.0, 186.48),
+      (sample.size.width.0, 207.81),
+      (sample.size.height.0, 169.29),
+    ] {
+      assert!((actual - expected).abs() < 0.0002, "{actual} != {expected}");
+    }
+    assert_eq!(
+      common::drawingml_shape_raster::raster_pixel_extent(sample.size.width.0, 48.0 / 72.0),
+      139
+    );
+    assert_eq!(
+      common::drawingml_shape_raster::raster_pixel_extent(sample.size.height.0, 48.0 / 72.0),
+      113
+    );
+  }
+
+  #[test]
+  fn powerpoint_blurred_line_allocation_keeps_cap_and_path_direction() {
+    for vertical in [false, true] {
+      for flip in [false, true] {
+        for (cap, near, far) in [
+          (
+            common::StrokeCap::Flat,
+            if flip { -3.0 } else { 0.0 },
+            if flip { 120.0 } else { 123.0 },
+          ),
+          (common::StrokeCap::Round, -3.0, 123.0),
+          (
+            common::StrokeCap::Square,
+            -3.0 * std::f32::consts::SQRT_2,
+            120.0 + 3.0 * std::f32::consts::SQRT_2,
+          ),
+        ] {
+          let frame = common_rect(
+            96.0,
+            252.0,
+            if vertical { 0.0 } else { 120.0 },
+            if vertical { 120.0 } else { 0.0 },
+          );
+          let end = common_point(
+            frame.origin.x.0 + frame.size.width.0,
+            frame.origin.y.0 + frame.size.height.0,
+          );
+          let item = common::DisplayItem::Line(common::LineItem {
+            kind: Default::default(),
+            start: if flip { end } else { frame.origin },
+            end: if flip { frame.origin } else { end },
+            stroke: common::Stroke {
+              width: common::Pt(6.0),
+              color: common::Color {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 255,
+              },
+              cap: Some(cap),
+              ..Default::default()
+            },
+          });
+          let bounds = powerpoint_line_shadow_surface_bounds(&[item], frame).unwrap();
+          let (low, high) = if vertical {
+            (bounds.top_pt, bounds.bottom_pt)
+          } else {
+            (bounds.left_pt, bounds.right_pt)
+          };
+          assert!((low - near).abs() < 0.0001);
+          assert!((high - far).abs() < 0.0001);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn powerpoint_blurred_line_placement_uses_the_allocated_sample_step() {
+    // Native Office flat 2/6pt, round 6pt and square 6pt controls. Source
+    // bounds retain the full printer guard; placement drops half a sample.
+    for (source_width, source_height, width, height, expected_width, expected_height) in [
+      (127.68, 8.64, 85, 6, 126.92894, 7.92),
+      (129.72, 12.72, 87, 8, 128.97448, 11.925),
+      (132.72, 12.72, 88, 8, 131.96591, 11.925),
+      (135.12, 15.12, 90, 10, 134.36934, 14.364),
+    ] {
+      let sample = common_rect(92.64, 249.24, source_width - 0.75, source_height - 0.75);
+      let placed = powerpoint_line_shadow_image_bounds(sample, width, height, 48.0 / 72.0);
+      assert_eq!(placed.origin, sample.origin);
+      assert!((placed.size.width.0 - expected_width).abs() < 0.0001);
+      assert!((placed.size.height.0 - expected_height).abs() < 0.0001);
+    }
+  }
+
+  #[test]
+  fn shape_backdrop_bounds_retain_zero_axis_stroke_and_logical_frame() {
+    for (width, height) in [(120.0, 0.0), (0.0, 120.0)] {
+      let frame = common_rect(96.0, 252.0, width, height);
+      let line = common::DisplayItem::Path(common::PathItem {
+        bounds: frame,
+        commands: vec![
+          common::PathCommand::MoveTo(frame.origin),
+          common::PathCommand::LineTo(common_point(96.0 + width, 252.0 + height)),
+        ],
+        stroke: Some(common::Stroke {
+          width: common::Pt(2.0),
+          color: common::Color {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 255,
+          },
+          cap: Some(common::StrokeCap::Flat),
+          ..Default::default()
+        }),
+        ..Default::default()
+      });
+      let bounds = shape_paint_bounds(&[line], frame);
+      if height == 0.0 {
+        assert_eq!((bounds.left_pt, bounds.right_pt), (0.0, 120.0));
+        assert_eq!((bounds.top_pt, bounds.bottom_pt), (-1.0, 1.0));
+      } else {
+        assert_eq!((bounds.left_pt, bounds.right_pt), (-1.0, 1.0));
+        assert_eq!((bounds.top_pt, bounds.bottom_pt), (0.0, 120.0));
+      }
+      let empty = shape_paint_bounds(&[], frame);
+      assert_eq!((empty.left_pt, empty.top_pt), (0.0, 0.0));
+      assert_eq!((empty.right_pt, empty.bottom_pt), (width, height));
+    }
+  }
+
+  #[test]
+  fn shape_paint_bounds_retain_centered_arrow_stroke_and_miter_tips() {
+    let frame = common_rect(0.0, 24.827166, 510.2362, 85.03937);
+    let point = |x: f32, y: f32| common_point(frame.origin.x.0 + x, frame.origin.y.0 + y);
+    let w = frame.size.width.0;
+    let h = frame.size.height.0;
+    let mut path = common::PathItem {
+      bounds: frame,
+      commands: vec![
+        common::PathCommand::MoveTo(point(0.0, h * 0.25)),
+        common::PathCommand::LineTo(point(w - h * 0.5, h * 0.25)),
+        common::PathCommand::LineTo(point(w - h * 0.5, 0.0)),
+        common::PathCommand::LineTo(point(w, h * 0.5)),
+        common::PathCommand::LineTo(point(w - h * 0.5, h)),
+        common::PathCommand::LineTo(point(w - h * 0.5, h * 0.75)),
+        common::PathCommand::LineTo(point(0.0, h * 0.75)),
+        common::PathCommand::Close,
+      ],
+      closed: true,
+      ..Default::default()
+    };
+    for width in [0.5, 1.0, 2.0] {
+      path.stroke = Some(common::Stroke {
+        width: common::Pt(width),
+        color: common::Color {
+          r: 0,
+          g: 176,
+          b: 80,
+          a: 255,
+        },
+        join: Some(common::StrokeJoin::Miter { limit: Some(8.0) }),
+        alignment: Some(common::StrokeAlignment::Center),
+        ..Default::default()
+      });
+      let bounds = shape_paint_bounds(&[common::DisplayItem::Path(path.clone())], frame);
+      let tip = width * 0.5 * (1.0 + std::f32::consts::SQRT_2);
+      assert!((bounds.left_pt + width * 0.5).abs() < 0.0001);
+      assert!((bounds.top_pt + tip).abs() < 0.0001);
+      assert!((bounds.right_pt - w - width / std::f32::consts::SQRT_2).abs() < 0.0001);
+      assert!((bounds.bottom_pt - h - tip).abs() < 0.0001);
+    }
+    path.stroke = None;
+    let bounds = shape_paint_bounds(&[common::DisplayItem::Path(path)], frame);
+    assert_eq!(
+      (
+        bounds.left_pt,
+        bounds.top_pt,
+        bounds.right_pt,
+        bounds.bottom_pt
+      ),
+      (0.0, 0.0, w, h)
+    );
+  }
+
+  #[test]
   fn shape_effect_source_bounds_include_only_the_visible_stroke_outset() {
     let item = |alignment| {
       common::DisplayItem::Rect(common::RectItem {
@@ -15322,6 +16904,37 @@ mod tests {
     assert_eq!(
       effect_source_stroke_outset_pt(&[item(Some(common::StrokeAlignment::Inside))]),
       0.0
+    );
+  }
+
+  #[test]
+  fn powerpoint_shadow_complement_uses_page_not_bitmap_edges() {
+    let shape = common::DisplayItem::Rect(common::RectItem {
+      bounds: common_rect(174.26, 194.09, 266.09, 29.08),
+      fill: common::Fill::Solid(common::Color {
+        r: 68,
+        g: 114,
+        b: 196,
+        a: 255,
+      }),
+      stroke: None,
+    });
+    let clip = shape_shadow_exclusion_clip_path(
+      &[shape],
+      super::super::slide::SlideSize {
+        width_pt: 960.0,
+        height_pt: 540.0,
+      },
+    );
+    assert_eq!(clip.len(), 10);
+    assert_eq!(clip[0], common::PathCommand::MoveTo(common_point(0.0, 0.0)));
+    assert_eq!(
+      clip[2],
+      common::PathCommand::LineTo(common_point(960.0, 540.0))
+    );
+    assert_eq!(
+      clip[5],
+      common::PathCommand::MoveTo(common_point(174.26, 194.09))
     );
   }
 
@@ -15371,6 +16984,124 @@ mod tests {
     assert!(
       simple_shape_glow_exclusion_clip_path(&[filled.clone(), filled], raster_bounds).is_empty()
     );
+  }
+
+  #[test]
+  fn paragraph_alignment_preserves_overflowing_text_center() {
+    for width in [0.0, 4.0, 10.0, 20.0] {
+      for line_width in [0.0, 7.0, 12.0] {
+        let centered =
+          aligned_paragraph_x(100.0, width, line_width, a::TextAlignmentTypeValues::Center);
+        assert_eq!(centered + line_width / 2.0, 100.0 + width / 2.0);
+        assert_eq!(
+          aligned_paragraph_x(100.0, width, line_width, a::TextAlignmentTypeValues::Left),
+          100.0
+        );
+        assert_eq!(
+          aligned_paragraph_x(100.0, width, line_width, a::TextAlignmentTypeValues::Right),
+          100.0 + (width - line_width).max(0.0)
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn shape_text_rectangle_precedes_insets_and_retains_group_scale() {
+    let mut shape = Shape::new(ShapeService::Custom);
+    shape.position.x = 127000;
+    shape.position.y = 254000;
+    shape.size.cx = 2540000;
+    shape.size.cy = 3810000;
+    shape.custom_shape_properties.geometry =
+      Some(CustomShapeGeometry::Preset(Box::new(a::PresetGeometry {
+        preset: a::ShapeTypeValues::DownArrow,
+        ..Default::default()
+      })));
+    let body = TextBody {
+      body_properties: Some(Box::new(a::BodyProperties {
+        left_inset: Some("0".parse().unwrap()),
+        top_inset: Some("127000".parse().unwrap()),
+        right_inset: Some("1524000".parse().unwrap()),
+        bottom_inset: Some("0".parse().unwrap()),
+        ..Default::default()
+      })),
+      ..Default::default()
+    };
+    let frame = text_box_metrics(&shape, DisplayOffset::default(), &body);
+    // Shaft text rect [50,0,150,250]pt plus shape origin; 120pt right inset
+    // exceeds its 100pt width, so collapse symmetrically before layout.
+    assert_eq!(
+      (frame.x_pt, frame.y_pt, frame.width_pt, frame.height_pt),
+      (50.0, 30.0, 0.0, 240.0)
+    );
+    let frame = text_box_metrics(&shape, DisplayOffset(Affine::scale(2.0)), &body);
+    assert_eq!(
+      (frame.x_pt, frame.y_pt, frame.width_pt, frame.height_pt),
+      (120.0, 50.0, 80.0, 490.0)
+    );
+    shape.custom_shape_properties.geometry = None;
+    let frame = text_box_metrics(&shape, DisplayOffset::default(), &body);
+    assert_eq!(
+      (frame.x_pt, frame.y_pt, frame.width_pt, frame.height_pt),
+      (10.0, 30.0, 80.0, 290.0)
+    );
+  }
+
+  #[test]
+  fn text_rotation_composes_independent_centers_without_losing_translation() {
+    for first in [-90.0_f32, -45.0, 0.0, 30.0, 90.0] {
+      for second in [-90.0_f32, -45.0, 0.0, 30.0, 360.0] {
+        let mut items = Vec::new();
+        let old_center = (18.0, 47.0);
+        let outer_center = (130.0, 180.0);
+        push_text_item(
+          &mut items,
+          TextItemPlacement {
+            x_pt: 10.0,
+            y_pt: 20.0,
+            line_height_pt: 24.0,
+            rotation_center_pt: Some(old_center),
+            paragraph_bidi: false,
+          },
+          "Hgp".into(),
+          TextStyle {
+            rotation_deg: first,
+            ..TextStyle::default()
+          },
+          None,
+        );
+        rotate_text_items_about(&mut items, outer_center, second);
+        let PageItem::Text(text) = &items[0] else {
+          panic!("rotation must preserve the text item");
+        };
+        for point in [(10.0, 20.0), (100.0, 40.0), (-20.0, 75.0)] {
+          let first_result = rotate_point(
+            point.0,
+            point.1,
+            old_center.0,
+            old_center.1,
+            first.to_radians(),
+          );
+          let expected = rotate_point(
+            first_result.0,
+            first_result.1,
+            outer_center.0,
+            outer_center.1,
+            second.to_radians(),
+          );
+          let center = text.rotation_center_pt.unwrap();
+          let actual = rotate_point(
+            point.0 + text.x_pt - 10.0,
+            point.1 + text.y_pt - 20.0,
+            center.0,
+            center.1,
+            text.style.rotation_deg.to_radians(),
+          );
+          assert!((actual.0 - expected.0).abs() < 0.0001, "{first}/{second}");
+          assert!((actual.1 - expected.1).abs() < 0.0001, "{first}/{second}");
+        }
+      }
+    }
   }
 
   #[test]
@@ -15773,7 +17504,7 @@ mod tests {
       },
     );
 
-    omit_powerpoint_text_outer_shadow_for_transparency_conformance(&mut effects);
+    omit_powerpoint_outer_shadow_for_transparency_conformance(&mut effects);
 
     assert_eq!(effects.effects.len(), 2);
     assert!(matches!(effects.effects[0], ImageEffect::Glow { .. }));
@@ -15782,7 +17513,7 @@ mod tests {
     let mut effect_dag =
       common::drawingml_image_effects::offset_outer_shadow_with_identity(2.0, 3.0, color);
     effect_dag.kind = common::drawingml_image_effects::ImageEffectContainerKind::Tree;
-    omit_powerpoint_text_outer_shadow_for_transparency_conformance(&mut effect_dag);
+    omit_powerpoint_outer_shadow_for_transparency_conformance(&mut effect_dag);
     assert!(matches!(
       effect_dag.effects[0],
       ImageEffect::OuterShadow { .. }
@@ -16239,19 +17970,104 @@ mod tests {
   }
 
   #[test]
+  fn powerpoint_page_fixed_gradient_uses_path_extrema_not_frame_corners() {
+    let commands = [
+      (0.0, 0.0),
+      (130.0, 0.0),
+      (180.0, 50.0),
+      (130.0, 100.0),
+      (0.0, 100.0),
+      (50.0, 50.0),
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(index, (x, y))| {
+      if index == 0 {
+        common::PathCommand::MoveTo(common_point(x, y))
+      } else {
+        common::PathCommand::LineTo(common_point(x, y))
+      }
+    })
+    .chain([common::PathCommand::Close])
+    .collect::<Vec<_>>();
+    for (angle, width, height) in [
+      (0.0_f64, 180.0, 100.0),
+      (30.0, 180.88457, 151.60254),
+      (90.0, 100.0, 180.0),
+    ] {
+      let paths = [common::DrawingPath {
+        commands: transform_commands(commands.clone(), Affine::rotate(angle.to_radians())),
+        ..Default::default()
+      }];
+      let bounds = drawing_paths_bounds(&paths).unwrap();
+      assert!((bounds.size.width.0 - width).abs() < 0.0001);
+      assert!((bounds.size.height.0 - height).abs() < 0.0001);
+    }
+    // Bézier control points are not extrema: the arch reaches y=75, not100.
+    let curve = [common::DrawingPath {
+      commands: vec![
+        common::PathCommand::MoveTo(common_point(0.0, 0.0)),
+        common::PathCommand::CubicTo {
+          control1: common_point(0.0, 100.0),
+          control2: common_point(100.0, 100.0),
+          end: common_point(100.0, 0.0),
+        },
+      ],
+      ..Default::default()
+    }];
+    assert_eq!(drawing_paths_bounds(&curve).unwrap().size.height.0, 75.0);
+    assert!(drawing_paths_bounds(&[]).is_none());
+  }
+
+  #[test]
   fn powerpoint_two_stop_linear_gradient_uses_fixed_output_gamma_sigma() {
+    let stops = [0.0, 1.0].map(|position| common::GradientStop {
+      position,
+      color: common::Color::default(),
+      scheme: None,
+    });
     assert_eq!(
-      powerpoint_fixed_output_linear_gradient_interpolation(2),
+      powerpoint_fixed_output_linear_gradient_interpolation(&stops),
       common::GradientInterpolation::PowerPointGammaSigma
     );
   }
 
   #[test]
   fn powerpoint_multistop_linear_gradient_keeps_authored_stop_interpolation() {
+    let stops = [0.0, 0.5, 1.0].map(|position| common::GradientStop {
+      position,
+      color: common::Color::default(),
+      scheme: None,
+    });
     assert_eq!(
-      powerpoint_fixed_output_linear_gradient_interpolation(3),
+      powerpoint_fixed_output_linear_gradient_interpolation(&stops),
       common::GradientInterpolation::LinearSrgb
     );
+  }
+
+  #[test]
+  fn powerpoint_two_stop_linear_gradient_with_interior_endpoints_is_linear() {
+    for [first, last] in [
+      [0.00001, 1.0],
+      [0.25, 1.0],
+      [0.5, 1.0],
+      [0.0, 0.99999],
+      [0.0, 0.75],
+      [0.0, 0.5],
+      [0.25, 0.75],
+      [0.00001, 0.99999],
+    ] {
+      let stops = [first, last].map(|position| common::GradientStop {
+        position,
+        color: common::Color::default(),
+        scheme: None,
+      });
+      assert_eq!(
+        powerpoint_fixed_output_linear_gradient_interpolation(&stops),
+        common::GradientInterpolation::LinearSrgb,
+        "interior endpoint range {first}..{last} requires boundary padding"
+      );
+    }
   }
 
   #[test]

@@ -661,7 +661,7 @@ impl CalcSheet {
       .is_some_and(|range| range.start != address)
   }
 
-  pub(crate) fn uses_legacy_excel12_cell_text_print_grid(&self) -> bool {
+  pub(crate) fn uses_legacy_excel12_fixed_output_grid(&self) -> bool {
     self.metrics.legacy_excel12_calibri_fixed_output_grid
   }
 
@@ -775,6 +775,28 @@ impl CalcSheet {
     (
       x_pt,
       base.y_pt + units::emu_to_points(marker.row_offset_emu),
+    )
+  }
+
+  pub(crate) fn fixed_output_drawing_row_offset_pt(&self, row: u32, scale: f32) -> f32 {
+    self.geometry.fixed_output_drawing_row_offset_pt(
+      row,
+      scale,
+      self.metrics.legacy_excel12_calibri_fixed_output_grid,
+    )
+  }
+
+  pub(crate) fn fixed_output_drawing_marker_position_pt(
+    &self,
+    marker: &super::drawing::DrawingMarkerModel,
+    scale: f32,
+  ) -> (f32, f32) {
+    let (x, _) = self.marker_position_pt(marker);
+    let row = u32::try_from(marker.row).unwrap_or(0).saturating_add(1);
+    (
+      x * scale,
+      self.fixed_output_drawing_row_offset_pt(row, scale)
+        + units::emu_to_points(marker.row_offset_emu) * scale,
     )
   }
 
@@ -1227,16 +1249,42 @@ impl SheetGeometry {
     if !quantize_each_row {
       return self.row_offset_pt(row) * scale;
     }
+    self.mapped_row_offset_pt(row, |height| {
+      units::quantize_points_to_office_print_grid(height * scale)
+    })
+  }
+
+  fn fixed_output_drawing_row_offset_pt(
+    &self,
+    row: u32,
+    scale: f32,
+    realize_each_row: bool,
+  ) -> f32 {
+    if !realize_each_row {
+      return self.row_offset_pt(row) * scale;
+    }
+    // DrawingML markers refer to the realized cell grid (ECMA-376
+    // §20.5.2.15/27/28), not a sum of logical row heights. Excel's legacy
+    // drawing owner first realizes each row on its 600dpi device and then
+    // realizes the scaled row. Office controls at 20/60/120/160% distinguish
+    // this from both a single rounding and a blanket upward rounding.
+    self.mapped_row_offset_pt(row, |height| {
+      units::quantize_points_to_office_print_grid(
+        units::quantize_points_to_office_print_grid(height) * scale,
+      )
+    })
+  }
+
+  fn mapped_row_offset_pt(&self, row: u32, map_height: impl Fn(f32) -> f32) -> f32 {
     let preceding_rows = row.saturating_sub(1);
-    let default_height_pt =
-      units::quantize_points_to_office_print_grid(self.default_row_height_pt * scale);
+    let default_height_pt = map_height(self.default_row_height_pt);
     let mut offset_pt = preceding_rows as f32 * default_height_pt;
     for geometry in self
       .row_overrides
       .iter()
       .take_while(|geometry| geometry.index <= preceding_rows)
     {
-      let height_pt = units::quantize_points_to_office_print_grid(geometry.height_pt * scale);
+      let height_pt = map_height(geometry.height_pt);
       offset_pt += height_pt - default_height_pt;
     }
     offset_pt
@@ -2608,6 +2656,41 @@ mod tests {
     assert_eq!(geometry.default_row_height_pt, 13.5);
     assert_eq!(geometry.fixed_output_row_offset_pt(12, 1.0, true), 149.16);
     assert_eq!(geometry.fixed_output_row_offset_pt(12, 0.95, true), 141.24);
+  }
+
+  #[test]
+  fn drawing_rows_realize_before_scaling_and_accumulating() {
+    let mut metrics = SheetMetrics::default();
+    metrics.format.default_row_height = 13.5;
+    let geometry = SheetGeometry::new(&metrics, &[], None, None);
+    // Same configured Office paper transform (95%) at several worksheet
+    // zooms; 20/60% reject ceil, 120/160% reject a single rounding.
+    for (scale, pitch) in [
+      (1.0, 13.56),
+      (0.19, 2.52),
+      (0.57, 7.68),
+      (0.76, 10.32),
+      (0.9025, 12.24),
+      (0.95, 12.84),
+      (1.14, 15.48),
+      (1.52, 20.64),
+    ] {
+      for row in [1, 2, 9, 17] {
+        let expected = (row - 1) as f32 * pitch;
+        assert!(
+          (geometry.fixed_output_drawing_row_offset_pt(row, scale, true) - expected).abs() < 1.0e-4,
+          "row={row}, scale={scale}"
+        );
+        assert_eq!(
+          geometry.fixed_output_drawing_row_offset_pt(row, scale, false),
+          geometry.row_offset_pt(row) * scale
+        );
+      }
+    }
+    // The logical grid and existing cell-text realization are not rewritten
+    // to compensate for this drawing-owner defect.
+    assert_eq!(geometry.default_row_height_pt, 13.5);
+    assert!((geometry.fixed_output_row_offset_pt(2, 1.14, true) - 15.36).abs() < 1.0e-4);
   }
 
   #[test]

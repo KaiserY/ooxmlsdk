@@ -19067,7 +19067,7 @@ fn drawingml_picture_image(
   let properties = drawing_picture_image_properties(picture, &styles.theme_colors, Some(images))?;
   let relationship_id = properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
-  let image_data = image_data_with_effects(resource, &properties);
+  let image_data = image_data_with_effects(resource, &properties.effects);
   let (image_data, crop) = materialize_source_rectangle_crop(
     image_data,
     properties.crop,
@@ -19193,7 +19193,7 @@ fn drawingml_blip_shape_image_fill(
     drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default(), Some(images))?;
   let relationship_id = image_properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
-  let image_data = image_data_with_effects(resource, &image_properties);
+  let image_data = image_data_with_effects(resource, &image_properties.effects);
 
   Some(InlineShapeImageFill {
     data: image_data.data,
@@ -19617,7 +19617,7 @@ fn drawing_image_data(
 ) -> Option<ImportedImageData> {
   let relationship_id = properties.relationship_id.as_deref()?;
   if let Some(resource) = images.by_relationship_id.get(relationship_id) {
-    return Some(image_data_with_effects(resource, properties));
+    return Some(image_data_with_effects(resource, &properties.effects));
   }
   properties.external_link.then(|| ImportedImageData {
     data: Bytes::new(),
@@ -19627,16 +19627,16 @@ fn drawing_image_data(
 
 fn image_data_with_effects(
   resource: &package::ImageResource,
-  properties: &DrawingImageProperties,
+  effects: &[ImageEffect],
 ) -> ImportedImageData {
-  if properties.effects.is_empty() {
+  if effects.is_empty() {
     return ImportedImageData {
       data: resource.data.clone(),
       content_type: resource.content_type.clone(),
     };
   }
 
-  let mut effects = properties.effects.clone();
+  let mut effects = effects.to_vec();
   let color_change_tolerance =
     common::drawingml_image_effects::color_change_tolerance(resource.content_type.as_deref());
   common::drawingml_image_effects::set_color_change_tolerance(&mut effects, color_change_tolerance);
@@ -19683,17 +19683,7 @@ fn materialize_source_rectangle_crop(
   };
   let width = source.width();
   let height = source.height();
-  let source_interval = |length: u32, leading: f32, trailing: f32| {
-    let leading = f64::from(leading.max(0.0));
-    let trailing = f64::from(trailing.max(0.0));
-    let length_f64 = f64::from(length);
-    let origin = (length_f64 * leading).round().clamp(0.0, length_f64) as u32;
-    let visible_ratio = (1.0 - leading - trailing).max(0.0);
-    let extent = (length_f64 * visible_ratio)
-      .round()
-      .clamp(0.0, f64::from(length.saturating_sub(origin))) as u32;
-    (origin, extent)
-  };
+  let source_interval = common::drawingml_image_crop::source_interval;
   let (left, cropped_width) = source_interval(width, crop.left, crop.right);
   let (top, cropped_height) = source_interval(height, crop.top, crop.bottom);
   if cropped_width == 0 || cropped_height == 0 {
@@ -20746,7 +20736,10 @@ fn vml_single_shadow_effect(shadow: &v::Shadow) -> Option<common::DrawingEffectS
       alpha: color.a,
     },
   );
-  Some(common::DrawingEffectSource::Resolved(resolved))
+  Some(common::DrawingEffectSource::VmlSingleShadow {
+    effects: resolved,
+    obscured: shadow.obscured.is_some_and(|value| value.as_bool()),
+  })
 }
 
 fn vml_shadow_offset_points(value: Option<&str>) -> Option<(f32, f32)> {
@@ -21071,7 +21064,7 @@ pub(crate) fn vml_path_geometry(
     match command {
       "m" | "t" => {
         pad_vml_path_parameters(&mut values, 2, 2);
-        for (pair_index, pair) in values.chunks_exact(2).enumerate() {
+        for (pair_index, pair) in values.as_chunks::<2>().0.iter().enumerate() {
           let point = if command == "t" {
             (current.0 + pair[0], current.1 + pair[1])
           } else {
@@ -21088,7 +21081,7 @@ pub(crate) fn vml_path_geometry(
       }
       "l" | "r" => {
         pad_vml_path_parameters(&mut values, 2, 2);
-        for pair in values.chunks_exact(2) {
+        for pair in values.as_chunks::<2>().0.iter() {
           let point = if command == "r" {
             (current.0 + pair[0], current.1 + pair[1])
           } else {
@@ -21100,7 +21093,7 @@ pub(crate) fn vml_path_geometry(
       }
       "c" | "v" => {
         pad_vml_path_parameters(&mut values, 6, 6);
-        for curve in values.chunks_exact(6) {
+        for curve in values.as_chunks::<6>().0.iter() {
           let relative = command == "v";
           let point = |x: f32, y: f32| {
             if relative {
@@ -21122,7 +21115,7 @@ pub(crate) fn vml_path_geometry(
       }
       "qx" | "qy" => {
         pad_vml_path_parameters(&mut values, 2, 2);
-        for end in values.chunks_exact(2) {
+        for end in values.as_chunks::<2>().0.iter() {
           let end = (end[0], end[1]);
           append_vml_quadrant(&mut commands, map, current, end, command == "qx");
           current = end;
@@ -21131,7 +21124,9 @@ pub(crate) fn vml_path_geometry(
       "qb" => {
         pad_vml_path_parameters(&mut values, 2, 4);
         let points = values
-          .chunks_exact(2)
+          .as_chunks::<2>()
+          .0
+          .iter()
           .map(|pair| (pair[0], pair[1]))
           .collect::<Vec<_>>();
         for (point_index, control) in points[..points.len() - 1].iter().copied().enumerate() {
@@ -21147,7 +21142,7 @@ pub(crate) fn vml_path_geometry(
       }
       "at" | "ar" | "wa" | "wr" => {
         pad_vml_path_parameters(&mut values, 8, 8);
-        for arc in values.chunks_exact(8) {
+        for arc in values.as_chunks::<8>().0.iter() {
           let left = arc[0].min(arc[2]);
           let top = arc[1].min(arc[3]);
           let right = arc[0].max(arc[2]);
@@ -21184,7 +21179,7 @@ pub(crate) fn vml_path_geometry(
       }
       "ae" | "al" => {
         pad_vml_path_parameters(&mut values, 6, 6);
-        for arc in values.chunks_exact(6) {
+        for arc in values.as_chunks::<6>().0.iter() {
           let radii = (arc[2].abs(), arc[3].abs());
           if radii.0 <= f32::EPSILON || radii.1 <= f32::EPSILON {
             return None;
@@ -22258,7 +22253,7 @@ fn vml_polyline_points(value: &str) -> Option<Vec<(f32, f32)>> {
     .map(|part| vml_measure_to_points(part.trim()))
     .collect::<Option<Vec<_>>>()?;
   let mut points = Vec::new();
-  for pair in values.chunks_exact(2) {
+  for pair in values.as_chunks::<2>().0.iter() {
     points.push((pair[0], pair[1]));
   }
   (points.len() >= 2).then_some(points)
@@ -23596,10 +23591,20 @@ fn vml_image_data(
   let mut style = vml_image_style(style);
   style.layout_in_cell = layout_in_cell;
   let (width_pt, height_pt) = style.size_pt.unwrap_or((72.0, 72.0));
+  // ECMA-376 Part 4 §19.1.2.11: grayscale defaults to false. Microsoft's
+  // VML GrayScale documentation specifies CCIR 709, the same conversion as
+  // DrawingML's grayscale image effect. Apply it to the source, before crop,
+  // placement and PDF compression; an omitted/false toggle preserves bytes.
+  let effects: &[ImageEffect] = if data.grayscale.is_some_and(|value| value.as_bool()) {
+    &[ImageEffect::Grayscale]
+  } else {
+    &[]
+  };
+  let image_data = image_data_with_effects(resource, effects);
 
   Some(InlineImage {
-    data: resource.data.clone(),
-    content_type: resource.content_type.clone(),
+    data: image_data.data,
+    content_type: image_data.content_type,
     picture_frame: None,
     picture_frame_clips_image: false,
     effects: None,
@@ -29971,7 +29976,7 @@ fn numbering_drawing_image(
   let resource = images
     .by_relationship_id
     .get(properties.relationship_id.as_deref()?)?;
-  let image_data = image_data_with_effects(resource, &properties);
+  let image_data = image_data_with_effects(resource, &properties.effects);
   Some(InlineImage {
     data: image_data.data,
     content_type: image_data.content_type,
@@ -34043,9 +34048,11 @@ mod tests {
     )
     .expect("VML shape");
     let shape = vml_shape_shape(&source, &ImageCatalog::default(), &[]).expect("painted shape");
-    let Some(common::DrawingEffectSource::Resolved(effects)) = shape.effects else {
+    let Some(common::DrawingEffectSource::VmlSingleShadow { effects, obscured }) = shape.effects
+    else {
       panic!("normalized VML shadow");
     };
+    assert!(!obscured);
     assert_eq!(
       effects.kind,
       common::drawingml_image_effects::ImageEffectContainerKind::Sibling
@@ -43168,6 +43175,74 @@ mod tests {
     assert_eq!(ruby.alignment, RubyAlignment::DistributeSpace);
     assert_eq!(ruby.raise_pt, 10.0);
     assert_eq!(ruby.guide[0].style.font_size_pt, 5.5);
+  }
+
+  #[test]
+  fn vml_image_data_grayscale_preserves_alpha_and_default_source_bytes() {
+    let colors = [
+      ([255, 0, 0], 54),
+      ([0, 255, 0], 182),
+      ([0, 0, 255], 18),
+      ([0, 0, 0], 0),
+      ([128, 128, 128], 128),
+      ([255, 255, 255], 255),
+    ];
+    let pixels: Vec<u8> = [0, 17, 128, 255]
+      .into_iter()
+      .flat_map(|alpha| {
+        colors
+          .iter()
+          .flat_map(move |(rgb, _)| [rgb[0], rgb[1], rgb[2], alpha])
+      })
+      .collect();
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(&pixels, 6, 4, image::ColorType::Rgba8.into())
+      .unwrap();
+    let mut images = ImageCatalog::default();
+    images.by_relationship_id.insert(
+      "rIdGray".into(),
+      package::ImageResource {
+        data: png.clone().into(),
+        content_type: Some("image/png".into()),
+      },
+    );
+
+    for enabled in [None, Some(false), Some(true)] {
+      let data = v::ImageData {
+        relationship_id: Some("rIdGray".into()),
+        grayscale: enabled.map(Into::into),
+        crop_left: Some("0.25".into()),
+        ..Default::default()
+      };
+      let image = vml_image_data(
+        &data,
+        Some("width:72pt;height:48pt;rotation:30"),
+        true,
+        Some("gray control".into()),
+        &images,
+      )
+      .unwrap();
+      assert_eq!((image.width_pt, image.height_pt), (72.0, 48.0));
+      assert_eq!(image.crop.left, 0.25);
+      assert_eq!(image.rotation_deg, -30.0);
+      assert_eq!(image.alt_text.as_deref(), Some("gray control"));
+      if enabled != Some(true) {
+        assert_eq!(image.data.as_ref(), png.as_slice());
+        continue;
+      }
+      let actual = image::load_from_memory(&image.data).unwrap().to_rgba8();
+      assert_eq!(actual.dimensions(), (6, 4));
+      for (row, alpha) in [0, 17, 128, 255].into_iter().enumerate() {
+        for (column, (_, gray)) in colors.iter().enumerate() {
+          assert_eq!(
+            actual.get_pixel(column as u32, row as u32).0,
+            [*gray, *gray, *gray, alpha],
+            "grayscale must use Rec.709 and leave straight alpha unchanged"
+          );
+        }
+      }
+    }
   }
 
   #[test]

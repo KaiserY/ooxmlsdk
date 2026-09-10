@@ -20,6 +20,10 @@ use super::native_png::NativeIndexedPng;
 
 const WORD_STATIC_3D_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-static-3d+png";
+const POWERPOINT_STATIC_3D_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.powerpoint-static-3d+png";
+const POWERPOINT_MODEL3D_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.powerpoint-model3d+png";
 const WORD_STATIC_3D_PHYSICAL_RGBA_CHUNK: [u8; 4] = *b"oxPr";
 const WORD_STATIC_3D_EFFECT_RGBA_CHUNK: [u8; 4] = *b"oxEr";
 const WORD_STATIC_3D_PHYSICAL_MAPPING_CHUNK: [u8; 4] = *b"oxMr";
@@ -188,7 +192,7 @@ struct RasterExportOptions {
   downsample_trigger_px: Option<RasterPixelLimits>,
   word_print_jpeg_downsample_trigger_px: Option<RasterPixelLimits>,
   exact_downsample_trigger: bool,
-  use_word_print_jpeg_gdiplus_resampler: bool,
+  use_gdiplus_jpeg_resampler: bool,
   allow_interpolation: bool,
   profile: RasterExportProfile,
 }
@@ -248,6 +252,16 @@ impl RasterExportProfile {
       }
     )
   }
+
+  fn is_power_point_screen(self) -> bool {
+    matches!(
+      self,
+      Self::MicrosoftOfficeFixedOutput {
+        document_kind: PdfDocumentKind::Pptx,
+        optimize_for: PdfOptimizeFor::Screen,
+      }
+    )
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -261,6 +275,7 @@ enum RasterOwner {
   WordLockedCanvasDevice,
   WordShapeStory,
   WordStatic3d,
+  PowerPointStatic3d,
   WordTableBorder,
   MetafilePreview,
 }
@@ -299,6 +314,14 @@ impl RasterOwner {
       .is_some_and(|value| value.eq_ignore_ascii_case(WORD_STATIC_3D_BITMAP_CONTENT_TYPE))
     {
       Self::WordStatic3d
+    } else if content_type.is_some_and(|value| {
+      value.eq_ignore_ascii_case(POWERPOINT_STATIC_3D_BITMAP_CONTENT_TYPE)
+        || value.eq_ignore_ascii_case(POWERPOINT_MODEL3D_BITMAP_CONTENT_TYPE)
+    }) {
+      // Both layout-owned 3-D surfaces retain their final grid and use the
+      // same independent associated RGB/A8 encoding. Their geometry and
+      // cached-model realization remain separate layout implementations.
+      Self::PowerPointStatic3d
     } else if content_type
       .is_some_and(|value| value.eq_ignore_ascii_case(WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE))
     {
@@ -483,7 +506,7 @@ impl RasterExportOptions {
         .then(|| RasterPixelLimits::from_display_size(display_width_pt, display_height_pt, 275))
         .flatten(),
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       // ISO 19005 forbids the image Interpolate key with a true value.
       // Preserve Office's ordinary-PDF smoothing policy, but force the
       // explicitly false archival form for every PDF/A profile.
@@ -499,10 +522,19 @@ impl RasterExportOptions {
       // The four-pixel tolerance belongs to other raster-owner policies and
       // must not pull the JPEG boundary below those measured values.
       self.exact_downsample_trigger = true;
+      // Word Print and Screen share the GDI+ bitmap realization. The Screen
+      // 419/420/421 and independent-axis controls reproduce the same Q16
+      // area switch; quality and target density remain profile-specific.
+      self.use_gdiplus_jpeg_resampler = true;
       if self.profile.is_word_print() {
         self.downsample_trigger_px = self.word_print_jpeg_downsample_trigger_px;
-        self.use_word_print_jpeg_gdiplus_resampler = true;
       }
+    }
+    // PowerPoint's JPEG/PNG 419/420/421 controls on both source axes expose
+    // the same bitmap area kernel. Its density/trigger policy is independent
+    // of Word's: selecting a sampler must not change the allocation boundary.
+    if self.profile.is_power_point_screen() && format == RasterImageFormat::Jpeg {
+      self.use_gdiplus_jpeg_resampler = true;
     }
     self
   }
@@ -541,7 +573,7 @@ impl RasterExportOptions {
     self.max_size_px = None;
     self.downsample_trigger_px = None;
     self.word_print_jpeg_downsample_trigger_px = None;
-    self.use_word_print_jpeg_gdiplus_resampler = false;
+    self.use_gdiplus_jpeg_resampler = false;
     self
   }
 
@@ -563,6 +595,44 @@ impl RasterExportOptions {
     } else {
       downsample_size(size, max_size)
     }
+  }
+
+  fn downsample_source_size(
+    self,
+    size: (u32, u32),
+    format: RasterImageFormat,
+    owner: RasterOwner,
+  ) -> Option<(u32, u32)> {
+    if owner != RasterOwner::Source
+      || !self.profile.is_power_point_screen()
+      || !matches!(format, RasterImageFormat::Png | RasterImageFormat::Jpeg)
+    {
+      return self.downsample_size(size);
+    }
+    let (target_width, target_height) = self.max_size_px?.pixels();
+    let Some(trigger) = self.downsample_trigger_px else {
+      return self.downsample_size(size);
+    };
+    let (trigger_width, trigger_height) = trigger.pixels();
+    if size.0 <= 50 || size.1 <= 50 {
+      return None;
+    }
+    // PowerPoint Screen tests each source axis against 150 DPI independently.
+    // Palette+alpha PNG, RGB PNG and JPEG controls retain 149.987 DPI, but
+    // reduce at 150 DPI. A four-pixel trigger allowance reduces too early;
+    // an OR test followed by resizing both axes also destroys untouched samples.
+    let axis = |source: u32, threshold: f64, target: f64| {
+      if f64::from(source) >= threshold {
+        (target.round() as u32).clamp(1, source)
+      } else {
+        source
+      }
+    };
+    let target = (
+      axis(size.0, trigger_width, target_width),
+      axis(size.1, trigger_height, target_height),
+    );
+    (target != size).then_some(target)
   }
 }
 
@@ -624,7 +694,7 @@ impl ImageSet {
     let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
     let mut alpha = Vec::with_capacity(width as usize * height as usize);
     let mut has_transparency = false;
-    for pixel in pixmap.data().chunks_exact(4) {
+    for pixel in pixmap.data().as_chunks::<4>().0.iter() {
       let a = u16::from(pixel[3]);
       has_transparency |= a != 255;
       for channel in &pixel[..3] {
@@ -785,6 +855,17 @@ fn decode_image(
   metafile_render_options: Option<emf_wmf::RenderOptions>,
 ) -> Result<PreparedRasterImage> {
   let owner = RasterOwner::from_content_type(content_type);
+  if owner == RasterOwner::PowerPointStatic3d {
+    // Layout has already realized the configured scene grid. Transparent
+    // working padding is not source-picture content and must not drive a
+    // second resample or the color classifier.
+    return export_decoded_image(
+      decode_dynamic_image(data, RasterImageFormat::Png)?,
+      RasterImageFormat::Png,
+      export_options.without_downsampling(),
+      owner,
+    );
+  }
   if owner == RasterOwner::MaterializedSourceRectangleCrop {
     // `a:srcRect` has already been rounded against and materialized from the
     // source pixels by the DOCX importer. Word embeds that visible source
@@ -875,8 +956,12 @@ fn decode_image(
         // marks their image XObjects `/Interpolate false`. Do not apply the
         // ordinary source-bitmap downsampling/JPEG policy to a completed GDI
         // replay; the PDF image matrix consumes that device surface directly
-        // and preserves its reconstructed soft mask.
-        prepare_sampled_image(image, false, None)
+        // and preserves its reconstructed soft mask. The decoder returns
+        // straight-alpha PNG samples, whereas Office associates the generated
+        // color plane with black and records /Matte on the mask. Carry both
+        // parts of that contract, including for binary coverage: a PDF reader
+        // can resample the color and mask before compositing them.
+        prepare_metafile_preview(image, export_options.profile.is_office_fixed_output())
       }
       content_type => Err(PdfError::Image(format!(
         "unsupported EMF/WMF raster content type: {content_type}"
@@ -893,9 +978,12 @@ fn decode_image(
     match plan.realization {
       RasterRealization::Decoded => {
         let raster = if format == RasterImageFormat::Jpeg
-          && format_export_options.use_word_print_jpeg_gdiplus_resampler
+          && (format_export_options.use_gdiplus_jpeg_resampler
+            || (format_export_options.profile.is_word()
+              && direct_jpeg_metadata(data)
+                .is_ok_and(|metadata| metadata.color_space == DirectRasterColorSpace::Gray)))
         {
-          decode_word_print_jpeg(data)?
+          decode_gdiplus_jpeg(data)?
         } else {
           decode_dynamic_image(data, format)?
         };
@@ -947,6 +1035,25 @@ fn raster_interpolation(format: RasterImageFormat, export_options: RasterExportO
   format == RasterImageFormat::Jpeg && export_options.allow_interpolation
 }
 
+fn prepare_metafile_preview(
+  mut image: PdfRasterImage,
+  office_fixed_output: bool,
+) -> Result<PreparedRasterImage> {
+  let associate_with_black = office_fixed_output && image.pixels.alpha.is_some();
+  if associate_with_black {
+    let mut pixels = Arc::unwrap_or_clone(image.pixels);
+    if let Some(alpha) = &pixels.alpha {
+      for (rgb, alpha) in pixels.rgb.as_chunks_mut::<3>().0.iter_mut().zip(alpha) {
+        for channel in rgb {
+          *channel = ((u16::from(*channel) * u16::from(*alpha) + 127) / 255) as u8;
+        }
+      }
+    }
+    image.pixels = Arc::new(pixels);
+  }
+  prepare_sampled_image(image, false, associate_with_black.then_some([0.0; 3]))
+}
+
 fn raster_compression_change_requested(
   format: RasterImageFormat,
   export_options: RasterExportOptions,
@@ -974,7 +1081,9 @@ fn should_try_jpeg(
       // were not selected by the native-image plan. Controlled opaque,
       // transparent, physical-resolution, and no-resolution PNG matrices all
       // use the same content-sensitive JPEG-versus-Flate comparison.
-      RasterOwner::Source | RasterOwner::MaterializedSourceRectangleCrop => true,
+      RasterOwner::Source
+      | RasterOwner::MaterializedSourceRectangleCrop
+      | RasterOwner::PowerPointStatic3d => true,
       // Generated metafile previews remain lossless; only an existing JPEG
       // preview participates in the host's JPEG recompression profile.
       RasterOwner::MetafilePreview => format == RasterImageFormat::Jpeg,
@@ -1048,8 +1157,11 @@ impl RasterPlan {
   ) -> Self {
     let needs_orientation =
       metadata.is_some_and(|value| value.orientation != Orientation::NoTransforms);
-    let needs_downsampling =
-      metadata.is_some_and(|value| export_options.downsample_size(value.size).is_some());
+    let needs_downsampling = metadata.is_some_and(|value| {
+      export_options
+        .downsample_source_size(value.size, format, owner)
+        .is_some()
+    });
 
     // GDI+/WIC exposes a metric pHYs chunk as a real-DPI image flag. Office
     // preserves opaque one-bit indexed sources carrying that flag at their
@@ -1194,7 +1306,7 @@ fn decode_dynamic_image(data: &[u8], format: RasterImageFormat) -> Result<Decode
   })
 }
 
-fn decode_word_print_jpeg(data: &[u8]) -> Result<DecodedRasterImage> {
+fn decode_gdiplus_jpeg(data: &[u8]) -> Result<DecodedRasterImage> {
   let mut metadata_decoder = ImageReader::with_format(Cursor::new(data), RasterImageFormat::Jpeg)
     .into_decoder()
     .map_err(|err| PdfError::Image(format!("failed to open JPEG image: {err}")))?;
@@ -1203,16 +1315,20 @@ fn decode_word_print_jpeg(data: &[u8]) -> Result<DecodedRasterImage> {
     .unwrap_or(Orientation::NoTransforms);
   let icc_profile = metadata_decoder.icc_profile().unwrap_or_default();
 
-  let mut image = if let Some(image) = super::jpeg_islow::decode_rgb(data) {
+  let mut image = if metadata_decoder.color_type() == image::ColorType::L8
+    && let Some(image) = super::jpeg_islow::decode_gray(data)
+  {
+    DynamicImage::ImageLuma8(image)
+  } else if let Some(image) = super::jpeg_islow::decode_rgb(data) {
     DynamicImage::ImageRgb8(image)
   } else {
     let mut decoder = jpeg_decoder::Decoder::new(Cursor::new(data));
     let pixels = decoder
       .decode()
-      .map_err(|err| PdfError::Image(format!("failed to decode Word Print JPEG image: {err}")))?;
+      .map_err(|err| PdfError::Image(format!("failed to decode Office JPEG image: {err}")))?;
     let info = decoder
       .info()
-      .ok_or_else(|| PdfError::Image("Word Print JPEG has no image information".to_string()))?;
+      .ok_or_else(|| PdfError::Image("Office JPEG has no image information".to_string()))?;
     let dimensions = (u32::from(info.width), u32::from(info.height));
     match info.pixel_format {
       jpeg_decoder::PixelFormat::L8 => {
@@ -1227,7 +1343,7 @@ fn decode_word_print_jpeg(data: &[u8]) -> Result<DecodedRasterImage> {
         return decode_dynamic_image(data, RasterImageFormat::Jpeg);
       }
     }
-    .ok_or_else(|| PdfError::Image("Word Print JPEG has an invalid pixel buffer".to_string()))?
+    .ok_or_else(|| PdfError::Image("Office JPEG has an invalid pixel buffer".to_string()))?
   };
 
   // System.Drawing's default Bitmap resize matches libjpeg's accurate integer
@@ -1439,9 +1555,36 @@ fn export_decoded_image(
   export_options: RasterExportOptions,
   owner: RasterOwner,
 ) -> Result<PreparedRasterImage> {
+  let office_gray_jpeg = format == RasterImageFormat::Jpeg
+    && owner == RasterOwner::Source
+    && export_options.profile.is_word()
+    && raster.image.color() == image::ColorType::L8;
   let mut resized = false;
-  if let Some(target_size) = export_options.downsample_size(raster.image.dimensions()) {
-    raster.image = resize_for_export(raster.image, target_size, export_options);
+  if let Some(target_size) =
+    export_options.downsample_source_size(raster.image.dimensions(), format, owner)
+  {
+    raster.image = if format == RasterImageFormat::Png
+      && owner == RasterOwner::Source
+      && export_options.profile.is_word()
+      && export_options.profile.is_office_screen()
+    {
+      resize_for_word_screen_png(raster.image, target_size)
+    } else if format == RasterImageFormat::Png
+      && owner == RasterOwner::Source
+      && export_options.profile.is_power_point_screen()
+      && (!raster.image.color().has_alpha()
+        || raster
+          .image
+          .pixels()
+          .all(|(_, _, pixel)| pixel[3] == u8::MAX))
+    {
+      // Include opaque RGBA produced by DrawingML blip effects. The native
+      // opaque PNG controls establish this path; transparent PowerPoint
+      // surfaces retain their independently owned alpha realization.
+      resize_for_gdiplus_bitmap(raster.image, target_size)
+    } else {
+      resize_for_export(raster.image, target_size, export_options)
+    };
     resized = true;
   }
   if resized && format == RasterImageFormat::Jpeg && export_options.profile.is_office_fixed_output()
@@ -1457,6 +1600,23 @@ fn export_decoded_image(
   let mut interpolate = raster_interpolation(format, export_options);
   if should_try_jpeg(format, export_options, owner) {
     let quality = export_options.jpeg_quality.unwrap_or(90);
+    if office_gray_jpeg {
+      // Preserve the component model before choosing its representation.
+      // Comparing an expanded RGB JPEG against deflated RGB misclassifies the
+      // native Gray JPEGs in Word's fixed-output references. Current Office
+      // also retains DCT for tiny Gray sources when its stream exceeds the
+      // raw RGB plane: independently verified for Print/Screen, dimensions,
+      // content, JFIF metadata and three authored tiny-image documents.
+      let jpeg = super::jpeg_islow_encoder::encode_gray(&raster.image.to_luma8(), quality)
+        .ok_or_else(|| {
+          PdfError::Image("failed to encode bounded Office grayscale JPEG image".to_string())
+        })?;
+      return prepare_encoded_jpeg_image(
+        jpeg,
+        raster.icc_profile,
+        export_options.allow_interpolation,
+      );
+    }
     let rgba = raster.image.to_rgba8();
     let has_alpha = rgba.pixels().any(|pixel| pixel[3] != u8::MAX);
     let jpeg_source = if has_alpha {
@@ -1484,16 +1644,34 @@ fn export_decoded_image(
       let lossless_color_bytes = deflated_rgb_size(&rgba);
       if jpeg.len() < lossless_color_bytes {
         if has_alpha {
+          if owner == RasterOwner::PowerPointStatic3d
+            || format == RasterImageFormat::Png
+              && owner == RasterOwner::Source
+              && export_options.profile.is_office_screen()
+              && (export_options.profile.is_power_point_screen()
+                || (resized && export_options.profile.is_word()))
+          {
+            // Ordinary PowerPoint Screen PNGs and reduced Word Screen PNGs
+            // keep the associated JPEG color and independent A8 plane. Their
+            // native Office controls use black Matte and interpolate the
+            // JPEG color, not SMask. Decoding JPEG back to straight RGB loses
+            // that independent reconstruction order at transparency edges.
+            return prepare_encoded_jpeg_image_with_soft_mask(
+              jpeg,
+              raster.icc_profile,
+              &rgba,
+              export_options.allow_interpolation,
+              false,
+              [0.0, 0.0, 0.0],
+            );
+          }
           let compressed_rgb = decode_dynamic_image(&jpeg, RasterImageFormat::Jpeg)?
             .image
             .to_rgb8();
-          // Word applies the configured JPEG policy to an ordinary PNG's color
-          // plane and carries transparency in a separate SMask. Krilla cannot
-          // attach a custom alpha plane to a DCT stream yet, so store the
-          // decoded JPEG samples with the original alpha. Removing the black
-          // matte first is equivalent to Word's `/Matte [0 0 0]` at decoded
-          // sample points. If interpolation is enabled, PDF's interpolation
-          // order remains a separate backend-level distinction.
+          // Other owners retain their existing straight-RGB reconstruction.
+          // Unassociation agrees with black Matte at decoded sample points,
+          // but interpolation order differs. Migrate each owner's contract
+          // with native evidence, independently of the verified path above.
           let rgb = remove_black_matte(compressed_rgb, &rgba);
           return prepare_sampled_image(
             PdfRasterImage::from_rgb_with_alpha(rgb, &rgba, raster.icc_profile),
@@ -1518,20 +1696,23 @@ fn export_decoded_image(
     interpolate = false;
   }
 
-  let screen_resized_with_alpha = resized
-    && export_options.profile.is_office_screen()
+  let associated_alpha = (resized && export_options.profile.is_office_screen()
+    || owner == RasterOwner::PowerPointStatic3d)
     && raster.image.color().has_alpha()
     && raster
       .image
       .to_rgba8()
       .pixels()
       .any(|pixel| pixel[3] != u8::MAX);
-  let image = if screen_resized_with_alpha {
+  let image = if associated_alpha {
     // GDI+ samples transparent bitmaps in associated-alpha space. Office
     // keeps those black-preblended color samples and records the association
     // with SMask/Matte. Earlier we unassociated the samples solely because
     // the backend could not write Matte; the direct image now carries that
     // association without a post-serialization dictionary replacement.
+    // PowerPoint's static-3D Flate surfaces use the same independent RGB/A8
+    // association as its JPEG surfaces (Scene3d_shape_rotation and the
+    // opaque-picture controls). Compression choice cannot change that order.
     DynamicImage::ImageRgba8(apply_black_matte(&raster.image.to_rgba8()))
   } else {
     raster.image
@@ -1540,7 +1721,7 @@ fn export_decoded_image(
   prepare_sampled_image(
     pdf_raster,
     interpolate,
-    screen_resized_with_alpha.then_some([0.0, 0.0, 0.0]),
+    associated_alpha.then_some([0.0, 0.0, 0.0]),
   )
 }
 
@@ -2201,7 +2382,9 @@ fn office_fixed_output_prefers_lossless(
     || export_options.profile.is_office_screen()
     || !matches!(
       owner,
-      RasterOwner::Source | RasterOwner::MaterializedSourceRectangleCrop
+      RasterOwner::Source
+        | RasterOwner::MaterializedSourceRectangleCrop
+        | RasterOwner::PowerPointStatic3d
     )
   {
     return false;
@@ -2215,7 +2398,19 @@ fn office_fixed_output_prefers_lossless(
     return false;
   }
 
-  let metrics = office_rgb_histogram_metrics(image);
+  let metrics = if owner == RasterOwner::PowerPointStatic3d {
+    // Scene3d_cropped_image exports DCT even though its transparent canvas
+    // makes the full plane look like a >95% palette image. Only covered
+    // samples describe the projected scene's color content.
+    office_rgb_histogram_metrics_from_pixels(
+      image
+        .pixels()
+        .filter(|pixel| pixel[3] != 0)
+        .map(|pixel| [pixel[0], pixel[1], pixel[2]]),
+    )
+  } else {
+    office_rgb_histogram_metrics(image)
+  };
   // Microsoft's document-image compression algorithm first keeps images whose
   // 256 most common exact colors cover at least 95% of the samples on the
   // palette/lossless path. Indexed and true-color encodings of the same 254
@@ -2229,7 +2424,9 @@ fn office_fixed_output_prefers_lossless(
   // PowerPoint agree that 154x141 RGB (65,142 bytes) remains lossless while
   // 155x142 RGB (66,030 bytes) enters JPEG analysis; 150x150 independently
   // rules out a longest-edge threshold and pins the boundary at 64 KiB.
-  if metrics.sample_count.saturating_mul(3) > OFFICE_SMALL_RASTER_UNCOMPRESSED_RGB_BYTES {
+  // Unlike the color histogram, this gate owns the complete stored plane.
+  let stored_samples = u64::from(image.width()) * u64::from(image.height());
+  if stored_samples.saturating_mul(3) > OFFICE_SMALL_RASTER_UNCOMPRESSED_RGB_BYTES {
     return false;
   }
 
@@ -2371,8 +2568,8 @@ fn resize_for_export(
   target_size: (u32, u32),
   export_options: RasterExportOptions,
 ) -> DynamicImage {
-  if export_options.use_word_print_jpeg_gdiplus_resampler {
-    resize_for_word_print_jpeg(image, target_size)
+  if export_options.use_gdiplus_jpeg_resampler {
+    resize_for_gdiplus_bitmap(image, target_size)
   } else if export_options.profile.is_office_screen() {
     resize_for_office_screen(image, target_size)
   } else {
@@ -2398,12 +2595,38 @@ struct GdiplusAreaAxis {
   reciprocal: u64,
 }
 
-fn resize_for_word_print_jpeg(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
+fn resize_for_gdiplus_bitmap(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
   let source_size = image.dimensions();
   if source_size.0.max(source_size.1) < GDIPLUS_BITMAP_AREA_THRESHOLD {
     return resize_for_office_screen(image, target_size);
   }
   resize_for_gdiplus_fixed_area(image, target_size)
+}
+
+fn resize_for_word_screen_png(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
+  let source_size = image.dimensions();
+  if source_size.0.max(source_size.1) < GDIPLUS_BITMAP_AREA_THRESHOLD {
+    return resize_for_office_screen(image, target_size);
+  }
+  if !image.color().has_alpha() {
+    return resize_for_gdiplus_fixed_area(image, target_size);
+  }
+
+  // PNG controls at 419/420 on either axis expose the same Q16 area kernel
+  // as large Word Print JPEGs. Filter associated color and coverage together;
+  // hidden RGB must not leak through a transparent sample. This helper keeps
+  // the caller's straight-alpha contract: its later black-matte association
+  // exactly recovers every filtered associated byte (including partial alpha).
+  let associated = apply_black_matte(&image.to_rgba8());
+  let mut resized =
+    resize_for_gdiplus_fixed_area(DynamicImage::ImageRgba8(associated), target_size).to_rgba8();
+  for pixel in resized.pixels_mut() {
+    let alpha = pixel[3];
+    for channel in &mut pixel.0[..3] {
+      *channel = remove_black_matte_component(*channel, alpha);
+    }
+  }
+  DynamicImage::ImageRgba8(resized)
 }
 
 fn resize_for_gdiplus_fixed_area(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
@@ -2717,7 +2940,7 @@ struct PdfRasterImage {
   pixels: Arc<PdfRasterPixels>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(super) struct PdfRasterPixels {
   pub(super) width: u32,
   pub(super) height: u32,
@@ -2784,7 +3007,7 @@ impl PdfRasterImage {
         }
       }
       png::ColorType::GrayscaleAlpha => {
-        for pixel in data.chunks_exact(2) {
+        for pixel in data.as_chunks::<2>().0.iter() {
           rgb.extend_from_slice(&visible_rgb(pixel[0], pixel[0], pixel[0], pixel[1]));
           alpha.push(pixel[1]);
           opaque &= pixel[1] == u8::MAX;
@@ -2794,7 +3017,7 @@ impl PdfRasterImage {
         rgb.extend_from_slice(data);
       }
       png::ColorType::Rgba => {
-        for pixel in data.chunks_exact(4) {
+        for pixel in data.as_chunks::<4>().0.iter() {
           rgb.extend_from_slice(&visible_rgb(pixel[0], pixel[1], pixel[2], pixel[3]));
           alpha.push(pixel[3]);
           opaque &= pixel[3] == u8::MAX;
@@ -2864,6 +3087,66 @@ mod tests {
   use super::*;
   use image::codecs::{jpeg::JpegEncoder as ImageJpegEncoder, tiff::TiffEncoder};
 
+  #[test]
+  fn metafile_preview_associates_color_and_declares_matte_together() {
+    let rgba = image::RgbaImage::from_raw(
+      4,
+      1,
+      vec![
+        200, 100, 50, 255, 200, 100, 50, 128, 200, 100, 50, 1, 200, 100, 50, 0,
+      ],
+    )
+    .unwrap();
+    let source = PdfRasterImage::from_dynamic_with_icc(
+      DynamicImage::ImageRgba8(rgba.clone()),
+      Some(vec![1, 2, 3]),
+    );
+    let shared_pixels = source.pixels.clone();
+    let office = prepare_metafile_preview(source, true).unwrap();
+    let expected = PdfRasterImage::from_dynamic_with_icc(
+      DynamicImage::ImageRgba8(apply_black_matte(&rgba)),
+      Some(vec![1, 2, 3]),
+    );
+    assert_sampled_image(&office, &expected, false);
+    assert_eq!(office.direct().matte, Some([0.0; 3]));
+    assert!(!office.direct().soft_mask_interpolate);
+    assert_eq!(shared_pixels.rgb[3..6], [200, 100, 50]);
+    assert_eq!(office.direct().alpha(), Some([255, 128, 1, 0].as_slice()));
+
+    let requested = prepare_metafile_preview(
+      PdfRasterImage {
+        pixels: shared_pixels,
+      },
+      false,
+    )
+    .unwrap();
+    assert!(requested.direct().matte.is_none());
+    let DirectRasterEncoding::Sampled { pixels } = &requested.direct().encoding else {
+      panic!("metafile preview must remain sampled");
+    };
+    assert_eq!(pixels.rgb[3..6], [200, 100, 50]);
+  }
+
+  #[test]
+  fn metafile_preview_binary_mask_retains_matte_but_opaque_preview_does_not() {
+    for alpha in [vec![0, 255], vec![255, 255]] {
+      let opaque = alpha.iter().all(|value| *value == 255);
+      let source = PdfRasterImage {
+        pixels: Arc::new(PdfRasterPixels {
+          width: 2,
+          height: 1,
+          rgb: vec![0, 0, 0, 200, 100, 50],
+          alpha: (!opaque).then_some(alpha),
+          icc_profile: None,
+        }),
+      };
+      let expected = source.clone();
+      let actual = prepare_metafile_preview(source, true).unwrap();
+      assert_sampled_image(&actual, &expected, false);
+      assert_eq!(actual.direct().matte, (!opaque).then_some([0.0; 3]));
+    }
+  }
+
   fn indexed_test_png(unit: Option<png::Unit>, transparent: bool) -> Vec<u8> {
     const WIDTH: u32 = 300;
     const HEIGHT: u32 = 300;
@@ -2914,6 +3197,34 @@ mod tests {
       panic!("expected DCT raster, got {:?}", direct.encoding);
     };
     assert_eq!(data.as_ref(), expected);
+  }
+
+  #[test]
+  fn office_gray_jpeg_preserves_components_across_size_and_density() {
+    for optimize_for in [PdfOptimizeFor::Print, PdfOptimizeFor::Screen] {
+      let mut options = PdfOptions {
+        optimize_for,
+        ..PdfOptions::default()
+      };
+      options.images.optimization_policy =
+        PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+      let export_options = RasterExportOptions::new(&options, 270.0, 270.0);
+      for (width, height) in [(2, 2), (8, 8), (14, 22), (32, 32), (64, 64), (128, 128)] {
+        let image =
+          image::GrayImage::from_fn(width, height, |x, y| image::Luma([(x * 13 + y * 29) as u8]));
+        let encoded = super::super::jpeg_islow_encoder::encode_gray(&image, 90).unwrap();
+        for density_unit in [0, 1, 2] {
+          let mut encoded = encoded.clone();
+          encoded[13] = density_unit;
+          let decoded = super::super::jpeg_islow::decode_gray(&encoded).unwrap();
+          let quality = export_options.jpeg_quality.unwrap();
+          let expected = super::super::jpeg_islow_encoder::encode_gray(&decoded, quality).unwrap();
+          let actual = decode_image(&encoded, Some("image/jpeg"), export_options, None).unwrap();
+          assert_eq!(actual.direct().color_space, DirectRasterColorSpace::Gray);
+          assert_dct_image(&actual, &expected, true);
+        }
+      }
+    }
   }
 
   #[test]
@@ -3038,9 +3349,9 @@ mod tests {
     assert_eq!(print.max_size_px.unwrap().pixels(), (199.0, 199.0));
     assert_eq!(print.downsample_size((295, 295)), None);
     assert_eq!(print.downsample_size((300, 300)), Some((199, 199)));
-    assert!(!print.use_word_print_jpeg_gdiplus_resampler);
+    assert!(!print.use_gdiplus_jpeg_resampler);
     let print_jpeg = print.for_raster_format(RasterImageFormat::Jpeg);
-    assert!(print_jpeg.use_word_print_jpeg_gdiplus_resampler);
+    assert!(print_jpeg.use_gdiplus_jpeg_resampler);
     let (jpeg_width, jpeg_height) = print_jpeg.max_size_px.unwrap().pixels();
     assert_eq!((jpeg_width, jpeg_height), (199.0, 199.0));
     assert_eq!(print_jpeg.downsample_size((274, 274)), None);
@@ -3053,7 +3364,7 @@ mod tests {
     assert_eq!(screen.downsample_size((144, 144)), None);
     assert_eq!(screen.downsample_size((150, 150)), Some((95, 95)));
     let screen_jpeg = screen.for_raster_format(RasterImageFormat::Jpeg);
-    assert!(!screen_jpeg.use_word_print_jpeg_gdiplus_resampler);
+    assert!(screen_jpeg.use_gdiplus_jpeg_resampler);
     assert_eq!(screen_jpeg.downsample_size((149, 149)), None);
     assert_eq!(screen_jpeg.downsample_size((150, 150)), Some((95, 95)));
 
@@ -3068,7 +3379,7 @@ mod tests {
         RasterExportOptions::new(&options, 72.0, 72.0).for_raster_format(RasterImageFormat::Jpeg);
       assert_eq!(print.jpeg_quality, Some(75));
       assert_eq!(print.max_size_px.unwrap().pixels(), (199.0, 199.0));
-      assert!(!print.use_word_print_jpeg_gdiplus_resampler);
+      assert!(!print.use_gdiplus_jpeg_resampler);
     }
 
     options.images.optimization_policy =
@@ -3382,13 +3693,273 @@ mod tests {
   }
 
   #[test]
+  fn word_screen_png_area_boundary_preserves_opaque_color_and_hidden_rgb() {
+    for (width, height) in [(419, 270), (420, 270), (270, 419), (270, 420)] {
+      let source = DynamicImage::ImageRgba8(image::RgbaImage::from_fn(width, height, |x, y| {
+        Rgba([
+          (x * 17 + y * 5) as u8,
+          (x * 3 + y * 19) as u8,
+          (x * 11 + y * 7) as u8,
+          255,
+        ])
+      }));
+      let expected = if width.max(height) < GDIPLUS_BITMAP_AREA_THRESHOLD {
+        resize_for_office_screen(source.clone(), (55, 34))
+      } else {
+        resize_for_gdiplus_fixed_area(source.clone(), (55, 34))
+      };
+      assert_eq!(
+        resize_for_word_screen_png(source, (55, 34)).to_rgba8(),
+        expected.to_rgba8()
+      );
+    }
+    for hidden in [[0, 0, 0, 0], [0, 0, 255, 0], [255, 255, 255, 0]] {
+      let source = image::RgbaImage::from_fn(420, 2, |x, _| {
+        if x % 2 == 0 {
+          Rgba([200, 0, 0, 255])
+        } else {
+          Rgba(hidden)
+        }
+      });
+      let resized =
+        resize_for_word_screen_png(DynamicImage::ImageRgba8(source), (210, 1)).to_rgba8();
+      assert!(resized.pixels().all(|pixel| pixel.0 == [199, 0, 0, 128]));
+      assert!(
+        apply_black_matte(&resized)
+          .pixels()
+          .all(|pixel| pixel.0 == [100, 0, 0, 128])
+      );
+    }
+  }
+
+  #[test]
+  fn power_point_screen_source_density_triggers_each_axis_independently() {
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..Default::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    for format in [RasterImageFormat::Png, RasterImageFormat::Jpeg] {
+      for axis in [0, 1] {
+        for (dpi, reduced) in [
+          (149.0, None),
+          (149.987, None),
+          (150.0, Some((558, 303))),
+          (150.1, Some((557, 303))),
+          (150.5, Some((556, 302))),
+          (151.0, Some((554, 301))),
+        ] {
+          let mut density = [149.0, 149.0];
+          density[axis] = dpi;
+          // Controls vary integer-EMU extents, not rounded pixel dimensions.
+          let points = |pixels: f64, dpi: f64| ((pixels * 914400.0 / dpi).round() / 12700.0) as f32;
+          let export = RasterExportOptions::new(
+            &options,
+            points(872.0, density[0]),
+            points(475.0, density[1]),
+          );
+          let expected = reduced.map(|(width, height)| {
+            if axis == 0 {
+              (width, 475)
+            } else {
+              (872, height)
+            }
+          });
+          assert_eq!(
+            export.downsample_source_size((872, 475), format, RasterOwner::Source),
+            expected,
+            "{format:?}, axis {axis}, {dpi} DPI",
+          );
+        }
+      }
+    }
+    for kind in [PdfDocumentKind::Docx, PdfDocumentKind::Xlsx] {
+      options.images.optimization_policy =
+        PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(kind);
+      let export = RasterExportOptions::new(&options, 418.5963, 228.01976);
+      assert_eq!(
+        export.downsample_source_size((872, 475), RasterImageFormat::Png, RasterOwner::Source),
+        export.downsample_size((872, 475)),
+      );
+    }
+  }
+
+  #[test]
+  fn power_point_screen_bitmap_sampler_does_not_change_density_or_other_profiles() {
+    for document_kind in [PdfDocumentKind::Pptx, PdfDocumentKind::Xlsx] {
+      for optimize_for in [PdfOptimizeFor::Screen, PdfOptimizeFor::Print] {
+        let mut options = PdfOptions {
+          optimize_for,
+          ..Default::default()
+        };
+        options.images.optimization_policy =
+          PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(document_kind);
+        let base = RasterExportOptions::new(&options, 120.0, 90.0);
+        let jpeg = base.for_raster_format(RasterImageFormat::Jpeg);
+        assert_eq!(
+          jpeg.use_gdiplus_jpeg_resampler,
+          document_kind == PdfDocumentKind::Pptx && optimize_for == PdfOptimizeFor::Screen
+        );
+        assert_eq!(jpeg.max_size_px, base.max_size_px);
+        assert_eq!(jpeg.downsample_trigger_px, base.downsample_trigger_px);
+        assert_eq!(jpeg.exact_downsample_trigger, base.exact_downsample_trigger);
+        assert!(!jpeg.without_downsampling().use_gdiplus_jpeg_resampler);
+      }
+    }
+  }
+
+  #[test]
+  fn power_point_screen_opaque_png_uses_bitmap_area_on_either_axis() {
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..Default::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    let export = RasterExportOptions::new(&options, 42.0, 26.25);
+    for (width, height) in [
+      (419, 317),
+      (420, 317),
+      (421, 317),
+      (317, 419),
+      (317, 420),
+      (317, 421),
+    ] {
+      let source = image::RgbaImage::from_fn(width, height, |x, y| {
+        Rgba([
+          (x * 17 + y * 5) as u8,
+          (x * 3 + y * 19) as u8,
+          (x * 11 + y * 7) as u8,
+          255,
+        ])
+      });
+      // Both original RGB PNG and opaque RGBA from blip effects select this
+      // realization. Alpha-bearing PowerPoint sources are not reclassified.
+      for dynamic in [
+        DynamicImage::ImageRgba8(source.clone()),
+        DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(source.clone()).to_rgb8()),
+      ] {
+        let mut png = Vec::new();
+        dynamic
+          .write_to(&mut Cursor::new(&mut png), RasterImageFormat::Png)
+          .unwrap();
+        let actual = decode_image(&png, Some("image/png"), export, None).unwrap();
+        let expected = if width.max(height) < GDIPLUS_BITMAP_AREA_THRESHOLD {
+          resize_for_office_screen(dynamic, (55, 34))
+        } else {
+          resize_for_gdiplus_fixed_area(dynamic, (55, 34))
+        };
+        let jpeg = encode_office_h2v2_jpeg(&expected.to_rgba8(), 59).unwrap();
+        assert_dct_image(&actual, &jpeg, true);
+      }
+    }
+  }
+
+  #[test]
+  fn word_screen_png_reduction_preserves_dct_and_independent_soft_mask() {
+    let source = image::RgbaImage::from_fn(420, 270, |x, y| {
+      Rgba([
+        (x * 17 + y * 5) as u8,
+        (x * 3 + y * 19) as u8,
+        (x * 11 + y * 7) as u8,
+        (x * 7 + y * 3) as u8,
+      ])
+    });
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(source.as_raw(), 420, 270, ColorType::Rgba8.into())
+      .unwrap();
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..PdfOptions::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    let export_options = RasterExportOptions::new(&options, 42.0, 26.25);
+    let actual = decode_image(&png, Some("image/png"), export_options, None).unwrap();
+    let sampled = resize_for_word_screen_png(DynamicImage::ImageRgba8(source), (55, 34)).to_rgba8();
+    let expected = encode_office_h2v2_jpeg(
+      &apply_black_matte(&sampled),
+      export_options.jpeg_quality.unwrap(),
+    )
+    .unwrap();
+    assert_dct_image(&actual, &expected, true);
+    assert_eq!(actual.direct().matte, Some([0.0, 0.0, 0.0]));
+    assert!(!actual.direct().soft_mask_interpolate);
+    let DirectRasterEncoding::Dct {
+      alpha: Some(alpha), ..
+    } = &actual.direct().encoding
+    else {
+      panic!("expected the independently sampled mask");
+    };
+    assert_eq!(
+      alpha.as_ref(),
+      sampled.pixels().map(|pixel| pixel[3]).collect::<Vec<_>>()
+    );
+  }
+
+  #[test]
+  fn powerpoint_screen_png_preserves_dct_and_independent_soft_mask() {
+    let source = image::RgbaImage::from_fn(420, 270, |x, y| {
+      Rgba([
+        (x * 17 + y * 5) as u8,
+        (x * 3 + y * 19) as u8,
+        (x * 11 + y * 7) as u8,
+        (x * 7 + y * 3) as u8,
+      ])
+    });
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(source.as_raw(), 420, 270, ColorType::Rgba8.into())
+      .unwrap();
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..PdfOptions::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    for (width_pt, height_pt) in [(420.0, 270.0), (42.0, 26.25)] {
+      let export_options = RasterExportOptions::new(&options, width_pt, height_pt);
+      let actual = decode_image(&png, Some("image/png"), export_options, None).unwrap();
+      let sampled = match export_options.downsample_size(source.dimensions()) {
+        Some(size) => resize_for_export(
+          DynamicImage::ImageRgba8(source.clone()),
+          size,
+          export_options,
+        )
+        .to_rgba8(),
+        None => source.clone(),
+      };
+      let expected = encode_office_h2v2_jpeg(
+        &apply_black_matte(&sampled),
+        export_options.jpeg_quality.unwrap(),
+      )
+      .unwrap();
+      assert_dct_image(&actual, &expected, true);
+      assert_eq!(actual.direct().matte, Some([0.0; 3]));
+      assert!(!actual.direct().soft_mask_interpolate);
+      let DirectRasterEncoding::Dct {
+        alpha: Some(alpha), ..
+      } = &actual.direct().encoding
+      else {
+        panic!("expected the independently sampled mask");
+      };
+      assert_eq!(
+        alpha.as_ref(),
+        sampled.pixels().map(|pixel| pixel[3]).collect::<Vec<_>>()
+      );
+    }
+  }
+
+  #[test]
   fn word_print_jpeg_large_bitmap_scaler_matches_gdiplus_q16_area_coverage() {
     let mut source = image::RgbaImage::from_pixel(443, 1, Rgba([0, 0, 0, 255]));
     source.put_pixel(100, 0, Rgba([255, 0, 0, 255]));
     source.put_pixel(101, 0, Rgba([0, 255, 0, 255]));
     source.put_pixel(102, 0, Rgba([0, 0, 255, 255]));
 
-    let reduced = resize_for_word_print_jpeg(DynamicImage::ImageRgba8(source), (315, 1)).to_rgba8();
+    let reduced = resize_for_gdiplus_bitmap(DynamicImage::ImageRgba8(source), (315, 1)).to_rgba8();
     let non_black = reduced
       .enumerate_pixels()
       .filter(|(_, _, pixel)| pixel.0[..3] != [0, 0, 0])
@@ -3412,7 +3983,7 @@ mod tests {
       Rgba([(x & 1) as u8 * 255, (x % 7) as u8 * 31, 19, 255])
     }));
     assert_eq!(
-      resize_for_word_print_jpeg(below.clone(), target).to_rgba8(),
+      resize_for_gdiplus_bitmap(below.clone(), target).to_rgba8(),
       resize_for_office_screen(below, target).to_rgba8()
     );
 
@@ -3420,7 +3991,7 @@ mod tests {
       Rgba([(x & 1) as u8 * 255, (x % 7) as u8 * 31, 19, 255])
     }));
     assert_eq!(
-      resize_for_word_print_jpeg(wide.clone(), target).to_rgba8(),
+      resize_for_gdiplus_bitmap(wide.clone(), target).to_rgba8(),
       resize_for_gdiplus_fixed_area(wide, target).to_rgba8()
     );
 
@@ -3428,7 +3999,7 @@ mod tests {
       Rgba([(y & 1) as u8 * 255, (y % 7) as u8 * 31, 19, 255])
     }));
     assert_eq!(
-      resize_for_word_print_jpeg(tall.clone(), (1, 298)).to_rgba8(),
+      resize_for_gdiplus_bitmap(tall.clone(), (1, 298)).to_rgba8(),
       resize_for_gdiplus_fixed_area(tall, (1, 298)).to_rgba8()
     );
   }
@@ -3452,7 +4023,7 @@ mod tests {
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       allow_interpolation: false,
       profile: RasterExportProfile::Requested,
     };
@@ -3492,7 +4063,7 @@ mod tests {
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::Requested,
     };
@@ -3525,7 +4096,7 @@ mod tests {
         downsample_trigger_px: None,
         word_print_jpeg_downsample_trigger_px: None,
         exact_downsample_trigger: false,
-        use_word_print_jpeg_gdiplus_resampler: false,
+        use_gdiplus_jpeg_resampler: false,
         allow_interpolation: interpolate,
         profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
           document_kind: PdfDocumentKind::Docx,
@@ -3589,7 +4160,14 @@ mod tests {
     let DirectRasterEncoding::Sampled { pixels } = &actual.direct().encoding else {
       panic!("lossless canvas");
     };
-    assert!(pixels.rgb.chunks_exact(3).all(|rgb| rgb == [64, 0, 0]));
+    assert!(
+      pixels
+        .rgb
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .all(|rgb| *rgb == [64, 0, 0])
+    );
     assert!(
       actual
         .direct()
@@ -3717,7 +4295,7 @@ mod tests {
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::Requested,
     };
@@ -4006,7 +4584,7 @@ mod tests {
       downsample_trigger_px: RasterPixelLimits::from_pixels(445.5, 285.0),
       word_print_jpeg_downsample_trigger_px: None,
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
         document_kind: PdfDocumentKind::Docx,
@@ -4052,7 +4630,7 @@ mod tests {
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::Requested,
     };
@@ -4104,7 +4682,7 @@ mod tests {
         downsample_trigger_px: None,
         word_print_jpeg_downsample_trigger_px: None,
         exact_downsample_trigger: false,
-        use_word_print_jpeg_gdiplus_resampler: false,
+        use_gdiplus_jpeg_resampler: false,
         allow_interpolation: true,
         profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
           document_kind: PdfDocumentKind::Docx,
@@ -4156,7 +4734,7 @@ mod tests {
         downsample_trigger_px: None,
         word_print_jpeg_downsample_trigger_px: None,
         exact_downsample_trigger: false,
-        use_word_print_jpeg_gdiplus_resampler: false,
+        use_gdiplus_jpeg_resampler: false,
         allow_interpolation: true,
         profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
           document_kind: PdfDocumentKind::Docx,
@@ -4206,7 +4784,7 @@ mod tests {
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
         document_kind: PdfDocumentKind::Docx,
@@ -4259,7 +4837,7 @@ mod tests {
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
         document_kind: PdfDocumentKind::Docx,
@@ -4303,7 +4881,7 @@ mod tests {
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
         document_kind: PdfDocumentKind::Docx,
@@ -4357,6 +4935,100 @@ mod tests {
     assert_eq!(output.dimensions(), (2, 1));
     assert_eq!(output.get_pixel(0, 0)[3], 255);
     assert_eq!(output.get_pixel(1, 0)[3], 0);
+  }
+
+  #[test]
+  fn powerpoint_static_3d_preserves_scene_grid_and_independent_jpeg_alpha() {
+    let source = image::RgbaImage::from_fn(300, 300, |x, y| {
+      if x >= 60 || y >= 60 {
+        return Rgba([19, 83, 117, 0]);
+      }
+      let v = (x + y * 60)
+        .wrapping_mul(1_664_525)
+        .wrapping_add(1_013_904_223);
+      Rgba([
+        v as u8,
+        (v >> 8) as u8,
+        (v >> 16) as u8,
+        128 + (v >> 25) as u8,
+      ])
+    });
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(source.as_raw(), 300, 300, ColorType::Rgba8.into())
+      .unwrap();
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    let export = RasterExportOptions::new(&options, 12.0, 12.0);
+    let premultiplied = apply_black_matte(&source);
+    assert!(office_fixed_output_prefers_lossless(
+      &premultiplied,
+      export,
+      RasterOwner::Source,
+      false
+    ));
+    assert!(!office_fixed_output_prefers_lossless(
+      &premultiplied,
+      export,
+      RasterOwner::PowerPointStatic3d,
+      false
+    ));
+    let actual = decode_image(
+      &png,
+      Some(POWERPOINT_STATIC_3D_BITMAP_CONTENT_TYPE),
+      export,
+      None,
+    )
+    .unwrap();
+    assert_eq!(actual.size(), (300, 300));
+    let jpeg = encode_office_h2v2_jpeg(&premultiplied, export.jpeg_quality.unwrap()).unwrap();
+    assert_dct_image(&actual, &jpeg, true);
+    assert_eq!(
+      actual.direct().alpha().unwrap(),
+      source.pixels().map(|p| p[3]).collect::<Vec<_>>()
+    );
+    assert_eq!(actual.direct().matte, Some([0.0; 3]));
+    assert!(!actual.direct().soft_mask_interpolate);
+
+    // A flat projected shape remains palette/lossless under the same owner.
+    let flat = image::RgbaImage::from_fn(300, 300, |x, y| {
+      if x < 60 && y < 60 {
+        Rgba([80, 100, 150, 255])
+      } else {
+        Rgba([0; 4])
+      }
+    });
+    assert!(office_fixed_output_prefers_lossless(
+      &flat,
+      export,
+      RasterOwner::PowerPointStatic3d,
+      false
+    ));
+    let mut flat = flat;
+    flat.put_pixel(0, 0, Rgba([80, 100, 150, 128]));
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(flat.as_raw(), 300, 300, ColorType::Rgba8.into())
+      .unwrap();
+    let actual = decode_image(
+      &png,
+      Some(POWERPOINT_STATIC_3D_BITMAP_CONTENT_TYPE),
+      export,
+      None,
+    )
+    .unwrap();
+    let expected = PdfRasterImage::from_dynamic_with_icc(
+      DynamicImage::ImageRgba8(apply_black_matte(&flat)),
+      None,
+    );
+    assert_sampled_image(&actual, &expected, false);
+    assert_eq!(actual.direct().matte, Some([0.0; 3]));
+    assert!(!actual.direct().soft_mask_interpolate);
+    assert_eq!(
+      actual.direct().alpha().unwrap(),
+      flat.pixels().map(|p| p[3]).collect::<Vec<_>>()
+    );
   }
 
   #[test]
@@ -4461,7 +5133,7 @@ mod tests {
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
       exact_downsample_trigger: false,
-      use_word_print_jpeg_gdiplus_resampler: false,
+      use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
       profile: RasterExportProfile::Requested,
     };
@@ -4631,7 +5303,7 @@ mod tests {
     oriented.extend_from_slice(&jpeg[2..]);
 
     let image = decode_dynamic_image(&oriented, RasterImageFormat::Jpeg).unwrap();
-    let word_print_image = decode_word_print_jpeg(&oriented).unwrap();
+    let word_print_image = decode_gdiplus_jpeg(&oriented).unwrap();
 
     assert_eq!(image.image.dimensions(), (1, 2));
     assert_eq!(word_print_image.image.dimensions(), (1, 2));

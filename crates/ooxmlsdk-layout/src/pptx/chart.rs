@@ -405,6 +405,8 @@ pub(crate) struct RadialChartStyle {
   pub data_label_rich_text_styles: Vec<Vec<TextStyle>>,
   pub point_colors: Vec<RgbColor>,
   pub point_styles: Vec<crate::common::ShapeStyle<'static>>,
+  pub point_image_effects:
+    Vec<Option<crate::common::drawingml_image_effects::ImageEffectContainer>>,
   pub data_label_fill_colors: Vec<Option<RgbColor>>,
   pub leader_line_style: crate::common::ShapeStyle<'static>,
   pub legend_frame_style: crate::common::ShapeStyle<'static>,
@@ -4457,12 +4459,19 @@ fn chart_shape_effect_image(
       },
     );
   }
+  chart_raster_image(&raster.image, raster_bounds)
+}
+
+fn chart_raster_image(
+  image: &image::RgbaImage,
+  raster_bounds: crate::common::Rect,
+) -> Option<ImageItem> {
   let mut png = Cursor::new(Vec::new());
   PngEncoder::new(&mut png)
     .write_image(
-      raster.image.as_raw(),
-      raster.image.width(),
-      raster.image.height(),
+      image.as_raw(),
+      image.width(),
+      image.height(),
       ColorType::Rgba8.into(),
     )
     .ok()?;
@@ -4650,6 +4659,31 @@ fn chart_point_inside_plot(point: (f32, f32), plot: PlotRect) -> bool {
     && point.1 <= plot.top + plot.height
 }
 
+fn push_radial_point_with_effects(
+  items: &mut Vec<PageItem>,
+  backdrops: &mut Vec<PageItem>,
+  item: PageItem,
+  effects: Option<&crate::common::drawingml_image_effects::ImageEffectContainer>,
+) {
+  let Some(effects) = effects else {
+    items.push(item);
+    return;
+  };
+  let PageItem::Path(path) = item else {
+    items.push(item);
+    return;
+  };
+  if let Some(backdrop) =
+    crate::common::drawingml_image_effects::unchanged_foreground_backdrop(effects)
+    && let Some(image) = chart_shape_effect_image(&path, &backdrop, None, None, None, 100.0 / 72.0)
+  {
+    backdrops.push(PageItem::Image(image));
+  }
+  if !push_chart_shape_effect_raster(items, &path, Some(effects), None, None, None, false) {
+    items.push(PageItem::Path(path));
+  }
+}
+
 pub(crate) fn lower_radial_chart(
   frame: ChartFrame,
   chart: &PieChartModel<'_>,
@@ -4775,6 +4809,16 @@ pub(crate) fn lower_radial_chart(
     && style.layout_profile == ChartLayoutProfile::PowerPoint)
     .then_some(profiles::POWERPOINT_PIE_3D_PROJECTION);
   let view_3d = chart.view_3d.unwrap_or_default();
+  // Automatic pies reserve the same fixed host margin before realizing
+  // their 3-D viewport. Unlike a 2-D pie, this viewport need not be square.
+  let camera_viewport_height = powerpoint_pie_3d.map(|_| {
+    let inset = if chart.plot_layout.is_none() {
+      profiles::POWERPOINT_AUTOMATIC_PIE_FIXED_INSET_PT
+    } else {
+      0.0
+    };
+    (plot.height - inset * 2.0).max(f32::EPSILON)
+  });
   let maximum_explosion = chart
     .point_explosion_percent
     .iter()
@@ -4876,13 +4920,15 @@ pub(crate) fn lower_radial_chart(
     },
   );
   let mut start_angle = chart.first_slice_angle_deg.to_radians() as f32;
+  let point_start = items.len();
+  let mut point_backdrops = Vec::new();
 
   if matches!(
     chart.kind,
     RadialChartKind::PieOfPie | RadialChartKind::BarOfPie
   ) && !chart.secondary_indices.is_empty()
   {
-    lower_of_pie_geometry(&mut items, plot, chart, style);
+    lower_of_pie_geometry(&mut items, &mut point_backdrops, plot, chart, style);
   } else {
     struct RadialSlice {
       index: usize,
@@ -4958,10 +5004,19 @@ pub(crate) fn lower_radial_chart(
         if slice.explosion <= f32::EPSILON {
           continue;
         }
-        let projection =
-          RadialPerspectiveProjection::new(slice.center, (radius_x, radius_y), view_3d)
-            .with_strength_scale(projected_scene_scale)
-            .with_plane_offset(slice.perspective_plane_offset);
+        let projection = RadialPerspectiveProjection::new(
+          slice.center,
+          (radius_x, radius_y),
+          view_3d,
+          camera_viewport_height,
+        )
+        .with_plane_offset(slice.perspective_plane_offset)
+        .with_extrusion_thickness(
+          powerpoint_pie_3d.map_or(0.0, |profile| {
+            profile.thickness_radius_ratio * view_3d.height_percent / 100.0
+          }),
+          view_3d.rotate_x_deg,
+        );
         // A separated extrusion exposes only the radial cut plane whose
         // outward normal faces the camera. Painting a translated complete
         // sector here would invent a triangular underside beyond the slice
@@ -4985,10 +5040,19 @@ pub(crate) fn lower_radial_chart(
         }
       }
       for slice in &slices {
-        let projection =
-          RadialPerspectiveProjection::new(slice.center, (radius_x, radius_y), view_3d)
-            .with_strength_scale(projected_scene_scale)
-            .with_plane_offset(slice.perspective_plane_offset);
+        let projection = RadialPerspectiveProjection::new(
+          slice.center,
+          (radius_x, radius_y),
+          view_3d,
+          camera_viewport_height,
+        )
+        .with_plane_offset(slice.perspective_plane_offset)
+        .with_extrusion_thickness(
+          powerpoint_pie_3d.map_or(0.0, |profile| {
+            profile.thickness_radius_ratio * view_3d.height_percent / 100.0
+          }),
+          view_3d.rotate_x_deg,
+        );
         items.extend(radial_3d_outer_wall_paths(
           projection,
           depth,
@@ -4999,29 +5063,52 @@ pub(crate) fn lower_radial_chart(
       }
     }
     for slice in slices {
-      items.push(radial_segment_path(RadialSegmentSpec {
-        center: slice.center,
-        radii: (radius_x, radius_y),
-        hole_ratio,
-        angles: (slice.start_angle, slice.sweep),
-        paint: (slice.color, 1.0),
-        fallback_stroke: (chart.kind != RadialChartKind::Pie3D).then_some((
-          RgbColor {
-            r: 255,
-            g: 255,
-            b: 255,
-          },
-          0.75,
-        )),
-        style: style.point_styles.get(slice.index),
-        perspective: (chart.kind == RadialChartKind::Pie3D).then(|| {
-          RadialPerspectiveProjection::new(slice.center, (radius_x, radius_y), view_3d)
-            .with_strength_scale(projected_scene_scale)
+      push_radial_point_with_effects(
+        &mut items,
+        &mut point_backdrops,
+        radial_segment_path(RadialSegmentSpec {
+          center: slice.center,
+          radii: (radius_x, radius_y),
+          hole_ratio,
+          angles: (slice.start_angle, slice.sweep),
+          paint: (slice.color, 1.0),
+          fallback_stroke: (chart.kind != RadialChartKind::Pie3D).then_some((
+            RgbColor {
+              r: 255,
+              g: 255,
+              b: 255,
+            },
+            0.75,
+          )),
+          style: style.point_styles.get(slice.index),
+          perspective: (chart.kind == RadialChartKind::Pie3D).then(|| {
+            RadialPerspectiveProjection::new(
+              slice.center,
+              (radius_x, radius_y),
+              view_3d,
+              camera_viewport_height,
+            )
             .with_plane_offset(slice.perspective_plane_offset)
+          }),
         }),
-      }));
+        style
+          .point_image_effects
+          .get(slice.index)
+          .and_then(Option::as_ref),
+      );
     }
   }
+
+  if powerpoint_pie_3d.is_some()
+    && let Some(scene) = radial_3d_scene_image(&items[point_start..])
+  {
+    items.truncate(point_start);
+    items.push(PageItem::Image(scene));
+  }
+
+  // Adjacent sectors share their visible foreground. Their shadows belong
+  // behind every sector, not between sectors where they darken the next face.
+  items.splice(point_start..point_start, point_backdrops);
 
   for (label_index, label) in chart.data_labels.iter().enumerate() {
     let before = chart
@@ -5769,6 +5856,7 @@ fn generated_chart_text_body_insets(properties: Option<&a::BodyProperties>) -> C
 
 fn lower_of_pie_geometry(
   items: &mut Vec<PageItem>,
+  backdrops: &mut Vec<PageItem>,
   plot: PlotRect,
   chart: &PieChartModel<'_>,
   style: &RadialChartStyle,
@@ -5831,23 +5919,31 @@ fn lower_of_pie_geometry(
   let mut angle = initial_angle;
   for (index, value) in primary {
     let sweep = (value / primary_total * std::f64::consts::TAU) as f32;
-    items.push(radial_segment_path(RadialSegmentSpec {
-      center: primary_center,
-      radii: (primary_radius, primary_radius),
-      hole_ratio: 0.0,
-      angles: (angle, sweep),
-      paint: (style.point_colors[index % style.point_colors.len()], 1.0),
-      fallback_stroke: (style.layout_profile != ChartLayoutProfile::Excel).then_some((
-        RgbColor {
-          r: 255,
-          g: 255,
-          b: 255,
-        },
-        0.75,
-      )),
-      style: style.point_styles.get(index),
-      perspective: None,
-    }));
+    push_radial_point_with_effects(
+      items,
+      backdrops,
+      radial_segment_path(RadialSegmentSpec {
+        center: primary_center,
+        radii: (primary_radius, primary_radius),
+        hole_ratio: 0.0,
+        angles: (angle, sweep),
+        paint: (style.point_colors[index % style.point_colors.len()], 1.0),
+        fallback_stroke: (style.layout_profile != ChartLayoutProfile::Excel).then_some((
+          RgbColor {
+            r: 255,
+            g: 255,
+            b: 255,
+          },
+          0.75,
+        )),
+        style: style.point_styles.get(index),
+        perspective: None,
+      }),
+      style
+        .point_image_effects
+        .get(index)
+        .and_then(Option::as_ref),
+    );
     angle += sweep;
   }
 
@@ -5871,23 +5967,31 @@ fn lower_of_pie_geometry(
         continue;
       };
       let sweep = (value / secondary * std::f64::consts::TAU) as f32;
-      items.push(radial_segment_path(RadialSegmentSpec {
-        center: secondary_center,
-        radii: (secondary_radius, secondary_radius),
-        hole_ratio: 0.0,
-        angles: (angle, sweep),
-        paint: (style.point_colors[index % style.point_colors.len()], 1.0),
-        fallback_stroke: (style.layout_profile != ChartLayoutProfile::Excel).then_some((
-          RgbColor {
-            r: 255,
-            g: 255,
-            b: 255,
-          },
-          0.75,
-        )),
-        style: style.point_styles.get(index),
-        perspective: None,
-      }));
+      push_radial_point_with_effects(
+        items,
+        backdrops,
+        radial_segment_path(RadialSegmentSpec {
+          center: secondary_center,
+          radii: (secondary_radius, secondary_radius),
+          hole_ratio: 0.0,
+          angles: (angle, sweep),
+          paint: (style.point_colors[index % style.point_colors.len()], 1.0),
+          fallback_stroke: (style.layout_profile != ChartLayoutProfile::Excel).then_some((
+            RgbColor {
+              r: 255,
+              g: 255,
+              b: 255,
+            },
+            0.75,
+          )),
+          style: style.point_styles.get(index),
+          perspective: None,
+        }),
+        style
+          .point_image_effects
+          .get(index)
+          .and_then(Option::as_ref),
+      );
       angle += sweep;
     }
   } else {
@@ -5904,6 +6008,7 @@ fn lower_of_pie_geometry(
       };
       let height = (value / secondary) as f32 * secondary_radius * 2.0;
       let point_style = style.point_styles.get(index);
+      let point_start = items.len();
       push_chart_shape_rect(
         items,
         PlotRect {
@@ -5919,6 +6024,18 @@ fn lower_of_pie_geometry(
           stroke_width_scale: 1.0,
         },
       );
+      let point_items = items.drain(point_start..).collect::<Vec<_>>();
+      for item in point_items {
+        push_radial_point_with_effects(
+          items,
+          backdrops,
+          item,
+          style
+            .point_image_effects
+            .get(index)
+            .and_then(Option::as_ref),
+        );
+      }
       y += height;
     }
   }
@@ -5945,23 +6062,45 @@ fn lower_of_pie_geometry(
 }
 
 #[derive(Clone, Copy)]
+struct RadialExtrusionProjection {
+  denominator: f32,
+  numerator: f32,
+}
+
+#[derive(Clone, Copy)]
 struct RadialPerspectiveProjection {
   conic_center: (f32, f32),
   radii: (f32, f32),
   strength: f32,
   plane_offset: (f32, f32),
+  extrusion: Option<RadialExtrusionProjection>,
 }
 
 impl RadialPerspectiveProjection {
-  fn new(center: (f32, f32), radii: (f32, f32), view: crate::render::chart::Chart3DView) -> Self {
-    // MS-OE376 5.7.2.137 records the field-of-view angle in half degrees.
-    // LibreOffice's OOXML importer maps that value to its perspective
-    // percentage by dividing by two. In the projected conic this is the
-    // displacement of the projected circle centre relative to its vertical
-    // radius: the default val=30 therefore produces a 15% displacement.
+  fn new(
+    center: (f32, f32),
+    radii: (f32, f32),
+    view: crate::render::chart::Chart3DView,
+    viewport_height: Option<f32>,
+  ) -> Self {
     let strength = if view.right_angle_axes {
       0.0
+    } else if let Some(viewport_height) = viewport_height {
+      // MS-OI29500 §21.2.2.136: val is twice the field of view; val=0
+      // means 0.1 degrees. For focal length f and projected ellipse radius
+      // rx, rx=f*R/sqrt(D²-R²*cos(a)²). Solve this for k=R*cos(a)/D.
+      // The fitted radius already includes explosion scaling; do not scale
+      // k a second time or approximate its nonlinear dependence on rx.
+      let fov = if view.perspective_half_degrees <= f32::EPSILON {
+        0.1
+      } else {
+        view.perspective_half_degrees * 0.5
+      };
+      let focal_length = viewport_height / (2.0 * (fov.clamp(0.1, 100.0) * 0.5).to_radians().tan());
+      let ratio = radii.0 * view.rotate_x_deg.to_radians().cos().abs() / focal_length;
+      ratio / (1.0 + ratio * ratio).sqrt()
     } else {
+      // Other host layouts do not yet expose their physical 3-D viewport.
       (view.perspective_half_degrees / 200.0).clamp(0.0, 0.9)
     };
     Self {
@@ -5969,6 +6108,7 @@ impl RadialPerspectiveProjection {
       radii,
       strength,
       plane_offset: (0.0, 0.0),
+      extrusion: None,
     }
   }
 
@@ -5976,15 +6116,35 @@ impl RadialPerspectiveProjection {
     self.project_plane_point(0.0, 0.0)
   }
 
-  fn with_strength_scale(mut self, scale: f32) -> Self {
-    // Explosion fitting changes the scene extent, not the camera distance.
-    // Its projective displacement therefore contracts with the fitted scene.
-    self.strength *= scale;
+  fn with_plane_offset(mut self, offset: (f32, f32)) -> Self {
+    self.plane_offset = offset;
     self
   }
 
-  fn with_plane_offset(mut self, offset: (f32, f32)) -> Self {
-    self.plane_offset = offset;
+  fn with_extrusion_thickness(mut self, thickness_radius_ratio: f32, tilt_deg: f32) -> Self {
+    // For a circle seen at elevation a, k = R*cos(a)/D. Extruding H away
+    // from its top plane adds H*sin(a)/D to the homogeneous denominator.
+    // Explosion scales k and the scene together, retaining H/R.
+    let tilt = tilt_deg.to_radians();
+    if thickness_radius_ratio > 0.0 && tilt.cos().abs() > f32::EPSILON {
+      let horizontal_scale = self.radii.0 * (1.0 - self.strength * self.strength).sqrt();
+      let vertical_scale = self.radii.1 * (1.0 - self.strength * self.strength);
+      // The conic is expressed relative to its projected hub, not the
+      // camera's principal point. Its vertical numerator V therefore equals
+      // f*sin(a) + hub_offset*k. Subtract that offset's q contribution when
+      // projecting an extrusion: d = H/R * (f/cos(a) - V*tan(a)). This keeps
+      // both coordinates in the same pinhole camera; a measured screen
+      // depth cannot be used as the homogeneous numerator.
+      let numerator = if self.strength > f32::EPSILON {
+        thickness_radius_ratio * (horizontal_scale / tilt.cos() - vertical_scale * tilt.tan())
+      } else {
+        thickness_radius_ratio * horizontal_scale * tilt.cos()
+      };
+      self.extrusion = Some(RadialExtrusionProjection {
+        denominator: (self.strength * thickness_radius_ratio * tilt.tan()).max(0.0),
+        numerator,
+      });
+    }
     self
   }
 
@@ -5993,15 +6153,60 @@ impl RadialPerspectiveProjection {
   }
 
   fn project_plane_point(self, horizontal: f32, vertical: f32) -> (f32, f32) {
+    self.project_point(horizontal, vertical, 0.0, 0.0)
+  }
+
+  fn project_bottom_point(self, horizontal: f32, vertical: f32, fallback_depth: f32) -> (f32, f32) {
+    if let Some(extrusion) = self.extrusion {
+      self.project_point(
+        horizontal,
+        vertical,
+        extrusion.denominator,
+        extrusion.numerator,
+      )
+    } else {
+      // Other host profiles still describe a screen-space extrusion.
+      let top = self.project_plane_point(horizontal, vertical);
+      (top.0, top.1 + fallback_depth)
+    }
+  }
+
+  fn project_point(
+    self,
+    horizontal: f32,
+    vertical: f32,
+    depth_denominator: f32,
+    depth_numerator: f32,
+  ) -> (f32, f32) {
     let horizontal = horizontal + self.plane_offset.0;
     let vertical = vertical + self.plane_offset.1;
-    let denominator = (1.0 - self.strength * vertical).max(0.05);
+    let denominator = (1.0 - self.strength * vertical + depth_denominator).max(0.05);
     let one_minus_squared = 1.0 - self.strength * self.strength;
     let base_hub_y = self.conic_center.1 - self.radii.1 * self.strength;
+    let vertical_scale = self.radii.1 * one_minus_squared;
     (
       self.conic_center.0 + self.radii.0 * one_minus_squared.sqrt() * horizontal / denominator,
-      base_hub_y + self.radii.1 * one_minus_squared * vertical / denominator,
+      base_hub_y + (vertical_scale * vertical + depth_numerator) / denominator,
     )
+  }
+
+  fn visible_wall_interval(self) -> (f32, f32) {
+    if self.extrusion.is_none() {
+      return (
+        std::f32::consts::FRAC_PI_2,
+        3.0 * std::f32::consts::FRAC_PI_2,
+      );
+    }
+    // A cylindrical wall faces the eye iff N dot (eye - surface) > 0.
+    // Unlike a parallel view, its silhouette is not at +/- 90 degrees.
+    let eye_u = -self.strength * self.plane_offset.0;
+    let eye_v = 1.0 - self.strength * self.plane_offset.1;
+    let distance = eye_u.hypot(eye_v);
+    let center = eye_u.atan2(-eye_v).rem_euclid(std::f32::consts::TAU);
+    let half_angle = (self.strength / distance.max(f32::EPSILON))
+      .clamp(-1.0, 1.0)
+      .acos();
+    (center - half_angle, center + half_angle)
   }
 
   fn horizontal_bounds(self) -> (f32, f32) {
@@ -6145,6 +6350,63 @@ pub(crate) fn radial_2d_segment_path(
   })
 }
 
+fn radial_3d_scene_image(items: &[PageItem]) -> Option<ImageItem> {
+  use crate::common::drawingml_shape_raster::{
+    PageToRasterMapping, rasterize_vector_scene_at_mapping,
+  };
+  let paths = items
+    .iter()
+    .map(|item| match item {
+      PageItem::Path(path) => Some(path.clone()),
+      _ => None,
+    })
+    .collect::<Option<Vec<_>>>()?;
+  let first = paths.first()?;
+  let mut bounds = first.bounds;
+  for path in &paths[1..] {
+    let left = bounds.origin.x.0.min(path.bounds.origin.x.0);
+    let top = bounds.origin.y.0.min(path.bounds.origin.y.0);
+    let right = (bounds.origin.x.0 + bounds.size.width.0)
+      .max(path.bounds.origin.x.0 + path.bounds.size.width.0);
+    let bottom = (bounds.origin.y.0 + bounds.size.height.0)
+      .max(path.bounds.origin.y.0 + path.bounds.size.height.0);
+    bounds = common_rect(left, top, right - left, bottom - top);
+  }
+  // Stroke/effect paint owns additional extent beyond this geometric scene.
+  // Keep its existing path until that extent is explicitly represented here.
+  if paths.iter().any(|path| path.stroke.is_some()) {
+    return None;
+  }
+  let ppp = crate::units::OFFICE_FIXED_OUTPUT_RASTER_DPI / crate::units::POINTS_PER_INCH;
+  let left = (bounds.origin.x.0 * ppp).floor() / ppp;
+  let top = (bounds.origin.y.0 * ppp).floor() / ppp;
+  let width = ((bounds.origin.x.0 + bounds.size.width.0 - left) * ppp).ceil() as u32;
+  let height = ((bounds.origin.y.0 + bounds.size.height.0 - top) * ppp).ceil() as u32;
+  if u64::from(width) * u64::from(height) > 16_000_000 {
+    return None;
+  }
+  let display = paths
+    .into_iter()
+    .map(crate::common::DisplayItem::Path)
+    .collect::<Vec<_>>();
+  let image = rasterize_vector_scene_at_mapping(
+    &display,
+    PageToRasterMapping {
+      width_px: width,
+      height_px: height,
+      scale_x: ppp,
+      scale_y: ppp,
+      translate_x: -left * ppp,
+      translate_y: -top * ppp,
+      text_hinting: None,
+    },
+  )?;
+  chart_raster_image(
+    &image,
+    common_rect(left, top, width as f32 / ppp, height as f32 / ppp),
+  )
+}
+
 fn radial_3d_outer_wall_paths(
   projection: RadialPerspectiveProjection,
   depth: f32,
@@ -6154,12 +6416,12 @@ fn radial_3d_outer_wall_paths(
 ) -> Vec<PageItem> {
   let (start_angle, sweep) = angles;
   let end_angle = start_angle + sweep;
-  let mut front_start = std::f32::consts::FRAC_PI_2
-    + ((start_angle - std::f32::consts::FRAC_PI_2) / std::f32::consts::TAU).floor()
-      * std::f32::consts::TAU;
+  let (first_front_start, first_front_end) = projection.visible_wall_interval();
+  let mut front_start = first_front_start
+    + ((start_angle - first_front_start) / std::f32::consts::TAU).floor() * std::f32::consts::TAU;
   let mut items = Vec::new();
   while front_start < end_angle {
-    let front_end = front_start + std::f32::consts::PI;
+    let front_end = front_start + first_front_end - first_front_start;
     let visible_start = start_angle.max(front_start);
     let visible_end = end_angle.min(front_end);
     if visible_end > visible_start + f32::EPSILON {
@@ -6173,8 +6435,8 @@ fn radial_3d_outer_wall_paths(
       }
       for segment in (0..=segment_count).rev() {
         let angle = visible_start + visible_sweep * segment as f32 / segment_count as f32;
-        let point = projection.point(angle);
-        points.push(common_point(point.0, point.1 + depth));
+        let point = projection.project_bottom_point(angle.sin(), -angle.cos(), depth);
+        points.push(common_point(point.0, point.1));
       }
       let (left, top, right, bottom) = points.iter().fold(
         (
@@ -6253,16 +6515,18 @@ fn radial_3d_cut_face_path(
 ) -> PageItem {
   let hub = projection.hub();
   let outer = projection.point(angle);
+  let bottom_hub = projection.project_bottom_point(0.0, 0.0, depth);
+  let bottom_outer = projection.project_bottom_point(angle.sin(), -angle.cos(), depth);
   let points = vec![
     common_point(hub.0, hub.1),
     common_point(outer.0, outer.1),
-    common_point(outer.0, outer.1 + depth),
-    common_point(hub.0, hub.1 + depth),
+    common_point(bottom_outer.0, bottom_outer.1),
+    common_point(bottom_hub.0, bottom_hub.1),
   ];
-  let left = hub.0.min(outer.0);
-  let top = hub.1.min(outer.1);
-  let right = hub.0.max(outer.0);
-  let bottom = (hub.1 + depth).max(outer.1 + depth);
+  let left = hub.0.min(outer.0).min(bottom_hub.0).min(bottom_outer.0);
+  let top = hub.1.min(outer.1).min(bottom_hub.1).min(bottom_outer.1);
+  let right = hub.0.max(outer.0).max(bottom_hub.0).max(bottom_outer.0);
+  let bottom = hub.1.max(outer.1).max(bottom_hub.1).max(bottom_outer.1);
   // Office's fixed upper-left chart light leaves a 40% ambient face and
   // adds diffuse light only while the radial plane points toward the lower
   // left. This reconstructs the dark green/purple cuts and the brighter red
@@ -15762,10 +16026,179 @@ mod tests {
   use crate::text_metrics::{TextMetrics, TextVerticalMetrics};
 
   #[test]
+  fn radial_perspective_extrusion_projects_both_planes_and_the_silhouette() {
+    let view = Chart3DView {
+      rotate_x_deg: 30.0,
+      ..Chart3DView::default()
+    };
+    let projection =
+      super::RadialPerspectiveProjection::new((300.0, 200.0), (180.0, 85.0), view, Some(263.0))
+        .with_extrusion_thickness(0.24, 30.0);
+    let top = projection.project_plane_point(0.0, 1.0);
+    let bottom = projection.project_bottom_point(0.0, 1.0, 40.0);
+    assert!(bottom.1 > top.1);
+    let (start, end) = projection.visible_wall_interval();
+    assert!((start.cos() + projection.strength).abs() < 1e-6);
+    assert!((end.cos() + projection.strength).abs() < 1e-6);
+    let top = projection.point(start);
+    let bottom = projection.project_bottom_point(start.sin(), -start.cos(), 40.0);
+    assert!(bottom.0 < top.0);
+    assert!(bottom.1 < top.1 + 40.0);
+    // The top plane must not change when its extrusion is enabled.
+    let flat =
+      super::RadialPerspectiveProjection::new((300.0, 200.0), (180.0, 85.0), view, Some(263.0));
+    for i in 0..360 {
+      let angle = (i as f32).to_radians();
+      assert_eq!(projection.point(angle), flat.point(angle));
+      // Independently project a physical cylinder in camera coordinates.
+      let tilt = 30_f32.to_radians();
+      let k = projection.strength;
+      let f = projection.radii.0 * (1.0 - k * k).sqrt();
+      let v_scale = projection.radii.1 * (1.0 - k * k);
+      let hub_offset = (v_scale - f * tilt.sin()) / k;
+      let hub = projection.hub();
+      let u = angle.sin();
+      let v = -angle.cos();
+      let denominator = 1.0 - k * v + 0.24 * k * tilt.tan();
+      let expected = (
+        hub.0 + f * u / denominator,
+        hub.1 - hub_offset + (hub_offset + f * (tilt.sin() * v + 0.24 * tilt.cos())) / denominator,
+      );
+      let bottom = projection.project_bottom_point(u, v, 40.0);
+      assert!((bottom.0 - expected.0).abs() < 1e-4);
+      assert!((bottom.1 - expected.1).abs() < 1e-4);
+    }
+  }
+
+  #[test]
+  fn radial_perspective_extrusion_preserves_parallel_and_exploded_geometry() {
+    let view = Chart3DView {
+      right_angle_axes: true,
+      ..Chart3DView::default()
+    };
+    let projection =
+      super::RadialPerspectiveProjection::new((0.0, 0.0), (180.0, 85.0), view, Some(263.0))
+        .with_extrusion_thickness(0.24, 30.0)
+        .with_plane_offset((0.2, -0.1));
+    for i in 0..360 {
+      let angle = (i as f32).to_radians();
+      let top = projection.point(angle);
+      let bottom = projection.project_bottom_point(angle.sin(), -angle.cos(), 40.0);
+      assert_eq!(top.0, bottom.0);
+      assert!((bottom.1 - top.1 - 0.24 * 180.0 * 30_f32.to_radians().cos()).abs() < 2e-5);
+    }
+    let projection = super::RadialPerspectiveProjection::new(
+      (0.0, 0.0),
+      (180.0, 85.0),
+      Chart3DView::default(),
+      Some(263.0),
+    )
+    .with_extrusion_thickness(0.24, 30.0)
+    .with_plane_offset((0.3, -0.2));
+    let (start, end) = projection.visible_wall_interval();
+    for angle in [start, end] {
+      let u = angle.sin();
+      let v = -angle.cos();
+      let facing = -projection.plane_offset.0 * u
+        + (1.0 / projection.strength - projection.plane_offset.1) * v
+        - 1.0;
+      assert!(facing.abs() < 1e-5);
+    }
+  }
+
+  #[test]
+  fn radial_perspective_camera_uses_fov_viewport_and_fitted_radius() {
+    for elevation in [15.0_f32, 30.0, 60.0] {
+      for perspective in [0.0_f32, 30.0, 60.0] {
+        for radius in [90.0_f32, 180.0] {
+          let view = Chart3DView {
+            rotate_x_deg: elevation,
+            perspective_half_degrees: perspective,
+            ..Chart3DView::default()
+          };
+          let p = super::RadialPerspectiveProjection::new(
+            (0.0, 0.0),
+            (radius, radius * elevation.to_radians().sin()),
+            view,
+            Some(263.0),
+          );
+          let fov = if perspective == 0.0 {
+            0.1
+          } else {
+            perspective * 0.5
+          };
+          let focal = 263.0 / (2.0 * (fov * 0.5).to_radians().tan());
+          let radius_over_distance = p.strength / elevation.to_radians().cos();
+          let recovered_radius =
+            focal * radius_over_distance / (1.0 - p.strength * p.strength).sqrt();
+          assert!((recovered_radius - radius).abs() < 5e-5);
+          assert!(p.strength > 0.0);
+        }
+      }
+    }
+  }
+
+  #[test]
   fn axis_values_do_not_expose_binary_float_artifacts() {
     let value_with_binary_artifact = f64::from_bits(4.4_f64.to_bits() + 1);
     assert_eq!(format_axis_value(value_with_binary_artifact, 0.2), "4.4");
     assert_eq!(format_axis_value(6.0, 1.0), "6");
+  }
+
+  #[test]
+  fn radial_effect_backdrops_do_not_replace_or_interleave_foreground_sectors() {
+    use crate::common::drawingml_image_effects::{
+      ImageEffect, ImageEffectContainer, ImageEffectContainerKind,
+    };
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![
+        ImageEffect::Container(ImageEffectContainer {
+          kind: ImageEffectContainerKind::Tree,
+          effects: vec![ImageEffect::Blur {
+            radius_px: 2.0,
+            grow_bounds: true,
+          }],
+        }),
+        ImageEffect::Identity,
+      ],
+    };
+    let path = || {
+      radial_2d_segment_path(
+        (40.0, 40.0),
+        (20.0, 20.0),
+        0.0,
+        (0.0, std::f32::consts::PI),
+        RgbColor {
+          r: 80,
+          g: 120,
+          b: 160,
+        },
+        None,
+        None,
+      )
+    };
+    let mut items = Vec::new();
+    let mut backdrops = Vec::new();
+    super::push_radial_point_with_effects(&mut items, &mut backdrops, path(), None);
+    assert!(backdrops.is_empty());
+    let empty = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![],
+    };
+    super::push_radial_point_with_effects(&mut items, &mut backdrops, path(), Some(&empty));
+    assert!(backdrops.is_empty());
+    for _ in 0..2 {
+      super::push_radial_point_with_effects(&mut items, &mut backdrops, path(), Some(&effects));
+    }
+    assert_eq!(backdrops.len(), 2);
+    assert!(
+      backdrops
+        .iter()
+        .all(|item| matches!(item, PageItem::Image(_)))
+    );
+    assert_eq!(items.len(), 4);
+    assert!(items.iter().all(|item| matches!(item, PageItem::Path(_))));
   }
 
   #[test]

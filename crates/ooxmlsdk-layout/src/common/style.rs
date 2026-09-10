@@ -11,9 +11,8 @@ use crate::common::Pt;
 /// DOCX, PPTX, XLSX, charts, and diagrams use host-specific `spPr` wrapper
 /// types, but the effect payload itself is always the shared DrawingML type.
 /// Keeping this enum in the common model prevents non-Presentation hosts from
-/// silently dropping ordered DAGs before paint. Legacy formats which have no
-/// DrawingML source node retain their source-backed, normalized effect graph
-/// in `Resolved` instead of manufacturing a misleading schema object.
+/// silently dropping ordered DAGs before paint. Legacy formats retain their
+/// own source semantics alongside the normalized effect graph.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum DrawingEffectSource {
   List {
@@ -24,7 +23,12 @@ pub(crate) enum DrawingEffectSource {
     source: Box<a::EffectDag>,
     resolved: Option<super::drawingml_image_effects::ImageEffectContainer>,
   },
-  Resolved(super::drawingml_image_effects::ImageEffectContainer),
+  /// VML's hard shadow belongs to the shape silhouette, not to the alpha of
+  /// its combined fill and stroke. Retain this provenance across lowering.
+  VmlSingleShadow {
+    effects: super::drawingml_image_effects::ImageEffectContainer,
+    obscured: bool,
+  },
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

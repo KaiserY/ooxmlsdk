@@ -163,7 +163,7 @@ fn decode_base64(encoded: &str) -> Option<Vec<u8>> {
     return None;
   }
   let mut output = Vec::with_capacity(encoded.len() / 4 * 3);
-  for encoded_block in encoded.as_bytes().chunks_exact(4) {
+  for encoded_block in encoded.as_bytes().as_chunks::<4>().0.iter() {
     let mut block = [0u8; 4];
     let mut padding = 0usize;
     for (index, byte) in encoded_block.iter().copied().enumerate() {

@@ -7,7 +7,7 @@
 //! Wine/libjpeg sources (`jidctint.c`, `jdcolor.c`, and `jdsample.c`). Inputs
 //! outside that proven path return `None` and retain the general decoder.
 
-use image::RgbImage;
+use image::{GrayImage, RgbImage};
 
 const MAX_DECODE_BYTES: usize = 512 * 1024 * 1024;
 const ZIGZAG_TO_NATURAL: [usize; 64] = [
@@ -119,10 +119,36 @@ struct ParsedJpeg<'a> {
   ycbcr: bool,
 }
 
-pub(super) fn decode_rgb(data: &[u8]) -> Option<RgbImage> {
+/// Decode a supported baseline YCbCr JPEG using accurate integer IDCT.
+/// Unsupported JPEG processes return `None` so callers retain their fallback.
+pub fn decode_rgb(data: &[u8]) -> Option<RgbImage> {
   let mut jpeg = parse(data)?;
+  if jpeg.frame.components.len() != 3 {
+    return None;
+  }
   decode_coefficients(&mut jpeg)?;
   interleave_rgb(jpeg.frame)
+}
+
+/// Decode a supported baseline grayscale JPEG without introducing RGB samples.
+pub fn decode_gray(data: &[u8]) -> Option<GrayImage> {
+  let mut jpeg = parse(data)?;
+  if jpeg.frame.components.len() != 1 {
+    return None;
+  }
+  decode_coefficients(&mut jpeg)?;
+  let frame = jpeg.frame;
+  let component = frame.components.first()?;
+  let mut samples = Vec::with_capacity(frame.width.checked_mul(frame.height)?);
+  for row in 0..frame.height {
+    let start = row.checked_mul(component.stride)?;
+    samples.extend_from_slice(component.data.get(start..start.checked_add(frame.width)?)?);
+  }
+  GrayImage::from_raw(
+    u32::try_from(frame.width).ok()?,
+    u32::try_from(frame.height).ok()?,
+    samples,
+  )
 }
 
 fn parse(data: &[u8]) -> Option<ParsedJpeg<'_>> {
@@ -160,7 +186,7 @@ fn parse(data: &[u8]) -> Option<ParsedJpeg<'_>> {
               .eq([1, 2, 3])
         }
       };
-      if !ycbcr {
+      if !ycbcr && frame.components.len() != 1 {
         return None;
       }
       return Some(ParsedJpeg {
@@ -228,12 +254,16 @@ fn parse_frame(payload: &[u8]) -> Option<Frame> {
   let height = usize::from(u16::from_be_bytes([payload[1], payload[2]]));
   let width = usize::from(u16::from_be_bytes([payload[3], payload[4]]));
   let component_count = usize::from(payload[5]);
-  if width == 0 || height == 0 || component_count != 3 || payload.len() != 6 + component_count * 3 {
+  if width == 0
+    || height == 0
+    || !matches!(component_count, 1 | 3)
+    || payload.len() != 6 + component_count * 3
+  {
     return None;
   }
 
   let mut specifications = Vec::with_capacity(component_count);
-  for bytes in payload[6..].chunks_exact(3) {
+  for bytes in payload[6..].as_chunks::<3>().0.iter() {
     let horizontal_sampling = usize::from(bytes[1] >> 4);
     let vertical_sampling = usize::from(bytes[1] & 0x0f);
     let quantization_table = usize::from(bytes[2]);
@@ -248,6 +278,13 @@ fn parse_frame(payload: &[u8]) -> Option<Frame> {
     {
       return None;
     }
+    // JPEG noninterleaved scans contain exactly one block per MCU regardless
+    // of the frame's sampling factors (IJG jdinput/jcmaster per_scan_setup).
+    let (horizontal_sampling, vertical_sampling) = if component_count == 1 {
+      (1, 1)
+    } else {
+      (horizontal_sampling, vertical_sampling)
+    };
     specifications.push((
       bytes[0],
       horizontal_sampling,
@@ -318,7 +355,7 @@ fn parse_scan(payload: &[u8], frame: &Frame) -> Option<Vec<ScanComponent>> {
   }
 
   let mut scan = Vec::with_capacity(count);
-  for bytes in payload[1..1 + count * 2].chunks_exact(2) {
+  for bytes in payload[1..1 + count * 2].as_chunks::<2>().0.iter() {
     let component = frame
       .components
       .iter()
@@ -480,7 +517,7 @@ impl<'a> EntropyBits<'a> {
 }
 
 fn decode_coefficients(jpeg: &mut ParsedJpeg<'_>) -> Option<()> {
-  if !jpeg.ycbcr {
+  if !jpeg.ycbcr && jpeg.frame.components.len() != 1 {
     return None;
   }
   for entry in &jpeg.scan {

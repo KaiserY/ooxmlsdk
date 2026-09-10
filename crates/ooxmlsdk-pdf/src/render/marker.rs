@@ -105,12 +105,16 @@ struct PathEndpoints {
 }
 
 fn path_endpoints(polyline: &PolylineItem<'_>) -> Option<PathEndpoints> {
+  if polyline.closed {
+    return None;
+  }
   if polyline.commands.is_empty() {
-    let [first, second, ..] = polyline.points else {
+    let [first, ..] = polyline.points else {
       return None;
     };
-    let penultimate = polyline.points[polyline.points.len() - 2];
     let last = polyline.points[polyline.points.len() - 1];
+    let second = polyline.points.iter().find(|point| *point != first)?;
+    let penultimate = polyline.points.iter().rev().find(|point| **point != last)?;
     return Some(PathEndpoints {
       start: (first.x.0, first.y.0),
       start_outward: normalized_direction(second.x.0, second.y.0, first.x.0, first.y.0)?,
@@ -132,8 +136,12 @@ fn path_endpoints(polyline: &PolylineItem<'_>) -> Option<PathEndpoints> {
       common::PathCommand::LineTo(point) => {
         let start = current?;
         let end = (point.x.0, point.y.0);
-        first_tangent.get_or_insert((start, end));
-        last_tangent = Some((start, end));
+        // A collapsed connector segment does not replace the adjacent
+        // nonzero tangent used by the endpoint decoration.
+        if start != end {
+          first_tangent.get_or_insert((start, end));
+          last_tangent = Some((start, end));
+        }
         current = Some(end);
       }
       common::PathCommand::CubicTo {
@@ -359,6 +367,62 @@ mod tests {
       separate_fill_and_stroke: false,
     };
     stroke_marker_geometries(&polyline, &stroke)[0].clone()
+  }
+
+  #[test]
+  fn marker_endpoint_directions_ignore_repeated_vertices() {
+    let start = Point {
+      x: Pt(0.0),
+      y: Pt(0.0),
+    };
+    let corner = Point {
+      x: Pt(10.0),
+      y: Pt(0.0),
+    };
+    let end = Point {
+      x: Pt(10.0),
+      y: Pt(10.0),
+    };
+    for leading in 1..=3 {
+      for trailing in 1..=3 {
+        let mut points = vec![start; leading];
+        points.push(corner);
+        points.extend(std::iter::repeat_n(end, trailing));
+        let mut path = PolylineItem {
+          x_pt: 0.0,
+          y_pt: 0.0,
+          width_pt: 10.0,
+          height_pt: 10.0,
+          points: &points,
+          commands: &[],
+          closed: false,
+          fill: &Fill::None,
+          stroke: None,
+          separate_fill_and_stroke: false,
+        };
+        let check = |path: &PolylineItem<'_>| {
+          let endpoints = path_endpoints(path).expect("nondegenerate path");
+          assert_eq!(endpoints.start, (0.0, 0.0));
+          assert_eq!(endpoints.end, (10.0, 10.0));
+          assert_eq!(endpoints.start_outward, (-1.0, 0.0));
+          assert_eq!(endpoints.end_outward, (0.0, 1.0));
+        };
+        check(&path);
+        let commands = std::iter::once(common::PathCommand::MoveTo(start))
+          .chain(
+            points
+              .iter()
+              .skip(1)
+              .copied()
+              .map(common::PathCommand::LineTo),
+          )
+          .collect::<Vec<_>>();
+        path.commands = &commands;
+        check(&path);
+        path.closed = true;
+        assert!(path_endpoints(&path).is_none());
+      }
+    }
   }
 
   #[test]

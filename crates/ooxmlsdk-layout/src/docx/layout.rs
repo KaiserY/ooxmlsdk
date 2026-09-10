@@ -24,6 +24,7 @@ use unicode_bidi::{BidiClass, BidiInfo, Level, bidi_class};
 use unicode_script::{Script, UnicodeScript};
 
 use crate::common;
+use crate::common::drawingml_shape_raster::office_shape_shadow_bitmap_sample_bounds as wordprocessing_shape_shadow_bitmap_sample_bounds;
 use crate::docx::{
   Block, BorderDashPattern, BorderStyle, DocxDocument, DynamicFieldKind,
   EXPLICIT_DEFAULT_WORD_TEXT_TAB, FieldNumberFormat, FloatingFrame, FloatingFramePlacement,
@@ -1465,7 +1466,7 @@ fn inline_drawing_line_height(
   if matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
     return portion_height_pt;
   }
-  if legacy_inline_object_owns_line_box(paragraph, text_frame) {
+  if legacy_inline_object_owns_line_box(paragraph, text_frame) || text_frame.picture_only_cell {
     // Writer's SwTextFormatter::InsertPortion() implements
     // MS_WORD_COMP_MIN_LINE_HEIGHT_BY_FLY through compatibility mode 14 by
     // replacing both line ascent and height with the last as-character
@@ -1788,6 +1789,18 @@ fn inline_drawing_top(
   if matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
     return line_top_pt;
   }
+  if let Some(baseline_offset) = text_frame.table_cell_baseline_offset_pt {
+    // Table cursors are resolved text baselines, whereas an image owns a
+    // frame top. Recover the line origin before fitting the object ascent.
+    // A drawing-only line has no paragraph-mark ascent to fit; visible text
+    // and shorter images still meet on the shared fitted baseline.
+    let line_origin = line_top_pt - baseline_offset;
+    return if text_frame.picture_only_cell {
+      line_origin
+    } else {
+      line_origin + (baseline_offset - object_height_pt).max(0.0)
+    };
+  }
   if legacy_inline_object_owns_line_box(paragraph, text_frame) {
     // The compatibility branch gives the as-character portion its own ascent,
     // so its upper edge is the line top even when that ascent is shorter than
@@ -1913,6 +1926,26 @@ fn legacy_inline_object_owns_line_box(
   text_frame: TextFrame,
 ) -> bool {
   text_frame.compatibility_mode < 15 && paragraph_has_only_inline_drawing_content(paragraph)
+}
+
+fn table_cell_picture_only_paragraph(paragraph: &crate::docx::Paragraph) -> bool {
+  // Ordinary as-character pictures, not positioned OLE/Math baselines or
+  // horizontal-rule hosts. Office's table-cell paragraph mark is not an
+  // additional line-height participant when these pictures are the content.
+  matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    && paragraph.list_label.is_none()
+    && paragraph.list_label_image.is_none()
+    && !paragraph.format.wordprocessing_shape_story
+    && !paragraph.format.word_text_frame_story
+    && paragraph_has_only_inline_drawing_content(paragraph)
+    && paragraph.inlines.iter().all(|inline| match inline {
+      InlineItem::Image(image) => {
+        image.line_box == crate::docx::InlineImageLineBox::CharacterLike
+          && image.inline_baseline_gap_pt.is_none()
+      }
+      InlineItem::Shape(_) => false,
+      _ => true,
+    })
 }
 
 fn word_textbox_inline_drawing_spacing_after(
@@ -2520,6 +2553,11 @@ pub(crate) enum PageItem {
   Image(ImageItem),
   LegacyFormCheckBox(Box<LegacyFormCheckBoxItem>),
   Group(Vec<PageItem>),
+  /// Paint the children against transparent black, then apply opacity once.
+  OpacityGroup {
+    items: Vec<PageItem>,
+    opacity: f32,
+  },
   IndependentTextFrame(Vec<PageItem>),
   FloatingDrawing {
     items: Vec<PageItem>,
@@ -3404,6 +3442,18 @@ fn into_common_page_item(item: PageItem) -> common::DisplayItem<'static> {
         items: items.into_iter().map(into_common_page_item).collect(),
       })
     }
+    PageItem::OpacityGroup { items, opacity } => {
+      common::DisplayItem::Group(common::CompositingGroup {
+        mask: None,
+        clip: None,
+        transform: None,
+        blend_mode: common::BlendMode::Normal,
+        opacity,
+        flatten_identity: false,
+        inherit_text_line_owner: true,
+        items: items.into_iter().map(into_common_page_item).collect(),
+      })
+    }
     PageItem::FloatingDrawing { items, .. } => {
       common::DisplayItem::Group(common::CompositingGroup {
         mask: None,
@@ -3573,6 +3623,8 @@ fn push_docx_picture_image(
   mut image_item: ImageItem,
 ) -> (usize, common::Rect) {
   let content_start = items.len();
+  let group_inline_picture_frame =
+    image_item.inline_baseline_participant && image.picture_frame.is_some();
   let mut content_bounds = image_effect_content_bounds(&image_item);
   let mut frame_foreground = Vec::new();
   let active_x_semantic_font = image.semantic_metafile_font_family.clone().filter(|_| {
@@ -3762,6 +3814,13 @@ fn push_docx_picture_image(
     if !semantic_items.is_empty() {
       items.push(PageItem::Group(semantic_items));
     }
+  }
+  if group_inline_picture_frame && items.len() > content_start + 1 {
+    // The bitmap, frame paint and effects belong to one as-character
+    // picture. Keep that ownership after lowering so line alignment and
+    // baseline placement translate its paint together with its clip.
+    let picture_items = items.split_off(content_start);
+    items.push(PageItem::Group(picture_items));
   }
   (content_start, content_bounds)
 }
@@ -3974,7 +4033,7 @@ fn inline_image_contains_reflection(image: &crate::docx::InlineImage) -> bool {
       resolved: Some(effects),
       ..
     } => Some(effects),
-    common::DrawingEffectSource::Resolved(effects) => Some(effects),
+    common::DrawingEffectSource::VmlSingleShadow { effects, .. } => Some(effects),
     _ => None,
   });
   effects.is_some_and(common::drawingml_image_effects::contains_reflection)
@@ -4055,6 +4114,9 @@ fn drawing_effect_content_bounds_with_markers(
         }
       }
       PageItem::Group(children)
+      | PageItem::OpacityGroup {
+        items: children, ..
+      }
       | PageItem::IndependentTextFrame(children)
       | PageItem::FloatingDrawing {
         items: children, ..
@@ -4692,12 +4754,164 @@ fn wordprocessing_fixed_output_static_3d_bitmap_target(
   )
 }
 
+fn vml_single_shadow_vector_backdrop(
+  items: &[PageItem],
+  effects: &common::drawingml_image_effects::ImageEffectContainer,
+  obscured: bool,
+) -> Option<Vec<PageItem>> {
+  use common::drawingml_image_effects::ImageEffect;
+  let backdrop = common::drawingml_image_effects::unchanged_foreground_backdrop(effects)?;
+  let translation = common::drawingml_image_effects::simple_outer_shadow_translation(&backdrop)?;
+  let [ImageEffect::OuterShadow { color, .. }] = backdrop.effects.as_slice() else {
+    return None;
+  };
+  if translation.blur_radius_px != 0.0 {
+    return None;
+  }
+  let color = common::Color {
+    r: color.color.r,
+    g: color.color.g,
+    b: color.color.b,
+    a: color.alpha,
+  };
+  let mut paths = Vec::<common::PathItem<'static>>::new();
+  for item in items {
+    collect_vml_shadow_silhouettes(into_common_page_item(item.clone()), &mut paths)?;
+  }
+  if paths.is_empty() {
+    return None;
+  }
+  for path in &mut paths {
+    let filled = !matches!(path.fill, common::Fill::None);
+    if obscured && !filled {
+      // This branch requires the geometric difference against the original
+      // unfilled shape; do not substitute its uncut silhouette.
+      return None;
+    }
+    if filled {
+      path.fill = common::Fill::Solid(color);
+      // Office controls resolve this boundary at adjacent integer EMUs,
+      // independently of print/screen density and for star/rect/triangle.
+      // Obscured filled shadows exclude the outline at every width.
+      if obscured
+        || path
+          .stroke
+          .as_ref()
+          .is_some_and(|stroke| stroke.width.0 <= units::emu_to_points(16_384))
+      {
+        path.stroke = None;
+      }
+    }
+    if let Some(stroke) = path.stroke.as_mut() {
+      stroke.color = color;
+      stroke.pattern = None;
+      stroke.gradient = None;
+    }
+  }
+  let dx = translation.offset_x_px * units::POINTS_PER_CSS_PIXEL;
+  let dy = translation.offset_y_px * units::POINTS_PER_CSS_PIXEL;
+  // A wide silhouette includes overlapping fill/stroke paint. PDF B/B* does
+  // not union their alpha: paint opaque children in an isolated group, then
+  // apply the shadow opacity once (PDF Reference 1.5, sections 7.3 and 7.5.5).
+  let isolate = paths.len() > 1
+    || paths
+      .iter()
+      .any(|path| !matches!(path.fill, common::Fill::None) && path.stroke.is_some());
+  if isolate {
+    for path in &mut paths {
+      if let common::Fill::Solid(fill) = &mut path.fill {
+        fill.a = u8::MAX;
+      }
+      if let Some(stroke) = &mut path.stroke {
+        stroke.color.a = u8::MAX;
+      }
+    }
+  }
+  let items = paths
+    .into_iter()
+    .map(|path| translate_page_item(PageItem::path(path), dx, dy))
+    .collect();
+  Some(if isolate {
+    vec![PageItem::OpacityGroup {
+      items,
+      opacity: f32::from(color.a) / 255.0,
+    }]
+  } else {
+    items
+  })
+}
+
+fn collect_vml_shadow_silhouettes(
+  item: common::DisplayItem<'static>,
+  paths: &mut Vec<common::PathItem<'static>>,
+) -> Option<()> {
+  let path = match item {
+    common::DisplayItem::Path(path) if path.closed => path,
+    common::DisplayItem::Rect(rect) => {
+      let bounds = rect.bounds;
+      let rectangle = kurbo::Rect::new(
+        f64::from(bounds.origin.x.0),
+        f64::from(bounds.origin.y.0),
+        f64::from(bounds.origin.x.0 + bounds.size.width.0),
+        f64::from(bounds.origin.y.0 + bounds.size.height.0),
+      );
+      common::PathItem {
+        bounds,
+        points: Vec::new(),
+        commands: common::drawingml_geometry::bez_path_commands(rectangle.to_path(0.01)),
+        closed: true,
+        fill: rect.fill,
+        stroke: rect.stroke,
+      }
+    }
+    common::DisplayItem::Group(group)
+      if group.mask.is_none()
+        && group.transform.is_none()
+        && group.clip.is_none()
+        && group.blend_mode == common::BlendMode::Normal
+        && (group.opacity - 1.0).abs() <= f32::EPSILON =>
+    {
+      for child in group.items {
+        collect_vml_shadow_silhouettes(child, paths)?;
+      }
+      return Some(());
+    }
+    common::DisplayItem::Text(_)
+    | common::DisplayItem::LinkArea(_)
+    | common::DisplayItem::AnnotationHint(_) => return Some(()),
+    _ => return None,
+  };
+  // Separate foreground fill/stroke copies must resolve to one shadow owner.
+  if let Some(existing) = paths
+    .iter_mut()
+    .find(|existing| existing.commands == path.commands && existing.points == path.points)
+  {
+    if !matches!(path.fill, common::Fill::None) {
+      existing.fill = path.fill;
+    }
+    if path.stroke.is_some() {
+      existing.stroke = path.stroke;
+    }
+    return Some(());
+  }
+  paths.push(path);
+  Some(())
+}
+
 fn finish_docx_drawing_effects(
   items: &mut Vec<PageItem>,
   content_start: usize,
   host: DocxDrawingEffectHost<'_>,
   content_bounds: common::Rect,
 ) {
+  if let Some(common::DrawingEffectSource::VmlSingleShadow { effects, obscured }) = host.effects
+    && host.static3d.is_none()
+    && let Some(shadow) =
+      vml_single_shadow_vector_backdrop(&items[content_start..], effects, *obscured)
+  {
+    items.splice(content_start..content_start, shadow);
+    return;
+  }
   let effects = host.effects.and_then(|source| match source {
     common::DrawingEffectSource::List {
       resolved: Some(effects),
@@ -4707,7 +4921,7 @@ fn finish_docx_drawing_effects(
       resolved: Some(effects),
       ..
     } => Some(effects),
-    common::DrawingEffectSource::Resolved(effects) => Some(effects),
+    common::DrawingEffectSource::VmlSingleShadow { effects, .. } => Some(effects),
     _ => None,
   });
   if effects.is_none_or(|effects| effects.effects.is_empty()) && host.static3d.is_none() {
@@ -4964,7 +5178,7 @@ fn finish_docx_drawing_effects(
   let screen_static_3d =
     host.static3d.is_some() && max_pixels_per_point <= 96.0 / units::POINTS_PER_INCH + f32::EPSILON;
   let raw_raster_bounds = static_display_bounds;
-  let shape_clip = display_items
+  let mut shape_clip = display_items
     .iter()
     .filter_map(|item| match item {
       common::DisplayItem::Path(path) if path.closed => Some(path.commands.as_slice()),
@@ -4984,20 +5198,37 @@ fn finish_docx_drawing_effects(
   }
   let automatic_extrusion_color =
     common::drawingml_3d::automatic_extrusion_color_from_items(&display_items);
-  let (aligned_raster_bounds, pixels_per_point) = if let Some(surface_bounds) =
-    wordprocessing_shape_effect_raster_bounds
+  // Picture geometry is its authored clip/frame, not the alpha silhouette of
+  // its texture (e.g. a transparent tree still extrudes a rectangular frame).
+  // Keep this geometry separate from the source image's raster clip so adding
+  // depth does not introduce an additional antialias mask on the front texture.
+  if shape_clip.is_empty()
+    && host.static3d.is_some_and(|style| {
+      style
+        .shape
+        .extrusion_height
+        .is_some_and(|height| height.to_emu() > 0)
+    })
+    && let [common::DisplayItem::Image(image)] = display_items.as_slice()
   {
-    let (_, bounded_pixels_per_point) = common::drawingml_shape_raster::bounded_effect_raster_grid(
-      surface_bounds,
-      max_pixels_per_point,
-    );
-    (surface_bounds, bounded_pixels_per_point)
+    shape_clip = if image.clip_path.is_empty() {
+      common::drawingml_shape_raster::static_3d_picture_frame(image.bounds, image.rotation_degrees)
+    } else {
+      image.clip_path.clone()
+    };
+  }
+  let effect_raster_grid = if host.static3d.is_some() {
+    common::drawingml_shape_raster::bounded_effect_raster_grid
   } else {
-    common::drawingml_shape_raster::bounded_effect_raster_grid(
-      raw_raster_bounds,
-      max_pixels_per_point,
-    )
+    common::drawingml_shape_raster::fixed_output_effect_raster_grid
   };
+  let (aligned_raster_bounds, pixels_per_point) =
+    if let Some(surface_bounds) = wordprocessing_shape_effect_raster_bounds {
+      let (_, bounded_pixels_per_point) = effect_raster_grid(surface_bounds, max_pixels_per_point);
+      (surface_bounds, bounded_pixels_per_point)
+    } else {
+      effect_raster_grid(raw_raster_bounds, max_pixels_per_point)
+    };
   // Static-3D Word output preserves the floating GetImageLocalBounds origin:
   // the one-pixel guard above makes tdf97371's model surface begin at 9.75px
   // in its 116x72 bitmap.  Aligning the absolute page rectangle instead moves
@@ -5160,8 +5391,13 @@ fn finish_docx_drawing_effects(
     if let Some(geometry) = shape_geometry.as_ref() {
       common::drawingml_3d::apply_static_3d_shape_geometry(
         &mut raster.image,
-        geometry,
-        shape_material_geometry.as_ref().unwrap_or(geometry),
+        common::drawingml_3d::Static3dShapeSurface {
+          two_sided_extrusion: matches!(display_items.as_slice(), [common::DisplayItem::Image(_)]),
+          geometry,
+          material_geometry: shape_material_geometry.as_ref().unwrap_or(geometry),
+          rasterization: common::drawingml_3d::Static3dShapeRasterization::SourceAntialias,
+          uniform_paint_opacity: None,
+        },
         &style.scene,
         projection,
         &style.shape,
@@ -5709,6 +5945,7 @@ fn locked_canvas_text_source_bounds(
     let item_bounds = match item {
       PageItem::Text(text) => locked_canvas_text_item_source_bounds(text, text_metrics),
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         locked_canvas_text_source_bounds(items, text_metrics)
@@ -6047,52 +6284,6 @@ fn wordprocessing_shape_glow_bitmap_display_bounds(
   common_rect(left, top, right - left, bottom - top)
 }
 
-fn wordprocessing_shape_shadow_bitmap_sample_bounds(
-  content_bounds: common::Rect,
-  output_bounds: common::drawingml_image_effects::EffectOutputBounds,
-  blur_radius_pt: f32,
-  effect_pixels_per_point: f32,
-) -> common::Rect {
-  fn quantize_source_edge(value_pt: f32) -> f32 {
-    let dot_position = f64::from(value_pt) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
-      / f64::from(units::POINTS_PER_INCH);
-    let dots = dot_position.round();
-    (dots * f64::from(units::POINTS_PER_INCH) / f64::from(units::OFFICE_FIXED_OUTPUT_DPI)) as f32
-  }
-
-  let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
-  let radius_position = blur_radius_pt.max(0.0) / printer_dot_pt;
-  let nearest_radius_dot = radius_position.round();
-  let integer_tolerance = f32::EPSILON * radius_position.abs().max(1.0) * 8.0;
-  let radius_dots = if (radius_position - nearest_radius_dot).abs() <= integer_tolerance {
-    nearest_radius_dot
-  } else {
-    radius_position.ceil()
-  };
-  // The WPS shadow surface owns one complete 600-DPI guard dot beyond the
-  // upward-quantized DrawingML blur radius. The exact-config 0.1/1/2/2.88/
-  // 3/4/5/6/8/9/12pt radius matrix keeps this rule across all five balanced
-  // pre-scale tiers. A zero-radius shadow is emitted as vectors by Word and
-  // never enters this bitmap path.
-  let display_radius_pt = (radius_dots + 1.0) * printer_dot_pt;
-  let far_edge_inset_pt = 0.5 / effect_pixels_per_point.max(f32::EPSILON);
-
-  // `output_bounds` already includes transform, alignment, rotation policy,
-  // distance, and the authored blur radius. Remove only that continuous blur
-  // to recover the moved source edges, quantize those edges on Word's printer
-  // grid, then install the independently observed display radius. This keeps
-  // local sample count separate from page/world phase.
-  let moved_left = content_bounds.origin.x.0 + output_bounds.left_pt + blur_radius_pt;
-  let moved_top = content_bounds.origin.y.0 + output_bounds.top_pt + blur_radius_pt;
-  let moved_right = content_bounds.origin.x.0 + output_bounds.right_pt - blur_radius_pt;
-  let moved_bottom = content_bounds.origin.y.0 + output_bounds.bottom_pt - blur_radius_pt;
-  let left = quantize_source_edge(moved_left) - display_radius_pt;
-  let top = quantize_source_edge(moved_top) - display_radius_pt;
-  let right = quantize_source_edge(moved_right) + display_radius_pt - far_edge_inset_pt;
-  let bottom = quantize_source_edge(moved_bottom) + display_radius_pt - far_edge_inset_pt;
-  common_rect(left, top, right - left, bottom - top)
-}
-
 fn wordprocessing_shape_shadow_bitmap_display_bounds(
   mut sample_bounds: common::Rect,
   effect_pixels_per_point: f32,
@@ -6232,7 +6423,7 @@ fn finish_docx_group_effects(
       resolved: Some(value),
       ..
     } => value.clone(),
-    common::DrawingEffectSource::Resolved(value) => value.clone(),
+    common::DrawingEffectSource::VmlSingleShadow { effects: value, .. } => value.clone(),
     _ => return,
   };
   if effects.effects.is_empty() {
@@ -8978,6 +9169,17 @@ fn materialize_legacy_wordprocessing_text_effects_in_items(
         items.push(PageItem::Group(nested));
         continue;
       }
+      PageItem::OpacityGroup {
+        items: mut nested,
+        opacity,
+      } => {
+        materialize_legacy_wordprocessing_text_effects_in_items(&mut nested, text_metrics);
+        items.push(PageItem::OpacityGroup {
+          items: nested,
+          opacity,
+        });
+        continue;
+      }
       PageItem::IndependentTextFrame(mut nested) => {
         materialize_legacy_wordprocessing_text_effects_in_items(&mut nested, text_metrics);
         items.push(PageItem::IndependentTextFrame(nested));
@@ -9947,6 +10149,7 @@ fn materialize_wordprocessing_text_effect_source_plane_with_native(
     let text = match item {
       PageItem::Text(text) => text,
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         materialize_wordprocessing_text_effect_source_plane_with_native(
@@ -13969,7 +14172,9 @@ fn line_number_text_metrics_for_items(
     .find_map(|item| match item {
       PageItem::Text(text) => Some((text.y_pt, text.line_height_pt)),
       PageItem::LegacyFormCheckBox(check_box) => Some((check_box.y_pt, check_box.line_height_pt)),
-      PageItem::Group(items) | PageItem::IndependentTextFrame(items) => {
+      PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
+      | PageItem::IndependentTextFrame(items) => {
         line_number_text_metrics_for_items(items, 0, items.len())
       }
       PageItem::FloatingDrawing { .. } => None,
@@ -15241,9 +15446,9 @@ fn item_line_y(item: &PageItem) -> Option<f32> {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::LegacyFormCheckBox(check_box) => Some(check_box.y_pt),
     PageItem::Image(image) if !image.floating => Some(image.y_pt),
-    PageItem::Group(items) | PageItem::IndependentTextFrame(items) => {
-      items.iter().find_map(item_line_y)
-    }
+    PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
+    | PageItem::IndependentTextFrame(items) => items.iter().find_map(item_line_y),
     PageItem::FloatingDrawing { .. } => None,
     PageItem::Image(_)
     | PageItem::Rect(_)
@@ -15278,6 +15483,7 @@ fn item_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Option<(f32, 
       image.y_pt + image.height_pt,
     )),
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => page_items_bounds(items, text_metrics),
     PageItem::Rect(rect) => Some((
@@ -15362,6 +15568,7 @@ fn item_vertical_bounds(item: &PageItem) -> (f32, f32) {
     }
     PageItem::Image(image) => (image.y_pt, image.y_pt + image.height_pt),
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => {
       page_items_vertical_bounds(items).unwrap_or((0.0, 0.0))
@@ -15407,6 +15614,7 @@ fn table_cell_flow_item_vertical_bounds(
       ))
     }
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => items
       .iter()
@@ -16385,6 +16593,11 @@ fn estimated_paragraph_content_extents(
     ),
     script_sensitive_line_height: flow.script_sensitive_line_height,
     compatibility_mode: flow.compatibility_mode,
+    // Height measurement has no paint cursor to convert.
+    table_cell_baseline_offset_pt: None,
+    picture_only_cell: flow.text_segmentation == TextSegmentation::TableCell
+      && flow.horizontal_table_cell
+      && table_cell_picture_only_paragraph(paragraph),
   };
   let mut line_text_extents = WordLineTextExtents::default();
   let mut line_height = include_numbering_label_height(
@@ -16787,12 +17000,14 @@ fn estimated_paragraph_content_extents(
           inline_image_line_height(metrics, paragraph, text_frame, text_metrics);
         let resolved_line_height =
           inline_object_line_metrics_for_flow(source_line_height, paragraph, flow).height_pt;
-        line_height =
-          if legacy_inline_object_owns_line_box(paragraph, text_frame) && !legacy_line_has_object {
-            resolved_line_height.max(LAYOUT_EPSILON_PT)
-          } else {
-            line_height.max(resolved_line_height)
-          };
+        line_height = if (legacy_inline_object_owns_line_box(paragraph, text_frame)
+          || text_frame.picture_only_cell)
+          && !legacy_line_has_object
+        {
+          resolved_line_height.max(LAYOUT_EPSILON_PT)
+        } else {
+          line_height.max(resolved_line_height)
+        };
         legacy_line_has_object = true;
         x += metrics.frame_width_pt;
       }
@@ -17038,6 +17253,7 @@ fn starts_new_page(kind: SectionBreakKind) -> bool {
 fn item_is_in_body_region(item: &PageItem, flow: FlowContext) -> bool {
   match item {
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => {
       items.iter().any(|item| item_is_in_body_region(item, flow))
@@ -19017,6 +19233,7 @@ fn shift_page_item_y(item: &mut PageItem, dy_pt: f32) {
     PageItem::Text(text) => text.y_pt += dy_pt,
     PageItem::LegacyFormCheckBox(check_box) => check_box.y_pt += dy_pt,
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
@@ -19217,7 +19434,7 @@ fn page_vertical_body_item_bounds(item: &PageItem) -> Option<(f32, f32)> {
   match item {
     PageItem::FloatingDrawing { .. } | PageItem::IndependentTextFrame(_) => None,
     PageItem::Image(image) if image.floating => None,
-    PageItem::Group(items) => items
+    PageItem::Group(items) | PageItem::OpacityGroup { items, .. } => items
       .iter()
       .filter_map(page_vertical_body_item_bounds)
       .reduce(|(top, bottom), (item_top, item_bottom)| {
@@ -19231,7 +19448,9 @@ fn page_vertical_body_line_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::FloatingDrawing { .. } | PageItem::IndependentTextFrame(_) => None,
     PageItem::Image(image) if image.floating => None,
-    PageItem::Group(items) => items.iter().find_map(page_vertical_body_line_y),
+    PageItem::Group(items) | PageItem::OpacityGroup { items, .. } => {
+      items.iter().find_map(page_vertical_body_line_y)
+    }
     _ => item_line_y(item),
   }
 }
@@ -19240,7 +19459,7 @@ fn shift_page_vertical_body_item_y(item: &mut PageItem, dy_pt: f32) {
   match item {
     PageItem::FloatingDrawing { .. } | PageItem::IndependentTextFrame(_) => {}
     PageItem::Image(image) if image.floating => {}
-    PageItem::Group(items) => {
+    PageItem::Group(items) | PageItem::OpacityGroup { items, .. } => {
       for item in items {
         shift_page_vertical_body_item_y(item, dy_pt);
       }
@@ -20341,6 +20560,7 @@ fn normalize_wordprocessing_floating_shape_shadow_bitmap_display_bounds_in_items
         }
       }
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         normalize_wordprocessing_floating_shape_shadow_bitmap_display_bounds_in_items(
@@ -20450,7 +20670,9 @@ fn order_floating_page_items(
       // An ordinary group does not change drawing ownership. In particular,
       // an effect backdrop nested under a FloatingDrawing remains an internal
       // layer and must not be hoisted as an independently floating image.
-      PageItem::Group(items) | PageItem::IndependentTextFrame(items) => {
+      PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
+      | PageItem::IndependentTextFrame(items) => {
         let _ = order_floating_page_items(items, None, inside_floating_drawing, compatibility_mode);
       }
       PageItem::FloatingDrawing { items, .. } => {
@@ -20732,6 +20954,7 @@ fn resolve_dynamic_fields_in_items(
         resolve_dynamic_field_text(text, context, in_marginal, sequence_numbers, text_metrics)
       }
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         resolve_dynamic_fields_in_items(items, context, in_marginal, sequence_numbers, text_metrics)
@@ -20877,6 +21100,7 @@ fn realign_resolved_dynamic_field_lines(items: &mut [PageItem], text_metrics: &m
   for item in items.iter_mut() {
     match item {
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         realign_resolved_dynamic_field_lines(items, text_metrics)
@@ -22734,6 +22958,7 @@ fn fragment_item_range_has_path(items: &[PageItem], item_start: usize, item_end:
 fn page_item_is_path(item: &PageItem) -> bool {
   match item {
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => items.iter().any(page_item_is_path),
     PageItem::Rect(rect) => rect.fill_color.is_some() || rect.stroke.is_some(),
@@ -23024,6 +23249,7 @@ fn translate_page_item(mut item: PageItem, dx_pt: f32, dy_pt: f32) -> PageItem {
       }
     }
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
@@ -23186,6 +23412,23 @@ fn lower_inline_chart(
           .unwrap_or_default(),
         point_colors: chart.pie_point_colors.clone(),
         point_styles: chart.pie_point_styles.clone(),
+        point_image_effects: (0..model.values.len())
+          .map(|index| {
+            chart
+              .series_point_effect_styles
+              .first()
+              .and_then(|points| points.get(index))
+              .and_then(Option::as_ref)
+              .and_then(|effects| effects.image_effects.clone())
+              .or_else(|| {
+                chart
+                  .series_effect_styles
+                  .first()
+                  .and_then(|effects| effects.image_effects.clone())
+              })
+              .or_else(|| chart.data_point_effect_style.image_effects.clone())
+          })
+          .collect(),
         data_label_fill_colors: chart
           .data_label_fill_colors
           .first()
@@ -30098,6 +30341,7 @@ fn table_cell_first_content_line_height(
 fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom: f32) -> bool {
   match item {
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => items
       .iter()
@@ -30156,6 +30400,7 @@ fn rotated_item_origin_y(
 fn shape_text_box_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom: f32) -> bool {
   match item {
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => items
       .iter()
@@ -30399,6 +30644,7 @@ fn attach_wordprocessing_text_effect_host(
     match item {
       PageItem::Text(text) => text.wordprocessing_effect_host = Some(host),
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         attach_wordprocessing_text_effect_host(items, host)
@@ -30875,6 +31121,23 @@ fn materialize_shape_text_columns(
         );
         lowered.push(PageItem::Group(nested));
       }
+      PageItem::OpacityGroup {
+        items: mut nested,
+        opacity,
+      } => {
+        materialize_shape_text_columns(
+          &mut nested,
+          mode,
+          physical_left,
+          physical_top,
+          physical_right,
+          text_metrics,
+        );
+        lowered.push(PageItem::OpacityGroup {
+          items: nested,
+          opacity,
+        });
+      }
       PageItem::IndependentTextFrame(mut nested) => {
         materialize_shape_text_columns(
           &mut nested,
@@ -31104,6 +31367,7 @@ fn detach_nested_inline_baseline_participants(items: &mut [PageItem]) {
     match item {
       PageItem::Image(image) => image.inline_baseline_participant = false,
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         detach_nested_inline_baseline_participants(items)
@@ -31317,6 +31581,7 @@ fn rotate_shape_text_items(items: &mut [PageItem], rect: ShapeTextBoxRect, rotat
   for item in items.iter_mut() {
     match item {
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         rotate_shape_text_items(items, rect, rotation_deg)
@@ -31408,6 +31673,7 @@ fn materialize_shape_text_rotation(
   for item in items {
     match item {
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         materialize_shape_text_rotation(items, pivot_x, pivot_y, rotation_deg)
@@ -31509,6 +31775,7 @@ fn materialize_frame_rect_rotation(items: &mut [PageItem], transform: Affine) {
   for item in items {
     match item {
       PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
       | PageItem::IndependentTextFrame(items)
       | PageItem::FloatingDrawing { items, .. } => {
         materialize_frame_rect_rotation(items, transform);
@@ -31562,7 +31829,13 @@ fn apply_shape_text_warp(
   let Some(preset) = shape.text_warp.as_deref() else {
     return;
   };
-  let Some((left, top, right, bottom)) = text_items_ink_bounds(items, text_metrics) else {
+  // WPS paragraphs retain logical advances but paint printer-realized glyphs.
+  // Legacy VML textpath has a different fitting contract (MS-OI29500
+  // 2.1.1812): the parent shape controls sizing, and trim owns the reserved
+  // font space. Do not impose WPS source realization on that older route.
+  let Some((left, top, right, bottom)) =
+    text_items_ink_bounds(items, text_metrics, shape.wordprocessing_shape_host)
+  else {
     return;
   };
   let border_inset = textbox_content_border_inset(shape);
@@ -31581,7 +31854,12 @@ fn apply_shape_text_warp(
   let Some(text_warp) = common::drawingml_text_warp::text_warp(
     preset,
     common_rect(left, top, right - left, bottom - top),
-    common_rect(warp_left, warp_top, warp_width, warp_height),
+    wordprocessing_text_warp_output_bounds(common_rect(
+      warp_left,
+      warp_top,
+      warp_width,
+      warp_height,
+    )),
     common_rect(rect.x, rect.y, rect.width, rect.height),
   ) else {
     return;
@@ -31625,16 +31903,47 @@ fn apply_shape_text_warp(
   }
 }
 
+fn wordprocessing_text_warp_output_bounds(bounds: common::Rect) -> common::Rect {
+  // The inset text rectangle, not the outer shape or each warped glyph, owns
+  // Word's fixed-output grid. Flat-envelope controls expose the four edges
+  // directly, independently of font realization and curve sampling. Quantize
+  // edges rather than an origin plus size: a translated rectangle can gain or
+  // lose a printer dot even though its authored extent is unchanged.
+  let left = word_fixed_output_nearest_printer_grid_pt(bounds.origin.x.0);
+  let top = word_fixed_output_nearest_printer_grid_pt(bounds.origin.y.0);
+  let right = word_fixed_output_nearest_printer_grid_pt(bounds.origin.x.0 + bounds.size.width.0);
+  let bottom = word_fixed_output_nearest_printer_grid_pt(bounds.origin.y.0 + bounds.size.height.0);
+  common_rect(
+    left,
+    top,
+    (right - left).max(f32::EPSILON),
+    (bottom - top).max(f32::EPSILON),
+  )
+}
+
 fn text_items_ink_bounds(
   items: &[PageItem],
   text_metrics: &mut TextMetrics,
+  realize_wps_paint: bool,
 ) -> Option<(f32, f32, f32, f32)> {
   let mut bounds: Option<(f32, f32, f32, f32)> = None;
   for item in items {
     let PageItem::Text(text) = item else {
       continue;
     };
-    let Some((left, top, right, bottom)) = text_item_ink_bounds(text, text_metrics) else {
+    let measured = if realize_wps_paint {
+      let mut paint_style = text.style.clone();
+      crate::docx::quantize_word_fixed_output_text_style(&mut paint_style);
+      text_item_ink_bounds_with_paint_metrics(
+        text,
+        text_metrics,
+        &paint_style,
+        units::quantize_points_to_office_print_grid,
+      )
+    } else {
+      text_item_ink_bounds(text, text_metrics)
+    };
+    let Some((left, top, right, bottom)) = measured else {
       continue;
     };
     bounds = Some(match bounds {
@@ -31678,14 +31987,27 @@ fn text_item_ink_bounds(
   text: &TextItem,
   text_metrics: &mut TextMetrics,
 ) -> Option<(f32, f32, f32, f32)> {
-  let baseline_offset = if text.style.use_windows_font_metrics {
+  text_item_ink_bounds_with_paint_metrics(text, text_metrics, &text.style, std::convert::identity)
+}
+
+fn text_item_ink_bounds_with_paint_metrics(
+  text: &TextItem,
+  text_metrics: &mut TextMetrics,
+  paint_style: &TextStyle,
+  paint_font_size: impl Fn(f32) -> f32,
+) -> Option<(f32, f32, f32, f32)> {
+  // The PDF consumer fits its baseline with the realized font metrics in the
+  // existing line box. The source rectangle must enclose that same paint, not
+  // realized outlines positioned on a logical-font baseline. A tiny source em
+  // stretched to a large envelope makes that otherwise small mismatch visible.
+  let baseline_offset = if paint_style.use_windows_font_metrics {
     text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
       &text.text,
-      &text.style,
+      paint_style,
       text.line_height_pt,
     )
   } else {
-    text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+    text_metrics.baseline_offset_in_line_for_text(&text.text, paint_style, text.line_height_pt)
   };
   let baseline = text.y_pt + baseline_offset;
   let mut glyph_x = text.x_pt;
@@ -31694,10 +32016,31 @@ fn text_item_ink_bounds(
   for glyph in shaped.glyphs {
     let font_size = glyph.font_size_pt;
     if let Some(glyph_bounds) = glyph.bounds_em {
-      let glyph_left = glyph_x + (glyph.x_offset_em + glyph_bounds.x_min_em) * font_size;
-      let glyph_right = glyph_x + (glyph.x_offset_em + glyph_bounds.x_max_em) * font_size;
-      let glyph_top = baseline - (glyph.y_offset_em + glyph_bounds.y_max_em) * font_size;
-      let glyph_bottom = baseline - (glyph.y_offset_em + glyph_bounds.y_min_em) * font_size;
+      // The deformation source encloses the outlines that will actually be
+      // painted. Word's fixed-output em is realized on the printer grid, but
+      // advances and shaping offsets still belong to the logical layout.
+      // Remeasuring the entire run at the output size would
+      // accumulate a new advance error; measuring only logical outlines would
+      // normalize the realized glyphs against the wrong ink rectangle.
+      let paint_size = paint_font_size(font_size);
+      let (glyph_left, glyph_top, glyph_right, glyph_bottom) = if paint_size == font_size {
+        // Preserve the original arithmetic for ordinary layout measurements.
+        (
+          glyph_x + (glyph.x_offset_em + glyph_bounds.x_min_em) * font_size,
+          baseline - (glyph.y_offset_em + glyph_bounds.y_max_em) * font_size,
+          glyph_x + (glyph.x_offset_em + glyph_bounds.x_max_em) * font_size,
+          baseline - (glyph.y_offset_em + glyph_bounds.y_min_em) * font_size,
+        )
+      } else {
+        let origin_x = glyph_x + glyph.x_offset_em * font_size;
+        let origin_y = baseline - glyph.y_offset_em * font_size;
+        (
+          origin_x + glyph_bounds.x_min_em * paint_size,
+          origin_y - glyph_bounds.y_max_em * paint_size,
+          origin_x + glyph_bounds.x_max_em * paint_size,
+          origin_y - glyph_bounds.y_min_em * paint_size,
+        )
+      };
       bounds = Some(match bounds {
         Some((old_left, old_top, old_right, old_bottom)) => (
           old_left.min(glyph_left),
@@ -32020,13 +32363,16 @@ fn table_cell_content_height_with_mode(
     script_sensitive_line_height: true,
     ..flow
   };
+  let first_text_height = if cell.text_rotation_deg.is_none()
+    && table_cell_first_paragraph(cell).is_some_and(table_cell_picture_only_paragraph)
+  {
+    0.0
+  } else {
+    table_cell_first_inline_text_height(cell, script_sensitive_line_height, text_metrics)
+  };
   let mut content =
     table_cell_blocks_content_height(&cell.blocks, cell.hide_end_mark, flow, mode, text_metrics)
-      .max(table_cell_first_inline_text_height(
-        cell,
-        script_sensitive_line_height,
-        text_metrics,
-      ));
+      .max(first_text_height);
   if mode == TableCellMeasureMode::WholeCell
     && let Some(reflow_height) = suppress_overlap_reflow_content_height(cell, flow, text_metrics)
   {
@@ -32270,13 +32616,17 @@ fn table_cell_paragraph_height(
   // master is not measured with its master's upper/lower spacing again.
   let extents = estimated_paragraph_content_extents(paragraph, flow, text_metrics);
   let content = extents.flow_height.max(extents.floating_bottom);
-  let min_height = paragraph_line_height_for_setup(
-    paragraph,
-    &paragraph_base_line_style(paragraph),
-    flow.setup,
-    flow.text_segmentation,
-    text_metrics,
-  );
+  let min_height = if flow.horizontal_table_cell && table_cell_picture_only_paragraph(paragraph) {
+    0.0
+  } else {
+    paragraph_line_height_for_setup(
+      paragraph,
+      &paragraph_base_line_style(paragraph),
+      flow.setup,
+      flow.text_segmentation,
+      text_metrics,
+    )
+  };
   let paragraph_mark_height = word_east_asian_paragraph_mark_single_line_height(
     paragraph,
     flow.compatibility_mode,
@@ -33629,6 +33979,8 @@ struct TextFrame {
   grid_character_pitch_pt: Option<f32>,
   script_sensitive_line_height: bool,
   compatibility_mode: u16,
+  table_cell_baseline_offset_pt: Option<f32>,
+  picture_only_cell: bool,
 }
 
 impl TextFrame {
@@ -33658,6 +34010,25 @@ impl TextFrame {
     } else {
       base_line_height
     };
+    let table_cell_baseline_offset_pt = (flow.text_segmentation == TextSegmentation::TableCell
+      && flow.horizontal_table_cell
+      && !paragraph.format.wordprocessing_shape_story
+      && !paragraph.format.word_text_frame_story
+      && matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+      && paragraph.inlines.iter().any(|inline| {
+        matches!(inline, InlineItem::Image(image)
+          if matches!(image.placement, crate::docx::ImagePlacement::Inline))
+      })
+      && paragraph.inlines.iter().all(|inline| match inline {
+        InlineItem::Image(image) => {
+          image.line_box == crate::docx::InlineImageLineBox::CharacterLike
+            && image.inline_baseline_gap_pt.is_none()
+        }
+        _ => true,
+      }))
+    .then(|| table_cell_initial_baseline_offset(&base_line_style, base_line_height, text_metrics));
+    let picture_only_cell =
+      table_cell_baseline_offset_pt.is_some() && table_cell_picture_only_paragraph(paragraph);
     let proportional_auto_gap_below_pt = proportional_auto_line_spacing_gap_below(
       paragraph,
       flow,
@@ -33746,6 +34117,8 @@ impl TextFrame {
       ),
       script_sensitive_line_height: flow.script_sensitive_line_height,
       compatibility_mode: flow.compatibility_mode,
+      table_cell_baseline_offset_pt,
+      picture_only_cell,
     }
   }
 
@@ -33948,7 +34321,6 @@ struct TextFrameFollow {
   start: InlineCursor,
   page_index: usize,
   y_pt: f32,
-  item_start: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -33966,6 +34338,9 @@ struct TextFrameState {
   current_position: InlineCursor,
   line_fragments: Vec<LineFragment>,
   page_follows: Vec<TextFrameFollow>,
+  // Paint ownership is independent from natural-page widow/orphan evidence.
+  alignment_item_start: usize,
+  initial_page_index: usize,
   line_content_item_start_index: usize,
   line_content_height: f32,
   line_inline_object_portion_height: f32,
@@ -33981,6 +34356,8 @@ impl TextFrameState {
       current_position: InlineCursor::default(),
       line_fragments: Vec::new(),
       page_follows: Vec::new(),
+      alignment_item_start: 0,
+      initial_page_index: 0,
       line_content_item_start_index: 0,
       line_content_height: 0.0,
       line_inline_object_portion_height: 0.0,
@@ -34009,29 +34386,16 @@ impl TextFrameState {
   }
 
   fn note_page_follow(&mut self, page_index: usize, y_pt: f32, item_start: usize) {
+    // Same-page column follows retain the initial page's existing alignment
+    // span. This repair changes explicit-page ownership, not column layout.
+    if page_index != self.initial_page_index {
+      self.alignment_item_start = item_start;
+    }
     self.page_follows.push(TextFrameFollow {
       start: self.current_line_start,
       page_index,
       y_pt,
-      item_start,
     });
-  }
-
-  fn current_page_item_start(
-    &self,
-    initial_item_start: usize,
-    initial_page_index: usize,
-    current_page_index: usize,
-  ) -> usize {
-    if current_page_index == initial_page_index {
-      return initial_item_start;
-    }
-    self
-      .page_follows
-      .iter()
-      .rev()
-      .find(|follow| follow.page_index == current_page_index)
-      .map_or(initial_item_start, |follow| follow.item_start)
   }
 
   fn finish_paragraph(&mut self, y_pt: f32, height_pt: f32, emitted: bool) {
@@ -34464,6 +34828,7 @@ struct InlineObjectAdvance<'a> {
 }
 
 struct TextPageBreakAdvance<'a> {
+  state: &'a mut TextFrameState,
   current: &'a mut Page,
   pages: &'a mut Vec<Page>,
   text_metrics: &'a mut TextMetrics,
@@ -34786,7 +35151,7 @@ impl<'a> TextFrameLayout<'a> {
       &mut advance.current.items,
       *advance.line_item_start_index,
       y,
-      advance.active.flow.text_segmentation == TextSegmentation::TableCell,
+      InlineBaselineMode::for_frame(advance.active.flow, advance.active.frame),
       advance.text_metrics,
     );
     if advance.active.flow.text_segmentation != TextSegmentation::TableCell {
@@ -34921,6 +35286,7 @@ impl<'a> TextFrameLayout<'a> {
     advance: TextPageBreakAdvance<'_>,
   ) -> (FlowContext, TextFrame, f32, f32, f32, f32) {
     let TextPageBreakAdvance {
+      state,
       current,
       pages,
       text_metrics,
@@ -34928,7 +35294,21 @@ impl<'a> TextFrameLayout<'a> {
       paragraph_anchor_top,
       preserve_paragraph_upper_space,
     } = advance;
+    // A manual break ends this page fragment, not its paragraph properties
+    // (ECMA-376 Part 1 §§17.3.1.13, 17.3.3.1). Finalizing only `current`
+    // after pagination drops center/right alignment on every preceding page.
+    let frame = TextFrame::new(self.paragraph, flow, text_metrics);
+    finish_paragraph_page_alignment(
+      current,
+      state.alignment_item_start,
+      self.paragraph,
+      text_metrics,
+      frame.default_line_right,
+    );
     let (next_flow, mut y) = force_page_break(flow, current, pages);
+    // Pending floating follows can seed this page with unrelated items.
+    // Retain the actual start, not the first page's index or an assumed zero.
+    state.alignment_item_start = current.items.len();
     // A run-level page break splits one Word paragraph into a master and a
     // follow text frame. Paragraph-relative drawings after the break use the
     // follow frame's origin, not the master frame's pre-break origin. This is
@@ -35127,6 +35507,9 @@ impl<'a> TextFrameLayout<'a> {
         text_metrics,
       ),
     );
+    let mut text_state = TextFrameState::new();
+    text_state.alignment_item_start = start_item_index;
+    text_state.initial_page_index = start_pages_len;
     let has_list_label = paragraph.list_label.is_some()
       || paragraph.list_label_image.is_some()
       || paragraph
@@ -35142,6 +35525,7 @@ impl<'a> TextFrameLayout<'a> {
           (flow, text_frame, y, _, _, _) = self.force_text_page_break(
             flow,
             TextPageBreakAdvance {
+              state: &mut text_state,
               current,
               pages,
               text_metrics,
@@ -35178,7 +35562,6 @@ impl<'a> TextFrameLayout<'a> {
     let mut ended_with_explicit_page_break = leading_break_was_page;
     let mut pending_tab: Option<PendingAlignedTab> = None;
     let mut pending_advance_logical_x: Option<f32> = None;
-    let mut text_state = TextFrameState::new();
     if first_inline_index != 0 {
       text_state.set_position(InlineCursor::after_inline(first_inline_index - 1));
     }
@@ -35745,6 +36128,7 @@ impl<'a> TextFrameLayout<'a> {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
               TextPageBreakAdvance {
+                state: &mut text_state,
                 current,
                 pages,
                 text_metrics,
@@ -35868,6 +36252,7 @@ impl<'a> TextFrameLayout<'a> {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
               TextPageBreakAdvance {
+                state: &mut text_state,
                 current,
                 pages,
                 text_metrics,
@@ -35946,6 +36331,7 @@ impl<'a> TextFrameLayout<'a> {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
               TextPageBreakAdvance {
+                state: &mut text_state,
                 current,
                 pages,
                 text_metrics,
@@ -36055,6 +36441,7 @@ impl<'a> TextFrameLayout<'a> {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
               TextPageBreakAdvance {
+                state: &mut text_state,
                 current,
                 pages,
                 text_metrics,
@@ -36174,6 +36561,7 @@ impl<'a> TextFrameLayout<'a> {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
               TextPageBreakAdvance {
+                state: &mut text_state,
                 current,
                 pages,
                 text_metrics,
@@ -37680,6 +38068,7 @@ impl<'a> TextFrameLayout<'a> {
                 .force_text_page_break(
                   flow,
                   TextPageBreakAdvance {
+                    state: &mut text_state,
                     current,
                     pages,
                     text_metrics,
@@ -37942,6 +38331,7 @@ impl<'a> TextFrameLayout<'a> {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
               TextPageBreakAdvance {
+                state: &mut text_state,
                 current,
                 pages,
                 text_metrics,
@@ -38472,12 +38862,14 @@ impl<'a> TextFrameLayout<'a> {
             }));
           }
           x += metrics.frame_width_pt;
-          line_height =
-            if legacy_inline_object_owns_line_box(paragraph, text_frame) && object_starts_line {
-              object_line_height.max(LAYOUT_EPSILON_PT)
-            } else {
-              line_height.max(object_line_height)
-            };
+          line_height = if (legacy_inline_object_owns_line_box(paragraph, text_frame)
+            || text_frame.picture_only_cell)
+            && object_starts_line
+          {
+            object_line_height.max(LAYOUT_EPSILON_PT)
+          } else {
+            line_height.max(object_line_height)
+          };
           flow_blocking_floating_only = false;
           emitted = true;
         }
@@ -39353,6 +39745,7 @@ impl<'a> TextFrameLayout<'a> {
                   .force_text_page_break(
                     flow,
                     TextPageBreakAdvance {
+                      state: &mut text_state,
                       current,
                       pages,
                       text_metrics,
@@ -39673,6 +40066,7 @@ impl<'a> TextFrameLayout<'a> {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
               TextPageBreakAdvance {
+                state: &mut text_state,
                 current,
                 pages,
                 text_metrics,
@@ -39785,6 +40179,7 @@ impl<'a> TextFrameLayout<'a> {
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
               TextPageBreakAdvance {
+                state: &mut text_state,
                 current,
                 pages,
                 text_metrics,
@@ -39914,6 +40309,7 @@ impl<'a> TextFrameLayout<'a> {
       (flow, text_frame, y, _, _, line_height) = self.force_text_page_break(
         flow,
         TextPageBreakAdvance {
+          state: &mut text_state,
           current,
           pages,
           text_metrics,
@@ -40015,7 +40411,7 @@ impl<'a> TextFrameLayout<'a> {
         &mut current.items,
         line_item_start_index,
         y,
-        flow.text_segmentation == TextSegmentation::TableCell,
+        InlineBaselineMode::for_frame(flow, text_frame),
         text_metrics,
       );
       if flow.text_segmentation != TextSegmentation::TableCell {
@@ -40329,38 +40725,13 @@ impl<'a> TextFrameLayout<'a> {
       }
     }
 
-    let alignment_start_item_index =
-      text_state.current_page_item_start(start_item_index, start_pages_len, pages.len());
-    if alignment_start_item_index <= current.items.len() {
-      let rtl_leading_numbering_labels = if numbering_label_uses_rtl_leading_edge(
-        paragraph.format.list_label_justification,
-        paragraph.format.bidi,
-      ) {
-        take_rtl_leading_numbering_labels(&mut current.items, alignment_start_item_index)
-      } else {
-        Vec::new()
-      };
-      trim_word_compatible_trailing_blanks(
-        &mut current.items[alignment_start_item_index..],
-        paragraph,
-        text_metrics,
-      );
-      align_paragraph_items(
-        &mut current.items[alignment_start_item_index..],
-        if paragraph_has_only_horizontal_rule_content(paragraph) {
-          // `o:hralign` owns the rule position independently from w:jc. The
-          // vector-only fallback in align_paragraph_items cannot recover that
-          // semantic owner after lowering, so leave an already-positioned
-          // horizontal-rule paragraph untouched.
-          ParagraphAlignment::Left
-        } else {
-          effective_paragraph_alignment(paragraph)
-        },
-        text_metrics,
-        default_line_right,
-      );
-      current.items.extend(rtl_leading_numbering_labels);
-    }
+    finish_paragraph_page_alignment(
+      current,
+      text_state.alignment_item_start,
+      paragraph,
+      text_metrics,
+      default_line_right,
+    );
     if start_item_index <= current.items.len() {
       let decoration_baseline_offset_pt =
         if matches!(flow.text_segmentation, TextSegmentation::TableCell) {
@@ -42510,6 +42881,45 @@ fn trim_word_compatible_trailing_blanks(
   }
 }
 
+fn finish_paragraph_page_alignment(
+  current: &mut Page,
+  alignment_start_item_index: usize,
+  paragraph: &crate::docx::Paragraph,
+  text_metrics: &mut TextMetrics,
+  default_line_right: f32,
+) {
+  if alignment_start_item_index <= current.items.len() {
+    let rtl_leading_numbering_labels = if numbering_label_uses_rtl_leading_edge(
+      paragraph.format.list_label_justification,
+      paragraph.format.bidi,
+    ) {
+      take_rtl_leading_numbering_labels(&mut current.items, alignment_start_item_index)
+    } else {
+      Vec::new()
+    };
+    trim_word_compatible_trailing_blanks(
+      &mut current.items[alignment_start_item_index..],
+      paragraph,
+      text_metrics,
+    );
+    align_paragraph_items(
+      &mut current.items[alignment_start_item_index..],
+      if paragraph_has_only_horizontal_rule_content(paragraph) {
+        // `o:hralign` owns the rule position independently from w:jc. The
+        // vector-only fallback in align_paragraph_items cannot recover that
+        // semantic owner after lowering, so leave an already-positioned
+        // horizontal-rule paragraph untouched.
+        ParagraphAlignment::Left
+      } else {
+        effective_paragraph_alignment(paragraph)
+      },
+      text_metrics,
+      default_line_right,
+    );
+    current.items.extend(rtl_leading_numbering_labels);
+  }
+}
+
 fn align_paragraph_items(
   items: &mut [PageItem],
   alignment: ParagraphAlignment,
@@ -42606,9 +43016,9 @@ fn align_paragraph_items(
 fn item_locks_paragraph_alignment(item: &PageItem) -> bool {
   match item {
     PageItem::Image(image) => image.paragraph_alignment_locked,
-    PageItem::Group(items) | PageItem::IndependentTextFrame(items) => {
-      items.iter().any(item_locks_paragraph_alignment)
-    }
+    PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
+    | PageItem::IndependentTextFrame(items) => items.iter().any(item_locks_paragraph_alignment),
     PageItem::Rect(rect) => rect.paragraph_alignment_locked,
     PageItem::FloatingDrawing { .. }
     | PageItem::Text(_)
@@ -43575,53 +43985,71 @@ fn justify_paragraph_last_line(
   }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum InlineBaselineMode {
+  LineTop,
+  FixedTable,
+  FittedTable,
+}
+
+impl InlineBaselineMode {
+  fn for_frame(flow: FlowContext, frame: TextFrame) -> Self {
+    if flow.text_segmentation != TextSegmentation::TableCell {
+      Self::LineTop
+    } else if frame.table_cell_baseline_offset_pt.is_some() {
+      Self::FittedTable
+    } else {
+      Self::FixedTable
+    }
+  }
+}
+
 fn align_line_items_to_inline_object_baseline(
   items: &mut [PageItem],
   start_index: usize,
   y: f32,
-  text_y_is_resolved_baseline: bool,
+  baseline_mode: InlineBaselineMode,
   text_metrics: &mut TextMetrics,
 ) {
   let object_baseline = items
     .iter()
     .skip(start_index)
-    .filter_map(|item| match item {
-      PageItem::Image(image) if image.inline_baseline_participant => {
-        Some(image.y_pt + image.height_pt + image.inline_baseline_gap_pt)
-      }
-      _ => None,
-    })
+    .filter_map(inline_alignment_image)
+    .map(|image| image.y_pt + image.height_pt + image.inline_baseline_gap_pt)
     .reduce(f32::max);
   let Some(object_baseline) = object_baseline else {
     return;
   };
 
-  if text_y_is_resolved_baseline
+  if baseline_mode != InlineBaselineMode::LineTop
     && items
       .iter()
       .skip(start_index)
       .any(|item| matches!(item, PageItem::Text(text) if (text.y_pt - y).abs() < 0.01))
   {
-    // Table-cell replay stores the already-resolved line baseline in
-    // TextItem::y_pt; the PDF table frame consumes that coordinate directly.
-    // An as-character object's authored bottom gap is therefore positioned
-    // from this baseline, not from a second font baseline offset. Writer's
-    // SwTextFormatter::UpdatePos() follows the same order: after the complete
-    // line metrics are known, SwFlyCntPortion::SetBase() resets every inline
-    // fly against the final line base. This signed translation is essential
-    // for legacy picture characters whose w:position leaves part of the
-    // object below the surrounding baseline.
+    // The initial cell cursor resolves the text-only baseline. A taller
+    // inline object raises that baseline for every participant; a short
+    // object retains it. Do not pull a tall picture above the cell just to
+    // keep the pre-object text baseline (d6568bad mixed-content controls).
+    // As in SwTextFormatter::UpdatePos()/SwFlyCntPortion::SetBase(), position
+    // the complete line only after resolving the common ascent.
+    let baseline = if baseline_mode == InlineBaselineMode::FittedTable {
+      y.max(object_baseline)
+    } else {
+      y
+    };
     for item in items.iter_mut().skip(start_index) {
-      let PageItem::Image(image) = item else {
+      if let PageItem::Text(text) = item
+        && (text.y_pt - y).abs() < 0.01
+      {
+        text.y_pt = baseline;
+      }
+      let Some(image) = inline_alignment_image(item) else {
         continue;
       };
-      if !image.inline_baseline_participant {
-        continue;
-      }
-      let offset = y - (image.y_pt + image.height_pt + image.inline_baseline_gap_pt);
+      let offset = baseline - (image.y_pt + image.height_pt + image.inline_baseline_gap_pt);
       if offset.abs() > LAYOUT_EPSILON_PT {
-        image.y_pt += offset;
-        translate_image_clip_path(image, 0.0, offset);
+        shift_page_item_y(item, offset);
       }
     }
     return;
@@ -43633,15 +44061,14 @@ fn align_line_items_to_inline_object_baseline(
   // common baseline only after the complete line is known: an earlier short
   // image must move down when a later image raises the ascent (tdf91122).
   for item in items.iter_mut().skip(start_index) {
-    match item {
-      PageItem::Image(image) if image.inline_baseline_participant => {
-        let offset =
-          object_baseline - (image.y_pt + image.height_pt + image.inline_baseline_gap_pt);
-        if offset > LAYOUT_EPSILON_PT {
-          image.y_pt += offset;
-          translate_image_clip_path(image, 0.0, offset);
-        }
+    if let Some(image) = inline_alignment_image(item) {
+      let offset = object_baseline - (image.y_pt + image.height_pt + image.inline_baseline_gap_pt);
+      if offset > LAYOUT_EPSILON_PT {
+        shift_page_item_y(item, offset);
       }
+      continue;
+    }
+    match item {
       PageItem::Text(text) if (text.y_pt - y).abs() < 0.01 => {
         let baseline_offset = if text.style.use_windows_font_metrics {
           text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
@@ -43699,7 +44126,7 @@ fn wordprocessing_line_baseline_offset(
       };
       Some(offset + line_shift_pt)
     }
-    PageItem::Group(items) => items
+    PageItem::Group(items) | PageItem::OpacityGroup { items, .. } => items
       .iter()
       .filter_map(|item| wordprocessing_line_baseline_offset(item, text_metrics))
       .reduce(f32::max),
@@ -43730,6 +44157,11 @@ fn align_exact_line_items_to_fixed_baseline(
   let text_top_pt = baseline_pt - common_baseline_offset_pt;
 
   fn align_item(item: &mut PageItem, text_top_pt: f32, baseline_pt: f32) {
+    if let Some(image) = inline_alignment_image(item) {
+      let offset = baseline_pt - (image.y_pt + image.height_pt + image.inline_baseline_gap_pt);
+      shift_page_item_y(item, offset);
+      return;
+    }
     match item {
       PageItem::Text(text)
         if !text.style.semantic_only
@@ -43740,12 +44172,7 @@ fn align_exact_line_items_to_fixed_baseline(
       {
         text.y_pt = text_top_pt;
       }
-      PageItem::Image(image) if image.inline_baseline_participant => {
-        let offset = baseline_pt - (image.y_pt + image.height_pt + image.inline_baseline_gap_pt);
-        image.y_pt += offset;
-        translate_image_clip_path(image, 0.0, offset);
-      }
-      PageItem::Group(items) => {
+      PageItem::Group(items) | PageItem::OpacityGroup { items, .. } => {
         for item in items {
           align_item(item, text_top_pt, baseline_pt);
         }
@@ -43857,7 +44284,9 @@ fn trailing_cjk_punctuation_compression_capacity(
       }
       PageItem::Image(image) if (image.y_pt - y).abs() < 0.01 => return 0.0,
       PageItem::LegacyFormCheckBox(check_box) if (check_box.y_pt - y).abs() < 0.01 => return 0.0,
-      PageItem::Group(items) | PageItem::IndependentTextFrame(items)
+      PageItem::Group(items)
+      | PageItem::OpacityGroup { items, .. }
+      | PageItem::IndependentTextFrame(items)
         if items
           .iter()
           .find_map(item_y)
@@ -43894,7 +44323,9 @@ fn item_y(item: &PageItem) -> Option<f32> {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::LegacyFormCheckBox(check_box) => Some(check_box.y_pt),
     PageItem::Image(image) => Some(image.y_pt),
-    PageItem::Group(items) | PageItem::IndependentTextFrame(items) => items.iter().find_map(item_y),
+    PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
+    | PageItem::IndependentTextFrame(items) => items.iter().find_map(item_y),
     PageItem::FloatingDrawing { .. } => None,
     PageItem::Rect(rect) => Some(rect.y_pt),
     PageItem::Fill(_) => None,
@@ -43909,15 +44340,26 @@ fn is_office_math_alignment_item(item: &PageItem) -> bool {
     PageItem::Image(image) => {
       super::math::is_office_math_content_type(image.content_type.as_deref())
     }
-    PageItem::Group(items) | PageItem::IndependentTextFrame(items) => {
-      items.iter().any(is_office_math_alignment_item)
-    }
+    PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
+    | PageItem::IndependentTextFrame(items) => items.iter().any(is_office_math_alignment_item),
     _ => false,
   }
 }
 
 fn is_inline_baseline_alignment_item(item: &PageItem) -> bool {
-  matches!(item, PageItem::Image(image) if image.inline_baseline_participant)
+  inline_alignment_image(item).is_some()
+}
+
+fn inline_alignment_image(item: &PageItem) -> Option<&ImageItem> {
+  match item {
+    PageItem::Image(image) if image.inline_baseline_participant => Some(image),
+    PageItem::Group(items) | PageItem::OpacityGroup { items, .. } => {
+      items.iter().find_map(inline_alignment_image)
+    }
+    // Nested text frames have their own line metrics, not the outer line's.
+    _ => None,
+  }
 }
 
 fn item_alignment_y(
@@ -43927,6 +44369,9 @@ fn item_alignment_y(
 ) -> Option<f32> {
   if !align_by_baseline {
     return item_y(item);
+  }
+  if let Some(image) = inline_alignment_image(item) {
+    return Some(image.y_pt + image.height_pt + image.inline_baseline_gap_pt);
   }
   match item {
     PageItem::Text(text) => {
@@ -43941,14 +44386,17 @@ fn item_alignment_y(
       };
       Some(text.y_pt + baseline_offset)
     }
-    PageItem::Image(image) if image.inline_baseline_participant => {
-      Some(image.y_pt + image.height_pt + image.inline_baseline_gap_pt)
-    }
     _ => item_y(item),
   }
 }
 
 fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Option<(f32, f32)> {
+  if let Some(image) = inline_alignment_image(item) {
+    return Some((
+      image.x_pt - image.inline_frame_left_gap_pt,
+      image.width_pt + image.inline_frame_left_gap_pt + image.inline_frame_right_gap_pt,
+    ));
+  }
   match item {
     PageItem::Text(text) => Some((
       text.x_pt,
@@ -43961,6 +44409,7 @@ fn item_horizontal_bounds(item: &PageItem, text_metrics: &mut TextMetrics) -> Op
     )),
     PageItem::LegacyFormCheckBox(check_box) => Some((check_box.x_pt, check_box.size_pt)),
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => {
       let (left, _, right, _) = page_items_bounds(items, text_metrics)?;
@@ -43979,6 +44428,7 @@ fn shift_item_x(item: &mut PageItem, offset: f32) {
     PageItem::Text(text) => text.x_pt += offset,
     PageItem::LegacyFormCheckBox(check_box) => check_box.x_pt += offset,
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
@@ -44029,6 +44479,7 @@ fn shift_item(item: &mut PageItem, dx: f32, dy: f32) {
       }
     }
     PageItem::Group(items)
+    | PageItem::OpacityGroup { items, .. }
     | PageItem::IndependentTextFrame(items)
     | PageItem::FloatingDrawing { items, .. } => {
       for item in items {
@@ -45868,6 +46319,163 @@ fn push_line_item(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  fn text_warp_bounds_test_item(size_pt: f32) -> TextItem {
+    TextItem {
+      x_pt: 100.0,
+      y_pt: 20.0,
+      line_height_pt: 24.0,
+      wordprocessing_auto_line_spacing_units: None,
+      line_metrics_participant: true,
+      wordprocessing_effect_host: None,
+      wordprocessing_terminal_effect_style: None,
+      text: "TbmgTbmg".to_string(),
+      style: TextStyle {
+        font_family: Some(Arc::from("Courier New")),
+        font_size_pt: size_pt,
+        bold: true,
+        ..Default::default()
+      },
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      dynamic_field_line_anchor: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      word_spacing_pt: 0.0,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    }
+  }
+
+  #[test]
+  fn word_text_warp_source_realization_does_not_redefine_legacy_vml_measurement() {
+    let mut metrics = TextMetrics::new();
+    for size in [1.0, 10.0, 12.0, 14.0] {
+      let text = text_warp_bounds_test_item(size);
+      let expected = text_item_ink_bounds(&text, &mut metrics).unwrap();
+      let actual =
+        text_items_ink_bounds(&[PageItem::Text(Box::new(text))], &mut metrics, false).unwrap();
+      assert_eq!(actual, expected);
+    }
+  }
+
+  #[test]
+  fn word_text_warp_source_bounds_enclose_realized_paint_baseline() {
+    let mut metrics = TextMetrics::new();
+    for size in [1.0, 1.5, 10.0, 11.0, 12.0, 14.0] {
+      for windows_metrics in [false, true] {
+        let mut text = text_warp_bounds_test_item(size);
+        text.text = "C".to_string();
+        text.style.font_family = Some(Arc::from("DejaVu Sans"));
+        text.style.use_windows_font_metrics = windows_metrics;
+        let actual = text_items_ink_bounds(
+          &[PageItem::Text(Box::new(text.clone()))],
+          &mut metrics,
+          true,
+        )
+        .unwrap();
+        // A single glyph has no advance accumulation. An independently shaped
+        // realized paint item therefore supplies its exact expected enclosure,
+        // including the baseline refitted inside the unchanged line box.
+        crate::docx::quantize_word_fixed_output_text_style(&mut text.style);
+        let expected = text_item_ink_bounds(&text, &mut metrics).unwrap();
+        for (a, b) in [actual.0, actual.1, actual.2, actual.3]
+          .into_iter()
+          .zip([expected.0, expected.1, expected.2, expected.3])
+        {
+          assert!(
+            (a - b).abs() < 0.0001,
+            "size {size}, Windows {windows_metrics}: {actual:?} != {expected:?}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn word_text_warp_source_bounds_realize_outlines_but_keep_logical_advances() {
+    let mut metrics = TextMetrics::new();
+    for size in [10.0, 11.0, 12.0, 14.0] {
+      let text = text_warp_bounds_test_item(size);
+      let actual = text_items_ink_bounds(
+        &[PageItem::Text(Box::new(text.clone()))],
+        &mut metrics,
+        true,
+      )
+      .unwrap();
+      let mut pieces = Vec::new();
+      let mut x = text.x_pt;
+      for character in text.text.chars() {
+        let mut piece = text.clone();
+        piece.text = character.to_string();
+        piece.x_pt = x;
+        // Character cells retain the logical layout's advance, not the
+        // realized font's advance. A whole-run font-size substitution fails
+        // this segmentation-invariance check for non-grid-aligned sizes.
+        x += metrics.measure_text(&piece.text, &piece.style);
+        pieces.push(PageItem::Text(Box::new(piece)));
+      }
+      let expected = text_items_ink_bounds(&pieces, &mut metrics, true).unwrap();
+      for (a, b) in [actual.0, actual.1, actual.2, actual.3]
+        .into_iter()
+        .zip([expected.0, expected.1, expected.2, expected.3])
+      {
+        assert!(
+          (a - b).abs() < 0.0001,
+          "size {size}: {actual:?} != {expected:?}"
+        );
+      }
+      let logical = text_item_ink_bounds(&text, &mut metrics).unwrap();
+      if size == 12.0 {
+        assert_eq!(actual, logical);
+      } else {
+        assert_ne!(actual, logical);
+      }
+      assert_eq!(text.style.font_size_pt, size);
+      assert_eq!((text.x_pt, text.y_pt), (100.0, 20.0));
+    }
+  }
+
+  #[test]
+  fn word_text_warp_quantizes_each_inset_edge_on_the_output_grid() {
+    for (shift, expected) in [
+      (0.0, [24.96, 55.8, 509.76, 56.16]),
+      (0.05, [25.08, 55.8, 509.64, 56.16]),
+      (0.10, [25.08, 55.8, 509.76, 56.16]),
+      (0.15, [25.20, 55.92, 509.64, 56.16]),
+    ] {
+      let bounds = wordprocessing_text_warp_output_bounds(common_rect(
+        25.0 + shift,
+        55.75 + shift,
+        509.7,
+        56.15,
+      ));
+      for (actual, expected) in [
+        bounds.origin.x.0,
+        bounds.origin.y.0,
+        bounds.size.width.0,
+        bounds.size.height.0,
+      ]
+      .into_iter()
+      .zip(expected)
+      {
+        assert!((actual - expected).abs() < 0.0001);
+      }
+    }
+  }
+
+  #[test]
+  fn word_text_warp_keeps_aligned_edges_and_nonempty_small_bounds() {
+    let aligned = common_rect(-12.0, 24.0, 120.0, 36.0);
+    assert_eq!(wordprocessing_text_warp_output_bounds(aligned), aligned);
+    let tiny = wordprocessing_text_warp_output_bounds(common_rect(0.0, 0.0, 0.01, 0.01));
+    assert!(tiny.size.width.0 > 0.0 && tiny.size.height.0 > 0.0);
+  }
 
   #[test]
   fn word_run_effect_merge_key_is_not_the_gradient_owner() {
@@ -49086,12 +49694,13 @@ mod tests {
 
   #[test]
   fn empty_effect_list_keeps_an_independent_scene_3d_shape_visible() {
-    let effects = common::DrawingEffectSource::Resolved(
-      common::drawingml_image_effects::ImageEffectContainer {
+    let effects = common::DrawingEffectSource::List {
+      source: Box::default(),
+      resolved: Some(common::drawingml_image_effects::ImageEffectContainer {
         kind: common::drawingml_image_effects::ImageEffectContainerKind::Sibling,
         effects: Vec::new(),
-      },
-    );
+      }),
+    };
     let static3d = common::drawingml_3d::Static3dStyle {
       scene: Box::new(a::Scene3DType {
         camera: Box::new(a::Camera {
@@ -51458,6 +52067,98 @@ mod tests {
   }
 
   #[test]
+  fn vml_single_shadow_vector_source_separates_fill_and_outline_ownership() {
+    let effects = common::drawingml_image_effects::offset_outer_shadow_with_identity(
+      -4.0,
+      8.0,
+      common::drawingml_image_effects::ResolvedEffectColor {
+        color: RgbColor {
+          r: 12,
+          g: 34,
+          b: 56,
+        },
+        alpha: 128,
+      },
+    );
+    for width_emu in [0, 9_525, 16_383, 16_384, 16_385, 50_800] {
+      for filled in [false, true] {
+        for obscured in [false, true] {
+          let path = common::PathItem {
+            bounds: common_rect(10.0, 20.0, 8.0, 6.0),
+            points: Vec::new(),
+            commands: common::drawingml_geometry::bez_path_commands(
+              kurbo::Rect::new(10.0, 20.0, 18.0, 26.0).to_path(0.01),
+            ),
+            closed: true,
+            // An explicitly transparent fill remains a filled silhouette.
+            fill: if filled {
+              common::Fill::Solid(common::Color::default())
+            } else {
+              common::Fill::None
+            },
+            stroke: Some(common::Stroke {
+              width: common::Pt(units::emu_to_points(width_emu)),
+              color: common::Color {
+                r: 255,
+                a: 64,
+                ..common::Color::default()
+              },
+              ..common::Stroke::default()
+            }),
+          };
+          let mut fill_copy = path.clone();
+          fill_copy.stroke = None;
+          let mut stroke_copy = path.clone();
+          stroke_copy.fill = common::Fill::None;
+          for originals in [
+            vec![PageItem::path(path.clone())],
+            vec![
+              PageItem::path(fill_copy.clone()),
+              PageItem::path(stroke_copy.clone()),
+            ],
+            vec![PageItem::path(stroke_copy), PageItem::path(fill_copy)],
+          ] {
+            let result = vml_single_shadow_vector_backdrop(&originals, &effects, obscured);
+            if obscured && !filled {
+              assert!(result.is_none());
+              continue;
+            }
+            let result = result.unwrap();
+            assert_eq!(result.len(), 1);
+            let isolated = filled && !obscured && width_emu > 16_384;
+            let (paint, expected_alpha) = if isolated {
+              let PageItem::OpacityGroup { items, opacity } = &result[0] else {
+                panic!("overlapping shadow paints need group alpha")
+              };
+              assert_eq!(*opacity, 128.0 / 255.0);
+              assert_eq!(items.len(), 1);
+              (&items[0], 255)
+            } else {
+              (&result[0], 128)
+            };
+            let PageItem::Path(shadow) = paint else {
+              panic!("vector shadow")
+            };
+            assert!((shadow.bounds.origin.x.0 - 7.0).abs() < 0.0001);
+            assert!((shadow.bounds.origin.y.0 - 26.0).abs() < 0.0001);
+            assert_eq!(!matches!(shadow.fill, common::Fill::None), filled);
+            assert_eq!(
+              shadow.stroke.is_some(),
+              !filled || (!obscured && width_emu > 16_384)
+            );
+            if let Some(stroke) = &shadow.stroke {
+              assert_eq!(stroke.color.a, expected_alpha);
+            }
+            if let common::Fill::Solid(color) = shadow.fill {
+              assert_eq!(color.a, expected_alpha);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn legacy_word_shadow_recurses_and_uses_office_fixed_output_grid() {
     let mut style = TextStyle {
       font_size_pt: 9.96,
@@ -52116,6 +52817,7 @@ mod tests {
       behind_text: false,
       wordprocessing_shape_shadow_far_edge_extension_pt: 0.0,
     })];
+    let source = items[0].clone();
     let mut text_metrics = TextMetrics::new();
 
     align_paragraph_items(
@@ -52137,6 +52839,59 @@ mod tests {
         .abs()
         < 0.001
     );
+    let mut framed = vec![PageItem::Group(vec![
+      source,
+      PageItem::path(common::PathItem {
+        bounds: common_rect(0.25, 20.0, 30.0, 40.0),
+        points: Vec::new(),
+        commands: vec![
+          common::PathCommand::MoveTo(common_point(0.25, 20.0)),
+          common::PathCommand::LineTo(common_point(30.25, 60.0)),
+        ],
+        closed: false,
+        fill: common::Fill::None,
+        stroke: None,
+      }),
+    ])];
+    align_paragraph_items(
+      &mut framed,
+      ParagraphAlignment::Center,
+      &mut text_metrics,
+      100.0,
+    );
+    let PageItem::Group(paint) = &framed[0] else {
+      panic!("picture paint");
+    };
+    let image = inline_alignment_image(&framed[0]).expect("inline picture anchor");
+    assert!((image.x_pt - 34.75).abs() < 0.001);
+    let PageItem::Path(frame) = &paint[1] else {
+      panic!("frame paint");
+    };
+    assert!((frame.bounds.origin.x.0 - image.x_pt).abs() < 0.001);
+    let common::PathCommand::MoveTo(point) = frame.commands[0] else {
+      panic!("frame start");
+    };
+    assert!((point.x.0 - image.x_pt).abs() < 0.001);
+
+    let mut tall = image.clone();
+    tall.height_pt = 80.0;
+    framed.push(PageItem::Image(tall));
+    align_line_items_to_inline_object_baseline(
+      &mut framed,
+      0,
+      20.0,
+      InlineBaselineMode::LineTop,
+      &mut text_metrics,
+    );
+    let image = inline_alignment_image(&framed[0]).expect("aligned picture");
+    assert!((image.y_pt - 60.0).abs() < 0.001);
+    let PageItem::Group(paint) = &framed[0] else {
+      panic!("picture paint");
+    };
+    let PageItem::Path(frame) = &paint[1] else {
+      panic!("frame paint");
+    };
+    assert!((frame.bounds.origin.y.0 - image.y_pt).abs() < 0.001);
   }
 
   #[test]
@@ -55801,6 +56556,8 @@ mod tests {
       grid_character_pitch_pt: None,
       script_sensitive_line_height: false,
       compatibility_mode: 15,
+      table_cell_baseline_offset_pt: None,
+      picture_only_cell: false,
     };
     let mut text_metrics = TextMetrics::new();
     let expected = inline_text_height(&label_style, &mut text_metrics);
@@ -60173,12 +60930,129 @@ mod tests {
   }
 
   #[test]
+  fn explicit_page_break_preserves_alignment_of_each_paragraph_fragment() {
+    for alignment in [
+      ParagraphAlignment::Left,
+      ParagraphAlignment::Center,
+      ParagraphAlignment::Right,
+    ] {
+      let run = |text: &str| {
+        InlineItem::Text(TextRun {
+          text: text.into(),
+          style: TextStyle::default(),
+          hyperlink_url: None,
+          dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
+          style_ref_numbering_text: None,
+          preserve_text_portion: false,
+        })
+      };
+      let paragraph = Paragraph {
+        inlines: vec![
+          run("first"),
+          InlineItem::PageBreak,
+          run("second"),
+          InlineItem::PageBreak,
+          run("third"),
+        ],
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        runs: Vec::new(),
+        format: Box::new(ParagraphFormat {
+          alignment,
+          ..ParagraphFormat::default()
+        }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      };
+      let flow = flow_context(
+        PageSetup::default(),
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        DEFAULT_TAB_STOP_PT,
+      );
+      let mut current = empty_page(flow.setup, flow.section_index);
+      // Earlier paragraph items must never become part of this alignment.
+      current.items.push(PageItem::Rect(RectItem {
+        x_pt: 7.0,
+        y_pt: 4.0,
+        width_pt: 5.0,
+        height_pt: 3.0,
+        paragraph_alignment_locked: false,
+        fill_color: None,
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      }));
+      let mut pages = Vec::new();
+      let mut metrics = TextMetrics::new();
+      layout_paragraph(
+        &paragraph,
+        flow,
+        ParagraphLayoutTarget {
+          current: &mut current,
+          pages: &mut pages,
+          anchor_pages: None,
+          text_metrics: &mut metrics,
+        },
+        flow.content_top_pt,
+        flow.content_top_pt,
+        0.0,
+      );
+      pages.push(current);
+      assert_eq!(pages.len(), 3);
+      let PageItem::Rect(sentinel) = &pages[0].items[0] else {
+        panic!("preceding item");
+      };
+      assert_eq!(sentinel.x_pt, 7.0);
+      for (page, expected_text) in pages.iter().zip(["first", "second", "third"]) {
+        let texts = page
+          .items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text) => Some(text),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(texts.len(), 1);
+        let text = texts[0];
+        assert_eq!(text.text, expected_text);
+        let width = metrics.measure_text(&text.text, &text.style);
+        let factor = match alignment {
+          ParagraphAlignment::Left => 0.0,
+          ParagraphAlignment::Center => 0.5,
+          ParagraphAlignment::Right => 1.0,
+          ParagraphAlignment::Justify => unreachable!(),
+        };
+        let expected = flow.content_left_pt + (flow.content_width - width) * factor;
+        assert!(
+          (text.x_pt - expected).abs() < 0.01,
+          "{alignment:?} {expected_text}: actual {}, expected {expected}",
+          text.x_pt
+        );
+      }
+    }
+  }
+
+  #[test]
   fn paragraph_alignment_uses_the_current_follow_page_item_start() {
     let mut state = TextFrameState::new();
+    state.alignment_item_start = 23;
+    assert_eq!(state.alignment_item_start, 23);
     state.note_page_follow(1, 72.0, 3);
-
-    assert_eq!(state.current_page_item_start(23, 0, 1), 3);
-    assert_eq!(state.current_page_item_start(23, 0, 0), 23);
+    assert_eq!(state.alignment_item_start, 3);
   }
 
   #[test]
@@ -60877,7 +61751,7 @@ mod tests {
       &mut floating_backdrop,
       0,
       0.0,
-      false,
+      InlineBaselineMode::LineTop,
       &mut text_metrics,
     );
     let PageItem::Text(text) = &floating_backdrop[1] else {
@@ -60886,17 +61760,42 @@ mod tests {
     assert_eq!(text.y_pt, 0.0);
 
     let mut table_items = items.clone();
-    align_line_items_to_inline_object_baseline(&mut table_items, 0, 0.0, true, &mut text_metrics);
+    align_line_items_to_inline_object_baseline(
+      &mut table_items,
+      0,
+      0.0,
+      InlineBaselineMode::FittedTable,
+      &mut text_metrics,
+    );
     let PageItem::Image(image) = &table_items[0] else {
       panic!("expected image item");
     };
-    assert_eq!(image.y_pt, -120.0);
+    assert_eq!(image.y_pt, 0.0);
     let PageItem::Text(text) = &table_items[1] else {
       panic!("expected text item");
     };
-    assert_eq!(text.y_pt, 0.0);
+    assert_eq!(text.y_pt, 120.0);
 
-    align_line_items_to_inline_object_baseline(&mut items, 0, 0.0, false, &mut text_metrics);
+    let mut fixed_table_items = items.clone();
+    align_line_items_to_inline_object_baseline(
+      &mut fixed_table_items,
+      0,
+      0.0,
+      InlineBaselineMode::FixedTable,
+      &mut text_metrics,
+    );
+    let PageItem::Image(image) = &fixed_table_items[0] else {
+      panic!("expected image item");
+    };
+    assert_eq!(image.y_pt, -120.0);
+
+    align_line_items_to_inline_object_baseline(
+      &mut items,
+      0,
+      0.0,
+      InlineBaselineMode::LineTop,
+      &mut text_metrics,
+    );
 
     let PageItem::Text(text) = &items[1] else {
       panic!("expected text item");
@@ -60952,7 +61851,13 @@ mod tests {
     ];
     let mut text_metrics = TextMetrics::new();
 
-    align_line_items_to_inline_object_baseline(&mut items, 0, 0.0, false, &mut text_metrics);
+    align_line_items_to_inline_object_baseline(
+      &mut items,
+      0,
+      0.0,
+      InlineBaselineMode::LineTop,
+      &mut text_metrics,
+    );
 
     let PageItem::Image(short) = &items[0] else {
       panic!("expected short image");
@@ -61007,7 +61912,13 @@ mod tests {
     detach_nested_inline_baseline_participants(&mut items[..1]);
     let mut text_metrics = TextMetrics::new();
 
-    align_line_items_to_inline_object_baseline(&mut items, 0, 0.0, false, &mut text_metrics);
+    align_line_items_to_inline_object_baseline(
+      &mut items,
+      0,
+      0.0,
+      InlineBaselineMode::LineTop,
+      &mut text_metrics,
+    );
 
     let PageItem::Image(textbox_image) = &items[0] else {
       panic!("expected textbox image");
@@ -61467,6 +62378,40 @@ mod tests {
       inline_drawing_top(72.0, baseline + 4.0, &paragraph, frame, &mut text_metrics),
       72.0
     );
+
+    for baseline in [5.0, 10.0, 20.0, 180.0] {
+      let table_frame = TextFrame {
+        table_cell_baseline_offset_pt: Some(baseline),
+        ..frame
+      };
+      let y = 72.0 + baseline;
+      assert_eq!(
+        inline_drawing_top(y, 4.0, &paragraph, table_frame, &mut text_metrics),
+        y - 4.0,
+      );
+      assert_eq!(
+        inline_drawing_top(
+          y,
+          baseline + 4.0,
+          &paragraph,
+          table_frame,
+          &mut text_metrics
+        ),
+        72.0,
+      );
+      let picture_frame = TextFrame {
+        picture_only_cell: true,
+        ..table_frame
+      };
+      assert_eq!(
+        inline_drawing_top(y, 4.0, &paragraph, picture_frame, &mut text_metrics),
+        72.0,
+      );
+      assert_eq!(
+        inline_drawing_line_height(61.5, &paragraph, picture_frame, &mut text_metrics),
+        61.5,
+      );
+    }
   }
 
   #[test]
@@ -61878,6 +62823,36 @@ mod tests {
       compatibility_mode: 15,
       ..flow
     };
+    let picture_cell_flow = FlowContext {
+      text_segmentation: TextSegmentation::TableCell,
+      horizontal_table_cell: true,
+      ..modern_flow
+    };
+    for mark_size in [5.5, 11.0, 22.0, 200.0] {
+      let mut picture_paragraph = paragraph(vec![InlineItem::Image(image(60.0))]);
+      picture_paragraph.base_style.font_size_pt = mark_size;
+      let (estimated, laid_out) = heights(&picture_paragraph, picture_cell_flow);
+      assert!(
+        (estimated - 16.0).abs() < LAYOUT_EPSILON_PT,
+        "mark={mark_size}, estimated={estimated}"
+      );
+      assert!(
+        (laid_out - 16.0).abs() < LAYOUT_EPSILON_PT,
+        "mark={mark_size}, laid_out={laid_out}"
+      );
+      let measured = table_cell_paragraph_height(
+        None,
+        &picture_paragraph,
+        None,
+        picture_cell_flow,
+        &mut TextMetrics::new(),
+        false,
+      );
+      assert!(
+        (measured - 16.0).abs() < LAYOUT_EPSILON_PT,
+        "mark={mark_size}, measured={measured}"
+      );
+    }
     let single_image = paragraph(vec![InlineItem::Image(image(60.0))]);
     let wrapped_images = paragraph(vec![
       InlineItem::Image(image(60.0)),

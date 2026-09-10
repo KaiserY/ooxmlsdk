@@ -397,7 +397,6 @@ fn print_page_items(
   setup: PageSetup,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let paper_scale = page.paper_scale_percent as f32 / 100.0;
   // The render layouts retain their historical `zoom_scale` field name, but
   // fixed output composes worksheet zoom and the paper transform as floats.
   // Keeping the stages separate avoids rounding 90% × 95% to 86%.
@@ -447,20 +446,9 @@ fn print_page_items(
     heading_height + repeat_height + area_size.1,
   );
   let body_origin_x = setup.margin_left_pt + horizontal_centering + heading_width;
-  let body_margin_top =
-    if page.paper_scale_percent < 100 && page.page_settings.header_footer.has_print_content() {
-      setup.margin_top_pt * paper_scale
-    } else {
-      setup.margin_top_pt
-    };
-  let body_origin_y = body_margin_top
-    + if page.paper_scale_percent < 100 {
-      page
-        .page_settings
-        .printer_default_paper_body_offset_y_pt(paper_scale)
-    } else {
-      0.0
-    }
+  let body_origin_y = page
+    .page_settings
+    .fixed_output_body_top_pt(page.paper_scale_percent)
     + vertical_centering
     + heading_height;
   let physical_page = CellRect {
@@ -652,6 +640,22 @@ impl DrawingAreaRenderLayout {
     SheetPageTransform::new(self.origin_x_pt, self.origin_y_pt, self.zoom_scale, source)
   }
 
+  fn fixed_output_drawing_page_transform(self, page: &CalcPrintPage<'_>) -> SheetPageTransform {
+    let source = self.area.map_or_else(CellRect::default, |area| {
+      let logical = page.sheet.range_rect(area);
+      CellRect {
+        x_pt: logical.x_pt * self.zoom_scale,
+        y_pt: page
+          .sheet
+          .fixed_output_drawing_row_offset_pt(area.start.row, self.zoom_scale),
+        ..CellRect::default()
+      }
+    });
+    // The anchors are already in scaled worksheet coordinates. Only remove
+    // the matching print-area origin and translate onto the physical page.
+    SheetPageTransform::new(self.origin_x_pt, self.origin_y_pt, 1.0, source)
+  }
+
   fn clip_rect(self, page: &CalcPrintPage<'_>, setup: PageSetup) -> CellRect {
     self.area.map_or(
       CellRect {
@@ -716,7 +720,15 @@ fn print_page_drawingml_items(
   layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let page_transform = layout.page_transform(page);
+  let output_scale = page
+    .sheet
+    .uses_legacy_excel12_fixed_output_grid()
+    .then_some(layout.zoom_scale);
+  let page_transform = if output_scale.is_some() {
+    layout.fixed_output_drawing_page_transform(page)
+  } else {
+    layout.page_transform(page)
+  };
   let mut page_clip_rect = layout.clip_rect(page, setup);
   if page.sheet.uses_indexed_scatter_print_grid() {
     page_clip_rect.width_pt += super::print::INDEXED_SCATTER_HORIZONTAL_CLIP_EXTENSION_PT;
@@ -729,7 +741,9 @@ fn print_page_drawingml_items(
       {
         continue;
       }
-      let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
+      let Some((x_pt, y_pt, width_pt, height_pt)) =
+        anchor_rect_in_coordinate_space_pt(page.sheet, anchor, output_scale)
+      else {
         continue;
       };
       if width_pt <= 0.0 || height_pt <= 0.0 {
@@ -2249,7 +2263,9 @@ fn parse_vml_coordinate_list(value: &str) -> Option<Vec<(f32, f32)>> {
   }
   Some(
     values
-      .chunks_exact(2)
+      .as_chunks::<2>()
+      .0
+      .iter()
       .map(|pair| (pair[0], pair[1]))
       .collect(),
   )
@@ -2629,7 +2645,7 @@ fn render_cell_area(
     // 11pt legacy workbook font is consequently emitted and measured as
     // 11.04pt (92/600in), which also decides borderline wrap opportunities.
     super::text::scale_text_style_for_fixed_output(&mut measurement_style, layout.zoom_scale);
-    if page.sheet.uses_legacy_excel12_cell_text_print_grid()
+    if page.sheet.uses_legacy_excel12_fixed_output_grid()
       && let Some(spacing_pt) = text_metrics.gdi_uniform_device_character_spacing_pt(
         &cell.rendered_text,
         &measurement_style,
@@ -5154,7 +5170,7 @@ fn finish_xlsx_shape_effects(
     Some(common::DrawingEffectSource::Dag { source, .. }) => {
       common::drawingml_image_effects::from_effect_dag(source, None, &resolver)
     }
-    Some(common::DrawingEffectSource::Resolved(effects)) => effects.clone(),
+    Some(common::DrawingEffectSource::VmlSingleShadow { effects, .. }) => effects.clone(),
     None => match theme_effects {
       Some((properties, _)) if properties.effect_list.is_some() => {
         common::drawingml_image_effects::from_effect_list(
@@ -6288,6 +6304,22 @@ fn lower_drawing_chart(
       .collect();
     let (data_label_styles, data_label_rich_text_styles) =
       xlsx_chart_data_label_host_styles(&chart.data_labels, &data_label_style, import);
+    let chart_effect_resolver = XlsxImageEffectColorResolver {
+      import,
+      image_resources: &drawing.image_resources,
+      chart_resource: Some(resource),
+      placeholder_color: Some(Color::Scheme(SchemeColor {
+        value: a::SchemeColorValues::Dark1,
+        transformations: Vec::new(),
+      })),
+    };
+    let theme_effects = shared_chart::chart_shape_effects_from_theme_style(
+      shared_chart::automatic_chart_data_point_effect_style_index(chart_style.unwrap_or(2))
+        .and_then(|index| xlsx_chart_effect_style_source(resource, import, index)),
+      &chart_effect_resolver,
+    );
+    let point_image_effects =
+      shared_chart::radial_chart_image_effects(&chart, theme_effects, &chart_effect_resolver);
     let mut items = lower_radial_chart(
       ChartFrame {
         x_pt: rect.x_pt,
@@ -6306,6 +6338,7 @@ fn lower_drawing_chart(
         data_label_rich_text_styles,
         point_colors,
         point_styles,
+        point_image_effects,
         data_label_fill_colors,
         leader_line_style: xlsx_chart_shape_style(
           chart.leader_line_shape_properties,
@@ -10098,29 +10131,37 @@ fn anchor_rect_pt(
   sheet: &CalcSheet,
   anchor: &super::drawing::DrawingAnchorModel,
 ) -> Option<(f32, f32, f32, f32)> {
+  anchor_rect_in_coordinate_space_pt(sheet, anchor, None)
+}
+
+fn anchor_rect_in_coordinate_space_pt(
+  sheet: &CalcSheet,
+  anchor: &super::drawing::DrawingAnchorModel,
+  output_scale: Option<f32>,
+) -> Option<(f32, f32, f32, f32)> {
+  let marker_position = |marker| match output_scale {
+    Some(scale) => sheet.fixed_output_drawing_marker_position_pt(marker, scale),
+    None => sheet.marker_position_pt(marker),
+  };
+  let length_pt = |emu| units::emu_to_points(emu) * output_scale.unwrap_or(1.0);
   let rect = match anchor.kind {
     super::drawing::DrawingAnchorKind::TwoCell => {
       let from = anchor.from.as_ref()?;
       let to = anchor.to.as_ref()?;
-      let (x1, y1) = sheet.marker_position_pt(from);
-      let (x2, y2) = sheet.marker_position_pt(to);
+      let (x1, y1) = marker_position(from);
+      let (x2, y2) = marker_position(to);
       Some((x1.min(x2), y1.min(y2), (x2 - x1).abs(), (y2 - y1).abs()))
     }
     super::drawing::DrawingAnchorKind::OneCell => {
       let from = anchor.from.as_ref()?;
-      let (x, y) = sheet.marker_position_pt(from);
+      let (x, y) = marker_position(from);
       let (cx, cy) = anchor.extent?;
-      Some((x, y, units::emu_to_points(cx), units::emu_to_points(cy)))
+      Some((x, y, length_pt(cx), length_pt(cy)))
     }
     super::drawing::DrawingAnchorKind::Absolute => {
       let (x, y) = anchor.position?;
       let (cx, cy) = anchor.extent?;
-      Some((
-        units::emu_to_points(x),
-        units::emu_to_points(y),
-        units::emu_to_points(cx),
-        units::emu_to_points(cy),
-      ))
+      Some((length_pt(x), length_pt(y), length_pt(cx), length_pt(cy)))
     }
   }?;
   Some(excel_unrotated_anchor_rect(

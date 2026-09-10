@@ -99,6 +99,26 @@ fn main() {
     definitions.len()
   )
   .unwrap();
+  writeln!(
+    output,
+    "pub(super) fn text_rectangle(preset: a::ShapeTypeValues) -> Option<[&'static str; 4]> {{\n  match preset {{"
+  )
+  .unwrap();
+  for (preset, geometry) in &definitions {
+    let rectangle = geometry.rectangle.as_ref().map(|rect| {
+      format!(
+        "Some([{:?}, {:?}, {:?}, {:?}])",
+        rect.left, rect.top, rect.right, rect.bottom
+      )
+    });
+    writeln!(
+      output,
+      "    a::ShapeTypeValues::{preset:?} => {},",
+      rectangle.unwrap_or_else(|| "None".into()),
+    )
+    .unwrap();
+  }
+  writeln!(output, "  }}\n}}").unwrap();
   fs::write(OUTPUT, output).unwrap_or_else(|error| panic!("failed to write {OUTPUT}: {error}"));
 
   let text_warp_input = env::args()

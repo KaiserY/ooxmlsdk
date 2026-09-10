@@ -90,6 +90,7 @@ fn graphic_data_record(
   let mut record = GraphicDataRecord {
     uri: graphic_data.uri.clone(),
     kind,
+    model3d_object_viewport_emu: None,
     chart_relationship_id: None,
     chart_resource: None,
     extended_chart_resource: None,
@@ -105,6 +106,12 @@ fn graphic_data_record(
   };
   for choice in &graphic_data.graphic_data_choice {
     match choice {
+      a::GraphicDataChoice::Model3D(model) => {
+        record.model3d_object_viewport_emu = match model.model3_d_choice1.as_ref() {
+          Some(am3d::Model3DChoice::ObjectViewport(viewport)) => Some(viewport.viewport_sz),
+          _ => None,
+        };
+      }
       a::GraphicDataChoice::ChartReference(reference) => {
         record.chart_relationship_id = Some(reference.id.clone());
         record.chart_resource = slide_persist.chart_resources.get(&reference.id).cloned();

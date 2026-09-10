@@ -312,6 +312,8 @@ fn mapped_reflection_retains_logical_fade_direction() {
     for angle in [0.0_f32, 33.0, 90.0, 147.0] {
       for flip_y in [1.0, -1.0] {
         let effect = ImageReflectionEffect {
+          source_is_transformed: false,
+          blur_kernel: ReflectionBlurKernel::RadialGaussian,
           blur_radius_px: 0.0,
           raster_length_scale: 1.0,
           bounds_radius_scale: 1.0,

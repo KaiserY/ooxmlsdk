@@ -9,6 +9,7 @@ mod drawingml_direct2d_raster;
 mod drawingml_direct_inset;
 pub(crate) mod drawingml_geometry;
 pub(crate) mod drawingml_gradient;
+pub(crate) mod drawingml_image_crop;
 pub(crate) mod drawingml_image_effects;
 pub(crate) mod drawingml_image_tile;
 mod drawingml_mil_raster;

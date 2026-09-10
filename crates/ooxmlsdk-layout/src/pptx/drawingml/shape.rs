@@ -117,6 +117,8 @@ pub(crate) enum FrameType {
 pub(crate) struct GraphicDataRecord {
   pub(crate) uri: String,
   pub(crate) kind: GraphicDataKind,
+  /// Full camera viewport, distinct from the cached raster's visible frame.
+  pub(crate) model3d_object_viewport_emu: Option<i64>,
   pub(crate) chart_relationship_id: Option<String>,
   pub(crate) chart_resource: Option<ChartResource>,
   pub(crate) extended_chart_resource: Option<ExtendedChartResource>,
@@ -705,6 +707,11 @@ fn merge_line_properties(
 ) -> Option<LineProperties> {
   match (base, direct) {
     (Some(mut base), Some(direct)) => {
+      base.source_outline = crate::common::drawingml_stroke::merge_outlines(
+        base.source_outline.as_deref(),
+        direct.source_outline.as_deref(),
+      )
+      .map(Box::new);
       if direct.fill != LineFill::Unspecified {
         base.fill = direct.fill;
         base.placeholder_color = direct.placeholder_color;
@@ -737,5 +744,57 @@ fn merge_effect_properties(
     (Some(base), None) => Some(base),
     (None, Some(direct)) => Some(direct),
     (None, None) => None,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+  use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn pptx_line_style_only_overrides_survive_import_and_inheritance() {
+    let theme = a::Outline::from_bytes(
+      br#"<a:ln xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="6350" cap="flat">
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+        <a:prstDash val="solid"/><a:miter lim="800000"/>
+        <a:tailEnd type="triangle" w="lg" len="sm"/>
+      </a:ln>"#,
+    ).unwrap();
+    for (attributes, children) in [
+      ("cap=\"rnd\"", ""),
+      ("cmpd=\"dbl\"", ""),
+      ("algn=\"in\"", ""),
+      ("", "<a:prstDash val=\"dash\"/>"),
+      (
+        "",
+        "<a:custDash><a:ds d=\"200000\" sp=\"100000\"/></a:custDash>",
+      ),
+      ("", "<a:round/>"),
+      ("", "<a:headEnd type=\"triangle\"/>"),
+      ("", "<a:tailEnd type=\"diamond\"/>"),
+      ("", "<a:tailEnd type=\"none\"/>"),
+      ("", "<a:tailEnd w=\"med\"/>"),
+    ] {
+      let xml = format!(
+        "<a:ln xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" {attributes}>{children}</a:ln>"
+      );
+      let direct = a::Outline::from_bytes(xml.as_bytes()).unwrap();
+      let imported = LineProperties::from_dml_outline(&direct).expect("style-only line");
+      assert_eq!(imported.fill, LineFill::Unspecified);
+      assert_eq!(imported.width_emu, None);
+      let inherited = LineProperties::from_dml_outline(&theme).unwrap();
+      let expected_fill = inherited.fill.clone();
+      let merged = merge_line_properties(Some(inherited), Some(imported)).unwrap();
+      assert_eq!(merged.fill, expected_fill);
+      assert_eq!(merged.width_emu, Some(6350));
+      assert_eq!(
+        merged.source_outline.as_deref(),
+        crate::common::drawingml_stroke::merge_outlines(Some(&theme), Some(&direct)).as_ref(),
+        "{xml}"
+      );
+    }
+    assert!(LineProperties::from_dml_outline(&a::Outline::default()).is_none());
   }
 }

@@ -31,6 +31,18 @@ pub(crate) fn paths(
   drawingml_custom_geometry::paths(&geometry, left, top, width, height)
 }
 
+pub(crate) fn text_rectangle(
+  preset: &a::PresetGeometry,
+  width_emu: f64,
+  height_emu: f64,
+) -> Option<Rect> {
+  drawingml_custom_geometry::text_rectangle(
+    &drawingml_preset_data::text_geometry(preset),
+    width_emu,
+    height_emu,
+  )
+}
+
 /// Compatibility adapter for hosts that have not migrated to per-path paint.
 ///
 /// A missing preset is the DrawingML rectangle default. Invalid preset data
@@ -70,7 +82,7 @@ fn rectangle_path(left: f32, top: f32, width: f32, height: f32) -> DrawingPath {
 mod tests {
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
-  use super::{path_commands, paths};
+  use super::{path_commands, paths, text_rectangle};
   use crate::common::{DrawingPathFillMode, PathCommand};
 
   fn preset(value: &str) -> a::PresetGeometry {
@@ -78,6 +90,30 @@ mod tests {
       preset: value.parse().unwrap(),
       ..Default::default()
     }
+  }
+
+  #[test]
+  fn preset_text_rectangle_preserves_adjustments_and_rectangle_default() {
+    assert_eq!(
+      text_rectangle(&preset("rect"), 200.0, 300.0),
+      Some(kurbo::Rect::new(0.0, 0.0, 200.0, 300.0))
+    );
+    let mut arrow = preset("downArrow");
+    assert_eq!(
+      text_rectangle(&arrow, 200.0, 300.0),
+      Some(kurbo::Rect::new(50.0, 0.0, 150.0, 250.0))
+    );
+    arrow.adjust_value_list = Some(a::AdjustValueList {
+      shape_guide: vec![a::ShapeGuide {
+        name: "adj1".into(),
+        formula: "val 100000".into(),
+      }],
+    });
+    assert_eq!(
+      text_rectangle(&arrow, 200.0, 300.0),
+      Some(kurbo::Rect::new(0.0, 0.0, 200.0, 200.0))
+    );
+    assert!(text_rectangle(&arrow, 0.0, 300.0).is_none());
   }
 
   #[test]
@@ -114,6 +150,39 @@ mod tests {
         y: crate::common::Pt(0.0),
       }))
     );
+  }
+
+  #[test]
+  fn zero_axis_connectors_preserve_their_stroked_paths() {
+    for name in [
+      "line",
+      "straightConnector1",
+      "bentConnector2",
+      "bentConnector3",
+      "curvedConnector2",
+      "curvedConnector3",
+    ] {
+      for (width, height) in [(510.0, 0.0), (0.0, 510.0), (510.0, 1.0), (1.0, 510.0)] {
+        let paths = paths(Some(&preset(name)), 96.0, 252.0, width, height)
+          .expect("a zero shape axis does not erase a connector");
+        assert!(
+          paths
+            .iter()
+            .any(|path| path.stroke && path.commands.len() >= 2),
+          "{name}: {width}x{height}"
+        );
+        let last = paths.last().unwrap().commands.last().unwrap();
+        let expected = crate::common::Point {
+          x: crate::common::Pt(96.0 + width),
+          y: crate::common::Pt(252.0 + height),
+        };
+        let endpoint = match last {
+          PathCommand::LineTo(end) | PathCommand::CubicTo { end, .. } => *end,
+          _ => panic!("unexpected connector endpoint {last:?}"),
+        };
+        assert_eq!(endpoint, expected, "{name}: {width}x{height}");
+      }
+    }
   }
 
   #[test]

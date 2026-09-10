@@ -281,9 +281,7 @@ fn ensure_group_supported(group: &common::CompositingGroup<'static>) -> Result<(
   if group.blend_mode != common::BlendMode::Normal {
     return unsupported("group blend modes");
   }
-  if (group.opacity - 1.0).abs() > f32::EPSILON {
-    return unsupported("group opacity");
-  }
+  opacity_alpha(group.opacity)?;
   if let Some(clip) = group.clip {
     validate_rect(clip)?;
   }
@@ -1094,7 +1092,9 @@ fn display_items_need_preparation(items: &[common::DisplayItem<'static>]) -> boo
       .as_ref()
       .is_some_and(|stroke| stroke.head_end.is_some() || stroke.tail_end.is_some()),
     common::DisplayItem::Group(group) => {
-      !group.flatten_identity || display_items_need_preparation(&group.items)
+      !group.flatten_identity
+        || (group.opacity - 1.0).abs() > f32::EPSILON
+        || display_items_need_preparation(&group.items)
     }
     common::DisplayItem::Glyphs(_)
     | common::DisplayItem::AnnotationHint(_)
@@ -1152,9 +1152,7 @@ fn write_prepared_item(
       if *blend_mode != common::BlendMode::Normal {
         return unsupported("group blend modes");
       }
-      if (*opacity - 1.0).abs() > f32::EPSILON {
-        return unsupported("group opacity");
-      }
+      let alpha = opacity_alpha(*opacity)?;
       let pushed_clip = clip.is_some_and(|clip| {
         if clip.width_pt <= 0.0 || clip.height_pt <= 0.0 {
           return false;
@@ -1166,12 +1164,21 @@ fn write_prepared_item(
           .end_path();
         true
       });
-      if *flatten_identity {
+      if *flatten_identity && alpha == u8::MAX {
         for child in items {
           write_prepared_item(content, child, writer)?;
         }
       } else {
+        // Group alpha belongs to the Do operation, not its children. The
+        // transparency Form initializes their alpha to one (PDF 1.5 §7.5.5).
+        if alpha != u8::MAX {
+          content.save_state();
+          set_alpha(content, writer.resources, writer.refs, None, Some(alpha))?;
+        }
         write_isolated_prepared_group(content, items, writer)?;
+        if alpha != u8::MAX {
+          content.restore_state();
+        }
       }
       if pushed_clip {
         content.restore_state();
@@ -8868,6 +8875,50 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_applies_group_alpha_once_even_with_flatten_identity_requested() {
+    for alpha in [0_u8, 64, 128, 254] {
+      let mut document = blank_document(&[(612.0, 792.0)]);
+      document.pages[0]
+        .items
+        .push(common::DisplayItem::Group(common::CompositingGroup {
+          mask: None,
+          clip: None,
+          transform: None,
+          blend_mode: common::BlendMode::Normal,
+          opacity: f32::from(alpha) / 255.0,
+          flatten_identity: true,
+          inherit_text_line_owner: true,
+          items: vec![common::DisplayItem::Rect(common::RectItem {
+            bounds: common::Rect {
+              origin: common::Point {
+                x: Pt(10.0),
+                y: Pt(20.0),
+              },
+              size: Size {
+                width: Pt(40.0),
+                height: Pt(30.0),
+              },
+            },
+            fill: common::Fill::Solid(color(0, 0, 0, 255)),
+            stroke: Some(common::Stroke {
+              width: Pt(4.0),
+              color: color(0, 0, 0, 255),
+              ..Default::default()
+            }),
+          })],
+        }));
+      assert!(display_items_need_preparation(&document.pages[0].items));
+      let bytes = render(&document, &uncompressed_options()).unwrap();
+      let pdf = String::from_utf8_lossy(&bytes);
+      assert_eq!(pdf.matches("/Subtype/Form").count(), 1, "{pdf}");
+      assert!(pdf.contains("/I true"), "{pdf}");
+      assert_eq!(pdf.matches("/ca ").count(), 1, "{pdf}");
+      assert_eq!(pdf.matches("/CA ").count(), 0, "{pdf}");
+      assert!(pdf.contains("/GS0 gs/Fm0 Do"), "{pdf}");
+    }
+  }
+
+  #[test]
   fn direct_writer_keeps_other_group_compositing_states_independent() {
     let base = common::CompositingGroup {
       mask: None,
@@ -8909,12 +8960,14 @@ mod tests {
 
     let mut translucent = base;
     translucent.opacity = 0.5;
-    assert!(matches!(
-      ensure_group_supported(&translucent),
-      Err(PdfError::DirectWriterUnsupported {
-        feature: "group opacity"
-      })
-    ));
+    assert!(ensure_group_supported(&translucent).is_ok());
+    for invalid in [f32::NAN, f32::INFINITY, -0.01, 1.01] {
+      translucent.opacity = invalid;
+      assert!(matches!(
+        ensure_group_supported(&translucent),
+        Err(PdfError::Writer(_))
+      ));
+    }
   }
 
   #[test]

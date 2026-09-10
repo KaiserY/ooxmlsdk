@@ -200,7 +200,7 @@ impl BackdropTexturePlan {
       return None;
     }
     let dimensions = (grid.width_px, grid.height_px);
-    let raster = TextSurfaceRasterization::FinalGrid(grid);
+    let raster = TextSurfaceRasterization::Final(grid);
     let pattern = raster.sample_pattern();
     let corners = self
       .projected_corners

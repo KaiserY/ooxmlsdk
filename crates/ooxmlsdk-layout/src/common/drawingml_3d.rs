@@ -9,11 +9,14 @@ mod contour;
 mod contour_mesh;
 mod material_texture;
 mod physical_curve;
+mod raster_boundary;
+mod raster_extrusion;
 pub(crate) use backdrop::BackdropTexturePlan;
 pub(crate) use material_texture::{
   TextMaterialTexture, TextMaterialTexturePlan, TextSurfaceRealizationPlan,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+pub(crate) use raster_boundary::RasterSourceBoundary;
 use smallvec::SmallVec;
 use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Transform};
 
@@ -1147,6 +1150,7 @@ struct CameraPreset {
   viewpoint_x: f32,
   viewpoint_y: f32,
   viewpoint_z: f32,
+  default_field_of_view_degrees: f32,
 }
 
 impl CameraPreset {
@@ -1163,6 +1167,7 @@ impl CameraPreset {
       viewpoint_x: 0.0,
       viewpoint_y: 0.0,
       viewpoint_z: if parallel { 0.0 } else { 38_451.0 },
+      default_field_of_view_degrees: 45.0,
     }
   }
 
@@ -1179,6 +1184,7 @@ impl CameraPreset {
       viewpoint_x: 0.0,
       viewpoint_y: 0.0,
       viewpoint_z: 0.0,
+      default_field_of_view_degrees: 0.0,
     }
   }
 
@@ -1197,14 +1203,17 @@ impl CameraPreset {
       viewpoint_x,
       viewpoint_y,
       viewpoint_z: 25_000.0,
+      default_field_of_view_degrees: 65.0,
     }
   }
 }
 
 /// Resolves the fixed DrawingML camera table into a deterministic page-plane
-/// projection. The preset values are the 62-entry Office table translated in
-/// LibreOffice `oox/source/drawingml/scene3dhelper.cxx`; an explicit `a:rot`
-/// replaces the preset latitude/longitude/revolution as required by ECMA-376.
+/// projection. Presets start from LibreOffice's experimentally collected
+/// `oox/source/drawingml/scene3dhelper.cxx` table, with precision corrections
+/// where independently verified against Office. Its UI-displayed angles are
+/// not necessarily the full preset values. An explicit `a:rot` replaces the
+/// preset latitude/longitude/revolution as required by ECMA-376.
 pub(crate) fn camera_projection(
   scene: &a::Scene3DType,
   shape_rotation_degrees: f32,
@@ -1265,7 +1274,15 @@ pub(crate) fn camera_projection(
     .map(|value| (value as f32 / 60_000.0).clamp(0.5, 179.5));
   let perspective_distance_pt = (!preset.parallel).then(|| {
     let distance_hmm = if let Some(fov) = field_of_view_degrees {
-      15_976.0 / (fov * 0.5).to_radians().tan()
+      // ECMA-376 20.1.5.5 defines fov as an override of the preset FOV.
+      // Office's omitted/explicit-default controls agree for the modern
+      // (45), legacy (65), and heroic-extreme (80 degree) camera families.
+      // Scale the preset distance by the cotangent ratio, so writing the
+      // default is an identity. The inherited fixed numerator 15976 made
+      // the explicit and implicit branches use different view volumes.
+      let default_half_angle = (preset.default_field_of_view_degrees as f64 * 0.5).to_radians();
+      let authored_half_angle = (fov as f64 * 0.5).to_radians();
+      (preset.viewpoint_z as f64 * (default_half_angle.tan() / authored_half_angle.tan())) as f32
     } else {
       preset.viewpoint_z
     };
@@ -1725,8 +1742,28 @@ enum Static3dGeometryLighting {
   Text,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum Static3dShapeRasterization {
+  #[default]
+  SourceAntialias,
+  Multisample8,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct Static3dShapeSurface<'a> {
+  pub(crate) geometry: &'a Static3dTextGeometry,
+  pub(crate) material_geometry: &'a Static3dTextGeometry,
+  pub(crate) rasterization: Static3dShapeRasterization,
+  /// Authored paint opacity, independent of source raster edge coverage.
+  pub(crate) uniform_paint_opacity: Option<f32>,
+  /// A picture may reveal the far sides through transparent front texels.
+  pub(crate) two_sided_extrusion: bool,
+}
+
 #[derive(Clone, Copy)]
 struct Static3dGeometryInput<'a> {
+  two_sided_extrusion: bool,
+  source_boundary: Option<&'a RasterSourceBoundary>,
   geometry: Option<&'a Static3dTextGeometry>,
   surface_material_texture: Option<&'a TextMaterialTexture>,
   material_geometry: Option<&'a Static3dTextGeometry>,
@@ -1741,6 +1778,7 @@ struct Static3dGeometryInput<'a> {
   front_fill_has_authored_transparency: bool,
   front_outline_has_authored_transparency: bool,
   lighting: Static3dGeometryLighting,
+  shape_rasterization: Static3dShapeRasterization,
 }
 
 /// Lowers DrawingML static 3-D to a bounded RGBA layer. This follows the
@@ -1755,6 +1793,17 @@ pub(crate) fn apply_static_3d(
   shape: &a::Shape3DType,
   options: Static3dRenderOptions,
 ) {
+  apply_static_3d_with_source_boundary(image, scene, projection, shape, options, None);
+}
+
+pub(crate) fn apply_static_3d_with_source_boundary(
+  image: &mut RgbaImage,
+  scene: &a::Scene3DType,
+  projection: Static3dProjection,
+  shape: &a::Shape3DType,
+  options: Static3dRenderOptions,
+  source_boundary: Option<&RasterSourceBoundary>,
+) {
   apply_static_3d_impl(
     image,
     scene,
@@ -1762,6 +1811,8 @@ pub(crate) fn apply_static_3d(
     shape,
     options,
     Static3dGeometryInput {
+      source_boundary,
+      two_sided_extrusion: false,
       geometry: None,
       surface_material_texture: None,
       material_geometry: None,
@@ -1776,6 +1827,7 @@ pub(crate) fn apply_static_3d(
       front_fill_has_authored_transparency: false,
       front_outline_has_authored_transparency: false,
       lighting: Static3dGeometryLighting::Shape,
+      shape_rasterization: Static3dShapeRasterization::SourceAntialias,
     },
     None,
   );
@@ -1783,8 +1835,7 @@ pub(crate) fn apply_static_3d(
 
 pub(crate) fn apply_static_3d_shape_geometry(
   image: &mut RgbaImage,
-  geometry: &Static3dTextGeometry,
-  material_geometry: &Static3dTextGeometry,
+  surface: Static3dShapeSurface<'_>,
   scene: &a::Scene3DType,
   projection: Static3dProjection,
   shape: &a::Shape3DType,
@@ -1797,20 +1848,23 @@ pub(crate) fn apply_static_3d_shape_geometry(
     shape,
     options,
     Static3dGeometryInput {
-      geometry: Some(geometry),
+      source_boundary: None,
+      two_sided_extrusion: surface.two_sided_extrusion,
+      geometry: Some(surface.geometry),
       surface_material_texture: None,
-      material_geometry: Some(material_geometry),
+      material_geometry: Some(surface.material_geometry),
       page_geometry: None,
       front_fill_material: None,
       front_outline_material: None,
       front_outline_coverage: None,
-      uniform_paint_opacity: None,
+      uniform_paint_opacity: surface.uniform_paint_opacity,
       front_fill_uniform_paint_opacity: None,
       front_outline_uniform_paint_opacity: None,
       front_outline_material_inset_px: None,
       front_fill_has_authored_transparency: false,
       front_outline_has_authored_transparency: false,
       lighting: Static3dGeometryLighting::Shape,
+      shape_rasterization: surface.rasterization,
     },
     None,
   );
@@ -1918,6 +1972,8 @@ fn apply_static_3d_text_with_outline_material_impl(
     shape,
     options,
     Static3dGeometryInput {
+      source_boundary: None,
+      two_sided_extrusion: false,
       geometry: Some(&geometry.physical),
       surface_material_texture: geometry.surface_material_texture.as_ref(),
       // The caller rasterizes both the composed paint and independent
@@ -1936,6 +1992,7 @@ fn apply_static_3d_text_with_outline_material_impl(
       front_fill_has_authored_transparency: geometry.front_fill_has_authored_transparency,
       front_outline_has_authored_transparency: geometry.front_outline_has_authored_transparency,
       lighting: Static3dGeometryLighting::Text,
+      shape_rasterization: Static3dShapeRasterization::SourceAntialias,
     },
     final_grid,
   );
@@ -1961,6 +2018,8 @@ pub(crate) fn apply_static_3d_text_paint(
     shape,
     options,
     Static3dGeometryInput {
+      source_boundary: None,
+      two_sided_extrusion: false,
       geometry: None,
       surface_material_texture: None,
       material_geometry: None,
@@ -1975,6 +2034,7 @@ pub(crate) fn apply_static_3d_text_paint(
       front_fill_has_authored_transparency: false,
       front_outline_has_authored_transparency: false,
       lighting: Static3dGeometryLighting::Text,
+      shape_rasterization: Static3dShapeRasterization::SourceAntialias,
     },
     None,
   );
@@ -2065,6 +2125,8 @@ fn apply_static_3d_impl(
   mut final_grid: Option<Static3dTextFinalGridOutput<'_>>,
 ) {
   let Static3dGeometryInput {
+    two_sided_extrusion,
+    source_boundary,
     geometry: text_geometry,
     surface_material_texture,
     material_geometry,
@@ -2079,6 +2141,7 @@ fn apply_static_3d_impl(
     front_fill_has_authored_transparency,
     front_outline_has_authored_transparency,
     lighting: geometry_lighting,
+    shape_rasterization,
   } = geometry_input;
   let Static3dRenderOptions {
     extrusion_color,
@@ -2192,19 +2255,17 @@ fn apply_static_3d_impl(
   // Direct2D's text extruder submits front, back, and side triangles in one
   // back-face-culled mesh. A separately projected back bitmap bypasses both
   // culling and the shared multisample/depth grid, so even a camera-facing
-  // front acquires a second antialiased alpha edge underneath it. Preserve the
-  // raster fallback for non-text geometry, but reject a vector-text back cap
-  // whenever its -Z face points away from the camera.
-  let word_text_back_cap_culled = word_text_lighting
-    && text_geometry.is_some()
-    && !surface_faces_camera(
-      projection,
-      [0.0, 0.0, -1.0],
-      [0.0, 0.0, planar_back_z_px],
-      bounds_width,
-      bounds_height,
-      pixels_per_point,
-    );
+  // front acquires a second antialiased alpha edge underneath it. Visibility
+  // belongs to the solid, not its source representation: outlined shapes in
+  // the raster fallback must reject the same hidden back cap as vector meshes.
+  let back_cap_culled = !surface_faces_camera(
+    projection,
+    [0.0, 0.0, -1.0],
+    [0.0, 0.0, planar_back_z_px],
+    bounds_width,
+    bounds_height,
+    pixels_per_point,
+  );
   let word_text_back_surfaces_fully_occluded = word_text_lighting
     && text_geometry.is_some()
     && projection_preserves_source_plane_coverage(projection);
@@ -2256,7 +2317,7 @@ fn apply_static_3d_impl(
       ),
       ..extrusion
     };
-    if !wireframe && !word_text_back_cap_culled {
+    if !wireframe && !back_cap_culled {
       let mut back_face = RgbaImage::new(image.width(), image.height());
       let options = ProjectedImageOptions {
         projection,
@@ -2339,6 +2400,8 @@ fn apply_static_3d_impl(
       text_surface_triangles.extend(bottom_bevel_mesh.triangles);
     }
     let options = ExtrusionEdgeOptions {
+      two_sided_extrusion,
+      source_boundary,
       bounds,
       model_surface,
       projection,
@@ -2347,6 +2410,17 @@ fn apply_static_3d_impl(
       pixels_per_point,
       steps,
       tint: extrusion,
+      opacity_source: if geometry_lighting == Static3dGeometryLighting::Shape
+        && extrusion_color.is_some()
+        && shape
+          .extrusion_color
+          .as_ref()
+          .is_some_and(|color| color.extrusion_color_choice.is_some())
+      {
+        ExtrusionOpacitySource::Color
+      } else {
+        ExtrusionOpacitySource::SourceMask
+      },
       scene,
       material: shape.preset_material,
       wireframe,
@@ -2640,10 +2714,13 @@ fn apply_static_3d_impl(
         &mut solid,
         &front_face,
         surface_input,
-        TextSurfaceRasterization::SourceGrid,
+        match shape_rasterization {
+          Static3dShapeRasterization::SourceAntialias => TextSurfaceRasterization::Source,
+          Static3dShapeRasterization::Multisample8 => TextSurfaceRasterization::MultisampleSource,
+        },
       );
       if !projection.parallel
-        && word_text_back_cap_culled
+        && back_cap_culled
         && let Some(final_grid) = final_grid.as_mut()
       {
         let mut resolved = RgbaImage::new(final_grid.target.width_px, final_grid.target.height_px);
@@ -2651,7 +2728,7 @@ fn apply_static_3d_impl(
           &mut resolved,
           &front_face,
           surface_input,
-          TextSurfaceRasterization::FinalGrid(final_grid.target),
+          TextSurfaceRasterization::Final(final_grid.target),
         );
         *final_grid.image = Some(resolved);
       }
@@ -2669,7 +2746,7 @@ fn apply_static_3d_impl(
           &mut coverage,
           &front_face,
           surface_input.independent_front_coverage(),
-          TextSurfaceRasterization::SourceGrid,
+          TextSurfaceRasterization::Source,
         );
         if contour_width_px > 0.0 {
           let contour = contour_color.unwrap_or(Static3dColor {
@@ -4528,8 +4605,14 @@ fn shade_planar_surface(
     };
     let alpha = pixel[3];
     for channel in 0..3 {
-      pixel[channel] =
-        shade_gouraud_channel_with_specular(pixel[channel], shade[channel], specular[channel]);
+      pixel[channel] = if word_text_lighting {
+        shade_gouraud_channel_with_specular(pixel[channel], shade[channel], specular[channel])
+      } else {
+        // The cap and its bevel are surfaces of the same shape material.
+        // Keep their fixed-function color conversion identical; using the
+        // text/float conversion only on the cap creates a brightness seam.
+        shade_fixed_gouraud_channel_with_specular(pixel[channel], shade[channel], specular[channel])
+      };
     }
     pixel[3] = alpha;
   }
@@ -4558,11 +4641,19 @@ fn composite_projected_image(
     return;
   };
 
+  // The logical model owns the projection center/aspect, not a paint clip.
+  // Centered strokes and miter tips can extend beyond it. Project the complete
+  // source-pixel footprint, including the final pixel's far edge; otherwise
+  // widening the source canvas still leaves its outside rows unvisited here.
+  let paint_left = left as f32 - center_x;
+  let paint_top = top as f32 - center_y;
+  let paint_right = right as f32 + 1.0 - center_x;
+  let paint_bottom = bottom as f32 + 1.0 - center_y;
   let projected_corners = [
-    map_homogeneous(matrix, -width * 0.5, -height * 0.5),
-    map_homogeneous(matrix, width * 0.5, -height * 0.5),
-    map_homogeneous(matrix, width * 0.5, height * 0.5),
-    map_homogeneous(matrix, -width * 0.5, height * 0.5),
+    map_homogeneous(matrix, paint_left, paint_top),
+    map_homogeneous(matrix, paint_right, paint_top),
+    map_homogeneous(matrix, paint_right, paint_bottom),
+    map_homogeneous(matrix, paint_left, paint_bottom),
   ];
   let min_x = projected_corners
     .iter()
@@ -5823,7 +5914,24 @@ fn text_projected_contour_triangles(
     .collect()
 }
 
+#[derive(Clone, Copy)]
+enum ExtrusionOpacitySource {
+  SourceMask,
+  Color,
+}
+
+impl ExtrusionOpacitySource {
+  fn alpha(self, source_alpha: u8, color_alpha: u8) -> u8 {
+    match self {
+      Self::SourceMask => ((u16::from(source_alpha) * u16::from(color_alpha) + 127) / 255) as u8,
+      Self::Color => color_alpha,
+    }
+  }
+}
+
 struct ExtrusionEdgeOptions<'a> {
+  two_sided_extrusion: bool,
+  source_boundary: Option<&'a RasterSourceBoundary>,
   bounds: (i32, i32, i32, i32),
   model_surface: Static3dSurface,
   projection: Static3dProjection,
@@ -5832,6 +5940,7 @@ struct ExtrusionEdgeOptions<'a> {
   pixels_per_point: f32,
   steps: u32,
   tint: Static3dColor,
+  opacity_source: ExtrusionOpacitySource,
   scene: &'a a::Scene3DType,
   material: Option<a::PresetMaterialTypeValues>,
   wireframe: bool,
@@ -5971,6 +6080,9 @@ fn text_extrusion_edge_triangles(
   options: ExtrusionEdgeOptions<'_>,
 ) -> Vec<TextSurfaceTriangle> {
   let ExtrusionEdgeOptions {
+    source_boundary: _,
+    two_sided_extrusion,
+    opacity_source: _,
     bounds: _,
     model_surface,
     projection,
@@ -6052,14 +6164,15 @@ fn text_extrusion_edge_triangles(
         ];
         (
           edge_length,
-          surface_faces_camera(
-            projection,
-            outward,
-            model_point,
-            width,
-            height,
-            pixels_per_point,
-          ),
+          two_sided_extrusion
+            || surface_faces_camera(
+              projection,
+              outward,
+              model_point,
+              width,
+              height,
+              pixels_per_point,
+            ),
         )
       })
       .collect::<Vec<_>>();
@@ -6215,12 +6328,87 @@ fn text_extrusion_edge_triangles(
   triangles
 }
 
+fn raster_source_edges(source: &RgbaImage) -> Vec<raster_extrusion::SourceEdge> {
+  let mut edges = Vec::new();
+  let source_alpha = |sample_x: i32, sample_y: i32| {
+    if sample_x < 0
+      || sample_y < 0
+      || sample_x >= source.width() as i32
+      || sample_y >= source.height() as i32
+    {
+      0
+    } else {
+      source.get_pixel(sample_x as u32, sample_y as u32)[3]
+    }
+  };
+  for (x, y, source_pixel) in source.enumerate_pixels() {
+    if source_pixel[3] == 0 {
+      continue;
+    }
+    let x = x as i32;
+    let y = y as i32;
+    let exposed = [
+      source_alpha(x - 1, y) == 0,
+      source_alpha(x + 1, y) == 0,
+      source_alpha(x, y - 1) == 0,
+      source_alpha(x, y + 1) == 0,
+    ];
+    // Interior pixels submit no side faces. Reject them before evaluating
+    // the boundary derivative, material lighting and specular response.
+    if !exposed.into_iter().any(|edge| edge) {
+      continue;
+    }
+    let raster_normal = alpha_boundary_normal(source, x, y);
+    let exposed_edges = [
+      (
+        exposed[0],
+        (x as f32, y as f32),
+        (x as f32, y as f32 + 1.0),
+        [-1.0, 0.0, 0.0],
+      ),
+      (
+        exposed[1],
+        (x as f32 + 1.0, y as f32 + 1.0),
+        (x as f32 + 1.0, y as f32),
+        [1.0, 0.0, 0.0],
+      ),
+      (
+        exposed[2],
+        (x as f32 + 1.0, y as f32),
+        (x as f32, y as f32),
+        [0.0, -1.0, 0.0],
+      ),
+      (
+        exposed[3],
+        (x as f32, y as f32 + 1.0),
+        (x as f32 + 1.0, y as f32 + 1.0),
+        [0.0, 1.0, 0.0],
+      ),
+    ];
+    for (exposed, first, second, face_normal) in exposed_edges {
+      if exposed {
+        edges.push(raster_extrusion::SourceEdge {
+          first,
+          second,
+          normal: raster_normal,
+          facing_hint: [face_normal[0], face_normal[1]],
+          source_pixel: [x as u32, y as u32],
+        });
+      }
+    }
+  }
+  edges
+}
+
 fn composite_extrusion_edges(
   destination: &mut RgbaImage,
   source: &RgbaImage,
   options: ExtrusionEdgeOptions<'_>,
 ) {
   let ExtrusionEdgeOptions {
+    source_boundary,
+    two_sided_extrusion: _,
+    opacity_source,
     bounds,
     model_surface,
     projection,
@@ -6242,47 +6430,28 @@ fn composite_extrusion_edges(
   let height = model_surface.height_px.max(1.0);
 
   if !wireframe {
-    // Sweep each exposed source-mask edge as one projected quadrilateral.
-    // tiny-skia coverage-rasterizes the full side surface; the aliased
-    // interior prevents adjacent mesh cells from creating coverage seams.
-    let Some(mut side_layer) = Pixmap::new(destination.width(), destination.height()) else {
-      return;
-    };
-    let source_alpha = |sample_x: i32, sample_y: i32| {
-      if sample_x < 0
-        || sample_y < 0
-        || sample_x >= source.width() as i32
-        || sample_y >= source.height() as i32
-      {
-        0
-      } else {
-        source.get_pixel(sample_x as u32, sample_y as u32)[3]
-      }
-    };
-    for (x, y, source_pixel) in source.enumerate_pixels() {
-      if source_pixel[3] == 0 {
+    // Authored material opacity composites actual surfaces. Automatic source
+    // coverage is NOT material opacity: Office's opaque automatic controls
+    // have no transparent overlap partition. Keep its visibility and scalar
+    // coverage policy separate from the authored-material compositor.
+    let source_mask = matches!(opacity_source, ExtrusionOpacitySource::SourceMask);
+    let mut faces = Vec::new();
+    let source_edges = source_boundary.map_or_else(
+      || raster_source_edges(source),
+      |boundary| boundary.source_edges(source.width(), source.height()),
+    );
+    for edge in source_edges {
+      let [source_x, source_y] = edge.source_pixel;
+      let source_pixel = source.get_pixel(source_x, source_y);
+      // Geometry retained from an opaque vector can cross a cell whose source
+      // coverage rounded to zero. Authored side material still owns its alpha;
+      // only automatic source-mask opacity inherits that transparent texel.
+      let side_alpha = opacity_source.alpha(source_pixel[3], tint.alpha);
+      if side_alpha == 0 {
         continue;
       }
-      let x = x as i32;
-      let y = y as i32;
-      let model_normal = alpha_boundary_normal(source, x, y);
-      let smooth_facing = (model_normal[0].hypot(model_normal[1]) > f32::EPSILON).then(|| {
-        surface_faces_camera(
-          projection,
-          [model_normal[0], model_normal[1], 0.0],
-          [
-            x as f32 + 0.5 - center_x,
-            y as f32 + 0.5 - center_y,
-            (front_z + back_z) * 0.5,
-          ],
-          width,
-          height,
-          pixels_per_point,
-        )
-      });
-      let surface_normal =
-        lighting_surface_normal(scene, projection, [model_normal[0], model_normal[1], 0.0]);
-      let shade = legacy_material_diffuse_shade(scene, surface_normal, material);
+      let x = source_x as i32;
+      let y = source_y as i32;
       let view_direction = surface_view_direction(
         scene,
         projection,
@@ -6295,44 +6464,25 @@ fn composite_extrusion_edges(
         height,
         pixels_per_point,
       );
-      let specular =
-        legacy_light_rig_surface_specular(scene, surface_normal, view_direction, material);
-      // This mesh is reconstructed from the rasterized glyph boundary. Keep
-      // the source pixel's antialias coverage on its swept side face;
-      // promoting every fringe pixel to an opaque quad turns adjacent glyph
-      // edges into dark rectangular bridges.
-      let side_alpha = ((u16::from(source_pixel[3]) * u16::from(tint.alpha) + 127) / 255) as u8;
-      let color = shaded_pixel_with_specular(tint, shade, specular, side_alpha);
-      let exposed_edges = [
-        (
-          source_alpha(x - 1, y) == 0,
-          (x as f32, y as f32),
-          (x as f32, y as f32 + 1.0),
-          [-1.0, 0.0, 0.0],
-        ),
-        (
-          source_alpha(x + 1, y) == 0,
-          (x as f32 + 1.0, y as f32 + 1.0),
-          (x as f32 + 1.0, y as f32),
-          [1.0, 0.0, 0.0],
-        ),
-        (
-          source_alpha(x, y - 1) == 0,
-          (x as f32 + 1.0, y as f32),
-          (x as f32, y as f32),
-          [0.0, -1.0, 0.0],
-        ),
-        (
-          source_alpha(x, y + 1) == 0,
-          (x as f32, y as f32 + 1.0),
-          (x as f32 + 1.0, y as f32 + 1.0),
-          [0.0, 1.0, 0.0],
-        ),
-      ];
-      for (exposed, first, second, face_normal) in exposed_edges {
-        if !exposed {
-          continue;
-        }
+      let first = edge.first;
+      let second = edge.second;
+      let model_normal = edge.normal;
+      let face_normal = [edge.facing_hint[0], edge.facing_hint[1], 0.0];
+      if source_mask {
+        let smooth_facing = (model_normal[0].hypot(model_normal[1]) > f32::EPSILON).then(|| {
+          surface_faces_camera(
+            projection,
+            [model_normal[0], model_normal[1], 0.0],
+            [
+              x as f32 + 0.5 - center_x,
+              y as f32 + 0.5 - center_y,
+              (front_z + back_z) * 0.5,
+            ],
+            width,
+            height,
+            pixels_per_point,
+          )
+        });
         let facing = smooth_facing.unwrap_or_else(|| {
           surface_faces_camera(
             projection,
@@ -6350,61 +6500,46 @@ fn composite_extrusion_edges(
         if !facing {
           continue;
         }
-        let project = |point: (f32, f32), z| {
-          let projected = project_local_pixels(
+      }
+      let surface_normal =
+        lighting_surface_normal(scene, projection, [model_normal[0], model_normal[1], 0.0]);
+      let shade = legacy_material_diffuse_shade(scene, surface_normal, material);
+      let specular =
+        legacy_light_rig_surface_specular(scene, surface_normal, view_direction, material);
+      let color = shaded_pixel_with_specular(tint, shade, specular, side_alpha);
+      let project = |point: (f32, f32), z| {
+        let projected = project_local_pixels(
+          projection,
+          point.0 - center_x,
+          point.1 - center_y,
+          z,
+          width,
+          height,
+          pixels_per_point,
+        );
+        raster_extrusion::Vertex {
+          point: (center_x + projected.0, center_y + projected.1),
+          depth: text_surface_visibility_depth(
             projection,
-            point.0 - center_x,
-            point.1 - center_y,
-            z,
-            width,
-            height,
+            [point.0 - center_x, point.1 - center_y, z],
             pixels_per_point,
-          );
-          (center_x + projected.0, center_y + projected.1)
-        };
-        let front_first = project(first, front_z);
-        let front_second = project(second, front_z);
-        let back_second = project(second, back_z);
-        let back_first = project(first, back_z);
-        let mut path = PathBuilder::new();
-        path.move_to(front_first.0, front_first.1);
-        path.line_to(front_second.0, front_second.1);
-        path.line_to(back_second.0, back_second.1);
-        path.line_to(back_first.0, back_first.1);
-        path.close();
-        let Some(path) = path.finish() else {
-          continue;
-        };
-        let mut paint = Paint {
-          anti_alias: true,
-          ..Paint::default()
-        };
-        paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
-        side_layer.fill_path(
-          &path,
-          &paint,
-          FillRule::Winding,
-          Transform::identity(),
-          None,
-        );
-        paint.anti_alias = false;
-        side_layer.fill_path(
-          &path,
-          &paint,
-          FillRule::Winding,
-          Transform::identity(),
-          None,
-        );
-      }
+          ),
+        }
+      };
+      let front_first = project(first, front_z);
+      let front_second = project(second, front_z);
+      let back_second = project(second, back_z);
+      let back_first = project(first, back_z);
+      let face = raster_extrusion::Face {
+        vertices: [front_first, front_second, back_second, back_first],
+        color,
+      };
+      faces.push(face);
     }
-    for (target, source) in destination.pixels_mut().zip(side_layer.pixels()) {
-      let source = source.demultiply();
-      if source.alpha() != 0 {
-        blend_over(
-          target,
-          Rgba([source.red(), source.green(), source.blue(), source.alpha()]),
-        );
-      }
+    if source_mask {
+      raster_extrusion::composite_source_coverage(destination, &mut faces);
+    } else {
+      raster_extrusion::composite(destination, &faces);
     }
     return;
   }
@@ -6514,6 +6649,24 @@ fn surface_faces_camera(
   height: f32,
   pixels_per_point: f32,
 ) -> bool {
+  if projection.parallel
+    && (projection.skew_x_per_depth != 0.0 || projection.skew_y_per_depth != 0.0)
+  {
+    // Oblique cameras shear Z into the projected X/Y plane in addition to
+    // rotation. The cross product of those two projection rows is the
+    // model-space viewing ray. Using only rotation incorrectly classifies
+    // the visible oblique side walls as edge-on and discards them.
+    let mut horizontal = projection.rotation[0];
+    let mut vertical = projection.rotation[1];
+    horizontal[2] += projection.skew_x_per_depth;
+    vertical[2] += projection.skew_y_per_depth;
+    let view = [
+      horizontal[1] * vertical[2] - horizontal[2] * vertical[1],
+      horizontal[2] * vertical[0] - horizontal[0] * vertical[2],
+      horizontal[0] * vertical[1] - horizontal[1] * vertical[0],
+    ];
+    return dot3(model_normal, view) > 0.0;
+  }
   let camera_normal = transform_normal(projection.rotation, model_normal);
   let view_direction =
     camera_view_direction(projection, model_point, width, height, pixels_per_point);
@@ -7193,6 +7346,17 @@ enum TextSurfaceSamplePattern {
   Direct3dStandard8,
 }
 
+pub(crate) const DIRECT3D_STANDARD_8_SAMPLES: [(f32, f32); 8] = [
+  (9.0 / 16.0, 5.0 / 16.0),
+  (7.0 / 16.0, 11.0 / 16.0),
+  (13.0 / 16.0, 9.0 / 16.0),
+  (5.0 / 16.0, 3.0 / 16.0),
+  (3.0 / 16.0, 13.0 / 16.0),
+  (1.0 / 16.0, 7.0 / 16.0),
+  (11.0 / 16.0, 15.0 / 16.0),
+  (15.0 / 16.0, 1.0 / 16.0),
+];
+
 impl TextSurfaceSamplePattern {
   /// Word's observed MSAA centroid selection: a fully covered pixel uses its
   /// center; partial coverage uses the first covered standard sample. Coverage
@@ -7234,17 +7398,7 @@ impl TextSurfaceSamplePattern {
         // their x/y pairing; the independent 256-cell physical-surface slice
         // keeps them uniquely best across glyph, camera, depth, bevel, and
         // contour controls.
-        const POSITIONS: [(f32, f32); 8] = [
-          (9.0 / 16.0, 5.0 / 16.0),
-          (7.0 / 16.0, 11.0 / 16.0),
-          (13.0 / 16.0, 9.0 / 16.0),
-          (5.0 / 16.0, 3.0 / 16.0),
-          (3.0 / 16.0, 13.0 / 16.0),
-          (1.0 / 16.0, 7.0 / 16.0),
-          (11.0 / 16.0, 15.0 / 16.0),
-          (15.0 / 16.0, 1.0 / 16.0),
-        ];
-        POSITIONS[sample_index]
+        DIRECT3D_STANDARD_8_SAMPLES[sample_index]
       }
     }
   }
@@ -7252,22 +7406,41 @@ impl TextSurfaceSamplePattern {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum TextSurfaceRasterization {
-  SourceGrid,
-  FinalGrid(Static3dTextFinalGrid),
+  Source,
+  MultisampleSource,
+  Final(Static3dTextFinalGrid),
+}
+
+fn interpolate_shape_surface_color(
+  first: [f32; 4],
+  second: [f32; 4],
+  third: [f32; 4],
+  second_weight: f32,
+  third_weight: f32,
+) -> [f32; 4] {
+  // Evaluate relative to one vertex. Independently rounded barycentric
+  // weights need not sum to exactly one, especially on thin/extrapolated
+  // MSAA triangles. A constant opaque attribute must remain exactly 255;
+  // otherwise half coverage incorrectly resolves to 127 instead of 128.
+  std::array::from_fn(|channel| {
+    first[channel]
+      + (second[channel] - first[channel]) * second_weight
+      + (third[channel] - first[channel]) * third_weight
+  })
 }
 
 impl TextSurfaceRasterization {
   fn sample_pattern(self) -> TextSurfaceSamplePattern {
     match self {
-      Self::SourceGrid => TextSurfaceSamplePattern::OfficeAntiAlias8x4,
-      Self::FinalGrid(_) => TextSurfaceSamplePattern::Direct3dStandard8,
+      Self::Source => TextSurfaceSamplePattern::OfficeAntiAlias8x4,
+      Self::MultisampleSource | Self::Final(_) => TextSurfaceSamplePattern::Direct3dStandard8,
     }
   }
 
   fn surface_to_raster(self, point: (f32, f32), dimensions: (u32, u32)) -> (f32, f32) {
     match self {
-      Self::SourceGrid => point,
-      Self::FinalGrid(target) => (
+      Self::Source | Self::MultisampleSource => point,
+      Self::Final(target) => (
         (point.0 - target.source_left_px) * dimensions.0 as f32 / target.source_width_px,
         (point.1 - target.source_top_px) * dimensions.1 as f32 / target.source_height_px,
       ),
@@ -7276,8 +7449,8 @@ impl TextSurfaceRasterization {
 
   fn raster_to_surface(self, point: (f32, f32), dimensions: (u32, u32)) -> (f32, f32) {
     match self {
-      Self::SourceGrid => point,
-      Self::FinalGrid(target) => (
+      Self::Source | Self::MultisampleSource => point,
+      Self::Final(target) => (
         target.source_left_px + point.0 * target.source_width_px / dimensions.0 as f32,
         target.source_top_px + point.1 * target.source_height_px / dimensions.1 as f32,
       ),
@@ -7338,7 +7511,7 @@ fn text_surface_quad_fully_occludes(
 }
 
 fn fully_occluded_text_surface_triangles(triangles: &[TextSurfaceTriangle]) -> Vec<bool> {
-  let quads = triangles.chunks_exact(2).collect::<Vec<_>>();
+  let quads = triangles.as_chunks::<2>().0;
   let mut projection_groups = HashMap::<[u64; 4], SmallVec<[usize; 2]>>::new();
   for (index, quad) in quads.iter().enumerate() {
     projection_groups
@@ -7351,7 +7524,7 @@ fn fully_occluded_text_surface_triangles(triangles: &[TextSurfaceTriangle]) -> V
     for &back_quad in group {
       let quad_is_occluded = group.iter().copied().any(|front_quad| {
         front_quad != back_quad
-          && text_surface_quad_fully_occludes(quads[front_quad], quads[back_quad])
+          && text_surface_quad_fully_occludes(&quads[front_quad], &quads[back_quad])
       });
       if quad_is_occluded {
         occluded[back_quad * 2] = true;
@@ -8523,7 +8696,7 @@ fn composite_text_solid_surfaces(
     direct_inset_cells,
     geometry_lighting == Static3dGeometryLighting::Text,
   );
-  let source_grid = matches!(rasterization, TextSurfaceRasterization::SourceGrid);
+  let source_grid = !matches!(rasterization, TextSurfaceRasterization::Final(_));
   // Both composed paint and separate fill/outline/coverage images use the
   // caller's page-space sampling contract. Only the physical mesh receives
   // its device-space conversion. Select the geometry belonging to the paint
@@ -8737,10 +8910,17 @@ fn composite_text_solid_surfaces(
     .then(|| vec![f32::NEG_INFINITY; samples.len()]);
   let fully_occluded_triangles = (geometry_lighting == Static3dGeometryLighting::Shape)
     .then(|| fully_occluded_text_surface_triangles(triangles));
-  // Direct3D 9 transformed screen coordinates address pixel centers at
-  // integer coordinates. Text continues to use the GDI+/image-space
-  // convention whose coverage cell [n, n + 1] is centered at n + 1/2.
-  let pixel_center_offset = if geometry_lighting == Static3dGeometryLighting::Shape {
+  // The legacy shape source grid uses D3D9 integer-center material inputs.
+  // MultisampleSourceGrid instead retains image-space geometry: its standard
+  // coverage samples and texel coordinates address cells [n, n + 1]. Its
+  // once-per-primitive shader must therefore use n + 1/2 too, as in D3D10's
+  // pixel coordinate system. Reusing the legacy center displaces texture
+  // details without moving the silhouette. The independent Office picture
+  // controls (arrow/rectangle, textured/solid, flat/extruded) isolate this
+  // color-only mismatch; their geometric alpha remains unchanged.
+  let pixel_center_offset = if geometry_lighting == Static3dGeometryLighting::Shape
+    && rasterization == TextSurfaceRasterization::Source
+  {
     0.0
   } else {
     0.5
@@ -8792,7 +8972,7 @@ fn composite_text_solid_surfaces(
     };
     let has_source_attributes = has_bevel_collision || textured_material.is_some();
     let final_grid_text_msaa = geometry_lighting == Static3dGeometryLighting::Text
-      && matches!(rasterization, TextSurfaceRasterization::FinalGrid(_));
+      && matches!(rasterization, TextSurfaceRasterization::Final(_));
     let triangle_left = first_point.0.min(second_point.0).min(third_point.0).floor() as i32;
     let triangle_top = first_point.1.min(second_point.1).min(third_point.1).floor() as i32;
     let triangle_right = first_point.0.max(second_point.0).max(third_point.0).ceil() as i32;
@@ -8804,8 +8984,6 @@ fn composite_text_solid_surfaces(
           pixel_x as f32 + pixel_center_offset,
           pixel_y as f32 + pixel_center_offset,
         );
-        let center_first_weight =
-          text_surface_edge(second_point, third_point, center_point) / signed_area;
         let center_second_weight =
           text_surface_edge(third_point, first_point, center_point) / signed_area;
         let center_third_weight =
@@ -8833,11 +9011,13 @@ fn composite_text_solid_surfaces(
           // Direct3D MSAA interpolates vertex attributes once at the integer
           // pixel center—even when that center requires extrapolation—and
           // replicates the shader result to every covered sub-sample.
-          let color = std::array::from_fn(|channel| {
-            first.color[channel] * center_first_weight
-              + second.color[channel] * center_second_weight
-              + third.color[channel] * center_third_weight
-          });
+          let color = interpolate_shape_surface_color(
+            first.color,
+            second.color,
+            third.color,
+            center_second_weight,
+            center_third_weight,
+          );
           Some(color)
         } else if final_grid_text_msaa {
           // Ordinary Direct3D multisampling runs the pixel shader once per
@@ -10940,17 +11120,24 @@ fn camera_preset(preset: a::PresetCameraValues) -> CameraPreset {
       CameraPreset::angles(false, 624_000, 2_634_000, 21_384_000)
     }
     P::PerspectiveContrastingRightFacing => {
-      CameraPreset::angles(false, 624_000, 18_966_000, 216_000)
+      // Office ThreeDFormat reports RotationX=43.9389, RotationY=10.396417,
+      // RotationZ=-3.5535166. OOXML uses lat=Y, lon=-X, rev=-Z. Explicit
+      // rotations at these integer OOXML angles reproduce the preset on
+      // arrow/rectangle, flat/extruded controls; UI-rounded 10.4/316.1/3.6
+      // degrees visibly displace the front-face texture and boundaries.
+      CameraPreset::angles(false, 623_785, 18_963_666, 213_211)
     }
     P::PerspectiveFront => CameraPreset::angles(false, 0, 0, 0),
     P::PerspectiveHeroicExtremeLeftFacing => {
       let mut value = CameraPreset::angles(false, 486_000, 2_070_000, 21_426_000);
       value.viewpoint_z = 18_981.0;
+      value.default_field_of_view_degrees = 80.0;
       value
     }
     P::PerspectiveHeroicExtremeRightFacing => {
       let mut value = CameraPreset::angles(false, 486_000, 19_530_000, 174_000);
       value.viewpoint_z = 18_981.0;
+      value.default_field_of_view_degrees = 80.0;
       value
     }
     P::PerspectiveHeroicLeftFacing => CameraPreset::angles(false, 20_940_000, 858_000, 156_000),
@@ -11004,6 +11191,118 @@ mod tests {
   use crate::model::RgbColor;
 
   #[test]
+  fn vector_side_material_is_not_culled_by_zero_source_coverage() {
+    use kurbo::Shape;
+    let mut boundary = super::RasterSourceBoundary::default();
+    boundary.push(
+      kurbo::Rect::new(16.25, 16.3, 48.75, 48.7).to_path(0.001),
+      tiny_skia::FillRule::Winding,
+    );
+    let scene = scene(a::PresetCameraValues::IsometricRightUp);
+    let render = |source_alpha, opacity_source| {
+      let source = RgbaImage::from_pixel(64, 64, Rgba([100, 200, 50, source_alpha]));
+      let mut destination = RgbaImage::new(64, 64);
+      super::composite_extrusion_edges(
+        &mut destination,
+        &source,
+        super::ExtrusionEdgeOptions {
+          two_sided_extrusion: false,
+          source_boundary: Some(&boundary),
+          bounds: (0, 0, 63, 63),
+          model_surface: Static3dSurface {
+            left_px: 16.25,
+            top_px: 16.3,
+            width_px: 32.5,
+            height_px: 32.4,
+          },
+          projection: camera_projection(&scene, 0.0),
+          front_z: 0.0,
+          back_z: -6.0,
+          pixels_per_point: 1.0,
+          steps: 6,
+          tint: Static3dColor {
+            color: RgbColor {
+              r: 100,
+              g: 200,
+              b: 50,
+            },
+            alpha: 128,
+          },
+          opacity_source,
+          scene: &scene,
+          material: None,
+          wireframe: false,
+          geometry_lighting: Static3dGeometryLighting::Shape,
+          outline_contour: None,
+        },
+      );
+      destination
+    };
+    let expected = render(255, super::ExtrusionOpacitySource::Color);
+    assert!(expected.pixels().any(|pixel| pixel[3] != 0));
+    assert_eq!(render(0, super::ExtrusionOpacitySource::Color), expected);
+    assert!(
+      render(0, super::ExtrusionOpacitySource::SourceMask)
+        .pixels()
+        .all(|pixel| pixel[3] == 0)
+    );
+  }
+
+  #[test]
+  fn picture_extrusion_retains_far_sides_for_transparent_front_texels() {
+    let bounds = Rect {
+      origin: Point {
+        x: Pt(0.0),
+        y: Pt(0.0),
+      },
+      size: Size {
+        width: Pt(64.0),
+        height: Pt(64.0),
+      },
+    };
+    let path = crate::common::drawingml_shape_raster::static_3d_picture_frame(bounds, 0.0);
+    let geometry = Static3dTextGeometry::from_page_path(&path, bounds, 1.0).unwrap();
+    let scene = scene(a::PresetCameraValues::IsometricRightUp);
+    let triangles = |two_sided_extrusion| {
+      super::text_extrusion_edge_triangles(
+        &geometry,
+        super::ExtrusionEdgeOptions {
+          two_sided_extrusion,
+          source_boundary: None,
+          bounds: (0, 0, 64, 64),
+          model_surface: Static3dSurface {
+            left_px: 0.0,
+            top_px: 0.0,
+            width_px: 64.0,
+            height_px: 64.0,
+          },
+          projection: camera_projection(&scene, 0.0),
+          front_z: 0.0,
+          back_z: -6.0,
+          pixels_per_point: 1.0,
+          steps: 6,
+          tint: Static3dColor {
+            color: RgbColor {
+              r: 100,
+              g: 200,
+              b: 50,
+            },
+            alpha: 255,
+          },
+          opacity_source: super::ExtrusionOpacitySource::Color,
+          scene: &scene,
+          material: None,
+          wireframe: false,
+          geometry_lighting: Static3dGeometryLighting::Shape,
+          outline_contour: None,
+        },
+      )
+    };
+    assert_eq!(triangles(true).len(), 8);
+    assert_eq!(triangles(false).len(), 4);
+  }
+
+  #[test]
   fn text_specular_reflection_is_independent_of_diffuse_light_culling() {
     let mut scene = scene(a::PresetCameraValues::PerspectiveLeft);
     *scene.light_rig = a::LightRig {
@@ -11046,6 +11345,86 @@ mod tests {
         [0.0; 3],
       );
     }
+  }
+
+  #[test]
+  fn shape_surface_interpolation_preserves_constant_attributes() {
+    let color = [0.0, 129.0, 58.0, 255.0];
+    for (second, third) in [(0.25, 0.25), (-17.321, 18.991), (1000.125, -999.875)] {
+      assert_eq!(
+        super::interpolate_shape_surface_color(color, color, color, second, third),
+        color
+      );
+    }
+    assert_eq!(
+      super::interpolate_shape_surface_color(
+        [0.0, 128.0, 64.0, 255.0],
+        [100.0, 128.0, 128.0, 255.0],
+        [200.0, 128.0, 0.0, 255.0],
+        0.25,
+        0.25,
+      ),
+      [75.0, 128.0, 64.0, 255.0]
+    );
+  }
+
+  #[test]
+  fn multisampled_shape_surface_resolves_geometry_and_opacity_once() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let geometry = Static3dTextGeometry::from_page_path(
+      &[
+        PathCommand::MoveTo(point(8.2, 7.1)),
+        PathCommand::LineTo(point(22.2, 7.1)),
+        PathCommand::LineTo(point(22.2, 24.5)),
+        PathCommand::LineTo(point(8.2, 24.5)),
+        PathCommand::Close,
+      ],
+      Rect {
+        origin: point(0.0, 0.0),
+        size: Size {
+          width: Pt(32.0),
+          height: Pt(32.0),
+        },
+      },
+      1.0,
+    )
+    .unwrap();
+    let scene = scene(a::PresetCameraValues::PerspectiveLeft);
+    let shape = a::Shape3DType {
+      extrusion_height: Some(CoordinateValue::Emu(25_400)),
+      ..a::Shape3DType::default()
+    };
+    let mut image = RgbaImage::from_pixel(32, 32, Rgba([200, 150, 50, 255]));
+    super::apply_static_3d_shape_geometry(
+      &mut image,
+      super::Static3dShapeSurface {
+        two_sided_extrusion: false,
+        geometry: &geometry,
+        material_geometry: &geometry,
+        rasterization: super::Static3dShapeRasterization::Multisample8,
+        uniform_paint_opacity: Some(1.0),
+      },
+      &scene,
+      camera_projection(&scene, 0.0),
+      &shape,
+      Static3dRenderOptions {
+        extrusion_color: None,
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: Some(super::Static3dSurface {
+          left_px: 0.0,
+          top_px: 0.0,
+          width_px: 32.0,
+          height_px: 32.0,
+        }),
+      },
+    );
+    assert!(image.pixels().any(|pixel| pixel[3] > 0 && pixel[3] < 255));
+    assert!(
+      image
+        .pixels()
+        .all(|pixel| [0, 32, 64, 96, 128, 159, 191, 223, 255].contains(&pixel[3]))
+    );
   }
 
   #[test]
@@ -11147,7 +11526,7 @@ mod tests {
     rasterize_test_surfaces_on_grid(
       triangles,
       geometry_lighting,
-      TextSurfaceRasterization::SourceGrid,
+      TextSurfaceRasterization::Source,
     )
   }
 
@@ -11540,7 +11919,7 @@ mod tests {
   }
 
   #[test]
-  fn shape_surface_attributes_use_the_d3d9_integer_pixel_center() {
+  fn shape_surface_attributes_follow_the_raster_grid_pixel_center() {
     let vertex = |point: (f32, f32), red: f32| TextSurfaceVertex {
       point,
       visibility_depth: 1.0,
@@ -11567,11 +11946,19 @@ mod tests {
       },
     ];
 
-    let raster = rasterize_test_surfaces(&triangles, Static3dGeometryLighting::Shape);
-
-    // Direct3D 9 evaluates both primitives at pixel center (0, 0), not at
-    // the image-space cell center (0.5, 0.5).
-    assert_eq!(raster.get_pixel(0, 0), &Rgba([0, 0, 0, 255]));
+    let final_grid =
+      Static3dTextFinalGrid::new(1, 1, 0.0, 0.0, 1.0, 1.0).expect("valid final grid");
+    for (rasterization, red) in [
+      (TextSurfaceRasterization::Source, 0),
+      (TextSurfaceRasterization::MultisampleSource, 50),
+      (TextSurfaceRasterization::Final(final_grid), 50),
+    ] {
+      let raster =
+        rasterize_test_surfaces_on_grid(&triangles, Static3dGeometryLighting::Shape, rasterization);
+      // A shared center evaluates the gradient once per primitive, without
+      // changing full coverage. Preserve the legacy D3D9 negative control.
+      assert_eq!(raster.get_pixel(0, 0), &Rgba([red, 0, 0, 255]));
+    }
   }
 
   #[test]
@@ -11597,7 +11984,7 @@ mod tests {
     let raster = rasterize_test_surfaces_on_grid(
       &triangles,
       Static3dGeometryLighting::Text,
-      TextSurfaceRasterization::FinalGrid(final_grid),
+      TextSurfaceRasterization::Final(final_grid),
     );
 
     // Two standard samples are covered. Word's centroid shader uses the first
@@ -11854,18 +12241,76 @@ mod tests {
   }
 
   #[test]
+  fn raster_source_side_coverage_does_not_saturate_only_the_bottom_edge() {
+    let mut layer = RgbaImage::new(8, 8);
+    let face = super::raster_extrusion::Face {
+      vertices: [(1.0, 0.5), (7.0, 0.5), (7.0, 7.5), (1.0, 7.5)]
+        .map(|point| super::raster_extrusion::Vertex { point, depth: 0.0 }),
+      color: Rgba([20, 100, 80, 255]),
+    };
+    super::raster_extrusion::composite_source_coverage(&mut layer, &mut [face]);
+    for x in 1..7 {
+      let top = layer.get_pixel(x, 0)[3];
+      let bottom = layer.get_pixel(x, 7)[3];
+      assert!(top.abs_diff(bottom) <= 1, "top={top}, bottom={bottom}");
+      assert!((127..=128).contains(&top));
+    }
+  }
+
+  #[test]
+  fn projected_raster_preserves_paint_outside_logical_model_bounds() {
+    let source = RgbaImage::from_fn(24, 20, |x, y| {
+      if (2..22).contains(&x) && (2..18).contains(&y) {
+        Rgba([20, 160, 80, 255])
+      } else {
+        Rgba([0; 4])
+      }
+    });
+    let mut target = RgbaImage::new(24, 20);
+    let scene = scene(a::PresetCameraValues::OrthographicFront);
+    super::composite_projected_image(
+      &mut target,
+      &source,
+      ProjectedImageOptions {
+        projection: camera_projection(&scene, 0.0),
+        z: 0.0,
+        bounds: super::alpha_bounds(&source).unwrap(),
+        model_surface: Static3dSurface {
+          left_px: 8.0,
+          top_px: 6.0,
+          width_px: 8.0,
+          height_px: 8.0,
+        },
+        pixels_per_point: 1.0,
+        tint: None,
+      },
+    );
+    assert_eq!(target, source);
+  }
+
+  #[test]
   fn viewport_translation_is_applied_after_parallel_and_perspective_projection() {
     for preset in [
       a::PresetCameraValues::OrthographicFront,
       a::PresetCameraValues::PerspectiveFront,
     ] {
       let projection = camera_projection(&scene(preset), 0.0);
-      let translated = projection.with_viewport_translation_px(-2.0 / 3.0, 0.25);
-      let before = super::project_local_pixels(projection, 7.0, -3.0, -5.0, 64.0, 36.0, 4.0 / 3.0);
-      let after = super::project_local_pixels(translated, 7.0, -3.0, -5.0, 64.0, 36.0, 4.0 / 3.0);
-
-      assert!((after.0 - before.0 + 2.0 / 3.0).abs() < 0.000_1);
-      assert!((after.1 - before.1 - 0.25).abs() < 0.000_1);
+      for pixels_per_point in [96.0 / 72.0, 200.0 / 72.0] {
+        for (dx, dy) in [(-2.0 / 3.0, 0.25), (-0.5, -0.5)] {
+          let translated = projection.with_viewport_translation_px(dx, dy);
+          let before =
+            super::project_local_pixels(projection, 7.0, -3.0, -5.0, 64.0, 36.0, pixels_per_point);
+          let after =
+            super::project_local_pixels(translated, 7.0, -3.0, -5.0, 64.0, 36.0, pixels_per_point);
+          assert!((after.0 - before.0 - dx).abs() < 0.000_1);
+          assert!((after.1 - before.1 - dy).abs() < 0.000_1);
+          assert_eq!(translated.rotation, projection.rotation);
+          assert_eq!(
+            translated.perspective_distance_pt,
+            projection.perspective_distance_pt
+          );
+        }
+      }
     }
   }
 
@@ -13498,6 +13943,67 @@ mod tests {
   }
 
   #[test]
+  fn camera_authored_default_fov_preserves_preset_projection() {
+    for (preset, degrees) in [
+      (a::PresetCameraValues::PerspectiveContrastingRightFacing, 45),
+      (a::PresetCameraValues::LegacyPerspectiveBottomLeft, 65),
+      (
+        a::PresetCameraValues::PerspectiveHeroicExtremeRightFacing,
+        80,
+      ),
+    ] {
+      let mut input = scene(preset);
+      let implicit = camera_projection(&input, 0.0);
+      input.camera.field_of_view = Some(degrees * 60_000);
+      let explicit = camera_projection(&input, 0.0);
+      assert_eq!(implicit.rotation, explicit.rotation);
+      assert_eq!(
+        implicit.perspective_distance_pt, explicit.perspective_distance_pt,
+        "authored default FOV must not change {preset:?}"
+      );
+
+      input.camera.field_of_view = Some(120 * 60_000);
+      let wider = camera_projection(&input, 0.0);
+      let distance = implicit.perspective_distance_pt.unwrap();
+      let expected =
+        distance as f64 * (degrees as f64 * 0.5).to_radians().tan() / 60.0_f64.to_radians().tan();
+      assert!((wider.perspective_distance_pt.unwrap() as f64 - expected).abs() < 0.000_1);
+      assert!(wider.perspective_distance_pt.unwrap() < distance);
+    }
+
+    let mut parallel = scene(a::PresetCameraValues::OrthographicFront);
+    parallel.camera.field_of_view = Some(120 * 60_000);
+    assert_eq!(
+      camera_projection(&parallel, 0.0).perspective_distance_pt,
+      None
+    );
+  }
+
+  #[test]
+  fn contrasting_right_camera_retains_office_preset_precision() {
+    let mut input = scene(a::PresetCameraValues::PerspectiveContrastingRightFacing);
+    let preset = camera_projection(&input, 0.0);
+    input.camera.rotation = Some(a::Rotation {
+      latitude: 623_785,
+      longitude: 18_963_666,
+      revolution: 213_211,
+    });
+    assert_eq!(preset.rotation, camera_projection(&input, 0.0).rotation);
+
+    // Authored angles retain precedence, including deliberately rounded
+    // values. Do not turn a preset precision correction into an XML rewrite.
+    input.camera.rotation = Some(a::Rotation {
+      latitude: 624_000,
+      longitude: 18_966_000,
+      revolution: 216_000,
+    });
+    let authored = camera_projection(&input, 0.0);
+    assert_ne!(preset.rotation, authored.rotation);
+    let (expected, _) = super::oox_rotation_matrix(624_000, 18_966_000, 216_000);
+    assert_eq!(authored.rotation, expected.map(|row| row.map(|v| v as f32)));
+  }
+
+  #[test]
   fn zero_width_bevel_heights_form_the_office_ordered_depth_chain() {
     let mut scene = scene(a::PresetCameraValues::OrthographicFront);
     scene.camera.rotation = Some(a::Rotation {
@@ -14224,6 +14730,63 @@ mod tests {
   }
 
   #[test]
+  fn oblique_visibility_includes_depth_shear() {
+    let projection = camera_projection(&scene(a::PresetCameraValues::ObliqueTopLeft), 0.0);
+    for (normal, visible) in [
+      ([-1.0, 0.0, 0.0], true),
+      ([1.0, 0.0, 0.0], false),
+      ([0.0, -1.0, 0.0], true),
+      ([0.0, 1.0, 0.0], false),
+      ([0.0, 0.0, 1.0], true),
+      ([0.0, 0.0, -1.0], false),
+    ] {
+      assert_eq!(
+        super::surface_faces_camera(projection, normal, [0.0; 3], 30.0, 20.0, 1.0),
+        visible,
+        "normal={normal:?}",
+      );
+    }
+  }
+
+  #[test]
+  fn raster_solid_hidden_back_cap_does_not_compound_front_opacity() {
+    let scene = scene(a::PresetCameraValues::OrthographicFront);
+    let projection = camera_projection(&scene, 0.0);
+    for alpha in [64, 128, 192, 255] {
+      for depth in [0, 25_400, 76_200] {
+        let mut image = RgbaImage::from_pixel(21, 21, Rgba([80, 120, 160, alpha]));
+        apply_static_3d(
+          &mut image,
+          &scene,
+          projection,
+          &a::Shape3DType {
+            extrusion_height: Some(CoordinateValue::Emu(depth)),
+            ..a::Shape3DType::default()
+          },
+          Static3dRenderOptions {
+            extrusion_color: None,
+            contour_color: None,
+            pixels_per_point: 1.0,
+            model_surface: None,
+          },
+        );
+        assert_eq!(image.get_pixel(10, 10)[3], alpha, "depth={depth}");
+      }
+    }
+    // A back face that actually faces the camera must remain visible.
+    let mut rear_view = projection;
+    rear_view.rotation = [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]];
+    assert!(super::surface_faces_camera(
+      rear_view,
+      [0.0, 0.0, -1.0],
+      [0.0, 0.0, -6.0],
+      21.0,
+      21.0,
+      1.0,
+    ));
+  }
+
+  #[test]
   fn legacy_wireframe_does_not_retain_a_solid_front_face() {
     let scene = scene(a::PresetCameraValues::OrthographicFront);
     let shape = a::Shape3DType {
@@ -14353,6 +14916,61 @@ mod tests {
     let center = image.get_pixel(2, 2);
     assert_eq!(center[3], 255);
     assert!(center[0] > 0 && center[1] > 0 && center[2] > 0);
+  }
+
+  #[test]
+  fn shape_planar_cap_uses_the_same_color_lattice_as_its_bevel() {
+    let mut scene = scene(a::PresetCameraValues::OrthographicFront);
+    *scene.light_rig = a::LightRig {
+      rig: a::LightRigValues::Balanced,
+      direction: a::LightRigDirectionValues::Top,
+      rotation: Some(a::Rotation {
+        latitude: 0,
+        longitude: 0,
+        revolution: 8_700_000,
+      }),
+    };
+    let options = super::ProjectedImageOptions {
+      projection: camera_projection(&scene, 0.0),
+      z: 0.0,
+      bounds: (0, 0, 0, 0),
+      model_surface: super::Static3dSurface {
+        left_px: 0.0,
+        top_px: 0.0,
+        width_px: 1.0,
+        height_px: 1.0,
+      },
+      pixels_per_point: 1.0,
+      tint: None,
+    };
+    // Lossless Office controls isolate shape color with the rig, material,
+    // camera and output options fixed. Device rounding leaves at most one
+    // byte of residual; the former floating cap was up to two bytes brighter.
+    for (input, office) in [
+      ([0, 0, 0], [7, 7, 7]),
+      ([1, 1, 1], [7, 7, 7]),
+      ([32, 32, 32], [37, 37, 37]),
+      ([64, 64, 64], [67, 67, 67]),
+      ([127, 127, 127], [127, 127, 127]),
+      ([128, 128, 128], [128, 128, 128]),
+      ([192, 192, 192], [188, 188, 188]),
+      ([255, 255, 255], [250, 250, 250]),
+      ([255, 0, 0], [250, 7, 7]),
+      ([0, 255, 0], [7, 250, 7]),
+      ([0, 0, 255], [7, 7, 250]),
+      ([60, 140, 147], [63, 140, 146]),
+    ] {
+      let mut image = RgbaImage::from_pixel(1, 1, Rgba([input[0], input[1], input[2], 255]));
+      super::shade_planar_surface(&mut image, &scene, &options, [0.0, 0.0, 1.0], None, false);
+      let pixel = image.get_pixel(0, 0);
+      for (actual, expected) in pixel.0[..3].iter().zip(office) {
+        assert!(
+          actual.abs_diff(expected) <= 1,
+          "{input:?}: {pixel:?} versus {office:?}"
+        );
+      }
+      assert_eq!(pixel[3], 255);
+    }
   }
 
   #[test]

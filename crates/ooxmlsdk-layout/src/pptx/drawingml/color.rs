@@ -1654,6 +1654,45 @@ mod tests {
   }
 
   #[test]
+  fn powerpoint_gradient_tint_retains_saturation_overflow_until_rgb() {
+    let transformations = vec![
+      valued_transform(ColorTransformationKind::HueOff, 0),
+      valued_transform(ColorTransformationKind::SatOff, 0),
+      valued_transform(ColorTransformationKind::LumOff, 0),
+      valued_transform(ColorTransformationKind::AlphaOff, 0),
+      valued_transform(ColorTransformationKind::Tint, 50_000),
+      valued_transform(ColorTransformationKind::Shade, 100_000),
+      valued_transform(ColorTransformationKind::SatMod, 350_000),
+    ];
+    let transformed = Color::RgbHex(RgbHexColor {
+      value: "4F81BD".to_string(),
+      transformations: transformations.clone(),
+    });
+    // tdf125551's native Office sampled gradient starts/ends at these bytes.
+    // Clipping HSL saturation instead yields [164, 196, 255]. The source
+    // theme indirection must not introduce an intermediate RGB quantization.
+    let expected = ResolvedColor::new(155, 193, 255);
+    assert_eq!(
+      transformed.resolve_rgb_preserving_transform_precision(&mut |_| None, None),
+      Some(expected)
+    );
+    let themed = Color::Scheme(SchemeColor {
+      value: a::SchemeColorValues::Accent1,
+      transformations,
+    });
+    assert_eq!(
+      themed.resolve_rgb_preserving_transform_precision(
+        &mut |_| Some(Color::RgbHex(RgbHexColor {
+          value: "4F81BD".to_string(),
+          transformations: Vec::new(),
+        })),
+        None,
+      ),
+      Some(expected)
+    );
+  }
+
+  #[test]
   fn word_fixed_output_effect_truncates_only_the_final_fractional_srgb_channel() {
     let transformed = Color::RgbHex(RgbHexColor {
       value: "FFFFFF".to_string(),

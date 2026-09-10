@@ -56,6 +56,17 @@ pub(super) enum PathCommandDef {
 }
 
 pub(crate) fn geometry(preset: &a::PresetGeometry) -> a::CustomGeometry {
+  let mut geometry = text_geometry(preset);
+  geometry.path_list.path = generated::definition(preset.preset)
+    .paths
+    .iter()
+    .map(schema_path)
+    .collect();
+  geometry
+}
+
+/// Text layout needs the same adjusted guides, but not allocated path commands.
+pub(super) fn text_geometry(preset: &a::PresetGeometry) -> a::CustomGeometry {
   let definition = generated::definition(preset.preset);
   let mut adjustments = definition
     .adjustments
@@ -81,9 +92,14 @@ pub(crate) fn geometry(preset: &a::PresetGeometry) -> a::CustomGeometry {
     shape_guide_list: Some(a::ShapeGuideList {
       shape_guide: definition.guides.iter().map(shape_guide).collect(),
     }),
-    path_list: a::PathList {
-      path: definition.paths.iter().map(schema_path).collect(),
-    },
+    rectangle: generated::text_rectangle(preset.preset).map(|[left, top, right, bottom]| {
+      a::Rectangle {
+        left: left.into(),
+        top: top.into(),
+        right: right.into(),
+        bottom: bottom.into(),
+      }
+    }),
     ..Default::default()
   }
 }

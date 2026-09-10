@@ -946,12 +946,17 @@ pub(crate) const POWERPOINT_RADIAL_DEFAULTS: RadialHostDefaults = RadialHostDefa
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Pie3DProjectionProfile {
+  /// Physical cylinder thickness / radius at hPercent=100. Office controls
+  /// at 15/30/60 degrees and 50/100/200 percent in a near-parallel camera
+  /// retain this ratio; perspective changes projected, not model thickness.
+  pub thickness_radius_ratio: f32,
   /// Horizontal radius relative to the host's radial plot basis.
   pub radius_x_scale: f32,
   /// Residual multiplier after projecting a circular top by `sin(rotX)`.
   pub vertical_tilt_scale: f32,
-  /// Default visible extrusion relative to the automatic plot height at the
-  /// canonical 30-degree X rotation.
+  /// Extrusion space reserved by the automatic layout at the canonical
+  /// 30-degree X rotation. Physical lower vertices use thickness_radius_ratio
+  /// and the camera, not this screen-space layout allowance.
   pub depth_height_scale: f32,
   /// Vertical residual after centering the complete top-plus-side scene.
   pub center_y_offset_height_ratio: f32,
@@ -970,12 +975,16 @@ pub(crate) struct Pie3DProjectionProfile {
 /// The strict Open XML `3D Pie-O12-PPT-Charts.pptx` reference has an authored
 /// `rotX=30`, `perspective=30` view and no `hPercent`. Its immutable Office
 /// fixed output rasterizes only the 3-D plot at 200 ppi while retaining the
-/// title and legend as vectors. The plot measures a 180.1pt horizontal radius,
-/// 85.3pt projected vertical radius, and 41.6pt visible extrusion inside the
-/// same automatic chart bands used by the vector host. These normalized
-/// values define the scene profile; they are not PDF-image dimensions.
+/// title and legend as vectors. The original host layout calibration estimated
+/// a 180.1pt horizontal radius, 85.3pt vertical radius and 41.6pt visible depth.
+/// Rechecking geometric alpha boundaries in six near-parallel controls at
+/// 15/30 degrees and 50/100/200 percent thickness gives a mean physical radius
+/// of 179.59pt. This independent calibration replaces the original horizontal
+/// basis. The retained vertical fit and layout allowance do not define the
+/// physical bottom plane, which is projected from the cylinder thickness.
 pub(crate) const POWERPOINT_PIE_3D_PROJECTION: Pie3DProjectionProfile = Pie3DProjectionProfile {
-  radius_x_scale: 0.468_8,
+  thickness_radius_ratio: 0.24,
+  radius_x_scale: 0.467_4,
   vertical_tilt_scale: 0.947,
   depth_height_scale: 0.146_2,
   center_y_offset_height_ratio: -0.011_86,

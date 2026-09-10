@@ -439,7 +439,9 @@ fn parse_style_level_pairs(value: &str) -> Vec<(String, u8)> {
   };
   let components = value.split(separator).map(str::trim).collect::<Vec<_>>();
   components
-    .chunks_exact(2)
+    .as_chunks::<2>()
+    .0
+    .iter()
     .filter_map(|pair| {
       let style = pair[0].trim_matches('"');
       let level = pair[1].parse::<u8>().ok()?;

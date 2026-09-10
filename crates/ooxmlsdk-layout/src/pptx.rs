@@ -4,6 +4,7 @@ mod display;
 pub(crate) mod drawingml;
 mod gradient;
 mod import;
+mod model3d;
 mod presentation;
 mod shadow;
 mod shape;

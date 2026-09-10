@@ -415,6 +415,61 @@ fn flatten_cubic(points: [FixedPoint; 4]) -> Option<Vec<FixedPoint>> {
   }
 }
 
+/// Flatten a device-space path on the shared Windows 28.4 curve lattice.
+/// This exposes geometry only; the caller still owns sample positions, fill
+/// rules, coverage resolution and compositing.
+pub(super) fn flatten_device_path_28_4(path: &BezPath) -> Option<BezPath> {
+  let fixed = |p| transform_to_28_4(FloatPoint::from_kurbo(p)?, 0.5, 0.5);
+  let point = |p: FixedPoint| kurbo::Point::new(f64::from(p.x) / 16.0, f64::from(p.y) / 16.0);
+  let mut result = BezPath::new();
+  let mut current = None;
+  let mut first = None;
+  for element in path.elements() {
+    match *element {
+      PathEl::MoveTo(p) => {
+        let p = fixed(p)?;
+        result.move_to(point(p));
+        current = Some(p);
+        first = Some(p);
+      }
+      PathEl::LineTo(p) => {
+        let p = fixed(p)?;
+        result.line_to(point(p));
+        current = Some(p);
+      }
+      PathEl::QuadTo(control, end) => {
+        let start = FloatPoint::from_kurbo(point(current?))?;
+        let control = FloatPoint::from_kurbo(control)?;
+        let end_float = FloatPoint::from_kurbo(end)?;
+        let a = start.quadratic_control_from_start(control);
+        let b = end_float.quadratic_control_from_start(control);
+        let end = fixed(end)?;
+        for p in flatten_cubic([
+          current?,
+          transform_to_28_4(a, 0.5, 0.5)?,
+          transform_to_28_4(b, 0.5, 0.5)?,
+          end,
+        ])? {
+          result.line_to(point(p));
+        }
+        current = Some(end);
+      }
+      PathEl::CurveTo(a, b, end) => {
+        let end = fixed(end)?;
+        for p in flatten_cubic([current?, fixed(a)?, fixed(b)?, end])? {
+          result.line_to(point(p));
+        }
+        current = Some(end);
+      }
+      PathEl::ClosePath => {
+        result.close_path();
+        current = first;
+      }
+    }
+  }
+  Some(result)
+}
+
 #[derive(Clone, Debug)]
 struct Edge {
   x: i64,

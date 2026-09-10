@@ -9,6 +9,24 @@ use crate::common::{DrawingPath, DrawingPathFillMode};
 
 use super::drawingml_geometry::{append_transformed_arc, bez_path_commands};
 
+/// ECMA-376 Part 1 §20.1.9.22: the text rectangle uses the shape's EMU
+/// coordinate system, independently of any individual path's viewport.
+pub(crate) fn text_rectangle(
+  geometry: &a::CustomGeometry,
+  width_emu: f64,
+  height_emu: f64,
+) -> Option<kurbo::Rect> {
+  let rect = geometry.rectangle.as_ref()?;
+  if width_emu <= 0.0 || height_emu <= 0.0 || !width_emu.is_finite() || !height_emu.is_finite() {
+    return None;
+  }
+  let guides = evaluate_guides(geometry, width_emu, height_emu)?;
+  let [left, top, right, bottom] = [&rect.left, &rect.top, &rect.right, &rect.bottom]
+    .map(|value| coordinate(value, &guides, width_emu, height_emu));
+  let rect = kurbo::Rect::new(left?, top?, right?, bottom?);
+  (rect.is_finite() && rect.x1 >= rect.x0 && rect.y1 >= rect.y0).then_some(rect)
+}
+
 /// Lowers DrawingML custom-geometry paths into page-space commands.
 ///
 /// ECMA-376 gives each `a:path` its own coordinate space through `w` and `h`.
@@ -35,15 +53,32 @@ pub(crate) fn paths(
       .map(|value| value.to_emu() as f64)
       .filter(|value| *value > 0.0)
       .unwrap_or(f64::from(height));
-    if viewport_width <= 0.0 || viewport_height <= 0.0 {
+    if viewport_width < 0.0
+      || viewport_height < 0.0
+      || !viewport_width.is_finite()
+      || !viewport_height.is_finite()
+    {
       return None;
     }
     let guides = evaluate_guides(geometry, viewport_width, viewport_height)?;
+    // With no independent path viewport, coordinates already inhabit the
+    // shape frame. A horizontal/vertical connector legally has a zero extent
+    // on one axis; its identity mapping must not become 0/0 or reject the
+    // entire path. An explicit positive viewport still scales to zero when
+    // its destination axis collapses. Do not invent a nonzero guide extent.
     let map_coordinates = Affine::new([
-      f64::from(width) / viewport_width,
+      if viewport_width == 0.0 {
+        1.0
+      } else {
+        f64::from(width) / viewport_width
+      },
       0.0,
       0.0,
-      f64::from(height) / viewport_height,
+      if viewport_height == 0.0 {
+        1.0
+      } else {
+        f64::from(height) / viewport_height
+      },
       f64::from(left),
       f64::from(top),
     ]);
@@ -370,8 +405,28 @@ mod tests {
   use kurbo::ParamCurve;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
-  use super::{drawingml_arc, formula, path_commands, paths};
+  use super::{drawingml_arc, formula, path_commands, paths, text_rectangle};
   use crate::common::{DrawingPathFillMode, PathCommand, Point, Pt};
+
+  #[test]
+  fn text_rectangle_uses_shape_extents_and_absolute_emu_not_path_viewport() {
+    let mut geometry: a::CustomGeometry = r#"<a:custGeom xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:gdLst><a:gd name="edge" fmla="*/ w 3 4"/></a:gdLst><a:rect l="12700" t="hd4" r="edge" b="h"/><a:pathLst><a:path w="10" h="20"/></a:pathLst></a:custGeom>"#.parse().unwrap();
+    assert_eq!(
+      text_rectangle(&geometry, 127000.0, 254000.0),
+      Some(kurbo::Rect::new(12700.0, 63500.0, 95250.0, 254000.0))
+    );
+    geometry.path_list.path.clear();
+    assert_eq!(
+      text_rectangle(&geometry, 254000.0, 508000.0),
+      Some(kurbo::Rect::new(12700.0, 127000.0, 190500.0, 508000.0))
+    );
+    for (w, h) in [(0.0, 100.0), (100.0, 0.0), (-1.0, 100.0), (f64::NAN, 100.0)] {
+      assert!(text_rectangle(&geometry, w, h).is_none());
+    }
+    geometry.rectangle.as_mut().unwrap().left = "missingGuide".into();
+    assert!(text_rectangle(&geometry, 127000.0, 254000.0).is_none());
+    assert!(text_rectangle(&a::CustomGeometry::default(), 100.0, 200.0).is_none());
+  }
 
   #[test]
   fn scales_custom_path_coordinates_into_the_shape_frame() {
@@ -415,6 +470,51 @@ mod tests {
         PathCommand::Close,
       ]
     );
+  }
+
+  #[test]
+  fn zero_axis_path_distinguishes_implicit_coordinates_from_explicit_scaling() {
+    let mut geometry = a::CustomGeometry {
+      path_list: a::PathList {
+        path: vec![a::Path {
+          path_choice: vec![
+            a::PathChoice::MoveTo(Box::new(a::MoveTo {
+              point: a::Point {
+                x: "l".into(),
+                y: "t".into(),
+              },
+            })),
+            a::PathChoice::LineTo(Box::new(a::LineTo {
+              point: a::Point {
+                x: "r".into(),
+                y: "7".into(),
+              },
+            })),
+          ],
+          ..Default::default()
+        }],
+      },
+      ..Default::default()
+    };
+    assert_eq!(
+      paths(&geometry, 10.0, 20.0, 100.0, 0.0).unwrap()[0].commands[1],
+      PathCommand::LineTo(Point {
+        x: Pt(110.0),
+        y: Pt(27.0)
+      })
+    );
+    geometry.path_list.path[0].height = Some("100".parse().unwrap());
+    assert_eq!(
+      paths(&geometry, 10.0, 20.0, 100.0, 0.0).unwrap()[0].commands[1],
+      PathCommand::LineTo(Point {
+        x: Pt(110.0),
+        y: Pt(20.0)
+      })
+    );
+    geometry.path_list.path[0].height = None;
+    for height in [-1.0, f32::NAN, f32::INFINITY] {
+      assert!(paths(&geometry, 10.0, 20.0, 100.0, height).is_none());
+    }
   }
 
   #[test]

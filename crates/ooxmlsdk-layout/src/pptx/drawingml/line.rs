@@ -29,7 +29,19 @@ impl LineProperties {
       None => LineFill::Unspecified,
     };
 
-    if fill == LineFill::Unspecified && outline.width.is_none() {
+    // A line can override only its decorations or stroke style while keeping
+    // the theme's fill and width (ECMA-376 Part 1, 20.1.2.2.24/20.1.8.57).
+    if fill == LineFill::Unspecified
+      && outline.width.is_none()
+      && outline.cap_type.is_none()
+      && outline.compound_line_type.is_none()
+      && outline.alignment.is_none()
+      && outline.outline_choice2.is_none()
+      && outline.outline_choice3.is_none()
+      && outline.head_end.is_none()
+      && outline.tail_end.is_none()
+      && outline.line_properties_extension_list.is_none()
+    {
       None
     } else {
       Some(Self {

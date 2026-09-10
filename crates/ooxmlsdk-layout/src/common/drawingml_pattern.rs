@@ -291,7 +291,7 @@ mod tests {
   fn vml_historical_pattern_uses_white_as_foreground() {
     let mut input = Vec::new();
     let mut pixels = vec![0_u8; 8 * 8 * 4];
-    for (index, pixel) in pixels.chunks_exact_mut(4).enumerate() {
+    for (index, pixel) in pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
       let value = if index % 2 == 0 { 255 } else { 0 };
       pixel.copy_from_slice(&[value, value, value, 255]);
     }

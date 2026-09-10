@@ -484,6 +484,88 @@ pub(crate) struct SimpleOuterShadowTranslation {
   pub(crate) offset_y_px: f32,
 }
 
+/// The host can realize an isolated DrawingML reflection at its configured
+/// output density without changing Word's independently normalized run effects.
+pub(crate) fn simple_reflection_blur_radius(container: &ImageEffectContainer) -> Option<f32> {
+  let [ImageEffect::Reflection(effect)] = container.effects.as_slice() else {
+    return None;
+  };
+  (effect.reference == ReflectionReference::EffectInput
+    && effect.raster_length_scale == 1.0
+    && effect.bounds_radius_scale == 1.0
+    && effect.bounds_radius_offset_px == 0.0
+    && effect.blur_radius_px.is_finite())
+  .then_some(effect.blur_radius_px)
+}
+
+/// PowerPoint's isolated reflection uses the Direct2D three-sigma radius.
+/// Its native A8 edge sweeps are narrower than Word's radial Gaussian even
+/// when the input, output rectangle and density agree. Do not change the
+/// authored geometry or Word's separately established kernel convention.
+pub(crate) fn configure_powerpoint_reflection(container: &mut ImageEffectContainer) {
+  if simple_reflection_blur_radius(container).is_some()
+    && let [ImageEffect::Reflection(effect)] = container.effects.as_mut_slice()
+  {
+    effect.blur_kernel = ReflectionBlurKernel::Direct2dGaussian;
+    // The PowerPoint gradient brush first realizes its stops as A8 colors.
+    // Constant 50% Office controls are uniformly 127, not 128, and the
+    // original 0.3% far stop is zero. Quantize the stops, not every sampled
+    // gradient value; changing the latter changes interpolation as well.
+    effect.start_opacity = (effect.start_opacity.clamp(0.0, 1.0) * 255.0).floor() / 255.0;
+    effect.end_opacity = (effect.end_opacity.clamp(0.0, 1.0) * 255.0).floor() / 255.0;
+  }
+}
+
+/// Move an isolated reflection's affine into source realization. Sampling a
+/// bitmap first and then mirroring that sampled canvas introduces a second
+/// interpolation whose phase depends on otherwise transparent working padding.
+/// The opacity ramp and blur still execute in reflected coordinates below.
+pub(crate) fn bake_powerpoint_reflection_source_transform(
+  container: &mut ImageEffectContainer,
+  anchor: super::Rect,
+) -> Option<super::Transform> {
+  simple_reflection_blur_radius(container)?;
+  let [ImageEffect::Reflection(effect)] = container.effects.as_mut_slice() else {
+    return None;
+  };
+  if effect.distance_mode != ReflectionDistanceMode::PostTransformOffset {
+    return None;
+  }
+  let pt_per_px = crate::units::POINTS_PER_INCH / crate::units::CSS_PIXELS_PER_INCH;
+  let x = anchor.origin.x.0 + anchor.size.width.0 * effect.alignment.0;
+  let y = anchor.origin.y.0 + anchor.size.height.0 * effect.alignment.1;
+  let distance = effect.distance_px * effect.distance_length_scale * pt_per_px;
+  let direction = effect.direction_degrees.to_radians();
+  let t = effect.transform;
+  let transform = super::Transform {
+    m11: t.scale_x,
+    m12: t.skew_y,
+    m21: t.skew_x,
+    m22: t.scale_y,
+    dx: super::Pt(
+      x - t.scale_x * x - t.skew_x * y + direction.cos() * distance + t.shift_x_px * pt_per_px,
+    ),
+    dy: super::Pt(
+      y - t.skew_y * x - t.scale_y * y + direction.sin() * distance + t.shift_y_px * pt_per_px,
+    ),
+  };
+  if ![
+    transform.m11,
+    transform.m12,
+    transform.m21,
+    transform.m22,
+    transform.dx.0,
+    transform.dy.0,
+  ]
+  .into_iter()
+  .all(f32::is_finite)
+  {
+    return None;
+  }
+  effect.source_is_transformed = true;
+  Some(transform)
+}
+
 pub(crate) fn simple_outer_shadow_translation(
   container: &ImageEffectContainer,
 ) -> Option<SimpleOuterShadowTranslation> {
@@ -831,7 +913,24 @@ pub(crate) fn bind_wordprocessing_reflection_metrics(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+enum ReflectionBlurKernel {
+  RadialGaussian,
+  Direct2dGaussian,
+}
+
+impl ReflectionBlurKernel {
+  fn sigma(self, radius_px: f32) -> f32 {
+    match self {
+      Self::RadialGaussian => reflection_radius_gaussian_sigma(radius_px),
+      Self::Direct2dGaussian => direct2d_gaussian_sigma(radius_px),
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ImageReflectionEffect {
+  source_is_transformed: bool,
+  blur_kernel: ReflectionBlurKernel,
   blur_radius_px: f32,
   /// Scales only the sampled Gaussian kernel.
   raster_length_scale: f32,
@@ -1088,6 +1187,8 @@ pub(crate) fn from_wordprocessing_text_effects(
   }
   let reflection_effect = reflection.map(|reflection| {
     ImageEffect::Reflection(ImageReflectionEffect {
+      source_is_transformed: false,
+      blur_kernel: ReflectionBlurKernel::RadialGaussian,
       blur_radius_px: reflection.blur_radius_px,
       raster_length_scale: reflection.raster_length_scale,
       bounds_radius_scale: reflection.geometry_length_scale,
@@ -1983,6 +2084,8 @@ fn preset_shadow(
 
 fn reflection(effect: &a::Reflection) -> ImageEffect {
   ImageEffect::Reflection(ImageReflectionEffect {
+    source_is_transformed: false,
+    blur_kernel: ReflectionBlurKernel::RadialGaussian,
     blur_radius_px: effect
       .blur_radius
       .map(|value| value.to_emu() as f32 / 9_525.0)
@@ -6001,7 +6104,11 @@ fn reflection_image_with_scale(
   transform.shift_y_px = anchor_y - transform.skew_y * anchor_x - transform.scale_y * anchor_y
     + post_transform_offset.1
     + authored_shift_y;
-  let mut reflected = affine_image(source, raster_scale.transform(transform));
+  let mut reflected = if effect.source_is_transformed {
+    source.clone()
+  } else {
+    affine_image(source, raster_scale.transform(transform))
+  };
 
   // MS-DOCX CT_Reflection defines fadeDir relative to the text, and stPos /
   // endPos as positions along that gradient ramp. Word text supplies its
@@ -6074,8 +6181,8 @@ fn reflection_image_with_scale(
     let blur_radius_px = effect.blur_radius_px * effect.raster_length_scale;
     blur_rgba_premultiplied_xy(
       &reflected,
-      reflection_radius_gaussian_sigma(blur_radius_px * raster_scale.x),
-      reflection_radius_gaussian_sigma(blur_radius_px * raster_scale.y),
+      effect.blur_kernel.sigma(blur_radius_px * raster_scale.x),
+      effect.blur_kernel.sigma(blur_radius_px * raster_scale.y),
     )
   } else {
     reflected
@@ -6653,6 +6760,8 @@ mod tests {
       ..paint
     };
     let effect = ImageReflectionEffect {
+      source_is_transformed: false,
+      blur_kernel: ReflectionBlurKernel::RadialGaussian,
       blur_radius_px: 0.0,
       raster_length_scale: 1.0,
       bounds_radius_scale: 1.0,
@@ -6909,10 +7018,10 @@ mod tests {
     ImageEffectContainerKind, ImageEffectFill, ImageEffectGradientKind, ImageEffectRelativeRect,
     ImageEffectSourceBounds, ImageEffectSourceGeometry, ImageEffectSourceImages,
     ImageEffectSourcePixelBounds, ImageEffectSourceReference, ImageEffectSourceRequirements,
-    ImageEffectTransform, ImageReflectionEffect, PixelBounds, ReflectionDistanceMode,
-    ReflectionReference, ResolvedEffectColor, ShadowBlurKernel, ShadowDistanceMode,
-    WordprocessingTextEffectHost, WordprocessingTextGlow, apply_container_to_padded_image,
-    apply_container_to_padded_image_with_sources,
+    ImageEffectTransform, ImageReflectionEffect, PixelBounds, ReflectionBlurKernel,
+    ReflectionDistanceMode, ReflectionReference, ResolvedEffectColor, ShadowBlurKernel,
+    ShadowDistanceMode, WordprocessingTextEffectHost, WordprocessingTextGlow,
+    apply_container_to_padded_image, apply_container_to_padded_image_with_sources,
     apply_container_to_padded_image_with_sources_and_anchor, apply_to_image,
     composite_coverage_source_over_preserving_paint, container_output_bounds,
     container_output_bounds_with_anchor, container_output_bounds_with_anchors,
@@ -7124,6 +7233,86 @@ mod tests {
         height_px: 10,
       }
     );
+  }
+
+  #[test]
+  fn powerpoint_reflection_kernel_preserves_word_and_effect_geometry() {
+    let effect = reflection(&a::Reflection::default());
+    let mut container = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![effect.clone()],
+    };
+    let before = container.clone();
+    super::configure_powerpoint_reflection(&mut container);
+    let ImageEffect::Reflection(mut actual) = container.effects[0] else {
+      panic!("reflection must retain its ownership");
+    };
+    assert_eq!(actual.blur_kernel, ReflectionBlurKernel::Direct2dGaussian);
+    assert_eq!(actual.blur_kernel.sigma(6.0), 2.0);
+    actual.blur_kernel = ReflectionBlurKernel::RadialGaussian;
+    assert_eq!(ImageEffect::Reflection(actual), effect);
+    assert_eq!(before.effects, vec![effect.clone()]);
+
+    container.effects.push(ImageEffect::Identity);
+    assert_eq!(super::simple_reflection_blur_radius(&container), None);
+    let mut word = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![ImageEffect::Reflection(ImageReflectionEffect {
+        reference: ReflectionReference::RootText,
+        ..actual
+      })],
+    };
+    let before = word.clone();
+    super::configure_powerpoint_reflection(&mut word);
+    assert_eq!(word, before);
+  }
+
+  #[test]
+  fn powerpoint_reflection_realizes_alpha_stops_before_interpolation() {
+    let ImageEffect::Reflection(mut effect) = reflection(&a::Reflection::default()) else {
+      unreachable!();
+    };
+    effect.start_opacity = 0.5;
+    effect.end_opacity = 0.003;
+    let mut container = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![ImageEffect::Reflection(effect)],
+    };
+    super::configure_powerpoint_reflection(&mut container);
+    let ImageEffect::Reflection(actual) = container.effects[0] else {
+      unreachable!();
+    };
+    assert_eq!(actual.start_opacity, 127.0 / 255.0);
+    assert_eq!(actual.end_opacity, 0.0);
+    assert_eq!(actual.start_position, effect.start_position);
+    assert_eq!(actual.end_position, effect.end_position);
+  }
+
+  #[test]
+  fn powerpoint_reflection_bakes_the_source_without_moving_the_fade_domain() {
+    let ImageEffect::Reflection(mut effect) = reflection(&a::Reflection::default()) else {
+      unreachable!();
+    };
+    effect.transform.scale_y = -1.0;
+    effect.alignment = (0.0, 1.0);
+    let mut container = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![ImageEffect::Reflection(effect)],
+    };
+    let transform = super::bake_powerpoint_reflection_source_transform(
+      &mut container,
+      crate::model::common_rect(605.5, 30.0, 84.5, 78.0),
+    )
+    .unwrap();
+    assert_eq!(transform.m22, -1.0);
+    assert_eq!(transform.dy.0, 216.0);
+    assert_eq!(transform.dx.0, 0.0);
+    let ImageEffect::Reflection(actual) = container.effects[0] else {
+      unreachable!();
+    };
+    assert!(actual.source_is_transformed);
+    effect.source_is_transformed = true;
+    assert_eq!(actual, effect);
   }
 
   #[test]
@@ -9196,6 +9385,8 @@ mod tests {
     apply_to_image(
       &mut reflected,
       &[ImageEffect::Reflection(ImageReflectionEffect {
+        source_is_transformed: false,
+        blur_kernel: ReflectionBlurKernel::RadialGaussian,
         blur_radius_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
@@ -9230,6 +9421,8 @@ mod tests {
     let effects = ImageEffectContainer {
       kind: ImageEffectContainerKind::Tree,
       effects: vec![ImageEffect::Reflection(ImageReflectionEffect {
+        source_is_transformed: false,
+        blur_kernel: ReflectionBlurKernel::RadialGaussian,
         blur_radius_px: 12.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
@@ -9270,6 +9463,8 @@ mod tests {
     let effects = ImageEffectContainer {
       kind: ImageEffectContainerKind::Tree,
       effects: vec![ImageEffect::Reflection(ImageReflectionEffect {
+        source_is_transformed: false,
+        blur_kernel: ReflectionBlurKernel::RadialGaussian,
         blur_radius_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
@@ -9348,6 +9543,8 @@ mod tests {
     };
     let effect = |distance_mode| {
       ImageEffect::Reflection(ImageReflectionEffect {
+        source_is_transformed: false,
+        blur_kernel: ReflectionBlurKernel::RadialGaussian,
         blur_radius_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
@@ -9499,7 +9696,7 @@ mod tests {
   }
 
   #[test]
-  fn reflection_blur_converts_the_authored_radius_to_gaussian_sigma() {
+  fn powerpoint_reflection_blur_uses_three_sigma_support() {
     let mut source = RgbaImage::from_pixel(11, 11, Rgba([0; 4]));
     source.get_pixel_mut(5, 5).0 = [90, 120, 150, 255];
     let bounds = PixelBounds {
@@ -9511,6 +9708,8 @@ mod tests {
     let reflected = reflection_image(
       &source,
       ImageReflectionEffect {
+        source_is_transformed: false,
+        blur_kernel: ReflectionBlurKernel::Direct2dGaussian,
         blur_radius_px: 2.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
@@ -9547,7 +9746,7 @@ mod tests {
   }
 
   #[test]
-  fn reflection_blurs_the_completed_alpha_ramp() {
+  fn powerpoint_reflection_blurs_the_completed_alpha_ramp() {
     let source = RgbaImage::from_pixel(1, 9, Rgba([90, 120, 150, 255]));
     let bounds = PixelBounds {
       left: 0.0,
@@ -9558,6 +9757,8 @@ mod tests {
     let reflected = reflection_image(
       &source,
       ImageReflectionEffect {
+        source_is_transformed: false,
+        blur_kernel: ReflectionBlurKernel::Direct2dGaussian,
         blur_radius_px: 2.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
@@ -9601,6 +9802,8 @@ mod tests {
     apply_to_image(
       &mut reflected,
       &[ImageEffect::Reflection(ImageReflectionEffect {
+        source_is_transformed: false,
+        blur_kernel: ReflectionBlurKernel::RadialGaussian,
         blur_radius_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
@@ -9636,6 +9839,8 @@ mod tests {
     let effects = ImageEffectContainer {
       kind: ImageEffectContainerKind::Tree,
       effects: vec![ImageEffect::Reflection(ImageReflectionEffect {
+        source_is_transformed: false,
+        blur_kernel: ReflectionBlurKernel::RadialGaussian,
         blur_radius_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,
@@ -9978,6 +10183,8 @@ mod tests {
     let container = ImageEffectContainer {
       kind: ImageEffectContainerKind::Tree,
       effects: vec![ImageEffect::Reflection(ImageReflectionEffect {
+        source_is_transformed: false,
+        blur_kernel: ReflectionBlurKernel::RadialGaussian,
         blur_radius_px: 0.0,
         raster_length_scale: 1.0,
         bounds_radius_scale: 1.0,

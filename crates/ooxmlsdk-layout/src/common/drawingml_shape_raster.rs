@@ -23,6 +23,9 @@ use super::{
 use crate::text_metrics::TextMetrics;
 
 const MAX_EFFECT_RASTER_PIXELS: f32 = 250_000.0;
+// Fixed-format effects are output surfaces, not low-cost previews. Keep their
+// resource guard separate from the optional supersampling/preview budget.
+const MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS: f32 = 16_000_000.0;
 const MAX_EFFECT_PIXELS_PER_POINT: f32 = 2.0;
 const OFFICE_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX: f32 = 16.0;
 const OFFICE_ANTIALIAS_8X4_HORIZONTAL_SAMPLES: u32 = 8;
@@ -50,6 +53,58 @@ pub(crate) fn office_simple_glow_pixels_per_point(output_dpi: f32, radius_pt: f3
   output_dpi / crate::units::POINTS_PER_INCH / divisor
 }
 
+/// Realizes Office's simple shape-shadow output range separately from its
+/// working allocation. Word radius/phase controls and PowerPoint rectangle
+/// radius/size/position controls share the printer guard and far sample inset.
+/// PowerPoint picture reflections share this range as well: same-options
+/// 0/.5/3/6pt blur and 78/156pt height controls retain all three density tiers.
+pub(crate) fn office_shape_shadow_bitmap_sample_bounds(
+  content_bounds: Rect,
+  output_bounds: super::drawingml_image_effects::EffectOutputBounds,
+  blur_radius_pt: f32,
+  effect_pixels_per_point: f32,
+) -> Rect {
+  fn quantize_source_edge(value_pt: f32) -> f32 {
+    let dot_position = f64::from(value_pt) * f64::from(crate::units::OFFICE_FIXED_OUTPUT_DPI)
+      / f64::from(crate::units::POINTS_PER_INCH);
+    let dots = dot_position.round();
+    (dots * f64::from(crate::units::POINTS_PER_INCH)
+      / f64::from(crate::units::OFFICE_FIXED_OUTPUT_DPI)) as f32
+  }
+
+  let printer_dot_pt = crate::units::POINTS_PER_INCH / crate::units::OFFICE_FIXED_OUTPUT_DPI;
+  let radius_position = blur_radius_pt.max(0.0) / printer_dot_pt;
+  let nearest_radius_dot = radius_position.round();
+  let integer_tolerance = f32::EPSILON * radius_position.abs().max(1.0) * 8.0;
+  let radius_dots = if (radius_position - nearest_radius_dot).abs() <= integer_tolerance {
+    nearest_radius_dot
+  } else {
+    radius_position.ceil()
+  };
+  // The WPS shadow surface owns one complete 600-DPI guard dot beyond the
+  // upward-quantized DrawingML blur radius. The exact-config 0.1/1/2/2.88/
+  // 3/4/5/6/8/9/12pt radius matrix keeps this rule across all five balanced
+  // pre-scale tiers. A zero-radius shadow is emitted as vectors by Word and
+  // never enters this bitmap path.
+  let display_radius_pt = (radius_dots + 1.0) * printer_dot_pt;
+  let far_edge_inset_pt = 0.5 / effect_pixels_per_point.max(f32::EPSILON);
+
+  // `output_bounds` already includes transform, alignment, rotation policy,
+  // distance, and the authored blur radius. Remove only that continuous blur
+  // to recover the moved source edges, quantize those edges on Office's printer
+  // grid, then install the independently observed display radius. This keeps
+  // local sample count separate from page/world phase.
+  let moved_left = content_bounds.origin.x.0 + output_bounds.left_pt + blur_radius_pt;
+  let moved_top = content_bounds.origin.y.0 + output_bounds.top_pt + blur_radius_pt;
+  let moved_right = content_bounds.origin.x.0 + output_bounds.right_pt - blur_radius_pt;
+  let moved_bottom = content_bounds.origin.y.0 + output_bounds.bottom_pt - blur_radius_pt;
+  let left = quantize_source_edge(moved_left) - display_radius_pt;
+  let top = quantize_source_edge(moved_top) - display_radius_pt;
+  let right = quantize_source_edge(moved_right) + display_radius_pt - far_edge_inset_pt;
+  let bottom = quantize_source_edge(moved_bottom) + display_radius_pt - far_edge_inset_pt;
+  crate::model::common_rect(left, top, right - left, bottom - top)
+}
+
 #[derive(Debug)]
 pub(crate) struct DrawingRaster {
   pub(crate) image: RgbaImage,
@@ -58,6 +113,257 @@ pub(crate) struct DrawingRaster {
   pub(crate) fill_line_image: Option<RgbaImage>,
   pub(crate) children_image: Option<RgbaImage>,
   pub(crate) pixels_per_point: f32,
+}
+
+impl DrawingRaster {
+  /// Physical extent of an integer bitmap painted at uniform sample density.
+  /// Callers using a custom `PageToRasterMapping` must retain that mapping's
+  /// display transform instead; nominal density does not describe its axes.
+  pub(crate) fn bounds_at_pixel_density(&self, origin: super::Point) -> Rect {
+    Rect {
+      origin,
+      size: super::Size {
+        width: Pt(self.image.width() as f32 / self.pixels_per_point),
+        height: Pt(self.image.height() as f32 / self.pixels_per_point),
+      },
+    }
+  }
+}
+
+/// Fixed-output straight, solid stroke source. Allocation may include a cap's
+/// conservative range independently of the tight widened ink.
+pub(crate) fn powerpoint_shadow_line<'a, 'data>(
+  items: &'a [DisplayItem<'data>],
+) -> Option<(super::Point, super::Point, &'a Stroke<'data>)> {
+  let [item] = items else { return None };
+  let (start, end, stroke) = match item {
+    DisplayItem::Path(path) if !path.closed && matches!(path.fill, Fill::None) => {
+      let [PathCommand::MoveTo(start), PathCommand::LineTo(end)] = path.commands.as_slice() else {
+        return None;
+      };
+      (*start, *end, path.stroke.as_ref()?)
+    }
+    DisplayItem::Line(line) if line.kind == super::LineKind::Stroke => {
+      (line.start, line.end, &line.stroke)
+    }
+    _ => return None,
+  };
+  if !stroke.width.0.is_finite()
+    || stroke.width.0 <= 0.0
+    || stroke.resolved_dash().is_some()
+    || !matches!(stroke.compound, None | Some(super::StrokeCompound::Single))
+    || stroke.head_end.is_some()
+    || stroke.tail_end.is_some()
+    || stroke.color.a == 0 && stroke.gradient.is_none() && stroke.pattern.is_none()
+    || ![start.x.0, start.y.0, end.x.0, end.y.0]
+      .iter()
+      .all(|v| v.is_finite())
+    || start == end
+  {
+    return None;
+  }
+  Some((start, end, stroke))
+}
+
+/// Orthogonal solid lines are realized on the actual balanced-blur surface,
+/// not a nominal-density image subsequently resized. The one-pixel pen is a
+/// device-space cosmetic stroke; wider pens retain their local geometric width.
+/// This owner is distinct from the sharp-shadow and image-reflection sources.
+pub(crate) fn rasterize_powerpoint_blurred_line_source(
+  items: &[DisplayItem<'static>],
+  output_bounds: Rect,
+  offset_pt: (f32, f32),
+  pixels_per_point: f32,
+) -> Option<(
+  DrawingRaster,
+  super::drawingml_image_effects::EffectRasterScale,
+)> {
+  use super::drawingml_device_stroke::{DeviceStrokeTransform, TransformPrecision};
+  let (start, end, stroke) = powerpoint_shadow_line(items)?;
+  if start.x != end.x && start.y != end.y
+    || stroke.gradient.is_some()
+    || stroke.pattern.is_some()
+    || !pixels_per_point.is_finite()
+    || pixels_per_point <= 0.0
+    || ![
+      output_bounds.origin.x.0,
+      output_bounds.origin.y.0,
+      output_bounds.size.width.0,
+      output_bounds.size.height.0,
+      offset_pt.0,
+      offset_pt.1,
+    ]
+    .iter()
+    .all(|value| value.is_finite())
+    || output_bounds.size.width.0 <= 0.0
+    || output_bounds.size.height.0 <= 0.0
+  {
+    return None;
+  }
+  let width = raster_pixel_extent(output_bounds.size.width.0, pixels_per_point);
+  let height = raster_pixel_extent(output_bounds.size.height.0, pixels_per_point);
+  if u64::from(width) * u64::from(height) > MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS as u64 {
+    return None;
+  }
+  // Recover the independently quantized printer edges before the f32 page
+  // representation loses their exact phase. The terminal half sample belongs
+  // to source coverage, not the smaller PDF placement rectangle.
+  let printer_edge = |value: f64| (value / 0.12).round() * 0.12;
+  let left = printer_edge(f64::from(output_bounds.origin.x.0));
+  let top = printer_edge(f64::from(output_bounds.origin.y.0));
+  let source_width =
+    printer_edge(f64::from(output_bounds.size.width.0) + 0.5 / f64::from(pixels_per_point));
+  let source_height =
+    printer_edge(f64::from(output_bounds.size.height.0) + 0.5 / f64::from(pixels_per_point));
+  if source_width <= 0.0 || source_height <= 0.0 {
+    return None;
+  }
+  let scale_x = f64::from(width) / source_width;
+  let scale_y = f64::from(height) / source_height;
+  // Native width realization rounds the completed EMU-to-device transform,
+  // not a nominal-DPI scale rounded before its unit conversion.
+  let authored_emu = (f64::from(stroke.width.0) * 12_700.0).round();
+  let pen_transform = DeviceStrokeTransform::new(
+    [scale_x / 12_700.0, 0.0, 0.0, scale_y / 12_700.0],
+    TransformPrecision::Paint,
+  )?;
+  let local_width = pen_transform.realize_width(authored_emu, true, 1.0, false)? / 12_700.0;
+  let cosmetic = (local_width * scale_x).round() == 1.0;
+  let vertical = start.x == end.x;
+  let normal_scale = if vertical { scale_x } else { scale_y };
+  let normal_width = if cosmetic {
+    1.0
+  } else {
+    (local_width * normal_scale) as f32
+  };
+  let (cap_scale_x, cap_scale_y) = if cosmetic {
+    (1.0, 1.0)
+  } else {
+    (
+      (scale_x / normal_scale) as f32,
+      (scale_y / normal_scale) as f32,
+    )
+  };
+  let mut device_stroke = stroke.clone();
+  device_stroke.width = Pt(normal_width);
+  let point = |p: super::Point| super::Point {
+    x: Pt(((f64::from(p.x.0) + f64::from(offset_pt.0) - left) * scale_x) as f32 / cap_scale_x),
+    y: Pt(((f64::from(p.y.0) + f64::from(offset_pt.1) - top) * scale_y) as f32 / cap_scale_y),
+  };
+  let line = DisplayItem::Line(super::LineItem {
+    start: point(start),
+    end: point(end),
+    stroke: device_stroke,
+    kind: super::LineKind::Stroke,
+  });
+  let mut image = RgbaImage::new(width, height);
+  let band_height = (262_144 / width.max(1)).clamp(1, 64);
+  for band_top in (0..height).step_by(band_height as usize) {
+    let band = rasterize_vector_items_at_mapping(
+      std::slice::from_ref(&line),
+      PageToRasterMapping {
+        width_px: width,
+        height_px: band_height.min(height - band_top),
+        scale_x: cap_scale_x,
+        scale_y: cap_scale_y,
+        translate_x: -0.5,
+        translate_y: -0.5 - band_top as f32,
+        text_hinting: None,
+      },
+      RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+    )?;
+    replace(&mut image, &band, 0, i64::from(band_top));
+  }
+  Some((
+    DrawingRaster {
+      image,
+      fill_image: None,
+      line_image: None,
+      fill_line_image: None,
+      children_image: None,
+      pixels_per_point,
+    },
+    super::drawingml_image_effects::EffectRasterScale {
+      x: (scale_x / f64::from(pixels_per_point)) as f32,
+      y: (scale_y / f64::from(pixels_per_point)) as f32,
+    },
+  ))
+}
+
+/// PowerPoint's sharp shape-shadow surface has an inclusive terminal sample,
+/// independently of the smaller rectangle used to place its PDF image. Paint
+/// into that source range, not an isotropic preview followed by image shifting.
+pub(crate) fn rasterize_powerpoint_sharp_shadow_source(
+  items: &[DisplayItem<'static>],
+  output_bounds: Rect,
+  offset_pt: (f32, f32),
+  pixels_per_point: f32,
+  snap_pen: bool,
+) -> Option<DrawingRaster> {
+  if !pixels_per_point.is_finite() || pixels_per_point <= 0.0 {
+    return None;
+  }
+  let width = raster_pixel_extent(output_bounds.size.width.0, pixels_per_point);
+  let height = raster_pixel_extent(output_bounds.size.height.0, pixels_per_point);
+  if u64::from(width) * u64::from(height) > MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS as u64 {
+    return None;
+  }
+  let scale_x = width as f32 / (output_bounds.size.width.0 + 0.5 / pixels_per_point);
+  let scale_y = height as f32 / (output_bounds.size.height.0 + 0.5 / pixels_per_point);
+  let mut realized_items = items.to_vec();
+  fn realize(items: &mut [DisplayItem<'static>], ppp: f32, snap: bool) -> Option<()> {
+    use super::drawingml_device_stroke::{DeviceStrokeTransform, TransformPrecision};
+    let transform = DeviceStrokeTransform::new(
+      [f64::from(ppp), 0.0, 0.0, f64::from(ppp)],
+      TransformPrecision::Paint,
+    )?;
+    for item in items {
+      let stroke = match item {
+        DisplayItem::Path(path) => path.stroke.as_mut(),
+        DisplayItem::Rect(rect) => rect.stroke.as_mut(),
+        DisplayItem::Line(line) => Some(&mut line.stroke),
+        DisplayItem::Group(group) => {
+          realize(&mut group.items, ppp, snap)?;
+          None
+        }
+        _ => None,
+      };
+      if let Some(stroke) = stroke {
+        stroke.width.0 =
+          transform.realize_width(f64::from(stroke.width.0), snap, 1.0, false)? as f32;
+      }
+    }
+    Some(())
+  }
+  realize(&mut realized_items, pixels_per_point, snap_pen)?;
+  let mut image = RgbaImage::new(width, height);
+  let band_height = (262_144 / width.max(1)).clamp(1, 64);
+  for top in (0..height).step_by(band_height as usize) {
+    let band = rasterize_vector_items_at_mapping(
+      &realized_items,
+      PageToRasterMapping {
+        width_px: width,
+        height_px: band_height.min(height - top),
+        scale_x,
+        scale_y,
+        // PixelOffsetModeHalf uses [0..7]/8 and [0..3]/4. Compensate
+        // the shared GDI+ integer-centered sample storage, as for text.
+        translate_x: -(output_bounds.origin.x.0 - offset_pt.0) * scale_x - 0.5,
+        translate_y: -(output_bounds.origin.y.0 - offset_pt.1) * scale_y - 0.5 - top as f32,
+        text_hinting: None,
+      },
+      RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+    )?;
+    replace(&mut image, &band, 0, i64::from(top));
+  }
+  Some(DrawingRaster {
+    image,
+    fill_image: None,
+    line_image: None,
+    fill_line_image: None,
+    children_image: None,
+    pixels_per_point,
+  })
 }
 
 /// Explicit page-to-device mapping for a fixed-output raster surface.
@@ -277,6 +583,266 @@ pub(crate) fn rasterize_vector_items_for_effects_at_pixels_per_point_with_extent
     extent,
     primitive_antialiasing,
   )
+}
+
+pub(crate) fn supports_powerpoint_blurred_vector_source(items: &[DisplayItem<'static>]) -> bool {
+  !items.is_empty()
+    && items.iter().all(|item| {
+      matches!(
+        item,
+        DisplayItem::Path(_) | DisplayItem::Rect(_) | DisplayItem::Line(_)
+      )
+    })
+}
+
+/// A blurred vector shape is sampled on its actual effect-device grid. Unlike
+/// the orthogonal line owner, wider geometric pens retain their authored width.
+pub(crate) fn rasterize_powerpoint_blurred_vector_source(
+  items: &[DisplayItem<'static>],
+  output_bounds: Rect,
+  offset_pt: (f32, f32),
+  pixels_per_point: f32,
+) -> Option<(
+  DrawingRaster,
+  super::drawingml_image_effects::EffectRasterScale,
+)> {
+  if !supports_powerpoint_blurred_vector_source(items)
+    || !pixels_per_point.is_finite()
+    || pixels_per_point <= 0.0
+    || !output_bounds.size.width.0.is_finite()
+    || !output_bounds.size.height.0.is_finite()
+    || output_bounds.size.width.0 <= 0.0
+    || output_bounds.size.height.0 <= 0.0
+    || ![
+      output_bounds.origin.x.0,
+      output_bounds.origin.y.0,
+      offset_pt.0,
+      offset_pt.1,
+    ]
+    .iter()
+    .all(|value| value.is_finite())
+  {
+    return None;
+  }
+  let width = raster_pixel_extent(output_bounds.size.width.0, pixels_per_point);
+  let height = raster_pixel_extent(output_bounds.size.height.0, pixels_per_point);
+  if u64::from(width) * u64::from(height) > MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS as u64 {
+    return None;
+  }
+  let scale_x = width as f32 / (output_bounds.size.width.0 + 0.5 / pixels_per_point);
+  let scale_y = height as f32 / (output_bounds.size.height.0 + 0.5 / pixels_per_point);
+  let mut realized = items.to_vec();
+  fn realize_minimum_width(items: &mut [DisplayItem<'static>], width: f32) {
+    for item in items {
+      let stroke = match item {
+        DisplayItem::Path(path) => path.stroke.as_mut(),
+        DisplayItem::Rect(rect) => rect.stroke.as_mut(),
+        DisplayItem::Line(line) => Some(&mut line.stroke),
+        DisplayItem::Group(group) => {
+          realize_minimum_width(&mut group.items, width);
+          None
+        }
+        _ => None,
+      };
+      if let Some(stroke) = stroke
+        && stroke.width.0.is_finite()
+        && stroke.width.0 >= 0.0
+        && stroke.width.0 < width
+      {
+        stroke.width.0 = width;
+      }
+    }
+  }
+  realize_minimum_width(&mut realized, 1.0 / scale_x);
+  let device = SkTransform::from_row(
+    scale_x,
+    0.0,
+    0.0,
+    scale_y,
+    -(output_bounds.origin.x.0 - offset_pt.0) * scale_x,
+    -(output_bounds.origin.y.0 - offset_pt.1) * scale_y,
+  );
+  let inverse = device.invert()?;
+  let mut paint_calls = Vec::new();
+  for item in realized {
+    match item {
+      DisplayItem::Path(mut path) => {
+        let transformed =
+          path_from_commands(&path.commands, &path.points, path.closed)?.transform(device)?;
+        let flattened =
+          super::drawingml_mil_raster::flatten_device_path_28_4(&tiny_path_as_kurbo(&transformed))?;
+        path.commands = flattened
+          .elements()
+          .iter()
+          .map(|element| {
+            let point = |point: kurbo::Point| {
+              let mut p = SkPoint::from_xy(point.x as f32, point.y as f32);
+              inverse.map_point(&mut p);
+              super::Point {
+                x: Pt(p.x),
+                y: Pt(p.y),
+              }
+            };
+            match *element {
+              kurbo::PathEl::MoveTo(p) => PathCommand::MoveTo(point(p)),
+              kurbo::PathEl::LineTo(p) => PathCommand::LineTo(point(p)),
+              kurbo::PathEl::ClosePath => PathCommand::Close,
+              _ => unreachable!("flattened paths have no curves"),
+            }
+          })
+          .collect();
+        let stroke = path.stroke.take();
+        if !matches!(path.fill, Fill::None) {
+          paint_calls.push(DisplayItem::Path(path.clone()));
+        }
+        if let Some(stroke) = stroke {
+          path.fill = Fill::None;
+          path.stroke = Some(stroke);
+          paint_calls.push(DisplayItem::Path(path));
+        }
+      }
+      DisplayItem::Rect(mut rect) => {
+        let stroke = rect.stroke.take();
+        if !matches!(rect.fill, Fill::None) {
+          paint_calls.push(DisplayItem::Rect(rect.clone()));
+        }
+        if let Some(stroke) = stroke {
+          rect.fill = Fill::None;
+          rect.stroke = Some(stroke);
+          paint_calls.push(DisplayItem::Rect(rect));
+        }
+      }
+      DisplayItem::Line(line) => paint_calls.push(DisplayItem::Line(line)),
+      _ => return None,
+    }
+  }
+  let mut image = RgbaImage::new(width, height);
+  let band_height = (262_144 / width.max(1)).clamp(1, 64);
+  for top in (0..height).step_by(band_height as usize) {
+    let mapping = PageToRasterMapping {
+      width_px: width,
+      height_px: band_height.min(height - top),
+      scale_x,
+      scale_y,
+      translate_x: -(output_bounds.origin.x.0 - offset_pt.0) * scale_x - 0.5,
+      translate_y: -(output_bounds.origin.y.0 - offset_pt.1) * scale_y - 0.5 - top as f32,
+      text_hinting: None,
+    };
+    let mut band = RgbaImage::new(width, mapping.height_px);
+    for call in &paint_calls {
+      let paint = rasterize_vector_items_at_mapping(
+        std::slice::from_ref(call),
+        mapping,
+        RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+      )?;
+      image::imageops::overlay(&mut band, &paint, 0, 0);
+    }
+    replace(&mut image, &band, 0, i64::from(top));
+  }
+  Some((
+    DrawingRaster {
+      image,
+      fill_image: None,
+      line_image: None,
+      fill_line_image: None,
+      children_image: None,
+      pixels_per_point,
+    },
+    super::drawingml_image_effects::EffectRasterScale {
+      x: scale_x / pixels_per_point,
+      y: scale_y / pixels_per_point,
+    },
+  ))
+}
+
+/// Realize a transformed backdrop directly in its output coordinate system.
+/// Keep native filtering to one source lookup rather than transforming an
+/// already sampled canvas. Blur-tier resolution follows the configured source;
+/// the allocated output dimensions own the physical mapping on each axis.
+pub(crate) fn rasterize_powerpoint_transformed_backdrop_source(
+  items: &[DisplayItem<'static>],
+  output_bounds: Rect,
+  transform: super::Transform,
+  source_pixels_per_point: f32,
+  target_pixels_per_point: f32,
+) -> Option<(
+  DrawingRaster,
+  super::drawingml_image_effects::EffectRasterScale,
+)> {
+  if items.iter().any(|item| !supported_raster_item(item))
+    || !source_pixels_per_point.is_finite()
+    || !target_pixels_per_point.is_finite()
+    || source_pixels_per_point <= 0.0
+    || target_pixels_per_point <= 0.0
+    || target_pixels_per_point > source_pixels_per_point
+    || !output_bounds.size.width.0.is_finite()
+    || !output_bounds.size.height.0.is_finite()
+    || output_bounds.size.width.0 <= 0.0
+    || output_bounds.size.height.0 <= 0.0
+  {
+    return None;
+  }
+  let target_width = raster_pixel_extent(output_bounds.size.width.0, target_pixels_per_point);
+  let target_height = raster_pixel_extent(output_bounds.size.height.0, target_pixels_per_point);
+  let divisor = source_pixels_per_point / target_pixels_per_point;
+  let width = (target_width as f32 * divisor).ceil() as u32;
+  let height = (target_height as f32 * divisor).ceil() as u32;
+  if u64::from(width) * u64::from(height) > MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS as u64 {
+    return None;
+  }
+  let mut pixmap = Pixmap::new(width, height)?;
+  // As with sharp shadows, the physical source window retains the terminal
+  // half sample removed from the PDF placement rectangle. The allocated
+  // image dimensions determine each axis scale independently.
+  let source_width_pt = output_bounds.size.width.0 + 0.5 / target_pixels_per_point;
+  let source_height_pt = output_bounds.size.height.0 + 0.5 / target_pixels_per_point;
+  let scale_x = target_width as f32 * divisor / source_width_pt;
+  let scale_y = target_height as f32 * divisor / source_height_pt;
+  let mapping = SkTransform::from_row(
+    transform.m11 * scale_x,
+    transform.m12 * scale_y,
+    transform.m21 * scale_x,
+    transform.m22 * scale_y,
+    (transform.dx.0 - output_bounds.origin.x.0) * scale_x,
+    (transform.dy.0 - output_bounds.origin.y.0) * scale_y,
+  );
+  let mut metrics = TextMetrics::new();
+  for item in items {
+    draw_display_item(
+      &mut pixmap,
+      item,
+      mapping,
+      None,
+      RasterPrimitiveAntialiasing::PerPrimitive,
+      &mut metrics,
+    )?;
+  }
+  let source = pixmap_into_rgba(pixmap)?;
+  let image = if source_pixels_per_point == target_pixels_per_point {
+    source
+  } else {
+    super::drawingml_image_effects::dpi_compensate_linear_hard(
+      &source,
+      source_pixels_per_point,
+      target_pixels_per_point,
+      target_width,
+      target_height,
+    )?
+  };
+  Some((
+    DrawingRaster {
+      image,
+      fill_image: None,
+      line_image: None,
+      fill_line_image: None,
+      children_image: None,
+      pixels_per_point: target_pixels_per_point,
+    },
+    super::drawingml_image_effects::EffectRasterScale {
+      x: scale_x / source_pixels_per_point,
+      y: scale_y / source_pixels_per_point,
+    },
+  ))
 }
 
 /// Realizes a vector effect input at one fixed-output density and resolves it
@@ -565,6 +1131,35 @@ fn realize_source_device_strokes(items: &mut [DisplayItem<'static>], dpi: f64) -
   Some(())
 }
 
+/// A Word shape shadow realizes an existing pen at no less than one pixel of
+/// the effect's output device, even when its source is painted at a higher
+/// density. Same-options Office controls at 96/48/24 DPI distinguish this
+/// minimum from both the base-surface pixel and an absent (`noFill`) pen.
+/// This does not implement the separate rounding of wider device pens.
+fn realize_word_shadow_minimum_strokes(items: &mut [DisplayItem<'static>], pixels_per_point: f32) {
+  let minimum_width = pixels_per_point.recip();
+  for item in items {
+    let stroke = match item {
+      DisplayItem::Path(path) => path.stroke.as_mut(),
+      DisplayItem::Rect(rect) => rect.stroke.as_mut(),
+      DisplayItem::Line(line) => Some(&mut line.stroke),
+      DisplayItem::Group(group) => {
+        // This rasterizer accepts only simple groups, with geometry already
+        // in page coordinates; transformed groups are rejected before drawing.
+        realize_word_shadow_minimum_strokes(&mut group.items, pixels_per_point);
+        None
+      }
+      _ => None,
+    };
+    if let Some(stroke) = stroke
+      && stroke.width.0.is_finite()
+      && stroke.width.0 >= 0.0
+    {
+      stroke.width.0 = stroke.width.0.max(minimum_width);
+    }
+  }
+}
+
 /// Rasterizes a standalone WordprocessingShape backdrop from its
 /// base-resolution source surface before resolving to the balanced-blur
 /// surface tier.
@@ -602,9 +1197,13 @@ pub(crate) fn rasterize_word_shape_effect_source_via_base_surface(
     WordShapeEffectSourceProfile::Glow => RasterPrimitiveAntialiasing::Aliased,
     WordShapeEffectSourceProfile::OuterShadow => RasterPrimitiveAntialiasing::PerPrimitive,
   };
+  let mut source_items = std::borrow::Cow::Borrowed(items);
+  if profile == WordShapeEffectSourceProfile::OuterShadow {
+    realize_word_shadow_minimum_strokes(source_items.to_mut(), target_pixels_per_point);
+  }
   let (mut source, _) =
     rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
-      items,
+      &source_items,
       base_surface_bounds,
       base_pixels_per_point,
       RasterSourceExtent::InclusiveFarEdge,
@@ -793,6 +1392,44 @@ pub(crate) fn rasterize_vector_items_for_effects_at_bounded_pixels_per_point(
     effects,
     max_pixels_per_point,
     RasterPrimitiveAntialiasing::PerPrimitive,
+  )
+}
+
+/// Fixed-output density is independent from the interactive preview budget.
+/// Keep the source origin/extent policy unchanged, with a separate allocation
+/// ceiling for unusually large authored canvases.
+pub(crate) fn rasterize_vector_items_for_effects_at_fixed_output_pixels_per_point(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  effects: &super::drawingml_image_effects::ImageEffectContainer,
+  requested_pixels_per_point: f32,
+) -> Option<DrawingRaster> {
+  if !requested_pixels_per_point.is_finite()
+    || requested_pixels_per_point <= 0.0
+    || !raster_bounds.size.width.0.is_finite()
+    || !raster_bounds.size.height.0.is_finite()
+    || raster_bounds.size.width.0 <= 0.0
+    || raster_bounds.size.height.0 <= 0.0
+  {
+    return None;
+  }
+  let pixels_per_point = effect_pixels_per_point_with_budget(
+    raster_bounds.size.width.0,
+    raster_bounds.size.height.0,
+    requested_pixels_per_point,
+    MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS,
+  )
+  .min(requested_pixels_per_point);
+  let width = raster_pixel_extent(raster_bounds.size.width.0, pixels_per_point);
+  let height = raster_pixel_extent(raster_bounds.size.height.0, pixels_per_point);
+  if u64::from(width) * u64::from(height) > MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS as u64 {
+    return None;
+  }
+  rasterize_vector_items_for_effects_at_pixels_per_point(
+    items,
+    raster_bounds,
+    effects,
+    pixels_per_point,
   )
 }
 
@@ -1770,6 +2407,117 @@ fn uniform_static_3d_text_paint_opacity(item: &TextRun<'static>) -> Option<f32> 
   Some(f32::from(color.a) / 255.0)
 }
 
+/// Retains normals of the actual painted source, including widened/dashed
+/// strokes. Coverage and projection still use the source raster. Sources with
+/// position-dependent opacity or compositing need their alpha boundary, not
+/// the union of opaque vector paths.
+pub(crate) fn static_3d_raster_source_boundary(
+  items: &[DisplayItem<'static>],
+  raster_bounds: Rect,
+  pixels_per_point: f32,
+) -> Option<super::drawingml_3d::RasterSourceBoundary> {
+  let mapping = SkTransform::from_row(
+    pixels_per_point,
+    0.0,
+    0.0,
+    pixels_per_point,
+    -raster_bounds.origin.x.0 * pixels_per_point,
+    -raster_bounds.origin.y.0 * pixels_per_point,
+  );
+  let mut boundary = super::drawingml_3d::RasterSourceBoundary::default();
+  for item in items {
+    let (path, fill, stroke) = match item {
+      DisplayItem::Path(item) => {
+        // Markers shorten the shaft and contribute separate painted shapes.
+        // Do not silently retain the unshortened centerline as their boundary.
+        if item.stroke.as_ref().is_some_and(|stroke| {
+          shortened_straight_stroke_path(item, stroke).is_some()
+            || !super::drawingml_stroke::stroke_end_marker_polygons(item, stroke).is_empty()
+            || !super::drawingml_stroke::stroked_open_arrow_markers(item, stroke).is_empty()
+        }) {
+          return None;
+        }
+        (
+          path_from_commands(&item.commands, &item.points, item.closed)?,
+          &item.fill,
+          item.stroke.as_ref(),
+        )
+      }
+      DisplayItem::Rect(item) => (
+        PathBuilder::from_rect(SkRect::from_xywh(
+          item.bounds.origin.x.0,
+          item.bounds.origin.y.0,
+          item.bounds.size.width.0,
+          item.bounds.size.height.0,
+        )?),
+        &item.fill,
+        item.stroke.as_ref(),
+      ),
+      DisplayItem::Line(item) => {
+        let mut builder = PathBuilder::new();
+        builder.move_to(item.start.x.0, item.start.y.0);
+        builder.line_to(item.end.x.0, item.end.y.0);
+        (builder.finish()?, &Fill::None, Some(&item.stroke))
+      }
+      DisplayItem::LinkArea(_) | DisplayItem::AnnotationHint(_) => continue,
+      _ => return None,
+    };
+    match fill {
+      Fill::None => {}
+      Fill::Solid(color) if color.a == 0 => {}
+      Fill::Solid(color) if color.a == 255 => boundary.push(
+        tiny_path_as_kurbo(&path.clone().transform(mapping)?),
+        FillRule::EvenOdd,
+      ),
+      _ => return None,
+    }
+    if let Some(stroke) = stroke {
+      if stroke.gradient.is_some() || stroke.pattern.is_some() {
+        return None;
+      }
+      if stroke.width.0 <= 0.0 || stroke.color.a == 0 {
+        continue;
+      }
+      if stroke.color.a != 255 {
+        return None;
+      }
+      let expanded = expanded_stroke_path(&path, &resolved_sk_stroke(stroke), mapping)?;
+      boundary.push(
+        tiny_path_as_kurbo(&expanded.transform(mapping)?),
+        FillRule::Winding,
+      );
+    }
+  }
+  (!boundary.is_empty()).then_some(boundary)
+}
+
+/// A picture's physical frame is independent of transparent texels and crop.
+/// An authored page-space clip, when present, supplies the geometry instead.
+pub(crate) fn static_3d_picture_frame(bounds: Rect, rotation_degrees: f32) -> Vec<PathCommand> {
+  let center_x = bounds.origin.x.0 + bounds.size.width.0 * 0.5;
+  let center_y = bounds.origin.y.0 + bounds.size.height.0 * 0.5;
+  let (sin, cos) = rotation_degrees.to_radians().sin_cos();
+  let mut commands = Vec::with_capacity(5);
+  for (index, (u, v)) in [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)]
+    .into_iter()
+    .enumerate()
+  {
+    let x = u * bounds.size.width.0;
+    let y = v * bounds.size.height.0;
+    let point = super::Point {
+      x: Pt(cos.mul_add(x, -sin * y) + center_x),
+      y: Pt(sin.mul_add(x, cos * y) + center_y),
+    };
+    commands.push(if index == 0 {
+      PathCommand::MoveTo(point)
+    } else {
+      PathCommand::LineTo(point)
+    });
+  }
+  commands.push(PathCommand::Close);
+  commands
+}
+
 pub(crate) fn static_3d_shape_geometry(
   commands: &[PathCommand],
   raster_bounds: Rect,
@@ -2035,7 +2783,21 @@ pub(crate) fn effect_pixels_per_point_with_max(
   height_pt: f32,
   max_pixels_per_point: f32,
 ) -> f32 {
-  (MAX_EFFECT_RASTER_PIXELS / (width_pt * height_pt))
+  effect_pixels_per_point_with_budget(
+    width_pt,
+    height_pt,
+    max_pixels_per_point,
+    MAX_EFFECT_RASTER_PIXELS,
+  )
+}
+
+fn effect_pixels_per_point_with_budget(
+  width_pt: f32,
+  height_pt: f32,
+  max_pixels_per_point: f32,
+  max_pixels: f32,
+) -> f32 {
+  (max_pixels / (width_pt * height_pt))
     .sqrt()
     .clamp(0.25, max_pixels_per_point.max(0.25))
 }
@@ -2050,17 +2812,42 @@ pub(crate) fn effect_pixels_per_point_with_max(
 /// clipped at the source edge.  The density is rechecked after alignment so
 /// the shared 250,000-pixel budget remains an actual upper bound.
 pub(crate) fn bounded_effect_raster_grid(bounds: Rect, max_pixels_per_point: f32) -> (Rect, f32) {
-  let mut pixels_per_point = effect_pixels_per_point_with_max(
+  effect_raster_grid_with_budget(bounds, max_pixels_per_point, MAX_EFFECT_RASTER_PIXELS)
+}
+
+/// Word's two-dimensional fixed-output effects retain their requested device
+/// density across the preview budget boundary. Twelve independently exported
+/// picture/shadow size controls retain 200 DPI above one million pixels. The
+/// larger cap here is our allocation safeguard, not an inferred Office limit.
+pub(crate) fn fixed_output_effect_raster_grid(
+  bounds: Rect,
+  max_pixels_per_point: f32,
+) -> (Rect, f32) {
+  effect_raster_grid_with_budget(
+    bounds,
+    max_pixels_per_point,
+    MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS,
+  )
+}
+
+fn effect_raster_grid_with_budget(
+  bounds: Rect,
+  max_pixels_per_point: f32,
+  max_pixels: f32,
+) -> (Rect, f32) {
+  let mut pixels_per_point = effect_pixels_per_point_with_budget(
     bounds.size.width.0,
     bounds.size.height.0,
     max_pixels_per_point,
+    max_pixels,
   );
   for _ in 0..3 {
     let aligned = align_rect_to_pixel_grid(bounds, pixels_per_point);
-    let bounded = effect_pixels_per_point_with_max(
+    let bounded = effect_pixels_per_point_with_budget(
       aligned.size.width.0,
       aligned.size.height.0,
       max_pixels_per_point,
+      max_pixels,
     )
     .min(pixels_per_point);
     if (bounded - pixels_per_point).abs() <= f32::EPSILON {
@@ -2183,6 +2970,59 @@ fn valid_raster_mapping(mapping: PageToRasterMapping) -> bool {
     && mapping.scale_y > 0.0
     && mapping.translate_x.is_finite()
     && mapping.translate_y.is_finite()
+}
+
+/// Resolve a complete, painter-ordered vector scene once, rather than resolving
+/// coverage independently for its adjoining faces. Independent source-over AA
+/// exposes the background at an otherwise completely covered internal edge.
+pub(crate) fn rasterize_vector_scene_at_mapping(
+  items: &[DisplayItem<'static>],
+  mapping: PageToRasterMapping,
+) -> Option<RgbaImage> {
+  if !valid_raster_mapping(mapping) || items.iter().any(|item| !supported_raster_item(item)) {
+    return None;
+  }
+  let mut pixmap = Pixmap::new(mapping.width_px, mapping.height_px)?;
+  let mut sums = vec![[0_u16; 4]; pixmap.pixels().len()];
+  let mut text_metrics = TextMetrics::new();
+  for (sample_x, sample_y) in super::drawingml_3d::DIRECT3D_STANDARD_8_SAMPLES {
+    pixmap.fill(SkColor::TRANSPARENT);
+    let transform = SkTransform::from_row(
+      mapping.scale_x,
+      0.0,
+      0.0,
+      mapping.scale_y,
+      mapping.translate_x + 0.5 - sample_x,
+      mapping.translate_y + 0.5 - sample_y,
+    );
+    for item in items {
+      draw_display_item(
+        &mut pixmap,
+        item,
+        transform,
+        mapping.text_hinting,
+        RasterPrimitiveAntialiasing::Aliased,
+        &mut text_metrics,
+      )?;
+    }
+    for (sum, pixel) in sums.iter_mut().zip(pixmap.data().as_chunks::<4>().0.iter()) {
+      for (total, value) in sum.iter_mut().zip(pixel) {
+        *total += u16::from(*value);
+      }
+    }
+  }
+  let mut output = RgbaImage::new(mapping.width_px, mapping.height_px);
+  for (pixel, sum) in output.pixels_mut().zip(sums) {
+    let alpha = u32::from(sum[3]);
+    if alpha == 0 {
+      continue;
+    }
+    for channel in 0..3 {
+      pixel[channel] = ((u32::from(sum[channel]) * 255 + alpha / 2) / alpha).min(255) as u8;
+    }
+    pixel[3] = ((alpha + 4) / 8) as u8;
+  }
+  Some(output)
 }
 
 /// Paints vectors on exactly the supplied lattice and primitive sample grid.
@@ -2839,7 +3679,16 @@ fn draw_image(
   .flatten()
   .map(|decoded| decoded.data);
   let source_data = raster_data.as_deref().unwrap_or(item.bytes.as_ref());
-  let source = image::load_from_memory(source_data).ok()?.to_rgba8();
+  // Fixed-output image effects must consume the same decoded JPEG samples
+  // as direct PDF pictures. The generic decoder uses a different IDCT;
+  // reflecting or blurring its RGB cannot recover the Office source plane.
+  let source = if let Some(rgb) = crate::render::jpeg_islow::decode_rgb(source_data) {
+    image::DynamicImage::ImageRgb8(rgb).to_rgba8()
+  } else if let Some(gray) = crate::render::jpeg_islow::decode_gray(source_data) {
+    image::DynamicImage::ImageLuma8(gray).to_rgba8()
+  } else {
+    image::load_from_memory(source_data).ok()?.to_rgba8()
+  };
   let crop = item.crop.unwrap_or_default();
   let visible_width = 1.0 - crop.left - crop.right;
   let visible_height = 1.0 - crop.top - crop.bottom;
@@ -3265,6 +4114,9 @@ fn draw_fill(
   page_to_raster: SkTransform,
   antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
+  if antialiasing == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
+    return draw_office_8x4_fill(pixmap, path, fill, bounds, commands, page_to_raster);
+  }
   if antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
     if matches!(fill, Fill::None) {
       return Some(());
@@ -3631,6 +4483,9 @@ fn draw_stroke(
   page_to_raster: SkTransform,
   antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
+  if antialiasing == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
+    return draw_office_8x4_stroke(pixmap, path, stroke, bounds, commands, page_to_raster);
+  }
   if antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4
     && stroke
       .drawingml_device
@@ -3975,17 +4830,58 @@ fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
 #[cfg(test)]
 mod tests {
   #[test]
+  fn vector_scene_resolves_shared_face_coverage_without_background_seams() {
+    let rect = |x, width, color| {
+      super::DisplayItem::Rect(super::RectItem {
+        bounds: crate::model::common_rect(x, 0.0, width, 4.0),
+        fill: super::Fill::Solid(color),
+        stroke: None,
+      })
+    };
+    let red = crate::model::common_rgb(crate::model::RgbColor { r: 255, g: 0, b: 0 }, 1.0);
+    let blue = crate::model::common_rgb(crate::model::RgbColor { r: 0, g: 0, b: 255 }, 1.0);
+    let items = [rect(0.0, 3.4, red), rect(3.4, 4.6, blue)];
+    let mapping = super::PageToRasterMapping {
+      width_px: 8,
+      height_px: 4,
+      scale_x: 1.0,
+      scale_y: 1.0,
+      translate_x: 0.0,
+      translate_y: 0.0,
+      text_hinting: None,
+    };
+    let image = super::rasterize_vector_scene_at_mapping(&items, mapping).unwrap();
+    assert!(image.pixels().all(|pixel| pixel[3] == 255));
+    assert!(image.get_pixel(3, 1)[0] > 0 && image.get_pixel(3, 1)[2] > 0);
+    let independent = super::rasterize_vector_items_at_mapping(
+      &items,
+      mapping,
+      super::RasterPrimitiveAntialiasing::PerPrimitive,
+    )
+    .unwrap();
+    assert!(independent.get_pixel(3, 1)[3] < 255);
+  }
+
+  #[test]
   fn material_texture_resolves_each_paint_before_source_over() {
     let mut result = tiny_skia::Pixmap::new(1, 2).unwrap();
     let mut samples = tiny_skia::Pixmap::new(8, 4).unwrap();
     // Half-covered opaque fill, then the same half-covered 60%-opaque
     // outline. Correlated sample composition would incorrectly give 128.
-    for pixel in samples.data_mut()[..16 * 4].chunks_exact_mut(4) {
+    for pixel in samples.data_mut()[..16 * 4]
+      .as_chunks_mut::<4>()
+      .0
+      .iter_mut()
+    {
       pixel.copy_from_slice(&[128, 64, 32, 255]);
     }
     super::composite_material_sample_band(&mut result, &samples, 1);
     assert_eq!(result.pixel(0, 1).unwrap().alpha(), 128);
-    for pixel in samples.data_mut()[..16 * 4].chunks_exact_mut(4) {
+    for pixel in samples.data_mut()[..16 * 4]
+      .as_chunks_mut::<4>()
+      .0
+      .iter_mut()
+    {
       pixel.copy_from_slice(&[120, 60, 12, 153]);
     }
     super::composite_material_sample_band(&mut result, &samples, 1);
@@ -4089,6 +4985,166 @@ mod tests {
   }
 
   #[test]
+  fn powerpoint_blurred_line_source_realizes_actual_grid_and_cosmetic_pen() {
+    use crate::common::drawingml_image_effects::EffectOutputBounds;
+    for (pen, expected) in [
+      (2.0, vec![0, 0, 64, 191, 0, 0]),
+      (2.25, vec![0, 0, 64, 191, 0, 0]),
+      (2.28, vec![0, 0, 255, 255, 0, 0]),
+      (3.75, vec![0, 0, 191, 255, 255, 0, 0]),
+      (6.0, vec![0, 0, 191, 255, 255, 255, 0, 0]),
+    ] {
+      for additional_distance in [0.0, 3.0, 15.0] {
+        let frame = rect(96.0, 252.0, 120.0, 0.0);
+        let item = DisplayItem::Line(crate::common::LineItem {
+          start: frame.origin,
+          end: Point {
+            x: Pt(216.0),
+            y: Pt(252.0),
+          },
+          kind: crate::common::LineKind::Stroke,
+          stroke: Stroke {
+            width: Pt(pen),
+            color: Color {
+              a: 255,
+              ..Default::default()
+            },
+            cap: Some(crate::common::StrokeCap::Flat),
+            ..Default::default()
+          },
+        });
+        let radius = 40000.0 / 12700.0;
+        let offset = 20000.0 / 12700.0 + additional_distance;
+        let ppp = 48.0 / 72.0;
+        let sample = super::office_shape_shadow_bitmap_sample_bounds(
+          frame,
+          EffectOutputBounds {
+            left_pt: -radius,
+            top_pt: offset - pen * 0.5 - radius,
+            right_pt: 120.0 + pen * 0.5 + radius,
+            bottom_pt: offset + pen * 0.5 + radius,
+          },
+          radius,
+          ppp,
+        );
+        let (raster, scale) =
+          super::rasterize_powerpoint_blurred_line_source(&[item], sample, (0.0, offset), ppp)
+            .unwrap();
+        let column = (0..raster.image.height())
+          .map(|y| raster.image.get_pixel(raster.image.width() / 2, y)[3])
+          .collect::<Vec<_>>();
+        assert_eq!(column, expected, "pen={pen} offset={offset}");
+        assert!(scale.x.is_finite() && scale.y.is_finite());
+      }
+    }
+  }
+
+  #[test]
+  fn powerpoint_sharp_shadow_source_keeps_inclusive_range_and_device_pen() {
+    use crate::common::drawingml_image_effects::EffectOutputBounds;
+    let ppp = 200.0 / 72.0;
+    for height in [30.0, 30.12] {
+      for width in [0.0, 0.72, 0.75] {
+        for offset in [0.0, 11.0 / 2.0_f32.sqrt()] {
+          let frame = rect(96.0, 120.0, 120.0, height);
+          let item = DisplayItem::Rect(RectItem {
+            bounds: frame,
+            fill: Fill::Solid(Color {
+              a: 255,
+              ..Default::default()
+            }),
+            stroke: (width > 0.0).then_some(Stroke {
+              width: Pt(width),
+              color: Color {
+                a: 255,
+                ..Default::default()
+              },
+              ..Default::default()
+            }),
+          });
+          let output = super::office_shape_shadow_bitmap_sample_bounds(
+            frame,
+            EffectOutputBounds {
+              left_pt: offset - width / 2.0,
+              top_pt: offset - width / 2.0,
+              right_pt: 120.0 + offset + width / 2.0,
+              bottom_pt: height + offset + width / 2.0,
+            },
+            0.0,
+            ppp,
+          );
+          let raster = super::rasterize_powerpoint_sharp_shadow_source(
+            &[item],
+            output,
+            (offset, offset),
+            ppp,
+            true,
+          )
+          .unwrap();
+          let image = raster.image;
+          let (w, h) = image.dimensions();
+          assert_eq!((w, h), if width == 0.0 { (334, 84) } else { (336, 86) });
+          assert_eq!(image.get_pixel(w / 2, 0)[3], 128);
+          assert_eq!(image.get_pixel(w / 2, h - 1)[3], 191);
+          assert!((1..h - 1).all(|y| image.get_pixel(w / 2, y)[3] == 255));
+          assert_eq!(image.get_pixel(0, h / 2)[3], 159);
+          assert_eq!(
+            image.get_pixel(w - 1, h / 2)[3],
+            if offset == 0.0 { 191 } else { 159 }
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn powerpoint_reflection_source_retains_terminal_half_sample_on_each_axis() {
+    for (width, height, divisor, dimensions) in [
+      (84.345, 77.865, 1.0, (113, 104)),
+      (85.545, 79.065, 1.0, (115, 106)),
+      (89.970, 83.490, 2.0, (60, 56)),
+      (95.595, 89.115, 3.0, (43, 40)),
+    ] {
+      let nominal = 96.0 / 72.0 / divisor;
+      let (raster, scale) = super::rasterize_powerpoint_transformed_backdrop_source(
+        &[],
+        rect(0.0, 0.0, width, height),
+        crate::common::Transform::default(),
+        96.0 / 72.0,
+        nominal,
+      )
+      .unwrap();
+      assert_eq!(raster.image.dimensions(), dimensions);
+      assert!((scale.x * nominal * (width + 0.5 / nominal) - dimensions.0 as f32).abs() < 0.0001);
+      assert!((scale.y * nominal * (height + 0.5 / nominal) - dimensions.1 as f32).abs() < 0.0001);
+    }
+    assert!(
+      super::rasterize_powerpoint_transformed_backdrop_source(
+        &[],
+        rect(0.0, 0.0, 100000.0, 100000.0),
+        crate::common::Transform::default(),
+        96.0 / 72.0,
+        96.0 / 72.0,
+      )
+      .is_none()
+    );
+  }
+
+  #[test]
+  fn powerpoint_sharp_shadow_rejects_unbounded_source_allocation() {
+    assert!(
+      super::rasterize_powerpoint_sharp_shadow_source(
+        &[],
+        rect(0.0, 0.0, 1_000_000.0, 1_000_000.0),
+        (0.0, 0.0),
+        200.0 / 72.0,
+        true,
+      )
+      .is_none()
+    );
+  }
+
+  #[test]
   fn text_raster_fill_uses_word_focus_and_farthest_container_corner() {
     let bounds = rect(20.0, 30.0, 100.0, 50.0);
     let mut fill = Fill::Gradient(GradientFill {
@@ -4130,6 +5186,107 @@ mod tests {
     let large = effect_pixels_per_point_with_max(500.0, 500.0, 200.0 / 72.0);
     assert!(large < 200.0 / 72.0);
     assert!(500.0 * 500.0 * large * large <= MAX_EFFECT_RASTER_PIXELS + 1.0);
+  }
+
+  #[test]
+  fn fixed_output_effect_grid_does_not_inherit_the_preview_budget() {
+    let density = 200.0 / 72.0;
+    for scale in [0.25, 0.4, 0.5, 0.75, 1.0, 1.25] {
+      for shadow_scale in [1.0, 2.0] {
+        let bounds = rect(
+          70.85,
+          70.85,
+          246.75 * scale * shadow_scale,
+          139.5 * scale * shadow_scale,
+        );
+        let (aligned, actual) = super::fixed_output_effect_raster_grid(bounds, density);
+        assert_eq!(actual, density);
+        assert_eq!(aligned, super::align_rect_to_pixel_grid(bounds, density));
+      }
+    }
+    // The caller's actual blur/output tier still owns the upper density.
+    let (_, blurred) = super::fixed_output_effect_raster_grid(rect(0.0, 0.0, 500.0, 500.0), 0.5);
+    assert_eq!(blurred, 0.5);
+    // Allocation protection is independent of that tier; it is not removed.
+    let (large, capped) =
+      super::fixed_output_effect_raster_grid(rect(0.0, 0.0, 4000.0, 4000.0), density);
+    assert!(capped < density);
+    assert!(
+      large.size.width.0 * large.size.height.0 * capped * capped
+        <= super::MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS + 1.0
+    );
+  }
+
+  #[test]
+  fn fixed_output_source_density_survives_preview_budget_boundary() {
+    let effects = super::super::drawingml_image_effects::ImageEffectContainer {
+      kind: super::super::drawingml_image_effects::ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+    for density in [96.0 / 72.0, 200.0 / 72.0] {
+      for size in [100.0, 400.0] {
+        let raster = super::rasterize_vector_items_for_effects_at_fixed_output_pixels_per_point(
+          &[],
+          rect(3.25, 7.5, size, size),
+          &effects,
+          density,
+        )
+        .unwrap();
+        assert_eq!(raster.pixels_per_point, density);
+        let extent = super::raster_pixel_extent(size, density);
+        assert_eq!(raster.image.dimensions(), (extent, extent));
+        let requested = rect(3.25, 7.5, size, size);
+        let displayed = raster.bounds_at_pixel_density(requested.origin);
+        assert_eq!(displayed.origin, requested.origin);
+        assert!((displayed.size.width.0 * density - extent as f32).abs() < 0.001);
+        assert!((displayed.size.height.0 * density - extent as f32).abs() < 0.001);
+        assert!(displayed.size.width.0 + 0.0001 >= size);
+        assert!(displayed.size.width.0 < size + 1.0 / density + 0.0001);
+      }
+    }
+    for (size, density) in [
+      (1.0e9, 200.0 / 72.0),
+      (10.0, f32::NAN),
+      (10.0, 0.0),
+      (f32::INFINITY, 1.0),
+    ] {
+      assert!(
+        super::rasterize_vector_items_for_effects_at_fixed_output_pixels_per_point(
+          &[],
+          rect(0.0, 0.0, size, size),
+          &effects,
+          density,
+        )
+        .is_none()
+      );
+    }
+  }
+
+  #[test]
+  fn uniform_raster_display_does_not_compress_fractional_requested_extents() {
+    for density in [96.0 / 72.0, 200.0 / 72.0] {
+      for width in [29.999, 30.0, 30.001, 248.44318] {
+        let requested = rect(-7.25, 155.90796, width, 143.23581);
+        let raster = super::rasterize_vector_items_for_effects_at_fixed_output_pixels_per_point(
+          &[],
+          requested,
+          &super::super::drawingml_image_effects::ImageEffectContainer {
+            kind: super::super::drawingml_image_effects::ImageEffectContainerKind::Sibling,
+            effects: Vec::new(),
+          },
+          density,
+        )
+        .unwrap();
+        let displayed = raster.bounds_at_pixel_density(requested.origin);
+        assert_eq!(displayed.origin, requested.origin);
+        for (physical, pixels) in [
+          (displayed.size.width.0, raster.image.width()),
+          (displayed.size.height.0, raster.image.height()),
+        ] {
+          assert!((physical / pixels as f32 - 1.0 / density).abs() < 0.000001);
+        }
+      }
+    }
   }
 
   #[test]
@@ -4476,6 +5633,179 @@ mod tests {
   }
 
   #[test]
+  fn word_shadow_minimum_pen_uses_output_density_without_changing_foreground() {
+    for dpi in [96.0, 48.0, 24.0] {
+      let minimum = 72.0 / dpi;
+      for width in [0.0, 0.25, 0.75, 1.5, 3.0, 5.0] {
+        let original = DisplayItem::Rect(RectItem {
+          bounds: rect(2.0, 2.0, 8.0, 6.0),
+          fill: Fill::None,
+          stroke: Some(Stroke {
+            width: Pt(width),
+            color: Color {
+              a: 255,
+              ..Color::default()
+            },
+            ..Stroke::default()
+          }),
+        });
+        let mut source = vec![original.clone()];
+        super::realize_word_shadow_minimum_strokes(&mut source, dpi / 72.0);
+        let DisplayItem::Rect(actual) = &source[0] else {
+          unreachable!()
+        };
+        assert_eq!(actual.stroke.as_ref().unwrap().width.0, width.max(minimum));
+        let DisplayItem::Rect(original) = original else {
+          unreachable!()
+        };
+        assert_eq!(original.stroke.unwrap().width.0, width);
+      }
+    }
+    let mut no_line = [DisplayItem::Rect(RectItem {
+      bounds: rect(2.0, 2.0, 8.0, 6.0),
+      fill: Fill::None,
+      stroke: None,
+    })];
+    super::realize_word_shadow_minimum_strokes(&mut no_line, 48.0 / 72.0);
+    let DisplayItem::Rect(actual) = &no_line[0] else {
+      unreachable!()
+    };
+    assert!(actual.stroke.is_none());
+  }
+
+  #[test]
+  fn word_shadow_source_keeps_zero_pen_distinct_from_no_pen() {
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+    let surface = rect(0.0, 0.0, 18.0, 16.0);
+    let content = rect(4.0, 4.0, 8.0, 6.0);
+    let raster = |profile, width: Option<f32>, target_pixels_per_point| {
+      let item = DisplayItem::Rect(RectItem {
+        bounds: content,
+        fill: Fill::None,
+        stroke: width.map(|width| Stroke {
+          width: Pt(width),
+          color: Color {
+            a: 255,
+            ..Color::default()
+          },
+          ..Stroke::default()
+        }),
+      });
+      rasterize_word_shape_effect_source_via_base_surface(
+        &[item],
+        &effects,
+        super::WordShapeEffectSurface {
+          profile,
+          base_bounds: surface,
+          content_bounds: content,
+          base_pixels_per_point: 96.0 / 72.0,
+          target_width_px: super::inclusive_far_edge_raster_pixel_extent(
+            surface.size.width.0,
+            target_pixels_per_point,
+          ),
+          target_height_px: super::inclusive_far_edge_raster_pixel_extent(
+            surface.size.height.0,
+            target_pixels_per_point,
+          ),
+          target_pixels_per_point,
+        },
+      )
+      .unwrap()
+      .image
+    };
+    for dpi in [96.0, 48.0, 24.0] {
+      let scale = dpi / 72.0;
+      let zero = raster(WordShapeEffectSourceProfile::OuterShadow, Some(0.0), scale);
+      let hairline = raster(
+        WordShapeEffectSourceProfile::OuterShadow,
+        Some(72.0 / dpi),
+        scale,
+      );
+      let absent = raster(WordShapeEffectSourceProfile::OuterShadow, None, scale);
+      assert_eq!(zero, hairline);
+      assert!(zero.pixels().any(|pixel| pixel[3] != 0));
+      assert!(absent.pixels().all(|pixel| pixel[3] == 0));
+      assert!(
+        raster(WordShapeEffectSourceProfile::Glow, Some(0.0), scale)
+          .pixels()
+          .all(|pixel| pixel[3] == 0)
+      );
+    }
+  }
+
+  #[test]
+  fn powerpoint_blurred_vector_source_keeps_pen_presence_and_device_minimum() {
+    let surface = rect(0.0, 0.0, 8.25, 8.25);
+    let sample = |width: Option<f32>| {
+      DisplayItem::Rect(RectItem {
+        bounds: rect(2.25, 2.25, 3.0, 3.0),
+        fill: Fill::Solid(Color {
+          r: 0,
+          g: 0,
+          b: 0,
+          a: 255,
+        }),
+        stroke: width.map(|width| Stroke {
+          width: Pt(width),
+          color: Color {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 255,
+          },
+          ..Default::default()
+        }),
+      })
+    };
+    let render = |item: &DisplayItem<'static>, bounds, offset, density| {
+      super::rasterize_powerpoint_blurred_vector_source(
+        std::slice::from_ref(item),
+        bounds,
+        offset,
+        density,
+      )
+    };
+    let zero = sample(Some(0.0));
+    let thin = sample(Some(0.25));
+    let zero_image = render(&zero, surface, (0.0, 0.0), 1.0).unwrap().0.image;
+    let thin_image = render(&thin, surface, (0.0, 0.0), 1.0).unwrap().0.image;
+    assert_eq!(zero_image, thin_image);
+    assert_ne!(
+      thin_image,
+      render(&sample(None), surface, (0.0, 0.0), 1.0)
+        .unwrap()
+        .0
+        .image
+    );
+    assert_ne!(
+      thin_image,
+      render(&sample(Some(2.0)), surface, (0.0, 0.0), 1.0)
+        .unwrap()
+        .0
+        .image
+    );
+    assert_eq!(
+      thin_image,
+      render(&thin, rect(1.0, 2.0, 8.25, 8.25), (1.0, 2.0), 1.0)
+        .unwrap()
+        .0
+        .image
+    );
+    let DisplayItem::Rect(original) = thin else {
+      unreachable!()
+    };
+    assert_eq!(original.stroke.unwrap().width, Pt(0.25));
+    for invalid in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+      assert!(render(&zero, surface, (0.0, 0.0), invalid).is_none());
+    }
+    assert!(render(&zero, surface, (f32::NAN, 0.0), 1.0).is_none());
+    assert!(render(&zero, rect(0.0, 0.0, 100_000.0, 100_000.0), (0.0, 0.0), 1.0).is_none());
+  }
+
+  #[test]
   fn word_shape_glow_and_shadow_keep_independent_primitive_coverage() {
     let surface = rect(0.0, 0.0, 4.0, 3.0);
     let content = rect(0.2, 0.2, 2.5, 1.5);
@@ -4676,6 +6006,20 @@ mod tests {
       // the bounded 32-sample coverage grid used here.
       [0, 255, 255, 0, 112, 255, 255, 104]
     );
+  }
+
+  #[test]
+  fn static_3d_picture_frame_retains_rectangular_surface_and_rotation() {
+    for (angle, expected) in [(0.0, (10.0, 20.0)), (90.0, (25.0, 15.0))] {
+      let path = super::static_3d_picture_frame(rect(10.0, 20.0, 20.0, 10.0), angle);
+      assert_eq!(path.len(), 5);
+      assert_eq!(path[4], PathCommand::Close);
+      let PathCommand::MoveTo(first) = path[0] else {
+        panic!("closed frame starts with MoveTo")
+      };
+      assert!((first.x.0 - expected.0).abs() < 0.0001);
+      assert!((first.y.0 - expected.1).abs() < 0.0001);
+    }
   }
 
   #[test]
@@ -5186,6 +6530,60 @@ mod tests {
     assert_eq!(
       super::uniform_fill_opacity(&Fill::Gradient(GradientFill::default())),
       None
+    );
+  }
+
+  #[test]
+  fn source_boundary_uses_widened_strokes_and_source_coordinates() {
+    for density in [1.0, 96.0 / 72.0, 200.0 / 72.0] {
+      for fill in [
+        Fill::None,
+        Fill::Solid(Color {
+          a: 255,
+          ..Color::default()
+        }),
+      ] {
+        let item = DisplayItem::Rect(RectItem {
+          bounds: rect(10.0, 20.0, 12.0, 8.0),
+          fill: fill.clone(),
+          stroke: Some(Stroke {
+            width: Pt(2.0),
+            color: Color {
+              a: 255,
+              ..Color::default()
+            },
+            ..Stroke::default()
+          }),
+        });
+        let boundary =
+          super::static_3d_raster_source_boundary(&[item], rect(8.0, 18.0, 16.0, 12.0), density)
+            .unwrap();
+        assert_eq!(
+          boundary.normal_at((density - 0.2, 5.0 * density), [-1.0, 0.0]),
+          Some([-1.0, 0.0])
+        );
+        let inside = boundary.normal_at((3.0 * density + 0.2, 5.0 * density), [1.0, 0.0]);
+        assert_eq!(
+          inside,
+          if matches!(fill, Fill::None) {
+            Some([1.0, 0.0])
+          } else {
+            None
+          }
+        );
+      }
+    }
+    let translucent = DisplayItem::Rect(RectItem {
+      bounds: rect(0.0, 0.0, 10.0, 10.0),
+      fill: Fill::Solid(Color {
+        a: 128,
+        ..Color::default()
+      }),
+      stroke: None,
+    });
+    assert!(
+      super::static_3d_raster_source_boundary(&[translucent], rect(0.0, 0.0, 10.0, 10.0), 1.0)
+        .is_none()
     );
   }
 

@@ -1,6 +1,7 @@
 use kurbo::{
-  Arc, BezPath, Cap as KurboCap, CubicBez, Join as KurboJoin, PathEl, Point, Shape,
-  Stroke as KurboStroke, StrokeOpts, Vec2, flatten, offset::offset_cubic, stroke as expand_stroke,
+  Arc, BezPath, Cap as KurboCap, CubicBez, Join as KurboJoin, ParamCurve, ParamCurveArclen, PathEl,
+  PathSeg, Point, Shape, Stroke as KurboStroke, StrokeOpts, Vec2, offset::offset_cubic,
+  stroke as expand_stroke,
 };
 use skrifa::{
   FontRef, GlyphId, MetadataProvider,
@@ -14,7 +15,7 @@ use crate::error::{PdfError, Result};
 use ooxmlsdk_layout::common;
 
 const SYNTHETIC_ITALIC_SHEAR: f32 = 1.0 / 3.0;
-const TEXT_WARP_FLATTEN_TOLERANCE_PT: f64 = 0.2;
+const TEXT_WARP_ARCLEN_ACCURACY_PT: f64 = 0.0001;
 const GLYPH_STROKE_EXPANSION_TOLERANCE_PT: f64 = 0.02;
 
 #[derive(Clone, Copy, Debug)]
@@ -718,7 +719,7 @@ pub(super) fn build_glyph_outline_path(
       warp
         .boundaries
         .iter()
-        .map(|commands| flatten_text_warp_boundary(commands))
+        .map(|commands| TextWarpBoundary::new(commands))
         .collect::<Result<Vec<_>>>()
     })
     .transpose()?;
@@ -727,6 +728,10 @@ pub(super) fn build_glyph_outline_path(
       "outlined glyph text warp has no usable boundary".to_string(),
     ));
   }
+  let source_seams = match (warp, warp_boundaries.as_deref()) {
+    (Some(warp), Some(boundaries)) => text_warp_source_seams(warp, boundaries),
+    _ => Vec::new(),
+  };
 
   let mut commands = Vec::new();
   let mut cursor_x_pt =
@@ -758,16 +763,19 @@ pub(super) fn build_glyph_outline_path(
 
     let origin_x_pt = cursor_x_pt + glyph.x_offset * run.font_size_pt * placement.horizontal_scale;
     let origin_y_pt = cursor_y_pt - glyph.y_offset * run.font_size_pt * placement.vertical_scale;
-    let map = |point: kurbo::Point| {
+    let glyph_to_page = |point: kurbo::Point| {
       let design_x = if run.font_face.synthetic_italic {
         point.x + point.y * f64::from(SYNTHETIC_ITALIC_SHEAR)
       } else {
         point.x
       };
-      let point = kurbo::Point::new(
+      kurbo::Point::new(
         f64::from(origin_x_pt) + design_x * f64::from(design_scale * placement.horizontal_scale),
         f64::from(origin_y_pt) - point.y * f64::from(design_scale * placement.vertical_scale),
-      );
+      )
+    };
+    let map = |point: kurbo::Point| {
+      let point = glyph_to_page(point);
       if let (Some(warp), Some(boundaries)) = (warp, warp_boundaries.as_deref()) {
         text_warp_point(warp, boundaries, point)
       } else if let Some(transform) = transform {
@@ -776,11 +784,131 @@ pub(super) fn build_glyph_outline_path(
         point
       }
     };
-    append_mapped_outline(&raw.path, map, &mut commands)?;
+    let split = split_outline_at_warp_seams(&raw.path, glyph_to_page, &source_seams);
+    append_mapped_outline(split.as_ref().unwrap_or(&raw.path), map, &mut commands)?;
     advance_cursor(&mut cursor_x_pt, &mut cursor_y_pt, glyph, run, placement);
   }
 
   Ok(DirectOutlinePath { commands })
+}
+
+fn text_warp_source_seams(warp: &common::TextWarp, boundaries: &[TextWarpBoundary]) -> Vec<f64> {
+  let mut seams = Vec::new();
+  for boundary in boundaries {
+    if boundary.total <= f64::EPSILON {
+      continue;
+    }
+    for &end in &boundary.ends[..boundary.ends.len() - 1] {
+      let fraction = end / boundary.total;
+      if fraction > 0.0 && fraction < 1.0 {
+        seams.push(
+          f64::from(warp.source_bounds.origin.x.0)
+            + fraction * f64::from(warp.source_bounds.size.width.0),
+        );
+      }
+    }
+  }
+  seams.sort_by(f64::total_cmp);
+  seams.dedup_by(|a, b| (*a - *b).abs() < TEXT_WARP_ARCLEN_ACCURACY_PT);
+  seams
+}
+
+/// Office splits the original glyph geometry at the joins of an envelope's
+/// boundary segments. Mapping one unsplit segment across that join replaces
+/// the piecewise deformation with a different curve. Keep quadratics quadratic
+/// until after the warp, and retain untouched outlines byte-for-byte.
+fn split_outline_at_warp_seams(
+  path: &BezPath,
+  glyph_to_page: impl Fn(Point) -> Point,
+  seams: &[f64],
+) -> Option<BezPath> {
+  if seams.is_empty() {
+    return None;
+  }
+  let mut result = None;
+  let mut current = Point::ZERO;
+  let mut start = Point::ZERO;
+  for (index, &element) in path.elements().iter().enumerate() {
+    let segment = match element {
+      PathEl::MoveTo(point) => {
+        current = point;
+        start = point;
+        None
+      }
+      PathEl::LineTo(end) => Some(PathSeg::Line(kurbo::Line::new(current, end))),
+      PathEl::QuadTo(control, end) => {
+        Some(PathSeg::Quad(kurbo::QuadBez::new(current, control, end)))
+      }
+      PathEl::CurveTo(a, b, end) => Some(PathSeg::Cubic(CubicBez::new(current, a, b, end))),
+      PathEl::ClosePath => Some(PathSeg::Line(kurbo::Line::new(current, start))),
+    };
+    let mut cuts = Vec::new();
+    if let Some(segment) = segment {
+      let x = |point| glyph_to_page(point).x;
+      let (coefficients, min, max) = match segment {
+        PathSeg::Line(line) => {
+          let (a, b) = (x(line.p0), x(line.p1));
+          ([a, b - a, 0.0, 0.0], a.min(b), a.max(b))
+        }
+        PathSeg::Quad(quad) => {
+          let (a, b, c) = (x(quad.p0), x(quad.p1), x(quad.p2));
+          (
+            [a, 2.0 * (b - a), a - 2.0 * b + c, 0.0],
+            a.min(b).min(c),
+            a.max(b).max(c),
+          )
+        }
+        PathSeg::Cubic(cubic) => {
+          let (a, b, c, d) = (x(cubic.p0), x(cubic.p1), x(cubic.p2), x(cubic.p3));
+          (
+            [
+              a,
+              3.0 * (b - a),
+              3.0 * (a - 2.0 * b + c),
+              d - a + 3.0 * (b - c),
+            ],
+            a.min(b).min(c).min(d),
+            a.max(b).max(c).max(d),
+          )
+        }
+      };
+      for &seam in seams {
+        if seam <= min || seam >= max {
+          continue;
+        }
+        cuts.extend(
+          kurbo::common::solve_cubic(
+            coefficients[0] - seam,
+            coefficients[1],
+            coefficients[2],
+            coefficients[3],
+          )
+          .into_iter()
+          .filter(|&t| t > 1e-9 && t < 1.0 - 1e-9),
+        );
+      }
+      current = segment.end();
+      cuts.sort_by(f64::total_cmp);
+      cuts.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+      if !cuts.is_empty() {
+        let result =
+          result.get_or_insert_with(|| BezPath::from_vec(path.elements()[..index].to_vec()));
+        let mut from = 0.0;
+        for to in cuts.into_iter().chain(std::iter::once(1.0)) {
+          result.push(segment.subsegment(from..to).as_path_el());
+          from = to;
+        }
+        if element == PathEl::ClosePath {
+          result.close_path();
+        }
+        continue;
+      }
+    }
+    if let Some(result) = &mut result {
+      result.push(element);
+    }
+  }
+  result
 }
 
 fn validate_placement(placement: GlyphOutlinePlacement) -> Result<()> {
@@ -937,43 +1065,65 @@ fn transform_point(transform: common::Transform, point: kurbo::Point) -> kurbo::
   )
 }
 
-fn flatten_text_warp_boundary(commands: &[common::PathCommand]) -> Result<Vec<kurbo::Point>> {
-  let elements = commands.iter().map(|command| match *command {
-    common::PathCommand::MoveTo(point) => PathEl::MoveTo(common_point(point)),
-    common::PathCommand::LineTo(point) => PathEl::LineTo(common_point(point)),
-    common::PathCommand::CubicTo {
-      control1,
-      control2,
-      end,
-    } => PathEl::CurveTo(
-      common_point(control1),
-      common_point(control2),
-      common_point(end),
-    ),
-    common::PathCommand::Close => PathEl::ClosePath,
-  });
-  let mut points = Vec::new();
-  flatten(
-    elements,
-    TEXT_WARP_FLATTEN_TOLERANCE_PT,
-    |element| match element {
-      PathEl::MoveTo(point) | PathEl::LineTo(point) => points.push(point),
-      PathEl::ClosePath => {}
-      PathEl::QuadTo(_, _) | PathEl::CurveTo(_, _, _) => {
-        unreachable!("kurbo::flatten only emits line path elements")
-      }
-    },
-  );
-  if points.len() < 2
-    || points
+/// A DrawingML envelope is sampled by distance along its original curves, not
+/// along coarse chords. Keep segment lengths once per run; mapping each glyph
+/// control point then needs only a segment lookup and inverse arc length.
+struct TextWarpBoundary {
+  segments: Vec<PathSeg>,
+  ends: Vec<f64>,
+  total: f64,
+}
+
+impl TextWarpBoundary {
+  fn new(commands: &[common::PathCommand]) -> Result<Self> {
+    let path = common_commands_to_bez_path(commands);
+    if !path.is_finite() {
+      return Err(PdfError::Writer(
+        "outlined glyph text warp has an invalid boundary".to_string(),
+      ));
+    }
+    let segments: Vec<_> = path.segments().collect();
+    if segments.is_empty() {
+      return Err(PdfError::Writer(
+        "outlined glyph text warp has no boundary segments".to_string(),
+      ));
+    }
+    let accuracy = TEXT_WARP_ARCLEN_ACCURACY_PT / segments.len() as f64;
+    let mut total = 0.0;
+    let ends = segments
       .iter()
-      .any(|point| !point.x.is_finite() || !point.y.is_finite())
-  {
-    return Err(PdfError::Writer(
-      "outlined glyph text warp has an invalid boundary".to_string(),
-    ));
+      .map(|segment| {
+        total += segment.arclen(accuracy);
+        total
+      })
+      .collect();
+    Ok(Self {
+      segments,
+      ends,
+      total,
+    })
   }
-  Ok(points)
+
+  fn sample(&self, position: f64) -> Point {
+    if self.total <= f64::EPSILON || position <= 0.0 {
+      return self.segments[0].start();
+    }
+    if position >= 1.0 {
+      return self.segments.last().expect("validated boundary").end();
+    }
+    let target = position.clamp(0.0, 1.0) * self.total;
+    let index = self
+      .ends
+      .partition_point(|&end| end < target)
+      .min(self.segments.len() - 1);
+    let start = if index == 0 {
+      0.0
+    } else {
+      self.ends[index - 1]
+    };
+    let segment = &self.segments[index];
+    segment.eval(segment.inv_arclen(target - start, TEXT_WARP_ARCLEN_ACCURACY_PT))
+  }
 }
 
 fn common_point(point: common::Point) -> kurbo::Point {
@@ -982,7 +1132,7 @@ fn common_point(point: common::Point) -> kurbo::Point {
 
 fn text_warp_point(
   warp: &common::TextWarp,
-  boundaries: &[Vec<kurbo::Point>],
+  boundaries: &[TextWarpBoundary],
   point: kurbo::Point,
 ) -> kurbo::Point {
   let source = warp.source_bounds;
@@ -994,14 +1144,14 @@ fn text_warp_point(
     let grid_position = v * (boundaries.len() - 1) as f64;
     let upper_index = (grid_position.floor() as usize).min(boundaries.len() - 2);
     let local_v = (grid_position - upper_index as f64).clamp(0.0, 1.0);
-    let upper = sample_text_warp_boundary(&boundaries[upper_index], u);
-    let lower = sample_text_warp_boundary(&boundaries[upper_index + 1], u);
+    let upper = boundaries[upper_index].sample(u);
+    let lower = boundaries[upper_index + 1].sample(u);
     return upper + (lower - upper) * local_v;
   }
 
-  let center = sample_text_warp_boundary(&boundaries[0], u);
-  let before = sample_text_warp_boundary(&boundaries[0], (u - 0.001).max(0.0));
-  let after = sample_text_warp_boundary(&boundaries[0], (u + 0.001).min(1.0));
+  let center = boundaries[0].sample(u);
+  let before = boundaries[0].sample((u - 0.001).max(0.0));
+  let after = boundaries[0].sample((u + 0.001).min(1.0));
   let tangent = after - before;
   let length = tangent.hypot();
   if length <= f64::EPSILON {
@@ -1011,32 +1161,134 @@ fn text_warp_point(
   center + normal * ((v - 0.5) * height)
 }
 
-fn sample_text_warp_boundary(points: &[kurbo::Point], position: f64) -> kurbo::Point {
-  let total = points
-    .windows(2)
-    .map(|segment| segment[0].distance(segment[1]))
-    .sum::<f64>();
-  if total <= f64::EPSILON {
-    return points[0];
-  }
-  let target = position.clamp(0.0, 1.0) * total;
-  let mut traversed = 0.0;
-  for segment in points.windows(2) {
-    let length = segment[0].distance(segment[1]);
-    if traversed + length >= target && length > f64::EPSILON {
-      let local = (target - traversed) / length;
-      return segment[0] + (segment[1] - segment[0]) * local;
-    }
-    traversed += length;
-  }
-  *points.last().expect("text warp boundary is non-empty")
-}
-
 #[cfg(test)]
 mod tests {
   use kurbo::{Circle, Rect, Shape};
 
   use super::*;
+
+  #[test]
+  fn text_warp_seams_split_lines_and_implicit_closure_without_changing_geometry() {
+    let mut path = BezPath::new();
+    path.move_to((0.0, 0.0));
+    path.line_to((10.0, 0.0));
+    path.line_to((10.0, 10.0));
+    path.close_path();
+    assert!(split_outline_at_warp_seams(&path, |p| p, &[]).is_none());
+    assert!(split_outline_at_warp_seams(&path, |p| p, &[20.0]).is_none());
+    let split = split_outline_at_warp_seams(&path, |p| p, &[5.0]).unwrap();
+    assert!(
+      split
+        .elements()
+        .contains(&PathEl::LineTo(Point::new(5.0, 0.0)))
+    );
+    assert!(
+      split
+        .elements()
+        .contains(&PathEl::LineTo(Point::new(5.0, 5.0)))
+    );
+    assert_eq!(split.elements().last(), Some(&PathEl::ClosePath));
+    assert!((split.area() - path.area()).abs() < 1e-10);
+  }
+
+  #[test]
+  fn text_warp_seams_keep_curve_degree_and_all_crossings() {
+    let mut quad = BezPath::new();
+    quad.move_to((1.0, 0.0));
+    quad.quad_to((9.0, 1.0), (1.0, 2.0));
+    let split = split_outline_at_warp_seams(&quad, |p| p, &[3.0]).unwrap();
+    assert_eq!(split.segments().count(), 3);
+    assert!(split.segments().all(|s| matches!(s, PathSeg::Quad(_))));
+    for segment in split.segments().take(2) {
+      assert!((segment.end().x - 3.0).abs() < 1e-10);
+    }
+    assert!((split.area() - quad.area()).abs() < 1e-10);
+
+    let mut cubic = BezPath::new();
+    cubic.move_to((-1.0, 0.0));
+    cubic.curve_to((3.0, 1.0), (-3.0, 2.0), (1.0, 3.0));
+    let split = split_outline_at_warp_seams(&cubic, |p| p, &[0.0]).unwrap();
+    assert_eq!(split.segments().count(), 4);
+    assert!(split.segments().all(|s| matches!(s, PathSeg::Cubic(_))));
+    for segment in split.segments().take(3) {
+      assert!(segment.end().x.abs() < 1e-10);
+    }
+    assert!((split.area() - cubic.area()).abs() < 1e-10);
+  }
+
+  #[test]
+  fn text_warp_seams_intersect_in_page_space_but_retain_design_space_points() {
+    let mut path = BezPath::new();
+    path.move_to((0.0, 0.0));
+    path.line_to((0.0, 10.0));
+    assert!(split_outline_at_warp_seams(&path, |p| p, &[5.0]).is_none());
+    let split =
+      split_outline_at_warp_seams(&path, |p| Point::new(2.0 * p.x + p.y + 10.0, p.y), &[15.0])
+        .unwrap();
+    assert_eq!(split.elements()[1], PathEl::LineTo(Point::new(0.0, 5.0)));
+    assert_eq!(split.elements()[2], PathEl::LineTo(Point::new(0.0, 10.0)));
+  }
+
+  fn warp_boundary(path: &BezPath) -> TextWarpBoundary {
+    let mut commands = Vec::new();
+    append_mapped_outline(path, |point| point, &mut commands).unwrap();
+    TextWarpBoundary::new(&commands).unwrap()
+  }
+
+  #[test]
+  fn text_warp_boundary_samples_curves_by_arc_length() {
+    for height in [0.0, 8.0, 50.0, 200.0] {
+      let curve = CubicBez::new((0.0, 0.0), (30.0, -height), (70.0, height), (100.0, 0.0));
+      let mut path = BezPath::new();
+      path.move_to(curve.p0);
+      path.curve_to(curve.p1, curve.p2, curve.p3);
+      let boundary = warp_boundary(&path);
+      let total = curve.arclen(1e-9);
+      for index in 0..=100 {
+        let t = f64::from(index) / 100.0;
+        let position = curve.subsegment(0.0..t).arclen(1e-9) / total;
+        assert!(boundary.sample(position).distance(curve.eval(t)) < 0.0003);
+      }
+    }
+  }
+
+  #[test]
+  fn text_warp_boundary_preserves_segment_lengths_endpoints_and_degeneracy() {
+    let mut path = BezPath::new();
+    path.move_to((0.0, 0.0));
+    path.line_to((0.0, 0.0));
+    path.line_to((10.0, 0.0));
+    path.line_to((10.0, 30.0));
+    let boundary = warp_boundary(&path);
+    assert_eq!(boundary.sample(-1.0), Point::new(0.0, 0.0));
+    assert_eq!(boundary.sample(0.25), Point::new(10.0, 0.0));
+    assert_eq!(boundary.sample(0.5), Point::new(10.0, 10.0));
+    assert_eq!(boundary.sample(2.0), Point::new(10.0, 30.0));
+    let mut degenerate = BezPath::new();
+    degenerate.move_to((5.0, 8.0));
+    degenerate.line_to((5.0, 8.0));
+    assert_eq!(warp_boundary(&degenerate).sample(0.5), Point::new(5.0, 8.0));
+    assert!(TextWarpBoundary::new(&[]).is_err());
+  }
+
+  #[test]
+  fn text_warp_boundary_is_invariant_to_cubic_subdivision() {
+    let curve = CubicBez::new((0.0, 0.0), (32.0, -48.0), (61.0, 72.0), (100.0, 0.0));
+    let mut whole = BezPath::new();
+    whole.move_to(curve.p0);
+    whole.curve_to(curve.p1, curve.p2, curve.p3);
+    let mut split = BezPath::new();
+    split.move_to(curve.p0);
+    for part in [curve.subsegment(0.0..0.37), curve.subsegment(0.37..1.0)] {
+      split.curve_to(part.p1, part.p2, part.p3);
+    }
+    let whole = warp_boundary(&whole);
+    let split = warp_boundary(&split);
+    for index in 0..=100 {
+      let position = f64::from(index) / 100.0;
+      assert!(whole.sample(position).distance(split.sample(position)) < 0.0003);
+    }
+  }
 
   fn rectangle_path() -> DirectOutlinePath {
     DirectOutlinePath {

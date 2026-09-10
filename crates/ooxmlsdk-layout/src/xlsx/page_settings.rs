@@ -132,7 +132,9 @@ fn devmode_public_and_private_sizes_are_valid(bytes: &[u8], byte_order: DevModeB
 
 fn devmode_utf16_string(bytes: &[u8], byte_order: DevModeByteOrder) -> String {
   let units = bytes
-    .chunks_exact(2)
+    .as_chunks::<2>()
+    .0
+    .iter()
     .map(|bytes| match byte_order {
       DevModeByteOrder::Little => u16::from_le_bytes([bytes[0], bytes[1]]),
       DevModeByteOrder::Big => u16::from_be_bytes([bytes[0], bytes[1]]),
@@ -621,7 +623,21 @@ impl CalcPageSettings {
     }
   }
 
-  pub(crate) fn printer_default_paper_body_offset_y_pt(&self, scale: f32) -> f32 {
+  pub(crate) fn fixed_output_body_top_pt(&self, paper_scale_percent: u32) -> f32 {
+    // ECMA-376 §18.3.1.62 gives pageMargins in physical inches. Header/footer
+    // presence does not scale that margin: Excel controls with three margins,
+    // both header states and implicit Letter / explicit A4 retain identical
+    // cell coordinates in each header pair. The paper mapping's body offset
+    // remains a separate transform, not a second scaling of the top margin.
+    self.margin_top_in as f32 * units::POINTS_PER_INCH
+      + if paper_scale_percent < DEFAULT_PRINT_SCALE_PERCENT {
+        self.printer_default_paper_body_offset_y_pt(paper_scale_percent as f32 / 100.0)
+      } else {
+        0.0
+      }
+  }
+
+  fn printer_default_paper_body_offset_y_pt(&self, scale: f32) -> f32 {
     if self.printer_default_paper_scale_percent() == DEFAULT_PRINT_SCALE_PERCENT {
       return 0.0;
     }
@@ -768,6 +784,33 @@ impl HeaderFooterModel {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn fixed_output_body_top_keeps_physical_margins_independent_of_headers() {
+    for margin_top_in in [0.5, 1.025, 1.5] {
+      for paper_scale_percent in [95, 100] {
+        let mut settings = CalcPageSettings {
+          margin_top_in,
+          margin_bottom_in: 1.025,
+          paper_size: MsPaperSize::Letter as u32,
+          implicit_microsoft_letter_canvas: true,
+          ..CalcPageSettings::default()
+        };
+        let top = settings.fixed_output_body_top_pt(paper_scale_percent);
+        let expected_offset = if paper_scale_percent == 95 {
+          settings.printer_default_paper_body_offset_y_pt(0.95)
+        } else {
+          0.0
+        };
+        assert!((top - margin_top_in as f32 * 72.0 - expected_offset).abs() < 1.0e-5);
+        for (header, footer) in [(true, false), (false, true), (true, true)] {
+          settings.header_footer.odd_header = header.then(|| "&C&A".to_string());
+          settings.header_footer.odd_footer = footer.then(|| "&CPage &P".to_string());
+          assert_eq!(settings.fixed_output_body_top_pt(paper_scale_percent), top);
+        }
+      }
+    }
+  }
 
   fn sample_windows_devmode(fields: u32) -> Vec<u8> {
     fn put_u16(bytes: &mut [u8], offset: usize, value: u16) {

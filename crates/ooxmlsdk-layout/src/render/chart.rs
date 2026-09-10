@@ -169,6 +169,31 @@ pub(crate) fn chart_shape_effects_from_theme_style(
   }
 }
 
+pub(crate) fn radial_chart_image_effects(
+  chart: &PieChartModel<'_>,
+  theme: ChartShapeEffects,
+  resolver: &impl crate::common::drawingml_image_effects::ImageEffectColorResolver,
+) -> Vec<Option<crate::common::drawingml_image_effects::ImageEffectContainer>> {
+  let inherited = chart_shape_effects_from_properties(chart.series_shape_properties, resolver)
+    .image_effects
+    .or(theme.image_effects);
+  (0..chart.values.len())
+    .map(|index| {
+      chart
+        .data_points
+        .iter()
+        .rev()
+        .find(|point| usize::try_from(point.index.val).ok() == Some(index))
+        .and_then(|point| {
+          chart_shape_effects_from_properties(point.chart_shape_properties.as_deref(), resolver)
+            .image_effects
+        })
+        // Some(empty) deliberately suppresses inherited effects.
+        .or_else(|| inherited.clone())
+    })
+    .collect()
+}
+
 #[derive(Clone, Debug)]
 pub struct SurfaceChartGroup<'a> {
   /// Index of the first series owned by this plot-area chart group.

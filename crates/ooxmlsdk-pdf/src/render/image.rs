@@ -1282,13 +1282,18 @@ fn jpeg_metadata(data: &[u8]) -> Option<JpegMetadata> {
   None
 }
 
-struct DecodedRasterImage {
-  image: DynamicImage,
-  icc_profile: Option<Vec<u8>>,
-  jpeg_has_real_physical_resolution: bool,
+pub(super) struct DecodedRasterImage {
+  pub(super) image: DynamicImage,
+  pub(super) icc_profile: Option<Vec<u8>>,
+  pub(super) jpeg_has_real_physical_resolution: bool,
 }
 
 fn decode_dynamic_image(data: &[u8], format: RasterImageFormat) -> Result<DecodedRasterImage> {
+  if format == RasterImageFormat::Tiff
+    && let Some(image) = super::tiff_palette::decode(data)?
+  {
+    return Ok(image);
+  }
   let mut decoder = ImageReader::with_format(Cursor::new(data), format)
     .into_decoder()
     .map_err(|err| PdfError::Image(format!("failed to open raster image: {err}")))?;
@@ -1563,12 +1568,12 @@ fn export_decoded_image(
   if let Some(target_size) =
     export_options.downsample_source_size(raster.image.dimensions(), format, owner)
   {
-    raster.image = if format == RasterImageFormat::Png
+    raster.image = if matches!(format, RasterImageFormat::Png | RasterImageFormat::Tiff)
       && owner == RasterOwner::Source
       && export_options.profile.is_word()
       && export_options.profile.is_office_screen()
     {
-      resize_for_word_screen_png(raster.image, target_size)
+      resize_for_word_screen_bitmap(raster.image, target_size)
     } else if format == RasterImageFormat::Png
       && owner == RasterOwner::Source
       && export_options.profile.is_power_point_screen()
@@ -2603,7 +2608,7 @@ fn resize_for_gdiplus_bitmap(image: DynamicImage, target_size: (u32, u32)) -> Dy
   resize_for_gdiplus_fixed_area(image, target_size)
 }
 
-fn resize_for_word_screen_png(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
+fn resize_for_word_screen_bitmap(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
   let source_size = image.dimensions();
   if source_size.0.max(source_size.1) < GDIPLUS_BITMAP_AREA_THRESHOLD {
     return resize_for_office_screen(image, target_size);
@@ -2613,7 +2618,8 @@ fn resize_for_word_screen_png(image: DynamicImage, target_size: (u32, u32)) -> D
   }
 
   // PNG controls at 419/420 on either axis expose the same Q16 area kernel
-  // as large Word Print JPEGs. Filter associated color and coverage together;
+  // as large Word Print JPEGs; reduced palette TIFF RGB also matches exactly.
+  // Filter associated color and coverage together;
   // hidden RGB must not leak through a transparent sample. This helper keeps
   // the caller's straight-alpha contract: its later black-matte association
   // exactly recovers every filtered associated byte (including partial alpha).
@@ -3709,7 +3715,7 @@ mod tests {
         resize_for_gdiplus_fixed_area(source.clone(), (55, 34))
       };
       assert_eq!(
-        resize_for_word_screen_png(source, (55, 34)).to_rgba8(),
+        resize_for_word_screen_bitmap(source, (55, 34)).to_rgba8(),
         expected.to_rgba8()
       );
     }
@@ -3722,7 +3728,7 @@ mod tests {
         }
       });
       let resized =
-        resize_for_word_screen_png(DynamicImage::ImageRgba8(source), (210, 1)).to_rgba8();
+        resize_for_word_screen_bitmap(DynamicImage::ImageRgba8(source), (210, 1)).to_rgba8();
       assert!(resized.pixels().all(|pixel| pixel.0 == [199, 0, 0, 128]));
       assert!(
         apply_black_matte(&resized)
@@ -3878,7 +3884,8 @@ mod tests {
       PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
     let export_options = RasterExportOptions::new(&options, 42.0, 26.25);
     let actual = decode_image(&png, Some("image/png"), export_options, None).unwrap();
-    let sampled = resize_for_word_screen_png(DynamicImage::ImageRgba8(source), (55, 34)).to_rgba8();
+    let sampled =
+      resize_for_word_screen_bitmap(DynamicImage::ImageRgba8(source), (55, 34)).to_rgba8();
     let expected = encode_office_h2v2_jpeg(
       &apply_black_matte(&sampled),
       export_options.jpeg_quality.unwrap(),

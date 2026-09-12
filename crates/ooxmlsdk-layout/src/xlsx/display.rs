@@ -14,6 +14,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
+use unicode_bidi::{BidiClass, BidiInfo, Level, bidi_class};
 
 use crate::common;
 use crate::common::drawingml_image_effects::{
@@ -168,11 +169,9 @@ fn common_fixed_pages_with_items(
   debug_records: Vec<common::DebugRecord<'static>>,
   options: &LayoutOptions,
 ) -> common::LayoutDocument<'static> {
-  let pages = if pages.is_empty() {
-    vec![(PageSetup::default(), Vec::new())]
-  } else {
-    pages
-  };
+  // An Excel workbook with no printable pages stays empty. A synthetic white
+  // page would change the observed print result and hide the PDF API's existing
+  // empty-layout error.
   common::LayoutDocument {
     engine_kind: common::LayoutEngineKind::Xlsx,
     options: common::LayoutOptions {
@@ -471,6 +470,7 @@ fn print_page_items(
       header: true,
       styles: &import.styles,
       source_file_name: import.source_file_name.as_deref(),
+      field_update_datetime: import.field_update_datetime,
     },
     &mut text_metrics,
   );
@@ -617,6 +617,7 @@ fn print_page_items(
       header: false,
       styles: &import.styles,
       source_file_name: import.source_file_name.as_deref(),
+      field_update_datetime: import.field_update_datetime,
     },
     &mut text_metrics,
   );
@@ -800,6 +801,7 @@ fn print_page_vml_shape_items(
     .flat_map(|drawing| drawing.shapes.iter())
   {
     if shape.hidden
+      || !page.sheet.vml_note_prints_in_place(shape)
       || !shape.print_object
       || shape.image_relationship_id.is_some()
       || shape.kind == super::object_resources::VmlShapeKind::Group
@@ -2532,7 +2534,14 @@ fn render_cell_area(
     height_pt: area_rect.height_pt,
   };
   let occupied_cells = calc_occupied_text_cells(cells);
+  let has_drawing_canvas = page
+    .sheet
+    .resources
+    .drawings
+    .iter()
+    .any(|drawing| !drawing.anchors.is_empty());
   let mut deferred_edit_text_items = Vec::new();
+  let mut conditional_eval_cache = super::print::ConditionalFormatEvalCache::default();
   for cell in cells {
     if page.sheet.is_covered_merged_cell(cell.address) {
       continue;
@@ -2567,23 +2576,46 @@ fn render_cell_area(
     );
     let pivot_builtin_style =
       super::pivot::pivot_builtin_style_for_address(page.sheet, &import.styles, cell.address);
-    if !scan_context_only
-      && let Some(fill_color) = conditional_fill_color(import, page.sheet, cell)
-        .or_else(|| pivot_format_fill_color(import, cell))
-        .or(pivot_builtin_style.fill)
-        .or(table_builtin_style.fill)
-        .or_else(|| import.styles.fill_color_for_cell(cell.style_index))
-    {
-      items.push(PageItem::Rect(RectItem {
-        x_pt,
-        y_pt,
-        width_pt,
-        height_pt,
-        fill_color: Some(fill_color),
-        fill_opacity: 1.0,
-        stroke: None,
-        stroke_opacity: 1.0,
-      }));
+    if !scan_context_only {
+      let solid = |color| super::styles::FillRecord {
+        color: Some(color),
+        ..Default::default()
+      };
+      let fill = conditional_fill(import, page.sheet, cell, &mut conditional_eval_cache)
+        .or_else(|| {
+          cell
+            .pivot_format_id
+            .and_then(|id| import.styles.differential_fill(id))
+        })
+        .or_else(|| pivot_builtin_style.fill.map(solid))
+        .or_else(|| table_builtin_style.fill.map(solid))
+        .unwrap_or_else(|| import.styles.fill_for_cell(cell.style_index));
+      if let Some(pattern) = fill.pattern {
+        items.push(PageItem::Path(common::PathItem {
+          bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
+          points: vec![
+            common_point(x_pt, y_pt),
+            common_point(x_pt + width_pt, y_pt),
+            common_point(x_pt + width_pt, y_pt + height_pt),
+            common_point(x_pt, y_pt + height_pt),
+          ],
+          commands: Vec::new(),
+          closed: true,
+          fill: common::Fill::Pattern(pattern),
+          stroke: None,
+        }));
+      } else if let Some(fill_color) = fill.color {
+        items.push(PageItem::Rect(RectItem {
+          x_pt,
+          y_pt,
+          width_pt,
+          height_pt,
+          fill_color: Some(fill_color),
+          fill_opacity: 1.0,
+          stroke: None,
+          stroke_opacity: 1.0,
+        }));
+      }
     }
     let mut borders = import.styles.borders_for_cell(cell.style_index);
     merge_cell_borders(&mut borders, table_builtin_style.borders);
@@ -2633,7 +2665,16 @@ fn render_cell_area(
     if let Some(color) = direct_font_color {
       measurement_style.color = color;
     }
-    apply_conditional_text_style(import, page.sheet, cell, &mut measurement_style);
+    if let Some(color) = cell.number_format_color {
+      measurement_style.color = color;
+    }
+    apply_conditional_text_style(
+      import,
+      page.sheet,
+      cell,
+      &mut measurement_style,
+      &mut conditional_eval_cache,
+    );
     // sc/source/ui/view/output2.cxx ScDrawStringsVars::SetPattern(). Calc's
     // print map mode scales cell geometry and the font used for measurement.
     if let Some(format_id) = cell.pivot_format_id {
@@ -2773,6 +2814,14 @@ fn render_cell_area(
         text_metrics,
       );
     }
+    reorder_cell_text_items(
+      &mut rendered_text_items,
+      alignment.and_then(|alignment| alignment.reading_order),
+      rendered_text.as_ref(),
+      output_area.align_rect,
+      horizontal_alignment,
+      text_metrics,
+    );
     rendered_text_items.retain_mut(|item| {
       let PageItem::Text(text) = item else {
         return false;
@@ -2782,17 +2831,46 @@ fn render_cell_area(
         cell.address.col.saturating_sub(1) as usize,
       ];
       if scan_context_only {
+        if cell.address.col < area.start.col {
+          // Earlier cells contribute only text that reaches this page through
+          // unoccupied columns. A long string blocked by another cell must
+          // not reappear on a later page just because its full glyph payload
+          // intersects that page.
+          let clip = output_area.clip_rect;
+          if !rect_intersects_clip(
+            clip.x_pt,
+            clip.y_pt,
+            clip.x_pt + clip.width_pt,
+            clip.y_pt + clip.height_pt,
+            page_clip_rect,
+          ) || !text_item_intersects_rect(text, page_clip_rect, text_metrics)
+          {
+            return false;
+          }
+        }
         // Office fixed output keeps physical-page culling independent from
         // the logical worksheet print clip. Apache POI 49156.xlsx proves both
         // boundaries: its first vertical page band owns searchable K-column
         // operators whose ink is wholly hidden by the A1:J78 clip, while the
         // next band omits its K-column values. Text that actually overflows
         // into a page band remains owned by that band on every page.
+        // Explicit print areas can retain hidden physical-page payloads.
+        // A drawing crossing an automatic break uses the continuous printable
+        // canvas too: 58325_db.xlsx retains its following wide cell's complete
+        // title alongside the split OLE picture. Ordinary cell-only pages
+        // (53282.xlsx, 48495.xlsx) retain the snapped column boundary.
+        let (text_left, _, text_right, _) = text_item_bounds(text, text_metrics);
+        let text_fits_printable_width = text_left
+          >= page.page_settings.margin_left_in as f32 * units::POINTS_PER_INCH
+          && text_right
+            <= layout.physical_page.width_pt
+              - page.page_settings.margin_right_in as f32 * units::POINTS_PER_INCH;
         if !scan_context_text_belongs_to_page(
           text,
           page_clip_rect,
           layout.physical_page,
-          page.starts_print_area_row,
+          page.starts_print_area_row
+            && (page.has_explicit_print_area || (has_drawing_canvas && text_fits_printable_width)),
           text_metrics,
         ) {
           return false;
@@ -3101,6 +3179,16 @@ fn calc_cell_visible_text<'a>(
   if output_area.left_clip_pt <= f32::EPSILON && output_area.right_clip_pt <= f32::EPSILON {
     return std::borrow::Cow::Borrowed(&cell.rendered_text);
   }
+  if cell.number_format_state == super::print::NumberFormatRenderState::Boolean {
+    // Office uses hashes when a localized logical value cannot fit, as
+    // with VERDADERO in CellValues.xlsx's narrow C4. Authored strings still
+    // follow the clipping path below.
+    return std::borrow::Cow::Owned(calc_cell_overflow_hash_text(
+      style,
+      output_area.align_rect.width_pt,
+      text_metrics,
+    ));
+  }
   if calc_cell_is_value(cell) {
     if cell.number_format_state == super::print::NumberFormatRenderState::General
       && let Some(text) =
@@ -3281,6 +3369,109 @@ fn calc_text_can_shape_as_line(text: &str) -> bool {
   })
 }
 
+fn reorder_cell_text_items(
+  items: &mut Vec<PageItem>,
+  reading_order: Option<u32>,
+  cell_text: &str,
+  rect: CellRect,
+  alignment: x::HorizontalAlignmentValues,
+  text_metrics: &mut TextMetrics,
+) {
+  // ECMA-376 §18.8.1 and Annex I.4 define a paragraph base direction,
+  // independent of sheet mirroring and of WordprocessingML run overrides.
+  let right_to_left = match reading_order {
+    Some(1) => false,
+    Some(2) => true,
+    _ => cell_text
+      .chars()
+      .find(|character| !character.is_whitespace())
+      .is_some_and(|character| matches!(bidi_class(character), BidiClass::R | BidiClass::AL)),
+  };
+  if (!right_to_left && cell_text.is_ascii())
+    || items.iter().any(|item| !matches!(item, PageItem::Text(_)))
+  {
+    return;
+  }
+  let base_level = if right_to_left {
+    Level::rtl()
+  } else {
+    Level::ltr()
+  };
+  let mut line = Vec::new();
+  let mut line_baseline = None::<f32>;
+  for item in std::mem::take(items) {
+    let PageItem::Text(text) = item else {
+      unreachable!("cell text items checked above");
+    };
+    // Rich portions may have different sizes or escapement while sharing
+    // one baseline. Reorder the whole physical line across those boundaries.
+    let baseline = text.y_pt
+      + text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+      + text.style.baseline_shift_pt;
+    if line_baseline.is_some_and(|previous| (baseline - previous).abs() > 0.01) {
+      push_cell_bidi_line(items, &line, base_level, rect, alignment, text_metrics);
+      line.clear();
+    }
+    line_baseline = Some(baseline);
+    line.push(text);
+  }
+  push_cell_bidi_line(items, &line, base_level, rect, alignment, text_metrics);
+}
+
+fn push_cell_bidi_line(
+  items: &mut Vec<PageItem>,
+  line: &[TextItem],
+  base_level: Level,
+  rect: CellRect,
+  alignment: x::HorizontalAlignmentValues,
+  text_metrics: &mut TextMetrics,
+) {
+  let logical_text = line
+    .iter()
+    .map(|text| text.text.as_str())
+    .collect::<String>();
+  let bidi = BidiInfo::new(&logical_text, Some(base_level));
+  let Some(paragraph) = bidi.paragraphs.first().filter(|_| bidi.has_rtl()) else {
+    items.extend(line.iter().cloned().map(PageItem::Text));
+    return;
+  };
+  let levels = bidi.reordered_levels(paragraph, 0..logical_text.len());
+  let mut segments = Vec::new();
+  let mut segment_levels = Vec::new();
+  let mut start = 0usize;
+  for text in line {
+    let end = start + text.text.len();
+    let mut offset = start;
+    while offset < end {
+      let level = levels[offset];
+      let next = logical_text[offset..end]
+        .char_indices()
+        .skip(1)
+        .find(|(index, _)| levels[offset + index] != level)
+        .map_or(end, |(index, _)| offset + index);
+      let mut segment = text.clone();
+      segment.text = logical_text[offset..next].to_string();
+      // Shaping owns glyph order and mirroring within a uniform portion.
+      // Keeping the source text intact also preserves searchable PDF text.
+      segment.style.resolved_bidi_level = Some(level.number());
+      segment.paragraph_bidi = base_level.is_rtl();
+      let width = text_metrics.measure_text(&segment.text, &segment.style);
+      segments.push((segment, width));
+      segment_levels.push(level);
+      offset = next;
+    }
+    start = end;
+  }
+  let width = segments.iter().map(|(_, width)| *width).sum();
+  let mut x = cell_text_x_pt(rect, width, alignment, 0.0);
+  for index in BidiInfo::reorder_visual(&segment_levels) {
+    let (mut text, advance) = segments[index].clone();
+    text.x_pt = x;
+    items.push(PageItem::Text(text));
+    x += advance;
+  }
+}
+
 fn render_cell_rich_text(
   items: &mut Vec<PageItem>,
   runs: &[super::workbook::SharedStringRun],
@@ -3444,33 +3635,44 @@ fn xlsx_rich_text_run_style(
   style
 }
 
-fn conditional_fill_color(
+fn conditional_fill(
   import: &ExcelImport,
   sheet: &CalcSheet,
   cell: &super::print::CalcPrintCell<'_>,
-) -> Option<RgbColor> {
+  cache: &mut super::print::ConditionalFormatEvalCache,
+) -> Option<super::styles::FillRecord> {
   let mut rules = sheet
     .metrics
     .conditions
     .conditional_formats
     .iter()
     .filter(|format| conditional_format_contains_cell(format, cell.address))
-    .flat_map(|format| format.rules.iter())
+    .flat_map(|format| format.rules.iter().map(move |rule| (format, rule)))
     .collect::<Vec<_>>();
-  rules.sort_by_key(|rule| rule.priority);
-  for rule in rules {
+  rules.sort_by_key(|(_, rule)| rule.priority);
+  for (format, rule) in rules {
     if let Some(fill) = cell
       .color_scale_fill
       .filter(|fill| fill.priority == rule.priority)
     {
-      return Some(fill.color);
+      return Some(super::styles::FillRecord {
+        color: Some(fill.color),
+        ..Default::default()
+      });
     }
-    if !conditional_rule_matches(rule, cell) {
+    if !conditional_rule_matches(
+      import,
+      sheet,
+      &format.sequence_of_references,
+      rule,
+      cell,
+      cache,
+    ) {
       continue;
     }
     if let Some(color) = rule
       .format_id
-      .and_then(|format_id| import.styles.differential_fill_color(format_id))
+      .and_then(|format_id| import.styles.differential_fill(format_id))
     {
       return Some(color);
     }
@@ -3486,6 +3688,7 @@ fn apply_conditional_text_style(
   sheet: &CalcSheet,
   cell: &super::print::CalcPrintCell<'_>,
   style: &mut TextStyle,
+  cache: &mut super::print::ConditionalFormatEvalCache,
 ) {
   let mut rules = sheet
     .metrics
@@ -3493,13 +3696,20 @@ fn apply_conditional_text_style(
     .conditional_formats
     .iter()
     .filter(|format| conditional_format_contains_cell(format, cell.address))
-    .flat_map(|format| format.rules.iter())
+    .flat_map(|format| format.rules.iter().map(move |rule| (format, rule)))
     .collect::<Vec<_>>();
   // sc/source/filter/oox/condformatbuffer.cxx sorts imported rules by
   // priority before applying their differential formats.
-  rules.sort_by_key(|rule| rule.priority);
-  for rule in rules {
-    if !conditional_rule_matches(rule, cell) {
+  rules.sort_by_key(|(_, rule)| rule.priority);
+  for (format, rule) in rules {
+    if !conditional_rule_matches(
+      import,
+      sheet,
+      &format.sequence_of_references,
+      rule,
+      cell,
+      cache,
+    ) {
       continue;
     }
     if let Some(format_id) = rule
@@ -3517,15 +3727,6 @@ fn apply_conditional_text_style(
   }
 }
 
-fn pivot_format_fill_color(
-  import: &ExcelImport,
-  cell: &super::print::CalcPrintCell<'_>,
-) -> Option<RgbColor> {
-  cell
-    .pivot_format_id
-    .and_then(|format_id| import.styles.differential_fill_color(format_id))
-}
-
 fn conditional_format_contains_cell(
   format: &super::sheet_conditions::ConditionalFormatModel,
   address: CellAddress,
@@ -3539,77 +3740,71 @@ fn conditional_format_contains_cell(
 }
 
 fn conditional_rule_matches(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  references: &[String],
   rule: &super::sheet_conditions::ConditionalFormatRuleModel,
   cell: &super::print::CalcPrintCell<'_>,
+  cache: &mut super::print::ConditionalFormatEvalCache,
 ) -> bool {
   match rule.rule_type {
-    x::ConditionalFormatValues::CellIs => conditional_cell_is_matches(rule, cell),
-    x::ConditionalFormatValues::ContainsText => rule.text.as_ref().is_some_and(|needle| {
-      cell.rendered_text.contains(needle) || cell.text.as_ref().contains(needle)
-    }),
-    x::ConditionalFormatValues::NotContainsText => rule.text.as_ref().is_some_and(|needle| {
-      !cell.rendered_text.contains(needle) && !cell.text.as_ref().contains(needle)
-    }),
-    x::ConditionalFormatValues::BeginsWith => rule.text.as_ref().is_some_and(|needle| {
-      cell.rendered_text.starts_with(needle) || cell.text.as_ref().starts_with(needle)
-    }),
-    x::ConditionalFormatValues::EndsWith => rule.text.as_ref().is_some_and(|needle| {
-      cell.rendered_text.ends_with(needle) || cell.text.as_ref().ends_with(needle)
-    }),
-    x::ConditionalFormatValues::ContainsBlanks => {
-      cell.text.as_ref().is_empty() && cell.rendered_text.is_empty()
+    x::ConditionalFormatValues::Top10 | x::ConditionalFormatValues::AboveAverage => {
+      super::print::conditional_statistical_cell_value(cell.text.as_ref(), cell.data_type)
+        .is_some_and(|value| {
+          super::print::conditional_numeric_rule_matches(
+            import,
+            sheet,
+            references,
+            rule,
+            cell.address,
+            value,
+            cache,
+          )
+        })
     }
-    x::ConditionalFormatValues::NotContainsBlanks => {
-      !cell.text.as_ref().is_empty() || !cell.rendered_text.is_empty()
+    x::ConditionalFormatValues::CellIs => {
+      if matches!(
+        cell.data_type,
+        Some(x::CellValues::SharedString | x::CellValues::InlineString | x::CellValues::String)
+      ) {
+        return super::print::conditional_cell_is_text_matches(
+          import,
+          sheet,
+          references,
+          rule,
+          cell.address,
+          cell.text.as_ref(),
+        );
+      }
+      cell.text.as_ref().parse::<f64>().ok().is_some_and(|value| {
+        super::print::conditional_cell_is_matches(
+          import,
+          sheet,
+          references,
+          rule,
+          cell.address,
+          value,
+        )
+      })
     }
-    x::ConditionalFormatValues::Expression => expression_rule_matches(rule),
+    x::ConditionalFormatValues::ContainsText
+    | x::ConditionalFormatValues::NotContainsText
+    | x::ConditionalFormatValues::BeginsWith
+    | x::ConditionalFormatValues::EndsWith
+    | x::ConditionalFormatValues::ContainsBlanks
+    | x::ConditionalFormatValues::NotContainsBlanks => {
+      super::print::conditional_text_rule_matches(import, sheet, rule, cell.address)
+    }
+    // ECMA-376 §18.18.12 defines these rules through ISERROR. Use the
+    // evaluated cell type: a string spelling "#DIV/0!" is still text, and
+    // number formatting must not change whether the cell is an error.
+    x::ConditionalFormatValues::ContainsErrors => cell.data_type == Some(x::CellValues::Error),
+    x::ConditionalFormatValues::NotContainsErrors => cell.data_type != Some(x::CellValues::Error),
+    x::ConditionalFormatValues::Expression => {
+      super::print::conditional_expression_matches(import, sheet, references, rule, cell.address)
+    }
     _ => false,
   }
-}
-
-fn conditional_cell_is_matches(
-  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
-  cell: &super::print::CalcPrintCell<'_>,
-) -> bool {
-  let Some(value) = cell.text.as_ref().parse::<f64>().ok() else {
-    return false;
-  };
-  let first = rule
-    .formulas
-    .first()
-    .and_then(|formula| formula.trim().parse::<f64>().ok());
-  let second = rule
-    .formulas
-    .get(1)
-    .and_then(|formula| formula.trim().parse::<f64>().ok());
-  match rule.operator.unwrap_or_default() {
-    x::ConditionalFormattingOperatorValues::LessThan => first.is_some_and(|limit| value < limit),
-    x::ConditionalFormattingOperatorValues::LessThanOrEqual => {
-      first.is_some_and(|limit| value <= limit)
-    }
-    x::ConditionalFormattingOperatorValues::Equal => first.is_some_and(|limit| value == limit),
-    x::ConditionalFormattingOperatorValues::NotEqual => first.is_some_and(|limit| value != limit),
-    x::ConditionalFormattingOperatorValues::GreaterThanOrEqual => {
-      first.is_some_and(|limit| value >= limit)
-    }
-    x::ConditionalFormattingOperatorValues::GreaterThan => first.is_some_and(|limit| value > limit),
-    x::ConditionalFormattingOperatorValues::Between => first
-      .zip(second)
-      .is_some_and(|(low, high)| value >= low.min(high) && value <= low.max(high)),
-    x::ConditionalFormattingOperatorValues::NotBetween => first
-      .zip(second)
-      .is_some_and(|(low, high)| value < low.min(high) || value > low.max(high)),
-    _ => false,
-  }
-}
-
-fn expression_rule_matches(rule: &super::sheet_conditions::ConditionalFormatRuleModel) -> bool {
-  rule.formulas.first().is_some_and(|formula| {
-    matches!(
-      formula.trim().to_ascii_uppercase().as_str(),
-      "TRUE" | "1" | "=TRUE" | "=1"
-    )
-  })
 }
 
 #[derive(Clone, Debug)]
@@ -4158,7 +4353,7 @@ fn print_page_vml_image_items(
   let mut items = Vec::new();
   for drawing in &page.sheet.resources.object_resources.vml_drawings {
     for shape in &drawing.shapes {
-      if shape.hidden || !shape.print_object {
+      if shape.hidden || !shape.print_object || !page.sheet.vml_note_prints_in_place(shape) {
         continue;
       }
       if !vml_shape_intersects_area(page.sheet, layout.area, shape) {
@@ -4312,6 +4507,20 @@ fn drawingml_image_fill_items(
   object: &super::drawing::DrawingObjectModel,
   input: DrawingMlImageFillInput,
 ) -> Vec<PageItem> {
+  drawingml_blip_fill_items(
+    object.image_crop,
+    object.image_tile.as_deref(),
+    object.image_rotate_with_shape,
+    input,
+  )
+}
+
+fn drawingml_blip_fill_items(
+  crop: ImageCrop,
+  tile: Option<&a::Tile>,
+  rotate_with_shape: bool,
+  input: DrawingMlImageFillInput,
+) -> Vec<PageItem> {
   let DrawingMlImageFillInput {
     rect,
     clip_path,
@@ -4323,13 +4532,13 @@ fn drawingml_image_fill_items(
     alt_text,
     hyperlink_url,
   } = input;
-  let rotation_deg = if object.image_rotate_with_shape {
+  let rotation_deg = if rotate_with_shape {
     authored_rotation_deg
   } else {
     Default::default()
   };
-  let flip_horizontal = object.image_rotate_with_shape && authored_flip_horizontal;
-  let flip_vertical = object.image_rotate_with_shape && authored_flip_vertical;
+  let flip_horizontal = rotate_with_shape && authored_flip_horizontal;
+  let flip_vertical = rotate_with_shape && authored_flip_vertical;
   let make_item = |placement: common::drawingml_image_tile::ImageTilePlacement| {
     PageItem::Image(ImageItem {
       x_pt: placement.x_pt,
@@ -4354,14 +4563,14 @@ fn drawingml_image_fill_items(
       behind_text: false,
     })
   };
-  let Some(tile) = object.image_tile.as_deref() else {
+  let Some(tile) = tile else {
     return vec![make_item(
       common::drawingml_image_tile::ImageTilePlacement {
         x_pt: rect.x_pt,
         y_pt: rect.y_pt,
         width_pt: rect.width_pt,
         height_pt: rect.height_pt,
-        crop: object.image_crop,
+        crop,
         flip_horizontal: false,
         flip_vertical: false,
       },
@@ -4380,7 +4589,7 @@ fn drawingml_image_fill_items(
     (rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
     natural_size,
     tile,
-    object.image_crop,
+    crop,
     1024,
   )
   .into_iter()
@@ -6168,6 +6377,76 @@ fn lower_drawing_chart(
   let chart_space = resource.chart_space.as_deref()?;
   let chart_style = xlsx_chart_style_id(chart_space);
 
+  if !excel_chart_has_series(chart_space) {
+    // Office's tdf107586 PDF contains the chart-area fill and border only.
+    // A title without any series must not become generic drawing text when
+    // the data-bearing chart model returns None. Authored empty series are
+    // distinct from absent series and continue through the ordinary path.
+    let style = xlsx_shape_style(
+      chart_space.shape_properties.as_deref(),
+      import,
+      resource,
+      solid_chart_shape_style(
+        Some(RgbColor {
+          r: 255,
+          g: 255,
+          b: 255,
+        }),
+        Some((
+          RgbColor {
+            r: 0x86,
+            g: 0x86,
+            b: 0x86,
+          },
+          0.75 * drawing_scale,
+        )),
+      ),
+    );
+    let mut items = vec![PageItem::Path(common::PathItem {
+      bounds: common_rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt),
+      points: vec![
+        common_point(rect.x_pt, rect.y_pt),
+        common_point(rect.x_pt + rect.width_pt, rect.y_pt),
+        common_point(rect.x_pt + rect.width_pt, rect.y_pt + rect.height_pt),
+        common_point(rect.x_pt, rect.y_pt + rect.height_pt),
+      ],
+      commands: Vec::new(),
+      closed: true,
+      fill: match style.fill {
+        common::ShapeStyleValue::Paint(fill) => fill,
+        _ => common::Fill::None,
+      },
+      stroke: match style.stroke {
+        common::ShapeStyleValue::Paint(stroke) => Some(stroke),
+        _ => None,
+      },
+    })];
+    resolve_xlsx_chart_background_image(import, resource, &mut items);
+    clip_chart_items_to_rect(
+      &mut items,
+      page_clip_rect,
+      &mut TextMetrics::new(),
+      DEFAULT_CHART_TEXT_CLIP_SLACK,
+      &[],
+    );
+    if let Some(hyperlink_url) = drawing_object_hyperlink_url(drawing, &anchor.object) {
+      let left = rect.x_pt.max(page_clip_rect.x_pt);
+      let top = rect.y_pt.max(page_clip_rect.y_pt);
+      let right = (rect.x_pt + rect.width_pt).min(page_clip_rect.x_pt + page_clip_rect.width_pt);
+      let bottom = (rect.y_pt + rect.height_pt).min(page_clip_rect.y_pt + page_clip_rect.height_pt);
+      if right > left && bottom > top {
+        items.push(PageItem::LinkArea(LinkAreaItem {
+          x_pt: left,
+          y_pt: top,
+          width_pt: right - left,
+          height_pt: bottom - top,
+          hyperlink_url: hyperlink_url.into_owned(),
+        }));
+      }
+    }
+    return Some(items);
+  }
+
   if let Some(mut chart) = shared_chart::pie_chart_model(chart_space) {
     if chart_space.chart.title.is_none()
       && matches!(chart.title, Some(shared_chart::ChartTitleText::Automatic))
@@ -6370,6 +6649,7 @@ fn lower_drawing_chart(
         ),
       },
     );
+    resolve_xlsx_chart_background_image(import, resource, &mut items);
     if !items.is_empty() {
       let mut metrics = TextMetrics::new();
       clip_chart_items_to_rect(
@@ -6443,28 +6723,10 @@ fn lower_drawing_chart(
   } else if has_visible_empty_automatic_title && chart.title.is_none() {
     chart.title = Some(shared_chart::ChartTitleText::Automatic);
   }
-  let has_explicit_single_series_compact_label_profile = matches!(
-    chart.title.as_ref(),
-    Some(shared_chart::ChartTitleText::Explicit(_))
-  ) && chart.series.len() == 1
-    && (chart.gap_width_percent - 219.0).abs() < f64::EPSILON
-    && (chart.overlap_percent + 27.0).abs() < f64::EPSILON;
-  let has_legacy_default_single_series_profile = chart_style.is_none()
-    && matches!(
-      chart.title.as_ref(),
-      Some(shared_chart::ChartTitleText::Explicit(_))
-    )
-    && chart.series.len() == 1;
-  if (chart.title.is_none() && chart.has_automatic_title_marker && chart.has_explicit_categories)
-    || has_explicit_single_series_compact_label_profile
-    || has_legacy_default_single_series_profile
-  {
-    // Excel's synthesized legend labels are compact (`Series1` / `系列1`)
-    // in the established automatic-title family and in explicitly titled
-    // single-series legacy layouts, including packages without c:style.
-    // Other compatibility profiles retain their host spelling.
-    apply_excel_automatic_series_names(&mut chart, Some(import.styles.output_ui_language()));
-  }
+  // Excel supplies default series names independently of the title, data
+  // range orientation, and chart style. Do not leak shared Row/Column labels
+  // into unnamed series in the fixed-format output.
+  apply_excel_automatic_series_names(&mut chart, Some(import.styles.output_ui_language()));
   resolve_hidden_chart_values(import, chart_space, &mut chart);
   apply_excel_chart_missing_value_treatment(chart_space, chart_style.is_some(), &mut chart);
   apply_excel_chart_smoothing_default(chart_style.is_some(), &mut chart);
@@ -7265,6 +7527,7 @@ fn lower_drawing_chart(
       ),
     },
   );
+  resolve_xlsx_chart_background_image(import, resource, &mut items);
   let indexed_scatter_text = chart.series.iter().all(|series| {
     matches!(
       series.kind,
@@ -7367,6 +7630,32 @@ fn lower_drawing_chart(
   Some(items)
 }
 
+fn excel_chart_has_series(chart_space: &c::ChartSpace) -> bool {
+  chart_space
+    .chart
+    .plot_area
+    .plot_area_choice1
+    .iter()
+    .any(|plot| match plot {
+      c::PlotAreaChoice::AreaChart(chart) => !chart.area_chart_series.is_empty(),
+      c::PlotAreaChoice::Area3DChart(chart) => !chart.area_chart_series.is_empty(),
+      c::PlotAreaChoice::LineChart(chart) => !chart.line_chart_series.is_empty(),
+      c::PlotAreaChoice::Line3DChart(chart) => !chart.line_chart_series.is_empty(),
+      c::PlotAreaChoice::StockChart(chart) => !chart.line_chart_series.is_empty(),
+      c::PlotAreaChoice::RadarChart(chart) => !chart.radar_chart_series.is_empty(),
+      c::PlotAreaChoice::ScatterChart(chart) => !chart.scatter_chart_series.is_empty(),
+      c::PlotAreaChoice::PieChart(chart) => !chart.pie_chart_series.is_empty(),
+      c::PlotAreaChoice::Pie3DChart(chart) => !chart.pie_chart_series.is_empty(),
+      c::PlotAreaChoice::DoughnutChart(chart) => !chart.pie_chart_series.is_empty(),
+      c::PlotAreaChoice::BarChart(chart) => !chart.bar_chart_series.is_empty(),
+      c::PlotAreaChoice::Bar3DChart(chart) => !chart.bar_chart_series.is_empty(),
+      c::PlotAreaChoice::OfPieChart(chart) => !chart.pie_chart_series.is_empty(),
+      c::PlotAreaChoice::SurfaceChart(chart) => !chart.surface_chart_series.is_empty(),
+      c::PlotAreaChoice::Surface3DChart(chart) => !chart.surface_chart_series.is_empty(),
+      c::PlotAreaChoice::BubbleChart(chart) => !chart.bubble_chart_series.is_empty(),
+    })
+}
+
 fn excel_empty_automatic_title_is_visible(chart_space: &c::ChartSpace) -> bool {
   let Some(title) = chart_space.chart.title.as_deref() else {
     return false;
@@ -7453,15 +7742,12 @@ fn apply_excel_automatic_series_names(
       continue;
     }
     let shared_name = shared_chart::automatic_series_title(ui_language, index + 1);
-    if series.name != shared_name {
-      continue;
-    }
     // Excel's synthesized legend labels are `Series1` / `系列1`; Word and
     // PowerPoint retain their host-specific spaced labels in the shared model.
     let excel_name = shared_name.replace(' ', "");
     series.name.clone_from(&excel_name);
     for label in &mut series.data_labels {
-      label.text = label.text.replace(&shared_name, &excel_name);
+      label.update_series_name(&excel_name);
     }
   }
 }
@@ -7493,7 +7779,7 @@ fn resolve_hidden_chart_values(
       let old_name = std::mem::replace(&mut series.name, name);
       series.has_nonempty_explicit_name = true;
       for label in &mut series.data_labels {
-        label.text = label.text.replace(&old_name, &series.name);
+        label.update_series_name(&series.name);
       }
       name_replacements.push((old_name, series.name.clone()));
     }
@@ -9131,7 +9417,7 @@ fn print_page_vml_text_items(
     .iter()
     .flat_map(|drawing| drawing.shapes.iter())
   {
-    if shape.hidden || !shape.print_object {
+    if shape.hidden || !shape.print_object || !page.sheet.vml_note_prints_in_place(shape) {
       continue;
     }
     if legacy_vml_form_control_kind(shape).is_some() {
@@ -9507,6 +9793,91 @@ fn shape_stroke(
     color,
     ..BorderStyle::default()
   })
+}
+
+fn resolve_xlsx_chart_background_image(
+  import: &ExcelImport,
+  chart: &super::drawing::ChartResourceCatalog,
+  items: &mut Vec<PageItem>,
+) {
+  let Some(c::ShapePropertiesChoice2::BlipFill(fill)) = chart
+    .chart_space
+    .as_deref()
+    .and_then(|space| space.shape_properties.as_deref())
+    .and_then(|properties| properties.shape_properties_choice2.as_ref())
+  else {
+    return;
+  };
+  let Some(blip) = fill.blip.as_deref() else {
+    return;
+  };
+  let Some(resource) = blip
+    .embed
+    .as_deref()
+    .and_then(|id| chart.image_resources.get(id))
+  else {
+    return;
+  };
+  // Both classic chart lowerers emit their chart-area rectangle first.
+  let Some(PageItem::Path(path)) = items.first_mut() else {
+    return;
+  };
+  if !matches!(path.fill, common::Fill::Image { .. }) {
+    return;
+  }
+  let resolver = XlsxImageEffectColorResolver {
+    import,
+    image_resources: &chart.image_resources,
+    chart_resource: Some(chart),
+    placeholder_color: None,
+  };
+  let effects = common::drawingml_image_effects::from_blip_choices(
+    &blip.blip_choice,
+    resource.content_type.as_deref(),
+    &resolver,
+  );
+  let (data, content_type) = if effects.is_empty() {
+    (resource.data.clone(), resource.content_type.clone())
+  } else {
+    common::drawingml_image_effects::apply(
+      &resource.data,
+      resource.content_type.as_deref(),
+      &effects,
+    )
+    .map(|data| (Bytes::from(data), Some("image/png".to_string())))
+    .unwrap_or_else(|| (resource.data.clone(), resource.content_type.clone()))
+  };
+  let bounds = path.bounds;
+  let tile = super::drawing::shape_blip_tile(fill);
+  let images = drawingml_blip_fill_items(
+    super::drawing::drawingml_blip_crop(fill),
+    tile.as_deref(),
+    fill
+      .rotate_with_shape
+      .as_ref()
+      .is_some_and(|value| value.as_bool()),
+    DrawingMlImageFillInput {
+      rect: CellRect {
+        x_pt: bounds.origin.x.0,
+        y_pt: bounds.origin.y.0,
+        width_pt: bounds.size.width.0,
+        height_pt: bounds.size.height.0,
+      },
+      clip_path: path.commands.clone(),
+      authored_rotation_deg: 0.0,
+      authored_flip_horizontal: false,
+      authored_flip_vertical: false,
+      data,
+      content_type,
+      alt_text: None,
+      hyperlink_url: None,
+    },
+  );
+  if !images.is_empty() {
+    path.fill = common::Fill::None;
+    // The outline and plot content remain above the background image.
+    items.splice(0..0, images);
+  }
 }
 
 fn xlsx_image_data_with_effects(
@@ -10349,6 +10720,7 @@ struct HeaderFooterRenderContext<'a, 'data> {
   header: bool,
   styles: &'a super::styles::StylesCatalog,
   source_file_name: Option<&'a str>,
+  field_update_datetime: Option<crate::options::FieldUpdateDateTime>,
 }
 
 fn render_header_or_footer(
@@ -10396,7 +10768,14 @@ fn render_header_footer_line(
     header,
     styles,
     source_file_name,
+    field_update_datetime,
   } = context;
+  let date = field_update_datetime.and_then(|value| {
+    crate::field_datetime::format_office_short_date(styles.output_format_locale(), value)
+  });
+  let time = field_update_datetime.and_then(|value| {
+    crate::field_datetime::format_office_short_time(styles.output_format_locale(), value)
+  });
   for (align, value) in split_header_footer_sections(text) {
     if value.is_empty() {
       continue;
@@ -10409,6 +10788,8 @@ fn render_header_footer_line(
         total_pages: page.total_pages,
         sheet_name: &page.sheet.name,
         file_name: source_file_name.unwrap_or(""),
+        date: date.as_deref(),
+        time: time.as_deref(),
       },
     );
     if runs.is_empty() {
@@ -10419,43 +10800,52 @@ fn render_header_footer_line(
         run.style.font_size_pt *= content_scale;
       }
     }
-    // OOXML pageMargins.header/footer is the distance from the page edge to
-    // the start/end of the header/footer. LibreOffice's HeaderFooterParser
-    // likewise computes each portion's height from its active font runs, and
-    // PageSettingsConverter describes the footer margin as the distance to
-    // the bottom of the footer. A fixed 12pt box misplaces any portion whose
-    // font metrics or explicit &nn size produce a different line height.
-    let line_height_pt = runs
+    let lines = split_header_footer_lines(runs);
+    let line_heights = lines
       .iter()
-      .map(|run| text_metrics.inline_text_box_height(&run.style))
-      .fold(0.0_f32, f32::max)
-      .max(1.0);
-    let y_pt = if header {
+      .map(|line| {
+        line
+          .iter()
+          .map(|run| text_metrics.inline_text_box_height(&run.style))
+          .fold(0.0_f32, f32::max)
+          .max(1.0)
+      })
+      .collect::<Vec<_>>();
+    // Each portion aligns its lines independently. The header starts at the
+    // header margin; the footer's complete multiline box ends at its margin.
+    // Keep line breaks out of shaping: they delimit lines, not font glyphs.
+    let mut y_pt = if header {
       setup.header_distance_pt
     } else {
-      setup.height_pt - setup.footer_distance_pt - line_height_pt
+      setup.height_pt - setup.footer_distance_pt - line_heights.iter().sum::<f32>()
     };
-    let total_width = runs
-      .iter()
-      .map(|run| text_metrics.measure_text(&run.text, &run.style))
-      .sum::<f32>();
     let (left_edge_pt, right_edge_pt) =
       header_footer_horizontal_edges(setup, page.page_settings.header_footer.align_with_margins);
-    let mut x = match align {
-      HeaderFooterAlign::Left => left_edge_pt,
-      HeaderFooterAlign::Center => (setup.width_pt - total_width) / 2.0,
-      HeaderFooterAlign::Right => right_edge_pt - total_width,
-    };
-    for run in runs {
-      let width = text_metrics.measure_text(&run.text, &run.style);
-      items.push(styled_header_text_with_line_height(
-        x,
-        y_pt,
-        run.text,
-        run.style,
-        line_height_pt,
-      ));
-      x += width;
+    for (line, line_height_pt) in lines.into_iter().zip(line_heights) {
+      let total_width = line
+        .iter()
+        .map(|run| text_metrics.measure_text(&run.text, &run.style))
+        .sum::<f32>();
+      let mut x = match align {
+        HeaderFooterAlign::Left => left_edge_pt,
+        HeaderFooterAlign::Center => (setup.width_pt - total_width) / 2.0,
+        HeaderFooterAlign::Right => right_edge_pt - total_width,
+      };
+      for run in line {
+        if run.text.is_empty() {
+          continue;
+        }
+        let width = text_metrics.measure_text(&run.text, &run.style);
+        items.push(styled_header_text_with_line_height(
+          x,
+          y_pt,
+          run.text,
+          run.style,
+          line_height_pt,
+        ));
+        x += width;
+      }
+      y_pt += line_height_pt;
     }
   }
 }
@@ -10522,18 +10912,44 @@ fn push_header_footer_section(
   }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct HeaderFooterFieldValues<'a> {
   page_number: usize,
   total_pages: usize,
   sheet_name: &'a str,
   file_name: &'a str,
+  date: Option<&'a str>,
+  time: Option<&'a str>,
 }
 
 #[derive(Clone, Debug)]
 struct HeaderFooterTextRun {
   text: String,
   style: TextStyle,
+}
+
+fn split_header_footer_lines(runs: Vec<HeaderFooterTextRun>) -> Vec<Vec<HeaderFooterTextRun>> {
+  let mut lines = vec![Vec::<HeaderFooterTextRun>::new()];
+  for run in runs {
+    for (index, text) in run.text.split('\n').enumerate() {
+      if index > 0 {
+        lines.push(Vec::new());
+      }
+      let line = lines.last_mut().unwrap();
+      // An empty line inherits the break's font. Once text arrives, only its
+      // actual runs contribute metrics, including a size change after a break.
+      if line.len() == 1 && line[0].text.is_empty() {
+        line.clear();
+      }
+      if !text.is_empty() || line.is_empty() {
+        line.push(HeaderFooterTextRun {
+          text: text.to_string(),
+          style: run.style.clone(),
+        });
+      }
+    }
+  }
+  lines
 }
 
 fn parse_header_footer_runs(
@@ -10557,6 +10973,16 @@ fn parse_header_footer_runs(
       Some('N' | 'n') => output.push_str(&fields.total_pages.to_string()),
       Some('A' | 'a') => output.push_str(fields.sheet_name),
       Some('F' | 'f') => output.push_str(fields.file_name),
+      // Header/footer fields use the supplied local clock and format locale,
+      // independent of UI language and the workbook's 1900/1904 date system.
+      Some(ch @ ('D' | 'd')) => match fields.date {
+        Some(date) => output.push_str(date),
+        None => output.push(ch),
+      },
+      Some(ch @ ('T' | 't')) => match fields.time {
+        Some(time) => output.push_str(time),
+        None => output.push(ch),
+      },
       Some('&') => output.push('&'),
       Some('L' | 'l' | 'C' | 'c' | 'R' | 'r') => {}
       Some('"') => {
@@ -10909,6 +11335,45 @@ mod drawing_page_tests {
       false,
       &mut metrics,
     ));
+  }
+
+  #[test]
+  fn excel_automatic_series_names_preserve_authored_label_components() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/>
+          <c:ser><c:idx val="0"/><c:order val="0"/>
+            <c:dLbls>
+              <c:dLbl><c:idx val="1"/><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Row 1</a:t></a:r></a:p></c:rich></c:tx></c:dLbl>
+              <c:dLbl><c:idx val="2"/><c:tx><c:strRef><c:f>Sheet1!$A$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Row 1</c:v></c:pt></c:strCache></c:strRef></c:tx></c:dLbl>
+              <c:showVal val="1"/><c:showCatName val="1"/><c:showSerName val="1"/>
+            </c:dLbls>
+            <c:cat><c:strLit><c:ptCount val="3"/><c:pt idx="0"><c:v>Row 1</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt><c:pt idx="2"><c:v>C</c:v></c:pt></c:strLit></c:cat>
+            <c:val><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="3"/><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt><c:pt idx="2"><c:v>3</c:v></c:pt></c:numLit></c:val>
+          </c:ser>
+          <c:ser><c:idx val="1"/><c:order val="1"/><c:tx><c:v>Row 2</c:v></c:tx></c:ser>
+        </c:barChart></c:plotArea></c:chart>
+      </c:chartSpace>"#,
+    )
+    .unwrap();
+    let mut chart =
+      shared_chart::clustered_column_chart_for_ui_language(&space, Some("en-US")).unwrap();
+    apply_excel_automatic_series_names(&mut chart, Some("en-US"));
+    assert_eq!(chart.series[0].name, "Series1");
+    assert_eq!(chart.series[1].name, "Row 2");
+    let labels = &chart.series[0].data_labels;
+    assert_eq!(labels.len(), 3);
+    assert_eq!(labels[0].text_components, ["Series1", "Row 1", "1"]);
+    assert_eq!(
+      labels[0].text,
+      labels[0].text_components.join(labels[0].separator)
+    );
+    for label in &labels[1..] {
+      assert_eq!(label.text, "Row 1");
+      assert_eq!(label.series_name_component_index, None);
+    }
   }
 
   #[test]
@@ -11403,17 +11868,95 @@ mod drawing_page_tests {
 mod cell_alignment_tests {
   use super::*;
 
+  #[test]
+  fn reading_order_reorders_rich_portions_without_changing_font_slots() {
+    let rect = CellRect {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      width_pt: 200.0,
+      height_pt: 20.0,
+    };
+    let mut metrics = TextMetrics::new();
+    for (reading_order, expected) in [
+      (Some(0), "English (Yes)."),
+      (Some(1), "English (Yes)."),
+      (Some(2), ".English (Yes)"),
+    ] {
+      let runs = [
+        super::super::workbook::SharedStringRun {
+          text: "English ".into(),
+          ..Default::default()
+        },
+        super::super::workbook::SharedStringRun {
+          text: "(Yes).".into(),
+          has_properties: true,
+          bold: Some(true),
+          ..Default::default()
+        },
+      ];
+      let mut items = Vec::new();
+      render_cell_rich_text(
+        &mut items,
+        &runs,
+        rect,
+        TextStyle::default(),
+        CellTextRenderOptions {
+          alignment: None,
+          horizontal_alignment: x::HorizontalAlignmentValues::Left,
+          hyperlink_url: None,
+          formula: false,
+          default_line_height_pt: 15.0,
+        },
+        1.0,
+        &mut metrics,
+      );
+      reorder_cell_text_items(
+        &mut items,
+        reading_order,
+        "English (Yes).",
+        rect,
+        x::HorizontalAlignmentValues::Left,
+        &mut metrics,
+      );
+      let text = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) => Some(text),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(
+        text
+          .iter()
+          .map(|text| text.text.as_str())
+          .collect::<String>(),
+        expected
+      );
+      assert!(text.iter().all(|text| text.style.right_to_left.is_none()));
+      if reading_order == Some(2) {
+        assert_eq!(text[0].text, ".");
+        assert_eq!(text[0].style.resolved_bidi_level, Some(1));
+        assert!(text[0].style.bold);
+        assert_eq!(text[1].text, "English ");
+        assert!(!text[1].style.bold);
+        assert!(text.windows(2).all(|pair| pair[0].x_pt < pair[1].x_pt));
+      }
+    }
+  }
+
   fn print_cell(
     state: super::super::print::NumberFormatRenderState,
   ) -> super::super::print::CalcPrintCell<'static> {
     super::super::print::CalcPrintCell {
       address: CellAddress { col: 1, row: 1 },
       text: std::borrow::Cow::Borrowed("value"),
+      data_type: None,
       style_index: None,
       pivot_format_id: None,
       rendered_text: "value".to_string(),
       rich_text_runs: &[],
       number_format_state: state,
+      number_format_color: None,
       formula: false,
       icon_set: None,
       color_scale_fill: None,
@@ -11429,6 +11972,65 @@ mod cell_alignment_tests {
       assert_eq!(
         calc_cell_horizontal_alignment(&print_cell(state), None),
         x::HorizontalAlignmentValues::Center
+      );
+    }
+  }
+
+  #[test]
+  fn literal_number_formats_preserve_numeric_alignment() {
+    let format = Some("\"TRUE\";\"TRUE\";\"FALSE\"");
+    for (raw, data_type, expected_text, expected_alignment) in [
+      (
+        "2",
+        x::CellValues::Number,
+        "TRUE",
+        x::HorizontalAlignmentValues::Right,
+      ),
+      (
+        "-2",
+        x::CellValues::Number,
+        "TRUE",
+        x::HorizontalAlignmentValues::Right,
+      ),
+      (
+        "0",
+        x::CellValues::Number,
+        "FALSE",
+        x::HorizontalAlignmentValues::Right,
+      ),
+      (
+        "1",
+        x::CellValues::Boolean,
+        "TRUE",
+        x::HorizontalAlignmentValues::Center,
+      ),
+      (
+        "0",
+        x::CellValues::Boolean,
+        "FALSE",
+        x::HorizontalAlignmentValues::Center,
+      ),
+    ] {
+      let (text, state) =
+        super::super::print::rendered_number_text(raw, format, Some(data_type), false);
+      let mut cell = print_cell(state);
+      cell.text = std::borrow::Cow::Borrowed(raw);
+      cell.rendered_text = text;
+      cell.data_type = Some(data_type);
+      assert_eq!(cell.rendered_text, expected_text);
+      assert_eq!(
+        calc_cell_horizontal_alignment(&cell, None),
+        expected_alignment
+      );
+      assert_eq!(
+        calc_cell_horizontal_alignment(
+          &cell,
+          Some(super::super::styles::AlignmentRecord {
+            horizontal: Some(x::HorizontalAlignmentValues::Left),
+            ..Default::default()
+          }),
+        ),
+        x::HorizontalAlignmentValues::Left
       );
     }
   }
@@ -11755,6 +12357,29 @@ mod header_footer_tests {
   use super::*;
 
   #[test]
+  fn header_footer_clock_fields_preserve_escapes_and_active_style() {
+    let fields = HeaderFooterFieldValues {
+      date: Some("2026/9/11"),
+      time: Some("16:04"),
+      ..Default::default()
+    };
+    let runs = parse_header_footer_runs("&&D &D&B&T&B &&T", TextStyle::default(), fields);
+    assert_eq!(runs.len(), 3);
+    assert_eq!(runs[0].text, "&D 2026/9/11");
+    assert!(!runs[0].style.bold);
+    assert_eq!(runs[1].text, "16:04");
+    assert!(runs[1].style.bold);
+    assert_eq!(runs[2].text, " &T");
+    assert!(!runs[2].style.bold);
+    let unavailable = parse_header_footer_runs(
+      "&D/&T/&d/&t",
+      TextStyle::default(),
+      HeaderFooterFieldValues::default(),
+    );
+    assert_eq!(unavailable[0].text, "D/T/d/t");
+  }
+
+  #[test]
   fn fixed_output_content_scale_preserves_separate_fractional_stages() {
     assert!((fixed_output_content_scale(100, 95) - 0.95).abs() < f32::EPSILON);
     assert!((fixed_output_content_scale(80, 95) - 0.76).abs() < f32::EPSILON);
@@ -11789,6 +12414,7 @@ mod header_footer_tests {
         total_pages: 3,
         sheet_name: "Sheet1",
         file_name: "book.xlsx",
+        ..Default::default()
       },
     );
 
@@ -11811,6 +12437,7 @@ mod header_footer_tests {
         total_pages: 3,
         sheet_name: "Sheet1",
         file_name: "book.xlsx",
+        ..Default::default()
       },
     );
 
@@ -11824,12 +12451,45 @@ mod header_footer_tests {
   }
 
   #[test]
+  fn header_footer_line_breaks_preserve_styles_fields_and_empty_lines() {
+    let runs = parse_header_footer_runs(
+      "&20Title\n&8Page &P&B of &N\n\nEnd",
+      TextStyle::default(),
+      HeaderFooterFieldValues {
+        page_number: 2,
+        total_pages: 3,
+        sheet_name: "Sheet1",
+        file_name: "book.xlsx",
+        ..Default::default()
+      },
+    );
+    let lines = split_header_footer_lines(runs);
+    let text = lines
+      .iter()
+      .map(|line| line.iter().map(|run| run.text.as_str()).collect::<String>())
+      .collect::<Vec<_>>();
+    assert_eq!(text, ["Title", "Page 2 of 3", "", "End"]);
+    assert_eq!(lines[0][0].style.font_size_pt, 20.0);
+    assert_eq!(lines[1].len(), 2);
+    assert!(!lines[1][0].style.bold);
+    assert!(lines[1][1].style.bold);
+    for line in &lines[1..] {
+      for run in line {
+        assert_eq!(run.style.font_size_pt, 8.0);
+      }
+    }
+    assert!(lines[2][0].style.bold);
+    assert!(lines[3][0].style.bold);
+  }
+
+  #[test]
   fn header_footer_file_field_uses_the_callers_workbook_name() {
     let fields = HeaderFooterFieldValues {
       page_number: 1,
       total_pages: 1,
       sheet_name: "Sheet1",
       file_name: "45540_classic_Footer.xlsx",
+      ..Default::default()
     };
     let runs = parse_header_footer_runs("&F", TextStyle::default(), fields);
     assert_eq!(runs.len(), 1);

@@ -873,6 +873,11 @@ pub(super) fn symbol_font_semantic_text<'a>(
         '\u{f020}' if wingdings => '\u{2002}',
         '\u{f097}' if wingdings_2 => '\u{2981}',
         '\u{f0a3}' if wingdings_2 => '\u{25a1}',
+        // Unicode WG2 N4363, Webdings IDs 0069, 0073 and 0074
+        // (decimal legacy selectors), pp. 22-23: desert, beach, island.
+        '\u{f045}' if webdings => '\u{1f3dc}',
+        '\u{f049}' if webdings => '\u{26f1}',
+        '\u{f04a}' if webdings => '\u{1f3dd}',
         '\u{f067}' if webdings => '\u{2b1b}',
         '\u{f06e}' if webdings => '\u{2b24}',
         '\u{f07d}' if wingdings_3 => '\u{1f782}',
@@ -1087,7 +1092,7 @@ pub(super) fn conversion_font_audit_for_direct(paint: &PaintDocument<'_>) -> Pdf
             }
             if visible
               && glyph.glyph_id == 0
-              && glyph_requires_pdf_paint(
+              && glyph_requires_font_coverage(
                 &text.item.text,
                 glyph,
                 text.item.style.explicit_symbol_character,
@@ -1166,7 +1171,7 @@ fn source_range_requires_visible_glyph(text: &str, range: &Range<usize>) -> bool
     .is_some_and(|source| source.chars().any(|ch| !ch.is_control()))
 }
 
-fn glyph_requires_pdf_paint(
+fn glyph_requires_font_coverage(
   text: &str,
   glyph: &PaintGlyph,
   explicit_symbol_character: bool,
@@ -1178,12 +1183,11 @@ fn glyph_requires_pdf_paint(
     return false;
   }
 
-  // ECMA-376 assigns ordinary PUA text to an actual run font but gives it no
-  // portable character semantics. LibreOffice consequently does not perform
-  // font fallback for PUA code points. When that exact face resolves to
-  // .notdef or an inkless source glyph, Word's fixed output preserves the
-  // shaped advance without painting a glyph. Explicit w:sym characters retain
-  // their authored selector even when the selected glyph has no outline.
+  // Ordinary PUA text has font-specific semantics rather than portable
+  // character coverage. Excluding it from a missing-character audit does not
+  // suppress painting: the selected face's .notdef can have a visible outline
+  // (as in Word's Times New Roman PUA output). Explicit w:sym selectors are
+  // accounted for separately by the caller, even for an inkless glyph.
   let private_use_only =
     !explicit_symbol_character && !source.is_empty() && source.chars().all(is_unicode_private_use);
   if !private_use_only {
@@ -4313,6 +4317,29 @@ mod tests {
     assert_eq!(
       symbol_font_semantic_text("\u{f0b7}", Some("Calibri")),
       "\u{f0b7}"
+    );
+  }
+
+  #[test]
+  fn webdings_map_symbols_remap_semantics_without_changing_glyphs() {
+    let source = "\u{f045}\u{f04a}\u{f049}";
+    let semantic = symbol_font_semantic_text(source, Some("wEbDiNgS"));
+    assert_eq!(semantic, "\u{1f3dc}\u{1f3dd}\u{26f1}");
+    let glyphs = [glyph(0..3), glyph(3..6), glyph(6..9)];
+    let remapped = remap_glyph_text_ranges(&glyphs, source, &semantic).unwrap();
+    for (index, expected_range) in [0..4, 4..8, 8..11].into_iter().enumerate() {
+      assert_eq!(remapped[index].text_range, expected_range);
+      assert_eq!(remapped[index].glyph_id, glyphs[index].glyph_id);
+      assert_eq!(remapped[index].x_advance, glyphs[index].x_advance);
+    }
+    assert_eq!(symbol_font_semantic_text(source, Some("Calibri")), source);
+    assert_eq!(
+      symbol_font_semantic_text("\u{f04a}", Some("Wingdings")),
+      "\u{263a}"
+    );
+    assert_eq!(
+      symbol_font_semantic_text("\u{e225}", Some("ZBFH")),
+      "\u{e225}"
     );
   }
 

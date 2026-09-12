@@ -407,13 +407,9 @@ fn resolve(
           "gradient stop positions are not monotonically increasing".to_string(),
         ));
       }
-      if stop.position == previous.position {
-        if rgb == previous.rgb && stop.color.a == previous.alpha {
-          continue;
-        }
-        return Err(PdfError::DirectWriterUnsupported {
-          feature: "coincident hard-edge gradient stops",
-        });
+      if stop.position == previous.position && rgb == previous.rgb && stop.color.a == previous.alpha
+      {
+        continue;
       }
     }
     stops.push(ColorStop {
@@ -495,17 +491,23 @@ fn allocate_function<const N: usize>(
 
   let id = refs.alloc()?;
   let mut segments = Vec::with_capacity(stops.len() - 1);
+  let mut bounds = Vec::with_capacity(stops.len() - 2);
   for pair in stops.windows(2) {
+    // Coincident stops give the incoming and outgoing colors of a jump.
+    // Keep both colors, but only allocate functions for nonempty intervals:
+    // a stitching boundary selects the next interval at the discontinuity.
+    if pair[0].position == pair[1].position {
+      continue;
+    }
+    if !segments.is_empty() {
+      bounds.push(pair[0].position);
+    }
     segments.push(ExponentialFunction {
       id: refs.alloc()?,
       start: components(&pair[0]),
       end: components(&pair[1]),
     });
   }
-  let bounds = stops[1..stops.len() - 1]
-    .iter()
-    .map(|stop| stop.position)
-    .collect();
   Ok(GradientFunction::Stitching {
     id,
     segments,
@@ -647,4 +649,57 @@ fn write_soft_mask_objects(
     soft_mask.finish();
   }
   state.finish();
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn hard_edge_functions_keep_colors_and_alpha_without_empty_intervals() {
+    for position in [0.0, 0.5, 1.0] {
+      let red = ColorStop {
+        position: 0.0,
+        rgb: [1.0, 0.0, 0.0],
+        alpha: 64,
+      };
+      let blue = ColorStop {
+        position: 1.0,
+        rgb: [0.0, 0.0, 1.0],
+        alpha: 255,
+      };
+      let stops = [
+        red.clone(),
+        ColorStop { position, ..red },
+        ColorStop { position, ..blue },
+        blue,
+      ];
+      let function = allocate_function(&stops, &mut RefAllocator::default(), |s| {
+        [s.rgb[0], s.rgb[1], s.rgb[2], f32::from(s.alpha) / 255.0]
+      })
+      .unwrap();
+      let GradientFunction::Stitching {
+        segments, bounds, ..
+      } = function
+      else {
+        panic!("expected stitching")
+      };
+      if position == 0.5 {
+        assert_eq!(bounds, vec![0.5]);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].end, [1.0, 0.0, 0.0, 64.0 / 255.0]);
+        assert_eq!(segments[1].start, [0.0, 0.0, 1.0, 1.0]);
+      } else {
+        assert!(bounds.is_empty());
+        assert_eq!(segments.len(), 1);
+        let expected = if position == 0.0 {
+          [0.0, 0.0, 1.0, 1.0]
+        } else {
+          [1.0, 0.0, 0.0, 64.0 / 255.0]
+        };
+        assert_eq!(segments[0].start, expected);
+        assert_eq!(segments[0].end, expected);
+      }
+    }
+  }
 }

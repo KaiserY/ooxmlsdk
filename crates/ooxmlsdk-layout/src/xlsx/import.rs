@@ -5,7 +5,7 @@ use crate::localization::OfficeLocaleContext;
 use crate::options::LayoutOptions;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 
-use super::formula::RelativeFormulaEvaluationContext;
+use super::formula::{FormulaDateContext, RelativeFormulaEvaluationContext};
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
 use super::workbook::WorkbookFragment;
 use super::workbook_catalog::WorkbookCatalog;
@@ -20,6 +20,8 @@ pub(crate) struct ExcelImport {
   pub(crate) defined_names: DefinedNamesCatalog,
   pub(crate) workbook_catalog: WorkbookCatalog,
   pub(crate) source_file_name: Option<String>,
+  pub(crate) field_update_datetime: Option<crate::options::FieldUpdateDateTime>,
+  formula_date_context: FormulaDateContext,
   relative_formula_context: OnceLock<RelativeFormulaEvaluationContext>,
 }
 
@@ -35,6 +37,8 @@ impl ExcelImport {
     let workbook_part = package.workbook_part()?;
     let workbook = workbook_part.root_element(package)?.clone();
     let globals = WorkbookGlobals::from_workbook(&workbook);
+    let formula_date_context =
+      FormulaDateContext::new(globals.settings.date_1904, options.field_update_datetime);
     let workbook_catalog = WorkbookCatalog::from_workbook_part(package, &workbook_part)?;
     let producer = spreadsheet_producer_profile(package, &workbook);
     let locales = OfficeLocaleContext::new(
@@ -50,6 +54,7 @@ impl ExcelImport {
       &fragment.defined_names,
       options.source_file_name.as_deref(),
       &workbook_catalog,
+      formula_date_context,
     );
     Ok(Self {
       sheets,
@@ -58,6 +63,8 @@ impl ExcelImport {
       defined_names: fragment.defined_names,
       workbook_catalog,
       source_file_name: options.source_file_name.clone(),
+      field_update_datetime: options.field_update_datetime,
+      formula_date_context,
       relative_formula_context: OnceLock::new(),
     })
   }
@@ -68,6 +75,7 @@ impl ExcelImport {
         &self.sheets,
         &self.defined_names,
         &self.workbook_catalog,
+        self.formula_date_context,
       )
     })
   }

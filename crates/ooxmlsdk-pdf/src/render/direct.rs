@@ -394,8 +394,9 @@ fn ensure_path_stroke_supported(stroke: &common::Stroke<'static>, closed: bool) 
   if stroke.gradient.is_some() {
     return unsupported("compound gradient strokes");
   }
-  if stroke.resolved_dash().is_some() {
-    return unsupported("dashed compound strokes");
+  if stroke.resolved_dash().is_some() && !matches!(stroke.cap, None | Some(common::StrokeCap::Flat))
+  {
+    return unsupported("non-flat dashed compound strokes");
   }
   if stroke_has_visible_endpoint_markers(stroke) {
     return unsupported("compound stroke endpoint markers");
@@ -1396,9 +1397,29 @@ fn is_svg_image(image: &super::paint::ImageItem<'_>) -> bool {
     .content_type
     .as_deref()
     .is_some_and(|content_type| content_type.eq_ignore_ascii_case("image/svg+xml"))
-    || std::str::from_utf8(&image.data)
-      .ok()
-      .is_some_and(|text| text.trim_start().starts_with("<svg"))
+    || has_svg_document_root(&image.data)
+}
+
+fn has_svg_document_root(data: &[u8]) -> bool {
+  use quick_xml::events::Event;
+  use quick_xml::name::ResolveResult;
+
+  // Image parts can carry an unknown content type. Recognize the XML root,
+  // including a declaration, comments, BOM or namespace prefix before it;
+  // text inside another XML document is not an SVG image.
+  let mut reader = quick_xml::NsReader::from_reader(data);
+  loop {
+    match reader.read_resolved_event() {
+      Ok((namespace, Event::Start(root) | Event::Empty(root))) => {
+        return root.local_name().as_ref() == b"svg"
+          && matches!(namespace, ResolveResult::Bound(uri)
+            if uri.as_ref() == b"http://www.w3.org/2000/svg");
+      }
+      Ok((_, Event::Decl(_) | Event::Comment(_) | Event::PI(_) | Event::DocType(_))) => {}
+      Ok((_, Event::Text(text))) if text.iter().all(u8::is_ascii_whitespace) => {}
+      _ => return false,
+    }
+  }
 }
 
 fn write_prepared_svg(
@@ -2113,6 +2134,11 @@ fn write_prepared_font_run_as_text(
     color,
     kind,
   } = text_run;
+  let visible_glyphs = without_bidi_control_glyphs(glyphs, semantic_text);
+  let glyphs = visible_glyphs.as_ref();
+  if glyphs.is_empty() {
+    return Ok(());
+  }
   let handle = writer
     .fonts
     .register_face(&run.font_face, || writer.refs.alloc())?;
@@ -2151,6 +2177,7 @@ fn write_prepared_font_run_as_text(
   };
   let mut segment_start = 0usize;
   let mut consumed_advance_em = 0.0f32;
+  let mut consumed_y_advance_em = 0.0f32;
   while segment_start < glyphs.len() {
     let segment = next_glyph_segment(glyphs, segment_start);
     let actual_text = segment
@@ -2176,6 +2203,7 @@ fn write_prepared_font_run_as_text(
         )?,
       },
       &glyph_context,
+      &mut consumed_y_advance_em,
       writer.fonts,
     )?;
     segment_start = segment.end;
@@ -2767,6 +2795,7 @@ fn begin_actual_text(content: &mut Content, text: &str) {
   marked.finish();
 }
 
+#[derive(Clone, Copy)]
 struct GlyphWriteContext<'a> {
   source: &'a str,
   baseline_y: f32,
@@ -2789,6 +2818,7 @@ fn write_positioned_glyph_segment(
   content: &mut Content,
   segment: PositionedGlyphSegment<'_, '_>,
   context: &GlyphWriteContext<'_>,
+  consumed_y_advance_em: &mut f32,
   fonts: &mut DirectFontSet,
 ) -> Result<f32> {
   let PositionedGlyphSegment {
@@ -2799,23 +2829,25 @@ fn write_positioned_glyph_segment(
     x_pt,
   } = segment;
   if let Some(actual_text) = actual_text {
+    let actual_text = without_bidi_controls(actual_text);
     let mut prepared = Vec::with_capacity(glyphs.len());
     for (index, glyph) in glyphs.iter().enumerate() {
       let semantic = glyph_semantic_text(context.source, glyph)?;
       ensure_glyph_semantic_mapping_supported(
-        semantic,
+        &semantic,
         requires_codepoint_mappings,
         forbids_private_use_mappings,
       )?;
       let registered = fonts.register_glyph(
         context.handle,
         glyph.glyph_id,
-        (index == 0 || requires_codepoint_mappings).then_some(semantic),
+        (index == 0 || requires_codepoint_mappings).then_some(semantic.as_ref()),
       )?;
       prepared.push(PreparedGlyph { glyph, registered });
     }
-    begin_actual_text(content, actual_text);
-    let advance = write_registered_glyph_segment(content, &prepared, x_pt, context);
+    begin_actual_text(content, &actual_text);
+    let advance =
+      write_registered_glyph_segment(content, &prepared, x_pt, context, consumed_y_advance_em);
     content.end_marked_content();
     return Ok(advance);
   }
@@ -2826,24 +2858,31 @@ fn write_positioned_glyph_segment(
   for glyph in glyphs {
     let semantic = glyph_semantic_text(context.source, glyph)?;
     ensure_glyph_semantic_mapping_supported(
-      semantic,
+      &semantic,
       requires_codepoint_mappings,
       forbids_private_use_mappings,
     )?;
-    let registered = fonts.register_glyph(context.handle, glyph.glyph_id, Some(semantic))?;
+    let registered = fonts.register_glyph(context.handle, glyph.glyph_id, Some(&semantic))?;
     let prepared = PreparedGlyph { glyph, registered };
     if registered.semantic_conflict {
-      let advance = write_registered_glyph_segment(content, &compatible, current_x_pt, context);
+      let advance = write_registered_glyph_segment(
+        content,
+        &compatible,
+        current_x_pt,
+        context,
+        consumed_y_advance_em,
+      );
       compatible.clear();
       current_x_pt += advance * context.font_size_pt * context.horizontal_scale;
       total_advance_em += advance;
 
-      begin_actual_text(content, semantic);
+      begin_actual_text(content, &semantic);
       let advance = write_registered_glyph_segment(
         content,
         std::slice::from_ref(&prepared),
         current_x_pt,
         context,
+        consumed_y_advance_em,
       );
       content.end_marked_content();
       current_x_pt += advance * context.font_size_pt * context.horizontal_scale;
@@ -2852,14 +2891,81 @@ fn write_positioned_glyph_segment(
       compatible.push(prepared);
     }
   }
-  total_advance_em += write_registered_glyph_segment(content, &compatible, current_x_pt, context);
+  total_advance_em += write_registered_glyph_segment(
+    content,
+    &compatible,
+    current_x_pt,
+    context,
+    consumed_y_advance_em,
+  );
   Ok(total_advance_em)
 }
 
-fn glyph_semantic_text<'a>(source: &'a str, glyph: &super::paint::PaintGlyph) -> Result<&'a str> {
+fn glyph_semantic_text<'a>(
+  source: &'a str,
+  glyph: &super::paint::PaintGlyph,
+) -> Result<Cow<'a, str>> {
   source
     .get(glyph.text_range.clone())
+    .map(without_bidi_controls)
     .ok_or_else(|| PdfError::Writer("shaped glyph has an invalid text range".to_string()))
+}
+
+// Unicode UAX #9, section 2: Bidi_Control characters affect ordering, not
+// visible glyphs. Their effect is already resolved by layout. Word fixed output
+// omits their inkless glyphs and text mappings (tdf104649's nine RLMs).
+fn is_bidi_control(character: char) -> bool {
+  matches!(character, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+}
+
+fn without_bidi_controls(text: &str) -> Cow<'_, str> {
+  if text.chars().any(is_bidi_control) {
+    Cow::Owned(text.chars().filter(|&ch| !is_bidi_control(ch)).collect())
+  } else {
+    Cow::Borrowed(text)
+  }
+}
+
+fn glyph_contains_only_bidi_controls(source: &str, glyph: &super::paint::PaintGlyph) -> bool {
+  source
+    .get(glyph.text_range.clone())
+    .is_some_and(|text| !text.is_empty() && text.chars().all(is_bidi_control))
+}
+
+fn without_bidi_control_glyphs<'a>(
+  glyphs: &'a [super::paint::PaintGlyph],
+  source: &str,
+) -> Cow<'a, [super::paint::PaintGlyph]> {
+  if !glyphs
+    .iter()
+    .any(|glyph| glyph_contains_only_bidi_controls(source, glyph))
+  {
+    return Cow::Borrowed(glyphs);
+  }
+  let mut visible: Vec<super::paint::PaintGlyph> = Vec::with_capacity(glyphs.len());
+  let mut leading_x = 0.0;
+  let mut leading_y = 0.0;
+  for glyph in glyphs {
+    if glyph_contains_only_bidi_controls(source, glyph) {
+      if let Some(previous) = visible.last_mut() {
+        previous.x_advance += glyph.x_advance;
+        previous.y_advance += glyph.y_advance;
+      } else {
+        leading_x += glyph.x_advance;
+        leading_y += glyph.y_advance;
+      }
+    } else {
+      let mut glyph = glyph.clone();
+      if visible.is_empty() {
+        glyph.x_offset += leading_x;
+        glyph.y_offset += leading_y;
+        glyph.x_advance += leading_x;
+        glyph.y_advance += leading_y;
+      }
+      visible.push(glyph);
+    }
+  }
+  Cow::Owned(visible)
 }
 
 pub(super) fn ensure_glyph_semantic_mapping_supported(
@@ -2887,7 +2993,46 @@ struct PreparedGlyph<'a> {
   registered: RegisteredGlyph,
 }
 
+// A horizontal CID font's TJ adjustments cannot move the baseline (ISO
+// 32000-1, 9.4.3-9.4.4). Keep each equal-baseline span together and place the
+// next span with Tm. Shaping uses y-up em coordinates; the page uses y-down
+// points. Carry the pen advance across ActualText and CID-conflict boundaries.
 fn write_registered_glyph_segment(
+  content: &mut Content,
+  glyphs: &[PreparedGlyph<'_>],
+  x_pt: f32,
+  context: &GlyphWriteContext<'_>,
+  consumed_y_advance_em: &mut f32,
+) -> f32 {
+  let mut start = 0;
+  let mut total_advance_em = 0.0;
+  while start < glyphs.len() {
+    let baseline_em = *consumed_y_advance_em + glyphs[start].glyph.y_offset;
+    let mut end = start;
+    while end < glyphs.len() {
+      let glyph = glyphs[end].glyph;
+      if end > start && *consumed_y_advance_em + glyph.y_offset != baseline_em {
+        break;
+      }
+      *consumed_y_advance_em += glyph.y_advance;
+      end += 1;
+    }
+    let span_context = GlyphWriteContext {
+      baseline_y: context.baseline_y - baseline_em * context.font_size_pt,
+      ..*context
+    };
+    total_advance_em += write_horizontal_glyph_segment(
+      content,
+      &glyphs[start..end],
+      x_pt + total_advance_em * context.font_size_pt * context.horizontal_scale,
+      &span_context,
+    );
+    start = end;
+  }
+  total_advance_em
+}
+
+fn write_horizontal_glyph_segment(
   content: &mut Content,
   glyphs: &[PreparedGlyph<'_>],
   x_pt: f32,
@@ -3022,9 +3167,9 @@ fn ensure_ordinary_text_supported(text: &super::paint::PaintText<'_>) -> Result<
         ));
       }
       for glyph in &run.glyphs {
-        if glyph.glyph_id == 0 {
-          return unsupported("missing-glyph text painting");
-        }
+        // OpenType glyph 0 is the font's drawable .notdef glyph. Keep its
+        // shaped metrics and outline; missing-character coverage is reported
+        // separately by the font audit, not a writer capability failure.
         if !glyph.x_advance.is_finite()
           || !glyph.x_offset.is_finite()
           || !glyph.y_offset.is_finite()
@@ -3033,9 +3178,6 @@ fn ensure_ordinary_text_supported(text: &super::paint::PaintText<'_>) -> Result<
           return Err(PdfError::Writer(
             "text glyph has non-finite metrics".to_string(),
           ));
-        }
-        if glyph.y_offset.abs() > f32::EPSILON || glyph.y_advance.abs() > f32::EPSILON {
-          return unsupported("vertically positioned text glyphs");
         }
         if !valid_text_range(source, &glyph.text_range) || glyph.text_range.is_empty() {
           return Err(PdfError::Writer(format!(
@@ -3291,7 +3433,7 @@ fn write_gradient_stroke(
   }
 }
 
-fn write_solid_compound_stroke(
+fn write_compound_stroke(
   content: &mut Content,
   commands: &[common::PathCommand],
   stroke: &common::Stroke<'static>,
@@ -3301,13 +3443,26 @@ fn write_solid_compound_stroke(
   if stroke.color.a == 0 {
     return Ok(());
   }
-  let expanded =
-    super::direct_glyph::DirectOutlinePath::from_commands(commands).expanded_stroke(stroke)?;
+  let source = super::direct_glyph::DirectOutlinePath::from_commands(commands);
+  let mut solid = stroke.clone();
+  solid.dash = None;
+  solid.preset_dash = None;
+  let expanded = source.expanded_stroke(&solid)?;
   if expanded.is_empty() {
     return Ok(());
   }
 
   content.save_state();
+  if stroke.resolved_dash().is_some() {
+    // Flat dash ends cut every compound band at the same centerline phase.
+    // Intersect the full-width dash geometry with the solid parallel bands;
+    // their gaps remain transparent, including with a translucent pen.
+    let mut dashed = stroke.clone();
+    dashed.compound = Some(common::StrokeCompound::Single);
+    let dash_clip = source.expanded_stroke(&dashed)?;
+    append_path_commands(content, dash_clip.commands());
+    content.clip_nonzero().end_path();
+  }
   set_alpha(content, resources, refs, None, Some(stroke.color.a))?;
   set_fill_color(content, stroke.color);
   append_path_commands(content, expanded.commands());
@@ -3533,7 +3688,7 @@ fn write_prepared_polyline(
   {
     write_prepared_polyline_fill_only(content, path, writer)?;
     let commands = path_commands_for_paint(path.commands, path.points, path.closed);
-    write_solid_compound_stroke(
+    write_compound_stroke(
       content,
       commands.as_ref(),
       stroke,
@@ -4099,7 +4254,7 @@ fn write_path_item(
   {
     write_path_fill_only(content, path, writer)?;
     let commands = path_commands_for_paint(&path.commands, &path.points, path.closed);
-    write_solid_compound_stroke(
+    write_compound_stroke(
       content,
       commands.as_ref(),
       stroke,
@@ -5837,12 +5992,7 @@ mod tests {
       },
       stops[1].clone(),
     ];
-    assert!(matches!(
-      DirectGradientSet::validate(&path_gradient, bounds),
-      Err(PdfError::DirectWriterUnsupported {
-        feature: "coincident hard-edge gradient stops"
-      })
-    ));
+    DirectGradientSet::validate(&path_gradient, bounds).unwrap();
   }
 
   fn glyph_path_gradient(
@@ -6222,6 +6372,35 @@ mod tests {
     assert_eq!(pixels.rgb, EXPECTED);
     assert!(pixels.alpha.is_none());
     assert!(pixels.icc_profile.is_none());
+  }
+
+  #[test]
+  fn svg_sniffing_recognizes_the_namespaced_root_after_xml_prolog() {
+    let sources: &[&[u8]] = &[
+      br#"<svg xmlns="http://www.w3.org/2000/svg"/>"#,
+      br#"<?xml version="1.0"?><!-- generator -->
+        <svg xmlns="http://www.w3.org/2000/svg"/>"#,
+      b"\xef\xbb\xbf<?xml version='1.0'?><?generator svg?>
+        <s:svg xmlns:s='http://www.w3.org/2000/svg'/>",
+      br#"<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+        "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+        <svg xmlns="http://www.w3.org/2000/svg"/>"#,
+    ];
+    for source in sources {
+      assert!(has_svg_document_root(source));
+      let mut image = test_image_item(source.to_vec());
+      image.content_type = "image/unknown".into();
+      assert!(render(&image_document(image), &uncompressed_options()).is_ok());
+    }
+    for source in [
+      "<svg xmlns='urn:other'/>",
+      "<svgExtra xmlns='http://www.w3.org/2000/svg'/>",
+      "<document><svg xmlns='http://www.w3.org/2000/svg'/></document>",
+      "<!-- <svg xmlns='http://www.w3.org/2000/svg'/> -->",
+      "not XML <svg xmlns='http://www.w3.org/2000/svg'/>",
+    ] {
+      assert!(!has_svg_document_root(source.as_bytes()), "{source}");
+    }
   }
 
   #[test]
@@ -7068,7 +7247,7 @@ mod tests {
   }
 
   #[test]
-  fn direct_writer_expands_closed_solid_compound_paths_for_raw_and_prepared_pages() {
+  fn direct_writer_expands_closed_compound_paths_for_raw_and_prepared_pages() {
     let compound_path = |compound, commands: bool, alpha| {
       let points = [
         common::Point {
@@ -7133,41 +7312,57 @@ mod tests {
       (common::StrokeCompound::ThinThick, true, 4),
       (common::StrokeCompound::Triple, false, 6),
     ] {
-      let mut raw = blank_document(&[(320.0, 260.0)]);
-      raw.pages[0]
-        .items
-        .push(compound_path(compound, commands, 192));
+      for dashed in [false, true] {
+        let mut raw = blank_document(&[(320.0, 260.0)]);
+        raw.pages[0]
+          .items
+          .push(compound_path(compound, commands, 192));
+        if dashed {
+          let common::DisplayItem::Path(path) = &mut raw.pages[0].items[0] else {
+            unreachable!();
+          };
+          let stroke = path.stroke.as_mut().unwrap();
+          stroke.preset_dash = Some(common::StrokeDashPreset::DashDot);
+          stroke.dash_offset = Pt(1.5);
+        }
 
-      let mut prepared = raw.clone();
-      prepared.pages[0]
-        .items
-        .push(common::DisplayItem::LinkArea(common::LinkArea {
-          bounds: common::Rect {
-            origin: common::Point {
-              x: Pt(1.0),
-              y: Pt(1.0),
+        let mut prepared = raw.clone();
+        prepared.pages[0]
+          .items
+          .push(common::DisplayItem::LinkArea(common::LinkArea {
+            bounds: common::Rect {
+              origin: common::Point {
+                x: Pt(1.0),
+                y: Pt(1.0),
+              },
+              size: Size {
+                width: Pt(1.0),
+                height: Pt(1.0),
+              },
             },
-            size: Size {
-              width: Pt(1.0),
-              height: Pt(1.0),
-            },
-          },
-          target: "https://example.test/".into(),
-        }));
+            target: "https://example.test/".into(),
+          }));
 
-      for document in [&raw, &prepared] {
-        let pdf =
-          String::from_utf8_lossy(&render(document, &uncompressed_options()).unwrap()).into_owned();
-        let content = object_body(&pdf, 4);
-        let tokens = content.split_ascii_whitespace().collect::<Vec<_>>();
-        assert_eq!(
-          tokens.iter().filter(|&&token| token == "h").count(),
-          boundary_count
-        );
-        assert_eq!(tokens.iter().filter(|&&token| token == "f").count(), 1);
-        assert!(!tokens.contains(&"S"), "{compound:?}: {content}");
-        assert!(!tokens.contains(&"B"), "{compound:?}: {content}");
-        assert!(pdf.contains("/ca 0.7529412"), "{compound:?}: {pdf}");
+        for document in [&raw, &prepared] {
+          let pdf = String::from_utf8_lossy(&render(document, &uncompressed_options()).unwrap())
+            .into_owned();
+          let content = object_body(&pdf, 4);
+          let tokens = content.split_ascii_whitespace().collect::<Vec<_>>();
+          let contours = tokens.iter().filter(|&&token| token == "h").count();
+          if dashed {
+            assert!(contours > boundary_count, "dash clip contours");
+            assert!(
+              tokens.contains(&"W"),
+              "compound gaps intersect the dash clip"
+            );
+          } else {
+            assert_eq!(contours, boundary_count);
+          }
+          assert_eq!(tokens.iter().filter(|&&token| token == "f").count(), 1);
+          assert!(!tokens.contains(&"S"), "{compound:?}: {content}");
+          assert!(!tokens.contains(&"B"), "{compound:?}: {content}");
+          assert!(pdf.contains("/ca 0.7529412"), "{compound:?}: {pdf}");
+        }
       }
     }
 
@@ -7220,10 +7415,12 @@ mod tests {
 
     let mut dashed = base.clone();
     dashed.preset_dash = Some(common::StrokeDashPreset::Dash);
+    assert!(ensure_path_stroke_supported(&dashed, true).is_ok());
+    dashed.cap = Some(common::StrokeCap::Round);
     assert!(matches!(
       ensure_path_stroke_supported(&dashed, true),
       Err(PdfError::DirectWriterUnsupported {
-        feature: "dashed compound strokes"
+        feature: "non-flat dashed compound strokes"
       })
     ));
     assert!(matches!(
@@ -7703,6 +7900,126 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_omits_bidi_controls_without_changing_shaped_positions() {
+    let source = "\u{200f}a\u{200e}b\u{061c}";
+    let glyphs = source
+      .char_indices()
+      .map(|(start, ch)| super::super::paint::PaintGlyph {
+        glyph_id: 3,
+        text_range: start..start + ch.len_utf8(),
+        x_advance: 0.5,
+        y_advance: 0.25,
+        x_offset: 0.125,
+        y_offset: -0.125,
+        bounds_em: None,
+      })
+      .collect::<Vec<_>>();
+    let visible = without_bidi_control_glyphs(&glyphs, source);
+    assert_eq!(visible.len(), 2);
+    let positions = |glyphs: &[super::super::paint::PaintGlyph]| {
+      let mut pen = (0.0, 0.0);
+      glyphs
+        .iter()
+        .map(|glyph| {
+          let position = (pen.0 + glyph.x_offset, pen.1 + glyph.y_offset);
+          pen.0 += glyph.x_advance;
+          pen.1 += glyph.y_advance;
+          position
+        })
+        .collect::<Vec<_>>()
+    };
+    let original = positions(&glyphs);
+    assert_eq!(positions(&visible), [original[1], original[3]]);
+    assert_eq!(visible.iter().map(|g| g.x_advance).sum::<f32>(), 2.5);
+    assert_eq!(visible.iter().map(|g| g.y_advance).sum::<f32>(), 1.25);
+    for codepoint in [
+      0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068,
+      0x2069,
+    ] {
+      let control = char::from_u32(codepoint).unwrap();
+      assert_eq!(without_bidi_controls(&format!("a{control}b")), "ab");
+    }
+    // Joiners and variation selectors retain their separate shaping semantics.
+    assert_eq!(
+      without_bidi_controls("a\u{200c}\u{200d}\u{fe0f}b"),
+      "a\u{200c}\u{200d}\u{fe0f}b"
+    );
+    assert!(matches!(
+      without_bidi_control_glyphs(&glyphs[1..2], source),
+      Cow::Borrowed(_)
+    ));
+  }
+
+  #[test]
+  fn direct_writer_preserves_vertical_positions_across_clusters_and_cid_conflicts() {
+    for horizontal_scale in [0.75, 1.0, 1.5] {
+      let document = text_document(
+        "abcdef",
+        common::TextStyle {
+          font_family: Some("Liberation Serif".into()),
+          font_size: Pt(12.0),
+          horizontal_scale: Some(horizontal_scale),
+          color: color(0, 0, 0, u8::MAX),
+          ..Default::default()
+        },
+      );
+      let options = uncompressed_options();
+      let mut paint = super::super::paint::prepare_for_direct(&document, &options);
+      let super::super::paint::PaintItem::Text(text) = &mut paint.pages[0].items[0] else {
+        unreachable!();
+      };
+      let baseline = text.portions[0].baseline_y;
+      let glyphs = &mut text.portions[0].glyphs.as_mut().unwrap()[0].glyphs;
+      assert_eq!(glyphs.len(), 6);
+      for ((glyph, offset), advance) in glyphs
+        .iter_mut()
+        .zip([0.0, 0.25, -0.25, 0.0, 0.0, 0.125])
+        .zip([0.125, 0.25, -0.125, 0.0, -0.25, 0.0])
+      {
+        glyph.x_advance = 0.5;
+        glyph.x_offset = 0.0;
+        glyph.y_offset = offset;
+        glyph.y_advance = advance;
+      }
+      glyphs[1].text_range = 1..3;
+      glyphs[2].text_range = 1..3;
+      glyphs[5].glyph_id = glyphs[0].glyph_id;
+      let selection = PageSelection::from_range(document.pages.len(), None).unwrap();
+      let conformance = DirectConformance::from_options(&options).unwrap();
+      let bytes =
+        write_page_document(&document, &options, &selection, Some(&paint), conformance).unwrap();
+      let pdf = String::from_utf8_lossy(&bytes);
+      let tokens = pdf.split_ascii_whitespace().collect::<Vec<_>>();
+      let matrices = tokens
+        .windows(7)
+        .filter(|window| window[6].starts_with("Tm"))
+        .map(|window| std::array::from_fn(|index| window[index].parse::<f32>().unwrap()))
+        .collect::<Vec<[f32; 6]>>();
+      assert_eq!(matrices.len(), 5);
+      for (matrix, (index, rise)) in
+        matrices
+          .into_iter()
+          .zip([(0, 0.0), (1, 4.5), (2, 1.5), (3, 3.0), (5, 1.5)])
+      {
+        assert_matrix_near(
+          matrix,
+          [
+            horizontal_scale,
+            0.0,
+            0.0,
+            -1.0,
+            72.0 + index as f32 * 6.0 * horizontal_scale,
+            baseline - rise,
+          ],
+        );
+      }
+      assert_eq!(pdf.matches("/ActualText").count(), 2);
+      assert!(pdf.contains("/ActualText(bc)"), "{pdf}");
+      assert!(pdf.contains("/ActualText(f)"), "{pdf}");
+    }
+  }
+
+  #[test]
   fn direct_writer_splits_actual_text_at_exact_multi_glyph_cluster_boundaries() {
     let glyph = |text_range| super::super::paint::PaintGlyph {
       glyph_id: 1,
@@ -7814,6 +8131,49 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_embeds_notdef_and_preserves_missing_character_diagnostics() {
+    let document = text_document(
+      "ab",
+      common::TextStyle {
+        font_family: Some("Liberation Serif".into()),
+        font_size: Pt(12.0),
+        color: color(0, 0, 0, u8::MAX),
+        ..Default::default()
+      },
+    );
+    let options = uncompressed_options();
+    let mut paint = super::super::paint::prepare_for_direct(&document, &options);
+    let super::super::paint::PaintItem::Text(text) = &mut paint.pages[0].items[0] else {
+      unreachable!();
+    };
+    let glyphs = &mut text.portions[0].glyphs.as_mut().unwrap()[0].glyphs;
+    assert_eq!(glyphs.len(), 2);
+    // Exercise an unavailable glyph with a non-PUA source character. Both
+    // uses share CID 0 but must retain distinct Unicode text and advances.
+    for glyph in glyphs {
+      glyph.glyph_id = 0;
+    }
+    let audit = super::super::paint::conversion_font_audit_for_direct(&paint);
+    assert_eq!(
+      audit
+        .issues
+        .iter()
+        .filter(|issue| issue.kind == crate::PdfFontAuditIssueKind::MissingGlyph)
+        .count(),
+      2
+    );
+    let selection = PageSelection::from_range(document.pages.len(), None).unwrap();
+    let conformance = DirectConformance::from_options(&options).unwrap();
+    let pdf = write_page_document(&document, &options, &selection, Some(&paint), conformance)
+      .expect("a font's .notdef glyph is renderable");
+    let pdf = String::from_utf8_lossy(&pdf);
+    assert!(pdf.contains("/Subtype/CIDFontType2"));
+    assert!(pdf.contains("/FontFile2"));
+    assert!(pdf.contains("/ToUnicode"));
+    assert!(pdf.contains("/ActualText(b)"));
+  }
+
+  #[test]
   fn direct_writer_accepts_the_source_backed_pdf_semantic_remapping_families() {
     let base_style = common::TextStyle {
       font_family: Some("Liberation Serif".into()),
@@ -7844,6 +8204,9 @@ mod tests {
   #[test]
   fn direct_writer_applies_profile_semantic_rules_after_legacy_symbol_remapping() {
     assert!(ensure_glyph_semantic_mapping_supported("\u{2022}", true, true).is_ok());
+    let webdings =
+      super::super::paint::symbol_font_semantic_text("\u{f045}\u{f04a}\u{f049}", Some("Webdings"));
+    assert!(ensure_glyph_semantic_mapping_supported(&webdings, true, true).is_ok());
     assert!(ensure_glyph_semantic_mapping_supported("\u{f0b7}", false, false).is_ok());
     assert!(ensure_glyph_semantic_mapping_supported("\u{f0b7}", true, false).is_ok());
     assert!(matches!(

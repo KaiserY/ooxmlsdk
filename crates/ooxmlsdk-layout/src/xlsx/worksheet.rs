@@ -588,7 +588,7 @@ impl CalcSheet {
       .iter()
       .flat_map(|drawing| drawing.shapes.iter())
     {
-      if shape.hidden || !shape.print_object {
+      if shape.hidden || !shape.print_object || !self.vml_note_prints_in_place(shape) {
         continue;
       }
       let Some(anchor) = shape.anchor else {
@@ -600,6 +600,16 @@ impl CalcSheet {
       });
     }
     used
+  }
+
+  pub(crate) fn vml_note_prints_in_place(
+    &self,
+    shape: &super::object_resources::VmlShapeModel,
+  ) -> bool {
+    // pageSetup.cellComments defaults to none. Screen visibility alone does
+    // not make a note printable; atEnd notes do not occupy their sheet anchor.
+    shape.object_type.as_deref() != Some("Note")
+      || self.page_settings.cell_comments == x::CellCommentsValues::AsDisplayed
   }
 
   fn drawing_anchor_range(&self, anchor: &super::drawing::DrawingAnchorModel) -> Option<CellRange> {

@@ -15583,6 +15583,41 @@ struct DataLabelTextLayout<'a, 'data> {
   text_frame: ResolvedDataLabelTextFrame,
 }
 
+pub(crate) fn lower_centered_chart_data_label(
+  frame: ChartFrame,
+  center: (f32, f32),
+  label: &crate::render::chart::ClusteredColumnDataLabel<'_>,
+  style: &TextStyle,
+  rich_text_styles: &[TextStyle],
+  metrics: &mut TextMetrics,
+) -> Vec<PageItem> {
+  let text_frame = resolved_radial_data_label_text_frame(frame, label);
+  let (width, height) =
+    data_label_text_dimensions(metrics, label, style, rich_text_styles, text_frame);
+  let automatic = PlotRect {
+    left: center.0 - width * 0.5,
+    top: center.1 - height * 0.5,
+    width,
+    height,
+  };
+  let positioned = label.layout.map_or(automatic, |layout| {
+    apply_manual_text_layout(frame, automatic, layout)
+  });
+  let mut items = Vec::new();
+  push_data_label_text_components(
+    &mut items,
+    metrics,
+    DataLabelTextLayout {
+      origin: (positioned.left, positioned.top),
+      label,
+      style,
+      rich_text_styles,
+      text_frame,
+    },
+  );
+  items
+}
+
 fn push_data_label_text_components(
   items: &mut Vec<PageItem>,
   metrics: &mut TextMetrics,

@@ -1274,7 +1274,7 @@ fn shape_blip_fill(properties: &xdr::ShapeProperties) -> Option<&a::BlipFill> {
   }
 }
 
-fn shape_blip_tile(fill: &a::BlipFill) -> Option<Box<a::Tile>> {
+pub(super) fn shape_blip_tile(fill: &a::BlipFill) -> Option<Box<a::Tile>> {
   match fill.blip_fill_choice.as_ref() {
     Some(a::BlipFillChoice::Stretch(_)) => None,
     Some(a::BlipFillChoice::Tile(tile)) => Some(tile.clone()),
@@ -1283,7 +1283,7 @@ fn shape_blip_tile(fill: &a::BlipFill) -> Option<Box<a::Tile>> {
   }
 }
 
-fn drawingml_blip_crop(blip_fill: &a::BlipFill) -> ImageCrop {
+pub(super) fn drawingml_blip_crop(blip_fill: &a::BlipFill) -> ImageCrop {
   let source = blip_fill.source_rectangle.as_ref();
   ImageCrop {
     left: source

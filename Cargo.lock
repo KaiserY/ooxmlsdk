@@ -1210,6 +1210,7 @@ version = "0.13.0"
 dependencies = [
  "fontique",
  "harfrust",
+ "icu_properties",
  "icu_segmenter",
  "ooxmlsdk",
  "skrifa 0.46.2",
@@ -1306,6 +1307,7 @@ dependencies = [
  "smallvec",
  "subsetter",
  "thiserror",
+ "tiff",
  "unicode-bidi",
  "unicode-script",
  "usvg",

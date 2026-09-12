@@ -20,9 +20,13 @@ pub struct LayoutOptions {
   pub default_document_language: Option<String>,
   /// Local civil time to use when an application explicitly refreshes
   /// unlocked WordprocessingML DATE, TIME, PRINTDATE, and SAVEDATE fields or
-  /// generated PresentationML `datetime` text fields.
+  /// generated PresentationML `datetime` text fields. SpreadsheetML formula
+  /// recalculation uses its date for TODAY(), in the workbook's date system.
+  /// SpreadsheetML header/footer `&D` and `&T` fields use this local time
+  /// with the format locale. Without it, their legacy literal output remains.
   ///
-  /// Leaving this unset preserves the package's cached field results.
+  /// Leaving this unset preserves Word/Presentation cached field results;
+  /// spreadsheet TODAY() retains the formula evaluator's system-clock fallback.
   pub field_update_datetime: Option<FieldUpdateDateTime>,
   /// IANA time-zone name used to convert absolute package-property
   /// timestamps, such as `dcterms:created`, when fields are refreshed.
@@ -31,6 +35,8 @@ pub struct LayoutOptions {
   /// absent or invalid, fields that require an absolute-to-local conversion
   /// preserve their cached results.
   pub field_update_time_zone: Option<String>,
+  /// Include slides marked as hidden in PresentationML fixed-format output.
+  pub include_hidden_slides: bool,
   /// Fixed-format bitmap working density requested by the caller.  `None`
   /// retains the Office print-compatible 200-DPI default.
   pub fixed_output_raster_dpi: Option<u32>,

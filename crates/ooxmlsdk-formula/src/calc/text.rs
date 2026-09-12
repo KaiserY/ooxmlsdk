@@ -2,7 +2,13 @@ use encoding_rs::WINDOWS_1252;
 use icu_properties::{CodePointMapData, props::GeneralCategory};
 
 pub fn trim_formula_text(value: &str) -> String {
-  value.split_whitespace().collect::<Vec<_>>().join(" ")
+  // ECMA-376 §18.17.7.329 defines space as U+0020. Tabs, line breaks and
+  // nonbreaking/ideographic spaces are data, not separators for TRIM.
+  value
+    .split(' ')
+    .filter(|part| !part.is_empty())
+    .collect::<Vec<_>>()
+    .join(" ")
 }
 
 pub fn proper_formula_text(value: &str) -> String {
@@ -463,7 +469,13 @@ mod tests {
 
   #[test]
   fn trims_propers_and_rot13s_text() {
-    assert_eq!(trim_formula_text("  one\t two\nthree  "), "one two three");
+    assert_eq!(
+      trim_formula_text("  one\t two\nthree  "),
+      "one\t two\nthree"
+    );
+    assert_eq!(trim_formula_text("  one   two  "), "one two");
+    assert_eq!(trim_formula_text(" \u{a0} \u{3000} "), "\u{a0} \u{3000}");
+    assert_eq!(trim_formula_text("   "), "");
     assert_eq!(proper_formula_text("hello 2world"), "Hello 2World");
     assert_eq!(rot13_formula_text("Abc-Mno-Zz"), "Nop-Zab-Mm");
   }

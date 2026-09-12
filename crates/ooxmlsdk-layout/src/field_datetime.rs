@@ -1,6 +1,7 @@
 use crate::localization::canonical_locale;
 use crate::options::FieldUpdateDateTime;
 use icu_calendar::Gregorian;
+use icu_calendar::cal::Japanese;
 use icu_datetime::fieldsets::{T, YMD, YMDE};
 use icu_datetime::input::{Date, DateTime, Time};
 use icu_datetime::options::YearStyle;
@@ -208,7 +209,36 @@ pub(crate) fn format_office_long_date(
   Some(normalize_office_field_output(formatted, language))
 }
 
-fn format_office_default_time(
+pub(crate) fn format_spreadsheet_system_long_date(
+  language: Option<&str>,
+  value: FieldUpdateDateTime,
+) -> Option<String> {
+  let locale = field_locale(language)?;
+  // Excel's F800 format omits the weekday in zh-CN fixed output, even
+  // when its saved fallback picture contains dddd. This is independent
+  // from PowerPoint fields that explicitly request a weekday.
+  let chinese_mainland = locale.id.language.as_str() == "zh"
+    && locale
+      .id
+      .region
+      .is_some_and(|region| region.as_str() == "CN");
+  format_office_long_date(language, value, !chinese_mainland)
+}
+
+pub(crate) fn format_office_short_time(
+  language: Option<&str>,
+  value: FieldUpdateDateTime,
+) -> Option<String> {
+  let locale = field_locale(language)?;
+  let time = field_time(value)?;
+  let formatter = NoCalendarFormatter::try_new(locale.into(), T::short()).ok()?;
+  Some(normalize_office_field_output(
+    formatter.format(&time).to_string(),
+    language,
+  ))
+}
+
+pub(crate) fn format_office_default_time(
   language: Option<&str>,
   value: FieldUpdateDateTime,
 ) -> Option<String> {
@@ -346,18 +376,19 @@ pub(crate) fn format_spreadsheet_date_picture(
   fallback_language: Option<&str>,
   value: FieldUpdateDateTime,
 ) -> Option<String> {
-  let (picture, embedded_language) = spreadsheet_date_picture_to_field_picture(picture)?;
-  format_picture(
-    &picture,
-    embedded_language.as_deref().or(fallback_language),
-    value,
-  )
+  let embedded_language = spreadsheet_date_picture_language(picture);
+  let language = embedded_language.as_deref().or(fallback_language);
+  let picture = spreadsheet_date_picture_to_field_picture(picture, language, value)?;
+  format_picture(&picture, language, value)
 }
 
-fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, Option<String>)> {
+fn spreadsheet_date_picture_to_field_picture(
+  picture: &str,
+  language: Option<&str>,
+  value: FieldUpdateDateTime,
+) -> Option<String> {
   let chars = picture.chars().collect::<Vec<_>>();
   let mut output = String::new();
-  let mut embedded_language = None;
   let mut index = 0usize;
   let mut saw_date_token = false;
   let mut previous_field = None;
@@ -369,7 +400,10 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
       break;
     }
     if ascii_prefix_eq_ignore_case(&chars[index..], "am/pm") {
-      output.push_str("am/pm");
+      // SpreadsheetML's explicit AM/PM token keeps these labels even
+      // under a Chinese format locale (built-in 18/19 and custom formats).
+      // System-time F400 is resolved separately by the worksheet formatter.
+      push_icu_quoted_literal(&mut output, if value.hour < 12 { "AM" } else { "PM" });
       previous_field = Some('a');
       index += "am/pm".len();
       continue;
@@ -394,9 +428,6 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
           // Elapsed-time brackets are not calendar fields. The worksheet
           // formatter handles them before entering this locale formatter.
           return None;
-        }
-        if let Some(lcid) = marker.strip_prefix("$-") {
-          embedded_language = spreadsheet_lcid_language(lcid).map(ToOwned::to_owned);
         }
         index = end + 1;
       }
@@ -430,6 +461,17 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
         output.push_str(if count <= 2 { "yy" } else { "yyyy" });
         saw_date_token = true;
         previous_field = Some('y');
+        index += count;
+      }
+      'g' | 'G' | 'e' | 'E' => {
+        let count = chars[index..]
+          .iter()
+          .take_while(|candidate| candidate.eq_ignore_ascii_case(&ch))
+          .count();
+        let text = spreadsheet_era_field(ch.to_ascii_lowercase(), count, language, value)?;
+        push_icu_quoted_literal(&mut output, &text);
+        saw_date_token = true;
+        previous_field = Some(ch.to_ascii_lowercase());
         index += count;
       }
       'm' | 'M' => {
@@ -489,7 +531,97 @@ fn spreadsheet_date_picture_to_field_picture(picture: &str) -> Option<(String, O
       }
     }
   }
-  saw_date_token.then_some((output, embedded_language))
+  saw_date_token.then_some(output)
+}
+
+fn spreadsheet_date_picture_language(picture: &str) -> Option<String> {
+  let mut chars = picture.chars();
+  let mut language = None;
+  while let Some(ch) = chars.next() {
+    match ch {
+      ';' => break,
+      '\\' | '_' | '*' => {
+        chars.next();
+      }
+      '"' => {
+        for ch in chars.by_ref() {
+          if ch == '"' {
+            break;
+          }
+        }
+      }
+      '[' => {
+        let marker = chars
+          .by_ref()
+          .take_while(|ch| *ch != ']')
+          .collect::<String>();
+        let Some((_, culture)) = marker.strip_prefix('$').and_then(|s| s.split_once('-')) else {
+          continue;
+        };
+        // Legacy LCIDs and formatCode16 culture tags select the format
+        // language independently of the application's UI/format locale.
+        let resolved = spreadsheet_lcid_language(culture)
+          .map(ToOwned::to_owned)
+          .or_else(|| canonical_locale(culture).map(|_| culture.to_owned()));
+        if resolved.is_some() {
+          language = resolved;
+        }
+      }
+      _ => {}
+    }
+  }
+  language
+}
+
+fn spreadsheet_era_field(
+  field: char,
+  width: usize,
+  language: Option<&str>,
+  value: FieldUpdateDateTime,
+) -> Option<String> {
+  let locale = field_locale(language)?;
+  if locale.id.language.as_str() != "ja" {
+    // MS-OI29500 2.1.713(f): Office maps both e and ee to yyyy outside
+    // Japan and Taiwan, overriding ECMA-376's two-digit-year rule.
+    // Taiwanese eras require a separate calendar implementation.
+    let taiwanese = locale.id.language.as_str() == "zh"
+      && locale
+        .id
+        .region
+        .is_some_and(|region| region.as_str() == "TW");
+    return (field == 'e' && !taiwanese).then(|| format!("{:04}", value.year));
+  }
+  let date = field_date(value)?.to_calendar(Japanese::new());
+  if field == 'e' {
+    let year = date.era_year().year;
+    // Excel's explicit Gannen format displays the first year as 元; the
+    // calendar data, rather than a fixture-specific date subtraction,
+    // decides the era and the year at every transition.
+    if year == 1
+      && language.is_some_and(|language| language.to_ascii_lowercase().contains("-x-gannen"))
+    {
+      return Some("元".to_owned());
+    }
+    return Some(format!("{year:0width$}", width = width.min(2)));
+  }
+  let pattern =
+    DateTimePattern::try_from_pattern_str(if width == 1 { "GGGGG" } else { "GGGG" }).ok()?;
+  let mut names = FixedCalendarDateTimeNames::<Japanese>::try_new(locale.into()).ok()?;
+  let formatter = names.include_for_pattern(&pattern).ok()?;
+  let datetime = DateTime {
+    date,
+    time: field_time(value)?,
+  };
+  let name = formatter
+    .format(&datetime)
+    .try_write_to_string()
+    .ok()?
+    .into_owned();
+  Some(if width == 2 {
+    name.chars().take(1).collect()
+  } else {
+    name
+  })
 }
 
 fn next_spreadsheet_date_time_field(chars: &[char], mut index: usize) -> Option<char> {
@@ -560,6 +692,8 @@ fn spreadsheet_lcid_language(value: &str) -> Option<&'static str> {
     0x0804 => Some("zh-CN"),
     0x0809 => Some("en-GB"),
     0x0816 => Some("pt-PT"),
+    // MS-LCID 2.2: Australian English is distinct from the caller's locale.
+    0x0c09 => Some("en-AU"),
     0x0c0a => Some("es-ES"),
     _ => None,
   }
@@ -806,10 +940,177 @@ mod tests {
   }
 
   #[test]
+  fn spreadsheet_explicit_ampm_keeps_its_labels_across_format_locales() {
+    for language in ["en-US", "zh-CN", "fr-CA", "ja-JP"] {
+      for (hour, expected) in [
+        (0, "12:19 AM"),
+        (8, "8:19 AM"),
+        (12, "12:19 PM"),
+        (20, "8:19 PM"),
+      ] {
+        let value = FieldUpdateDateTime { hour, ..VALUE };
+        for picture in ["h:mm AM/PM", "h:mm am/pm"] {
+          assert_eq!(
+            format_spreadsheet_date_picture(picture, Some(language), value).as_deref(),
+            Some(expected),
+            "{language}: {picture}"
+          );
+        }
+      }
+    }
+    // Word field pictures continue to use localized day-period resources.
+    assert_eq!(
+      format_date_time_picture("h:mm am/pm", Some("zh-CN"), VALUE).as_deref(),
+      Some("8:19 下午")
+    );
+  }
+
+  #[test]
   fn adjacent_spreadsheet_escapes_remain_one_literal() {
     assert_eq!(
       super::format_spreadsheet_date_picture(r"yyyy/\ m/\ d\.\ h:mm", Some("zh-CN"), VALUE),
       Some("2026/ 7/ 12. 20:19".to_string())
+    );
+  }
+
+  #[test]
+  fn japanese_spreadsheet_eras_follow_calendar_boundaries_and_format_tags() {
+    for (year, month, day, expected) in [
+      (2024, 5, 28, "令和6年5月28日"),
+      (2019, 4, 30, "平成31年4月30日"),
+      (2019, 5, 1, "令和元年5月1日"),
+      (2020, 1, 1, "令和2年1月1日"),
+      (1989, 1, 7, "昭和64年1月7日"),
+      (1989, 1, 8, "平成元年1月8日"),
+    ] {
+      let value = FieldUpdateDateTime {
+        year,
+        month,
+        day,
+        ..VALUE
+      };
+      assert_eq!(
+        super::format_spreadsheet_date_picture(
+          r#"[$-ja-JP-x-gannen]ggge"年"m"月"d"日";@"#,
+          Some("zh-CN"),
+          value,
+        )
+        .as_deref(),
+        Some(expected),
+      );
+    }
+    let value = FieldUpdateDateTime {
+      year: 2019,
+      month: 5,
+      day: 1,
+      ..VALUE
+    };
+    for (picture, expected) in [
+      (r#"[$-411]ggge"年"m"月"d"日""#, "令和1年5月1日"),
+      ("[$-ja-JP]ge/mm/dd", "R1/05/01"),
+      ("[$-ja-JP]ggee/mm/dd", "令01/05/01"),
+      (r#"[$-ja-JP]"ggge" yyyy/mm/dd"#, "ggge 2019/05/01"),
+      ("[$-zh-CN]e/mm/dd", "2019/05/01"),
+      ("[$-en-US]ee/mm/dd", "2019/05/01"),
+      (r#"[$-ja-JP]ggge"年"m"月"d"日""#, "令和1年5月1日"),
+    ] {
+      assert_eq!(
+        super::format_spreadsheet_date_picture(picture, Some("en-US"), value).as_deref(),
+        Some(expected),
+      );
+    }
+  }
+
+  #[test]
+  fn non_japanese_era_years_follow_office_full_year_width() {
+    for year in [1999, 2000, 2026] {
+      let value = FieldUpdateDateTime { year, ..VALUE };
+      for language in ["en-US", "zh-CN", "fr-FR"] {
+        for field in ["e", "ee"] {
+          assert_eq!(
+            super::format_spreadsheet_date_picture(
+              &format!("{field}/mm/dd"),
+              Some(language),
+              value
+            ),
+            Some(format!("{year}/07/12")),
+          );
+        }
+      }
+      assert_eq!(
+        super::format_spreadsheet_date_picture("yy/mm/dd", Some("en-US"), value),
+        Some(format!("{:02}/07/12", year % 100)),
+      );
+    }
+  }
+
+  #[test]
+  fn spreadsheet_system_long_date_preserves_explicit_weekday_fields() {
+    for (year, month, day, expected) in [
+      (1904, 3, 1, "1904年3月1日"),
+      (2005, 9, 12, "2005年9月12日"),
+      (1976, 8, 26, "1976年8月26日"),
+      (2019, 1, 21, "2019年1月21日"),
+    ] {
+      let value = FieldUpdateDateTime {
+        year,
+        month,
+        day,
+        ..VALUE
+      };
+      assert_eq!(
+        super::format_spreadsheet_system_long_date(Some("zh-CN"), value).as_deref(),
+        Some(expected)
+      );
+      let explicit_weekday = super::format_office_long_date(Some("zh-CN"), value, true).unwrap();
+      assert!(explicit_weekday.contains(expected));
+      assert_ne!(explicit_weekday, expected);
+    }
+  }
+
+  #[test]
+  fn australian_date_lcid_overrides_the_fallback_format_language() {
+    let value = FieldUpdateDateTime {
+      year: 2019,
+      month: 1,
+      day: 21,
+      ..VALUE
+    };
+    let picture = r"dddd\,\ d\ mmmm\ yyyy";
+    for fallback in ["zh-CN", "ja-JP", "fr-FR"] {
+      for culture in ["C09", "0c09", "000C09", "en-AU"] {
+        assert_eq!(
+          super::format_spreadsheet_date_picture(
+            &format!("[$-{culture}]{picture};@"),
+            Some(fallback),
+            value,
+          )
+          .as_deref(),
+          Some("Monday, 21 January 2019"),
+          "{culture}: {fallback}",
+        );
+      }
+    }
+    // Unrecognized LCIDs still follow the requested format language.
+    let french = super::format_spreadsheet_date_picture(picture, Some("fr-FR"), value);
+    assert!(french.is_some());
+    assert_ne!(french.as_deref(), Some("Monday, 21 January 2019"));
+    assert_eq!(
+      super::format_spreadsheet_date_picture(&format!("[$-7FFF]{picture}"), Some("fr-FR"), value,),
+      french,
+    );
+  }
+
+  #[test]
+  fn spreadsheet_culture_markers_ignore_quoted_escaped_and_later_section_text() {
+    let picture = r#""[$-ja-JP]"\[\$\-ja\-JP\] [$-fr-FR]d-mmm;[$-ja-JP]ggge"#;
+    assert_eq!(
+      super::spreadsheet_date_picture_language(picture).as_deref(),
+      Some("fr-FR")
+    );
+    assert_eq!(
+      super::spreadsheet_date_picture_language("[$-0409]d-mmm").as_deref(),
+      Some("en-US")
     );
   }
 }

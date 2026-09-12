@@ -227,14 +227,18 @@ pub struct PdfOptions {
   pub default_document_language: Option<String>,
 
   /// Local civil time used to refresh unlocked WordprocessingML DATE, TIME,
-  /// PRINTDATE, and SAVEDATE fields. When absent, persisted field results
-  /// remain authoritative.
+  /// PRINTDATE, SAVEDATE, and PresentationML datetime fields, and to evaluate
+  /// SpreadsheetML TODAY(). When absent, Word/Presentation cached fields stay
+  /// authoritative and spreadsheet TODAY() uses the evaluator's system clock.
   pub field_update_datetime: Option<ooxmlsdk_layout::options::FieldUpdateDateTime>,
 
   /// IANA time-zone name used to convert absolute package-property
   /// timestamps when fields such as WordprocessingML CREATEDATE are
   /// refreshed. This is independent from UI language and format locale.
   pub field_update_time_zone: Option<String>,
+
+  /// Include hidden PowerPoint slides in fixed-format output.
+  pub include_hidden_slides: bool,
 
   pub general: PdfGeneralOptions,
   pub images: PdfImageOptions,
@@ -261,6 +265,7 @@ impl Default for PdfOptions {
       default_document_language: None,
       field_update_datetime: None,
       field_update_time_zone: None,
+      include_hidden_slides: false,
       general: PdfGeneralOptions::default(),
       images: PdfImageOptions::default(),
       links: PdfLinkOptions::default(),
@@ -332,6 +337,7 @@ impl PdfOptions {
       default_document_language: self.default_document_language.clone(),
       field_update_datetime: self.field_update_datetime,
       field_update_time_zone: self.field_update_time_zone.clone(),
+      include_hidden_slides: self.include_hidden_slides,
       // WdExportOptimizeFor selects the fixed-output bitmap surface itself:
       // Word's controlled static-3D screen export realizes a 34.5-point face
       // as exactly 46 pixels at 96 DPI rather than reducing a 200-DPI face

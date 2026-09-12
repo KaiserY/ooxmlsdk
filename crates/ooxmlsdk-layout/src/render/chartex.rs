@@ -18,7 +18,6 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2012_chart_style as 
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex as cx;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
-use crate::localization::OfficeStringCatalog;
 use crate::model::{
   BorderStyle, ImageCrop, ImageItem, LineItem, LineItemKind, PageItem, PdfTextSegmentation,
   RectItem, RgbColor, TextItem, TextStyle, common_point, common_rect, common_rgb,
@@ -2404,7 +2403,7 @@ fn axis_title_offset_points(title: Option<&cx::AxisTitle>) -> (f32, f32) {
 }
 
 fn automatic_axis_title(ui_language: Option<&str>) -> &'static str {
-  OfficeStringCatalog::for_ui_language(ui_language).chart_axis_title()
+  crate::localization::office_automatic_chart_axis_title(ui_language)
 }
 
 fn axis_scale(values: impl IntoIterator<Item = f64>, axis: Option<&cx::Axis>) -> AxisScale {
@@ -3164,7 +3163,7 @@ fn waterfall_role_color(appearance: &Appearance, role: WaterfallColorRole) -> Rg
 }
 
 fn waterfall_legend(ui_language: Option<&str>, appearance: &Appearance) -> Vec<(String, RgbColor)> {
-  let names = OfficeStringCatalog::for_ui_language(ui_language).waterfall_legend();
+  let names = crate::localization::office_waterfall_legend(ui_language);
   vec![
     (
       names[0].to_string(),
@@ -6514,6 +6513,44 @@ mod tests {
     assert_eq!(
       (scale.minimum, scale.maximum, scale.major),
       (-100.0, 150.0, 50.0)
+    );
+  }
+
+  #[test]
+  fn automatic_spanish_axis_and_waterfall_text_preserves_authored_captions() {
+    let title = cx::AxisTitle::default();
+    assert_eq!(
+      axis_title(Some(&title), Some("ES_mx")).as_deref(),
+      Some("Título del eje")
+    );
+    assert_eq!(
+      axis_title(Some(&title), Some("en-US")).as_deref(),
+      Some("Axis Title")
+    );
+    assert_eq!(axis_title(None, Some("es-MX")), None);
+    let authored = cx::AxisTitle {
+      text: Some(Box::new(cx::Text {
+        text_choice: Some(cx::TextChoice::TextData(Box::new(cx::TextData {
+          text_data_choice: Some(cx::TextDataChoice::VXsdstring("Authored Axis Title".into())),
+        }))),
+      })),
+      ..cx::AxisTitle::default()
+    };
+    assert_eq!(
+      axis_title(Some(&authored), Some("es-MX")).as_deref(),
+      Some("Authored Axis Title")
+    );
+    assert_eq!(
+      crate::localization::office_waterfall_legend(Some("es-MX")),
+      ["Aumento", "Disminución", "Total"]
+    );
+    assert_eq!(
+      crate::localization::office_waterfall_legend(None),
+      ["Increase", "Decrease", "Total"]
+    );
+    assert_eq!(
+      crate::localization::office_waterfall_legend(Some("zh-TW")),
+      ["增加", "減少", "合計"]
     );
   }
 

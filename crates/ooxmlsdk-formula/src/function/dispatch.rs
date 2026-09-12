@@ -2659,10 +2659,11 @@ fn evaluate_trim_reader<'doc>(
         .map(|row| {
           row
             .into_iter()
-            .map(|value| {
-              FormulaValue::String(Cow::Owned(trim_formula_text(&display_text_from_value(
-                &value,
-              ))))
+            .map(|value| match value {
+              FormulaValue::Error(error) => FormulaValue::Error(error),
+              value => FormulaValue::String(Cow::Owned(trim_formula_text(
+                &display_text_from_value(&value),
+              ))),
             })
             .collect()
         })
@@ -2672,9 +2673,11 @@ fn evaluate_trim_reader<'doc>(
   if is_multicell_scalar_argument(&value) {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
-  Some(FormulaValue::String(Cow::Owned(trim_formula_text(
-    &evaluator.text(&value),
-  ))))
+  let text = match strict_text_arg(evaluator, value) {
+    Ok(text) => text,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  Some(FormulaValue::String(Cow::Owned(trim_formula_text(&text))))
 }
 
 fn evaluate_clean_reader<'doc>(

@@ -610,6 +610,7 @@ pub fn layout_anchor_pages(
     default_document_language: options.default_document_language.clone(),
     field_update_datetime: options.field_update_datetime,
     field_update_time_zone: options.field_update_time_zone.clone(),
+    include_hidden_slides: options.include_hidden_slides,
     fixed_output_raster_dpi: options.fixed_output_raster_dpi,
     native_picture_dpi: options.native_picture_dpi,
     fixed_output_forbids_transparency: options.fixed_output_forbids_transparency,
@@ -1676,7 +1677,15 @@ fn html_content_type_charset(content_type: &str) -> Option<&str> {
   })
 }
 
-fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
+fn push_body_paragraph(blocks: &mut Vec<Block>, paragraph: Paragraph) {
+  push_joined_paragraph(blocks, paragraph, true);
+}
+
+fn push_joined_paragraph(
+  blocks: &mut Vec<Block>,
+  mut paragraph: Paragraph,
+  transfer_frame_page_break_before: bool,
+) {
   if let Some(Block::Paragraph(previous)) = blocks.last_mut()
     && (previous.format.hidden_separator || previous.format.deleted_separator)
   {
@@ -1728,7 +1737,7 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     previous.inlines.append(&mut paragraph.inlines);
     return;
   }
-  push_story_paragraph(blocks, paragraph, true);
+  push_story_paragraph(blocks, paragraph, transfer_frame_page_break_before);
 }
 
 fn normalize_complex_field_paragraph_breaks(blocks: &mut Vec<Block>) {
@@ -5349,6 +5358,7 @@ fn table_cell_model(
         if !context.in_header_footer {
           apply_recovered_table_cell_paragraph_defaults(paragraph, context.styles, &mut model);
         }
+        model.format.hidden_separator = paragraph_mark_is_hidden(paragraph);
         boundary_bookmarks.attach_to_paragraph_start(&mut model);
         let out_of_place_table = paragraph.paragraph_choice.iter().find_map(|choice| {
           let w::ParagraphChoice::Table(table) = choice else {
@@ -5583,32 +5593,10 @@ fn prepend_out_of_place_paragraph_to_nested_table(
   true
 }
 
-fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
-  let Some(frame) = paragraph.format.frame else {
-    blocks.push(Block::paragraph(paragraph));
-    return;
-  };
-  let suppress_overlap = paragraph.format.suppress_overlap == Some(true);
-  let vertical_text_flow = paragraph.format.vertical_text_flow;
-  paragraph.format.frame = None;
-  if let Some(Block::Frame(previous)) = blocks.last_mut()
-    && paragraph_belongs_to_frame(previous, frame, suppress_overlap, vertical_text_flow)
-  {
-    previous.blocks.push(Block::paragraph(paragraph));
-    return;
-  }
-  blocks.push(Block::Frame(FloatingFrame {
-    blocks: vec![Block::paragraph(paragraph)],
-    page_break_before: false,
-    width_pt: frame.width_pt,
-    height_pt: frame.height_pt,
-    height_rule: frame.height_rule,
-    vertical_text_flow,
-    placement: frame.placement,
-    suppress_overlap,
-    outer_fill_color: None,
-    outer_borders: ParagraphBordersModel::default(),
-  }));
+fn push_cell_paragraph(blocks: &mut Vec<Block>, paragraph: Paragraph) {
+  // A hidden paragraph mark joins contents inside this cell just as it does
+  // in the body story. Keep frame page-break handling local to the cell.
+  push_joined_paragraph(blocks, paragraph, false);
 }
 
 fn table_row_grid_properties(properties: Option<&w::TableRowProperties>) -> (usize, usize) {
@@ -7003,6 +6991,7 @@ fn merge_paragraph_frame_properties(format: &mut ParagraphFormat, frame: &w::Fra
   }
   if frame.vertical_position.is_some() {
     merged.placement.vertical_anchor = frame_vertical_anchor(frame.vertical_position);
+    merged.vertical_anchor_explicit = true;
   }
   if let Some(alignment) = frame.x_align {
     merged.placement.horizontal_alignment = Some(frame_horizontal_alignment(alignment));
@@ -7052,7 +7041,26 @@ fn merge_paragraph_frame_properties(format: &mut ParagraphFormat, frame: &w::Fra
     merged.placement.margin_top_pt = vertical_space;
     merged.placement.margin_bottom_pt = vertical_space;
   }
+  resolve_paragraph_frame_vertical_anchor(&mut merged);
   format.frame = Some(merged);
+}
+
+fn resolve_paragraph_frame_vertical_anchor(frame: &mut ParagraphFrameProperties) {
+  if frame.vertical_anchor_explicit {
+    return;
+  }
+  let placement = &mut frame.placement;
+  // The current Office tdf112287/tdf157572 PDFs refine the general "text"
+  // default documented by MS-OI29500 §2.1.43: alignment without y, or a
+  // nonzero y, defaults to the text margins. An explicit y=0 remains text
+  // relative even if yAlign is present. Resolve after merging style layers.
+  placement.vertical_anchor = if placement.vertical_offset_pt != 0.0
+    || (!placement.vertical_offset_explicit && placement.vertical_alignment.is_some())
+  {
+    FrameVerticalAnchor::Margin
+  } else {
+    FrameVerticalAnchor::Text
+  };
 }
 
 fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFrameProperties {
@@ -7067,10 +7075,11 @@ fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFramePrope
     .as_ref()
     .and_then(twips_measure_to_points)
     .unwrap_or(0.0);
-  ParagraphFrameProperties {
+  let mut properties = ParagraphFrameProperties {
     width_pt: frame.width.as_ref().and_then(twips_measure_to_points),
     height_pt,
     height_rule: frame_height_rule(frame.height_type, height_pt),
+    vertical_anchor_explicit: frame.vertical_position.is_some(),
     drop_cap: matches!(
       frame.drop_cap,
       Some(w::DropCapLocationValues::Drop | w::DropCapLocationValues::Margin)
@@ -7097,7 +7106,9 @@ fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFramePrope
       margin_bottom_pt: vertical_space,
       margin_left_pt: horizontal_space,
     },
-  }
+  };
+  resolve_paragraph_frame_vertical_anchor(&mut properties);
+  properties
 }
 
 fn apply_tab_stops(format: &mut ParagraphFormat, tabs: &w::Tabs) {
@@ -8148,7 +8159,7 @@ fn flush_complex_field(
     style.complex_bold = Some(true);
     push_resolved_field_text(
       &mut resolved,
-      "Invalid source specified.".to_string(),
+      styles.locales.field_invalid_citation_source().to_string(),
       style,
       state.hyperlink_url.as_deref(),
     );
@@ -8555,11 +8566,29 @@ fn field_result_is_visible(instr: &str) -> bool {
 
 fn button_field_display_text(instr: &str) -> Option<String> {
   let tokens = field_instruction_tokens(instr);
+  if tokens
+    .first()
+    .is_some_and(|name| name.eq_ignore_ascii_case("MACROBUTTON"))
+  {
+    // Word paints the text following the macro name literally, including
+    // quotation marks and internal spacing. General field argument parsing
+    // would treat those quotes as delimiters and change the visible label.
+    let mut remaining = instr.trim();
+    for _ in 0..2 {
+      let mut quoted = false;
+      let end = remaining.char_indices().find_map(|(index, ch)| {
+        if ch == '"' {
+          quoted = !quoted;
+        }
+        (ch.is_whitespace() && !quoted).then_some(index)
+      })?;
+      remaining = remaining[end..].trim_start();
+    }
+    return (!remaining.is_empty()).then(|| remaining.to_string());
+  }
   tokens
     .first()
-    .is_some_and(|name| {
-      name.eq_ignore_ascii_case("GOTOBUTTON") || name.eq_ignore_ascii_case("MACROBUTTON")
-    })
+    .is_some_and(|name| name.eq_ignore_ascii_case("GOTOBUTTON"))
     .then(|| tokens.get(2..).map(|text| text.join(" ")))
     .flatten()
     .filter(|text| !text.is_empty())
@@ -8999,11 +9028,36 @@ fn refreshed_date_time_field(
 }
 
 fn refreshed_doc_property_field(instr: &str, styles: &StylesCatalog) -> Option<String> {
-  // DOCPROPERTY is refreshed only when the configured Office conversion
+  // Property fields are refreshed only when the configured Office conversion
   // requests field updates. Without that opt-in the authored cached result
   // remains authoritative, matching the ordinary DATE/IF policy.
   styles.import_settings.field_update_datetime?;
   let tokens = field_instruction_tokens(instr);
+  let field_name = tokens.first()?;
+  if field_name.eq_ignore_ascii_case("AUTHOR") || field_name.eq_ignore_ascii_case("LASTSAVEDBY") {
+    // ECMA-376 Part 1 §17.16.5.4 and §17.16.5.31 read dc:creator and
+    // cp:lastModifiedBy respectively, not the rendering host's user name.
+    let mut value = if field_name.eq_ignore_ascii_case("AUTHOR") {
+      styles.author.clone()?
+    } else {
+      styles.last_saved_by.clone()?
+    };
+    let mut switches = tokens[1..].chunks_exact(2);
+    for pair in &mut switches {
+      if pair[0] != r"\*" {
+        return None;
+      }
+      match pair[1].to_ascii_lowercase().as_str() {
+        "upper" => value = value.to_uppercase(),
+        "lower" => value = value.to_lowercase(),
+        "mergeformat" => {}
+        // Preserve authored results for formatting switches whose semantics
+        // are not implemented, including CHARFORMAT's different style source.
+        _ => return None,
+      }
+    }
+    return switches.remainder().is_empty().then_some(value);
+  }
   if !tokens
     .first()
     .is_some_and(|name| name.eq_ignore_ascii_case("DOCPROPERTY"))
@@ -16853,17 +16907,17 @@ fn chart_space_shapes(
     chart_theme_colors,
     chart_space.color_map_override.as_deref(),
   );
-  let chart_area_style = drawingml_chart_area_common_style(
+  let mut chart_area_style = drawingml_chart_area_common_style(
     chart_space.shape_properties.as_deref(),
     chart_theme_colors,
     chart_space.color_map_override.as_deref(),
   );
-  let plot_area_style = drawingml_chart_area_common_style(
+  let mut plot_area_style = drawingml_chart_area_common_style(
     chart_space.chart.plot_area.shape_properties.as_deref(),
     chart_theme_colors,
     chart_space.color_map_override.as_deref(),
   );
-  let floor_style = drawingml_chart_area_common_style(
+  let mut floor_style = drawingml_chart_area_common_style(
     chart_space
       .chart
       .floor
@@ -16872,7 +16926,7 @@ fn chart_space_shapes(
     chart_theme_colors,
     chart_space.color_map_override.as_deref(),
   );
-  let side_wall_style = drawingml_chart_area_common_style(
+  let mut side_wall_style = drawingml_chart_area_common_style(
     chart_space
       .chart
       .side_wall
@@ -16881,7 +16935,7 @@ fn chart_space_shapes(
     chart_theme_colors,
     chart_space.color_map_override.as_deref(),
   );
-  let back_wall_style = drawingml_chart_area_common_style(
+  let mut back_wall_style = drawingml_chart_area_common_style(
     chart_space
       .chart
       .back_wall
@@ -16890,6 +16944,70 @@ fn chart_space_shapes(
     chart_theme_colors,
     chart_space.color_map_override.as_deref(),
   );
+  let mut image_fills = BTreeMap::new();
+  if let Some(resource) = chart_resource {
+    let images = ImageCatalog {
+      by_relationship_id: resource.image_resources.clone(),
+      ..ImageCatalog::default()
+    };
+    for (role, properties, style) in [
+      (
+        "chart",
+        chart_space.shape_properties.as_deref(),
+        &mut chart_area_style,
+      ),
+      (
+        "plot",
+        chart_space.chart.plot_area.shape_properties.as_deref(),
+        &mut plot_area_style,
+      ),
+      (
+        "floor",
+        chart_space
+          .chart
+          .floor
+          .as_deref()
+          .and_then(|area| area.shape_properties.as_deref()),
+        &mut floor_style,
+      ),
+      (
+        "side-wall",
+        chart_space
+          .chart
+          .side_wall
+          .as_deref()
+          .and_then(|area| area.shape_properties.as_deref()),
+        &mut side_wall_style,
+      ),
+      (
+        "back-wall",
+        chart_space
+          .chart
+          .back_wall
+          .as_deref()
+          .and_then(|area| area.shape_properties.as_deref()),
+        &mut back_wall_style,
+      ),
+    ] {
+      let Some(c::ShapePropertiesChoice2::BlipFill(fill)) =
+        properties.and_then(|p| p.shape_properties_choice2.as_ref())
+      else {
+        continue;
+      };
+      let Some(image) =
+        drawingml_blip_shape_image_fill_with_theme(fill, &images, chart_theme_colors)
+      else {
+        continue;
+      };
+      // Each area owns its crop/tile settings even when it shares an image relationship.
+      let key = format!("docx-chart-image/{role}");
+      style.fill = common::ShapeStyleValue::Paint(common::Fill::Image {
+        relationship_id: Some(Cow::Owned(key.clone())),
+        tile: matches!(fill.blip_fill_choice, Some(a::BlipFillChoice::Tile(_))),
+      });
+      image_fills.insert(key, image);
+    }
+  }
   let title_fill_color = chart_space
     .chart
     .title
@@ -17095,7 +17213,7 @@ fn chart_space_shapes(
     })
     .unwrap_or_default();
   let ui_language = styles.locales.ui_language().map(str::to_owned);
-  let automatic_title = styles.locales.strings().chart_title().to_string();
+  let automatic_title = shared_chart::automatic_chart_title(ui_language.as_deref()).to_string();
   let gridline_color = cartesian
     .as_ref()
     .and_then(|chart| chart.value_axis)
@@ -17173,6 +17291,7 @@ fn chart_space_shapes(
   let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
   apply_drawing_effect_extent_to_shape(&mut shape, effect_extent);
   shape.chart = Some(Box::new(InlineChart {
+    image_fills,
     chart_space: Some(Box::new(chart_space.clone())),
     extended_chart_space: None,
     extended_chart_styles: Vec::new(),
@@ -17425,6 +17544,7 @@ fn drawing_extended_chart_shapes(
   let mut shape = chart_shape(width_pt, height_pt, 0.0, placement, None);
   apply_drawing_effect_extent_to_shape(&mut shape, effect_extent);
   shape.chart = Some(Box::new(InlineChart {
+    image_fills: BTreeMap::new(),
     chart_space: None,
     extended_chart_space: Some(Box::new(chart_space.clone())),
     extended_chart_styles: resource.chart_styles.clone(),
@@ -19189,8 +19309,15 @@ fn drawingml_blip_shape_image_fill(
   blip_fill: &a::BlipFill,
   images: &ImageCatalog,
 ) -> Option<InlineShapeImageFill> {
-  let image_properties =
-    drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default(), Some(images))?;
+  drawingml_blip_shape_image_fill_with_theme(blip_fill, images, &ThemeColors::default())
+}
+
+fn drawingml_blip_shape_image_fill_with_theme(
+  blip_fill: &a::BlipFill,
+  images: &ImageCatalog,
+  theme_colors: &ThemeColors,
+) -> Option<InlineShapeImageFill> {
+  let image_properties = drawing_blip_fill_image_properties(blip_fill, theme_colors, Some(images))?;
   let relationship_id = image_properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
   let image_data = image_data_with_effects(resource, &image_properties.effects);
@@ -23671,6 +23798,7 @@ struct VmlImageStyle {
   relative_height_to: Option<VerticalImageReference>,
   relative_height_pct: Option<f32>,
   flattened_group: VmlFlattenedGroupStyle,
+  group_anchor_offsets: bool,
   rotation_deg: f32,
   flip_horizontal: bool,
   flip_vertical: bool,
@@ -23840,6 +23968,7 @@ impl VmlGroupTransform {
     // uses the last duplicate style property.
     let mut output = vec![
       vml_group_child_style_without_relative_size(style),
+      "ooxmlsdk-vml-group-anchor-offsets:true".to_string(),
       format!("left:{}pt", mapped.x_pt),
       format!("top:{}pt", mapped.y_pt),
       format!("width:{}pt", mapped.width_pt),
@@ -24470,6 +24599,7 @@ impl Default for VmlImageStyle {
       relative_height_to: None,
       relative_height_pct: None,
       flattened_group: VmlFlattenedGroupStyle::default(),
+      group_anchor_offsets: false,
       rotation_deg: 0.0,
       flip_horizontal: false,
       flip_vertical: false,
@@ -24503,8 +24633,19 @@ impl VmlImageStyle {
         alignment_extent: self.flattened_group.alignment_extent(),
         group_child_offset_x_pt: self.flattened_group.child_offset_x_pt,
         group_child_offset_y_pt: self.flattened_group.child_offset_y_pt,
-        horizontal_offset_pt: self.horizontal_offset_pt,
-        vertical_offset_pt: self.vertical_offset_pt,
+        // [MS-OI29500] Part 4 §19.1.2.1(t, dddd): authored alignment
+        // overrides top/left margins. Flattened group margins instead carry
+        // child-coordinate compensation and must survive that alignment.
+        horizontal_offset_pt: if self.horizontal_alignment.is_some() && !self.group_anchor_offsets {
+          0.0
+        } else {
+          self.horizontal_offset_pt
+        },
+        vertical_offset_pt: if self.vertical_alignment.is_some() && !self.group_anchor_offsets {
+          0.0
+        } else {
+          self.vertical_offset_pt
+        },
         horizontal_offset_pct: None,
         vertical_offset_pct: None,
         wrap: self.wrap,
@@ -24616,6 +24757,9 @@ fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
       }
       "ooxmlsdk-vml-group-width" => {
         output.flattened_group.width_pt = vml_measure_to_points(value);
+      }
+      "ooxmlsdk-vml-group-anchor-offsets" => {
+        output.group_anchor_offsets = value.trim().eq_ignore_ascii_case("true");
       }
       "ooxmlsdk-vml-group-height" => {
         output.flattened_group.height_pt = vml_measure_to_points(value);
@@ -25421,6 +25565,8 @@ struct StylesCatalog {
   theme_effects: ThemeEffectStyles,
   font_substitutions: HashMap<String, FontSubstitution>,
   custom_properties: HashMap<String, String>,
+  author: Option<String>,
+  last_saved_by: Option<String>,
   document_variables: HashMap<String, String>,
   has_bibliography: bool,
   has_index_entries: bool,
@@ -25883,6 +26029,15 @@ impl StylesCatalog {
     let theme = ThemeData::load(package, main, locales.default_document_resource_locale());
     let font_substitutions = load_font_substitutions(package, main);
     let custom_properties = load_custom_document_properties(package);
+    let core_properties = package
+      .core_file_properties_part()
+      .and_then(|part| part.root_element(package).ok());
+    let author = core_properties
+      .and_then(|properties| properties.creator.as_ref())
+      .map(ToString::to_string);
+    let last_saved_by = core_properties
+      .and_then(|properties| properties.last_modified_by.as_ref())
+      .map(ToString::to_string);
     let has_bibliography = has_word_bibliography_custom_xml(package, main);
     let has_index_entries = main
       .data_as_str(package)
@@ -25930,6 +26085,8 @@ impl StylesCatalog {
         theme_effects: theme.effects,
         font_substitutions,
         custom_properties,
+        author,
+        last_saved_by,
         document_variables,
         has_bibliography,
         has_index_entries,
@@ -25991,6 +26148,8 @@ impl StylesCatalog {
       theme_effects: theme.effects,
       font_substitutions,
       custom_properties,
+      author,
+      last_saved_by,
       document_variables,
       has_bibliography,
       has_index_entries,
@@ -26425,7 +26584,12 @@ impl StylesCatalog {
   }
 
   fn style_ref_name_requires_localized_error(&self, style_name: &str) -> bool {
-    if !self.simplified_chinese_ui || matches!(style_name.trim().as_bytes(), [b'1'..=b'9']) {
+    let localized_name = self.simplified_chinese_ui
+      || field_localization::korean_ui_english_heading_reference(
+        style_name,
+        self.locales.ui_language(),
+      );
+    if !localized_name || matches!(style_name.trim().as_bytes(), [b'1'..=b'9']) {
       return false;
     }
     let target = normalized_style_ref_lookup_key(style_name);
@@ -33060,6 +33224,7 @@ mod tests {
       width_pt: Some(238.4),
       height_pt: Some(197.05),
       height_rule: FrameHeightRule::Exact,
+      vertical_anchor_explicit: false,
       placement: FloatingFramePlacement {
         horizontal_anchor: FrameHorizontalAnchor::Page,
         horizontal_offset_pt: 97.0,
@@ -33126,6 +33291,7 @@ mod tests {
       width_pt: Some(382.75),
       height_pt: None,
       height_rule: FrameHeightRule::Auto,
+      vertical_anchor_explicit: true,
       placement: FloatingFramePlacement {
         vertical_anchor: FrameVerticalAnchor::Text,
         wrap: FrameWrapMode::Around,
@@ -33167,6 +33333,7 @@ mod tests {
       width_pt: None,
       height_pt: None,
       height_rule: FrameHeightRule::Auto,
+      vertical_anchor_explicit: true,
       placement: FloatingFramePlacement {
         horizontal_anchor: FrameHorizontalAnchor::Margin,
         vertical_anchor: FrameVerticalAnchor::Text,
@@ -35023,6 +35190,11 @@ mod tests {
     assert_eq!(child_anchor.vertical_alignment, None);
     assert!((child_anchor.horizontal_offset_pt + 16.25).abs() < 0.001);
     assert!((child_anchor.vertical_offset_pt + 44.25).abs() < 0.001);
+    let ImagePlacement::Floating(placement) = child_anchor.placement() else {
+      panic!("floating group child");
+    };
+    assert!((placement.horizontal_offset_pt + 16.25).abs() < 0.001);
+    assert!((placement.vertical_offset_pt + 44.25).abs() < 0.001);
 
     let overriding_outer = v::Group::from_bytes(
       br#"<v:group xmlns:v="urn:schemas-microsoft-com:vml"
@@ -35503,6 +35675,50 @@ mod tests {
     );
 
     assert!(format.frame.is_none());
+  }
+
+  #[test]
+  fn paragraph_frame_anchor_default_tracks_merged_position_properties() {
+    let merge = |format: &mut ParagraphFormat, attributes: &str| {
+      let xml = format!(
+        r#"<w:framePr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" {attributes}/>"#
+      );
+      let properties = w::FrameProperties::from_bytes(xml.as_bytes()).unwrap();
+      merge_paragraph_frame_properties(format, &properties);
+    };
+    let mut format = ParagraphFormat::default();
+    merge(&mut format, r#"w:w="2268""#);
+    assert_eq!(
+      format.frame.unwrap().placement.vertical_anchor,
+      FrameVerticalAnchor::Text
+    );
+    merge(&mut format, r#"w:yAlign="bottom""#);
+    assert_eq!(
+      format.frame.unwrap().placement.vertical_anchor,
+      FrameVerticalAnchor::Margin
+    );
+    merge(&mut format, r#"w:y="0""#);
+    assert_eq!(
+      format.frame.unwrap().placement.vertical_anchor,
+      FrameVerticalAnchor::Text
+    );
+    merge(&mut format, r#"w:y="10""#);
+    assert_eq!(
+      format.frame.unwrap().placement.vertical_anchor,
+      FrameVerticalAnchor::Margin
+    );
+    merge(&mut format, r#"w:vAnchor="text""#);
+    merge(&mut format, r#"w:y="20" w:yAlign="center""#);
+    assert_eq!(
+      format.frame.unwrap().placement.vertical_anchor,
+      FrameVerticalAnchor::Text
+    );
+    merge(&mut format, r#"w:vAnchor="page""#);
+    merge(&mut format, r#"w:y="0""#);
+    assert_eq!(
+      format.frame.unwrap().placement.vertical_anchor,
+      FrameVerticalAnchor::Page
+    );
   }
 
   #[test]
@@ -36883,7 +37099,7 @@ mod tests {
 
   #[test]
   fn style_ref_keys_mark_only_authored_custom_style_names() {
-    let styles = StylesCatalog {
+    let mut styles = StylesCatalog {
       simplified_chinese_ui: true,
       styles: HashMap::from([
         (
@@ -36920,6 +37136,14 @@ mod tests {
     assert!(!styles.style_ref_name_requires_localized_error("foobar"));
     assert!(styles.style_ref_name_requires_localized_error("Heading 1"));
     assert!(!styles.style_ref_name_requires_localized_error("1"));
+
+    styles.simplified_chinese_ui = false;
+    styles.locales = OfficeLocaleContext::new(Some("ko-KR"), Some("en-US"), Some("zh-CN"));
+    assert!(styles.style_ref_name_requires_localized_error("Heading 1"));
+    assert!(!styles.style_ref_name_requires_localized_error("1"));
+    assert!(!styles.style_ref_name_requires_localized_error("foobar"));
+    styles.styles.get_mut("Heading1").unwrap().custom_style = true;
+    assert!(!styles.style_ref_name_requires_localized_error("Heading 1"));
   }
 
   #[test]
@@ -41774,6 +41998,55 @@ mod tests {
   }
 
   #[test]
+  fn core_property_fields_use_property_text_only_when_refresh_is_requested() {
+    let mut styles = StylesCatalog {
+      author: Some("Lorenzo Chavez".to_string()),
+      last_saved_by: Some("Charles Brown".to_string()),
+      ..Default::default()
+    };
+    assert_eq!(refreshed_doc_property_field("LASTSAVEDBY", &styles), None);
+    assert_eq!(refreshed_doc_property_field("AUTHOR", &styles), None);
+    styles.import_settings.field_update_datetime = Some(FieldUpdateDateTime {
+      year: 2026,
+      month: 9,
+      day: 11,
+      hour: 15,
+      minute: 57,
+      second: 0,
+    });
+    for (instruction, expected) in [
+      ("LASTSAVEDBY", "Charles Brown"),
+      (r"lastsavedby \* MERGEFORMAT", "Charles Brown"),
+      (r"LASTSAVEDBY \* Upper", "CHARLES BROWN"),
+      (r"LASTSAVEDBY \* Lower \* MERGEFORMAT", "charles brown"),
+      ("AUTHOR", "Lorenzo Chavez"),
+      (r"author \* MERGEFORMAT", "Lorenzo Chavez"),
+      (r"AUTHOR \* Upper", "LORENZO CHAVEZ"),
+      (r"AUTHOR \* Lower", "lorenzo chavez"),
+    ] {
+      assert_eq!(
+        refreshed_doc_property_field(instruction, &styles).as_deref(),
+        Some(expected)
+      );
+    }
+    for instruction in [
+      r"LASTSAVEDBY \*",
+      r"LASTSAVEDBY \* CHARFORMAT",
+      r"AUTHOR \*",
+      r"AUTHOR \* CHARFORMAT",
+      // AUTHOR with an argument also changes the document property. Keep
+      // its cache until that stateful field behavior is implemented.
+      r#"AUTHOR "Another Author""#,
+    ] {
+      assert_eq!(refreshed_doc_property_field(instruction, &styles), None);
+    }
+    styles.last_saved_by = None;
+    assert_eq!(refreshed_doc_property_field("LASTSAVEDBY", &styles), None);
+    styles.author = None;
+    assert_eq!(refreshed_doc_property_field("AUTHOR", &styles), None);
+  }
+
+  #[test]
   fn simple_if_field_refresh_is_opt_in_and_compares_quoted_operands() {
     let styles = StylesCatalog {
       import_settings: ImportSettings {
@@ -42364,6 +42637,52 @@ mod tests {
   }
 
   #[test]
+  fn macro_button_field_keeps_literal_label_quotes_and_spacing() {
+    for (instruction, expected) in [
+      (
+        r#" MACROBUTTON  synchronize "Sync contents" "#,
+        Some(r#""Sync contents""#),
+      ),
+      (
+        "macrobutton NoMacro contacts  ssss ",
+        Some("contacts  ssss"),
+      ),
+      (
+        r#" MACROBUTTON "NoMacro" [Your Name] "#,
+        Some("[Your Name]"),
+      ),
+      (" MACROBUTTON NoMacro ", None),
+      (" GOTOBUTTON bookmark Label ", Some("Label")),
+    ] {
+      assert_eq!(button_field_display_text(instruction).as_deref(), expected);
+    }
+    let blocks = imported_complex_field_story(
+      br#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p>
+          <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+          <w:r><w:instrText> MACROBUTTON synchronize "Sync contents" </w:instrText></w:r>
+          <w:r><w:fldChar w:fldCharType="end"/></w:r>
+        </w:p>
+        <w:p>
+          <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+          <w:r><w:instrText> MACROBUTTON NoMacro "new label" </w:instrText></w:r>
+          <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+          <w:r><w:t>cached label</w:t></w:r>
+          <w:r><w:fldChar w:fldCharType="end"/></w:r>
+        </w:p>
+      </w:body>"#,
+    );
+    let text: Vec<_> = blocks
+      .iter()
+      .filter_map(|block| match block {
+        Block::Paragraph(paragraph) => Some(inline_text(&paragraph.inlines)),
+        _ => None,
+      })
+      .collect();
+    assert_eq!(text, [r#""Sync contents""#, "cached label"]);
+  }
+
+  #[test]
   fn closed_field_without_instruction_drops_result_but_unclosed_field_keeps_it() {
     fn imported_text(xml: &[u8]) -> String {
       let paragraph = w::Paragraph::from_bytes(xml).expect("complex field paragraph");
@@ -42453,13 +42772,20 @@ mod tests {
       "<root>bibliography</root>"
     ));
 
-    let imported_text = |has_bibliography| {
-      let paragraph = w::Paragraph::from_bytes(
-        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> CITATION Joh50 \l 1033 </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>(Smith, 1950)</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
-      )
-      .expect("citation field paragraph");
+    let imported_text = |has_bibliography, ui_language, locked| {
+      let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> CITATION Joh50 \l 1033 </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>(Smith, 1950)</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#;
+      let xml = if locked {
+        xml.replace(
+          "w:fldCharType=\"begin\"",
+          "w:fldCharType=\"begin\" w:fldLock=\"1\"",
+        )
+      } else {
+        xml.to_string()
+      };
+      let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).expect("citation field paragraph");
       let styles = StylesCatalog {
         has_bibliography,
+        locales: OfficeLocaleContext::new(ui_language, Some("en-US"), Some("zh-CN")),
         ..Default::default()
       };
       let mut form_widget_ids = FormWidgetIdAllocator::default();
@@ -42474,8 +42800,17 @@ mod tests {
       ))
     };
 
-    assert_eq!(imported_text(true), "(Smith, 1950)");
-    assert_eq!(imported_text(false), "Invalid source specified.");
+    assert_eq!(imported_text(true, None, false), "(Smith, 1950)");
+    assert_eq!(
+      imported_text(false, None, false),
+      "Invalid source specified."
+    );
+    assert_eq!(
+      imported_text(false, Some("ja-JP"), false),
+      "無効な資料文献が指定されました。"
+    );
+    assert_eq!(imported_text(false, Some("JA_jp"), true), "(Smith, 1950)");
+    assert_eq!(imported_text(true, Some("ja-JP"), false), "(Smith, 1950)");
   }
 
   #[test]
@@ -43569,7 +43904,7 @@ mod tests {
   fn vml_absolute_style_maps_to_floating_placement() {
     let style = vml_image_style(Some(
       "position:absolute;margin-left:12pt;margin-top:18pt;z-index:-2;\
-       mso-position-horizontal:left;\
+       mso-position-horizontal:absolute;\
        mso-position-horizontal-relative:page;mso-position-vertical-relative:margin;\
        mso-wrap-style:square;mso-wrap-distance-left:0x0001BE7C",
     ));
@@ -43585,15 +43920,55 @@ mod tests {
       placement.vertical_relative_to,
       VerticalImageReference::Margin
     );
-    assert_eq!(
-      placement.horizontal_alignment,
-      Some(HorizontalImageAlignment::Left)
-    );
+    assert_eq!(placement.horizontal_alignment, None);
     assert_eq!(placement.wrap, ImageWrapMode::Square);
     assert!(placement.behind_text);
     assert!((placement.horizontal_offset_pt - 12.0).abs() < 0.001);
     assert!((placement.vertical_offset_pt - 18.0).abs() < 0.001);
     assert!((placement.margin_left_pt - 9.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn vml_alignment_overrides_authored_offsets_per_axis() {
+    for declarations in [
+      "margin-left:-277.6pt;margin-top:18pt;mso-position-horizontal:right;mso-position-vertical:bottom",
+      "mso-position-horizontal:right;mso-position-vertical:bottom;left:-277.6pt;top:18pt",
+    ] {
+      let style = format!(
+        "position:absolute;width:51.9pt;height:648pt;\
+         mso-position-horizontal-relative:left-margin-area;\
+         mso-position-vertical-relative:margin;{declarations}"
+      );
+      let ImagePlacement::Floating(placement) = vml_image_style(Some(&style)).placement() else {
+        panic!("aligned VML placement");
+      };
+      assert_eq!(
+        placement.horizontal_alignment,
+        Some(HorizontalImageAlignment::Right)
+      );
+      assert_eq!(
+        placement.vertical_alignment,
+        Some(VerticalImageAlignment::Bottom)
+      );
+      assert_eq!(placement.horizontal_offset_pt, 0.0);
+      assert_eq!(placement.vertical_offset_pt, 0.0);
+
+      let style = format!("{style};mso-position-horizontal:absolute");
+      let ImagePlacement::Floating(placement) = vml_image_style(Some(&style)).placement() else {
+        panic!("mixed VML placement");
+      };
+      assert_eq!(placement.horizontal_alignment, None);
+      assert!((placement.horizontal_offset_pt + 277.6).abs() < 0.001);
+      assert_eq!(placement.vertical_offset_pt, 0.0);
+
+      let style = format!("{style};mso-position-horizontal:right;mso-position-vertical:absolute");
+      let ImagePlacement::Floating(placement) = vml_image_style(Some(&style)).placement() else {
+        panic!("mixed VML placement with an absolute vertical offset");
+      };
+      assert_eq!(placement.horizontal_offset_pt, 0.0);
+      assert_eq!(placement.vertical_alignment, None);
+      assert_eq!(placement.vertical_offset_pt, 18.0);
+    }
   }
 
   #[test]

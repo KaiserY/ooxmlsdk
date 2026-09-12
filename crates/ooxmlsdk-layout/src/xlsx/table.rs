@@ -118,86 +118,85 @@ pub(crate) fn builtin_table_style_for_address(
   let Some(name) = table.style.name.as_deref() else {
     return BuiltinTableCellStyle::default();
   };
-  let mut result = if let Some(style) = styles.table_style(name) {
-    custom_table_style(table, styles, style, range, address)
-  } else {
-    match name {
-      "TableStyleLight1" => light1_style(table, styles, range, address),
-      "TableStyleLight2" => light_accent_outline_style(table, styles, range, address, 4),
-      "TableStyleLight3" => light_accent_outline_style(table, styles, range, address, 5),
-      "TableStyleLight4" => light_accent_outline_style(table, styles, range, address, 6),
-      "TableStyleLight5" => light_accent_outline_style(table, styles, range, address, 7),
-      "TableStyleLight6" => light_accent_outline_style(table, styles, range, address, 8),
-      "TableStyleLight7" => light_accent_outline_style(table, styles, range, address, 9),
-      "TableStyleLight8" => light_accent_grid_style(table, styles, range, address, 1),
-      "TableStyleLight9" => light_accent_grid_style(table, styles, range, address, 4),
-      "TableStyleLight10" => light_accent_grid_style(table, styles, range, address, 5),
-      "TableStyleLight11" => light_accent_grid_style(table, styles, range, address, 6),
-      "TableStyleLight12" => light_accent_grid_style(table, styles, range, address, 7),
-      "TableStyleLight13" => light_accent_grid_style(table, styles, range, address, 8),
-      "TableStyleLight14" => light_accent_grid_style(table, styles, range, address, 9),
-      "TableStyleLight15" => light_tinted_grid_style(table, styles, range, address, 1),
-      "TableStyleLight16" => light_tinted_grid_style(table, styles, range, address, 4),
-      "TableStyleLight17" => light_tinted_grid_style(table, styles, range, address, 5),
-      "TableStyleLight18" => light_tinted_grid_style(table, styles, range, address, 6),
-      "TableStyleLight19" => light_tinted_grid_style(table, styles, range, address, 7),
-      "TableStyleLight20" => light_tinted_grid_style(table, styles, range, address, 8),
-      "TableStyleLight21" => light_tinted_grid_style(table, styles, range, address, 9),
-      "TableStyleMedium1" => medium_header_fill_style(
-        table,
-        styles,
-        range,
-        address,
-        1,
-        Some((0, -0.149_998_474_074_526_2)),
-      ),
-      "TableStyleMedium2" => medium2_style(table, styles, range, address),
-      "TableStyleMedium3" => medium_header_fill_style(
-        table,
-        styles,
-        range,
-        address,
-        5,
-        Some((5, 0.799_981_688_894_314_4)),
-      ),
-      "TableStyleMedium4" => medium_header_fill_style(
-        table,
-        styles,
-        range,
-        address,
-        6,
-        Some((6, 0.799_981_688_894_314_4)),
-      ),
-      "TableStyleMedium5" => medium_header_fill_style(
-        table,
-        styles,
-        range,
-        address,
-        7,
-        Some((7, 0.799_981_688_894_314_4)),
-      ),
-      "TableStyleMedium6" => medium_header_fill_style(
-        table,
-        styles,
-        range,
-        address,
-        8,
-        Some((8, 0.799_981_688_894_314_4)),
-      ),
-      "TableStyleMedium7" => medium_header_fill_style(
-        table,
-        styles,
-        range,
-        address,
-        9,
-        Some((9, 0.799_981_688_894_314_4)),
-      ),
-      "TableStyleMedium9" => medium9_style(table, styles, range, address),
-      "TableStyleMedium21" => medium_dark_header_style(table, styles, range, address, 9),
-      "TableStyleMedium24" => medium_tinted_grid_style(table, styles, range, address, 5),
-      "TableStyleDark11" => dark_split_accent_style(table, styles, range, address, 8, 9),
-      _ => BuiltinTableCellStyle::default(),
-    }
+  if let Some(style) = styles.table_style(name) {
+    return custom_table_style(table, styles, style, range, address);
+  }
+  let mut result = match name {
+    "TableStyleLight1" => light1_style(table, styles, range, address),
+    "TableStyleLight2" => light_accent_outline_style(table, styles, range, address, 4),
+    "TableStyleLight3" => light_accent_outline_style(table, styles, range, address, 5),
+    "TableStyleLight4" => light_accent_outline_style(table, styles, range, address, 6),
+    "TableStyleLight5" => light_accent_outline_style(table, styles, range, address, 7),
+    "TableStyleLight6" => light_accent_outline_style(table, styles, range, address, 8),
+    "TableStyleLight7" => light_accent_outline_style(table, styles, range, address, 9),
+    "TableStyleLight8" => light_accent_grid_style(table, styles, range, address, 1),
+    "TableStyleLight9" => light_accent_grid_style(table, styles, range, address, 4),
+    "TableStyleLight10" => light_accent_grid_style(table, styles, range, address, 5),
+    "TableStyleLight11" => light_accent_grid_style(table, styles, range, address, 6),
+    "TableStyleLight12" => light_accent_grid_style(table, styles, range, address, 7),
+    "TableStyleLight13" => light_accent_grid_style(table, styles, range, address, 8),
+    "TableStyleLight14" => light_accent_grid_style(table, styles, range, address, 9),
+    "TableStyleLight15" => light_tinted_grid_style(table, styles, range, address, 1),
+    "TableStyleLight16" => light_tinted_grid_style(table, styles, range, address, 4),
+    "TableStyleLight17" => light_tinted_grid_style(table, styles, range, address, 5),
+    "TableStyleLight18" => light_tinted_grid_style(table, styles, range, address, 6),
+    "TableStyleLight19" => light_tinted_grid_style(table, styles, range, address, 7),
+    "TableStyleLight20" => light_tinted_grid_style(table, styles, range, address, 8),
+    "TableStyleLight21" => light_tinted_grid_style(table, styles, range, address, 9),
+    "TableStyleMedium1" => medium_header_fill_style(
+      table,
+      styles,
+      range,
+      address,
+      1,
+      Some((0, -0.149_998_474_074_526_2)),
+    ),
+    "TableStyleMedium2" => medium2_style(table, styles, range, address),
+    "TableStyleMedium3" => medium_header_fill_style(
+      table,
+      styles,
+      range,
+      address,
+      5,
+      Some((5, 0.799_981_688_894_314_4)),
+    ),
+    "TableStyleMedium4" => medium_header_fill_style(
+      table,
+      styles,
+      range,
+      address,
+      6,
+      Some((6, 0.799_981_688_894_314_4)),
+    ),
+    "TableStyleMedium5" => medium_header_fill_style(
+      table,
+      styles,
+      range,
+      address,
+      7,
+      Some((7, 0.799_981_688_894_314_4)),
+    ),
+    "TableStyleMedium6" => medium_header_fill_style(
+      table,
+      styles,
+      range,
+      address,
+      8,
+      Some((8, 0.799_981_688_894_314_4)),
+    ),
+    "TableStyleMedium7" => medium_header_fill_style(
+      table,
+      styles,
+      range,
+      address,
+      9,
+      Some((9, 0.799_981_688_894_314_4)),
+    ),
+    "TableStyleMedium9" => medium9_style(table, styles, range, address),
+    "TableStyleMedium21" => medium_dark_header_style(table, styles, range, address, 9),
+    "TableStyleMedium24" => medium_tinted_grid_style(table, styles, range, address, 5),
+    "TableStyleDark11" => dark_split_accent_style(table, styles, range, address, 8, 9),
+    _ => BuiltinTableCellStyle::default(),
   };
   merge_direct_table_differentials(&mut result, table, styles, range, address);
   result
@@ -301,6 +300,10 @@ fn custom_table_style(
   ];
 
   let mut result = BuiltinTableCellStyle::default();
+  // Office totalsRowFunction.xlsx retains its custom totalRow's bold teal
+  // font over the column totalsRowDxfId's cached regular black font. Seed
+  // those column/table formats before applying the authored style regions.
+  merge_direct_table_differentials(&mut result, table, styles, table_range, address);
   for element_type in PRECEDENCE {
     let Some(element) = style
       .elements
@@ -1123,15 +1126,21 @@ mod tests {
     let mut styles = StylesCatalog::default();
     styles.differential_format_records = vec![
       DifferentialFormatRecord {
-        fill: Some(FillRecord { color: Some(red) }),
+        fill: Some(FillRecord {
+          color: Some(red),
+          ..Default::default()
+        }),
         ..DifferentialFormatRecord::default()
       },
       DifferentialFormatRecord {
-        fill: Some(FillRecord { color: Some(blue) }),
+        fill: Some(FillRecord {
+          color: Some(blue),
+          ..Default::default()
+        }),
         font: Some(FontRecord {
           name: Some(Arc::from("Arial")),
           color: Some(white),
-          bold: true,
+          bold: Some(true),
           ..FontRecord::default()
         }),
         ..DifferentialFormatRecord::default()
@@ -1192,11 +1201,17 @@ mod tests {
     let mut styles = StylesCatalog::default();
     styles.differential_format_records = vec![
       DifferentialFormatRecord {
-        fill: Some(FillRecord { color: Some(red) }),
+        fill: Some(FillRecord {
+          color: Some(red),
+          ..Default::default()
+        }),
         ..DifferentialFormatRecord::default()
       },
       DifferentialFormatRecord {
-        fill: Some(FillRecord { color: Some(blue) }),
+        fill: Some(FillRecord {
+          color: Some(blue),
+          ..Default::default()
+        }),
         ..DifferentialFormatRecord::default()
       },
     ];

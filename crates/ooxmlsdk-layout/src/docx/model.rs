@@ -685,6 +685,8 @@ pub(crate) struct ParagraphFrameProperties {
   pub height_pt: Option<f32>,
   pub height_rule: FrameHeightRule,
   pub placement: FloatingFramePlacement,
+  /// An inherited explicit vAnchor wins over defaults inferred from y/yAlign.
+  pub vertical_anchor_explicit: bool,
   pub drop_cap: bool,
 }
 
@@ -1322,6 +1324,7 @@ impl TextBoxWritingMode {
 
 #[derive(Clone, Debug)]
 pub(crate) struct InlineChart {
+  pub image_fills: BTreeMap<String, InlineShapeImageFill>,
   pub chart_space: Option<Box<c::ChartSpace>>,
   pub extended_chart_space: Option<Box<cx::ChartSpace>>,
   pub extended_chart_styles: Vec<cs::ChartStyle>,

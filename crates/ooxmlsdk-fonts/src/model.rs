@@ -20,6 +20,7 @@ use harfrust::{
   Language as HarfLanguage, Script as HarfScript, ShapeOptions as HarfShapeOptions, ShapePlan,
   ShaperData, Tag as HarfTag, UnicodeBuffer, script,
 };
+use icu_properties::{CodePointSetData, props::EmojiPresentation};
 use icu_segmenter::GraphemeClusterSegmenter;
 use skrifa::{
   FontRef as SkrifaFontRef, GlyphId as SkrifaGlyphId, MetadataProvider,
@@ -864,15 +865,56 @@ impl<'a> FontRegistry<'a> {
     let mut start = 0usize;
     let mut active = None::<usize>;
     for cluster in grapheme_clusters(text) {
-      let font_index = fonts
-        .iter()
-        .enumerate()
-        .position(|(index, font)| {
-          font_supports_text_cluster(
+      let cluster_text = &text[cluster.clone()];
+      let variations = text_variation_sequences(cluster_text);
+      let variant_font = if variations.is_empty() {
+        None
+      } else {
+        fonts.iter().enumerate().position(|(index, font)| {
+          runtime_faces[index].as_deref().is_some_and(|face| {
+            let charmap = face.skrifa().charmap();
+            variations
+              .iter()
+              .all(|&(base, selector)| charmap.map_variant(base, selector).is_some())
+          }) && font_supports_text_cluster(
             font,
             runtime_faces[index].as_deref().map(RuntimeFace::skrifa),
-            &text[cluster.clone()],
+            cluster_text,
           )
+        })
+      };
+      let font_index = variant_font
+        .or_else(|| {
+          // Keep an authored face that covers the cluster. When it needs
+          // fallback, default-emoji characters use an emoji face before
+          // generic monochrome symbol faces. FE0E can still shape the same
+          // font's text outline; it does not require a different family.
+          (cluster_text.chars().any(is_default_emoji)
+            && !font_supports_text_cluster(
+              &fonts[0],
+              runtime_faces[0].as_deref().map(RuntimeFace::skrifa),
+              cluster_text,
+            ))
+          .then(|| {
+            fonts.iter().enumerate().position(|(index, font)| {
+              font.face.is_some_and(|face| face.flags.color_glyphs)
+                && font_supports_text_cluster(
+                  font,
+                  runtime_faces[index].as_deref().map(RuntimeFace::skrifa),
+                  cluster_text,
+                )
+            })
+          })
+          .flatten()
+        })
+        .or_else(|| {
+          fonts.iter().enumerate().position(|(index, font)| {
+            font_supports_text_cluster(
+              font,
+              runtime_faces[index].as_deref().map(RuntimeFace::skrifa),
+              cluster_text,
+            )
+          })
         })
         .unwrap_or(0);
       if active.is_some_and(|active| active != font_index) {
@@ -932,10 +974,12 @@ impl<'a> FontRegistry<'a> {
         .map(|chain| self.resolved_fonts_from_chain(&chain));
     }
 
+    let variations = text_variation_sequences(text);
+    let needs_presentation_fallback = !variations.is_empty() || text.chars().any(is_default_emoji);
     let mut missing_chars = self.missing_chars_for_fonts(&fonts, text);
 
     for family in self.fallback_families(request) {
-      if missing_chars.is_empty() {
+      if missing_chars.is_empty() && !needs_presentation_fallback {
         break;
       }
       if let Ok(resolved) = self
@@ -960,7 +1004,7 @@ impl<'a> FontRegistry<'a> {
       }
     }
 
-    if missing_chars.is_empty() {
+    if missing_chars.is_empty() && variations.is_empty() {
       return Ok(fonts);
     }
 
@@ -968,9 +1012,18 @@ impl<'a> FontRegistry<'a> {
       if fonts
         .iter()
         .any(|font| font.resolved.font_id == face.font_id)
-        || !missing_chars
+        || (!missing_chars
           .iter()
           .any(|ch| self.face_info_supports_char(face, *ch))
+          && !(!variations.is_empty()
+            && self
+              .runtime_face_for_font(&face.font_id)
+              .is_some_and(|face| {
+                let charmap = face.skrifa().charmap();
+                variations
+                  .iter()
+                  .any(|&(base, selector)| charmap.map_variant(base, selector).is_some())
+              })))
       {
         continue;
       }
@@ -981,7 +1034,7 @@ impl<'a> FontRegistry<'a> {
         fallback_level,
       });
       missing_chars = self.missing_chars_for_fonts(&fonts, text);
-      if missing_chars.is_empty() {
+      if missing_chars.is_empty() && variations.is_empty() {
         break;
       }
     }
@@ -1015,7 +1068,7 @@ impl<'a> FontRegistry<'a> {
   ) -> SmallVec<[char; 8]> {
     let mut missing = SmallVec::<[char; 8]>::new();
     for ch in text.chars() {
-      if is_private_use_char(ch) || missing.contains(&ch) {
+      if is_private_use_char(ch) || is_variation_selector(ch) || missing.contains(&ch) {
         continue;
       }
       if !fonts.iter().any(|font| {
@@ -3124,6 +3177,11 @@ fn default_glyph_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
         // fullwidth Latin forms. Those runs are not classified as Han, so
         // the Han-specific chain above cannot supply their glyphs.
         Cow::Borrowed("Noto Sans CJK JP"),
+        // Keep emoji variants available even when an earlier text/symbol
+        // face covers the base. Selection prefers a supported cmap-14
+        // sequence before falling back to ordinary nominal coverage.
+        Cow::Borrowed("Segoe UI Emoji"),
+        Cow::Borrowed("Noto Color Emoji"),
       ],
     },
   ]);
@@ -3931,10 +3989,32 @@ fn font_supports_text_cluster(
   parsed_face: Option<&SkrifaFontRef<'_>>,
   text: &str,
 ) -> bool {
+  // A variation selector requests a glyph variant (cmap format 14 or
+  // shaping features), not a separately encoded visible glyph. Keep it in
+  // the shaping input, but do not require its own nominal cmap mapping.
+  // Unicode's unsupported-sequence fallback displays the base normally.
   !text.chars().any(is_private_use_char)
     && text
       .chars()
+      .filter(|&ch| !is_variation_selector(ch))
       .all(|ch| font_supports_char(font, parsed_face, ch))
+}
+
+fn is_variation_selector(ch: char) -> bool {
+  // Unicode PropList.txt: Variation_Selector (including Mongolian FVS).
+  matches!(ch, '\u{180b}'..='\u{180d}' | '\u{180f}' | '\u{fe00}'..='\u{fe0f}' | '\u{e0100}'..='\u{e01ef}')
+}
+
+fn text_variation_sequences(text: &str) -> SmallVec<[(char, char); 2]> {
+  text
+    .chars()
+    .zip(text.chars().skip(1))
+    .filter(|&(base, selector)| !is_variation_selector(base) && is_variation_selector(selector))
+    .collect()
+}
+
+fn is_default_emoji(ch: char) -> bool {
+  CodePointSetData::new::<EmojiPresentation>().contains(ch)
 }
 
 fn is_private_use_char(ch: char) -> bool {
@@ -5756,6 +5836,158 @@ mod tests {
       )
       .unwrap();
     assert_eq!(cached_runs, runs);
+  }
+
+  #[test]
+  fn default_emoji_fallback_keeps_text_symbols_and_authored_coverage() {
+    let mut registry = FontRegistry::new();
+    let mut primary = FontFaceInfo::synthetic("primary", "Primary");
+    primary.coverage.unicode_ranges = vec![0x41..0x42];
+    registry.register_face(FontSource::System, primary);
+    for (id, family, color) in [("symbol", "Symbol", false), ("emoji", "Emoji", true)] {
+      let mut face = FontFaceInfo::synthetic(id, family);
+      face.coverage.unicode_ranges = vec![0x2600..0x2601, 0x1f60a..0x1f60b];
+      face.flags.color_glyphs = color;
+      registry.register_face(FontSource::System, face);
+    }
+    registry.book.fallback_chains.push(FontFallbackChain {
+      requested_family: None,
+      script: None,
+      language: None,
+      families: vec![Cow::Borrowed("Symbol"), Cow::Borrowed("Emoji")],
+    });
+    for (primary, text, expected) in [
+      ("Primary", "A", "primary"),
+      ("Primary", "☀", "symbol"),
+      ("Primary", "😊", "emoji"),
+      ("Primary", "😊\u{fe0e}", "emoji"),
+      ("Symbol", "😊", "symbol"),
+    ] {
+      let request = FontRequest {
+        family: Some(Cow::Borrowed(primary)),
+        ..FontRequest::default()
+      };
+      let runs = registry
+        .shape_text_runs(&request, text, TextDirection::LeftToRight)
+        .unwrap();
+      assert_eq!(runs.len(), 1);
+      assert_eq!(
+        runs[0].font_id,
+        FontId(Arc::from(expected)),
+        "{primary}: {text}"
+      );
+      let chain = registry.resolve_font_chain(&request).unwrap();
+      let cached = registry
+        .shape_text_runs_with_font_chain(
+          &chain,
+          text,
+          &ShapeOptions::from_request(&request, TextDirection::LeftToRight),
+        )
+        .unwrap();
+      assert_eq!(cached, runs);
+    }
+  }
+
+  #[test]
+  fn system_query_prefers_supported_variation_sequences() {
+    if !platform_has_font("Segoe UI Emoji", "SegoeUIEmoji")
+      || !platform_has_font("Segoe UI Symbol", "SegoeUISymbol")
+    {
+      return;
+    }
+    let mut registry = FontRegistry::with_default_policy();
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Segoe UI Symbol")),
+      size_pt: FontSize(12.0),
+      ..FontRequest::default()
+    };
+    registry.register_system_query_fonts(&request).unwrap();
+    let chain = registry.resolve_font_chain(&request).unwrap();
+    for (text, family) in [
+      ("⛄", "Segoe UI Symbol"),
+      ("⛄\u{fe0e}", "Segoe UI Symbol"),
+      ("A\u{fe0f}", "Segoe UI Symbol"),
+      ("⛄\u{fe0f}", "Segoe UI Emoji"),
+      ("1\u{fe0f}\u{20e3}", "Segoe UI Emoji"),
+      ("☀\u{fe0f}\u{fe0f}", "Segoe UI Emoji"),
+    ] {
+      let runs = registry
+        .shape_text_runs(&request, text, TextDirection::LeftToRight)
+        .unwrap();
+      assert_eq!(runs.len(), 1, "{text:?}");
+      let expected = registry
+        .resolve(&FontRequest {
+          family: Some(Cow::Borrowed(family)),
+          ..request.clone()
+        })
+        .unwrap();
+      assert_eq!(runs[0].font_id, expected.font_id, "{text:?}");
+      assert_eq!(runs[0].text_range, 0..text.len());
+      let cached = registry
+        .shape_text_runs_with_font_chain(
+          &chain,
+          text,
+          &ShapeOptions::from_request(&request, TextDirection::LeftToRight),
+        )
+        .unwrap();
+      assert_eq!(cached, runs, "{text:?}");
+    }
+  }
+
+  #[test]
+  fn variation_selectors_do_not_block_base_or_combining_mark_fallback() {
+    let mut registry = FontRegistry::new();
+    let mut primary = FontFaceInfo::synthetic("primary", "Primary");
+    primary.coverage.unicode_ranges = vec![0x31..0x32, 0x41..0x42];
+    registry.register_face(FontSource::System, primary);
+    let mut fallback = FontFaceInfo::synthetic("fallback", "Fallback");
+    fallback.coverage.unicode_ranges = vec![0x31..0x32, 0x20e3..0x20e4, 0x26c4..0x26c5];
+    registry.register_face(FontSource::System, fallback);
+    registry.book.fallback_chains.push(FontFallbackChain {
+      requested_family: None,
+      script: None,
+      language: None,
+      families: vec![Cow::Borrowed("Fallback")],
+    });
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Primary")),
+      size_pt: FontSize(12.0),
+      ..FontRequest::default()
+    };
+    let chain = registry.resolve_font_chain(&request).unwrap();
+    for selector in [
+      '\u{180b}',
+      '\u{180f}',
+      '\u{fe00}',
+      '\u{fe0f}',
+      '\u{e0100}',
+      '\u{e01ef}',
+    ] {
+      for (text, expected_font) in [
+        (format!("A{selector}"), "primary"),
+        (format!("⛄{selector}"), "fallback"),
+        (format!("1{selector}\u{20e3}"), "fallback"),
+      ] {
+        let runs = registry
+          .shape_text_runs(&request, &text, TextDirection::LeftToRight)
+          .unwrap();
+        assert_eq!(runs.len(), 1, "{text:?}");
+        assert_eq!(
+          runs[0].font_id,
+          FontId(Arc::from(expected_font)),
+          "{text:?}"
+        );
+        assert_eq!(runs[0].text_range, 0..text.len());
+        let cached = registry
+          .shape_text_runs_with_font_chain(
+            &chain,
+            &text,
+            &ShapeOptions::from_request(&request, TextDirection::LeftToRight),
+          )
+          .unwrap();
+        assert_eq!(cached, runs);
+      }
+    }
   }
 
   #[test]

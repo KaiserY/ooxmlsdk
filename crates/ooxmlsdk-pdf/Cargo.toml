@@ -18,6 +18,7 @@ flate2 = { workspace = true }
 hypher = { workspace = true }
 icu_segmenter = { workspace = true }
 image = { workspace = true }
+tiff = { workspace = true }
 jpeg-decoder = { workspace = true }
 jpeg-encoder = { workspace = true }
 zune-jpeg = { workspace = true }

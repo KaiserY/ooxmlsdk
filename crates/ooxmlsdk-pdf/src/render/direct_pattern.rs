@@ -252,11 +252,20 @@ fn resolved_pattern_geometry(
   } else {
     tile_size_pt / pattern_units
   };
-  let phase_x = pattern_origin(origin_x_pt, tile_size_pt);
+  let phase_x = if fill.page_origin {
+    0.0
+  } else {
+    pattern_origin(origin_x_pt, tile_size_pt)
+  };
   // Layout coordinates are y-down, but PDF pattern matrices are expressed in
   // the parent stream's default y-up user space. This is the same boundary as
   // the page-root reflection and matches Office's fixed-output matrices.
-  let phase_y = page_height_pt - pattern_origin(origin_y_pt, tile_size_pt);
+  let phase_y = page_height_pt
+    - if fill.page_origin {
+      0.0
+    } else {
+      pattern_origin(origin_y_pt, tile_size_pt)
+    };
   let matrix = [scale, 0.0, 0.0, scale, phase_x, phase_y];
   if matrix.into_iter().any(|value| !value.is_finite()) {
     return Err(PdfError::Writer(
@@ -430,6 +439,27 @@ mod tests {
         tile_repetitions: 1,
       }
     );
+  }
+
+  #[test]
+  fn worksheet_pattern_keeps_page_phase_across_cell_origins() {
+    let mut fill = common::PatternFill::bitmap8(
+      [0x18, 0x30, 0x60, 0xc0, 0x81, 0x03, 0x06, 0x0c],
+      960,
+      color(0, 0, 0, 255),
+      color(255, 255, 255, 255),
+    );
+    let sampling = PatternSampling {
+      image_size_px: 8,
+      tile_repetitions: 1,
+    };
+    let local = resolved_pattern_geometry(fill, sampling, 54.0, 87.3, 841.92).unwrap();
+    fill.page_origin = true;
+    let first = resolved_pattern_geometry(fill, sampling, 54.0, 87.3, 841.92).unwrap();
+    let second = resolved_pattern_geometry(fill, sampling, 106.32, 103.68, 841.92).unwrap();
+    assert_eq!(first, second);
+    assert_eq!(first, (8.0, [0.12, 0.0, 0.0, 0.12, 0.0, 841.92]));
+    assert_ne!(first, local);
   }
 
   #[test]

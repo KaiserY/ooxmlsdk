@@ -11,6 +11,7 @@ use crate::model::{RgbColor, TextStyle};
 use crate::text_metrics::TextMetrics;
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
+use ooxmlsdk_formula::calc::numeric::round_to_decimal_places;
 const ZOOM_MIN: u32 = 10;
 // Excel's indexed-scatter printer profile retains one four-pixel band at the
 // authored 300dpi in each horizontal page clip. The band extends the paint
@@ -42,6 +43,7 @@ pub(crate) struct CalcPrintPage<'a> {
   pub(crate) sheet: &'a CalcSheet,
   pub(crate) sheet_page_index: usize,
   pub(crate) starts_print_area_row: bool,
+  pub(crate) has_explicit_print_area: bool,
   pub(crate) page_number: usize,
   pub(crate) total_pages: usize,
   /// Worksheet print zoom before the fixed-output paper transform.
@@ -71,11 +73,13 @@ pub(crate) struct CalcPrintNamedRanges {
 pub(crate) struct CalcPrintCell<'a> {
   pub(crate) address: CellAddress,
   pub(crate) text: Cow<'a, str>,
+  pub(crate) data_type: Option<x::CellValues>,
   pub(crate) style_index: Option<u32>,
   pub(crate) pivot_format_id: Option<u32>,
   pub(crate) rendered_text: String,
   pub(crate) rich_text_runs: &'a [super::workbook::SharedStringRun],
   pub(crate) number_format_state: NumberFormatRenderState,
+  pub(crate) number_format_color: Option<RgbColor>,
   pub(crate) formula: bool,
   pub(crate) icon_set: Option<CalcPrintIconSet>,
   pub(crate) color_scale_fill: Option<CalcPrintColorScaleFill>,
@@ -133,6 +137,7 @@ impl<'a> CalcPrintDocument<'a> {
       let uses_formatted_implicit_header_footer_extent =
         implicit_header_footer_uses_formatted_cell_extent(import, sheet, &named_ranges);
       let keep_header_footer_only_page = visible_sheets_with_body == 0
+        && !named_ranges.resolved_print_areas.is_empty()
         && sheet.page_settings.header_footer.has_print_content()
         && sheet_body_is_empty(import, sheet);
       let page_areas = page_areas_for_sheet(
@@ -191,9 +196,10 @@ impl<'a> CalcPrintDocument<'a> {
             .unwrap_or_default();
         // ScPrintFunc::DoPrint. Empty sheet page ranges are hidden by
         // ScDocument::IsPrintEmpty before PrintPage is called; header/footer
-        // content is painted only for page ranges that survive that test. A
-        // workbook made entirely of header/footer-only empty visible sheets
-        // still emits one page; otherwise later empty sheets keep being hidden.
+        // content is painted only for page ranges that survive that test.
+        // Excel does not create an implicit print page solely for headers or
+        // footers (empty-noconf.xlsx and WorkbookProperties.xlsx). Keep the
+        // existing explicit-print-area behavior separate from this empty case.
         // Excel fixed output retains blank pages ahead of later printable
         // cells or drawings in the actual page order. Ordinary implicit
         // ranges exclude invisible blank-cell XF metadata, so a style-only
@@ -227,6 +233,7 @@ impl<'a> CalcPrintDocument<'a> {
           sheet,
           sheet_page_index,
           starts_print_area_row,
+          has_explicit_print_area: !named_ranges.resolved_print_areas.is_empty(),
           page_number: pages.len() + 1,
           total_pages: 0,
           zoom: scale.zoom,
@@ -280,12 +287,19 @@ fn keep_formatted_horizontal_header_footer_page(
 }
 
 fn page_cell_scan_area(area: CellRange) -> CellRange {
+  // A string can start several columns before this horizontal page and still
+  // overflow into it. The Strict CGM-picture workbook's I13 text continues on
+  // its second page. Retain preceding cells as overflow/occupancy context;
+  // display culls their text against the page and paints no cell bodies.
   // Calc's FillInfo builds ScCellInfo through nCol2 + 1 so the logical page
   // can resolve occupied neighbours and text overflowing back from the first
   // following column. ScOutputData still owns paint only through mnX2; display
   // keeps the extra column as scan context rather than ordinary page content.
   CellRange::new(
-    area.start,
+    CellAddress {
+      col: 1,
+      row: area.start.row,
+    },
     CellAddress {
       col: area.end.col.saturating_add(1).min(XLSX_MAX_COLUMN),
       row: area.end.row,
@@ -521,7 +535,13 @@ fn fit_scale_area(
 }
 
 fn print_content_size_pt(page_settings: &CalcPageSettings) -> (f32, f32) {
-  let (mut width, mut height) = page_settings.page_size_pt();
+  print_content_size_for_page(page_settings, page_settings.page_size_pt())
+}
+
+fn print_content_size_for_page(
+  page_settings: &CalcPageSettings,
+  (mut width, mut height): (f32, f32),
+) -> (f32, f32) {
   width -= (page_settings.margin_left_in + page_settings.margin_right_in) as f32
     * crate::units::POINTS_PER_INCH;
   height -= (page_settings.margin_top_in + page_settings.margin_bottom_in) as f32
@@ -558,7 +578,7 @@ fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcP
     .iter()
     .flat_map(|drawing| drawing.shapes.iter())
   {
-    if !vml_shape_intersects_area(sheet, shape, area) {
+    if !sheet.vml_note_prints_in_place(shape) || !vml_shape_intersects_area(sheet, shape, area) {
       continue;
     }
     summary.anchors += 1;
@@ -639,12 +659,11 @@ fn print_areas_for_sheet(
   text_metrics: &mut TextMetrics,
 ) -> Vec<CellRange> {
   if !named_ranges.resolved_print_areas.is_empty() {
-    return named_ranges
-      .resolved_print_areas
-      .iter()
-      .copied()
-      .map(|range| extend_print_area_for_merges(sheet, range))
-      .collect();
+    // _xlnm.Print_Area is an explicit output boundary. A merged cell can
+    // intersect that boundary without admitting unrelated cells beyond it:
+    // Office prints A:F in tdf100034 even though its title merges A1:G1.
+    // Merge expansion belongs only to the implicit used-range path below.
+    return named_ranges.resolved_print_areas.clone();
   }
   match implicit_used_range(import, sheet, named_ranges) {
     // Implicit print ranges start at A1; ScDocument::GetPrintArea() only
@@ -774,8 +793,9 @@ fn drawing_print_area(sheet: &CalcSheet) -> Option<CellRange> {
     .vml_drawings
     .iter()
     .flat_map(|drawing| drawing.shapes.iter())
-    // Calc puts hidden note objects on SC_LAYER_HIDDEN and excludes that layer
-    // from ScDrawLayer::GetPrintArea. Other VML objects keep participating.
+    // Notes omitted from the printout must not create pages or enlarge them.
+    .filter(|shape| sheet.vml_note_prints_in_place(shape))
+    // Hidden notes also stay out of the printed area.
     .filter(|shape| !(shape.hidden && shape.object_type.as_deref() == Some("Note")))
     .filter_map(|shape| vml_shape_cell_range(sheet, shape));
   xdr_ranges.chain(vml_ranges).reduce(|acc, range| {
@@ -1387,7 +1407,9 @@ fn sheet_body_is_empty(import: &ExcelImport, sheet: &CalcSheet) -> bool {
     .vml_drawings
     .iter()
     .flat_map(|drawing| drawing.shapes.iter())
-    .any(|shape| vml_shape_cell_range(sheet, shape).is_some());
+    .any(|shape| {
+      sheet.vml_note_prints_in_place(shape) && vml_shape_cell_range(sheet, shape).is_some()
+    });
   if has_vml_drawing {
     return false;
   }
@@ -1509,7 +1531,17 @@ fn split_range_by_page_metrics(
     area.end.col
   };
   let mut slices = Vec::new();
-  let content_size = print_content_size_pt(&sheet.page_settings);
+  let has_chart = sheet
+    .resources
+    .drawings
+    .iter()
+    .any(|drawing| !drawing.charts.is_empty() || !drawing.extended_charts.is_empty());
+  let content_size = print_content_size_for_page(
+    &sheet.page_settings,
+    sheet
+      .page_settings
+      .fixed_output_pagination_page_size_pt(has_chart),
+  );
   let repeat_size = split
     .repeat
     .map(|range| {
@@ -1830,6 +1862,20 @@ fn print_cells_for_area<'a>(
         import.globals.settings.date_1904,
         import.styles.output_format_locale(),
       );
+      let rendered_text = if number_format_state == NumberFormatRenderState::Boolean {
+        // Logical values are Office UI resources. Their cell type remains
+        // boolean; text spelling TRUE/FALSE and numeric literal formats do
+        // not enter this path and retain their authored contents/alignment.
+        crate::localization::office_boolean_text(
+          Some(import.styles.output_ui_language()),
+          boolean_raw_value(raw_text),
+        )
+        .to_owned()
+      } else {
+        rendered_text
+      };
+      let number_format_color = effective_number_format_code
+        .and_then(|code| numeric_format_color(code, raw_text, cell.data_type, &import.styles));
       let rendered_text = pivot_display_text(
         sheet,
         print_address,
@@ -1837,20 +1883,24 @@ fn print_cells_for_area<'a>(
         import.styles.has_explicit_ui_language(),
         strings,
       );
-      let icon_set = cell.display_text.parse::<f64>().ok().and_then(|value| {
-        conditional_icon_set(import, sheet, address, value, conditional_eval_cache)
-      });
-      let color_scale_fill = cell.display_text.parse::<f64>().ok().and_then(|value| {
-        conditional_color_scale_fill(import, sheet, address, value, conditional_eval_cache)
-      });
+      let icon_set = conditional_statistical_cell_value(&cell.display_text, cell.data_type)
+        .and_then(|value| {
+          conditional_icon_set(import, sheet, address, value, conditional_eval_cache)
+        });
+      let color_scale_fill = conditional_statistical_cell_value(&cell.display_text, cell.data_type)
+        .and_then(|value| {
+          conditional_color_scale_fill(import, sheet, address, value, conditional_eval_cache)
+        });
       physical_cells.push(CalcPrintCell {
         address: print_address,
         text: Cow::Borrowed(cell.display_text.as_str()),
+        data_type: cell.data_type,
         style_index,
         pivot_format_id,
         rendered_text,
         rich_text_runs: &cell.rich_text_runs,
         number_format_state,
+        number_format_color,
         formula: cell.formula.is_some(),
         icon_set,
         color_scale_fill,
@@ -1935,11 +1985,13 @@ fn pivot_virtual_print_cells<'a>(
         cells.push(CalcPrintCell {
           address,
           text: Cow::Borrowed(text),
+          data_type: Some(x::CellValues::String),
           style_index: None,
           pivot_format_id: None,
           rendered_text: text.to_string(),
           rich_text_runs: &[],
           number_format_state: NumberFormatRenderState::Raw,
+          number_format_color: None,
           formula: false,
           icon_set: None,
           color_scale_fill: None,
@@ -1982,11 +2034,13 @@ fn table_virtual_print_cells<'a>(
         cells.push(CalcPrintCell {
           address,
           text: Cow::Borrowed(""),
+          data_type: None,
           style_index: None,
           pivot_format_id: None,
           rendered_text: String::new(),
           rich_text_runs: &[],
           number_format_state: NumberFormatRenderState::Raw,
+          number_format_color: None,
           formula: false,
           icon_set: None,
           color_scale_fill: None,
@@ -2021,9 +2075,6 @@ fn conditional_number_format_code<'a>(
   rules.sort_by_key(|(_, rule)| rule.priority);
   for (references, rule) in rules {
     if !conditional_numeric_rule_matches(import, sheet, references, rule, address, value, cache) {
-      if rule.stop_if_true {
-        break;
-      }
       continue;
     }
     if let Some(code) = rule
@@ -2372,7 +2423,7 @@ fn conditional_references_contain_cell(references: &[String], address: CellAddre
   })
 }
 
-fn conditional_numeric_rule_matches(
+pub(super) fn conditional_numeric_rule_matches(
   import: &ExcelImport,
   sheet: &CalcSheet,
   references: &[String],
@@ -2448,7 +2499,7 @@ fn conditional_average_matches(
   }
 }
 
-fn conditional_cell_is_matches(
+pub(super) fn conditional_cell_is_matches(
   import: &ExcelImport,
   sheet: &CalcSheet,
   references: &[String],
@@ -2484,7 +2535,107 @@ fn conditional_cell_is_matches(
   }
 }
 
-fn conditional_expression_matches(
+pub(super) fn conditional_cell_is_text_matches(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  references: &[String],
+  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  address: CellAddress,
+  text: &str,
+) -> bool {
+  let Some(first) = rule.formulas.first() else {
+    return false;
+  };
+  let Some(base) = conditional_format_base_address(references, address) else {
+    return false;
+  };
+  // Keep the cell value a quoted string while translating the rule's formula
+  // references from its sqref origin. In particular, text "2" sorts after
+  // text "10"; coercing both to numbers changes the conditional formatting.
+  let value = format!("\"{}\"", text.replace('"', "\"\""));
+  let first = first.trim().trim_start_matches('=');
+  let compare = |operator| format!("{value}{operator}({first})");
+  let predicate = match rule.operator.unwrap_or_default() {
+    x::ConditionalFormattingOperatorValues::Equal => compare("="),
+    x::ConditionalFormattingOperatorValues::NotEqual => compare("<>"),
+    x::ConditionalFormattingOperatorValues::LessThan => {
+      format!("AND(ISTEXT(({first})),{})", compare("<"))
+    }
+    x::ConditionalFormattingOperatorValues::LessThanOrEqual => {
+      format!("AND(ISTEXT(({first})),{})", compare("<="))
+    }
+    x::ConditionalFormattingOperatorValues::GreaterThan => {
+      format!("AND(ISTEXT(({first})),{})", compare(">"))
+    }
+    x::ConditionalFormattingOperatorValues::GreaterThanOrEqual => {
+      format!("AND(ISTEXT(({first})),{})", compare(">="))
+    }
+    x::ConditionalFormattingOperatorValues::Between
+    | x::ConditionalFormattingOperatorValues::NotBetween => {
+      let Some(second) = rule.formulas.get(1) else {
+        return false;
+      };
+      let second = second.trim().trim_start_matches('=');
+      let between = format!(
+        "OR(AND({value}>=({first}),{value}<=({second})),AND({value}>=({second}),{value}<=({first})))"
+      );
+      let range_condition =
+        if rule.operator == Some(x::ConditionalFormattingOperatorValues::NotBetween) {
+          format!("NOT({between})")
+        } else {
+          between
+        };
+      format!("AND(ISTEXT(({first})),ISTEXT(({second})),{range_condition})")
+    }
+    _ => return false,
+  };
+  super::formula::evaluate_relative_formula_as_condition(
+    import,
+    sheet,
+    &format!("IFERROR({predicate},FALSE())"),
+    base,
+    address,
+  )
+}
+
+pub(super) fn conditional_text_rule_matches(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  address: CellAddress,
+) -> bool {
+  // ECMA-376 §18.18.12 defines these predicates using SEARCH, LEFT/RIGHT
+  // comparisons and LEN(TRIM()). Reuse formula semantics for case handling,
+  // wildcard escapes, numeric coercion and errors; formatted display text
+  // must not replace the underlying cell value. A1 is a relative placeholder
+  // translated by the existing evaluator to the cell currently being styled.
+  let predicate = match rule.rule_type {
+    x::ConditionalFormatValues::ContainsBlanks => "LEN(TRIM(A1))=0".to_string(),
+    x::ConditionalFormatValues::NotContainsBlanks => "LEN(TRIM(A1))>0".to_string(),
+    kind => {
+      let Some(text) = rule.text.as_deref() else {
+        return false;
+      };
+      let text = format!("\"{}\"", text.replace('"', "\"\""));
+      match kind {
+        x::ConditionalFormatValues::ContainsText => format!("NOT(ISERROR(SEARCH({text},A1)))"),
+        x::ConditionalFormatValues::NotContainsText => format!("ISERROR(SEARCH({text},A1))"),
+        x::ConditionalFormatValues::BeginsWith => format!("LEFT(A1,LEN({text}))={text}"),
+        x::ConditionalFormatValues::EndsWith => format!("RIGHT(A1,LEN({text}))={text}"),
+        _ => return false,
+      }
+    }
+  };
+  super::formula::evaluate_relative_formula_as_condition(
+    import,
+    sheet,
+    &predicate,
+    CellAddress { col: 1, row: 1 },
+    address,
+  )
+}
+
+pub(super) fn conditional_expression_matches(
   import: &ExcelImport,
   sheet: &CalcSheet,
   references: &[String],
@@ -2504,11 +2655,18 @@ fn conditional_format_base_address(
   references: &[String],
   address: CellAddress,
 ) -> Option<CellAddress> {
+  if !conditional_references_contain_cell(references, address) {
+    return None;
+  }
+  // The rule has one formula origin across the entire sqref list. Office's
+  // conditional_formatting_multiple_ranges.xlsx colors D1 by comparing it
+  // with E2, translating B2 from the first range's A1 origin. Restarting at
+  // the containing range's D1 would incorrectly compare D1 with B2 instead.
   references
     .iter()
     .flat_map(|references| references.split_whitespace())
     .filter_map(CellRange::parse_a1_range)
-    .find(|range| range.contains(address))
+    .next()
     .map(|range| range.start)
 }
 
@@ -2521,8 +2679,21 @@ fn conditional_reference_range(references: &[String], address: CellAddress) -> O
 }
 
 #[derive(Debug, Default)]
-struct ConditionalFormatEvalCache {
+pub(super) struct ConditionalFormatEvalCache {
   ranges: HashMap<CellRange, ConditionalRangeStats>,
+}
+
+pub(super) fn conditional_statistical_cell_value(
+  text: &str,
+  data_type: Option<x::CellValues>,
+) -> Option<f64> {
+  // Statistical rules operate on numeric cells, not text that merely parses
+  // as a number or a boolean's serialized 0/1. Use the same population for
+  // thresholds and for selecting the cells that receive the visual format.
+  if !matches!(data_type, None | Some(x::CellValues::Number)) {
+    return None;
+  }
+  text.parse::<f64>().ok().filter(|value| value.is_finite())
 }
 
 #[derive(Debug)]
@@ -2547,7 +2718,7 @@ impl ConditionalFormatEvalCache {
           let address = cell.address()?;
           range
             .contains(address)
-            .then(|| cell.display_text.parse::<f64>().ok())
+            .then(|| conditional_statistical_cell_value(&cell.display_text, cell.data_type))
             .flatten()
         })
         .collect::<Vec<_>>();
@@ -2971,8 +3142,9 @@ pub(crate) fn rendered_number_text_for_locale(
     Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Boolean) => {
       // A SpreadsheetML boolean is a logical value, not a numeric value to
       // which the cell XF's number format is applied. Excel fixed output
-      // therefore keeps TRUE/FALSE even when a producer stored localized
-      // literal sections such as `"IGAZ";"IGAZ";"HAMIS"` (tdf#122191).
+      // therefore ignores producer-authored literal sections such as
+      // `"IGAZ";"IGAZ";"HAMIS"` (tdf#122191). Emit canonical spelling here;
+      // the worksheet print caller applies the Office UI resource afterward.
       return (
         if boolean_raw_value(raw) {
           "TRUE".to_string()
@@ -3024,16 +3196,40 @@ pub(crate) fn rendered_number_text_for_locale(
       NumberFormatRenderState::UnsupportedFormatCode,
     );
   };
-  if let Some(text) = render_literal_section_number_format(format_code, value) {
-    return (text, NumberFormatRenderState::Boolean);
+  let sections = split_number_format_sections(format_code);
+  let Some(section_index) = number_format_section_index(&sections, value) else {
+    return (
+      raw.to_string(),
+      NumberFormatRenderState::UnsupportedFormatCode,
+    );
+  };
+  let section = sections[section_index];
+  let cleaned_section = strip_number_format_markers(section);
+  if sections.len() > 1 && cleaned_section.is_empty() {
+    // An explicitly skipped numeric section suppresses the displayed value
+    // (ECMA-376 18.8.31). For example, m/d/yyyy;; hides zero dates in Office.
+    // Keep the numeric cell and its formatting so fills/borders still render.
+    return (String::new(), NumberFormatRenderState::Number);
   }
-  let format = NumberFormatPattern::parse(format_code, value);
+  if cleaned_section.eq_ignore_ascii_case("General") {
+    return (
+      format_general_number(value),
+      NumberFormatRenderState::General,
+    );
+  }
+  if let Some(text) = literal_number_format_section(&cleaned_section) {
+    // A literal number format changes the displayed text, not the cell's
+    // value type. Even a number displayed as "TRUE" remains right-aligned
+    // under General; only an actual boolean cell is centered.
+    return (text, NumberFormatRenderState::Number);
+  }
+  let format = NumberFormatPattern::parse_section(section, section_index == 1);
   if format.date_time {
-    if let Some(text) = render_elapsed_date_time(value, format_code) {
+    if let Some(text) = render_elapsed_date_time(value, &format.section) {
       return (text, NumberFormatRenderState::DateTime);
     }
     return (
-      format_serial_date_time(value, format_code, date_1904, format_locale),
+      format_serial_date_time(value, section, date_1904, format_locale),
       NumberFormatRenderState::DateTime,
     );
   }
@@ -3090,20 +3286,93 @@ fn trim_general_fraction(mut text: String) -> String {
   if text == "-0" { "0".to_string() } else { text }
 }
 
-fn render_literal_section_number_format(code: &str, value: f64) -> Option<String> {
-  let sections = split_number_format_sections(code);
-  if sections.len() < 3 {
+fn numeric_format_color(
+  code: &str,
+  raw: &str,
+  data_type: Option<x::CellValues>,
+  styles: &super::styles::StylesCatalog,
+) -> Option<RgbColor> {
+  if !code.contains('[') {
     return None;
   }
-  let section_index = if value.is_sign_negative() && sections.len() > 1 {
-    1
-  } else if value == 0.0 && sections.len() > 2 {
-    2
+  if matches!(
+    data_type,
+    Some(
+      x::CellValues::Boolean
+        | x::CellValues::Error
+        | x::CellValues::String
+        | x::CellValues::InlineString
+        | x::CellValues::SharedString
+        | x::CellValues::Date
+    )
+  ) {
+    return None;
+  }
+  let value = raw.parse::<f64>().ok().filter(|value| value.is_finite())?;
+  let sections = split_number_format_sections(code);
+  let section = sections[number_format_section_index(&sections, value)?];
+  // ECMA-376 18.8.31: color is a directive of the chosen format section,
+  // not part of the displayed text. Quoted/escaped brackets remain literal.
+  let marker = section.strip_prefix('[')?.split_once(']')?.0;
+  styles.number_format_color(marker)
+}
+
+fn number_format_section_index(sections: &[&str], value: f64) -> Option<usize> {
+  // Conditions in the first two sections replace their usual value tests;
+  // a third numeric section handles the remaining values. Use the same
+  // selection for formatting and color (ECMA-376 18.8.31).
+  if sections
+    .iter()
+    .take(2)
+    .any(|section| number_format_condition(section, value).is_some())
+  {
+    sections
+      .iter()
+      .take(3)
+      .enumerate()
+      .find(|(index, section)| match *index {
+        0 => number_format_condition(section, value).unwrap_or_else(|| {
+          if sections.len() > 2 {
+            value > 0.0
+          } else {
+            value >= 0.0
+          }
+        }),
+        1 => number_format_condition(section, value).unwrap_or(sections.len() <= 2 || value < 0.0),
+        _ => true,
+      })
+      .map(|(index, _)| index)
   } else {
-    0
-  };
-  let section = strip_number_format_markers(sections.get(section_index).copied().unwrap_or(code));
-  literal_number_format_section(&section)
+    let index = if value.is_sign_negative() && sections.len() > 1 {
+      1
+    } else if value == 0.0 && sections.len() > 2 {
+      2
+    } else {
+      0
+    };
+    (index < sections.len()).then_some(index)
+  }
+}
+
+fn number_format_condition(mut section: &str, value: f64) -> Option<bool> {
+  while let Some(rest) = section.strip_prefix('[') {
+    let (marker, remaining) = rest.split_once(']')?;
+    for operator in ["<=", ">=", "<>", "<", ">", "="] {
+      if let Some(operand) = marker.strip_prefix(operator) {
+        let operand = operand.parse::<f64>().ok()?;
+        return Some(match operator {
+          "<=" => value <= operand,
+          ">=" => value >= operand,
+          "<>" => value != operand,
+          "<" => value < operand,
+          ">" => value > operand,
+          _ => value == operand,
+        });
+      }
+    }
+    section = remaining;
+  }
+  None
 }
 
 fn split_number_format_sections(code: &str) -> Vec<&str> {
@@ -3134,28 +3403,34 @@ fn literal_number_format_section(section: &str) -> Option<String> {
   let mut output = String::new();
   let mut in_quote = false;
   let mut escaped = false;
-  let mut has_quoted_literal = false;
+  let mut skip_next = false;
+  let mut has_literal = false;
   for ch in section.chars() {
+    if skip_next {
+      skip_next = false;
+      continue;
+    }
     if escaped {
-      if in_quote {
-        output.push(ch);
-      }
+      output.push(ch);
       escaped = false;
       continue;
     }
     match ch {
-      '\\' => escaped = true,
+      '\\' if !in_quote => {
+        escaped = true;
+        has_literal = true;
+      }
       '"' => {
         in_quote = !in_quote;
-        has_quoted_literal = true;
+        has_literal = true;
       }
-      '_' | '*' if !in_quote => escaped = true,
+      '_' | '*' if !in_quote => skip_next = true,
       _ if in_quote => output.push(ch),
-      _ if ch.is_whitespace() => {}
+      _ if ch.is_whitespace() => output.push(ch),
       _ => return None,
     }
   }
-  if in_quote || !has_quoted_literal {
+  if in_quote || escaped || !has_literal {
     return None;
   }
   Some(output)
@@ -3174,26 +3449,98 @@ struct NumberFormatPattern {
   section: String,
   integer_pattern: String,
   scale_commas: usize,
+  scientific: Option<ScientificNumberFormat>,
+}
+
+#[derive(Clone, Debug)]
+struct ScientificNumberFormat {
+  marker: char,
+  positive_sign: bool,
+  exponent_width: usize,
+  mantissa_section: String,
+  exponent_suffix: String,
+}
+
+fn split_scientific_number_format(section: &str) -> Option<(String, ScientificNumberFormat)> {
+  let mut quoted = false;
+  let mut escaped = false;
+  for (index, ch) in section.char_indices() {
+    if escaped {
+      escaped = false;
+      continue;
+    }
+    match ch {
+      '"' => quoted = !quoted,
+      '\\' | '_' | '*' if !quoted => escaped = true,
+      'e' | 'E' if !quoted => {
+        let rest = &section[index + 1..];
+        let sign = rest.chars().next()?;
+        if !matches!(sign, '+' | '-') || integer_placeholder_count(&section[..index]) == 0 {
+          continue;
+        }
+        let exponent_width = rest[1..]
+          .bytes()
+          .take_while(|ch| matches!(*ch, b'0' | b'#'))
+          .count();
+        if exponent_width == 0 {
+          continue;
+        }
+        let (mantissa_section, _) = strip_trailing_scaling_commas(&section[..index]);
+        let suffix = &rest[1 + exponent_width..];
+        let mut numeric_section = section[..index].to_string();
+        numeric_section.push_str(suffix);
+        return Some((
+          numeric_section,
+          ScientificNumberFormat {
+            marker: ch,
+            positive_sign: sign == '+',
+            exponent_width,
+            mantissa_section,
+            exponent_suffix: scientific_number_format_suffix(suffix),
+          },
+        ));
+      }
+      _ => {}
+    }
+  }
+  None
+}
+
+fn scientific_number_format_suffix(section: &str) -> String {
+  let mut output = String::new();
+  let mut quoted = false;
+  let mut chars = section.chars();
+  while let Some(ch) = chars.next() {
+    match ch {
+      '"' => quoted = !quoted,
+      '\\' if !quoted => {
+        if let Some(literal) = chars.next() {
+          output.push(literal);
+        }
+      }
+      '_' | '*' if !quoted => {
+        chars.next();
+      }
+      _ => output.push(ch),
+    }
+  }
+  output
 }
 
 impl NumberFormatPattern {
-  fn parse(code: &str, value: f64) -> Self {
-    let sections = code.split(';').collect::<Vec<_>>();
-    let section_index = if value.is_sign_negative() && sections.len() > 1 {
-      1
-    } else if value == 0.0 && sections.len() > 2 {
-      2
-    } else {
-      0
+  fn parse_section(section: &str, suppress_negative_sign: bool) -> Self {
+    let cleaned_section = strip_number_format_markers(section);
+    let (cleaned_section, scientific) = match split_scientific_number_format(&cleaned_section) {
+      Some((section, scientific)) => (section, Some(scientific)),
+      None => (cleaned_section, None),
     };
-    let cleaned_section =
-      strip_number_format_markers(sections.get(section_index).copied().unwrap_or(code));
     let (section, scale_commas) = strip_trailing_scaling_commas(&cleaned_section);
     let section = section.as_str();
     let mut pattern = Self {
-      suppress_negative_sign: section_index == 1,
+      suppress_negative_sign,
       section: section.to_string(),
       scale_commas,
+      scientific,
       ..Self::default()
     };
     let mut in_quote = false;
@@ -3241,6 +3588,7 @@ impl NumberFormatPattern {
         '"' => in_quote = !in_quote,
         _ if in_quote => {
           if !after_decimal && !literal_prefix {
+            integer_pattern.push('\\');
             integer_pattern.push(ch);
           }
           if literal_prefix {
@@ -3287,7 +3635,7 @@ impl NumberFormatPattern {
             pattern.suffix.push(ch);
           }
         }
-        'd' | 'D' | 'm' | 'M' | 'y' | 'Y' | 'h' | 'H' | 's' | 'S' => {
+        'd' | 'D' | 'm' | 'M' | 'y' | 'Y' | 'h' | 'H' | 's' | 'S' | 'g' | 'G' | 'e' | 'E' => {
           pattern.date_time = true;
           literal_prefix = false;
         }
@@ -3322,24 +3670,56 @@ fn boolean_raw_value(raw: &str) -> bool {
 
 fn strip_number_format_markers(section: &str) -> String {
   let mut output = String::new();
-  let mut rest = section;
-  while let Some(start) = rest.find('[') {
-    output.push_str(&rest[..start]);
-    let Some(end) = rest[start + 1..].find(']') else {
-      output.push_str(&rest[start..]);
-      return output;
-    };
-    let marker = &rest[start + 1..start + 1 + end];
-    if let Some(currency) = number_format_currency_marker(marker) {
-      output.push_str(currency);
-    } else if !is_ignored_number_format_marker(marker) {
+  let mut chars = section.chars();
+  let mut in_quote = false;
+  while let Some(ch) = chars.next() {
+    // ECMA-376 §18.8.31: quoted and escaped characters are literal text,
+    // even when they spell a color, condition or currency marker. The next
+    // character after _ or * belongs to that spacing/fill instruction too.
+    if ch == '"' {
+      in_quote = !in_quote;
+      output.push(ch);
+      continue;
+    }
+    if !in_quote && matches!(ch, '\\' | '_' | '*') {
+      output.push(ch);
+      if let Some(next) = chars.next() {
+        output.push(next);
+      }
+      continue;
+    }
+    if ch != '[' || in_quote {
+      output.push(ch);
+      continue;
+    }
+    let mut marker = String::new();
+    let mut closed = false;
+    for next in chars.by_ref() {
+      if next == ']' {
+        closed = true;
+        break;
+      }
+      marker.push(next);
+    }
+    if !closed {
       output.push('[');
-      output.push_str(marker);
+      output.push_str(&marker);
+      break;
+    }
+    if let Some(currency) = number_format_currency_marker(&marker) {
+      // Currency names are literal content, not another format program.
+      // For example, USD must not turn into seconds/day tokens, and a
+      // currency containing 0 or % must not add numeric placeholders.
+      for character in currency.chars() {
+        output.push('\\');
+        output.push(character);
+      }
+    } else if !is_ignored_number_format_marker(&marker) {
+      output.push('[');
+      output.push_str(&marker);
       output.push(']');
     }
-    rest = &rest[start + end + 2..];
   }
-  output.push_str(rest);
   output
 }
 
@@ -3378,33 +3758,51 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
   if pattern.scale_commas > 0 {
     value /= 1000_f64.powi(i32::try_from(pattern.scale_commas).unwrap_or(i32::MAX));
   }
-  if let Some(fraction) = format_fraction_value(value, &pattern.section) {
+  if let Some(scientific) = &pattern.scientific
+    && let Some(text) = format_scientific_value(value, pattern, scientific)
+  {
+    return text;
+  }
+  // With one format section, Excel supplies the minus before any authored
+  // prefix (for example -AMT 12.50). Only a selected negative section owns
+  // the sign itself; a currency or text prefix does not suppress it.
+  let sign = if value.is_sign_negative() && !pattern.suppress_negative_sign {
+    "-"
+  } else {
+    ""
+  };
+  if let Some(fraction) = format_fraction_value(value.abs(), &pattern.section) {
     let mut output = String::new();
+    output.push_str(sign);
     output.push_str(&pattern.prefix);
     output.push_str(&fraction);
     output.push_str(&pattern.suffix);
     return output.trim_end().to_string();
   }
-  let sign =
-    if value.is_sign_negative() && !pattern.suppress_negative_sign && pattern.prefix.is_empty() {
-      "-"
-    } else {
-      ""
-    };
   let decimals = fraction_placeholder_count(&pattern.section).unwrap_or(pattern.decimals);
-  let integer_placeholders = integer_placeholder_count(&pattern.integer_pattern);
-  let value_abs = value.abs();
-  let scaled = if decimals == 0 && integer_placeholders > 0 {
-    value_abs.round()
-  } else {
-    value_abs
-  };
+  // Office rounds decimal ties away from zero and removes binary scaling
+  // noise (decimal-format.xlsx: 1.005 -> 1.01, while 1.004 -> 1.00).
+  // Share the spreadsheet ROUND policy before Rust formats the fixed digits.
+  let scaled = round_to_decimal_places(value.abs(), i32::try_from(decimals).unwrap_or(i32::MAX));
   let formatted = format!("{:.*}", decimals, scaled);
   let (integer, fraction) = formatted.split_once('.').unwrap_or((&formatted, ""));
+  let minimum_integer_digits = integer_pattern_tokens(&pattern.integer_pattern)
+    .iter()
+    .filter(|token| matches!(token, IntegerPatternToken::Placeholder('0')))
+    .count();
+  // # and ? do not display an insignificant integer zero. An authored
+  // 0 placeholder still requires it (ECMA-376 18.8.31; 52348.xlsx).
+  let integer = if integer == "0" && minimum_integer_digits == 0 {
+    Cow::Borrowed("")
+  } else if integer.len() < minimum_integer_digits {
+    Cow::Owned(format!("{integer:0>minimum_integer_digits$}"))
+  } else {
+    Cow::Borrowed(integer)
+  };
   let integer = if integer_pattern_has_literal_between_placeholders(&pattern.integer_pattern) {
-    render_integer_pattern(&pattern.integer_pattern, integer)
+    render_integer_pattern(&pattern.integer_pattern, &integer)
   } else if pattern.grouping {
-    group_integer(integer)
+    group_integer(&integer)
   } else {
     integer.to_string()
   };
@@ -3427,6 +3825,59 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
     output.push_str(&pattern.suffix);
   }
   output.trim().to_string()
+}
+
+fn format_scientific_value(
+  value: f64,
+  pattern: &NumberFormatPattern,
+  scientific: &ScientificNumberFormat,
+) -> Option<String> {
+  if !value.is_finite() {
+    return None;
+  }
+  // Separate decimal exponent normalization from binary powi at the source
+  // exponent, so subnormal values such as 5e-324 never divide by 10^-324 = 0.
+  let decimal = format!("{:e}", value.abs());
+  let (mantissa, exponent) = decimal.split_once('e')?;
+  let mut mantissa = mantissa.parse::<f64>().ok()?;
+  let decimal_exponent = exponent.parse::<i32>().ok()?;
+  // Multiple integer placeholders use engineering-style exponent groups.
+  // This follows SvNumberformat's nCntPre exponent rescaling.
+  let period = i32::try_from(integer_placeholder_count(&pattern.integer_pattern).max(1)).ok()?;
+  let threshold = 10.0_f64.powi(period);
+  if !threshold.is_finite() {
+    return None;
+  }
+  let mut exponent = decimal_exponent.div_euclid(period) * period;
+  mantissa *= 10.0_f64.powi(decimal_exponent - exponent);
+
+  let mut mantissa_pattern =
+    NumberFormatPattern::parse_section(&scientific.mantissa_section, false);
+  // Percent and comma scaling have already been applied to the original
+  // value. Preserve the selected negative section without applying it twice.
+  mantissa_pattern.percent = false;
+  mantissa_pattern.scale_commas = 0;
+  mantissa_pattern.suppress_negative_sign = pattern.suppress_negative_sign;
+  let rounded = round_to_decimal_places(mantissa, i32::try_from(mantissa_pattern.decimals).ok()?);
+  if rounded >= threshold {
+    mantissa /= threshold;
+    exponent += period;
+  }
+  let mantissa = format_decimal_value(mantissa.copysign(value), &mantissa_pattern);
+  let sign = if exponent < 0 {
+    "-"
+  } else if scientific.positive_sign {
+    "+"
+  } else {
+    ""
+  };
+  let width = scientific.exponent_width;
+  Some(format!(
+    "{mantissa}{}{sign}{:0width$}{}",
+    scientific.marker,
+    exponent.unsigned_abs(),
+    scientific.exponent_suffix
+  ))
 }
 
 fn strip_trailing_scaling_commas(section: &str) -> (String, usize) {
@@ -3461,13 +3912,22 @@ fn strip_trailing_scaling_commas(section: &str) -> (String, usize) {
 
 fn format_fraction_value(value: f64, section: &str) -> Option<String> {
   let slash_index = unescaped_char_index(section, '/')?;
-  let denominator_placeholders = section[slash_index + 1..]
-    .chars()
-    .filter(|ch| matches!(ch, '0' | '#' | '?'))
-    .count();
+  let denominator_placeholders = integer_placeholder_count(&section[slash_index + 1..]);
   if denominator_placeholders == 0 {
     return None;
   }
+  let numerator_tokens = integer_pattern_tokens(&section[..slash_index]);
+  let numerator_end = numerator_tokens
+    .iter()
+    .rposition(|token| matches!(token, IntegerPatternToken::Placeholder(_)))?;
+  let numerator_start = numerator_tokens[..=numerator_end]
+    .iter()
+    .rposition(|token| !matches!(token, IntegerPatternToken::Placeholder(_)))
+    .map_or(0, |index| index + 1);
+  let integer_tokens = &numerator_tokens[..numerator_start];
+  let mixed_fraction = integer_tokens
+    .iter()
+    .any(|token| matches!(token, IntegerPatternToken::Placeholder(_)));
   let max_denominator = 10_i64.pow(denominator_placeholders as u32) - 1;
   let absolute = value.abs();
   let whole = absolute.floor();
@@ -3492,8 +3952,27 @@ fn format_fraction_value(value: f64, section: &str) -> Option<String> {
       best_denominator,
     )
   };
-  let sign = if value.is_sign_negative() { "-" } else { "" };
-  Some(format!("{sign}{numerator}/{denominator}"))
+  if !mixed_fraction {
+    return Some(format!("{numerator}/{denominator}"));
+  }
+  // A separate integer field requests a mixed fraction. Without it, Excel
+  // keeps an improper fraction such as 7/1 (tdf70455), rather than a plain
+  // integer. Divide the rounded ratio so a fractional carry reaches the
+  // whole-number field too (tdf81939 uses -3 14093/99532).
+  let integer = numerator / denominator;
+  let remainder = numerator % denominator;
+  let minimum_integer_digits = integer_tokens
+    .iter()
+    .filter(|token| matches!(token, IntegerPatternToken::Placeholder('0')))
+    .count();
+  let integer_text = format!("{integer:0minimum_integer_digits$}");
+  if remainder == 0 {
+    Some(integer_text)
+  } else if integer == 0 && minimum_integer_digits == 0 {
+    Some(format!("{remainder}/{denominator}"))
+  } else {
+    Some(format!("{integer_text} {remainder}/{denominator}"))
+  }
 }
 
 fn unescaped_char_index(value: &str, needle: char) -> Option<usize> {
@@ -3693,8 +4172,17 @@ fn format_serial_date_time(
   date_1904: bool,
   format_locale: Option<&str>,
 ) -> String {
-  let days = value.floor() as i64;
-  let seconds = ((value - value.floor()) * 86_400.0).round() as i64;
+  let (seconds, code) = rounded_calendar_time_picture((value - value.floor()) * 86_400.0, code);
+  let day_carry = if matches!(&code, Cow::Owned(_)) {
+    seconds / 86_400
+  } else {
+    0
+  };
+  let code = code.as_ref();
+  // Subsecond rounding may carry into the next minute or day. A date-only
+  // picture still uses the original calendar day, even just before midnight.
+  let days = value.floor() as i64 + day_carry;
+  let seconds = seconds - day_carry * 86_400;
   let days_since_unix = if date_1904 {
     days - 24_107
   } else if days < 60 {
@@ -3719,8 +4207,15 @@ fn format_serial_date_time(
   if uses_system_long_date_format(code) {
     // NF_DATE_SYSTEM_LONG is resolved through the caller's format locale,
     // independently of the UI and document languages.
+    if let Some(text) = field_value.and_then(|value| {
+      crate::field_datetime::format_spreadsheet_system_long_date(format_locale, value)
+    }) {
+      return text;
+    }
+  }
+  if uses_system_date_time_format(code, "$-F400") {
     if let Some(text) = field_value
-      .and_then(|value| crate::field_datetime::format_office_long_date(format_locale, value, true))
+      .and_then(|value| crate::field_datetime::format_office_default_time(format_locale, value))
     {
       return text;
     }
@@ -3741,35 +4236,104 @@ fn format_serial_date_time(
   )
 }
 
-fn uses_system_long_date_format(code: &str) -> bool {
-  let mut rest = code;
-  while let Some(start) = rest.find('[') {
-    let Some(end) = rest[start + 1..].find(']') else {
-      break;
-    };
-    if rest[start + 1..start + 1 + end]
-      .trim()
-      .eq_ignore_ascii_case("$-F800")
-    {
-      return true;
+fn rounded_calendar_time_picture(seconds: f64, code: &str) -> (i64, Cow<'_, str>) {
+  let fields = subsecond_format_fields(code);
+  let Some(precision) = fields.iter().map(|field| field.len() - 1).max() else {
+    return (seconds.round() as i64, Cow::Borrowed(code));
+  };
+  let scale = 10_i64.pow(precision as u32);
+  let ticks = (round_to_decimal_places(seconds, precision as i32) * scale as f64).round() as i64;
+  let fraction = ticks % scale;
+  let mut picture = String::with_capacity(code.len());
+  let mut start = 0;
+  for field in fields {
+    let width = field.len() - 1;
+    let digits = fraction / 10_i64.pow((precision - width) as u32);
+    picture.push_str(&code[start..field.start]);
+    // The shared calendar formatter takes whole seconds. Pass the already
+    // rounded fraction as literal text while keeping its locale/date tokens.
+    picture.push_str(&format!("\".{digits:0width$}\""));
+    start = field.end;
+  }
+  picture.push_str(&code[start..]);
+  (ticks / scale, Cow::Owned(picture))
+}
+
+fn subsecond_format_fields(code: &str) -> Vec<std::ops::Range<usize>> {
+  let mut fields = Vec::new();
+  let mut chars = code.char_indices().peekable();
+  while let Some((start, ch)) = chars.next() {
+    match ch {
+      ';' => break,
+      '\\' | '_' | '*' => {
+        chars.next();
+      }
+      '"' | '[' => {
+        let closing = if ch == '[' { ']' } else { '"' };
+        for (_, ch) in chars.by_ref() {
+          if ch == closing {
+            break;
+          }
+        }
+      }
+      '.' => {
+        let mut end = start + 1;
+        while chars.peek().is_some_and(|(_, ch)| *ch == '0') {
+          chars.next();
+          end += 1;
+        }
+        // MS-OI29500 NFPartSubSecond permits one to three zero digits.
+        if (1..=3).contains(&(end - start - 1)) {
+          fields.push(start..end);
+        }
+      }
+      _ => {}
     }
-    rest = &rest[start + end + 2..];
+  }
+  fields
+}
+
+fn uses_system_long_date_format(code: &str) -> bool {
+  uses_system_date_time_format(code, "$-F800")
+}
+
+fn uses_system_date_time_format(code: &str, system_marker: &str) -> bool {
+  let mut chars = code.chars();
+  while let Some(ch) = chars.next() {
+    match ch {
+      ';' => break,
+      '\\' | '_' | '*' => {
+        chars.next();
+      }
+      '"' => {
+        for ch in chars.by_ref() {
+          if ch == '"' {
+            break;
+          }
+        }
+      }
+      '[' => {
+        let mut marker = String::new();
+        let mut closed = false;
+        for ch in chars.by_ref() {
+          if ch == ']' {
+            closed = true;
+            break;
+          }
+          marker.push(ch);
+        }
+        if closed && marker.trim().eq_ignore_ascii_case(system_marker) {
+          return true;
+        }
+      }
+      _ => {}
+    }
   }
   false
 }
 
 fn render_elapsed_date_time(value: f64, code: &str) -> Option<String> {
   let clean = strip_number_format_markers(code);
-  let lower = clean.to_ascii_lowercase();
-  let elapsed = if lower.contains("[hh]") {
-    ElapsedDateTimeUnit::Hour
-  } else if lower.contains("[mm]") {
-    ElapsedDateTimeUnit::Minute
-  } else if lower.contains("[ss]") {
-    ElapsedDateTimeUnit::Second
-  } else {
-    return None;
-  };
   let total_seconds = value.abs() * 86_400.0;
   let rounded_seconds = total_seconds.round() as i64;
   let sign = if value.is_sign_negative() { "-" } else { "" };
@@ -3783,17 +4347,21 @@ fn render_elapsed_date_time(value: f64, code: &str) -> Option<String> {
   let mut rest = clean.as_str();
   let mut bracket_written = false;
   while let Some(ch) = rest.chars().next() {
-    let lower_rest = rest.to_ascii_lowercase();
-    if lower_rest.starts_with("[hh]") {
-      output.push_str(&total_hours.to_string());
-      rest = &rest[4..];
-      bracket_written = true;
-    } else if lower_rest.starts_with("[mm]") {
-      output.push_str(&total_minutes.to_string());
-      rest = &rest[4..];
-      bracket_written = true;
-    } else if lower_rest.starts_with("[ss]") {
-      let consumed = render_elapsed_second_token(rest, total_seconds, &mut output);
+    // ECMA-376 18.8.31 includes the built-in [h]:mm:ss format as well
+    // as doubled elapsed fields. Read tokens here so quoted or escaped
+    // bracket text cannot turn an ordinary clock format into elapsed time.
+    if let Some((unit, width, mut consumed)) = elapsed_date_time_token(rest) {
+      match unit {
+        ElapsedDateTimeUnit::Hour => {
+          output.push_str(&format_padded_number(total_hours, width));
+        }
+        ElapsedDateTimeUnit::Minute => {
+          output.push_str(&format_padded_number(total_minutes, width));
+        }
+        ElapsedDateTimeUnit::Second => {
+          consumed = render_elapsed_second_token(rest, total_seconds, width, &mut output);
+        }
+      }
       rest = &rest[consumed..];
       bracket_written = true;
     } else if ch == 'h' || ch == 'H' {
@@ -3821,17 +4389,16 @@ fn render_elapsed_date_time(value: f64, code: &str) -> Option<String> {
       let consumed = push_escaped_number_format_literal(rest, &mut output);
       rest = &rest[consumed..];
     } else if matches!(ch, '_' | '*') {
-      rest = rest.get(ch.len_utf8() * 2..).unwrap_or("");
+      let mut chars = rest.chars();
+      chars.next();
+      chars.next();
+      rest = chars.as_str();
     } else {
       output.push(ch);
       rest = &rest[ch.len_utf8()..];
     }
   }
-  if elapsed == ElapsedDateTimeUnit::Second || bracket_written {
-    Some(output)
-  } else {
-    None
-  }
+  bracket_written.then_some(output)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -3841,8 +4408,24 @@ enum ElapsedDateTimeUnit {
   Second,
 }
 
-fn render_elapsed_second_token(rest: &str, total_seconds: f64, output: &mut String) -> usize {
-  let mut consumed = 4usize;
+fn elapsed_date_time_token(rest: &str) -> Option<(ElapsedDateTimeUnit, usize, usize)> {
+  let (field, _) = rest.strip_prefix('[')?.split_once(']')?;
+  let unit = match field.to_ascii_lowercase().as_str() {
+    "h" | "hh" => ElapsedDateTimeUnit::Hour,
+    "m" | "mm" => ElapsedDateTimeUnit::Minute,
+    "s" | "ss" => ElapsedDateTimeUnit::Second,
+    _ => return None,
+  };
+  Some((unit, field.len(), field.len() + 2))
+}
+
+fn render_elapsed_second_token(
+  rest: &str,
+  total_seconds: f64,
+  width: usize,
+  output: &mut String,
+) -> usize {
+  let mut consumed = width + 2;
   if let Some(fraction) = rest
     .get(consumed..)
     .and_then(|suffix| suffix.strip_prefix('.'))
@@ -3852,12 +4435,13 @@ fn render_elapsed_second_token(rest: &str, total_seconds: f64, output: &mut Stri
       .take_while(|ch| matches!(ch, '0' | '#' | '?'))
       .count();
     if decimals > 0 {
-      output.push_str(&format!("{total_seconds:.decimals$}"));
+      let minimum_width = width + 1 + decimals;
+      output.push_str(&format!("{total_seconds:0minimum_width$.decimals$}"));
       consumed += 1 + decimals;
       return consumed;
     }
   }
-  output.push_str(&(total_seconds.round() as i64).to_string());
+  output.push_str(&format_padded_number(total_seconds.round() as i64, width));
   consumed
 }
 
@@ -3903,12 +4487,7 @@ fn push_escaped_number_format_literal(rest: &str, output: &mut String) -> usize 
 
 fn fraction_placeholder_count(section: &str) -> Option<usize> {
   let fraction = split_number_format_decimal(section)?.1;
-  Some(
-    fraction
-      .chars()
-      .filter(|ch| matches!(ch, '0' | '#' | '?'))
-      .count(),
-  )
+  Some(integer_placeholder_count(fraction))
 }
 
 fn render_fraction_pattern(section: &str, digits: &str) -> Option<String> {
@@ -3919,6 +4498,21 @@ fn render_fraction_pattern(section: &str, digits: &str) -> Option<String> {
   let mut in_quote = false;
   let mut escaped = false;
   let digit_chars = digits.chars().collect::<Vec<_>>();
+  let required_digits = integer_pattern_tokens(fraction)
+    .into_iter()
+    .filter_map(|token| match token {
+      IntegerPatternToken::Placeholder(ch) => Some(ch),
+      IntegerPatternToken::Literal(_) => None,
+    })
+    .enumerate()
+    .filter_map(|(index, ch)| (ch == '0').then_some(index + 1))
+    .last()
+    .unwrap_or(0);
+  let significant_digits = digit_chars
+    .iter()
+    .rposition(|digit| *digit != '0')
+    .map_or(0, |index| index + 1)
+    .max(required_digits);
   while let Some(ch) = chars.next() {
     if escaped {
       output.push(ch);
@@ -3941,21 +4535,19 @@ fn render_fraction_pattern(section: &str, digits: &str) -> Option<String> {
       '0' | '#' | '?' if !in_quote => {
         let digit = digit_chars.get(digit_index).copied().unwrap_or('0');
         digit_index += 1;
-        if ch == '0'
-          || digit != '0'
-          || has_required_or_nonzero_fraction_digit(&digit_chars, digit_index)
-        {
+        if ch == '0' || digit_index <= significant_digits {
           output.push(digit);
+        } else if ch == '?' {
+          output.push(' ');
         }
       }
       _ => output.push(ch),
     }
   }
-  if output.is_empty() {
-    None
-  } else {
-    Some(format!(".{}", output.trim_end()))
-  }
+  // A decimal separator remains visible when all fractional # digits are
+  // omitted. Returning None here incorrectly reinstates fixed zero digits
+  // in format_decimal_value (Office prints 0. and 1000. for #0.#).
+  Some(format!(".{}", output.trim_end()))
 }
 
 fn split_number_format_decimal(section: &str) -> Option<(&str, &str)> {
@@ -3976,10 +4568,6 @@ fn split_number_format_decimal(section: &str) -> Option<(&str, &str)> {
   None
 }
 
-fn has_required_or_nonzero_fraction_digit(digits: &[char], start: usize) -> bool {
-  digits.iter().skip(start).any(|digit| *digit != '0')
-}
-
 fn render_date_time_format(
   code: &str,
   year: i64,
@@ -3992,17 +4580,6 @@ fn render_date_time_format(
   let sections = split_number_format_sections(code);
   let clean = strip_number_format_markers(sections.first().copied().unwrap_or(code));
   let lower = clean.to_ascii_lowercase();
-  if lower.contains("ggge") {
-    // the stray leading "[$]" from tdf#161301 before SvNumberFormatter scans
-    // the Japanese-era `ggge"年"m"月"d"日"` format. Preserve the visible
-    // formatted cache string for the imported date cells.
-    return format!(
-      "CE{}年{}月{}日",
-      year - 1240,
-      month.saturating_sub(3),
-      day.saturating_sub(8)
-    );
-  }
   if let Some(text) =
     render_tokenized_date_time_format(&clean, year, month, day, hour, minute, second)
   {
@@ -4460,7 +5037,7 @@ mod tests {
   }
 
   #[test]
-  fn page_cell_scan_includes_one_following_column_without_changing_rows() {
+  fn page_cell_scan_includes_preceding_and_one_following_column_without_changing_rows() {
     let page = CellRange::new(
       CellAddress { col: 2, row: 3 },
       CellAddress { col: 7, row: 19 },
@@ -4469,7 +5046,7 @@ mod tests {
     assert_eq!(
       page_cell_scan_area(page),
       CellRange::new(
-        CellAddress { col: 2, row: 3 },
+        CellAddress { col: 1, row: 3 },
         CellAddress { col: 8, row: 19 },
       )
     );
@@ -4524,6 +5101,523 @@ mod tests {
         CellAddress { col: 8, row: 2 },
       ))
     );
+  }
+
+  #[test]
+  fn required_integer_zeroes_are_padded_without_reinterpreting_literals() {
+    // ECMA-376 18.8.31: 0 is a required digit, whereas quoted/escaped 0 is text.
+    for (raw, code, expected) in [
+      ("12", "00000", "00012"),
+      ("-12", "00000", "-00012"),
+      ("0", "00000", "00000"),
+      ("123456", "00000", "123456"),
+      ("12.36", "000.0", "012.4"),
+      ("12", "000,000", "000,012"),
+      ("12", "##0", "12"),
+      ("12", r#"0"0"0"#, "102"),
+      ("12", r"0\00", "102"),
+      ("5", "000.0E+00", "005.0E+00"),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, Some(code), None, false).0,
+        expected,
+        "{raw}: {code}"
+      );
+    }
+  }
+
+  #[test]
+  fn numeric_format_colors_follow_sections_and_ignore_literal_markers() {
+    let styles = super::super::styles::StylesCatalog::default();
+    let red = Some(RgbColor { r: 255, g: 0, b: 0 });
+    let blue = Some(RgbColor { r: 0, g: 0, b: 255 });
+    for (raw, code, expected) in [
+      ("-130", r##"\€#,##0.00;[RED]"-€"#,##0.00"##, red),
+      ("130", r##"\€#,##0.00;[RED]"-€"#,##0.00"##, None),
+      ("0", "0;[Red]-0;[Blue]0", blue),
+      ("-1", "[Red]0", red),
+      ("1", "[Color3]0", red),
+      ("1", r#""[Red]"0"#, None),
+      ("1", r"\[Red\]0", None),
+      ("50", "[Red][<=100]0;[Blue][>100]0", red),
+      ("150", "[Red][<=100]0;[Blue][>100]0", blue),
+      ("10", "[Red][<0]0;[Blue][>100]0;0", None),
+      ("-1", "[Red]0;[Blue][<0]0", blue),
+    ] {
+      assert_eq!(
+        numeric_format_color(code, raw, None, &styles),
+        expected,
+        "{raw}: {code}"
+      );
+    }
+    for data_type in [
+      x::CellValues::Boolean,
+      x::CellValues::Error,
+      x::CellValues::SharedString,
+    ] {
+      assert_eq!(
+        numeric_format_color("[Red]0", "1", Some(data_type), &styles),
+        None
+      );
+    }
+  }
+
+  #[test]
+  fn fraction_formats_keep_mixed_parts_and_selected_negative_signs() {
+    for (raw, code, expected) in [
+      (
+        "-3.1415926535897931",
+        r"#\ ?/?;[Red]\-#\ #/#####",
+        "-3 14093/99532",
+      ),
+      ("3.1415926535897931", r"#\ ?/?;[Red]\-#\ #/#####", "3 1/7"),
+      ("3.1415926535897931", "??/?", "22/7"),
+      ("7", "??/?", "7/1"),
+      ("16", "??/?", "16/1"),
+      ("7", "# ?/?", "7"),
+      ("0.25", "# ?/?", "1/4"),
+      ("0.25", "0 ?/?", "0 1/4"),
+      ("1.999999", "# ?/?", "2"),
+      ("-1.5", r##""AMT "# ?/?"##, "-AMT 1 1/2"),
+      ("1.5", r#"# ?/?" 00""#, "1 1/2 00"),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, Some(code), None, false).0,
+        expected,
+        "{raw}: {code}"
+      );
+    }
+  }
+
+  #[test]
+  fn system_long_date_markers_ignore_literal_and_later_section_text() {
+    assert!(uses_system_long_date_format(
+      "[Red][$-f800]dddd, mmmm dd, yyyy"
+    ));
+    for code in [
+      r#""[$-F800]"d-mmm"#,
+      r"\[$-F800\]d-mmm",
+      "d-mmm;[$-F800]dddd",
+      "[$-F800",
+    ] {
+      assert!(!uses_system_long_date_format(code), "{code}");
+    }
+    assert_eq!(
+      rendered_number_text_for_locale(
+        "43486",
+        Some(r#""[$-F800]"d-mmm"#),
+        None,
+        false,
+        Some("en-US")
+      )
+      .0,
+      "[$-F800]21-Jan",
+    );
+  }
+
+  #[test]
+  fn optional_number_placeholders_omit_zeroes_but_keep_required_digits() {
+    for (raw, code, expected) in [
+      ("0", "#", ""),
+      ("0", "?", ""),
+      ("0", "0", "0"),
+      ("0", "000", "000"),
+      ("0.1", "#", ""),
+      ("1", "#", "1"),
+      ("0.25", "#.00", ".25"),
+      ("0.25", "0.00", "0.25"),
+      ("0", "#0.#", "0."),
+      ("1000", "#0.#", "1000."),
+      ("600.3", "#0.#", "600.3"),
+      ("1.2", "0.###", "1.2"),
+      ("1", "0.#0", "1.00"),
+      ("1.2", "0.#0#", "1.20"),
+      ("1.201", "0.#0#", "1.201"),
+      ("1.2", r#"0.??" kg""#, "1.2  kg"),
+      ("0", r#"[=0]?;0.00"#, ""),
+      ("0", r#"[=0]?;0.00;"unused""#, ""),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, Some(code), None, false).0,
+        expected,
+        "{raw}: {code}"
+      );
+    }
+  }
+
+  #[test]
+  fn conditional_number_format_sections_share_value_and_color_selection() {
+    let compact = r#"[>999999]#,,"M";[>999]#,"K";#"#;
+    let precise = r#"[>999999]#.000,,"M";[>999]#.000,"K";#.000"#;
+    for (raw, code, expected) in [
+      ("1.02", compact, "1"),
+      ("999", compact, "999"),
+      ("1000", compact, "1K"),
+      ("102102.102", compact, "102K"),
+      ("999999", compact, "1000K"),
+      ("1000000", compact, "1M"),
+      ("1.02", precise, "1.020"),
+      ("1021.02", precise, "1.021K"),
+      ("1021021.02", precise, "1.021M"),
+      ("1021021021.02", precise, "1021.021M"),
+      ("0", r#"[=0]"none";0.00"#, "none"),
+      ("0", r#"[=0]"A"\ "B";0"#, "A B"),
+      ("0", r#"[=0]"A\B";0"#, r"A\B"),
+      ("0.125", r#"[<0]"";0%"#, "13%"),
+      (
+        "1.25",
+        "[=0]?;[<4.16666666666667][hh]:mm:ss;[hh]:mm",
+        "30:00:00",
+      ),
+      ("5", "[=0]?;[<4.16666666666667][hh]:mm:ss;[hh]:mm", "120:00"),
+      ("43486", "[>50000][$-804]dddd;[$-409]mmm", "Jan"),
+      ("12345", "[>9999]0.00E+00;0.0", "1.23E+04"),
+      ("123", "[>9999]0.00E+00;0.0", "123.0"),
+      ("1.25", "[>10]0;[<0]0;General", "1.25"),
+      ("0", "0;[<0]0", "0"),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, Some(code), None, false).0,
+        expected,
+        "{raw}: {code}"
+      );
+    }
+    let styles = super::super::styles::StylesCatalog::default();
+    let colored = r#"[Red][<=100]0.0" low";[Blue][>100]0.00" high""#;
+    for (raw, expected, color) in [
+      ("100", "100.0 low", RgbColor { r: 255, g: 0, b: 0 }),
+      ("101", "101.00 high", RgbColor { r: 0, g: 0, b: 255 }),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, Some(colored), None, false).0,
+        expected
+      );
+      assert_eq!(
+        numeric_format_color(colored, raw, None, &styles),
+        Some(color)
+      );
+    }
+  }
+
+  #[test]
+  fn elapsed_time_formats_preserve_totals_padding_and_literal_brackets() {
+    for (value, code, expected) in [
+      (1.10538194444444, "[h]:mm:ss", "26:31:45"),
+      (1.40650462962963, "[h]:mm:ss", "33:45:22"),
+      (1.25, "[h]:mm:ss;@", "30:00:00"),
+      (0.0625, "[h]:mm", "1:30"),
+      (0.0625, "[HH]:mm", "01:30"),
+      (90.0 / 86_400.0, "[m]:ss", "1:30"),
+      (90.0 / 86_400.0, "[MM]:ss", "01:30"),
+      (3_735.8 / 86_400.0, "[mm]:ss", "62:16"),
+      (5.0 / 86_400.0, "[s]", "5"),
+      (5.0 / 86_400.0, "[SS]", "05"),
+      (0.25 / 86_400.0, "[s].00", "0.25"),
+      (0.25 / 86_400.0, "[ss].00", "00.25"),
+      (3.14159265358979, "[ss].00", "271433.61"),
+      (1.25, r#""[hh] "[h]:mm"#, "[hh] 30:00"),
+      (1.25, "_时[h]:mm", "30:00"),
+    ] {
+      let (text, state) = rendered_number_text(&value.to_string(), Some(code), None, false);
+      assert_eq!(text, expected, "{value}: {code}");
+      assert_eq!(state, NumberFormatRenderState::DateTime, "{code}");
+    }
+    for code in [r#""[hh]" h:mm"#, r"\[hh\] h:mm", "h:mm:ss"] {
+      assert_eq!(render_elapsed_date_time(1.25, code), None, "{code}");
+    }
+  }
+
+  #[test]
+  fn negative_numbers_keep_the_sign_before_literal_prefixes() {
+    for (raw, code, expected) in [
+      ("-12.5", r#""AMT"\ #,##0.00"#, "-AMT 12.50"),
+      ("12.5", r#""AMT"\ #,##0.00"#, "AMT 12.50"),
+      ("-38", r##""$"#,##0"##, "-$38"),
+      ("-5.2", r#""NEG"\ 0.00;("NEG"\ 0.00)"#, "(NEG 5.20)"),
+      ("-1.2", r#""P "0.00;"N "0.00"#, "N 1.20"),
+      ("-0.125", r#""rate "0.0%"#, "-rate 12.5%"),
+      ("-12300", r#""mass "0.00E+00"#, "-mass 1.23E+04"),
+      (
+        "-12300",
+        r#""mass "0.00E+00;("mass "0.00E+00)"#,
+        "(mass 1.23E+04)",
+      ),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, Some(code), None, false).0,
+        expected,
+        "{raw}: {code}",
+      );
+    }
+  }
+
+  #[test]
+  fn decimal_format_rounding_preserves_half_ties_and_scientific_carries() {
+    for (raw, code, expected) in [
+      ("1.005", "0.00", "1.01"),
+      ("1.004", "0.00", "1.00"),
+      ("1.0049", "0.00", "1.00"),
+      ("-1.005", "0.00", "-1.01"),
+      ("1.25", "0.0", "1.3"),
+      ("-1.25", "0.0", "-1.3"),
+      ("9.995", "0.00", "10.00"),
+      ("999.995", "#,##0.00", "1,000.00"),
+      ("0.01005", "0.00%", "1.01%"),
+      ("1005", "0.00,", "1.01"),
+      ("1.005", "0.00E+00", "1.01E+00"),
+      ("9.995", "0.00E+00", "1.00E+01"),
+      ("999.95", "##0.0E+00", "1.0E+03"),
+      ("-9.995", "0.00E+00;(0.00E+00)", "(1.00E+01)"),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, Some(code), None, false).0,
+        expected,
+        "{raw}: {code}",
+      );
+    }
+  }
+
+  #[test]
+  fn scientific_number_formats_separate_mantissa_and_exponent() {
+    // ECMA-376 §18.8.31: E+/E- select the exponent sign policy, and
+    // placeholders after E belong to the exponent rather than the fraction.
+    for (raw, code, expected) in [
+      ("103000000", "0.00E+00", "1.03E+08"),
+      ("0.00123", "0.00E+00", "1.23E-03"),
+      ("-12300", "0.00E-00", "-1.23E04"),
+      ("0", "0.00E+00", "0.00E+00"),
+      ("12300", "0.0e+000", "1.2e+004"),
+      ("12345", "##0.0E+0", "12.3E+3"),
+      ("0.012345", "##0.0E+0", "12.3E-3"),
+      ("9.9996", "0.00E+00", "1.00E+01"),
+      ("999.96", "##0.0E+0", "1.0E+3"),
+      ("5e-324", "0.00E+00", "5.00E-324"),
+      ("1.7976931348623157e308", "0.00E+00", "1.80E+308"),
+      ("12300", r#""mass "0.00E+00" kg""#, "mass 1.23E+04 kg"),
+      ("12300", r#"0.00"x"E+00" kg""#, "1.23xE+04 kg"),
+      ("1.26", r#"0.0"0"E+00"#, "1.30E+00"),
+      ("-12300", "0.00E+00;(0.00E+00)", "(1.23E+04)"),
+      ("12300000", "0.0,,E+00", "1.2E+01"),
+      ("0.0123", "0.00E+00%", "1.23E+00%"),
+      ("12", r#""E+00 "0"#, "E+00 12"),
+    ] {
+      let (text, state) = rendered_number_text(raw, Some(code), None, false);
+      assert_eq!(text, expected, "{raw}: {code}");
+      assert_eq!(state, NumberFormatRenderState::Number, "{code}");
+    }
+  }
+
+  #[test]
+  fn system_time_formats_use_the_format_locale_instead_of_the_saved_picture() {
+    for language in ["zh-CN", "en-US"] {
+      let expected = if language == "zh-CN" {
+        "13:30:55"
+      } else {
+        "1:30:55 PM"
+      };
+      assert_eq!(
+        rendered_number_text_for_locale(
+          "0.56313888888888886",
+          Some(r"[$-F400]h:mm:ss\ AM/PM"),
+          None,
+          false,
+          Some(language)
+        )
+        .0,
+        expected,
+      );
+    }
+    assert!(uses_system_date_time_format("[$-f400]h:mm:ss", "$-F400"));
+    for code in [
+      r#""[$-F400]"h:mm:ss"#,
+      r"\[$-F400\]h:mm:ss",
+      "h:mm:ss;[$-F400]h:mm",
+      "[$-F400",
+    ] {
+      assert!(!uses_system_date_time_format(code, "$-F400"), "{code}");
+    }
+    assert!(!uses_system_long_date_format("[$-F400]h:mm:ss"));
+    assert!(!uses_system_date_time_format("[$-F800]dddd", "$-F400"));
+  }
+
+  #[test]
+  fn calendar_time_formats_preserve_subseconds_and_rounding_carries() {
+    for (seconds, code, expected) in [
+      (48_655.2, "mm:ss.0", "30:55.2"),
+      (1_855.2, "mm:ss.0;@", "30:55.2"),
+      (14_706.009, "hh:mm:ss.000", "04:05:06.009"),
+      (14_706.009, "h:m:s.00", "4:5:6.01"),
+      (59.9996, "mm:ss.000", "01:00.000"),
+      (3_599.96, "hh:mm:ss.0", "01:00:00.0"),
+      (48_655.2, r#"hh:mm:ss".000""#, "13:30:55.000"),
+      (48_655.2, r"hh:mm:ss\.000", "13:30:55.000"),
+      (48_655.2, r#"hh:mm:ss.0" seconds""#, "13:30:55.2 seconds"),
+    ] {
+      assert_eq!(
+        rendered_number_text(&(seconds / 86_400.0).to_string(), Some(code), None, false).0,
+        expected,
+        "{code}"
+      );
+    }
+    for (date_1904, expected) in [
+      (false, "1900-01-02 00:00:00.000"),
+      (true, "1904-01-03 00:00:00.000"),
+    ] {
+      let serial = 1.0 + 86_399.9996 / 86_400.0;
+      assert_eq!(
+        rendered_number_text(
+          &serial.to_string(),
+          Some("yyyy-mm-dd hh:mm:ss.000"),
+          None,
+          date_1904
+        )
+        .0,
+        expected
+      );
+    }
+    let before_midnight = 1.0 + 86_399.9996 / 86_400.0;
+    assert_eq!(
+      rendered_number_text(
+        &before_midnight.to_string(),
+        Some("yyyy-mm-dd"),
+        None,
+        false
+      )
+      .0,
+      "1900-01-01"
+    );
+    for code in [
+      r#"hh:mm:ss".000""#,
+      r"hh:mm:ss\.000",
+      "[$-0409]hh:mm:ss;ss.0",
+      "hh:mm:ss_.000",
+      "hh:mm:ss*时",
+      "hh:mm:ss.0000",
+    ] {
+      assert!(subsecond_format_fields(code).is_empty(), "{code}");
+    }
+    assert_eq!(
+      rendered_number_text_for_locale(
+        "37653.170208437499",
+        Some(r"[$-0409]dd\-mmm\-yyyy\ hh:mm:ss.000"),
+        None,
+        false,
+        Some("zh-CN")
+      )
+      .0,
+      "01-Feb-2003 04:05:06.009",
+    );
+  }
+
+  #[test]
+  fn empty_numeric_sections_hide_only_the_selected_values() {
+    for (raw, code) in [
+      ("0", "m/d/yyyy;;"),
+      ("-1", "m/d/yyyy;;"),
+      ("12", ";0;0"),
+      ("-12", "0;"),
+      ("0", "0;0;;@"),
+      ("0", "0;0;[Red]"),
+      ("0", "[=0];0"),
+      ("12", ";;;"),
+      ("-12", ";;;"),
+      ("0", ";;;"),
+    ] {
+      let (text, state) = rendered_number_text(raw, Some(code), None, false);
+      assert!(text.is_empty(), "{raw}: {code}: {text}");
+      assert_eq!(state, NumberFormatRenderState::Number, "{code}");
+    }
+    for (raw, code, expected) in [
+      ("1", "m/d/yyyy;;", "1/1/1900"),
+      ("12", "0;", "12"),
+      ("-12", ";0;0", "12"),
+      ("0", ";0;0", "0"),
+      ("12", "[=0];0", "12"),
+      ("12", "General;;", "12"),
+      ("0", r#"0;0;";""#, ";"),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, Some(code), None, false).0,
+        expected,
+        "{code}"
+      );
+    }
+    assert_eq!(
+      rendered_number_text(
+        "authored text",
+        Some("0;0;;@"),
+        Some(x::CellValues::SharedString),
+        false
+      )
+      .0,
+      "authored text",
+    );
+    assert_eq!(
+      rendered_number_text("#N/A", Some(";;;"), Some(x::CellValues::Error), false).0,
+      "#N/A",
+    );
+    assert_eq!(
+      rendered_number_text("12", Some(""), None, false).1,
+      NumberFormatRenderState::UnsupportedFormatCode
+    );
+  }
+
+  #[test]
+  fn numeric_format_sections_preserve_literal_semicolons() {
+    for (raw, code, expected) in [
+      ("12", r#"0";kg";-0";kg";0"#, "12;kg"),
+      ("-12", r#"0";kg";-0";kg";0"#, "-12;kg"),
+      ("12", r"0\;0", "1;2"),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, Some(code), None, false).0,
+        expected,
+        "{code}"
+      );
+    }
+  }
+
+  #[test]
+  fn quoted_fraction_digits_do_not_change_numeric_rounding() {
+    for code in [r#"0.0"0""#, r"0.0\0"] {
+      assert_eq!(
+        rendered_number_text("1.26", Some(code), None, false).0,
+        "1.30",
+        "{code}"
+      );
+    }
+  }
+
+  #[test]
+  fn quoted_number_format_markers_remain_visible_text() {
+    for (raw, code, expected) in [
+      ("12", r#""[Red]"0"#, "[Red]12"),
+      ("12", r#""[>=10]"0"#, "[>=10]12"),
+      ("12", r#""[$USD-409]"0"#, "[$USD-409]12"),
+      ("12", r"\[0\]", "[12]"),
+      ("12", r#"[Red]"[Blue]"0"#, "[Blue]12"),
+      ("12", r#""[Red]";"[Blue]";"[Green]""#, "[Red]"),
+      ("-12", r#""[Red]";"[Blue]";"[Green]""#, "[Blue]"),
+      ("0", r#""[Red]";"[Blue]";"[Green]""#, "[Green]"),
+      ("12", "[Red]0", "12"),
+      ("12", "[$$-409]0", "$12"),
+      ("12", "[$USD-409]0.00", "USD12.00"),
+      ("12", "0.00[$USD-409]", "12.00USD"),
+      ("12", "[$S/.-280A]0.00", "S/.12.00"),
+    ] {
+      let (text, state) = rendered_number_text(raw, Some(code), None, false);
+      assert_eq!(text, expected, "{raw}: {code}");
+      assert_eq!(state, NumberFormatRenderState::Number, "{code}");
+    }
+    // These brackets are actual elapsed-time/native-number instructions,
+    // not color markers to discard or literals to reinterpret.
+    assert_eq!(strip_number_format_markers("[Red][h]:mm"), "[h]:mm");
+    assert_eq!(
+      strip_number_format_markers("[DBNum1][$-804]General"),
+      "[DBNum1]General"
+    );
+    assert_eq!(strip_number_format_markers(r"_[0"), r"_[0");
+    assert_eq!(strip_number_format_markers(r"*[0"), r"*[0");
   }
 
   #[test]
@@ -4585,6 +5679,32 @@ mod tests {
     assert_eq!(
       rendered_number_text("45657", Some("[$-809]dd/mm/yy"), None, false).0,
       "31/12/24"
+    );
+  }
+
+  #[test]
+  fn japanese_era_number_formats_use_the_serial_date_without_fixed_offsets() {
+    for date_1904 in [false, true] {
+      let serial = if date_1904 { "43978" } else { "45440" };
+      assert_eq!(
+        rendered_number_text_for_locale(
+          serial,
+          Some(r#"[$-ja-JP-x-gannen]ggge"年"m"月"d"日";@"#),
+          None,
+          date_1904,
+          Some("zh-CN"),
+        )
+        .0,
+        "令和6年5月28日",
+      );
+    }
+    assert_eq!(
+      rendered_number_text("45440", Some("[$-ja-JP]ge"), None, false).0,
+      "R6",
+    );
+    assert_eq!(
+      rendered_number_text("123000", Some("0.00E+00"), None, false).0,
+      "1.23E+05",
     );
   }
 

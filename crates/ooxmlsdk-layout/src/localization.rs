@@ -59,9 +59,108 @@ impl OfficeLocaleContext {
     self.resource_locale
   }
 
-  pub(crate) fn strings(&self) -> &'static OfficeStringCatalog {
-    OfficeStringCatalog::for_resource_locale(self.resource_locale)
+  pub(crate) fn field_invalid_citation_source(&self) -> &'static str {
+    // This resource has independently verified language coverage. Resolve it
+    // from the canonical UI tag, without changing the full resource pack or
+    // document font defaults when only one translated key is available.
+    ui_string_overrides(self.ui_language())
+      .and_then(|strings| strings.invalid_citation_source)
+      .unwrap_or("Invalid source specified.")
   }
+}
+
+// Per-key coverage can grow independently from complete locale packs. None
+// retains that key's existing fallback; these resources never translate
+// authored document text or change the document's font-locale selection.
+struct OfficeUiStringOverrides {
+  language: &'static str,
+  chart_title: Option<&'static str>,
+  chart_axis_title: Option<&'static str>,
+  waterfall_legend: Option<[&'static str; 3]>,
+  boolean_values: Option<[&'static str; 2]>,
+  invalid_citation_source: Option<&'static str>,
+}
+
+const OFFICE_UI_STRING_OVERRIDES: &[OfficeUiStringOverrides] = &[
+  OfficeUiStringOverrides {
+    // Current Office UI exports: tdf137505 and testCustomPosDataLabels.
+    language: "es",
+    chart_title: Some("Título del gráfico"),
+    // Current Of16-06.docx Office PDF, automatic ChartEx axis/legend text.
+    chart_axis_title: Some("Título del eje"),
+    waterfall_legend: Some(["Aumento", "Disminución", "Total"]),
+    boolean_values: Some(["FALSO", "VERDADERO"]),
+    invalid_citation_source: None,
+  },
+  OfficeUiStringOverrides {
+    // Current Office UI export: tdf127777.
+    language: "fr",
+    chart_title: Some("Titre du graphique"),
+    chart_axis_title: None,
+    waterfall_legend: None,
+    boolean_values: Some(["FAUX", "VRAI"]),
+    invalid_citation_source: None,
+  },
+  OfficeUiStringOverrides {
+    language: "de",
+    // Current Office tdf121744.docx PDF, automatic c:title without c:tx.
+    chart_title: Some("Diagrammtitel"),
+    chart_axis_title: None,
+    waterfall_legend: None,
+    boolean_values: Some(["FALSCH", "WAHR"]),
+    invalid_citation_source: None,
+  },
+  OfficeUiStringOverrides {
+    language: "ja",
+    chart_title: Some("グラフ タイトル"),
+    chart_axis_title: None,
+    waterfall_legend: None,
+    boolean_values: None,
+    // sdt-citation-run.docx uses English bibliography language (1033),
+    // but the unresolved-field diagnostic follows Japanese Office UI.
+    invalid_citation_source: Some("無効な資料文献が指定されました。"),
+  },
+  OfficeUiStringOverrides {
+    language: "ko",
+    // Current Office legend_manual_layout.xlsx chart-sheet PDF.
+    chart_title: Some("차트 제목"),
+    chart_axis_title: None,
+    waterfall_legend: None,
+    boolean_values: None,
+    invalid_citation_source: None,
+  },
+];
+
+fn ui_string_overrides(ui_language: Option<&str>) -> Option<&'static OfficeUiStringOverrides> {
+  let locale = canonical_locale(ui_language?)?;
+  OFFICE_UI_STRING_OVERRIDES
+    .iter()
+    .find(|strings| strings.language == locale.id.language.as_str())
+}
+
+pub(crate) fn office_automatic_chart_title(ui_language: Option<&str>) -> &'static str {
+  ui_string_overrides(ui_language)
+    .and_then(|strings| strings.chart_title)
+    .unwrap_or_else(|| OfficeStringCatalog::for_ui_language(ui_language).chart_title())
+}
+
+pub(crate) fn office_automatic_chart_axis_title(ui_language: Option<&str>) -> &'static str {
+  ui_string_overrides(ui_language)
+    .and_then(|strings| strings.chart_axis_title)
+    .unwrap_or_else(|| OfficeStringCatalog::for_ui_language(ui_language).chart_axis_title())
+}
+
+pub(crate) fn office_waterfall_legend(ui_language: Option<&str>) -> [&'static str; 3] {
+  ui_string_overrides(ui_language)
+    .and_then(|strings| strings.waterfall_legend)
+    .unwrap_or_else(|| OfficeStringCatalog::for_ui_language(ui_language).waterfall_legend())
+}
+
+pub(crate) fn office_boolean_text(ui_language: Option<&str>, value: bool) -> &'static str {
+  let values = ui_string_overrides(ui_language)
+    .and_then(|strings| strings.boolean_values)
+    .unwrap_or(["FALSE", "TRUE"]);
+  values[usize::from(value)]
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -423,7 +522,7 @@ const OFFICE_STRINGS_ZH_HANT: OfficeStringCatalog = OfficeStringCatalog {
   chart_trendlines: ["線性", "對數", "指數", "乘冪", "多項式", "移動平均"],
   waterfall_increase: "增加",
   waterfall_decrease: "減少",
-  waterfall_total: "總計",
+  waterfall_total: "合計",
   // The retained fixed-output evidence establishes only the existing Chinese
   // display-unit spellings. Keep those exact resources until a Traditional
   // Chinese Office sample establishes a distinct pack.

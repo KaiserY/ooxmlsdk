@@ -11,17 +11,53 @@ use super::worksheet::{CalcCell, CalcSheet, CellAddress, CellRange};
 const MAX_FORMULA_RECALCULATION_PASSES: usize = 12;
 const FORMULA_ZERO_TOLERANCE: f64 = 1.0e-12;
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FormulaDateContext {
+  date_system: ooxmlsdk_formula::DateSystem,
+  today_serial: Option<f64>,
+}
+
+impl FormulaDateContext {
+  pub(crate) fn new(
+    date_1904: bool,
+    datetime: Option<crate::options::FieldUpdateDateTime>,
+  ) -> Self {
+    let date_system = if date_1904 {
+      ooxmlsdk_formula::DateSystem::Date1904
+    } else {
+      ooxmlsdk_formula::DateSystem::Date1900
+    };
+    // ECMA-376 §18.17.7.326: TODAY uses the workbook's date base.
+    // The supplied timestamp is already local civil time, so no time-zone
+    // conversion or time-of-day fraction belongs in this date-only value.
+    let today_serial = datetime.and_then(|datetime| {
+      ooxmlsdk_formula::calc::datetime::date_serial_with_system(
+        datetime.year.into(),
+        datetime.month.into(),
+        datetime.day.into(),
+        date_system,
+      )
+    });
+    Self {
+      date_system,
+      today_serial,
+    }
+  }
+}
+
 pub(crate) fn recalculate_formula_cells(
   sheets: &mut [CalcSheet],
   defined_names: &DefinedNamesCatalog,
   source_file_name: Option<&str>,
   workbook_catalog: &WorkbookCatalog,
+  date_context: FormulaDateContext,
 ) {
   let defined = DefinedNames::from_catalog(defined_names);
   apply_named_array_formulas(sheets, &defined);
   let formulas = sheets.iter().map(formula_cells).collect::<Vec<_>>();
   let mut book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
-  let mut formula_book = formula_evaluation_book_from_calc_book(&book, source_file_name);
+  let mut formula_book =
+    formula_evaluation_book_from_calc_book(&book, source_file_name, date_context);
 
   for _ in 0..MAX_FORMULA_RECALCULATION_PASSES {
     let mut changed = false;
@@ -186,11 +222,12 @@ impl RelativeFormulaEvaluationContext {
     sheets: &[CalcSheet],
     defined_names: &DefinedNamesCatalog,
     workbook_catalog: &WorkbookCatalog,
+    date_context: FormulaDateContext,
   ) -> Self {
     let defined = DefinedNames::from_catalog(defined_names);
     let calc_book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
     let sheet_workbook_indices = calc_book.sheet_workbook_indices.clone();
-    let book = formula_evaluation_book_from_calc_book(&calc_book, None);
+    let book = formula_evaluation_book_from_calc_book(&calc_book, None, date_context);
     Self {
       sheet_workbook_indices,
       book,
@@ -681,8 +718,11 @@ impl FormulaBook {
 fn formula_evaluation_book_from_calc_book(
   book: &FormulaBook,
   source_file_name: Option<&str>,
+  date_context: FormulaDateContext,
 ) -> ooxmlsdk_formula::FormulaEvaluationBook<'static> {
   ooxmlsdk_formula::FormulaEvaluationBook {
+    date_system: date_context.date_system,
+    today_serial: date_context.today_serial,
     source_file_name: source_file_name.map(|name| Cow::Owned(name.to_string())),
     sheet_names: book
       .sheet_names
@@ -1068,6 +1108,12 @@ fn formula_cell_value(cell: &CalcCell) -> Value {
     Some(x::CellValues::SharedString | x::CellValues::InlineString) => &cell.display_text,
     _ => cell.cached_value.as_deref().unwrap_or(&cell.display_text),
   };
+  if matches!(
+    cell.data_type,
+    Some(x::CellValues::SharedString | x::CellValues::InlineString | x::CellValues::String)
+  ) {
+    return Value::Text(text.to_string());
+  }
   Value::from_cell_text(text)
 }
 

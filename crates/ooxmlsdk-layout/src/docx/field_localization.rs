@@ -25,12 +25,32 @@ pub(super) fn localized_field_message(
   message: FieldMessage<'_>,
   ui_language: Option<&str>,
 ) -> String {
+  // Per-message Office resources confirmed in existing fixed output. Keep
+  // unsupported messages on the catalog fallback until their wording is
+  // established, instead of treating this as a complete UI language pack.
+  let reference_message = ui_language
+    .and_then(crate::localization::canonical_locale)
+    .and_then(|locale| match (locale.id.language.as_str(), message) {
+      ("de", FieldMessage::UndefinedBookmark) => Some("Fehler! Textmarke nicht definiert."),
+      ("de", FieldMessage::ReferenceSourceNotFound) => {
+        Some("Fehler! Verweisquelle konnte nicht gefunden werden.")
+      }
+      ("ja", FieldMessage::UndefinedBookmark) => Some("エラー! ブックマークが定義されていません。"),
+      ("ja", FieldMessage::ReferenceSourceNotFound) => Some("エラー! 参照元が見つかりません。"),
+      _ => None,
+    });
+  if let Some(text) = reference_message {
+    return text.to_owned();
+  }
   let strings = OfficeStringCatalog::for_ui_language(ui_language);
   match message {
     FieldMessage::UndefinedBookmark => strings.field_undefined_bookmark().to_string(),
     FieldMessage::ReferenceSourceNotFound => strings.field_reference_source_not_found().to_string(),
     FieldMessage::BookmarkNameNotSpecified => {
       strings.field_bookmark_name_not_specified().to_string()
+    }
+    FieldMessage::MissingStyle(style_name) if is_korean_ui_language(ui_language) => {
+      format!("오류! 여기에 표시할 텍스트에 {style_name} 을(를) 적용하려면 홈 탭을 사용하세요.")
     }
     FieldMessage::MissingStyle(style_name) => strings.field_missing_style(style_name),
     FieldMessage::EmptyTableOfContents => {
@@ -54,6 +74,25 @@ pub(super) fn localized_field_message(
     .to_string(),
     FieldMessage::PageRefOnPage(page_number) => strings.field_on_page(page_number),
   }
+}
+
+fn is_korean_ui_language(ui_language: Option<&str>) -> bool {
+  ui_language
+    .and_then(crate::localization::canonical_locale)
+    .is_some_and(|locale| locale.id.language.as_str() == "ko")
+}
+
+pub(super) fn korean_ui_english_heading_reference(
+  style_name: &str,
+  ui_language: Option<&str>,
+) -> bool {
+  // STYLEREF numeric levels are locale-independent. A named built-in heading
+  // uses Word's localized UI name instead; an authored custom style can still
+  // use the English name, and is handled separately by the caller.
+  is_korean_ui_language(ui_language)
+    && super::normalized_style_ref_lookup_key(style_name)
+      .strip_prefix("heading")
+      .is_some_and(|level| matches!(level.as_bytes(), [b'1'..=b'9']))
 }
 
 pub(super) fn apply_generated_field_message_style(
@@ -190,6 +229,65 @@ pub(super) fn apply_bidi_outline_missing_context_style(style: &mut TextStyle) {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn bookmark_diagnostics_preserve_office_ui_language_and_field_kind() {
+    for (language, bookmark, reference) in [
+      (
+        "DE_de",
+        "Fehler! Textmarke nicht definiert.",
+        "Fehler! Verweisquelle konnte nicht gefunden werden.",
+      ),
+      (
+        "ja-JP",
+        "エラー! ブックマークが定義されていません。",
+        "エラー! 参照元が見つかりません。",
+      ),
+    ] {
+      assert_eq!(
+        localized_field_message(FieldMessage::UndefinedBookmark, Some(language)),
+        bookmark
+      );
+      assert_eq!(
+        localized_field_message(FieldMessage::ReferenceSourceNotFound, Some(language)),
+        reference
+      );
+    }
+    assert_eq!(
+      localized_field_message(FieldMessage::BookmarkNameNotSpecified, Some("ja-JP")),
+      "Error! No bookmark name given.",
+    );
+    assert_eq!(
+      localized_field_message(FieldMessage::ReferenceSourceNotFound, Some("en-US")),
+      "Error! Reference source not found.",
+    );
+  }
+
+  #[test]
+  fn korean_missing_style_resource_preserves_the_requested_style_name() {
+    assert_eq!(
+      localized_field_message(FieldMessage::MissingStyle("Heading 2"), Some("KO_kr")),
+      "오류! 여기에 표시할 텍스트에 Heading 2 을(를) 적용하려면 홈 탭을 사용하세요."
+    );
+    for level in 1..=9 {
+      assert!(korean_ui_english_heading_reference(
+        &format!("Heading {level}"),
+        Some("ko-KR")
+      ));
+      assert!(!korean_ui_english_heading_reference(
+        &level.to_string(),
+        Some("ko-KR")
+      ));
+    }
+    assert!(!korean_ui_english_heading_reference(
+      "Heading 10",
+      Some("ko-KR")
+    ));
+    assert!(!korean_ui_english_heading_reference(
+      "Heading 1",
+      Some("en-US")
+    ));
+  }
 
   #[test]
   fn field_diagnostics_follow_ui_language_not_document_language() {

@@ -273,6 +273,7 @@ pub(crate) struct CalcPageSettings {
   pub(crate) explicit_paper_size: bool,
   requested_custom_paper_size_pt: Option<(f32, f32)>,
   implicit_microsoft_letter_canvas: bool,
+  default_printer_canvas: bool,
   related_printer_letter_canvas: bool,
   pub(crate) valid_printer_settings: bool,
   pub(crate) fit_to_page: bool,
@@ -287,6 +288,7 @@ pub(crate) struct CalcPageSettings {
   pub(crate) vertical_centered: bool,
   pub(crate) print_headings: bool,
   pub(crate) print_grid_lines: bool,
+  pub(crate) cell_comments: x::CellCommentsValues,
   pub(crate) header_footer: HeaderFooterModel,
 }
 
@@ -326,6 +328,7 @@ impl Default for CalcPageSettings {
       explicit_paper_size: false,
       requested_custom_paper_size_pt: None,
       implicit_microsoft_letter_canvas: false,
+      default_printer_canvas: false,
       related_printer_letter_canvas: false,
       valid_printer_settings: true,
       fit_to_page: false,
@@ -340,6 +343,7 @@ impl Default for CalcPageSettings {
       vertical_centered: false,
       print_headings: false,
       print_grid_lines: false,
+      cell_comments: x::CellCommentsValues::None,
       header_footer: HeaderFooterModel::default(),
     }
   }
@@ -469,6 +473,12 @@ impl CalcPageSettings {
     self.vertical_dpi = page_setup.vertical_dpi.unwrap_or(self.vertical_dpi);
     self.page_order = page_setup.page_order.or(self.page_order);
     self.orientation = page_setup.orientation;
+    self.cell_comments = page_setup.cell_comments.unwrap_or_default();
+    // CT_PageSetup defaults usePrinterDefaults to true when pageSetup exists.
+    // An explicit false keeps the authored worksheet canvas (e.g. 56295.xlsx).
+    self.default_printer_canvas = page_setup
+      .use_printer_defaults
+      .is_none_or(|value| value.as_bool());
   }
 
   fn apply_windows_printer_settings(
@@ -599,10 +609,16 @@ impl CalcPageSettings {
     // setup at 100%. barOfPieChart.xlsx and Microsoft's implicit Letter canvas
     // are the other positive profiles. tdf105272.xlsx is the fit-to-page
     // counterexample: fit owns the worksheet scale and must not gain 95%.
+    // Initialized pageSetup with usePrinterDefaults (default true) also uses
+    // that paper mapping; explicit false remains the unscaled counterexample.
     if self.fit_to_page {
       return DEFAULT_PRINT_SCALE_PERCENT;
     }
-    if has_chart || self.implicit_microsoft_letter_canvas || self.related_printer_letter_canvas {
+    if has_chart
+      || self.implicit_microsoft_letter_canvas
+      || self.related_printer_letter_canvas
+      || self.default_printer_canvas
+    {
       self.printer_default_paper_scale_percent()
     } else {
       DEFAULT_PRINT_SCALE_PERCENT
@@ -620,6 +636,24 @@ impl CalcPageSettings {
       self.fixed_output_paper_scale_percent(true)
     } else {
       DEFAULT_PRINT_SCALE_PERCENT
+    }
+  }
+
+  pub(crate) fn fixed_output_pagination_page_size_pt(&self, has_chart: bool) -> (f32, f32) {
+    // With worksheet-zoom pagination, the requested printer canvas owns the
+    // width before its Letter-to-A4 transform. 59264.xlsx starts its second
+    // horizontal page at K: ten 50.05pt columns fit the Letter body. Chart
+    // pages already paginate with the transformed output-page footprint.
+    // Row breaks retain the output height: GraphPaper_TP10193274 fits three
+    // explicit-height grids on A4; the shorter Letter height splits two grids.
+    if self.fixed_output_paper_scale_percent(has_chart) < DEFAULT_PRINT_SCALE_PERCENT
+      && self.fixed_output_pagination_paper_scale_percent(has_chart) == DEFAULT_PRINT_SCALE_PERCENT
+    {
+      let mut requested = self.clone();
+      requested.valid_printer_settings = false;
+      (requested.page_size_pt().0, self.page_size_pt().1)
+    } else {
+      self.page_size_pt()
     }
   }
 
@@ -1060,11 +1094,40 @@ mod tests {
   }
 
   #[test]
+  fn worksheet_printer_defaults_map_letter_canvas_without_charts() {
+    for (use_defaults, expected_scale) in [(None, 95), (Some(true), 95), (Some(false), 100)] {
+      let worksheet = x::Worksheet {
+        page_setup: Some(x::PageSetup {
+          paper_size: Some(MsPaperSize::Letter as u32),
+          use_printer_defaults: use_defaults.map(Into::into),
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      let settings = CalcPageSettings::from_worksheet(&worksheet, false, None);
+      assert_eq!(
+        settings.fixed_output_paper_scale_percent(false),
+        expected_scale
+      );
+      assert_eq!(
+        settings.fixed_output_pagination_paper_scale_percent(false),
+        100
+      );
+      assert_eq!(settings.scale, 100);
+      assert_eq!(
+        settings.fixed_output_body_top_pt(expected_scale) > 54.0,
+        expected_scale < 100
+      );
+    }
+  }
+
+  #[test]
   fn explicit_letter_chart_keeps_the_independent_fixed_output_canvas_scale() {
     let worksheet = x::Worksheet {
       page_setup: Some(x::PageSetup {
         paper_size: Some(MsPaperSize::Letter as u32),
         scale: Some(100),
+        use_printer_defaults: Some(false.into()),
         orientation: Some(x::OrientationValues::Portrait),
         ..Default::default()
       }),

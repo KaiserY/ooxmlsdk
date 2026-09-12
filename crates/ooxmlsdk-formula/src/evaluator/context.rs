@@ -275,6 +275,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         let haystack_column = if haystack_columns == 1 { 0 } else { column };
         let needle = needles.get(needle_row)?.get(needle_column)?;
         let haystack = haystacks.get(haystack_row)?.get(haystack_column)?;
+        // References and arrays are dereferenced here, after the dispatcher's
+        // top-level argument checks. Preserve each element's error before
+        // coercing to text; an error cell is not a string spelling "#N/A".
+        if let FormulaValue::Error(error) = needle {
+          result_row.push(FormulaValue::Error(*error));
+          continue;
+        }
+        if let FormulaValue::Error(error) = haystack {
+          result_row.push(FormulaValue::Error(*error));
+          continue;
+        }
         let needle_text = self.text(needle);
         result_row.push(if bytes {
           self.findb_text_value(&needle_text, haystack, start, case_sensitive)

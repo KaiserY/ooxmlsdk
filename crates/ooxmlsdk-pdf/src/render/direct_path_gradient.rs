@@ -486,7 +486,10 @@ fn sample(stops: &[ColorStop], position: f32) -> RasterColor {
   let position = position.clamp(0.0, 1.0);
   let pair = stops
     .windows(2)
-    .find(|pair| position <= pair[1].position)
+    .find(|pair| {
+      pair[0].position < pair[1].position
+        && (position < pair[1].position || pair[1].position == 1.0)
+    })
     .unwrap_or_else(|| &stops[stops.len() - 2..]);
   let span = pair[1].position - pair[0].position;
   let ratio = if span <= f32::EPSILON {
@@ -518,4 +521,40 @@ struct RasterPoint {
 struct RasterColor {
   rgb: [u8; 3],
   alpha: u8,
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn hard_edge_sampling_uses_nonempty_intervals_at_boundaries() {
+    for position in [0.0, 0.5, 1.0] {
+      let red = ColorStop {
+        position: 0.0,
+        rgb: [1.0, 0.0, 0.0],
+        alpha: 64,
+      };
+      let blue = ColorStop {
+        position: 1.0,
+        rgb: [0.0, 0.0, 1.0],
+        alpha: 255,
+      };
+      let stops = [
+        red.clone(),
+        ColorStop { position, ..red },
+        ColorStop { position, ..blue },
+        blue,
+      ];
+      for probe in [0.0, 0.499, 0.5, 0.501, 1.0] {
+        let sampled = sample(&stops, probe);
+        let use_blue = position == 0.0 || (position == 0.5 && probe >= 0.5);
+        assert_eq!(
+          sampled.rgb,
+          if use_blue { [0, 0, 255] } else { [255, 0, 0] }
+        );
+        assert_eq!(sampled.alpha, if use_blue { 255 } else { 64 });
+      }
+    }
+  }
 }

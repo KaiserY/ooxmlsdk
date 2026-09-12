@@ -15,6 +15,7 @@ mod direct_svg;
 mod direct_tag;
 mod gradient;
 mod image;
+mod tiff_palette;
 use ooxmlsdk_layout::render::jpeg_islow;
 mod jpeg_islow_encoder;
 mod link;

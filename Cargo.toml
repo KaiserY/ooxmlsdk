@@ -75,6 +75,7 @@ icu_datetime = { version = "2.2.0", features = ["compiled_data"] }
 icu_locale = { version = "2.2.0", features = ["compiled_data"] }
 icu_properties = { version = "2.2.0", features = ["compiled_data"] }
 icu_segmenter = { version = "2.2.0", features = ["compiled_data"] }
+tiff = "0.11.3"
 image = { version = "0.25.10", default-features = false, features = [
   "png",
   "jpeg",

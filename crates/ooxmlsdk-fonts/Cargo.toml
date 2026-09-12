@@ -19,6 +19,7 @@ ooxml = ["dep:ooxmlsdk"]
 [dependencies]
 fontique = { workspace = true }
 harfrust = { workspace = true }
+icu_properties = { workspace = true }
 icu_segmenter = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"], optional = true }
 smallvec = { workspace = true }

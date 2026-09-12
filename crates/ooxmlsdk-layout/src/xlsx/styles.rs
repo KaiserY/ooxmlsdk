@@ -42,6 +42,25 @@ struct ThemeColorPalette {
 }
 
 impl ThemeColorPalette {
+  fn office_default() -> Self {
+    // The current Office default theme (introduced in 2023), used by Excel
+    // when the workbook has no theme part. Spreadsheet theme indices start
+    // with lt1/dk1/lt2/dk2 rather than DrawingML's dk1/lt1/dk2/lt2 order.
+    let colors: [u32; 12] = [
+      0xFFFFFF, 0x000000, 0xE8E8E8, 0x0E2841, 0x156082, 0xE97132, 0x196B24, 0x0F9ED5, 0xA02B93,
+      0x4EA72E, 0x467886, 0x96607D,
+    ];
+    Self {
+      colors: colors.map(|color| {
+        Some(RgbColor {
+          r: (color >> 16) as u8,
+          g: (color >> 8) as u8,
+          b: color as u8,
+        })
+      }),
+    }
+  }
+
   fn from_dml(scheme: &a::ColorScheme) -> Self {
     let scheme = ThemeColorScheme::from_dml(scheme);
     let tokens = [
@@ -118,10 +137,12 @@ pub(crate) struct FontRecord {
   pub(crate) name: Option<Arc<str>>,
   pub(crate) size_pt: Option<OrderedF64>,
   pub(crate) color: Option<RgbColor>,
-  pub(crate) bold: bool,
-  pub(crate) italic: bool,
-  pub(crate) underline: bool,
-  pub(crate) strikethrough: bool,
+  // DXF font properties are sparse: an omitted effect inherits, while an
+  // explicit false clears the underlying cell/table effect (§18.8.14–15).
+  pub(crate) bold: Option<bool>,
+  pub(crate) italic: Option<bool>,
+  pub(crate) underline: Option<bool>,
+  pub(crate) strikethrough: Option<bool>,
   pub(crate) vertical_alignment: Option<x::VerticalAlignmentRunValues>,
   pub(crate) scheme: x::FontSchemeValues,
 }
@@ -129,6 +150,7 @@ pub(crate) struct FontRecord {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct FillRecord {
   pub(crate) color: Option<RgbColor>,
+  pub(crate) pattern: Option<crate::common::PatternFill>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -223,6 +245,30 @@ impl StylesCatalog {
     color_from_color(color, &self.indexed_colors, &self.theme_colors)
   }
 
+  pub(crate) fn number_format_color(&self, marker: &str) -> Option<RgbColor> {
+    let marker = marker.to_ascii_lowercase();
+    let rgb = match marker.as_str() {
+      "black" => 0x000000,
+      "blue" => 0x0000FF,
+      "cyan" => 0x00FFFF,
+      "green" => 0x00FF00,
+      "magenta" => 0xFF00FF,
+      "red" => 0xFF0000,
+      "white" => 0xFFFFFF,
+      "yellow" => 0xFFFF00,
+      _ => {
+        // Format Color1..Color56 map to indexed palette entries 8..63,
+        // including a workbook's replacement palette (ECMA-376 18.8.31).
+        let index = marker.strip_prefix("color")?.parse::<u32>().ok()?;
+        return (1..=56)
+          .contains(&index)
+          .then(|| indexed_color(&self.indexed_colors, index + 7))
+          .flatten();
+      }
+    };
+    Some(indexed_rgb(rgb))
+  }
+
   pub(crate) fn theme_fill_style(&self, index: u32) -> Option<&FillProperties> {
     self.theme_format.as_ref()?.get_fill_style(index)
   }
@@ -255,7 +301,7 @@ impl StylesCatalog {
           ThemeColorPalette::from_dml(&theme.theme_elements.color_scheme),
         )
       } else {
-        (None, None, ThemeColorPalette::default())
+        (None, None, ThemeColorPalette::office_default())
       };
     let missing_theme_minor = missing_theme_minor_font(
       theme_fonts.as_ref(),
@@ -312,7 +358,7 @@ impl StylesCatalog {
             .iter()
             .map(|format| NumberFormatRecord {
               id: format.number_format_id,
-              code: format.format_code.clone(),
+              code: effective_number_format_code(format).to_owned(),
             })
             .collect()
         })
@@ -497,7 +543,8 @@ impl StylesCatalog {
       44 => Some("_-* #,##0.00_-;-* #,##0.00_-;_-* \"-\"??_-;_-@_-"),
       45 => Some("mm:ss"),
       46 => Some("[h]:mm:ss"),
-      47 => Some("mmss.0"),
+      // MS-OI29500 18.8.30(a): Excel includes the time separator here.
+      47 => Some("mm:ss.0"),
       48 => Some("##0.0E+0"),
       49 => Some("@"),
       _ => None,
@@ -544,10 +591,10 @@ impl StylesCatalog {
     if let Some(color) = font.color {
       style.color = color;
     }
-    style.bold = font.bold;
-    style.italic = font.italic;
-    style.underline = font.underline;
-    style.strikethrough = font.strikethrough;
+    style.bold = font.bold.unwrap_or(false);
+    style.italic = font.italic.unwrap_or(false);
+    style.underline = font.underline.unwrap_or(false);
+    style.strikethrough = font.strikethrough.unwrap_or(false);
     super::text::apply_vertical_text_alignment(
       &mut style,
       font
@@ -594,10 +641,10 @@ impl StylesCatalog {
     if let Some(color) = font.color {
       style.color = color;
     }
-    style.bold = font.bold;
-    style.italic = font.italic;
-    style.underline = font.underline;
-    style.strikethrough = font.strikethrough;
+    style.bold = font.bold.unwrap_or(false);
+    style.italic = font.italic.unwrap_or(false);
+    style.underline = font.underline.unwrap_or(false);
+    style.strikethrough = font.strikethrough.unwrap_or(false);
     super::text::apply_vertical_text_alignment(
       &mut style,
       font
@@ -667,22 +714,11 @@ impl StylesCatalog {
     if let Some(color) = font.color {
       style.color = color;
     }
-    style.bold = font.bold;
-    style.italic = font.italic;
-    style.underline = font.underline;
-    style.strikethrough = font.strikethrough;
+    style.bold = font.bold.unwrap_or(false);
+    style.italic = font.italic.unwrap_or(false);
+    style.underline = font.underline.unwrap_or(false);
+    style.strikethrough = font.strikethrough.unwrap_or(false);
     Some(style)
-  }
-
-  pub(crate) fn fill_color_for_cell(&self, style_index: Option<u32>) -> Option<RgbColor> {
-    let format = self.effective_cell_format(style_index)?;
-    if !format.apply_fill {
-      return None;
-    }
-    format
-      .fill_id
-      .and_then(|id| self.fill_records.get(id as usize))
-      .and_then(|fill| fill.color)
   }
 
   pub(crate) fn alignment_for_cell(&self, style_index: Option<u32>) -> Option<AlignmentRecord> {
@@ -699,6 +735,14 @@ impl StylesCatalog {
       .get(format_id as usize)
       .and_then(|format| format.fill.as_ref())
       .and_then(|fill| fill.color)
+  }
+
+  pub(crate) fn differential_fill(&self, format_id: u32) -> Option<FillRecord> {
+    self
+      .differential_format_records
+      .get(format_id as usize)
+      .and_then(|format| format.fill.clone())
+      .filter(|fill| fill.color.is_some() || fill.pattern.is_some())
   }
 
   pub(crate) fn table_style(&self, name: &str) -> Option<&TableStyleRecord> {
@@ -737,17 +781,17 @@ impl StylesCatalog {
     if let Some(color) = font.color {
       style.color = color;
     }
-    if font.bold {
-      style.bold = true;
+    if let Some(value) = font.bold {
+      style.bold = value;
     }
-    if font.italic {
-      style.italic = true;
+    if let Some(value) = font.italic {
+      style.italic = value;
     }
-    if font.underline {
-      style.underline = true;
+    if let Some(value) = font.underline {
+      style.underline = value;
     }
-    if font.strikethrough {
-      style.strikethrough = true;
+    if let Some(value) = font.strikethrough {
+      style.strikethrough = value;
     }
     if let Some(vertical_alignment) = font.vertical_alignment {
       super::text::apply_vertical_text_alignment(style, vertical_alignment);
@@ -1105,16 +1149,16 @@ impl FontRecord {
     for choice in &font.font_choice {
       match choice {
         x::FontChoice::Bold(value) => {
-          record.bold = value.val.is_none_or(|value| value.as_bool());
+          record.bold = Some(value.val.is_none_or(|value| value.as_bool()));
         }
         x::FontChoice::Italic(value) => {
-          record.italic = value.val.is_none_or(|value| value.as_bool());
+          record.italic = Some(value.val.is_none_or(|value| value.as_bool()));
         }
         x::FontChoice::Strike(value) => {
-          record.strikethrough = value.val.is_none_or(|value| value.as_bool());
+          record.strikethrough = Some(value.val.is_none_or(|value| value.as_bool()));
         }
         x::FontChoice::Underline(value) => {
-          record.underline = !matches!(value.val, Some(x::UnderlineValues::None));
+          record.underline = Some(!matches!(value.val, Some(x::UnderlineValues::None)));
         }
         x::FontChoice::VerticalTextAlignment(value) => {
           record.vertical_alignment = Some(value.val);
@@ -1139,6 +1183,31 @@ impl FontRecord {
 }
 
 impl FillRecord {
+  fn from_differential_fill_with_colors(
+    fill: &x::Fill,
+    indexed_colors: &[RgbColor],
+    theme_colors: &ThemeColorPalette,
+  ) -> Self {
+    // A DXF can specify just a background color, without a pattern attribute.
+    // Office renders this as the cell's solid background (POI's conditional
+    // formatting multiple-ranges fixture). With an explicit solid pattern,
+    // DXF bgColor also owns the solid color, unlike an ordinary cell fill.
+    // sc/filter/oox/stylesbuffer.cxx Fill::finalizeImport handles the same
+    // distinction; an explicit patternType="none" remains transparent.
+    if let Some(x::FillChoice::PatternFill(pattern)) = &fill.fill_choice
+      && pattern
+        .pattern_type
+        .is_none_or(|value| value == x::PatternValues::Solid)
+      && let Some(background) = &pattern.background_color
+    {
+      return Self {
+        color: color_from_background_color(background, indexed_colors, theme_colors),
+        pattern: None,
+      };
+    }
+    Self::from_fill_with_colors(fill, indexed_colors, theme_colors)
+  }
+
   fn from_fill_with_colors(
     fill: &x::Fill,
     indexed_colors: &[RgbColor],
@@ -1153,7 +1222,46 @@ impl FillRecord {
       }
       None => None,
     };
-    Self { color }
+    let pattern = match &fill.fill_choice {
+      Some(x::FillChoice::PatternFill(fill))
+        if fill.pattern_type == Some(x::PatternValues::LightUp) =>
+      {
+        // Office's worksheet lightUp brush (FillWithoutColor.xlsx) is an
+        // 8x8 image over a 0.96pt
+        // period, independent of worksheet zoom, anchored to the page.
+        // These are the foreground bits of its unfiltered RGB tile.
+        let foreground = fill
+          .foreground_color
+          .as_ref()
+          .and_then(|color| color_from_foreground_color(color, indexed_colors, theme_colors))
+          .unwrap_or(RgbColor { r: 0, g: 0, b: 0 });
+        let background = fill
+          .background_color
+          .as_ref()
+          .and_then(|color| color_from_background_color(color, indexed_colors, theme_colors))
+          .unwrap_or(RgbColor {
+            r: 255,
+            g: 255,
+            b: 255,
+          });
+        let color = |value: RgbColor| crate::common::Color {
+          r: value.r,
+          g: value.g,
+          b: value.b,
+          a: 255,
+        };
+        let mut pattern = crate::common::PatternFill::bitmap8(
+          [0x18, 0x30, 0x60, 0xc0, 0x81, 0x03, 0x06, 0x0c],
+          960,
+          color(foreground),
+          color(background),
+        );
+        pattern.page_origin = true;
+        Some(pattern)
+      }
+      _ => None,
+    };
+    Self { color, pattern }
   }
 }
 
@@ -1211,10 +1319,9 @@ impl DifferentialFormatRecord {
         .font
         .as_ref()
         .map(|font| FontRecord::from_font_with_colors(font, indexed_colors, theme_colors)),
-      fill: format
-        .fill
-        .as_deref()
-        .map(|fill| FillRecord::from_fill_with_colors(fill, indexed_colors, theme_colors)),
+      fill: format.fill.as_deref().map(|fill| {
+        FillRecord::from_differential_fill_with_colors(fill, indexed_colors, theme_colors)
+      }),
       border: format
         .border
         .as_deref()
@@ -1228,10 +1335,19 @@ impl DifferentialFormatRecord {
         .as_ref()
         .map(|format| NumberFormatRecord {
           id: format.number_format_id,
-          code: format.format_code.clone(),
+          code: effective_number_format_code(format).to_owned(),
         }),
     }
   }
+}
+
+fn effective_number_format_code(format: &x::NumberingFormat) -> &str {
+  // [MS-XLSX] §2.5.4: formatCode16 takes precedence when present, including
+  // culture tags such as ja-JP-x-gannen that cannot survive the old fallback.
+  format
+    .x16r2_format_code16
+    .as_deref()
+    .unwrap_or(&format.format_code)
 }
 
 impl AlignmentRecord {
@@ -1686,6 +1802,122 @@ mod tests {
   use super::*;
 
   #[test]
+  fn extended_number_format_code_precedes_the_fallback_in_cell_and_differential_styles() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let stylesheet = x::Stylesheet::from_bytes(
+      br#"
+      <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:x16r2="http://schemas.microsoft.com/office/spreadsheetml/2015/02/main">
+        <numFmts count="2">
+          <numFmt numFmtId="176" formatCode="0"
+              x16r2:formatCode16="[$-ja-JP-x-gannen]ggge/m/d"/>
+          <numFmt numFmtId="177" formatCode="0.00"/>
+        </numFmts>
+        <dxfs count="1"><dxf><numFmt numFmtId="176" formatCode="0"
+            x16r2:formatCode16="[$-ja-JP-x-gannen]ggge/m/d"/></dxf></dxfs>
+      </styleSheet>"#,
+    )
+    .expect("extended number formats");
+    let catalog = StylesCatalog::from_stylesheet(
+      &stylesheet,
+      None,
+      ThemeColorPalette::default(),
+      &OfficeLocaleContext::new(None, Some("en-US"), None),
+    );
+    assert_eq!(
+      catalog.number_format_code(176),
+      Some("[$-ja-JP-x-gannen]ggge/m/d")
+    );
+    assert_eq!(catalog.number_format_code(177), Some("0.00"));
+    assert_eq!(
+      catalog.differential_number_format_code(0),
+      Some("[$-ja-JP-x-gannen]ggge/m/d")
+    );
+  }
+
+  #[test]
+  fn missing_theme_palette_keeps_authored_colors_and_tints() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let fallback = ThemeColorPalette::office_default();
+    let white = Some(RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    });
+    let accent = Some(RgbColor {
+      r: 0x15,
+      g: 0x60,
+      b: 0x82,
+    });
+    assert_eq!(
+      color_from_components(Some(0), None, None, None, &[], &fallback),
+      white
+    );
+    assert_eq!(
+      color_from_components(Some(4), None, None, None, &[], &fallback),
+      accent
+    );
+    assert_eq!(
+      color_from_components(Some(4), None, None, Some(1.0), &[], &fallback),
+      white
+    );
+    let authored = Some(RgbColor {
+      r: 0x12,
+      g: 0x34,
+      b: 0x56,
+    });
+    assert_eq!(
+      color_from_components(None, Some("FF123456"), None, None, &[], &fallback),
+      authored
+    );
+
+    // A supplied theme owns every color slot; the missing-theme defaults
+    // must not replace an authored accent or leak into an empty test catalog.
+    let slots = [
+      "dk1", "lt1", "dk2", "lt2", "accent1", "accent2", "accent3", "accent4", "accent5", "accent6",
+      "hlink", "folHlink",
+    ];
+    let body = slots
+      .map(|slot| format!("<a:{slot}><a:srgbClr val=\"123456\"/></a:{slot}>"))
+      .join("");
+    let xml = format!(
+      "<a:clrScheme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"Authored\">{body}</a:clrScheme>"
+    );
+    let theme = ThemeColorPalette::from_dml(&a::ColorScheme::from_bytes(xml.as_bytes()).unwrap());
+    assert_eq!(theme.get(4), authored);
+    assert_eq!(ThemeColorPalette::default().get(4), None);
+  }
+
+  #[test]
+  fn differential_background_fill_keeps_ordinary_pattern_defaults_separate() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let red = Some(RgbColor { r: 255, g: 0, b: 0 });
+    let blue = Some(RgbColor { r: 0, g: 0, b: 255 });
+    for (attribute, ordinary, differential) in [
+      ("", None, red),
+      ("patternType=\"solid\"", blue, red),
+      ("patternType=\"none\"", None, None),
+    ] {
+      let xml = format!(
+        "<fill xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><patternFill {attribute}><fgColor rgb=\"FF0000FF\"/><bgColor rgb=\"FFFF0000\"/></patternFill></fill>"
+      );
+      let fill = x::Fill::from_bytes(xml.as_bytes()).unwrap();
+      let theme = ThemeColorPalette::default();
+      assert_eq!(
+        FillRecord::from_fill_with_colors(&fill, &[], &theme).color,
+        ordinary
+      );
+      assert_eq!(
+        FillRecord::from_differential_fill_with_colors(&fill, &[], &theme).color,
+        differential
+      );
+    }
+  }
+
+  #[test]
   fn rich_text_cell_font_vertical_alignment_parses_with_baseline_opposite_state() {
     let superscript = FontRecord::from_font_with_colors(
       &x::Font {
@@ -1733,6 +1965,38 @@ mod tests {
     assert_eq!(regular_style.font_size_pt, 10.0);
     assert_eq!(regular_style.baseline_shift_pt, 0.0);
     assert_eq!(regular_style.automatic_escapement_font_size_pt, None);
+  }
+
+  #[test]
+  fn number_format_colors_use_the_workbook_indexed_palette() {
+    let replacement = indexed_rgb(0x123456);
+    let mut palette = DEFAULT_INDEXED_COLORS.to_vec();
+    palette[10] = replacement;
+    let catalog = StylesCatalog {
+      indexed_colors: palette,
+      ..StylesCatalog::default()
+    };
+    assert_eq!(catalog.number_format_color("Color3"), Some(replacement));
+    assert_eq!(
+      catalog.number_format_color("RED"),
+      Some(indexed_rgb(0xFF0000))
+    );
+    for marker in ["Color0", "Color57", "Color9999999999999", "[Red]", "Red0"] {
+      assert_eq!(catalog.number_format_color(marker), None);
+    }
+    let defaults = StylesCatalog::default();
+    for (marker, rgb) in [
+      ("Black", 0x000000),
+      ("Blue", 0x0000FF),
+      ("Cyan", 0x00FFFF),
+      ("Green", 0x00FF00),
+      ("Magenta", 0xFF00FF),
+      ("Red", 0xFF0000),
+      ("White", 0xFFFFFF),
+      ("Yellow", 0xFFFF00),
+    ] {
+      assert_eq!(defaults.number_format_color(marker), Some(indexed_rgb(rgb)));
+    }
   }
 
   #[test]

@@ -510,6 +510,9 @@ pub struct ClusteredColumnDataLabel<'a> {
   /// these as separate text runs, which matters when a worksheet page
   /// boundary falls between the fields.
   pub text_components: Vec<String>,
+  /// Index of an automatically composed series-name component. An authored
+  /// label may contain the same words and must not be rewritten as a name.
+  pub series_name_component_index: Option<usize>,
   /// Index of the automatically composed value component. Custom c:tx
   /// labels intentionally keep this unset because their field semantics are
   /// already resolved by the producer.
@@ -542,6 +545,19 @@ pub struct ClusteredColumnDataLabel<'a> {
   /// Resolved c:dLbls/c:dLbl shape properties after applying Office's
   /// chart-group < series < point override hierarchy.
   pub shape_properties: Option<&'a c::ChartShapeProperties>,
+}
+
+impl ClusteredColumnDataLabel<'_> {
+  pub(crate) fn update_series_name(&mut self, name: &str) {
+    let Some(component) = self
+      .series_name_component_index
+      .and_then(|index| self.text_components.get_mut(index))
+    else {
+      return;
+    };
+    *component = name.to_string();
+    self.text = self.text_components.join(self.separator);
+  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -785,7 +801,7 @@ pub struct ChartCategoryTick {
 }
 
 pub fn automatic_chart_title(ui_language: Option<&str>) -> &'static str {
-  OfficeStringCatalog::for_ui_language(ui_language).chart_title()
+  crate::localization::office_automatic_chart_title(ui_language)
 }
 
 pub fn automatic_series_title(ui_language: Option<&str>, series_index: usize) -> String {
@@ -3457,6 +3473,10 @@ fn resolved_data_labels<'a>(
                 .is_some_and(|category| !category.is_empty()),
           )
       });
+      let series_name_component_index = (custom_text.is_none()
+        && point_settings.show_series_name
+        && !series_name.is_empty())
+      .then_some(usize::from(range_text.is_some()));
       let (text, text_components, separator, rich_text_runs) = match custom_text {
         Some(text) if !text.text.is_empty() => {
           (text.text, text.lines, "\n", text.rich_text_runs)
@@ -3478,6 +3498,7 @@ fn resolved_data_labels<'a>(
         point_index,
         text,
         text_components,
+        series_name_component_index,
         value_component_index,
         rich_text_runs,
         value_format_code: point_settings.value_format_code,
@@ -4839,7 +4860,7 @@ fn push_fixed_axis_title(
 }
 
 fn automatic_axis_title(ui_language: Option<&str>) -> &'static str {
-  OfficeStringCatalog::for_ui_language(ui_language).chart_axis_title()
+  crate::localization::office_automatic_chart_axis_title(ui_language)
 }
 
 fn push_fixed_category_texts(
@@ -5622,16 +5643,12 @@ fn indexed_numeric_values(points: &[c::NumericPoint]) -> Vec<Option<f64>> {
 }
 
 pub(crate) fn format_chart_number(value: f64, format_code: Option<&str>) -> String {
-  let value = if value.abs() < 1.0e-15 { 0.0 } else { value };
   let code = format_code.unwrap_or("General");
   if !is_general_chart_number_format(code) {
-    let uppercase_code = code.to_ascii_uppercase();
-    if uppercase_code.contains("E+") || uppercase_code.contains("E-") {
-      return format_chart_scientific(value, format_decimal_places(code));
-    }
     let code = chart_number_format_without_cell_alignment(code);
     return crate::xlsx::format_spreadsheet_number(value, &code);
   }
+  let value = if value.abs() < 1.0e-15 { 0.0 } else { value };
   general_chart_number(value)
 }
 
@@ -5696,36 +5713,6 @@ fn chart_number_format_without_cell_alignment(code: &str) -> std::borrow::Cow<'_
     }
   }
   std::borrow::Cow::Owned(normalized)
-}
-
-fn format_decimal_places(code: &str) -> usize {
-  code
-    .split_once('.')
-    .map(|(_, fraction)| {
-      fraction
-        .chars()
-        .take_while(|ch| matches!(ch, '0' | '#'))
-        .count()
-    })
-    .unwrap_or(0)
-}
-
-fn format_chart_scientific(value: f64, requested_decimals: usize) -> String {
-  if value == 0.0 {
-    return "0".to_string();
-  }
-  let exponent = value.abs().log10().floor() as i32;
-  let mantissa = value / 10.0_f64.powi(exponent);
-  let mantissa = if requested_decimals == 0 {
-    general_chart_number(mantissa)
-  } else {
-    format!("{mantissa:.requested_decimals$}")
-  };
-  format!(
-    "{mantissa}E{}{absolute:02}",
-    if exponent < 0 { '-' } else { '+' },
-    absolute = exponent.unsigned_abs()
-  )
 }
 
 fn format_chart_category_number(value: f64, format_code: Option<&str>, date_1904: bool) -> String {
@@ -8006,6 +7993,15 @@ mod tests {
     assert_eq!(automatic_chart_title(Some("zh-CN")), "图表标题");
     assert_eq!(automatic_chart_title(Some("zh-TW")), "圖表標題");
     assert_eq!(automatic_chart_title(Some("en-US")), "Chart Title");
+    assert_eq!(automatic_chart_title(Some("de-DE")), "Diagrammtitel");
+    assert_eq!(automatic_chart_title(Some("KO_kr")), "차트 제목");
+    assert_eq!(automatic_chart_title(Some("fr-CA")), "Titre du graphique");
+    assert_eq!(automatic_chart_title(Some("es-MX")), "Título del gráfico");
+    assert_eq!(automatic_chart_title(Some("ja-JP")), "グラフ タイトル");
+    assert_eq!(automatic_chart_title(None), "Chart Title");
+    assert_eq!(super::automatic_axis_title(Some("es-MX")), "Título del eje");
+    assert_eq!(super::automatic_axis_title(Some("zh-CN")), "坐标轴标题");
+    assert_eq!(super::automatic_axis_title(None), "Axis Title");
   }
 
   #[test]
@@ -8237,6 +8233,27 @@ mod tests {
       super::automatic_chart_data_point_fill_style_index(49, true),
       super::automatic_chart_data_point_fill_style_index(2, true)
     );
+  }
+
+  #[test]
+  fn scientific_chart_formats_share_section_sign_and_literal_handling() {
+    for (value, code, expected) in [
+      (12300.0, "0.00E-00", "1.23E04"),
+      (0.00123, "0.0e+000", "1.2e-003"),
+      (2.0e-20, "0.0E+00", "2.0E-20"),
+      (5.0e-324, "0.0E+00", "5.0E-324"),
+      (0.0, "0.00E+00", "0.00E+00"),
+      (9.9996, "0.00E+00", "1.00E+01"),
+      (12345.0, "##0.0E+0", "12.3E+3"),
+      (-12300.0, "0.00E+00;(0.00E+00)", "(1.23E+04)"),
+      (12.0, r#""E+00 "0"#, "E+00 12"),
+    ] {
+      assert_eq!(
+        format_chart_number(value, Some(code)),
+        expected,
+        "{value}: {code}"
+      );
+    }
   }
 
   #[test]

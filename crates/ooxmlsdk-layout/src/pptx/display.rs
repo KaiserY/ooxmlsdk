@@ -161,7 +161,7 @@ pub(crate) fn lower_to_layout_document(
     .draw_pages
     .iter()
     .enumerate()
-    .filter(|(_, slide)| slide.visible)
+    .filter(|(_, slide)| slide.visible || options.include_hidden_slides)
     .map(|(page_index, slide)| {
       (
         slide.size.to_page_setup(),
@@ -1569,6 +1569,7 @@ fn lower_chart(
       },
     );
     if !chart_items.is_empty() {
+      resolve_chart_background_blip_fill(import, slide, chart_resource, &mut chart_items);
       if let (Some(fill), Some(shared_chart::ChartTitleText::Explicit(title))) = (
         chart_resource
           .chart_space
@@ -2276,6 +2277,7 @@ fn lower_chart(
         },
       );
       if !chart_items.is_empty() {
+        resolve_chart_background_blip_fill(import, slide, chart_resource, &mut chart_items);
         if let (Some(fill), Some(shared_chart::ChartTitleText::Explicit(title))) =
           (title_blip_fill, chart.title.as_ref())
         {
@@ -2402,6 +2404,70 @@ fn lower_extended_chart(
     },
     None,
   ));
+}
+
+fn resolve_chart_background_blip_fill(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  items: &mut Vec<PageItem>,
+) {
+  let Some(c::ShapePropertiesChoice2::BlipFill(fill)) = chart_resource
+    .chart_space
+    .shape_properties
+    .as_deref()
+    .and_then(|properties| properties.shape_properties_choice2.as_ref())
+  else {
+    return;
+  };
+  let Some(blip) = fill.blip.as_deref() else {
+    return;
+  };
+  let Some(resource) = blip
+    .embed
+    .as_deref()
+    .and_then(|id| chart_resource.image_resources.get(id))
+  else {
+    return;
+  };
+  // Both chart lowerers emit the chart-area fill first. Its resolved bounds
+  // own the image frame, while the authored blip owns crop, stretch and tile
+  // settings. Keep a separate outline in place above the resolved image.
+  let Some(PageItem::Path(path)) = items.first() else {
+    return;
+  };
+  if !matches!(path.fill, common::Fill::Image { .. }) {
+    return;
+  }
+  let images = blip_fill_image_items_from_resource(
+    import,
+    slide,
+    fill,
+    blip,
+    resource,
+    ImageFillPlacement {
+      frame: TextFrame {
+        x_pt: path.bounds.origin.x.0,
+        y_pt: path.bounds.origin.y.0,
+        width_pt: path.bounds.size.width.0,
+        height_pt: path.bounds.size.height.0,
+      },
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      crop_bitmap: false,
+      clip_path: path.commands.clone(),
+      alt_text: None,
+      hyperlink_url: None,
+    },
+  );
+  if images.is_empty() {
+    return;
+  }
+  if let PageItem::Path(path) = &mut items[0] {
+    path.fill = common::Fill::None;
+  }
+  items.splice(0..0, images.into_iter().map(PageItem::Image));
 }
 
 fn insert_chart_title_blip_fill(
@@ -3121,7 +3187,13 @@ fn pptx_chart_gradient_fill_with_placeholder(
       })
     })
     .collect::<Vec<_>>();
-  super::gradient::normalize_powerpoint_gradient_stops(&mut stops);
+  super::gradient::normalize_powerpoint_gradient_stops(
+    &mut stops,
+    matches!(
+      fill.gradient_fill_choice.as_ref(),
+      Some(a::GradientFillChoice::LinearGradientFill(_))
+    ),
+  );
   if stops.is_empty() {
     return None;
   }
@@ -4097,11 +4169,10 @@ fn lower_diagram_drawing_shape(
   for item in &mut lowered_text_items {
     if let PageItem::Text(text) = item {
       text.preserve_text_portion = true;
-      if text_frame.rotation_deg.abs() > f32::EPSILON {
-        text.style.rotation_deg += text_frame.rotation_deg;
-        text.rotation_center_pt = text_frame.rotation_center_pt;
-      }
     }
+  }
+  if let Some(center) = text_frame.rotation_center_pt {
+    rotate_text_items_about(&mut lowered_text_items, center, text_frame.rotation_deg);
   }
   let order = context
     .text_orders
@@ -4649,7 +4720,13 @@ fn gradient_fill_for_optional_slide(
       })
     })
     .collect::<Vec<_>>();
-  super::gradient::normalize_powerpoint_gradient_stops(&mut stops);
+  super::gradient::normalize_powerpoint_gradient_stops(
+    &mut stops,
+    matches!(
+      fill.gradient_fill_choice.as_ref(),
+      Some(a::GradientFillChoice::LinearGradientFill(_))
+    ),
+  );
   if stops.is_empty() {
     return None;
   }
@@ -5194,30 +5271,19 @@ fn diagram_shape_bounds(
 }
 
 fn diagram_text_transform_bounds(
-  shape: &dsp::Shape,
   transform: &dsp::Transform2D,
   parent_transform: DiagramDrawingTransform,
 ) -> Option<shared_diagram::DiagramBounds> {
-  let (shape_bounds, _preset_bounds, mut text_bounds) =
-    diagram_unrotated_text_transform_bounds(shape, transform)?;
-  let shape_rotation = shape
-    .shape_properties
-    .transform2_d
-    .as_deref()?
-    .rotation
-    .unwrap_or_default() as f32
-    / 60_000.0;
-  let shape_center = (
-    shape_bounds.x + shape_bounds.width / 2.0,
-    shape_bounds.y + shape_bounds.height / 2.0,
-  );
-  (text_bounds.x, text_bounds.y) =
-    rotate_diagram_point((text_bounds.x, text_bounds.y), shape_center, shape_rotation);
+  let offset = transform.offset.as_ref()?;
+  let extents = transform.extents.as_ref()?;
+  // dsp:txXfrm supplies the text rectangle in the diagram's coordinates.
+  // Its rotation is composed around that rectangle's center later. Moving
+  // its top-left around the owning shape center applies rotation twice.
   Some(parent_transform.apply_bounds(
-    text_bounds.x,
-    text_bounds.y,
-    text_bounds.width,
-    text_bounds.height,
+    units::emu_to_points(offset.x.to_emu()),
+    units::emu_to_points(offset.y.to_emu()),
+    units::emu_to_points(extents.cx.to_emu()),
+    units::emu_to_points(extents.cy.to_emu()),
   ))
 }
 
@@ -5299,8 +5365,7 @@ fn diagram_drawing_text_frame(
       shape_bounds.y,
     );
   };
-  let Some(text_bounds) = diagram_text_transform_bounds(shape, text_transform, parent_transform)
-  else {
+  let Some(text_bounds) = diagram_text_transform_bounds(text_transform, parent_transform) else {
     return DiagramDrawingTextFrame::new(
       text_body_frame(
         shape_bounds.x,
@@ -5372,20 +5437,25 @@ fn diagram_drawing_text_frame(
       )
     },
   );
+  let shape_rotation = shape
+    .shape_properties
+    .transform2_d
+    .as_deref()
+    .and_then(|transform| transform.rotation)
+    .unwrap_or_default() as f32
+    / 60_000.0;
+  let rotation_deg = shape_rotation + text_transform.rotation.unwrap_or_default() as f32 / 60_000.0;
   DiagramDrawingTextFrame {
     frame,
     text_area_x_pt: preset_bounds.x,
     text_area_y_pt: preset_bounds.y,
-    rotation_center_pt: text_transform.rotation.map(|_| {
+    rotation_center_pt: (rotation_deg.abs() > f32::EPSILON).then(|| {
       (
         text_bounds.x + text_bounds.width / 2.0,
         text_bounds.y + text_bounds.height / 2.0,
       )
     }),
-    rotation_deg: text_transform
-      .rotation
-      .map(|rotation| rotation as f32 / 60_000.0)
-      .unwrap_or_default(),
+    rotation_deg,
     text_distances_100mm,
   }
 }
@@ -6379,23 +6449,23 @@ fn lower_table(
     return;
   }
 
-  let package_table_style = table
-    .inline_style
-    .as_ref()
-    .or_else(|| import.get_table_style(table.style_id.as_deref()));
+  let package_table_style = table.inline_style.as_ref().or_else(|| {
+    table
+      .style_id
+      .as_deref()
+      .filter(|style_id| !style_id.is_empty())
+      .and_then(|style_id| import.get_table_style(Some(style_id)))
+  });
   let predefined_table_style = if package_table_style.is_none() {
     predefined_table_style(table.style_id.as_deref())
   } else {
     None
   };
-  let table_style = package_table_style
-    .or(predefined_table_style.as_ref())
-    .or_else(|| {
-      import
-        .table_style_list
-        .as_ref()
-        .and_then(|styles| styles.default_style())
-    });
+  // ECMA-376 §20.1.4.2.27: tblStyleLst/@def is available when inserting a
+  // new table, not an implicit style for an existing unstyled table.
+  // [MS-OI29500] §21.1.3.12 likewise leaves invalid references unstyled.
+  // Keep explicit package/inline styles and recognized built-in references.
+  let table_style = package_table_style.or(predefined_table_style.as_ref());
   let table_background = table_style.and_then(|style| {
     let fill = table_style_part_fill(import, &style.table_background)?;
     match &fill.kind {
@@ -9164,7 +9234,13 @@ fn shape_gradient_path(
     })
     .collect::<Vec<_>>();
   let mut stops = stops;
-  super::gradient::normalize_powerpoint_gradient_stops(&mut stops);
+  super::gradient::normalize_powerpoint_gradient_stops(
+    &mut stops,
+    matches!(
+      gradient.gradient_fill_choice.as_ref(),
+      Some(a::GradientFillChoice::LinearGradientFill(_))
+    ),
+  );
   if stops.is_empty() {
     return None;
   }
@@ -11918,19 +11994,8 @@ fn lower_paragraph(
       edge_font_sizes.first_pt,
       context.options,
     );
-    advance_text_column_if_needed(cursor, context.frame, *context.options);
+    advance_text_column_if_needed(cursor, context.frame, *context.options, 0.0);
   }
-  let logical_column_index = cursor
-    .column_index
-    .min(context.options.column_count.saturating_sub(1));
-  let visual_column_index = if context.options.right_to_left_columns {
-    context.options.column_count - logical_column_index - 1
-  } else {
-    logical_column_index
-  };
-  let column_x = context.frame.x_pt
-    + visual_column_index as f32 * (column_width + context.options.column_spacing_pt);
-  cursor.x_pt = column_x;
   if context.options.clip_vertical_overflow
     && cursor.y_pt
       > context.frame.y_pt + context.frame.height_pt + context.options.clip_bottom_extension_pt
@@ -11957,12 +12022,6 @@ fn lower_paragraph(
     &paragraph_style,
     &bullet,
   );
-  let paragraph_x = cursor.x_pt
-    + if paragraph_style.right_to_left {
-      paragraph_style.right_margin_pt
-    } else {
-      paragraph_leading_offset
-    };
   for (segment_index, segment) in text_segments.iter().enumerate() {
     let segment_start = segment.start;
     let segment_end = segment.end;
@@ -11989,8 +12048,6 @@ fn lower_paragraph(
         ParagraphLineAdjustment::Grapheme { count, .. } => count,
         ParagraphLineAdjustment::None | ParagraphLineAdjustment::Word { .. } => 0,
       };
-      let mut run_x =
-        aligned_paragraph_x(paragraph_x, paragraph_width, text_line.width_pt, alignment);
       let base_line_style = paragraph_base_style.clone();
       // ECMA-376 Part 1 §21.1.2.2.5: without explicit lnSpc, spacing is
       // determined by the largest piece of text in the line. The inherited
@@ -12010,6 +12067,32 @@ fn lower_paragraph(
         max_line_height =
           max_line_height.max(paragraph_style.line_height(&line_run.style, context.options));
       }
+      // A column must fit the next complete line. A paragraph can span
+      // columns, so resolve its horizontal origin after each line's fit check.
+      advance_text_column_if_needed(cursor, context.frame, *context.options, max_line_height);
+      let logical_column_index = cursor
+        .column_index
+        .min(context.options.column_count.saturating_sub(1));
+      let visual_column_index = if context.options.right_to_left_columns {
+        context.options.column_count - logical_column_index - 1
+      } else {
+        logical_column_index
+      };
+      cursor.x_pt = context.frame.x_pt
+        + visual_column_index as f32 * (column_width + context.options.column_spacing_pt);
+      let paragraph_x = cursor.x_pt
+        + if paragraph_style.right_to_left {
+          paragraph_style.right_margin_pt
+        } else {
+          paragraph_leading_offset
+        };
+      let mut run_x = aligned_paragraph_x(
+        paragraph_x,
+        paragraph_width,
+        text_line.width_pt,
+        alignment,
+        context.options.word_wrap,
+      );
       let common_baseline_offset = if matches!(
         paragraph_style.font_alignment,
         a::TextFontAlignmentValues::Automatic | a::TextFontAlignmentValues::Baseline
@@ -12036,7 +12119,14 @@ fn lower_paragraph(
         && line_index == 0
         && let Some(label) = bullet.label.as_deref()
       {
-        let label = shared_symbol::font_symbol_transport_text(bullet.font.as_deref(), label);
+        // Office uses the first text run's font for automatic numbering.
+        // buFont selects character bullets (ECMA-376 §21.1.2.4.6); applying
+        // it to numbers can also turn their letters into symbol selectors.
+        let bullet_font = bullet
+          .font
+          .as_deref()
+          .filter(|_| bullet.auto_number.is_none());
+        let label = shared_symbol::font_symbol_transport_text(bullet_font, label);
         // DrawingML's follow-text bullet properties use the first character
         // in the paragraph. `line_run.style` already includes inheritance and
         // auto-fit scaling, so it is also the correct base for explicit bullet
@@ -12065,7 +12155,7 @@ fn lower_paragraph(
           bullet_style.underline = false;
           bullet_style.strikethrough = false;
         }
-        if let Some(font) = bullet.font.as_deref() {
+        if let Some(font) = bullet_font {
           bullet_style.font_family = Some(Arc::from(resolve_theme_font(context.import, font)));
         }
         if let Some(paint) = bullet.color.as_ref().and_then(|color| {
@@ -12211,7 +12301,7 @@ fn lower_paragraph(
 
       assign_drawingml_text_effect_line_anchor(&mut items[line_item_start..], text_metrics);
       cursor.y_pt += max_line_height;
-      advance_text_column_if_needed(cursor, context.frame, *context.options);
+      advance_text_column_if_needed(cursor, context.frame, *context.options, 0.0);
     }
   }
   if paragraph_index + 1 < context.paragraph_count
@@ -12222,7 +12312,7 @@ fn lower_paragraph(
       edge_font_sizes.last_pt,
       context.options,
     );
-    advance_text_column_if_needed(cursor, context.frame, *context.options);
+    advance_text_column_if_needed(cursor, context.frame, *context.options, 0.0);
   }
 }
 
@@ -12378,12 +12468,20 @@ fn layout_text_lines<'a>(
   let has_dictionary_or_east_asian_text = text.chars().any(parley_line_break_script);
   let has_east_asian_text = text.chars().any(east_asian_line_break_script);
   // eaLnBrk=true permits the East Asian word to wrap without inserting a
-  // hyphen; false keeps that word intact. latinLnBrk has the corresponding
-  // emergency-break meaning for Latin words (ECMA-376 Part 1, 21.1.2.2.7).
+  // hyphen; false keeps that word intact.
   // Do not invert the East Asian flag here: Parley's normal Unicode break
   // opportunities are the enabled behavior, while the legacy whole-token
   // path preserves a disabled East Asian word.
-  let needs_emergency_breaking = context.latin_line_break;
+  // PowerPoint still fits an overlong Latin token to the wrapped text box
+  // when latinLnBrk is false (font-scale.pptx). Keep this fallback separate
+  // from dictionary/East Asian breaking and preserve grapheme clusters.
+  let needs_emergency_breaking = context.latin_line_break
+    || text.chars().all(|ch| {
+      matches!(
+        ch.script(),
+        Script::Latin | Script::Common | Script::Inherited
+      )
+    });
   let needs_span_aware_breaking = (joins_word_across_run
     && (context.east_asian_line_break || !has_east_asian_text))
     || (has_dictionary_or_east_asian_text
@@ -13288,15 +13386,19 @@ fn aligned_paragraph_x(
   column_width: f32,
   line_width: f32,
   alignment: a::TextAlignmentTypeValues,
+  word_wrap: bool,
 ) -> f32 {
   match alignment {
     a::TextAlignmentTypeValues::Center => {
       // Keep the center fixed even when a glyph overflows a narrow or collapsed
       // text frame. Clamping this signed offset incorrectly left-aligns it.
-      // Office width/alignment controls establish that right-aligned overflow
-      // remains clamped, so it deliberately retains its separate policy below.
       paragraph_x + (column_width - line_width) / 2.0
     }
+    // With bodyPr@wrap="none", the text remains one line and its right edge
+    // stays at the paragraph boundary even when the line is wider than the
+    // frame. The current Office Pandoc document-properties title exercises
+    // this through an inherited right alignment and no-wrap layout bodyPr.
+    a::TextAlignmentTypeValues::Right if !word_wrap => paragraph_x + column_width - line_width,
     a::TextAlignmentTypeValues::Right => paragraph_x + (column_width - line_width).max(0.0),
     a::TextAlignmentTypeValues::Left
     | a::TextAlignmentTypeValues::Justified
@@ -13825,8 +13927,14 @@ fn advance_text_column_if_needed(
   cursor: &mut TextCursor,
   frame: TextFrame,
   options: TextLoweringOptions,
+  next_line_height_pt: f32,
 ) {
-  if options.column_count <= 1 || cursor.y_pt <= frame.y_pt + frame.height_pt {
+  if options.column_count <= 1
+    || cursor.y_pt + next_line_height_pt <= frame.y_pt + frame.height_pt
+    // An oversized line must start in the current empty column; moving it
+    // would just leave that column blank without making the line fit.
+    || cursor.y_pt <= frame.y_pt
+  {
     return;
   }
   if cursor.column_index + 1 >= options.column_count {
@@ -14494,7 +14602,13 @@ impl ParagraphDisplayStyle {
   }
 
   fn left_offset(&self, has_bullet: bool) -> f32 {
-    self.left_margin_pt + if has_bullet { 0.0 } else { self.indent_pt }
+    if has_bullet {
+      self.left_margin_pt
+    } else {
+      // PowerPoint keeps unbulleted text inside the text-body inset when
+      // the hanging indent exceeds marL (paraMarginAndIndentation.pptx).
+      (self.left_margin_pt + self.indent_pt).max(0.0)
+    }
   }
 
   fn apply_diagram_autofit_spacing_scale(
@@ -16288,6 +16402,38 @@ mod tests {
   use super::*;
 
   #[test]
+  fn smartart_text_transform_keeps_its_rectangle_and_composes_rotations() {
+    use ooxmlsdk::sdk::SdkType;
+
+    for (shape_angle, text_angle) in [(90, -90), (30, 15), (-45, 15)] {
+      let xml = format!(
+        r#"<dsp:sp xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" modelId="0"><dsp:nvSpPr><dsp:cNvPr id="1" name="test"/><dsp:cNvSpPr/></dsp:nvSpPr><dsp:spPr><a:xfrm rot="{}"><a:off x="1270000" y="2540000"/><a:ext cx="3810000" cy="2540000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></dsp:spPr><dsp:txXfrm rot="{}"><a:off x="1524000" y="2921000"/><a:ext cx="2032000" cy="1270000"/></dsp:txXfrm></dsp:sp>"#,
+        shape_angle * 60_000,
+        text_angle * 60_000
+      );
+      let shape = dsp::Shape::from_bytes(xml.as_bytes()).unwrap();
+      let parent = DiagramDrawingTransform(Affine::translate((7.0, 11.0)));
+      let bounds =
+        diagram_text_transform_bounds(shape.transform2_d.as_deref().unwrap(), parent).unwrap();
+      assert_eq!(
+        (bounds.x, bounds.y, bounds.width, bounds.height),
+        (127.0, 241.0, 160.0, 100.0)
+      );
+      let shape_bounds = diagram_shape_bounds(&shape.shape_properties, parent).unwrap();
+      let frame = diagram_drawing_text_frame(&shape, shape_bounds, parent, &TextBody::default());
+      assert_eq!(frame.rotation_deg, (shape_angle + text_angle) as f32);
+      assert_eq!(
+        frame.rotation_center_pt,
+        if shape_angle + text_angle == 0 {
+          None
+        } else {
+          Some((207.0, 291.0))
+        }
+      );
+    }
+  }
+
+  #[test]
   fn extruded_source_stroke_minimum_preserves_absence_and_wider_lines() {
     for (authored, realized) in [
       (0.0, 0.0),
@@ -16990,17 +17136,42 @@ mod tests {
   fn paragraph_alignment_preserves_overflowing_text_center() {
     for width in [0.0, 4.0, 10.0, 20.0] {
       for line_width in [0.0, 7.0, 12.0] {
-        let centered =
-          aligned_paragraph_x(100.0, width, line_width, a::TextAlignmentTypeValues::Center);
+        let centered = aligned_paragraph_x(
+          100.0,
+          width,
+          line_width,
+          a::TextAlignmentTypeValues::Center,
+          true,
+        );
         assert_eq!(centered + line_width / 2.0, 100.0 + width / 2.0);
         assert_eq!(
-          aligned_paragraph_x(100.0, width, line_width, a::TextAlignmentTypeValues::Left),
+          aligned_paragraph_x(
+            100.0,
+            width,
+            line_width,
+            a::TextAlignmentTypeValues::Left,
+            true
+          ),
           100.0
         );
         assert_eq!(
-          aligned_paragraph_x(100.0, width, line_width, a::TextAlignmentTypeValues::Right),
+          aligned_paragraph_x(
+            100.0,
+            width,
+            line_width,
+            a::TextAlignmentTypeValues::Right,
+            true
+          ),
           100.0 + (width - line_width).max(0.0)
         );
+        let right = aligned_paragraph_x(
+          100.0,
+          width,
+          line_width,
+          a::TextAlignmentTypeValues::Right,
+          false,
+        );
+        assert_eq!(right + line_width, 100.0 + width);
       }
     }
   }
@@ -17839,6 +18010,26 @@ mod tests {
     let unbulleted_left = hanging.left_offset(false);
     assert!(unbulleted_left.abs() < 0.001);
     assert!((hanging.available_width(74.192_28, unbulleted_left) - 74.192_28).abs() < 0.001);
+    let excessive_hanging = ParagraphDisplayStyle {
+      left_margin_pt: 28.346_457,
+      indent_pt: -36.0,
+      ..ParagraphDisplayStyle::default()
+    };
+    assert_eq!(excessive_hanging.left_offset(false), 0.0);
+    assert_eq!(
+      excessive_hanging.left_offset(true),
+      excessive_hanging.left_margin_pt
+    );
+    assert_eq!(
+      excessive_hanging.available_width(100.0, excessive_hanging.left_offset(false)),
+      100.0
+    );
+    let positive_indent = ParagraphDisplayStyle {
+      left_margin_pt: 12.0,
+      indent_pt: 6.0,
+      ..ParagraphDisplayStyle::default()
+    };
+    assert_eq!(positive_indent.left_offset(false), 18.0);
   }
 
   #[test]

@@ -50,7 +50,8 @@ use crate::model::{
 use crate::options::{LayoutActionOptions, LayoutOptions};
 use crate::pptx::chart::{
   ChartFrame, ChartLayoutProfile, ClusteredColumnStyle, RadialChartStyle,
-  lower_clustered_column_chart, lower_radial_chart, radial_2d_segment_path,
+  lower_centered_chart_data_label, lower_clustered_column_chart, lower_radial_chart,
+  radial_2d_segment_path,
 };
 use crate::render::chart as shared_chart;
 use crate::render::chart_layout_profiles as chart_profiles;
@@ -2785,6 +2786,8 @@ struct FlowContext {
   repeating_slots: RepeatingSlotState,
   text_segmentation: TextSegmentation,
   horizontal_table_cell: bool,
+  // Actual initial cell ascent minus the paragraph line-box ascent.
+  table_cell_baseline_delta_pt: f32,
   paragraph_spacing_context: ParagraphSpacingContext,
   preserve_horizontal_on_advance: bool,
   script_sensitive_line_height: bool,
@@ -3623,8 +3626,8 @@ fn push_docx_picture_image(
   mut image_item: ImageItem,
 ) -> (usize, common::Rect) {
   let content_start = items.len();
-  let group_inline_picture_frame =
-    image_item.inline_baseline_participant && image.picture_frame.is_some();
+  let group_inline_picture_content = image_item.inline_baseline_participant
+    && (image.picture_frame.is_some() || image.semantic_metafile_font_family.is_some());
   let mut content_bounds = image_effect_content_bounds(&image_item);
   let mut frame_foreground = Vec::new();
   let active_x_semantic_font = image.semantic_metafile_font_family.clone().filter(|_| {
@@ -3815,10 +3818,10 @@ fn push_docx_picture_image(
       items.push(PageItem::Group(semantic_items));
     }
   }
-  if group_inline_picture_frame && items.len() > content_start + 1 {
-    // The bitmap, frame paint and effects belong to one as-character
-    // picture. Keep that ownership after lowering so line alignment and
-    // baseline placement translate its paint together with its clip.
+  if group_inline_picture_content && items.len() > content_start + 1 {
+    // The bitmap, frame paint, effects and ActiveX semantic text belong to
+    // one as-character picture. Keep that ownership after lowering so line
+    // alignment and baseline placement translate all its content together.
     let picture_items = items.split_off(content_start);
     items.push(PageItem::Group(picture_items));
   }
@@ -16106,6 +16109,7 @@ fn flow_context(
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+    table_cell_baseline_delta_pt: 0.0,
   }
 }
 
@@ -18528,6 +18532,7 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+    table_cell_baseline_delta_pt: 0.0,
   }
 }
 
@@ -19908,6 +19913,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       note_continuation_top_inset_pt: 0.0,
       inside_paragraph_frame: false,
       fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+      table_cell_baseline_delta_pt: 0.0,
     },
   );
 
@@ -19959,6 +19965,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       note_continuation_top_inset_pt: 0.0,
       inside_paragraph_frame: false,
       fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+      table_cell_baseline_delta_pt: 0.0,
     },
   );
 
@@ -20233,6 +20240,7 @@ fn apply_headers_and_footers(
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
         fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+        table_cell_baseline_delta_pt: 0.0,
       },
       RepeatingFrameSink {
         page_index: index,
@@ -20289,6 +20297,7 @@ fn apply_headers_and_footers(
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
         fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+        table_cell_baseline_delta_pt: 0.0,
       },
       RepeatingFrameSink {
         page_index: index,
@@ -21570,8 +21579,9 @@ fn style_ref_candidate_matches(
 ) -> bool {
   let target = normalized_style_ref_name(style_name);
   let numeric_heading_reference = matches!(style_name.trim().as_bytes(), [b'1'..=b'9']);
-  let localized_builtin_name =
-    super::is_simplified_chinese_ui_language(ui_language) && !numeric_heading_reference;
+  let localized_builtin_name = (super::is_simplified_chinese_ui_language(ui_language)
+    || super::field_localization::korean_ui_english_heading_reference(style_name, ui_language))
+    && !numeric_heading_reference;
   candidate
     .keys
     .iter()
@@ -22093,6 +22103,7 @@ fn measured_repeating_blocks_height_at(
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+    table_cell_baseline_delta_pt: 0.0,
   };
   let mut y = origin_y_pt;
   for (index, block) in blocks.iter().enumerate() {
@@ -23307,6 +23318,82 @@ fn lower_inline_chart(
   height_pt: f32,
   text_metrics: &mut TextMetrics,
 ) -> Vec<PageItem> {
+  let lowered = lower_inline_chart_contents(chart, x_pt, y_pt, width_pt, height_pt, text_metrics);
+  if chart.image_fills.is_empty() {
+    return lowered;
+  }
+  let mut items = Vec::new();
+  for mut item in lowered {
+    if let PageItem::Path(path) = &mut item
+      && let common::Fill::Image {
+        relationship_id: Some(id),
+        ..
+      } = &path.fill
+      && let Some(fill) = chart.image_fills.get(id.as_ref())
+    {
+      let bounds = path.bounds;
+      let frame = super::chart_shape(
+        bounds.size.width.0,
+        bounds.size.height.0,
+        0.0,
+        crate::docx::ImagePlacement::Inline,
+        None,
+      );
+      let mut images = inline_shape_fill_image_items(
+        &frame,
+        fill,
+        bounds.origin.x.0,
+        bounds.origin.y.0,
+        bounds.size.width.0,
+        bounds.size.height.0,
+        Affine::IDENTITY,
+      );
+      let clip_path = if !path.commands.is_empty() {
+        path.commands.clone()
+      } else {
+        let mut commands = path
+          .points
+          .iter()
+          .enumerate()
+          .map(|(index, point)| {
+            if index == 0 {
+              common::PathCommand::MoveTo(*point)
+            } else {
+              common::PathCommand::LineTo(*point)
+            }
+          })
+          .collect::<Vec<_>>();
+        if !commands.is_empty() {
+          commands.push(common::PathCommand::Close);
+        }
+        commands
+      };
+      for image in &mut images {
+        // A chart image is part of its existing object, not another line-box participant.
+        image.inline_baseline_participant = false;
+        if !clip_path.is_empty() {
+          image.clip_path.clone_from(&clip_path);
+        }
+      }
+      if !images.is_empty() {
+        items.extend(images.into_iter().map(PageItem::Image));
+        path.fill = common::Fill::None;
+      }
+    }
+    // Keep the original outline above its fill and preserve chart stacking order.
+    items.push(item);
+  }
+  items
+}
+
+fn lower_inline_chart_contents(
+  chart: &InlineChart,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> Vec<PageItem> {
   if let Some(chart_space) = chart.extended_chart_space.as_deref() {
     return crate::xlsx::chartex::lower_extended_chart_cached_with_resources(
       chart_space,
@@ -23734,7 +23821,7 @@ fn lower_word_pie_chart(
         height_pt * label_profile.plot_radius_x_height_ratio * label_profile.radius_x_scale;
       let label_radius_y = height_pt * label_profile.radius_y_height_ratio;
       let start_angle = model.first_slice_angle_deg.to_radians() as f32;
-      for label in &model.data_labels {
+      for (label_index, label) in model.data_labels.iter().enumerate() {
         let before = model
           .values
           .iter()
@@ -23746,6 +23833,45 @@ fn lower_word_pie_chart(
         };
         let mid_angle =
           start_angle + ((before + value * 0.5) / total * std::f64::consts::TAU) as f32;
+        if label.text.contains(['\r', '\n']) {
+          // Keep Word's plot and label-ring geometry while centering the
+          // complete multiline box at the ordinary label's anchor.
+          let label_style = chart
+            .data_label_styles
+            .first()
+            .and_then(|styles| styles.get(label_index))
+            .and_then(Option::as_ref)
+            .unwrap_or(&chart.data_label_style);
+          let rich_text_styles = chart
+            .data_label_rich_text_styles
+            .first()
+            .and_then(|styles| styles.get(label_index))
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+          items.extend(
+            lower_centered_chart_data_label(
+              ChartFrame {
+                x_pt,
+                y_pt: chart_y_pt,
+                width_pt,
+                height_pt,
+              },
+              (
+                x_pt + center_x + mid_angle.sin() * label_radius_x,
+                chart_y_pt + center_y
+                  - mid_angle.cos() * label_radius_y
+                  - label_style.font_size_pt * (0.99 - 0.6),
+              ),
+              label,
+              label_style,
+              rich_text_styles,
+              text_metrics,
+            )
+            .into_iter()
+            .flat_map(docx_chart_page_items),
+          );
+          continue;
+        }
         let text_width = text_metrics.measure_text(&label.text, &chart.data_label_style);
         items.push(PageItem::Text(Box::new(TextItem {
           x_pt: x_pt + center_x + mid_angle.sin() * label_radius_x - text_width * 0.5,
@@ -29527,6 +29653,11 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) -> Option<f32> {
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+    table_cell_baseline_delta_pt: if replay_baseline_offset == 0.0 {
+      0.0
+    } else {
+      table_cell_baseline_delta(cell, setup, text_metrics)
+    },
   };
   let overlap_probe_exclusions = future_floating_table_wrap_exclusions(
     blocks_to_layout,
@@ -30063,6 +30194,31 @@ fn table_cell_first_inline_text_height(
   }
 }
 
+fn table_cell_baseline_delta(
+  cell: &TableCell,
+  setup: PageSetup,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let Some(Block::Paragraph(paragraph)) = cell.blocks.first() else {
+    return 0.0;
+  };
+  let style = paragraph_base_line_style(paragraph);
+  let initial_height = table_cell_first_resolved_line_height(cell, setup, true, text_metrics);
+  let paragraph_height = paragraph_line_height_for_setup(
+    paragraph,
+    &style,
+    setup,
+    TextSegmentation::TableCell,
+    text_metrics,
+  );
+  // Ordinary first-line text retains Word's natural-ascent cell baseline.
+  // Later paragraphs adjust that cursor by differences of line-box ascent.
+  // Carry the initial difference when an inline object converts the cursor
+  // back into a physical frame top, instead of charging leading twice.
+  table_cell_initial_baseline_offset(&style, initial_height, text_metrics)
+    - table_cell_initial_baseline_offset(&style, paragraph_height, text_metrics)
+}
+
 fn table_cell_first_resolved_line_height(
   cell: &TableCell,
   setup: PageSetup,
@@ -30258,6 +30414,7 @@ fn table_cell_first_content_line_height(
           note_continuation_top_inset_pt: 0.0,
           inside_paragraph_frame: false,
           fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+          table_cell_baseline_delta_pt: 0.0,
         };
         let next = cell.blocks.get(1);
         return Some(
@@ -30324,6 +30481,7 @@ fn table_cell_first_content_line_height(
             note_continuation_top_inset_pt: 0.0,
             inside_paragraph_frame: false,
             fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+            table_cell_baseline_delta_pt: 0.0,
           };
           frame
             .blocks
@@ -30839,6 +30997,7 @@ fn layout_shape_text_box(
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
     fixed_output_raster_dpi: parent_flow.fixed_output_raster_dpi,
+    table_cell_baseline_delta_pt: 0.0,
   };
   let content_height = match shape.text_vertical_alignment {
     TextBoxVerticalAlignment::Top => 0.0,
@@ -31425,6 +31584,7 @@ fn shape_text_box_measure_flow(parent_flow: FlowContext, content_width: f32) -> 
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
     fixed_output_raster_dpi: parent_flow.fixed_output_raster_dpi,
+    table_cell_baseline_delta_pt: 0.0,
   }
 }
 
@@ -32358,6 +32518,7 @@ fn table_cell_content_height_with_mode(
     note_continuation_top_inset_pt: 0.0,
     inside_paragraph_frame: false,
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+    table_cell_baseline_delta_pt: table_cell_baseline_delta(cell, setup, text_metrics),
   };
   let flow = FlowContext {
     script_sensitive_line_height: true,
@@ -33344,13 +33505,15 @@ fn paragraph_frame_position(
   // keeping x/y in HoriOrientPosition/VertOrientPosition, so they must not
   // shift the frame's specified position.
   //
-  // ECMA-376 Part 1 §17.3.1.11 also makes xAlign supersede x. yAlign
-  // supersedes y unless vAnchor is text, where relative vertical alignment
-  // is itself ignored.
+  // xAlign supersedes x. Office's current tdf157572_defaultVAnchor and
+  // tdf112287B PDFs instead give an explicitly authored y priority over
+  // yAlign, including y=0. Text-relative anchors also ignore yAlign.
   if placement.horizontal_alignment.is_some() {
     placement.horizontal_offset_pt = 0.0;
   }
-  if matches!(placement.vertical_anchor, FrameVerticalAnchor::Text) {
+  if placement.vertical_offset_explicit
+    || matches!(placement.vertical_anchor, FrameVerticalAnchor::Text)
+  {
     placement.vertical_alignment = None;
   } else if placement.vertical_alignment.is_some() {
     placement.vertical_offset_pt = 0.0;
@@ -34026,7 +34189,10 @@ impl TextFrame {
         }
         _ => true,
       }))
-    .then(|| table_cell_initial_baseline_offset(&base_line_style, base_line_height, text_metrics));
+    .then(|| {
+      table_cell_initial_baseline_offset(&base_line_style, base_line_height, text_metrics)
+        + flow.table_cell_baseline_delta_pt
+    });
     let picture_only_cell =
       table_cell_baseline_offset_pt.is_some() && table_cell_picture_only_paragraph(paragraph);
     let proportional_auto_gap_below_pt = proportional_auto_line_spacing_gap_below(
@@ -47870,6 +48036,37 @@ mod tests {
   }
 
   #[test]
+  fn korean_style_ref_keeps_numeric_levels_and_authored_custom_names() {
+    let mut candidate = StyleRefCandidate {
+      y_pt: 100.0,
+      keys: vec![Arc::from("Heading 1")],
+      text: Arc::from("heading text"),
+      numbering_text: Some(Arc::from("1")),
+      full_numbering_text: None,
+    };
+    assert!(!style_ref_candidate_matches(
+      &candidate,
+      "Heading 1",
+      Some("ko-KR")
+    ));
+    assert!(style_ref_candidate_matches(&candidate, "1", Some("ko-KR")));
+    assert!(style_ref_candidate_matches(
+      &candidate,
+      "Heading 1",
+      Some("en-US")
+    ));
+    candidate.keys.push(Arc::from(format!(
+      "{}Heading 1",
+      super::super::CUSTOM_STYLE_REF_KEY_PREFIX
+    )));
+    assert!(style_ref_candidate_matches(
+      &candidate,
+      "Heading 1",
+      Some("ko-KR")
+    ));
+  }
+
+  #[test]
   fn body_style_ref_searches_up_before_down_and_respects_localized_style_names() {
     let standard_key = Arc::<str>::from("Heading 1");
     let custom_key = Arc::<str>::from(format!(
@@ -53841,7 +54038,7 @@ mod tests {
   }
 
   #[test]
-  fn paragraph_frame_alignment_supersedes_absolute_offsets() {
+  fn paragraph_frame_position_respects_explicit_vertical_offsets() {
     let setup = PageSetup {
       width_pt: 612.0,
       height_pt: 792.0,
@@ -53884,6 +54081,22 @@ mod tests {
       paragraph_frame_position(aligned, flow, 72.0, 144.0, 36.0),
       (234.0, 378.0)
     );
+    for offset in [0.0, 90.0] {
+      assert_eq!(
+        paragraph_frame_position(
+          FloatingFramePlacement {
+            vertical_offset_pt: offset,
+            vertical_offset_explicit: true,
+            ..aligned
+          },
+          flow,
+          72.0,
+          144.0,
+          36.0,
+        ),
+        (234.0, offset)
+      );
+    }
     assert_eq!(
       paragraph_frame_position(
         FloatingFramePlacement {
@@ -57298,6 +57511,7 @@ mod tests {
       note_continuation_top_inset_pt: 0.0,
       inside_paragraph_frame: false,
       fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+      table_cell_baseline_delta_pt: 0.0,
     };
     let mut text_metrics = TextMetrics::new();
     let large_style = paragraph_base_line_style(&large);
@@ -57392,6 +57606,7 @@ mod tests {
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
         fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+        table_cell_baseline_delta_pt: 0.0,
       }
     }
 
@@ -57487,6 +57702,7 @@ mod tests {
         note_continuation_top_inset_pt: 0.0,
         inside_paragraph_frame: false,
         fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+        table_cell_baseline_delta_pt: 0.0,
       }
     }
 
@@ -57989,6 +58205,7 @@ mod tests {
       note_continuation_top_inset_pt: 0.0,
       inside_paragraph_frame: false,
       fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
+      table_cell_baseline_delta_pt: 0.0,
     };
     let paragraph = Paragraph {
       inlines: Vec::new(),

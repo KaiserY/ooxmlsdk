@@ -279,6 +279,8 @@ pub enum Fill<'doc> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PatternFill {
   pub mask: PatternMask,
+  /// Keep a worksheet's brush phase continuous across cells on the page.
+  pub page_origin: bool,
   /// Physical width and height of one semantic 8×8 period, in thousandths of a point.
   ///
   /// DrawingML preset patterns and WordprocessingML shading use different
@@ -348,6 +350,7 @@ impl PatternFill {
   ) -> Self {
     Self {
       mask: PatternMask::EmfPlusHatch(hatch_style),
+      page_origin: false,
       tile_size_milli_points: Self::DRAWINGML_TILE_SIZE_MILLI_POINTS,
       // Word fixed output preserves the canonical 8×8 EMF+ mask as a
       // non-interpolated 16×16 image over one 6pt period. This 2× sampling
@@ -386,6 +389,7 @@ impl PatternFill {
   ) -> Self {
     Self {
       mask: PatternMask::Bitmap8(rows),
+      page_origin: false,
       tile_size_milli_points,
       bitmap_sampling,
       foreground,

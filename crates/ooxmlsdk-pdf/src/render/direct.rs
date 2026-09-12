@@ -401,7 +401,12 @@ fn ensure_path_stroke_supported(stroke: &common::Stroke<'static>, closed: bool) 
   if stroke_has_visible_endpoint_markers(stroke) {
     return unsupported("compound stroke endpoint markers");
   }
-  if !closed {
+  if !closed
+    && (!matches!(
+      stroke.compound,
+      Some(common::StrokeCompound::Double | common::StrokeCompound::Triple)
+    ) || !matches!(stroke.cap, None | Some(common::StrokeCap::Flat)))
+  {
     return unsupported("open compound strokes");
   }
   Ok(())
@@ -2230,7 +2235,9 @@ fn write_prepared_glyph_outline_run(
       run_x_offset_pt: run.x_offset_pt,
       baseline_y_pt: portion.baseline_y,
       horizontal_scale: text.item.style.horizontal_scale.unwrap_or(1.0),
-      vertical_scale: text.item.style.direct_vertical_scale(),
+      // Font family, weight and em size do not imply a vertical stretch.
+      // Authored outline transforms are applied separately below.
+      vertical_scale: 1.0,
     },
     options.and_then(|options| options.transform),
     options.and_then(|options| options.text_warp.as_deref()),
@@ -3128,9 +3135,6 @@ fn ensure_ordinary_text_supported(text: &super::paint::PaintText<'_>) -> Result<
     return Err(PdfError::Writer(
       "text horizontal scale must be finite and positive".to_string(),
     ));
-  }
-  if paints_glyphs && !outlined && (style.direct_vertical_scale() - 1.0).abs() > f32::EPSILON {
-    return unsupported("vertically scaled text painting");
   }
   let source = text.item.text.as_ref();
   for portion in &text.portions {
@@ -7381,6 +7385,134 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_expands_open_symmetric_compound_paths_for_raw_and_prepared_pages() {
+    let compound_path = |compound, commands: bool, alpha| {
+      let points = [
+        common::Point {
+          x: Pt(100.0),
+          y: Pt(100.0),
+        },
+        common::Point {
+          x: Pt(220.0),
+          y: Pt(100.0),
+        },
+        common::Point {
+          x: Pt(220.0),
+          y: Pt(160.0),
+        },
+      ];
+      common::DisplayItem::Path(common::PathItem {
+        bounds: common::Rect {
+          origin: points[0],
+          size: Size {
+            width: Pt(120.0),
+            height: Pt(60.0),
+          },
+        },
+        points: if commands {
+          Vec::new()
+        } else {
+          points.to_vec()
+        },
+        commands: if commands {
+          vec![
+            common::PathCommand::MoveTo(points[0]),
+            common::PathCommand::LineTo(points[1]),
+            common::PathCommand::LineTo(points[2]),
+          ]
+        } else {
+          Vec::new()
+        },
+        closed: false,
+        fill: common::Fill::None,
+        stroke: Some(common::Stroke {
+          width: Pt(6.0),
+          color: color(57, 82, 116, alpha),
+          preset_dash: Some(common::StrokeDashPreset::Solid),
+          cap: Some(common::StrokeCap::Flat),
+          join: Some(common::StrokeJoin::Round),
+          compound: Some(compound),
+          alignment: Some(common::StrokeAlignment::Center),
+          ..Default::default()
+        }),
+      })
+    };
+
+    for (compound, commands, boundary_count) in [
+      (common::StrokeCompound::Double, true, 2),
+      (common::StrokeCompound::Double, false, 2),
+      (common::StrokeCompound::Triple, true, 3),
+      (common::StrokeCompound::Triple, false, 3),
+    ] {
+      for dashed in [false, true] {
+        let mut raw = blank_document(&[(320.0, 260.0)]);
+        raw.pages[0]
+          .items
+          .push(compound_path(compound, commands, 192));
+        if dashed {
+          let common::DisplayItem::Path(path) = &mut raw.pages[0].items[0] else {
+            unreachable!();
+          };
+          let stroke = path.stroke.as_mut().unwrap();
+          stroke.preset_dash = Some(common::StrokeDashPreset::DashDot);
+          stroke.dash_offset = Pt(1.5);
+        }
+
+        let mut prepared = raw.clone();
+        prepared.pages[0]
+          .items
+          .push(common::DisplayItem::LinkArea(common::LinkArea {
+            bounds: common::Rect {
+              origin: common::Point {
+                x: Pt(1.0),
+                y: Pt(1.0),
+              },
+              size: Size {
+                width: Pt(1.0),
+                height: Pt(1.0),
+              },
+            },
+            target: "https://example.test/".into(),
+          }));
+
+        for document in [&raw, &prepared] {
+          let pdf = String::from_utf8_lossy(&render(document, &uncompressed_options()).unwrap())
+            .into_owned();
+          let content = object_body(&pdf, 4);
+          let tokens = content.split_ascii_whitespace().collect::<Vec<_>>();
+          let contours = tokens.iter().filter(|&&token| token == "h").count();
+          if dashed {
+            assert!(contours > boundary_count, "dash clip contours");
+            assert!(
+              tokens.contains(&"W"),
+              "compound gaps intersect the dash clip"
+            );
+          } else {
+            assert_eq!(contours, boundary_count);
+          }
+          assert_eq!(tokens.iter().filter(|&&token| token == "f").count(), 1);
+          assert!(!tokens.contains(&"S"), "{compound:?}: {content}");
+          assert!(!tokens.contains(&"B"), "{compound:?}: {content}");
+          assert!(pdf.contains("/ca 0.7529412"), "{compound:?}: {pdf}");
+        }
+      }
+    }
+
+    let mut transparent = blank_document(&[(320.0, 260.0)]);
+    transparent.pages[0]
+      .items
+      .push(compound_path(common::StrokeCompound::Double, true, 0));
+    let pdf =
+      String::from_utf8_lossy(&render(&transparent, &uncompressed_options()).unwrap()).into_owned();
+    assert!(
+      !object_body(&pdf, 4)
+        .split_ascii_whitespace()
+        .any(|token| token == "f")
+    );
+    assert!(!pdf.contains("/ca 0"), "{pdf}");
+  }
+
+  #[test]
   fn direct_writer_keeps_unsettled_compound_path_states_typed() {
     let base = common::Stroke {
       width: Pt(6.0),
@@ -7423,8 +7555,24 @@ mod tests {
         feature: "non-flat dashed compound strokes"
       })
     ));
+    assert!(ensure_path_stroke_supported(&base, false).is_ok());
+    for compound in [
+      common::StrokeCompound::ThickThin,
+      common::StrokeCompound::ThinThick,
+    ] {
+      let mut asymmetric = base.clone();
+      asymmetric.compound = Some(compound);
+      assert!(matches!(
+        ensure_path_stroke_supported(&asymmetric, false),
+        Err(PdfError::DirectWriterUnsupported {
+          feature: "open compound strokes"
+        })
+      ));
+    }
+    let mut round_open = base.clone();
+    round_open.cap = Some(common::StrokeCap::Round);
     assert!(matches!(
-      ensure_path_stroke_supported(&base, false),
+      ensure_path_stroke_supported(&round_open, false),
       Err(PdfError::DirectWriterUnsupported {
         feature: "open compound strokes"
       })
@@ -7824,7 +7972,7 @@ mod tests {
   }
 
   #[test]
-  fn direct_writer_rejects_invalid_horizontal_and_independent_vertical_text_scaling() {
+  fn direct_writer_rejects_invalid_horizontal_text_scaling() {
     for horizontal_scale in [0.0, -1.0, f32::NAN, f32::INFINITY] {
       let document = text_document(
         "invalid scale",
@@ -7842,23 +7990,115 @@ mod tests {
           if message == "text horizontal scale must be finite and positive"
       ));
     }
+  }
 
-    let legacy_vertical = text_document(
-      "independent vertical scale",
-      common::TextStyle {
-        font_family: Some("Arial".into()),
-        font_size: Pt(11.0),
-        bold: true,
-        color: color(0, 0, 0, u8::MAX),
-        ..Default::default()
-      },
-    );
-    assert!(matches!(
-      render(&legacy_vertical, &uncompressed_options()),
-      Err(PdfError::DirectWriterUnsupported {
-        feature: "vertically scaled text painting"
-      })
-    ));
+  #[test]
+  fn direct_writer_preserves_arial_em_proportions_across_weights_and_sizes() {
+    // Current Office stress024.xlsx and 57181.xlsm PDFs paint authored
+    // 11pt Arial bold with equal horizontal and vertical em dimensions.
+    for bold in [false, true] {
+      for font_size in [10.0, 11.0, 12.0] {
+        let document = text_document(
+          "Arial proportions",
+          common::TextStyle {
+            font_family: Some("Arial".into()),
+            font_size: Pt(font_size),
+            bold,
+            color: color(0, 0, 0, u8::MAX),
+            ..Default::default()
+          },
+        );
+        let options = uncompressed_options();
+        let paint = super::super::paint::prepare_for_direct(&document, &options);
+        let super::super::paint::PaintItem::Text(text) = &paint.pages[0].items[0] else {
+          unreachable!();
+        };
+        let baseline = text.portions[0].baseline_y;
+        let bytes = render(&document, &options).unwrap();
+        let pdf = String::from_utf8_lossy(&bytes);
+        let tokens = pdf.split_ascii_whitespace().collect::<Vec<_>>();
+        let matrices = tokens
+          .windows(7)
+          .filter(|window| window[6].starts_with("Tm"))
+          .map(|window| std::array::from_fn(|index| window[index].parse::<f32>().unwrap()))
+          .collect::<Vec<[f32; 6]>>();
+        assert_eq!(matrices.len(), 1, "{font_size}pt, bold={bold}");
+        assert_matrix_near(matrices[0], [1.0, 0.0, 0.0, -1.0, 72.0, baseline]);
+      }
+    }
+  }
+
+  #[test]
+  fn direct_writer_preserves_arial_outline_proportions_and_authored_transforms() {
+    let measure = |font_size: f32, bold: bool, transform| {
+      let document = text_document(
+        "H",
+        common::TextStyle {
+          font_family: Some("Arial".into()),
+          font_size: Pt(font_size),
+          bold,
+          color: color(0, 0, 0, u8::MAX),
+          pdf_glyph_outlines: true,
+          pdf_glyph_outline_options: Some(Arc::new(common::PdfGlyphOutlineOptions {
+            transform,
+            ..Default::default()
+          })),
+          ..Default::default()
+        },
+      );
+      let bytes = render(&document, &uncompressed_options()).unwrap();
+      let pdf = String::from_utf8_lossy(&bytes);
+      let content = object_body(&pdf, 4);
+      assert!(!content.contains("BT"), "{content}");
+      let tokens = content.split_ascii_whitespace().collect::<Vec<_>>();
+      // Arial's H has straight contours, so the emitted line endpoints give
+      // its exact visible bounds without relying on font-specific metrics.
+      let points = tokens
+        .windows(3)
+        .filter(|window| matches!(window[2], "m" | "l"))
+        .map(|window| {
+          (
+            window[0].parse::<f32>().unwrap(),
+            window[1].parse::<f32>().unwrap(),
+          )
+        })
+        .collect::<Vec<_>>();
+      assert!(points.len() >= 4, "{content}");
+      let left = points
+        .iter()
+        .map(|point| point.0)
+        .fold(f32::INFINITY, f32::min);
+      let right = points
+        .iter()
+        .map(|point| point.0)
+        .fold(f32::NEG_INFINITY, f32::max);
+      let top = points
+        .iter()
+        .map(|point| point.1)
+        .fold(f32::INFINITY, f32::min);
+      let bottom = points
+        .iter()
+        .map(|point| point.1)
+        .fold(f32::NEG_INFINITY, f32::max);
+      (right - left, bottom - top)
+    };
+
+    for bold in [false, true] {
+      let natural = measure(12.0, bold, None);
+      let eleven = measure(11.0, bold, None);
+      assert!((eleven.0 / 11.0 - natural.0 / 12.0).abs() < 1.0e-4);
+      assert!((eleven.1 / 11.0 - natural.1 / 12.0).abs() < 1.0e-4);
+      let transformed = measure(
+        11.0,
+        bold,
+        Some(common::Transform {
+          m22: 1.5,
+          ..Default::default()
+        }),
+      );
+      assert!((transformed.0 - eleven.0).abs() < 1.0e-4);
+      assert!((transformed.1 - eleven.1 * 1.5).abs() < 1.0e-4);
+    }
   }
 
   #[test]
@@ -8220,6 +8460,32 @@ mod tests {
       ensure_glyph_semantic_mapping_supported("\0", true, false),
       Err(PdfError::DirectWriterUnsupported {
         feature: "invalid glyph semantics in a Unicode-mapped PDF profile"
+      })
+    ));
+  }
+
+  #[test]
+  fn direct_writer_legacy_symbol_selectors_keep_unknown_private_use_rejected() {
+    for (family, source) in [("Wingdings", "\u{f0e8}"), ("Symbol", "\u{f0de}")] {
+      let semantic = super::super::paint::symbol_font_semantic_text(source, Some(family));
+      assert!(ensure_glyph_semantic_mapping_supported(&semantic, true, true).is_ok());
+      for (family, source) in [("Calibri", source), (family, "\u{e225}")] {
+        let unsupported = super::super::paint::symbol_font_semantic_text(source, Some(family));
+        assert!(matches!(
+          ensure_glyph_semantic_mapping_supported(&unsupported, true, true),
+          Err(PdfError::DirectWriterUnsupported {
+            feature: "private-use glyph semantics in PDF/A-3a"
+          })
+        ));
+      }
+    }
+    let mixed =
+      super::super::paint::symbol_font_semantic_text("\u{f0e8}\u{e225}", Some("Wingdings"));
+    assert_eq!(mixed, "\u{1f87a}\u{e225}");
+    assert!(matches!(
+      ensure_glyph_semantic_mapping_supported(&mixed, true, true),
+      Err(PdfError::DirectWriterUnsupported {
+        feature: "private-use glyph semantics in PDF/A-3a"
       })
     ));
   }

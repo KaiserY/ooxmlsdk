@@ -1052,7 +1052,7 @@ fn lower_shape(
   if let Some(table) = &shape.table_properties
     && shape.service_name == ShapeService::Table
   {
-    lower_table(import, shape, offset, table, context.fixed_output, items);
+    lower_table(context, shape, offset, table, items);
   }
 
   if shape.service_name == ShapeService::Chart
@@ -3678,7 +3678,10 @@ fn lower_diagram_contents(
         .and_then(|properties| {
           diagram_model_shape_common_fill(context.import, context.slide, properties, shape_bounds)
         });
-      let default_fill = common::Fill::Solid(common_rgb(pdf_rgb_color(diagram_shape.fill), 1.0));
+      let default_fill = common::Fill::Solid(common_rgb(
+        pdf_rgb_color(diagram_shape.fill),
+        diagram_shape.fill_opacity,
+      ));
       let suppress_fill = diagram_shape
         .shape_properties
         .as_deref()
@@ -3698,8 +3701,8 @@ fn lower_diagram_contents(
               context.slide,
               diagram_shape.style.as_deref(),
               diagram_shape.line_fill.map(pdf_rgb_color),
+              diagram_shape.line_opacity,
             )
-            .map(|stroke| common_stroke_from_border(stroke, 1.0))
           })
           .unwrap_or_else(|| common_stroke_from_border(BorderStyle::default(), 1.0));
         diagram_shape.apply_connector_ends(&mut stroke);
@@ -3736,8 +3739,8 @@ fn lower_diagram_contents(
               context.slide,
               diagram_shape.style.as_deref(),
               diagram_shape.line_fill.map(pdf_rgb_color),
+              diagram_shape.line_opacity,
             )
-            .map(|stroke| common_stroke_from_border(stroke, 1.0))
           })
           .or_else(|| {
             (!suppress_fill).then(|| common_stroke_from_border(BorderStyle::default(), 1.0))
@@ -4235,6 +4238,7 @@ fn lower_diagram_text_body_at_with_style_and_scale(
       frame,
       base_style: &base_style,
       font_reference: style_inputs.font_reference,
+      table_text_style: style_inputs.table_text_style,
       options: &options,
       slide_number: 1,
     },
@@ -4265,6 +4269,7 @@ fn lower_diagram_text_body_at_with_style_and_scale(
         slide: None,
         base_style: &base_style,
         font_reference: style_inputs.font_reference,
+        table_text_style: style_inputs.table_text_style,
         options: &options,
         frame,
         shape_hyperlink_url: style_inputs.shape_hyperlink_url,
@@ -5036,18 +5041,22 @@ fn diagram_style_outline(
   slide: &SlidePersist,
   style: Option<&dgm::Style>,
   line_fill: Option<RgbColor>,
-) -> Option<BorderStyle> {
+  line_opacity: f32,
+) -> Option<common::Stroke<'static>> {
   let reference = &style?.line_reference;
-  let placeholder_color = line_fill.map(diagram_rgb_color).or_else(|| {
-    reference
-      .line_reference_choice
-      .as_ref()
-      .and_then(Color::from_line_reference_choice)
-  });
+  let placeholder_color = line_fill
+    .map(|color| diagram_rgba_color(color, line_opacity))
+    .or_else(|| {
+      reference
+        .line_reference_choice
+        .as_ref()
+        .and_then(Color::from_line_reference_choice)
+    });
   let line = import
     .get_theme_line_style(reference.index)
     .map(|line| line.with_placeholder_color(placeholder_color))?;
-  line_stroke(import, Some(slide), &line).map(|stroke| stroke.style)
+  line_stroke(import, Some(slide), &line)
+    .map(|stroke| common_stroke_from_border(stroke.style, stroke.opacity))
 }
 
 fn diagram_model_shape_blip_fill_image_items(
@@ -5882,39 +5891,53 @@ fn diagram_style_colors(
 ) -> Option<shared_diagram::DiagramStyleColors> {
   let color_resource = record.diagram_color_resource.as_ref()?;
   let mut fill_by_label = HashMap::new();
+  let mut fill_opacity_by_label = HashMap::new();
   let mut line_by_label = HashMap::new();
+  let mut line_opacity_by_label = HashMap::new();
   let mut text_fill_by_label = HashMap::new();
   for label in &color_resource.colors.color_transform_style_label {
     if let Some(fill_list) = label.fill_color_list.as_ref() {
-      let fills: Vec<LayoutRgbColor> = fill_list
+      let (fills, opacities): (Vec<LayoutRgbColor>, Vec<f32>) = fill_list
         .fill_color_list_choice
         .iter()
         .filter_map(Color::from_diagram_fill_color_choice)
         .filter_map(|color| import.resolve_color_for_slide(slide, &color, None))
-        .map(|color| LayoutRgbColor {
-          r: color.r,
-          g: color.g,
-          b: color.b,
+        .map(|color| {
+          (
+            LayoutRgbColor {
+              r: color.r,
+              g: color.g,
+              b: color.b,
+            },
+            color_opacity(color.alpha),
+          )
         })
-        .collect();
+        .unzip();
       if !fills.is_empty() {
         fill_by_label.insert(label.name.clone(), fills);
+        fill_opacity_by_label.insert(label.name.clone(), opacities);
       }
     }
     if let Some(line_list) = label.line_color_list.as_ref() {
-      let lines: Vec<LayoutRgbColor> = line_list
+      let (lines, opacities): (Vec<LayoutRgbColor>, Vec<f32>) = line_list
         .line_color_list_choice
         .iter()
         .filter_map(Color::from_diagram_line_color_choice)
         .filter_map(|color| import.resolve_color_for_slide(slide, &color, None))
-        .map(|color| LayoutRgbColor {
-          r: color.r,
-          g: color.g,
-          b: color.b,
+        .map(|color| {
+          (
+            LayoutRgbColor {
+              r: color.r,
+              g: color.g,
+              b: color.b,
+            },
+            color_opacity(color.alpha),
+          )
         })
-        .collect();
+        .unzip();
       if !lines.is_empty() {
         line_by_label.insert(label.name.clone(), lines);
+        line_opacity_by_label.insert(label.name.clone(), opacities);
       }
     }
     if let Some(text_fill_list) = label.text_fill_color_list.as_ref() {
@@ -5937,7 +5960,9 @@ fn diagram_style_colors(
   (!fill_by_label.is_empty() || !line_by_label.is_empty() || !text_fill_by_label.is_empty())
     .then_some(shared_diagram::DiagramStyleColors {
       fill_by_label,
+      fill_opacity_by_label,
       line_by_label,
+      line_opacity_by_label,
       text_fill_by_label,
     })
 }
@@ -5976,6 +6001,19 @@ fn diagram_rgb_color(color: RgbColor) -> Color {
   Color::RgbHex(super::drawingml::color::RgbHexColor {
     value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
     transformations: Vec::new(),
+  })
+}
+
+fn diagram_rgba_color(color: RgbColor, opacity: f32) -> Color {
+  use super::drawingml::color::{ColorTransformation, ColorTransformationKind, RgbHexColor};
+  // The color-list alpha belongs to the placeholder. Theme alpha transforms
+  // must run afterward, in their authored order.
+  Color::RgbHex(RgbHexColor {
+    value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+    transformations: vec![ColorTransformation {
+      kind: ColorTransformationKind::Alpha,
+      value: Some((opacity.clamp(0.0, 1.0) * 100_000.0).round() as i32),
+    }],
   })
 }
 
@@ -6432,20 +6470,18 @@ fn lower_shape_hyperlink(shape: &Shape, offset: DisplayOffset, items: &mut Vec<P
 }
 
 fn lower_table(
-  import: &PowerPointImport,
+  context: PptxLoweringContext<'_>,
   shape: &Shape,
   offset: DisplayOffset,
   table: &TableProperties,
-  fixed_output: PptxFixedOutputProfile,
   items: &mut Vec<PageItem>,
 ) {
+  let import = context.import;
   // table grid and row heights as the visible TableShape size.
   let x0 = offset.x_pt(shape.position.x);
   let y0 = offset.y_pt(shape.position.y);
   let table_width = offset.width_pt(table.grid.iter().copied().sum::<i64>());
-  let row_height_sum = table.rows.iter().map(|row| row.height).sum::<i64>();
-  let table_height = offset.height_pt(row_height_sum.max(shape.size.cy));
-  if table_width <= 0.0 || table_height <= 0.0 {
+  if table_width <= 0.0 || table.rows.is_empty() {
     return;
   }
 
@@ -6466,6 +6502,11 @@ fn lower_table(
   // [MS-OI29500] §21.1.3.12 likewise leaves invalid references unstyled.
   // Keep explicit package/inline styles and recognized built-in references.
   let table_style = package_table_style.or(predefined_table_style.as_ref());
+  let row_heights = table_display_row_heights(context, table, table_style, shape.size.cy, offset);
+  let table_height = row_heights.iter().sum::<f32>();
+  if table_height <= 0.0 {
+    return;
+  }
   let table_background = table_style.and_then(|style| {
     let fill = table_style_part_fill(import, &style.table_background)?;
     match &fill.kind {
@@ -6497,13 +6538,6 @@ fn lower_table(
   let mut y = y0;
   let max_row = table.rows.len().saturating_sub(1);
   let max_column = table.grid.len().saturating_sub(1);
-  let row_heights = table
-    .rows
-    .iter()
-    .map(|row| {
-      table_row_display_height(row.height, row_height_sum, shape.size.cy, offset.scale_y())
-    })
-    .collect::<Vec<_>>();
   for (row_index, row) in table.rows.iter().enumerate() {
     let row_height = row_heights[row_index];
     let mut x = x0;
@@ -6532,7 +6566,7 @@ fn lower_table(
           )
         });
         lower_table_cell(
-          import,
+          context,
           cell,
           style_part.as_ref(),
           table_background.clone(),
@@ -6542,7 +6576,6 @@ fn lower_table(
             width_pt: cell_width,
             height_pt: table_cell_display_height(cell, row_index, &row_heights),
           },
-          fixed_output,
           items,
         );
       }
@@ -6623,6 +6656,144 @@ fn table_row_display_height(
     return row_height;
   }
   row_height * shape_height as f32 / row_height_sum as f32
+}
+
+fn table_display_row_heights(
+  context: PptxLoweringContext<'_>,
+  table: &TableProperties,
+  table_style: Option<&TableStyle>,
+  shape_height: i64,
+  offset: DisplayOffset,
+) -> Vec<f32> {
+  let row_height_sum = table.rows.iter().map(|row| row.height).sum::<i64>();
+  if table.rows.iter().all(|row| row.height > 0) {
+    return table
+      .rows
+      .iter()
+      .map(|row| {
+        table_row_display_height(row.height, row_height_sum, shape_height, offset.scale_y())
+      })
+      .collect();
+  }
+  // MS-OI29500 §21.1.3.18 permits h=0. Office measures those rows from
+  // their cells instead of hiding them or dividing the graphic-frame height
+  // equally among them. Existing positive row extents remain authored minima.
+  let mut heights = table
+    .rows
+    .iter()
+    .map(|row| offset.height_pt(row.height.max(0)))
+    .collect::<Vec<_>>();
+  let mut merged_requirements = Vec::new();
+  let mut text_metrics = TextMetrics::new();
+  for (row_index, row) in table.rows.iter().enumerate() {
+    let mut grid_index = 0;
+    for cell in &row.cells {
+      let span = table_cell_grid_advance(cell);
+      let end_row = table
+        .rows
+        .len()
+        .min(row_index.saturating_add(table_cell_row_span(cell)));
+      if !cell.horizontal_merge
+        && !cell.vertical_merge
+        && grid_index < table.grid.len()
+        && table.rows[row_index..end_row]
+          .iter()
+          .any(|row| row.height <= 0)
+      {
+        let width = offset.width_pt(
+          table.grid[grid_index..table.grid.len().min(grid_index + span)]
+            .iter()
+            .copied()
+            .sum(),
+        );
+        let style = table_style.map(|style| {
+          table_cell_style_part(
+            context.import,
+            table,
+            style,
+            grid_index,
+            table.grid.len().saturating_sub(1),
+            row_index,
+            table.rows.len().saturating_sub(1),
+          )
+        });
+        let margins = units::emu_to_points(i64::from(cell.margins.top + cell.margins.bottom));
+        let text_height = table_cell_text_body(context, cell)
+          .map(|body| {
+            let frame = TextFrame {
+              x_pt: 0.0,
+              y_pt: 0.0,
+              width_pt: (width
+                - units::emu_to_points(i64::from(cell.margins.left + cell.margins.right)))
+              .max(0.0),
+              height_pt: 0.0,
+            };
+            let options = TextLoweringOptions::from_text_body(&body);
+            let table_text_style = style.as_ref().map(|style| &style.text);
+            let base_style = text_base_style(
+              context.import,
+              Some(context.slide),
+              &body,
+              table_text_style,
+              None,
+            );
+            estimate_wrapped_text_body_height(
+              TextBodyHeightContext {
+                import: context.import,
+                slide: Some(context.slide),
+                frame,
+                base_style: &base_style,
+                font_reference: None,
+                table_text_style,
+                options: &options,
+                slide_number: presentation_slide_number(context.import, context.page_index),
+              },
+              &body,
+              &mut text_metrics,
+            )
+          })
+          .unwrap_or_default();
+        // MS-OI29500 §21.1.3.18: Office's minimum cell height holds its top
+        // and bottom margins plus two points, even when there is no text.
+        let required_height = margins + text_height.max(2.0);
+        if end_row == row_index + 1 {
+          heights[row_index] = heights[row_index].max(required_height);
+        } else {
+          merged_requirements.push((row_index, end_row, required_height));
+        }
+      }
+      grid_index = grid_index.saturating_add(span);
+    }
+  }
+  // A spanning cell constrains the sum of its rows. Charge any remaining
+  // height only once, to its final automatic row, preserving fixed rows and
+  // the hMerge/vMerge continuation ownership used during painting.
+  for (start, end, required) in merged_requirements {
+    let remaining = (required - heights[start..end].iter().sum::<f32>()).max(0.0);
+    if let Some(index) = (start..end)
+      .rev()
+      .find(|&index| table.rows[index].height <= 0)
+    {
+      heights[index] += remaining;
+    }
+  }
+  heights
+}
+
+fn table_cell_text_body(context: PptxLoweringContext<'_>, cell: &TableCell) -> Option<TextBody> {
+  let mut body = cell.text_body.clone()?;
+  body.apply_text_styles(
+    context
+      .slide
+      .other_text_style
+      .as_ref()
+      .or(context.slide.default_text_style.as_ref()),
+  );
+  body.display_properties.vertical = cell.vertical;
+  body.display_properties.anchor = cell.anchor;
+  body.display_properties.anchor_center = cell.anchor_center;
+  body.display_properties.horizontal_overflow = Some(cell.horizontal_overflow);
+  Some(body)
 }
 
 fn table_cell_style_part(
@@ -6873,14 +7044,14 @@ fn table_border_line_is_visible(line: &Option<LineProperties>) -> bool {
 }
 
 fn lower_table_cell(
-  import: &PowerPointImport,
+  context: PptxLoweringContext<'_>,
   cell: &TableCell,
   style_part: Option<&TableStylePart>,
   table_background: Option<common::Fill<'static>>,
   frame: TextFrame,
-  fixed_output: PptxFixedOutputProfile,
   items: &mut Vec<PageItem>,
 ) {
+  let import = context.import;
   if frame.width_pt <= 0.0 || frame.height_pt <= 0.0 {
     return;
   }
@@ -6906,16 +7077,11 @@ fn lower_table_cell(
     items,
   );
 
-  if let Some(text_body) = &cell.text_body {
-    let mut text_body = text_body.clone();
-    text_body.display_properties.vertical = cell.vertical;
-    text_body.display_properties.anchor = cell.anchor;
-    text_body.display_properties.anchor_center = cell.anchor_center;
-    text_body.display_properties.horizontal_overflow = Some(cell.horizontal_overflow);
+  if let Some(text_body) = table_cell_text_body(context, cell) {
     let x = frame.x_pt + units::emu_to_points(i64::from(cell.margins.left));
     let y = frame.y_pt + units::emu_to_points(i64::from(cell.margins.top));
     lower_text_body_at_with_table_style(
-      import,
+      context,
       TextFrame {
         x_pt: x,
         y_pt: y,
@@ -6928,7 +7094,6 @@ fn lower_table_cell(
       },
       &text_body,
       style_part.map(|style| &style.text),
-      fixed_output,
       items,
     );
   }
@@ -10142,15 +10307,14 @@ fn lower_text_body(
 }
 
 fn lower_text_body_at_with_table_style(
-  import: &PowerPointImport,
+  context: PptxLoweringContext<'_>,
   frame: TextFrame,
   text_body: &TextBody,
   table_text_style: Option<&TableStyleTextProperties>,
-  fixed_output: PptxFixedOutputProfile,
   items: &mut Vec<PageItem>,
 ) {
   lower_text_body_at_with_style(
-    import,
+    context.import,
     frame,
     text_body,
     TextStyleLoweringInputs {
@@ -10159,7 +10323,9 @@ fn lower_text_body_at_with_table_style(
       ..TextStyleLoweringInputs::default()
     },
     TextLoweringRuntime {
-      fixed_output,
+      slide: Some(context.slide),
+      page_index: context.page_index,
+      fixed_output: context.fixed_output,
       ..TextLoweringRuntime::default()
     },
     None,
@@ -10285,6 +10451,7 @@ fn lower_text_body_at_with_style_and_scale(
       frame,
       base_style: &base_style,
       font_reference: style_inputs.font_reference,
+      table_text_style: style_inputs.table_text_style,
       options: &options,
       slide_number: presentation_slide_number(import, runtime.page_index),
     },
@@ -10321,6 +10488,7 @@ fn lower_text_body_at_with_style_and_scale(
         slide: runtime.slide,
         base_style: &base_style,
         font_reference: style_inputs.font_reference,
+        table_text_style: style_inputs.table_text_style,
         options: &options,
         frame,
         shape_hyperlink_url: style_inputs.shape_hyperlink_url,
@@ -11901,6 +12069,7 @@ struct ParagraphLoweringContext<'a> {
   slide: Option<&'a SlidePersist>,
   base_style: &'a TextStyle,
   font_reference: Option<&'a FontStyleReference>,
+  table_text_style: Option<&'a TableStyleTextProperties>,
   options: &'a TextLoweringOptions,
   frame: TextFrame,
   shape_hyperlink_url: Option<&'a str>,
@@ -11938,6 +12107,14 @@ fn lower_paragraph(
     context.slide,
     &mut paragraph_base_style,
   );
+  if let Some(table_text_style) = context.table_text_style {
+    apply_table_text_style(
+      context.import,
+      context.slide,
+      table_text_style,
+      &mut paragraph_base_style,
+    );
+  }
   if let Some(font_reference) = context.font_reference {
     apply_font_reference_text_style(
       context.import,
@@ -12140,12 +12317,21 @@ fn lower_paragraph(
             ) && (!run.text.is_empty() || presentation_field_may_generate_text(context.import, run))
           })
           .map(|run| {
+            // buClrTx follows character formatting, not the hyperlink field's
+            // automatic color/underline. The current Office slide-breaks-toc
+            // PDF keeps black bullets beside blue linked text. Explicit rPr
+            // fills still participate, and buClr overrides are applied below.
+            let mut bullet_run = run.clone();
+            if let Some(properties) = bullet_run.run_properties.as_mut() {
+              properties.hyperlink_on_click = None;
+              properties.hyperlink_on_mouse_over = None;
+            }
             styled_text_run(
               context.import,
               context.slide,
               &paragraph_base_style,
               context.options,
-              run,
+              &bullet_run,
             )
           })
           .unwrap_or_else(|| paragraph_base_style.clone());
@@ -13257,6 +13443,19 @@ fn styled_text_run(
 ) -> TextStyle {
   let mut style = base_style.clone();
   apply_run_properties(import, slide, run, &mut style);
+  if style.baseline_shift_pt != 0.0 {
+    // PowerPoint treats nonzero baseline as superscript/subscript formatting
+    // (MS-OI29500 §21.1.2.3.9(d)). Its fixed output uses two-thirds of the
+    // nominal size: inline-formatting's 24pt becomes 15.96pt and n828390's
+    // 20pt becomes 13.32pt after the existing 600dpi print-grid quantization.
+    // Apply this once after inheritance, before measuring or quantizing runs;
+    // the baseline displacement still uses the full nominal font size.
+    let nominal_size = style
+      .drawingml_effect_font_size_pt
+      .unwrap_or(style.font_size_pt);
+    style.font_size_pt = nominal_size * (2.0 / 3.0);
+    style.drawingml_effect_font_size_pt = Some(style.font_size_pt);
+  }
   apply_text_scale(&mut style, options);
   style
 }
@@ -13729,6 +13928,7 @@ struct TextBodyHeightContext<'a> {
   frame: TextFrame,
   base_style: &'a TextStyle,
   font_reference: Option<&'a FontStyleReference>,
+  table_text_style: Option<&'a TableStyleTextProperties>,
   options: &'a TextLoweringOptions,
   slide_number: i32,
 }
@@ -13748,6 +13948,14 @@ fn estimate_wrapped_text_body_height(
       context.slide,
       &mut paragraph_base_style,
     );
+    if let Some(table_text_style) = context.table_text_style {
+      apply_table_text_style(
+        context.import,
+        context.slide,
+        table_text_style,
+        &mut paragraph_base_style,
+      );
+    }
     if let Some(font_reference) = context.font_reference {
       apply_font_reference_text_style(
         context.import,
@@ -15716,6 +15924,16 @@ fn apply_run_common(import: &PowerPointImport, properties: RunCommon<'_>, style:
   }
   if let Some(font_size) = properties.font_size {
     let font_size_pt = ooxmlsdk::units::drawingml_text_size_to_points(font_size) as f32;
+    if properties.baseline.is_none() && style.baseline_shift_pt != 0.0 {
+      // An inherited baseline remains a percentage when a child run changes
+      // sz; keep its displacement relative to that run's new nominal size.
+      let inherited_size = style
+        .drawingml_effect_font_size_pt
+        .unwrap_or(style.font_size_pt);
+      if inherited_size > 0.0 {
+        style.baseline_shift_pt *= font_size_pt / inherited_size;
+      }
+    }
     style.font_size_pt = font_size_pt;
     style.drawingml_effect_font_size_pt = Some(font_size_pt);
   }

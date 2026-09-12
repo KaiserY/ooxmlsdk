@@ -248,7 +248,7 @@ pub(crate) fn predefined_table_style(style_id: Option<&str>) -> Option<TableStyl
 fn light_style_1(style_id: &str, style_name: &str, accent: a::SchemeColorValues) -> TableStyle {
   // LibreOffice's predefined-table-styles.cxx applies alpha=20000 to the
   // band1H/band1V accent color for the Office Light Style 1 GUID family.
-  // [MS-OE376] 2.1.168 provides the corresponding GUID/name mapping.
+  // [MS-OE376] 2.1.1343(b) provides the corresponding GUID/name mapping.
   let accent_fill = solid_scheme_alpha_fill(accent, 20_000);
   let accent_line = solid_scheme_line(accent);
 
@@ -314,10 +314,15 @@ fn light_style_1(style_id: &str, style_name: &str, accent: a::SchemeColorValues)
 }
 
 fn medium_style_2(style_id: &str, style_name: &str, accent: a::SchemeColorValues) -> TableStyle {
+  // MS-OE376 §2.1.1343(b): Medium Style 2 has bold edge regions, 1pt
+  // grid lines and 3pt edge-row separators. Accent variants change only color.
   let accent_fill = solid_scheme_fill(accent, None);
   let accent_tint_20 = solid_scheme_fill(accent, Some(20_000));
   let accent_tint_40 = solid_scheme_fill(accent, Some(40_000));
-  let light1_line = solid_scheme_line(a::SchemeColorValues::Light1);
+  let mut light1_line = solid_scheme_line(a::SchemeColorValues::Light1);
+  light1_line.width_emu = Some(12_700);
+  let mut edge_row_line = light1_line.clone();
+  edge_row_line.width_emu = Some(38_100);
 
   TableStyle {
     style_id: Some(style_id.to_string()),
@@ -342,10 +347,11 @@ fn medium_style_2(style_id: &str, style_name: &str, accent: a::SchemeColorValues
     first_row: TableStylePart {
       fill_properties: Some(accent_fill.clone()),
       borders: TableStyleBorders {
-        bottom: Some(light1_line.clone()),
+        bottom: Some(edge_row_line.clone()),
         ..TableStyleBorders::default()
       },
       text: TableStyleTextProperties {
+        bold: Some(a::BooleanStyleValues::On),
         color: Some(scheme_color(a::SchemeColorValues::Light1, None)),
         ..TableStyleTextProperties::default()
       },
@@ -354,10 +360,11 @@ fn medium_style_2(style_id: &str, style_name: &str, accent: a::SchemeColorValues
     last_row: TableStylePart {
       fill_properties: Some(accent_fill.clone()),
       borders: TableStyleBorders {
-        top: Some(light1_line),
+        top: Some(edge_row_line),
         ..TableStyleBorders::default()
       },
       text: TableStyleTextProperties {
+        bold: Some(a::BooleanStyleValues::On),
         color: Some(scheme_color(a::SchemeColorValues::Light1, None)),
         ..TableStyleTextProperties::default()
       },
@@ -366,6 +373,7 @@ fn medium_style_2(style_id: &str, style_name: &str, accent: a::SchemeColorValues
     first_column: TableStylePart {
       fill_properties: Some(accent_fill.clone()),
       text: TableStyleTextProperties {
+        bold: Some(a::BooleanStyleValues::On),
         color: Some(scheme_color(a::SchemeColorValues::Light1, None)),
         ..TableStyleTextProperties::default()
       },
@@ -374,6 +382,7 @@ fn medium_style_2(style_id: &str, style_name: &str, accent: a::SchemeColorValues
     last_column: TableStylePart {
       fill_properties: Some(accent_fill.clone()),
       text: TableStyleTextProperties {
+        bold: Some(a::BooleanStyleValues::On),
         color: Some(scheme_color(a::SchemeColorValues::Light1, None)),
         ..TableStyleTextProperties::default()
       },

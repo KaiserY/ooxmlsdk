@@ -300,7 +300,7 @@ fn apply_defined_names_to_sheets<'doc>(
   }
 }
 
-fn split_defined_name_ranges(value: &str) -> Vec<&str> {
+pub(super) fn split_defined_name_ranges(value: &str) -> Vec<&str> {
   let value = value.trim().trim_start_matches('=');
   let mut quoted = false;
   let mut start = 0;

@@ -39,6 +39,7 @@ pub struct DiagramShape {
   pub shape_properties: Option<Box<dgm::ShapeProperties>>,
   pub style: Option<Box<dgm::Style>>,
   pub line_fill: Option<RgbColor>,
+  pub line_opacity: f32,
   pub text_fill: Option<RgbColor>,
   pub shape_rotation_deg: f32,
   pub text_rotation_deg: f32,
@@ -59,6 +60,7 @@ pub struct DiagramShape {
   pub connector_end_override: Option<(f32, f32)>,
   pub is_blip_placeholder: bool,
   pub fill: RgbColor,
+  pub fill_opacity: f32,
   pub text_order: usize,
   pub font_size_pt: Option<f32>,
   pub minimum_font_size_pt: Option<f32>,
@@ -344,6 +346,7 @@ pub struct DiagramTextBody {
   pub auto_fit: bool,
   pub paragraphs: Vec<DiagramTextParagraph>,
   custom_text: bool,
+  descendant_text: bool,
 }
 
 impl DiagramTextBody {
@@ -766,7 +769,9 @@ pub enum DiagramTextRunKind {
 #[derive(Clone, Debug, Default)]
 pub struct DiagramStyleColors {
   pub fill_by_label: HashMap<String, Vec<RgbColor>>,
+  pub fill_opacity_by_label: HashMap<String, Vec<f32>>,
   pub line_by_label: HashMap<String, Vec<RgbColor>>,
+  pub line_opacity_by_label: HashMap<String, Vec<f32>>,
   pub text_fill_by_label: HashMap<String, Vec<RgbColor>>,
 }
 
@@ -813,6 +818,7 @@ struct DiagramShapeNode {
   internal_name: String,
   text_body: DiagramTextBody,
   fill: RgbColor,
+  fill_opacity: f32,
   x: f32,
   y: f32,
   width: f32,
@@ -845,6 +851,7 @@ struct DiagramShapeNode {
   preset_geometry: Option<Box<a::PresetGeometry>>,
   style: Option<Box<dgm::Style>>,
   line_fill: Option<RgbColor>,
+  line_opacity: f32,
   text_fill: Option<RgbColor>,
   text_rotation_deg: f32,
   aspect_ratio: f32,
@@ -855,6 +862,7 @@ struct DiagramShapeNode {
   text_order: usize,
   constraints: Vec<DiagramConstraint>,
   direct_constraints: Vec<DiagramConstraint>,
+  size_constraints_applied: bool,
   rules: Vec<DiagramRule>,
   placeholder_line_count: usize,
   children: Vec<DiagramShapeNode>,
@@ -1190,6 +1198,7 @@ fn build_diagram_shape_tree(
       internal_name: String::new(),
       text_body: DiagramTextBody::default(),
       fill: fallback_fill,
+      fill_opacity: 1.0,
       x: 0.0,
       y: 0.0,
       width: bounds.width,
@@ -1222,6 +1231,7 @@ fn build_diagram_shape_tree(
       preset_geometry: None,
       style: None,
       line_fill: None,
+      line_opacity: 1.0,
       text_fill: None,
       text_rotation_deg: 0.0,
       aspect_ratio: 0.0,
@@ -1232,6 +1242,7 @@ fn build_diagram_shape_tree(
       text_order: usize::MAX,
       constraints: Vec::new(),
       direct_constraints: Vec::new(),
+      size_constraints_applied: false,
       rules: Vec::new(),
       placeholder_line_count,
       children: Vec::new(),
@@ -2393,6 +2404,14 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
           .and_then(|colors| colors.line_by_label.get(label))
       })
       .and_then(|fills| color_by_index(fills, self.current_index));
+    let line_opacity = style_label
+      .and_then(|label| {
+        self
+          .colors
+          .and_then(|colors| colors.line_opacity_by_label.get(label))
+      })
+      .and_then(|values| opacity_by_index(values, self.current_index))
+      .unwrap_or(1.0);
     let text_fill = style_label
       .and_then(|label| {
         self
@@ -2415,6 +2434,22 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         let data_point = binding.point;
         let first_new_paragraph = text_body.paragraphs.len();
         text_body.append_point(data_point, binding.depth);
+        if text_body.paragraphs.len() > first_new_paragraph
+          && let Some(association) = presentation_association_id(presentation_point)
+        {
+          let mut current = data_point;
+          let mut visited = HashSet::new();
+          while visited.insert(current.model_id.as_str()) {
+            let Some(parent) = self.parent_data_point(current) else {
+              break;
+            };
+            if parent.model_id == association {
+              text_body.descendant_text = true;
+              break;
+            }
+            current = parent;
+          }
+        }
         for paragraph in &mut text_body.paragraphs[first_new_paragraph..] {
           paragraph.source_order = Some(binding.source_order);
         }
@@ -2451,6 +2486,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       internal_name: name.to_string(),
       text_body,
       fill: diagram_node_fill(Some(presentation_point), self.colors, self.fallback_fill),
+      fill_opacity: diagram_node_fill_opacity(presentation_point, self.colors),
       x: 0.0,
       y: 0.0,
       width: 0.0,
@@ -2490,6 +2526,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       preset_geometry,
       style,
       line_fill,
+      line_opacity,
       text_fill,
       text_rotation_deg: 0.0,
       aspect_ratio: active_algorithms
@@ -2504,6 +2541,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       text_order,
       constraints: self.active_constraints(layout_node),
       direct_constraints: self.active_constraints_unfiltered(layout_node),
+      size_constraints_applied: false,
       rules: self.active_rules(layout_node),
       placeholder_line_count: self.placeholder_line_count,
       children: Vec::new(),
@@ -3206,6 +3244,33 @@ fn diagram_shape_properties_has_blip_fill(properties: &dgm::ShapeProperties) -> 
   )
 }
 
+fn diagram_node_fill_opacity(
+  presentation_point: &dgm::Point,
+  colors: Option<&DiagramStyleColors>,
+) -> f32 {
+  let Some(properties) = presentation_point.property_set.as_deref() else {
+    return 1.0;
+  };
+  properties
+    .presentation_style_label
+    .as_deref()
+    .and_then(|label| colors.and_then(|colors| colors.fill_opacity_by_label.get(label)))
+    .and_then(|values| {
+      opacity_by_index(
+        values,
+        properties
+          .presentation_style_index
+          .unwrap_or_default()
+          .max(0) as usize,
+      )
+    })
+    .unwrap_or(1.0)
+}
+
+fn opacity_by_index(values: &[f32], index: usize) -> Option<f32> {
+  (!values.is_empty()).then(|| values[index % values.len()])
+}
+
 fn color_by_index(colors: &[RgbColor], index: usize) -> Option<RgbColor> {
   (!colors.is_empty()).then(|| colors[index % colors.len()])
 }
@@ -3831,6 +3896,9 @@ fn assign_diagram_font_sync_groups(
 }
 
 fn apply_direct_node_size_constraints(node: &mut DiagramShapeNode) {
+  if node.size_constraints_applied {
+    return;
+  }
   let original_width = node.width;
   let original_height = node.height;
   let mut width = original_width;
@@ -3977,6 +4045,7 @@ fn apply_text_algorithm(
       .vertical = Some(a::TextVerticalValues::Vertical);
   }
   let has_child_text = node.text_body.has_child_text();
+  let anchor_child_text = has_child_text || node.text_body.descendant_text;
   let right_to_left = node.text_body.is_right_to_left();
   let has_direct_font_size = node.text_body.has_direct_font_size();
   let font_size = constraints
@@ -4039,14 +4108,25 @@ fn apply_text_algorithm(
       .iter()
       .rev()
       .find_map(|algorithm| {
-        has_child_text
-          .then_some(algorithm.text_anchor_vertical_with_children)
-          .flatten()
-          .or(algorithm.text_anchor_vertical)
+        if anchor_child_text {
+          algorithm.text_anchor_vertical_with_children
+        } else {
+          algorithm.text_anchor_vertical
+        }
       })
-      .or(inherited_vertical_alignment)
-      .unwrap_or(dgm::TextAnchorVerticalValues::Middle)
-    {
+      .or(if anchor_child_text {
+        None
+      } else {
+        inherited_vertical_alignment
+      })
+      // MS-OI29500 §21.4.7.49 defines separate defaults: child text is
+      // top-anchored, parent text is centered. A descendant-only presentation
+      // binding still contains child text even though its list levels are equal.
+      .unwrap_or(if anchor_child_text {
+        dgm::TextAnchorVerticalValues::Top
+      } else {
+        dgm::TextAnchorVerticalValues::Middle
+      }) {
       dgm::TextAnchorVerticalValues::Top => a::TextAnchoringTypeValues::Top,
       dgm::TextAnchorVerticalValues::Bottom => a::TextAnchoringTypeValues::Bottom,
       dgm::TextAnchorVerticalValues::Middle => a::TextAnchoringTypeValues::Center,
@@ -5881,6 +5961,27 @@ fn snake_layout_tree(
   }
 
   let mut snake_constraints = expand_constraints_for_children(node, constraints);
+  // A child can define its own coordinate basis (commonly w=1, h=w*ar)
+  // while the containing snake constrains its allocated width. Resolve that
+  // basis in the parent's units before choosing rows; it is not a 1 mm slot.
+  let parent_sizes = snake_constraints
+    .iter()
+    .filter(|constraint| {
+      matches!(
+        constraint.target,
+        dgm::ConstraintValues::Width | dgm::ConstraintValues::Height
+      ) && (constraint.reference != dgm::ConstraintValues::None || constraint.has_value)
+    })
+    .map(|constraint| (constraint.for_name.clone(), constraint.target))
+    .collect::<HashSet<_>>();
+  let normalized_children = node.children.iter().any(|child| {
+    child.direct_constraints.iter().any(|direct| {
+      direct_constraint_applies_to_node(direct, child)
+        && direct.reference == dgm::ConstraintValues::None
+        && direct.has_value
+        && parent_sizes.contains(&(child.internal_name.clone(), direct.target))
+    })
+  });
   let mut properties_by_name: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::new();
   properties_by_name.insert(
     String::new(),
@@ -5899,6 +6000,16 @@ fn snake_layout_tree(
         ])
       });
     for direct in &child.direct_constraints {
+      if normalized_children
+        && (!direct_constraint_applies_to_node(direct, child)
+          || !matches!(
+            direct.target,
+            dgm::ConstraintValues::Width | dgm::ConstraintValues::Height
+          )
+          || parent_sizes.contains(&(child.internal_name.clone(), direct.target)))
+      {
+        continue;
+      }
       let mut direct = direct.clone();
       if direct.for_name.is_empty() {
         direct.for_name.clone_from(&child.internal_name);
@@ -5939,6 +6050,15 @@ fn snake_layout_tree(
     .map(|spacing| spacing.clamp(-0.9, 4.0));
   let space_from_constraints = normalized_spacing.is_some();
   let space_from_constraint = normalized_spacing.unwrap_or(1.0);
+  if normalized_children {
+    layout_normalized_snake_slots(
+      node,
+      &algorithm,
+      &shape_sizes,
+      normalized_spacing.map(|spacing| spacing * shape_width),
+    );
+    return;
+  }
   let (increment_x, increment_y) = match algorithm.grow_direction {
     GrowDirection::TopLeft => (1.0, 1.0),
     GrowDirection::TopRight => (-1.0, 1.0),
@@ -6141,6 +6261,160 @@ fn snake_layout_tree(
       child.width = old_height / node.height.max(f32::EPSILON) * node.width;
       child.height = old_width / node.width.max(f32::EPSILON) * node.height;
     }
+  }
+}
+
+fn layout_normalized_snake_slots(
+  node: &mut DiagramShapeNode,
+  algorithm: &LayoutAlgorithm,
+  shape_sizes: &[(f32, f32)],
+  spacing: Option<f32>,
+) {
+  let is_spacer = |child: &DiagramShapeNode| {
+    child.data_node_type == Some(dgm::ElementValues::SiblingTransition)
+      && child
+        .algorithms
+        .iter()
+        .any(|algorithm| algorithm.kind == dgm::AlgorithmValues::Space)
+  };
+  let content = node
+    .children
+    .iter()
+    .enumerate()
+    .filter_map(|(index, child)| (!is_spacer(child)).then_some(index))
+    .collect::<Vec<_>>();
+  if content.is_empty() {
+    return;
+  }
+  let column_flow = algorithm.flow_direction == dgm::FlowDirectionValues::Column;
+  let (available_main, available_cross) = if column_flow {
+    (node.height, node.width)
+  } else {
+    (node.width, node.height)
+  };
+  let sizes = shape_sizes
+    .iter()
+    .map(|&(width, height)| {
+      if column_flow {
+        (height, width)
+      } else {
+        (width, height)
+      }
+    })
+    .collect::<Vec<_>>();
+  let has_spacers = content.len() != node.children.len();
+  let main_gap = if has_spacers {
+    0.0
+  } else {
+    spacing.unwrap_or_else(|| sizes.iter().map(|size| size.0).fold(0.0_f32, f32::max) * 0.3)
+  };
+  // The solver has already evaluated the constraint's reference dimension.
+  // Keep that absolute scalar: sp=0.16*child.w is not 0.16*child.h, even
+  // when the spacing separates rows rather than columns.
+  let cross_gap = spacing.unwrap_or_else(|| {
+    content
+      .iter()
+      .map(|&index| sizes[index].1)
+      .fold(0.0_f32, f32::max)
+      * 0.3
+  });
+  let make_lines = |columns: usize| {
+    content
+      .chunks(columns)
+      .map(|line| {
+        let start = line[0];
+        let end = line[line.len() - 1] + 1;
+        let width = sizes[start..end].iter().map(|size| size.0).sum::<f32>()
+          + main_gap * (line.len() - 1) as f32;
+        let height = line
+          .iter()
+          .map(|&index| sizes[index].1)
+          .fold(0.0_f32, f32::max);
+        (start, end, width, height)
+      })
+      .collect::<Vec<_>>()
+  };
+  let scale_for_lines = |lines: &[(usize, usize, f32, f32)]| {
+    let width = lines.iter().map(|line| line.2).fold(0.0_f32, f32::max);
+    let height = lines.iter().map(|line| line.3).sum::<f32>()
+      + cross_gap * lines.len().saturating_sub(1) as f32;
+    (available_main / width.max(f32::EPSILON)).min(available_cross / height.max(f32::EPSILON))
+  };
+  let columns = match algorithm.breakpoint {
+    dgm::BreakpointValues::Fixed => algorithm.breakpoint_fixed_value.clamp(1, content.len()),
+    dgm::BreakpointValues::Balanced => ((content.len() as f32 * available_main / available_cross)
+      .sqrt()
+      .ceil() as usize)
+      .clamp(1, content.len()),
+    dgm::BreakpointValues::EndCanvas => {
+      // Fit one common scale to the complete two-dimensional layout. Counting
+      // sibling transitions as full cells or scaling each row separately makes
+      // equal children overlap or change size on the final row.
+      (1..=content.len())
+        .max_by(|&left, &right| {
+          scale_for_lines(&make_lines(left)).total_cmp(&scale_for_lines(&make_lines(right)))
+        })
+        .unwrap_or(1)
+    }
+  };
+  let lines = make_lines(columns);
+  let scale = scale_for_lines(&lines);
+  let total_height =
+    lines.iter().map(|line| line.3).sum::<f32>() + cross_gap * lines.len().saturating_sub(1) as f32;
+  let mut cross = (available_cross - total_height * scale) / 2.0;
+  // A transition at a row break has no horizontal space to reserve. Keep its
+  // layout node, and retain the authored transition widths inside each row.
+  for child in &mut node.children {
+    child.width = 0.0;
+    child.height = 0.0;
+    child.size_constraints_applied = true;
+  }
+  for (line_index, &(start, end, width, height)) in lines.iter().enumerate() {
+    let reverse = algorithm.continue_direction == ContinueDirection::ReverseDirection
+      && !line_index.is_multiple_of(2);
+    let offset = if algorithm.offset == dgm::OffsetValues::Offset && !line_index.is_multiple_of(2) {
+      sizes[start].0 * scale / 2.0
+    } else {
+      0.0
+    };
+    let line_start = (available_main - width * scale) / 2.0 + offset;
+    let mut main = 0.0;
+    for (index, &(raw_width, raw_height)) in sizes.iter().enumerate().take(end).skip(start) {
+      let child = &mut node.children[index];
+      let width = raw_width * scale;
+      let height = raw_height * scale;
+      let position = line_start
+        + if reverse {
+          (lines[line_index].2 - main - raw_width) * scale
+        } else {
+          main * scale
+        };
+      let (x, y, width, height) = if column_flow {
+        (cross, position, height, width)
+      } else {
+        (position, cross, width, height)
+      };
+      child.x = if matches!(
+        algorithm.grow_direction,
+        GrowDirection::TopRight | GrowDirection::BottomRight
+      ) {
+        node.width - x - width
+      } else {
+        x
+      };
+      child.y = if matches!(
+        algorithm.grow_direction,
+        GrowDirection::BottomLeft | GrowDirection::BottomRight
+      ) {
+        node.height - y - height
+      } else {
+        y
+      };
+      child.width = width;
+      child.height = height;
+      main += raw_width + if has_spacers { 0.0 } else { main_gap };
+    }
+    cross += (height + cross_gap) * scale;
   }
 }
 
@@ -6408,6 +6682,7 @@ fn flatten_diagram_shape_tree(
       shape_properties: node.shape_properties.clone(),
       style: node.style.clone(),
       line_fill: node.line_fill,
+      line_opacity: node.line_opacity,
       text_fill: node.text_fill,
       shape_rotation_deg: shape_rotation_degrees(node),
       text_rotation_deg: node.text_rotation_deg,
@@ -6432,6 +6707,7 @@ fn flatten_diagram_shape_tree(
         .map(|point| (x + point.0, y + point.1)),
       is_blip_placeholder: node.is_blip_placeholder,
       fill: node.fill,
+      fill_opacity: node.fill_opacity,
       text_order: node.text_order,
       font_size_pt: node.font_size_pt,
       minimum_font_size_pt: node.minimum_font_size_pt,

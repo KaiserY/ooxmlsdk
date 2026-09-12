@@ -75,7 +75,7 @@ use crate::units;
 pub(crate) use custom_xml::CustomXmlBindings;
 use field_localization::{
   FieldMessage, apply_bidi_outline_missing_context_style, apply_generated_field_message_style,
-  localized_field_message,
+  apply_japanese_diagnostic_font_slots, localized_field_message,
 };
 pub(crate) use model::*;
 use package::{
@@ -6828,6 +6828,7 @@ fn merge_paragraph_format_with_theme(
   }
 
   if let Some(outline_level) = properties.outline_level() {
+    format.outline_level_set = true;
     format.outline_level = u8::try_from(outline_level.val)
       .ok()
       .filter(|level| *level <= 8);
@@ -7756,6 +7757,7 @@ impl ComplexFieldImportState {
     &mut self,
     inlines: &mut Vec<InlineItem>,
     events: &mut Vec<ParagraphFieldEvent>,
+    styles: &StylesCatalog,
   ) {
     let mut suppress_break = None;
     if let Some(field) = self.fields.first_mut() {
@@ -7796,7 +7798,7 @@ impl ComplexFieldImportState {
               field_id: field.import_id,
             });
           }
-          Some("ADDRESSBLOCK") => {
+          Some("ADDRESSBLOCK") if !field.field_locked => {
             // The Word/Writer address-block placeholder is anchored at the
             // first persisted-result paragraph. The imported cache can span
             // several paragraphs (M/F/1815 or M/Ma/1815 in tdf134264 and
@@ -7811,7 +7813,10 @@ impl ComplexFieldImportState {
               let hyperlink_url = field.hyperlink_url.clone();
               push_resolved_field_text(
                 inlines,
-                "«AddressBlock» ".to_string(),
+                field_localization::localized_address_block_placeholder(
+                  styles.locales.ui_language(),
+                )
+                .to_string(),
                 style,
                 hyperlink_url.as_deref(),
               );
@@ -7871,7 +7876,7 @@ impl ComplexFieldImportState {
       return;
     };
     flush_unclosed_complex_fields(&mut paragraph.inlines, self, styles);
-    self.finish_paragraph(&mut paragraph.inlines, &mut paragraph.field_events);
+    self.finish_paragraph(&mut paragraph.inlines, &mut paragraph.field_events, styles);
     refresh_paragraph_story_derivatives(paragraph);
   }
 
@@ -8124,6 +8129,30 @@ fn flush_complex_field(
     // recalculation even when an application explicitly requests an update.
     // The persisted result is therefore authoritative.
     resolved = state.result;
+  } else if closed && let Some(text) = refreshed_bibliography_diagnostic(&state.instr, styles) {
+    let mut style = field_result_style(&state.result).unwrap_or(state.style);
+    apply_bibliography_diagnostic_style(&mut style, styles);
+    push_resolved_field_text(
+      &mut resolved,
+      text.to_string(),
+      style,
+      state.hyperlink_url.as_deref(),
+    );
+  } else if closed
+    && instruction_name.as_deref() == Some("GREETINGLINE")
+    && field_result_text(&state.result).is_some_and(|text| text.contains('«') && text.contains('»'))
+  {
+    // A placeholder in a complex field follows the same UI-resource rule
+    // as fldSimple. A real cached greeting and locked fields retain their
+    // authored result (the strict GreetingLine fixture uses a complex field).
+    let style = field_result_style(&state.result).unwrap_or(state.style);
+    push_resolved_field_text(
+      &mut resolved,
+      field_localization::localized_greeting_line_placeholder(styles.locales.ui_language())
+        .to_string(),
+      style,
+      state.hyperlink_url.as_deref(),
+    );
   } else if closed && instruction_name.as_deref() == Some("ADDRESSBLOCK") {
     // Word exposes the standard mail-merge placeholder when an ADDRESSBLOCK
     // field has no active merge data source; do not replay producer-specific
@@ -8133,7 +8162,8 @@ fn flush_complex_field(
       style.wordprocessingml_address_block_placeholder = true;
       push_resolved_field_text(
         &mut resolved,
-        "«AddressBlock» ".to_string(),
+        field_localization::localized_address_block_placeholder(styles.locales.ui_language())
+          .to_string(),
         style,
         state.hyperlink_url.as_deref(),
       );
@@ -8157,6 +8187,7 @@ fn flush_complex_field(
     let mut style = field_result_style(&state.result).unwrap_or(state.style);
     style.bold = true;
     style.complex_bold = Some(true);
+    apply_japanese_diagnostic_font_slots(&mut style, styles.locales.ui_language());
     push_resolved_field_text(
       &mut resolved,
       styles.locales.field_invalid_citation_source().to_string(),
@@ -8720,7 +8751,7 @@ fn symbol_field_run(
     && !unicode
     && font
       .as_deref()
-      .is_some_and(|font| styles.font_uses_symbol_charset(font));
+      .is_some_and(|font| styles.symbol_font_uses_byte_transport(font, code, &style));
   let character = if unicode {
     // [MS-OI29500] §2.1.489: Word truncates values outside plane zero.
     char::from_u32(code & 0xFFFF)?
@@ -9042,8 +9073,8 @@ fn refreshed_doc_property_field(instr: &str, styles: &StylesCatalog) -> Option<S
     } else {
       styles.last_saved_by.clone()?
     };
-    let mut switches = tokens[1..].chunks_exact(2);
-    for pair in &mut switches {
+    let (switches, remainder) = tokens[1..].as_chunks::<2>();
+    for pair in switches {
       if pair[0] != r"\*" {
         return None;
       }
@@ -9056,7 +9087,7 @@ fn refreshed_doc_property_field(instr: &str, styles: &StylesCatalog) -> Option<S
         _ => return None,
       }
     }
-    return switches.remainder().is_empty().then_some(value);
+    return remainder.is_empty().then_some(value);
   }
   if !tokens
     .first()
@@ -10047,6 +10078,14 @@ fn push_simple_field(
     .field_lock
     .is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool);
   if !field_locked {
+    if let Some(text) = refreshed_bibliography_diagnostic(&field.instruction, context.styles) {
+      let (_, result_style) =
+        simple_field_result_text_and_style(field, base_style.clone(), context);
+      let mut style = result_style.unwrap_or(base_style);
+      apply_bibliography_diagnostic_style(&mut style, context.styles);
+      push_resolved_field_text(inlines, text.to_string(), style, None);
+      return;
+    }
     if field_instruction_name(&field.instruction).as_deref() == Some("GREETINGLINE") {
       let (result_text, result_style) =
         simple_field_result_text_and_style(field, base_style.clone(), context);
@@ -10054,12 +10093,14 @@ fn push_simple_field(
         .as_deref()
         .is_some_and(|text| text.contains('«') && text.contains('»'))
       {
-        // With no usable mail-merge data source, Word exposes the standard
-        // GreetingLine placeholder instead of the localized cached label
-        // (Open-XML-SDK mailmerge.docx).
+        // With no usable mail-merge data source, Word exposes the current
+        // UI GreetingLine placeholder (Open-XML-SDK mailmerge.docx).
         push_resolved_field_text(
           inlines,
-          "«GreetingLine»".to_string(),
+          field_localization::localized_greeting_line_placeholder(
+            context.styles.locales.ui_language(),
+          )
+          .to_string(),
           result_style.unwrap_or(base_style),
           None,
         );
@@ -10338,12 +10379,8 @@ fn push_run_with_character_style_policy(
         inlines.push(InlineItem::LastRenderedPageBreak);
       }
       w::RunChoice::SymbolChar(symbol) => {
-        let declared_symbol_charset = symbol
-          .font
-          .as_deref()
-          .is_some_and(|font| styles.font_uses_symbol_charset(font));
         if let Some((symbol_char, uses_declared_font)) =
-          symbol_transport_char(symbol, declared_symbol_charset)
+          symbol_transport_char(symbol, styles, &style)
         {
           flush_run_text(
             inlines,
@@ -11681,7 +11718,8 @@ fn symbol_text(symbol: &w::SymbolChar) -> Option<char> {
 
 fn symbol_transport_char(
   symbol: &w::SymbolChar,
-  declared_symbol_charset: bool,
+  styles: &StylesCatalog,
+  style: &TextStyle,
 ) -> Option<(char, bool)> {
   let code = u32::from_str_radix(symbol.char.as_deref()?, 16).ok()?;
   let font = symbol.font.as_deref().unwrap_or("");
@@ -11702,11 +11740,11 @@ fn symbol_transport_char(
     // legacy value is the existing opposite-state counterexample: paint the
     // Unicode black square with the inherited text fallback instead.
     Some((mapped, false))
-  } else if declared_symbol_charset {
+  } else if styles.symbol_font_uses_byte_transport(font, code, style) {
     // §17.3.3.30 permits either the raw byte value or that value plus F000.
-    // Windows symbol cmaps use the latter form, so normalize a font-table
-    // charset=02 byte before shaping. Already-normalized PUA values remain
-    // unchanged.
+    // Windows symbol cmaps use the latter form. Font-table charset metadata
+    // cannot override an installed Unicode face's unambiguous direct glyph;
+    // already-normalized PUA values retain their authored transport.
     let transport = if code <= 0xFF { 0xF000 | code } else { code };
     char::from_u32(transport)
       .or(Some(mapped))
@@ -25569,6 +25607,7 @@ struct StylesCatalog {
   last_saved_by: Option<String>,
   document_variables: HashMap<String, String>,
   has_bibliography: bool,
+  has_explicitly_empty_bibliography: bool,
   has_index_entries: bool,
   styles: HashMap<String, StyleEntry>,
   numbering_template: Option<NumberingCatalog>,
@@ -26001,6 +26040,91 @@ fn has_word_bibliography_custom_xml(
   })
 }
 
+fn is_explicitly_empty_word_bibliography(xml: &str) -> bool {
+  use quick_xml::events::Event;
+  use quick_xml::name::ResolveResult;
+
+  // An explicit empty Sources root is evidence of an empty bibliography.
+  // Populated, malformed or extension-bearing XML remains an opaque cache;
+  // merely finding the bibliography namespace is insufficient.
+  let mut reader = quick_xml::NsReader::from_reader(xml.as_bytes());
+  let mut opened = false;
+  let mut closed = false;
+  loop {
+    match reader.read_resolved_event() {
+      Ok((namespace, event @ (Event::Start(_) | Event::Empty(_)))) if !opened => {
+        let empty = matches!(event, Event::Empty(_));
+        let root = match event {
+          Event::Start(root) | Event::Empty(root) => root,
+          _ => unreachable!(),
+        };
+        if root.local_name().as_ref() != b"Sources"
+          || !matches!(namespace, ResolveResult::Bound(uri)
+            if uri.as_ref() == WORD_BIBLIOGRAPHY_NAMESPACE.as_bytes())
+        {
+          return false;
+        }
+        opened = true;
+        closed = empty;
+      }
+      Ok((_, Event::End(_))) if opened && !closed => closed = true,
+      Ok((_, Event::Text(text))) if text.iter().all(u8::is_ascii_whitespace) => {}
+      Ok((_, Event::Decl(_))) if !opened => {}
+      Ok((_, Event::Comment(_) | Event::PI(_))) => {}
+      Ok((_, Event::Eof)) => return opened && closed,
+      _ => return false,
+    }
+  }
+}
+
+fn has_explicitly_empty_word_bibliography(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  let mut found = false;
+  for part in main.custom_xml_parts(package) {
+    let Ok(Some(xml)) = part.data_as_str(package) else {
+      return false;
+    };
+    if !is_word_bibliography_custom_xml(xml) {
+      continue;
+    }
+    if !is_explicitly_empty_word_bibliography(xml) {
+      return false;
+    }
+    found = true;
+  }
+  found
+}
+
+fn refreshed_bibliography_diagnostic(
+  instruction: &str,
+  styles: &StylesCatalog,
+) -> Option<&'static str> {
+  use field_localization::BibliographyDiagnostic;
+
+  let tokens = field_instruction_tokens(instruction);
+  let name = tokens.first()?;
+  let message =
+    if name.eq_ignore_ascii_case("BIBLIOGRAPHY") && styles.has_explicitly_empty_bibliography {
+      BibliographyDiagnostic::EmptySources
+    } else if name.eq_ignore_ascii_case("CITATION") && tokens.len() == 1 {
+      // The bare field omits CITATION's required source tag (ECMA-376
+      // §17.16.5.8). Preserve tagged citations and other instruction forms.
+      BibliographyDiagnostic::MissingCitationSource
+    } else {
+      return None;
+    };
+  field_localization::localized_bibliography_diagnostic(message, styles.locales.ui_language())
+}
+
+fn apply_bibliography_diagnostic_style(style: &mut TextStyle, styles: &StylesCatalog) {
+  // Both Japanese resources in 99_Fields use synthesized-bold MS Mincho.
+  style.bold = true;
+  style.complex_bold = Some(true);
+  apply_japanese_diagnostic_font_slots(style, styles.locales.ui_language());
+}
+
 struct TableModelEnv<'a> {
   styles: &'a StylesCatalog,
   numbering: &'a mut NumberingCatalog,
@@ -26034,11 +26158,15 @@ impl StylesCatalog {
       .and_then(|part| part.root_element(package).ok());
     let author = core_properties
       .and_then(|properties| properties.creator.as_ref())
+      // Creator is an XML element, unlike the scalar LastModifiedBy alias.
+      // AUTHOR displays its text value, not the element's XML serialization.
+      .and_then(|creator| creator.xml_content.as_ref())
       .map(ToString::to_string);
     let last_saved_by = core_properties
       .and_then(|properties| properties.last_modified_by.as_ref())
       .map(ToString::to_string);
     let has_bibliography = has_word_bibliography_custom_xml(package, main);
+    let has_explicitly_empty_bibliography = has_explicitly_empty_word_bibliography(package, main);
     let has_index_entries = main
       .data_as_str(package)
       .ok()
@@ -26089,6 +26217,7 @@ impl StylesCatalog {
         last_saved_by,
         document_variables,
         has_bibliography,
+        has_explicitly_empty_bibliography,
         has_index_entries,
         default_table_style_id: settings_default_table_style_id,
         ..Self::default()
@@ -26152,6 +26281,7 @@ impl StylesCatalog {
       last_saved_by,
       document_variables,
       has_bibliography,
+      has_explicitly_empty_bibliography,
       has_index_entries,
       default_table_style_id: settings_default_table_style_id,
       ..Self::default()
@@ -26526,14 +26656,31 @@ impl StylesCatalog {
     apply_font_substitution_from_table(&self.font_substitutions, style);
   }
 
-  fn font_uses_symbol_charset(&self, family: &str) -> bool {
-    symbol_transport_font(family)
-      || self
-        .font_substitutions
-        .get(&family.trim().to_ascii_lowercase())
-        .is_some_and(|substitution| {
-          substitution.charset == Some(ooxmlsdk_fonts::FontCharset::Symbol)
-        })
+  fn symbol_font_uses_byte_transport(&self, family: &str, code: u32, style: &TextStyle) -> bool {
+    if symbol_transport_font(family) {
+      return true;
+    }
+    let declared_symbol_charset = self
+      .font_substitutions
+      .get(&family.trim().to_ascii_lowercase())
+      .is_some_and(|substitution| {
+        substitution.charset == Some(ooxmlsdk_fonts::FontCharset::Symbol)
+      });
+    if !declared_symbol_charset {
+      return false;
+    }
+    let Ok(byte) = u8::try_from(code) else {
+      return true;
+    };
+
+    // ECMA-376 §17.8.3.2 makes the installed font authoritative for charset;
+    // the font table describes substitution when that font is unavailable.
+    // A stale charset=02 declaration must not turn a Unicode face's ordinary
+    // glyph into a nonexistent F0xx selector. Keep unknown or ambiguous font
+    // encodings on the existing legacy path.
+    let mut symbol_style = style.clone();
+    self.apply_symbol_character_font(&mut symbol_style, family);
+    !crate::fonts::named_font_has_direct_symbol_byte(&symbol_style, byte)
   }
 
   fn apply_symbol_character_font(&self, style: &mut TextStyle, declared_family: &str) {
@@ -28850,8 +28997,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
   if values.overflow_punctuation.is_some() {
     target.overflow_punctuation = values.overflow_punctuation;
   }
-  if values.outline_level.is_some() {
+  if values.outline_level_set || values.outline_level.is_some() {
     target.outline_level = values.outline_level;
+    target.outline_level_set = values.outline_level_set;
   }
   if values.frame.is_some() {
     target.frame = values.frame;
@@ -29081,8 +29229,9 @@ fn merge_numbering_format_values(
   if values.overflow_punctuation.is_some() {
     target.overflow_punctuation = values.overflow_punctuation;
   }
-  if values.outline_level.is_some() {
+  if values.outline_level_set || values.outline_level.is_some() {
     target.outline_level = values.outline_level;
+    target.outline_level_set = values.outline_level_set;
   }
   if values.frame.is_some() {
     target.frame = values.frame;
@@ -42304,6 +42453,137 @@ mod tests {
   }
 
   #[test]
+  fn symbol_transport_charset_controls_keep_unknown_and_known_legacy_fonts() {
+    let unknown = "Unavailable Original Symbol Face 8A90C2";
+    for charset in [
+      None,
+      Some(ooxmlsdk_fonts::FontCharset::Ansi),
+      Some(ooxmlsdk_fonts::FontCharset::Symbol),
+    ] {
+      let styles = StylesCatalog {
+        font_substitutions: ["Calibri", "Symbol", unknown]
+          .into_iter()
+          .map(|family| {
+            (
+              family.to_ascii_lowercase(),
+              FontSubstitution {
+                alternate_family: Some(Arc::from("Calibri")),
+                charset,
+                ..FontSubstitution::default()
+              },
+            )
+          })
+          .collect(),
+        ..StylesCatalog::default()
+      };
+      for (family, code, expected) in [
+        ("Calibri", "26", '&'),
+        ("Symbol", "5E", '\u{f05e}'),
+        (
+          unknown,
+          "26",
+          if charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+            '\u{f026}'
+          } else {
+            '&'
+          },
+        ),
+      ] {
+        let symbol = w::SymbolChar {
+          font: Some(family.into()),
+          char: Some(code.into()),
+        };
+        assert_eq!(
+          symbol_transport_char(&symbol, &styles, &TextStyle::default()),
+          Some((expected, true)),
+          "family={family}, charset={charset:?}, code={code}",
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn symbol_field_stale_charset_preserves_an_installed_unicode_face() {
+    for family in ["Calibri", "Arial"] {
+      let styles = StylesCatalog {
+        font_substitutions: HashMap::from([(
+          family.to_ascii_lowercase(),
+          FontSubstitution {
+            charset: Some(ooxmlsdk_fonts::FontCharset::Symbol),
+            ..FontSubstitution::default()
+          },
+        )]),
+        ..StylesCatalog::default()
+      };
+      for code in [38, 65] {
+        let run = symbol_field_run(
+          &format!(r#"SYMBOL {code} \f "{family}""#),
+          TextStyle::default(),
+          None,
+          &styles,
+        )
+        .expect("Unicode-font SYMBOL field");
+        assert_eq!(run.text, char::from_u32(code).unwrap().to_string());
+        assert_eq!(run.style.font_family.as_deref(), Some(family));
+        assert!(!run.style.explicit_symbol_character);
+        assert_eq!(run.style.symbol_font_family, None);
+      }
+      for encoding in [r"\a", r"\j", r"\u"] {
+        let run = symbol_field_run(
+          &format!(r#"SYMBOL 38 \f "{family}" {encoding}"#),
+          TextStyle::default(),
+          None,
+          &styles,
+        )
+        .unwrap();
+        assert_eq!(run.text, "&");
+      }
+      assert_eq!(
+        run_display_text(
+          "\u{f026}".into(),
+          TextStyle {
+            font_family: Some(Arc::from(family)),
+            ..TextStyle::default()
+          },
+        ),
+        "\u{f026}",
+        "ordinary authored text retains its code point",
+      );
+      // Already authored PUA remains uninterpreted, including when the face
+      // has an ordinary character in the corresponding low-byte position.
+      let symbol = w::SymbolChar {
+        font: Some(family.into()),
+        char: Some("F026".into()),
+      };
+      assert_eq!(
+        symbol_transport_char(&symbol, &styles, &TextStyle::default()),
+        Some(('\u{f026}', true)),
+      );
+    }
+    let family = "Unavailable Original Symbol Face 8A90C2";
+    let styles = StylesCatalog {
+      font_substitutions: HashMap::from([(
+        family.to_ascii_lowercase(),
+        FontSubstitution {
+          alternate_family: Some(Arc::from("Calibri")),
+          charset: Some(ooxmlsdk_fonts::FontCharset::Symbol),
+          ..FontSubstitution::default()
+        },
+      )]),
+      ..StylesCatalog::default()
+    };
+    let symbol = w::SymbolChar {
+      font: Some(family.into()),
+      char: Some("26".into()),
+    };
+    assert_eq!(
+      symbol_transport_char(&symbol, &styles, &TextStyle::default()),
+      Some(('\u{f026}', true)),
+      "an available Unicode alternate cannot prove the missing original encoding",
+    );
+  }
+
+  #[test]
   fn symbol_field_ordinary_font_does_not_enable_legacy_symbol_charset() {
     let styles = StylesCatalog::default();
     let run = symbol_field_run(
@@ -42754,10 +43034,190 @@ mod tests {
       },
     );
     let mut field_events = Vec::new();
-    complex_fields.finish_paragraph(&mut inlines, &mut field_events);
+    complex_fields.finish_paragraph(&mut inlines, &mut field_events, &styles);
     flush_unclosed_complex_fields(&mut inlines, &mut complex_fields, &styles);
 
     assert_eq!(inline_text(&inlines), "beforeFORMTEXT     ");
+  }
+
+  #[test]
+  fn address_block_placeholder_uses_ui_resources_and_preserves_locked_caches() {
+    for (language, placeholder) in [
+      ("zh-CN", "«地址块» "),
+      ("zh-TW", "«地址區塊» "),
+      ("en-US", "«AddressBlock» "),
+    ] {
+      for multiline in [false, true] {
+        for locked in [false, true] {
+          let paragraph_boundary = if multiline {
+            "</w:r></w:p><w:p><w:r>"
+          } else {
+            ""
+          };
+          let xml = format!(
+            r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>before</w:t><w:fldChar w:fldCharType="begin" w:fldLock="{}"/><w:instrText> ADDRESSBLOCK \l 4108 </w:instrText><w:fldChar w:fldCharType="separate"/><w:t>cached first</w:t>{paragraph_boundary}<w:t>cached second</w:t><w:fldChar w:fldCharType="end"/><w:t>after</w:t></w:r></w:p><w:sectPr/></w:body>"#,
+            u8::from(locked),
+          );
+          let body = w::Body::from_bytes(xml.as_bytes()).expect("address-block story");
+          let styles = StylesCatalog {
+            locales: OfficeLocaleContext::new(Some(language), Some("fr-FR"), Some("en-US")),
+            ..Default::default()
+          };
+          let mut numbering = NumberingCatalog::default();
+          let sections = body_sections(
+            &body,
+            BodySectionEnv {
+              styles: &styles,
+              numbering: &mut numbering,
+              images: &ImageCatalog::default(),
+              alt_chunks: &AltChunkCatalog::default(),
+              hyperlinks: &HyperlinkCatalog::default(),
+              custom_xml_bindings: &CustomXmlBindings::default(),
+              form_widget_ids: &mut FormWidgetIdAllocator::default(),
+              no_column_balance: false,
+              fixed_html_paragraph_auto_spacing: false,
+            },
+          );
+          assert_eq!(sections.len(), 1);
+          let result = story_paragraph_texts(&sections[0].blocks).concat();
+          let expected = if locked {
+            "cached firstcached second"
+          } else {
+            placeholder
+          };
+          assert_eq!(
+            result,
+            format!("before{expected}after"),
+            "{language}, multiline={multiline}, locked={locked}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn greeting_line_placeholder_uses_ui_language_and_preserves_real_or_locked_results() {
+    for simple in [false, true] {
+      for (language, cached, locked, expected) in [
+        ("ja-JP", "«GreetingLine»", false, "«あいさつ文»"),
+        ("es-MX", "«GreetingLine»", false, "«Línea de saludo»"),
+        ("en-US", "«あいさつ文»", false, "«GreetingLine»"),
+        ("ja-JP", "«GreetingLine»", true, "«GreetingLine»"),
+        ("es-MX", "Dear recipient,", false, "Dear recipient,"),
+      ] {
+        let field = if simple {
+          format!(
+            r#"<w:fldSimple w:instr=" GREETINGLINE \l 1033 " w:fldLock="{}"><w:r><w:t>{cached}</w:t></w:r></w:fldSimple>"#,
+            u8::from(locked)
+          )
+        } else {
+          format!(
+            r#"<w:r><w:fldChar w:fldCharType="begin" w:fldLock="{}"/></w:r><w:r><w:instrText> GREETINGLINE \l 1033 </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>{cached}</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>"#,
+            u8::from(locked)
+          )
+        };
+        let xml = format!(
+          r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>before</w:t></w:r>{field}<w:r><w:t>after</w:t></w:r></w:p>"#
+        );
+        let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).expect("greeting line paragraph");
+        let styles = StylesCatalog {
+          locales: OfficeLocaleContext::new(Some(language), Some("zh-CN"), Some("en-US")),
+          ..Default::default()
+        };
+        let mut form_widget_ids = FormWidgetIdAllocator::default();
+        let inlines = paragraph_inlines(
+          &paragraph,
+          TextStyle::default(),
+          &styles,
+          &ImageCatalog::default(),
+          &HyperlinkCatalog::default(),
+          &CustomXmlBindings::default(),
+          &mut form_widget_ids,
+        );
+        assert_eq!(
+          inline_text(&inlines),
+          format!("before{expected}after"),
+          "simple={simple}, language={language}, locked={locked}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn bibliography_emptiness_requires_an_empty_root_in_the_bibliography_namespace() {
+    for xml in [
+      r#"<b:Sources xmlns:b="http://schemas.openxmlformats.org/officeDocument/2006/bibliography"/>"#,
+      r#"<Sources xmlns="http://schemas.openxmlformats.org/officeDocument/2006/bibliography" SelectedStyle="APA"> <!-- empty --> </Sources>"#,
+    ] {
+      assert!(is_explicitly_empty_word_bibliography(xml));
+    }
+    for xml in [
+      r#"<b:Sources xmlns:b="http://schemas.openxmlformats.org/officeDocument/2006/bibliography"><b:Source><b:Tag>Smith50</b:Tag></b:Source></b:Sources>"#,
+      r#"<Sources xmlns="http://schemas.openxmlformats.org/officeDocument/2006/bibliography"><Extension/></Sources>"#,
+      r#"<Sources xmlns="http://schemas.openxmlformats.org/officeDocument/2006/bibliography">opaque text</Sources>"#,
+      r#"<Sources xmlns="http://schemas.openxmlformats.org/officeDocument/2006/bibliography">"#,
+      r#"<Other xmlns="http://schemas.openxmlformats.org/officeDocument/2006/bibliography"/>"#,
+      r#"<Sources xmlns="urn:other"/>"#,
+    ] {
+      assert!(!is_explicitly_empty_word_bibliography(xml), "{xml}");
+    }
+  }
+
+  #[test]
+  fn empty_bibliography_diagnostics_preserve_populated_and_locked_field_caches() {
+    for simple in [false, true] {
+      for (instruction, empty_sources, locked, expected) in [
+        (
+          "BIBLIOGRAPHY",
+          true,
+          false,
+          "作業中の文書には元データがありません。",
+        ),
+        ("BIBLIOGRAPHY", false, false, "cached value"),
+        ("BIBLIOGRAPHY", true, true, "cached value"),
+        ("CITATION", true, false, "資料文献が指定されていません。"),
+        ("CITATION", false, true, "cached value"),
+        ("CITATION Smith50", false, false, "cached value"),
+        ("CITATION Smith50", true, false, "cached value"),
+      ] {
+        let field = if simple {
+          format!(
+            r#"<w:fldSimple w:instr="{instruction}" w:fldLock="{}"><w:r><w:t>cached value</w:t></w:r></w:fldSimple>"#,
+            u8::from(locked)
+          )
+        } else {
+          format!(
+            r#"<w:r><w:fldChar w:fldCharType="begin" w:fldLock="{}"/></w:r><w:r><w:instrText>{instruction}</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>cached value</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>"#,
+            u8::from(locked)
+          )
+        };
+        let xml = format!(
+          r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>before</w:t></w:r>{field}<w:r><w:t>after</w:t></w:r></w:p>"#
+        );
+        let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).expect("bibliography paragraph");
+        let styles = StylesCatalog {
+          has_bibliography: true,
+          has_explicitly_empty_bibliography: empty_sources,
+          locales: OfficeLocaleContext::new(Some("ja-JP"), Some("en-US"), Some("zh-CN")),
+          ..Default::default()
+        };
+        let mut form_widget_ids = FormWidgetIdAllocator::default();
+        let inlines = paragraph_inlines(
+          &paragraph,
+          TextStyle::default(),
+          &styles,
+          &ImageCatalog::default(),
+          &HyperlinkCatalog::default(),
+          &CustomXmlBindings::default(),
+          &mut form_widget_ids,
+        );
+        assert_eq!(
+          inline_text(&inlines),
+          format!("before{expected}after"),
+          "simple={simple}, {instruction}, locked={locked}"
+        );
+      }
+    }
   }
 
   #[test]
@@ -45044,6 +45504,61 @@ mod tests {
       panic!("content-control text run");
     };
     assert_eq!(run.style.font_size_pt, 17.0);
+  }
+
+  #[test]
+  fn paragraph_style_outline_reset_clears_inherited_heading_level() {
+    // ECMA-376 Part 1 §17.3.1.20: value 9 means no outline level. Office
+    // excludes TOCHeading, based on Heading1, from sdt-before-table's TOC.
+    for (properties, expected) in [
+      ("", Some(0)),
+      (r#"<w:outlineLvl w:val="2"/>"#, Some(2)),
+      (r#"<w:outlineLvl w:val="9"/>"#, None),
+    ] {
+      let xml = format!(
+        r#"<w:style xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:type="paragraph" w:styleId="Derived"><w:pPr>{properties}</w:pPr></w:style>"#
+      );
+      let source = w::Style::from_bytes(xml.as_bytes()).expect("paragraph style");
+      let mut derived_format = ParagraphFormat::default();
+      merge_paragraph_format(
+        &mut derived_format,
+        source
+          .style_paragraph_properties
+          .as_deref()
+          .map(ParagraphProps::Style),
+        ImportSettings::default(),
+      );
+      let mut catalog = StylesCatalog::default();
+      catalog.styles.insert(
+        "Heading".into(),
+        StyleEntry {
+          paragraph_format: ParagraphFormat {
+            outline_level: Some(0),
+            ..Default::default()
+          },
+          ..Default::default()
+        },
+      );
+      catalog.styles.insert(
+        "Derived".into(),
+        StyleEntry {
+          based_on: Some("Heading".into()),
+          paragraph_format: derived_format,
+          ..Default::default()
+        },
+      );
+      catalog.styles.insert(
+        "Descendant".into(),
+        StyleEntry {
+          based_on: Some("Derived".into()),
+          ..Default::default()
+        },
+      );
+      for style_id in ["Derived", "Descendant"] {
+        let format = catalog.paragraph_format_with_base(Some(style_id), ParagraphFormat::default());
+        assert_eq!(format.outline_level, expected, "{style_id}: {properties}");
+      }
+    }
   }
 
   #[test]

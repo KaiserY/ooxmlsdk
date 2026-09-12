@@ -87,10 +87,28 @@ impl DirectOutlinePath {
   pub(super) fn expanded_stroke(&self, stroke: &common::Stroke<'static>) -> Result<Self> {
     let source = common_commands_to_bez_path(&self.commands);
     let compound = stroke.compound.unwrap_or(common::StrokeCompound::Single);
+    let has_open_contours = source
+      .subpaths()
+      .any(|subpath| subpath.last() != Some(&PathEl::ClosePath));
+    if compound != common::StrokeCompound::Single
+      && has_open_contours
+      && (!matches!(
+        compound,
+        common::StrokeCompound::Double | common::StrokeCompound::Triple
+      ) || !matches!(stroke.cap, None | Some(common::StrokeCap::Flat)))
+    {
+      return Err(PdfError::DirectWriterUnsupported {
+        feature: "open compound strokes with asymmetric bands or non-flat caps",
+      });
+    }
     let expanded = if compound == common::StrokeCompound::Single {
       expand_centered_stroke(&source, stroke, f64::from(stroke.width.0))?
-    } else if stroke.resolved_dash().is_some() {
-      expand_dashed_symmetric_compound_stroke(&source, stroke, compound)?
+    } else if stroke.resolved_dash().is_some() || has_open_contours {
+      // Open flat-cap bands share the same endpoints. Alternating the winding
+      // of centered widths leaves transparent gaps without closing the source
+      // path or painting a background-colored knockout. Office stress004's
+      // 3pt open double line has two 1pt bands separated by a 1pt gap.
+      expand_symmetric_compound_stroke(&source, stroke, compound)?
     } else {
       expand_solid_compound_stroke(&source, stroke, compound)?
     };
@@ -114,7 +132,7 @@ fn expand_centered_stroke(
   ))
 }
 
-fn expand_dashed_symmetric_compound_stroke(
+fn expand_symmetric_compound_stroke(
   source: &BezPath,
   stroke: &common::Stroke<'static>,
   compound: common::StrokeCompound,
@@ -1357,6 +1375,84 @@ mod tests {
           subpaths[index - 1].area().signum() != subpath.area().signum(),
           "boundary winding must alternate at index {index}"
         );
+      }
+    }
+  }
+
+  #[test]
+  fn open_symmetric_compound_bands_preserve_gaps_and_flat_endpoints() {
+    for compound in [
+      common::StrokeCompound::Double,
+      common::StrokeCompound::Triple,
+    ] {
+      for reversed in [false, true] {
+        for elbow in [false, true] {
+          let mut points = vec![Point::new(10.0, 20.0), Point::new(110.0, 20.0)];
+          if elbow {
+            points.push(Point::new(110.0, 100.0));
+          }
+          if reversed {
+            points.reverse();
+          }
+          let mut commands = vec![common::PathCommand::MoveTo(common::Point {
+            x: common::Pt(points[0].x as f32),
+            y: common::Pt(points[0].y as f32),
+          })];
+          commands.extend(points[1..].iter().map(|point| {
+            common::PathCommand::LineTo(common::Point {
+              x: common::Pt(point.x as f32),
+              y: common::Pt(point.y as f32),
+            })
+          }));
+          let stroke = common::Stroke {
+            width: common::Pt(6.0),
+            compound: Some(compound),
+            cap: Some(common::StrokeCap::Flat),
+            join: Some(common::StrokeJoin::Round),
+            ..Default::default()
+          };
+          let expanded = DirectOutlinePath::from_commands(&commands)
+            .expanded_stroke(&stroke)
+            .unwrap();
+          let path = common_commands_to_bez_path(expanded.commands());
+          // MS-ODRAW total-width fractions: double has two equal bands and
+          // one equal gap; triple has thin outer bands and a wider center.
+          for offset in [-3.5_f64, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 3.5] {
+            let expected = match compound {
+              common::StrokeCompound::Double => (1.0..3.0).contains(&offset.abs()),
+              common::StrokeCompound::Triple => {
+                offset.abs() < 1.0 || (2.0..3.0).contains(&offset.abs())
+              }
+              _ => unreachable!(),
+            };
+            assert_eq!(
+              path.winding(Point::new(60.0, 20.0 + offset)) != 0,
+              expected,
+              "{compound:?}, reversed={reversed}, elbow={elbow}, offset={offset}"
+            );
+            if elbow {
+              assert_eq!(
+                path.winding(Point::new(110.0 + offset, 60.0)) != 0,
+                expected
+              );
+            }
+          }
+          for offset in [-2.5, 0.5, 2.5] {
+            assert_eq!(path.winding(Point::new(9.99, 20.0 + offset)), 0);
+            if elbow {
+              assert_eq!(path.winding(Point::new(110.0 + offset, 100.01)), 0);
+            } else {
+              assert_eq!(path.winding(Point::new(110.01, 20.0 + offset)), 0);
+            }
+          }
+          if elbow {
+            assert_eq!(
+              path.winding(Point::new(60.0, 60.0)),
+              0,
+              "the open polyline must not gain a closing diagonal"
+            );
+          }
+        }
       }
     }
   }

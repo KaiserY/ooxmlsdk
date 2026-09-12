@@ -870,12 +870,27 @@ pub(super) fn refresh_tables_of_contents(
     // tdf155736_PageNumbers_footer.docx) is replaced by the fixed-format
     // "NO TABLE OF CONTENTS ENTRIES FOUND." diagnostic even when the field is
     // not marked dirty. A genuinely empty cached field remains untouched.
-    let has_empty_result_placeholder = toc_span_has_empty_result_placeholder(sections, &scan, span);
-    if span.locked || (!span.dirty && !update_fields_on_open && !has_empty_result_placeholder) {
+    if span.locked {
       continue;
     }
+    let has_empty_result_placeholder = toc_span_has_empty_result_placeholder(sections, &scan, span);
+    let mut entries = None;
+    if !span.dirty && !update_fields_on_open && !has_empty_result_placeholder {
+      // Word also replaces a stored English empty-TOC diagnostic with the
+      // current UI resource (sdt-before-table.docx). This does not authorize
+      // rebuilding other clean caches, including an obsolete empty diagnostic
+      // for which headings now exist.
+      if !toc_span_has_cached_empty_diagnostic(sections, &scan, span) {
+        continue;
+      }
+      let current_entries = collect_toc_entry_sources(sections, &scan, span);
+      if !current_entries.is_empty() {
+        continue;
+      }
+      entries = Some(current_entries);
+    }
 
-    let mut entries = collect_toc_entry_sources(sections, &scan, span);
+    let mut entries = entries.unwrap_or_else(|| collect_toc_entry_sources(sections, &scan, span));
     let templates = cached_toc_templates(sections, &scan, span, styles);
     let page = scan
       .paragraphs
@@ -2047,6 +2062,9 @@ fn build_empty_toc_result(
   paragraph.list_label = None;
   paragraph.list_label_hyperlink_url = None;
   let text = localized_field_message(FieldMessage::EmptyTableOfContents, ui_language);
+  // The paragraph's reference cache must describe the replacement too.
+  paragraph.style_ref_text = Some(Arc::<str>::from(text.as_str()));
+  paragraph.style_ref_numbering_text = None;
   let mut style = paragraph.base_style.clone();
   // Writer's generated empty-TOC diagnostic is an application error run, not
   // ordinary TOC1 cached text. Its fixed PDF output is bold even when the
@@ -2063,6 +2081,30 @@ fn build_empty_toc_result(
     preserve_text_portion: false,
   }));
   paragraph
+}
+
+fn toc_span_has_cached_empty_diagnostic(
+  sections: &[ImportedSection],
+  scan: &StoryScan,
+  span: &TocSpan,
+) -> bool {
+  let mut text = String::new();
+  for ordinal in span.start_ordinal..=span.end_ordinal {
+    let Some(paragraph) = paragraph(sections, scan, ordinal) else {
+      return false;
+    };
+    for inline in &paragraph.inlines {
+      match inline {
+        InlineItem::Text(run) => text.push_str(&run.text),
+        InlineItem::BookmarkStart(_) => {}
+        _ => return false,
+      }
+    }
+  }
+  text.trim().eq_ignore_ascii_case(&localized_field_message(
+    FieldMessage::EmptyTableOfContents,
+    Some("en-US"),
+  ))
 }
 
 fn toc_span_has_empty_result_placeholder(
@@ -2359,6 +2401,76 @@ mod tests {
       Block::Paragraph(source)
         if matches!(source.inlines.first(), Some(InlineItem::BookmarkStart(_)))
     ));
+  }
+
+  #[test]
+  fn cached_empty_toc_diagnostic_refresh_preserves_clean_and_locked_controls() {
+    const CACHED: &str = "No table of contents entries found.";
+    const FRENCH: &str = "Aucune entrée de table des matières n'a été trouvée.";
+    for simple in [false, true] {
+      for (locked, cached_text, has_heading, expected) in [
+        (false, CACHED, false, FRENCH),
+        (true, CACHED, false, CACHED),
+        (false, "Persisted entry", false, "Persisted entry"),
+        (false, CACHED, true, CACHED),
+      ] {
+        let mut cached = test_paragraph(cached_text);
+        cached.field_events = if simple {
+          vec![
+            ParagraphFieldEvent::Simple {
+              instruction: r#"TOC \o "1-3""#.to_string(),
+              locked,
+              dirty: false,
+            },
+            ParagraphFieldEvent::Content,
+          ]
+        } else {
+          vec![
+            ParagraphFieldEvent::Begin {
+              locked,
+              dirty: false,
+            },
+            ParagraphFieldEvent::Instruction(r#"TOC \o "1-3""#.to_string()),
+            ParagraphFieldEvent::Separate,
+            ParagraphFieldEvent::Content,
+            ParagraphFieldEvent::End,
+          ]
+        };
+        // Identical authored prose outside a field is never a diagnostic.
+        let mut blocks = vec![
+          Block::paragraph(test_paragraph(CACHED)),
+          Block::paragraph(cached),
+        ];
+        if has_heading {
+          let mut heading = test_paragraph("Current heading");
+          heading.format.style_outline_level = Some(0);
+          heading.format.outline_level = Some(0);
+          blocks.push(Block::paragraph(heading));
+        }
+        let mut sections = vec![default_section(blocks)];
+        refresh_tables_of_contents(
+          &mut sections,
+          &StylesCatalog::default(),
+          false,
+          Some("fr-CA"),
+        );
+        for (index, text) in [(0, CACHED), (1, expected)] {
+          let Block::Paragraph(paragraph) = &sections[0].blocks[index] else {
+            panic!("expected paragraph");
+          };
+          let visible: String = paragraph
+            .inlines
+            .iter()
+            .filter_map(|inline| match inline {
+              InlineItem::Text(run) => Some(run.text.as_str()),
+              _ => None,
+            })
+            .collect();
+          assert_eq!(visible, text);
+          assert_eq!(paragraph_source_text(paragraph).as_deref(), Some(text));
+        }
+      }
+    }
   }
 
   #[test]

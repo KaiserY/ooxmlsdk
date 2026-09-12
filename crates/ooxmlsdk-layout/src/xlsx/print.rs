@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
 use super::import::ExcelImport;
+use super::model::split_defined_name_ranges;
 use super::page_settings::CalcPageSettings;
 use super::pivot::pivot_print_address;
 use super::styles::DefinedNameBuiltin;
@@ -122,12 +123,6 @@ impl<'a> CalcPrintDocument<'a> {
     // count logic lands here; display only consumes the resulting print pages.
     let mut pages = Vec::new();
     let mut text_metrics = TextMetrics::new();
-    let mut visible_sheets_with_body = 0usize;
-    for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
-      if !sheet_body_is_empty(import, sheet) {
-        visible_sheets_with_body += 1;
-      }
-    }
     for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
       let mut conditional_eval_cache = ConditionalFormatEvalCache::default();
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
@@ -136,10 +131,12 @@ impl<'a> CalcPrintDocument<'a> {
       let scale = print_scale_state(import, sheet, &areas, &named_ranges, &mut text_metrics);
       let uses_formatted_implicit_header_footer_extent =
         implicit_header_footer_uses_formatted_cell_extent(import, sheet, &named_ranges);
-      let keep_header_footer_only_page = visible_sheets_with_body == 0
-        && !named_ranges.resolved_print_areas.is_empty()
-        && sheet.page_settings.header_footer.has_print_content()
-        && sheet_body_is_empty(import, sheet);
+      // An explicit print area gives an otherwise empty worksheet printable
+      // pages. Office preserves separate areas and manual page breaks even
+      // without cell paint, headings, or headers/footers. An implicit blank
+      // sheet still has no printable pages.
+      let keep_empty_explicit_sheet_pages =
+        !named_ranges.resolved_print_areas.is_empty() && sheet_body_is_empty(import, sheet);
       let page_areas = page_areas_for_sheet(
         import,
         sheet,
@@ -199,7 +196,7 @@ impl<'a> CalcPrintDocument<'a> {
         // content is painted only for page ranges that survive that test.
         // Excel does not create an implicit print page solely for headers or
         // footers (empty-noconf.xlsx and WorkbookProperties.xlsx). Keep the
-        // existing explicit-print-area behavior separate from this empty case.
+        // explicit empty-sheet print areas separate from this implicit case.
         // Excel fixed output retains blank pages ahead of later printable
         // cells or drawings in the actual page order. Ordinary implicit
         // ranges exclude invisible blank-cell XF metadata, so a style-only
@@ -225,7 +222,7 @@ impl<'a> CalcPrintDocument<'a> {
           empty,
           implicit_page_before_content,
           keep_formatted_horizontal_header_footer_page,
-          keep_header_footer_only_page && sheet_page_index == 0,
+          keep_empty_explicit_sheet_pages,
         ) {
           continue;
         }
@@ -266,13 +263,13 @@ fn should_skip_empty_print_page(
   empty: bool,
   implicit_page_before_content: bool,
   keep_implicit_header_footer_page: bool,
-  keep_header_footer_only_page: bool,
+  keep_empty_explicit_sheet_pages: bool,
 ) -> bool {
   skip_empty
     && empty
     && !implicit_page_before_content
     && !keep_implicit_header_footer_page
-    && !keep_header_footer_only_page
+    && !keep_empty_explicit_sheet_pages
 }
 
 fn keep_formatted_horizontal_header_footer_page(
@@ -2100,7 +2097,8 @@ fn conditional_icon_set(
   struct Rule<'a> {
     priority: i32,
     references: &'a [String],
-    icon_set: &'a super::sheet_conditions::IconSetModel,
+    icon_set: Option<&'a super::sheet_conditions::IconSetModel>,
+    stop_rule: Option<&'a super::sheet_conditions::ConditionalFormatRuleModel>,
   }
 
   let mut rules = Vec::new();
@@ -2117,7 +2115,8 @@ fn conditional_icon_set(
       Some(Rule {
         priority: rule.priority?,
         references: &format.sequence_of_references,
-        icon_set: rule.icon_set.as_ref()?,
+        icon_set: Some(rule.icon_set.as_ref()?),
+        stop_rule: None,
       })
     }));
   }
@@ -2125,27 +2124,55 @@ fn conditional_icon_set(
     if !conditional_format_contains_cell(format, address) {
       continue;
     }
-    rules.extend(format.rules.iter().filter_map(|rule| {
-      Some(Rule {
-        priority: rule.priority,
-        references: &format.sequence_of_references,
-        icon_set: rule.icon_set.as_ref()?,
-      })
-    }));
+    // A matching higher-priority rule can stop icon formatting even when
+    // it has no differential style or icon of its own (ECMA-376 18.3.1.10).
+    rules.extend(
+      format
+        .rules
+        .iter()
+        .filter(|rule| rule.icon_set.is_some() || rule.stop_if_true)
+        .map(|rule| Rule {
+          priority: rule.priority,
+          references: &format.sequence_of_references,
+          icon_set: rule.icon_set.as_ref(),
+          stop_rule: rule.stop_if_true.then_some(rule),
+        }),
+    );
+  }
+  if !rules.iter().any(|rule| rule.icon_set.is_some()) {
+    return None;
   }
   rules.sort_by_key(|rule| rule.priority);
 
-  rules.into_iter().find_map(|rule| {
-    evaluate_icon_set_rule(
-      import,
-      sheet,
-      rule.references,
-      rule.icon_set,
-      address,
-      value,
-      cache,
-    )
-  })
+  for rule in rules {
+    if let Some(icon_set) = rule.icon_set
+      && let Some(selection) = evaluate_icon_set_rule(
+        import,
+        sheet,
+        rule.references,
+        icon_set,
+        address,
+        value,
+        cache,
+      )
+    {
+      return Some(selection);
+    }
+    if let Some(stop_rule) = rule.stop_rule
+      && conditional_numeric_rule_matches(
+        import,
+        sheet,
+        rule.references,
+        stop_rule,
+        address,
+        value,
+        cache,
+      )
+    {
+      break;
+    }
+  }
+  None
 }
 
 fn conditional_color_scale_fill(
@@ -3331,7 +3358,7 @@ fn number_format_section_index(sections: &[&str], value: f64) -> Option<usize> {
       .take(3)
       .enumerate()
       .find(|(index, section)| match *index {
-        0 => number_format_condition(section, value).unwrap_or_else(|| {
+        0 => number_format_condition(section, value).unwrap_or({
           if sections.len() > 2 {
             value > 0.0
           } else {
@@ -3639,10 +3666,12 @@ impl NumberFormatPattern {
           pattern.date_time = true;
           literal_prefix = false;
         }
-        _ if !ch.is_whitespace() && literal_prefix => {
+        // ECMA-376 18.8.31 lists a space as displayed literal text even
+        // without quotes or an escape (for example, "P" #,##0.00).
+        _ if literal_prefix => {
           pattern.prefix.push(ch);
         }
-        _ if !ch.is_whitespace() && seen_digit && after_decimal => pattern.suffix.push(ch),
+        _ if seen_digit && after_decimal => pattern.suffix.push(ch),
         _ => {
           if !after_decimal {
             integer_pattern.push(ch);
@@ -4213,12 +4242,11 @@ fn format_serial_date_time(
       return text;
     }
   }
-  if uses_system_date_time_format(code, "$-F400") {
-    if let Some(text) = field_value
+  if uses_system_date_time_format(code, "$-F400")
+    && let Some(text) = field_value
       .and_then(|value| crate::field_datetime::format_office_default_time(format_locale, value))
-    {
-      return text;
-    }
+  {
+    return text;
   }
   if let Some(text) = field_value.and_then(|value| {
     crate::field_datetime::format_spreadsheet_date_picture(code, format_locale, value)
@@ -4881,8 +4909,8 @@ fn column_hidden(sheet: &CalcSheet, col: u32) -> bool {
 }
 
 fn parse_defined_name_ranges(formula: &str) -> Vec<CellRange> {
-  formula
-    .split(',')
+  split_defined_name_ranges(formula)
+    .into_iter()
     .filter_map(|range| {
       let range = range.trim().replace('$', "");
       CellRange::parse_a1_range(&range)
@@ -4891,14 +4919,14 @@ fn parse_defined_name_ranges(formula: &str) -> Vec<CellRange> {
 }
 
 fn parse_print_title_rows(formula: &str) -> Option<CellRange> {
-  formula
-    .split(',')
+  split_defined_name_ranges(formula)
+    .into_iter()
     .find_map(|range| parse_row_or_column_title(range, true))
 }
 
 fn parse_print_title_columns(formula: &str) -> Option<CellRange> {
-  formula
-    .split(',')
+  split_defined_name_ranges(formula)
+    .into_iter()
     .find_map(|range| parse_row_or_column_title(range, false))
 }
 
@@ -4942,6 +4970,58 @@ fn column_name_to_index(value: &str) -> Option<u32> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn print_area_unions_preserve_quoted_sheet_names() {
+    // Splitting inside this actual sheet name used to interpret the fragment
+    // 'Sheet1 as a cell address and invent a second empty print area.
+    assert_eq!(
+      parse_defined_name_ranges("'Sheet1, Sheet3'!$A$1:$H$17"),
+      vec![CellRange::new(
+        CellAddress { col: 1, row: 1 },
+        CellAddress { col: 8, row: 17 },
+      )]
+    );
+    let expected = vec![
+      CellRange::new(
+        CellAddress { col: 1, row: 1 },
+        CellAddress { col: 2, row: 2 },
+      ),
+      CellRange::new(
+        CellAddress { col: 4, row: 3 },
+        CellAddress { col: 4, row: 5 },
+      ),
+    ];
+    assert_eq!(
+      parse_defined_name_ranges("='O''Brien, Q1'!$A$1:$B$2, 'O''Brien, Q1'!$D$3:$D$5"),
+      expected
+    );
+    assert_eq!(
+      parse_defined_name_ranges("Sheet1!$A$1:$B$2,Sheet1!$D$3:$D$5"),
+      expected
+    );
+  }
+
+  #[test]
+  fn print_title_unions_preserve_quoted_sheet_names() {
+    let formula = "='O''Brien, Q1'!$3:$4, 'O''Brien, Q1'!$C:$D";
+    assert_eq!(
+      parse_print_title_rows(formula),
+      Some(CellRange::new(
+        CellAddress { col: 1, row: 3 },
+        CellAddress { col: 1, row: 4 },
+      ))
+    );
+    assert_eq!(
+      parse_print_title_columns(formula),
+      Some(CellRange::new(
+        CellAddress { col: 3, row: 1 },
+        CellAddress { col: 4, row: 1 },
+      ))
+    );
+    assert_eq!(parse_print_title_rows("'O''Brien, Q1'!$C:$D"), None);
+    assert_eq!(parse_print_title_columns("'O''Brien, Q1'!$3:$4"), None);
+  }
 
   #[test]
   fn implicit_header_footer_uses_directly_formatted_cell_extent() {
@@ -5301,6 +5381,8 @@ mod tests {
 
   #[test]
   fn elapsed_time_formats_preserve_totals_padding_and_literal_brackets() {
+    // Preserve the workbook's cached fifteen-digit decimal serial.
+    let cached_serial = "3.14159265358979".parse::<f64>().unwrap();
     for (value, code, expected) in [
       (1.10538194444444, "[h]:mm:ss", "26:31:45"),
       (1.40650462962963, "[h]:mm:ss", "33:45:22"),
@@ -5314,7 +5396,7 @@ mod tests {
       (5.0 / 86_400.0, "[SS]", "05"),
       (0.25 / 86_400.0, "[s].00", "0.25"),
       (0.25 / 86_400.0, "[ss].00", "00.25"),
-      (3.14159265358979, "[ss].00", "271433.61"),
+      (cached_serial, "[ss].00", "271433.61"),
       (1.25, r#""[hh] "[h]:mm"#, "[hh] 30:00"),
       (1.25, "_时[h]:mm", "30:00"),
     ] {
@@ -5335,6 +5417,10 @@ mod tests {
       ("-38", r##""$"#,##0"##, "-$38"),
       ("-5.2", r#""NEG"\ 0.00;("NEG"\ 0.00)"#, "(NEG 5.20)"),
       ("-1.2", r#""P "0.00;"N "0.00"#, "N 1.20"),
+      ("1.2", r##""P" #,##0.00; "N" #,##0.00;0;@"##, "P 1.20"),
+      ("-1.2", r##""P" #,##0.00; "N" #,##0.00;0;@"##, "N 1.20"),
+      ("1.2", r#""P"  0.00"#, "P  1.20"),
+      ("1.2", r#"0.00 "units""#, "1.20 units"),
       ("-0.125", r#""rate "0.0%"#, "-rate 12.5%"),
       ("-12300", r#""mass "0.00E+00"#, "-mass 1.23E+04"),
       (
@@ -5398,13 +5484,17 @@ mod tests {
       ("1.26", r#"0.0"0"E+00"#, "1.30E+00"),
       ("-12300", "0.00E+00;(0.00E+00)", "(1.23E+04)"),
       ("12300000", "0.0,,E+00", "1.2E+01"),
-      ("0.0123", "0.00E+00%", "1.23E+00%"),
       ("12", r#""E+00 "0"#, "E+00 12"),
     ] {
       let (text, state) = rendered_number_text(raw, Some(code), None, false);
       assert_eq!(text, expected, "{raw}: {code}");
       assert_eq!(state, NumberFormatRenderState::Number, "{code}");
     }
+    // Scientific notation does not remove the percentage value category.
+    assert_eq!(
+      rendered_number_text("0.0123", Some("0.00E+00%"), None, false),
+      ("1.23E+00%".to_string(), NumberFormatRenderState::Percent)
+    );
   }
 
   #[test]
@@ -5463,7 +5553,7 @@ mod tests {
       (false, "1900-01-02 00:00:00.000"),
       (true, "1904-01-03 00:00:00.000"),
     ] {
-      let serial = 1.0 + 86_399.9996 / 86_400.0;
+      let serial = 1.0 + 86_399.999_6 / 86_400.0;
       assert_eq!(
         rendered_number_text(
           &serial.to_string(),
@@ -5475,7 +5565,7 @@ mod tests {
         expected
       );
     }
-    let before_midnight = 1.0 + 86_399.9996 / 86_400.0;
+    let before_midnight = 1.0 + 86_399.999_6 / 86_400.0;
     assert_eq!(
       rendered_number_text(
         &before_midnight.to_string(),

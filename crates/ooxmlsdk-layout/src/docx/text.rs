@@ -384,7 +384,7 @@ fn paragraph_model_with_base_impl<'a>(
   );
   let mut field_events = paragraph_field_events(paragraph);
   if let Some(complex_fields) = complex_fields {
-    complex_fields.finish_paragraph(&mut inlines, &mut field_events);
+    complex_fields.finish_paragraph(&mut inlines, &mut field_events, styles);
   }
   if inlines.iter().any(|inline| {
     matches!(

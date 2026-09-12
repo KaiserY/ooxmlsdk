@@ -30837,6 +30837,38 @@ fn wordprocessing_shape_source_axis(
   (edge(local_near_pt), edge(local_near_pt + extent_pt))
 }
 
+fn upright_vml_text_box_content_rect(
+  host: ShapeTextBoxRect,
+  content: ShapeTextBoxRect,
+  stored_rotation_deg: f32,
+) -> ShapeTextBoxRect {
+  let rotation = stored_rotation_deg.rem_euclid(360.0);
+  if !((rotation - 90.0).abs() <= f32::EPSILON || (rotation - 270.0).abs() <= f32::EPSILON) {
+    return content;
+  }
+  // Legacy VML stores the inverse of the authored angle. Word rotates the
+  // inset allocation rectangle with the host before independently applying
+  // the textbox writing direction. Rotating only its extents would lose the
+  // asymmetric inset translation (TextFrameRotation's 72pt left inset).
+  let bounds = rotate_frame_bounds(
+    FrameBounds {
+      x_pt: content.x,
+      y_pt: content.y,
+      width_pt: content.width,
+      height_pt: content.height,
+    },
+    host.x + host.width * 0.5,
+    host.y + host.height * 0.5,
+    -rotation,
+  );
+  ShapeTextBoxRect {
+    x: bounds.x_pt,
+    y: bounds.y_pt,
+    width: bounds.width_pt,
+    height: bounds.height_pt,
+  }
+}
+
 fn layout_shape_text_box(
   current: &mut Page,
   parent_flow: FlowContext,
@@ -30860,8 +30892,29 @@ fn layout_shape_text_box(
     // the absolute origin turn that zero extent into a tiny positive frame.
     return;
   }
-  let physical_left = rect.x + border_inset + shape.text_inset_left_pt;
-  let physical_top = rect.y + border_inset + shape.text_inset_top_pt;
+  let content_rect = ShapeTextBoxRect {
+    x: rect.x + border_inset + shape.text_inset_left_pt,
+    y: rect.y + border_inset + shape.text_inset_top_pt,
+    width: physical_width,
+    height: physical_height,
+  };
+  // Fixed, unflipped legacy frames have independent shape and text axes.
+  // Keep automatic growth and its clipping on their existing layout path.
+  let content_rect = if shape.word_text_frame
+    && shape.text_upright
+    && !shape.flip_horizontal
+    && !shape.flip_vertical
+    && !shape.text_box_resizes_to_fit
+    && !shape.text_box_auto_fit
+  {
+    upright_vml_text_box_content_rect(rect, content_rect, shape.rotation_deg)
+  } else {
+    content_rect
+  };
+  let physical_left = content_rect.x;
+  let physical_top = content_rect.y;
+  let physical_width = content_rect.width;
+  let physical_height = content_rect.height;
   let physical_right = physical_left + physical_width;
   let physical_bottom = physical_top + physical_height;
   let mut effect_host = WordprocessingTextEffectHost {
@@ -34751,11 +34804,18 @@ fn auto_script_class(character: char) -> AutoScriptClass {
     return AutoScriptClass::Transparent;
   }
   let script = character.script();
-  if matches!(
+  // Shared kana letters, including the prolonged sound mark U+30FC, have
+  // Script=Common but East Asian Script_Extensions. Treating them as western
+  // letters inserts autoSpaceDE gaps inside Japanese words such as データ.
+  let east_asian_script = matches!(
     script,
     Script::Han | Script::Hiragana | Script::Katakana | Script::Bopomofo | Script::Yi
-  ) && character.is_alphanumeric()
-  {
+  ) || (script == Script::Common
+    && character
+      .script_extension()
+      .iter()
+      .any(|script| matches!(script, Script::Hiragana | Script::Katakana)));
+  if east_asian_script && character.is_alphanumeric() {
     return AutoScriptClass::EastAsian;
   }
   // Writer deliberately excludes Hangul from Asian/Latin script spacing.
@@ -46486,6 +46546,72 @@ fn push_line_item(
 mod tests {
   use super::*;
 
+  #[test]
+  fn upright_vml_quarter_turns_rotate_the_complete_asymmetric_inset_rectangle() {
+    // Page coordinates have y down. VML import stores the inverse angle:
+    // +90 below is an authored -90 turn, moving the left inset to the bottom.
+    for (host, content, cases) in [
+      (
+        ShapeTextBoxRect {
+          x: -237.8,
+          y: 209.05,
+          width: 820.0,
+          height: 44.35,
+        },
+        ShapeTextBoxRect {
+          x: -165.8,
+          y: 216.25,
+          width: 740.8,
+          height: 29.95,
+        },
+        [
+          (0.0, [-165.8, 216.25, 740.8, 29.95]),
+          (90.0, [157.225, -171.575, 29.95, 740.8]),
+          (-90.0, [157.225, -106.775, 29.95, 740.8]),
+        ],
+      ),
+      (
+        // Insets left/top/right/bottom = 3/7/11/17; no pair can cancel.
+        ShapeTextBoxRect {
+          x: 10.0,
+          y: 20.0,
+          width: 100.0,
+          height: 60.0,
+        },
+        ShapeTextBoxRect {
+          x: 13.0,
+          y: 27.0,
+          width: 86.0,
+          height: 36.0,
+        },
+        [
+          (0.0, [13.0, 27.0, 86.0, 36.0]),
+          (90.0, [37.0, 11.0, 36.0, 86.0]),
+          (-90.0, [47.0, 3.0, 36.0, 86.0]),
+        ],
+      ),
+    ] {
+      for (rotation, expected) in cases {
+        let actual = upright_vml_text_box_content_rect(host, content, rotation);
+        for (actual, expected) in [actual.x, actual.y, actual.width, actual.height]
+          .into_iter()
+          .zip(expected)
+        {
+          assert!(
+            (actual - expected).abs() < 0.0001,
+            "rotation={rotation}, actual={actual}, expected={expected}"
+          );
+        }
+        if rotation == 0.0 {
+          assert_eq!(
+            [actual.x, actual.y, actual.width, actual.height],
+            [content.x, content.y, content.width, content.height]
+          );
+        }
+      }
+    }
+  }
+
   fn text_warp_bounds_test_item(size_pt: f32) -> TextItem {
     TextItem {
       x_pt: 100.0,
@@ -48382,6 +48508,77 @@ mod tests {
         .collect::<Vec<_>>(),
       vec![("汉", 7, 10), ("A1", 10, 12), ("字", 12, 15)]
     );
+  }
+
+  #[test]
+  fn auto_script_spacing_keeps_shared_kana_letters_in_the_east_asian_region() {
+    let format = ParagraphFormat::default();
+    let style = TextStyle {
+      font_size_pt: 11.0,
+      ..TextStyle::default()
+    };
+    let line = AutoScriptLine {
+      page_index: 0,
+      item_start_index: 0,
+      y_pt: 72.0,
+    };
+    for text in ["データ", "あーあ", "ﾃﾞｰﾀ", "い〱"] {
+      let segments = split_auto_script_spacing_segments(
+        vec![TextSegment {
+          text: text.to_string(),
+          start: 7,
+          end: 7 + text.len(),
+        }],
+        &format,
+      );
+      assert_eq!(segments.len(), 1, "{text}");
+      assert_eq!(segments[0].text, text);
+      assert_eq!((segments[0].start, segments[0].end), (7, 7 + text.len()));
+
+      // Run boundaries must not turn a shared kana letter into a Latin edge.
+      let mut state = AutoScriptSpacingState::default();
+      for character in text.chars() {
+        let fragment = character.to_string();
+        assert_eq!(
+          state.leading_space_pt(line, &fragment, &style, &format, false),
+          0.0,
+          "{text}: {character}",
+        );
+        state.observe_text(line, &fragment, &style);
+      }
+    }
+
+    // Unicode Common is not itself an East Asian script. Genuine Latin and
+    // numeric edges still receive their respective automatic spacing.
+    assert_eq!(auto_script_class('A'), AutoScriptClass::Letter);
+    assert_eq!(auto_script_class('1'), AutoScriptClass::Number);
+    assert_eq!(auto_script_class('ˇ'), AutoScriptClass::Letter);
+    assert_eq!(auto_script_class('㊀'), AutoScriptClass::Number);
+    assert_eq!(auto_script_class('。'), AutoScriptClass::Boundary);
+    assert_eq!(auto_script_class('\u{3099}'), AutoScriptClass::Transparent);
+    for (left, right) in [("ー", "A"), ("A", "ー"), ("ー", "1"), ("1", "ー")] {
+      let mut state = AutoScriptSpacingState::default();
+      state.observe_text(line, left, &style);
+      assert!(
+        (state.leading_space_pt(line, right, &style, &format, false) - 2.2).abs()
+          < LAYOUT_EPSILON_PT,
+        "{left}{right}",
+      );
+      assert_eq!(
+        state.leading_space_pt(
+          line,
+          right,
+          &style,
+          &ParagraphFormat {
+            auto_space_de: Some(false),
+            auto_space_dn: Some(false),
+            ..ParagraphFormat::default()
+          },
+          false,
+        ),
+        0.0,
+      );
+    }
   }
 
   fn word_text_shadow(

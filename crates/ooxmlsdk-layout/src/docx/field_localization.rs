@@ -35,8 +35,15 @@ pub(super) fn localized_field_message(
       ("de", FieldMessage::ReferenceSourceNotFound) => {
         Some("Fehler! Verweisquelle konnte nicht gefunden werden.")
       }
+      ("fr", FieldMessage::ReferenceSourceNotFound) => {
+        Some("Erreur! Source du renvoi introuvable.")
+      }
       ("ja", FieldMessage::UndefinedBookmark) => Some("エラー! ブックマークが定義されていません。"),
       ("ja", FieldMessage::ReferenceSourceNotFound) => Some("エラー! 参照元が見つかりません。"),
+      ("ja", FieldMessage::EmptyTableOfContents) => Some("目次項目が見つかりません。"),
+      ("fr", FieldMessage::EmptyTableOfContents) => {
+        Some("Aucune entrée de table des matières n'a été trouvée.")
+      }
       _ => None,
     });
   if let Some(text) = reference_message {
@@ -44,6 +51,13 @@ pub(super) fn localized_field_message(
   }
   let strings = OfficeStringCatalog::for_ui_language(ui_language);
   match message {
+    FieldMessage::UndefinedBookmark
+      if strings.resource_locale() == OfficeResourceLocale::TraditionalChinese =>
+    {
+      // Word's Traditional Chinese PAGEREF resource includes 尚 and uses
+      // Basic Latin punctuation (tdf64531.docx fixed output).
+      "錯誤! 尚未定義書籤。".to_string()
+    }
     FieldMessage::UndefinedBookmark => strings.field_undefined_bookmark().to_string(),
     FieldMessage::ReferenceSourceNotFound => strings.field_reference_source_not_found().to_string(),
     FieldMessage::BookmarkNameNotSpecified => {
@@ -76,6 +90,54 @@ pub(super) fn localized_field_message(
   }
 }
 
+#[derive(Clone, Copy)]
+pub(super) enum BibliographyDiagnostic {
+  EmptySources,
+  MissingCitationSource,
+}
+
+pub(super) fn localized_bibliography_diagnostic(
+  message: BibliographyDiagnostic,
+  ui_language: Option<&str>,
+) -> Option<&'static str> {
+  let language = ui_language.and_then(crate::localization::canonical_locale)?;
+  if language.id.language.as_str() != "ja" {
+    return None;
+  }
+  // Distinct Office resources in 99_Fields.docx; neither is the invalid-tag
+  // CITATION diagnostic. Keep other locales on their existing cache paths.
+  Some(match message {
+    BibliographyDiagnostic::EmptySources => "作業中の文書には元データがありません。",
+    BibliographyDiagnostic::MissingCitationSource => "資料文献が指定されていません。",
+  })
+}
+
+pub(super) fn localized_address_block_placeholder(ui_language: Option<&str>) -> &'static str {
+  // The unresolved mail-merge placeholder is an application UI resource.
+  // ADDRESSBLOCK's \l switch controls recipient-address formatting instead.
+  // Both established Chinese resources retain the fixed-output trailing blank.
+  match OfficeStringCatalog::for_ui_language(ui_language).resource_locale() {
+    OfficeResourceLocale::SimplifiedChinese => "«地址块» ",
+    OfficeResourceLocale::TraditionalChinese => "«地址區塊» ",
+    _ => "«AddressBlock» ",
+  }
+}
+
+pub(super) fn localized_greeting_line_placeholder(ui_language: Option<&str>) -> &'static str {
+  // These are application placeholders, independent of GREETINGLINE's \l
+  // switch for formatting actual recipient data. Only established Office
+  // resources are supplied here; other UI locales keep the English fallback.
+  match ui_language
+    .and_then(crate::localization::canonical_locale)
+    .map(|locale| locale.id.language.to_string())
+    .as_deref()
+  {
+    Some("ja") => "«あいさつ文»",
+    Some("es") => "«Línea de saludo»",
+    _ => "«GreetingLine»",
+  }
+}
+
 fn is_korean_ui_language(ui_language: Option<&str>) -> bool {
   ui_language
     .and_then(crate::localization::canonical_locale)
@@ -93,6 +155,30 @@ pub(super) fn korean_ui_english_heading_reference(
     && super::normalized_style_ref_lookup_key(style_name)
       .strip_prefix("heading")
       .is_some_and(|level| matches!(level.as_bytes(), [b'1'..=b'9']))
+}
+
+pub(super) fn apply_japanese_diagnostic_font_slots(
+  style: &mut TextStyle,
+  ui_language: Option<&str>,
+) -> bool {
+  let Some(language) = ui_language
+    .and_then(crate::localization::canonical_locale)
+    .filter(|locale| locale.id.language.as_str() == "ja")
+  else {
+    return false;
+  };
+  // Existing Office output binds Japanese generated field resources to MS
+  // Mincho, including their katakana prolonged sound mark and punctuation.
+  // This state belongs to the generated run, not authored Japanese text.
+  style.wordprocessingml_font_slots = true;
+  style.wordprocessingml_font_hint = Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia);
+  style.east_asia_font_family = Some(Arc::<str>::from("MS Mincho"));
+  style.east_asia_language = Some(Arc::<str>::from(language.to_string()));
+  style.east_asia_fallback_font_family = None;
+  style.east_asia_font_family_class = None;
+  style.east_asia_font_charset = None;
+  style.east_asia_font_pitch = None;
+  true
 }
 
 pub(super) fn apply_generated_field_message_style(
@@ -145,9 +231,42 @@ pub(super) fn apply_generated_field_message_style(
     style.bold = bold;
     style.complex_bold = Some(bold);
   }
-  if OfficeStringCatalog::for_ui_language(ui_language).resource_locale()
-    != OfficeResourceLocale::SimplifiedChinese
+  if matches!(
+    message,
+    FieldMessage::UndefinedBookmark
+      | FieldMessage::ReferenceSourceNotFound
+      | FieldMessage::EmptyTableOfContents
+  ) && apply_japanese_diagnostic_font_slots(style, ui_language)
   {
+    if matches!(message, FieldMessage::ReferenceSourceNotFound) {
+      // The missing-REF resource uses Arial for its ASCII exclamation mark
+      // (tdf171299_tableInField.docx). The undefined-bookmark resource keeps
+      // the field's Latin face (Calibri in fdo78910.docx).
+      style.font_family = Some(Arc::<str>::from("Arial"));
+      style.fallback_font_family = None;
+    }
+    return;
+  }
+  let resource_locale = OfficeStringCatalog::for_ui_language(ui_language).resource_locale();
+  if resource_locale == OfficeResourceLocale::TraditionalChinese
+    && matches!(message, FieldMessage::UndefinedBookmark)
+  {
+    // The established Traditional Chinese bookmark resource uses PMingLiU
+    // for Han text and keeps the field's Latin face for its ASCII ! and space.
+    // Keep the locale-independent explicit bold override applied above.
+    style.wordprocessingml_font_slots = true;
+    style.wordprocessingml_font_hint = Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia);
+    style.east_asia_font_family = Some(Arc::<str>::from("PMingLiU"));
+    style.east_asia_language = ui_language
+      .and_then(crate::localization::canonical_locale)
+      .map(|language| Arc::<str>::from(language.to_string()));
+    style.east_asia_fallback_font_family = None;
+    style.east_asia_font_family_class = None;
+    style.east_asia_font_charset = None;
+    style.east_asia_font_pitch = None;
+    return;
+  }
+  if resource_locale != OfficeResourceLocale::SimplifiedChinese {
     return;
   }
   let east_asia_language = ui_language
@@ -264,6 +383,104 @@ mod tests {
   }
 
   #[test]
+  fn traditional_chinese_bookmark_resource_preserves_other_messages_and_font_slots() {
+    for language in ["zh-TW", "zh_Hant_HK", "zh-MO"] {
+      assert_eq!(
+        localized_field_message(FieldMessage::UndefinedBookmark, Some(language)),
+        "錯誤! 尚未定義書籤。",
+      );
+    }
+    assert_eq!(
+      localized_field_message(FieldMessage::UndefinedBookmark, Some("zh-Hans-TW")),
+      "错误!未定义书签。",
+    );
+    for (message, expected) in [
+      (
+        FieldMessage::ReferenceSourceNotFound,
+        "錯誤! 找不到參照來源。",
+      ),
+      (
+        FieldMessage::BookmarkNameNotSpecified,
+        "錯誤! 未提供書籤名稱。",
+      ),
+      (FieldMessage::EmptyTableOfContents, "錯誤! 找不到目錄項目。"),
+    ] {
+      assert_eq!(localized_field_message(message, Some("zh-TW")), expected);
+    }
+
+    for bold_override in [None, Some(false), Some(true)] {
+      let mut style = TextStyle {
+        font_family: Some(Arc::from("Lucida Sans Unicode")),
+        high_ansi_font_family: Some(Arc::from("Times New Roman")),
+        complex_font_family: Some(Arc::from("Tahoma")),
+        east_asia_font_family: Some(Arc::from("Microsoft JhengHei")),
+        east_asia_fallback_font_family: Some(Arc::from("Noto Sans CJK TC")),
+        wordprocessingml_field_bold_override: bold_override,
+        ..TextStyle::default()
+      };
+      apply_generated_field_message_style(
+        &mut style,
+        FieldMessage::UndefinedBookmark,
+        Some("zh-TW"),
+      );
+      assert_eq!(style.font_family.as_deref(), Some("Lucida Sans Unicode"));
+      assert_eq!(
+        style.high_ansi_font_family.as_deref(),
+        Some("Times New Roman")
+      );
+      assert_eq!(style.complex_font_family.as_deref(), Some("Tahoma"));
+      assert_eq!(style.east_asia_font_family.as_deref(), Some("PMingLiU"));
+      assert_eq!(style.east_asia_language.as_deref(), Some("zh-TW"));
+      assert_eq!(style.east_asia_fallback_font_family, None);
+      assert_eq!(style.bold, bold_override != Some(false));
+      assert_eq!(style.complex_bold, Some(bold_override != Some(false)));
+      let text = localized_field_message(FieldMessage::UndefinedBookmark, Some("zh-TW"));
+      let runs = ooxmlsdk_fonts::script_direction_runs_with_options(
+        &text,
+        ooxmlsdk_fonts::FontSize(style.font_size_pt),
+        ooxmlsdk_fonts::ScriptScanOptions {
+          wordprocessingml_font_slots: style.wordprocessingml_font_slots,
+          wordprocessingml_font_hint: style.wordprocessingml_font_hint,
+          wordprocessingml_east_asia_language_is_chinese: true,
+          ..ooxmlsdk_fonts::ScriptScanOptions::default()
+        },
+      );
+      for run in runs {
+        for character in text[run.text_range].chars() {
+          let expected = if character.is_ascii() {
+            ooxmlsdk_fonts::WordprocessingFontSlot::Ascii
+          } else {
+            ooxmlsdk_fonts::WordprocessingFontSlot::EastAsia
+          };
+          assert_eq!(
+            run.wordprocessingml_font_slot,
+            Some(expected),
+            "{character}"
+          );
+        }
+      }
+    }
+
+    for (language, message) in [
+      (Some("en-US"), FieldMessage::UndefinedBookmark),
+      (Some("zh-TW"), FieldMessage::ReferenceSourceNotFound),
+      (Some("zh-TW"), FieldMessage::BookmarkNameNotSpecified),
+    ] {
+      let mut style = TextStyle {
+        font_family: Some(Arc::from("Lucida Sans Unicode")),
+        east_asia_font_family: Some(Arc::from("Microsoft JhengHei")),
+        ..TextStyle::default()
+      };
+      apply_generated_field_message_style(&mut style, message, language);
+      assert_eq!(style.font_family.as_deref(), Some("Lucida Sans Unicode"));
+      assert_eq!(
+        style.east_asia_font_family.as_deref(),
+        Some("Microsoft JhengHei")
+      );
+    }
+  }
+
+  #[test]
   fn korean_missing_style_resource_preserves_the_requested_style_name() {
     assert_eq!(
       localized_field_message(FieldMessage::MissingStyle("Heading 2"), Some("KO_kr")),
@@ -354,6 +571,94 @@ mod tests {
       localized_field_message(FieldMessage::EmptyTableOfContents, Some("zh-Hant-HK")),
       "錯誤! 找不到目錄項目。"
     );
+  }
+
+  #[test]
+  fn japanese_diagnostics_bind_east_asia_without_overwriting_other_font_slots() {
+    for (message, ascii) in [
+      (FieldMessage::UndefinedBookmark, "Courier New"),
+      (FieldMessage::ReferenceSourceNotFound, "Arial"),
+      (FieldMessage::EmptyTableOfContents, "Courier New"),
+    ] {
+      let mut style = TextStyle {
+        font_family: Some(Arc::from("Courier New")),
+        high_ansi_font_family: Some(Arc::from("Times New Roman")),
+        east_asia_font_family: Some(Arc::from("Microsoft YaHei")),
+        east_asia_fallback_font_family: Some(Arc::from("Noto Sans CJK JP")),
+        complex_font_family: Some(Arc::from("Tahoma")),
+        wordprocessingml_field_bold_override: Some(false),
+        ..TextStyle::default()
+      };
+      apply_generated_field_message_style(&mut style, message, Some("JA_jp"));
+      assert_eq!(style.font_family.as_deref(), Some(ascii));
+      assert_eq!(
+        style.high_ansi_font_family.as_deref(),
+        Some("Times New Roman")
+      );
+      assert_eq!(style.east_asia_font_family.as_deref(), Some("MS Mincho"));
+      assert_eq!(style.complex_font_family.as_deref(), Some("Tahoma"));
+      assert_eq!(style.east_asia_language.as_deref(), Some("ja-JP"));
+      assert_eq!(style.east_asia_fallback_font_family, None);
+      assert_eq!(
+        style.bold,
+        matches!(message, FieldMessage::EmptyTableOfContents)
+      );
+
+      let text = localized_field_message(message, Some("ja-JP"));
+      let runs = ooxmlsdk_fonts::script_direction_runs_with_options(
+        &text,
+        ooxmlsdk_fonts::FontSize(style.font_size_pt),
+        ooxmlsdk_fonts::ScriptScanOptions {
+          wordprocessingml_font_slots: style.wordprocessingml_font_slots,
+          wordprocessingml_font_hint: style.wordprocessingml_font_hint,
+          ..ooxmlsdk_fonts::ScriptScanOptions::default()
+        },
+      );
+      for run in runs {
+        for character in text[run.text_range].chars() {
+          let expected = if character.is_ascii() {
+            ooxmlsdk_fonts::WordprocessingFontSlot::Ascii
+          } else {
+            ooxmlsdk_fonts::WordprocessingFontSlot::EastAsia
+          };
+          assert_eq!(
+            run.wordprocessingml_font_slot,
+            Some(expected),
+            "{character}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn japanese_diagnostic_font_binding_requires_an_established_resource() {
+    let original = TextStyle {
+      font_family: Some(Arc::from("Courier New")),
+      east_asia_font_family: Some(Arc::from("Yu Gothic")),
+      ..TextStyle::default()
+    };
+    for language in [None, Some("en-US"), Some("fr-CA")] {
+      let mut style = original.clone();
+      assert!(!apply_japanese_diagnostic_font_slots(&mut style, language));
+      assert_eq!(style, original);
+    }
+    for message in [
+      FieldMessage::BookmarkNameNotSpecified,
+      FieldMessage::MissingStyle("Heading 1"),
+      FieldMessage::PageRefRelative {
+        bookmark_is_above: true,
+      },
+    ] {
+      let mut style = original.clone();
+      apply_generated_field_message_style(&mut style, message, Some("ja-JP"));
+      assert_eq!(style.font_family, original.font_family);
+      assert_eq!(style.east_asia_font_family, original.east_asia_font_family);
+      assert_eq!(
+        style.wordprocessingml_font_hint,
+        original.wordprocessingml_font_hint
+      );
+    }
   }
 
   #[test]

@@ -14,6 +14,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
+use ooxmlsdk_formula::calc::numeric::round_to_decimal_places;
 use unicode_bidi::{BidiClass, BidiInfo, Level, bidi_class};
 
 use crate::common;
@@ -444,7 +445,23 @@ fn print_page_items(
     setup.height_pt - setup.margin_top_pt - setup.margin_bottom_pt,
     heading_height + repeat_height + area_size.1,
   );
-  let body_origin_x = setup.margin_left_pt + horizontal_centering + heading_width;
+  let right_to_left = sheet_right_to_left(page.sheet);
+  let body_width = repeat_width + area_size.0;
+  let body_origin_x = if right_to_left {
+    setup.width_pt - setup.margin_right_pt - horizontal_centering - heading_width - body_width
+  } else {
+    setup.margin_left_pt + horizontal_centering + heading_width
+  };
+  let repeated_origin_x = if right_to_left {
+    body_origin_x + area_size.0
+  } else {
+    body_origin_x
+  };
+  let main_origin_x = if right_to_left {
+    body_origin_x
+  } else {
+    body_origin_x + repeat_width
+  };
   let body_origin_y = page
     .page_settings
     .fixed_output_body_top_pt(page.paper_scale_percent)
@@ -483,7 +500,7 @@ fn print_page_items(
       &page.repeated_corner_cells,
       area,
       CellAreaRenderLayout {
-        origin_x_pt: body_origin_x,
+        origin_x_pt: repeated_origin_x,
         origin_y_pt: body_origin_y,
         zoom_scale,
         physical_page,
@@ -499,7 +516,7 @@ fn print_page_items(
       &page.repeated_row_cells,
       area,
       CellAreaRenderLayout {
-        origin_x_pt: body_origin_x + repeat_width,
+        origin_x_pt: main_origin_x,
         origin_y_pt: body_origin_y,
         zoom_scale,
         physical_page,
@@ -515,7 +532,7 @@ fn print_page_items(
       &page.repeated_column_cells,
       area,
       CellAreaRenderLayout {
-        origin_x_pt: body_origin_x,
+        origin_x_pt: repeated_origin_x,
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
         physical_page,
@@ -531,7 +548,7 @@ fn print_page_items(
       &page.cells,
       area,
       CellAreaRenderLayout {
-        origin_x_pt: body_origin_x + repeat_width,
+        origin_x_pt: main_origin_x,
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
         physical_page,
@@ -544,9 +561,13 @@ fn print_page_items(
         page,
         area,
         HeadingRenderLayout {
-          row_header_x_pt: setup.margin_left_pt,
+          row_header_x_pt: if right_to_left {
+            body_origin_x + body_width
+          } else {
+            setup.margin_left_pt
+          },
           row_header_y_pt: body_origin_y + repeat_height,
-          col_header_x_pt: body_origin_x + repeat_width,
+          col_header_x_pt: main_origin_x,
           col_header_y_pt: body_origin_y - heading_height,
           zoom_scale,
         },
@@ -562,7 +583,7 @@ fn print_page_items(
       setup,
       DrawingAreaRenderLayout {
         area: Some(area),
-        origin_x_pt: body_origin_x,
+        origin_x_pt: repeated_origin_x,
         origin_y_pt: body_origin_y,
         zoom_scale,
       },
@@ -576,7 +597,7 @@ fn print_page_items(
       setup,
       DrawingAreaRenderLayout {
         area: Some(area),
-        origin_x_pt: body_origin_x,
+        origin_x_pt: repeated_origin_x,
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
       },
@@ -590,7 +611,7 @@ fn print_page_items(
       setup,
       DrawingAreaRenderLayout {
         area: Some(area),
-        origin_x_pt: body_origin_x + repeat_width,
+        origin_x_pt: main_origin_x,
         origin_y_pt: body_origin_y,
         zoom_scale,
       },
@@ -603,7 +624,7 @@ fn print_page_items(
     setup,
     DrawingAreaRenderLayout {
       area: page.area,
-      origin_x_pt: body_origin_x + repeat_width,
+      origin_x_pt: main_origin_x,
       origin_y_pt: body_origin_y + repeat_height,
       zoom_scale,
     },
@@ -639,6 +660,11 @@ impl DrawingAreaRenderLayout {
       .map(|area| page.sheet.range_rect(area))
       .unwrap_or_default();
     SheetPageTransform::new(self.origin_x_pt, self.origin_y_pt, self.zoom_scale, source)
+      .with_horizontal_order(
+        self.origin_x_pt,
+        self.area_width(page),
+        sheet_right_to_left(page.sheet),
+      )
   }
 
   fn fixed_output_drawing_page_transform(self, page: &CalcPrintPage<'_>) -> SheetPageTransform {
@@ -654,7 +680,20 @@ impl DrawingAreaRenderLayout {
     });
     // The anchors are already in scaled worksheet coordinates. Only remove
     // the matching print-area origin and translate onto the physical page.
-    SheetPageTransform::new(self.origin_x_pt, self.origin_y_pt, 1.0, source)
+    SheetPageTransform::new(self.origin_x_pt, self.origin_y_pt, 1.0, source).with_horizontal_order(
+      self.origin_x_pt,
+      self.area_width(page),
+      sheet_right_to_left(page.sheet),
+    )
+  }
+
+  fn area_width(self, page: &CalcPrintPage<'_>) -> f32 {
+    self.area.map_or(0.0, |area| {
+      page
+        .sheet
+        .fixed_output_range_rect(area, self.zoom_scale)
+        .width_pt
+    })
   }
 
   fn clip_rect(self, page: &CalcPrintPage<'_>, setup: PageSetup) -> CellRect {
@@ -2469,6 +2508,38 @@ fn page_setup_from_calc(page: &CalcPrintPage<'_>) -> PageSetup {
   setup
 }
 
+fn sheet_right_to_left(sheet: &CalcSheet) -> bool {
+  sheet
+    .metrics
+    .views
+    .views
+    .first()
+    .is_some_and(|view| view.right_to_left == Some(true))
+}
+
+fn sheet_horizontal_rect(
+  mut rect: CellRect,
+  origin_x_pt: f32,
+  width_pt: f32,
+  right_to_left: bool,
+) -> CellRect {
+  // rightToLeft reverses worksheet column placement. Keep the rectangle's
+  // positive size so its glyphs, images and authored shape transforms retain
+  // their orientation; headers and footers have independent page owners.
+  if right_to_left {
+    rect.x_pt = origin_x_pt * 2.0 + width_pt - rect.x_pt - rect.width_pt;
+  }
+  rect
+}
+
+fn neighboring_column(column: u32, toward_right: bool, right_to_left: bool) -> Option<u32> {
+  if toward_right != right_to_left {
+    column.checked_add(1).filter(|column| *column <= 16_384)
+  } else {
+    column.checked_sub(1).filter(|column| *column >= 1)
+  }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct CellAreaRenderLayout {
   origin_x_pt: f32,
@@ -2478,7 +2549,7 @@ struct CellAreaRenderLayout {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct SheetPageTransform(Affine);
+struct SheetPageTransform(Affine, Option<f32>);
 
 impl SheetPageTransform {
   fn new(origin_x_pt: f32, origin_y_pt: f32, zoom_scale: f32, source: CellRect) -> Self {
@@ -2486,7 +2557,13 @@ impl SheetPageTransform {
       Affine::translate((-f64::from(source.x_pt), -f64::from(source.y_pt)))
         .then_scale(f64::from(zoom_scale))
         .then_translate((f64::from(origin_x_pt), f64::from(origin_y_pt)).into()),
+      None,
     )
+  }
+
+  fn with_horizontal_order(mut self, origin_x_pt: f32, width_pt: f32, right_to_left: bool) -> Self {
+    self.1 = right_to_left.then_some(origin_x_pt * 2.0 + width_pt);
+    self
   }
 
   fn rect(self, rect: CellRect) -> CellRect {
@@ -2499,12 +2576,16 @@ impl SheetPageTransform {
       ),
       self.0,
     );
-    CellRect {
+    let mut rect = CellRect {
       x_pt: bounds.x0 as f32,
       y_pt: bounds.y0 as f32,
       width_pt: bounds.width() as f32,
       height_pt: bounds.height() as f32,
+    };
+    if let Some(axis_sum) = self.1 {
+      rect.x_pt = axis_sum - rect.x_pt - rect.width_pt;
     }
+    rect
   }
 
   fn rect_from_xywh(self, x_pt: f32, y_pt: f32, width_pt: f32, height_pt: f32) -> CellRect {
@@ -2557,12 +2638,17 @@ fn render_cell_area(
       y_pt,
       width_pt,
       height_pt,
-    } = CellRect {
-      x_pt: layout.origin_x_pt + rect.x_pt - area_rect.x_pt,
-      y_pt: layout.origin_y_pt + rect.y_pt - area_rect.y_pt,
-      width_pt: rect.width_pt,
-      height_pt: rect.height_pt,
-    };
+    } = sheet_horizontal_rect(
+      CellRect {
+        x_pt: layout.origin_x_pt + rect.x_pt - area_rect.x_pt,
+        y_pt: layout.origin_y_pt + rect.y_pt - area_rect.y_pt,
+        width_pt: rect.width_pt,
+        height_pt: rect.height_pt,
+      },
+      layout.origin_x_pt,
+      area_rect.width_pt,
+      sheet_right_to_left(page.sheet),
+    );
     // FillInfo retains one column on either side of ScOutputData's logical
     // range, but DrawStrings and DrawEdit paint only through mnX2. The extra
     // cell remains useful as occupied/overflow context and may contribute
@@ -3069,16 +3155,18 @@ fn calc_cell_output_area(
     calc_cell_missing_width_by_alignment(missing_width_pt, cell, alignment);
 
   if !calc_cell_is_value(cell) && !alignment.is_some_and(|alignment| alignment.wrap_text) {
+    let right_to_left = sheet_right_to_left(context.sheet);
     let mut right_col = cell.address.col;
     while right_missing_pt > 0.0
+      && let Some(next_col) = neighboring_column(right_col, true, right_to_left)
       && output_column_available(
         context.sheet,
         context.occupied_cells,
-        right_col + 1,
+        next_col,
         cell.address.row,
       )
     {
-      right_col += 1;
+      right_col = next_col;
       let column_width_pt = context
         .sheet
         .fixed_output_column_range_width_pt(right_col, right_col, zoom_scale);
@@ -3088,17 +3176,24 @@ fn calc_cell_output_area(
       output.clip_rect.width_pt += column_width_pt;
       right_missing_pt -= column_width_pt;
     }
-    let mut left_col = cell.address.col;
+    let mut left_col = if right_to_left {
+      context
+        .sheet
+        .merged_range_for_cell(cell.address)
+        .map_or(cell.address.col, |range| range.end.col)
+    } else {
+      cell.address.col
+    };
     while left_missing_pt > 0.0
-      && left_col > 1
+      && let Some(next_col) = neighboring_column(left_col, false, right_to_left)
       && output_column_available(
         context.sheet,
         context.occupied_cells,
-        left_col - 1,
+        next_col,
         cell.address.row,
       )
     {
-      left_col -= 1;
+      left_col = next_col;
       let column_width_pt = context
         .sheet
         .fixed_output_column_range_width_pt(left_col, left_col, zoom_scale);
@@ -3326,6 +3421,15 @@ fn calc_fit_general_number_text(
   }
   for significant_digits in (1..=15).rev() {
     let text = format_general_number_with_significant_digits(value, significant_digits);
+    if (value == 0.0 || text != "0") && text_metrics.measure_text(&text, style) <= available_width {
+      return Some(text);
+    }
+  }
+  // General may use an exponent when fixed decimals cannot fit. Current
+  // Office 57914.xlsx and escape-unicode.xlsx show 1E+09 and 1.16E+09 here;
+  // hashes are reserved for widths that cannot fit even the shortest form.
+  for significant_digits in (1..=15).rev() {
+    let text = format_general_scientific_with_significant_digits(value, significant_digits);
     if text_metrics.measure_text(&text, style) <= available_width {
       return Some(text);
     }
@@ -3348,7 +3452,10 @@ fn format_general_number_with_significant_digits(value: f64, significant_digits:
   } else {
     significant_digits.saturating_sub(integer_digits.max(0) as usize)
   };
-  let mut text = format!("{value:.decimals$}");
+  // General narrows its precision to fit the cell, but keeps the same
+  // decimal tie policy as explicit number formats (52348.xlsx: 600.25 -> 600.3).
+  let rounded = round_to_decimal_places(value, i32::try_from(decimals).unwrap_or(i32::MAX));
+  let mut text = format!("{rounded:.decimals$}");
   if text.contains('.') {
     while text.ends_with('0') {
       text.pop();
@@ -3358,6 +3465,27 @@ fn format_general_number_with_significant_digits(value: f64, significant_digits:
     }
   }
   if text == "-0" { "0".to_string() } else { text }
+}
+
+fn format_general_scientific_with_significant_digits(
+  value: f64,
+  significant_digits: usize,
+) -> String {
+  // Decimal decomposition also handles subnormal doubles without computing
+  // an underflowing 10^exponent divisor. Reuse the spreadsheet tie policy.
+  let decimal = format!("{value:e}");
+  let (mantissa, exponent) = decimal.split_once('e').expect("finite scientific value");
+  let mut exponent = exponent.parse::<i32>().expect("decimal exponent");
+  let mut mantissa = round_to_decimal_places(
+    mantissa.parse::<f64>().expect("decimal mantissa"),
+    significant_digits.saturating_sub(1) as i32,
+  );
+  if mantissa.abs() >= 10.0 {
+    mantissa /= 10.0;
+    exponent += 1;
+  }
+  let mantissa = format_general_number_with_significant_digits(mantissa, significant_digits);
+  format!("{mantissa}E{exponent:+03}")
 }
 
 fn calc_text_can_shape_as_line(text: &str) -> bool {
@@ -4131,10 +4259,15 @@ fn render_grid(
     if col > area.start.col {
       x += page.sheet.column_width_pt(col - 1) * zoom_scale;
     }
+    let paint_x = if sheet_right_to_left(page.sheet) {
+      origin_x_pt * 2.0 + width - x
+    } else {
+      x
+    };
     items.push(PageItem::Line(LineItem {
-      x1_pt: x,
+      x1_pt: paint_x,
       y1_pt: origin_y_pt,
-      x2_pt: x,
+      x2_pt: paint_x,
       y2_pt: origin_y_pt + height,
       width_pt: XLSX_GRID_LINE_WIDTH_PT,
       color,
@@ -4176,8 +4309,14 @@ fn render_headings(
   let mut x = layout.col_header_x_pt;
   for col in area.start.col..=area.end.col {
     let width = page.sheet.column_width_pt(col) * layout.zoom_scale;
+    let paint_x = if sheet_right_to_left(page.sheet) {
+      let total_width = page.sheet.range_rect(area).width_pt * layout.zoom_scale;
+      layout.col_header_x_pt * 2.0 + total_width - x - width
+    } else {
+      x
+    };
     items.push(header_text(
-      x + XLSX_CELL_TEXT_INSET_PT,
+      paint_x + XLSX_CELL_TEXT_INSET_PT,
       layout.col_header_y_pt,
       column_label(col),
     ));
@@ -9640,6 +9779,12 @@ fn fixed_output_vml_shape_rect(
       width_pt: x2 - x1,
       height_pt: y2 - y1,
     };
+    let rect = sheet_horizontal_rect(
+      rect,
+      layout.origin_x_pt,
+      layout.area_width(page),
+      sheet_right_to_left(page.sheet),
+    );
     return (rect.width_pt > 0.0 && rect.height_pt > 0.0).then_some(rect);
   }
 
@@ -11869,6 +12014,75 @@ mod cell_alignment_tests {
   use super::*;
 
   #[test]
+  fn fitted_general_precision_keeps_office_decimal_rounding() {
+    for (value, digits, expected) in [
+      (600.25, 4, "600.3"),
+      (-600.25, 4, "-600.3"),
+      (600.249, 4, "600.2"),
+      (600.25, 5, "600.25"),
+      (1.005, 3, "1.01"),
+      (1.0049, 3, "1"),
+      (99.95, 3, "100"),
+      (-0.0, 1, "0"),
+    ] {
+      assert_eq!(
+        format_general_number_with_significant_digits(value, digits),
+        expected,
+        "{value}, {digits} digits"
+      );
+    }
+  }
+
+  #[test]
+  fn general_scientific_precision_keeps_decimal_ties_and_exponent_carry() {
+    for (value, digits, expected) in [
+      (1.25e8, 2, "1.3E+08"),
+      (-1.25e8, 2, "-1.3E+08"),
+      (1.249e8, 2, "1.2E+08"),
+      (999_999_999.0, 8, "1E+09"),
+      (1_161_014_163.0, 3, "1.16E+09"),
+      (5e-324, 1, "5E-324"),
+    ] {
+      assert_eq!(
+        format_general_scientific_with_significant_digits(value, digits),
+        expected,
+        "{value}, {digits} digits"
+      );
+    }
+  }
+
+  #[test]
+  fn general_width_fitting_uses_scientific_before_hashes() {
+    let style = TextStyle::default();
+    let mut metrics = TextMetrics::new();
+    for (raw, expected) in [
+      ("999999999", "1E+09"),
+      ("1161014163", "1.16E+09"),
+      ("-1161014163", "-1.16E+09"),
+      ("5e-324", "5E-324"),
+      ("600.25", "600.3"),
+    ] {
+      let mut cell = print_cell(super::super::print::NumberFormatRenderState::General);
+      cell.text = std::borrow::Cow::Borrowed(raw);
+      let width = metrics.measure_text(expected, &style) + XLSX_CELL_TEXT_INSET_PT * 2.0 + 0.01;
+      assert_eq!(
+        calc_fit_general_number_text(&cell, &style, width, &mut metrics).as_deref(),
+        Some(expected),
+        "{raw} in {width}pt"
+      );
+    }
+    let mut cell = print_cell(super::super::print::NumberFormatRenderState::General);
+    cell.text = std::borrow::Cow::Borrowed("999999999");
+    let width = metrics.measure_text("1", &style) + XLSX_CELL_TEXT_INSET_PT * 2.0 + 0.01;
+    assert!(calc_fit_general_number_text(&cell, &style, width, &mut metrics).is_none());
+    cell.text = std::borrow::Cow::Borrowed("0");
+    assert_eq!(
+      calc_fit_general_number_text(&cell, &style, width, &mut metrics).as_deref(),
+      Some("0")
+    );
+  }
+
+  #[test]
   fn reading_order_reorders_rich_portions_without_changing_font_slots() {
     let rect = CellRect {
       x_pt: 10.0,
@@ -11960,6 +12174,137 @@ mod cell_alignment_tests {
       formula: false,
       icon_set: None,
       color_scale_fill: None,
+    }
+  }
+
+  #[test]
+  fn rtl_sheet_anchor_placement_preserves_positive_extents_and_text_orientation() {
+    let source = CellRect {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      width_pt: 100.0,
+      height_pt: 50.0,
+    };
+    let anchor = CellRect {
+      x_pt: 20.0,
+      y_pt: 25.0,
+      width_pt: 15.0,
+      height_pt: 4.0,
+    };
+    let base = SheetPageTransform::new(100.0, 50.0, 2.0, source);
+    let ltr = base.rect(anchor);
+    let rtl = base.with_horizontal_order(100.0, 200.0, true).rect(anchor);
+    assert_eq!((ltr.x_pt, rtl.x_pt), (120.0, 250.0));
+    assert_eq!((rtl.y_pt, rtl.width_pt, rtl.height_pt), (60.0, 30.0, 8.0));
+    for rect in [ltr, rtl] {
+      let mut items = Vec::new();
+      render_drawing_text(
+        &mut items,
+        "AB12",
+        rect,
+        Some(TextStyle {
+          font_size_pt: 5.0,
+          ..Default::default()
+        }),
+        Some(DrawingTextLayout {
+          text_rotation_deg: 15.0,
+          ..Default::default()
+        }),
+        None,
+        None,
+      );
+      let [PageItem::Text(text)] = items.as_slice() else {
+        panic!("one unchanged text run");
+      };
+      assert_eq!(text.text, "AB12");
+      assert_eq!(text.style.rotation_deg, 15.0);
+      assert_eq!(text.style.font_size_pt, 5.0);
+    }
+    assert_eq!(neighboring_column(3, true, false), Some(4));
+    assert_eq!(neighboring_column(3, true, true), Some(2));
+    assert_eq!(neighboring_column(3, false, true), Some(4));
+    assert_eq!(neighboring_column(1, true, true), None);
+    assert_eq!(neighboring_column(16_384, false, true), None);
+  }
+
+  #[test]
+  fn rtl_cell_overflow_uses_visual_neighbors_and_skips_the_owned_merge() {
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+    let style = TextStyle::default();
+    let mut metrics = TextMetrics::new();
+    for (right_to_left, merged) in [(false, false), (true, false), (true, true)] {
+      let merge = if merged {
+        r#"<mergeCells count="1"><mergeCell ref="B1:C1"/></mergeCells>"#
+      } else {
+        ""
+      };
+      let worksheet = x::Worksheet::from_bytes(
+        format!(
+          r#"
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetViews><sheetView workbookViewId="0" rightToLeft="{right_to_left}"/></sheetViews>
+          <cols><col min="1" max="5" width="10" customWidth="1"/></cols>
+          <sheetData/>{merge}
+        </worksheet>"#
+        )
+        .as_bytes(),
+      )
+      .unwrap();
+      let sheet = CalcSheet::from_worksheet(
+        SheetIdentity {
+          workbook_index: 0,
+          name: "Sheet1".into(),
+          state: None,
+          active: true,
+        },
+        worksheet,
+        SheetResourceCatalog::default(),
+        &[],
+        &super::super::styles::StylesCatalog::default(),
+        Default::default(),
+      );
+      let address = CellAddress { col: 2, row: 1 };
+      let mut rect = sheet.fixed_output_cell_rect(address, 1.0);
+      rect.x_pt = 100.0;
+      let mut text = "M".to_owned();
+      while metrics.measure_text(&text, &style) + XLSX_CELL_TEXT_INSET_PT * 2.0 <= rect.width_pt {
+        text.push('M');
+      }
+      let mut cell = print_cell(super::super::print::NumberFormatRenderState::Text);
+      cell.address = address;
+      cell.rendered_text = text;
+      let occupied = if merged {
+        HashMap::new()
+      } else {
+        HashMap::from([((1, 3), true)])
+      };
+      let output = calc_cell_output_area(
+        CalcCellOutputContext {
+          sheet: &sheet,
+          occupied_cells: &occupied,
+          text_metrics: &mut metrics,
+        },
+        &cell,
+        rect,
+        &style,
+        merged.then_some(super::super::styles::AlignmentRecord {
+          horizontal: Some(x::HorizontalAlignmentValues::Right),
+          ..Default::default()
+        }),
+        1.0,
+      );
+      if right_to_left {
+        assert_eq!(output.left_clip_pt, 0.0);
+        assert_eq!(output.right_clip_pt, 0.0);
+        assert!(output.clip_rect.width_pt > rect.width_pt);
+        if merged {
+          assert!(output.clip_rect.x_pt < rect.x_pt);
+        }
+      } else {
+        assert!(output.right_clip_pt > 0.0);
+        assert_eq!(output.clip_rect.width_pt, rect.width_pt);
+      }
     }
   }
 

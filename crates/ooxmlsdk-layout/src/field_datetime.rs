@@ -4,7 +4,7 @@ use icu_calendar::Gregorian;
 use icu_calendar::cal::Japanese;
 use icu_datetime::fieldsets::{T, YMD, YMDE};
 use icu_datetime::input::{Date, DateTime, Time};
-use icu_datetime::options::YearStyle;
+use icu_datetime::options::{TimePrecision, YearStyle};
 use icu_datetime::pattern::{DateTimePattern, FixedCalendarDateTimeNames};
 use icu_datetime::{FixedCalendarDateTimeFormatter, NoCalendarFormatter};
 use writeable::TryWriteable;
@@ -231,7 +231,13 @@ pub(crate) fn format_office_short_time(
 ) -> Option<String> {
   let locale = field_locale(language)?;
   let time = field_time(value)?;
-  let formatter = NoCalendarFormatter::try_new(locale.into(), T::short()).ok()?;
+  // ICU field-set length does not select time precision: its default still
+  // includes seconds. Office short-time fields retain only hours and minutes.
+  let formatter = NoCalendarFormatter::try_new(
+    locale.into(),
+    T::short().with_time_precision(TimePrecision::Minute),
+  )
+  .ok()?;
   Some(normalize_office_field_output(
     formatter.format(&time).to_string(),
     language,
@@ -347,7 +353,7 @@ fn office_picture_to_icu_pattern(picture: &str) -> Option<(String, bool)> {
       'y' | 'Y' if count == 4 => output.push_str("yyyy"),
       'h' | 'H' | 'm' | 's' if count <= 2 => output.extend(chars[index..index + count].iter()),
       _ if ch.is_ascii_alphabetic() => return None,
-      _ => output.push(ch),
+      _ => output.extend(chars[index..index + count].iter()),
     }
     index += count;
   }
@@ -815,7 +821,7 @@ fn leap_year(year: u16) -> bool {
 
 #[cfg(test)]
 mod tests {
-  use super::format_date_time_field;
+  use super::{format_date_time_field, format_office_default_time, format_office_short_time};
   use crate::options::FieldUpdateDateTime;
 
   const VALUE: FieldUpdateDateTime = FieldUpdateDateTime {
@@ -829,6 +835,77 @@ mod tests {
 
   fn tokens(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_string()).collect()
+  }
+
+  #[test]
+  fn office_short_time_keeps_minutes_and_omits_seconds() {
+    for second in [0, 3, 54, 59] {
+      let value = FieldUpdateDateTime { second, ..VALUE };
+      for (locale, expected) in [("zh-CN", "20:19"), ("en-US", "8:19 PM"), ("de-DE", "20:19")] {
+        assert_eq!(
+          format_office_short_time(Some(locale), value).as_deref(),
+          Some(expected)
+        );
+      }
+    }
+    let whole_hour = FieldUpdateDateTime {
+      minute: 0,
+      second: 59,
+      ..VALUE
+    };
+    assert_eq!(
+      format_office_short_time(Some("en-US"), whole_hour).as_deref(),
+      Some("8:00 PM")
+    );
+    assert_eq!(
+      format_office_short_time(Some("zh-CN"), whole_hour).as_deref(),
+      Some("20:00")
+    );
+  }
+
+  #[test]
+  fn office_short_time_keeps_day_periods_at_hour_boundaries() {
+    for (hour, minute, expected) in [
+      (0, 0, "12:00 AM"),
+      (11, 59, "11:59 AM"),
+      (12, 0, "12:00 PM"),
+      (23, 59, "11:59 PM"),
+    ] {
+      let value = FieldUpdateDateTime {
+        hour,
+        minute,
+        second: 59,
+        ..VALUE
+      };
+      assert_eq!(
+        format_office_short_time(Some("en-US"), value).as_deref(),
+        Some(expected)
+      );
+    }
+    // The retained Invoice Tracking Office PDF prints 23:59 for a supplied
+    // civil clock of 23:59:46, without carrying into the following day.
+    let end_of_day = FieldUpdateDateTime {
+      hour: 23,
+      minute: 59,
+      second: 59,
+      ..VALUE
+    };
+    assert_eq!(
+      format_office_short_time(Some("zh-CN"), end_of_day).as_deref(),
+      Some("23:59")
+    );
+  }
+
+  #[test]
+  fn office_default_time_retains_its_seconds() {
+    assert_eq!(
+      format_office_default_time(Some("zh-CN"), VALUE).as_deref(),
+      Some("20:19:54")
+    );
+    assert_eq!(
+      format_office_default_time(Some("en-US"), VALUE).as_deref(),
+      Some("8:19:54 PM")
+    );
   }
 
   #[test]
@@ -951,7 +1028,7 @@ mod tests {
         let value = FieldUpdateDateTime { hour, ..VALUE };
         for picture in ["h:mm AM/PM", "h:mm am/pm"] {
           assert_eq!(
-            format_spreadsheet_date_picture(picture, Some(language), value).as_deref(),
+            super::format_spreadsheet_date_picture(picture, Some(language), value).as_deref(),
             Some(expected),
             "{language}: {picture}"
           );
@@ -960,8 +1037,29 @@ mod tests {
     }
     // Word field pictures continue to use localized day-period resources.
     assert_eq!(
-      format_date_time_picture("h:mm am/pm", Some("zh-CN"), VALUE).as_deref(),
+      super::format_date_time_picture("h:mm am/pm", Some("zh-CN"), VALUE).as_deref(),
       Some("8:19 下午")
+    );
+  }
+
+  #[test]
+  fn date_pictures_preserve_repeated_literal_characters() {
+    assert_eq!(
+      super::format_date_time_picture("yyyy//MM//dd  HH::mm::ss.000", Some("en-US"), VALUE)
+        .as_deref(),
+      Some("2026//07//12  20::19::54.000")
+    );
+    for picture in [r"hh:mm:ss\.000", r#"hh:mm:ss".000""#] {
+      assert_eq!(
+        super::format_spreadsheet_date_picture(picture, Some("en-US"), VALUE).as_deref(),
+        Some("20:19:54.000"),
+        "{picture}"
+      );
+    }
+    assert_eq!(
+      super::format_spreadsheet_date_picture(r#"yyyy//mm//dd "hh" \m\m"#, Some("en-US"), VALUE)
+        .as_deref(),
+      Some("2026//07//12 hh mm")
     );
   }
 

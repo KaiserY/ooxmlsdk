@@ -3656,6 +3656,16 @@ fn format_text_date(number: f64, format: &str, date_system: DateSystem) -> Optio
   let mut index = 0usize;
   while index < chars.len() {
     let ch = chars[index];
+    // Number-format LITERAL-CHAR is a backslash plus the next character
+    // (MS-OI29500, 18.8.30). Consume the marker before interpreting date
+    // tokens; a quoted string below keeps its characters literally.
+    if ch == '\\'
+      && let Some(literal) = chars.get(index + 1)
+    {
+      output.push(*literal);
+      index += 2;
+      continue;
+    }
     if ch == '"' {
       let quote_width = if chars.get(index + 1).is_some_and(|next| *next == '"') {
         2

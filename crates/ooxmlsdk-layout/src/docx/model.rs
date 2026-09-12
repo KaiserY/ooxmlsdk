@@ -675,6 +675,9 @@ pub(crate) struct ParagraphFormat {
   /// value; `\u` uses the final `outline_level` below.
   pub style_outline_level: Option<u8>,
   pub outline_level: Option<u8>,
+  /// An authored w:outlineLvl, including value 9 which clears an inherited
+  /// heading level rather than leaving it unspecified.
+  pub outline_level_set: bool,
   pub vertical_text_flow: Option<VerticalTextFlow>,
   pub frame: Option<ParagraphFrameProperties>,
 }

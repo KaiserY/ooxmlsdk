@@ -22,14 +22,6 @@ use ooxmlsdk_layout::common;
 use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef};
 use ooxmlsdk_layout::text_metrics::{TextMetrics, TextVerticalMetrics};
 
-// Historical fixed-output calibration retained from the DOCX numbering/font
-// parity path. No matching LibreOffice source constant has been identified;
-// keep the trigger and scale isolated so font-metric work can remove it
-// without adding another renderer-wide conditional.
-const LEGACY_ARIAL_BOLD_FONT_SIZE_PT: f32 = 11.0;
-const LEGACY_ARIAL_BOLD_FONT_SIZE_TOLERANCE_PT: f32 = 0.01;
-const LEGACY_ARIAL_BOLD_VERTICAL_SCALE: f32 = 1.07;
-
 type PaintTextPortionRanges = SmallVec<[(PaintTextPortionKind, Range<usize>); 2]>;
 pub(super) type PaintGlyphFontRuns = SmallVec<[PaintGlyphFontRun; 2]>;
 
@@ -487,10 +479,6 @@ impl FontStyleRef for TextStyle<'_> {
 }
 
 impl TextStyle<'_> {
-  pub(super) fn direct_vertical_scale(&self) -> f32 {
-    text_vertical_scale(self)
-  }
-
   pub(super) fn pdf_font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
   }
@@ -834,6 +822,7 @@ pub(super) fn symbol_font_semantic_text<'a>(
         '\u{f0d5}' if symbol => '\u{220f}',
         '\u{f0d6}' if symbol => '\u{221a}',
         '\u{f0d7}' if symbol => '\u{22c5}',
+        '\u{f0de}' if symbol => '\u{21d2}',
         '\u{f0e5}' if symbol => '\u{2211}',
         '\u{f0e6}' if symbol => '\u{239b}',
         '\u{f0e7}' if symbol => '\u{239c}',
@@ -866,6 +855,7 @@ pub(super) fn symbol_font_semantic_text<'a>(
         '\u{f0d8}' if wingdings => '\u{27a2}',
         '\u{f0e0}' if wingdings => '\u{2192}',
         '\u{f0e7}' if wingdings => '\u{1f878}',
+        '\u{f0e8}' if wingdings => '\u{1f87a}',
         '\u{f0fb}' if wingdings => '\u{1f5f6}',
         '\u{f0fc}' if wingdings => '\u{2713}',
         '\u{f0fd}' if wingdings => '\u{1f5f7}',
@@ -3950,21 +3940,6 @@ fn semantic_advance_for_text_range(
   (matched && total.is_finite()).then_some(total)
 }
 
-fn text_vertical_scale(style: &TextStyle<'_>) -> f32 {
-  if style.bold
-    && (style.font_size_pt - LEGACY_ARIAL_BOLD_FONT_SIZE_PT).abs()
-      < LEGACY_ARIAL_BOLD_FONT_SIZE_TOLERANCE_PT
-    && style
-      .font_family
-      .as_deref()
-      .is_some_and(|family| family.eq_ignore_ascii_case("Arial"))
-  {
-    LEGACY_ARIAL_BOLD_VERTICAL_SCALE
-  } else {
-    1.0
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use std::borrow::Cow;
@@ -4341,6 +4316,121 @@ mod tests {
       symbol_font_semantic_text("\u{e225}", Some("ZBFH")),
       "\u{e225}"
     );
+  }
+
+  #[test]
+  fn legacy_symbol_missing_selectors_keep_font_scope_and_unknown_private_use() {
+    for family in ["Symbol", "SymbolMT", "sYmBoLmT"] {
+      assert_eq!(
+        symbol_font_semantic_text("\u{f0de}", Some(family)),
+        "\u{21d2}"
+      );
+    }
+    for family in ["Wingdings", "wInGdInGs"] {
+      assert_eq!(
+        symbol_font_semantic_text("\u{f0a8}\u{f0e8}", Some(family)),
+        "\u{f0a8}\u{1f87a}"
+      );
+    }
+    let selectors = "\u{f0a8}\u{f0e8}\u{f0de}";
+    for family in [
+      None,
+      Some("Calibri"),
+      Some("Wingdings 2"),
+      Some("Wingdings2"),
+      Some("Wingdings 3"),
+      Some("Webdings"),
+      Some("Symbol Bold"),
+    ] {
+      let semantic = symbol_font_semantic_text(selectors, family);
+      assert_eq!(semantic, selectors, "unrelated font {family:?}");
+      assert!(matches!(semantic, Cow::Borrowed(_)));
+    }
+    // The same selector has different meaning in the two legacy fonts.
+    assert_eq!(
+      symbol_font_semantic_text("\u{f0e8}", Some("Symbol")),
+      "\u{239d}"
+    );
+    for family in ["Symbol", "Wingdings"] {
+      let unknown = "\u{f0ff}\u{e225}\u{e004}";
+      assert_eq!(symbol_font_semantic_text(unknown, Some(family)), unknown);
+      // Ordinary Unicode scalars are not F000-offset legacy selectors.
+      let ordinary = "\u{00a8}\u{00e8}\u{00de}";
+      assert_eq!(symbol_font_semantic_text(ordinary, Some(family)), ordinary);
+    }
+  }
+
+  #[test]
+  fn legacy_symbol_office_square_selector_preserves_its_private_use_encoding() {
+    // Office retains F0A8 in tdf138899's PDF 1.4 output. A standardized
+    // pictograph exists, but substituting it changes the extracted text.
+    for family in ["Wingdings", "wInGdInGs"] {
+      let semantic = symbol_font_semantic_text("\u{f0a8}", Some(family));
+      assert_eq!(semantic, "\u{f0a8}");
+      assert!(matches!(semantic, Cow::Borrowed(_)));
+    }
+  }
+
+  #[test]
+  fn legacy_symbol_scalar_ranges_preserve_all_glyph_metrics_and_visual_order() {
+    let source = "A\u{f0e8}\u{f0e8}B\u{e225}";
+    let semantic = symbol_font_semantic_text(source, Some("Wingdings"));
+    assert_eq!(semantic, "A\u{1f87a}\u{1f87a}B\u{e225}");
+    assert_eq!((source.len(), semantic.len()), (11, 13));
+    let source_ranges = [0..1, 1..4, 4..7, 4..7, 7..8, 8..11];
+    let semantic_ranges = [0..1, 1..5, 5..9, 5..9, 9..10, 10..13];
+    let ids = [17, 42, 91, 92, 3, 99];
+    let advances = [0.75, 1.25, 0.0, 1.5, 0.25, 0.5];
+    let y_advances = [0.0, 0.125, 0.0, -0.125, 0.25, 0.0];
+    let glyphs = source_ranges
+      .iter()
+      .enumerate()
+      .map(|(index, range)| PaintGlyph {
+        glyph_id: ids[index],
+        text_range: range.clone(),
+        x_advance: advances[index],
+        x_offset: index as f32 * 0.125 - 0.25,
+        y_offset: index as f32 * -0.0625,
+        y_advance: y_advances[index],
+        bounds_em: Some(super::PdfGlyphBoundsDiagnostics {
+          x_min_em: -0.125,
+          y_min_em: -0.25,
+          x_max_em: 0.75 + index as f32 * 0.125,
+          y_max_em: 1.0,
+        }),
+      })
+      .collect::<Vec<_>>();
+    for reverse in [false, true] {
+      let mut visual_glyphs = glyphs.clone();
+      let mut expected_ranges = semantic_ranges.clone();
+      if reverse {
+        visual_glyphs.reverse();
+        expected_ranges.reverse();
+      }
+      let remapped = remap_glyph_text_ranges(&visual_glyphs, source, &semantic)
+        .expect("one-to-one scalars must preserve shared clusters and visual order");
+      assert_eq!(remapped.len(), visual_glyphs.len());
+      for ((before, after), expected) in visual_glyphs
+        .iter()
+        .zip(remapped.iter())
+        .zip(expected_ranges)
+      {
+        assert_eq!(after.text_range, expected);
+        assert_eq!(after.glyph_id, before.glyph_id);
+        assert_eq!(after.x_advance.to_bits(), before.x_advance.to_bits());
+        assert_eq!(after.y_advance.to_bits(), before.y_advance.to_bits());
+        assert_eq!(after.x_offset.to_bits(), before.x_offset.to_bits());
+        assert_eq!(after.y_offset.to_bits(), before.y_offset.to_bits());
+        assert_eq!(after.bounds_em, before.bounds_em);
+        assert!(semantic.get(after.text_range.clone()).is_some());
+      }
+    }
+    // Remapping cannot mutate the original glyph run used for visible outlines.
+    for (glyph, original_range) in glyphs.iter().zip(source_ranges) {
+      assert_eq!(glyph.text_range, original_range);
+    }
+    assert!(remap_glyph_text_ranges(&[glyph(2..4)], source, &semantic).is_none());
+    assert!(remap_glyph_text_ranges(&glyphs, source, "expanded into extra scalars").is_none());
   }
 
   #[test]

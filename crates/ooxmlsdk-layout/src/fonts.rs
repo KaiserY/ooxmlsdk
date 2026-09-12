@@ -1029,6 +1029,52 @@ fn apply_wordprocessingml_single_double_byte_width_balance(
   run.advance_pt += total_adjustment;
 }
 
+pub(crate) fn named_font_has_direct_symbol_byte(
+  style: &(impl FontStyleRef + ?Sized),
+  byte: u8,
+) -> bool {
+  let mut request = font_request(style, None);
+  let Some(family) = request.family.as_deref() else {
+    return false;
+  };
+  // This is a query for an exact authored face, not a charset substitution
+  // request. In particular, do not trigger a characteristics search across
+  // system fonts because stale Word metadata says Symbol. Platform family
+  // queries and parsed face metadata use the existing shared caches.
+  request.charset = None;
+  request.family_class = None;
+  request.pitch = None;
+  let mut registry = FontRegistry::new();
+  if registry.register_system_query_fonts(&request).is_err() {
+    return false;
+  }
+  let Ok(resolved) = registry.resolve(&request) else {
+    return false;
+  };
+  registry
+    .face(&resolved.font_id)
+    .is_some_and(|face| font_face_has_direct_symbol_byte(face, family, byte))
+}
+
+fn font_face_has_direct_symbol_byte(
+  face: &ooxmlsdk_fonts::FontFaceInfo<'_>,
+  family: &str,
+  byte: u8,
+) -> bool {
+  // A substitute cannot establish the original face's encoding. Limit this
+  // correction to an exact, nonsymbolic face with one unambiguous Unicode
+  // selector. A dual-mapped font requires separate evidence of equivalence.
+  !face.flags.symbolic
+    && face
+      .family_names
+      .iter()
+      .any(|name| name.trim().eq_ignore_ascii_case(family.trim()))
+    && face.coverage.contains_char(char::from(byte))
+    && !face
+      .coverage
+      .contains_char(char::from_u32(0xF000 | u32::from(byte)).expect("legacy symbol byte"))
+}
+
 pub fn load_text_face(style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
   FontResolver::default().load_text_face(style)
 }
@@ -2314,6 +2360,36 @@ mod tests {
       .as_deref(),
       Some("East Asian Face")
     );
+  }
+
+  #[test]
+  fn direct_symbol_byte_requires_an_exact_unambiguous_unicode_face() {
+    for family in ["Ordinary Face A", "Ordinary Face B"] {
+      let mut face = ooxmlsdk_fonts::FontFaceInfo::synthetic("unicode-face", family);
+      face.coverage.unicode_ranges = vec![0x26..0x27, 0x41..0x42];
+      for byte in *b"&A" {
+        assert!(super::font_face_has_direct_symbol_byte(&face, family, byte));
+        assert!(!super::font_face_has_direct_symbol_byte(
+          &face,
+          "Unavailable Original Face",
+          byte,
+        ));
+      }
+      assert!(!super::font_face_has_direct_symbol_byte(
+        &face, family, b'$'
+      ));
+
+      face.flags.symbolic = true;
+      assert!(!super::font_face_has_direct_symbol_byte(
+        &face, family, b'&'
+      ));
+      face.flags.symbolic = false;
+      face.coverage.unicode_ranges.push(0xF026..0xF027);
+      assert!(!super::font_face_has_direct_symbol_byte(
+        &face, family, b'&'
+      ));
+      assert!(super::font_face_has_direct_symbol_byte(&face, family, b'A'));
+    }
   }
 
   #[test]

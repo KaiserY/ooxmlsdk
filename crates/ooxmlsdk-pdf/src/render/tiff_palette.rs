@@ -53,7 +53,7 @@ pub(super) fn decode(data: &[u8]) -> Result<Option<DecodedRasterImage>> {
   let indices = decoder.read_image().map_err(error)?;
   let mut rgb = vec![0; len];
   let row_bytes = (width as usize * bits as usize).div_ceil(8);
-  for (pixel, color) in rgb.chunks_exact_mut(3).enumerate() {
+  for (pixel, color) in rgb.as_chunks_mut::<3>().0.iter_mut().enumerate() {
     let index = match &indices {
       DecodingResult::U8(bytes) if bits <= 8 => {
         let x = pixel % width as usize;

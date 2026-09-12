@@ -628,11 +628,28 @@ pub(crate) fn lower_extended_chart(
       } else {
         slot
       };
+      let mut legend_style = appearance.label_style.clone();
+      if options.host == ChartExHost::PowerPoint
+        && series
+          .first()
+          .is_some_and(|series| series.layout == cx::SeriesLayout::Waterfall)
+      {
+        // Waterfall role labels are UI resources, like an automatic title.
+        // The current PowerPoint forum-mso-de-138303 reference uses PMingLiU
+        // for both under zh-TW, independently of document-language labels.
+        legend_style.east_asia_font_family = options.title_style.east_asia_font_family.clone();
+        apply_chartex_text_properties(
+          &mut legend_style,
+          legend.and_then(|legend| legend.tx_pr_text_body.as_deref()),
+          options.theme,
+        );
+      }
       lower_legend(
         &mut items,
         slot,
         &legend_entries,
         &appearance,
+        &legend_style,
         has_funnel,
         has_category_axis_title,
       );
@@ -1236,6 +1253,14 @@ fn apply_chartex_text_properties(
         .filter(|typeface| !typeface.is_empty() && !typeface.starts_with('+'))
       {
         style.font_family = Some(Arc::from(typeface));
+      }
+      if let Some(typeface) = defaults
+        .east_asian_font
+        .as_ref()
+        .and_then(|font| font.typeface.as_deref())
+        .filter(|typeface| !typeface.is_empty() && !typeface.starts_with('+'))
+      {
+        style.east_asia_font_family = Some(Arc::from(typeface));
       }
     }
     if let Some(properties) = paragraph
@@ -1897,13 +1922,13 @@ fn lower_legend(
   slot: PlotRect,
   entries: &[(String, RgbColor)],
   appearance: &Appearance,
+  style: &TextStyle,
   compact_funnel: bool,
   has_category_axis_title: bool,
 ) {
   if entries.is_empty() {
     return;
   }
-  let style = &appearance.label_style;
   let horizontal = slot.width > slot.height * 2.0;
   let powerpoint_compact =
     appearance.host == ChartExHost::PowerPoint && horizontal && style.font_size_pt > 9.5;

@@ -5842,7 +5842,7 @@ mod tests {
   fn default_emoji_fallback_keeps_text_symbols_and_authored_coverage() {
     let mut registry = FontRegistry::new();
     let mut primary = FontFaceInfo::synthetic("primary", "Primary");
-    primary.coverage.unicode_ranges = vec![0x41..0x42];
+    primary.coverage.unicode_ranges = std::iter::once(0x41..0x42).collect();
     registry.register_face(FontSource::System, primary);
     for (id, family, color) in [("symbol", "Symbol", false), ("emoji", "Emoji", true)] {
       let mut face = FontFaceInfo::synthetic(id, family);

@@ -163,6 +163,36 @@ pub(crate) fn office_boolean_text(ui_language: Option<&str>, value: bool) -> &'s
   values[usize::from(value)]
 }
 
+pub(crate) fn office_spreadsheet_error_text<'a>(
+  ui_language: Option<&str>,
+  error: &'a str,
+) -> &'a str {
+  let Some(locale) = ui_language.and_then(canonical_locale) else {
+    return error;
+  };
+  // Fixed-output controls verify these installed UI variants independently.
+  // In particular, es-MX prints #N¡NUM! and fr-CA keeps #GETTING_DATA.
+  // Do not infer another regional resource pack from the language alone.
+  match (locale.id.to_string().as_str(), error) {
+    ("de-DE", "#VALUE!") => "#WERT!",
+    ("de-DE", "#REF!") => "#BEZUG!",
+    ("de-DE", "#NUM!") => "#ZAHL!",
+    ("de-DE", "#N/A") => "#NV",
+    ("de-DE", "#GETTING_DATA") => "#DATEN_ABRUFEN",
+    ("es-MX", "#NULL!") => "#NULO!",
+    ("es-MX", "#VALUE!") => "#VALOR!",
+    ("es-MX", "#NAME?") => "#NOMBRE?",
+    ("es-MX", "#NUM!") => "#N¡NUM!",
+    ("es-MX", "#N/A") => "#N/D",
+    ("es-MX", "#GETTING_DATA") => "#OBTENIENDO_DATOS",
+    ("fr-CA", "#NULL!") => "#NUL!",
+    ("fr-CA", "#VALUE!") => "#VALEUR!",
+    ("fr-CA", "#NAME?") => "#NOM?",
+    ("fr-CA", "#NUM!") => "#NOMBRE!",
+    _ => error,
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum OfficeResourceLocale {
   #[default]

@@ -140,7 +140,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   pub(crate) fn date_number_from_scalar(&self, value: &FormulaValue<'doc>) -> Option<f64> {
     match value {
-      FormulaValue::String(text) => match datevalue(text, self.book.date_system) {
+      FormulaValue::String(text) => match self.date_value_from_text(text) {
         FormulaValue::Number(value) => Some(value),
         _ => None,
       },

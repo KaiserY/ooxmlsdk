@@ -6,7 +6,7 @@ use crate::error::Result;
 use crate::model::{BorderStyle, RgbColor, TextStyle};
 
 use super::styles::{BorderRecord, StylesCatalog, TableStyleRecord};
-use super::worksheet::{CellAddress, CellRange};
+use super::worksheet::{CalcRow, CellAddress, CellRange};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TableResourceCatalog {
@@ -21,12 +21,14 @@ pub(crate) struct TableResourceCatalog {
   pub(crate) header_row_format_id: Option<u32>,
   pub(crate) data_format_id: Option<u32>,
   pub(crate) totals_row_format_id: Option<u32>,
+  pub(crate) border_format_id: Option<u32>,
   pub(crate) columns: Vec<TableColumnModel>,
   pub(crate) has_auto_filter: bool,
   pub(crate) has_sort_state: bool,
   pub(crate) style: TableStyleModel,
   pub(crate) has_extensions: bool,
   pub(crate) query_tables: usize,
+  hidden_rows: Vec<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -73,6 +75,7 @@ impl TableResourceCatalog {
       header_row_format_id: table.header_row_format_id,
       data_format_id: table.data_format_id,
       totals_row_format_id: table.totals_row_format_id,
+      border_format_id: table.border_format_id,
       columns: table
         .table_columns
         .table_column
@@ -88,7 +91,50 @@ impl TableResourceCatalog {
         .unwrap_or_default(),
       has_extensions: table.table_extension_list.is_some(),
       query_tables: part.query_table_parts(package).count(),
+      hidden_rows: Vec::new(),
     })
+  }
+
+  pub(crate) fn set_row_visibility(&mut self, rows: &[CalcRow]) {
+    self.hidden_rows = rows
+      .iter()
+      .filter(|row| row.hidden)
+      .filter_map(|row| row.row_index)
+      .filter(|row| {
+        self
+          .range
+          .is_some_and(|range| (range.start.row..=range.end.row).contains(row))
+      })
+      .collect();
+    self.hidden_rows.sort_unstable();
+    self.hidden_rows.dedup();
+  }
+
+  fn visible_row_offset(&self, start: u32, row: u32) -> u32 {
+    if row <= start {
+      return 0;
+    }
+    let first = self.hidden_rows.partition_point(|hidden| *hidden < start);
+    let last = self.hidden_rows.partition_point(|hidden| *hidden < row);
+    row - start - (last - first) as u32
+  }
+
+  fn row_at_visible_offset(&self, start: u32, end: u32, offset: u32) -> Option<u32> {
+    if start > end || offset >= self.visible_row_offset(start, end.saturating_add(1)) {
+      return None;
+    }
+    // Select a visible row by rank without scanning long runs of hidden rows.
+    let mut low = start;
+    let mut high = end;
+    while low < high {
+      let middle = low + (high - low) / 2;
+      if self.visible_row_offset(start, middle + 1) > offset {
+        high = middle;
+      } else {
+        low = middle + 1;
+      }
+    }
+    Some(low)
   }
 }
 
@@ -98,6 +144,7 @@ pub(crate) struct BuiltinTableCellStyle {
   pub(crate) text_color: Option<RgbColor>,
   pub(crate) bold: bool,
   pub(crate) borders: BorderRecord,
+  pub(crate) outline_borders: BorderRecord,
   differential_format_ids: [Option<u32>; 16],
 }
 
@@ -115,6 +162,35 @@ pub(crate) fn builtin_table_style_for_address(
   let Some(range) = table.range else {
     return BuiltinTableCellStyle::default();
   };
+  let mut result = table_style_for_address(table, styles, range, address);
+  // Unlike cached data/header/totals DXFs, tableBorderDxfId paints the
+  // table perimeter. It also applies when no named table style is selected.
+  if let Some(outline) = table
+    .border_format_id
+    .and_then(|id| styles.differential_borders(id))
+  {
+    if address.col == range.start.col && outline.left.is_some() {
+      result.outline_borders.left = outline.left;
+    }
+    if address.col == range.end.col && outline.right.is_some() {
+      result.outline_borders.right = outline.right;
+    }
+    if address.row == range.start.row && outline.top.is_some() {
+      result.outline_borders.top = outline.top;
+    }
+    if address.row == range.end.row && outline.bottom.is_some() {
+      result.outline_borders.bottom = outline.bottom;
+    }
+  }
+  result
+}
+
+fn table_style_for_address(
+  table: &TableResourceCatalog,
+  styles: &StylesCatalog,
+  range: CellRange,
+  address: CellAddress,
+) -> BuiltinTableCellStyle {
   let Some(name) = table.style.name.as_deref() else {
     return BuiltinTableCellStyle::default();
   };
@@ -194,18 +270,23 @@ pub(crate) fn builtin_table_style_for_address(
     ),
     "TableStyleMedium9" => medium9_style(table, styles, range, address),
     "TableStyleMedium21" => medium_dark_header_style(table, styles, range, address, 9),
+    "TableStyleMedium22" => medium_tinted_grid_style(table, styles, range, address, 1),
+    "TableStyleMedium23" => medium_tinted_grid_style(table, styles, range, address, 4),
     "TableStyleMedium24" => medium_tinted_grid_style(table, styles, range, address, 5),
+    "TableStyleMedium25" => medium_tinted_grid_style(table, styles, range, address, 6),
+    "TableStyleMedium26" => medium_tinted_grid_style(table, styles, range, address, 7),
+    "TableStyleMedium27" => medium_tinted_grid_style(table, styles, range, address, 8),
+    "TableStyleMedium28" => medium_tinted_grid_style(table, styles, range, address, 9),
     "TableStyleDark11" => dark_split_accent_style(table, styles, range, address, 8, 9),
     _ => BuiltinTableCellStyle::default(),
   };
-  merge_direct_table_differentials(&mut result, table, styles, range, address);
+  merge_direct_table_differentials(&mut result, table, range, address);
   result
 }
 
 fn merge_direct_table_differentials(
   result: &mut BuiltinTableCellStyle,
   table: &TableResourceCatalog,
-  styles: &StylesCatalog,
   range: CellRange,
   address: CellAddress,
 ) {
@@ -220,7 +301,7 @@ fn merge_direct_table_differentials(
     table.data_format_id
   };
   if let Some(format_id) = table_format_id {
-    merge_direct_cell_differential(result, styles, format_id);
+    merge_direct_cell_differential(result, format_id);
   }
 
   let Some(column) = address
@@ -238,15 +319,11 @@ fn merge_direct_table_differentials(
     column.data_format_id
   };
   if let Some(format_id) = column_format_id {
-    merge_direct_cell_differential(result, styles, format_id);
+    merge_direct_cell_differential(result, format_id);
   }
 }
 
-fn merge_direct_cell_differential(
-  result: &mut BuiltinTableCellStyle,
-  styles: &StylesCatalog,
-  format_id: u32,
-) {
+fn merge_direct_cell_differential(result: &mut BuiltinTableCellStyle, format_id: u32) {
   if let Some(slot) = result
     .differential_format_ids
     .iter_mut()
@@ -254,23 +331,10 @@ fn merge_direct_cell_differential(
   {
     *slot = Some(format_id);
   }
-  if let Some(fill) = styles.differential_fill_color(format_id) {
-    result.fill = Some(fill);
-  }
-  if let Some(border) = styles.differential_borders(format_id) {
-    if border.left.is_some() {
-      result.borders.left = border.left;
-    }
-    if border.right.is_some() {
-      result.borders.right = border.right;
-    }
-    if border.top.is_some() {
-      result.borders.top = border.top;
-    }
-    if border.bottom.is_some() {
-      result.borders.bottom = border.bottom;
-    }
-  }
+  // Table/column region DXFs retain formatting for table operations; their
+  // cached fills and borders do not repaint existing cells. Office controls
+  // retain the table stripe and grid even without an explicit cell style.
+  // Authored tableStyleElement DXFs are applied separately below.
 }
 
 fn custom_table_style(
@@ -303,7 +367,7 @@ fn custom_table_style(
   // Office totalsRowFunction.xlsx retains its custom totalRow's bold teal
   // font over the column totalsRowDxfId's cached regular black font. Seed
   // those column/table formats before applying the authored style regions.
-  merge_direct_table_differentials(&mut result, table, styles, table_range, address);
+  merge_direct_table_differentials(&mut result, table, table_range, address);
   for element_type in PRECEDENCE {
     let Some(element) = style
       .elements
@@ -390,6 +454,7 @@ fn table_style_element_region(
     {
       stripe_region(
         style,
+        table,
         table_range,
         address,
         true,
@@ -402,6 +467,7 @@ fn table_style_element_region(
     {
       stripe_region(
         style,
+        table,
         table_range,
         address,
         false,
@@ -416,6 +482,7 @@ fn table_style_element_region(
 
 fn stripe_region(
   style: &TableStyleRecord,
+  table: &TableResourceCatalog,
   table_range: CellRange,
   address: CellAddress,
   rows: bool,
@@ -456,19 +523,35 @@ fn stripe_region(
   if target < start || target > end || period == 0 {
     return None;
   }
-  let offset = target - start;
-  let period_start = start.saturating_add(offset / period * period);
-  let (stripe_start, stripe_size) = if first {
+  let offset = if rows {
+    table.visible_row_offset(start, target)
+  } else {
+    target - start
+  };
+  let period_start = offset / period * period;
+  let (stripe_offset, stripe_size) = if first {
     (period_start, first_size)
   } else {
     (period_start.saturating_add(first_size), second_size)
   };
-  let stripe_end = stripe_start
-    .saturating_add(stripe_size.saturating_sub(1))
-    .min(end);
-  if target < stripe_start || target > stripe_end {
+  let stripe_last_offset = stripe_offset.saturating_add(stripe_size.saturating_sub(1));
+  if offset < stripe_offset || offset > stripe_last_offset {
     return None;
   }
+  let (stripe_start, stripe_end) = if rows {
+    let last_visible = table
+      .visible_row_offset(start, end.saturating_add(1))
+      .checked_sub(1)?;
+    (
+      table.row_at_visible_offset(start, end, stripe_offset)?,
+      table.row_at_visible_offset(start, end, stripe_last_offset.min(last_visible))?,
+    )
+  } else {
+    (
+      start.saturating_add(stripe_offset),
+      start.saturating_add(stripe_last_offset).min(end),
+    )
+  };
   Some(if rows {
     CellRange::new(
       CellAddress {
@@ -539,17 +622,17 @@ fn light1_style(
   // columns, a dk1 rule around the table, and a shaded lt1 first stripe.
   let dark1 = styles.theme_color(1, 0.0);
   let mut result = BuiltinTableCellStyle {
-    borders: horizontal_table_rule(range, address, dark1, 0.5),
+    borders: horizontal_table_rule(range, address, dark1, 1.0),
     ..BuiltinTableCellStyle::default()
   };
   if is_header(table, range, address) {
     result.bold = true;
     result.text_color = dark1;
-    result.borders.bottom = border(dark1, 0.5, false);
+    result.borders.bottom = border(dark1, 1.0, false);
   } else if is_total(table, range, address) {
     result.bold = true;
     result.text_color = dark1;
-    result.borders.top = border(dark1, 0.5, false);
+    result.borders.top = border(dark1, 1.0, false);
   } else {
     apply_emphasized_edge_columns(table, range, address, dark1, &mut result);
     if is_first_row_stripe(table, range, address) {
@@ -575,17 +658,17 @@ fn light_accent_grid_style(
   let dark1 = styles.theme_color(1, 0.0);
   let mut result = BuiltinTableCellStyle {
     text_color: dark1,
-    borders: outer_table_rules(range, address, accent, 0.5),
+    borders: outer_table_rules(range, address, accent, 1.0),
     ..BuiltinTableCellStyle::default()
   };
 
   if table.style.show_row_stripes
     && address.row >= range.start.row.saturating_add(table.header_rows)
   {
-    result.borders.top = border(accent, 0.5, false);
+    result.borders.top = border(accent, 1.0, false);
   }
   if table.style.show_column_stripes {
-    result.borders.left = border(accent, 0.5, false);
+    result.borders.left = border(accent, 1.0, false);
   }
   apply_emphasized_edge_columns(table, range, address, dark1, &mut result);
 
@@ -615,17 +698,17 @@ fn light_accent_outline_style(
   let stripe = styles.theme_color(accent_theme, 0.799_981_688_894_314_4);
   let mut result = BuiltinTableCellStyle {
     text_color: dark_accent,
-    borders: horizontal_outer_table_rules(range, address, accent, 0.5),
+    borders: horizontal_outer_table_rules(range, address, accent, 1.0),
     ..BuiltinTableCellStyle::default()
   };
   apply_first_table_stripe_fill(table, range, address, stripe, &mut result);
   apply_emphasized_edge_columns(table, range, address, dark_accent, &mut result);
   if is_header(table, range, address) {
     result.bold = true;
-    result.borders.bottom = border(accent, 0.5, false);
+    result.borders.bottom = border(accent, 1.0, false);
   } else if is_total(table, range, address) {
     result.bold = true;
-    result.borders.top = border(accent, 0.5, false);
+    result.borders.top = border(accent, 1.0, false);
   }
   result
 }
@@ -648,14 +731,14 @@ fn light_tinted_grid_style(
   };
   let mut result = BuiltinTableCellStyle {
     text_color: dark1,
-    borders: grid_table_rules(accent, 0.5),
+    borders: grid_table_rules(accent, 1.0),
     ..BuiltinTableCellStyle::default()
   };
   apply_first_table_stripe_fill(table, range, address, stripe, &mut result);
   apply_emphasized_edge_columns(table, range, address, dark1, &mut result);
   if is_header(table, range, address) {
     result.bold = true;
-    result.borders.bottom = border(accent, 1.5, false);
+    result.borders.bottom = border(accent, 2.0, false);
   } else if is_total(table, range, address) {
     result.bold = true;
     result.borders.top = border(accent, 1.0, true);
@@ -680,7 +763,7 @@ fn medium_header_fill_style(
   let stripe = stripe_theme.and_then(|(theme, tint)| styles.theme_color(theme, tint));
   let mut result = BuiltinTableCellStyle {
     text_color: dark1,
-    borders: all_table_rules(range, address, rule, 0.5),
+    borders: all_table_rules(range, address, rule, 1.0),
     ..BuiltinTableCellStyle::default()
   };
   apply_first_table_stripe_fill(table, range, address, stripe, &mut result);
@@ -712,7 +795,7 @@ fn medium_dark_header_style(
   let stripe = styles.theme_color(0, -0.149_998_474_074_526_2);
   let mut result = BuiltinTableCellStyle {
     text_color: dark1,
-    borders: horizontal_outer_table_rules(range, address, dark1, 1.5),
+    borders: horizontal_outer_table_rules(range, address, dark1, 2.0),
     ..BuiltinTableCellStyle::default()
   };
   apply_first_table_stripe_fill(table, range, address, stripe, &mut result);
@@ -727,7 +810,7 @@ fn medium_dark_header_style(
     result.fill = accent;
     result.text_color = light1;
     result.bold = true;
-    result.borders.bottom = border(dark1, 1.5, false);
+    result.borders.bottom = border(dark1, 2.0, false);
   } else if is_total(table, range, address) {
     result.borders.top = border(dark1, 1.0, true);
   }
@@ -741,32 +824,39 @@ fn medium_tinted_grid_style(
   address: CellAddress,
   accent_theme: u32,
 ) -> BuiltinTableCellStyle {
-  // POI presetTableStyles.xml Medium22..28: tint-0.8 base, tint-0.6
-  // first stripe, and tint-0.4 full cell grid.
+  // POI presetTableStyles.xml Medium23..28: tint-0.8 base, tint-0.6
+  // first stripe, and tint-0.4 full cell grid. Medium22 uses shaded
+  // Light1 fills and an untinted Dark1 grid instead.
   let accent = styles.theme_color(accent_theme, 0.0);
   let dark1 = styles.theme_color(1, 0.0);
-  let mut result = BuiltinTableCellStyle {
-    fill: styles.theme_color(accent_theme, 0.799_981_688_894_314_4),
-    text_color: dark1,
-    borders: grid_table_rules(
+  let (fill, stripe, grid) = if accent_theme == 1 {
+    (
+      styles.theme_color(0, -0.149_998_474_074_526_2),
+      styles.theme_color(0, -0.349_986_266_670_735_8),
+      dark1,
+    )
+  } else {
+    (
+      styles.theme_color(accent_theme, 0.799_981_688_894_314_4),
+      styles.theme_color(accent_theme, 0.599_993_896_298_104_8),
       styles.theme_color(accent_theme, 0.399_975_585_192_419_2),
-      0.5,
-    ),
+    )
+  };
+  let mut result = BuiltinTableCellStyle {
+    fill,
+    text_color: dark1,
+    borders: grid_table_rules(grid, 1.0),
     ..BuiltinTableCellStyle::default()
   };
-  apply_first_table_stripe_fill(
-    table,
-    range,
-    address,
-    styles.theme_color(accent_theme, 0.599_993_896_298_104_8),
-    &mut result,
-  );
+  if !is_header(table, range, address) && !is_total(table, range, address) {
+    apply_first_table_stripe_fill(table, range, address, stripe, &mut result);
+  }
   apply_emphasized_edge_columns(table, range, address, dark1, &mut result);
   if is_header(table, range, address) {
     result.bold = true;
   } else if is_total(table, range, address) {
     result.bold = true;
-    result.borders.top = border(accent, 1.5, false);
+    result.borders.top = border(accent, 2.0, false);
   }
   result
 }
@@ -820,7 +910,7 @@ fn medium2_style(
   let dark1 = styles.theme_color(1, 0.0);
   let rule = styles.theme_color(4, 0.399_975_585_192_419_2);
   let mut result = BuiltinTableCellStyle {
-    borders: all_table_rules(range, address, rule, 0.5),
+    borders: all_table_rules(range, address, rule, 1.0),
     ..BuiltinTableCellStyle::default()
   };
   if is_header(table, range, address) {
@@ -849,14 +939,16 @@ fn medium9_style(
   range: CellRange,
   address: CellAddress,
 ) -> BuiltinTableCellStyle {
-  // LibreOffice defaulttablestyles.inc: Medium9 has an Accent1 tint 0.8
-  // whole-table fill, tint 0.6 first stripes, and Accent1 header/total rows.
+  // Office Medium9 has thin internal rules, a thick header bottom and a
+  // thick totals top, with no outer frame. FilterColumn's printer mapping
+  // renders these at 0.96/2.76pt (100%) and 0.36/1.20pt (45%): retain the
+  // nominal thin/thick weights here and let fixed output apply that mapping.
   let accent1 = styles.theme_color(4, 0.0);
   let light1 = styles.theme_color(0, 0.0);
   let dark1 = styles.theme_color(1, 0.0);
   let mut result = BuiltinTableCellStyle {
     fill: styles.theme_color(4, 0.799_981_688_894_314_4),
-    borders: inner_table_rules(range, address, light1, 0.5),
+    borders: inner_table_rules(range, address, light1, 1.0),
     text_color: dark1,
     ..BuiltinTableCellStyle::default()
   };
@@ -864,11 +956,12 @@ fn medium9_style(
     result.fill = accent1;
     result.text_color = light1;
     result.bold = true;
+    result.borders.bottom = border(light1, 3.0, false);
   } else if is_total(table, range, address) {
     result.fill = accent1;
     result.text_color = light1;
     result.bold = true;
-    result.borders.bottom = border(light1, 1.5, false);
+    result.borders.top = border(light1, 3.0, false);
   } else {
     apply_emphasized_edge_columns(table, range, address, dark1, &mut result);
     if is_first_row_stripe(table, range, address) {
@@ -910,7 +1003,12 @@ fn is_first_row_stripe(
     return false;
   }
   let data_start = range.start.row.saturating_add(table.header_rows);
-  address.row >= data_start && (address.row - data_start).is_multiple_of(2)
+  // Both manual hiding and AutoFilter skip rows in Office table banding.
+  // The phase belongs to the table's visible data rows, not a printed page.
+  address.row >= data_start
+    && table
+      .visible_row_offset(data_start, address.row)
+      .is_multiple_of(2)
 }
 
 fn is_first_column_stripe(
@@ -1101,6 +1199,7 @@ mod tests {
       header_row_format_id: None,
       data_format_id: None,
       totals_row_format_id: None,
+      border_format_id: None,
       columns: Vec::new(),
       has_auto_filter: true,
       has_sort_state: false,
@@ -1111,6 +1210,7 @@ mod tests {
       },
       has_extensions: false,
       query_tables: 0,
+      hidden_rows: Vec::new(),
     }
   }
 
@@ -1195,16 +1295,23 @@ mod tests {
   }
 
   #[test]
-  fn direct_column_differential_follows_table_differential() {
+  fn cached_column_paint_differentials_do_not_override_table_style() {
     let red = RgbColor { r: 255, g: 0, b: 0 };
     let blue = RgbColor { r: 0, g: 0, b: 255 };
     let mut styles = StylesCatalog::default();
+    let cached_border = BorderRecord {
+      left: border(Some(red), 3.0, false),
+      right: border(Some(red), 3.0, false),
+      top: border(Some(red), 3.0, false),
+      bottom: border(Some(red), 3.0, false),
+    };
     styles.differential_format_records = vec![
       DifferentialFormatRecord {
         fill: Some(FillRecord {
           color: Some(red),
           ..Default::default()
         }),
+        border: Some(cached_border),
         ..DifferentialFormatRecord::default()
       },
       DifferentialFormatRecord {
@@ -1212,10 +1319,17 @@ mod tests {
           color: Some(blue),
           ..Default::default()
         }),
+        border: Some(cached_border),
         ..DifferentialFormatRecord::default()
       },
     ];
     let mut table = custom_table("TableStyleMedium21");
+    let original_fill = builtin_table_style_for_address(
+      std::slice::from_ref(&table),
+      &styles,
+      CellAddress { col: 1, row: 3 },
+    )
+    .fill;
     table.data_format_id = Some(0);
     table.columns = (1..=3)
       .map(|id| TableColumnModel {
@@ -1240,13 +1354,80 @@ mod tests {
       &styles,
       CellAddress { col: 1, row: 3 },
     );
-    assert_eq!(first_column.fill, Some(red));
+    assert_eq!(first_column.fill, original_fill);
     let second_column = builtin_table_style_for_address(
       std::slice::from_ref(&table),
       &styles,
       CellAddress { col: 2, row: 3 },
     );
-    assert_eq!(second_column.fill, Some(blue));
+    assert_eq!(second_column.fill, original_fill);
+    for cell in [first_column, second_column] {
+      assert!(cell.borders.left.is_none());
+      assert!(cell.borders.right.is_none());
+      assert!(cell.borders.top.is_none());
+      assert!(cell.borders.bottom.is_none());
+    }
+    assert_eq!(
+      second_column.differential_format_ids[..2],
+      [Some(0), Some(1)]
+    );
+  }
+
+  #[test]
+  fn table_border_differential_paints_only_the_perimeter_without_a_named_style() {
+    let red = RgbColor { r: 255, g: 0, b: 0 };
+    let mut styles = StylesCatalog::default();
+    styles.differential_format_records = vec![DifferentialFormatRecord {
+      border: Some(grid_table_rules(Some(red), 1.0)),
+      ..Default::default()
+    }];
+    let mut table = custom_table("TableStyleLight17");
+    table.style.name = None;
+    table.border_format_id = Some(0);
+    for row in 1..=5 {
+      for col in 1..=3 {
+        let cell = builtin_table_style_for_address(
+          std::slice::from_ref(&table),
+          &styles,
+          CellAddress { row, col },
+        );
+        assert_eq!(cell.outline_borders.left.is_some(), col == 1);
+        assert_eq!(cell.outline_borders.right.is_some(), col == 3);
+        assert_eq!(cell.outline_borders.top.is_some(), row == 1);
+        assert_eq!(cell.outline_borders.bottom.is_some(), row == 5);
+      }
+    }
+  }
+
+  #[test]
+  fn preset_table_weights_match_office_thin_and_medium_borders() {
+    let mut package = SpreadsheetDocument::create(ooxmlsdk::sdk::SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::default(),
+    )
+    .unwrap();
+    for (name, top_width) in [
+      ("TableStyleLight1", 1.0),
+      ("TableStyleLight2", 1.0),
+      ("TableStyleLight9", 1.0),
+      ("TableStyleLight17", 1.0),
+      ("TableStyleMedium2", 1.0),
+      ("TableStyleMedium21", 2.0),
+    ] {
+      let table = custom_table(name);
+      let header = builtin_table_style_for_address(
+        std::slice::from_ref(&table),
+        &styles,
+        CellAddress { col: 1, row: 1 },
+      );
+      assert_eq!(header.borders.top.unwrap().width_pt, top_width, "{name}");
+      if name == "TableStyleLight17" || name == "TableStyleMedium21" {
+        assert_eq!(header.borders.bottom.unwrap().width_pt, 2.0, "{name}");
+      }
+    }
   }
 
   #[test]
@@ -1271,6 +1452,227 @@ mod tests {
       );
       assert!(header.bold, "{style_name} header");
       assert!(total.bold, "{style_name} total");
+    }
+  }
+
+  #[test]
+  fn medium9_rules_follow_office_header_and_totals_regions() {
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::default(),
+    )
+    .unwrap();
+    let white = RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    };
+    for headers in [0, 1] {
+      for totals in [0, 1] {
+        let mut table = custom_table("TableStyleMedium9");
+        table.header_rows = headers;
+        table.totals_rows = totals;
+        for (address, expected) in [
+          (
+            CellAddress { col: 1, row: 1 },
+            [
+              None,
+              Some(1.0),
+              None,
+              Some(if headers == 1 { 3.0 } else { 1.0 }),
+            ],
+          ),
+          (
+            CellAddress { col: 2, row: 3 },
+            [Some(1.0), Some(1.0), Some(1.0), Some(1.0)],
+          ),
+          (
+            CellAddress { col: 3, row: 5 },
+            [
+              Some(1.0),
+              None,
+              Some(if totals == 1 { 3.0 } else { 1.0 }),
+              None,
+            ],
+          ),
+        ] {
+          let result =
+            builtin_table_style_for_address(std::slice::from_ref(&table), &styles, address);
+          for (line, width) in [
+            result.borders.left,
+            result.borders.right,
+            result.borders.top,
+            result.borders.bottom,
+          ]
+          .into_iter()
+          .zip(expected)
+          {
+            assert_eq!(line.map(|line| line.width_pt), width);
+            if let Some(line) = line {
+              assert_eq!(line.color, white);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn table_stripes_skip_hidden_rows_and_keep_custom_region_edges() {
+    use super::super::worksheet::{
+      CalcSheet, SheetIdentity, SheetResourceCatalog, SpreadsheetProducerProfile,
+    };
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let mut styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::default(),
+    )
+    .unwrap();
+    let dark = styles.theme_color(4, 0.599_993_896_298_104_8);
+    let light = styles.theme_color(4, 0.799_981_688_894_314_4);
+    let mut table = custom_table("TableStyleMedium9");
+    table.range = CellRange::parse_a1_range("F12:O30");
+    table.totals_rows = 0;
+    let worksheet = x::Worksheet::from_bytes(br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="16" hidden="1"/></sheetData></worksheet>"#).unwrap();
+    let sheet = CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Bands".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog {
+        tables: vec![table],
+        ..Default::default()
+      },
+      &[],
+      &styles,
+      SpreadsheetProducerProfile::default(),
+    );
+    let mut table = sheet.resources.tables[0].clone();
+    // Office's filtered and manually hidden F16 controls have the same
+    // visible colors: F17 continues with the second stripe after F15.
+    for (row, expected) in [(13, dark), (14, light), (15, dark), (17, light), (18, dark)] {
+      let actual = builtin_table_style_for_address(
+        std::slice::from_ref(&table),
+        &styles,
+        CellAddress { col: 6, row },
+      );
+      assert_eq!(actual.fill, expected, "Medium9 row {row}");
+    }
+    styles.differential_format_records = [dark, light]
+      .into_iter()
+      .map(|color| DifferentialFormatRecord {
+        fill: Some(FillRecord {
+          color,
+          ..Default::default()
+        }),
+        ..Default::default()
+      })
+      .collect();
+    styles.table_style_records = vec![TableStyleRecord {
+      name: "TwoThree".into(),
+      elements: vec![
+        TableStyleElementRecord {
+          r#type: x::TableStyleValues::FirstRowStripe,
+          size: 2,
+          format_id: Some(0),
+        },
+        TableStyleElementRecord {
+          r#type: x::TableStyleValues::SecondRowStripe,
+          size: 3,
+          format_id: Some(1),
+        },
+      ],
+    }];
+    table.style.name = Some("TwoThree".into());
+    for (row, expected) in [
+      (13, dark),
+      (14, dark),
+      (15, light),
+      (17, light),
+      (18, light),
+      (19, dark),
+      (20, dark),
+    ] {
+      let actual = builtin_table_style_for_address(
+        std::slice::from_ref(&table),
+        &styles,
+        CellAddress { col: 6, row },
+      );
+      assert_eq!(actual.fill, expected, "2/3 stripe row {row}");
+    }
+    let region = table_style_element_region(
+      &table,
+      &styles.table_style_records[0],
+      table.range.unwrap(),
+      CellAddress { col: 6, row: 17 },
+      x::TableStyleValues::SecondRowStripe,
+    )
+    .unwrap();
+    assert_eq!((region.start.row, region.end.row), (15, 18));
+    table.hidden_rows.push(17);
+    let actual = builtin_table_style_for_address(
+      std::slice::from_ref(&table),
+      &styles,
+      CellAddress { col: 6, row: 19 },
+    );
+    assert_eq!(
+      actual.fill, light,
+      "mixed hiding retains three visible rows in the second stripe"
+    );
+  }
+
+  #[test]
+  fn tinted_grid_stripes_leave_header_and_totals_unbanded() {
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::default(),
+    )
+    .unwrap();
+    // Office's Medium22..28 controls keep both regions unbanded, including
+    // when the totals row would otherwise be the next first-stripe row.
+    for number in 22..=28 {
+      for column_stripes in [false, true] {
+        let mut table = custom_table(&format!("TableStyleMedium{number}"));
+        table.range.as_mut().unwrap().end.row = 6;
+        table.style.show_row_stripes = !column_stripes;
+        table.style.show_column_stripes = column_stripes;
+        let at = |col, row| {
+          builtin_table_style_for_address(
+            std::slice::from_ref(&table),
+            &styles,
+            CellAddress { col, row },
+          )
+        };
+        let base = at(2, 3).fill;
+        assert!(base.is_some());
+        assert_ne!(at(1, 2).fill, base);
+        for col in 1..=3 {
+          let header = at(col, 1);
+          let total = at(col, 6);
+          assert_eq!(header.fill, base, "Medium{number} header column {col}");
+          assert_eq!(total.fill, base, "Medium{number} total column {col}");
+          assert!(header.bold && total.bold);
+          assert_eq!(header.borders.bottom.unwrap().width_pt, 1.0);
+          assert_eq!(total.borders.top.unwrap().width_pt, 2.0);
+        }
+      }
     }
   }
 

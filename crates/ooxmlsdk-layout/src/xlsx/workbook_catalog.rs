@@ -263,6 +263,7 @@ pub(crate) struct CalculationChainResource {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct CellMetadataResource {
+  pub(crate) dynamic_array_indices: Vec<u32>,
   pub(crate) metadata_types: usize,
   pub(crate) metadata_strings: usize,
   pub(crate) mdx_records: usize,
@@ -1207,6 +1208,7 @@ impl CellMetadataResource {
         .sum()
     });
     Ok(Self {
+      dynamic_array_indices: ooxmlsdk_formula::dynamic_array_metadata_indices(metadata),
       metadata_types: metadata
         .metadata_types
         .as_ref()
@@ -1322,4 +1324,23 @@ fn rich_value_reserved_key_text_len(flags: &xlrd2::RichValueTypeKeyFlags) -> usi
           .sum::<usize>()
     })
     .sum()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn dynamic_array_metadata_follows_type_value_and_cell_indices() {
+    let metadata = x::Metadata::from_bytes(br#"<metadata xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:xda="http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray">
+      <metadataTypes><metadataType name="OTHER" minSupportedVersion="1"/><metadataType name="XLDAPR" minSupportedVersion="120000"/></metadataTypes>
+      <futureMetadata name="XLDAPR"><bk><extLst><ext uri="{bdbb8cdc-fa1e-496e-a857-3c3f30c029c3}"><xda:dynamicArrayProperties fDynamic="0"/></ext></extLst></bk><bk><extLst><ext uri="{bdbb8cdc-fa1e-496e-a857-3c3f30c029c3}"><xda:dynamicArrayProperties fDynamic="1"/></ext></extLst></bk></futureMetadata>
+      <cellMetadata><bk><rc t="1" v="1"/></bk><bk><rc t="2" v="0"/></bk><bk><rc t="2" v="1"/></bk><bk><rc t="0" v="1"/></bk><bk><rc t="2" v="2"/></bk></cellMetadata>
+    </metadata>"#).unwrap();
+    assert_eq!(
+      ooxmlsdk_formula::dynamic_array_metadata_indices(&metadata),
+      [3]
+    );
+  }
 }

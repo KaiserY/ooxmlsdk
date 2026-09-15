@@ -183,6 +183,8 @@ pub struct FormulaReferencePoint {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum FormulaSheetReference {
   Current,
+  /// An explicit `!` qualifier, resolved against the evaluating worksheet.
+  CurrentQualified,
   Local(FormulaSheetRange),
   External {
     book: FormulaSymbolId,
@@ -898,7 +900,7 @@ impl FormulaPrinter<'_> {
     args: FormulaArgSpan,
     output: &mut String,
   ) -> Option<()> {
-    self.print_expr(callee, 0, FormulaPrintSide::None, output)?;
+    self.print_expr(callee, 12, FormulaPrintSide::Left, output)?;
     output.push('(');
     self.print_args(args, output)?;
     output.push(')');
@@ -1011,6 +1013,7 @@ impl FormulaPrinter<'_> {
   fn print_sheet_reference(&self, sheet: FormulaSheetReference, output: &mut String) -> Option<()> {
     match sheet {
       FormulaSheetReference::Current => {}
+      FormulaSheetReference::CurrentQualified => output.push('!'),
       FormulaSheetReference::Local(range) => {
         self.print_sheet_range(range, output)?;
         output.push('!');

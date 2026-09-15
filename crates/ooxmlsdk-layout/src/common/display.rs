@@ -147,6 +147,11 @@ pub struct TextRun<'doc> {
   /// stream and semantic layer while glyph ink outside this rectangle is
   /// suppressed.
   pub paint_clip: Option<Rect>,
+  /// Optional page-space ownership bounds used instead of glyph bounds when
+  /// deciding whether to emit this run on a physical page. For example, a
+  /// spanning spreadsheet merge retains its complete text on each owned page.
+  /// This does not change the text geometry or its paint clip.
+  pub page_culling_bounds: Option<Rect>,
   pub style: TextStyle<'doc>,
   pub font_id: Option<FontId>,
   pub color: Color,

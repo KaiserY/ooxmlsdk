@@ -66,7 +66,7 @@ pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
 png = "0.18.1"
 toml = "1.1.4"
 fontique = { version = "0.11.0", features = ["fontconfig-dlopen", "system"] }
-harfrust = { version = "0.12.0", default-features = false, features = ["std"] }
+harfrust = { version = "0.13.3", default-features = false, features = ["std"] }
 html5ever = "0.39.0"
 hypher = "0.1.7"
 icu_collator = { version = "2.2.1", features = ["compiled_data"] }

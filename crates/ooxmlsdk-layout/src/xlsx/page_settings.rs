@@ -283,6 +283,7 @@ pub(crate) struct CalcPageSettings {
   pub(crate) horizontal_dpi: u32,
   pub(crate) vertical_dpi: u32,
   pub(crate) page_order: Option<x::PageOrderValues>,
+  pub(crate) first_page_number: Option<i64>,
   pub(crate) orientation: Option<x::OrientationValues>,
   pub(crate) horizontal_centered: bool,
   pub(crate) vertical_centered: bool,
@@ -338,6 +339,7 @@ impl Default for CalcPageSettings {
       horizontal_dpi: units::OFFICE_FIXED_OUTPUT_DPI as u32,
       vertical_dpi: units::OFFICE_FIXED_OUTPUT_DPI as u32,
       page_order: Some(x::PageOrderValues::DownThenOver),
+      first_page_number: None,
       orientation: None,
       horizontal_centered: false,
       vertical_centered: false,
@@ -350,6 +352,12 @@ impl Default for CalcPageSettings {
 }
 
 impl CalcPageSettings {
+  pub(crate) fn header_footer_page_number(&self, sheet_page_index: usize, automatic: usize) -> i64 {
+    self.first_page_number.map_or(automatic as i64, |first| {
+      first.saturating_add(sheet_page_index as i64)
+    })
+  }
+
   pub(crate) fn from_worksheet(
     worksheet: &x::Worksheet,
     microsoft_office: bool,
@@ -384,16 +392,28 @@ impl CalcPageSettings {
     }
     settings.header_footer = HeaderFooterModel::from_worksheet(worksheet);
     // Microsoft Excel writes a pageSetup element for an initialized print
-    // canvas but may omit both paperSize and the devMode printer-settings
-    // relation. SpreadsheetML's paperSize default is Letter; Office fixed
-    // output maps that uncalibrated canvas onto the active default page. A
+    // canvas but may omit paperSize. A related DEVMODE whose media flags are
+    // clear supplies no paper size either. SpreadsheetML defaults to Letter;
+    // Office fixed output maps that canvas onto the active default page. A
     // worksheet with no pageSetup is the counterexample and retains the native
     // default page. This profile is emitted by both desktop and online Excel.
     settings.implicit_microsoft_letter_canvas = microsoft_office
       && worksheet
         .page_setup
         .as_ref()
-        .is_some_and(|setup| setup.paper_size.is_none() && setup.id.is_none());
+        .is_some_and(|setup| setup.paper_size.is_none())
+      && !settings.explicit_paper_size;
+    // 61652's omitted paper, explicit Letter, and absent relationship controls
+    // produce identical PDFs. Unflagged DEVMODE media bytes do not calibrate
+    // an explicit Letter request; explicit paperSize=0 remains unscaled.
+    if microsoft_office
+      && settings.paper_size == MsPaperSize::Letter as u32
+      && printer_settings.is_some_and(|printer| {
+        printer.paper_size.is_none() && printer.custom_paper_size_pt().is_none()
+      })
+    {
+      settings.valid_printer_settings = true;
+    }
     settings
   }
 
@@ -406,6 +426,10 @@ impl CalcPageSettings {
       settings.apply_margins(margins);
     }
     if let Some(page_setup) = &chartsheet.chart_sheet_page_setup {
+      settings.first_page_number = page_setup
+        .use_first_page_number
+        .is_some_and(|value| value.as_bool())
+        .then(|| i64::from(page_setup.first_page_number.unwrap_or(1)));
       settings.explicit_paper_size = page_setup.paper_size.is_some();
       settings.paper_size = page_setup.paper_size.unwrap_or(settings.paper_size);
       settings.valid_printer_settings = page_setup.id.is_none()
@@ -428,9 +452,28 @@ impl CalcPageSettings {
         setup.is_some_and(|setup| setup.vertical_dpi.is_some()),
       );
     }
-    // LibreOffice PageSettingsConverter treats a chart sheet with default
-    // orientation (or invalid printer settings) as landscape.
-    if !settings.valid_printer_settings || settings.orientation.is_none() {
+    // Excel exports a chartsheet's Letter request on the active default
+    // A4 page even when Letter came from a related DEVMODE. Native controls
+    // retain an explicit A3 request and its portrait/landscape orientation.
+    if settings.paper_size == MsPaperSize::Letter as u32
+      && settings.requested_custom_paper_size_pt.is_none()
+    {
+      settings.valid_printer_settings = true;
+      if chartsheet
+        .chart_sheet_page_setup
+        .as_ref()
+        .and_then(|setup| setup.use_printer_defaults)
+        .is_some_and(|value| !value.as_bool())
+      {
+        // Excel initializes this explicit opt-out to the active A4 paper;
+        // it does not retain the Letter canvas's print-origin adjustment.
+        settings.paper_size = MsPaperSize::A4 as u32;
+        settings.related_printer_letter_canvas = false;
+      } else {
+        settings.implicit_microsoft_letter_canvas = true;
+      }
+    }
+    if settings.orientation.is_none() {
       settings.orientation = Some(x::OrientationValues::Landscape);
     }
     settings.header_footer = HeaderFooterModel::from_chartsheet(chartsheet);
@@ -448,6 +491,12 @@ impl CalcPageSettings {
   }
 
   fn apply_page_setup(&mut self, page_setup: &x::PageSetup) {
+    // ECMA-376 18.3.1.63: useFirstPageNumber enables the value whose schema
+    // default is 1. Office tdf163554.xlsx restarts its second sheet this way.
+    self.first_page_number = page_setup
+      .use_first_page_number
+      .is_some_and(|value| value.as_bool())
+      .then(|| page_setup.first_page_number.unwrap_or(1));
     if let Some(paper_size) = page_setup.paper_size {
       self.paper_size = paper_size;
       self.explicit_paper_size = true;
@@ -658,17 +707,58 @@ impl CalcPageSettings {
   }
 
   pub(crate) fn fixed_output_body_top_pt(&self, paper_scale_percent: u32) -> f32 {
-    // ECMA-376 §18.3.1.62 gives pageMargins in physical inches. Header/footer
-    // presence does not scale that margin: Excel controls with three margins,
-    // both header states and implicit Letter / explicit A4 retain identical
-    // cell coordinates in each header pair. The paper mapping's body offset
-    // remains a separate transform, not a second scaling of the top margin.
-    self.margin_top_in as f32 * units::POINTS_PER_INCH
-      + if paper_scale_percent < DEFAULT_PRINT_SCALE_PERCENT {
-        self.printer_default_paper_body_offset_y_pt(paper_scale_percent as f32 / 100.0)
-      } else {
-        0.0
-      }
+    self.fixed_output_body_origin_pt(paper_scale_percent).1
+  }
+
+  pub(crate) fn fixed_output_body_origin_pt(&self, paper_scale_percent: u32) -> (f32, f32) {
+    let left = self.margin_left_in as f32 * units::POINTS_PER_INCH;
+    let top = self.margin_top_in as f32 * units::POINTS_PER_INCH;
+    if paper_scale_percent >= DEFAULT_PRINT_SCALE_PERCENT {
+      return (left, top);
+    }
+    let scale = paper_scale_percent as f32 / 100.0;
+    if self.orientation == Some(x::OrientationValues::Landscape) {
+      // The default-paper mapping follows the long paper axis. Landscape
+      // worksheets, like chartsheets, translate horizontally: Office's
+      // centered/un-centered Letter/A4 controls retain the physical top
+      // margin while exposing the same independently derived paper offset.
+      let mut portrait = self.clone();
+      portrait.orientation = Some(x::OrientationValues::Portrait);
+      portrait.margin_top_in = self.margin_left_in;
+      portrait.margin_bottom_in = self.margin_right_in;
+      (
+        left + portrait.printer_default_paper_body_offset_y_pt(scale),
+        top,
+      )
+    } else {
+      (
+        left,
+        top + self.printer_default_paper_body_offset_y_pt(scale),
+      )
+    }
+  }
+
+  pub(crate) fn fixed_output_chartsheet_origin_pt(&self) -> (f32, f32) {
+    let left = self.margin_left_in as f32 * units::POINTS_PER_INCH;
+    let top = self.margin_top_in as f32 * units::POINTS_PER_INCH;
+    let scale = self.printer_default_paper_scale_percent() as f32 / 100.0;
+    if self.orientation == Some(x::OrientationValues::Landscape) {
+      // The default-paper centering follows the long paper axis. Chart
+      // anchors retain their physical extents even when this origin moves.
+      let mut portrait = self.clone();
+      portrait.orientation = Some(x::OrientationValues::Portrait);
+      portrait.margin_top_in = self.margin_left_in;
+      portrait.margin_bottom_in = self.margin_right_in;
+      (
+        left + portrait.printer_default_paper_body_offset_y_pt(scale),
+        top,
+      )
+    } else {
+      (
+        left,
+        top + self.printer_default_paper_body_offset_y_pt(scale),
+      )
+    }
   }
 
   fn printer_default_paper_body_offset_y_pt(&self, scale: f32) -> f32 {
@@ -820,6 +910,44 @@ mod tests {
   use super::*;
 
   #[test]
+  fn worksheet_and_chartsheet_first_page_numbers() {
+    for (use_first, first, expected) in [
+      (None, None, 8),
+      (None, Some(7_u32), 8),
+      (Some(false), Some(7), 8),
+      (Some(true), None, 3),
+      (Some(true), Some(7), 9),
+    ] {
+      let worksheet = x::Worksheet {
+        page_setup: Some(x::PageSetup {
+          use_first_page_number: use_first.map(Into::into),
+          first_page_number: first.map(i64::from),
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      let chartsheet = x::Chartsheet {
+        chart_sheet_page_setup: Some(x::ChartSheetPageSetup {
+          use_first_page_number: use_first.map(Into::into),
+          first_page_number: first,
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      for settings in [
+        CalcPageSettings::from_worksheet(&worksheet, true, None),
+        CalcPageSettings::from_chartsheet(&chartsheet, None),
+      ] {
+        assert_eq!(
+          settings.header_footer_page_number(2, 8),
+          expected,
+          "useFirstPageNumber={use_first:?}, firstPageNumber={first:?}"
+        );
+      }
+    }
+  }
+
+  #[test]
   fn fixed_output_body_top_keeps_physical_margins_independent_of_headers() {
     for margin_top_in in [0.5, 1.025, 1.5] {
       for paper_scale_percent in [95, 100] {
@@ -928,6 +1056,66 @@ mod tests {
     assert_eq!(width, 595.32);
     assert_eq!(height, 841.92);
     assert!((settings.printer_default_paper_body_offset_y_pt(0.95) - 40.68).abs() < 1.0e-4);
+  }
+
+  #[test]
+  fn landscape_default_paper_mapping_preserves_the_top_margin() {
+    let printer = WindowsPrinterSettings::from_bytes(&sample_windows_devmode(
+      DM_ORIENTATION | DM_PAPER_SIZE | DM_SCALE,
+    ))
+    .unwrap();
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        id: Some("rId1".to_string()),
+        orientation: Some(x::OrientationValues::Landscape),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let mut settings = CalcPageSettings::from_worksheet(&worksheet, true, Some(&printer));
+    settings.margin_left_in = 0.25;
+    settings.margin_right_in = 0.25;
+    settings.margin_top_in = 1.18;
+    settings.margin_bottom_in = 1.0;
+    // Office worksheet controls with centering disabled: the Letter-to-A4
+    // map translates the long horizontal axis by 42.48pt. Explicit A4 keeps
+    // the 18pt left margin. Both retain the authored 84.96pt top margin.
+    let mapped = settings.fixed_output_body_origin_pt(95);
+    let unmapped = settings.fixed_output_body_origin_pt(100);
+    assert!((mapped.0 - 60.48).abs() < 0.001);
+    assert!((mapped.1 - 84.96).abs() < 0.001);
+    assert!((unmapped.0 - 18.0).abs() < 0.001);
+    assert!((unmapped.1 - 84.96).abs() < 0.001);
+  }
+
+  #[test]
+  fn related_devmode_without_media_preserves_the_default_letter_canvas() {
+    for unflagged_paper in [1_u16, 9] {
+      let mut bytes = sample_windows_devmode(DM_ORIENTATION);
+      bytes[DEVMODEW_PAPER_SIZE_OFFSET..DEVMODEW_PAPER_SIZE_OFFSET + 2]
+        .copy_from_slice(&unflagged_paper.to_le_bytes());
+      let printer = WindowsPrinterSettings::from_bytes(&bytes).unwrap();
+      assert_eq!(printer.paper_size, None);
+      for (paper_size, expected_scale) in [(None, 95), (Some(1), 95), (Some(0), 100)] {
+        let worksheet = x::Worksheet {
+          page_setup: Some(x::PageSetup {
+            paper_size,
+            id: Some("rId1".to_string()),
+            ..Default::default()
+          }),
+          ..Default::default()
+        };
+        let settings = CalcPageSettings::from_worksheet(&worksheet, true, Some(&printer));
+        assert_eq!(
+          settings.fixed_output_paper_scale_percent(false),
+          expected_scale
+        );
+        assert_eq!(
+          settings.fixed_output_body_top_pt(expected_scale) > 54.0,
+          expected_scale == 95
+        );
+      }
+    }
   }
 
   #[test]
@@ -1151,6 +1339,66 @@ mod tests {
     assert_eq!(settings.margin_bottom_in, 0.75);
     assert_eq!(settings.margin_header_in, 0.3);
     assert_eq!(settings.margin_footer_in, 0.3);
+  }
+
+  #[test]
+  fn chartsheet_letter_uses_default_paper_and_preserves_explicit_orientation() {
+    let printer = WindowsPrinterSettings {
+      paper_size: Some(1),
+      ..Default::default()
+    };
+    for (paper_size, use_defaults, orientation, expected) in [
+      (
+        None,
+        None,
+        x::OrientationValues::Landscape,
+        (841.92, 595.32),
+      ),
+      (
+        Some(1),
+        None,
+        x::OrientationValues::Landscape,
+        (841.92, 595.32),
+      ),
+      (
+        None,
+        Some(false),
+        x::OrientationValues::Landscape,
+        (841.92, 595.32),
+      ),
+      (
+        Some(1),
+        Some(false),
+        x::OrientationValues::Landscape,
+        (841.92, 595.32),
+      ),
+      (
+        Some(8),
+        None,
+        x::OrientationValues::Landscape,
+        (1190.52, 841.92),
+      ),
+      (
+        Some(8),
+        None,
+        x::OrientationValues::Portrait,
+        (841.92, 1190.52),
+      ),
+    ] {
+      let sheet = x::Chartsheet {
+        chart_sheet_page_setup: Some(x::ChartSheetPageSetup {
+          id: Some("rId1".into()),
+          paper_size,
+          use_printer_defaults: use_defaults.map(Into::into),
+          orientation: Some(orientation),
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      let settings = CalcPageSettings::from_chartsheet(&sheet, Some(&printer));
+      assert_eq!(settings.page_size_pt(), expected);
+      assert_eq!(settings.orientation, Some(orientation));
+    }
   }
 
   #[test]

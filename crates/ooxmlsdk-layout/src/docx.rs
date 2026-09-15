@@ -7530,6 +7530,8 @@ fn paragraph_inlines_with_policy(
 }
 
 fn merge_adjacent_variation_selector_runs(inlines: &mut Vec<InlineItem>) {
+  // Empty semantic runs are not variation selectors: a hidden STYLEREF
+  // separator must keep adjacent character-style ranges distinct.
   // Word may serialize an emoji's variation selector in a separate w:r. It
   // remains part of the preceding Unicode grapheme, so carry it into that
   // text portion before shaping; otherwise a zero-glyph standalone run is
@@ -7537,7 +7539,9 @@ fn merge_adjacent_variation_selector_runs(inlines: &mut Vec<InlineItem>) {
   let mut index = 1;
   while index < inlines.len() {
     let selector_text = match &inlines[index] {
-      InlineItem::Text(run) if run.text.chars().all(is_unicode_variation_selector) => {
+      InlineItem::Text(run)
+        if !run.text.is_empty() && run.text.chars().all(is_unicode_variation_selector) =>
+      {
         Some(run.text.clone())
       }
       _ => None,
@@ -47553,6 +47557,9 @@ mod tests {
 
   #[test]
   fn wordart_outline_fragment_resolves_expected_color_and_opacity() {
+    // Word 16.0.20326, theme accent2 C0504D + lumMod 75000:
+    // fixed PDF uses 0.584 0.216 0.204 RG (#953734), including opaque paint.
+    // Retained color controls and provenance: corpus_pdf_conv.md.
     let fragment = r#"<w14:textOutline xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" w14:w="228600" w14:cap="rnd" w14:cmpd="sng" w14:algn="ctr"><w14:solidFill><w14:schemeClr w14:val="accent2"><w14:alpha w14:val="20000"/><w14:lumMod w14:val="75000"/></w14:schemeClr></w14:solidFill><w14:prstDash w14:val="sysDot"/><w14:bevel/></w14:textOutline>"#;
     let outline = w14::TextOutlineEffect::from_bytes(fragment.as_bytes()).unwrap();
     let theme_colors = ThemeColors {
@@ -47571,7 +47578,7 @@ mod tests {
       RgbColor {
         r: 0x95,
         g: 0x37,
-        b: 0x35,
+        b: 0x34,
       }
     );
     assert!((resolved.opacity - 0.8).abs() < 0.001);
@@ -47581,7 +47588,7 @@ mod tests {
     assert!((stroke.width.0 - 18.0).abs() < f32::EPSILON);
     assert_eq!(stroke.color.r, 0x95);
     assert_eq!(stroke.color.g, 0x37);
-    assert_eq!(stroke.color.b, 0x35);
+    assert_eq!(stroke.color.b, 0x34);
     assert_eq!(stroke.color.a, 204);
     assert_eq!(stroke.cap, Some(common::StrokeCap::Round));
     assert_eq!(stroke.compound, Some(common::StrokeCompound::Single));
@@ -47936,6 +47943,9 @@ mod tests {
 
   #[test]
   fn text_effect_overrides_apply_to_style_from_run_properties_fragment() {
+    // Word 16.0.20326, theme accent2 C0504D + lumMod 75000:
+    // fixed PDF uses 0.584 0.216 0.204 RG (#953734), including opaque paint.
+    // Retained color controls and provenance: corpus_pdf_conv.md.
     let fragment = r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:color w:val="D6E3BC" w:themeColor="accent3" w:themeTint="66"/><w14:textOutline w14:w="228600" w14:cap="rnd" w14:cmpd="sng" w14:algn="ctr"><w14:solidFill><w14:schemeClr w14:val="accent2"><w14:alpha w14:val="20000"/><w14:lumMod w14:val="75000"/></w14:schemeClr></w14:solidFill><w14:prstDash w14:val="sysDot"/><w14:bevel/></w14:textOutline></w:rPr>"#;
     let styles = StylesCatalog {
       theme_colors: ThemeColors {
@@ -47971,7 +47981,7 @@ mod tests {
       Some(RgbColor {
         r: 0x95,
         g: 0x37,
-        b: 0x35,
+        b: 0x34,
       })
     );
     assert!((style.outline_opacity - 0.8).abs() < 0.001);

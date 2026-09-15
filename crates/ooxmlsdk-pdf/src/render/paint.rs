@@ -72,6 +72,7 @@ pub(super) struct TextItem<'doc> {
   pub(super) line_height_pt: f32,
   line_metrics_participant: bool,
   pub(super) paint_clip: Option<PaintClipRect>,
+  page_culling_bounds: Option<PaintClipRect>,
   pub(super) text: Cow<'doc, str>,
   pub(super) style: TextStyle<'doc>,
   pub(super) rotation_center_pt: Option<(f32, f32)>,
@@ -1811,6 +1812,7 @@ fn expand_metafile_semantic_text_item<'doc>(
             line_height_pt: (font_size_pt * 1.15).max(1.0),
             line_metrics_participant: true,
             paint_clip: None,
+            page_culling_bounds: None,
             text: Cow::Owned(run.text),
             style: TextStyle {
               font_family: run.font_family.map(Cow::Owned),
@@ -2032,6 +2034,7 @@ fn word_signature_line_text_item<'doc>(
     line_height_pt: font_size_pt * 1.15,
     line_metrics_participant: true,
     paint_clip: None,
+    page_culling_bounds: None,
     text: Cow::Owned(text),
     style: TextStyle {
       font_family: font_family.map(Cow::Owned),
@@ -2138,6 +2141,7 @@ fn image_page_item_from_common<'doc>(
           line_height_pt: 1.2,
           line_metrics_participant: true,
           paint_clip: clip,
+          page_culling_bounds: None,
           text: Cow::Owned(text),
           style: style.clone(),
           rotation_center_pt: None,
@@ -2278,6 +2282,7 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
     line_height_pt: text.line_height.0,
     line_metrics_participant: text.line_metrics_participant,
     paint_clip: text.paint_clip.map(paint_clip_from_common),
+    page_culling_bounds: text.page_culling_bounds.map(paint_clip_from_common),
     text: Cow::Borrowed(text.text.as_ref()),
     style: text_style_from_common(&text.style),
     rotation_center_pt: text.rotation_center.map(|point| (point.x.0, point.y.0)),
@@ -3591,6 +3596,14 @@ fn paint_item_bounds(item: &PaintItem<'_>) -> Option<(f32, f32, f32, f32)> {
   match item {
     PaintItem::Text(text) => {
       let item = &text.item;
+      if let Some(bounds) = item.page_culling_bounds {
+        return Some((
+          bounds.x_pt,
+          bounds.y_pt,
+          bounds.x_pt + bounds.width_pt,
+          bounds.y_pt + bounds.height_pt,
+        ));
+      }
       let bounds = (
         item.x_pt,
         item.y_pt,
@@ -4203,6 +4216,7 @@ mod tests {
       line_height: common::Pt(12.0),
       line_metrics_participant: true,
       paint_clip: None,
+      page_culling_bounds: None,
       style,
       font_id: None,
       color: common::Color {

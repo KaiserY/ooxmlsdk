@@ -1482,25 +1482,58 @@ pub(crate) fn rasterize_vector_items_for_effects_as_local_source_at_pixels_per_p
     return None;
   }
 
-  let guard_pt = 1.0 / pixels_per_point;
-  let local_raster_bounds = Rect {
-    origin: super::Point {
-      x: Pt(source_bounds.origin.x.0 - guard_pt),
-      y: Pt(source_bounds.origin.y.0 - guard_pt),
-    },
-    size: super::Size {
-      width: Pt(source_bounds.size.width.0 + guard_pt * 2.0),
-      height: Pt(source_bounds.size.height.0 + guard_pt * 2.0),
-    },
+  // Allocate the guard in device pixels. Subtracting 1/scale in page-space
+  // f32 and scaling that rounded origin back loses a fraction of a sample:
+  // merely translating the same source can then change its edge coverage.
+  let mapping = PageToRasterMapping {
+    width_px: raster_source_extent(
+      source_bounds.size.width.0,
+      pixels_per_point,
+      RasterSourceExtent::Outward,
+    )
+    .checked_add(2)?,
+    height_px: raster_source_extent(
+      source_bounds.size.height.0,
+      pixels_per_point,
+      RasterSourceExtent::Outward,
+    )
+    .checked_add(2)?,
+    scale_x: pixels_per_point,
+    scale_y: pixels_per_point,
+    translate_x: 1.0 - source_bounds.origin.x.0 * pixels_per_point,
+    translate_y: 1.0 - source_bounds.origin.y.0 * pixels_per_point,
+    text_hinting: None,
   };
-  let raster = rasterize_vector_items_for_effects_at_pixels_per_point_with_extent_and_antialiasing(
-    items,
-    local_raster_bounds,
-    effects,
+  let requirements = super::drawingml_image_effects::source_requirements(effects);
+  if requirements.children {
+    return None;
+  }
+  let render = |items: &[DisplayItem<'static>]| {
+    rasterize_vector_items_at_mapping(items, mapping, primitive_antialiasing)
+  };
+  let layer = |kind| {
+    let mut layer_items = Vec::new();
+    for item in items {
+      collect_source_layer_item(item, kind, &mut layer_items)?;
+    }
+    render(&layer_items)
+  };
+  let raster = DrawingRaster {
+    image: render(items)?,
+    fill_image: if requirements.fill {
+      Some(layer(SourceLayer::Fill)?)
+    } else {
+      None
+    },
+    line_image: if requirements.line {
+      Some(layer(SourceLayer::Line)?)
+    } else {
+      None
+    },
+    fill_line_image: None,
+    children_image: None,
     pixels_per_point,
-    RasterSourceExtent::Outward,
-    primitive_antialiasing,
-  )?;
+  };
 
   let rounded_nonnegative = |value: f32| {
     value
@@ -1510,10 +1543,10 @@ pub(crate) fn rasterize_vector_items_for_effects_as_local_source_at_pixels_per_p
       .map(|value| value as u32)
   };
   let crop_left = rounded_nonnegative(
-    (source_display_bounds.origin.x.0 - local_raster_bounds.origin.x.0) * pixels_per_point,
+    (source_display_bounds.origin.x.0 - source_bounds.origin.x.0) * pixels_per_point + 1.0,
   )?;
   let crop_top = rounded_nonnegative(
-    (source_display_bounds.origin.y.0 - local_raster_bounds.origin.y.0) * pixels_per_point,
+    (source_display_bounds.origin.y.0 - source_bounds.origin.y.0) * pixels_per_point + 1.0,
   )?;
   let crop_width =
     rounded_nonnegative(source_display_bounds.size.width.0 * pixels_per_point)?.max(1);
@@ -5475,9 +5508,29 @@ mod tests {
         )
         .unwrap();
         for (x, y, pixel) in image.enumerate_pixels() {
-          let inside = (1.0 + 2.0 * scale_x..1.0 + 6.0 * scale_x).contains(&(x as f32))
-            && (2.0 + 3.0 * scale_y..2.0 + 8.0 * scale_y).contains(&(y as f32));
-          assert_eq!(pixel[3], if inside { 255 } else { 0 }, "{x},{y}");
+          let left = 1.0 + 2.0 * scale_x;
+          let right = 1.0 + 6.0 * scale_x;
+          let top = 2.0 + 3.0 * scale_y;
+          let bottom = 2.0 + 8.0 * scale_y;
+          let expected = if antialiasing == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
+            // GDI+ samples around integer device centers: an integer edge
+            // bisects a pixel, including the far edge. A corner has 1/4 coverage.
+            let axis = |value: f32, near, far| {
+              if value == near || value == far {
+                1_u32
+              } else if value > near && value < far {
+                2
+              } else {
+                0
+              }
+            };
+            ((axis(x as f32, left, right) * axis(y as f32, top, bottom) * 255 + 2) / 4) as u8
+          } else if (left..right).contains(&(x as f32)) && (top..bottom).contains(&(y as f32)) {
+            255
+          } else {
+            0
+          };
+          assert_eq!(pixel[3], expected, "{antialiasing:?}: {x},{y}");
         }
       }
     }
@@ -5581,7 +5634,9 @@ mod tests {
     let pixels_per_point = 200.0 / 72.0;
     let effects = ImageEffectContainer {
       kind: ImageEffectContainerKind::Sibling,
-      effects: Vec::new(),
+      effects: vec![ImageEffect::SourceReference(
+        ImageEffectSourceReference::Fill,
+      )],
     };
     let raster = |dx: f32, dy: f32| {
       let source = rect(10.13 + dx, 20.17 + dy, 4.2, 3.3);
@@ -5596,19 +5651,26 @@ mod tests {
         }),
         stroke: None,
       });
-      rasterize_vector_items_for_effects_as_local_source_at_pixels_per_point_with_antialiasing(
-        &[item],
-        source,
-        display,
-        &effects,
-        pixels_per_point,
-        RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
-      )
-      .unwrap()
-      .image
+      let raster =
+        rasterize_vector_items_for_effects_as_local_source_at_pixels_per_point_with_antialiasing(
+          &[item],
+          source,
+          display,
+          &effects,
+          pixels_per_point,
+          RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+        )
+        .unwrap();
+      assert_eq!(raster.fill_image.as_ref(), Some(&raster.image));
+      assert!(raster.line_image.is_none());
+      raster.image
     };
 
-    assert_eq!(raster(0.0, 0.0), raster(0.12, 0.24));
+    let original = raster(0.0, 0.0);
+    assert_eq!(original.get_pixel(0, 0)[3], 64);
+    for (dx, dy) in [(0.12, 0.24), (-0.12, -0.24), (64.0, 32.0), (-10.13, -20.17)] {
+      assert_eq!(original, raster(dx, dy), "translation {dx},{dy}");
+    }
   }
 
   #[test]
@@ -6116,6 +6178,7 @@ mod tests {
       line_height: Pt(12.0),
       line_metrics_participant: true,
       paint_clip: None,
+      page_culling_bounds: None,
       style,
       font_id: None,
       color: fill_color,
@@ -6371,6 +6434,7 @@ mod tests {
       line_height: Pt(12.0),
       line_metrics_participant: true,
       paint_clip: None,
+      page_culling_bounds: None,
       style: TextStyle {
         outline_color: Some(outline_color),
         outline_width: Pt(2.0),

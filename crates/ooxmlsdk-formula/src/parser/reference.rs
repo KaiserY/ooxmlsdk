@@ -45,7 +45,24 @@ pub(crate) fn parse_formula_range<'doc>(
   sheet: SheetId,
   token: &str,
 ) -> Option<QualifiedRange<'doc>> {
+  if let Some(reference) = token.strip_prefix('!') {
+    let mut range = QualifiedRange::parse_a1(sheet, reference).ok()?;
+    if range.sheet_name.is_some() {
+      return None;
+    }
+    // Preserve the explicit current-sheet qualifier for the program printer.
+    range.sheet_name = Some(SheetName(std::borrow::Cow::Borrowed("")));
+    return Some(range);
+  }
   if let Some(range) = parse_chained_formula_range(sheet, token) {
+    return Some(range);
+  }
+  // A quoted 3D qualifier applies to both endpoints of the cell area. Parsing
+  // its first endpoint as a single QualifiedAddress loses the sheet span.
+  if token.starts_with('\'')
+    && let Ok(range) = QualifiedRange::parse_a1(sheet, token)
+    && range.end_sheet_name.is_some()
+  {
     return Some(range);
   }
   if let ReferenceParts::Range { start, end } = reference_parts(token)? {

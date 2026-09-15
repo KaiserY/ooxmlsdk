@@ -341,7 +341,7 @@ fn formula_body_start_parser(input: &mut &str) -> WinnowResult<usize> {
 fn formula_token_kind(input: &mut &str) -> WinnowResult<LexTokenKind> {
   dispatch! {peek(any);
     '"' => formula_text.value(LexTokenKind::Text),
-    '0'..='9' => formula_number.map(LexTokenKind::Number),
+    '0'..='9' | '$' => formula_number_or_row_reference,
     '.' => formula_dot_prefixed_number.map(LexTokenKind::Number),
     '#' | 'E' | 'e' => formula_error_or_word,
     '<' => formula_comparison_operator,
@@ -430,6 +430,41 @@ fn formula_number(input: &mut &str) -> WinnowResult<f64> {
     }
     Err(_) => fail.parse_next(input),
   }
+}
+
+fn formula_number_or_row_reference(input: &mut &str) -> WinnowResult<LexTokenKind> {
+  if let Some(consumed) = scan_formula_row_range_len(input) {
+    *input = &input[consumed..];
+    return Ok(LexTokenKind::Word);
+  }
+  if input.starts_with('$') {
+    return formula_word_or_unknown(input);
+  }
+  formula_number.map(LexTokenKind::Number).parse_next(input)
+}
+
+fn scan_formula_row_range_len(input: &str) -> Option<usize> {
+  // In 1:1, the digits denote row references, not scalar operands of the
+  // range operator. Keep both endpoints together, including optional $ and
+  // whitespace, while leaving ordinary numbers and cell references alone.
+  let mut rest = input;
+  for endpoint in 0..2 {
+    if endpoint == 1 {
+      rest = rest.trim_start().strip_prefix(':')?.trim_start();
+    }
+    rest = rest.strip_prefix('$').unwrap_or(rest);
+    let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 0 {
+      return None;
+    }
+    rest = &rest[digits..];
+  }
+  if rest.chars().next().is_some_and(is_formula_word_char) {
+    return None;
+  }
+  let consumed = input.len() - rest.len();
+  let range = super::reference::parse_formula_range(crate::SheetId::default(), &input[..consumed])?;
+  (range.start_flags.whole_row && range.end_flags.whole_row).then_some(consumed)
 }
 
 fn formula_dot_prefixed_number(input: &mut &str) -> WinnowResult<f64> {
@@ -712,10 +747,12 @@ fn should_stop_formula_word_at_range_operator(original: &str, input: &str) -> bo
 }
 
 fn is_formula_word_char(ch: char) -> bool {
+  // MS-XLSX §2.2.2 permits backslash in name-start-character and question
+  // mark in name-character, including table names in structured references.
   ch.is_alphanumeric()
     || matches!(
       ch,
-      '$' | ':' | '!' | '\'' | '[' | ']' | '.' | '_' | '#' | '@'
+      '$' | ':' | '!' | '\'' | '[' | ']' | '.' | '_' | '#' | '@' | '\\' | '?'
     )
 }
 

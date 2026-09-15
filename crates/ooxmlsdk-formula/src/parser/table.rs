@@ -73,9 +73,19 @@ fn table_reference_specifiers(selector_tail: &str) -> Option<Vec<TableReferenceC
     return Some(Vec::new());
   }
   if !selector.starts_with('[') {
-    let mut specifiers = Vec::new();
-    push_table_reference_column_or_range(selector, &mut specifiers);
-    return Some(specifiers);
+    // MS-XLSX 2.2.2: literal column brackets must be apostrophe-escaped.
+    // In particular, [Book]Table[Column] is not one implicit column selector.
+    let mut chars = selector.chars();
+    while let Some(ch) = chars.next() {
+      match ch {
+        '\'' => {
+          let _ = chars.next();
+        }
+        '[' | ']' => return None,
+        _ => {}
+      }
+    }
+    return Some(vec![table_reference_column(selector)]);
   }
   let mut specifiers = Vec::new();
   let mut depth = 0i32;
@@ -97,7 +107,9 @@ fn table_reference_specifiers(selector_tail: &str) -> Option<Vec<TableReferenceC
         depth -= 1;
         if depth == 0 {
           let start = start.take()?;
-          push_table_reference_column_or_range(&selector[start..index], &mut specifiers);
+          // A colon inside a column's brackets belongs to its name (7:00 AM).
+          // The range separator is outside the brackets: [first]:[last].
+          specifiers.push(table_reference_column(&selector[start..index]));
         } else if depth < 0 {
           return None;
         }
@@ -115,35 +127,6 @@ fn table_reference_specifiers(selector_tail: &str) -> Option<Vec<TableReferenceC
   } else {
     Some(specifiers)
   }
-}
-
-fn push_table_reference_column_or_range<'a>(
-  value: &'a str,
-  specifiers: &mut Vec<TableReferenceColumn<'a>>,
-) {
-  if let Some((start, end)) = split_unescaped_table_reference_range(value) {
-    specifiers.push(table_reference_column(start));
-    specifiers.push(table_reference_column(end));
-  } else {
-    specifiers.push(table_reference_column(value));
-  }
-}
-
-fn split_unescaped_table_reference_range(value: &str) -> Option<(&str, &str)> {
-  let mut chars = value.char_indices().peekable();
-  while let Some((index, ch)) = chars.next() {
-    if ch == '\'' {
-      let _ = chars.next();
-    } else if ch == ':' {
-      let start = &value[..index];
-      let end = &value[index + 1..];
-      if !start.trim().is_empty() && !end.trim().is_empty() {
-        return Some((start, end));
-      }
-      return None;
-    }
-  }
-  None
 }
 
 fn table_reference_column(value: &str) -> TableReferenceColumn<'_> {

@@ -250,6 +250,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     line_height: common::Pt(item.line_height_pt),
     line_metrics_participant: true,
     paint_clip: None,
+    page_culling_bounds: None,
     style: common_text_style(*item.style),
     font_id: None,
     color,
@@ -2111,6 +2112,7 @@ fn lower_chart(
         shared_chart::automatic_chart_title(ui_language),
         &ClusteredColumnStyle {
           layout_profile: ChartLayoutProfile::PowerPoint,
+          chartsheet: false,
           chart_style_id: shared_chart::chart_style_id(&chart_resource.chart_space).unwrap_or(2),
           modern_excel_profile: false,
           stroke_scale: 1.0,
@@ -13634,6 +13636,7 @@ fn push_text_item(
     line_height_pt: placement.line_height_pt,
     drawingml_text_effect_anchor: None,
     paint_clip: None,
+    page_culling_bounds: None,
     discard_if_horizontally_clipped: false,
     text,
     style: Box::new(style),

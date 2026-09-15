@@ -877,8 +877,9 @@ fn paragraph_auto_baseline_line_height_cap(
     // Writer's LINE_SPACING_AS_GAP_BELOW compatibility path leaves the first
     // line's glyph baseline in the ordinary line box and owns proportional
     // excess below the text. Office fixed output does the same: even an
-    // extreme auto multiple keeps the first baseline at the default 115%
-    // position while the full real height still drives following flow.
+    // extreme auto multiple keeps its first baseline near ordinary text.
+    // This compatibility cap is an upper bound; the proportional-gap path
+    // can further reduce the baseline box to the natural text height.
     paragraph_single_line_height(paragraph, base_line_style, text_metrics)
       * LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT
       / PERCENT_SCALE
@@ -6944,6 +6945,7 @@ fn into_common_text_run(item: TextItem) -> common::TextRun<'static> {
     line_height: common::Pt(item.line_height_pt),
     line_metrics_participant: item.line_metrics_participant,
     paint_clip: None,
+    page_culling_bounds: None,
     style: word_fixed_output_common_text_style(item.style),
     font_id: None,
     color,
@@ -23610,6 +23612,7 @@ fn lower_inline_chart_contents(
       &chart.automatic_title,
       &ClusteredColumnStyle {
         layout_profile: ChartLayoutProfile::Word,
+        chartsheet: false,
         chart_style_id: shared_chart::chart_style_id(chart_space).unwrap_or(2),
         modern_excel_profile: false,
         stroke_scale: 1.0,
@@ -34310,8 +34313,8 @@ impl TextFrame {
       // coordinates. Office fixed output preserves that natural baseline when
       // every visible run is translucent and therefore emitted as a path; the
       // full proportional line height still remains available to following
-      // flow. A mixed opaque/translucent line is the counterexample and keeps
-      // its ordinary text baseline box.
+      // flow. The general proportional-gap path also applies to mixed and
+      // opaque lines when its paragraph and flow conditions are satisfied.
       auto_baseline_line_height_cap: [
         generated_resource_baseline_cap,
         translucent_glyph_path_baseline_cap,
@@ -47390,11 +47393,14 @@ mod tests {
 
     push_docx_picture_image(&mut items, &image, image_item);
 
+    let [PageItem::Group(layers)] = items.as_slice() else {
+      panic!("inline VML paint layers must move together");
+    };
     let [
       PageItem::Path(background),
       PageItem::Image(image),
       PageItem::Path(foreground),
-    ] = items.as_slice()
+    ] = layers.as_slice()
     else {
       panic!("VML host must remain one three-layer painted image");
     };
@@ -56316,7 +56322,7 @@ mod tests {
   }
 
   #[test]
-  fn extreme_auto_line_spacing_keeps_the_default_text_baseline_box() {
+  fn extreme_auto_line_spacing_keeps_proportional_excess_below_the_baseline() {
     let paragraph = Paragraph {
       inlines: vec![InlineItem::Text(TextRun {
         text: "Hello".into(),
@@ -56376,12 +56382,12 @@ mod tests {
       &mut text_metrics,
     );
 
-    assert!(frame.base_line_height > 1_000.0);
+    // Word baseline controls (corpus_pdf_conv.md): even a 132x auto
+    // multiple keeps the first text at the ordinary baseline. The full
+    // proportional advance remains owned below it, not in the glyph box.
+    assert!((frame.base_line_height - natural_height * 132.0).abs() < 0.001);
     assert!(
-      (frame.text_baseline_line_height(frame.base_line_height)
-        - natural_height * LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE)
-        .abs()
-        < 0.001
+      (frame.text_baseline_line_height(frame.base_line_height) - natural_height).abs() < 0.001
     );
   }
 
@@ -56816,7 +56822,7 @@ mod tests {
   }
 
   #[test]
-  fn all_translucent_glyph_path_line_uses_natural_baseline_box() {
+  fn inherited_proportional_spacing_keeps_opaque_and_translucent_baselines_aligned() {
     fn paragraph(opacities: &[f32]) -> Paragraph {
       Paragraph {
         inlines: opacities
@@ -56905,12 +56911,19 @@ mod tests {
         < 0.001
     );
 
-    let mixed = paragraph(&[1.0, 0.71]);
-    let mixed_frame = frame(&mixed, &mut text_metrics);
-    assert_eq!(
-      mixed_frame.text_baseline_line_height(mixed_frame.base_line_height),
-      mixed_frame.base_line_height
-    );
+    // Word 16.0.20326 controls: inherited 115% spacing puts opaque,
+    // mixed and all-translucent glyphs on the same baseline (795.6pt).
+    // The proportional flow height still applies to each case.
+    for opacities in [&[1.0, 0.71][..], &[1.0, 1.0][..]] {
+      let mixed = paragraph(opacities);
+      let mixed_frame = frame(&mixed, &mut text_metrics);
+      assert!((mixed_frame.base_line_height - natural_height * 1.15).abs() < 0.001);
+      assert!(
+        (mixed_frame.text_baseline_line_height(mixed_frame.base_line_height) - natural_height)
+          .abs()
+          < 0.001
+      );
+    }
   }
 
   #[test]

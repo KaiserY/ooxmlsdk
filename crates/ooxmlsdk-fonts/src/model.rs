@@ -3091,6 +3091,24 @@ fn default_family_substitution_chains<'a>() -> Vec<FontFallbackChain<'a>> {
 
 fn default_glyph_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
   let mut chains = default_family_specific_chains();
+  // Office's Cyrillic coverage matrices keep SimSun/NSimSun's existing
+  // glyphs, but link their missing glyphs to different Office text faces.
+  // Localized family names share the rule; requested weight/slant still
+  // select the corresponding fallback face (including bold italic).
+  chains.extend(
+    [
+      ("SimSun", "Cambria"),
+      ("宋体", "Cambria"),
+      ("NSimSun", "Calibri"),
+      ("新宋体", "Calibri"),
+    ]
+    .map(|(requested, fallback)| FontFallbackChain {
+      requested_family: Some(Cow::Borrowed(requested)),
+      script: Some(TextScript::Cyrillic),
+      language: None,
+      families: vec![Cow::Borrowed(fallback)],
+    }),
+  );
   chains.extend([
     // Word keeps Liberation Sans for its covered Latin glyphs, but fixed
     // output links missing Han glyphs from that requested face through SimSun.
@@ -6086,6 +6104,74 @@ mod tests {
       resolved.substitution.as_ref().map(|item| item.reason),
       Some(FontSubstitutionReason::MissingFamily)
     );
+  }
+
+  #[test]
+  fn office_song_faces_keep_covered_cyrillic_and_link_missing_glyphs_by_family() {
+    for (family, expected_fallback) in [
+      ("SimSun", "Cambria"),
+      ("宋体", "Cambria"),
+      ("NSimSun", "Calibri"),
+      ("新宋体", "Calibri"),
+    ] {
+      for emphasized in [false, true] {
+        let mut registry = FontRegistry::with_default_policy();
+        let mut primary = FontFaceInfo::synthetic("primary", family);
+        primary.coverage.unicode_ranges = vec![0x430..0x431]; // а
+        registry.register_face(FontSource::System, primary);
+        for name in ["DejaVu Sans", "Cambria", "Calibri"] {
+          for bold_italic in [false, true] {
+            let id = format!("{name}-{bold_italic}");
+            let mut face = FontFaceInfo::synthetic(id, name);
+            face.coverage.unicode_ranges = vec![0x430..0x431, 0x458..0x459]; // а, ј
+            if bold_italic {
+              face.weight = FontWeight::Bold;
+              face.slant = FontSlant::Italic;
+            }
+            registry.register_face(FontSource::System, face);
+          }
+        }
+        let request = FontRequest {
+          family: Some(Cow::Borrowed(family)),
+          script: Some(TextScript::Cyrillic),
+          bold: emphasized,
+          italic: emphasized,
+          ..FontRequest::default()
+        };
+        let chain = registry.resolve_font_chain(&request).unwrap();
+        let runs = registry
+          .shape_text_runs_with_font_chain(
+            &chain,
+            "аја",
+            &ShapeOptions::from_request(&request, TextDirection::LeftToRight),
+          )
+          .unwrap();
+        assert_eq!(runs.len(), 3, "{family}, emphasized={emphasized}");
+        assert_eq!(runs[0].font_id, FontId(Arc::from("primary")));
+        assert_eq!(runs[2].font_id, FontId(Arc::from("primary")));
+        assert_eq!(
+          runs[1].font_id,
+          FontId(Arc::from(format!("{expected_fallback}-{emphasized}"))),
+        );
+        assert_eq!(
+          runs[1].diagnostics.fallback_runs[0].reason,
+          FontSubstitutionReason::MissingGlyph,
+        );
+        // These glyph links must not become missing-family substitutions,
+        // or replace the chains for unrelated scripts.
+        for script in [None, Some(TextScript::Latin), Some(TextScript::Han)] {
+          let other = FontRequest {
+            script,
+            ..request.clone()
+          };
+          assert!(
+            !registry
+              .fallback_families(&other)
+              .contains(&expected_fallback)
+          );
+        }
+      }
+    }
   }
 
   #[test]

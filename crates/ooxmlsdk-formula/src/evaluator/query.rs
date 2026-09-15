@@ -473,6 +473,11 @@ impl<'doc> CriteriaPlan<'doc> {
       return matches!(self.op, QueryOp::NotEqual);
     }
     if self.search_type == QuerySearchType::Wildcard {
+      // COUNTIF's wildcard criteria select text cells, including a formula's
+      // empty string, but not absent cells or logical/numeric values.
+      if !matches!(candidate, FormulaValue::String(_)) {
+        return matches!(self.op, QueryOp::NotEqual);
+      }
       let text = evaluator.text(candidate);
       let matched = if self.match_whole_cell {
         wildcard_match(pattern, &text)

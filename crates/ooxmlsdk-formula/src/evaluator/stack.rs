@@ -7,6 +7,9 @@ pub(crate) enum EvalOperand<'doc> {
   Reference(QualifiedRange<'doc>),
   ExternalReference(ExternalReferenceId<'doc>),
   Name(Cow<'doc, str>),
+  Lambda(std::sync::Arc<super::lambda::LambdaClosure<'doc>>),
+  Builtin(String),
+  Omitted,
 }
 
 #[derive(Clone, Copy)]
@@ -60,7 +63,13 @@ impl<'doc> EvalOperand<'doc> {
       EvalOperand::ExternalReference(reference) => {
         evaluator.evaluate_external_reference(&reference)
       }
-      EvalOperand::Name(name) => evaluator.evaluate_name(&name),
+      EvalOperand::Name(name) => {
+        super::lambda::resolve_name_operand(name, evaluator)?.into_value(evaluator)
+      }
+      EvalOperand::Lambda(_) | EvalOperand::Builtin(_) => {
+        Some(FormulaValue::Error(FormulaErrorValue::Calc))
+      }
+      EvalOperand::Omitted => Some(FormulaValue::Blank),
     }
   }
 }

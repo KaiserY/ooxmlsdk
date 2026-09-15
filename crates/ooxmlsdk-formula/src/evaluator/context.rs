@@ -11,19 +11,36 @@ pub(crate) use display::{
   error_text_value, error_value, format_number_with_format_code,
 };
 
+#[derive(Clone)]
 pub(crate) struct FormulaEvaluator<'a, 'doc> {
   pub(crate) book: &'a FormulaEvaluationBook<'doc>,
   pub(crate) engine: &'a CalcEngine,
   pub(crate) current_sheet: SheetId,
   pub(crate) current_cell: Option<CellAddress>,
   pub(crate) grammar: FormulaGrammar,
-  pub(crate) locals: BTreeMap<String, FormulaValue<'doc>>,
+  pub(crate) locals: BTreeMap<String, EvalOperand<'doc>>,
+  pub(crate) call_depth: usize,
   pub(crate) array_context: bool,
   pub(crate) current_value: Option<FormulaValue<'doc>>,
   pub(crate) calc_a1_indirect_bang_reference: bool,
 }
 
 impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
+  pub(crate) fn with_current_sheet(&self, current_sheet: SheetId) -> Self {
+    Self {
+      book: self.book,
+      engine: self.engine,
+      current_sheet,
+      current_cell: self.current_cell,
+      grammar: self.grammar,
+      locals: self.locals.clone(),
+      call_depth: self.call_depth,
+      array_context: self.array_context,
+      current_value: self.current_value.clone(),
+      calc_a1_indirect_bang_reference: self.calc_a1_indirect_bang_reference,
+    }
+  }
+
   pub(crate) fn with_array_context(&self) -> Self {
     Self {
       book: self.book,
@@ -32,6 +49,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       current_cell: self.current_cell,
       grammar: self.grammar,
       locals: self.locals.clone(),
+      call_depth: self.call_depth,
       array_context: true,
       current_value: self.current_value.clone(),
       calc_a1_indirect_bang_reference: self.calc_a1_indirect_bang_reference,
@@ -46,6 +64,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       current_cell: self.current_cell,
       grammar: self.grammar,
       locals: self.locals.clone(),
+      call_depth: self.call_depth,
       array_context: self.array_context,
       current_value: Some(current_value),
       calc_a1_indirect_bang_reference: self.calc_a1_indirect_bang_reference,
@@ -312,6 +331,27 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     Some(FormulaValue::Number(
       date_serial_with_system(1970, 1, 1, self.book.date_system)? + unix_days as f64,
     ))
+  }
+
+  pub(crate) fn date_value_from_text(&self, text: &str) -> FormulaValue<'doc> {
+    let parsed = datevalue(text, self.book.date_system);
+    if !matches!(
+      parsed,
+      FormulaValue::Error(FormulaErrorValue::IllegalArgument)
+    ) {
+      return parsed;
+    }
+    // Excel fills an omitted year from the calculation clock. Reuse TODAY's
+    // supplied serial so configured exports replay the recorded refresh date.
+    let inferred = (|| {
+      let FormulaValue::Number(today) = self.evaluate_today()? else {
+        return None;
+      };
+      let (year, _, _) =
+        crate::calc::datetime::date_from_serial_with_system(today as i32, self.book.date_system)?;
+      parse_month_date_input(date_input_prefix(text)?, self.book.date_system, Some(year))
+    })();
+    inferred.map(FormulaValue::Number).unwrap_or(parsed)
   }
 
   pub(crate) fn time_number_from_value(&self, value: &FormulaValue<'doc>) -> Option<f64> {
@@ -1716,24 +1756,67 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.len() != 3 {
       return None;
     }
-    let Some(database) = args.query_source(0) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    let excel = matches!(
+      self.grammar,
+      FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+    );
+    let invalid_argument = if excel {
+      FormulaErrorValue::Value
+    } else {
+      FormulaErrorValue::IllegalArgument
     };
-    let Some(criteria) = args.query_source(2) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    // Excel propagates evaluated argument errors in database/field/criteria
+    // order, before checking range shape or the field index. A referenced
+    // field containing an error instead fails field validation with #VALUE!.
+    let mut excel_field = None;
+    let database = if excel {
+      let value = args.value(0)?;
+      if matches!(value, FormulaValue::Error(_)) {
+        return Some(value);
+      }
+      let field = args.value(1)?;
+      if matches!(field, FormulaValue::Error(_)) {
+        return Some(field);
+      }
+      excel_field = Some(field);
+      self.query_source_from_value(value)
+    } else {
+      args.query_source(0)
+    };
+    let criteria = if excel {
+      let value = args.value(2)?;
+      if matches!(value, FormulaValue::Error(_)) {
+        return Some(value);
+      }
+      // Array constants and scalars are legal argument expressions, but
+      // Excel requires a range for the criteria table.
+      if !matches!(value, FormulaValue::Reference(_) | FormulaValue::RefList(_)) {
+        return Some(FormulaValue::Error(invalid_argument));
+      }
+      self.query_source_from_value(value)
+    } else {
+      args.query_source(2)
+    };
+    let (Some(database), Some(criteria)) = (database, criteria) else {
+      return Some(FormulaValue::Error(invalid_argument));
     };
     let (database_rows, database_columns) = database.dimensions();
     let (criteria_rows, criteria_columns) = criteria.dimensions();
     if database_rows < 2 || database_columns == 0 || criteria_rows < 2 || criteria_columns == 0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+      return Some(FormulaValue::Error(invalid_argument));
     }
     let Some(headers) = database.header_row(self) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+      return Some(FormulaValue::Error(invalid_argument));
     };
-    let field = match self.database_field_index_value(args.value(1)?, &headers, function) {
-      Some(field) => field,
-      None => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+    let field_value = match excel_field {
+      Some(value) => value,
+      None => args.value(1)?,
     };
+    let field =
+      match self.database_field_index_value(field_value, &headers, function, args.is_missing(1)) {
+        Some(field) => field,
+        None => return Some(FormulaValue::Error(invalid_argument)),
+      };
     let plan = self.database_criteria_plan(&headers, &criteria);
     let matching_rows = (1..database_rows)
       .filter(|row| plan.matches_row(self, &database, *row))
@@ -1742,7 +1825,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Number(matching_rows.len() as f64));
     }
     let Some(field) = field else {
-      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+      return Some(FormulaValue::Error(invalid_argument));
     };
     if field >= database_columns {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
@@ -1793,7 +1876,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       DatabaseFunction::Get => match text_values.as_slice() {
         [value] => Some(value.clone()),
         [] => Some(FormulaValue::Error(FormulaErrorValue::Value)),
-        _ => Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+        _ => Some(FormulaValue::Error(if excel {
+          FormulaErrorValue::Num
+        } else {
+          FormulaErrorValue::IllegalArgument
+        })),
       },
       DatabaseFunction::Max => Some(FormulaValue::Number(
         values.into_iter().reduce(f64::max).unwrap_or(0.0),
@@ -1826,18 +1913,27 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     value: FormulaValue<'doc>,
     headers: &[FormulaValue<'doc>],
     function: DatabaseFunction,
+    field_omitted: bool,
   ) -> Option<Option<usize>> {
     let allow_missing = matches!(function, DatabaseFunction::Count | DatabaseFunction::CountA);
+    let excel = matches!(
+      self.grammar,
+      FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+    );
     match self.first_value(&value) {
-      FormulaValue::Blank if allow_missing => Some(None),
-      FormulaValue::Number(value) if allow_missing && value.floor() == 0.0 => Some(None),
+      FormulaValue::Blank if allow_missing && (!excel || field_omitted) => Some(None),
+      FormulaValue::Number(value) if !excel && allow_missing && value.floor() == 0.0 => Some(None),
       FormulaValue::Number(value) => {
-        let index = value.floor() as i64 - 1;
-        (index >= 0).then_some(Some(index as usize))
+        (value.is_finite() && value >= 1.0).then(|| Some(value.floor() as usize - 1))
       }
+      FormulaValue::Boolean(true) if excel => Some(Some(0)),
       FormulaValue::String(name) => headers
         .iter()
-        .position(|header| self.text(header).eq_ignore_ascii_case(name.trim()))
+        .position(|header| {
+          self
+            .text(header)
+            .eq_ignore_ascii_case(if excel { &name } else { name.trim() })
+        })
         .map(Some)
         .or(Some(Some(usize::MAX))),
       FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_) => {
@@ -2436,15 +2532,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if left_rows == 0 || left_columns == 0 || right_rows == 0 || right_columns == 0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let rows = matrix_binary_extent(left_rows, right_rows);
-    let columns = matrix_binary_extent(left_columns, right_columns);
+    let rows = matrix_binary_extent(left_rows, right_rows, self.grammar);
+    let columns = matrix_binary_extent(left_columns, right_columns, self.grammar);
 
     let mut result = Vec::with_capacity(rows);
     for row in 0..rows {
       let mut result_row = Vec::with_capacity(columns);
       for column in 0..columns {
-        let left = &left_matrix[row.min(left_rows - 1)][column.min(left_columns - 1)];
-        let right = &right_matrix[row.min(right_rows - 1)][column.min(right_columns - 1)];
+        let left = matrix_binary_item(&left_matrix, row, column);
+        let right = matrix_binary_item(&right_matrix, row, column);
         result_row.push(if let Some(error) = propagate_binary_error(left, right) {
           FormulaValue::Error(error)
         } else if let Some((left, right)) =
@@ -2483,15 +2579,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if left_rows == 0 || left_columns == 0 || right_rows == 0 || right_columns == 0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let rows = matrix_binary_extent(left_rows, right_rows);
-    let columns = matrix_binary_extent(left_columns, right_columns);
+    let rows = matrix_binary_extent(left_rows, right_rows, self.grammar);
+    let columns = matrix_binary_extent(left_columns, right_columns, self.grammar);
 
     let mut result = Vec::with_capacity(rows);
     for row in 0..rows {
       let mut result_row = Vec::with_capacity(columns);
       for column in 0..columns {
-        let left = &left_matrix[row.min(left_rows - 1)][column.min(left_columns - 1)];
-        let right = &right_matrix[row.min(right_rows - 1)][column.min(right_columns - 1)];
+        let left = matrix_binary_item(&left_matrix, row, column);
+        let right = matrix_binary_item(&right_matrix, row, column);
         result_row.push(if let Some(error) = propagate_binary_error(left, right) {
           FormulaValue::Error(error)
         } else {
@@ -3329,14 +3425,29 @@ fn matrix_can_broadcast(
   (rows == target_rows || rows == 1) && (columns == target_columns || columns == 1)
 }
 
-fn matrix_binary_extent(left: usize, right: usize) -> usize {
-  if left == 1 {
+fn matrix_binary_extent(left: usize, right: usize, grammar: FormulaGrammar) -> usize {
+  if matches!(grammar, FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1) {
+    // Office keeps the union of operand shapes; missing non-singleton elements
+    // are #N/A (DynamicArrayFixture.xlsx F25:F28), not truncated or repeated.
+    left.max(right)
+  } else if left == 1 {
     right
   } else if right == 1 {
     left
   } else {
     left.min(right)
   }
+}
+
+fn matrix_binary_item<'a, 'doc>(
+  matrix: &'a [Vec<FormulaValue<'doc>>],
+  row: usize,
+  column: usize,
+) -> &'a FormulaValue<'doc> {
+  matrix
+    .get(if matrix.len() == 1 { 0 } else { row })
+    .and_then(|row| row.get(if row.len() == 1 { 0 } else { column }))
+    .unwrap_or(&FormulaValue::Error(FormulaErrorValue::NA))
 }
 
 fn formula_error_matches(value: &FormulaValue<'_>, na_only: bool) -> bool {
@@ -4341,15 +4452,29 @@ pub(crate) fn column_index_to_name(mut column: u32) -> String {
   name.into_iter().rev().collect()
 }
 
-fn parse_table_reference<'doc>(
+pub(crate) fn parse_table_reference<'doc>(
   book: &FormulaEvaluationBook<'doc>,
   text: &str,
+  current_sheet: SheetId,
   current_address: Option<CellAddress>,
 ) -> Option<QualifiedRange<'doc>> {
   let selection = crate::parser::parse_table_reference_selection(text)?;
-  let table = book
-    .tables
-    .get(&selection.table_name.to_ascii_uppercase())?;
+  let table = if selection.table_name.is_empty() {
+    // MS-XLSX 2.2.2: an omitted table identifier refers to the table that
+    // contains this formula cell, including its header and totals rows.
+    let address = current_address?;
+    book.tables.values().find(|table| {
+      table.sheet == current_sheet
+        && address.column >= table.range.start.column.min(table.range.end.column)
+        && address.column <= table.range.start.column.max(table.range.end.column)
+        && address.row >= table.range.start.row.min(table.range.end.row)
+        && address.row <= table.range.start.row.max(table.range.end.row)
+    })?
+  } else {
+    book
+      .tables
+      .get(&selection.table_name.to_ascii_uppercase())?
+  };
   let mut range = table_reference_item_range(table, selection.items, current_address)?;
   if !selection.columns.is_empty() {
     let start = table_reference_column_offset(table, selection.columns[0].as_ref())?;
@@ -4630,7 +4755,7 @@ pub(crate) fn parse_date_input(text: &str, date_system: DateSystem) -> Option<f6
   let date = date_input_prefix(text)?;
   parse_iso_date_input(date, date_system)
     .or_else(|| parse_numeric_date_input(date, date_system))
-    .or_else(|| parse_month_date_input(date, date_system))
+    .or_else(|| parse_month_date_input(date, date_system, None))
 }
 
 fn date_input_prefix(text: &str) -> Option<&str> {
@@ -4666,7 +4791,11 @@ fn parse_iso_date_input(text: &str, date_system: DateSystem) -> Option<f64> {
   valid_date_serial_with_system(year, month, day, date_system)
 }
 
-fn parse_month_date_input(text: &str, date_system: DateSystem) -> Option<f64> {
+fn parse_month_date_input(
+  text: &str,
+  date_system: DateSystem,
+  default_year: Option<i32>,
+) -> Option<f64> {
   let tokens = date_input_tokens(text)?;
   let month_index = tokens
     .iter()
@@ -4683,6 +4812,8 @@ fn parse_month_date_input(text: &str, date_system: DateSystem) -> Option<f64> {
     })
     .collect::<Vec<_>>();
   let (year, day) = match (month_index, numbers.as_slice()) {
+    (0 | 1, [(day, _)]) if (1..=31).contains(day) => (default_year?, *day),
+    (0 | 1, [(year, _)]) if *year >= 100 => (*year, 1),
     // Month-first long dates with two numeric substrings use MDY in the
     // default English locale.
     (0, [(day, _), (year, _)]) => (*year, *day),

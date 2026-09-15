@@ -6,7 +6,8 @@ use statrs::distribution::{
 };
 
 use super::{
-  EvalContext, FormulaFunctionId, FunctionArgReader, FunctionArgs, resolve_function_name,
+  EvalContext, FormulaFunctionId, FunctionArgReader, FunctionArgs, is_reserved_excel_function_name,
+  resolve_function_name,
 };
 use crate::calc::combinatorics::{
   combination_count, gcd_number, lcm_number, permutation_count, permutation_with_repetition_count,
@@ -64,8 +65,8 @@ use crate::calc::text::{
 use crate::calc::units::convert_unit;
 use crate::evaluator::{
   DatabaseFunction, DatePart, EvalArg, IfsAggregate, TimePart, column_index_to_name, compare_text,
-  datevalue, display_text_from_value, error_text_value, format_number_with_format_code, rtl_cos,
-  rtl_sin, rtl_tan, timevalue,
+  display_text_from_value, error_text_value, format_number_with_format_code, rtl_cos, rtl_sin,
+  rtl_tan, timevalue,
 };
 use crate::model::{XLSX_MAX_COLUMN_ZERO_BASED, XLSX_MAX_ROW_ZERO_BASED};
 use crate::program::{FormulaNodeKind, FormulaReference};
@@ -81,7 +82,26 @@ pub(crate) fn evaluate_function<'doc>(
   name: &Cow<'doc, str>,
   args: FunctionArgs<'_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let function = function.or_else(|| resolve_function_name(name.as_ref()))?;
+  let Some(function) = function.or_else(|| resolve_function_name(name.as_ref())) else {
+    if !matches!(
+      evaluator.grammar,
+      FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+    ) || is_reserved_excel_function_name(name)
+      || evaluator
+        .book
+        .defined_name_formula(Some(evaluator.current_sheet), name)
+        .is_some()
+      || evaluator
+        .locals
+        .contains_key(&name.trim_start_matches("_xlpm.").to_ascii_uppercase())
+    {
+      return None;
+    }
+    // An unbound function is unavailable in this host. Office returns #NAME?
+    // before evaluating its arguments; enclosing IF/IFERROR still control
+    // whether this call is reached and how the error is handled.
+    return Some(FormulaValue::Error(FormulaErrorValue::Name));
+  };
   evaluate_function_id(evaluator, function, args)
 }
 
@@ -1001,33 +1021,38 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Choosecols if args.len() >= 2 => {
       evaluate_choose_rows_columns_reader(evaluator, args, false)
     }
-    FormulaFunctionId::Ceiling if (1..=3).contains(&args.len()) => {
+    FormulaFunctionId::Ceiling | FormulaFunctionId::Floor => {
+      let ceiling = function == FormulaFunctionId::Ceiling;
       if matches!(
         evaluator.grammar,
         FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
-      ) && args.len() == 2
-        && !(evaluator.array_context && ceiling_floor_has_array_argument(args))
-      {
-        return evaluate_ceiling_floor_legacy_reader(evaluator, args, true);
+      ) {
+        if args.len() != 2 {
+          // Excel's legacy functions take exactly two arguments. Preserve
+          // an argument error before reporting the invalid count, as in
+          // bug67784.xlsx's FLOOR(beta,1,2) -> #NAME?.
+          for index in 0..args.len() {
+            if let Some(value) = args.value(index)
+              && let FormulaValue::Error(error) = evaluator.scalar_binary_operand(value)
+            {
+              return Some(FormulaValue::Error(error));
+            }
+          }
+          return Some(FormulaValue::Error(FormulaErrorValue::Value));
+        }
+        if !(evaluator.array_context && ceiling_floor_has_array_argument(args)) {
+          return evaluate_ceiling_floor_legacy_reader(evaluator, args, ceiling);
+        }
+      } else if !(1..=3).contains(&args.len()) {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
       }
-      evaluate_ceiling_floor_reader(evaluator, args, true, CeilingFloorKind::Odff)
+      evaluate_ceiling_floor_reader(evaluator, args, ceiling, CeilingFloorKind::Odff)
     }
     FormulaFunctionId::ComDotMicrosoftDotCeiling if args.len() == 2 => {
       evaluate_ceiling_floor_legacy_reader(evaluator, args, true)
     }
     FormulaFunctionId::ComDotMicrosoftDotCeiling => {
       Some(FormulaValue::Error(FormulaErrorValue::Error))
-    }
-    FormulaFunctionId::Floor if (1..=3).contains(&args.len()) => {
-      if matches!(
-        evaluator.grammar,
-        FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
-      ) && args.len() == 2
-        && !(evaluator.array_context && ceiling_floor_has_array_argument(args))
-      {
-        return evaluate_ceiling_floor_legacy_reader(evaluator, args, false);
-      }
-      evaluate_ceiling_floor_reader(evaluator, args, false, CeilingFloorKind::Odff)
     }
     FormulaFunctionId::ComDotMicrosoftDotFloor if args.len() == 2 => {
       evaluate_ceiling_floor_legacy_reader(evaluator, args, false)
@@ -1047,18 +1072,13 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::FloorDotPrecise if (1..=2).contains(&args.len()) => {
       evaluate_ceiling_floor_reader(evaluator, args, false, CeilingFloorKind::Precise)
     }
-    FormulaFunctionId::Ceiling
-    | FormulaFunctionId::Floor
-    | FormulaFunctionId::CeilingDotMath
+    FormulaFunctionId::CeilingDotMath
     | FormulaFunctionId::FloorDotMath
     | FormulaFunctionId::CeilingDotPrecise
     | FormulaFunctionId::FloorDotPrecise => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Date if args.len() == 3 => evaluate_date_reader(evaluator, args),
     FormulaFunctionId::Datevalue if args.len() == 1 => {
-      let value = datevalue(
-        &evaluator.text(&args.first_value()?),
-        evaluator.book.date_system,
-      );
+      let value = evaluator.date_value_from_text(&evaluator.text(&args.first_value()?));
       Some(match value {
         FormulaValue::Error(FormulaErrorValue::IllegalArgument) => {
           FormulaValue::Error(FormulaErrorValue::Value)
@@ -2226,6 +2246,15 @@ fn evaluate_type_value<'doc>(
   Some(FormulaValue::Number(match evaluator.first_value(value) {
     FormulaValue::Number(_) => 1.0,
     FormulaValue::String(_) => 2.0,
+    FormulaValue::Boolean(_)
+      if matches!(
+        evaluator.grammar,
+        FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+      ) =>
+    {
+      // Excel TYPE distinguishes logical values (4) from numbers (1).
+      4.0
+    }
     FormulaValue::Boolean(_) => 1.0,
     FormulaValue::Error(_) => 16.0,
     FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => 64.0,
@@ -3645,8 +3674,14 @@ fn format_text_date(number: f64, format: &str, date_system: DateSystem) -> Optio
   let mut milliseconds = ((number - day) * 86_400_000.0).round() as i64;
   let day_adjust = milliseconds.div_euclid(86_400_000);
   milliseconds = milliseconds.rem_euclid(86_400_000);
-  let (year, month, date) =
-    date_from_serial_with_system(day as i32 + day_adjust as i32, date_system)?;
+  let serial = day as i32 + day_adjust as i32;
+  // TEXT displays Excel's January 0, while calendar arithmetic still uses
+  // the real date underlying serial zero (December 31, 1899).
+  let (year, month, date) = if date_system == DateSystem::Date1900 && serial == 0 {
+    (1900, 1, 0)
+  } else {
+    date_from_serial_with_system(serial, date_system)?
+  };
   let hour = milliseconds / 3_600_000;
   let minute = (milliseconds % 3_600_000) / 60_000;
   let second = (milliseconds % 60_000) / 1_000;
@@ -3702,7 +3737,8 @@ fn format_text_date(number: f64, format: &str, date_system: DateSystem) -> Optio
       }
       let len = index - start;
       match upper {
-        'Y' => output.push_str(&format!("{year:0len$}")),
+        'Y' if len <= 2 => output.push_str(&format!("{:02}", year.rem_euclid(100))),
+        'Y' => output.push_str(&format!("{year:04}")),
         'M' if len >= 3 => output.push_str(month_abbrev(month)),
         'M' if month_token_is_minute(&chars, start, index) => {
           output.push_str(&format!("{minute:0len$}"))
@@ -6718,43 +6754,65 @@ fn evaluate_index_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  let row = args
-    .value(1)
-    .and_then(|value| evaluator.number(&value))
-    .unwrap_or(0.0);
-  let column = args
-    .value(2)
-    .and_then(|value| evaluator.number(&value))
-    .unwrap_or(0.0);
-  let area = args
-    .value(3)
-    .and_then(|value| evaluator.number(&value))
-    .unwrap_or(1.0);
+  let source = args.value(0)?;
+  // Excel preserves a scalar source error before inspecting row/column/area.
+  // Errors within a matrix remain selectable cells, not whole-array errors.
+  if matches!(source, FormulaValue::Error(_)) {
+    return Some(source);
+  }
+  let excel = matches!(
+    evaluator.grammar,
+    FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1
+  );
+  let mut selectors = [0.0, 0.0, 1.0];
+  for (offset, selector) in selectors.iter_mut().enumerate() {
+    let index = offset + 1;
+    if args.raw_arg(index).is_none() || args.is_missing(index) {
+      continue;
+    }
+    let value = args.value(index)?;
+    if let FormulaValue::Error(error) = evaluator.first_value(&value) {
+      return Some(FormulaValue::Error(error));
+    }
+    let Some(number) = evaluator.number(&value) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
+    *selector = number;
+  }
+  let [row, column, area] = selectors;
   if row < 0.0 || column < 0.0 || area < 1.0 {
-    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    return Some(FormulaValue::Error(if excel {
+      FormulaErrorValue::Value
+    } else {
+      FormulaErrorValue::IllegalArgument
+    }));
   }
   let row = row as u32;
   let column = column as u32;
   let area = area as usize;
-  let ranges = args.reference_ranges(0)?;
+  let ranges = evaluator.reference_ranges_from_value(&source);
   if !ranges.is_empty() {
     return Some(evaluator.index_reference_area(&ranges, row, column, area, args.len()));
   }
-  let value = args
-    .value(0)
-    .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value));
-  if let FormulaValue::Matrix(rows) = value {
-    let value = index_matrix(rows, row, column, args.len());
-    return Some(if evaluator.array_context {
-      value
-    } else {
-      evaluator.scalar_value(value)
-    });
-  }
-  let Some(reference) = evaluator.as_reference(&value) else {
-    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  let rows = match source {
+    FormulaValue::Matrix(rows) => rows,
+    // Excel's array form accepts a single scalar as a one-cell array.
+    value @ (FormulaValue::Number(_)
+    | FormulaValue::String(_)
+    | FormulaValue::Boolean(_)
+    | FormulaValue::Blank)
+      if excel =>
+    {
+      vec![vec![value]]
+    }
+    _ => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
   };
-  Some(evaluator.index_reference_area(&[reference], row, column, area, args.len()))
+  let value = index_matrix(rows, row, column, args.len());
+  Some(if evaluator.array_context {
+    value
+  } else {
+    evaluator.scalar_value(value)
+  })
 }
 
 fn evaluate_offset_reader<'doc>(
@@ -6909,37 +6967,55 @@ fn offset_reference<'doc>(
   height: i64,
   width: i64,
 ) -> Option<FormulaValue<'doc>> {
-  if width <= 0 || height <= 0 {
+  let Some((start_column, end_column)) = offset_axis_range(
+    reference.range.start.column,
+    column_offset,
+    width,
+    XLSX_MAX_COLUMN_ZERO_BASED,
+  ) else {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
-  }
-  let start_column = i64::from(reference.range.start.column) + column_offset;
-  let start_row = i64::from(reference.range.start.row) + row_offset;
-  let end_column = start_column + width - 1;
-  let end_row = start_row + height - 1;
-  if start_column < 0
-    || start_row < 0
-    || end_column > i64::from(XLSX_MAX_COLUMN_ZERO_BASED)
-    || end_row > i64::from(XLSX_MAX_ROW_ZERO_BASED)
-  {
+  };
+  let Some((start_row, end_row)) = offset_axis_range(
+    reference.range.start.row,
+    row_offset,
+    height,
+    XLSX_MAX_ROW_ZERO_BASED,
+  ) else {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
-  }
+  };
   Some(FormulaValue::Reference(QualifiedRange {
     sheet: reference.sheet,
     sheet_name: reference.sheet_name.clone(),
     end_sheet_name: reference.end_sheet_name.clone(),
     range: CellRange::new(
       CellAddress {
-        column: start_column as u32,
-        row: start_row as u32,
+        column: start_column,
+        row: start_row,
       },
       CellAddress {
-        column: end_column as u32,
-        row: end_row as u32,
+        column: end_column,
+        row: end_row,
       },
     ),
     start_flags: reference.start_flags,
     end_flags: reference.end_flags,
   }))
+}
+
+fn offset_axis_range(origin: u32, offset: i64, extent: i64, maximum: u32) -> Option<(u32, u32)> {
+  if extent == 0 {
+    return None;
+  }
+  let anchor = i64::from(origin).checked_add(offset)?;
+  // Office allows negative dimensions: the anchor is the last cell on that
+  // axis, and is included in the requested absolute number of cells.
+  let opposite = anchor.checked_add(extent)?.checked_sub(extent.signum())?;
+  let start = anchor.min(opposite);
+  let end = anchor.max(opposite);
+  if start < 0 || end > i64::from(maximum) {
+    return None;
+  }
+  Some((start as u32, end as u32))
 }
 
 fn matrix_can_broadcast_local(
@@ -7849,7 +7925,7 @@ fn evaluate_formula_text_reader<'doc>(
   let sheet = evaluator.range_sheet(&reference);
   evaluator
     .book
-    .formula_text(sheet, reference.range.start)
+    .formula_text_with_grammar(sheet, reference.range.start, evaluator.grammar)
     .map(|text| FormulaValue::String(Cow::Owned(text)))
     .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
 }

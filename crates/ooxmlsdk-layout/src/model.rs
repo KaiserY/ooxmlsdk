@@ -553,6 +553,7 @@ pub(crate) struct TextItem {
   /// source; this rectangle is only the scale/skew/offset anchor.
   pub drawingml_text_effect_anchor: Option<common::Rect>,
   pub paint_clip: Option<common::Rect>,
+  pub page_culling_bounds: Option<common::Rect>,
   pub discard_if_horizontally_clipped: bool,
   pub text: String,
   pub style: Box<TextStyle>,

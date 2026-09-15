@@ -81,9 +81,24 @@ pub(crate) struct CalcPrintCell<'a> {
   pub(crate) rich_text_runs: &'a [super::workbook::SharedStringRun],
   pub(crate) number_format_state: NumberFormatRenderState,
   pub(crate) number_format_color: Option<RgbColor>,
+  pub(crate) number_format_layout: Option<Vec<NumberFormatLayoutItem>>,
   pub(crate) formula: bool,
   pub(crate) icon_set: Option<CalcPrintIconSet>,
+  pub(crate) data_bar: Option<CalcPrintDataBar>,
   pub(crate) color_scale_fill: Option<CalcPrintColorScaleFill>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct CalcPrintDataBar {
+  pub(crate) start: f32,
+  pub(crate) end: f32,
+  pub(crate) axis: Option<f32>,
+  pub(crate) color: RgbColor,
+  pub(crate) border_color: Option<RgbColor>,
+  pub(crate) axis_color: RgbColor,
+  pub(crate) gradient: bool,
+  pub(crate) show_value: bool,
+  pub(crate) direction: ooxmlsdk::schemas::x14::DataBarDirectionValues,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -109,6 +124,13 @@ pub(crate) enum NumberFormatRenderState {
   Percent,
   DateTime,
   UnsupportedFormatCode,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum NumberFormatLayoutItem {
+  Text(String),
+  Reserve(char),
+  Fill(char),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -320,6 +342,17 @@ fn print_scale_state(
   named_ranges: &CalcPrintNamedRanges,
   text_metrics: &mut TextMetrics,
 ) -> CalcPrintScaleState {
+  if sheet.sheet_type == SheetType::Chartsheet {
+    // A chartsheet's absolute anchors are already physical point sizes.
+    // Office keeps both dimensions when paper, margins or orientation change.
+    return CalcPrintScaleState {
+      zoom: 100,
+      paper_scale_percent: 100,
+      pagination_paper_scale_percent: 100,
+      skip_empty: true,
+      top_down: true,
+    };
+  }
   // UpdatePages, CalcZoom. Full page-size based CalcPages is a later bridge;
   // this keeps the exact branch ownership and forced-break constraints.
   let forced_break_min_columns = sheet
@@ -496,7 +529,10 @@ fn fit_zoom_to_pages(
     .map(|range| sheet.range_rect(range).height_pt)
     .unwrap_or(0.0);
   let page_width = (content.0 - repeat_width).max(1.0);
-  let page_height = (content.1 - repeat_height).max(1.0);
+  let page_height =
+    (print_row_capacity_pt(&sheet.page_settings, sheet.page_settings.page_size_pt().1)
+      - repeat_height)
+      .max(1.0);
   let fit_area = fit_scale_area(import, sheet, area, named_ranges);
   let area_rect = sheet.range_rect(fit_area);
   let width_zoom = if page_columns > 0 && area_rect.width_pt > 0.0 {
@@ -551,6 +587,20 @@ fn print_content_size_for_page(
   // Footer geometry is symmetric. Scaling changes worksheet content, not
   // these physical margins; subtracting header/footer again shrinks the body.
   (width.max(1.0), height.max(1.0))
+}
+
+fn print_row_capacity_pt(page_settings: &CalcPageSettings, page_height_pt: f32) -> f32 {
+  // Excel's fixed-output row page breaks reserve eight 600dpi dots inside
+  // the physical margins. Original/mixed-font and uniform-row Office controls
+  // at 50/100/200% keep this physical allowance unchanged; print/screen PDF
+  // quality also has no effect. Each margin is truncated on the device grid
+  // before subtraction: 0.740 and 0.739 inches distinguish that boundary.
+  let dpi = f64::from(crate::units::OFFICE_FIXED_OUTPUT_DPI);
+  let points_per_inch = f64::from(crate::units::POINTS_PER_INCH);
+  let page_dots = (f64::from(page_height_pt) * dpi / points_per_inch).round();
+  let top_dots = (page_settings.margin_top_in * dpi).floor();
+  let bottom_dots = (page_settings.margin_bottom_in * dpi).floor();
+  ((page_dots - top_dots - bottom_dots - 8.0) * points_per_inch / dpi).max(1.0) as f32
 }
 
 fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcPrintDrawingSummary {
@@ -719,6 +769,13 @@ fn implicit_header_footer_uses_formatted_cell_extent(
   sheet: &CalcSheet,
   named_ranges: &CalcPrintNamedRanges,
 ) -> bool {
+  // Fit-to-pages uses the visible body extent for both zoom and pagination.
+  // ExpenseReport's font/number-format-only M cells must neither shrink its
+  // A:L body nor add a header/footer-only page after that body has been fitted.
+  // Fixed-scale printing keeps the wider formatted extent below.
+  if sheet.page_settings.fit_to_page || sheet.metrics.settings.properties.page_setup.fit_to_page {
+    return false;
+  }
   use_formatted_cell_extent_for_implicit_header_footer(
     !named_ranges.resolved_print_areas.is_empty(),
     sheet.page_settings.header_footer.has_print_content(),
@@ -1119,7 +1176,7 @@ fn extend_print_area_for_overflow(
       if row_cell_has_print_data_at(row, address.col + 1) {
         continue;
       }
-      let style_index = sheet.effective_cell_style_index(row, cell, address);
+      let style_index = cell.style_index;
       if import
         .styles
         .alignment_for_cell(style_index)
@@ -1180,17 +1237,6 @@ fn calc_cached_print_text_width_pt(width_pt: f32) -> f32 {
   f32::from(cached_pixels) * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
 }
 
-fn print_cell_text_style(
-  import: &ExcelImport,
-  sheet: &CalcSheet,
-  row: &CalcRow,
-  cell: &CalcCell,
-  address: CellAddress,
-) -> TextStyle {
-  let style_index = sheet.effective_cell_style_index(row, cell, address);
-  import.styles.text_style_for_cell(style_index)
-}
-
 fn row_cell_has_print_data_at(row: &CalcRow, col: u32) -> bool {
   row.cells.iter().enumerate().any(|(cell_position, cell)| {
     let address = cell.address().unwrap_or(CellAddress {
@@ -1242,7 +1288,7 @@ fn print_area_is_empty(
       {
         return false;
       }
-      let style_index = sheet.effective_cell_style_index(row, cell, address);
+      let style_index = cell.style_index;
       let borders = import.styles.borders_for_cell(style_index);
       if borders.left.is_some()
         || borders.right.is_some()
@@ -1382,7 +1428,7 @@ fn sheet_area_has_left_text_overflow(
       // ScDocument::IsPrintEmpty calls ExtendPrintArea() for the columns left
       // of the candidate page. If a left-side string extends into this page,
       // the page is not empty even when it has no cell bodies of its own.
-      let style = print_cell_text_style(import, sheet, row, cell, address);
+      let style = import.styles.text_style_for_cell(cell.style_index);
       text_overflow_end_column(sheet, row, cell, address, &style, text_metrics) >= area.start.col
     })
   })
@@ -1412,9 +1458,9 @@ fn sheet_body_is_empty(import: &ExcelImport, sheet: &CalcSheet) -> bool {
   }
   sheet.rows.iter().all(|row| {
     row.cells.iter().all(|cell| {
-      let Some(address) = cell.address() else {
+      if cell.address().is_none() {
         return true;
-      };
+      }
       if !cell.display_text.is_empty()
         || !cell.rich_text_runs.is_empty()
         || cell.formula.is_some()
@@ -1423,7 +1469,7 @@ fn sheet_body_is_empty(import: &ExcelImport, sheet: &CalcSheet) -> bool {
       {
         return false;
       }
-      let style_index = sheet.effective_cell_style_index(row, cell, address);
+      let style_index = cell.style_index;
       let borders = import.styles.borders_for_cell(style_index);
       borders.left.is_none()
         && borders.right.is_none()
@@ -1533,12 +1579,10 @@ fn split_range_by_page_metrics(
     .drawings
     .iter()
     .any(|drawing| !drawing.charts.is_empty() || !drawing.extended_charts.is_empty());
-  let content_size = print_content_size_for_page(
-    &sheet.page_settings,
-    sheet
-      .page_settings
-      .fixed_output_pagination_page_size_pt(has_chart),
-  );
+  let page_size = sheet
+    .page_settings
+    .fixed_output_pagination_page_size_pt(has_chart);
+  let content_size = print_content_size_for_page(&sheet.page_settings, page_size);
   let repeat_size = split
     .repeat
     .map(|range| {
@@ -1549,12 +1593,12 @@ fn split_range_by_page_metrics(
       }
     })
     .unwrap_or(0.0);
-  let available = (if split.by_row {
-    content_size.1
+  let page_capacity = (if split.by_row {
+    print_row_capacity_pt(&sheet.page_settings, page_size.1)
   } else {
     content_size.0
-  } - repeat_size)
-    .max(1.0)
+  })
+  .max(1.0)
     * 100.0
     / split.zoom_percent.max(ZOOM_MIN as f32);
   let mut current_start = start;
@@ -1570,12 +1614,42 @@ fn split_range_by_page_metrics(
       current_start = current;
       used = 0.0;
     }
+    // Titles already inside this slice occupy their ordinary row/column
+    // space. Only continuation slices prepend them. Both the title extent
+    // and row/column sizes are unscaled here; subtracting the title before
+    // undoing page zoom reserves too much space below 100%.
+    let repeat_is_prepended = split.repeat.is_some_and(|range| {
+      current_start
+        > if split.by_row {
+          range.end.row
+        } else {
+          range.end.col
+        }
+    });
+    let available = (page_capacity
+      - if repeat_is_prepended {
+        repeat_size
+      } else {
+        0.0
+      })
+    .max(1.0);
     let size = if split.by_row {
       print_row_height_pt(import, sheet, current, &mut *split.text_metrics)
     } else {
       sheet.column_width_pt(current)
     };
-    if used > 0.0 && used + size > available {
+    let exceeds_page = if split.by_row {
+      // Compare realized row bottoms, not sub-dot accumulation noise.
+      // Two 50% rows fit at the same device boundary as one 100% row;
+      // floating-point summation must not move that break.
+      let dots_per_point = split.zoom_percent.max(ZOOM_MIN as f32) / 100.0
+        * crate::units::OFFICE_FIXED_OUTPUT_DPI
+        / crate::units::POINTS_PER_INCH;
+      ((used + size) * dots_per_point).round() > (available * dots_per_point).round()
+    } else {
+      used + size > available
+    };
+    if used > 0.0 && exceeds_page {
       // CalcPages first derives every page boundary from the sheet metrics;
       // lcl_SetHidden/IsPrintEmpty then decides whether each complete slice
       // is printable.  Content in the first column after a break therefore
@@ -1636,7 +1710,7 @@ fn print_row_height_pt(
       col: cell_position as u32 + 1,
       row: row_index,
     });
-    let style_index = sheet.effective_cell_style_index(row, cell, address);
+    let style_index = cell.style_index;
     let Some(alignment) = import.styles.alignment_for_cell(style_index) else {
       continue;
     };
@@ -1827,7 +1901,7 @@ fn print_cells_for_area<'a>(
       if row.hidden || hidden_column {
         continue;
       }
-      let style_index = sheet.effective_cell_style_index(row, cell, address);
+      let style_index = cell.style_index;
       let number_format_id = style_index
         .and_then(|index| import.styles.cell_xfs.get(index as usize))
         .and_then(|format| format.number_format_id);
@@ -1868,11 +1942,21 @@ fn print_cells_for_area<'a>(
           boolean_raw_value(raw_text),
         )
         .to_owned()
+      } else if number_format_state == NumberFormatRenderState::Error {
+        // Keep the formula model and conditional evaluation in canonical
+        // error codes; only typed error cells use localized display text.
+        crate::localization::office_spreadsheet_error_text(
+          Some(import.styles.output_ui_language()),
+          &rendered_text,
+        )
+        .to_owned()
       } else {
         rendered_text
       };
       let number_format_color = effective_number_format_code
         .and_then(|code| numeric_format_color(code, raw_text, cell.data_type, &import.styles));
+      let number_format_layout = effective_number_format_code
+        .and_then(|code| number_format_layout(raw_text, code, number_format_state));
       let rendered_text = pivot_display_text(
         sheet,
         print_address,
@@ -1888,6 +1972,10 @@ fn print_cells_for_area<'a>(
         .and_then(|value| {
           conditional_color_scale_fill(import, sheet, address, value, conditional_eval_cache)
         });
+      let data_bar = conditional_statistical_cell_value(&cell.display_text, cell.data_type)
+        .and_then(|value| {
+          conditional_data_bar(import, sheet, address, value, conditional_eval_cache)
+        });
       physical_cells.push(CalcPrintCell {
         address: print_address,
         text: Cow::Borrowed(cell.display_text.as_str()),
@@ -1898,8 +1986,10 @@ fn print_cells_for_area<'a>(
         rich_text_runs: &cell.rich_text_runs,
         number_format_state,
         number_format_color,
+        number_format_layout,
         formula: cell.formula.is_some(),
         icon_set,
+        data_bar,
         color_scale_fill,
       });
     }
@@ -1918,6 +2008,8 @@ fn print_cells_for_area<'a>(
   let mut virtual_cells = pivot_virtual_print_cells(sheet, area, &occupied, strings);
   occupied.extend(virtual_cells.iter().map(|cell| cell.address));
   virtual_cells.extend(table_virtual_print_cells(sheet, area, &occupied));
+  occupied.extend(virtual_cells.iter().map(|cell| cell.address));
+  virtual_cells.extend(inherited_format_print_cells(import, sheet, area, &occupied));
   virtual_cells.sort_unstable_by_key(|cell| (cell.address.row, cell.address.col));
   merge_print_cells_by_scan_order(physical_cells, virtual_cells)
 }
@@ -1989,11 +2081,78 @@ fn pivot_virtual_print_cells<'a>(
           rich_text_runs: &[],
           number_format_state: NumberFormatRenderState::Raw,
           number_format_color: None,
+          number_format_layout: None,
           formula: false,
           icon_set: None,
+          data_bar: None,
           color_scale_fill: None,
         });
       }
+    }
+  }
+  cells
+}
+
+fn inherited_format_print_cells<'a>(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  area: CellRange,
+  occupied: &HashSet<CellAddress>,
+) -> Vec<CalcPrintCell<'a>> {
+  // Row/column styles also paint cells that have no <c> record. Materialize
+  // only visible blanks on this already paginated area: formatting must not
+  // create values, extend the used range, or become a text-overflow owner.
+  let columns = (area.start.col..=area.end.col)
+    .filter(|&col| sheet.column_width_pt(col) > 0.0)
+    .map(|col| (col, sheet.column_style_index(col)))
+    .collect::<Vec<_>>();
+  let mut visible_styles = HashMap::new();
+  let mut has_paint = |style| {
+    *visible_styles
+      .entry(style)
+      .or_insert_with(|| import.styles.cell_has_visible_paint(style))
+  };
+  let painted_columns = columns
+    .iter()
+    .copied()
+    .filter(|&(_, style)| has_paint(style))
+    .collect::<Vec<_>>();
+  let mut cells = Vec::new();
+  for row in area.start.row..=area.end.row {
+    if sheet.row_height_pt(row) <= 0.0 {
+      continue;
+    }
+    let row_style = sheet.row_style_index(row);
+    let candidates = if let Some(style) = row_style {
+      // An explicit default row style clears a column's fill as well.
+      if !has_paint(Some(style)) {
+        continue;
+      }
+      &columns
+    } else {
+      &painted_columns
+    };
+    for &(col, column_style) in candidates {
+      let address = CellAddress { col, row };
+      if occupied.contains(&address) || sheet.is_covered_merged_cell(address) {
+        continue;
+      }
+      cells.push(CalcPrintCell {
+        address,
+        text: Cow::Borrowed(""),
+        data_type: None,
+        style_index: row_style.or(column_style),
+        pivot_format_id: None,
+        rendered_text: String::new(),
+        rich_text_runs: &[],
+        number_format_state: NumberFormatRenderState::Raw,
+        number_format_color: None,
+        number_format_layout: None,
+        formula: false,
+        icon_set: None,
+        data_bar: None,
+        color_scale_fill: None,
+      });
     }
   }
   cells
@@ -2038,8 +2197,10 @@ fn table_virtual_print_cells<'a>(
           rich_text_runs: &[],
           number_format_state: NumberFormatRenderState::Raw,
           number_format_color: None,
+          number_format_layout: None,
           formula: false,
           icon_set: None,
+          data_bar: None,
           color_scale_fill: None,
         });
       }
@@ -2085,6 +2246,303 @@ fn conditional_number_format_code<'a>(
     }
   }
   None
+}
+
+fn conditional_data_bar(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  address: CellAddress,
+  value: f64,
+  cache: &mut ConditionalFormatEvalCache,
+) -> Option<CalcPrintDataBar> {
+  let conditions = &sheet.metrics.conditions;
+  let extensions = &conditions.extension_conditions.conditional_formats;
+  let mut rules = conditions
+    .conditional_formats
+    .iter()
+    .filter(|format| conditional_format_contains_cell(format, address))
+    .flat_map(|format| {
+      format
+        .rules
+        .iter()
+        .filter(|rule| rule.data_bar.is_some() || rule.stop_if_true)
+        .map(move |rule| {
+          (
+            rule.priority,
+            &format.sequence_of_references,
+            Some(rule),
+            None,
+          )
+        })
+    })
+    .collect::<Vec<_>>();
+  for format in extensions {
+    if conditional_references_contain_cell(&format.sequence_of_references, address) {
+      rules.extend(format.rules.iter().filter_map(|rule| {
+        Some((
+          rule.priority?,
+          &format.sequence_of_references,
+          None,
+          Some(rule.data_bar.as_ref()?),
+        ))
+      }));
+    }
+  }
+  if !rules.iter().any(|(_, _, rule, standalone)| {
+    rule.is_some_and(|rule| rule.data_bar.is_some()) || standalone.is_some()
+  }) {
+    return None;
+  }
+  rules.sort_by_key(|rule| rule.0);
+  for (_, references, rule, standalone) in rules {
+    let base = rule.and_then(|rule| rule.data_bar.as_ref());
+    let extended = standalone.or_else(|| {
+      let id = rule?.extension_id.as_deref()?;
+      extensions
+        .iter()
+        .flat_map(|format| &format.rules)
+        .find(|rule| {
+          rule.priority.is_none()
+            && rule
+              .id
+              .as_deref()
+              .is_some_and(|other| other.eq_ignore_ascii_case(id))
+        })?
+        .data_bar
+        .as_ref()
+    });
+    if (base.is_some() || extended.is_some())
+      && let Some(bar) = evaluate_data_bar(
+        import,
+        sheet,
+        references,
+        (base, extended),
+        address,
+        value,
+        cache,
+      )
+    {
+      return Some(bar);
+    }
+    if let Some(rule) = rule
+      && rule.stop_if_true
+      && conditional_numeric_rule_matches(import, sheet, references, rule, address, value, cache)
+    {
+      break;
+    }
+  }
+  None
+}
+
+fn evaluate_data_bar(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  references: &[String],
+  rules: (
+    Option<&x::DataBar>,
+    Option<&ooxmlsdk::schemas::x14::DataBar>,
+  ),
+  address: CellAddress,
+  value: f64,
+  cache: &mut ConditionalFormatEvalCache,
+) -> Option<CalcPrintDataBar> {
+  use super::sheet_conditions::{IconSetThresholdModel, IconSetThresholdType};
+  use ooxmlsdk::schemas::x14::{DataBarAxisPositionValues as Axis, DataBarDirectionValues};
+
+  let (base, extended) = rules;
+  let range = conditional_reference_range(references, address)?;
+  let stats = cache.stats_for_range(sheet, range);
+  let minimum = *stats.sorted_values.first()?;
+  let maximum = *stats.sorted_values.last()?;
+  let origin = conditional_format_base_address(references, address)?;
+  let threshold = |index: usize| {
+    let legacy = base.and_then(|bar| bar.conditional_format_value_object.get(index));
+    let extension = extended.and_then(|bar| bar.conditional_formatting_value_object.get(index));
+    // Excel's linked rules retain their base threshold values. In particular,
+    // ClosedXML CFDataBar and CFDataBarNegative have conflicting x14 numeric
+    // placeholders, but Office prints the base min/max/percent scale. The
+    // automatic endpoint types only exist in x14 and augment that scale.
+    let threshold = match (legacy, extension) {
+      (_, Some(point))
+        if matches!(
+          point.r#type,
+          ooxmlsdk::schemas::x14::ConditionalFormattingValueObjectTypeValues::AutoMin
+            | ooxmlsdk::schemas::x14::ConditionalFormattingValueObjectTypeValues::AutoMax
+        ) =>
+      {
+        IconSetThresholdModel {
+          threshold_type: point.r#type.into(),
+          value: None,
+          greater_than_or_equal: true,
+        }
+      }
+      (Some(point), _) => IconSetThresholdModel {
+        threshold_type: point.r#type.into(),
+        value: point.val.clone(),
+        greater_than_or_equal: true,
+      },
+      (None, Some(point)) => IconSetThresholdModel {
+        threshold_type: point.r#type.into(),
+        value: point.formula.clone().or_else(|| point.value.clone()),
+        greater_than_or_equal: true,
+      },
+      _ => return None,
+    };
+    let number = match threshold.threshold_type {
+      IconSetThresholdType::AutomaticMinimum => minimum.min(0.0),
+      IconSetThresholdType::AutomaticMaximum => maximum.max(0.0),
+      _ => icon_set_threshold_value(
+        &threshold,
+        IconSetThresholdContext {
+          import,
+          sheet,
+          base: origin,
+          address: origin,
+          minimum,
+          maximum,
+          sorted_values: &stats.sorted_values,
+        },
+      )?,
+    };
+    number.is_finite().then_some(number)
+  };
+  let minimum = threshold(0)?;
+  let maximum = threshold(1)?;
+  let min_length = extended
+    .and_then(|bar| bar.min_length)
+    .or_else(|| base.and_then(|bar| bar.min_length))
+    .unwrap_or(10)
+    .min(100) as f64
+    / 100.0;
+  let max_length = extended
+    .and_then(|bar| bar.max_length)
+    .or_else(|| base.and_then(|bar| bar.max_length))
+    .unwrap_or(90)
+    .min(100) as f64
+    / 100.0;
+  let axis = extended.map_or(Axis::None, |bar| bar.axis_position.unwrap_or_default());
+  let (start, end, axis) = data_bar_extent(value, minimum, maximum, min_length, max_length, axis)?;
+  // The schema has distinct color element types with the same CT_Color fields.
+  macro_rules! color {
+    ($color:expr) => {
+      $color.and_then(|color| {
+        import.styles.spreadsheet_color(&x::Color {
+          auto: color.auto,
+          indexed: color.indexed,
+          rgb: color.rgb.clone(),
+          theme: color.theme,
+          tint: color.tint,
+        })
+      })
+    };
+  }
+  let positive = color!(extended.and_then(|bar| bar.fill_color.as_ref()))
+    .or_else(|| base.and_then(|bar| import.styles.spreadsheet_color(&bar.color)))?;
+  let negative = value < 0.0
+    && extended.is_some_and(|bar| {
+      !bar
+        .negative_bar_color_same_as_positive
+        .is_some_and(|value| value.as_bool())
+    });
+  let color = if negative {
+    color!(extended.and_then(|bar| bar.negative_fill_color.as_ref())).unwrap_or(RgbColor {
+      r: 255,
+      g: 0,
+      b: 0,
+    })
+  } else {
+    positive
+  };
+  let border_color = if extended.is_some_and(|bar| bar.border.is_some_and(|value| value.as_bool()))
+  {
+    let positive_border = color!(extended.and_then(|bar| bar.border_color.as_ref()));
+    if value < 0.0
+      && extended.is_some_and(|bar| {
+        bar
+          .negative_bar_border_color_same_as_positive
+          .is_some_and(|value| !value.as_bool())
+      })
+    {
+      color!(extended.and_then(|bar| bar.negative_border_color.as_ref())).or(positive_border)
+    } else {
+      positive_border
+    }
+  } else {
+    None
+  };
+  Some(CalcPrintDataBar {
+    start: start as f32,
+    end: end as f32,
+    axis: axis.map(|value| value as f32),
+    color,
+    border_color,
+    axis_color: color!(extended.and_then(|bar| bar.bar_axis_color.as_ref())).unwrap_or(RgbColor {
+      r: 0,
+      g: 0,
+      b: 0,
+    }),
+    gradient: extended.is_none_or(|bar| bar.gradient.is_none_or(|value| value.as_bool())),
+    show_value: extended
+      .and_then(|bar| bar.show_value)
+      .or_else(|| base.and_then(|bar| bar.show_value))
+      .is_none_or(|value| value.as_bool()),
+    direction: extended
+      .and_then(|bar| bar.direction)
+      .unwrap_or(DataBarDirectionValues::Context),
+  })
+}
+
+fn data_bar_extent(
+  value: f64,
+  minimum: f64,
+  maximum: f64,
+  min_length: f64,
+  max_length: f64,
+  axis: ooxmlsdk::schemas::x14::DataBarAxisPositionValues,
+) -> Option<(f64, f64, Option<f64>)> {
+  use ooxmlsdk::schemas::x14::DataBarAxisPositionValues as Axis;
+  if minimum > maximum || min_length > max_length {
+    return None;
+  }
+  if axis == Axis::None || (axis == Axis::Automatic && minimum >= 0.0) {
+    let fraction = if maximum == minimum {
+      1.0
+    } else {
+      ((value - minimum) / (maximum - minimum)).clamp(0.0, 1.0)
+    };
+    return Some((0.0, min_length + fraction * (max_length - min_length), None));
+  }
+  let zero = if axis == Axis::Middle {
+    0.5
+  } else if maximum <= 0.0 {
+    1.0
+  } else {
+    -minimum / (maximum - minimum)
+  };
+  let clamped = value.clamp(minimum.min(0.0), maximum.max(0.0));
+  let end = if axis == Axis::Middle {
+    let magnitude = minimum.abs().max(maximum.abs());
+    zero
+      + if magnitude > 0.0 {
+        clamped / magnitude * 0.5 * max_length
+      } else {
+        0.0
+      }
+  } else if clamped < 0.0 {
+    let fraction = if minimum == maximum {
+      // The constant scale has no interval to divide by, just as for
+      // nonnegative bars above. Keep its geometry finite.
+      1.0
+    } else {
+      ((clamped - maximum.min(0.0)) / (minimum - maximum.min(0.0))).clamp(0.0, 1.0)
+    };
+    zero - zero * fraction
+  } else if maximum > 0.0 {
+    zero + (1.0 - zero) * (clamped / maximum).clamp(0.0, 1.0)
+  } else {
+    zero
+  };
+  Some((zero, end, (zero > 0.0 && zero < 1.0).then_some(zero)))
 }
 
 fn conditional_icon_set(
@@ -2467,7 +2925,7 @@ pub(super) fn conditional_numeric_rule_matches(
       conditional_average_matches(sheet, references, rule, address, value, cache)
     }
     x::ConditionalFormatValues::CellIs => {
-      conditional_cell_is_matches(import, sheet, references, rule, address, value)
+      conditional_cell_is_matches(import, sheet, references, rule, address)
     }
     x::ConditionalFormatValues::Expression => {
       conditional_expression_matches(import, sheet, references, rule, address)
@@ -2494,7 +2952,10 @@ fn conditional_top10_matches(
   }
   let mut rank = (rule.rank.unwrap_or(10) as usize).max(1);
   if rule.percent {
-    rank = ((values.len() as f64 * rank as f64 / 100.0).ceil() as usize).max(1);
+    // Excel truncates a percentage rank before selecting the cutoff, with
+    // at least one numeric value. Twenty-one values at ten percent select
+    // two; ties at that cutoff remain included by the comparisons below.
+    rank = ((values.len() as f64 * rank as f64 / 100.0).floor() as usize).max(1);
   }
   rank = rank.min(values.len());
   if rule.bottom {
@@ -2532,43 +2993,6 @@ pub(super) fn conditional_cell_is_matches(
   references: &[String],
   rule: &super::sheet_conditions::ConditionalFormatRuleModel,
   address: CellAddress,
-  value: f64,
-) -> bool {
-  let base = conditional_format_base_address(references, address).unwrap_or(address);
-  let first = rule.formulas.first().and_then(|formula| {
-    super::formula::evaluate_relative_formula_as_number(import, sheet, formula, base, address)
-  });
-  let second = rule.formulas.get(1).and_then(|formula| {
-    super::formula::evaluate_relative_formula_as_number(import, sheet, formula, base, address)
-  });
-  match rule.operator.unwrap_or_default() {
-    x::ConditionalFormattingOperatorValues::LessThan => first.is_some_and(|limit| value < limit),
-    x::ConditionalFormattingOperatorValues::LessThanOrEqual => {
-      first.is_some_and(|limit| value <= limit)
-    }
-    x::ConditionalFormattingOperatorValues::Equal => first.is_some_and(|limit| value == limit),
-    x::ConditionalFormattingOperatorValues::NotEqual => first.is_some_and(|limit| value != limit),
-    x::ConditionalFormattingOperatorValues::GreaterThanOrEqual => {
-      first.is_some_and(|limit| value >= limit)
-    }
-    x::ConditionalFormattingOperatorValues::GreaterThan => first.is_some_and(|limit| value > limit),
-    x::ConditionalFormattingOperatorValues::Between => first
-      .zip(second)
-      .is_some_and(|(low, high)| value >= low.min(high) && value <= low.max(high)),
-    x::ConditionalFormattingOperatorValues::NotBetween => first
-      .zip(second)
-      .is_some_and(|(low, high)| value < low.min(high) || value > low.max(high)),
-    _ => false,
-  }
-}
-
-pub(super) fn conditional_cell_is_text_matches(
-  import: &ExcelImport,
-  sheet: &CalcSheet,
-  references: &[String],
-  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
-  address: CellAddress,
-  text: &str,
 ) -> bool {
   let Some(first) = rule.formulas.first() else {
     return false;
@@ -2576,27 +3000,29 @@ pub(super) fn conditional_cell_is_text_matches(
   let Some(base) = conditional_format_base_address(references, address) else {
     return false;
   };
-  // Keep the cell value a quoted string while translating the rule's formula
-  // references from its sqref origin. In particular, text "2" sorts after
-  // text "10"; coercing both to numbers changes the conditional formatting.
-  let value = format!("\"{}\"", text.replace('"', "\"\""));
+  // Office cellIs compares the underlying typed cell value. Numbers, text
+  // and logical values keep their ordinary formula comparison ordering;
+  // TRUE is not numeric 1 or the string "TRUE". A blank reference can compare
+  // equal to either zero or FALSE, while errors never receive the format.
+  // Translate the cell reference from the same sqref origin as the limits,
+  // preserving relative/mixed references and recalculated formula types.
+  let mut column = base.col;
+  let mut value = String::new();
+  while column > 0 {
+    column -= 1;
+    value.insert(0, (b'A' + (column % 26) as u8) as char);
+    column /= 26;
+  }
+  value.push_str(&base.row.to_string());
   let first = first.trim().trim_start_matches('=');
   let compare = |operator| format!("{value}{operator}({first})");
   let predicate = match rule.operator.unwrap_or_default() {
     x::ConditionalFormattingOperatorValues::Equal => compare("="),
     x::ConditionalFormattingOperatorValues::NotEqual => compare("<>"),
-    x::ConditionalFormattingOperatorValues::LessThan => {
-      format!("AND(ISTEXT(({first})),{})", compare("<"))
-    }
-    x::ConditionalFormattingOperatorValues::LessThanOrEqual => {
-      format!("AND(ISTEXT(({first})),{})", compare("<="))
-    }
-    x::ConditionalFormattingOperatorValues::GreaterThan => {
-      format!("AND(ISTEXT(({first})),{})", compare(">"))
-    }
-    x::ConditionalFormattingOperatorValues::GreaterThanOrEqual => {
-      format!("AND(ISTEXT(({first})),{})", compare(">="))
-    }
+    x::ConditionalFormattingOperatorValues::LessThan => compare("<"),
+    x::ConditionalFormattingOperatorValues::LessThanOrEqual => compare("<="),
+    x::ConditionalFormattingOperatorValues::GreaterThan => compare(">"),
+    x::ConditionalFormattingOperatorValues::GreaterThanOrEqual => compare(">="),
     x::ConditionalFormattingOperatorValues::Between
     | x::ConditionalFormattingOperatorValues::NotBetween => {
       let Some(second) = rule.formulas.get(1) else {
@@ -2606,13 +3032,11 @@ pub(super) fn conditional_cell_is_text_matches(
       let between = format!(
         "OR(AND({value}>=({first}),{value}<=({second})),AND({value}>=({second}),{value}<=({first})))"
       );
-      let range_condition =
-        if rule.operator == Some(x::ConditionalFormattingOperatorValues::NotBetween) {
-          format!("NOT({between})")
-        } else {
-          between
-        };
-      format!("AND(ISTEXT(({first})),ISTEXT(({second})),{range_condition})")
+      if rule.operator == Some(x::ConditionalFormattingOperatorValues::NotBetween) {
+        format!("NOT({between})")
+      } else {
+        between
+      }
     }
     _ => return false,
   };
@@ -3277,28 +3701,37 @@ pub(crate) fn rendered_number_text_for_locale(
 }
 
 fn format_general_number(value: f64) -> String {
-  // SvNumberformat output instead of the raw OOXML double text. Fifteen
-  // significant digits match Calc/Excel's normal General precision.
+  // Excel's General display budget is ten digits, counting the leading zero
+  // of a fraction. Widening a column does not restore the raw double's extra
+  // digits: independent worksheet and pivot controls both retain nine decimal
+  // places for 0.7034962745892106 and 3.6512482151539434.
   if value == 0.0 {
     return "0".to_string();
   }
   let abs = value.abs();
-  if !(1.0e-4..1.0e15).contains(&abs) {
-    let text = format!("{value:.14e}");
-    if let Some((mantissa, exponent)) = text.split_once('e') {
-      let mantissa = trim_general_fraction(mantissa.to_string());
-      let exponent_value = exponent.parse::<i32>().unwrap_or(0);
-      return format!("{mantissa}E{exponent_value:+03}");
+  if abs < 1.0e11 {
+    let integer_digits = if abs >= 1.0 {
+      abs.log10().floor() as usize + 1
+    } else {
+      1
+    };
+    let decimals = 10usize.saturating_sub(integer_digits);
+    let rounded = round_to_decimal_places(value, decimals as i32);
+    let fixed = trim_general_fraction(format!("{rounded:.decimals$}"));
+    // Exact small decimals such as 0.000000001 remain fixed. Values needing
+    // more fractional places below 0.0001 use a six-digit scientific mantissa.
+    // An eleven-digit integer is also fixed until rounding carries to 10^11.
+    if rounded.abs() < 1.0e11 && (abs >= 1.0e-4 || fixed.parse::<f64>().ok() == Some(value)) {
+      return fixed;
     }
-    return text;
   }
-  let integer_digits = if abs >= 1.0 {
-    abs.log10().floor() as isize + 1
-  } else {
-    0
-  };
-  let decimals = 15usize.saturating_sub(integer_digits.max(0) as usize);
-  trim_general_fraction(format!("{value:.decimals$}"))
+  let pattern = NumberFormatPattern::parse_section("0.#####E+00", false);
+  let scientific = format_scientific_value(value, &pattern, pattern.scientific.as_ref().unwrap())
+    .unwrap_or_else(|| value.to_string());
+  scientific.split_once('E').map_or_else(
+    || scientific.clone(),
+    |(mantissa, exponent)| format!("{}E{exponent}", trim_general_fraction(mantissa.to_string())),
+  )
 }
 
 fn trim_general_fraction(mut text: String) -> String {
@@ -3342,6 +3775,258 @@ fn numeric_format_color(
   // not part of the displayed text. Quoted/escaped brackets remain literal.
   let marker = section.strip_prefix('[')?.split_once(']')?.0;
   styles.number_format_color(marker)
+}
+
+#[derive(Clone, Debug)]
+enum NumberFormatAtom {
+  Literal(char),
+  Syntax(char),
+  Reserve(char),
+  Fill(char),
+}
+
+fn number_format_atoms(section: &str) -> Option<Vec<NumberFormatAtom>> {
+  let mut atoms = Vec::new();
+  let mut quoted = false;
+  let mut chars = section.chars();
+  while let Some(ch) = chars.next() {
+    atoms.push(match ch {
+      '"' => {
+        quoted = !quoted;
+        continue;
+      }
+      _ if quoted => NumberFormatAtom::Literal(ch),
+      '\\' => NumberFormatAtom::Literal(chars.next()?),
+      '_' => NumberFormatAtom::Reserve(chars.next()?),
+      '*' => NumberFormatAtom::Fill(chars.next()?),
+      _ => NumberFormatAtom::Syntax(ch),
+    });
+  }
+  (!quoted).then_some(atoms)
+}
+
+fn number_layout_atom(atom: &NumberFormatAtom) -> NumberFormatLayoutItem {
+  match *atom {
+    NumberFormatAtom::Literal(ch) | NumberFormatAtom::Syntax(ch) => {
+      NumberFormatLayoutItem::Text(ch.to_string())
+    }
+    NumberFormatAtom::Reserve(ch) => NumberFormatLayoutItem::Reserve(ch),
+    NumberFormatAtom::Fill(ch) => NumberFormatLayoutItem::Fill(ch),
+  }
+}
+
+fn coalesce_number_layout(items: Vec<NumberFormatLayoutItem>) -> Vec<NumberFormatLayoutItem> {
+  let mut result = Vec::new();
+  for item in items {
+    if let NumberFormatLayoutItem::Text(text) = &item {
+      if text.is_empty() {
+        continue;
+      }
+      if let Some(NumberFormatLayoutItem::Text(previous)) = result.last_mut() {
+        previous.push_str(text);
+        continue;
+      }
+    }
+    result.push(item);
+  }
+  result
+}
+
+fn number_format_layout(
+  raw: &str,
+  code: &str,
+  state: NumberFormatRenderState,
+) -> Option<Vec<NumberFormatLayoutItem>> {
+  if !matches!(
+    state,
+    NumberFormatRenderState::Number
+      | NumberFormatRenderState::Percent
+      | NumberFormatRenderState::Text
+  ) {
+    return None;
+  }
+  let sections = split_number_format_sections(code);
+  let text = state == NumberFormatRenderState::Text;
+  let value = if text {
+    0.0
+  } else {
+    raw.parse::<f64>().ok().filter(|v| v.is_finite())?
+  };
+  let index = if text {
+    if sections.len() >= 4 {
+      3
+    } else if sections.len() == 1 {
+      0
+    } else {
+      return None;
+    }
+  } else {
+    number_format_section_index(&sections, value)?
+  };
+  let section = strip_number_format_markers(sections[index]);
+  let atoms = number_format_atoms(&section)?;
+  if !atoms.iter().any(|atom| {
+    matches!(
+      atom,
+      NumberFormatAtom::Reserve(_) | NumberFormatAtom::Fill(_) | NumberFormatAtom::Syntax('?')
+    )
+  }) || atoms
+    .iter()
+    .filter(|atom| matches!(atom, NumberFormatAtom::Fill(_)))
+    .count()
+    > 1
+  {
+    return None;
+  }
+  if text {
+    if !atoms
+      .iter()
+      .any(|atom| matches!(atom, NumberFormatAtom::Syntax('@')))
+    {
+      return None;
+    }
+    return Some(coalesce_number_layout(
+      atoms
+        .iter()
+        .map(|atom| {
+          if matches!(atom, NumberFormatAtom::Syntax('@')) {
+            NumberFormatLayoutItem::Text(raw.to_string())
+          } else {
+            number_layout_atom(atom)
+          }
+        })
+        .collect(),
+    ));
+  }
+  let pattern = NumberFormatPattern::parse_section(&section, index == 1);
+  // Calendar, scientific and rational pictures retain their existing formatter;
+  // their field-width semantics are distinct from decimal placeholders.
+  if pattern.date_time
+    || pattern.scientific.is_some()
+    || atoms
+      .iter()
+      .any(|atom| matches!(atom, NumberFormatAtom::Syntax('/' | '@' | '[' | ']')))
+  {
+    return None;
+  }
+  let digit = |atom: &NumberFormatAtom| matches!(atom, NumberFormatAtom::Syntax('0' | '#' | '?'));
+  let Some(first) = atoms.iter().position(digit) else {
+    return Some(coalesce_number_layout(
+      atoms.iter().map(number_layout_atom).collect(),
+    ));
+  };
+  let last = atoms.iter().rposition(digit)?;
+  let decimal = atoms[..=last]
+    .iter()
+    .position(|atom| matches!(atom, NumberFormatAtom::Syntax('.')));
+  let integer_end = decimal.unwrap_or(last + 1);
+  let integer_start = first.min(integer_end);
+  let integer_atoms = &atoms[integer_start..integer_end];
+  let fraction_atoms = decimal.map_or(&[][..], |index| &atoms[index + 1..=last]);
+  let decimals = fraction_atoms.iter().filter(|atom| digit(atom)).count();
+  if decimals > 30 {
+    return None;
+  }
+  let scaled = value.abs() * if pattern.percent { 100.0 } else { 1.0 }
+    / 1000_f64.powi(i32::try_from(pattern.scale_commas).ok()?);
+  let rounded = round_to_decimal_places(scaled, decimals as i32);
+  let formatted = format!("{rounded:.decimals$}");
+  let (integer, fraction) = formatted.split_once('.').unwrap_or((&formatted, ""));
+  let required_integer = integer_atoms
+    .iter()
+    .filter(|atom| matches!(atom, NumberFormatAtom::Syntax('0')))
+    .count();
+  let integer = if integer == "0" && required_integer == 0 {
+    String::new()
+  } else {
+    format!("{integer:0>required_integer$}")
+  };
+  let mut result = Vec::new();
+  if value.is_sign_negative() && index != 1 {
+    result.push(NumberFormatLayoutItem::Text("-".into()));
+  }
+  result.extend(atoms[..integer_start].iter().map(number_layout_atom));
+  let grouped = integer_atoms
+    .iter()
+    .any(|atom| matches!(atom, NumberFormatAtom::Syntax(',')))
+    && integer_atoms
+      .iter()
+      .all(|atom| matches!(atom, NumberFormatAtom::Syntax('0' | '#' | '?' | ',')));
+  if grouped {
+    let missing = integer_atoms
+      .iter()
+      .filter(|atom| digit(atom))
+      .count()
+      .saturating_sub(integer.len());
+    let spaces = integer_atoms
+      .iter()
+      .filter(|atom| matches!(atom, NumberFormatAtom::Syntax('?')))
+      .count()
+      .min(missing);
+    result.extend(std::iter::repeat_n(
+      NumberFormatLayoutItem::Reserve('0'),
+      spaces,
+    ));
+    result.push(NumberFormatLayoutItem::Text(group_integer(&integer)));
+  } else {
+    let mut digits = integer.chars().rev();
+    let mut reversed = Vec::new();
+    for atom in integer_atoms.iter().rev() {
+      match atom {
+        NumberFormatAtom::Syntax('0' | '#' | '?') => {
+          if let Some(ch) = digits.next() {
+            reversed.push(NumberFormatLayoutItem::Text(ch.to_string()));
+          } else if matches!(atom, NumberFormatAtom::Syntax('0')) {
+            reversed.push(NumberFormatLayoutItem::Text("0".into()));
+          } else if matches!(atom, NumberFormatAtom::Syntax('?')) {
+            reversed.push(NumberFormatLayoutItem::Reserve('0'));
+          }
+        }
+        NumberFormatAtom::Syntax(',') => {}
+        _ => reversed.push(number_layout_atom(atom)),
+      }
+    }
+    result.push(NumberFormatLayoutItem::Text(
+      digits.collect::<Vec<_>>().into_iter().rev().collect(),
+    ));
+    result.extend(reversed.into_iter().rev());
+  }
+  if decimal.is_some() {
+    result.push(NumberFormatLayoutItem::Text(".".into()));
+    let required = fraction_atoms
+      .iter()
+      .filter(|atom| digit(atom))
+      .enumerate()
+      .filter(|(_, atom)| matches!(atom, NumberFormatAtom::Syntax('0')))
+      .map(|(index, _)| index + 1)
+      .last()
+      .unwrap_or(0);
+    let significant = fraction
+      .bytes()
+      .rposition(|ch| ch != b'0')
+      .map_or(0, |index| index + 1)
+      .max(required);
+    let mut digits = fraction.chars().enumerate();
+    for atom in fraction_atoms {
+      if digit(atom) {
+        let (index, ch) = digits.next()?;
+        if index < significant {
+          result.push(NumberFormatLayoutItem::Text(ch.to_string()));
+        } else if matches!(atom, NumberFormatAtom::Syntax('?')) {
+          result.push(NumberFormatLayoutItem::Reserve('0'));
+        }
+      } else {
+        result.push(number_layout_atom(atom));
+      }
+    }
+  }
+  result.extend(
+    atoms[last + 1..]
+      .iter()
+      .skip(pattern.scale_commas)
+      .map(number_layout_atom),
+  );
+  Some(coalesce_number_layout(result))
 }
 
 fn number_format_section_index(sections: &[&str], value: f64) -> Option<usize> {
@@ -3609,9 +4294,9 @@ impl NumberFormatPattern {
         continue;
       }
       match ch {
-        '\\' => escaped = true,
-        '_' => skip_next = true,
-        '*' => emit_next_fill = true,
+        '\\' if !in_quote => escaped = true,
+        '_' if !in_quote => skip_next = true,
+        '*' if !in_quote => emit_next_fill = true,
         '"' => in_quote = !in_quote,
         _ if in_quote => {
           if !after_decimal && !literal_prefix {
@@ -4058,7 +4743,7 @@ fn trailing_integer_format_suffix(section: &str) -> String {
       continue;
     }
     match ch {
-      '\\' => escaped = true,
+      '\\' if !in_quote => escaped = true,
       '"' => in_quote = !in_quote,
       '0' | '#' | '?' if !in_quote => last_placeholder_end = Some(index + ch.len_utf8()),
       _ => {}
@@ -4072,19 +4757,19 @@ fn trailing_integer_format_suffix(section: &str) -> String {
   let mut in_quote = false;
   while let Some(ch) = chars.next() {
     match ch {
-      '\\' => {
+      '\\' if !in_quote => {
         if let Some(next) = chars.next() {
           suffix.push(next);
         }
       }
-      '_' => {
+      '_' if !in_quote => {
         if let Some(next) = chars.next()
           && matches!(next, '$' | '€' | '£' | '¥')
         {
           suffix.push(next);
         }
       }
-      '*' => {
+      '*' if !in_quote => {
         chars.next();
       }
       '"' => in_quote = !in_quote,
@@ -4161,12 +4846,12 @@ fn integer_pattern_tokens(pattern: &str) -> Vec<IntegerPatternToken> {
   let mut in_quote = false;
   while let Some(ch) = chars.next() {
     match ch {
-      '\\' => {
+      '\\' if !in_quote => {
         if let Some(next) = chars.next() {
           tokens.push(IntegerPatternToken::Literal(next));
         }
       }
-      '_' | '*' => {
+      '_' | '*' if !in_quote => {
         chars.next();
       }
       '"' => in_quote = !in_quote,
@@ -4202,14 +4887,10 @@ fn format_serial_date_time(
   format_locale: Option<&str>,
 ) -> String {
   let (seconds, code) = rounded_calendar_time_picture((value - value.floor()) * 86_400.0, code);
-  let day_carry = if matches!(&code, Cow::Owned(_)) {
-    seconds / 86_400
-  } else {
-    0
-  };
+  let day_carry = seconds / 86_400;
   let code = code.as_ref();
-  // Subsecond rounding may carry into the next minute or day. A date-only
-  // picture still uses the original calendar day, even just before midnight.
+  // Excel rounds even a date-only picture to whole seconds. Rounding at the
+  // displayed precision can carry into the next calendar day.
   let days = value.floor() as i64 + day_carry;
   let seconds = seconds - day_carry * 86_400;
   let days_since_unix = if date_1904 {
@@ -4219,7 +4900,13 @@ fn format_serial_date_time(
   } else {
     days - 25_569
   };
-  let (year, month, day) = civil_from_days(days_since_unix);
+  let (year, month, day) = match (date_1904, days) {
+    (false, 0) => (1900, 1, 0),
+    (false, 60) => (1900, 2, 29),
+    _ => civil_from_days(days_since_unix),
+  };
+  let compatibility_weekday =
+    (!date_1904 && (0..=60).contains(&days)).then(|| (days + 5).rem_euclid(7) as u8);
   let hour = seconds / 3_600;
   let minute = (seconds % 3_600) / 60;
   let second = seconds % 60;
@@ -4237,19 +4924,28 @@ fn format_serial_date_time(
     // NF_DATE_SYSTEM_LONG is resolved through the caller's format locale,
     // independently of the UI and document languages.
     if let Some(text) = field_value.and_then(|value| {
-      crate::field_datetime::format_spreadsheet_system_long_date(format_locale, value)
+      crate::field_datetime::format_spreadsheet_system_long_date(
+        format_locale,
+        value,
+        compatibility_weekday,
+      )
     }) {
       return text;
     }
   }
   if uses_system_date_time_format(code, "$-F400")
     && let Some(text) = field_value
-      .and_then(|value| crate::field_datetime::format_office_default_time(format_locale, value))
+      .and_then(|value| crate::field_datetime::format_spreadsheet_system_time(format_locale, value))
   {
     return text;
   }
   if let Some(text) = field_value.and_then(|value| {
-    crate::field_datetime::format_spreadsheet_date_picture(code, format_locale, value)
+    crate::field_datetime::format_spreadsheet_date_picture_with_weekday(
+      code,
+      format_locale,
+      value,
+      compatibility_weekday,
+    )
   }) {
     return text;
   }
@@ -4548,8 +5244,8 @@ fn render_fraction_pattern(section: &str, digits: &str) -> Option<String> {
       continue;
     }
     match ch {
-      '\\' => escaped = true,
-      '_' | '*' => {
+      '\\' if !in_quote => escaped = true,
+      '_' | '*' if !in_quote => {
         chars.next();
       }
       '"' => in_quote = !in_quote,
@@ -4972,6 +5668,543 @@ mod tests {
   use super::*;
 
   #[test]
+  fn absent_cells_inherit_row_column_paint_without_creating_print_data() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Excel COM and exported PDF controls: serialized cells without s clear
+    // inherited fills, row s=0 clears columns, and row s requires customFormat.
+    // The same controls verify hidden rows/columns and cleared merged anchors.
+    for variant in ["ordinary", "hidden", "merged", "serialized"] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let id = workbook
+        .get_id_of_part(&package, &worksheet)
+        .unwrap()
+        .to_string();
+      workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+      let styles = workbook
+        .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+        .unwrap();
+      styles
+        .set_data(
+          &mut package,
+          br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <fills count="5"><fill><patternFill patternType="none"/></fill>
+          <fill><patternFill patternType="solid"><fgColor rgb="FFE0FFFF"/></patternFill></fill>
+          <fill><patternFill patternType="solid"><fgColor rgb="FF0000FF"/></patternFill></fill>
+          <fill><patternFill patternType="solid"><fgColor rgb="FFFFA500"/></patternFill></fill>
+          <fill><patternFill patternType="solid"><fgColor rgb="FFFFC0CB"/></patternFill></fill>
+        </fills><cellXfs count="5"><xf fillId="0" applyFill="1"/>
+          <xf fillId="1" applyFill="1"/><xf fillId="2" applyFill="1"/>
+          <xf fillId="3" applyFill="1"/><xf fillId="4" applyFill="1"/>
+        </cellXfs></styleSheet>"#
+            .to_vec(),
+        )
+        .unwrap();
+      let hidden = if variant == "hidden" {
+        r#" hidden="1""#
+      } else {
+        ""
+      };
+      let (row1, row2, row3, row4, row5, merges) = match variant {
+        "merged" => (
+          r#"<c r="C1"/>"#,
+          "",
+          "",
+          r#"<c r="B4" s="0"/>"#,
+          "",
+          r#"<mergeCells><mergeCell ref="C1:C3"/><mergeCell ref="B4:D5"/></mergeCells>"#,
+        ),
+        "serialized" => (
+          "",
+          r#"<c r="A2"><v>2</v></c>"#,
+          r#"<c r="D3" s="1"/>"#,
+          r#"<c r="A4" s="2"/>"#,
+          r#"<c r="B5"/>"#,
+          "",
+        ),
+        _ => ("", "", "", "", "", ""),
+      };
+      let c2 = if variant == "serialized" {
+        r#"<c r="C2"/>"#
+      } else {
+        ""
+      };
+      worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <sheetFormatPr defaultColWidth="10" defaultRowHeight="20" customHeight="1"/>
+        <cols><col min="1" max="2" style="1"/><col min="3" max="3" style="3"{hidden}/><col min="4" max="16384" style="1"/></cols>
+        <sheetData><row r="1"><c r="A1"><v>1</v></c>{row1}</row>
+          <row r="2" s="2" customFormat="1">{row2}<c r="B2" s="0"/>{c2}<c r="D2" s="4"/></row>
+          <row r="3" s="0" customFormat="1"{hidden}>{row3}</row>
+          <row r="4" s="2" customFormat="0">{row4}</row>
+          <row r="5" s="2">{row5}</row>
+          <row r="6"><c r="E6" s="0"><v>6</v></c></row>
+        </sheetData>{merges}</worksheet>"#).into_bytes()).unwrap();
+      let import =
+        ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+      let sheet = &import.sheets[0];
+      let used = sheet.used_range(&import.styles);
+      assert_eq!(used, CellRange::parse_a1_range("A1:E6"));
+      let area = CellRange::parse_a1_range("A1:E7").unwrap();
+      let cells = print_cells_for_area(
+        &import,
+        sheet,
+        area,
+        &mut ConditionalFormatEvalCache::default(),
+      );
+      assert!(cells.len() <= 35);
+      assert_eq!(sheet.used_range(&import.styles), used);
+      assert!(cells.iter().all(|cell| area.contains(cell.address)));
+      assert!(
+        cells
+          .iter()
+          .filter(|cell| sheet.cell_at(cell.address).is_none())
+          .all(|cell| {
+            cell.text.is_empty()
+              && cell.rendered_text.is_empty()
+              && !cell.formula
+              && cell.data_type.is_none()
+              && cell.rich_text_runs.is_empty()
+          })
+      );
+      assert_eq!(
+        sheet
+          .cell_at(CellAddress::parse_a1("A1").unwrap())
+          .unwrap()
+          .style_index,
+        None
+      );
+      let expected = if variant == "serialized" {
+        [
+          "WCOCC", "WWWPB", "WWWCW", "BCOCC", "CWOCC", "CCOCW", "CCOCC",
+        ]
+      } else {
+        [
+          "WCOCC", "BWBPB", "WWWWW", "CCOCC", "CCOCC", "CCOCW", "CCOCC",
+        ]
+      };
+      for (r, row) in expected.iter().enumerate() {
+        for (c, mut color) in row.chars().filter(|c| *c != ' ').enumerate() {
+          let address = CellAddress {
+            col: c as u32 + 1,
+            row: r as u32 + 1,
+          };
+          if variant == "hidden" && (address.row == 3 || address.col == 3) {
+            assert!(!cells.iter().any(|cell| cell.address == address));
+            continue;
+          }
+          if variant == "merged"
+            && (address.col == 3 && address.row <= 3
+              || (2..=4).contains(&address.col) && (4..=5).contains(&address.row))
+          {
+            color = 'W';
+          }
+          let expected = match color {
+            'W' => None,
+            'C' => Some(RgbColor {
+              r: 224,
+              g: 255,
+              b: 255,
+            }),
+            'O' => Some(RgbColor {
+              r: 255,
+              g: 165,
+              b: 0,
+            }),
+            'B' => Some(RgbColor { r: 0, g: 0, b: 255 }),
+            'P' => Some(RgbColor {
+              r: 255,
+              g: 192,
+              b: 203,
+            }),
+            _ => unreachable!(),
+          };
+          let actual = cells
+            .iter()
+            .find(|cell| cell.address == address)
+            .filter(|_| !sheet.is_covered_merged_cell(address))
+            .and_then(|cell| import.styles.fill_for_cell(cell.style_index).color);
+          assert_eq!(actual, expected, "{variant} {address:?}");
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn conditional_percent_ranks_truncate_before_selecting_the_cutoff() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Excel DisplayFormat counts for 1, 5, 10, 15, 25, 50, 99 and 100
+    // percent, independently checked against exported PDF glyph colors.
+    for (count, expected_counts) in [
+      (4, [1, 1, 1, 1, 1, 2, 3, 4]),
+      (21, [1, 1, 2, 3, 5, 10, 20, 21]),
+      (29, [1, 1, 2, 4, 7, 14, 28, 29]),
+    ] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let id = workbook
+        .get_id_of_part(&package, &worksheet)
+        .unwrap()
+        .to_string();
+      workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+      let mut rows = String::new();
+      for row in 1..=count {
+        rows.push_str(&format!(
+          r#"<row r="{row}"><c r="A{row}"><v>{row}</v></c></row>"#
+        ));
+      }
+      let mut rules = String::new();
+      for bottom in [false, true] {
+        for percent in [1, 5, 10, 15, 25, 50, 99, 100] {
+          rules.push_str(&format!(r#"<conditionalFormatting sqref="A1:A{count}"><cfRule type="top10" percent="1" rank="{percent}" bottom="{}" priority="1"/></conditionalFormatting>"#, u8::from(bottom)));
+        }
+      }
+      worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{rows}</sheetData>{rules}</worksheet>"#).into_bytes()).unwrap();
+      let import =
+        ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+      let sheet = &import.sheets[0];
+      let mut cache = ConditionalFormatEvalCache::default();
+      for (index, format) in sheet
+        .metrics
+        .conditions
+        .conditional_formats
+        .iter()
+        .enumerate()
+      {
+        let expected_count = expected_counts[index % 8];
+        for row in 1..=count {
+          let expected = if index < 8 {
+            row > count - expected_count
+          } else {
+            row <= expected_count
+          };
+          assert_eq!(
+            conditional_top10_matches(
+              sheet,
+              &format.sequence_of_references,
+              &format.rules[0],
+              CellAddress { col: 1, row },
+              f64::from(row),
+              &mut cache
+            ),
+            expected,
+            "count={count} rule={index} row={row}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn conditional_cell_is_keeps_logical_numeric_text_and_blank_types() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Excel fixed-output controls: each row contains nine comparisons.
+    // DisplayFormat observations were independently checked against PDF glyph colors.
+    let values = [
+      ("b", "<v>0</v>"),
+      ("b", "<v>1</v>"),
+      ("n", "<v>0</v>"),
+      ("n", "<v>1</v>"),
+      ("n", "<v>-1</v>"),
+      ("n", "<v>2</v>"),
+      ("inlineStr", "<is><t>FALSE</t></is>"),
+      ("inlineStr", "<is><t>TRUE</t></is>"),
+      ("inlineStr", "<is><t>0</t></is>"),
+      ("inlineStr", "<is><t>1</t></is>"),
+      ("inlineStr", "<is><t>a</t></is>"),
+      ("e", "<f>1/0</f><v>#DIV/0!</v>"),
+      ("e", "<f>NA()</f><v>#N/A</v>"),
+      ("b", "<f>TRUE()</f><v>1</v>"),
+      ("n", "<f>1</f><v>1</v>"),
+      ("str", "<f>\"TRUE\"</f><v>TRUE</v>"),
+      ("str", "<f>\"\"</f><v></v>"),
+      ("n", ""),
+    ];
+    let first_limits = [
+      "TRUE", "FALSE", "1", "0", "\"TRUE\"", "\"1\"", "$A$1", "TRUE()", "1/0",
+    ];
+    let second_limits = [
+      "FALSE",
+      "TRUE",
+      "0",
+      "1",
+      "\"FALSE\"",
+      "\"0\"",
+      "FALSE()",
+      "FALSE()",
+      "TRUE",
+    ];
+    for (operator, expected) in [
+      (
+        "equal",
+        [
+          ".Y.......",
+          "Y.....YY.",
+          "...Y.....",
+          "..Y......",
+          ".........",
+          ".........",
+          ".........",
+          "....Y....",
+          ".........",
+          ".....Y...",
+          ".........",
+          ".........",
+          ".........",
+          "Y.....YY.",
+          "..Y......",
+          "....Y....",
+          ".........",
+          ".Y.Y.....",
+        ],
+      ),
+      (
+        "notEqual",
+        [
+          "Y.YYYYYY.",
+          ".YYYYY...",
+          "YYY.YYYY.",
+          "YY.YYYYY.",
+          "YYYYYYYY.",
+          "YYYYYYYY.",
+          "YYYYYYYY.",
+          "YYYY.YYY.",
+          "YYYYYYYY.",
+          "YYYYY.YY.",
+          "YYYYYYYY.",
+          ".........",
+          ".........",
+          ".YYYYY...",
+          "YY.YYYYY.",
+          "YYYY.YYY.",
+          "YYYYYYYY.",
+          "Y.Y.YYYY.",
+        ],
+      ),
+      (
+        "lessThan",
+        [
+          "Y.....YY.",
+          ".........",
+          "YYY.YYYY.",
+          "YY..YYYY.",
+          "YYYYYYYY.",
+          "YY..YYYY.",
+          "YY..Y.YY.",
+          "YY....YY.",
+          "YY..YYYY.",
+          "YY..Y.YY.",
+          "YY..Y.YY.",
+          ".........",
+          ".........",
+          ".........",
+          "YY..YYYY.",
+          "YY....YY.",
+          "YY..YYYY.",
+          "Y.Y.YYYY.",
+        ],
+      ),
+      (
+        "lessThanOrEqual",
+        [
+          "YY....YY.",
+          "Y.....YY.",
+          "YYYYYYYY.",
+          "YYY.YYYY.",
+          "YYYYYYYY.",
+          "YY..YYYY.",
+          "YY..Y.YY.",
+          "YY..Y.YY.",
+          "YY..YYYY.",
+          "YY..YYYY.",
+          "YY..Y.YY.",
+          ".........",
+          ".........",
+          "Y.....YY.",
+          "YYY.YYYY.",
+          "YY..Y.YY.",
+          "YY..YYYY.",
+          "YYYYYYYY.",
+        ],
+      ),
+      (
+        "greaterThan",
+        [
+          "..YYYY...",
+          ".YYYYY...",
+          ".........",
+          "...Y.....",
+          ".........",
+          "..YY.....",
+          "..YY.Y...",
+          "..YY.Y...",
+          "..YY.....",
+          "..YY.....",
+          "..YY.Y...",
+          ".........",
+          ".........",
+          ".YYYYY...",
+          "...Y.....",
+          "..YY.Y...",
+          "..YY.....",
+          ".........",
+        ],
+      ),
+      (
+        "greaterThanOrEqual",
+        [
+          ".YYYYY...",
+          "YYYYYYYY.",
+          "...Y.....",
+          "..YY.....",
+          ".........",
+          "..YY.....",
+          "..YY.Y...",
+          "..YYYY...",
+          "..YY.....",
+          "..YY.Y...",
+          "..YY.Y...",
+          ".........",
+          ".........",
+          "YYYYYYYY.",
+          "..YY.....",
+          "..YYYY...",
+          "..YY.....",
+          ".Y.Y.....",
+        ],
+      ),
+      (
+        "between",
+        [
+          "YY....YY.",
+          "YY....YY.",
+          "..YY.....",
+          "..YY.....",
+          ".........",
+          ".........",
+          "....Y....",
+          "....Y....",
+          ".....Y...",
+          ".....Y...",
+          ".........",
+          ".........",
+          ".........",
+          "YY....YY.",
+          "..YY.....",
+          "....Y....",
+          ".........",
+          "YYYY..YY.",
+        ],
+      ),
+      (
+        "notBetween",
+        [
+          "..YYYY...",
+          "..YYYY...",
+          "YY..YYYY.",
+          "YY..YYYY.",
+          "YYYYYYYY.",
+          "YYYYYYYY.",
+          "YYYY.YYY.",
+          "YYYY.YYY.",
+          "YYYYY.YY.",
+          "YYYYY.YY.",
+          "YYYYYYYY.",
+          ".........",
+          ".........",
+          "..YYYY...",
+          "YY..YYYY.",
+          "YYYY.YYY.",
+          "YYYYYYYY.",
+          "....YY...",
+        ],
+      ),
+    ] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let id = workbook
+        .get_id_of_part(&package, &worksheet)
+        .unwrap()
+        .to_string();
+      workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+      let mut rows = String::from(r#"<row r="1"><c r="A1" t="b"><v>1</v></c></row>"#);
+      for (index, (kind, payload)) in values.iter().enumerate() {
+        let row = index + 3;
+        rows.push_str(&format!(r#"<row r="{row}">"#));
+        for col in 'B'..='J' {
+          rows.push_str(&format!(r#"<c r="{col}{row}" t="{kind}">{payload}</c>"#));
+        }
+        rows.push_str("</row>");
+      }
+      let mut formats = String::new();
+      for (index, col) in ('B'..='J').enumerate() {
+        let first = first_limits[index];
+        let second = if matches!(operator, "between" | "notBetween") {
+          format!("<formula>{}</formula>", second_limits[index])
+        } else {
+          String::new()
+        };
+        formats.push_str(&format!(r#"<conditionalFormatting sqref="{col}3:{col}20"><cfRule type="cellIs" operator="{operator}" priority="1"><formula>{first}</formula>{second}</cfRule></conditionalFormatting>"#));
+      }
+      worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{rows}</sheetData>{formats}</worksheet>"#).into_bytes()).unwrap();
+      let import =
+        ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+      let sheet = &import.sheets[0];
+      for (index, pattern) in expected.iter().enumerate() {
+        for (column, expected) in pattern.bytes().enumerate() {
+          let format = &sheet.metrics.conditions.conditional_formats[column];
+          let address = CellAddress {
+            col: column as u32 + 2,
+            row: index as u32 + 3,
+          };
+          assert_eq!(
+            conditional_cell_is_matches(
+              &import,
+              sheet,
+              &format.sequence_of_references,
+              &format.rules[0],
+              address
+            ),
+            expected == b'Y',
+            "{operator}: {address:?}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn constant_data_bar_scales_have_finite_geometry() {
+    use ooxmlsdk::schemas::x14::DataBarAxisPositionValues as Axis;
+    for value in [-3.0, 0.0, 3.0] {
+      for axis in [Axis::Automatic, Axis::Middle, Axis::None] {
+        let (start, end, axis) = data_bar_extent(value, value, value, 0.0, 1.0, axis).unwrap();
+        assert!(start.is_finite() && end.is_finite());
+        assert!((0.0..=1.0).contains(&start) && (0.0..=1.0).contains(&end));
+        assert!(axis.is_none_or(|axis| axis.is_finite()));
+      }
+    }
+  }
+
+  #[test]
   fn print_area_unions_preserve_quoted_sheet_names() {
     // Splitting inside this actual sheet name used to interpret the fragment
     // 'Sheet1 as a cell address and invent a second empty print area.
@@ -5021,6 +6254,84 @@ mod tests {
     );
     assert_eq!(parse_print_title_rows("'O''Brien, Q1'!$C:$D"), None);
     assert_eq!(parse_print_title_columns("'O''Brien, Q1'!$3:$4"), None);
+  }
+
+  #[test]
+  fn fit_zoom_ignores_trailing_font_only_cells_retained_for_headers() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let id = workbook
+      .get_id_of_part(&package, &worksheet)
+      .unwrap()
+      .to_string();
+    workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+    let styles = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF000000"/></patternFill></fill></fills><cellXfs count="3"><xf fontId="0"/><xf fontId="1" applyFont="1"/><xf fillId="1" applyFill="1"/></cellXfs></styleSheet>"#.to_vec()).unwrap();
+    let mut zooms = Vec::new();
+    for (header, tail_style, explicit) in [
+      (false, 1, false),
+      (true, 1, false),
+      (true, 2, false),
+      (true, 1, true),
+    ] {
+      let footer = if header {
+        "<headerFooter><oddFooter>Page &amp;P</oddFooter></headerFooter>"
+      } else {
+        ""
+      };
+      worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetFormatPr defaultColWidth="12" defaultRowHeight="15"/><sheetData><row r="1"><c r="L1"><v>1</v></c><c r="M1" s="{tail_style}"/></row></sheetData><pageMargins left="0.5" right="0.5" top="0.5" bottom="0.5" header="0.25" footer="0.25"/><pageSetup paperSize="9" fitToWidth="1" fitToHeight="0"/>{footer}</worksheet>"#).into_bytes()).unwrap();
+      let mut import =
+        ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+      let sheet = &import.sheets[0];
+      let area = CellRange::parse_a1_range("A1:M1").unwrap();
+      let named = CalcPrintNamedRanges {
+        resolved_print_areas: if explicit { vec![area] } else { Vec::new() },
+        ..Default::default()
+      };
+      if header && !explicit {
+        assert_eq!(
+          implicit_used_range(&import, sheet, &named).unwrap().end.col,
+          if tail_style == 1 { 12 } else { 13 }
+        );
+      }
+      zooms.push(fit_zoom_to_pages(&import, sheet, &[area], &named, 1, 0));
+      if !explicit {
+        assert_eq!(CalcPrintDocument::from_import(&import).pages.len(), 1);
+      }
+      if header && !explicit {
+        import.sheets[0].page_settings.fit_to_page = false;
+        import.sheets[0]
+          .metrics
+          .settings
+          .properties
+          .page_setup
+          .fit_to_page = false;
+        assert_eq!(
+          implicit_used_range(&import, &import.sheets[0], &named)
+            .unwrap()
+            .end
+            .col,
+          13
+        );
+      }
+    }
+    assert!(zooms[0] < 100);
+    assert_eq!(zooms[0], zooms[1]);
+    assert!(
+      zooms[2] < zooms[1],
+      "visible fill must enlarge the fit extent"
+    );
+    assert_eq!(zooms[2], zooms[3], "explicit print area keeps blank cells");
   }
 
   #[test]
@@ -5114,6 +6425,121 @@ mod tests {
     assert_eq!(with_footer, without_footer);
     assert!((with_footer.0 - (page_width - 72.0)).abs() <= f32::EPSILON);
     assert!((with_footer.1 - (page_height - 108.0)).abs() <= f32::EPSILON);
+  }
+
+  #[test]
+  fn row_page_breaks_use_physical_grid_capacity_at_each_zoom() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // These logical row metrics are isolated from font selection here. The
+    // Office controls realize them from DengXian/Courier New; worksheet tests
+    // cover that conversion separately. Last rows below are observed PDF and
+    // Excel HPageBreaks results, including margins on either side of a dot.
+    for (mixed, zoom, top, bottom, last_row) in [
+      (true, 100, 0.75, 0.75, 56),
+      (true, 100, 0.75, 0.74, 56),
+      (true, 100, 0.75, 0.739, 57),
+      (true, 100, 0.75, 0.73, 57),
+      (true, 100, 0.74, 0.75, 56),
+      (true, 100, 0.73, 0.75, 57),
+      (false, 100, 0.75, 0.71, 58),
+      (false, 100, 0.75, 0.705, 58),
+      (false, 100, 0.75, 0.7045, 59),
+      (false, 100, 0.75, 0.70, 59),
+      (false, 50, 0.75, 0.705, 117),
+      (false, 50, 0.75, 0.7045, 118),
+      (false, 50, 0.75, 0.70, 118),
+      (false, 200, 0.75, 0.525, 30),
+      (false, 200, 0.75, 0.510, 30),
+    ] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let id = workbook.get_id_of_part(&package, &worksheet).unwrap();
+      let xml = format!(
+        r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#
+      );
+      workbook.set_data(&mut package, xml.into_bytes()).unwrap();
+      let rows = (1..=170)
+        .map(|row| {
+          let height = if mixed && row == 1 {
+            r#" ht="22.2" customHeight="1""#
+          } else if mixed && row >= 5 {
+            r#" ht="12.72" customHeight="1""#
+          } else {
+            ""
+          };
+          format!(r#"<row r="{row}"{height}><c r="A{row}"><v>{row}</v></c></row>"#)
+        })
+        .collect::<String>();
+      let xml = format!(
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetFormatPr defaultRowHeight="12.48" customHeight="1"/><sheetData>{rows}</sheetData><pageMargins left="0.7" right="0.7" top="{top}" bottom="{bottom}" header="0.3" footer="0.3"/><pageSetup paperSize="9" scale="{zoom}"/></worksheet>"#
+      );
+      worksheet.set_data(&mut package, xml.into_bytes()).unwrap();
+      let import =
+        ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+      assert!((import.sheets[0].row_height_pt(2) - 12.48).abs() < 1.0e-5);
+      let print = CalcPrintDocument::from_import(&import);
+      assert_eq!(
+        print.pages[0].area.unwrap().end.row,
+        last_row,
+        "mixed={mixed} zoom={zoom} top={top} bottom={bottom}"
+      );
+      assert_eq!(print.pages[1].area.unwrap().start.row, last_row + 1);
+    }
+  }
+
+  #[test]
+  fn repeated_rows_reserve_scaled_space_only_on_continuation_pages() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Isolate pagination from font realization with authored 20pt rows.
+    // Office's 71/100% controls keep the same first-page boundary with and
+    // without titles; subsequent pages prepend the title at document zoom.
+    for (zoom, first_end, second_end) in [(50, 69, 136), (100, 34, 66), (200, 17, 32)] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let id = workbook.get_id_of_part(&package, &worksheet).unwrap();
+      let xml = format!(
+        r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets><definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">Sheet1!$3:$4</definedName></definedNames></workbook>"#
+      );
+      workbook.set_data(&mut package, xml.into_bytes()).unwrap();
+      let rows = (1..=150)
+        .map(|row| {
+          format!(r#"<row r="{row}" ht="20" customHeight="1"><c r="A{row}"><v>{row}</v></c></row>"#)
+        })
+        .collect::<String>();
+      let xml = format!(
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetFormatPr defaultRowHeight="20" customHeight="1"/><sheetData>{rows}</sheetData><pageMargins left="0.5" right="0.5" top="1" bottom="1" header="0.3" footer="0.3"/><pageSetup paperSize="9" scale="{zoom}"/></worksheet>"#
+      );
+      worksheet.set_data(&mut package, xml.into_bytes()).unwrap();
+      let import =
+        ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+      let print = CalcPrintDocument::from_import(&import);
+      assert_eq!(
+        print.pages[0].area.unwrap().end.row,
+        first_end,
+        "zoom={zoom}"
+      );
+      assert!(repeat_rows_for_page(print.pages[0].area, print.pages[0].repeated_rows).is_none());
+      assert_eq!(print.pages[1].area.unwrap().start.row, first_end + 1);
+      assert_eq!(
+        print.pages[1].area.unwrap().end.row,
+        second_end,
+        "zoom={zoom}"
+      );
+      assert_eq!(print.pages[1].repeated_rows.unwrap().start.row, 3);
+      assert_eq!(print.pages[1].repeated_rows.unwrap().end.row, 4);
+    }
   }
 
   #[test]
@@ -5499,6 +6925,21 @@ mod tests {
 
   #[test]
   fn system_time_formats_use_the_format_locale_instead_of_the_saved_picture() {
+    for (value, expected) in [
+      (0.0, "0:00:00"),
+      (0.25, "6:00:00"),
+      (0.375, "9:00:00"),
+      (0.5, "12:00:00"),
+      (60.25, "6:00:00"),
+      (40_000.25, "6:00:00"),
+    ] {
+      for picture in ["[$-F400]h:mm:ss", "[$-F400]hh:mm:ss"] {
+        assert_eq!(
+          format_serial_date_time(value, picture, false, Some("zh-CN")),
+          expected
+        );
+      }
+    }
     for language in ["zh-CN", "en-US"] {
       let expected = if language == "zh-CN" {
         "13:30:55"
@@ -5528,6 +6969,108 @@ mod tests {
     }
     assert!(!uses_system_long_date_format("[$-F400]h:mm:ss"));
     assert!(!uses_system_date_time_format("[$-F800]dddd", "$-F400"));
+  }
+
+  #[test]
+  fn excel_1900_calendar_preserves_fictitious_days_and_localized_weekdays() {
+    // Excel 20326 controls: serials 0/59/60/61, explicit 409/804 LCIDs,
+    // system F800/F400, and the same numeric values under date1904.
+    for (serial, iso, english, chinese) in [
+      (
+        0,
+        "1900-01-00",
+        "Saturday, January 0, 1900",
+        "星期六 一月 0 1900",
+      ),
+      (
+        1,
+        "1900-01-01",
+        "Sunday, January 1, 1900",
+        "星期日 一月 1 1900",
+      ),
+      (
+        59,
+        "1900-02-28",
+        "Tuesday, February 28, 1900",
+        "星期二 二月 28 1900",
+      ),
+      (
+        60,
+        "1900-02-29",
+        "Wednesday, February 29, 1900",
+        "星期三 二月 29 1900",
+      ),
+      (
+        61,
+        "1900-03-01",
+        "Thursday, March 1, 1900",
+        "星期四 三月 1 1900",
+      ),
+    ] {
+      for (picture, expected) in [
+        ("yyyy-mm-dd", iso),
+        ("[$-409]dddd, mmmm d, yyyy", english),
+        ("[$-804]dddd mmmm d yyyy", chinese),
+      ] {
+        assert_eq!(
+          format_serial_date_time(serial as f64, picture, false, None),
+          expected
+        );
+      }
+    }
+    for (picture, expected) in [
+      ("d", "0"),
+      ("dd", "00"),
+      ("mmmm", "January"),
+      ("ddd", "Sat"),
+      ("e", "1900"),
+      (r#""d"dd"d" \d yyyy-mm-dd"#, "d00d d 1900-01-00"),
+    ] {
+      assert_eq!(format_serial_date_time(0.0, picture, false, None), expected);
+    }
+    for (picture, expected) in [
+      ("[$-F800]dddd, mmmm dd, yyyy", "1900年1月0日"),
+      ("[$-F400]h:mm:ss", "0:00:00"),
+    ] {
+      assert_eq!(
+        format_serial_date_time(0.0, picture, false, Some("zh-CN")),
+        expected
+      );
+    }
+    for (serial, expected) in [
+      (0, "1904-01-01"),
+      (1, "1904-01-02"),
+      (59, "1904-02-29"),
+      (60, "1904-03-01"),
+      (61, "1904-03-02"),
+    ] {
+      assert_eq!(
+        format_serial_date_time(serial as f64, "yyyy-mm-dd", true, None),
+        expected
+      );
+    }
+  }
+
+  #[test]
+  fn date_only_pictures_carry_at_the_whole_second_boundary() {
+    // Office brackets half a second before midnight at these two serials.
+    for (serial, expected_date, expected_time) in [
+      (0.999_994_21, "1900-01-00", "23:59:59"),
+      (0.999_994_22, "1900-01-01", "00:00:00"),
+      (1.999_994_21, "1900-01-01", "23:59:59"),
+      (1.999_994_22, "1900-01-02", "00:00:00"),
+      (59.999_999_995_4, "1900-02-29", "00:00:00"),
+      (60.999_999_995_4, "1900-03-01", "00:00:00"),
+    ] {
+      assert_eq!(
+        format_serial_date_time(serial, "yyyy-mm-dd", false, None),
+        expected_date
+      );
+      assert_eq!(
+        format_serial_date_time(serial, "yyyy-mm-dd hh:mm:ss", false, None),
+        format!("{expected_date} {expected_time}")
+      );
+    }
   }
 
   #[test]
@@ -5574,7 +7117,7 @@ mod tests {
         false
       )
       .0,
-      "1900-01-01"
+      "1900-01-02"
     );
     for code in [
       r#"hh:mm:ss".000""#,
@@ -5711,7 +7254,7 @@ mod tests {
   }
 
   #[test]
-  fn general_number_format_uses_calc_significant_digits() {
+  fn general_number_format_removes_binary_double_noise() {
     assert_eq!(
       rendered_number_text("4.0999999999999996", None, None, false).0,
       "4.1"
@@ -5720,6 +7263,37 @@ mod tests {
       rendered_number_text("4.0999999999999996", Some("General"), None, false).0,
       "4.1"
     );
+  }
+
+  #[test]
+  fn general_number_format_matches_office_wide_column_controls() {
+    for (raw, expected) in [
+      ("0.7034962745892106", "0.703496275"),
+      ("3.6512482151539434", "3.651248215"),
+      ("0.123456789012345", "0.123456789"),
+      ("-0.123456789012345", "-0.123456789"),
+      ("1.23456789012345", "1.23456789"),
+      ("1234.5678912345", "1234.567891"),
+      ("12345.6789012345", "12345.6789"),
+      ("-12345.6789012345", "-12345.6789"),
+      ("123456789012.345", "1.23457E+11"),
+      ("99999999999", "99999999999"),
+      ("100000000000", "1E+11"),
+      ("99999999999.9", "1E+11"),
+      ("0.9999999995", "1"),
+      ("0.0001", "0.0001"),
+      ("0.00001", "0.00001"),
+      ("0.000000001", "0.000000001"),
+      ("0.0000123456789", "1.23457E-05"),
+      ("0.00000123456789", "1.23457E-06"),
+      ("0.000000123456789", "1.23457E-07"),
+    ] {
+      assert_eq!(
+        rendered_number_text(raw, None, None, false).0,
+        expected,
+        "{raw}"
+      );
+    }
   }
 
   #[test]
@@ -5833,6 +7407,90 @@ mod tests {
       .0,
       "Tuesday, March 1, 1904"
     );
+  }
+
+  #[test]
+  fn quoted_spacing_operators_are_literal_in_number_affixes() {
+    for (code, expected) in [
+      ("\"*_\"0", "*_12"),
+      ("0\"*_\"", "12*_"),
+      ("0.0\"*_\"", "12.0*_"),
+    ] {
+      assert_eq!(
+        rendered_number_text("12", Some(code), None, false).0,
+        expected,
+        "{code}"
+      );
+    }
+  }
+
+  #[test]
+  fn accounting_layout_preserves_fill_and_nonprinting_digit_widths() {
+    use NumberFormatLayoutItem::{Fill, Reserve, Text};
+    let code = "_(\"$\"* #,##0.00_);_(\"$\"* \\(#,##0.00\\);_(\"$\"* \"-\"??_);_(@_)";
+    for (raw, body) in [("1", "1.00"), ("-1", "(1.00)")] {
+      let mut expected = vec![Reserve('('), Text("$".into()), Fill(' '), Text(body.into())];
+      if raw == "1" {
+        expected.push(Reserve(')'));
+      }
+      assert_eq!(
+        number_format_layout(raw, code, NumberFormatRenderState::Number),
+        Some(expected)
+      );
+    }
+    assert_eq!(
+      number_format_layout("0", code, NumberFormatRenderState::Number),
+      Some(vec![
+        Reserve('('),
+        Text("$".into()),
+        Fill(' '),
+        Text("-".into()),
+        Reserve('0'),
+        Reserve('0'),
+        Reserve(')'),
+      ])
+    );
+    assert_eq!(
+      number_format_layout("Total", code, NumberFormatRenderState::Text),
+      Some(vec![Reserve('('), Text("Total".into()), Reserve(')'),])
+    );
+  }
+
+  #[test]
+  fn numeric_layout_reserves_internal_and_optional_placeholder_widths() {
+    use NumberFormatLayoutItem::{Reserve, Text};
+    for (raw, code, expected) in [
+      (
+        "12",
+        "0_W0",
+        vec![Text("1".into()), Reserve('W'), Text("2".into())],
+      ),
+      (
+        "12",
+        "_W0_i",
+        vec![Reserve('W'), Text("12".into()), Reserve('i')],
+      ),
+      (
+        "1.2",
+        "???0.00",
+        vec![
+          Reserve('0'),
+          Reserve('0'),
+          Reserve('0'),
+          Text("1.20".into()),
+        ],
+      ),
+      ("1.2", "0.??", vec![Text("1.2".into()), Reserve('0')]),
+      ("1250", "0.0,,_)", vec![Text("0.0".into()), Reserve(')')]),
+    ] {
+      assert_eq!(
+        number_format_layout(raw, code, NumberFormatRenderState::Number),
+        Some(expected),
+        "{code}"
+      );
+    }
+    assert!(number_format_layout("12", "\"*_\"0", NumberFormatRenderState::Number).is_none());
+    assert!(number_format_layout("0.5", "# ?/?", NumberFormatRenderState::Number).is_none());
   }
 
   #[test]

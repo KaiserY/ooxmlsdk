@@ -525,6 +525,19 @@ pub(crate) fn resolve_function_name(name: &str) -> Option<FormulaFunctionId> {
   }
 }
 
+pub(crate) fn is_reserved_excel_function_name(name: &str) -> bool {
+  let upper = name.trim_start_matches('@').to_ascii_uppercase();
+  // MS-XLSX §2.2.2 function-list, command-list, future-function-list and
+  // worksheet-only-function-list (2026-05-19). Reserved names remain distinct
+  // from unavailable UDFs even when this evaluator has no implementation.
+  // Future-function prefixes also cover functions added after this catalog.
+  upper.starts_with("_XLFN.")
+    || upper.starts_with("_XLWS.")
+    || include_str!("function/excel_reserved_names.txt")
+      .split_ascii_whitespace()
+      .any(|reserved| reserved == upper)
+}
+
 fn strip_excel_function_prefix(name: &str) -> &str {
   name
     .strip_prefix("_xlfn.")

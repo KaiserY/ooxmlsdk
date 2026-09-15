@@ -11,16 +11,18 @@ use super::worksheet::{CalcCell, CalcSheet, CellAddress, CellRange};
 const MAX_FORMULA_RECALCULATION_PASSES: usize = 12;
 const FORMULA_ZERO_TOLERANCE: f64 = 1.0e-12;
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct FormulaDateContext {
+#[derive(Clone, Debug)]
+pub(crate) struct FormulaContext {
   date_system: ooxmlsdk_formula::DateSystem,
   today_serial: Option<f64>,
+  ui_language: Option<String>,
 }
 
-impl FormulaDateContext {
+impl FormulaContext {
   pub(crate) fn new(
     date_1904: bool,
     datetime: Option<crate::options::FieldUpdateDateTime>,
+    ui_language: Option<&str>,
   ) -> Self {
     let date_system = if date_1904 {
       ooxmlsdk_formula::DateSystem::Date1904
@@ -41,6 +43,7 @@ impl FormulaDateContext {
     Self {
       date_system,
       today_serial,
+      ui_language: ui_language.map(str::to_owned),
     }
   }
 }
@@ -50,14 +53,12 @@ pub(crate) fn recalculate_formula_cells(
   defined_names: &DefinedNamesCatalog,
   source_file_name: Option<&str>,
   workbook_catalog: &WorkbookCatalog,
-  date_context: FormulaDateContext,
+  context: &FormulaContext,
 ) {
   let defined = DefinedNames::from_catalog(defined_names);
-  apply_named_array_formulas(sheets, &defined);
   let formulas = sheets.iter().map(formula_cells).collect::<Vec<_>>();
   let mut book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
-  let mut formula_book =
-    formula_evaluation_book_from_calc_book(&book, source_file_name, date_context);
+  let mut formula_book = formula_evaluation_book_from_calc_book(&book, source_file_name, context);
 
   for _ in 0..MAX_FORMULA_RECALCULATION_PASSES {
     let mut changed = false;
@@ -80,20 +81,25 @@ pub(crate) fn recalculate_formula_cells(
           else {
             continue;
           };
+          let repeat_scalar = formula_cell.is_array
+            && !is_dynamic_array_cell(&sheets[sheet_index], formula_cell.address, workbook_catalog);
           if let Some(range) = formula_cell
             .reference
             .as_deref()
             .and_then(CellRange::parse_a1_range)
-            && apply_array_formula_result(&book, &mut sheets[sheet_index], range, &value)
+            && apply_array_formula_result(
+              &book,
+              &mut sheets[sheet_index],
+              range,
+              &value,
+              repeat_scalar,
+            )
           {
             changed = true;
             refresh_all_cells = true;
             continue;
           }
-          let old_text = cell_at(&sheets[sheet_index], formula_cell.address)
-            .map(|cell| cell.display_text.as_str())
-            .unwrap_or("");
-          if !should_replace_formula_result(old_text, &value) {
+          if matches!(value, Value::Range(_) | Value::Blank) {
             continue;
           }
           if replace_cell_value(&mut sheets[sheet_index], formula_cell.address, &value) {
@@ -222,12 +228,12 @@ impl RelativeFormulaEvaluationContext {
     sheets: &[CalcSheet],
     defined_names: &DefinedNamesCatalog,
     workbook_catalog: &WorkbookCatalog,
-    date_context: FormulaDateContext,
+    context: &FormulaContext,
   ) -> Self {
     let defined = DefinedNames::from_catalog(defined_names);
     let calc_book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
     let sheet_workbook_indices = calc_book.sheet_workbook_indices.clone();
-    let book = formula_evaluation_book_from_calc_book(&calc_book, None, date_context);
+    let book = formula_evaluation_book_from_calc_book(&calc_book, None, context);
     Self {
       sheet_workbook_indices,
       book,
@@ -311,7 +317,7 @@ fn formula_cells(sheet: &CalcSheet) -> Vec<FormulaCell> {
       };
       (!text.trim().is_empty()).then(|| FormulaCell {
         address,
-        formula: normalize_legacy_addin_formula(&text).into_owned(),
+        formula: text,
         reference: formula.reference.clone(),
         is_array: formula.formula_type == x::CellFormulaValues::Array,
       })
@@ -319,63 +325,24 @@ fn formula_cells(sheet: &CalcSheet) -> Vec<FormulaCell> {
     .collect()
 }
 
-fn apply_named_array_formulas(sheets: &mut [CalcSheet], defined: &DefinedNames) {
-  let book = FormulaBook::from_sheets(sheets, defined, &WorkbookCatalog::default());
-  let mut sheet_index = 0;
-  while sheet_index < sheets.len() {
-    let cells = formula_addresses(&sheets[sheet_index]);
-    for address in cells {
-      let Some((formula, reference)) = cell_formula_and_reference(&sheets[sheet_index], address)
-      else {
-        continue;
-      };
-      let formula = formula.trim();
-      let Some(array) = book.defined.array(sheet_index, formula) else {
-        continue;
-      };
-      let range = reference
-        .as_deref()
-        .and_then(CellRange::parse_a1_range)
-        .unwrap_or_else(|| CellRange::single(address));
-      for row in range.start.row..=range.end.row {
-        for col in range.start.col..=range.end.col {
-          let row_offset = (row - range.start.row) as usize;
-          let col_offset = (col - range.start.col) as usize;
-          let value = array
-            .get(row_offset)
-            .and_then(|row| row.get(col_offset))
-            .cloned()
-            .unwrap_or(Value::Blank);
-          replace_cell_value(&mut sheets[sheet_index], CellAddress { col, row }, &value);
-        }
-      }
-    }
-    sheet_index += 1;
-  }
-}
-
-fn formula_addresses(sheet: &CalcSheet) -> Vec<CellAddress> {
-  sheet
-    .rows
-    .iter()
-    .flat_map(|row| row.cells.iter())
-    .filter(|cell| cell.formula.is_some())
-    .filter_map(CalcCell::address)
-    .collect()
-}
-
-fn cell_formula_and_reference(
-  sheet: &CalcSheet,
-  address: CellAddress,
-) -> Option<(String, Option<String>)> {
-  cell_at(sheet, address)
-    .and_then(|cell| cell.formula.as_ref())
-    .map(|formula| (formula.text.clone(), formula.reference.clone()))
-    .filter(|(formula, _)| !formula.trim().is_empty())
-}
-
 fn cell_at(sheet: &CalcSheet, address: CellAddress) -> Option<&CalcCell> {
   sheet.cell_at(address)
+}
+
+fn is_dynamic_array_cell(
+  sheet: &CalcSheet,
+  address: CellAddress,
+  catalog: &WorkbookCatalog,
+) -> bool {
+  cell_at(sheet, address)
+    .and_then(|cell| cell.cell_metadata_index)
+    .is_some_and(|index| {
+      catalog
+        .relationship_resources
+        .cell_metadata
+        .as_ref()
+        .is_some_and(|metadata| metadata.dynamic_array_indices.contains(&index))
+    })
 }
 
 fn cell_at_mut(sheet: &mut CalcSheet, address: CellAddress) -> Option<&mut CalcCell> {
@@ -416,19 +383,6 @@ fn formula_value_data_type(value: &Value) -> Option<x::CellValues> {
   }
 }
 
-fn normalize_legacy_addin_formula(formula: &str) -> Cow<'_, str> {
-  let Some((function, arguments)) = formula.split_once('(') else {
-    return Cow::Borrowed(formula);
-  };
-  if function
-    .trim()
-    .eq_ignore_ascii_case("com.sun.star.sheet.addin.Analysis.getEomonth")
-  {
-    return Cow::Owned(format!("EOMONTH({arguments}"));
-  }
-  Cow::Borrowed(formula)
-}
-
 fn unresolved_external_reference_value(formula: &str) -> Option<Value> {
   let formula = formula.trim().trim_start_matches('=').trim_start();
   let bang = formula.find('!')?;
@@ -456,6 +410,7 @@ fn apply_array_formula_result(
   sheet: &mut CalcSheet,
   target: CellRange,
   value: &Value,
+  repeat_scalar: bool,
 ) -> bool {
   let mut changed = false;
   for row in target.start.row..=target.end.row {
@@ -468,6 +423,13 @@ fn apply_array_formula_result(
           .and_then(|row| row.get(col_offset))
           .cloned()
           .unwrap_or(Value::Blank),
+        // A one-cell reference is a scalar result of a fixed array too
+        // (Office 57798.xlsx). Repeating it must not read neighboring cells.
+        Value::Range(reference)
+          if repeat_scalar && reference.range.start == reference.range.end =>
+        {
+          reference_cell_value(book, reference, reference.range.start)
+        }
         Value::Range(reference) => reference_cell_value(
           book,
           reference,
@@ -476,6 +438,14 @@ fn apply_array_formula_result(
             row: reference.range.start.row + row_offset as u32,
           },
         ),
+        // A legacy CSE formula has a fixed output region. A scalar result
+        // fills that region (Office ArrayFormula.xlsx: {=1+2} in A1:B2).
+        // XLDAPR dynamic arrays instead spill the result's actual shape.
+        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Error(_)
+          if repeat_scalar && target.start != target.end =>
+        {
+          value.clone()
+        }
         _ => return false,
       };
       if replace_cell_value(sheet, CellAddress { col, row }, &value) {
@@ -484,25 +454,6 @@ fn apply_array_formula_result(
     }
   }
   changed
-}
-
-fn should_replace_formula_result(old_text: &str, value: &Value) -> bool {
-  let old_text = old_text.trim();
-  match value {
-    Value::Range(_) | Value::Blank => false,
-    Value::Number(number)
-      if number.abs() < FORMULA_ZERO_TOLERANCE
-        && !old_text.is_empty()
-        && !old_text.starts_with('#')
-        && !matches!(
-          old_text.parse::<f64>(),
-          Ok(old) if old.abs() < FORMULA_ZERO_TOLERANCE
-        ) =>
-    {
-      false
-    }
-    _ => true,
-  }
 }
 
 fn formula_contains_smart_quote(formula: &str) -> bool {
@@ -528,7 +479,7 @@ struct FormulaBook {
 #[derive(Clone, Debug)]
 struct FormulaText {
   text: String,
-  is_array: bool,
+  kind: ooxmlsdk_formula::FormulaKind,
 }
 
 #[derive(Clone, Debug)]
@@ -543,13 +494,11 @@ struct TableModel {
 #[derive(Clone, Debug, Default)]
 struct DefinedNames {
   names: HashMap<(Option<u32>, String), String>,
-  arrays: HashMap<(Option<u32>, String), Vec<Vec<Value>>>,
 }
 
 impl DefinedNames {
   fn from_catalog(catalog: &DefinedNamesCatalog) -> Self {
     let mut names = HashMap::new();
-    let mut arrays = HashMap::new();
     for record in &catalog.records {
       if record.builtin.is_some()
         || record.hidden
@@ -557,22 +506,22 @@ impl DefinedNames {
       {
         continue;
       }
+      // MS-OI29500 18.2.5 / MS-XLSX 2.2.2.5 require the name-formula
+      // grammar. Office removes unqualified cell references from names;
+      // constants, other names and explicit sheet-relative `!` remain valid.
+      if ooxmlsdk_formula::parse_formula_text(
+        ooxmlsdk_formula::SheetId(record.local_sheet_id.unwrap_or(0)),
+        record.formula.as_str(),
+      )
+      .has_unqualified_cell_references()
+      {
+        continue;
+      }
       let key = record.name.to_ascii_uppercase();
       let scoped_key = (record.local_sheet_id, key);
-      if let Some(array) = parse_array_constant(&record.formula) {
-        arrays.insert(scoped_key.clone(), array);
-      }
       names.insert(scoped_key, record.formula.clone());
     }
-    Self { names, arrays }
-  }
-
-  fn array(&self, sheet_index: usize, name: &str) -> Option<&Vec<Vec<Value>>> {
-    let name = name.to_ascii_uppercase();
-    self
-      .arrays
-      .get(&(Some(sheet_index as u32), name.clone()))
-      .or_else(|| self.arrays.get(&(None, name)))
+    Self { names }
   }
 }
 
@@ -623,8 +572,14 @@ impl FormulaBook {
         formulas.insert(
           (sheet_index, formula.address),
           FormulaText {
+            kind: if !formula.is_array {
+              ooxmlsdk_formula::FormulaKind::Normal
+            } else if is_dynamic_array_cell(sheet, formula.address, workbook_catalog) {
+              ooxmlsdk_formula::FormulaKind::DynamicArray
+            } else {
+              ooxmlsdk_formula::FormulaKind::Array
+            },
             text: formula.formula,
-            is_array: formula.is_array,
           },
         );
       }
@@ -718,11 +673,12 @@ impl FormulaBook {
 fn formula_evaluation_book_from_calc_book(
   book: &FormulaBook,
   source_file_name: Option<&str>,
-  date_context: FormulaDateContext,
+  context: &FormulaContext,
 ) -> ooxmlsdk_formula::FormulaEvaluationBook<'static> {
   ooxmlsdk_formula::FormulaEvaluationBook {
-    date_system: date_context.date_system,
-    today_serial: date_context.today_serial,
+    date_system: context.date_system,
+    today_serial: context.today_serial,
+    ui_language: context.ui_language.clone().map(Cow::Owned),
     source_file_name: source_file_name.map(|name| Cow::Owned(name.to_string())),
     sheet_names: book
       .sheet_names
@@ -757,11 +713,7 @@ fn formula_evaluation_book_from_calc_book(
           ),
           ooxmlsdk_formula::FormulaText {
             text: Cow::Owned(formula.text.clone()),
-            kind: if formula.is_array {
-              ooxmlsdk_formula::FormulaKind::Array
-            } else {
-              ooxmlsdk_formula::FormulaKind::Normal
-            },
+            kind: formula.kind,
             reference: None,
           },
         )
@@ -781,23 +733,7 @@ fn formula_evaluation_book_from_calc_book(
         )
       })
       .collect(),
-    defined_arrays: book
-      .defined
-      .arrays
-      .iter()
-      .map(|((sheet, name), rows)| {
-        (
-          ooxmlsdk_formula::DefinedNameKey {
-            sheet: sheet.map(|sheet| formula_sheet_id(sheet as usize)),
-            name_upper: name.clone(),
-          },
-          rows
-            .iter()
-            .map(|row| row.iter().map(formula_value_from_calc_value).collect())
-            .collect(),
-        )
-      })
-      .collect(),
+    defined_arrays: BTreeMap::new(),
     external_cached_cells: book
       .external_cells
       .iter()
@@ -1108,6 +1044,11 @@ fn formula_cell_value(cell: &CalcCell) -> Value {
     Some(x::CellValues::SharedString | x::CellValues::InlineString) => &cell.display_text,
     _ => cell.cached_value.as_deref().unwrap_or(&cell.display_text),
   };
+  if cell.data_type == Some(x::CellValues::Boolean) {
+    // OOXML caches booleans as 1/0; recalculated values may spell TRUE/FALSE.
+    // Keep their type so equality and information functions see a logical value.
+    return Value::Bool(text.trim() == "1" || text.trim().eq_ignore_ascii_case("true"));
+  }
   if matches!(
     cell.data_type,
     Some(x::CellValues::SharedString | x::CellValues::InlineString | x::CellValues::String)
@@ -1191,13 +1132,20 @@ fn render_number(value: f64) -> String {
 }
 
 fn reference_cell_value(book: &FormulaBook, reference: &Reference, address: CellAddress) -> Value {
-  if let Some(sheet_name) = reference.external_sheet_name.as_deref() {
-    return book.external_cell(reference.external_link_index, sheet_name, address);
+  let value = if let Some(sheet_name) = reference.external_sheet_name.as_deref() {
+    book.external_cell(reference.external_link_index, sheet_name, address)
+  } else {
+    reference
+      .sheet_index
+      .map(|sheet_index| book.cell(sheet_index, address))
+      .unwrap_or(Value::Blank)
+  };
+  match value {
+    // Office tdf162093.xlsx: the empty table total becomes 0 when referenced
+    // by a spilling formula. Literal empty strings and array padding stay empty.
+    Value::Blank if reference.range.contains(address) => Value::Number(0.0),
+    value => value,
   }
-  reference
-    .sheet_index
-    .map(|sheet_index| book.cell(sheet_index, address))
-    .unwrap_or(Value::Blank)
 }
 
 fn translate_shared_formula(formula: &str, origin: CellAddress, target: CellAddress) -> String {
@@ -1214,31 +1162,408 @@ fn translate_shared_formula(formula: &str, origin: CellAddress, target: CellAddr
   )
 }
 
-fn parse_array_constant(formula: &str) -> Option<Vec<Vec<Value>>> {
-  let inner = formula.trim().strip_prefix('{')?.strip_suffix('}')?;
-  Some(
-    inner
-      .split(';')
-      .map(|row| {
-        row
-          .split(',')
-          .map(|item| {
-            let item = item.trim();
-            if item.is_empty() {
-              Value::Blank
-            } else {
-              Value::from_cell_text(item.trim_matches('"'))
-            }
-          })
-          .collect()
-      })
-      .collect(),
-  )
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn evaluated_zero_replaces_nonzero_cache_and_updates_dependents() {
+    use super::super::styles::StylesCatalog;
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+    let worksheet = x::Worksheet::from_bytes(br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><f>1-1</f><v>425</v></c><c r="B1"><f>50000-A1</f><v>49575</v></c><c r="C1"><f>SUMIF(D1:D1,"no",E1:E1)</f><v>100</v></c><c r="D1" t="str"><v>yes</v></c><c r="E1"><v>100</v></c></row></sheetData></worksheet>"#).unwrap();
+    let mut sheets = vec![CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Sheet1".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog::default(),
+      &[],
+      &StylesCatalog::default(),
+      Default::default(),
+    )];
+    recalculate_formula_cells(
+      &mut sheets,
+      &DefinedNamesCatalog::default(),
+      None,
+      &WorkbookCatalog::default(),
+      &FormulaContext::new(false, None, None),
+    );
+    for (address, expected) in [("A1", "0"), ("B1", "50000"), ("C1", "0")] {
+      assert_eq!(
+        cell_at(&sheets[0], CellAddress::parse_a1(address).unwrap())
+          .unwrap()
+          .display_text,
+        expected,
+        "{address}"
+      );
+    }
+  }
+
+  #[test]
+  fn recalculation_omits_invalid_name_references_but_keeps_qualified_and_indirect_ones() {
+    use super::super::styles::StylesCatalog;
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+
+    let workbook = x::Workbook::from_bytes(br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets/><definedNames>
+      <definedName name="Cnt">2+3</definedName>
+      <definedName name="Cnt" localSheetId="0">COUNTA(A:A)</definedName>
+      <definedName name="Bad">SUM(A1:A2)</definedName>
+      <definedName name="Qualified">Sheet1!$A$1</definedName>
+      <definedName name="Relative">!$A$1</definedName>
+      <definedName name="Literal">INDIRECT("A1")</definedName>
+      </definedNames></workbook>"#).unwrap();
+    let worksheet = x::Worksheet::from_bytes(br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">
+      <c r="A1"><v>7</v></c><c r="B1"><f>Cnt</f><v>1</v></c>
+      <c r="C1"><f>Bad</f><v>7</v></c><c r="D1"><f>SUM(Qualified)</f><v>0</v></c>
+      <c r="E1"><f>SUM(Relative)</f><v>0</v></c><c r="F1"><f>SUM(Literal)</f><v>0</v></c>
+      <c r="G1"><f>SUM(A1)</f><v>0</v></c></row></sheetData></worksheet>"#).unwrap();
+    let mut sheets = vec![CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Sheet1".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog::default(),
+      &[],
+      &StylesCatalog::default(),
+      Default::default(),
+    )];
+    let names = DefinedNamesCatalog::from_workbook(&workbook);
+    recalculate_formula_cells(
+      &mut sheets,
+      &names,
+      None,
+      &WorkbookCatalog::default(),
+      &FormulaContext::new(false, None, None),
+    );
+    assert_eq!(names.records.len(), 6, "preserve the source catalog");
+    for (address, expected) in [
+      ("B1", "5"),
+      ("C1", "#NAME?"),
+      ("D1", "7"),
+      ("E1", "7"),
+      ("F1", "7"),
+      ("G1", "7"),
+    ] {
+      assert_eq!(
+        sheets[0]
+          .cell_at(CellAddress::parse_a1(address).unwrap())
+          .unwrap()
+          .display_text,
+        expected,
+        "{address}"
+      );
+    }
+  }
+
+  #[test]
+  fn recalculation_preserves_imported_boolean_types() {
+    use super::super::styles::StylesCatalog;
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+
+    for (boolean, logical) in [
+      ("1", "TRUE"),
+      ("true", "TRUE"),
+      ("0", "FALSE"),
+      ("false", "FALSE"),
+    ] {
+      let worksheet = x::Worksheet::from_bytes(format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">
+        <c r="A1" t="b"><v>{boolean}</v></c><c r="B1"><v>1</v></c>
+        <c r="C1" t="str"><v>1</v></c><c r="D1" t="b"><f>{logical}()</f><v>1</v></c>
+        <c r="E1" t="b"><f>A1=D1</f><v>0</v></c><c r="F1" t="b"><f>ISLOGICAL(A1)</f><v>0</v></c>
+        <c r="G1" t="b"><f>ISNUMBER(A1)</f><v>1</v></c><c r="H1"><f>TYPE(A1)</f><v>1</v></c>
+        <c r="I1" t="b"><f>A1=B1</f><v>1</v></c><c r="J1" t="b"><f>A1=C1</f><v>1</v></c>
+      </row></sheetData></worksheet>"#).as_bytes()).unwrap();
+      let sheet = CalcSheet::from_worksheet(
+        SheetIdentity {
+          workbook_index: 0,
+          name: "Sheet1".into(),
+          state: None,
+          active: true,
+        },
+        worksheet,
+        SheetResourceCatalog::default(),
+        &[],
+        &StylesCatalog::default(),
+        Default::default(),
+      );
+      let mut sheets = vec![sheet];
+      recalculate_formula_cells(
+        &mut sheets,
+        &DefinedNamesCatalog::default(),
+        None,
+        &WorkbookCatalog::default(),
+        &FormulaContext::new(false, None, None),
+      );
+      for (address, expected) in [
+        ("D1", logical),
+        ("E1", "TRUE"),
+        ("F1", "TRUE"),
+        ("G1", "FALSE"),
+        ("H1", "4"),
+        ("I1", "FALSE"),
+        ("J1", "FALSE"),
+      ] {
+        assert_eq!(
+          sheets[0]
+            .cell_at(CellAddress::parse_a1(address).unwrap())
+            .unwrap()
+            .display_text,
+          expected,
+          "{boolean}: {address}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn array_recalculation_preserves_empty_strings_and_materializes_referenced_blanks() {
+    use super::super::styles::StylesCatalog;
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+
+    for (formula, expected) in [
+      ("A1:C1", ["0", "", "7"]),
+      ("A1", ["0", "0", "0"]),
+      ("B1", ["", "", ""]),
+      (r#"{0,"",7}"#, ["0", "", "7"]),
+      (r#"{0,""}"#, ["0", "", ""]),
+    ] {
+      let worksheet = x::Worksheet::from_bytes(format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">
+        <c r="B1" t="str"><f>""</f><v></v></c><c r="C1"><v>7</v></c>
+        <c r="D1"><f t="array" ref="D1:F1">{formula}</f><v>9</v></c>
+        <c r="E1"><v>9</v></c><c r="F1"><v>9</v></c>
+      </row></sheetData></worksheet>"#).as_bytes()).unwrap();
+      let sheet = CalcSheet::from_worksheet(
+        SheetIdentity {
+          workbook_index: 0,
+          name: "Sheet1".into(),
+          state: None,
+          active: true,
+        },
+        worksheet,
+        SheetResourceCatalog::default(),
+        &[],
+        &StylesCatalog::default(),
+        Default::default(),
+      );
+      let mut sheets = vec![sheet];
+      recalculate_formula_cells(
+        &mut sheets,
+        &DefinedNamesCatalog::default(),
+        None,
+        &WorkbookCatalog::default(),
+        &FormulaContext::new(false, None, None),
+      );
+      for (address, expected) in ["D1", "E1", "F1"].into_iter().zip(expected) {
+        assert_eq!(
+          sheets[0]
+            .cell_at(CellAddress::parse_a1(address).unwrap())
+            .unwrap()
+            .display_text,
+          expected,
+          "{formula}: {address}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn formulatext_recalculation_uses_ui_language_and_preserves_authored_text() {
+    use super::super::styles::StylesCatalog;
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+
+    for (language, expected) in [
+      ("de-DE", "=myData[#Kopfzeilen]"),
+      ("en-US", "=myData[#Headers]"),
+    ] {
+      // FORMULATEXT can also display a formula whose referenced table is absent.
+      let worksheet = x::Worksheet::from_bytes(br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">
+        <c r="A1" t="e"><f>myData[#Headers]</f><v>#NAME?</v></c>
+        <c r="B1" t="str"><f>_xlfn.FORMULATEXT(A1)</f><v>stale</v></c>
+        <c r="C1" t="str"><v>=myData[#Headers]</v></c>
+      </row></sheetData></worksheet>"#).unwrap();
+      let sheet = CalcSheet::from_worksheet(
+        SheetIdentity {
+          workbook_index: 0,
+          name: "Sheet1".into(),
+          state: None,
+          active: true,
+        },
+        worksheet,
+        SheetResourceCatalog::default(),
+        &[],
+        &StylesCatalog::default(),
+        Default::default(),
+      );
+      let mut sheets = vec![sheet];
+      recalculate_formula_cells(
+        &mut sheets,
+        &DefinedNamesCatalog::default(),
+        None,
+        &WorkbookCatalog::default(),
+        &FormulaContext::new(false, None, Some(language)),
+      );
+      for (address, expected) in [("B1", expected), ("C1", "=myData[#Headers]")] {
+        assert_eq!(
+          sheets[0]
+            .cell_at(CellAddress::parse_a1(address).unwrap())
+            .unwrap()
+            .display_text,
+          expected,
+          "{language}: {address}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn formulatext_preserves_dynamic_array_metadata_during_recalculation() {
+    use super::super::styles::StylesCatalog;
+    use super::super::workbook_catalog::CellMetadataResource;
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+
+    let worksheet = x::Worksheet::from_bytes(
+      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>
+      <row r="1">
+        <c r="A1"><f t="array" ref="A1">SUM(C1:C2)</f><v>3</v></c>
+        <c r="B1" cm="3"><f t="array" ref="B1">SUM(C1:C2)</f><v>3</v></c>
+        <c r="C1"><v>1</v></c>
+        <c r="D1"><f>C1:C2</f><v>1</v></c>
+      </row><row r="2">
+        <c r="A2" t="str"><f>_xlfn.FORMULATEXT(A1)</f><v>stale</v></c>
+        <c r="B2" t="str"><f>_xlfn.FORMULATEXT(B1)</f><v>stale</v></c>
+        <c r="C2"><v>2</v></c>
+        <c r="D2" t="str"><f>_xlfn.FORMULATEXT(D1)</f><v>stale</v></c>
+      </row><row r="3">
+        <c r="A3"><f t="array" ref="A3">C1:C2</f><v>1</v></c>
+        <c r="B3" cm="3"><f t="array" ref="B3">C1:C2</f><v>1</v></c>
+      </row><row r="4">
+        <c r="A4" t="str"><f>_xlfn.FORMULATEXT(A3)</f><v>stale</v></c>
+        <c r="B4" t="str"><f>_xlfn.FORMULATEXT(B3)</f><v>stale</v></c>
+      </row></sheetData></worksheet>"#,
+    )
+    .unwrap();
+    let sheet = CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Sheet1".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog::default(),
+      &[],
+      &StylesCatalog::default(),
+      Default::default(),
+    );
+    let mut sheets = vec![sheet];
+    let mut catalog = WorkbookCatalog::default();
+    catalog.relationship_resources.cell_metadata = Some(CellMetadataResource {
+      dynamic_array_indices: vec![3],
+      ..Default::default()
+    });
+    recalculate_formula_cells(
+      &mut sheets,
+      &DefinedNamesCatalog::default(),
+      None,
+      &catalog,
+      &FormulaContext::new(false, None, None),
+    );
+    for (address, expected) in [
+      ("A1", "3"),
+      ("B1", "3"),
+      ("A2", "{=SUM(C1:C2)}"),
+      ("B2", "=SUM(C1:C2)"),
+      ("D2", "=@C1:C2"),
+      ("A4", "{=C1:C2}"),
+      ("B4", "=C1:C2"),
+    ] {
+      assert_eq!(
+        sheets[0]
+          .cell_at(CellAddress::parse_a1(address).unwrap())
+          .unwrap()
+          .display_text,
+        expected
+      );
+    }
+  }
+
+  #[test]
+  fn fixed_array_single_cell_reference_repeats_its_value() {
+    use super::super::styles::StylesCatalog;
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+
+    // POI 57798.xlsx: Office repeats the value of A1 throughout B1:B2.
+    // Adjacent source cells must not leak into a fixed array's output region.
+    for (formula, expected) in [
+      ("A1", ["one", "one", "one", "one"]),
+      ("$A$1", ["one", "one", "one", "one"]),
+      ("A1:A1", ["one", "one", "one", "one"]),
+      ("A1:B2", ["one", "right", "below", "bottom"]),
+    ] {
+      let worksheet = x::Worksheet::from_bytes(
+        format!(
+          r#"
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetData>
+            <row r="1">
+              <c r="A1" t="str"><v>one</v></c><c r="B1" t="str"><v>right</v></c>
+              <c r="C1" t="str"><f t="array" ref="C1:D2">{formula}</f><v>stale</v></c>
+              <c r="D1" t="str"><v>stale</v></c>
+            </row>
+            <row r="2">
+              <c r="A2" t="str"><v>below</v></c><c r="B2" t="str"><v>bottom</v></c>
+              <c r="C2" t="str"><v>stale</v></c><c r="D2" t="str"><v>stale</v></c>
+            </row>
+          </sheetData>
+        </worksheet>"#
+        )
+        .as_bytes(),
+      )
+      .unwrap();
+      let sheet = CalcSheet::from_worksheet(
+        SheetIdentity {
+          workbook_index: 0,
+          name: "Sheet1".into(),
+          state: None,
+          active: true,
+        },
+        worksheet,
+        SheetResourceCatalog::default(),
+        &[],
+        &StylesCatalog::default(),
+        Default::default(),
+      );
+      let mut sheets = vec![sheet];
+      recalculate_formula_cells(
+        &mut sheets,
+        &DefinedNamesCatalog::default(),
+        None,
+        &WorkbookCatalog::default(),
+        &FormulaContext::new(false, None, None),
+      );
+      let actual = ["C1", "D1", "C2", "D2"].map(|address| {
+        sheets[0]
+          .cell_at(CellAddress::parse_a1(address).unwrap())
+          .unwrap()
+          .display_text
+          .as_str()
+      });
+      assert_eq!(actual, expected, "{formula}");
+    }
+  }
 
   #[test]
   fn recalculated_formula_type_follows_the_evaluated_scalar() {
@@ -1271,15 +1596,71 @@ mod tests {
   }
 
   #[test]
-  fn legacy_analysis_eomonth_is_normalized_to_the_excel_function() {
-    assert_eq!(
-      normalize_legacy_addin_formula("com.sun.star.sheet.addin.Analysis.getEomonth(A5,1)"),
-      "EOMONTH(A5,1)"
-    );
-    assert_eq!(
-      normalize_legacy_addin_formula("com.sun.star.sheet.addin.Unknown(A1)"),
-      "com.sun.star.sheet.addin.Unknown(A1)"
-    );
+  fn foreign_eomonth_addin_is_not_an_excel_builtin() {
+    use super::super::styles::StylesCatalog;
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+
+    // Office tdf141495.xlsx recalculates the LibreOffice service name as
+    // #NAME?, while the actual Excel EOMONTH builtin remains available.
+    for (formula, expected) in [
+      (
+        "com.sun.star.sheet.addin.Analysis.getEomonth(A1,1)",
+        "#NAME?",
+      ),
+      ("EOMONTH(A1,1)", "44255"),
+      (
+        "IFERROR(com.sun.star.sheet.addin.Analysis.getEomonth(A1,1),7)",
+        "7",
+      ),
+      (
+        "IF(FALSE,com.sun.star.sheet.addin.Analysis.getEomonth(A1,1),9)",
+        "9",
+      ),
+    ] {
+      let worksheet = x::Worksheet::from_bytes(
+        format!(
+          r#"
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetData><row r="1">
+            <c r="A1"><v>44227</v></c>
+            <c r="B1"><f>{formula}</f><v>999</v></c>
+          </row></sheetData>
+        </worksheet>"#
+        )
+        .as_bytes(),
+      )
+      .unwrap();
+      let sheet = CalcSheet::from_worksheet(
+        SheetIdentity {
+          workbook_index: 0,
+          name: "Sheet1".into(),
+          state: None,
+          active: true,
+        },
+        worksheet,
+        SheetResourceCatalog::default(),
+        &[],
+        &StylesCatalog::default(),
+        Default::default(),
+      );
+      let mut sheets = vec![sheet];
+      recalculate_formula_cells(
+        &mut sheets,
+        &DefinedNamesCatalog::default(),
+        None,
+        &WorkbookCatalog::default(),
+        &FormulaContext::new(false, None, None),
+      );
+      assert_eq!(
+        sheets[0]
+          .cell_at(CellAddress::parse_a1("B1").unwrap())
+          .unwrap()
+          .display_text,
+        expected,
+        "{formula}"
+      );
+    }
   }
 
   #[test]

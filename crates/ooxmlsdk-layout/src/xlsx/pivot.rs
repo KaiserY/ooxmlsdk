@@ -308,6 +308,17 @@ pub(crate) fn pivot_builtin_style_for_address(
   else {
     return PivotBuiltinCellStyle::default();
   };
+  if pivot.row_fields == 0
+    && pivot.column_fields == 0
+    && pivot.page_fields == 0
+    && pivot.data_fields == 0
+  {
+    // Excel retains an empty report's placeholder cell borders, but does
+    // not apply its named style, including whole-table fills and stripes.
+    // Cache fields alone do not make report regions; a page-only report,
+    // however, still has styled filter labels/values.
+    return PivotBuiltinCellStyle::default();
+  }
   let geometry = pivot_render_geometry(pivot);
   let mut style =
     pivot_named_style_for_address(pivot, styles, geometry, address).unwrap_or_else(|| {
@@ -3962,4 +3973,141 @@ fn pivot_table_flag_count(definition: &x::PivotTableDefinition) -> usize {
   .iter()
   .filter(|value| value.is_some_and(|value| value.as_bool()))
   .count()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+  use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+  use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+  #[test]
+  fn empty_pivot_placeholders_keep_cell_borders_without_named_style_paint() {
+    // Office exports: empty Light16, Dark9 and custom whole-table/header/
+    // total fills all print the same undecorated placeholder. Separately,
+    // page-, row-, column- and values-only reports retain their styled cells.
+    for (name, fields, location, styled_address) in [
+      ("PivotStyleLight16", "", "A3:C20", None),
+      ("PivotStyleDark9", "", "A3:C20", None),
+      ("EmptyPivotProbe", "", "A3:C20", None),
+      (
+        "EmptyPivotProbe",
+        r#"<rowFields count="1"><field x="0"/></rowFields>"#,
+        "A3:A7",
+        Some("A3"),
+      ),
+      (
+        "PivotStyleLight16",
+        r#"<pageFields count="1"><pageField fld="0" hier="-1"/></pageFields>"#,
+        "A3",
+        Some("A1"),
+      ),
+      (
+        "PivotStyleLight16",
+        r#"<rowFields count="1"><field x="0"/></rowFields>"#,
+        "A3:A7",
+        Some("A3"),
+      ),
+      (
+        "PivotStyleLight16",
+        r#"<colFields count="1"><field x="0"/></colFields>"#,
+        "A3:D4",
+        Some("A3"),
+      ),
+      (
+        "PivotStyleLight16",
+        r#"<dataFields count="1"><dataField name="Total Numbers" fld="0" subtotal="sum"/></dataFields>"#,
+        "A3:A4",
+        Some("A3"),
+      ),
+    ] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let id = workbook
+        .get_id_of_part(&package, &worksheet)
+        .unwrap()
+        .to_string();
+      workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+      worksheet.set_data(&mut package, br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="3"><c r="A3" s="1"/></row></sheetData></worksheet>"#.to_vec()).unwrap();
+      let styles_part = workbook
+        .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+        .unwrap();
+      styles_part.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <borders count="2"><border/><border><left style="thin"><color rgb="FFABABAB"/></left><top style="thin"><color rgb="FFABABAB"/></top></border></borders>
+        <cellXfs count="2"><xf borderId="0"/><xf borderId="1" applyBorder="1"/></cellXfs>
+        <dxfs count="3">
+          <dxf><fill><patternFill patternType="solid"><bgColor rgb="FFFF0000"/></patternFill></fill></dxf>
+          <dxf><fill><patternFill patternType="solid"><bgColor rgb="FF00FF00"/></patternFill></fill></dxf>
+          <dxf><fill><patternFill patternType="solid"><bgColor rgb="FF0000FF"/></patternFill></fill></dxf>
+        </dxfs><tableStyles count="1"><tableStyle name="EmptyPivotProbe" pivot="1" table="0" count="3">
+          <tableStyleElement type="wholeTable" dxfId="0"/><tableStyleElement type="headerRow" dxfId="1"/><tableStyleElement type="totalRow" dxfId="2"/>
+        </tableStyle></tableStyles></styleSheet>"#.to_vec()).unwrap();
+      let pivot_part = worksheet
+        .add_new_part_auto_id::<_, PivotTablePart>(&mut package)
+        .unwrap();
+      let first_data_row = if styled_address == Some("A1") { 0 } else { 1 };
+      pivot_part.set_data(&mut package, format!(r#"<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="Report" cacheId="0" dataCaption="Values">
+        <location ref="{location}" firstHeaderRow="{first_data_row}" firstDataRow="{first_data_row}" firstDataCol="0"/>
+        <pivotFields count="1"><pivotField/></pivotFields>{fields}
+        <pivotTableStyleInfo name="{name}" showRowHeaders="1" showColHeaders="1" showRowStripes="1" showColStripes="1" showLastColumn="1"/>
+      </pivotTableDefinition>"#).into_bytes()).unwrap();
+      let import = super::super::import::ExcelImport::import_document(
+        &package,
+        &crate::LayoutOptions::default(),
+      )
+      .unwrap();
+      let sheet = &import.sheets[0];
+      let pivot = &sheet.resources.pivot_tables.tables[0];
+      assert_eq!(pivot.pivot_fields, 1);
+      if name == "EmptyPivotProbe" && styled_address.is_some() {
+        for (row, expected) in [
+          (3, RgbColor { r: 0, g: 255, b: 0 }),
+          (4, RgbColor { r: 255, g: 0, b: 0 }),
+          (7, RgbColor { r: 0, g: 0, b: 255 }),
+        ] {
+          assert_eq!(
+            pivot_builtin_style_for_address(sheet, &import.styles, CellAddress { row, col: 1 })
+              .fill,
+            Some(expected)
+          );
+        }
+      }
+      if let Some(address) = styled_address {
+        assert!(
+          pivot_builtin_style_for_address(
+            sheet,
+            &import.styles,
+            CellAddress::parse_a1(address).unwrap()
+          )
+          .fill
+          .is_some(),
+          "{fields}"
+        );
+      } else {
+        for row in 3..=20 {
+          for col in 1..=3 {
+            let style =
+              pivot_builtin_style_for_address(sheet, &import.styles, CellAddress { row, col });
+            assert!(
+              style.fill.is_none() && style.text_color.is_none() && !style.bold,
+              "{name} row={row} col={col}"
+            );
+            assert!(
+              style.borders.left.is_none()
+                && style.borders.right.is_none()
+                && style.borders.top.is_none()
+                && style.borders.bottom.is_none()
+            );
+          }
+        }
+        let cell = sheet.cell_at(CellAddress::parse_a1("A3").unwrap()).unwrap();
+        let borders = import.styles.borders_for_cell(cell.style_index);
+        assert!(borders.left.is_some() && borders.top.is_some());
+      }
+    }
+  }
 }

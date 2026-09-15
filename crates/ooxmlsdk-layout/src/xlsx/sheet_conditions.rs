@@ -35,7 +35,8 @@ pub(crate) struct ConditionalFormatRuleModel {
   pub(crate) equal_average: bool,
   pub(crate) formulas: Vec<String>,
   pub(crate) color_scale: Option<ColorScaleModel>,
-  pub(crate) has_data_bar: bool,
+  pub(crate) data_bar: Option<x::DataBar>,
+  pub(crate) extension_id: Option<String>,
   pub(crate) icon_set: Option<IconSetModel>,
   pub(crate) has_extensions: bool,
 }
@@ -186,7 +187,7 @@ pub(crate) struct ExtendedConditionalFormatRuleModel {
   pub(crate) id: Option<String>,
   pub(crate) formulas: Vec<String>,
   pub(crate) has_color_scale: bool,
-  pub(crate) has_data_bar: bool,
+  pub(crate) data_bar: Option<x14::DataBar>,
   pub(crate) icon_set: Option<IconSetModel>,
   pub(crate) has_differential_format: bool,
   pub(crate) has_extensions: bool,
@@ -356,7 +357,24 @@ impl ConditionalFormatRuleModel {
         .filter_map(|formula| formula.xml_content.clone())
         .collect(),
       color_scale: rule.color_scale.as_ref().map(ColorScaleModel::from_base),
-      has_data_bar: rule.data_bar.is_some(),
+      data_bar: rule.data_bar.as_deref().cloned(),
+      extension_id: rule
+        .conditional_formatting_rule_extension_list
+        .as_ref()
+        .and_then(|extensions| {
+          extensions
+            .conditional_formatting_rule_extension
+            .iter()
+            .find_map(|extension| {
+              match extension
+                .conditional_formatting_rule_extension_choice
+                .as_ref()?
+              {
+                x::ConditionalFormattingRuleExtensionChoice::Id(id) => Some(id.clone()),
+                _ => None,
+              }
+            })
+        }),
       icon_set: rule.icon_set.as_ref().map(IconSetModel::from_base),
       has_extensions: rule.conditional_formatting_rule_extension_list.is_some(),
     }
@@ -594,7 +612,7 @@ impl ExtendedConditionalFormatRuleModel {
       id: rule.id.clone(),
       formulas: rule.formula.to_vec(),
       has_color_scale: rule.color_scale.is_some(),
-      has_data_bar: rule.data_bar.is_some(),
+      data_bar: rule.data_bar.as_deref().cloned(),
       icon_set: rule.icon_set.as_ref().map(IconSetModel::from_extended),
       has_differential_format: rule.differential_type.is_some(),
       has_extensions: rule.extension_list.is_some(),

@@ -62,6 +62,7 @@ pub(crate) enum SemanticTokenKind {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum SemanticWordKind {
   Boolean(bool),
+  Error(LexErrorValue),
   ExternalReference(ExternalReferenceSpans),
   ReferenceCandidate,
   Name,
@@ -96,6 +97,7 @@ fn semantic_token_kind(source: &str, token: LexToken) -> SemanticTokenKind {
       } else {
         match semantic_word_kind(value) {
           SemanticWordKind::Boolean(value) => SemanticTokenKind::Boolean(value),
+          SemanticWordKind::Error(value) => SemanticTokenKind::Error(value),
           SemanticWordKind::ExternalReference(reference) => {
             SemanticTokenKind::ExternalReference(reference.offset(token.start))
           }
@@ -115,8 +117,22 @@ pub(crate) fn semantic_word_kind(source: &str) -> SemanticWordKind {
   if source.eq_ignore_ascii_case("FALSE") {
     return SemanticWordKind::Boolean(false);
   }
+  // A complete selector such as [Price] or [[#Data],[Price]] has no book
+  // prefix. Let structured-reference parsing bind it to the containing table.
+  if source.starts_with('[') && super::table::parse_table_reference_selection(source).is_some() {
+    return SemanticWordKind::ReferenceCandidate;
+  }
   if let Some(reference) = external_reference_spans(source) {
     return SemanticWordKind::ExternalReference(reference);
+  }
+  // A deleted Excel cell reference can retain its worksheet qualifier,
+  // including inside a defined name. It remains #REF!, not an unknown name.
+  // Text literals and structured references keep their own token boundaries.
+  if source
+    .strip_suffix("!#REF!")
+    .is_some_and(|sheet| !sheet.is_empty())
+  {
+    return SemanticWordKind::Error(LexErrorValue::Ref);
   }
   if is_reference_candidate(source) {
     SemanticWordKind::ReferenceCandidate
@@ -132,28 +148,47 @@ fn is_reference_candidate(source: &str) -> bool {
 }
 
 pub(crate) fn external_reference_spans(source: &str) -> Option<ExternalReferenceSpans> {
-  let rest = source.strip_prefix('[')?;
+  // Excel can quote the workbook and sheet together: '[Book.xlsx]Sheet 1'!A1.
+  // Treat that qualifier as external just like [Book.xlsx]'Sheet 1'!A1.
+  let quoted = source.starts_with('\'');
+  let book_start = if quoted { 2 } else { 1 };
+  let rest = source
+    .strip_prefix('\'')
+    .unwrap_or(source)
+    .strip_prefix('[')?;
   let book_len = rest.find(']')?;
   let book = SemanticSpan {
-    start: 1,
-    end: 1 + book_len,
+    start: book_start,
+    end: book_start + book_len,
   };
   let rest_start = book.end + 1;
   let rest = source.get(rest_start..)?;
   let (sheet, name) = if let Some(separator) = rest.rfind('!') {
-    let sheet = trim_external_sheet_quotes(
-      source,
+    let sheet = if quoted {
+      let end = rest_start + separator;
+      source.get(rest_start..end)?.strip_suffix('\'')?;
       SemanticSpan {
         start: rest_start,
-        end: rest_start + separator,
-      },
-    );
+        end: end - 1,
+      }
+    } else {
+      trim_external_sheet_quotes(
+        source,
+        SemanticSpan {
+          start: rest_start,
+          end: rest_start + separator,
+        },
+      )
+    };
     let name = SemanticSpan {
       start: rest_start + separator + 1,
       end: source.len(),
     };
     (Some(sheet).filter(|span| span.start < span.end), Some(name))
   } else {
+    if quoted {
+      return None;
+    }
     (
       None,
       (!rest.is_empty()).then_some(SemanticSpan {

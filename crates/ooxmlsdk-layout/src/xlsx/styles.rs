@@ -135,6 +135,8 @@ pub(crate) struct CellFormatRecord {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct FontRecord {
   pub(crate) name: Option<Arc<str>>,
+  pub(crate) family: Option<i32>,
+  pub(crate) charset: Option<i32>,
   pub(crate) size_pt: Option<OrderedF64>,
   pub(crate) color: Option<RgbColor>,
   // DXF font properties are sparse: an omitted effect inherits, while an
@@ -604,6 +606,16 @@ impl StylesCatalog {
     style
   }
 
+  pub(crate) fn font_charset_for_cell(&self, style_index: Option<u32>) -> Option<i32> {
+    self
+      .effective_cell_format(style_index)
+      .filter(|format| format.apply_font)
+      .and_then(|format| format.font_id)
+      .and_then(|id| self.font_records.get(id as usize))
+      .or_else(|| self.font_records.first())
+      .and_then(|font| font.charset)
+  }
+
   pub(crate) fn direct_nondefault_font_color_for_cell(
     &self,
     style_index: Option<u32>,
@@ -845,6 +857,17 @@ impl StylesCatalog {
       .unwrap_or_default()
   }
 
+  pub(crate) fn cell_has_visible_paint(&self, style_index: Option<u32>) -> bool {
+    let borders = self.borders_for_cell(style_index);
+    let fill = self.fill_for_cell(style_index);
+    borders.left.is_some()
+      || borders.right.is_some()
+      || borders.top.is_some()
+      || borders.bottom.is_some()
+      || fill.color.is_some()
+      || fill.pattern.is_some()
+  }
+
   pub(crate) fn direct_cell_format_differs_from_parent(&self, style_index: u32) -> bool {
     let Some(format) = self.cell_xfs.get(style_index as usize) else {
       return false;
@@ -927,9 +950,29 @@ impl StylesCatalog {
       // theme's matching supplemental script font.
       style.font_family = Some(Arc::clone(&theme_font));
       style.east_asia_font_family = Some(theme_font);
+      // Excel retains an installed supplemental face, but a missing theme
+      // face uses Arial for Latin text (including legacy 仿宋_GB2312).
+      // Keep this as a fallback so an installed FangSong is not substituted.
+      style.fallback_font_family = Some(Arc::from("Arial"));
     } else if let Some(name) = &font.name {
       style.font_family = Some(Arc::clone(name));
+      style.fallback_font_family = font.missing_family_fallback(&self.locales).map(Arc::from);
     }
+  }
+
+  pub(crate) fn resolve_rich_text_run_font(&self, run: &mut super::workbook::SharedStringRun) {
+    let Some(scheme) = run.font_scheme else {
+      return;
+    };
+    let font = FontRecord {
+      name: run.font_family.as_deref().map(Arc::from),
+      scheme,
+      ..FontRecord::default()
+    };
+    let mut style = TextStyle::default();
+    self.apply_font_family(&font, &mut style);
+    run.font_family = style.font_family.as_deref().map(str::to_owned);
+    run.fallback_font_family = style.fallback_font_family.as_deref().map(str::to_owned);
   }
 
   pub(crate) fn uses_application_default_minor_theme(&self) -> bool {
@@ -965,6 +1008,20 @@ impl StylesCatalog {
         .as_ref()
         .and_then(|fonts| fonts.minor_latin.as_deref())
         .is_some_and(|font| font.eq_ignore_ascii_case("Calibri"))
+  }
+
+  pub(crate) fn normal_style_resolves_to_calibri_11(&self) -> bool {
+    let Some(font) = self.font_records.first() else {
+      return false;
+    };
+    let theme_font = self.theme_east_asian_font(font.scheme);
+    theme_font
+      .as_deref()
+      .or(font.name.as_deref())
+      .is_some_and(|name| name.eq_ignore_ascii_case("Calibri"))
+      && font
+        .size_pt
+        .is_some_and(|size| (size.get() - 11.0).abs() <= f64::EPSILON)
   }
 
   pub(crate) fn normal_style_uses_explicit_calibri_11(&self) -> bool {
@@ -1140,6 +1197,18 @@ impl CellFormatRecord {
 }
 
 impl FontRecord {
+  fn missing_family_fallback(&self, locales: &OfficeLocaleContext) -> Option<&'static str> {
+    // Excel's Windows mapper uses SimSun for a missing Swiss face with
+    // GB2312_CHARSET, or DEFAULT_CHARSET in the verified zh-CN environment.
+    // Keep the authored face first: Arial with the same metadata stays Arial.
+    // ANSI/omitted charset and Roman/Modern families have different Office
+    // substitutes; they cannot establish this fallback from the name alone.
+    (self.family == Some(2)
+      && (self.charset == Some(134)
+        || (self.charset == Some(1) && locales.format_locale() == Some("zh-CN"))))
+    .then_some("SimSun")
+  }
+
   fn from_font_with_colors(
     font: &x::Font,
     indexed_colors: &[RgbColor],
@@ -1171,6 +1240,12 @@ impl FontRecord {
         }
         x::FontChoice::FontName(value) => {
           record.name = Some(Arc::from(value.val.as_str()));
+        }
+        x::FontChoice::FontFamilyNumbering(value) => {
+          record.family = Some(value.val);
+        }
+        x::FontChoice::FontCharSet(value) => {
+          record.charset = Some(value.val);
         }
         x::FontChoice::FontScheme(value) => {
           record.scheme = value.val;
@@ -1473,6 +1548,21 @@ fn border_style(
 ) -> Option<BorderStyle> {
   let style = style?;
   if matches!(style, x::BorderStyleValues::None) {
+    return None;
+  }
+  // ECMA-376 §18.8.27 reserves index 65 for the system background. Excel
+  // omits these border strokes, including over a colored cell fill: 61652's
+  // yellow-fill control keeps only its gray outer border. Explicit white
+  // instead paints white interior strokes, so a white RGB fallback is wrong.
+  // Preserve the existing theme/RGB precedence when multiple forms occur.
+  if color.is_some_and(|color| {
+    color.indexed == Some(65)
+      && color
+        .theme
+        .and_then(|index| theme_colors.get(index))
+        .is_none()
+      && color_from_ooxml(color.rgb.as_deref()).is_none()
+  }) {
     return None;
   }
   Some(BorderStyle {
@@ -2029,6 +2119,33 @@ mod tests {
   }
 
   #[test]
+  fn system_background_borders_are_unpainted_but_explicit_white_is_retained() {
+    use ooxmlsdk::sdk::SdkType;
+
+    for (attributes, expected) in [
+      ("indexed=\"65\"", None),
+      ("indexed=\"64\"", Some(indexed_rgb(0x000000))),
+      ("rgb=\"FFFFFFFF\"", Some(indexed_rgb(0xFFFFFF))),
+      (
+        "indexed=\"65\" rgb=\"FFABABAB\"",
+        Some(indexed_rgb(0xABABAB)),
+      ),
+      ("indexed=\"65\" theme=\"0\"", Some(indexed_rgb(0xFFFFFF))),
+    ] {
+      let color = x::Color::from_bytes(
+        format!(r#"<color xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" {attributes}/>"#).as_bytes(),
+      ).unwrap();
+      let border = border_style(
+        Some(x::BorderStyleValues::Thin),
+        Some(&color),
+        &[],
+        &ThemeColorPalette::office_default(),
+      );
+      assert_eq!(border.map(|border| border.color), expected, "{attributes}");
+    }
+  }
+
+  #[test]
   fn office_border_weights_follow_fixed_output_point_grid() {
     assert_eq!(border_width_pt(x::BorderStyleValues::Hair), 0.5);
     assert_eq!(border_width_pt(x::BorderStyleValues::Thin), 1.0);
@@ -2087,6 +2204,45 @@ mod tests {
   }
 
   #[test]
+  fn swiss_font_charset_selects_a_missing_face_fallback_without_replacing_the_name() {
+    use ooxmlsdk::sdk::SdkType;
+
+    for (family, charset, locale, expected) in [
+      (2, Some(1), "zh-CN", Some("SimSun")),
+      (2, Some(134), "zh-CN", Some("SimSun")),
+      (2, Some(0), "zh-CN", None),
+      (2, None, "zh-CN", None),
+      (1, Some(1), "zh-CN", None),
+      (3, Some(1), "zh-CN", None),
+      (2, Some(1), "en-US", None),
+    ] {
+      let charset_xml = charset
+        .map(|value| format!("<charset val=\"{value}\"/>"))
+        .unwrap_or_default();
+      let xml = format!(
+        "<font xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><name val=\"FreeSans\"/><family val=\"{family}\"/>{charset_xml}</font>"
+      );
+      let font = FontRecord::from_font_with_colors(
+        &x::Font::from_bytes(xml.as_bytes()).unwrap(),
+        &[],
+        &ThemeColorPalette::default(),
+      );
+      let catalog = StylesCatalog {
+        locales: OfficeLocaleContext::new(Some("de-DE"), Some(locale), Some("zh-CN")),
+        ..StylesCatalog::default()
+      };
+      // A new explicit font also clears a substitute inherited from Normal.
+      let mut style = TextStyle {
+        fallback_font_family: Some(Arc::from("inherited substitute")),
+        ..TextStyle::default()
+      };
+      catalog.apply_font_family(&font, &mut style);
+      assert_eq!(style.font_family.as_deref(), Some("FreeSans"));
+      assert_eq!(style.fallback_font_family.as_deref(), expected);
+    }
+  }
+
+  #[test]
   fn cjk_theme_scheme_replaces_the_stored_latin_snapshot_for_the_cell_run() {
     let catalog = StylesCatalog {
       theme_minor_east_asian: Some(Arc::from("SimSun")),
@@ -2097,12 +2253,42 @@ mod tests {
       scheme: x::FontSchemeValues::Minor,
       ..FontRecord::default()
     };
-    let mut style = TextStyle::default();
+    let mut style = TextStyle {
+      fallback_font_family: Some(Arc::from("inherited substitute")),
+      ..TextStyle::default()
+    };
 
     catalog.apply_font_family(&font, &mut style);
 
     assert_eq!(style.font_family.as_deref(), Some("SimSun"));
     assert_eq!(style.east_asia_font_family.as_deref(), Some("SimSun"));
+    assert_eq!(style.fallback_font_family.as_deref(), Some("Arial"));
+  }
+
+  #[test]
+  fn rich_text_theme_scheme_uses_the_same_font_policy_as_cells() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let catalog = StylesCatalog {
+      theme_major_east_asian: Some(Arc::from("SimSun")),
+      theme_minor_east_asian: Some(Arc::from("SimHei")),
+      ..StylesCatalog::default()
+    };
+    for (scheme, expected, fallback) in [
+      ("<scheme val=\"minor\"/>", "SimHei", Some("Arial")),
+      ("<scheme val=\"major\"/>", "SimSun", Some("Arial")),
+      ("<scheme val=\"none\"/>", "Gill Sans MT", None),
+      ("", "Gill Sans MT", None),
+    ] {
+      let xml = format!(
+        "<r xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><rPr><rFont val=\"Gill Sans MT\"/>{scheme}</rPr><t>Reminder</t></r>"
+      );
+      let mut run =
+        super::super::workbook::shared_string_run(&x::Run::from_bytes(xml.as_bytes()).unwrap());
+      catalog.resolve_rich_text_run_font(&mut run);
+      assert_eq!(run.font_family.as_deref(), Some(expected), "{scheme}");
+      assert_eq!(run.fallback_font_family.as_deref(), fallback, "{scheme}");
+    }
   }
 
   #[test]

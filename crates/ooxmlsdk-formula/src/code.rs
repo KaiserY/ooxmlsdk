@@ -56,9 +56,10 @@ pub(crate) fn qualified_sheet_parts(
   end: FormulaSheetReference,
 ) -> Option<(SheetId, Option<String>, Option<String>)> {
   match (start, end) {
-    (FormulaSheetReference::Current, FormulaSheetReference::Current) => {
-      Some((current_sheet, None, None))
-    }
+    (
+      FormulaSheetReference::Current | FormulaSheetReference::CurrentQualified,
+      FormulaSheetReference::Current | FormulaSheetReference::CurrentQualified,
+    ) => Some((current_sheet, None, None)),
     (
       FormulaSheetReference::Local(FormulaSheetRange::Sheet(start)),
       FormulaSheetReference::Local(FormulaSheetRange::Sheet(end)),
@@ -88,10 +89,10 @@ pub(crate) fn qualified_sheet_parts(
     }
     (
       FormulaSheetReference::Local(FormulaSheetRange::Sheet(start)),
-      FormulaSheetReference::Current,
+      FormulaSheetReference::Current | FormulaSheetReference::CurrentQualified,
     )
     | (
-      FormulaSheetReference::Current,
+      FormulaSheetReference::Current | FormulaSheetReference::CurrentQualified,
       FormulaSheetReference::Local(FormulaSheetRange::Sheet(start)),
     ) => {
       let (sheet, name) = qualified_sheet_name(program, start)?;
@@ -248,12 +249,10 @@ pub(crate) fn structured_reference_text(
   if let Some(table) = reference.table {
     text.push_str(program.symbols.get(table)?);
   }
-  if reference.table.is_some()
-    && matches!(
-      reference.specifier,
-      FormulaStructuredReferenceSpecifier::Table
-    )
-  {
+  if matches!(
+    reference.specifier,
+    FormulaStructuredReferenceSpecifier::Table
+  ) {
     text.push_str("[]");
   } else {
     push_structured_reference_specifier(program, &reference.specifier, &mut text)?;
@@ -471,7 +470,6 @@ pub(crate) fn formula_value_from_array_constant<'doc>(
   value: parser::ArrayConstantValue<'_>,
 ) -> FormulaValue<'doc> {
   match value {
-    parser::ArrayConstantValue::Blank => FormulaValue::Blank,
     parser::ArrayConstantValue::Number(value) => FormulaValue::Number(value),
     parser::ArrayConstantValue::Boolean(value) => FormulaValue::Boolean(value),
     parser::ArrayConstantValue::Error(value) => FormulaValue::Error(formula_error_from_lex(value)),

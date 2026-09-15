@@ -12959,7 +12959,7 @@ mod tests {
   }
 
   #[test]
-  fn word_text_contour_depth_exposes_less_rgb_through_a_taller_angle_bevel() {
+  fn word_text_contour_tube_occlusion_begins_when_the_bevel_reaches_it() {
     let point = |x, y| Point { x: Pt(x), y: Pt(y) };
     let geometry = Static3dTextGeometry::from_page_path(
       &[
@@ -13036,10 +13036,11 @@ mod tests {
     let full_contour = contribution(None);
     let shallow_bevel = contribution(Some(19_050));
     let tall_bevel = contribution(Some(152_400));
-    assert!(
-      full_contour > shallow_bevel,
-      "{full_contour} <= {shallow_bevel}"
-    );
+    // Office's captured six-section tube has physical depth. A shallow
+    // bevel does not cut its front-visible material; a tall bevel does.
+    // See drawingml_3d/contour_mesh.rs for the retained mesh source.
+    assert!(full_contour > 0);
+    assert_eq!(full_contour, shallow_bevel);
     assert!(
       shallow_bevel > tall_bevel,
       "{shallow_bevel} <= {tall_bevel}"
@@ -13220,7 +13221,7 @@ mod tests {
   }
 
   #[test]
-  fn text_geometry_area_mask_retains_curves_and_continuous_byte_coverage() {
+  fn text_geometry_keeps_continuous_fill_and_wpf_stroke_coverage() {
     let point = |x, y| Point { x: Pt(x), y: Pt(y) };
     let geometry = Static3dTextGeometry::from_page_path(
       &[
@@ -13282,7 +13283,25 @@ mod tests {
     for pixel in stroke.pixels() {
       stroke_values[usize::from(pixel[3])] = true;
     }
-    assert!(stroke_values.into_iter().filter(|present| *present).count() > 128);
+    // WPF aacoverage.h defines 64 samples; aarasterizer.cpp converts them
+    // widened strokes have this lattice while source fill remains continuous.
+    let legal = (0..=64)
+      .map(|samples| {
+        if samples == 64 {
+          255
+        } else {
+          (samples * 255 * 4 + 128) >> 8
+        }
+      })
+      .collect::<Vec<_>>();
+    let actual = stroke_values
+      .iter()
+      .enumerate()
+      .filter_map(|(alpha, present)| present.then_some(alpha))
+      .collect::<Vec<_>>();
+    assert!(actual.len() > 32);
+    assert!(actual.iter().all(|alpha| legal.contains(alpha)));
+    assert!(stroke_values[0] && stroke_values[255]);
   }
 
   #[test]
@@ -13347,7 +13366,8 @@ mod tests {
         .expect("antialiased contour mask");
 
     assert_eq!(geometry.contours[0].bounds, (2.5, 0.5, 4.5, 6.5));
-    assert_eq!(physical.alpha_at(1, 3), 127);
+    // WPF/MIL 8x8 coverage maps 32/64 samples to byte alpha 128.
+    assert_eq!(physical.alpha_at(1, 3), 128);
     assert_eq!(antialiased.alpha_at(1, 3), 0);
     assert_eq!(antialiased.alpha_at(2, 3), 255);
     assert_eq!(geometry.contours[0].bounds, (2.5, 0.5, 4.5, 6.5));
@@ -13505,7 +13525,7 @@ mod tests {
   }
 
   #[test]
-  fn projected_contour_stops_inset_faces_at_their_collapse() {
+  fn projected_contour_keeps_closed_tubes_when_opposite_edges_overlap() {
     let point = |x, y| Point { x: Pt(x), y: Pt(y) };
     let bounds = Rect {
       origin: point(0.0, 0.0),
@@ -13555,22 +13575,29 @@ mod tests {
       },
     );
     assert!(!triangles.is_empty());
-    let mut checked = 0;
+    // The retained Word mesh has six circular section vertices, including
+    // the negative-Z half. It is not an inset cap clipped at the medial axis.
+    // A horizontal first edge gives ±r*sin(60°); the cap's middle
+    // ring scales the same profile by cos(45°).
+    let section_depths = [0.0_f32, 3.0_f32.sqrt(), 1.5_f32.sqrt()];
+    let mut inside_front = 0;
+    let mut inside_back = 0;
     for vertex in triangles.iter().flat_map(|triangle| &triangle.vertices) {
       let (x, y) = vertex.point;
-      let distance = (x - xmin).min(xmax - x).min(y - ymin).min(ymax - y);
-      if distance >= 0.0 {
-        let expected =
-          2.0 * super::WORD_CONTOUR_HEIGHT_OVER_RADIUS * (1.0 - (distance / 2.0).powi(2));
-        assert!(
-          (vertex.visibility_depth - expected).abs() < 0.0001,
-          "inset face continued past collapse: {x},{y}, depth={} expected={expected}",
-          vertex.visibility_depth
-        );
-        checked += 1;
+      let depth = vertex.visibility_depth;
+      assert!(
+        section_depths
+          .iter()
+          .any(|expected| (depth.abs() - expected).abs() < 0.0001)
+      );
+      assert!((xmin - 2.0001..=xmax + 2.0001).contains(&x));
+      assert!((ymin - 2.0001..=ymax + 2.0001).contains(&y));
+      if (xmin..=xmax).contains(&x) && (ymin..=ymax).contains(&y) {
+        inside_front += usize::from(depth > 0.0001);
+        inside_back += usize::from(depth < -0.0001);
       }
     }
-    assert!(checked > 0);
+    assert!(inside_front > 0 && inside_back > 0);
   }
 
   #[test]

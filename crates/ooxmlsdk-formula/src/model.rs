@@ -85,7 +85,6 @@ impl<'doc> WorkbookValueModel<'doc> {
           &shared_strings,
           &metadata,
           &styles,
-          &identity,
           &external_references,
         )
         .map(WorksheetValueModel::into_owned)
@@ -365,7 +364,7 @@ impl<'doc> WorkbookValueModel<'doc> {
             current_sheet: sheet_id,
             current_cell: Some(address),
             grammar: parsed.grammar,
-            array_context: formula.formula_kind == FormulaKind::Array,
+            array_context: formula.formula_kind.is_array(),
             calc_a1_indirect_bang_reference: parsed.grammar == FormulaGrammar::CalcA1
               && !parsed.source.trim_start().starts_with('=')
               && parsed.source.to_ascii_uppercase().contains("INDIRECT")
@@ -379,7 +378,7 @@ impl<'doc> WorkbookValueModel<'doc> {
           };
           match context.evaluate_program(program, borrowed_source) {
             Some(value) => {
-              let is_array_formula = formula.formula_kind == FormulaKind::Array;
+              let is_array_formula = formula.formula_kind.is_array();
               let value = if is_array_formula && formula.reference.is_some() {
                 value.into_owned()
               } else {
@@ -542,8 +541,9 @@ fn array_formula_result_items<'doc>(
           .unwrap_or_default(),
         FormulaValue::Reference(reference) => {
           let source_sheet = evaluator.range_sheet(reference);
-          evaluator.book.cell_value(
+          evaluator.book.array_reference_cell_value(
             source_sheet,
+            reference.range,
             CellAddress {
               column: reference.range.start.column + column_offset as u32,
               row: reference.range.start.row + row_offset as u32,
@@ -639,7 +639,15 @@ pub enum FormulaKind {
     group_index: u32,
   },
   Array,
+  /// An array formula whose cell metadata explicitly enables dynamic spilling.
+  DynamicArray,
   DataTable,
+}
+
+impl FormulaKind {
+  pub fn is_array(self) -> bool {
+    matches!(self, Self::Array | Self::DynamicArray)
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -665,6 +673,26 @@ pub struct ParsedFormula<'doc> {
 }
 
 impl<'doc> ParsedFormula<'doc> {
+  /// Whether a cell/range reference omits both a sheet and the `!` qualifier.
+  /// Excel name formulas prohibit these references even for sheet-local names
+  /// (MS-XLSX 2.2.2.5); ordinary cell formulas may use them.
+  pub fn has_unqualified_cell_references(&self) -> bool {
+    use crate::program::{FormulaNodeKind, FormulaReference, FormulaSheetReference};
+
+    self.program.as_ref().is_some_and(|program| {
+      program.nodes.iter().any(|node| match &node.kind {
+        FormulaNodeKind::Reference(FormulaReference::Cell(reference)) => {
+          reference.target.sheet == FormulaSheetReference::Current
+        }
+        FormulaNodeKind::Reference(FormulaReference::Range(reference)) => {
+          reference.start.sheet == FormulaSheetReference::Current
+            || reference.end.sheet == FormulaSheetReference::Current
+        }
+        _ => false,
+      })
+    })
+  }
+
   fn into_owned(self) -> ParsedFormula<'static> {
     ParsedFormula {
       source: Cow::Owned(self.source.into_owned()),
@@ -967,6 +995,8 @@ pub struct EvaluationContext<'doc> {
 pub struct FormulaEvaluationBook<'doc> {
   pub source_file_name: Option<Cow<'doc, str>>,
   pub locale: Option<Cow<'doc, str>>,
+  /// Office UI language for formula-bar text, independent of value formatting.
+  pub ui_language: Option<Cow<'doc, str>>,
   pub sheet_names: Vec<SheetBinding<'doc>>,
   pub cells: BTreeMap<(SheetId, CellAddress), FormulaValue<'doc>>,
   pub query_cell_values: BTreeMap<(SheetId, CellAddress), FormulaValue<'doc>>,
@@ -990,6 +1020,7 @@ impl<'doc> Default for FormulaEvaluationBook<'doc> {
     Self {
       source_file_name: None,
       locale: None,
+      ui_language: None,
       sheet_names: Vec::new(),
       cells: BTreeMap::new(),
       query_cell_values: BTreeMap::new(),
@@ -1077,6 +1108,11 @@ impl<'doc> FormulaEvaluationBookBuilder<'doc> {
 
   pub fn with_locale(mut self, locale: impl Into<Cow<'doc, str>>) -> Self {
     self.book.locale = Some(locale.into());
+    self
+  }
+
+  pub fn with_ui_language(mut self, language: impl Into<Cow<'doc, str>>) -> Self {
+    self.book.ui_language = Some(language.into());
     self
   }
 
@@ -1330,6 +1366,20 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     let mut defined_arrays = BTreeMap::new();
     for defined_name in &model.defined_names {
       if defined_name.built_in.is_some() {
+        continue;
+      }
+      // Preserve the serialized model, but omit names that Excel removes on
+      // import. Sheet-local scope does not supply the missing `!` qualifier.
+      if defined_name.parsed_formula.as_ref().map_or_else(
+        || {
+          parse_formula_text(
+            defined_name.sheet.unwrap_or_default(),
+            defined_name.formula_text.as_ref(),
+          )
+          .has_unqualified_cell_references()
+        },
+        ParsedFormula::has_unqualified_cell_references,
+      ) {
         continue;
       }
       let key = DefinedNameKey {
@@ -1633,6 +1683,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
           current_cell: Some(address),
           grammar: FormulaGrammar::ExcelA1,
           locals: BTreeMap::new(),
+          call_depth: 0,
           array_context: false,
           current_value: None,
           calc_a1_indirect_bang_reference: false,
@@ -1657,6 +1708,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       current_cell: Some(address),
       grammar: FormulaGrammar::ExcelA1,
       locals: BTreeMap::new(),
+      call_depth: 0,
       array_context: false,
       current_value: None,
       calc_a1_indirect_bang_reference: false,
@@ -1674,14 +1726,6 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     let clean = clean.strip_prefix('=').unwrap_or(clean);
     if let Ok(number) = clean.parse::<f64>() {
       return Some(FormulaValue::Number(number));
-    }
-    if clean.eq_ignore_ascii_case("empty_array") {
-      return self
-        .defined_name_array(Some(current_sheet), "EMPTY_ARRAY")
-        .or_else(|| self.defined_name_array(None, "EMPTY_ARRAY"))
-        .and_then(|rows| rows.first())
-        .and_then(|row| row.first())
-        .cloned();
     }
     if let Some(error) = crate::parser::formula_error_value(clean) {
       return Some(FormulaValue::Error(formula_error_from_lex(error)));
@@ -1931,6 +1975,20 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     parts
   }
 
+  fn array_reference_cell_value(
+    &self,
+    sheet: SheetId,
+    range: CellRange,
+    address: CellAddress,
+  ) -> FormulaValue<'doc> {
+    match self.cell_value(sheet, address) {
+      // A referenced empty cell yields zero in an array, just as in a scalar
+      // reference. This does not convert explicit empty strings or array padding.
+      FormulaValue::Blank if range_contains(range, address) => FormulaValue::Number(0.0),
+      value => value,
+    }
+  }
+
   fn array_formula_cell_value(
     &self,
     current_sheet: SheetId,
@@ -1965,13 +2023,15 @@ impl<'doc> FormulaEvaluationBook<'doc> {
           current_cell,
           grammar: FormulaGrammar::ExcelA1,
           locals: BTreeMap::new(),
+          call_depth: 0,
           array_context: true,
           current_value: None,
           calc_a1_indirect_bang_reference: false,
         };
         let source_sheet = context.range_sheet(&reference);
-        self.cell_value(
+        self.array_reference_cell_value(
           source_sheet,
+          reference.range,
           CellAddress {
             column: reference.range.start.column + column_offset as u32,
             row: reference.range.start.row + row_offset as u32,
@@ -2001,6 +2061,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         current_cell,
         grammar: FormulaGrammar::ExcelA1,
         locals: BTreeMap::new(),
+        call_depth: 0,
         array_context: false,
         current_value: None,
         calc_a1_indirect_bang_reference: false,
@@ -2033,9 +2094,18 @@ impl<'doc> FormulaEvaluationBook<'doc> {
   }
 
   pub fn formula_text(&self, sheet: SheetId, address: CellAddress) -> Option<String> {
+    self.formula_text_with_grammar(sheet, address, FormulaGrammar::ExcelA1)
+  }
+
+  pub(crate) fn formula_text_with_grammar(
+    &self,
+    sheet: SheetId,
+    address: CellAddress,
+    grammar: FormulaGrammar,
+  ) -> Option<String> {
     let formula = self.formulas.get(&(sheet, address))?;
     let text = formula.text.as_ref();
-    Some(if text.is_empty() {
+    let text = if text.is_empty() {
       String::new()
     } else if text.starts_with('{') {
       text.to_string()
@@ -2049,7 +2119,37 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       text.to_string()
     } else {
       format!("={text}")
-    })
+    };
+    // FORMULA in Calc exposes its own formula-bar spelling. Excel's storage
+    // markers and Formula2 implicit intersections belong to the Excel dialect.
+    if !matches!(grammar, FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1) {
+      return Some(text);
+    }
+    let text = if !formula.kind.is_array() && !text.starts_with('{') {
+      crate::parser::display_legacy_implicit_intersections(&text, |reference| {
+        evaluator::parse_table_reference(self, reference, sheet, Some(address))
+          .or_else(|| {
+            self
+              .defined_name_formula(Some(sheet), reference)
+              .filter(|formula| {
+                formula
+                  .trim()
+                  .trim_start_matches('=')
+                  .trim()
+                  .parse::<f64>()
+                  .is_err()
+              })
+              .and_then(|formula| crate::parser::parse_formula_range(sheet, formula))
+          })
+          .is_some_and(|reference| reference.range.cell_count_hint() != 1)
+      })
+    } else {
+      text
+    };
+    Some(crate::parser::display_excel_formula_text(
+      &text,
+      self.ui_language.as_deref(),
+    ))
   }
 
   pub fn row_hidden(&self, sheet: SheetId, row: u32) -> bool {
@@ -2141,11 +2241,39 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     })
   }
 
+  pub(crate) fn defined_name_scope<'name>(
+    &self,
+    sheet: Option<SheetId>,
+    name: &'name str,
+  ) -> Option<(Option<SheetId>, &'name str)> {
+    let Some((qualifier, name)) = name.rsplit_once('!') else {
+      return Some((sheet, name));
+    };
+    if qualifier.is_empty() {
+      return Some((sheet, name));
+    }
+    let qualifier = qualifier
+      .strip_prefix('\'')
+      .and_then(|text| text.strip_suffix('\''))
+      .map(|text| Cow::Owned(text.replace("''", "'")))
+      .unwrap_or(Cow::Borrowed(qualifier));
+    if qualifier == "[0]" {
+      return Some((None, name));
+    }
+    let sheet = self
+      .sheet_names
+      .iter()
+      .find(|sheet| sheet.name.eq_ignore_ascii_case(&qualifier))?
+      .id;
+    Some((Some(sheet), name))
+  }
+
   pub fn defined_name_formula(
     &self,
     sheet: Option<SheetId>,
     name: &str,
   ) -> Option<&Cow<'doc, str>> {
+    let (sheet, name) = self.defined_name_scope(sheet, name)?;
     let name_upper = name.to_ascii_uppercase();
     sheet
       .and_then(|sheet| {
@@ -2167,6 +2295,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     sheet: Option<SheetId>,
     name: &str,
   ) -> Option<&Vec<Vec<FormulaValue<'doc>>>> {
+    let (sheet, name) = self.defined_name_scope(sheet, name)?;
     let name_upper = name.to_ascii_uppercase();
     sheet
       .and_then(|sheet| {
@@ -2270,7 +2399,6 @@ fn worksheet_value_model<'doc>(
   shared_strings: &[String],
   metadata: &WorkbookMetadata,
   styles: &WorkbookStyles,
-  workbook_identity: &WorkbookIdentity<'doc>,
   external_references: &[ExternalReference<'doc>],
 ) -> Result<WorksheetValueModel<'doc>> {
   let mut cells = BTreeMap::new();
@@ -2302,7 +2430,6 @@ fn worksheet_value_model<'doc>(
               shared_strings,
               metadata,
               styles,
-              workbook_identity,
               external_references,
             },
           )?,
@@ -2430,7 +2557,6 @@ struct CellValueRecordContext<'a, 'doc> {
   shared_strings: &'a [String],
   metadata: &'a WorkbookMetadata,
   styles: &'a WorkbookStyles,
-  workbook_identity: &'a WorkbookIdentity<'doc>,
   external_references: &'a [ExternalReference<'doc>],
 }
 
@@ -2466,11 +2592,8 @@ fn cell_value_record<'doc>(
       .as_deref()
       .map(Cow::Borrowed)
       .unwrap_or(Cow::Borrowed(""));
-    let formula_text = normalize_imported_formula_text(
-      raw_formula_text.clone(),
-      context.workbook_identity,
-      context.external_references,
-    );
+    let formula_text =
+      normalize_imported_formula_text(raw_formula_text.clone(), context.external_references);
     let parsed_formula_text = if raw_formula_text.as_ref().contains('[')
       && normalize_external_formula_references(
         raw_formula_text.as_ref(),
@@ -2489,7 +2612,13 @@ fn cell_value_record<'doc>(
       .any(|dependency| matches!(dependency, FormulaDependency::Volatile));
     FormulaCell {
       address,
-      formula_kind: formula_kind(formula),
+      formula_kind: if formula_kind(formula) == FormulaKind::Array
+        && context.metadata.is_dynamic_array(cell)
+      {
+        FormulaKind::DynamicArray
+      } else {
+        formula_kind(formula)
+      },
       formula_text: formula_text.clone(),
       reference: formula
         .reference
@@ -2546,7 +2675,6 @@ fn cell_value_record<'doc>(
 
 fn normalize_imported_formula_text<'doc>(
   formula: Cow<'doc, str>,
-  workbook_identity: &WorkbookIdentity<'_>,
   external_references: &[ExternalReference<'_>],
 ) -> Cow<'doc, str> {
   let mut current = formula;
@@ -2557,11 +2685,6 @@ fn normalize_imported_formula_text<'doc>(
     normalize_external_formula_references(current.as_ref(), external_references)
   {
     current = Cow::Owned(external);
-  }
-  if let Some(sheet_range) =
-    normalize_quoted_sheet_range_formula(current.as_ref(), workbook_identity)
-  {
-    current = Cow::Owned(sheet_range);
   }
   current
 }
@@ -2649,86 +2772,6 @@ fn normalize_external_formula_target(target: &str) -> String {
   }
 }
 
-fn normalize_quoted_sheet_range_formula(
-  formula: &str,
-  workbook_identity: &WorkbookIdentity<'_>,
-) -> Option<String> {
-  let (start, end, reference, span) = quoted_sheet_range_reference(formula)?;
-  let (first, last) =
-    ordered_sheet_range_names(start, end, workbook_identity).unwrap_or((start, end));
-  let (start_reference, end_reference) =
-    reference.split_once(':').unwrap_or((reference, reference));
-  let replacement = format!("$'{first}'.{start_reference}:$'{last}'.{end_reference}");
-  Some(format!(
-    "{}{}{}",
-    &formula[..span.start],
-    replacement,
-    &formula[span.end..]
-  ))
-}
-
-struct FormulaTextSpan {
-  start: usize,
-  end: usize,
-}
-
-fn quoted_sheet_range_reference(formula: &str) -> Option<(&str, &str, &str, FormulaTextSpan)> {
-  let first_quote = formula.find('\'')?;
-  let first_end = formula[first_quote + 1..].find('\'')? + first_quote + 1;
-  let after_first = first_end + 1;
-  if !formula[after_first..].starts_with(':') {
-    return None;
-  }
-  let second_quote = after_first + 1;
-  if !formula[second_quote..].starts_with('\'') {
-    return None;
-  }
-  let second_end = formula[second_quote + 1..].find('\'')? + second_quote + 1;
-  let after_second = second_end + 1;
-  if !formula[after_second..].starts_with('!') {
-    return None;
-  }
-  let reference_start = after_second + 1;
-  let reference_len = formula[reference_start..]
-    .char_indices()
-    .take_while(|(_, ch)| ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':'))
-    .last()
-    .map(|(index, ch)| index + ch.len_utf8())
-    .unwrap_or(0);
-  if reference_len == 0 {
-    return None;
-  }
-  Some((
-    &formula[first_quote + 1..first_end],
-    &formula[second_quote + 1..second_end],
-    &formula[reference_start..reference_start + reference_len],
-    FormulaTextSpan {
-      start: first_quote,
-      end: reference_start + reference_len,
-    },
-  ))
-}
-
-fn ordered_sheet_range_names<'a>(
-  left: &'a str,
-  right: &'a str,
-  workbook_identity: &WorkbookIdentity<'_>,
-) -> Option<(&'a str, &'a str)> {
-  let left_index = workbook_identity
-    .sheets
-    .iter()
-    .position(|sheet| sheet.name == left)?;
-  let right_index = workbook_identity
-    .sheets
-    .iter()
-    .position(|sheet| sheet.name == right)?;
-  if left_index <= right_index {
-    Some((left, right))
-  } else {
-    Some((right, left))
-  }
-}
-
 fn cell_display_text(cell: &x::Cell, shared_strings: &[String]) -> String {
   let value = cell
     .cell_value
@@ -2749,7 +2792,12 @@ fn cell_display_text(cell: &x::Cell, shared_strings: &[String]) -> String {
       .unwrap_or(error_text_value(FormulaErrorValue::Error))
       .to_string(),
     x::CellValues::SharedString => value
-      .and_then(|value| value.parse::<usize>().ok())
+      .and_then(|value| {
+        value
+          .trim_matches([' ', '\t', '\r', '\n'])
+          .parse::<usize>()
+          .ok()
+      })
       .and_then(|index| shared_strings.get(index))
       .cloned()
       .unwrap_or_default(),
@@ -2780,7 +2828,12 @@ fn cell_value<'doc>(cell: &'doc x::Cell, shared_strings: &[String]) -> FormulaVa
       .map(FormulaValue::Error)
       .unwrap_or(FormulaValue::Error(FormulaErrorValue::Error)),
     x::CellValues::SharedString => value
-      .and_then(|value| value.parse::<usize>().ok())
+      .and_then(|value| {
+        value
+          .trim_matches([' ', '\t', '\r', '\n'])
+          .parse::<usize>()
+          .ok()
+      })
       .and_then(|index| shared_strings.get(index))
       .map(|value| FormulaValue::String(Cow::Owned(value.clone())))
       .unwrap_or_default(),
@@ -2819,12 +2872,16 @@ struct WorkbookMetadata {
 }
 
 impl WorkbookMetadata {
+  fn is_dynamic_array(&self, cell: &x::Cell) -> bool {
+    cell
+      .cell_meta_index
+      .is_some_and(|index| self.dynamic_array_cell_metadata.contains(&index))
+  }
+
   fn is_dynamic_array_spill(&self, cell: &x::Cell, value: &FormulaValue<'_>) -> bool {
     matches!(value, FormulaValue::Error(FormulaErrorValue::Value))
       && cell.value_meta_index.is_some()
-      && cell
-        .cell_meta_index
-        .is_some_and(|index| self.dynamic_array_cell_metadata.contains(&index))
+      && self.is_dynamic_array(cell)
   }
 }
 
@@ -2838,40 +2895,61 @@ fn workbook_metadata(
   let metadata = metadata_part
     .root_element(document)
     .map_err(|error| FormulaError::Package(error.to_string()))?;
-  let dynamic_array_type_indices = metadata
-    .metadata_types
-    .as_ref()
-    .map(|types| {
-      types
-        .metadata_type
-        .iter()
-        .enumerate()
-        .filter(|(_, metadata_type)| metadata_type.name.eq_ignore_ascii_case("XLDAPR"))
-        .flat_map(|(index, _)| [index as u32, index as u32 + 1])
-        .collect::<BTreeSet<_>>()
-    })
-    .unwrap_or_default();
-  let dynamic_array_cell_metadata = metadata
-    .cell_metadata
-    .as_ref()
-    .map(|cell_metadata| {
-      cell_metadata
-        .metadata_block
-        .iter()
-        .enumerate()
-        .filter(|(_, block)| {
-          block
-            .metadata_record
-            .iter()
-            .any(|record| dynamic_array_type_indices.contains(&record.type_index))
-        })
-        .flat_map(|(index, _)| [index as u32, index as u32 + 1])
-        .collect::<BTreeSet<_>>()
-    })
-    .unwrap_or_default();
   Ok(WorkbookMetadata {
-    dynamic_array_cell_metadata,
+    dynamic_array_cell_metadata: dynamic_array_metadata_indices(metadata)
+      .into_iter()
+      .collect(),
   })
+}
+
+/// One-based cell-metadata indexes whose XLDAPR record has fDynamic enabled.
+pub fn dynamic_array_metadata_indices(metadata: &x::Metadata) -> Vec<u32> {
+  use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2017_dynamicarray::DynamicArrayProperties;
+  use ooxmlsdk::sdk::SdkType;
+
+  let Some(types) = metadata.metadata_types.as_ref() else {
+    return Vec::new();
+  };
+  let Some(cells) = metadata.cell_metadata.as_ref() else {
+    return Vec::new();
+  };
+  // cm and rc/@t are one-based; rc/@v indexes the named future-metadata
+  // blocks from zero. Other metadata kinds do not imply a dynamic array.
+  cells
+    .metadata_block
+    .iter()
+    .enumerate()
+    .filter_map(|(index, block)| {
+      let dynamic = block.metadata_record.iter().any(|record| {
+        let Some(kind) = record
+          .type_index
+          .checked_sub(1)
+          .and_then(|index| types.metadata_type.get(index as usize))
+        else {
+          return false;
+        };
+        if kind.name != "XLDAPR" {
+          return false;
+        }
+        metadata
+          .future_metadata
+          .iter()
+          .filter(|future| future.name == kind.name)
+          .filter_map(|future| future.future_metadata_block.get(record.val as usize))
+          .filter_map(|block| block.extension_list.as_ref())
+          .flat_map(|extensions| &extensions.extension)
+          .filter(|extension| {
+            extension
+              .uri
+              .eq_ignore_ascii_case("{bdbb8cdc-fa1e-496e-a857-3c3f30c029c3}")
+          })
+          .flat_map(|extension| &extension.xml_children)
+          .filter_map(|xml| DynamicArrayProperties::from_bytes(xml).ok())
+          .any(|properties| properties.f_dynamic.is_some_and(|flag| flag.as_bool()))
+      });
+      dynamic.then_some(index as u32 + 1)
+    })
+    .collect()
 }
 
 #[derive(Clone, Debug, Default)]
@@ -3199,7 +3277,7 @@ fn array_formula_groups<'doc>(
       let Some(formula) = &record.formula else {
         continue;
       };
-      if formula.formula_kind != FormulaKind::Array {
+      if !formula.formula_kind.is_array() {
         continue;
       }
       groups.push(ArrayFormulaGroup {
@@ -4111,6 +4189,89 @@ mod tests {
   use crate::program::{FormulaNodeKind, FormulaReference};
 
   #[test]
+  fn structured_column_names_keep_literal_colons_in_countif_ranges() {
+    let sheet = SheetId(1);
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_table(FormulaTable {
+        sheet,
+        name: Cow::Borrowed("Table1"),
+        range: CellRange::new(
+          CellAddress { column: 0, row: 0 },
+          CellAddress { column: 2, row: 1 },
+        ),
+        header_rows: 1,
+        totals_rows: 0,
+        columns: vec![
+          Cow::Borrowed("7:00 AM"),
+          Cow::Borrowed("8:00 AM"),
+          Cow::Borrowed("3:00 PM"),
+        ],
+      })
+      .with_cell(
+        sheet,
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::String(Cow::Borrowed("manager")),
+      )
+      .with_cell(
+        sheet,
+        CellAddress { column: 2, row: 1 },
+        FormulaValue::String(Cow::Borrowed("cashier")),
+      )
+      .build();
+    for formula in [
+      r#"COUNTIF(Table1[[#This Row],[7:00 AM]:[3:00 PM]],"*")"#,
+      r#"COUNTIF(Table1[[7:00 AM]:[3:00 PM]],"*")"#,
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text(sheet, Some(CellAddress { column: 2, row: 1 }), formula),
+        Some(FormulaValue::Number(2.0)),
+        "{formula}"
+      );
+    }
+    assert_eq!(
+      book.evaluate_formula_text(
+        sheet,
+        Some(CellAddress { column: 2, row: 1 }),
+        r#"COUNTIF(Table1[7:00 AM],"*")"#
+      ),
+      Some(FormulaValue::Number(1.0))
+    );
+  }
+
+  #[test]
+  fn text_short_year_and_yearless_date_use_the_calculation_clock() {
+    for year in [2007, 2026] {
+      let today =
+        crate::calc::datetime::date_serial_with_system(year, 9, 11, DateSystem::Date1900).unwrap();
+      let book = FormulaEvaluationBookBuilder::new()
+        .with_today_serial(today)
+        .build();
+      for (formula, expected) in [
+        (r#"TEXT(39097,"mmm-yy")"#.to_string(), "Jan-07".to_string()),
+        (r#"TEXT(0,"mmm-yy")"#.to_string(), "Jan-00".to_string()),
+        (
+          r#"TEXT("Jan-07","mmm-yy")"#.to_string(),
+          format!("Jan-{:02}", year % 100),
+        ),
+        (
+          r#"TEXT(DATEVALUE("7-Jan"),"yyyy-mm-dd")"#.to_string(),
+          format!("{year}-01-07"),
+        ),
+        (
+          r#"TEXT(DATEVALUE("Jan-2007"),"yyyy-mm-dd")"#.to_string(),
+          "2007-01-01".to_string(),
+        ),
+      ] {
+        assert_eq!(
+          book.evaluate_formula_text(SheetId(1), None, &formula),
+          Some(FormulaValue::String(Cow::Owned(expected))),
+          "{formula}; clock year {year}"
+        );
+      }
+    }
+  }
+
+  #[test]
   fn parses_odf_range_endpoints_with_inherited_sheet_name() {
     let same_sheet = crate::parser::parse_formula_range(SheetId(3), ".B8:.B95").unwrap();
     assert_eq!(same_sheet.sheet, SheetId(3));
@@ -4195,7 +4356,6 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
-      &WorkbookIdentity::default(),
       &[],
     )
     .unwrap();
@@ -4237,6 +4397,401 @@ mod tests {
   }
 
   #[test]
+  fn formulatext_displays_excel_storage_functions_as_formula_bar_syntax() {
+    for (source, expected) in [
+      ("_xlfn._xlws.SORT(A2:A5)", "=SORT(A2:A5)"),
+      ("_xlfn.ANCHORARRAY(B2)", "=B2#"),
+      ("_xlfn.UNIQUE(_xlfn.ANCHORARRAY(B2))", "=UNIQUE(B2#)"),
+      ("SUM(_xlfn.ANCHORARRAY(B2))", "=SUM(B2#)"),
+      ("_xlfn.ANCHORARRAY('A'' B'!$B$2)", "='A'' B'!$B$2#"),
+      ("_xlfn.ANCHORARRAY(OFFSET(B2,0,0))", "=OFFSET(B2,0,0)#"),
+      ("_xlfn.ANCHORARRAY(((B2)))", "=((B2))#"),
+      ("_xlfn.ANCHORARRAY(B2+C2)", "=(B2+C2)#"),
+      ("_xlfn.SINGLE(B2:B4)", "=@B2:B4"),
+      ("_xlfn.SINGLE((B2:B4))", "=@(B2:B4)"),
+      ("_xlfn.SINGLE(B2:B4+1)", "=@(B2:B4+1)"),
+      ("_xlfn.SINGLE(TRANSPOSE(B2:B4))", "=@TRANSPOSE(B2:B4)"),
+      (
+        "_xlfn.SINGLE(CHOOSE(2,B2:B4,C2:C4))",
+        "=@CHOOSE(2,B2:B4,C2:C4)",
+      ),
+      ("_xlfn.SINGLE(_xlfn.ANCHORARRAY(B2))", "=@B2#"),
+      ("_xlfn.SINGLE(_xlfn.SINGLE(B2:B4))", "=@@B2:B4"),
+      ("_xlfn.SINGLE()", "=_xlfn.SINGLE()"),
+      ("_xlfn.SINGLE(B2,C2)", "=_xlfn.SINGLE(B2,C2)"),
+      (r#""_xlfn.SINGLE(B2)""#, r#"="_xlfn.SINGLE(B2)""#),
+      (
+        "_xlfn.LET(_xlpm.x, F5:F7, _xlpm.x*2)",
+        "=LET(x, F5:F7, x*2)",
+      ),
+      ("_xlfn.LET(_xlpm.x,{1,2},_xlpm.x)", "=LET(x,{1,2},x)"),
+      (
+        "_xlfn.LAMBDA(_xlpm.x,_xlop.y,_xlop.z,_xlpm.x+_xlpm.y+_xlpm.z)(7)",
+        "=LAMBDA(x,[y],[z],x+y+z)(7)",
+      ),
+      (
+        "_xlfn.LAMBDA(_xlpm.f,_xlpm.n,_xlpm.f(_xlpm.n))(_xleta.COUNT,{1,2})",
+        "=LAMBDA(f,n,f(n))(COUNT,{1,2})",
+      ),
+      (
+        "_xlfn.LET(_xlpm.x,1,_xlop.x)+_xlpm.x+_xleta.UNRECOGNIZED",
+        "=LET(x,1,_xlop.x)+_xlpm.x+_xleta.UNRECOGNIZED",
+      ),
+      ("_xlfn.LAMBDA(_xlpm.x,_xlpm.x+1)(2)", "=LAMBDA(x,x+1)(2)"),
+      (
+        "_xlfn.LET(_xlpm.x,1,_xlfn.LET(_xlpm.y,2,_xlpm.x+_xlpm.y))+_xlpm.x",
+        "=LET(x,1,LET(y,2,x+y))+_xlpm.x",
+      ),
+      (
+        r#"_xlfn.LET(_xlpm.x,1,_xlpm.x&"_xlpm.x")"#,
+        r#"=LET(x,1,x&"_xlpm.x")"#,
+      ),
+      (
+        "_xlfn.LET(_xlpm.x,1,Table1[_xlpm.x])",
+        "=LET(x,1,Table1[_xlpm.x])",
+      ),
+      (
+        "_xlfn.LET(_xlpm.x,1,'_xlpm.x'!A1)",
+        "=LET(x,1,'_xlpm.x'!A1)",
+      ),
+      ("_xlpm.x", "=_xlpm.x"),
+      ("_xlfn.ANCHORARRAY(B2,C2)", "=_xlfn.ANCHORARRAY(B2,C2)"),
+      ("_xlfn.ANCHORARRAY()", "=_xlfn.ANCHORARRAY()"),
+      ("_xlfn.DoesNotExist(A1)", "=_xlfn.DoesNotExist(A1)"),
+      ("_xlfn.SUM(A1)", "=_xlfn.SUM(A1)"),
+      ("_xlfn.UNIQUE", "=_xlfn.UNIQUE"),
+      ("Table1[_xlfn.UNIQUE]", "=Table1[_xlfn.UNIQUE]"),
+      ("'_xlfn.UNIQUE'!A1", "='_xlfn.UNIQUE'!A1"),
+      (
+        r#"IF(A1,"_xlfn.ANCHORARRAY(B2)",_xlfn.UNIQUE( B2:B4 ))"#,
+        r#"=IF(A1,"_xlfn.ANCHORARRAY(B2)",UNIQUE( B2:B4 ))"#,
+      ),
+      (
+        r#"IF(A1,"""_xlfn.UNIQUE""",_xlfn.UNIQUE(B2:B4))"#,
+        r#"=IF(A1,"""_xlfn.UNIQUE""",UNIQUE(B2:B4))"#,
+      ),
+    ] {
+      let mut book = FormulaEvaluationBookBuilder::new()
+        .with_formula(SheetId(1), CellAddress { column: 0, row: 0 }, source)
+        .build();
+      // These controls isolate storage spelling in the array-evaluation dialect.
+      // Normal scalar formulas gain implicit @ at their coercion boundaries.
+      book
+        .formulas
+        .get_mut(&(SheetId(1), CellAddress::default()))
+        .unwrap()
+        .kind = FormulaKind::DynamicArray;
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, "FORMULATEXT(A1)"),
+        Some(FormulaValue::String(Cow::Borrowed(expected))),
+        "{source}"
+      );
+      assert_eq!(
+        book.formulas[&(SheetId(1), CellAddress { column: 0, row: 0 })].text,
+        source
+      );
+    }
+  }
+
+  #[test]
+  fn formula_text_display_uses_the_evaluating_grammar() {
+    for source in ["ISNUMBER(B1:D5)", "ISLOGICAL(B1:D5)"] {
+      let book = FormulaEvaluationBookBuilder::new()
+        .with_formula(SheetId(1), CellAddress::default(), source)
+        .build();
+      for (grammar, query, intersection) in [
+        (FormulaGrammar::ExcelA1, "FORMULATEXT(A1)", "@"),
+        (FormulaGrammar::CalcA1, "FORMULA(A1)", ""),
+        (FormulaGrammar::OpenFormula, "of:=FORMULA([.A1])", ""),
+      ] {
+        let expected = format!(
+          "={}",
+          source.replace("B1:D5", &format!("{intersection}B1:D5"))
+        );
+        assert_eq!(
+          book.evaluate_formula_text_with_grammar(SheetId(1), None, query, grammar),
+          Some(FormulaValue::String(Cow::Owned(expected))),
+          "{source}: {grammar:?}"
+        );
+      }
+      assert_eq!(
+        book.formula_text(SheetId(1), CellAddress::default()),
+        Some(format!("={}", source.replace("B1:D5", "@B1:D5")))
+      );
+    }
+  }
+
+  #[test]
+  fn formulatext_localizes_only_reserved_table_specifiers_in_the_ui_language() {
+    for (source, german) in [
+      ("myData[#Headers]", "myData[#Kopfzeilen]"),
+      ("myData[#Data]", "myData[#Daten]"),
+      ("myData[#Totals]", "myData[#Ergebnisse]"),
+      (
+        "myData[[#Headers],[Count]]",
+        "myData[[#Kopfzeilen],[Count]]",
+      ),
+      (
+        "myData[[#Data],[#Totals]]",
+        "myData[[#Daten],[#Ergebnisse]]",
+      ),
+      ("[#Headers]", "[#Kopfzeilen]"),
+      ("myData[ #headers ]", "myData[ #Kopfzeilen ]"),
+      ("myData['#Headers]", "myData['#Headers]"),
+      (
+        "myData[['#Headers],[#Data]]",
+        "myData[['#Headers],[#Daten]]",
+      ),
+      ("myData[has #Headers]", "myData[has #Headers]"),
+      ("myData['[#Headers']]", "myData['[#Headers']]"),
+      ("'[myData[#Headers]]'!A1", "'[myData[#Headers]]'!A1"),
+      ("'[Book]Sheet'!A1", "'[Book]Sheet'!A1"),
+      (r#""myData[#Headers]""#, r#""myData[#Headers]""#),
+      ("_xlfn.ANCHORARRAY(myData[#Data])", "myData[#Daten]#"),
+    ] {
+      for language in [
+        None,
+        Some("de-DE"),
+        Some("DE-de"),
+        Some("en-US"),
+        Some("zh-CN"),
+      ] {
+        let mut builder = FormulaEvaluationBookBuilder::new()
+          .with_locale(if language == Some("en-US") {
+            "de-DE"
+          } else {
+            "zh-CN"
+          })
+          .with_formula(SheetId(1), CellAddress::default(), source);
+        if let Some(language) = language {
+          builder = builder.with_ui_language(language);
+        }
+        let mut book = builder.build();
+        book
+          .formulas
+          .get_mut(&(SheetId(1), CellAddress::default()))
+          .unwrap()
+          .kind = FormulaKind::DynamicArray;
+        let expected = if language.is_some_and(|language| language.eq_ignore_ascii_case("de-DE")) {
+          format!("={german}")
+        } else if source == "_xlfn.ANCHORARRAY(myData[#Data])" {
+          "=myData[#Data]#".to_string()
+        } else {
+          format!("={source}")
+        };
+        assert_eq!(
+          book.evaluate_formula_text(SheetId(1), None, "FORMULATEXT(A1)"),
+          Some(FormulaValue::String(Cow::Owned(expected))),
+          "{language:?}: {source}"
+        );
+        assert_eq!(
+          book.formulas[&(SheetId(1), CellAddress::default())].text,
+          source
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn array_references_coerce_empty_cells_but_preserve_empty_strings() {
+    use ooxmlsdk::sdk::SdkType;
+    let worksheet = x::Worksheet::from_bytes(br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">
+      <c r="B1" t="str"><v></v></c><c r="C1"><v>7</v></c>
+      <c r="D1"><f t="array" ref="D1:F1">A1:C1</f><v>9</v></c>
+      <c r="E1"><v>9</v></c><c r="F1"><v>9</v></c>
+    </row></sheetData></worksheet>"#).unwrap();
+    let identity = WorksheetIdentity {
+      id: SheetId(1),
+      name: "Sheet1".into(),
+      relationship_id: None,
+      visible: true,
+    };
+    let sheet = worksheet_value_model(
+      &identity,
+      Some(&worksheet),
+      &[],
+      &WorkbookMetadata::default(),
+      &WorkbookStyles::default(),
+      &[],
+    )
+    .unwrap();
+    let mut model = WorkbookValueModel {
+      sheets: vec![sheet],
+      ..Default::default()
+    };
+    let book = FormulaEvaluationBook::from_workbook_value_model(&model);
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress::parse_a1("D1").unwrap()),
+        "A1:C1"
+      ),
+      Some(FormulaValue::Number(0.0)),
+    );
+    model.evaluate_supported_formulas();
+    for (address, expected) in [("D1", "0"), ("E1", ""), ("F1", "7")] {
+      assert_eq!(
+        model
+          .cell(SheetId(1), CellAddress::parse_a1(address).unwrap())
+          .and_then(|cell| cell.display_value.as_ref())
+          .map(|value| value.text.as_ref()),
+        Some(expected),
+        "{address}",
+      );
+    }
+  }
+
+  #[test]
+  fn formulatext_marks_legacy_scalar_boundaries_without_changing_arrays() {
+    for (source, scalar, array) in [
+      ("A1:A3", "@A1:A3", "A1:A3"),
+      ("$A$1:A1", "$A$1:A1", "$A$1:A1"),
+      ("A1:A3+B1:B3", "@A1:A3+@B1:B3", "A1:A3+B1:B3"),
+      ("SUM(A1:A3)", "SUM(A1:A3)", "SUM(A1:A3)"),
+      ("SQRT(A1:A3)", "SQRT(@A1:A3)", "SQRT(A1:A3)"),
+      ("SUM(SQRT(A1:A3))", "SUM(SQRT(@A1:A3))", "SUM(SQRT(A1:A3))"),
+      (
+        "SUMPRODUCT(A1:A3*B1:B3)",
+        "SUMPRODUCT(A1:A3*B1:B3)",
+        "SUMPRODUCT(A1:A3*B1:B3)",
+      ),
+      ("INDEX(A1:A3,1)", "@INDEX(A1:A3,1)", "INDEX(A1:A3,1)"),
+      (
+        "SUM(OFFSET(A1,0,0,3,1))",
+        "SUM(OFFSET(A1,0,0,3,1))",
+        "SUM(OFFSET(A1,0,0,3,1))",
+      ),
+      ("_xlfn.UNIQUE(A1:A3)", "@UNIQUE(A1:A3)", "UNIQUE(A1:A3)"),
+      (
+        "SUM(_xlfn.UNIQUE(A1:A3))",
+        "SUM(UNIQUE(A1:A3))",
+        "SUM(UNIQUE(A1:A3))",
+      ),
+      ("_xlfn.ANCHORARRAY(A1)", "@A1#", "A1#"),
+      ("SUM(_xlfn.ANCHORARRAY(A1))", "SUM(A1#)", "SUM(A1#)"),
+      ("TYPE(_xlfn.ANCHORARRAY(A1))", "TYPE(A1#)", "TYPE(A1#)"),
+      ("ISREF(_xlfn.ANCHORARRAY(A1))", "ISREF(A1#)", "ISREF(A1#)"),
+      (
+        "_xlfn.SINGLE(A1:A3+B1:B3)",
+        "@(A1:A3+B1:B3)",
+        "@(A1:A3+B1:B3)",
+      ),
+      ("@_xlfn.ANCHORARRAY(A1)", "@A1#", "@A1#"),
+      (
+        "_xlfn.ANCHORARRAY()",
+        "_xlfn.ANCHORARRAY()",
+        "_xlfn.ANCHORARRAY()",
+      ),
+      (
+        "_xlfn.ANCHORARRAY(A1,B1)",
+        "_xlfn.ANCHORARRAY(A1,B1)",
+        "_xlfn.ANCHORARRAY(A1,B1)",
+      ),
+      (
+        "_xlfn.SQRT(A1:A3)",
+        "_xlfn.SQRT(A1:A3)",
+        "_xlfn.SQRT(A1:A3)",
+      ),
+      (r#""A1:A3"&A1"#, r#""A1:A3"&A1"#, r#""A1:A3"&A1"#),
+      ("Many", "@Many", "Many"),
+      ("Constant", "Constant", "Constant"),
+      ("myTable[Column]", "@myTable[Column]", "myTable[Column]"),
+      (
+        "SUM(myTable[Column])",
+        "SUM(myTable[Column])",
+        "SUM(myTable[Column])",
+      ),
+    ] {
+      for kind in [
+        FormulaKind::Normal,
+        FormulaKind::Array,
+        FormulaKind::DynamicArray,
+      ] {
+        let mut book = FormulaEvaluationBookBuilder::new()
+          .with_formula(SheetId(1), CellAddress::default(), source)
+          .with_defined_name(None, "Many", "$B$1:$B$3")
+          .with_defined_name(None, "Constant", "42")
+          .build();
+        book.tables.insert(
+          "MYTABLE".to_string(),
+          FormulaTable {
+            sheet: SheetId(1),
+            name: "myTable".into(),
+            range: CellRange::parse_a1("B1:B4").unwrap(),
+            header_rows: 1,
+            totals_rows: 0,
+            columns: vec!["Column".into()],
+          },
+        );
+        book
+          .formulas
+          .get_mut(&(SheetId(1), CellAddress::default()))
+          .unwrap()
+          .kind = kind;
+        let expected = match kind {
+          FormulaKind::Normal => format!("={scalar}"),
+          FormulaKind::Array => format!("{{={array}}}"),
+          _ => format!("={array}"),
+        };
+        assert_eq!(
+          book.evaluate_formula_text(SheetId(1), None, "FORMULATEXT(A1)"),
+          Some(FormulaValue::String(Cow::Owned(expected))),
+          "{kind:?}: {source}"
+        );
+        assert_eq!(
+          book.formulas[&(SheetId(1), CellAddress::default())].text,
+          source
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn formulatext_distinguishes_imported_dynamic_and_legacy_arrays() {
+    use ooxmlsdk::sdk::SdkType;
+    let worksheet = x::Worksheet::from_bytes(br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">
+      <c r="A1"><f t="array" ref="A1">SUM(D1:D2)</f><v>3</v></c>
+      <c r="B1" cm="2"><f t="array" ref="B1">SUM(D1:D2)</f><v>3</v></c>
+      <c r="C1" cm="1"><f t="array" ref="C1">SUM(D1:D2)</f><v>3</v></c>
+    </row></sheetData></worksheet>"#).unwrap();
+    let identity = WorksheetIdentity {
+      id: SheetId(1),
+      name: "Sheet1".into(),
+      relationship_id: None,
+      visible: true,
+    };
+    let sheet = worksheet_value_model(
+      &identity,
+      Some(&worksheet),
+      &[],
+      &WorkbookMetadata {
+        dynamic_array_cell_metadata: BTreeSet::from([2]),
+      },
+      &WorkbookStyles::default(),
+      &[],
+    )
+    .unwrap();
+    let model = WorkbookValueModel {
+      sheets: vec![sheet],
+      ..Default::default()
+    };
+    let book = FormulaEvaluationBook::from_workbook_value_model(&model);
+    for (column, expected) in [
+      (0, "{=SUM(D1:D2)}"),
+      (1, "=SUM(D1:D2)"),
+      (2, "{=SUM(D1:D2)}"),
+    ] {
+      assert_eq!(
+        book
+          .formula_text(SheetId(1), CellAddress { column, row: 0 })
+          .as_deref(),
+        Some(expected)
+      );
+    }
+    assert_eq!(array_formula_groups(&model.sheets).len(), 3);
+  }
+
+  #[test]
   fn imports_shared_string_cells_as_text_not_indexes() {
     let identity = WorksheetIdentity {
       id: SheetId(1),
@@ -4244,45 +4799,67 @@ mod tests {
       relationship_id: Some(Cow::Borrowed("rId1")),
       visible: true,
     };
-    let worksheet = x::Worksheet {
-      sheet_data: x::SheetData {
-        row: vec![x::Row {
-          row_index: Some(1),
-          cell: vec![x::Cell {
-            cell_reference: Some("B1".to_string()),
-            data_type: Some(x::CellValues::SharedString),
-            cell_value: Some(x::CellValue(x::XstringType {
-              xml_content: Some("0".to_string()),
-              ..x::XstringType::default()
-            })),
-            ..x::Cell::default()
+    for (index_text, expected) in [
+      ("0", " Shared \t"),
+      ("0 ", " Shared \t"),
+      (" 0", " Shared \t"),
+      ("\t0\r\n", " Shared \t"),
+      ("1", ""),
+      ("-1", ""),
+      ("0 0", ""),
+      ("\u{a0}0", ""),
+    ] {
+      let worksheet = x::Worksheet {
+        sheet_data: x::SheetData {
+          row: vec![x::Row {
+            row_index: Some(1),
+            cell: vec![x::Cell {
+              cell_reference: Some("B1".to_string()),
+              data_type: Some(x::CellValues::SharedString),
+              cell_value: Some(x::CellValue(x::XstringType {
+                xml_content: Some(index_text.to_string()),
+                ..x::XstringType::default()
+              })),
+              ..x::Cell::default()
+            }],
+            ..x::Row::default()
           }],
-          ..x::Row::default()
-        }],
-      },
-      ..x::Worksheet::default()
-    };
+        },
+        ..x::Worksheet::default()
+      };
 
-    let sheet = worksheet_value_model(
-      &identity,
-      Some(&worksheet),
-      &["Shared".to_string()],
-      &WorkbookMetadata::default(),
-      &WorkbookStyles::default(),
-      &WorkbookIdentity::default(),
-      &[],
-    )
-    .unwrap();
-    let record = sheet.cells.get(&CellAddress { column: 1, row: 0 }).unwrap();
+      let sheet = worksheet_value_model(
+        &identity,
+        Some(&worksheet),
+        &[" Shared \t".to_string()],
+        &WorkbookMetadata::default(),
+        &WorkbookStyles::default(),
+        &[],
+      )
+      .unwrap();
+      let record = sheet.cells.get(&CellAddress { column: 1, row: 0 }).unwrap();
 
-    assert_eq!(
-      record.raw_value,
-      FormulaValue::String(Cow::Borrowed("Shared"))
-    );
-    assert_eq!(
-      record.display_value.as_ref().unwrap().text,
-      Cow::Borrowed("Shared")
-    );
+      let expected_value = if expected.is_empty() {
+        FormulaValue::Blank
+      } else {
+        FormulaValue::String(Cow::Borrowed(expected))
+      };
+      assert_eq!(record.raw_value, expected_value, "{index_text:?}");
+      assert_eq!(
+        record.display_value.as_ref().unwrap().text,
+        expected,
+        "{index_text:?}"
+      );
+      assert_eq!(
+        worksheet.sheet_data.row[0].cell[0]
+          .cell_value
+          .as_ref()
+          .unwrap()
+          .xml_content
+          .as_deref(),
+        Some(index_text)
+      );
+    }
   }
 
   #[test]
@@ -4318,7 +4895,6 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
-      &WorkbookIdentity::default(),
       &[],
     )
     .unwrap();
@@ -4414,7 +4990,6 @@ mod tests {
         &["a value".to_string(), "another value".to_string()],
         &WorkbookMetadata::default(),
         &WorkbookStyles::default(),
-        &WorkbookIdentity::default(),
         &[],
       )
       .unwrap(),
@@ -4514,7 +5089,6 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
-      &WorkbookIdentity::default(),
       &[],
     )
     .unwrap();
@@ -4993,7 +5567,6 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
-      &WorkbookIdentity::default(),
       &[],
     )
     .unwrap();
@@ -5071,7 +5644,6 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
-      &WorkbookIdentity::default(),
       &[],
     )
     .unwrap();
@@ -5109,6 +5681,162 @@ mod tests {
     assert_eq!(
       formula_value_from_cached_text("East"),
       FormulaValue::String(Cow::Borrowed("East"))
+    );
+  }
+
+  #[test]
+  fn excel_name_formula_references_require_a_sheet_or_bang_qualifier() {
+    for formula in [
+      "A1",
+      "$A$1",
+      "COUNTA($A:$A)",
+      "SUM(OFFSET($B$1,3,0,COUNTA($A:$A)))",
+      "SUM($B$4:$B$8)",
+      "SUM(1:2)",
+      "IF(FALSE,A1,3)",
+      "SUM(Sheet1!A1,A2)",
+      "_xlfn.LAMBDA(_xlpm.x,A1+_xlpm.x)",
+    ] {
+      assert!(
+        parse_formula_text(SheetId(0), formula).has_unqualified_cell_references(),
+        "{formula}"
+      );
+    }
+    for formula in [
+      "Sheet1!$A$1",
+      "!$A$1",
+      "COUNTA(Sheet1!$A:$A)",
+      "SUM(OFFSET(!$B$1,3,0,COUNTA(!$A:$A)))",
+      "SUM(Sheet1!$B$4:$B$8)",
+      "SUM('First:Last'!A1:B2)",
+      "SUM([1]Sheet1!A1:B2)",
+      "2+3",
+      "Cnt*6",
+      "INDIRECT(\"A1\")",
+      "{1,2;3,4}",
+      "_xlfn.LAMBDA(_xlpm.x,_xlpm.x+1)",
+      "SUM(Table1[Values])",
+    ] {
+      assert!(
+        !parse_formula_text(SheetId(0), formula).has_unqualified_cell_references(),
+        "{formula}"
+      );
+    }
+  }
+
+  #[test]
+  fn excel_bang_references_preserve_the_evaluating_sheet_and_print_qualifier() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(0), "Sheet1")
+      .with_sheet(SheetId(1), "Sheet2")
+      .with_cell(
+        SheetId(0),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Number(7.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Number(9.0),
+      )
+      .build();
+    for text in [
+      "SUM(!$A$1)",
+      "SUM(!$A$1:$A$2)",
+      "SUM(!$A:$A)",
+      "SUM(!$1:$1)",
+    ] {
+      let parsed = parse_formula_text(SheetId(0), text);
+      assert!(
+        parsed.unsupported.is_empty(),
+        "{text}: {:?}",
+        parsed.unsupported
+      );
+      let printed = parsed
+        .program
+        .as_ref()
+        .unwrap()
+        .print_formula(&crate::program::FormulaPrintOptions::default())
+        .unwrap();
+      assert!(printed.starts_with("SUM(!"), "{text}: {printed}");
+      let reparsed = parse_formula_text(SheetId(0), &printed);
+      for (sheet, value) in [(SheetId(0), 7.0), (SheetId(1), 9.0)] {
+        assert_eq!(
+          book.evaluate_parsed_formula(sheet, None, &parsed),
+          Some(FormulaValue::Number(value)),
+          "{text}, {sheet:?}"
+        );
+        assert_eq!(
+          book.evaluate_parsed_formula(sheet, None, &reparsed),
+          Some(FormulaValue::Number(value)),
+          "{printed}, {sheet:?}"
+        );
+      }
+    }
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(0), None, "!#REF!"),
+      Some(FormulaValue::Error(FormulaErrorValue::Ref))
+    );
+  }
+
+  #[test]
+  fn workbook_evaluation_discards_only_unqualified_imported_name_formulas() {
+    let name = |label, formula, sheet| DefinedName {
+      name: Cow::Borrowed(label),
+      sheet,
+      formula_text: Cow::Borrowed(formula),
+      parsed_formula: Some(parse_formula_text(SheetId(0), formula)),
+      dependencies: Vec::new(),
+      hidden: false,
+      built_in: None,
+    };
+    let model = WorkbookValueModel {
+      sheets: vec![WorksheetValueModel {
+        id: SheetId(0),
+        name: Cow::Borrowed("Sheet1"),
+        cells: BTreeMap::from([(
+          CellAddress { column: 0, row: 0 },
+          CellValueRecord {
+            raw_value: FormulaValue::Number(7.0),
+            formula: None,
+            display_value: None,
+          },
+        )]),
+      }],
+      defined_names: vec![
+        name("Cnt", "2+3", None),
+        name("Bad", "SUM(A1:A2)", None),
+        name("Cnt", "COUNTA($A:$A)", Some(SheetId(0))),
+        name("X", "Cnt*6", None),
+        name("Qualified", "Sheet1!$A$1", None),
+        name("Relative", "!$A$1", None),
+        name("Literal", "INDIRECT(\"A1\")", None),
+      ],
+      ..WorkbookValueModel::default()
+    };
+    let book = FormulaEvaluationBook::from_workbook_value_model(&model);
+    assert_eq!(model.defined_names.len(), 7, "retain serialized model");
+    assert_eq!(book.defined_names.len(), 5);
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(0), None, "X"),
+      Some(FormulaValue::Number(30.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(0), None, "Bad"),
+      Some(FormulaValue::Error(FormulaErrorValue::Name))
+    );
+    for label in ["Qualified", "Relative", "Literal"] {
+      assert!(book.defined_name_formula(Some(SheetId(0)), label).is_some());
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(0), None, &format!("SUM({label})")),
+        Some(FormulaValue::Number(7.0)),
+        "{label}"
+      );
+    }
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(0), None, "SUM(A1)"),
+      Some(FormulaValue::Number(7.0)),
+      "ordinary cell formulas retain unqualified references"
     );
   }
 
@@ -5515,6 +6243,85 @@ mod tests {
   }
 
   #[test]
+  fn excel_array_operators_keep_unmatched_elements_as_na() {
+    let number = FormulaValue::Number;
+    let na = FormulaValue::Error(FormulaErrorValue::NA);
+    for (source, expected) in [
+      (
+        "{1;2;3;4}*{1;2;3}",
+        vec![
+          vec![number(1.0)],
+          vec![number(4.0)],
+          vec![number(9.0)],
+          vec![na.clone()],
+        ],
+      ),
+      (
+        "{1;2;3}*{1;2;3;4}",
+        vec![
+          vec![number(1.0)],
+          vec![number(4.0)],
+          vec![number(9.0)],
+          vec![na.clone()],
+        ],
+      ),
+      (
+        "{1,2,3}/{1,0}",
+        vec![vec![
+          number(1.0),
+          FormulaValue::Error(FormulaErrorValue::Div0),
+          na.clone(),
+        ]],
+      ),
+      (
+        "{1,2}+{10;20;30}",
+        vec![
+          vec![number(11.0), number(12.0)],
+          vec![number(21.0), number(22.0)],
+          vec![number(31.0), number(32.0)],
+        ],
+      ),
+      (
+        "{1,2;3,4}+{10,20,30;40,50,60}",
+        vec![
+          vec![number(11.0), number(22.0), na.clone()],
+          vec![number(43.0), number(54.0), na.clone()],
+        ],
+      ),
+      (
+        "{1,2}={1,3,4}",
+        vec![vec![
+          FormulaValue::Boolean(true),
+          FormulaValue::Boolean(false),
+          na.clone(),
+        ]],
+      ),
+      (
+        r#"{1,2}&{"a","b","c"}"#,
+        vec![vec![
+          FormulaValue::String("1a".into()),
+          FormulaValue::String("2b".into()),
+          na,
+        ]],
+      ),
+    ] {
+      for grammar in [FormulaGrammar::ExcelA1, FormulaGrammar::ExcelR1C1] {
+        let parsed = parse_formula(SheetId(1), Cow::Borrowed(source), grammar);
+        assert_eq!(
+          FormulaEvaluationBook::default().evaluate_parsed_formula_raw(
+            SheetId(1),
+            None,
+            &parsed,
+            true
+          ),
+          Some(FormulaValue::Matrix(expected.clone())),
+          "{grammar:?}: {source}",
+        );
+      }
+    }
+  }
+
+  #[test]
   fn evaluator_ceiling_broadcasts_array_arguments_like_libreoffice() {
     let book = FormulaEvaluationBook {
       cells: BTreeMap::from([
@@ -5814,6 +6621,372 @@ mod tests {
       ),
       Some(FormulaValue::Number(0.75))
     );
+  }
+
+  #[test]
+  fn unavailable_excel_functions_return_name_errors_without_evaluating_arguments() {
+    let book = FormulaEvaluationBook::default();
+    for (formula, expected) in [
+      ("missingUdf()", FormulaValue::Error(FormulaErrorValue::Name)),
+      (
+        "missingUdf(1/0)",
+        FormulaValue::Error(FormulaErrorValue::Name),
+      ),
+      (
+        "SUM(missingUdf(),1)",
+        FormulaValue::Error(FormulaErrorValue::Name),
+      ),
+      ("IFERROR(missingUdf(),9)", FormulaValue::Number(9.0)),
+      ("IF(FALSE,missingUdf(),7)", FormulaValue::Number(7.0)),
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, formula),
+        Some(expected),
+        "{formula}"
+      );
+    }
+  }
+
+  #[test]
+  fn unsupported_excel_builtins_remain_unevaluated() {
+    let book = FormulaEvaluationBook {
+      defined_names: BTreeMap::from([(
+        DefinedNameKey {
+          sheet: None,
+          name_upper: "NAMEDFUNCTION".into(),
+        },
+        Cow::Borrowed("_xlfn.LAMBDA(x,x+1)"),
+      )]),
+      ..FormulaEvaluationBook::default()
+    };
+    for formula in [
+      "CUBEVALUE(\"connection\",\"measure\")",
+      "GET.CELL(1,A1)",
+      "_xlfn.NEWFUTUREFUNCTION(1)",
+      "IFERROR(CUBEVALUE(\"connection\",\"measure\"),0)",
+      "SUM(IFERROR(_xlfn.MAP({1,0,2},_xlfn.LAMBDA(x,1/x)),0))",
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, formula),
+        None,
+        "{formula}"
+      );
+    }
+    for grammar in [FormulaGrammar::CalcA1, FormulaGrammar::OpenFormula] {
+      assert_eq!(
+        book.evaluate_formula_text_with_grammar(SheetId(1), None, "missingUdf()", grammar),
+        None
+      );
+    }
+  }
+
+  #[test]
+  fn excel_lambda_calls_capture_scope_and_keep_function_names_distinct() {
+    let mut builder = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(1), "Data")
+      .with_defined_name(None, "PLUS2", "_xlfn.LAMBDA(_xlpm.x,_xlpm.x+2)")
+      .with_defined_name(None, "SUM", "_xlfn.LAMBDA(_xlpm.x,_xlpm.x+10)")
+      .with_defined_name(
+        None,
+        "APPLYTWICE",
+        "_xlfn.LAMBDA(_xlpm.f,_xlpm.x,_xlpm.f(_xlpm.f(_xlpm.x)))",
+      );
+    for row in 0..4 {
+      builder = builder.with_cell(
+        SheetId(1),
+        CellAddress { column: 5, row },
+        FormulaValue::Number(10.0 * (row + 1) as f64),
+      );
+    }
+    let book = builder.build();
+    for (formula, expected) in [
+      ("LAMBDA(x,2)(1)", 2.0),
+      ("LAMBDA(x,x)(F1)", 10.0),
+      ("LAMBDA(x,IF(x>0,x,-x))(-5)", 5.0),
+      ("LAMBDA(SQRT,SQRT(SQRT))(4)", 2.0),
+      ("LAMBDA(a,b,c,a+b+c)(,,)", 0.0),
+      ("LAMBDA(x,LAMBDA(y,x+y))(3)(4)", 7.0),
+      ("LET(f,LAMBDA(x,x*x),f(4))", 16.0),
+      ("SUM(LAMBDA(a,a*2)(F1:F4))", 200.0),
+      ("SUM(LAMBDA(a,a*2)({10;11;20}))", 82.0),
+      (
+        "LET(g,LAMBDA(self,n,IF(n<=1,1,n*self(self,n-1))),g(g,5))",
+        120.0,
+      ),
+      ("PLUS2(5)", 7.0),
+      ("SUM(4)", 4.0),
+      ("LAMBDA(x,f,f(x))(100,SUM)", 110.0),
+      ("LAMBDA(f,n,f(n))(PLUS2,1)", 3.0),
+      ("LAMBDA(f,n,f(n))(_xleta.COUNT,{1,2,3,4})", 4.0),
+      ("LAMBDA(f,f(5))(LAMBDA(x,x*2))", 10.0),
+      ("APPLYTWICE(LAMBDA(x,x*2),8)", 32.0),
+      ("LAMBDA(x,x+$F$1)(5)", 15.0),
+      ("LAMBDA(a,LAMBDA(b,LAMBDA(c,a+b+c)))(3)(30)(300)", 333.0),
+      ("LET(x,2,f,LAMBDA(y,x+y),LET(x,10,f(3)))", 5.0),
+      ("IF(TRUE,LAMBDA(x,x+1),LAMBDA(x,x+2))(4)", 5.0),
+      ("IF(F1,LAMBDA(x,x+1),LAMBDA(x,x+2))(4)", 5.0),
+      ("LAMBDA(x,IF(F1,LAMBDA(y,x+y),LAMBDA(y,0)))(3)(4)", 7.0),
+      ("LAMBDA(x,x)(3)^2+1", 10.0),
+      ("-LAMBDA(x,x)(3)^2", 9.0),
+    ] {
+      let parsed = parse_formula(SheetId(1), Cow::Borrowed(formula), FormulaGrammar::ExcelA1);
+      assert!(
+        parsed.unsupported.is_empty(),
+        "{formula}: {:?}",
+        parsed.unsupported
+      );
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, formula),
+        Some(FormulaValue::Number(expected)),
+        "{formula}"
+      );
+    }
+  }
+
+  #[test]
+  fn excel_callable_expressions_keep_grouping_when_printed() {
+    for formula in [
+      "LAMBDA(x,LAMBDA(y,x+y))(3)(4)",
+      "(-LAMBDA(x,x))(2)",
+      "(LAMBDA(x,x)+1)(2)",
+      "IF(TRUE,LAMBDA(x,x+1),LAMBDA(x,x+2))(4)",
+      "_xlfn.LAMBDA(_xlpm.x,_xlpm.x)(1)",
+    ] {
+      let parsed = parse_formula(SheetId(1), Cow::Borrowed(formula), FormulaGrammar::ExcelA1);
+      assert!(parsed.unsupported.is_empty());
+      let printed = parsed
+        .program
+        .unwrap()
+        .print_formula(&crate::program::FormulaPrintOptions::default())
+        .unwrap();
+      assert_eq!(printed, formula);
+      let reparsed = parse_formula(SheetId(1), Cow::Owned(printed), FormulaGrammar::ExcelA1);
+      assert!(reparsed.unsupported.is_empty());
+    }
+  }
+
+  #[test]
+  fn excel_lambda_missing_arguments_and_errors_follow_the_call_boundary() {
+    let book = FormulaEvaluationBook::default();
+    for (formula, expected) in [
+      ("LAMBDA(x,y,ISOMITTED(x))(,5)", FormulaValue::Boolean(true)),
+      (
+        "LAMBDA(x,y,ISOMITTED(x))(3,5)",
+        FormulaValue::Boolean(false),
+      ),
+      ("LAMBDA(x,ISOMITTED(x))(A1)", FormulaValue::Boolean(false)),
+      (
+        "LAMBDA(x,y,IF(ISOMITTED(x),99,x)+y)(,5)",
+        FormulaValue::Number(104.0),
+      ),
+      (
+        "LAMBDA(_xlpm.x,_xlop.y,_xlop.z,_xlpm.x+_xlpm.y+_xlpm.z)(7)",
+        FormulaValue::Number(7.0),
+      ),
+      (
+        "LAMBDA(_xlop.x,IF(ISOMITTED(_xlpm.x),12,5))()",
+        FormulaValue::Number(12.0),
+      ),
+      (
+        "LAMBDA(_xlop.x,IF(ISOMITTED(_xlpm.x),12,5))(1)",
+        FormulaValue::Number(5.0),
+      ),
+      (
+        "LAMBDA(x,y,x+y)(1)",
+        FormulaValue::Error(FormulaErrorValue::Value),
+      ),
+      (
+        "LAMBDA(x,x)(1,2)",
+        FormulaValue::Error(FormulaErrorValue::Value),
+      ),
+      ("ERROR.TYPE(LAMBDA(x,1/x)(0))", FormulaValue::Number(2.0)),
+      ("ERROR.TYPE(LAMBDA(x,y,x+y)(1))", FormulaValue::Number(3.0)),
+      ("LAMBDA(x,x)", FormulaValue::Error(FormulaErrorValue::Calc)),
+      (
+        "LET(f,LAMBDA(self,self(self)),f(f))",
+        FormulaValue::Error(FormulaErrorValue::Num),
+      ),
+      (
+        "LAMBDA(a,a&\"!\")(\"hi\")",
+        FormulaValue::String(Cow::Borrowed("hi!")),
+      ),
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, formula),
+        Some(expected),
+        "{formula}"
+      );
+    }
+  }
+
+  #[test]
+  fn evaluator_accepts_backslash_and_question_mark_in_defined_names() {
+    for name in [r"\rate", r"rate\suffix", "rate?", r"\rate.2?"] {
+      let book = FormulaEvaluationBook {
+        defined_names: BTreeMap::from([(
+          DefinedNameKey {
+            sheet: None,
+            name_upper: name.to_ascii_uppercase(),
+          },
+          Cow::Borrowed("7"),
+        )]),
+        ..FormulaEvaluationBook::default()
+      };
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, &format!("SUM({name},3)*2")),
+        Some(FormulaValue::Number(20.0)),
+        "{name}"
+      );
+    }
+  }
+
+  #[test]
+  fn evaluator_resolves_qualified_local_names_and_current_workbook_names() {
+    // POI 56737.xlsx: Defines!NR_To_A1 is a local name, while
+    // [0]!NR_Global_B2 refers to the current workbook's global name.
+    let mut book = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(7), "Defines")
+      .with_sheet(SheetId(3), "Uses")
+      .with_sheet(SheetId(9), "Q'1 !")
+      .with_cell(
+        SheetId(7),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Number(41.0),
+      )
+      .with_cell(
+        SheetId(7),
+        CellAddress { column: 1, row: 1 },
+        FormulaValue::Number(142.0),
+      )
+      .with_cell(
+        SheetId(3),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Number(5.0),
+      )
+      .with_defined_name(Some(SheetId(7)), "NR_To_A1", "Defines!$A$1")
+      .with_defined_name(Some(SheetId(7)), "LocalCalculation", "A1+1")
+      .with_defined_name(Some(SheetId(3)), "NR_To_A1", "Uses!$A$1")
+      .with_defined_name(Some(SheetId(9)), "NR_To_A1", "77")
+      .with_defined_name(None, "NR_Global_B2", "Defines!$B$2")
+      .with_defined_name(Some(SheetId(3)), "NR_Global_B2", "900")
+      .with_defined_name(None, "ROW", "17")
+      .with_defined_array(
+        Some(SheetId(7)),
+        "NamedArray",
+        vec![vec![FormulaValue::Number(3.0), FormulaValue::Number(4.0)]],
+      )
+      .build();
+    book
+      .external_defined_names
+      .insert((1, None, "NR_GLOBAL_B2".into()), Cow::Borrowed("73"));
+    for (formula, expected) in [
+      ("Defines!NR_To_A1", 41.0),
+      ("Defines!LocalCalculation", 42.0),
+      ("'Defines'!NR_To_A1", 41.0),
+      ("'Q''1 !'!NR_To_A1", 77.0),
+      ("NR_To_A1", 5.0),
+      ("SUM(Defines!NamedArray)", 7.0),
+      ("NR_Global_B2", 900.0),
+      ("[0]!NR_Global_B2", 142.0),
+      ("[1]!NR_Global_B2", 73.0),
+      ("[0]!ROW", 17.0),
+      ("[0]Defines!NR_To_A1", 41.0),
+      ("'[0]Defines'!B2", 142.0),
+      ("SUM([0]Defines!A1:B2)", 183.0),
+      ("IF(Defines!B2=142,[0]!NR_Global_B2,-1)", 142.0),
+      ("IF(FALSE,[0]!NoSuchName,-1)", -1.0),
+      ("IFERROR([0]!NoSuchName,99)", 99.0),
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(3), None, formula),
+        Some(FormulaValue::Number(expected)),
+        "{formula}"
+      );
+    }
+  }
+
+  #[test]
+  fn evaluator_resolves_implicit_table_reference_in_owning_sheet() {
+    // TableColumnStyles-output.xlsx has no header, two Price values (5, 7),
+    // and SUBTOTAL(109,[Price]) in its totals row. Office prints 12.
+    let mut builder = FormulaEvaluationBookBuilder::new();
+    for (sheet, name, column, values) in [
+      (SheetId(1), "Table1", 2, [5.0, 7.0]),
+      (SheetId(2), "OtherSheet", 2, [40.0, 60.0]),
+      (SheetId(1), "Neighbor", 6, [1000.0, 2000.0]),
+    ] {
+      builder = builder.with_table(FormulaTable {
+        sheet,
+        name: Cow::Borrowed(name),
+        range: CellRange::new(
+          CellAddress {
+            column: column - 1,
+            row: 2,
+          },
+          CellAddress { column, row: 4 },
+        ),
+        header_rows: 0,
+        totals_rows: 1,
+        columns: vec![Cow::Borrowed("Name"), Cow::Borrowed("Price")],
+      });
+      for (offset, value) in values.into_iter().enumerate() {
+        builder = builder.with_cell(
+          sheet,
+          CellAddress {
+            column,
+            row: 2 + offset as u32,
+          },
+          FormulaValue::Number(value),
+        );
+      }
+      builder = builder.with_cell(
+        sheet,
+        CellAddress { column, row: 4 },
+        FormulaValue::Number(999.0),
+      );
+    }
+    let book = builder.build();
+    for (sheet, column, expected) in [
+      (SheetId(1), 2, 12.0),
+      (SheetId(2), 2, 100.0),
+      (SheetId(1), 6, 3000.0),
+    ] {
+      for formula in [
+        "SUBTOTAL(109,[Price])",
+        "SUM([])",
+        "SUM([[#Data],[Price]])",
+        "SUM([[Price]:[Price]])",
+      ] {
+        assert_eq!(
+          book.evaluate_formula_text(sheet, Some(CellAddress { column, row: 4 }), formula),
+          Some(FormulaValue::Number(expected)),
+          "{formula}, {sheet:?}, column={column}"
+        );
+      }
+    }
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 2, row: 2 }),
+        "SUM([[#This Row],[Price]])"
+      ),
+      Some(FormulaValue::Number(5.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(2), None, "SUM(Table1[Price])"),
+      Some(FormulaValue::Number(12.0))
+    );
+    for (sheet, address) in [
+      (SheetId(1), None),
+      (SheetId(1), Some(CellAddress { column: 0, row: 0 })),
+      (SheetId(3), Some(CellAddress { column: 2, row: 4 })),
+    ] {
+      assert!(
+        book
+          .evaluate_formula_text(sheet, address, "SUM([Price])")
+          .is_none_or(|value| matches!(value, FormulaValue::Error(_)))
+      );
+    }
   }
 
   #[test]
@@ -6508,7 +7681,13 @@ mod tests {
       Some(FormulaValue::Number(5.0))
     );
     assert_eq!(
-      book.evaluate_formula_text(SheetId(1), None, "FLOOR(7.9,,5)"),
+      // The optional third argument belongs to ODFF, not Excel FLOOR.
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "FLOOR(7.9,,5)",
+        FormulaGrammar::CalcA1,
+      ),
       Some(FormulaValue::Number(7.0))
     );
     assert!(matches!(
@@ -6585,6 +7764,86 @@ mod tests {
   }
 
   #[test]
+  fn evaluation_book_rejects_invalid_excel_named_array_constants() {
+    for source in [
+      "{}", "{1,,3}", "{,1}", "{1,}", "{1;;3}", "{1,2;3}", "{1,A1}", "{1,1+1}", "{1,{2}}",
+    ] {
+      let book = FormulaEvaluationBook {
+        defined_names: BTreeMap::from([(
+          DefinedNameKey {
+            sheet: None,
+            name_upper: "VALUES".to_string(),
+          },
+          Cow::Borrowed(source),
+        )]),
+        ..FormulaEvaluationBook::default()
+      };
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, "VALUES"),
+        Some(FormulaValue::Error(FormulaErrorValue::Name)),
+        "{source}"
+      );
+    }
+    let book = FormulaEvaluationBook::default();
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "SUM({1,2})+SUM({3,4})"),
+      Some(FormulaValue::Number(10.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, r#"{1,"","2","a,b;c","a""b"}"#),
+      Some(FormulaValue::Matrix(vec![vec![
+        FormulaValue::Number(1.0),
+        FormulaValue::String(Cow::Borrowed("")),
+        FormulaValue::String(Cow::Borrowed("2")),
+        FormulaValue::String(Cow::Borrowed("a,b;c")),
+        FormulaValue::String(Cow::Borrowed("a\"b")),
+      ]]))
+    );
+  }
+
+  #[test]
+  fn missing_array_items_remain_available_to_calc_grammars() {
+    for grammar in [FormulaGrammar::CalcA1, FormulaGrammar::OpenFormula] {
+      let program = FormulaProgram::from_source(FormulaSource {
+        text: "{1,,3}",
+        context: FormulaCompileContext {
+          grammar,
+          ..Default::default()
+        },
+      });
+      assert!(program.root.is_some(), "{grammar:?}");
+    }
+  }
+
+  #[test]
+  fn evaluation_book_preserves_named_array_shapes() {
+    let rows = vec![vec![FormulaValue::Number(1.0), FormulaValue::Number(3.0)]];
+    for name in ["numbers", "empty_array"] {
+      let book = FormulaEvaluationBook {
+        defined_arrays: BTreeMap::from([(
+          DefinedNameKey {
+            sheet: None,
+            name_upper: name.to_ascii_uppercase(),
+          },
+          rows.clone(),
+        )]),
+        ..FormulaEvaluationBook::default()
+      };
+      let parsed = parse_formula_text(SheetId(1), Cow::Borrowed(name));
+      assert_eq!(
+        book.evaluate_parsed_formula_raw(SheetId(1), None, &parsed, true),
+        Some(FormulaValue::Matrix(rows.clone())),
+        "{name}"
+      );
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, name),
+        Some(FormulaValue::Matrix(rows.clone())),
+        "{name}"
+      );
+    }
+  }
+
+  #[test]
   fn evaluation_book_evaluates_pdf_special_formula_paths() {
     let book = FormulaEvaluationBook {
       source_file_name: Some(Cow::Borrowed("book.xlsx")),
@@ -6606,13 +7865,6 @@ mod tests {
           FormulaValue::Number(4.0),
         ),
       ]),
-      defined_arrays: BTreeMap::from([(
-        DefinedNameKey {
-          sheet: None,
-          name_upper: "EMPTY_ARRAY".to_string(),
-        },
-        vec![vec![FormulaValue::Number(9.0)]],
-      )]),
       ..FormulaEvaluationBook::default()
     };
 
@@ -6633,10 +7885,6 @@ mod tests {
         "CELL(\"type\")"
       ),
       Some(FormulaValue::String(Cow::Borrowed("l")))
-    );
-    assert_eq!(
-      book.evaluate_formula_text(SheetId(1), None, "empty_array"),
-      Some(FormulaValue::Number(9.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "INDIRECT(\"A1:B2\")INDIRECT(\"B1:B2\")"),
@@ -7280,6 +8528,15 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "TYPE(TRUE())"),
+      Some(FormulaValue::Number(4.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=TYPE(TRUE())",
+        FormulaGrammar::OpenFormula,
+      ),
       Some(FormulaValue::Number(1.0))
     );
     assert_eq!(
@@ -8411,6 +9668,190 @@ mod tests {
   }
 
   #[test]
+  fn evaluation_book_excel_3d_reference_quote_forms() {
+    for (first, last) in [
+      ("First", "Last"),
+      ("First Sheet", "Last Sheet"),
+      ("Q'1", "End!"),
+    ] {
+      let book = FormulaEvaluationBookBuilder::new()
+        .with_sheet(SheetId(7), first)
+        .with_sheet(SheetId(3), "Middle")
+        .with_sheet(SheetId(9), last)
+        .with_cell(
+          SheetId(7),
+          CellAddress { column: 0, row: 0 },
+          FormulaValue::Number(1.0),
+        )
+        .with_cell(
+          SheetId(3),
+          CellAddress { column: 0, row: 0 },
+          FormulaValue::Number(20.0),
+        )
+        .with_cell(
+          SheetId(9),
+          CellAddress { column: 0, row: 0 },
+          FormulaValue::Number(300.0),
+        )
+        .build();
+      let first = first.replace('\'', "''");
+      let last = last.replace('\'', "''");
+      for formula in [
+        format!("SUM('{first}:{last}'!A1)"),
+        format!("SUM('{last}:{first}'!A1:A2)"),
+      ] {
+        assert_eq!(
+          book.evaluate_formula_text(SheetId(7), None, &formula),
+          Some(FormulaValue::Number(321.0)),
+          "{formula}"
+        );
+      }
+      for formula in [
+        format!("SUM('{first}'!A1:'{first}'!A2)"),
+        format!("SUM(A1:'{first}'!A2)"),
+      ] {
+        assert_eq!(
+          book.evaluate_formula_text(SheetId(7), None, &formula),
+          Some(FormulaValue::Number(1.0)),
+          "{formula}"
+        );
+      }
+      let invalid = format!("SUM('{first}':'{last}'!A1)");
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(7), None, &invalid),
+        Some(FormulaValue::Error(FormulaErrorValue::Name)),
+        "{invalid}"
+      );
+      assert_eq!(
+        book.evaluate_formula_text_with_grammar(SheetId(7), None, &invalid, FormulaGrammar::CalcA1),
+        Some(FormulaValue::Number(321.0)),
+        "CalcA1 {invalid}"
+      );
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(7), None, &format!("IFERROR({invalid},5)")),
+        Some(FormulaValue::Number(5.0))
+      );
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(7), None, &format!("'{first}'!A1")),
+        Some(FormulaValue::Number(1.0))
+      );
+    }
+  }
+
+  #[test]
+  fn evaluation_book_excel_ceiling_floor_rejects_odff_argument_counts() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Error(FormulaErrorValue::Div0),
+      )
+      .build();
+    // POI bug67784.xlsx: FLOOR(beta,1,2) retains #NAME? and
+    // FLOOR(1.2,1,2) is #VALUE!, not ODFF's three-argument FLOOR.
+    for name in ["FLOOR", "CEILING"] {
+      for (arguments, expected) in [
+        ("beta,1,2", FormulaErrorValue::Name),
+        ("1.2,1,2", FormulaErrorValue::Value),
+        ("1.2", FormulaErrorValue::Value),
+        ("", FormulaErrorValue::Value),
+        ("1,1,1,1", FormulaErrorValue::Value),
+        ("#NUM!,1,2", FormulaErrorValue::Num),
+        ("1,#DIV/0!,2", FormulaErrorValue::Div0),
+        ("1,1,#REF!", FormulaErrorValue::Ref),
+      ] {
+        let formula = format!("{name}({arguments})");
+        for grammar in [FormulaGrammar::ExcelA1, FormulaGrammar::ExcelR1C1] {
+          assert_eq!(
+            book.evaluate_formula_text_with_grammar(SheetId(1), None, &formula, grammar),
+            Some(FormulaValue::Error(expected)),
+            "{formula}, {grammar:?}"
+          );
+        }
+      }
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, &format!("{name}(1,A1,2)")),
+        Some(FormulaValue::Error(FormulaErrorValue::Div0))
+      );
+      let rounded = if name == "FLOOR" { 1.0 } else { 2.0 };
+      for formula in [format!("{name}(1.2)"), format!("{name}(1.2,1,2)")] {
+        for grammar in [FormulaGrammar::CalcA1, FormulaGrammar::OpenFormula] {
+          let formula = if grammar == FormulaGrammar::OpenFormula {
+            formula.replace(',', ";")
+          } else {
+            formula.clone()
+          };
+          assert_eq!(
+            book.evaluate_formula_text_with_grammar(SheetId(1), None, &formula, grammar),
+            Some(FormulaValue::Number(rounded)),
+            "{formula}, {grammar:?}"
+          );
+        }
+      }
+      for (formula, expected) in [
+        (format!("{name}(1.2,1)"), rounded),
+        (format!("IFERROR({name}(1.2,1,2),7)"), 7.0),
+        (format!("IF(FALSE,{name}(beta,1,2),9)"), 9.0),
+      ] {
+        assert_eq!(
+          book.evaluate_formula_text(SheetId(1), None, &formula),
+          Some(FormulaValue::Number(expected)),
+          "{formula}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn evaluation_book_offset_accepts_negative_dimensions() {
+    // Office tdf124816.xlsx extends OFFSET backwards for negative sizes.
+    let mut builder = FormulaEvaluationBookBuilder::new();
+    for row in 0..3 {
+      for column in 0..3 {
+        builder = builder.with_cell(
+          SheetId(1),
+          CellAddress { column, row },
+          FormulaValue::Number(f64::from(row * 3 + column + 1)),
+        );
+      }
+    }
+    let book = builder.build();
+    for (formula, expected) in [
+      ("SUM(OFFSET(A1,0,0,2,2))", 12.0),
+      ("SUM(OFFSET(A2,0,0,-2,2))", 12.0),
+      ("SUM(OFFSET(B1,0,0,2,-2))", 12.0),
+      ("SUM(OFFSET(B2,0,0,-2,-2))", 12.0),
+      ("SUM(OFFSET(C3,-1,-1,-2,-2))", 12.0),
+      ("SUM(OFFSET(B2,0,0,-1,-1))", 5.0),
+      ("SUM(OFFSET(B2:C3,0,0,-2))", 16.0),
+      ("SUM(OFFSET(B2:C3,0,0,,-2))", 24.0),
+      ("SUM(OFFSET(C3,{-1;0},-1,-2,-2))", 36.0),
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, formula),
+        Some(FormulaValue::Number(expected)),
+        "{formula}"
+      );
+    }
+    for formula in [
+      "OFFSET(A1,0,0,-2)",
+      "OFFSET(A1,0,0,1,-2)",
+      "OFFSET(A1,0,0,0)",
+      "OFFSET(A1,0,0,1,0)",
+      "OFFSET(A1,1E20,0)",
+      "OFFSET(A1,0,0,-1E20)",
+    ] {
+      assert!(
+        matches!(
+          book.evaluate_formula_text(SheetId(1), None, formula),
+          Some(FormulaValue::Error(_))
+        ),
+        "{formula}"
+      );
+    }
+  }
+
+  #[test]
   fn evaluation_book_offset_scalarizes_reference_arguments_like_excel() {
     let book = FormulaEvaluationBookBuilder::new()
       .with_cell(
@@ -8614,6 +10055,161 @@ mod tests {
   }
 
   #[test]
+  fn excel_database_functions_validate_fields_and_preserve_argument_errors() {
+    let book = database_field_test_book();
+    for (formula, expected) in [
+      ("DCOUNT(A1:C7,1,A13:C14)", FormulaValue::Number(0.0)),
+      ("DCOUNT(A1:C7,2,A13:C14)", FormulaValue::Number(4.0)),
+      ("DCOUNTA(A1:C7,1,A13:C14)", FormulaValue::Number(4.0)),
+      ("DCOUNT(A1:C7,,A13:C14)", FormulaValue::Number(4.0)),
+      ("DCOUNTA(A1:C7,,A13:C14)", FormulaValue::Number(4.0)),
+      ("DCOUNT(A1:C7,1.9,A13:C14)", FormulaValue::Number(0.0)),
+      ("DCOUNT(A1:C7,TRUE,A13:C14)", FormulaValue::Number(0.0)),
+      ("DCOUNT(A1:C7,\"age\",A13:C14)", FormulaValue::Number(4.0)),
+      (
+        "DCOUNT(INDEX(A1:C7,NA(),0),#DIV/0!,A13:C14)",
+        FormulaValue::Error(FormulaErrorValue::NA),
+      ),
+      (
+        "DCOUNT(INDEX(A1:C7,NA(),0),0,A13:C14)",
+        FormulaValue::Error(FormulaErrorValue::NA),
+      ),
+      (
+        "DCOUNT(A1:C7,#DIV/0!,#REF!)",
+        FormulaValue::Error(FormulaErrorValue::Div0),
+      ),
+      (
+        "DCOUNT(A1:C7,2,#REF!)",
+        FormulaValue::Error(FormulaErrorValue::Ref),
+      ),
+      (
+        "DCOUNT(database1,0,#REF!)",
+        FormulaValue::Error(FormulaErrorValue::Name),
+      ),
+      (
+        "DCOUNT(A1:C7,2,NA())",
+        FormulaValue::Error(FormulaErrorValue::NA),
+      ),
+      ("DCOUNT(A1:C2,2,A13:C14)", FormulaValue::Number(0.0)),
+      (
+        "DGET(A1:C7,2,A13:C14)",
+        FormulaValue::Error(FormulaErrorValue::Num),
+      ),
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, formula),
+        Some(expected),
+        "{formula}"
+      );
+    }
+    for formula in [
+      "DCOUNT(A1:C7,0,A13:C14)",
+      "DCOUNTA(A1:C7,0,A13:C14)",
+      "DCOUNT(A1:C7,0.5,A13:C14)",
+      "DCOUNT(A1:C7,-0.5,A13:C14)",
+      "DCOUNT(A1:C7,4,A13:C14)",
+      "DCOUNT(A1:C7,FALSE,A13:C14)",
+      "DCOUNT(A1:C7,\"\",A13:C14)",
+      "DCOUNT(A1:C7,\"2\",A13:C14)",
+      "DCOUNT(A1:C7,\" age \",A13:C14)",
+      "DCOUNT(A1:C7,A11,A13:C14)",
+      "DCOUNT(A1:C7,A14,A13:C14)",
+      "DCOUNTA(A1:C7,A14,A13:C14)",
+      "DCOUNT(A1:C7,2,0)",
+      "DCOUNT(A1:C7,2,\"bad\")",
+      "DCOUNT(A1:C7,2,)",
+      "DCOUNT(A1:C7,2,{\"Age\";\">2\"})",
+      "DCOUNT(A2,1,A13:C14)",
+      "DCOUNT(A1:C1,2,A13:C14)",
+      "DCOUNT(A1:C7,2,A13:C13)",
+      "DSUM(A1:C7,,A13:C14)",
+      "DAVERAGE(A1:C7,,A13:C14)",
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, formula),
+        Some(FormulaValue::Error(FormulaErrorValue::Value)),
+        "{formula}"
+      );
+    }
+    for function in [
+      "DCOUNT", "DCOUNTA", "DSUM", "DAVERAGE", "DGET", "DMAX", "DMIN", "DPRODUCT", "DVAR", "DVARP",
+      "DSTDEV", "DSTDEVP",
+    ] {
+      let formula = format!("{function}(database1,2,A13:C14)");
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, &formula),
+        Some(FormulaValue::Error(FormulaErrorValue::Name)),
+        "{formula}"
+      );
+    }
+  }
+
+  #[test]
+  fn calc_database_field_zero_keeps_its_record_count_semantics() {
+    let book = database_field_test_book();
+    for (grammar, formula) in [
+      (FormulaGrammar::CalcA1, "DCOUNT(A1:C7;0;A13:C14)"),
+      (
+        FormulaGrammar::OpenFormula,
+        "of:=DCOUNT([.A1:.C7];0;[.A13:.C14])",
+      ),
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text_with_grammar(SheetId(1), None, formula, grammar),
+        Some(FormulaValue::Number(4.0)),
+        "{formula}"
+      );
+    }
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "DCOUNT(database1;2;A13:C14)",
+        FormulaGrammar::CalcA1
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+    );
+  }
+
+  fn database_field_test_book() -> FormulaEvaluationBook<'static> {
+    let mut builder = FormulaEvaluationBookBuilder::new().with_sheet(SheetId(1), "Sheet1");
+    for (column, name) in ["Name", "Age", "Children"].into_iter().enumerate() {
+      for row in [0, 12] {
+        builder = builder.with_cell(
+          SheetId(1),
+          CellAddress {
+            column: column as u32,
+            row,
+          },
+          FormulaValue::String(Cow::Borrowed(name)),
+        );
+      }
+    }
+    for (index, children) in [2.0, 3.0, 1.0, 0.0, 2.0, 2.0].into_iter().enumerate() {
+      let row = index as u32 + 1;
+      for (column, value) in [
+        (0, FormulaValue::String(Cow::Owned(format!("name{row}")))),
+        (1, FormulaValue::Number(f64::from(row))),
+        (2, FormulaValue::Number(children)),
+      ] {
+        builder = builder.with_cell(SheetId(1), CellAddress { column, row }, value);
+      }
+    }
+    builder
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 13 },
+        FormulaValue::String(Cow::Borrowed(">2")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 10 },
+        FormulaValue::Error(FormulaErrorValue::NA),
+      )
+      .build()
+  }
+
+  #[test]
   fn evaluation_book_dsum_parses_decimal_comma_criteria_like_libreoffice() {
     // Decimal-comma criteria such as ">,005" and "<=0,01" should parse as
     // numbers in database criteria cells.
@@ -8684,6 +10280,111 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "DSUM(A1:B4,\"Bal Now\",D1:E2)"),
       Some(FormulaValue::Number(14.0))
     );
+  }
+
+  #[test]
+  fn evaluation_book_external_range_does_not_resolve_as_local_cells() {
+    // POI link-external-workbook-b.xlsx has an unavailable external SUM
+    // and a cache of 30. Returning a spurious local zero hides the missing
+    // link from the layout importer, which must display Office's #REF!.
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(1), "Sheet0")
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Number(30.0),
+      )
+      .with_external_cached_cell(
+        1,
+        "Q'1",
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Number(5.0),
+      )
+      .with_external_cached_cell(
+        1,
+        "Q'1",
+        CellAddress { column: 1, row: 0 },
+        FormulaValue::Number(7.0),
+      )
+      .build();
+    let formula = "SUM('[link-external-workbook-a.xlsx]Sheet0'!A1:B1)";
+    let parsed = parse_formula_text(SheetId(1), Cow::Borrowed(formula));
+    assert!(parsed.dependencies.iter().any(|dependency| matches!(
+      dependency,
+      FormulaDependency::External(ExternalReferenceId {
+        book: Some(book), sheet: Some(sheet), name: Some(name),
+      }) if book == "link-external-workbook-a.xlsx" && sheet == "Sheet0" && name == "A1:B1"
+    )));
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), Some(CellAddress { column: 0, row: 0 }), formula),
+      None
+    );
+    let external_table = parse_formula_text(SheetId(1), Cow::Borrowed("[Book.xlsx]Table1[Price]"));
+    assert!(
+      external_table
+        .dependencies
+        .iter()
+        .any(|dependency| matches!(
+          dependency,
+          FormulaDependency::External(ExternalReferenceId {
+            book: Some(book), sheet: None, name: Some(name),
+          }) if book == "Book.xlsx" && name == "Table1[Price]"
+        ))
+    );
+    for (formula, expected) in [
+      ("SUM('[1]Q''1'!A1:B1)", 12.0),
+      ("SUM([1]'Q''1'!A1:B1)", 12.0),
+      ("SUM('Sheet0'!A1:B1)", 30.0),
+    ] {
+      assert_eq!(
+        book.evaluate_formula_text(SheetId(1), None, formula),
+        Some(FormulaValue::Number(expected)),
+        "{formula}"
+      );
+    }
+  }
+
+  #[test]
+  fn evaluation_book_sums_unqualified_whole_rows() {
+    // POI 53105.xlsx has 16,384 ones in row 1; Office prints 16,384 for
+    // SUM(1:1). A bare numeric row endpoint must not become a scalar operand
+    // of the range operator. The small case isolates parsing from range size.
+    for columns in [3, 16_384] {
+      let mut builder = FormulaEvaluationBookBuilder::new();
+      for column in 0..columns {
+        builder = builder.with_cell(
+          SheetId(1),
+          CellAddress { column, row: 0 },
+          FormulaValue::Number(1.0),
+        );
+      }
+      let book = builder.build();
+      for formula in [
+        "SUM(1:1)",
+        "SUM(1:$1)",
+        "SUM($1:1)",
+        "SUM($1:$1)",
+        "SUM(1 : 1)",
+        "SUM($1 : $1)",
+      ] {
+        assert_eq!(
+          book.evaluate_formula_text(SheetId(1), None, formula),
+          Some(FormulaValue::Number(columns as f64)),
+          "{formula}, columns={columns}"
+        );
+      }
+      for (formula, expected) in [
+        ("SUM(1,1)", 2.0),
+        ("SUM(1.25,2.5,1E-3)", 3.751),
+        ("SUM($A$1,$B1,A$1)", 3.0),
+      ] {
+        assert_eq!(
+          book.evaluate_formula_text(SheetId(1), None, formula),
+          Some(FormulaValue::Number(expected)),
+          "{formula}"
+        );
+      }
+    }
   }
 
   #[test]

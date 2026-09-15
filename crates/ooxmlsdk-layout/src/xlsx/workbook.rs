@@ -39,6 +39,8 @@ pub(crate) struct SharedStringRun {
   /// escapement properties return to their ordinary defaults.
   pub(crate) has_properties: bool,
   pub(crate) font_family: Option<String>,
+  pub(crate) font_scheme: Option<x::FontSchemeValues>,
+  pub(crate) fallback_font_family: Option<String>,
   pub(crate) font_size_pt: Option<f32>,
   pub(crate) color: Option<RgbColor>,
   /// `None` preserves whether the corresponding element was absent. The
@@ -278,6 +280,9 @@ pub(crate) fn shared_string_run(run: &x::Run) -> SharedStringRun {
         }
         x::RunPropertiesChoice::RunFont(value) => {
           model.font_family = Some(value.val.clone());
+        }
+        x::RunPropertiesChoice::FontScheme(value) => {
+          model.font_scheme = Some(value.val);
         }
         _ => {}
       }

@@ -108,6 +108,7 @@ impl<'book, 'engine, 'doc> FormulaEvaluatorEngine<'book, 'engine, 'doc> {
       current_cell: self.current_cell,
       grammar: self.grammar,
       locals: BTreeMap::new(),
+      call_depth: 0,
       array_context: self.array_context,
       current_value: None,
       calc_a1_indirect_bang_reference: self.calc_a1_indirect_bang_reference,
@@ -161,7 +162,7 @@ pub(crate) fn evaluate_arg_direct<'doc>(
   }
 }
 
-fn evaluate_node_operand<'doc>(
+pub(super) fn evaluate_node_operand<'doc>(
   program: &FormulaProgram,
   borrowed_source: Option<&'doc str>,
   id: FormulaExprId,
@@ -212,6 +213,15 @@ fn evaluate_node_operand<'doc>(
       let name = crate::code::function_name_cow(program, borrowed_source, node.span, *name)?;
       let function = crate::function::resolve_function_name(name.as_ref());
       let eval_args = EvalArgs::new(program, args, borrowed_source);
+      if let Some(value) = super::lambda::evaluate_function_operand(&name, eval_args, evaluator) {
+        return value;
+      }
+      if matches!(
+        crate::code::control_for_function(function),
+        Some(FormulaControlOp::LetBind)
+      ) {
+        return evaluate_let_control(eval_args, evaluator);
+      }
       let value = match crate::code::control_for_function(function) {
         Some(control) => evaluate_control_call(control, eval_args, evaluator),
         None => crate::function::evaluate_function(
@@ -239,7 +249,15 @@ fn evaluate_node_operand<'doc>(
       }
       Some(EvalOperand::Value(FormulaValue::Matrix(rows)))
     }
-    FormulaNodeKind::Call { .. } | FormulaNodeKind::Unsupported(_) => None,
+    FormulaNodeKind::Call { callee, args } => {
+      let callee = evaluate_node_operand(program, borrowed_source, *callee, evaluator)?;
+      super::lambda::invoke(
+        callee,
+        EvalArgs::new(program, program.args(*args)?, borrowed_source),
+        evaluator,
+      )
+    }
+    FormulaNodeKind::Unsupported(_) => None,
   }
 }
 
@@ -334,7 +352,7 @@ fn evaluate_control_call<'doc>(
     FormulaControlOp::ChooseJump => evaluate_choose_control(args, evaluator),
     FormulaControlOp::IfsJump => evaluate_ifs_control(args, evaluator),
     FormulaControlOp::SwitchJump => evaluate_switch_control(args, evaluator),
-    FormulaControlOp::LetBind => evaluate_let_control(args, evaluator),
+    FormulaControlOp::LetBind => evaluate_let_control(args, evaluator)?.into_value(evaluator),
   }
 }
 
@@ -381,8 +399,9 @@ fn evaluate_if_error_control<'doc>(
   if is_missing_arg(value_arg) {
     return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
   }
-  let value = evaluate_arg_direct(value_arg, evaluator)
-    .unwrap_or(FormulaValue::Error(FormulaErrorValue::Error));
+  // None denotes an unsupported evaluation, not an Excel error value.
+  // IFERROR must not turn an unimplemented function into a computed fallback.
+  let value = evaluate_arg_direct(value_arg, evaluator)?;
   if evaluator.array_context
     && matches!(
       value,
@@ -494,33 +513,27 @@ fn evaluate_switch_control<'doc>(
 fn evaluate_let_control<'doc>(
   args: EvalArgs<'_, 'doc>,
   evaluator: &FormulaEvaluator<'_, 'doc>,
-) -> Option<FormulaValue<'doc>> {
+) -> Option<EvalOperand<'doc>> {
   if args.len() < 3 || args.len().is_multiple_of(2) {
-    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    return Some(EvalOperand::Value(FormulaValue::Error(
+      FormulaErrorValue::Value,
+    )));
   }
-  let mut local_evaluator = FormulaEvaluator {
-    book: evaluator.book,
-    engine: evaluator.engine,
-    current_sheet: evaluator.current_sheet,
-    current_cell: evaluator.current_cell,
-    grammar: evaluator.grammar,
-    locals: evaluator.locals.clone(),
-    array_context: evaluator.array_context,
-    current_value: evaluator.current_value.clone(),
-    calc_a1_indirect_bang_reference: evaluator.calc_a1_indirect_bang_reference,
-  };
+  let mut local_evaluator = evaluator.clone();
   let mut local_names = BTreeMap::new();
   let mut index = 0;
   while index + 2 < args.len() {
     let name = let_binding_name_from_arg(args.get(index)?)?;
     if name.is_empty() || local_names.insert(name.clone(), ()).is_some() {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      return Some(EvalOperand::Value(FormulaValue::Error(
+        FormulaErrorValue::Value,
+      )));
     }
-    let value = evaluate_arg_direct(args.get(index + 1)?, &local_evaluator)?.into_owned();
+    let value = super::lambda::evaluate_argument(args.get(index + 1)?, &local_evaluator)?;
     local_evaluator.locals.insert(name, value);
     index += 2;
   }
-  evaluate_arg_direct(args.get(args.len() - 1)?, &local_evaluator)
+  super::lambda::evaluate_argument(args.get(args.len() - 1)?, &local_evaluator)
 }
 
 fn is_missing_arg(arg: EvalArg<'_, '_>) -> bool {
@@ -585,7 +598,11 @@ fn reference_ranges_from_operand<'doc>(
   match operand {
     EvalOperand::Reference(reference) => Some(vec![reference]),
     EvalOperand::Value(value) => Some(evaluator.reference_ranges_from_value(&value)),
-    EvalOperand::ExternalReference(_) | EvalOperand::Name(_) => {
+    EvalOperand::ExternalReference(_)
+    | EvalOperand::Name(_)
+    | EvalOperand::Lambda(_)
+    | EvalOperand::Builtin(_)
+    | EvalOperand::Omitted => {
       let value = operand.into_value(evaluator)?;
       Some(evaluator.reference_ranges_from_value(&value))
     }

@@ -140,6 +140,57 @@ impl<'p> ProgramSyntaxParser<'p> {
   }
 
   fn parse_operand(&mut self) -> Option<FormulaExprId> {
+    let mut callee = self.parse_primary()?;
+    if matches!(
+      self.source.context.grammar,
+      crate::FormulaGrammar::ExcelA1 | crate::FormulaGrammar::ExcelR1C1
+    ) {
+      while !self.tokens.ws_before_next()
+        && self
+          .tokens
+          .peek()
+          .is_some_and(|token| token.kind == parser::LexTokenKind::ParenOpen)
+      {
+        let args = self.parse_argument_list(None)?;
+        callee = self
+          .builder
+          .push_value(FormulaNodeKind::Call { callee, args });
+      }
+    }
+    Some(callee)
+  }
+
+  fn parse_primary(&mut self) -> Option<FormulaExprId> {
+    // In an Excel operand, `!A1` explicitly qualifies the current sheet.
+    // Keep the shared lexer's `!` token for Calc's infix intersection.
+    if matches!(
+      self.source.context.grammar,
+      crate::FormulaGrammar::ExcelA1 | crate::FormulaGrammar::ExcelR1C1
+    ) && let Some(bang) = self
+      .tokens
+      .consume_token_kind(parser::LexTokenKind::Operator(
+        parser::LexOperator::Intersection,
+      ))
+    {
+      let token = self.tokens.advance()?;
+      if token.start != bang.end {
+        return None;
+      }
+      return match token.kind {
+        parser::LexTokenKind::Word => {
+          let span = parser::SemanticSpan {
+            start: bang.start,
+            end: token.end,
+          };
+          let word = self.body.get(span.start..span.end)?;
+          self.push_word(span, parser::semantic_word_kind(word))
+        }
+        parser::LexTokenKind::Error(parser::LexErrorValue::Ref) => {
+          Some(self.builder.error(crate::FormulaErrorValue::Ref))
+        }
+        _ => None,
+      };
+    }
     if self
       .tokens
       .consume_token_kind(parser::LexTokenKind::ParenOpen)
@@ -158,12 +209,11 @@ impl<'p> ProgramSyntaxParser<'p> {
     if let Some(token) = self.tokens.consume_token_kind(parser::LexTokenKind::Text) {
       return self.push_text_literal(token_span(token));
     }
-    if self
+    if let Some(token) = self
       .tokens
       .consume_token_kind(parser::LexTokenKind::ArrayOpen)
-      .is_some()
     {
-      return self.parse_array();
+      return self.parse_array(token.start);
     }
     if let Some(token) = self.tokens.peek() {
       match token.kind {
@@ -198,7 +248,19 @@ impl<'p> ProgramSyntaxParser<'p> {
     Some(left)
   }
 
-  fn parse_array(&mut self) -> Option<FormulaExprId> {
+  fn parse_array(&mut self, start: usize) -> Option<FormulaExprId> {
+    // ECMA-376 18.17.2.1: Excel arrays contain scalar constants in
+    // rectangular rows. Missing elements and expressions are invalid;
+    // quoted empty text is a constant. Calc/OpenFormula keep their grammar.
+    if matches!(
+      self.source.context.grammar,
+      crate::FormulaGrammar::ExcelA1 | crate::FormulaGrammar::ExcelR1C1
+    ) {
+      let text = self.body.get(start..)?;
+      let close =
+        parser::lex_tokens(text).find(|token| token.kind == parser::LexTokenKind::ArrayClose)?;
+      parser::parse_array_constant(text.get(..close.end)?)?;
+    }
     let checkpoint = self.checkpoint();
     let result = self.parse_array_inner();
     if result.is_none() {
@@ -434,7 +496,15 @@ impl<'p> ProgramSyntaxParser<'p> {
     span: parser::SemanticSpan,
     kind: parser::SemanticWordKind,
   ) -> Option<FormulaExprId> {
-    lower_parser_word(self.builder, self.source, self.body_start, span, kind)
+    let id = lower_parser_word(self.builder, self.source, self.body_start, span, kind)?;
+    // Reference leaves need their source location for display-only coercion
+    // markers, just as names and function calls do.
+    if let Some(node) = self.builder.program.nodes.get_mut(id.0 as usize)
+      && matches!(node.kind, FormulaNodeKind::Reference(_))
+    {
+      node.span = Some(source_span(self.body_start, span));
+    }
+    Some(id)
   }
 
   fn diagnose_current_unsupported_token(&mut self) {
@@ -973,14 +1043,53 @@ fn lower_parser_word(
     .get(body_start + span.start..body_start + span.end)?;
   match kind {
     parser::SemanticWordKind::Boolean(value) => Some(builder.boolean(value)),
+    parser::SemanticWordKind::Error(value) => {
+      Some(builder.error(crate::code::formula_error_from_lex(value)))
+    }
     parser::SemanticWordKind::ReferenceCandidate => {
+      // Excel parameter/eta storage names are identifiers. In particular,
+      // _xlpm.x is not Calc's sheet-qualified whole column named x.
+      let upper = word.to_ascii_uppercase();
+      if matches!(
+        source.context.grammar,
+        crate::FormulaGrammar::ExcelA1 | crate::FormulaGrammar::ExcelR1C1
+      ) && ["_XLPM.", "_XLOP.", "_XLETA."]
+        .iter()
+        .any(|prefix| upper.starts_with(prefix))
+        && !word.contains(['!', '[', ']', ':'])
+      {
+        return Some(named_reference_with_span(
+          builder,
+          word,
+          Some(source_span(body_start, span)),
+        ));
+      }
       if let Some(reference) = structured_reference_from_text(builder, word) {
         return Some(builder.push_reference(reference));
+      }
+      if matches!(
+        source.context.grammar,
+        crate::FormulaGrammar::ExcelA1 | crate::FormulaGrammar::ExcelR1C1
+      ) && separately_quoted_sheet_range(word)
+      {
+        return Some(builder.error(crate::FormulaErrorValue::Name));
       }
       let sheet = match source.context.position {
         FormulaSourcePosition::Cell(cell) => cell.sheet,
         FormulaSourcePosition::Sheet(sheet) => sheet,
       };
+      if word.starts_with('!')
+        && matches!(
+          source.context.grammar,
+          crate::FormulaGrammar::CalcA1 | crate::FormulaGrammar::OpenFormula
+        )
+      {
+        return Some(named_reference_with_span(
+          builder,
+          word,
+          Some(source_span(body_start, span)),
+        ));
+      }
       if let Some(range) = parser::parse_formula_range(sheet, word) {
         let reference = reference_from_qualified_range(builder, range);
         return Some(builder.push_reference(reference));
@@ -1003,15 +1112,38 @@ fn lower_parser_word(
   }
 }
 
+fn separately_quoted_sheet_range(word: &str) -> bool {
+  if !word.starts_with('\'') {
+    return false;
+  }
+  let mut quoted = false;
+  let mut separate_endpoints = false;
+  let mut chars = word.chars().peekable();
+  while let Some(ch) = chars.next() {
+    match ch {
+      '\'' if quoted && chars.peek() == Some(&'\'') => {
+        chars.next();
+      }
+      '\'' => quoted = !quoted,
+      ':' if !quoted => separate_endpoints = true,
+      // Only inspect the sheet qualifier. A colon after the first ! belongs
+      // to the cell range, including 'Sheet'!A1:'Sheet'!A2.
+      '!' if !quoted => return separate_endpoints,
+      _ => {}
+    }
+  }
+  false
+}
+
 fn structured_reference_from_text(
   builder: &mut FormulaProgramBuilder,
   text: &str,
 ) -> Option<FormulaReference> {
   let selection = parser::parse_table_reference_selection(text)?;
-  let table = builder.intern(selection.table_name);
+  let table = (!selection.table_name.is_empty()).then(|| builder.intern(selection.table_name));
   let specifier = structured_reference_specifier_from_selection(builder, &selection)?;
   Some(FormulaReference::Structured(FormulaStructuredReference {
-    table: Some(table),
+    table,
     specifier,
   }))
 }
@@ -1136,7 +1268,11 @@ fn external_reference_from_spans(
     .map(|sheet| FormulaSheetName::Name(intern_external_sheet_text(builder, source, sheet)));
   let name = span_text(source, reference.name?);
 
-  if let Some(range) = parser::parse_formula_range(SheetId::default(), name) {
+  // A workbook prefix without a sheet qualifies a name, even when that
+  // name (for example ROW) could also be read as a whole-column address.
+  if sheet.is_some()
+    && let Some(range) = parser::parse_formula_range(SheetId::default(), name)
+  {
     let sheet = FormulaSheetReference::External {
       book,
       sheet: sheet.map(FormulaSheetRange::Sheet),
@@ -1246,6 +1382,9 @@ fn sheet_reference_from_qualified_range(
   let Some(start) = range.sheet_name.as_ref() else {
     return FormulaSheetReference::Current;
   };
+  if start.0.is_empty() {
+    return FormulaSheetReference::CurrentQualified;
+  }
   let start = FormulaSheetName::Name(builder.intern(start.0.as_ref()));
   let sheet = if let Some(end) = range.end_sheet_name.as_ref() {
     FormulaSheetRange::Range {

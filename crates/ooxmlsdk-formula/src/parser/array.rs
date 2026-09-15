@@ -10,7 +10,6 @@ pub(crate) struct ArrayConstant<'a> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ArrayConstantValue<'a> {
-  Blank,
   Number(f64),
   Boolean(bool),
   Error(LexErrorValue),
@@ -80,11 +79,6 @@ fn parse_array_constant_value<'a>(
 ) -> Option<ArrayConstantValue<'a>> {
   cursor.skip_ws();
   match cursor.peek_token_raw().map(|token| token.kind) {
-    Some(
-      LexTokenKind::ArgumentSeparator | LexTokenKind::RowSeparator | LexTokenKind::ArrayClose,
-    ) => {
-      return Some(ArrayConstantValue::Blank);
-    }
     Some(LexTokenKind::Text) => {
       let token = cursor.consume_token_kind(LexTokenKind::Text)?;
       return Some(ArrayConstantValue::Text(formula_text_literal(
@@ -149,9 +143,11 @@ mod tests {
 
   #[test]
   fn array_constants_reject_ragged_rows_and_raw_values() {
-    assert!(parse_array_constant("{1,2;3}").is_none());
-    assert!(parse_array_constant("{1,Name}").is_none());
-    assert!(parse_array_constant("{1,A1+1}").is_none());
+    for source in [
+      "{}", "{1,,3}", "{,1}", "{1,}", "{1;;3}", "{1,2;3}", "{1,Name}", "{1,A1+1}",
+    ] {
+      assert!(parse_array_constant(source).is_none(), "{source}");
+    }
   }
 
   #[test]

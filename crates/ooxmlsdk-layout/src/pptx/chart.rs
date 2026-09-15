@@ -110,6 +110,8 @@ pub(crate) struct ChartFrame {
 #[derive(Clone, Debug)]
 pub(crate) struct ClusteredColumnStyle {
   pub layout_profile: ChartLayoutProfile,
+  /// A standalone Excel chart sheet uses fixed page-space margins.
+  pub chartsheet: bool,
   pub chart_style_id: u8,
   pub modern_excel_profile: bool,
   pub stroke_scale: f32,
@@ -670,6 +672,7 @@ pub(crate) fn lower_clustered_column_chart(
       title_width * rotation_radians.sin().abs() + title_line_height * rotation_radians.cos().abs()
     }
   });
+  let chartsheet_category_layout = excel_chartsheet_automatic_category_layout(chart, style);
   let category_label_line_height = line_height(&style.category_label);
   let value_label_line_height = line_height(&style.value_label);
   let label_line_height = category_label_line_height
@@ -1527,25 +1530,29 @@ pub(crate) fn lower_clustered_column_chart(
     0.0
   };
   let side_plot_outer_margin = frame.height_pt * profiles::CARTESIAN_SIDE_PLOT_OUTER_MARGIN_RATIO;
-  let side_legend_outer_margin = frame.height_pt
-    * match style.layout_profile {
-      ChartLayoutProfile::Excel
-        if !has_layout_title
-          && has_automatic_untitled_layout
-          && (chart.has_explicit_categories
-            || (chart.title_overlay
-              && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic)))
-            || has_indexed_scatter_automatic_layout) =>
-      {
-        profiles::EXCEL_AUTOMATIC_UNTITLED_SIDE_LEGEND_OUTER_MARGIN_RATIO
+  let side_legend_outer_margin = if style.chartsheet {
+    2.0 * style.stroke_scale
+  } else {
+    frame.height_pt
+      * match style.layout_profile {
+        ChartLayoutProfile::Excel
+          if !has_layout_title
+            && has_automatic_untitled_layout
+            && (chart.has_explicit_categories
+              || (chart.title_overlay
+                && matches!(chart.title.as_ref(), Some(ChartTitleText::Automatic)))
+              || has_indexed_scatter_automatic_layout) =>
+        {
+          profiles::EXCEL_AUTOMATIC_UNTITLED_SIDE_LEGEND_OUTER_MARGIN_RATIO
+        }
+        ChartLayoutProfile::Excel if has_derived_single_series_side_title_layout => {
+          profiles::EXCEL_DERIVED_TITLE_SIDE_LEGEND_OUTER_MARGIN_RATIO
+        }
+        ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Word | ChartLayoutProfile::Excel => {
+          host_side_legend_bands.legend_outer_margin_ratio
+        }
       }
-      ChartLayoutProfile::Excel if has_derived_single_series_side_title_layout => {
-        profiles::EXCEL_DERIVED_TITLE_SIDE_LEGEND_OUTER_MARGIN_RATIO
-      }
-      ChartLayoutProfile::PowerPoint | ChartLayoutProfile::Word | ChartLayoutProfile::Excel => {
-        host_side_legend_bands.legend_outer_margin_ratio
-      }
-    };
+  };
   let side_plot_gap = frame.height_pt
     * match style.layout_profile {
       ChartLayoutProfile::Excel
@@ -1659,7 +1666,12 @@ pub(crate) fn lower_clustered_column_chart(
     + frame.height_pt * excel_vary_colors_data_table_adjustment.tick_left_ratio;
   tick_left +=
     frame.height_pt * excel_explicit_date_line_top_right_overlay_adjustment.tick_left_ratio;
-  let tick_gap = if value_tick_labels_visible {
+  let tick_gap = if chartsheet_category_layout && value_tick_labels_visible {
+    metrics
+      .vertical_metrics_for_text("0", &style.value_label)
+      .line_height_pt()
+      * (profiles::EXCEL_CHARTSHEET_AXIS_BAND_LINE_HEIGHTS * 0.5)
+  } else if value_tick_labels_visible {
     automatic_band_height_pt
       * if has_side_legend {
         if has_shifted_category_empty_side_legend_layout {
@@ -1852,6 +1864,54 @@ pub(crate) fn lower_clustered_column_chart(
       plot_bottom -= label_line_height * 1.35;
     }
   }
+  if chartsheet_category_layout {
+    // Native width/height, font-size and no-legend controls retain fixed
+    // outer margins. Axis bands grow with font metrics, not chart height.
+    let device_scale = style.stroke_scale;
+    let value_height = metrics
+      .vertical_metrics_for_text("0", &style.value_label)
+      .line_height_pt();
+    let category_height = metrics
+      .vertical_metrics_for_text("Mg", &style.category_label)
+      .line_height_pt();
+    tick_left = frame.x_pt + 6.5 * device_scale;
+    plot_left = tick_left + maximum_tick_width + tick_gap;
+    plot_top = frame.y_pt + (11.0 * device_scale).max(5.0 * device_scale + value_height * 0.5);
+    plot_right = frame.x_pt + frame.width_pt
+      - if has_side_legend {
+        side_legend_width + 17.0 * device_scale
+      } else {
+        11.0 * device_scale
+      };
+    let leaf_band = if category_label_rotation.abs() <= f32::EPSILON {
+      category_height
+        * profiles::EXCEL_CHARTSHEET_AXIS_BAND_LINE_HEIGHTS
+        * category_label_line_count
+    } else {
+      category_leaf_label_height + category_height * 0.5
+    };
+    let parent_bands = hierarchical_category_level_layouts
+      .iter()
+      .map(|level| {
+        category_height
+          * profiles::EXCEL_CHARTSHEET_AXIS_BAND_LINE_HEIGHTS
+          * level
+            .groups
+            .iter()
+            .map(|group| group.lines.len())
+            .max()
+            .unwrap_or(1) as f32
+      })
+      .sum::<f32>();
+    plot_bottom = frame.y_pt + frame.height_pt
+      - 6.5 * device_scale
+      - if category_tick_labels_visible {
+        leaf_band + parent_bands
+      } else {
+        4.5 * device_scale
+      };
+    category_top = plot_bottom + category_height * 0.5;
+  }
   if plot_right <= plot_left {
     return Vec::new();
   }
@@ -2018,7 +2078,9 @@ pub(crate) fn lower_clustered_column_chart(
   };
   let primary_value_label_gap = if primary_value_axis_on_right {
     tick_gap + frame.height_pt * 0.012_59 + projected_tick_label_spacing
-  } else if has_outer_value_label_band && axis_text_projection_3d.is_none() {
+  } else if (has_outer_value_label_band || chartsheet_category_layout)
+    && axis_text_projection_3d.is_none()
+  {
     // These automatic profiles own an outer value-label band independently
     // of the residual plot inset. Deriving labels from
     // `plot_left` with only the generic gap incorrectly carries that residual
@@ -2660,15 +2722,28 @@ pub(crate) fn lower_clustered_column_chart(
       kind: LineItemKind::Stroke,
     }));
   }
-  if style.layout_profile == ChartLayoutProfile::Word {
-    let tick_length = frame.height_pt * 0.012_59;
+  if style.layout_profile == ChartLayoutProfile::Word || chartsheet_category_layout {
+    let tick_length = if chartsheet_category_layout {
+      metrics
+        .vertical_metrics_for_text("0", &style.value_label)
+        .line_height_pt()
+        * (profiles::EXCEL_CHARTSHEET_AXIS_BAND_LINE_HEIGHTS - 1.0)
+        * 0.5
+    } else {
+      frame.height_pt * 0.012_59
+    };
     if value_axis_visible {
       let axis_x = primary_value_axis_x;
       let axis_top = projection_3d.map_or((axis_x, plot_top), |projection| {
         projection.project(axis_x, plot_top, primary_value_axis_depth)
       });
-      let axis_zero = projection_3d.map_or((axis_x, zero_y), |projection| {
-        projection.project(axis_x, zero_y, primary_value_axis_depth)
+      let axis_end_y = if chartsheet_category_layout {
+        plot_bottom
+      } else {
+        zero_y
+      };
+      let axis_zero = projection_3d.map_or((axis_x, axis_end_y), |projection| {
+        projection.project(axis_x, axis_end_y, primary_value_axis_depth)
       });
       items.push(PageItem::Line(LineItem {
         x1_pt: axis_top.0,
@@ -2680,6 +2755,17 @@ pub(crate) fn lower_clustered_column_chart(
         kind: LineItemKind::Stroke,
       }));
       if chart.value_axis.is_none_or(value_axis_has_major_ticks) {
+        let (tick_start, tick_end) = if chartsheet_category_layout {
+          chartsheet_tick_offsets(
+            chart
+              .value_axis
+              .and_then(|axis| axis.major_tick_mark.as_ref())
+              .and_then(|tick| tick.val),
+            tick_length,
+          )
+        } else {
+          (0.0, tick_length)
+        };
         for (value, _) in &tick_labels {
           let y = value_y(*value, scale, plot_top, plot_height);
           let point = projection_3d.map_or((axis_x, y), |projection| {
@@ -2687,15 +2773,15 @@ pub(crate) fn lower_clustered_column_chart(
           });
           items.push(PageItem::Line(LineItem {
             x1_pt: if primary_value_axis_on_right {
-              point.0
+              point.0 + tick_start
             } else {
-              point.0 - tick_length
+              point.0 - tick_end
             },
             y1_pt: point.1,
             x2_pt: if primary_value_axis_on_right {
-              point.0 + tick_length
+              point.0 + tick_end
             } else {
-              point.0
+              point.0 - tick_start
             },
             y2_pt: point.1,
             width_pt: axis_line_width,
@@ -2712,6 +2798,22 @@ pub(crate) fn lower_clustered_column_chart(
         .or_else(|| chart.date_axis.map(date_axis_has_major_ticks))
         .unwrap_or(true)
     {
+      let (tick_start, tick_end) = if chartsheet_category_layout {
+        chartsheet_tick_offsets(
+          chart
+            .category_axis
+            .and_then(|axis| axis.major_tick_mark.as_ref())
+            .or_else(|| {
+              chart
+                .date_axis
+                .and_then(|axis| axis.major_tick_mark.as_ref())
+            })
+            .and_then(|tick| tick.val),
+          tick_length,
+        )
+      } else {
+        (0.0, tick_length)
+      };
       let tick_positions = date_ticks
         .as_ref()
         .map(|ticks| ticks.iter().map(|tick| tick.position).collect::<Vec<_>>())
@@ -2731,9 +2833,9 @@ pub(crate) fn lower_clustered_column_chart(
           projection_3d.map_or((x, zero_y), |projection| projection.project(x, zero_y, 0.0));
         items.push(PageItem::Line(LineItem {
           x1_pt: point.0,
-          y1_pt: point.1,
+          y1_pt: point.1 + tick_start,
           x2_pt: point.0,
-          y2_pt: point.1 + tick_length,
+          y2_pt: point.1 + tick_end,
           width_pt: axis_line_width,
           color: style.gridline_color,
           kind: LineItemKind::Stroke,
@@ -3632,7 +3734,9 @@ pub(crate) fn lower_clustered_column_chart(
       Some(ChartLegendPosition::Right | ChartLegendPosition::TopRight) => lower_vertical_legend(
         &mut items,
         frame.x_pt + frame.width_pt - side_legend_outer_margin - side_legend_width
-          + if has_explicit_single_series_side_title_layout {
+          + if style.chartsheet {
+            0.0
+          } else if has_explicit_single_series_side_title_layout {
             -frame.height_pt * 0.009_84
           } else if has_excel_vary_colors_data_table_layout {
             frame.height_pt * profiles::EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_X_RATIO
@@ -4460,6 +4564,442 @@ fn chart_shape_effect_image(
     );
   }
   chart_raster_image(&raster.image, raster_bounds)
+}
+
+fn chartsheet_marker_raster_extent(
+  size_pt: f32,
+  pen_pt: f32,
+  symbol: c::MarkerStyleValues,
+  pixels_per_point: f32,
+) -> (f32, f32, u32) {
+  // Native size/outline controls quantize geometry on the 600-DPI printer
+  // grid, then allocate the guarded surface at the nearest 200-DPI pixel.
+  // Its actual density follows that integer allocation, not the nominal DPI.
+  let dots = f64::from(size_pt) * 600.0 / 72.0;
+  let geometry_dots = if symbol == c::MarkerStyleValues::Square {
+    dots.round()
+  } else {
+    (dots * 0.5 + 1e-4).floor() * 2.0
+  };
+  let canvas_dots = (geometry_dots + f64::from(pen_pt) * 600.0 / 72.0).round() + 2.0;
+  let canvas_pt = (canvas_dots * 72.0 / 600.0) as f32;
+  let pixels = (canvas_pt * pixels_per_point).round().max(0.0) as u32;
+  let source_pixels = (geometry_dots * f64::from(pixels) / canvas_dots) as f32;
+  (source_pixels, canvas_pt, pixels)
+}
+
+fn chartsheet_marker_source_image(
+  path: &crate::common::PathItem<'static>,
+  symbol: c::MarkerStyleValues,
+  pixels_per_point: f32,
+) -> Option<image::RgbaImage> {
+  if !matches!(path.fill, crate::common::Fill::Solid(color) if color.a == 255)
+    || !matches!(
+      symbol,
+      c::MarkerStyleValues::Diamond | c::MarkerStyleValues::Triangle | c::MarkerStyleValues::Square
+    )
+    || path.stroke.as_ref().is_some_and(|stroke| {
+      stroke.gradient.is_some()
+        || stroke.pattern.is_some()
+        || stroke.color.a != 255
+        || stroke.resolved_dash().is_some()
+        || stroke.alignment == Some(crate::common::StrokeAlignment::Inside)
+        || stroke
+          .compound
+          .is_some_and(|compound| compound != crate::common::StrokeCompound::Single)
+    })
+  {
+    return None;
+  }
+  let pen = path
+    .stroke
+    .as_ref()
+    .map_or(0.0, |stroke| stroke.width.0.max(0.0));
+  let (source_width, canvas_width, width_px) =
+    chartsheet_marker_raster_extent(path.bounds.size.width.0, pen, symbol, pixels_per_point);
+  let (source_height, _, height_px) =
+    chartsheet_marker_raster_extent(path.bounds.size.height.0, pen, symbol, pixels_per_point);
+  if width_px == 0 || height_px == 0 || u64::from(width_px) * u64::from(height_px) > 250_000 {
+    return None;
+  }
+  // PixelOffsetModeNone geometry is displaced by half a pixel within the
+  // allocated canvas. This also reproduces the native no-outline controls.
+  if source_width <= 0.0 || source_height <= 0.0 {
+    return None;
+  }
+  let center_x = (width_px as f32 - 1.0) * 0.5;
+  let center_y = (height_px as f32 - 1.0) * 0.5;
+  chartsheet_marker_rasterize_source(
+    path,
+    common_rect(
+      center_x - source_width * 0.5,
+      center_y - source_height * 0.5,
+      source_width,
+      source_height,
+    ),
+    width_px,
+    height_px,
+    width_px as f32 / canvas_width,
+  )
+}
+
+fn chartsheet_marker_rasterize_source(
+  path: &crate::common::PathItem<'static>,
+  source_bounds: crate::common::Rect,
+  width_px: u32,
+  height_px: u32,
+  stroke_scale: f32,
+) -> Option<image::RgbaImage> {
+  use crate::common::drawingml_shape_raster::{
+    PageToRasterMapping, RasterPrimitiveAntialiasing, rasterize_vector_items_at_mapping,
+  };
+  let mut source = path.clone();
+  source.bounds = source_bounds;
+  for point in &mut source.points {
+    point.x.0 = source.bounds.origin.x.0
+      + ((point.x.0 - path.bounds.origin.x.0) / path.bounds.size.width.0 * 2.0).round()
+        * source_bounds.size.width.0
+        * 0.5;
+    point.y.0 = source.bounds.origin.y.0
+      + ((point.y.0 - path.bounds.origin.y.0) / path.bounds.size.height.0 * 2.0).round()
+        * source_bounds.size.height.0
+        * 0.5;
+  }
+  if let Some(stroke) = source.stroke.as_mut() {
+    stroke.width.0 *= stroke_scale;
+    stroke.join = stroke.join.or(Some(crate::common::StrokeJoin::Round));
+    stroke.drawingml_device = None;
+  }
+  let mapping = PageToRasterMapping {
+    width_px,
+    height_px,
+    scale_x: 1.0,
+    scale_y: 1.0,
+    translate_x: 0.0,
+    translate_y: 0.0,
+    text_hinting: None,
+  };
+  // GDI+ resolves FillPolygon and DrawPolygon separately before compositing.
+  let mut fill = source.clone();
+  fill.stroke = None;
+  let mut image = rasterize_vector_items_at_mapping(
+    &[crate::common::DisplayItem::Path(fill)],
+    mapping,
+    RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+  )?;
+  let crate::common::Fill::Solid(fill_color) = path.fill else {
+    return None;
+  };
+  chartsheet_marker_premultiply_coverage(&mut image, fill_color);
+  if source.stroke.is_some() {
+    source.fill = crate::common::Fill::None;
+    let stroke = source.stroke.as_ref()?;
+    let stroke_color = stroke.color;
+    let mut line = if stroke.width.0 * stroke.width.0 < 2.0001 {
+      chartsheet_marker_cosmetic_image(&source.points, width_px, height_px, stroke_color)
+    } else {
+      rasterize_vector_items_at_mapping(
+        &[crate::common::DisplayItem::Path(source)],
+        mapping,
+        RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+      )?
+    };
+    chartsheet_marker_premultiply_coverage(&mut line, stroke_color);
+    for (destination, source) in image.pixels_mut().zip(line.pixels()) {
+      let inverse_alpha = 255 - u32::from(source[3]);
+      for channel in 0..4 {
+        destination[channel] = (u32::from(source[channel])
+          + (u32::from(destination[channel]) * inverse_alpha + 127) / 255)
+          .min(255) as u8;
+      }
+    }
+  }
+  for pixel in image.pixels_mut() {
+    let alpha = u32::from(pixel[3]);
+    if alpha == 0 {
+      *pixel = image::Rgba([0; 4]);
+      continue;
+    }
+    *pixel = chartsheet_marker_export_pixel(chartsheet_marker_demultiply_pixel(*pixel));
+  }
+  Some(image)
+}
+
+fn chartsheet_marker_cosmetic_image(
+  points: &[crate::common::Point],
+  width: u32,
+  height: u32,
+  color: crate::common::Color,
+) -> image::RgbaImage {
+  // GDI+ cosmetic edges occupy one minor-axis pixel. At a 45-degree tie
+  // the vertical axis owns the scan. Cross products preserve exact sample
+  // boundaries; widening by a rounded Euclidean normal moves sloped edges.
+  let edges = points
+    .iter()
+    .zip(points.iter().cycle().skip(1))
+    .map(|(a, b)| {
+      (
+        f64::from(a.x.0),
+        f64::from(a.y.0),
+        f64::from(b.x.0) - f64::from(a.x.0),
+        f64::from(b.y.0) - f64::from(a.y.0),
+      )
+    })
+    .collect::<Vec<_>>();
+  // Native corner controls retain a subpixel guard; the right arc boundary
+  // is excluded by the scanner.
+  let corner_radius_squared = 1.0 / 8.0;
+  image::RgbaImage::from_fn(width, height, |x, y| {
+    let mut covered = 0_u32;
+    for sy in 0..4 {
+      for sx in 0..8 {
+        let px = f64::from(x) + f64::from(sx - 4) / 8.0;
+        let py = f64::from(y) + f64::from(sy - 2) / 4.0;
+        let inside = edges.iter().any(|&(ax, ay, dx, dy)| {
+          let vertical = dy.abs() >= dx.abs();
+          let major = if vertical { dy } else { dx };
+          if major == 0.0 {
+            return false;
+          }
+          let along = if vertical { py - ay } else { px - ax };
+          let cross = if vertical {
+            (px - ax) * dy - dx * (py - ay)
+          } else {
+            (py - ay) * dx - dy * (px - ax)
+          } * major.signum();
+          let within = if major > 0.0 {
+            along >= 0.0 && along < major
+          } else {
+            along <= 0.0 && along > major
+          };
+          within && cross >= -major.abs() * 0.5 && cross < major.abs() * 0.5
+        }) || points.iter().any(|point| {
+          let dx = px - f64::from(point.x.0);
+          let dy = py - f64::from(point.y.0);
+          let distance = dx * dx + dy * dy;
+          distance < corner_radius_squared || distance == corner_radius_squared && dx < 0.0
+        });
+        covered += u32::from(inside);
+      }
+    }
+    image::Rgba([color.r, color.g, color.b, ((covered * 255 + 16) / 32) as u8])
+  })
+}
+
+fn chartsheet_marker_demultiply_pixel(mut pixel: image::Rgba<u8>) -> image::Rgba<u8> {
+  let alpha = u32::from(pixel[3]);
+  if alpha != 0 {
+    // A truncated reciprocal reproduces the GDI+ primitive color controls.
+    // Exact integer division would round some bright edge colors up by one.
+    let reciprocal = (255_u32 << 16) / alpha;
+    for channel in 0..3 {
+      pixel[channel] = ((u32::from(pixel[channel]) * reciprocal) >> 16).min(255) as u8;
+    }
+  }
+  pixel
+}
+
+fn chartsheet_marker_premultiply_coverage(
+  image: &mut image::RgbaImage,
+  color: crate::common::Color,
+) {
+  // Recover the opaque brush's 32-sample coverage before rounding each
+  // premultiplied channel. Using rounded A8 as a fraction loses that boundary.
+  for pixel in image.pixels_mut() {
+    let samples = (u32::from(pixel[3]) * 32 + 127) / 255;
+    for (channel, value) in [color.r, color.g, color.b].into_iter().enumerate() {
+      pixel[channel] = ((u32::from(value) * samples + 16) / 32) as u8;
+    }
+  }
+}
+
+fn chartsheet_marker_export_pixel(mut pixel: image::Rgba<u8>) -> image::Rgba<u8> {
+  // Native GDI+ color controls reproduce the PDF's RGB/soft-mask pair after
+  // this additional truncated premultiply/unpremultiply conversion.
+  let alpha = u32::from(pixel[3]);
+  if alpha != 0 {
+    for channel in 0..3 {
+      pixel[channel] = ((u32::from(pixel[channel]) * alpha / 255) * 255 / alpha) as u8;
+    }
+  }
+  pixel
+}
+
+struct ChartsheetMarkerShadowAxis {
+  near_pt: f32,
+  span_pt: f32,
+  pixels: u32,
+  source_near_px: f32,
+  source_span_px: f32,
+}
+
+fn chartsheet_marker_shadow_axis(
+  size_pt: f32,
+  pen_pt: f32,
+  symbol: c::MarkerStyleValues,
+  offset_pt: f32,
+  blur_pt: f32,
+  pixels_per_point: f32,
+) -> ChartsheetMarkerShadowAxis {
+  let dots = f64::from(size_pt) * 600.0 / 72.0;
+  let half_dots = (dots * 0.5 + 1e-4).floor();
+  let near = -half_dots * 72.0 / 600.0;
+  let far = if symbol == c::MarkerStyleValues::Square {
+    (dots.round() - half_dots) * 72.0 / 600.0
+  } else {
+    -near
+  };
+  let quantize = |value: f64| (value * 600.0 / 72.0).round() * 72.0 / 600.0;
+  let offset = f64::from(offset_pt);
+  let outset = f64::from(pen_pt) * 0.5 + f64::from(blur_pt);
+  // Excel's distance/direction/blur controls quantize the complete translated
+  // effect bounds, then add one guard dot. Quantizing the source first loses
+  // the change in canvas size and sampling phase at fractional translations.
+  let left = quantize(near - outset + offset) - 72.0 / 600.0;
+  let right = quantize(far + outset + offset) + 72.0 / 600.0;
+  let span = right - left;
+  let pixels = (span * f64::from(pixels_per_point)).round().max(0.0) as u32;
+  let scale = f64::from(pixels) / span;
+  ChartsheetMarkerShadowAxis {
+    near_pt: left as f32,
+    span_pt: span as f32,
+    pixels,
+    source_near_px: ((near + offset - left) * scale - 0.5) as f32,
+    source_span_px: ((far - near) * scale) as f32,
+  }
+}
+
+fn push_chartsheet_marker_effect_raster(
+  items: &mut Vec<PageItem>,
+  marker_backdrops: Option<&mut Vec<PageItem>>,
+  path: &crate::common::PathItem<'static>,
+  symbol: c::MarkerStyleValues,
+  effects: Option<&crate::common::drawingml_image_effects::ImageEffectContainer>,
+) -> bool {
+  use crate::common::drawingml_image_effects::{
+    EffectRasterScale, ImageEffect, ImageEffectSourceGeometry, simple_outer_shadow_translation,
+    unchanged_foreground_backdrop,
+  };
+  let Some(mut backdrop) = effects.and_then(unchanged_foreground_backdrop) else {
+    return false;
+  };
+  let Some(shadow) = simple_outer_shadow_translation(&backdrop) else {
+    return false;
+  };
+  let pixels_per_point = 200.0 / 72.0;
+  let Some(source) = chartsheet_marker_source_image(path, symbol, pixels_per_point) else {
+    return false;
+  };
+  let pen = path
+    .stroke
+    .as_ref()
+    .map_or(0.0, |stroke| stroke.width.0.max(0.0));
+  let (_, canvas_width, _) =
+    chartsheet_marker_raster_extent(path.bounds.size.width.0, pen, symbol, pixels_per_point);
+  let (_, canvas_height, _) =
+    chartsheet_marker_raster_extent(path.bounds.size.height.0, pen, symbol, pixels_per_point);
+  let printer_grid = |value: f32| (f64::from(value) * 600.0 / 72.0).round() as f32 * (72.0 / 600.0);
+  // The PDF range ends at the final sample center, half a bitmap pixel short
+  // of the allocated surface. Keep this separate from source rasterization.
+  let foreground_bounds = common_rect(
+    printer_grid(path.bounds.origin.x.0 + (path.bounds.size.width.0 - canvas_width) * 0.5),
+    printer_grid(path.bounds.origin.y.0 + (path.bounds.size.height.0 - canvas_height) * 0.5),
+    canvas_width * (1.0 - 0.5 / source.width() as f32),
+    canvas_height * (1.0 - 0.5 / source.height() as f32),
+  );
+  let Some(foreground) = chart_raster_image(&source, foreground_bounds) else {
+    return false;
+  };
+  let radius_pt = shadow.blur_radius_px * (72.0 / 96.0);
+  let x = chartsheet_marker_shadow_axis(
+    path.bounds.size.width.0,
+    pen,
+    symbol,
+    shadow.offset_x_px * (72.0 / 96.0),
+    radius_pt,
+    pixels_per_point,
+  );
+  let y = chartsheet_marker_shadow_axis(
+    path.bounds.size.height.0,
+    pen,
+    symbol,
+    shadow.offset_y_px * (72.0 / 96.0),
+    radius_pt,
+    pixels_per_point,
+  );
+  if x.pixels == 0 || y.pixels == 0 || u64::from(x.pixels) * u64::from(y.pixels) > 250_000 {
+    return false;
+  }
+  let source_bounds = common_rect(
+    x.source_near_px,
+    y.source_near_px,
+    x.source_span_px,
+    y.source_span_px,
+  );
+  let Some(mut image) = chartsheet_marker_rasterize_source(
+    path,
+    source_bounds,
+    x.pixels,
+    y.pixels,
+    x.pixels as f32 / x.span_pt,
+  ) else {
+    return false;
+  };
+  // The shifted shape is sampled directly into its own guarded shadow canvas.
+  // Reusing foreground pixels misses the native subpixel phase and density.
+  if let [ImageEffect::OuterShadow { distance_px, .. }] = backdrop.effects.as_mut_slice() {
+    *distance_px = 0.0;
+  }
+  let scale = EffectRasterScale {
+    x: x.pixels as f32 / x.span_pt / (96.0 / 72.0),
+    y: y.pixels as f32 / y.span_pt / (96.0 / 72.0),
+  };
+  let left = source_bounds.origin.x.0 / scale.x;
+  let top = source_bounds.origin.y.0 / scale.y;
+  let width = source_bounds.size.width.0 / scale.x;
+  let height = source_bounds.size.height.0 / scale.y;
+  if crate::common::drawingml_image_effects::apply_container_to_padded_image_with_sources_on_raster(
+    &mut image,
+    &backdrop,
+    ImageEffectSourceGeometry {
+      paint_left_px: left,
+      paint_top_px: top,
+      paint_width_px: width,
+      paint_height_px: height,
+      shadow_anchor_left_px: left,
+      shadow_anchor_top_px: top,
+      shadow_anchor_width_px: width,
+      shadow_anchor_height_px: height,
+      anchor_left_px: left,
+      anchor_top_px: top,
+      anchor_width_px: width,
+      anchor_height_px: height,
+      ramp_left_px: left,
+      ramp_top_px: top,
+      ramp_width_px: width,
+      ramp_height_px: height,
+    },
+    Default::default(),
+    scale,
+  )
+  .is_none()
+  {
+    return false;
+  }
+  let shadow_bounds = common_rect(
+    printer_grid(path.bounds.origin.x.0 + path.bounds.size.width.0 * 0.5) + x.near_pt,
+    printer_grid(path.bounds.origin.y.0 + path.bounds.size.height.0 * 0.5) + y.near_pt,
+    x.span_pt * (1.0 - 0.5 / x.pixels as f32),
+    y.span_pt * (1.0 - 0.5 / y.pixels as f32),
+  );
+  let Some(shadow) = chart_raster_image(&image, shadow_bounds) else {
+    return false;
+  };
+  marker_backdrops
+    .unwrap_or(items)
+    .push(PageItem::Image(shadow));
+  items.push(PageItem::Image(foreground));
+  true
 }
 
 fn chart_raster_image(
@@ -8271,6 +8811,8 @@ fn lower_series_geometry(
     projection_3d,
   );
 
+  let marker_backdrop_start = items.len();
+  let mut marker_backdrops = Vec::new();
   let bubble_group_maxima = bubble_group_maxima(chart);
 
   let mut series_indices = (0..chart.series.len()).collect::<Vec<_>>();
@@ -8322,10 +8864,26 @@ fn lower_series_geometry(
         lower_bar_series(items, &context, style, series_index, color);
       }
       ChartSeriesKind::Line | ChartSeriesKind::Stock => {
-        lower_line_series(items, &context, series_index, color, false, style);
+        lower_line_series(
+          items,
+          &mut marker_backdrops,
+          &context,
+          series_index,
+          color,
+          false,
+          style,
+        );
       }
       ChartSeriesKind::Area => {
-        lower_line_series(items, &context, series_index, color, true, style);
+        lower_line_series(
+          items,
+          &mut marker_backdrops,
+          &context,
+          series_index,
+          color,
+          true,
+          style,
+        );
       }
       ChartSeriesKind::Surface => {}
       ChartSeriesKind::Scatter => {
@@ -8374,6 +8932,11 @@ fn lower_series_geometry(
       );
     }
   }
+  // Chartsheet marker shadows lie below every series line and foreground.
+  items.splice(
+    marker_backdrop_start..marker_backdrop_start,
+    marker_backdrops,
+  );
 }
 
 fn lower_series_error_bars(
@@ -10866,6 +11429,7 @@ fn chart_marker_fill_style(
   style: &ClusteredColumnStyle,
   series_index: usize,
   point_index: Option<usize>,
+  automatic_paint: bool,
 ) -> Option<&crate::common::ShapeStyleValue<crate::common::Fill<'static>>> {
   let point_marker = point_index.and_then(|point_index| {
     style
@@ -10899,8 +11463,8 @@ fn chart_marker_fill_style(
     point_marker,
     point,
     marker,
-    automatic_point,
-    automatic_series,
+    automatic_paint.then_some(automatic_point).flatten(),
+    automatic_paint.then_some(automatic_series).flatten(),
   )
 }
 
@@ -10908,6 +11472,7 @@ fn chart_marker_stroke_style(
   style: &ClusteredColumnStyle,
   series_index: usize,
   point_index: Option<usize>,
+  automatic_paint: bool,
 ) -> Option<&crate::common::ShapeStyleValue<crate::common::Stroke<'static>>> {
   let point_marker = point_index.and_then(|point_index| {
     style
@@ -10948,8 +11513,8 @@ fn chart_marker_stroke_style(
     point_marker,
     point,
     marker,
-    automatic_point,
-    automatic_series,
+    automatic_paint.then_some(automatic_point).flatten(),
+    automatic_paint.then_some(automatic_series).flatten(),
   )
 }
 
@@ -11044,6 +11609,7 @@ fn word_fixed_chart_value_edge(
 
 fn lower_line_series(
   items: &mut Vec<PageItem>,
+  marker_backdrops: &mut Vec<PageItem>,
   context: &SeriesGeometryContext<'_, '_>,
   series_index: usize,
   color: RgbColor,
@@ -11124,6 +11690,7 @@ fn lower_line_series(
       };
       lower_chart_marker(
         items,
+        Some(&mut *marker_backdrops),
         (x, y),
         marker,
         chart_point_color(style, series_index, index).unwrap_or(color),
@@ -11246,6 +11813,7 @@ fn lower_line_series(
     };
     lower_chart_marker(
       items,
+      Some(&mut *marker_backdrops),
       (x, y),
       marker,
       chart_point_color(style, series_index, index).unwrap_or(color),
@@ -11669,6 +12237,7 @@ fn lower_scatter_series(
       };
       lower_chart_marker(
         items,
+        None,
         (x, y),
         marker,
         chart_point_color(style, series_index, index).unwrap_or(color),
@@ -11756,6 +12325,7 @@ fn lower_scatter_series(
       };
       lower_chart_marker(
         items,
+        None,
         (x, y),
         marker,
         point_color,
@@ -11792,6 +12362,24 @@ fn lower_chart_line_segment(
 struct ResolvedChartMarker {
   symbol: c::MarkerStyleValues,
   size_pt: f32,
+  legend_key: bool,
+}
+
+fn chartsheet_tick_offsets(tick: Option<c::TickMarkValues>, length: f32) -> (f32, f32) {
+  match tick.unwrap_or(c::TickMarkValues::Outside) {
+    c::TickMarkValues::None => (0.0, 0.0),
+    c::TickMarkValues::Outside => (0.0, length),
+    c::TickMarkValues::Inside => (-length, 0.0),
+    c::TickMarkValues::Cross => (-length, length),
+  }
+}
+
+fn chartsheet_legend_marker_size_pt(marker_size_pt: f32, font_size_pt: f32) -> f32 {
+  marker_size_pt.min(
+    (font_size_pt * TEXT_LINE_HEIGHT_SCALE * 0.5)
+      .floor()
+      .max(2.0),
+  )
 }
 
 fn chart_point_marker<'data>(
@@ -11831,6 +12419,7 @@ fn resolved_chart_marker(
     Some(ResolvedChartMarker {
       symbol,
       size_pt: size_pt.unwrap_or(default_size_pt),
+      legend_key: false,
     })
   };
   let marker_size = |marker: &c::Marker| {
@@ -11853,6 +12442,7 @@ fn resolved_chart_marker(
       .map(|symbol| ResolvedChartMarker {
         symbol,
         size_pt: automatic_size_pt,
+        legend_key: false,
       }),
   };
   let Some(point_marker) = point_index.and_then(|index| chart_point_marker(series, index)) else {
@@ -11918,6 +12508,7 @@ fn chart_marker_stroke_width(
 
 fn lower_chart_marker(
   items: &mut Vec<PageItem>,
+  marker_backdrops: Option<&mut Vec<PageItem>>,
   center: (f32, f32),
   marker: ResolvedChartMarker,
   fallback_color: RgbColor,
@@ -11931,6 +12522,11 @@ fn lower_chart_marker(
     point_index,
   } = point;
   let fallback_stroke = chart_marker_stroke_width(series, point_index).map(|width| {
+    let width = if marker.legend_key && series.marker.is_none() {
+      0.5
+    } else {
+      width
+    };
     crate::common::ShapeStyleValue::Paint(crate::common::Stroke {
       width: crate::common::Pt(width),
       color: common_rgb(fallback_color, 1.0),
@@ -11938,13 +12534,19 @@ fn lower_chart_marker(
     })
   });
   let paint = ChartShapePaint {
-    fill: chart_marker_fill_style(style, series_index, point_index),
-    stroke: chart_marker_stroke_style(style, series_index, point_index)
+    fill: chart_marker_fill_style(style, series_index, point_index, !marker.legend_key),
+    stroke: chart_marker_stroke_style(style, series_index, point_index, !marker.legend_key)
       .or(fallback_stroke.as_ref()),
     fallback_fill_color: Some(fallback_color),
     stroke_width_scale: style.stroke_scale,
   };
-  let geometry = chart_marker_geometry(marker.symbol, x, y, marker.size_pt * style.stroke_scale);
+  let geometry = chart_marker_geometry(
+    marker.symbol,
+    x,
+    y,
+    marker.size_pt * style.stroke_scale,
+    style.chartsheet,
+  );
   let no_fill = crate::common::ShapeStyleValue::NoPaint;
   let paint = if geometry.filled {
     paint
@@ -11965,12 +12567,30 @@ fn lower_chart_marker(
     fill,
     stroke,
   };
+  if marker.legend_key {
+    // Excel legend symbols describe the series without its plot shadows or
+    // three-dimensional effects. Authored marker paint still wins above.
+    items.push(PageItem::Path(path));
+    return;
+  }
   let effects = resolved_chart_shape_effects(
     style,
     series_index,
     point_index,
     ChartShapeEffectTarget::Marker,
   );
+  if style.chartsheet
+    && effects.static_3d.is_none()
+    && push_chartsheet_marker_effect_raster(
+      items,
+      marker_backdrops,
+      &path,
+      marker.symbol,
+      effects.image_effects,
+    )
+  {
+    return;
+  }
   if !push_chart_shape_effect_raster(
     items,
     &path,
@@ -11997,9 +12617,15 @@ fn chart_marker_geometry(
   x: f32,
   y: f32,
   size: f32,
+  chartsheet: bool,
 ) -> ChartMarkerGeometry {
   use crate::common::PathCommand::{LineTo, MoveTo};
 
+  // Excel's diamond and triangle share the same centered marker cell as
+  // its square. Other chart hosts retain their existing symbol proportions.
+  let polygon_half_width = size * if chartsheet { 0.5 } else { 0.55 };
+  let triangle_top = size * if chartsheet { 0.5 } else { 0.6 };
+  let triangle_bottom = size * if chartsheet { 0.5 } else { 0.45 };
   match symbol {
     c::MarkerStyleValues::Plus | c::MarkerStyleValues::X => {
       let diagonal = symbol == c::MarkerStyleValues::X;
@@ -12054,23 +12680,33 @@ fn chart_marker_geometry(
       }
     }
     c::MarkerStyleValues::Diamond => ChartMarkerGeometry {
-      bounds: common_rect(x - size * 0.55, y - size * 0.55, size * 1.1, size * 1.1),
+      bounds: common_rect(
+        x - polygon_half_width,
+        y - polygon_half_width,
+        size * if chartsheet { 1.0 } else { 1.1 },
+        size * if chartsheet { 1.0 } else { 1.1 },
+      ),
       points: vec![
-        common_point(x, y - size * 0.55),
-        common_point(x + size * 0.55, y),
-        common_point(x, y + size * 0.55),
-        common_point(x - size * 0.55, y),
+        common_point(x, y - polygon_half_width),
+        common_point(x + polygon_half_width, y),
+        common_point(x, y + polygon_half_width),
+        common_point(x - polygon_half_width, y),
       ],
       commands: Vec::new(),
       closed: true,
       filled: true,
     },
     c::MarkerStyleValues::Triangle => ChartMarkerGeometry {
-      bounds: common_rect(x - size * 0.55, y - size * 0.6, size * 1.1, size * 1.05),
+      bounds: common_rect(
+        x - polygon_half_width,
+        y - triangle_top,
+        size * if chartsheet { 1.0 } else { 1.1 },
+        size * if chartsheet { 1.0 } else { 1.05 },
+      ),
       points: vec![
-        common_point(x, y - size * 0.6),
-        common_point(x + size * 0.55, y + size * 0.45),
-        common_point(x - size * 0.55, y + size * 0.45),
+        common_point(x, y - triangle_top),
+        common_point(x + polygon_half_width, y + triangle_bottom),
+        common_point(x - polygon_half_width, y + triangle_bottom),
       ],
       commands: Vec::new(),
       closed: true,
@@ -12231,6 +12867,7 @@ fn lower_radar_series(
     {
       lower_chart_marker(
         items,
+        None,
         point,
         marker,
         chart_point_color(style, series_index, index).unwrap_or(color),
@@ -14660,7 +15297,13 @@ fn lower_manual_legend(
   } else {
     style.legend.font_size_pt * 0.26
   };
-  let text_body = chart_legend_text_body(chart.legend_text_body_properties);
+  let mut text_body = chart_legend_text_body(chart.legend_text_body_properties);
+  if style.layout_profile == ChartLayoutProfile::Excel {
+    // Excel's manual Cartesian legend retains identical label positions for
+    // omitted, zero and explicitly supplied DrawingML body insets. Applying
+    // text-box margins here can remove every label from a one-line legend.
+    text_body.insets = ChartTextBodyInsets::default();
+  }
   let mut metrics = TextMetrics::new();
   let entry_widths = entries
     .iter()
@@ -14960,13 +15603,42 @@ fn horizontal_legend_key_width(
   style.legend.font_size_pt * if line_key { line_key_width_em } else { 0.55 }
 }
 
+fn excel_chartsheet_automatic_category_layout(
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+) -> bool {
+  style.chartsheet
+    && chart.title.is_none()
+    && chart.plot_layout.is_none()
+    && chart.view_3d.is_none()
+    && chart.data_table.is_none()
+    && chart.category_axis_title.is_none()
+    && chart.value_axis_title.is_none()
+    && chart.axis_sets.len() <= 1
+    && !chart.legend_overlay
+    && matches!(
+      chart.legend_position,
+      None | Some(ChartLegendPosition::Right)
+    )
+    && chart.series.iter().all(|series| {
+      matches!(
+        series.kind,
+        ChartSeriesKind::Line | ChartSeriesKind::Column | ChartSeriesKind::Area
+      )
+    })
+}
+
 fn vertical_legend_width(
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
   scale: crate::render::chart::LinearAxisScale,
   metrics: &mut TextMetrics,
 ) -> f32 {
-  let marker_gap = style.legend.font_size_pt * 0.26;
+  let marker_gap = if style.chartsheet {
+    2.0 * style.stroke_scale
+  } else {
+    style.legend.font_size_pt * 0.26
+  };
   cartesian_legend_entries(chart, style, scale)
     .iter()
     .map(|entry| {
@@ -14979,6 +15651,11 @@ fn vertical_legend_width(
         + metrics.measure_text(entry.label.as_ref(), &legend_style)
     })
     .fold(0.0_f32, f32::max)
+    + if style.chartsheet {
+      8.0 * style.stroke_scale
+    } else {
+      0.0
+    }
 }
 
 fn lower_vertical_legend(
@@ -14992,7 +15669,9 @@ fn lower_vertical_legend(
 ) {
   let framed = legend_frame_has_paint(&style.legend_frame_style);
   let frame_metrics = legend_frame_metrics(style.legend.font_size_pt);
-  let marker_gap = if framed {
+  let marker_gap = if style.chartsheet {
+    2.0 * style.stroke_scale
+  } else if framed {
     frame_metrics.symbol_to_text
   } else {
     style.legend.font_size_pt * 0.26
@@ -15077,6 +15756,13 @@ fn lower_vertical_legend(
   if excel_vary_colors_data_table_layout(chart, style) && !align_top {
     y += frame.height_pt * profiles::EXCEL_VARY_COLORS_DATA_TABLE_LEGEND_Y_RATIO;
   }
+  if style.chartsheet {
+    y = if align_top {
+      frame.y_pt + 11.0 * style.stroke_scale
+    } else {
+      frame.y_pt + (frame.height_pt - total_height) * 0.5
+    };
+  }
   let mut metrics = TextMetrics::new();
   let maximum_entry_width = entries
     .iter()
@@ -15155,7 +15841,11 @@ fn vertical_legend_key_width(
   style: &ClusteredColumnStyle,
 ) -> f32 {
   if kind.uses_line_width() {
-    return style.legend.font_size_pt * profiles::CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM;
+    return if style.chartsheet {
+      20.0 * style.stroke_scale
+    } else {
+      style.legend.font_size_pt * profiles::CARTESIAN_LINE_LEGEND_KEY_WIDTH_EM
+    };
   }
   if legend_frame_has_paint(&style.legend_frame_style) {
     return legend_frame_metrics(style.legend.font_size_pt).symbol_height;
@@ -15253,13 +15943,20 @@ fn push_cartesian_legend_key(
     let Some(series) = chart.series.get(series_index) else {
       return;
     };
-    let Some(marker) =
+    let Some(mut marker) =
       resolved_chart_marker(series, entry.point_index, style.automatic_line_width_pt)
     else {
       return;
     };
+    if style.chartsheet {
+      // Font-size controls (8/10/12/20pt) cap automatic legend symbols at
+      // 4/6/7/8pt respectively, independently of the full-size plot marker.
+      marker.legend_key = true;
+      marker.size_pt = chartsheet_legend_marker_size_pt(marker.size_pt, style.legend.font_size_pt);
+    }
     lower_chart_marker(
       items,
+      None,
       (x_pt + size_pt * 0.5, y_pt + size_pt * 0.5),
       marker,
       entry.color.unwrap_or_default(),
@@ -15985,6 +16682,7 @@ fn push_text_with_segmentation_rotation_center_and_paint_clip(
     line_height_pt: line_height(&style),
     drawingml_text_effect_anchor: None,
     paint_clip,
+    page_culling_bounds: None,
     discard_if_horizontally_clipped: false,
     text,
     style: Box::new(style),
@@ -16015,6 +16713,7 @@ fn push_data_table_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String,
     line_height_pt: line_height(&style),
     drawingml_text_effect_anchor: None,
     paint_clip: None,
+    page_culling_bounds: None,
     discard_if_horizontally_clipped: true,
     text,
     style: Box::new(style),
@@ -16059,6 +16758,131 @@ mod tests {
     ChartSeriesKind,
   };
   use crate::text_metrics::{TextMetrics, TextVerticalMetrics};
+
+  #[test]
+  fn chartsheet_legend_marker_matches_native_font_size_controls() {
+    // Office exports: an 8pt automatic plot marker is capped independently
+    // by each legend font. A smaller authored marker remains smaller.
+    for (font_size, expected) in [(8.0, 4.0), (10.0, 6.0), (12.0, 7.0), (20.0, 8.0)] {
+      assert_eq!(
+        super::chartsheet_legend_marker_size_pt(8.0, font_size),
+        expected
+      );
+    }
+    assert_eq!(super::chartsheet_legend_marker_size_pt(3.0, 12.0), 3.0);
+  }
+
+  #[test]
+  fn chartsheet_marker_raster_matches_native_polygon_coverage() {
+    // Alpha masses from configured Office output, independently reproduced
+    // by GDI+ FillPolygon/DrawPolygon with AntiAlias8x4 and PixelOffsetModeNone.
+    for (symbol, size, pen, pixels, expected) in [
+      (c::MarkerStyleValues::Diamond, 8.0, 0.5, 24, 67_448_i64),
+      (c::MarkerStyleValues::Triangle, 8.0, 0.5, 24, 69_584),
+      (c::MarkerStyleValues::Square, 8.0, 0.5, 24, 137_542),
+      (c::MarkerStyleValues::Diamond, 8.0, 0.0, 23, 63_836),
+      (c::MarkerStyleValues::Triangle, 8.0, 0.0, 23, 63_116),
+      (c::MarkerStyleValues::Square, 8.0, 0.0, 23, 126_943),
+      (c::MarkerStyleValues::Diamond, 12.0, 0.5, 35, 148_626),
+      (c::MarkerStyleValues::Triangle, 12.0, 0.5, 35, 153_216),
+      (c::MarkerStyleValues::Square, 12.0, 0.5, 35, 298_791),
+      (c::MarkerStyleValues::Diamond, 12.0, 0.0, 34, 142_040),
+      (c::MarkerStyleValues::Triangle, 12.0, 0.0, 34, 140_952),
+      (c::MarkerStyleValues::Square, 12.0, 0.0, 34, 282_967),
+    ] {
+      let geometry = super::chart_marker_geometry(symbol, 141.56569, 150.65988, size, true);
+      let path = crate::common::PathItem {
+        bounds: geometry.bounds,
+        points: geometry.points,
+        commands: geometry.commands,
+        closed: geometry.closed,
+        fill: Fill::Solid(Color {
+          a: 255,
+          ..Color::default()
+        }),
+        stroke: (pen > 0.0).then_some(Stroke {
+          width: Pt(pen),
+          color: Color {
+            a: 255,
+            ..Color::default()
+          },
+          ..Stroke::default()
+        }),
+      };
+      let image = super::chartsheet_marker_source_image(&path, symbol, 200.0 / 72.0).unwrap();
+      assert_eq!(image.dimensions(), (pixels, pixels));
+      let mass: i64 = image.pixels().map(|pixel| i64::from(pixel[3])).sum();
+      assert!(
+        (mass - expected).abs() <= expected / 100,
+        "{symbol:?}, size {size}, pen {pen}: alpha mass {mass}, native {expected}"
+      );
+    }
+  }
+
+  #[test]
+  fn chartsheet_shadow_canvas_matches_native_distance_and_blur_controls() {
+    // Office zero/1/2/3pt, reverse direction, 45-degree and 3pt blur exports.
+    // Square's odd printer-dot width is retained independently of polygons.
+    for (offset, blur, near, polygon_span, square_span, pixels) in [
+      (0.0, 5.0, -9.36, 18.72, 18.84, 52),
+      (1.0, 5.0, -8.28, 18.60, 18.72, 52),
+      (2.0, 5.0, -7.32, 18.60, 18.72, 52),
+      (3.0, 5.0, -6.36, 18.72, 18.84, 52),
+      (-2.0, 5.0, -11.28, 18.60, 18.72, 52),
+      (std::f32::consts::SQRT_2, 5.0, -7.92, 18.72, 18.84, 52),
+      (2.0, 3.0, -5.28, 14.64, 14.76, 41),
+    ] {
+      for (symbol, span) in [
+        (c::MarkerStyleValues::Diamond, polygon_span),
+        (c::MarkerStyleValues::Triangle, polygon_span),
+        (c::MarkerStyleValues::Square, square_span),
+      ] {
+        let axis =
+          super::chartsheet_marker_shadow_axis(8.0, 0.5, symbol, offset, blur, 200.0 / 72.0);
+        assert!(
+          (axis.near_pt - near).abs() < 0.0001,
+          "{symbol:?}, offset {offset}"
+        );
+        assert!(
+          (axis.span_pt - span).abs() < 0.0001,
+          "{symbol:?}, offset {offset}"
+        );
+        assert_eq!(axis.pixels, pixels);
+      }
+    }
+  }
+
+  #[test]
+  fn chartsheet_marker_export_matches_native_gdiplus_color_control() {
+    for (source, expected) in [
+      ([63, 143, 159, 16], [47, 127, 143, 16]),
+      ([55, 145, 167, 215], [54, 144, 166, 215]),
+      ([56, 145, 166, 231], [55, 144, 165, 231]),
+      ([58, 143, 164, 48], [53, 138, 159, 48]),
+      ([56, 145, 167, 255], [56, 145, 167, 255]),
+    ] {
+      assert_eq!(
+        super::chartsheet_marker_export_pixel(image::Rgba(source)),
+        image::Rgba(expected)
+      );
+    }
+  }
+
+  #[test]
+  fn chartsheet_marker_demultiply_matches_native_bright_edges() {
+    for (source, expected) in [
+      ([159, 115, 6, 159], [254, 184, 9, 159]),
+      ([171, 124, 6, 171], [254, 184, 8, 171]),
+      ([127, 92, 5, 128], [253, 183, 9, 128]),
+      ([21, 54, 63, 96], [55, 143, 167, 96]),
+      ([4, 9, 10, 16], [63, 143, 159, 16]),
+    ] {
+      assert_eq!(
+        super::chartsheet_marker_demultiply_pixel(image::Rgba(source)),
+        image::Rgba(expected)
+      );
+    }
+  }
 
   #[test]
   fn radial_perspective_extrusion_projects_both_planes_and_the_silhouette() {
@@ -16466,7 +17290,7 @@ mod tests {
       c::MarkerStyleValues::Dot,
       c::MarkerStyleValues::Star,
     ] {
-      let geometry = super::chart_marker_geometry(symbol, 10.0, 20.0, 6.0);
+      let geometry = super::chart_marker_geometry(symbol, 10.0, 20.0, 6.0, false);
       assert!(geometry.bounds.size.width.0 > 0.0, "{symbol:?}");
       assert!(geometry.bounds.size.height.0 > 0.0, "{symbol:?}");
     }
@@ -16543,6 +17367,7 @@ mod tests {
     assert_eq!(
       marker(0, 1),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Square,
         size_pt: 8.0,
       })
@@ -16550,6 +17375,7 @@ mod tests {
     assert_eq!(
       marker(0, 2),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::X,
         size_pt: 5.0,
       })
@@ -16557,6 +17383,7 @@ mod tests {
     assert_eq!(
       marker(0, 3),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Circle,
         size_pt: 15.0,
       })
@@ -16564,6 +17391,7 @@ mod tests {
     assert_eq!(
       marker(0, 4),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Circle,
         size_pt: 7.0,
       })
@@ -16571,6 +17399,7 @@ mod tests {
     assert_eq!(
       marker(1, 0),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Dash,
         size_pt: 7.0,
       })
@@ -16615,6 +17444,7 @@ mod tests {
     assert_eq!(
       marker(0, Some(0)),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Triangle,
         size_pt: 8.0,
       })
@@ -16622,6 +17452,7 @@ mod tests {
     assert_eq!(
       marker(0, Some(1)),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Triangle,
         size_pt: 11.0,
       })
@@ -16629,6 +17460,7 @@ mod tests {
     assert_eq!(
       marker(0, Some(2)),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Triangle,
         size_pt: 7.0,
       })
@@ -16636,6 +17468,7 @@ mod tests {
     assert_eq!(
       marker(0, Some(3)),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Square,
         size_pt: 5.0,
       })
@@ -16645,6 +17478,7 @@ mod tests {
     assert_eq!(
       marker(1, Some(2)),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::X,
         size_pt: 7.0,
       })
@@ -16652,6 +17486,7 @@ mod tests {
     assert_eq!(
       marker(1, Some(3)),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Triangle,
         size_pt: 5.0,
       })
@@ -16659,6 +17494,7 @@ mod tests {
     assert_eq!(
       marker(2, None),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Star,
         size_pt: 7.0,
       })
@@ -16666,6 +17502,7 @@ mod tests {
     assert_eq!(
       marker(3, None),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Circle,
         size_pt: 8.0,
       })
@@ -16673,6 +17510,7 @@ mod tests {
     assert_eq!(
       marker(4, None),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Plus,
         size_pt: 8.0,
       })
@@ -16680,6 +17518,7 @@ mod tests {
     assert_eq!(
       marker(5, None),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Triangle,
         size_pt: 5.0,
       })
@@ -16687,6 +17526,7 @@ mod tests {
     assert_eq!(
       marker(6, None),
       Some(super::ResolvedChartMarker {
+        legend_key: false,
         symbol: c::MarkerStyleValues::Dash,
         size_pt: 7.0,
       })

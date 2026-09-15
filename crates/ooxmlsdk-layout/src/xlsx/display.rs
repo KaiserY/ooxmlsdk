@@ -303,6 +303,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     line_height: common::Pt(item.line_height_pt),
     line_metrics_participant: true,
     paint_clip: item.paint_clip,
+    page_culling_bounds: item.page_culling_bounds,
     style: common_text_style(*item.style),
     font_id: None,
     color,
@@ -435,11 +436,39 @@ fn print_page_items(
     .area
     .map(|area| page.sheet.fixed_output_range_rect(area, zoom_scale))
     .map_or((0.0, 0.0), |rect| (rect.width_pt, rect.height_pt));
-  let horizontal_centering = calc_axis_centering_offset(
-    page.page_settings.horizontal_centered,
-    setup.width_pt - setup.margin_left_pt - setup.margin_right_pt,
-    heading_width + repeat_width + area_size.0,
-  );
+  // Center the worksheet on the unmapped output-paper canvas, then apply
+  // the paper scale to that distance. Centering already-scaled columns
+  // incorrectly moves the page center when Letter is mapped onto A4.
+  let paper_scale = page.paper_scale_percent as f32 / 100.0;
+  let centering_scale = page.zoom as f32 / 100.0;
+  let horizontal_centering = if page.page_settings.horizontal_centered {
+    calc_axis_centering_offset(
+      true,
+      setup.width_pt
+        - units::quantize_points_to_office_print_grid(setup.margin_left_pt)
+        - units::quantize_points_to_office_print_grid(setup.margin_right_pt),
+      heading_width / paper_scale
+        + effective_repeated_columns(page).map_or(0.0, |range| {
+          page
+            .sheet
+            .fixed_output_centering_width_pt(range, centering_scale)
+        })
+        + page.area.map_or(0.0, |range| {
+          page
+            .sheet
+            .fixed_output_centering_width_pt(range, centering_scale)
+        }),
+    )
+  } else {
+    0.0
+  };
+  let horizontal_centering = if page.page_settings.horizontal_centered {
+    page
+      .sheet
+      .fixed_output_centering_offset_pt(horizontal_centering * paper_scale)
+  } else {
+    0.0
+  };
   let vertical_centering = calc_axis_centering_offset(
     page.page_settings.vertical_centered,
     setup.height_pt - setup.margin_top_pt - setup.margin_bottom_pt,
@@ -448,9 +477,19 @@ fn print_page_items(
   let right_to_left = sheet_right_to_left(page.sheet);
   let body_width = repeat_width + area_size.0;
   let body_origin_x = if right_to_left {
+    // Mirrored worksheets remain anchored to the physical right margin;
+    // paper scaling changes column extents, not that page-edge reference.
     setup.width_pt - setup.margin_right_pt - horizontal_centering - heading_width - body_width
   } else {
-    setup.margin_left_pt + horizontal_centering + heading_width
+    (if page.sheet.sheet_type == super::worksheet::SheetType::Chartsheet {
+      page.page_settings.fixed_output_chartsheet_origin_pt().0
+    } else {
+      page
+        .page_settings
+        .fixed_output_body_origin_pt(page.paper_scale_percent)
+        .0
+    }) + horizontal_centering
+      + heading_width
   };
   let repeated_origin_x = if right_to_left {
     body_origin_x + area_size.0
@@ -462,16 +501,25 @@ fn print_page_items(
   } else {
     body_origin_x + repeat_width
   };
-  let body_origin_y = page
-    .page_settings
-    .fixed_output_body_top_pt(page.paper_scale_percent)
-    + vertical_centering
+  let body_origin_y = if page.sheet.sheet_type == super::worksheet::SheetType::Chartsheet {
+    page.page_settings.fixed_output_chartsheet_origin_pt().1
+  } else {
+    page
+      .page_settings
+      .fixed_output_body_top_pt(page.paper_scale_percent)
+  } + vertical_centering
     + heading_height;
   let physical_page = CellRect {
     x_pt: 0.0,
     y_pt: 0.0,
     width_pt: setup.width_pt,
     height_pt: setup.height_pt,
+  };
+  let fill_page = CellRect {
+    x_pt: body_origin_x,
+    y_pt: body_origin_y,
+    width_pt: body_width,
+    height_pt: repeat_height + area_size.1,
   };
   let mut text_metrics = TextMetrics::new();
 
@@ -504,6 +552,7 @@ fn print_page_items(
         origin_y_pt: body_origin_y,
         zoom_scale,
         physical_page,
+        fill_page,
       },
       &mut text_metrics,
     );
@@ -520,6 +569,7 @@ fn print_page_items(
         origin_y_pt: body_origin_y,
         zoom_scale,
         physical_page,
+        fill_page,
       },
       &mut text_metrics,
     );
@@ -536,6 +586,7 @@ fn print_page_items(
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
         physical_page,
+        fill_page,
       },
       &mut text_metrics,
     );
@@ -552,6 +603,7 @@ fn print_page_items(
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
         physical_page,
+        fill_page,
       },
       &mut text_metrics,
     );
@@ -697,6 +749,19 @@ impl DrawingAreaRenderLayout {
   }
 
   fn clip_rect(self, page: &CalcPrintPage<'_>, setup: PageSetup) -> CellRect {
+    if page.sheet.sheet_type == super::worksheet::SheetType::Chartsheet {
+      // Keep the full anchor geometry, but paint only the printer's body.
+      // Native PDF paths can extend past this clip; their coordinates alone
+      // do not establish that the overflowing border or labels are visible.
+      let left = self.origin_x_pt.max(setup.margin_left_pt);
+      let top = self.origin_y_pt.max(setup.margin_top_pt);
+      return CellRect {
+        x_pt: left,
+        y_pt: top,
+        width_pt: (setup.width_pt - setup.margin_right_pt - left).max(0.0),
+        height_pt: (setup.height_pt - setup.margin_bottom_pt - top).max(0.0),
+      };
+    }
     self.area.map_or(
       CellRect {
         x_pt: setup.margin_left_pt,
@@ -819,6 +884,7 @@ fn print_page_drawingml_items(
           page_transform,
           page_clip_rect,
           zoom_scale: layout.zoom_scale,
+          chartsheet: page.sheet.sheet_type == super::worksheet::SheetType::Chartsheet,
         },
       );
     }
@@ -1093,6 +1159,7 @@ fn push_vml_group_box_text_item(
     line_height_pt: line_height,
     drawingml_text_effect_anchor: None,
     paint_clip: None,
+    page_culling_bounds: None,
     discard_if_horizontally_clipped: false,
     text: shape.text.clone(),
     style: Box::new(style),
@@ -1370,6 +1437,7 @@ fn push_vml_checkable_control_text_item(
     line_height_pt: line_height,
     drawingml_text_effect_anchor: None,
     paint_clip: None,
+    page_culling_bounds: None,
     discard_if_horizontally_clipped: false,
     text: shape.text.clone(),
     style: Box::new(style),
@@ -2546,6 +2614,8 @@ struct CellAreaRenderLayout {
   origin_y_pt: f32,
   zoom_scale: f32,
   physical_page: CellRect,
+  // Repeated rows/columns and the main area share one outer fill clip.
+  fill_page: CellRect,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2614,6 +2684,59 @@ fn render_cell_area(
     width_pt: area_rect.width_pt,
     height_pt: area_rect.height_pt,
   };
+  let rotated_page_clip = if page.has_explicit_print_area {
+    layout.fill_page
+  } else {
+    CellRect {
+      x_pt: page.page_settings.margin_left_in as f32 * units::POINTS_PER_INCH,
+      y_pt: layout.origin_y_pt,
+      width_pt: layout.physical_page.width_pt
+        - (page.page_settings.margin_left_in + page.page_settings.margin_right_in) as f32
+          * units::POINTS_PER_INCH,
+      height_pt: (layout.physical_page.height_pt
+        - layout.origin_y_pt
+        - page.page_settings.margin_bottom_in as f32 * units::POINTS_PER_INCH)
+        .max(0.0),
+    }
+  };
+  // Office starts its search for strings spilling from earlier columns at
+  // the first data column on this page, or the page's last column when the
+  // page contains only overflow. The tdf124816 continuation and explicit
+  // K/R print-area controls retain different strings with identical glyph
+  // positions. A value anywhere in the page's row range moves this boundary;
+  // empty strings/formulas and hidden numbers count, formatting alone does not.
+  let first_data_column = cells
+    .iter()
+    .filter(|cell| {
+      area.contains(cell.address)
+        && (!cell.text.is_empty()
+          || cell.formula
+          || cell.data_type.is_some()
+          || !cell.rich_text_runs.is_empty())
+    })
+    .map(|cell| cell.address.col)
+    .min()
+    .unwrap_or(area.end.col);
+  let overflow_scan_area = CellRange::new(
+    CellAddress {
+      col: first_data_column,
+      row: area.start.row,
+    },
+    area.end,
+  );
+  let overflow_scan_rect = page
+    .sheet
+    .fixed_output_range_rect(overflow_scan_area, layout.zoom_scale);
+  let overflow_scan_rect = sheet_horizontal_rect(
+    CellRect {
+      x_pt: layout.origin_x_pt + overflow_scan_rect.x_pt - area_rect.x_pt,
+      y_pt: layout.origin_y_pt,
+      ..overflow_scan_rect
+    },
+    layout.origin_x_pt,
+    area_rect.width_pt,
+    sheet_right_to_left(page.sheet),
+  );
   let occupied_cells = calc_occupied_text_cells(cells);
   let has_drawing_canvas = page
     .sheet
@@ -2622,9 +2745,89 @@ fn render_cell_area(
     .iter()
     .any(|drawing| !drawing.anchors.is_empty());
   let mut deferred_edit_text_items = Vec::new();
+  let mut border_paints = Vec::new();
   let mut conditional_eval_cache = super::print::ConditionalFormatEvalCache::default();
   for cell in cells {
-    if page.sheet.is_covered_merged_cell(cell.address) {
+    let merged_range = page.sheet.merged_range_for_cell(cell.address);
+    let table_builtin_style = super::table::builtin_table_style_for_address(
+      &page.sheet.resources.tables,
+      &import.styles,
+      cell.address,
+    );
+    let pivot_builtin_style =
+      super::pivot::pivot_builtin_style_for_address(page.sheet, &import.styles, cell.address);
+    let mut alignment = import.styles.alignment_for_cell(cell.style_index);
+    if pivot_builtin_style.left_align {
+      let mut pivot_alignment = alignment.unwrap_or_default();
+      pivot_alignment.horizontal = Some(x::HorizontalAlignmentValues::Left);
+      alignment = Some(pivot_alignment);
+    }
+    if let Some(format_id) = cell.pivot_format_id
+      && let Some(pivot_alignment) = import.styles.differential_alignment(format_id)
+    {
+      alignment = Some(pivot_alignment);
+    }
+    let mut borders = table_builtin_style.borders;
+    // Direct cell paint wins over the named style; tableBorderDxfId then
+    // overrides the perimeter, even over a thicker direct cell border.
+    merge_cell_borders(
+      &mut borders,
+      import.styles.borders_for_cell(cell.style_index),
+    );
+    merge_cell_borders(&mut borders, table_builtin_style.outline_borders);
+    merge_cell_borders(&mut borders, pivot_builtin_style.borders);
+    if let Some(format_id) = cell.pivot_format_id
+      && let Some(pivot_borders) = import.styles.differential_borders(format_id)
+    {
+      merge_cell_borders(&mut borders, pivot_borders);
+    }
+    let shear = cell_border_shear(alignment.and_then(|a| a.text_rotation), borders);
+    // The upper horizontal edge of a slanted cell lies outside Office's
+    // print clip on the first printed row. A6:C9 controls omit the same
+    // edge that remains visible when the table prints below earlier rows.
+    if shear.is_some() && cell.address.row == area.start.row {
+      borders.top = None;
+    }
+    if area.contains(cell.address) {
+      // Merged cells keep individual perimeter segments. Office suppresses
+      // internal edges but does not stretch the anchor's borders over the
+      // merged rectangle; covered cells still contribute their outer edges.
+      if let Some(merged) = merged_range {
+        if cell.address.col != merged.start.col {
+          borders.left = None;
+        }
+        if cell.address.col != merged.end.col {
+          borders.right = None;
+        }
+        if cell.address.row != merged.start.row {
+          borders.top = None;
+        }
+        if cell.address.row != merged.end.row {
+          borders.bottom = None;
+        }
+      }
+      let rect = page
+        .sheet
+        .fixed_output_range_rect(CellRange::single(cell.address), layout.zoom_scale);
+      if rect.width_pt > 0.0 && rect.height_pt > 0.0 {
+        let rect = sheet_horizontal_rect(
+          CellRect {
+            x_pt: layout.origin_x_pt + rect.x_pt - area_rect.x_pt,
+            y_pt: layout.origin_y_pt + rect.y_pt - area_rect.y_pt,
+            ..rect
+          },
+          layout.origin_x_pt,
+          area_rect.width_pt,
+          sheet_right_to_left(page.sheet),
+        );
+        border_paints.push(CellBorderPaint {
+          rect,
+          borders,
+          shear,
+        });
+      }
+    }
+    if merged_range.is_some_and(|merged| cell.address != merged.start) {
       continue;
     }
     let rect = page
@@ -2655,14 +2858,12 @@ fn render_cell_area(
     // text that extends left into the page; it does not own ordinary cell
     // paint on this page.
     let scan_context_only = !area.contains(cell.address);
-    let table_builtin_style = super::table::builtin_table_style_for_address(
-      &page.sheet.resources.tables,
-      &import.styles,
-      cell.address,
-    );
-    let pivot_builtin_style =
-      super::pivot::pivot_builtin_style_for_address(page.sheet, &import.styles, cell.address);
+    let owns_merged_text = page
+      .sheet
+      .merged_range_for_cell(cell.address)
+      .is_some_and(|merged| merged.intersects(area));
     if !scan_context_only {
+      let fill_start = items.len();
       let solid = |color| super::styles::FillRecord {
         color: Some(color),
         ..Default::default()
@@ -2674,6 +2875,13 @@ fn render_cell_area(
             .and_then(|id| import.styles.differential_fill(id))
         })
         .or_else(|| pivot_builtin_style.fill.map(solid))
+        .or_else(|| {
+          // A visible cell fill overrides both builtin and custom table
+          // styles. "No fill" leaves table stripes visible, including when
+          // the cell XF explicitly sets applyFill with fillId zero.
+          let fill = import.styles.fill_for_cell(cell.style_index);
+          (fill.color.is_some() || fill.pattern.is_some()).then_some(fill)
+        })
         .or_else(|| table_builtin_style.fill.map(solid))
         .unwrap_or_else(|| import.styles.fill_for_cell(cell.style_index));
       if let Some(pattern) = fill.pattern {
@@ -2690,41 +2898,43 @@ fn render_cell_area(
           fill: common::Fill::Pattern(pattern),
           stroke: None,
         }));
-      } else if let Some(fill_color) = fill.color {
+      } else if let Some(fill_color) = fill.color
+        && let Some(fill_rect) = fixed_output_solid_cell_fill_rect(
+          CellRect {
+            x_pt,
+            y_pt,
+            width_pt,
+            height_pt,
+          },
+          layout.fill_page,
+        )
+      {
         items.push(PageItem::Rect(RectItem {
-          x_pt,
-          y_pt,
-          width_pt,
-          height_pt,
+          x_pt: fill_rect.x_pt,
+          y_pt: fill_rect.y_pt,
+          width_pt: fill_rect.width_pt,
+          height_pt: fill_rect.height_pt,
           fill_color: Some(fill_color),
           fill_opacity: 1.0,
           stroke: None,
           stroke_opacity: 1.0,
         }));
       }
+      if let Some(shear) = shear {
+        shear_cell_paint(
+          &mut items[fill_start..],
+          CellRect {
+            x_pt,
+            y_pt,
+            width_pt,
+            height_pt,
+          },
+          shear,
+          rotated_page_clip,
+        );
+      }
     }
-    let mut borders = import.styles.borders_for_cell(cell.style_index);
-    merge_cell_borders(&mut borders, table_builtin_style.borders);
-    merge_cell_borders(&mut borders, pivot_builtin_style.borders);
-    if let Some(format_id) = cell.pivot_format_id
-      && let Some(pivot_borders) = import.styles.differential_borders(format_id)
-    {
-      merge_cell_borders(&mut borders, pivot_borders);
-    }
-    if !scan_context_only {
-      render_cell_borders(
-        items,
-        CellRect {
-          x_pt,
-          y_pt,
-          width_pt,
-          height_pt,
-        },
-        borders,
-        layout.zoom_scale,
-      );
-    }
-    if cell.rendered_text.is_empty() && cell.icon_set.is_none() {
+    if cell.rendered_text.is_empty() && cell.icon_set.is_none() && cell.data_bar.is_none() {
       continue;
     }
     let hyperlink_url = hyperlink_for_cell(page, cell.address);
@@ -2734,6 +2944,15 @@ fn render_cell_area(
       width_pt,
       height_pt,
     };
+    if !scan_context_only && let Some(bar) = cell.data_bar {
+      render_cell_data_bar(
+        items,
+        bar,
+        cell_rect,
+        layout.zoom_scale,
+        sheet_right_to_left(page.sheet),
+      );
+    }
     let mut measurement_style = import.styles.text_style_for_cell(cell.style_index);
     let direct_font_color = import
       .styles
@@ -2772,7 +2991,15 @@ fn render_cell_area(
     // 11pt legacy workbook font is consequently emitted and measured as
     // 11.04pt (92/600in), which also decides borderline wrap opportunities.
     super::text::scale_text_style_for_fixed_output(&mut measurement_style, layout.zoom_scale);
-    if page.sheet.uses_legacy_excel12_fixed_output_grid()
+    if let Some(spacing_pt) = text_metrics.gdi_synthetic_bold_character_spacing_pt(
+      &cell.rendered_text,
+      &measurement_style,
+      units::OFFICE_FIXED_OUTPUT_DPI,
+    ) {
+      // Office's SimHei controls match integer device advances plus GDI's
+      // one-pixel synthetic-bold expansion, independently of font size.
+      measurement_style.character_spacing_pt = spacing_pt;
+    } else if page.sheet.uses_legacy_excel12_fixed_output_grid()
       && let Some(spacing_pt) = text_metrics.gdi_uniform_device_character_spacing_pt(
         &cell.rendered_text,
         &measurement_style,
@@ -2797,21 +3024,13 @@ fn render_cell_area(
           .icon_set_print_metrics(measurement_style.font_size_pt),
       );
     }
-    if cell.rendered_text.is_empty() || cell.icon_set.is_some_and(|icon_set| !icon_set.show_value) {
+    if cell.rendered_text.is_empty()
+      || cell.icon_set.is_some_and(|icon_set| !icon_set.show_value)
+      || cell.data_bar.is_some_and(|bar| !bar.show_value)
+    {
       continue;
     }
     let render_style = measurement_style.clone();
-    let mut alignment = import.styles.alignment_for_cell(cell.style_index);
-    if pivot_builtin_style.left_align {
-      let mut pivot_alignment = alignment.unwrap_or_default();
-      pivot_alignment.horizontal = Some(x::HorizontalAlignmentValues::Left);
-      alignment = Some(pivot_alignment);
-    }
-    if let Some(format_id) = cell.pivot_format_id
-      && let Some(pivot_alignment) = import.styles.differential_alignment(format_id)
-    {
-      alignment = Some(pivot_alignment);
-    }
     let alignment_indent = alignment.map_or(0i64, |alignment| {
       i64::from(alignment.indent.unwrap_or(0)) + i64::from(alignment.relative_indent.unwrap_or(0))
     });
@@ -2864,10 +3083,15 @@ fn render_cell_area(
       cell,
       &measurement_style,
       output_area,
+      alignment,
       text_metrics,
     );
     let horizontal_alignment = calc_cell_horizontal_alignment(cell, alignment);
+    let formula_text_layout = cell.formula
+      && !(calc_cell_is_logical_value(cell)
+        && alignment.is_some_and(|alignment| alignment.wrap_text && alignment.shrink_to_fit));
     let mut rendered_text_items = Vec::new();
+    let mut number_layout_rendered = false;
     if !cell.rich_text_runs.is_empty() && rendered_text.as_ref() == cell.text.as_ref() {
       render_cell_rich_text(
         &mut rendered_text_items,
@@ -2878,12 +3102,45 @@ fn render_cell_area(
           alignment,
           horizontal_alignment,
           hyperlink_url: hyperlink_url.clone(),
-          formula: cell.formula,
-          default_line_height_pt: page.sheet.default_row_height_pt() * layout.zoom_scale,
+          formula: formula_text_layout,
+          default_line_height_pt: page.sheet.default_text_line_height_pt() * layout.zoom_scale,
+          clip_wrapped_text: page.sheet.row_has_custom_height(cell.address.row),
+          has_outer_border: borders.left.is_some()
+            || borders.right.is_some()
+            || borders.top.is_some()
+            || borders.bottom.is_some(),
         },
         layout.zoom_scale,
         text_metrics,
       );
+    } else if cell
+      .number_format_layout
+      .as_deref()
+      .is_some_and(|number_layout| {
+        number_layout_rendered = rendered_text.as_ref() == cell.rendered_text
+          && render_number_format_layout(
+            &mut rendered_text_items,
+            number_layout,
+            output_area.align_rect,
+            &render_style,
+            CellTextRenderOptions {
+              alignment,
+              horizontal_alignment,
+              hyperlink_url: hyperlink_url.clone(),
+              formula: formula_text_layout,
+              default_line_height_pt: page.sheet.default_text_line_height_pt() * layout.zoom_scale,
+              clip_wrapped_text: page.sheet.row_has_custom_height(cell.address.row),
+              has_outer_border: borders.left.is_some()
+                || borders.right.is_some()
+                || borders.top.is_some()
+                || borders.bottom.is_some(),
+            },
+            text_metrics,
+          );
+        number_layout_rendered
+      })
+    {
+      // Number-format spacing is measured on the same printer font grid as text.
     } else {
       render_cell_text(
         &mut rendered_text_items,
@@ -2894,20 +3151,27 @@ fn render_cell_area(
           alignment,
           horizontal_alignment,
           hyperlink_url: hyperlink_url.clone(),
-          formula: cell.formula,
-          default_line_height_pt: page.sheet.default_row_height_pt() * layout.zoom_scale,
+          formula: formula_text_layout,
+          default_line_height_pt: page.sheet.default_text_line_height_pt() * layout.zoom_scale,
+          clip_wrapped_text: page.sheet.row_has_custom_height(cell.address.row),
+          has_outer_border: borders.left.is_some()
+            || borders.right.is_some()
+            || borders.top.is_some()
+            || borders.bottom.is_some(),
         },
         text_metrics,
       );
     }
-    reorder_cell_text_items(
-      &mut rendered_text_items,
-      alignment.and_then(|alignment| alignment.reading_order),
-      rendered_text.as_ref(),
-      output_area.align_rect,
-      horizontal_alignment,
-      text_metrics,
-    );
+    if !number_layout_rendered {
+      reorder_cell_text_items(
+        &mut rendered_text_items,
+        alignment.and_then(|alignment| alignment.reading_order),
+        rendered_text.as_ref(),
+        output_area.align_rect,
+        horizontal_alignment,
+        text_metrics,
+      );
+    }
     rendered_text_items.retain_mut(|item| {
       let PageItem::Text(text) = item else {
         return false;
@@ -2916,8 +3180,28 @@ fn render_cell_area(
         cell.address.row.saturating_sub(1) as usize,
         cell.address.col.saturating_sub(1) as usize,
       ];
+      if owns_merged_text {
+        text.page_culling_bounds = Some(common_rect(x_pt, y_pt, width_pt, height_pt));
+      }
+      if page.has_explicit_print_area
+        && alignment
+          .and_then(|a| a.text_rotation)
+          .is_some_and(|r| (1..=180).contains(&r))
+      {
+        // The Office angle matrices omit rotated strings wholly outside an
+        // explicit print area and clip the ink of intersecting strings.
+        if !owns_merged_text && !text_item_intersects_rect(text, rotated_page_clip, text_metrics) {
+          return false;
+        }
+        text.paint_clip = Some(common_rect(
+          rotated_page_clip.x_pt,
+          rotated_page_clip.y_pt,
+          rotated_page_clip.width_pt,
+          rotated_page_clip.height_pt,
+        ));
+      }
       if scan_context_only {
-        if cell.address.col < area.start.col {
+        if !owns_merged_text && cell.address.col < area.start.col {
           // Earlier cells contribute only text that reaches this page through
           // unoccupied columns. A long string blocked by another cell must
           // not reappear on a later page just because its full glyph payload
@@ -2928,8 +3212,8 @@ fn render_cell_area(
             clip.y_pt,
             clip.x_pt + clip.width_pt,
             clip.y_pt + clip.height_pt,
-            page_clip_rect,
-          ) || !text_item_intersects_rect(text, page_clip_rect, text_metrics)
+            overflow_scan_rect,
+          ) || !text_item_intersects_rect(text, overflow_scan_rect, text_metrics)
           {
             return false;
           }
@@ -2951,16 +3235,22 @@ fn render_cell_area(
           && text_right
             <= layout.physical_page.width_pt
               - page.page_settings.margin_right_in as f32 * units::POINTS_PER_INCH;
-        if !scan_context_text_belongs_to_page(
-          text,
-          page_clip_rect,
-          layout.physical_page,
-          page.starts_print_area_row
-            && (page.has_explicit_print_area || (has_drawing_canvas && text_fits_printable_width)),
-          text_metrics,
-        ) {
+        if !owns_merged_text
+          && !scan_context_text_belongs_to_page(
+            text,
+            page_clip_rect,
+            layout.physical_page,
+            page.starts_print_area_row
+              && (page.has_explicit_print_area
+                || (has_drawing_canvas && text_fits_printable_width)),
+            text_metrics,
+          )
+        {
           return false;
         }
+        // Office repeats the complete text payload on every page intersecting
+        // a merged area, even when its glyphs lie outside the physical page.
+        // The page clip controls ink; it does not remove this merged owner.
         text.paint_clip = Some(common_rect(
           page_clip_rect.x_pt,
           page_clip_rect.y_pt,
@@ -2992,6 +3282,15 @@ fn render_cell_area(
     }
   }
   items.append(&mut deferred_edit_text_items);
+  // Office paints cell borders after the backgrounds and strings. A later
+  // filled cell must not erase its neighbor's right or bottom border.
+  let grid_exclusions = render_cell_border_grid(
+    items,
+    &mut border_paints,
+    layout.zoom_scale,
+    layout.fill_page,
+    rotated_page_clip,
+  );
   if page.page_settings.print_grid_lines {
     render_grid(
       items,
@@ -3000,8 +3299,145 @@ fn render_cell_area(
       layout.origin_x_pt,
       layout.origin_y_pt,
       layout.zoom_scale,
+      &grid_exclusions,
     );
   }
+}
+
+fn cell_border_shear(rotation: Option<u32>, borders: super::styles::BorderRecord) -> Option<f32> {
+  if borders.left.is_none()
+    && borders.right.is_none()
+    && borders.top.is_none()
+    && borders.bottom.is_none()
+  {
+    return None;
+  }
+  let angle = match rotation? {
+    value @ 1..=89 => value as f32,
+    value @ 91..=179 => 90.0 - value as f32,
+    _ => return None,
+  };
+  Some(1.0 / angle.to_radians().tan())
+}
+
+fn shear_cell_paint(items: &mut [PageItem], cell: CellRect, shear: f32, page: CellRect) {
+  let bottom =
+    cell.y_pt + cell.height_pt + 4.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  for item in items {
+    let (mut points, fill) = match item {
+      PageItem::Rect(rect) => {
+        let Some(color) = rect.fill_color else {
+          continue;
+        };
+        (
+          vec![
+            (rect.x_pt, rect.y_pt),
+            (rect.x_pt + rect.width_pt, rect.y_pt),
+            (rect.x_pt + rect.width_pt, rect.y_pt + rect.height_pt),
+            (rect.x_pt, rect.y_pt + rect.height_pt),
+          ],
+          common::Fill::Solid(common_rgb(color, rect.fill_opacity)),
+        )
+      }
+      PageItem::Path(path) if path.commands.is_empty() => (
+        path
+          .points
+          .iter()
+          .map(|point| (point.x.0, point.y.0))
+          .collect(),
+        path.fill.clone(),
+      ),
+      _ => continue,
+    };
+    for (x, y) in &mut points {
+      *x += (bottom - *y) * shear;
+    }
+    // Sheared cell paint can extend across adjacent columns, but still obeys
+    // the worksheet's print clip. Clip the polygon, not its unrotated cell.
+    for (axis, edge, lower) in [
+      (0, page.x_pt, true),
+      (0, page.x_pt + page.width_pt, false),
+      (1, page.y_pt, true),
+      (1, page.y_pt + page.height_pt, false),
+    ] {
+      let mut clipped = Vec::new();
+      if let Some(&last) = points.last() {
+        let coordinate = |point: (f32, f32)| if axis == 0 { point.0 } else { point.1 };
+        let inside = |point| {
+          if lower {
+            coordinate(point) >= edge
+          } else {
+            coordinate(point) <= edge
+          }
+        };
+        let mut previous = last;
+        for &current in &points {
+          if inside(previous) != inside(current) {
+            let ratio =
+              (edge - coordinate(previous)) / (coordinate(current) - coordinate(previous));
+            clipped.push((
+              previous.0 + ratio * (current.0 - previous.0),
+              previous.1 + ratio * (current.1 - previous.1),
+            ));
+          }
+          if inside(current) {
+            clipped.push(current);
+          }
+          previous = current;
+        }
+      }
+      points = clipped;
+    }
+    let (left, top, right, bottom) = points.iter().fold(
+      (
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+      ),
+      |(left, top, right, bottom), &(x, y)| (left.min(x), top.min(y), right.max(x), bottom.max(y)),
+    );
+    *item = PageItem::Path(common::PathItem {
+      bounds: if points.is_empty() {
+        common_rect(0.0, 0.0, 0.0, 0.0)
+      } else {
+        common_rect(left, top, right - left, bottom - top)
+      },
+      points: points
+        .into_iter()
+        .map(|(x, y)| common_point(x, y))
+        .collect(),
+      commands: Vec::new(),
+      closed: true,
+      fill,
+      stroke: None,
+    });
+  }
+}
+
+fn fixed_output_solid_cell_fill_rect(cell: CellRect, page: CellRect) -> Option<CellRect> {
+  // Office's solid cell backgrounds have a device-space paint origin, separate
+  // from text alignment. Alternating-color controls at 50/100/200% retain four
+  // 600dpi dots after the truncated margin and another four before the page
+  // clip. Rectangles include their final device dot, so adjacent fills overlap
+  // by one dot. The later cell owns that shared edge.
+  let dpi = units::OFFICE_FIXED_OUTPUT_DPI;
+  let dot = units::POINTS_PER_INCH / dpi;
+  let origin_x = (page.x_pt * dpi / units::POINTS_PER_INCH).floor() * dot;
+  let origin_y = (page.y_pt * dpi / units::POINTS_PER_INCH).floor() * dot;
+  let snap = units::quantize_points_to_office_print_grid;
+  let left = (origin_x + 4.0 * dot + snap(cell.x_pt - page.x_pt)).max(origin_x + 8.0 * dot);
+  let top = (origin_y + 4.0 * dot + snap(cell.y_pt - page.y_pt)).max(origin_y + 8.0 * dot);
+  let right = (origin_x + 5.0 * dot + snap(cell.x_pt + cell.width_pt - page.x_pt))
+    .min(origin_x + 8.0 * dot + snap(page.width_pt));
+  let bottom = (origin_y + 5.0 * dot + snap(cell.y_pt + cell.height_pt - page.y_pt))
+    .min(origin_y + 8.0 * dot + snap(page.height_pt));
+  (right > left && bottom > top).then_some(CellRect {
+    x_pt: left,
+    y_pt: top,
+    width_pt: right - left,
+    height_pt: bottom - top,
+  })
 }
 
 fn text_item_bounds(text: &TextItem, text_metrics: &mut TextMetrics) -> (f32, f32, f32, f32) {
@@ -3060,6 +3496,113 @@ fn scan_context_text_belongs_to_page(
 ) -> bool {
   text_item_intersects_rect(text, print_clip, text_metrics)
     || (starts_print_area_row && text_item_intersects_rect(text, physical_page, text_metrics))
+}
+
+fn render_cell_data_bar(
+  items: &mut Vec<PageItem>,
+  bar: super::print::CalcPrintDataBar,
+  rect: CellRect,
+  scale: f32,
+  sheet_rtl: bool,
+) {
+  use ooxmlsdk::schemas::x14::DataBarDirectionValues;
+  let rtl = match bar.direction {
+    DataBarDirectionValues::Context => sheet_rtl,
+    DataBarDirectionValues::RightToLeft => true,
+    DataBarDirectionValues::LeftToRight => false,
+  };
+  // Office's data bars keep a small horizontal inset and twice that inset
+  // vertically. The gradient finishes at a 85% white tint, not transparency.
+  let inset = 0.96 * scale;
+  let width = (rect.width_pt - 2.0 * inset).max(0.0);
+  let height = (rect.height_pt - 4.0 * inset).max(0.0);
+  let x = |fraction: f32| rect.x_pt + inset + width * if rtl { 1.0 - fraction } else { fraction };
+  let start = x(bar.start);
+  let end = x(bar.end);
+  if (end - start).abs() > f32::EPSILON && height > 0.0 {
+    let left = start.min(end);
+    let right = start.max(end);
+    let top = rect.y_pt + 2.0 * inset;
+    let bottom = top + height;
+    let color = common::Color {
+      r: bar.color.r,
+      g: bar.color.g,
+      b: bar.color.b,
+      a: 255,
+    };
+    let fill = if bar.gradient {
+      let tint = |value: u8| (f32::from(value) * 0.15 + 255.0 * 0.85) as u8;
+      common::Fill::Gradient(common::GradientFill {
+        stops: vec![
+          common::GradientStop {
+            position: 0.0,
+            color,
+            scheme: None,
+          },
+          common::GradientStop {
+            position: 1.0,
+            color: common::Color {
+              r: tint(bar.color.r),
+              g: tint(bar.color.g),
+              b: tint(bar.color.b),
+              a: 255,
+            },
+            scheme: None,
+          },
+        ],
+        line: Some((common_point(start, top), common_point(end, top))),
+        ..Default::default()
+      })
+    } else {
+      common::Fill::Solid(color)
+    };
+    items.push(PageItem::Path(common::PathItem {
+      bounds: common_rect(left, top, right - left, height),
+      points: vec![
+        common_point(left, top),
+        common_point(right, top),
+        common_point(right, bottom),
+        common_point(left, bottom),
+      ],
+      commands: Vec::new(),
+      closed: true,
+      fill,
+      stroke: bar.border_color.map(|color| common::Stroke {
+        width: common::Pt(inset),
+        color: common::Color {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+          a: 255,
+        },
+        ..Default::default()
+      }),
+    }));
+  }
+  if let Some(axis) = bar.axis {
+    let axis_x = x(axis);
+    items.push(PageItem::Path(common::PathItem {
+      bounds: common_rect(axis_x, rect.y_pt, 0.0, rect.height_pt),
+      points: vec![
+        common_point(axis_x, rect.y_pt),
+        common_point(axis_x, rect.y_pt + rect.height_pt),
+      ],
+      commands: Vec::new(),
+      closed: false,
+      fill: common::Fill::None,
+      stroke: Some(common::Stroke {
+        width: common::Pt(inset),
+        color: common::Color {
+          r: bar.axis_color.r,
+          g: bar.axis_color.g,
+          b: bar.axis_color.b,
+          a: 255,
+        },
+        dash: Some(vec![common::Pt(3.0 * inset), common::Pt(inset)]),
+        ..Default::default()
+      }),
+    }));
+  }
 }
 
 fn render_cell_icon_set(
@@ -3154,7 +3697,10 @@ fn calc_cell_output_area(
   let (mut left_missing_pt, mut right_missing_pt) =
     calc_cell_missing_width_by_alignment(missing_width_pt, cell, alignment);
 
-  if !calc_cell_is_value(cell) && !alignment.is_some_and(|alignment| alignment.wrap_text) {
+  if !calc_cell_is_value(cell)
+    && !calc_cell_is_logical_value(cell)
+    && !alignment.is_some_and(|alignment| alignment.wrap_text)
+  {
     let right_to_left = sheet_right_to_left(context.sheet);
     let mut right_col = cell.address.col;
     while right_missing_pt > 0.0
@@ -3262,6 +3808,7 @@ fn calc_cell_visible_text<'a>(
   cell: &'a super::print::CalcPrintCell<'_>,
   style: &TextStyle,
   output_area: CalcCellOutputArea,
+  alignment: Option<super::styles::AlignmentRecord>,
   text_metrics: &mut TextMetrics,
 ) -> std::borrow::Cow<'a, str> {
   if calc_cell_requires_date_hashes(cell) {
@@ -3269,19 +3816,25 @@ fn calc_cell_visible_text<'a>(
       style,
       output_area.align_rect.width_pt,
       text_metrics,
+      1,
     ));
   }
   if output_area.left_clip_pt <= f32::EPSILON && output_area.right_clip_pt <= f32::EPSILON {
     return std::borrow::Cow::Borrowed(&cell.rendered_text);
   }
-  if cell.number_format_state == super::print::NumberFormatRenderState::Boolean {
-    // Office uses hashes when a localized logical value cannot fit, as
-    // with VERDADERO in CellValues.xlsx's narrow C4. Authored strings still
-    // follow the clipping path below.
+  if calc_cell_is_logical_value(cell) {
+    // Logical/error values cannot borrow empty neighboring cells. In fixed
+    // output they use hashes unless shrinkToFit selects text layout; a cell
+    // too narrow for even one hash is blank. Numeric overflow keeps its
+    // existing minimum of one hash, and authored strings keep their text.
+    if alignment.is_some_and(|alignment| alignment.shrink_to_fit) {
+      return std::borrow::Cow::Borrowed(&cell.rendered_text);
+    }
     return std::borrow::Cow::Owned(calc_cell_overflow_hash_text(
       style,
       output_area.align_rect.width_pt,
       text_metrics,
+      0,
     ));
   }
   if calc_cell_is_value(cell) {
@@ -3296,6 +3849,7 @@ fn calc_cell_visible_text<'a>(
         style,
         output_area.align_rect.width_pt,
         text_metrics,
+        1,
       ))
     } else {
       std::borrow::Cow::Borrowed(&cell.rendered_text)
@@ -3326,22 +3880,36 @@ fn calc_cell_overflow_hash_text(
   style: &TextStyle,
   cell_width_pt: f32,
   text_metrics: &mut TextMetrics,
+  minimum_count: usize,
 ) -> String {
   let hash_width_pt = text_metrics.measure_text("#", style);
   let available_width_pt = (cell_width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(0.0);
-  let count = calc_cell_overflow_hash_count(available_width_pt, hash_width_pt);
+  let count = calc_cell_overflow_hash_count(available_width_pt, hash_width_pt, minimum_count);
   "#".repeat(count)
 }
 
-fn calc_cell_overflow_hash_count(available_width_pt: f32, hash_width_pt: f32) -> usize {
+fn calc_cell_overflow_hash_count(
+  available_width_pt: f32,
+  hash_width_pt: f32,
+  minimum_count: usize,
+) -> usize {
   if !available_width_pt.is_finite()
     || !hash_width_pt.is_finite()
     || available_width_pt <= f32::EPSILON
     || hash_width_pt <= f32::EPSILON
   {
-    return 1;
+    return minimum_count;
   }
-  (available_width_pt / hash_width_pt).floor().max(1.0) as usize
+  (available_width_pt / hash_width_pt)
+    .floor()
+    .max(minimum_count as f32) as usize
+}
+
+fn calc_cell_is_logical_value(cell: &super::print::CalcPrintCell<'_>) -> bool {
+  matches!(
+    cell.number_format_state,
+    super::print::NumberFormatRenderState::Boolean | super::print::NumberFormatRenderState::Error
+  )
 }
 
 fn calc_cell_is_value(cell: &super::print::CalcPrintCell<'_>) -> bool {
@@ -3384,8 +3952,11 @@ fn clipped_string_text(
   }
   if output_area.left_clip_pt > output_area.right_clip_pt {
     let mut start = text.len();
-    for (index, _) in text.char_indices().rev() {
-      if text_metrics.measure_text(&text[index..], style) <= visible_width {
+    for (index, ch) in text.char_indices().rev() {
+      // A partially visible edge character remains in Office's PDF text
+      // payload; the paint clip trims its ink. Test the preceding advance,
+      // not whether the complete character fits inside the cell.
+      if text_metrics.measure_text(&text[index + ch.len_utf8()..], style) < visible_width {
         start = index;
       } else {
         break;
@@ -3396,7 +3967,7 @@ fn clipped_string_text(
   let mut end = 0usize;
   for (index, ch) in text.char_indices() {
     let next = index + ch.len_utf8();
-    if text_metrics.measure_text(&text[..next], style) <= visible_width {
+    if text_metrics.measure_text(&text[..index], style) < visible_width {
       end = next;
     } else {
       break;
@@ -3609,6 +4180,7 @@ fn render_cell_rich_text(
   print_scale: f32,
   text_metrics: &mut TextMetrics,
 ) {
+  let first_item = items.len();
   let mut rendered_runs = runs
     .iter()
     .filter_map(|run| {
@@ -3617,13 +4189,18 @@ fn render_cell_rich_text(
         return None;
       }
       let mut style = xlsx_rich_text_run_style(&base_style, run, print_scale);
+      if run.has_properties {
+        style.character_spacing_pt = text_metrics
+          .gdi_synthetic_bold_character_spacing_pt(&text, &style, units::OFFICE_FIXED_OUTPUT_DPI)
+          .unwrap_or(0.0);
+      }
       if let Some(rotation) = options
         .alignment
         .and_then(|alignment| alignment.text_rotation)
       {
         style.rotation_deg = match rotation {
-          1..=90 => rotation as f32,
-          91..=180 => 90.0 - rotation as f32,
+          1..=90 => -(rotation as f32),
+          91..=180 => rotation as f32 - 90.0,
           255 => 90.0,
           _ => 0.0,
         };
@@ -3638,13 +4215,8 @@ fn render_cell_rich_text(
 
   let line_height = rendered_runs
     .iter()
-    .map(|(_, style, _)| {
-      style
-        .automatic_escapement_font_size_pt
-        .unwrap_or(style.font_size_pt)
-        * 1.15
-    })
-    .fold(options.default_line_height_pt.max(1.0), f32::max);
+    .map(|(_, style, _)| cell_text_line_height_pt(style, &options, true))
+    .fold(1.0_f32, f32::max);
   // Rich portions of one cell share a logical baseline. The text metrics
   // helper already subtracts superscript/subscript's painted shift, so add it
   // back while finding the common unescaped baseline and retain the shift when
@@ -3689,6 +4261,7 @@ fn render_cell_rich_text(
       line_height_pt: line_height,
       drawingml_text_effect_anchor: None,
       paint_clip: None,
+      page_culling_bounds: None,
       discard_if_horizontally_clipped: false,
       text,
       style: Box::new(style),
@@ -3706,6 +4279,153 @@ fn render_cell_rich_text(
     }));
     x_pt += width_pt;
   }
+  position_rotated_cell_text(&mut items[first_item..], rect, &options, text_metrics);
+}
+
+// Office aligns a rotated text block by its transformed extent. A bordered
+// cell instead uses the bottom edge as its rotation reference: its sides are
+// sheared parallel to the writing axis (ECMA-376 §18.8.1; Office angle/alignment
+// controls). All rich portions must share this transform and baseline anchor.
+fn position_rotated_cell_text(
+  items: &mut [PageItem],
+  rect: CellRect,
+  options: &CellTextRenderOptions,
+  text_metrics: &mut TextMetrics,
+) {
+  let Some(rotation @ 1..=180) = options.alignment.and_then(|a| a.text_rotation) else {
+    return;
+  };
+  let degrees = if rotation <= 90 {
+    -(rotation as f32)
+  } else {
+    rotation as f32 - 90.0
+  };
+  let (sin, cos) = degrees.to_radians().sin_cos();
+  let sin_abs = sin.abs();
+  let cos = cos.max(0.0);
+  // Reset each logical line's portion positions after replacing horizontal
+  // printer spacing with the slanted font's positioned device advances.
+  let mut previous_baseline = None::<f32>;
+  let mut portion_shift = 0.0_f32;
+  for item in items.iter_mut() {
+    if let PageItem::Text(text) = item {
+      let baseline = text.y_pt
+        + text_metrics.baseline_offset_in_line_for_text(
+          &text.text,
+          &text.style,
+          text.line_height_pt,
+        )
+        + text.style.baseline_shift_pt;
+      if previous_baseline.is_none_or(|previous| (previous - baseline).abs() > 0.01) {
+        portion_shift = 0.0;
+      }
+      previous_baseline = Some(baseline);
+      let previous_width = text_metrics.measure_text(&text.text, &text.style);
+      let mut rotated_style = text.style.clone();
+      rotated_style.character_spacing_pt = 0.0;
+      rotated_style.kerning_minimum_size_pt = Some(f32::INFINITY);
+      text.x_pt += portion_shift;
+      if let Some(advances) =
+        text_metrics.excel_rotated_character_advances_pt(&text.text, &rotated_style, degrees)
+      {
+        portion_shift += advances.iter().sum::<f32>() - previous_width;
+        rotated_style.semantic_character_advances_pt = Some(advances);
+        text.style = rotated_style;
+      }
+    }
+  }
+  let mut left = f32::INFINITY;
+  let mut top = f32::INFINITY;
+  let mut right = f32::NEG_INFINITY;
+  let mut bottom = f32::NEG_INFINITY;
+  let mut line_baseline = None::<f32>;
+  let mut line_origin = 0.0_f32;
+  let mut line_width = 0.0_f32;
+  let mut line_padding = 0.0_f32;
+  let mut horizontal_padding = 0.0_f32;
+  for item in items.iter() {
+    if let PageItem::Text(text) = item {
+      left = left.min(text.x_pt);
+      top = top.min(text.y_pt);
+      let baseline = text.y_pt
+        + text_metrics.baseline_offset_in_line_for_text(
+          &text.text,
+          &text.style,
+          text.line_height_pt,
+        )
+        + text.style.baseline_shift_pt;
+      if line_baseline.is_none_or(|previous| (previous - baseline).abs() > 0.01) {
+        line_origin = text.x_pt;
+        line_width = 0.0;
+        line_padding = 0.0;
+      }
+      line_baseline = Some(baseline);
+      let mut measurement_style = text.style.clone();
+      measurement_style.character_spacing_pt = 0.0;
+      measurement_style.kerning_minimum_size_pt = Some(f32::INFINITY);
+      let (width, padding) = text_metrics
+        .excel_rotated_layout_extents_pt(&text.text, &measurement_style)
+        .unwrap_or_else(|| (text_metrics.measure_text(&text.text, &text.style), 0.0));
+      // A rich line owns one inset pair, not one pair per portion. Its
+      // positioned paint advances remain independent of this alignment box.
+      line_width += width;
+      line_padding = line_padding.max(padding);
+      horizontal_padding = horizontal_padding.max(padding);
+      right = right.max(line_origin + line_width + line_padding);
+      bottom = bottom.max(text.y_pt + text.line_height_pt);
+    }
+  }
+  if !left.is_finite() {
+    return;
+  }
+  let width = right - left;
+  let height = bottom - top;
+  let rotated_width = width * cos + height * sin_abs;
+  let rotated_height = width * sin_abs + height * cos;
+  let y = match options.alignment.and_then(|a| a.vertical) {
+    Some(
+      x::VerticalAlignmentValues::Top
+      | x::VerticalAlignmentValues::Justify
+      | x::VerticalAlignmentValues::Distributed,
+    ) => rect.y_pt,
+    Some(x::VerticalAlignmentValues::Center) => rect.y_pt + (rect.height_pt - rotated_height) / 2.0,
+    _ => rect.y_pt + rect.height_pt - rotated_height,
+  };
+  let mut x = if options.has_outer_border {
+    let across = height / sin_abs;
+    let cot = cos / sin_abs;
+    let x = cell_text_x_pt(rect, across, options.horizontal_alignment, 0.0);
+    let below = rect.y_pt + rect.height_pt - y;
+    x + height * cos * cot
+      + if sin < 0.0 {
+        (below - rotated_height) * cot
+      } else {
+        -below * cot
+      }
+  } else {
+    cell_text_x_pt(rect, rotated_width, options.horizontal_alignment, 0.0)
+  };
+  let mut y = y;
+  if sin < 0.0 {
+    y += width * sin_abs;
+  } else {
+    x += height * sin_abs;
+    // The downward-writing origin starts inside the padded logical box.
+    // Mirror the inset displacement with the bordered bottom reference;
+    // an unbordered block keeps its ordinary horizontal cell anchor.
+    if options.has_outer_border {
+      x += horizontal_padding * cos;
+    }
+    y += horizontal_padding * sin_abs;
+  }
+  for item in items {
+    if let PageItem::Text(text) = item {
+      text.x_pt += x - left;
+      text.y_pt += y - top;
+      text.style.rotation_deg = degrees;
+      text.rotation_center_pt = Some((x, y));
+    }
+  }
 }
 
 fn xlsx_rich_text_run_style(
@@ -3715,6 +4435,9 @@ fn xlsx_rich_text_run_style(
 ) -> TextStyle {
   let mut style = base_style.clone();
   if run.has_properties {
+    // Printer spacing derived from the cell's synthesized bold face cannot
+    // survive a run-font change. The caller recomputes it for the resolved run.
+    style.character_spacing_pt = 0.0;
     // A missing rPr inherits the cell font; a present rPr is a run-font state.
     // In particular, omitted boolean properties are false and omitted
     // vertAlign is baseline. This distinction is visible in 45540's footnote:
@@ -3731,6 +4454,7 @@ fn xlsx_rich_text_run_style(
   }
   if let Some(font_family) = run.font_family.as_deref() {
     style.font_family = Some(Arc::from(font_family));
+    style.fallback_font_family = run.fallback_font_family.as_deref().map(Arc::from);
   }
   if let Some(font_size_pt) = run.font_size_pt {
     style.font_size_pt = units::quantize_points_to_office_print_grid(font_size_pt * print_scale);
@@ -3891,29 +4615,7 @@ fn conditional_rule_matches(
         })
     }
     x::ConditionalFormatValues::CellIs => {
-      if matches!(
-        cell.data_type,
-        Some(x::CellValues::SharedString | x::CellValues::InlineString | x::CellValues::String)
-      ) {
-        return super::print::conditional_cell_is_text_matches(
-          import,
-          sheet,
-          references,
-          rule,
-          cell.address,
-          cell.text.as_ref(),
-        );
-      }
-      cell.text.as_ref().parse::<f64>().ok().is_some_and(|value| {
-        super::print::conditional_cell_is_matches(
-          import,
-          sheet,
-          references,
-          rule,
-          cell.address,
-          value,
-        )
-      })
+      super::print::conditional_cell_is_matches(import, sheet, references, rule, cell.address)
     }
     x::ConditionalFormatValues::ContainsText
     | x::ConditionalFormatValues::NotContainsText
@@ -3942,6 +4644,139 @@ struct CellTextRenderOptions {
   hyperlink_url: Option<String>,
   formula: bool,
   default_line_height_pt: f32,
+  clip_wrapped_text: bool,
+  has_outer_border: bool,
+}
+
+fn render_number_format_layout(
+  items: &mut Vec<PageItem>,
+  layout: &[super::print::NumberFormatLayoutItem],
+  rect: CellRect,
+  style: &TextStyle,
+  options: CellTextRenderOptions,
+  text_metrics: &mut TextMetrics,
+) -> bool {
+  use super::print::NumberFormatLayoutItem;
+
+  if options
+    .alignment
+    .is_some_and(|alignment| alignment.text_rotation.unwrap_or(0) != 0)
+  {
+    return false;
+  }
+  let widths = layout
+    .iter()
+    .map(|item| match item {
+      NumberFormatLayoutItem::Text(text) => text_metrics.measure_text(text, style),
+      NumberFormatLayoutItem::Reserve(ch) => text_metrics.measure_text(&ch.to_string(), style),
+      NumberFormatLayoutItem::Fill(_) => 0.0,
+    })
+    .collect::<Vec<_>>();
+  let fixed_width: f32 = widths.iter().sum();
+  let available = (rect.width_pt - 2.0 * XLSX_CELL_TEXT_INSET_PT).max(0.0);
+  if fixed_width > available {
+    return false;
+  }
+  let has_fill = layout
+    .iter()
+    .any(|item| matches!(item, NumberFormatLayoutItem::Fill(_)));
+  let fill_width = if has_fill {
+    available - fixed_width
+  } else {
+    0.0
+  };
+  let mut x = cell_text_x_pt(
+    rect,
+    fixed_width + fill_width,
+    options.horizontal_alignment,
+    0.0,
+  );
+  let visible_text = layout
+    .iter()
+    .filter_map(|item| match item {
+      NumberFormatLayoutItem::Text(text) => Some(text.as_str()),
+      _ => None,
+    })
+    .collect::<String>();
+  if options
+    .alignment
+    .is_some_and(|alignment| alignment.reading_order == Some(2))
+    || visible_text
+      .chars()
+      .any(|ch| matches!(bidi_class(ch), BidiClass::R | BidiClass::AL))
+  {
+    return false;
+  }
+  let mut template_items = Vec::new();
+  render_cell_text(
+    &mut template_items,
+    &visible_text,
+    rect,
+    style.clone(),
+    options,
+    text_metrics,
+  );
+  let [PageItem::Text(template)] = template_items.as_slice() else {
+    return false;
+  };
+  for (item, width) in layout.iter().zip(widths) {
+    let (text, advance) = match item {
+      NumberFormatLayoutItem::Text(text) => (text.clone(), width),
+      NumberFormatLayoutItem::Reserve(_) => {
+        x += width;
+        continue;
+      }
+      NumberFormatLayoutItem::Fill(ch) => {
+        let unit = text_metrics.measure_text(&ch.to_string(), style);
+        let count = if unit > 0.0 {
+          (fill_width / unit).floor().max(0.0) as usize
+        } else {
+          0
+        };
+        (ch.to_string().repeat(count.min(65_536)), fill_width)
+      }
+    };
+    if !text.is_empty() {
+      let mut portion = template.clone();
+      portion.text = text;
+      portion.x_pt = x;
+      items.push(PageItem::Text(portion));
+    }
+    x += advance;
+  }
+  true
+}
+
+fn cell_text_line_height_pt(style: &TextStyle, options: &CellTextRenderOptions, rich: bool) -> f32 {
+  let font_size = if rich {
+    style
+      .automatic_escapement_font_size_pt
+      .unwrap_or(style.font_size_pt)
+  } else {
+    style.font_size_pt
+  };
+  let fallback = font_size * 1.15;
+  if options
+    .alignment
+    .and_then(|alignment| alignment.text_rotation)
+    .is_some_and(|rotation| (1..=180).contains(&rotation))
+  {
+    // Native Normal-font controls keep the rotated baseline's cell-relative
+    // horizontal position fixed. The sheet's default row/line height must
+    // not enlarge a smaller cell font's rotated alignment box.
+    let mut font_style = style.clone();
+    font_style.font_size_pt = font_size;
+    let charset = if style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+      2
+    } else {
+      0
+    };
+    super::worksheet::printer_font_line_height_pt(&font_style, charset)
+      .unwrap_or(fallback)
+      .max(1.0)
+  } else {
+    fallback.max(options.default_line_height_pt).max(1.0)
+  }
 }
 
 fn render_cell_text(
@@ -3952,9 +4787,8 @@ fn render_cell_text(
   options: CellTextRenderOptions,
   text_metrics: &mut TextMetrics,
 ) {
-  let line_height = (style.font_size_pt * 1.15)
-    .max(options.default_line_height_pt)
-    .max(1.0);
+  let first_item = items.len();
+  let line_height = cell_text_line_height_pt(&style, &options, false);
   let alignment = options.alignment;
   let wrap_text = alignment.is_some_and(|alignment| alignment.wrap_text);
   let fill_text;
@@ -3988,6 +4822,37 @@ fn render_cell_text(
   } else {
     vec![text.lines().next().unwrap_or(text)]
   };
+  // Office first limits the edit-layout payload to the fixed row's available
+  // lines, then aligns that block. Aligning all source lines would expose the
+  // tail of a wrapped value instead of its beginning. Partially visible last
+  // lines remain searchable and receive a cell paint clip. The four-dot inset
+  // on each edge is the fixed-output text clip, independent of sheet zoom.
+  let clipped_wrap = options.clip_wrapped_text
+    && wrap_text
+    && !options.formula
+    && alignment
+      .and_then(|alignment| alignment.text_rotation)
+      .unwrap_or(0)
+      == 0
+    && lines.len() > 1
+    && line_height * lines.len() as f32 > rect.height_pt;
+  let clip_inset = 4.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let line_count = if clipped_wrap {
+    ((rect.height_pt - 2.0 * clip_inset).max(0.0) / line_height)
+      .ceil()
+      .max(1.0) as usize
+  } else {
+    lines.len()
+  };
+  let lines = &lines[..line_count.min(lines.len())];
+  let paint_clip = clipped_wrap.then(|| {
+    common_rect(
+      rect.x_pt + clip_inset,
+      rect.y_pt + clip_inset,
+      (rect.width_pt - 2.0 * clip_inset).max(0.0),
+      (rect.height_pt - 2.0 * clip_inset).max(0.0),
+    )
+  });
   let text_height = line_height * lines.len().max(1) as f32;
   let vertical_alignment = alignment.and_then(|alignment| alignment.vertical);
   let mut y_pt = match vertical_alignment {
@@ -4005,8 +4870,8 @@ fn render_cell_text(
   };
   if let Some(rotation) = alignment.and_then(|alignment| alignment.text_rotation) {
     style.rotation_deg = match rotation {
-      1..=90 => rotation as f32,
-      91..=180 => 90.0 - rotation as f32,
+      1..=90 => -(rotation as f32),
+      91..=180 => rotation as f32 - 90.0,
       255 => 90.0,
       _ => 0.0,
     };
@@ -4019,7 +4884,8 @@ fn render_cell_text(
       y_pt,
       line_height_pt: line_height,
       drawingml_text_effect_anchor: None,
-      paint_clip: None,
+      paint_clip,
+      page_culling_bounds: None,
       discard_if_horizontally_clipped: false,
       text: line.to_string(),
       style: Box::new(style.clone()),
@@ -4040,6 +4906,22 @@ fn render_cell_text(
     }));
     y_pt += line_height;
   }
+  position_rotated_cell_text(&mut items[first_item..], rect, &options, text_metrics);
+}
+
+pub(super) fn cell_text_wrapped_line_count(
+  text: &str,
+  cell_width_pt: f32,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> usize {
+  wrap_cell_text(
+    text,
+    (cell_width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(1.0),
+    style,
+    text_metrics,
+  )
+  .len()
 }
 
 fn wrap_cell_text(
@@ -4161,24 +5043,541 @@ fn cell_text_x_pt(
   text_start_pt + leading_offset_pt
 }
 
+#[derive(Clone, Copy)]
+struct CellBorderPaint {
+  rect: CellRect,
+  borders: super::styles::BorderRecord,
+  shear: Option<f32>,
+}
+
+fn border_sides(borders: super::styles::BorderRecord) -> [Option<BorderStyle>; 4] {
+  [borders.left, borders.right, borders.top, borders.bottom]
+}
+
+fn set_border_side(borders: &mut super::styles::BorderRecord, side: usize, border: BorderStyle) {
+  match side {
+    0 => borders.left = Some(border),
+    1 => borders.right = Some(border),
+    2 => borders.top = Some(border),
+    _ => borders.bottom = Some(border),
+  }
+}
+
+fn border_plane(paint: &CellBorderPaint) -> (u32, i64) {
+  paint.shear.map_or((0, 0), |shear| {
+    (
+      shear.to_bits(),
+      border_device_coordinate(paint.rect.y_pt + paint.rect.height_pt),
+    )
+  })
+}
+
+fn border_device_coordinate(value: f32) -> i64 {
+  (value * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).round() as i64
+}
+
+fn resolve_double_cell_borders(paints: &mut [CellBorderPaint]) {
+  let mut edges: HashMap<[i64; 6], Vec<(usize, usize, BorderStyle)>> = HashMap::new();
+  for (index, paint) in paints.iter().enumerate() {
+    let r = paint.rect;
+    let plane = border_plane(paint);
+    for (side, border) in border_sides(paint.borders).into_iter().enumerate() {
+      let Some(border) = border else { continue };
+      let (coordinate, start, end) = match side {
+        0 => (r.x_pt, r.y_pt, r.y_pt + r.height_pt),
+        1 => (r.x_pt + r.width_pt, r.y_pt, r.y_pt + r.height_pt),
+        2 => (r.y_pt, r.x_pt, r.x_pt + r.width_pt),
+        _ => (r.y_pt + r.height_pt, r.x_pt, r.x_pt + r.width_pt),
+      };
+      let key = [
+        i64::from(side < 2),
+        border_device_coordinate(coordinate),
+        border_device_coordinate(start),
+        border_device_coordinate(end),
+        i64::from(plane.0),
+        plane.1,
+      ];
+      edges.entry(key).or_default().push((index, side, border));
+    }
+  }
+  for edge in edges.values() {
+    // Double beats even thick single borders. Equal double styles use
+    // Office's color brightness, independently of which cell owns them.
+    // Keep the winner on both sides for consistent corner geometry.
+    let winner = edge
+      .iter()
+      .filter(|entry| entry.2.compound)
+      .min_by_key(|entry| double_border_color_priority(entry.2.color));
+    if let Some(winner) = winner {
+      for &(index, side, _) in edge {
+        set_border_side(&mut paints[index].borders, side, winner.2);
+      }
+    }
+  }
+}
+
+fn double_border_color_priority(color: RgbColor) -> (u16, u8, u8) {
+  // Office's swapped-color and one-channel ramps establish this integer
+  // brightness, including exact ties. Dividing by eight before comparing
+  // loses the distinction between red 127 and blue 255.
+  (
+    2 * u16::from(color.r) + 5 * u16::from(color.g) + u16::from(color.b),
+    u8::MAX - color.b,
+    color.g,
+  )
+}
+
+fn color_double_border_junctions(
+  items: &mut Vec<PageItem>,
+  paints: &[CellBorderPaint],
+  scale: f32,
+  page: CellRect,
+) {
+  let mut nodes: std::collections::BTreeMap<(i64, i64), [Option<BorderStyle>; 4]> =
+    std::collections::BTreeMap::new();
+  for paint in paints.iter().filter(|paint| paint.shear.is_none()) {
+    let r = cell_border_device_rect(paint.rect, page);
+    for (side, border) in border_sides(paint.borders).into_iter().enumerate() {
+      let Some(border) = border else { continue };
+      // Directions at the node are up, down, left, right.
+      let endpoints = match side {
+        0 => [(r.x_pt, r.y_pt, 1), (r.x_pt, r.y_pt + r.height_pt, 0)],
+        1 => [
+          (r.x_pt + r.width_pt, r.y_pt, 1),
+          (r.x_pt + r.width_pt, r.y_pt + r.height_pt, 0),
+        ],
+        2 => [(r.x_pt, r.y_pt, 3), (r.x_pt + r.width_pt, r.y_pt, 2)],
+        _ => [
+          (r.x_pt, r.y_pt + r.height_pt, 3),
+          (r.x_pt + r.width_pt, r.y_pt + r.height_pt, 2),
+        ],
+      };
+      for (x, y, direction) in endpoints {
+        let node = nodes
+          .entry((border_device_coordinate(y), border_device_coordinate(x)))
+          .or_default();
+        if node[direction].is_none_or(|old| {
+          double_border_color_priority(border.color) < double_border_color_priority(old.color)
+        }) {
+          node[direction] = Some(border);
+        }
+      }
+    }
+  }
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let total = fixed_output_cell_border_width_pt(3.0, scale);
+  let before = ((total / dot).round() / 2.0).floor() * dot;
+  for ((y, x), directions) in nodes {
+    let existing = directions.into_iter().flatten().collect::<Vec<_>>();
+    if existing.iter().any(|border| !border.compound)
+      || existing
+        .first()
+        .is_none_or(|first| existing.iter().all(|border| border.color == first.color))
+    {
+      continue;
+    }
+    let vertical = [
+      directions[0].or(directions[1]),
+      directions[1].or(directions[0]),
+    ];
+    let horizontal = [
+      directions[2].or(directions[3]),
+      directions[3].or(directions[2]),
+    ];
+    let (Some(up), Some(down), Some(left), Some(right)) =
+      (vertical[0], vertical[1], horizontal[0], horizontal[1])
+    else {
+      continue;
+    };
+    let x = x as f32 * dot;
+    let y = y as f32 * dot;
+    // At a four-way intersection each quadrant belongs to its two
+    // incident edges. A missing direction closes a corner with the
+    // opposite edge. This keeps a darker lower/right edge from repainting
+    // the unrelated upper-left quadrant of a colored double junction.
+    for (row, vertical) in [up, down].into_iter().enumerate() {
+      for (col, horizontal) in [left, right].into_iter().enumerate() {
+        let color = [vertical.color, horizontal.color]
+          .into_iter()
+          .min_by_key(|color| double_border_color_priority(*color))
+          .unwrap();
+        recolor_border_region(
+          items,
+          CellRect {
+            x_pt: if col == 0 { x - before } else { x },
+            y_pt: if row == 0 { y - before } else { y },
+            width_pt: if col == 0 { before } else { total - before },
+            height_pt: if row == 0 { before } else { total - before },
+          },
+          color,
+        );
+      }
+    }
+  }
+}
+
+fn recolor_border_region(items: &mut Vec<PageItem>, region: CellRect, color: RgbColor) {
+  let old = std::mem::take(items);
+  items.reserve(old.len());
+  for item in old {
+    let PageItem::Rect(rect) = item else {
+      items.push(item);
+      continue;
+    };
+    let left = rect.x_pt.max(region.x_pt);
+    let top = rect.y_pt.max(region.y_pt);
+    let right = (rect.x_pt + rect.width_pt).min(region.x_pt + region.width_pt);
+    let bottom = (rect.y_pt + rect.height_pt).min(region.y_pt + region.height_pt);
+    if rect.fill_color == Some(color) || right <= left + 1.0e-4 || bottom <= top + 1.0e-4 {
+      items.push(PageItem::Rect(rect));
+      continue;
+    }
+    for (x, y, w, h, fill) in [
+      (
+        rect.x_pt,
+        rect.y_pt,
+        rect.width_pt,
+        top - rect.y_pt,
+        rect.fill_color,
+      ),
+      (
+        rect.x_pt,
+        bottom,
+        rect.width_pt,
+        rect.y_pt + rect.height_pt - bottom,
+        rect.fill_color,
+      ),
+      (
+        rect.x_pt,
+        top,
+        left - rect.x_pt,
+        bottom - top,
+        rect.fill_color,
+      ),
+      (
+        right,
+        top,
+        rect.x_pt + rect.width_pt - right,
+        bottom - top,
+        rect.fill_color,
+      ),
+      (left, top, right - left, bottom - top, Some(color)),
+    ] {
+      if w > 1.0e-4 && h > 1.0e-4 {
+        items.push(PageItem::Rect(RectItem {
+          x_pt: x,
+          y_pt: y,
+          width_pt: w,
+          height_pt: h,
+          fill_color: fill,
+          ..rect.clone()
+        }));
+      }
+    }
+  }
+}
+
+fn render_cell_border_grid(
+  items: &mut Vec<PageItem>,
+  paints: &mut [CellBorderPaint],
+  scale: f32,
+  page: CellRect,
+  rotated_clip: CellRect,
+) -> Vec<CellRect> {
+  let has_double = paints.iter().any(|paint| {
+    border_sides(paint.borders)
+      .into_iter()
+      .flatten()
+      .any(|border| border.compound)
+  });
+  if !has_double {
+    for paint in paints {
+      let start = items.len();
+      render_cell_borders(items, paint.rect, paint.borders, scale, page);
+      if let Some(shear) = paint.shear {
+        shear_cell_paint(&mut items[start..], paint.rect, shear, rotated_clip);
+      }
+    }
+    return Vec::new();
+  }
+  if has_double {
+    resolve_double_cell_borders(paints);
+  }
+  let mut gaps = Vec::new();
+  let mut grid_exclusions = Vec::new();
+  if has_double {
+    for paint in paints.iter() {
+      let rect = cell_border_device_rect(paint.rect, page);
+      let (bands, cell_gaps) = compound_border_geometry(rect, paint.borders, scale);
+      gaps.extend(cell_gaps.into_iter().map(|gap| (border_plane(paint), gap)));
+      if paint.shear.is_none() {
+        grid_exclusions.extend(
+          bands
+            .into_iter()
+            .filter(|band| band.0.compound)
+            .map(|band| band.2),
+        );
+      }
+    }
+  }
+  let border_start = items.len();
+  for paint in paints.iter() {
+    let mut cell_items = Vec::new();
+    render_cell_borders(&mut cell_items, paint.rect, paint.borders, scale, page);
+    if has_double {
+      let plane = border_plane(paint);
+      for &(gap_plane, gap) in &gaps {
+        if plane == gap_plane {
+          subtract_border_gap(&mut cell_items, gap);
+        }
+      }
+    }
+    if let Some(shear) = paint.shear {
+      shear_cell_paint(&mut cell_items, paint.rect, shear, rotated_clip);
+    }
+    items.append(&mut cell_items);
+  }
+  let mut border_items = items.split_off(border_start);
+  color_double_border_junctions(&mut border_items, paints, scale, page);
+  items.append(&mut border_items);
+  grid_exclusions
+}
+
+fn cell_border_device_rect(rect: CellRect, page: CellRect) -> CellRect {
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let grid = |position: f32, origin: f32| {
+    (origin * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).floor() * dot
+      + 4.0 * dot
+      + units::quantize_points_to_office_print_grid(position - origin)
+  };
+  CellRect {
+    x_pt: grid(rect.x_pt, page.x_pt),
+    y_pt: grid(rect.y_pt, page.y_pt),
+    width_pt: grid(rect.x_pt + rect.width_pt, page.x_pt) - grid(rect.x_pt, page.x_pt),
+    height_pt: grid(rect.y_pt + rect.height_pt, page.y_pt) - grid(rect.y_pt, page.y_pt),
+  }
+}
+
+fn compound_border_geometry(
+  rect: CellRect,
+  borders: super::styles::BorderRecord,
+  scale: f32,
+) -> (Vec<(BorderStyle, bool, CellRect)>, Vec<CellRect>) {
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let width = |border: BorderStyle| {
+    fixed_output_cell_border_width_pt(
+      if border.compound {
+        3.0
+      } else {
+        border.width_pt
+      },
+      scale,
+    )
+  };
+  let half = |width: f32| ((width / dot).round() / 2.0).floor() * dot;
+  let rail = fixed_output_cell_border_width_pt(1.0, scale);
+  let sides = border_sides(borders);
+  let mut bands = Vec::new();
+  let mut gaps = Vec::new();
+  for (side, border) in sides.into_iter().enumerate() {
+    let Some(border) = border else { continue };
+    let vertical = side < 2;
+    let total = width(border);
+    let before = half(total);
+    let (coordinate, start, end, first, last) = if vertical {
+      (
+        if side == 0 {
+          rect.x_pt
+        } else {
+          rect.x_pt + rect.width_pt
+        },
+        rect.y_pt,
+        rect.y_pt + rect.height_pt,
+        sides[2],
+        sides[3],
+      )
+    } else {
+      (
+        if side == 2 {
+          rect.y_pt
+        } else {
+          rect.y_pt + rect.height_pt
+        },
+        rect.x_pt,
+        rect.x_pt + rect.width_pt,
+        sides[0],
+        sides[1],
+      )
+    };
+    // A single perpendicular border closes the two rails. Two double
+    // borders instead share an open corner; their transparent gaps meet.
+    let endpoint = |neighbor: Option<BorderStyle>, ending: bool, gap: bool| -> f32 {
+      if let Some(neighbor) = neighbor {
+        let neighbor_width = width(neighbor);
+        let side_width = if ending {
+          neighbor_width - half(neighbor_width)
+        } else {
+          half(neighbor_width)
+        };
+        if neighbor.compound {
+          if gap { side_width - rail } else { side_width }
+        } else if border.compound {
+          -if ending {
+            half(neighbor_width)
+          } else {
+            neighbor_width - half(neighbor_width)
+          }
+        } else if ending {
+          total - before
+        } else {
+          before
+        }
+      } else {
+        if ending { dot } else { 0.0 }
+      }
+    };
+    let make_rect = |cross: f32, thickness: f32, start: f32, end: f32| {
+      if vertical {
+        CellRect {
+          x_pt: cross,
+          y_pt: start,
+          width_pt: thickness,
+          height_pt: (end - start).max(0.0),
+        }
+      } else {
+        CellRect {
+          x_pt: start,
+          y_pt: cross,
+          width_pt: (end - start).max(0.0),
+          height_pt: thickness,
+        }
+      }
+    };
+    bands.push((
+      border,
+      vertical,
+      make_rect(
+        coordinate - before,
+        total,
+        start - endpoint(first, false, false),
+        end + endpoint(last, true, false),
+      ),
+    ));
+    if border.compound && total > 2.0 * rail {
+      // Round the total and rail widths independently. At 95%, native
+      // output has .96pt rails and .84pt gap; at 45%, .48/.36/.48pt.
+      gaps.push(make_rect(
+        coordinate - before + rail,
+        total - 2.0 * rail,
+        start - endpoint(first, false, true),
+        end + endpoint(last, true, true),
+      ));
+    }
+  }
+  (bands, gaps)
+}
+
+fn subtract_border_gap(items: &mut Vec<PageItem>, gap: CellRect) {
+  let old = std::mem::take(items);
+  items.reserve(old.len());
+  for item in old {
+    let PageItem::Rect(rect) = item else {
+      items.push(item);
+      continue;
+    };
+    let left = rect.x_pt.max(gap.x_pt);
+    let top = rect.y_pt.max(gap.y_pt);
+    let right = (rect.x_pt + rect.width_pt).min(gap.x_pt + gap.width_pt);
+    let bottom = (rect.y_pt + rect.height_pt).min(gap.y_pt + gap.height_pt);
+    if right <= left + 1.0e-4 || bottom <= top + 1.0e-4 {
+      items.push(PageItem::Rect(rect));
+      continue;
+    }
+    for (x, y, w, h) in [
+      (rect.x_pt, rect.y_pt, rect.width_pt, top - rect.y_pt),
+      (
+        rect.x_pt,
+        bottom,
+        rect.width_pt,
+        rect.y_pt + rect.height_pt - bottom,
+      ),
+      (rect.x_pt, top, left - rect.x_pt, bottom - top),
+      (right, top, rect.x_pt + rect.width_pt - right, bottom - top),
+    ] {
+      if w > 1.0e-4 && h > 1.0e-4 {
+        items.push(PageItem::Rect(RectItem {
+          x_pt: x,
+          y_pt: y,
+          width_pt: w,
+          height_pt: h,
+          ..rect.clone()
+        }));
+      }
+    }
+  }
+}
+
 fn render_cell_borders(
   items: &mut Vec<PageItem>,
   rect: CellRect,
   borders: super::styles::BorderRecord,
   print_scale: f32,
+  page: CellRect,
 ) {
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let rect = cell_border_device_rect(rect, page);
+  if border_sides(borders)
+    .into_iter()
+    .flatten()
+    .any(|border| border.compound)
+  {
+    let (bands, gaps) = compound_border_geometry(rect, borders, print_scale);
+    let mut cell_items = Vec::new();
+    for (border, vertical, band) in bands {
+      push_cell_border_rect(
+        &mut cell_items,
+        border,
+        print_scale,
+        vertical,
+        page,
+        RectItem {
+          x_pt: band.x_pt,
+          y_pt: band.y_pt,
+          width_pt: band.width_pt,
+          height_pt: band.height_pt,
+          fill_color: Some(border.color),
+          fill_opacity: 1.0,
+          stroke: None,
+          stroke_opacity: 1.0,
+        },
+      );
+    }
+    for gap in gaps {
+      subtract_border_gap(&mut cell_items, gap);
+    }
+    items.append(&mut cell_items);
+    return;
+  }
+  let half_width = |width: f32| ((width / dot).round() / 2.0).floor() * dot;
   let mut push_vertical_border = |x_pt: f32, border: BorderStyle| {
     let width_pt = fixed_output_cell_border_width_pt(border.width_pt, print_scale);
-    items.push(PageItem::Rect(RectItem {
-      x_pt: x_pt - width_pt / 2.0,
-      y_pt: rect.y_pt - width_pt / 2.0,
-      width_pt,
-      height_pt: rect.height_pt + width_pt,
-      fill_color: Some(border.color),
-      fill_opacity: 1.0,
-      stroke: None,
-      stroke_opacity: 1.0,
-    }));
+    push_cell_border_rect(
+      items,
+      border,
+      print_scale,
+      true,
+      page,
+      RectItem {
+        x_pt: x_pt - half_width(width_pt),
+        y_pt: rect.y_pt - half_width(width_pt),
+        width_pt,
+        height_pt: rect.height_pt + width_pt,
+        fill_color: Some(border.color),
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      },
+    );
   };
   if let Some(border) = borders.left {
     push_vertical_border(rect.x_pt, border);
@@ -4188,22 +5587,96 @@ fn render_cell_borders(
   }
   let mut push_horizontal_border = |y_pt: f32, border: BorderStyle| {
     let width_pt = fixed_output_cell_border_width_pt(border.width_pt, print_scale);
-    items.push(PageItem::Rect(RectItem {
-      x_pt: rect.x_pt - width_pt / 2.0,
-      y_pt: y_pt - width_pt / 2.0,
-      width_pt: rect.width_pt + width_pt,
-      height_pt: width_pt,
-      fill_color: Some(border.color),
-      fill_opacity: 1.0,
-      stroke: None,
-      stroke_opacity: 1.0,
-    }));
+    push_cell_border_rect(
+      items,
+      border,
+      print_scale,
+      false,
+      page,
+      RectItem {
+        x_pt: rect.x_pt - half_width(width_pt),
+        y_pt: y_pt - half_width(width_pt),
+        width_pt: rect.width_pt + width_pt,
+        height_pt: width_pt,
+        fill_color: Some(border.color),
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      },
+    );
   };
   if let Some(border) = borders.top {
     push_horizontal_border(rect.y_pt, border);
   }
   if let Some(border) = borders.bottom {
     push_horizontal_border(rect.y_pt + rect.height_pt, border);
+  }
+}
+
+fn push_cell_border_rect(
+  items: &mut Vec<PageItem>,
+  border: BorderStyle,
+  print_scale: f32,
+  vertical: bool,
+  page: CellRect,
+  rect: RectItem,
+) {
+  if border.dash_pattern != crate::model::BorderDashPattern::Dashed {
+    items.push(PageItem::Rect(rect));
+    return;
+  }
+  // Excel's dashed patterns use the thin weight as their length unit even
+  // for medium borders. Quantize the complete period independently: at 95%
+  // thin dashes are 2.76pt on / 0.84pt off, and at 45% 1.32pt / 0.36pt.
+  let medium = border.width_pt > 1.0;
+  let unit = 0.96 * print_scale;
+  let snap = units::quantize_points_to_office_print_grid;
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let dash = snap(unit * if medium { 9.0 } else { 3.0 }).max(dot);
+  let period = snap(unit * if medium { 12.0 } else { 4.0 }).max(dash + dot);
+  // The unscaled thin-dash path has a four-dot brush origin. The scaled and
+  // medium paths start at device zero. A shifted-margin Office control keeps
+  // the same dash positions: restarting at each cell would break continuity.
+  let origin = if !medium && print_scale == 1.0 {
+    4.0 * dot
+  } else {
+    0.0
+  };
+  let (start, length) = if vertical {
+    (rect.y_pt, rect.height_pt)
+  } else {
+    (rect.x_pt, rect.width_pt)
+  };
+  // A merged cell can span thousands of columns or rows. Expand only the
+  // visible page interval, retaining the absolute pattern phase at its clip.
+  let allowance = if vertical {
+    rect.width_pt
+  } else {
+    rect.height_pt
+  };
+  let (clip_start, clip_length) = if vertical {
+    (page.y_pt, page.height_pt)
+  } else {
+    (page.x_pt, page.width_pt)
+  };
+  let end = (start + length).min(clip_start + clip_length + allowance);
+  let start = start.max(clip_start - allowance);
+  let mut position = origin + ((start - origin) / period).floor() * period;
+  while position < end {
+    let left = position.max(start);
+    let right = (position + dash).min(end);
+    if right > left {
+      let mut segment = rect.clone();
+      if vertical {
+        segment.y_pt = left;
+        segment.height_pt = right - left;
+      } else {
+        segment.x_pt = left;
+        segment.width_pt = right - left;
+      }
+      items.push(PageItem::Rect(segment));
+    }
+    position += period;
   }
 }
 
@@ -4215,14 +5688,13 @@ fn fixed_output_cell_border_width_pt(authored_width_pt: f32, print_scale: f32) -
   {
     return 0.0;
   }
-  // Calc's print path passes the same nScaleX/nScaleY into ScOutputData for
-  // cell geometry and DrawFrame. The Windows GDI counterexample converts a
-  // geometric pen through the logical-to-device transform and preserves at
-  // least one device pixel. Mirror both stages on Office's 600dpi fixed-
-  // output grid. In 49156.xlsx this maps a 1pt thin border at the worksheet
-  // print scale to the four-dot (0.48pt) rectangles in the Office PDF.
+  // Excel's nominal thin/medium/thick weights occupy 8/16/24 printer dots
+  // at 100%. Scale those weights before rounding to the 600dpi grid. Office
+  // controls at 45/95/100/150% distinguish this from scaling 1/2/3pt: a 95%
+  // medium border is 1.80pt, while a 45% thin border remains 0.48pt (49156).
   let printer_dot_pt = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
-  units::quantize_points_to_office_print_grid(authored_width_pt * print_scale).max(printer_dot_pt)
+  units::quantize_points_to_office_print_grid(authored_width_pt * 0.96 * print_scale)
+    .max(printer_dot_pt)
 }
 
 fn merge_cell_borders(
@@ -4243,6 +5715,64 @@ fn merge_cell_borders(
   }
 }
 
+fn push_grid_line(items: &mut Vec<PageItem>, exclusions: &[CellRect], line: LineItem) {
+  if exclusions.is_empty() {
+    items.push(PageItem::Line(line));
+    return;
+  }
+  let vertical = line.x1_pt == line.x2_pt;
+  let (start, end, cross) = if vertical {
+    (line.y1_pt, line.y2_pt, line.x1_pt)
+  } else {
+    (line.x1_pt, line.x2_pt, line.y1_pt)
+  };
+  let mut intervals = vec![(start, end)];
+  for rect in exclusions {
+    let (low, high, near, far) = if vertical {
+      (
+        rect.y_pt,
+        rect.y_pt + rect.height_pt,
+        rect.x_pt,
+        rect.x_pt + rect.width_pt,
+      )
+    } else {
+      (
+        rect.x_pt,
+        rect.x_pt + rect.width_pt,
+        rect.y_pt,
+        rect.y_pt + rect.height_pt,
+      )
+    };
+    if cross + line.width_pt / 2.0 <= near || cross - line.width_pt / 2.0 >= far {
+      continue;
+    }
+    intervals = intervals
+      .into_iter()
+      .flat_map(|(a, b)| {
+        if b <= low || a >= high {
+          vec![(a, b)]
+        } else {
+          [(a, low.max(a)), (high.min(b), b)]
+            .into_iter()
+            .filter(|(a, b)| b > a)
+            .collect()
+        }
+      })
+      .collect();
+  }
+  for (a, b) in intervals {
+    let mut segment = line.clone();
+    if vertical {
+      segment.y1_pt = a;
+      segment.y2_pt = b;
+    } else {
+      segment.x1_pt = a;
+      segment.x2_pt = b;
+    }
+    items.push(PageItem::Line(segment));
+  }
+}
+
 fn render_grid(
   items: &mut Vec<PageItem>,
   page: &CalcPrintPage<'_>,
@@ -4250,6 +5780,7 @@ fn render_grid(
   origin_x_pt: f32,
   origin_y_pt: f32,
   zoom_scale: f32,
+  exclusions: &[CellRect],
 ) {
   let width = page.sheet.range_rect(area).width_pt * zoom_scale;
   let height = page.sheet.range_rect(area).height_pt * zoom_scale;
@@ -4264,30 +5795,38 @@ fn render_grid(
     } else {
       x
     };
-    items.push(PageItem::Line(LineItem {
-      x1_pt: paint_x,
-      y1_pt: origin_y_pt,
-      x2_pt: paint_x,
-      y2_pt: origin_y_pt + height,
-      width_pt: XLSX_GRID_LINE_WIDTH_PT,
-      color,
-      kind: LineItemKind::Stroke,
-    }));
+    push_grid_line(
+      items,
+      exclusions,
+      LineItem {
+        x1_pt: paint_x,
+        y1_pt: origin_y_pt,
+        x2_pt: paint_x,
+        y2_pt: origin_y_pt + height,
+        width_pt: XLSX_GRID_LINE_WIDTH_PT,
+        color,
+        kind: LineItemKind::Stroke,
+      },
+    );
   }
   let mut y = origin_y_pt;
   for row in area.start.row..=area.end.row + 1 {
     if row > area.start.row {
       y += page.sheet.row_height_pt(row - 1) * zoom_scale;
     }
-    items.push(PageItem::Line(LineItem {
-      x1_pt: origin_x_pt,
-      y1_pt: y,
-      x2_pt: origin_x_pt + width,
-      y2_pt: y,
-      width_pt: XLSX_GRID_LINE_WIDTH_PT,
-      color,
-      kind: LineItemKind::Stroke,
-    }));
+    push_grid_line(
+      items,
+      exclusions,
+      LineItem {
+        x1_pt: origin_x_pt,
+        y1_pt: y,
+        x2_pt: origin_x_pt + width,
+        y2_pt: y,
+        width_pt: XLSX_GRID_LINE_WIDTH_PT,
+        color,
+        kind: LineItemKind::Stroke,
+      },
+    );
   }
 }
 
@@ -4355,6 +5894,7 @@ fn styled_header_text_with_line_height(
     line_height_pt,
     drawingml_text_effect_anchor: None,
     paint_clip: None,
+    page_culling_bounds: None,
     discard_if_horizontally_clipped: false,
     text,
     style: Box::new(style),
@@ -6318,6 +7858,7 @@ struct DrawingAnchorPageGeometry {
   page_transform: SheetPageTransform,
   page_clip_rect: CellRect,
   zoom_scale: f32,
+  chartsheet: bool,
 }
 
 fn push_page_drawing_anchor_text_items(
@@ -6333,6 +7874,7 @@ fn push_page_drawing_anchor_text_items(
     page_transform,
     page_clip_rect,
     zoom_scale,
+    chartsheet,
   } = geometry;
   let text_rect = page_transform.rect(if anchor.object.text_upright {
     drawing_object_visual_bounds(source_rect, &anchor.object)
@@ -6357,6 +7899,7 @@ fn push_page_drawing_anchor_text_items(
     drawing_rect,
     page_clip_rect,
     zoom_scale,
+    chartsheet,
   ) && !chart_items.is_empty()
   {
     items.extend(chart_items);
@@ -6476,6 +8019,7 @@ fn lower_drawing_chart(
   rect: CellRect,
   page_clip_rect: CellRect,
   drawing_scale: f32,
+  chartsheet: bool,
 ) -> Option<Vec<PageItem>> {
   if anchor.object.kind != super::drawing::DrawingObjectKind::GraphicFrame {
     return None;
@@ -6868,7 +8412,7 @@ fn lower_drawing_chart(
   apply_excel_automatic_series_names(&mut chart, Some(import.styles.output_ui_language()));
   resolve_hidden_chart_values(import, chart_space, &mut chart);
   apply_excel_chart_missing_value_treatment(chart_space, chart_style.is_some(), &mut chart);
-  apply_excel_chart_smoothing_default(chart_style.is_some(), &mut chart);
+  apply_excel_scatter_smoothing_default(chart_style.is_some(), &mut chart);
   let maximum_series_formatting_index = chart
     .series
     .iter()
@@ -7165,7 +8709,13 @@ fn lower_drawing_chart(
       // ECMA's omitted legacy chart style resolves to style 2. LibreOffice's
       // ChartSpaceModel likewise initializes mnStyle to 2 before parsing an
       // optional c:style element.
-      if chart_style.unwrap_or(2) == 2 {
+      if chartsheet {
+        RgbColor {
+          r: 137,
+          g: 137,
+          b: 137,
+        }
+      } else if chart_style.unwrap_or(2) == 2 {
         RgbColor {
           r: 0x86,
           g: 0x86,
@@ -7184,6 +8734,7 @@ fn lower_drawing_chart(
     .and_then(|axis| axis.major_gridlines.as_deref())
     .and_then(|gridlines| gridlines.chart_shape_properties.as_deref())
     .and_then(xlsx_chart_outline_width_pt)
+    .or(chartsheet.then_some(0.5))
     .or_else(|| chart_style.is_none().then_some(0.75 * drawing_scale));
   let axis_line_width_pt = chart
     .date_axis
@@ -7195,6 +8746,7 @@ fn lower_drawing_chart(
         .and_then(|axis| axis.chart_shape_properties.as_deref())
         .and_then(xlsx_chart_outline_width_pt)
     })
+    .or(chartsheet.then_some(0.5))
     .or_else(|| chart_style.is_none().then_some(0.75 * drawing_scale));
   let category_major_gridline = chart.date_axis.and_then(|axis| {
     let properties = axis
@@ -7492,16 +9044,26 @@ fn lower_drawing_chart(
         .as_deref()
         .and_then(shared_chart::shape_properties_solid_fill)
         .and_then(|fill| xlsx_chart_solid_fill_color(fill, import, resource)),
-      chart_area_stroke_color.map(|color| {
-        (
-          color,
-          chart_space
-            .shape_properties
-            .as_deref()
-            .and_then(xlsx_shape_outline_width_pt)
-            .unwrap_or(0.75 * drawing_scale),
-        )
-      }),
+      chart_area_stroke_color
+        .or(chartsheet.then_some(RgbColor {
+          r: 137,
+          g: 137,
+          b: 137,
+        }))
+        .map(|color| {
+          (
+            color,
+            chart_space
+              .shape_properties
+              .as_deref()
+              .and_then(xlsx_shape_outline_width_pt)
+              .unwrap_or(if chartsheet {
+                0.5
+              } else {
+                0.75 * drawing_scale
+              }),
+          )
+        }),
     ),
   );
   let plot_area_style = xlsx_shape_style(
@@ -7548,6 +9110,7 @@ fn lower_drawing_chart(
     shared_chart::automatic_chart_title(Some(import.styles.output_ui_language())),
     &ClusteredColumnStyle {
       layout_profile: ChartLayoutProfile::Excel,
+      chartsheet: chartsheet,
       chart_style_id: chart_style.unwrap_or(2),
       modern_excel_profile: chart_style.is_some(),
       stroke_scale: drawing_scale,
@@ -7849,7 +9412,7 @@ fn apply_excel_chart_missing_value_treatment(
   }
 }
 
-fn apply_excel_chart_smoothing_default(
+fn apply_excel_scatter_smoothing_default(
   has_explicit_modern_style: bool,
   chart: &mut shared_chart::ClusteredColumnChart<'_>,
 ) {
@@ -7857,16 +9420,10 @@ fn apply_excel_chart_smoothing_default(
     return;
   }
   for series in &mut chart.series {
-    if matches!(
-      series.kind,
-      shared_chart::ChartSeriesKind::Line | shared_chart::ChartSeriesKind::Scatter
-    ) && series.smooth.is_none()
-    {
-      // LibreOffice Chart2ImportTest::testSmoothDefaultValue2007XLSX and
-      // testSmoothDefaultValue2013XLSX establish the versioned omission:
-      // Office 2007 imports a missing per-series c:smooth as straight lines,
-      // while the modern OOXML profile imports it as a smooth curve. The
-      // chart-group c:smooth value does not replace that series default.
+    if series.kind == shared_chart::ChartSeriesKind::Scatter && series.smooth.is_none() {
+      // Native scatter controls retain the modern omission default. Line
+      // charts remain straight without per-series c:smooth, including with
+      // C14 styles and AppVersion 16; chart style alone must not curve them.
       series.smooth = Some(true);
     }
   }
@@ -8973,6 +10530,28 @@ fn xlsx_chart_color_with_placeholder_policy(
   placeholder_color: Option<&Color>,
   preserve_saturation_overflow: bool,
 ) -> Option<common::Color> {
+  let color = xlsx_chart_resolved_color_with_placeholder_policy(
+    color,
+    import,
+    resource,
+    placeholder_color,
+    preserve_saturation_overflow,
+  )?;
+  Some(common::Color {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
+  })
+}
+
+fn xlsx_chart_resolved_color_with_placeholder_policy(
+  color: Color,
+  import: &ExcelImport,
+  resource: &super::drawing::ChartResourceCatalog,
+  placeholder_color: Option<&Color>,
+  preserve_saturation_overflow: bool,
+) -> Option<crate::pptx::drawingml::color::ResolvedColor> {
   let color_map = resource
     .chart_space
     .as_deref()
@@ -8992,17 +10571,11 @@ fn xlsx_chart_color_with_placeholder_policy(
       transformations: Vec::new(),
     }))
   };
-  let color = if preserve_saturation_overflow {
-    color.resolve_rgb_preserving_transform_precision(&mut scheme_resolver, placeholder_color)?
+  if preserve_saturation_overflow {
+    color.resolve_rgb_preserving_transform_precision(&mut scheme_resolver, placeholder_color)
   } else {
-    color.resolve_rgb(&mut scheme_resolver, placeholder_color)?
-  };
-  Some(common::Color {
-    r: color.r,
-    g: color.g,
-    b: color.b,
-    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
-  })
+    color.resolve_rgb(&mut scheme_resolver, placeholder_color)
+  }
 }
 
 fn xlsx_chart_theme_color_index(value: a::ColorSchemeIndexValues) -> u32 {
@@ -9411,6 +10984,7 @@ fn render_drawing_text(
       line_height_pt: line_height,
       drawingml_text_effect_anchor: None,
       paint_clip: None,
+      page_culling_bounds: None,
       discard_if_horizontally_clipped: false,
       text: line.to_string(),
       style: Box::new(style.clone()),
@@ -10058,17 +11632,28 @@ struct XlsxImageEffectColorResolver<'a> {
 
 impl XlsxImageEffectColorResolver<'_> {
   fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
-    let color = match self.chart_resource {
-      Some(chart_resource) => xlsx_chart_effect_color_with_placeholder(
+    if let Some(chart_resource) = self.chart_resource {
+      let color = xlsx_chart_resolved_color_with_placeholder_policy(
         color?,
         self.import,
         chart_resource,
         self.placeholder_color.as_ref(),
-      ),
-      None => {
-        xlsx_drawing_color_with_placeholder(color?, self.import, self.placeholder_color.as_ref())
-      }
-    }?;
+        false,
+      )?;
+      // Office chart shadow controls round the final effect opacity to A8.
+      // Passing through the ordinary paint color truncates 43.137% to 109
+      // instead of 110 and makes the entire blurred shadow too light.
+      return Some(ResolvedEffectColor {
+        color: RgbColor {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+        },
+        alpha: ((color.alpha.clamp(0, 100_000) as u32 * 255 + 50_000) / 100_000) as u8,
+      });
+    }
+    let color =
+      xlsx_drawing_color_with_placeholder(color?, self.import, self.placeholder_color.as_ref())?;
     Some(ResolvedEffectColor {
       color: RgbColor {
         r: color.r,
@@ -10925,11 +12510,13 @@ fn render_header_footer_line(
     if value.is_empty() {
       continue;
     }
-    let mut runs = parse_header_footer_runs(
+    let runs = parse_header_footer_runs(
       &value,
       styles.default_font_text_style(),
       HeaderFooterFieldValues {
-        page_number: page.page_number,
+        page_number: page
+          .page_settings
+          .header_footer_page_number(page.sheet_page_index, page.page_number),
         total_pages: page.total_pages,
         sheet_name: &page.sheet.name,
         file_name: source_file_name.unwrap_or(""),
@@ -10940,12 +12527,28 @@ fn render_header_footer_line(
     if runs.is_empty() {
       continue;
     }
-    if page.page_settings.header_footer.scale_with_doc {
-      for run in &mut runs {
-        run.style.font_size_pt *= content_scale;
+    let font_scale = if page.page_settings.header_footer.scale_with_doc {
+      content_scale
+    } else {
+      1.0
+    };
+    let mut lines = split_header_footer_lines(runs);
+    let line_advances = lines
+      .iter()
+      .map(|line| {
+        line
+          .iter()
+          .map(|run| fixed_output_header_line_advance_pt(&run.style, font_scale, text_metrics))
+          .fold(0.0_f32, f32::max)
+          .max(1.0)
+      })
+      .collect::<Vec<_>>();
+    for line in &mut lines {
+      for run in line {
+        run.style.font_size_pt =
+          fixed_output_header_font_size_pt(run.style.font_size_pt, font_scale);
       }
     }
-    let lines = split_header_footer_lines(runs);
     let line_heights = lines
       .iter()
       .map(|line| {
@@ -10962,11 +12565,19 @@ fn render_header_footer_line(
     let mut y_pt = if header {
       setup.header_distance_pt
     } else {
-      setup.height_pt - setup.footer_distance_pt - line_heights.iter().sum::<f32>()
+      setup.height_pt
+        - setup.footer_distance_pt
+        - line_advances
+          .iter()
+          .take(line_advances.len().saturating_sub(1))
+          .sum::<f32>()
+        - line_heights.last().copied().unwrap_or(0.0)
     };
     let (left_edge_pt, right_edge_pt) =
       header_footer_horizontal_edges(setup, page.page_settings.header_footer.align_with_margins);
-    for (line, line_height_pt) in lines.into_iter().zip(line_heights) {
+    for ((line, line_height_pt), line_advance_pt) in
+      lines.into_iter().zip(line_heights).zip(line_advances)
+    {
       let total_width = line
         .iter()
         .map(|run| text_metrics.measure_text(&run.text, &run.style))
@@ -10990,9 +12601,34 @@ fn render_header_footer_line(
         ));
         x += width;
       }
-      y_pt += line_height_pt;
+      y_pt += line_advance_pt;
     }
   }
+}
+
+fn fixed_output_header_font_size_pt(size_pt: f32, scale: f32) -> f32 {
+  // Excel scales header/footer point sizes through an integral twip before
+  // creating the printer font. Office's 48-size matrix at 45/71/90/100%
+  // distinguishes both boundaries: 8pt at 71% becomes 114 twips and 48
+  // printer dots (5.76pt); 6pt becomes 85 twips and 35 dots (4.20pt).
+  let twips = (size_pt * scale * units::TWIPS_PER_POINT).round();
+  let dots = (twips * units::OFFICE_FIXED_OUTPUT_DPI
+    / (units::TWIPS_PER_POINT * units::POINTS_PER_INCH))
+    .round();
+  dots * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
+}
+
+fn fixed_output_header_line_advance_pt(
+  style: &TextStyle,
+  scale: f32,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  // Header/footer baseline intervals use the realized font line grid, not
+  // the tight glyph box. Independent plain/Regular/Gras controls all retain
+  // Arial 10 intervals of 12.36pt at 100% and 8.76pt at 71%.
+  let height = super::worksheet::printer_font_line_height_pt(style, 0)
+    .unwrap_or_else(|| text_metrics.inline_text_box_height(style));
+  units::quantize_points_to_office_print_grid(height * scale)
 }
 
 fn header_footer_horizontal_edges(setup: PageSetup, align_with_margins: bool) -> (f32, f32) {
@@ -11059,7 +12695,7 @@ fn push_header_footer_section(
 
 #[derive(Clone, Copy, Debug, Default)]
 struct HeaderFooterFieldValues<'a> {
-  page_number: usize,
+  page_number: i64,
   total_pages: usize,
   sheet_name: &'a str,
   file_name: &'a str,
@@ -11234,6 +12870,80 @@ fn header_footer_italic_style(name: &str) -> bool {
 #[cfg(test)]
 mod drawing_page_tests {
   use super::*;
+
+  #[test]
+  fn chart_effect_opacity_preserves_native_alpha_rounding() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    package
+      .add_workbook_part()
+      .unwrap()
+      .set_data(
+        &mut package,
+        br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets/></workbook>"#
+          .to_vec(),
+      )
+      .unwrap();
+    let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+    let resource = super::super::drawing::ChartResourceCatalog::default();
+    let images = HashMap::new();
+    let resolver = XlsxImageEffectColorResolver {
+      import: &import,
+      image_resources: &images,
+      chart_resource: Some(&resource),
+      placeholder_color: None,
+    };
+    let shadow = a::OuterShadow::from_bytes(
+      br#"<a:outerShdw xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" blurRad="63500" dist="25400" dir="5400000"><a:srgbClr val="000000"><a:alpha val="43137"/></a:srgbClr></a:outerShdw>"#,
+    ).unwrap();
+    let color = resolver
+      .outer_shadow(shadow.outer_shadow_choice.as_ref().unwrap())
+      .unwrap();
+    assert_eq!(color.alpha, 110);
+  }
+
+  #[test]
+  fn line_and_scatter_smoothing_defaults_keep_series_overrides() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let source = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+      <c:chart><c:plotArea>
+        <c:lineChart><c:grouping val="standard"/>
+          <c:ser><c:idx val="0"/><c:order val="0"/></c:ser>
+          <c:ser><c:idx val="1"/><c:order val="1"/><c:smooth val="0"/></c:ser>
+          <c:ser><c:idx val="2"/><c:order val="2"/><c:smooth val="1"/></c:ser>
+          <c:axId val="1"/><c:axId val="2"/>
+        </c:lineChart>
+        <c:scatterChart><c:scatterStyle val="lineMarker"/>
+          <c:ser><c:idx val="3"/><c:order val="3"/></c:ser>
+          <c:ser><c:idx val="4"/><c:order val="4"/><c:smooth val="0"/></c:ser>
+          <c:ser><c:idx val="5"/><c:order val="5"/><c:smooth val="1"/></c:ser>
+          <c:axId val="1"/><c:axId val="2"/>
+        </c:scatterChart>
+      </c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .unwrap();
+    let mut chart = shared_chart::cartesian_chart_for_ui_language(&source, None).unwrap();
+    apply_excel_scatter_smoothing_default(true, &mut chart);
+    assert_eq!(
+      chart
+        .series
+        .iter()
+        .map(|series| series.smooth)
+        .collect::<Vec<_>>(),
+      [
+        None,
+        Some(false),
+        Some(true),
+        Some(true),
+        Some(false),
+        Some(true)
+      ]
+    );
+  }
 
   #[test]
   fn generic_vml_caption_uses_its_authored_control_font() {
@@ -11425,6 +13135,318 @@ mod drawing_page_tests {
       (400.01, 250.0, 100.0, 100.0),
       page
     ));
+  }
+
+  #[test]
+  fn solid_cell_fill_uses_fixed_device_insets_at_each_zoom() {
+    // Bounds of the first two alternating-color rows in the Office PDFs;
+    // the worksheet's logical column width is 61.824pt. Small sub-dot PDF
+    // coordinate drift stays below half of one 600dpi device dot.
+    for (scale, x, y, expected_first, expected_second) in [
+      (
+        0.5,
+        50.4,
+        54.0,
+        [51.36, 54.956, 81.984, 60.84],
+        [51.36, 60.72, 81.984, 67.08],
+      ),
+      (
+        1.0,
+        50.4,
+        54.0,
+        [51.36, 54.956, 112.824, 67.08],
+        [51.36, 66.96, 112.824, 79.56],
+      ),
+      (
+        2.0,
+        50.4,
+        54.0,
+        [51.36, 54.96, 174.62, 79.56],
+        [51.36, 79.436, 174.62, 104.54],
+      ),
+      (
+        1.0,
+        50.616,
+        54.216,
+        [51.48, 55.076, 112.944, 67.2],
+        [51.48, 67.08, 112.944, 79.68],
+      ),
+    ] {
+      let page = CellRect {
+        x_pt: x,
+        y_pt: y,
+        width_pt: 61.824 * scale,
+        height_pt: 8.0 * 12.48 * scale,
+      };
+      for (row, expected) in [expected_first, expected_second].into_iter().enumerate() {
+        let cell = CellRect {
+          y_pt: y + row as f32 * 12.48 * scale,
+          height_pt: 12.48 * scale,
+          ..page
+        };
+        let rect = fixed_output_solid_cell_fill_rect(cell, page).unwrap();
+        let bounds = [
+          rect.x_pt,
+          rect.y_pt,
+          rect.x_pt + rect.width_pt,
+          rect.y_pt + rect.height_pt,
+        ];
+        for (actual, expected) in bounds.into_iter().zip(expected) {
+          assert!(
+            (actual - expected).abs() < 0.04,
+            "scale={scale} row={row}: {actual} != {expected}"
+          );
+        }
+      }
+      assert!(
+        fixed_output_solid_cell_fill_rect(
+          CellRect {
+            y_pt: y + page.height_pt + 1.0,
+            height_pt: 12.48 * scale,
+            ..page
+          },
+          page
+        )
+        .is_none()
+      );
+    }
+  }
+
+  #[test]
+  fn preceding_cell_overflow_search_starts_at_the_pages_first_data_column() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Office's fixed-output length matrices use explicit SimSun 11.
+    // Use an explicit 50.05pt column grid to keep producer/theme defaults
+    // separate from the observed overflow ownership. The second page is
+    // J:R; without owned data it retains lengths 127+, while
+    // a value in L22 admits lengths 73+. A shorter explicit area J:K starts
+    // at K instead. Empty strings and invisible values still own a column.
+    for (last_column, extra_row, first_length) in [
+      ("R", "", 127),
+      ("K", "", 64),
+      ("R", r#"<row r="22"><c r="J22"><v>1</v></c></row>"#, 55),
+      ("R", r#"<row r="22"><c r="L22"><v>1</v></c></row>"#, 73),
+      ("R", r#"<row r="22"><c r="L22" s="1"/></row>"#, 127),
+      (
+        "R",
+        r#"<row r="22"><c r="L22" t="inlineStr"><is><t></t></is></c></row>"#,
+        73,
+      ),
+      (
+        "R",
+        r#"<row r="22"><c r="L22" t="str"><f>""</f><v></v></c></row>"#,
+        73,
+      ),
+      (
+        "R",
+        r#"<row r="22"><c r="L22" s="2"><v>1</v></c></row>"#,
+        73,
+      ),
+      ("R", r#"<row r="23"><c r="J23"><v>1</v></c></row>"#, 127),
+    ] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let styles = workbook
+        .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+        .unwrap();
+      let id = workbook
+        .get_id_of_part(&package, &worksheet)
+        .unwrap()
+        .to_owned();
+      workbook.set_data(&mut package, format!(
+        r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <fileVersion appName="xl" lastEdited="5" lowestEdited="5"/>
+        <sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets>
+        <definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Sheet1!$A$1:${last_column}$22</definedName></definedNames></workbook>"#
+      ).into_bytes()).unwrap();
+      styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <numFmts count="1"><numFmt numFmtId="164" formatCode=";;;"/></numFmts>
+        <fonts count="1"><font><sz val="11"/><name val="SimSun"/></font></fonts>
+        <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+        <cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+        <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="right"/></xf>
+        <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>
+        <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#.to_vec()).unwrap();
+      let lengths = [54, 55, 63, 64, 72, 73, 126, 127, 130, 145];
+      let rows = lengths
+        .into_iter()
+        .enumerate()
+        .map(|(index, length)| {
+          let row = index + 1;
+          let text = format!("L{length:03}{}", "X".repeat(length - 4));
+          format!(r#"<row r="{row}"><c r="D{row}" t="inlineStr"><is><t>{text}</t></is></c></row>"#)
+        })
+        .collect::<String>();
+      // SimSun 11 has a 5.52pt digit on the Office 600dpi print grid.
+      let column_width = 50.05 / 5.52;
+      worksheet
+        .set_data(
+          &mut package,
+          format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <sheetFormatPr defaultRowHeight="15" defaultColWidth="{column_width}"/><sheetData>{rows}{extra_row}</sheetData>
+        <pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>
+        <pageSetup paperSize="9"/></worksheet>"#
+          )
+          .into_bytes(),
+        )
+        .unwrap();
+      let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+      let print = CalcPrintDocument::from_import(&import);
+      assert_eq!(print.pages.len(), 2);
+      let page = &print.pages[1];
+      assert!((page.sheet.column_width_pt(1) - 50.05).abs() < 0.001);
+      let area = page.area.unwrap();
+      assert_eq!(area.start.col, 10);
+      let mut metrics = TextMetrics::new();
+      let mut items = Vec::new();
+      render_cell_area(
+        &mut items,
+        &import,
+        page,
+        &page.cells,
+        area,
+        CellAreaRenderLayout {
+          origin_x_pt: 50.4,
+          origin_y_pt: 54.0,
+          zoom_scale: 1.0,
+          fill_page: CellRect {
+            x_pt: 50.4,
+            y_pt: 54.0,
+            ..page.sheet.fixed_output_range_rect(area, 1.0)
+          },
+          physical_page: CellRect {
+            x_pt: 0.0,
+            y_pt: 0.0,
+            width_pt: 595.32,
+            height_pt: 841.92,
+          },
+        },
+        &mut metrics,
+      );
+      let retained = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) if text.text.starts_with('L') => Some(text.text.len()),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(
+        retained,
+        lengths
+          .into_iter()
+          .filter(|length| *length >= first_length)
+          .collect::<Vec<_>>(),
+        "{last_column}: {extra_row}"
+      );
+    }
+  }
+
+  #[test]
+  fn merged_text_is_retained_on_owned_pages_when_its_glyphs_are_off_page() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    for last_merged_column in ["F", "Z"] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let id = workbook.get_id_of_part(&package, &worksheet).unwrap();
+      let xml = format!(
+        r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets>
+        <definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Sheet1!$A$1:$Z$3</definedName></definedNames></workbook>"#
+      );
+      workbook.set_data(&mut package, xml.into_bytes()).unwrap();
+      let markers = ('A'..='Z')
+        .map(|column| format!("<c r=\"{column}3\"><v>1</v></c>"))
+        .collect::<String>();
+      let xml = format!(
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="26" width="20" customWidth="1"/></cols>
+        <sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Hidden merged heading</t></is></c></row>
+        <row r="2"><c r="A2" t="inlineStr"><is><t>Ordinary left text</t></is></c></row><row r="3">{markers}</row></sheetData>
+        <mergeCells><mergeCell ref="A1:{last_merged_column}1"/></mergeCells>
+        <pageMargins left="0.5" right="0.5" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>
+        <pageSetup paperSize="9"/></worksheet>"#
+      );
+      worksheet.set_data(&mut package, xml.into_bytes()).unwrap();
+      let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+      let print = CalcPrintDocument::from_import(&import);
+      assert!(print.pages.len() > 2);
+      let merged = CellRange::parse_a1_range(&format!("A1:{last_merged_column}1")).unwrap();
+      let mut metrics = TextMetrics::new();
+      let mut off_page_heading = false;
+      for page in &print.pages {
+        let area = page.area.unwrap();
+        let mut items = Vec::new();
+        render_cell_area(
+          &mut items,
+          &import,
+          page,
+          &page.cells,
+          area,
+          CellAreaRenderLayout {
+            origin_x_pt: 36.0,
+            origin_y_pt: 36.0,
+            zoom_scale: 1.0,
+            fill_page: CellRect {
+              x_pt: 36.0,
+              y_pt: 36.0,
+              ..page.sheet.fixed_output_range_rect(area, 1.0)
+            },
+            physical_page: CellRect {
+              x_pt: 0.0,
+              y_pt: 0.0,
+              width_pt: 595.32,
+              height_pt: 841.92,
+            },
+          },
+          &mut metrics,
+        );
+        let heading = items.iter().find_map(|item| match item {
+          PageItem::Text(text) if text.text == "Hidden merged heading" => Some(text),
+          _ => None,
+        });
+        assert_eq!(
+          heading.is_some(),
+          merged.intersects(area),
+          "{last_merged_column}: {area:?}"
+        );
+        if let Some(heading) = heading {
+          assert!(heading.page_culling_bounds.is_some());
+          let common = common_text_run(heading.clone());
+          assert_eq!(common.page_culling_bounds, heading.page_culling_bounds);
+        }
+        if area.start.col > 1 {
+          assert!(
+            !items.iter().any(
+              |item| matches!(item, PageItem::Text(text) if text.text == "Ordinary left text")
+            )
+          );
+          if let Some(heading) = heading {
+            assert!(heading.paint_clip.is_some());
+            off_page_heading |= text_item_bounds(heading, &mut metrics).2 < 0.0;
+          }
+        }
+      }
+      if last_merged_column == "Z" {
+        assert!(
+          off_page_heading,
+          "exercise ownership beyond physical glyph bounds"
+        );
+      }
+    }
   }
 
   #[test]
@@ -12014,6 +14036,36 @@ mod cell_alignment_tests {
   use super::*;
 
   #[test]
+  fn clipped_pivot_text_retains_partially_visible_edge_characters() {
+    let style = TextStyle {
+      font_family: Some("SimSun".into()),
+      font_size_pt: 11.04,
+      character_spacing_pt: 0.12,
+      ..TextStyle::default()
+    };
+    let mut metrics = TextMetrics::new();
+    let mut cell = print_cell(super::super::print::NumberFormatRenderState::General);
+    cell.rendered_text = "ABCD".to_string();
+    let full_width = metrics.measure_text(&cell.rendered_text, &style);
+    let visible = metrics.measure_text("AB", &style) + metrics.measure_text("C", &style) * 0.5;
+    for (left_clip_pt, right_clip_pt, expected) in [
+      (0.0, full_width - visible, "ABC"),
+      (full_width - visible, 0.0, "BCD"),
+    ] {
+      let output = CalcCellOutputArea {
+        align_rect: CellRect::default(),
+        clip_rect: CellRect::default(),
+        left_clip_pt,
+        right_clip_pt,
+      };
+      assert_eq!(
+        clipped_string_text(&cell, &style, output, &mut metrics).as_deref(),
+        Some(expected)
+      );
+    }
+  }
+
+  #[test]
   fn fitted_general_precision_keeps_office_decimal_rounding() {
     for (value, digits, expected) in [
       (600.25, 4, "600.3"),
@@ -12120,6 +14172,8 @@ mod cell_alignment_tests {
           hyperlink_url: None,
           formula: false,
           default_line_height_pt: 15.0,
+          clip_wrapped_text: false,
+          has_outer_border: false,
         },
         1.0,
         &mut metrics,
@@ -12171,8 +14225,10 @@ mod cell_alignment_tests {
       rich_text_runs: &[],
       number_format_state: state,
       number_format_color: None,
+      number_format_layout: None,
       formula: false,
       icon_set: None,
+      data_bar: None,
       color_scale_fill: None,
     }
   }
@@ -12309,6 +14365,141 @@ mod cell_alignment_tests {
   }
 
   #[test]
+  fn logical_values_use_their_own_width_and_preserve_text_controls() {
+    use super::super::print::NumberFormatRenderState;
+    use super::super::styles::{AlignmentRecord, StylesCatalog};
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+    let worksheet = x::Worksheet::from_bytes(
+      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <cols><col min="1" max="5" width="15" customWidth="1"/></cols><sheetData/>
+      </worksheet>"#,
+    )
+    .unwrap();
+    let sheet = CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Sheet1".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog::default(),
+      &[],
+      &StylesCatalog::default(),
+      Default::default(),
+    );
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 9.96,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    // Office PDF, not Range.Text: the latter still reports hashes at the
+    // widest width even though fixed output fits VERDADERO there.
+    for (state, text, displayed) in [
+      (
+        NumberFormatRenderState::Boolean,
+        "VERDADERO",
+        ["", "#", "###", "#####", "#######", "VERDADERO"],
+      ),
+      (
+        NumberFormatRenderState::Boolean,
+        "FALSO",
+        ["", "#", "###", "#####", "FALSO", "FALSO"],
+      ),
+      (
+        NumberFormatRenderState::Error,
+        "#DIV/0!",
+        ["", "#", "###", "#####", "#DIV/0!", "#DIV/0!"],
+      ),
+      (
+        NumberFormatRenderState::Error,
+        "#VALOR!",
+        ["", "#", "###", "#####", "#######", "#VALOR!"],
+      ),
+    ] {
+      let mut cell = print_cell(state);
+      cell.address = CellAddress { col: 2, row: 1 };
+      cell.rendered_text = text.into();
+      for occupied in [
+        HashMap::new(),
+        HashMap::from([((1, 1), true), ((1, 3), true)]),
+      ] {
+        for horizontal in [
+          None,
+          Some(x::HorizontalAlignmentValues::Left),
+          Some(x::HorizontalAlignmentValues::Center),
+          Some(x::HorizontalAlignmentValues::Right),
+        ] {
+          for wrap_text in [false, true] {
+            for (index, width) in [5.52, 11.04, 22.08, 33.12, 44.16, 66.24]
+              .into_iter()
+              .enumerate()
+            {
+              let rect = CellRect {
+                x_pt: 100.0,
+                y_pt: 0.0,
+                width_pt: width,
+                height_pt: 29.04,
+              };
+              let alignment = Some(AlignmentRecord {
+                horizontal,
+                wrap_text,
+                ..Default::default()
+              });
+              let output = calc_cell_output_area(
+                CalcCellOutputContext {
+                  sheet: &sheet,
+                  occupied_cells: &occupied,
+                  text_metrics: &mut metrics,
+                },
+                &cell,
+                rect,
+                &style,
+                alignment,
+                1.0,
+              );
+              assert_eq!(output.clip_rect, rect);
+              assert_eq!(
+                calc_cell_visible_text(&sheet, &cell, &style, output, alignment, &mut metrics),
+                displayed[index],
+                "{text}, width={width}, horizontal={horizontal:?}, wrap={wrap_text}"
+              );
+            }
+          }
+        }
+      }
+    }
+    let mut cell = print_cell(NumberFormatRenderState::Text);
+    cell.address = CellAddress { col: 2, row: 1 };
+    cell.rendered_text = "VERDADERO".into();
+    let rect = CellRect {
+      x_pt: 100.0,
+      y_pt: 0.0,
+      width_pt: 33.12,
+      height_pt: 29.04,
+    };
+    let output = calc_cell_output_area(
+      CalcCellOutputContext {
+        sheet: &sheet,
+        occupied_cells: &HashMap::new(),
+        text_metrics: &mut metrics,
+      },
+      &cell,
+      rect,
+      &style,
+      None,
+      1.0,
+    );
+    assert!(output.clip_rect.width_pt > rect.width_pt);
+    assert_eq!(
+      calc_cell_visible_text(&sheet, &cell, &style, output, None, &mut metrics),
+      "VERDADERO"
+    );
+  }
+
+  #[test]
   fn general_alignment_centers_boolean_and_error_values() {
     for state in [
       super::super::print::NumberFormatRenderState::Boolean,
@@ -12387,6 +14578,7 @@ mod cell_alignment_tests {
       font_size_pt: 9.48,
       bold: true,
       italic: true,
+      character_spacing_pt: 0.12,
       ..TextStyle::default()
     };
     let run = super::super::workbook::SharedStringRun {
@@ -12402,6 +14594,7 @@ mod cell_alignment_tests {
     let style = xlsx_rich_text_run_style(&base_style, &run, 0.95);
 
     assert_eq!(style.font_family.as_deref(), Some("Arial"));
+    assert_eq!(style.character_spacing_pt, 0.0);
     assert!(style.bold);
     assert!(
       !style.italic,
@@ -12410,6 +14603,183 @@ mod cell_alignment_tests {
     assert!((style.font_size_pt - 6.36).abs() < 1.0e-5);
     assert_eq!(style.automatic_escapement_font_size_pt, Some(9.48));
     assert!((style.baseline_shift_pt - 4.68).abs() < 1.0e-5);
+  }
+
+  #[test]
+  fn opposite_rotations_place_the_origin_inside_the_padded_layout_box() {
+    let mut metrics = TextMetrics::new();
+    for has_outer_border in [false, true] {
+      let mut baselines = Vec::new();
+      for rotation in [45, 135] {
+        let mut items = Vec::new();
+        render_cell_text(
+          &mut items,
+          "CCCCCCCCCC",
+          CellRect {
+            x_pt: 72.0,
+            y_pt: 0.0,
+            width_pt: 132.48,
+            height_pt: 96.96,
+          },
+          TextStyle {
+            font_family: Some(Arc::from("SimSun")),
+            font_size_pt: 7.08,
+            bold: true,
+            ..Default::default()
+          },
+          CellTextRenderOptions {
+            alignment: Some(super::super::styles::AlignmentRecord {
+              text_rotation: Some(rotation),
+              vertical: Some(x::VerticalAlignmentValues::Bottom),
+              ..Default::default()
+            }),
+            horizontal_alignment: x::HorizontalAlignmentValues::Left,
+            hyperlink_url: None,
+            formula: false,
+            default_line_height_pt: 12.36,
+            clip_wrapped_text: false,
+            has_outer_border,
+          },
+          &mut metrics,
+        );
+        let PageItem::Text(text) = &items[0] else {
+          panic!("rotated text");
+        };
+        let baseline =
+          metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt);
+        baselines.push(text.y_pt + baseline * std::f32::consts::FRAC_1_SQRT_2);
+      }
+      // Native bordered and borderless 45/135-degree controls differ by
+      // 26.26pt after removing their cell-row origins. The full padded
+      // extent would instead introduce an extra 1.44pt displacement.
+      assert!(
+        (baselines[0] - baselines[1] - 26.26).abs() < 0.12,
+        "{baselines:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn rotated_cell_font_alignment_does_not_inherit_the_normal_line_height() {
+    let mut metrics = TextMetrics::new();
+    let mut previous = None;
+    for default_line_height_pt in [7.08, 12.36, 20.0] {
+      let mut items = Vec::new();
+      render_cell_text(
+        &mut items,
+        "CCCCCCCCCC",
+        CellRect {
+          x_pt: 72.0,
+          y_pt: 0.0,
+          width_pt: 132.48,
+          height_pt: 96.96,
+        },
+        TextStyle {
+          font_family: Some(Arc::from("SimSun")),
+          font_size_pt: 7.08,
+          bold: true,
+          ..Default::default()
+        },
+        CellTextRenderOptions {
+          alignment: Some(super::super::styles::AlignmentRecord {
+            text_rotation: Some(45),
+            vertical: Some(x::VerticalAlignmentValues::Bottom),
+            ..Default::default()
+          }),
+          horizontal_alignment: x::HorizontalAlignmentValues::Left,
+          hyperlink_url: None,
+          formula: false,
+          default_line_height_pt,
+          clip_wrapped_text: false,
+          has_outer_border: true,
+        },
+        &mut metrics,
+      );
+      let PageItem::Text(text) = &items[0] else {
+        panic!("rotated text");
+      };
+      let baseline =
+        metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt);
+      let origin = (
+        text.x_pt + baseline * std::f32::consts::FRAC_1_SQRT_2,
+        text.y_pt + baseline * std::f32::consts::FRAC_1_SQRT_2,
+      );
+      // Three native Normal-size controls retain this x origin despite
+      // their distinct printer row grids and column widths.
+      assert!((origin.0 - 84.624).abs() < 1.5, "{origin:?}");
+      if let Some(previous) = previous {
+        assert_eq!(origin, previous);
+      }
+      previous = Some(origin);
+    }
+  }
+
+  #[test]
+  fn fixed_height_wrapping_aligns_only_the_visible_leading_lines() {
+    let mut metrics = TextMetrics::new();
+    for vertical in [
+      x::VerticalAlignmentValues::Top,
+      x::VerticalAlignmentValues::Center,
+      x::VerticalAlignmentValues::Bottom,
+    ] {
+      for (height, manual, expected) in [
+        (8.0, true, 1),
+        (12.75, true, 1),
+        (18.0, true, 2),
+        (24.0, true, 2),
+        (36.0, true, 3),
+        (12.75, false, 3),
+      ] {
+        let mut items = Vec::new();
+        render_cell_text(
+          &mut items,
+          "Alpha\nBeta\nGamma",
+          CellRect {
+            x_pt: 10.0,
+            y_pt: 20.0,
+            width_pt: 100.0,
+            height_pt: height,
+          },
+          TextStyle {
+            font_family: Some(Arc::from("Arial")),
+            font_size_pt: 9.96,
+            ..Default::default()
+          },
+          CellTextRenderOptions {
+            alignment: Some(super::super::styles::AlignmentRecord {
+              vertical: Some(vertical),
+              wrap_text: true,
+              ..Default::default()
+            }),
+            horizontal_alignment: x::HorizontalAlignmentValues::Left,
+            hyperlink_url: None,
+            formula: false,
+            default_line_height_pt: 12.36,
+            clip_wrapped_text: manual,
+            has_outer_border: false,
+          },
+          &mut metrics,
+        );
+        let text = items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text) => Some(text),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(text.len(), expected, "{vertical:?}, {height}, {manual}");
+        assert_eq!(text[0].text, "Alpha");
+        assert_eq!(text[0].paint_clip.is_some(), manual);
+        if manual && expected == 1 {
+          let expected_y = match vertical {
+            x::VerticalAlignmentValues::Top => 20.0,
+            x::VerticalAlignmentValues::Center => 20.0 + (height - 12.36) / 2.0,
+            _ => 20.0 + height - 12.36,
+          };
+          assert!((text[0].y_pt - expected_y).abs() < 0.001);
+        }
+      }
+    }
   }
 
   #[test]
@@ -12453,6 +14823,8 @@ mod cell_alignment_tests {
         hyperlink_url: None,
         formula: false,
         default_line_height_pt: 12.0,
+        clip_wrapped_text: false,
+        has_outer_border: false,
       },
       0.95,
       &mut metrics,
@@ -12562,6 +14934,8 @@ mod cell_alignment_tests {
         hyperlink_url: None,
         formula: false,
         default_line_height_pt: 12.0,
+        clip_wrapped_text: false,
+        has_outer_border: false,
       },
       0.95,
       &mut metrics,
@@ -12583,8 +14957,9 @@ mod cell_alignment_tests {
 
   #[test]
   fn overflow_hashes_fill_the_available_cell_width() {
-    assert_eq!(calc_cell_overflow_hash_count(90.0, 6.0), 15);
-    assert_eq!(calc_cell_overflow_hash_count(5.0, 6.0), 1);
+    assert_eq!(calc_cell_overflow_hash_count(90.0, 6.0, 1), 15);
+    assert_eq!(calc_cell_overflow_hash_count(5.0, 6.0, 1), 1);
+    assert_eq!(calc_cell_overflow_hash_count(5.0, 6.0, 0), 0);
   }
 
   #[test]
@@ -12595,11 +14970,721 @@ mod cell_alignment_tests {
   }
 
   #[test]
+  fn double_cell_border_rails_and_gaps_match_native_zoom_controls() {
+    let page = CellRect {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 500.0,
+      height_pt: 700.0,
+    };
+    for authored_width in [1.0, 2.0] {
+      for (scale, expected_rail, expected_gap) in [
+        (1.0, 0.96, 0.96),
+        (0.95, 0.96, 0.84),
+        (0.45, 0.48, 0.36),
+        (1.5, 1.44, 1.44),
+      ] {
+        let border = BorderStyle {
+          width_pt: authored_width,
+          compound: true,
+          ..Default::default()
+        };
+        let mut items = Vec::new();
+        render_cell_borders(
+          &mut items,
+          CellRect {
+            x_pt: 12.0,
+            y_pt: 24.0,
+            width_pt: 48.0,
+            height_pt: 12.0,
+          },
+          super::super::styles::BorderRecord {
+            bottom: Some(border),
+            ..Default::default()
+          },
+          scale,
+          page,
+        );
+        let mut rails = items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Rect(r) => Some(r),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        rails.sort_by(|a, b| a.y_pt.total_cmp(&b.y_pt));
+        assert_eq!(rails.len(), 2);
+        for rail in &rails {
+          assert!((rail.height_pt - expected_rail).abs() < 1.0e-4);
+          assert!((rail.x_pt - 12.48).abs() < 1.0e-4);
+          assert!((rail.width_pt - 48.12).abs() < 1.0e-4);
+        }
+        assert!((rails[1].y_pt - rails[0].y_pt - rails[0].height_pt - expected_gap).abs() < 1.0e-4);
+      }
+    }
+  }
+
+  #[test]
+  fn shared_double_borders_override_single_weights_and_choose_the_darker_color() {
+    let black = RgbColor { r: 0, g: 0, b: 0 };
+    let red = RgbColor { r: 255, g: 0, b: 0 };
+    for vertical in [false, true] {
+      for first_double in [false, true] {
+        for other_width in [1.0, 3.0] {
+          let double = BorderStyle {
+            color: black,
+            compound: true,
+            width_pt: 2.0,
+            ..Default::default()
+          };
+          let single = BorderStyle {
+            color: red,
+            width_pt: other_width,
+            ..Default::default()
+          };
+          let mut paints = [CellBorderPaint {
+            rect: CellRect {
+              x_pt: 12.0,
+              y_pt: 12.0,
+              width_pt: 24.0,
+              height_pt: 12.0,
+            },
+            borders: Default::default(),
+            shear: None,
+          }; 2];
+          if vertical {
+            paints[1].rect.x_pt += 24.0;
+          } else {
+            paints[1].rect.y_pt += 12.0;
+          }
+          let sides = if vertical { [1, 0] } else { [3, 2] };
+          set_border_side(
+            &mut paints[0].borders,
+            sides[0],
+            if first_double { double } else { single },
+          );
+          set_border_side(
+            &mut paints[1].borders,
+            sides[1],
+            if first_double { single } else { double },
+          );
+          resolve_double_cell_borders(&mut paints);
+          for (paint, side) in paints.iter().zip(sides) {
+            let border = border_sides(paint.borders)[side].unwrap();
+            assert!(border.compound);
+            assert_eq!(border.color, black);
+          }
+          set_border_side(
+            &mut paints[1].borders,
+            sides[1],
+            BorderStyle {
+              color: red,
+              ..double
+            },
+          );
+          resolve_double_cell_borders(&mut paints);
+          assert_eq!(
+            border_sides(paints[0].borders)[sides[0]].unwrap().color,
+            black
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn shared_double_border_colors_match_office_channel_ramps_and_exact_ties() {
+    // Read-only Excel exports, including swapping which cell owns each color.
+    for (first, second, expected) in [
+      ((255, 0, 0), (0, 101, 0), (0, 101, 0)),
+      ((255, 0, 0), (0, 102, 0), (255, 0, 0)),
+      ((255, 0, 0), (0, 103, 0), (255, 0, 0)),
+      ((127, 0, 0), (0, 0, 255), (127, 0, 0)),
+      ((128, 0, 0), (0, 0, 255), (0, 0, 255)),
+      ((127, 0, 0), (0, 0, 254), (0, 0, 254)),
+      ((10, 20, 30), (20, 10, 60), (20, 10, 60)),
+      ((50, 0, 0), (0, 10, 50), (0, 10, 50)),
+      ((50, 0, 0), (0, 20, 0), (50, 0, 0)),
+      ((100, 0, 100), (0, 40, 100), (100, 0, 100)),
+    ] {
+      let rgb = |(r, g, b)| RgbColor { r, g, b };
+      for colors in [[first, second], [second, first]] {
+        let mut paints = colors
+          .into_iter()
+          .enumerate()
+          .map(|(row, color)| {
+            let border = BorderStyle {
+              color: rgb(color),
+              compound: true,
+              width_pt: 2.0,
+              ..Default::default()
+            };
+            let mut borders = super::super::styles::BorderRecord::default();
+            set_border_side(&mut borders, if row == 0 { 3 } else { 2 }, border);
+            CellBorderPaint {
+              rect: CellRect {
+                x_pt: 12.0,
+                y_pt: 12.0 + row as f32 * 12.0,
+                width_pt: 24.0,
+                height_pt: 12.0,
+              },
+              borders,
+              shear: None,
+            }
+          })
+          .collect::<Vec<_>>();
+        resolve_double_cell_borders(&mut paints);
+        assert_eq!(paints[0].borders.bottom.unwrap().color, rgb(expected));
+        assert_eq!(paints[1].borders.top.unwrap().color, rgb(expected));
+      }
+    }
+  }
+
+  #[test]
+  fn colored_double_border_junctions_match_native_quadrants_and_closers() {
+    let red = RgbColor { r: 255, g: 0, b: 0 };
+    let blue = RgbColor { r: 0, g: 0, b: 255 };
+    let green = RgbColor { r: 0, g: 128, b: 0 };
+    let black = RgbColor { r: 0, g: 0, b: 0 };
+    let page = CellRect {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 500.0,
+      height_pt: 700.0,
+    };
+    let mut paints = [red, blue, green, black]
+      .into_iter()
+      .enumerate()
+      .map(|(i, color)| {
+        let border = BorderStyle {
+          color,
+          compound: true,
+          width_pt: 2.0,
+          ..Default::default()
+        };
+        CellBorderPaint {
+          rect: CellRect {
+            x_pt: 12.0 + (i % 2) as f32 * 24.0,
+            y_pt: 12.0 + (i / 2) as f32 * 12.0,
+            width_pt: 24.0,
+            height_pt: 12.0,
+          },
+          borders: super::super::styles::BorderRecord {
+            left: Some(border),
+            right: Some(border),
+            top: Some(border),
+            bottom: Some(border),
+          },
+          shear: None,
+        }
+      })
+      .collect::<Vec<_>>();
+    let mut items = Vec::new();
+    render_cell_border_grid(&mut items, &mut paints, 1.0, page, page);
+    let ink = |x, y| {
+      items.iter().rev().find_map(|item| match item {
+        PageItem::Rect(r)
+          if x > r.x_pt && x < r.x_pt + r.width_pt && y > r.y_pt && y < r.y_pt + r.height_pt =>
+        {
+          r.fill_color
+        }
+        _ => None,
+      })
+    };
+    assert_eq!(ink(35.52, 23.52), Some(blue));
+    assert_eq!(ink(37.44, 23.52), Some(black));
+    assert_eq!(ink(35.52, 25.44), Some(black));
+    assert_eq!(ink(37.44, 25.44), Some(black));
+    assert_eq!(ink(11.52, 24.48), Some(red));
+    assert_eq!(ink(13.44, 25.44), Some(red));
+    assert_eq!(ink(36.48, 24.48), None);
+  }
+
+  #[test]
+  fn single_closer_of_a_double_border_ends_at_the_last_cell_printer_dot() {
+    let page = CellRect {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 500.0,
+      height_pt: 700.0,
+    };
+    let mut items = Vec::new();
+    let red = RgbColor { r: 255, g: 0, b: 0 };
+    render_cell_borders(
+      &mut items,
+      CellRect {
+        x_pt: 12.0,
+        y_pt: 12.0,
+        width_pt: 24.0,
+        height_pt: 12.0,
+      },
+      super::super::styles::BorderRecord {
+        top: Some(BorderStyle {
+          compound: true,
+          width_pt: 2.0,
+          ..Default::default()
+        }),
+        left: Some(BorderStyle {
+          color: red,
+          width_pt: 1.0,
+          ..Default::default()
+        }),
+        ..Default::default()
+      },
+      1.0,
+      page,
+    );
+    let last = items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Rect(r) if r.fill_color == Some(red) => Some(r.y_pt + r.height_pt),
+        _ => None,
+      })
+      .max_by(f32::total_cmp)
+      .unwrap();
+    assert!((last - 24.60).abs() < 1.0e-4);
+  }
+
+  #[test]
+  fn double_border_corner_and_cross_gaps_preserve_the_cell_background() {
+    let black = RgbColor { r: 0, g: 0, b: 0 };
+    let border = BorderStyle {
+      color: black,
+      compound: true,
+      width_pt: 2.0,
+      ..Default::default()
+    };
+    let borders = super::super::styles::BorderRecord {
+      left: Some(border),
+      right: Some(border),
+      top: Some(border),
+      bottom: Some(border),
+    };
+    let page = CellRect {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 500.0,
+      height_pt: 700.0,
+    };
+    let mut paints = Vec::new();
+    for row in 0..2 {
+      for col in 0..2 {
+        paints.push(CellBorderPaint {
+          rect: CellRect {
+            x_pt: 12.0 + col as f32 * 24.0,
+            y_pt: 12.0 + row as f32 * 12.0,
+            width_pt: 24.0,
+            height_pt: 12.0,
+          },
+          borders,
+          shear: None,
+        });
+      }
+    }
+    let mut items = Vec::new();
+    let exclusions = render_cell_border_grid(&mut items, &mut paints, 1.0, page, page);
+    let ink = |x: f32, y: f32| {
+      items.iter().any(|item| match item {
+        PageItem::Rect(r) => {
+          x > r.x_pt && x < r.x_pt + r.width_pt && y > r.y_pt && y < r.y_pt + r.height_pt
+        }
+        _ => false,
+      })
+    };
+    // Native double frames and four-cell junction: two rails stay solid,
+    // while the center and both crossing gaps remain transparent.
+    assert!(ink(11.52, 16.0));
+    assert!(!ink(12.48, 16.0));
+    assert!(ink(13.44, 16.0));
+    assert!(ink(11.52, 11.52));
+    assert!(!ink(12.48, 12.48));
+    assert!(!ink(36.48, 24.48));
+    assert!(!ink(35.52, 24.48));
+    assert!(!ink(36.48, 23.52));
+    assert!(ink(35.52, 23.52));
+    let mut grid = Vec::new();
+    push_grid_line(
+      &mut grid,
+      &exclusions,
+      LineItem {
+        x1_pt: 36.0,
+        y1_pt: 0.0,
+        x2_pt: 36.0,
+        y2_pt: 60.0,
+        width_pt: 0.5,
+        color: black,
+        kind: LineItemKind::Stroke,
+      },
+    );
+    assert!(grid.iter().all(|item| match item {
+      PageItem::Line(line) => line.y2_pt <= 11.04 || line.y1_pt >= 37.92,
+      _ => false,
+    }));
+  }
+
+  #[test]
   fn cell_border_weight_uses_the_print_transform_and_device_grid() {
     assert_eq!(fixed_output_cell_border_width_pt(1.0, 0.45), 0.48);
     assert_eq!(fixed_output_cell_border_width_pt(1.0, 1.0), 0.96);
     assert_eq!(fixed_output_cell_border_width_pt(0.5, 0.10), 0.12);
     assert_eq!(fixed_output_cell_border_width_pt(0.0, 0.45), 0.0);
+    for (scale, widths) in [
+      (0.45, [0.48, 0.84, 1.32]),
+      (0.95, [0.96, 1.80, 2.76]),
+      (1.0, [0.96, 1.92, 2.88]),
+      (1.5, [1.44, 2.88, 4.32]),
+    ] {
+      for (index, expected) in widths.into_iter().enumerate() {
+        assert!(
+          (fixed_output_cell_border_width_pt((index + 1) as f32, scale) - expected).abs() < 1.0e-5
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn adjacent_cell_borders_share_the_same_quantized_edge() {
+    let page = CellRect {
+      x_pt: 50.4,
+      y_pt: 54.0,
+      width_pt: 500.0,
+      height_pt: 700.0,
+    };
+    for weight in [1.0, 2.0] {
+      let border = BorderStyle {
+        width_pt: weight,
+        ..Default::default()
+      };
+      let mut first = Vec::new();
+      let mut second = Vec::new();
+      for (items, x, borders) in [
+        (
+          &mut first,
+          page.x_pt + 11.0,
+          super::super::styles::BorderRecord {
+            right: Some(border),
+            ..Default::default()
+          },
+        ),
+        (
+          &mut second,
+          page.x_pt + 22.0,
+          super::super::styles::BorderRecord {
+            left: Some(border),
+            ..Default::default()
+          },
+        ),
+      ] {
+        render_cell_borders(
+          items,
+          CellRect {
+            x_pt: x,
+            y_pt: 70.0,
+            width_pt: 11.0,
+            height_pt: 8.37,
+          },
+          borders,
+          0.95,
+          page,
+        );
+      }
+      let (PageItem::Rect(a), PageItem::Rect(b)) = (&first[0], &second[0]) else {
+        unreachable!()
+      };
+      assert!((a.x_pt - b.x_pt).abs() < 1.0e-5);
+      assert_eq!(a.y_pt, b.y_pt);
+      assert_eq!(a.width_pt, b.width_pt);
+      assert_eq!(a.height_pt, b.height_pt);
+    }
+  }
+
+  #[test]
+  fn cell_borders_survive_the_neighboring_backgrounds() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let styles = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    let id = workbook.get_id_of_part(&package, &worksheet).unwrap();
+    let xml = format!(
+      r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Grid" sheetId="1" r:id="{id}"/></sheets></workbook>"#
+    );
+    workbook.set_data(&mut package, xml.into_bytes()).unwrap();
+    styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="1"><font><sz val="11"/><name val="SimSun"/></font></fonts>
+      <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF00FF00"/></patternFill></fill></fills>
+      <borders count="2"><border/><border><right style="thin"><color rgb="FF000000"/></right><bottom style="thin"><color rgb="FF000000"/></bottom></border></borders>
+      <cellXfs count="3"><xf fontId="0" fillId="0" borderId="0"/><xf fontId="0" fillId="0" borderId="1" applyBorder="1"/><xf fontId="0" fillId="1" borderId="0" applyFill="1"/></cellXfs></styleSheet>"#.to_vec()).unwrap();
+    worksheet.set_data(&mut package, br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <sheetFormatPr defaultRowHeight="15"/><sheetData><row r="1"><c r="A1" s="1"/><c r="B1" s="2"/></row>
+      <row r="2"><c r="A2" s="2"/><c r="B2" s="2"/></row></sheetData></worksheet>"#.to_vec()).unwrap();
+    let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+    let print = CalcPrintDocument::from_import(&import);
+    let page = &print.pages[0];
+    let area = page.area.unwrap();
+    let fill_page = CellRect {
+      x_pt: 50.4,
+      y_pt: 54.0,
+      ..page.sheet.fixed_output_range_rect(area, 1.0)
+    };
+    let mut items = Vec::new();
+    render_cell_area(
+      &mut items,
+      &import,
+      page,
+      &page.cells,
+      area,
+      CellAreaRenderLayout {
+        origin_x_pt: fill_page.x_pt,
+        origin_y_pt: fill_page.y_pt,
+        zoom_scale: 1.0,
+        fill_page,
+        physical_page: CellRect {
+          x_pt: 0.0,
+          y_pt: 0.0,
+          width_pt: 600.0,
+          height_pt: 800.0,
+        },
+      },
+      &mut TextMetrics::new(),
+    );
+    let cell = page
+      .sheet
+      .fixed_output_cell_rect(CellAddress { col: 1, row: 1 }, 1.0);
+    let paint_at = |x, y| {
+      items.iter().rev().find_map(|item| {
+        let PageItem::Rect(rect) = item else {
+          return None;
+        };
+        (x >= rect.x_pt
+          && x < rect.x_pt + rect.width_pt
+          && y >= rect.y_pt
+          && y < rect.y_pt + rect.height_pt)
+          .then_some(rect.fill_color)
+          .flatten()
+      })
+    };
+    let black = Some(RgbColor { r: 0, g: 0, b: 0 });
+    assert_eq!(
+      paint_at(
+        fill_page.x_pt + cell.width_pt + 0.72,
+        fill_page.y_pt + cell.height_pt / 2.0
+      ),
+      black
+    );
+    assert_eq!(
+      paint_at(
+        fill_page.x_pt + cell.width_pt / 2.0,
+        fill_page.y_pt + cell.height_pt + 0.72
+      ),
+      black
+    );
+    assert_eq!(
+      paint_at(
+        fill_page.x_pt + cell.width_pt + 2.0,
+        fill_page.y_pt + cell.height_pt / 2.0
+      ),
+      Some(RgbColor { r: 0, g: 255, b: 0 })
+    );
+  }
+
+  #[test]
+  fn merged_cell_borders_keep_office_perimeter_segments() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let styles = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    let id = workbook
+      .get_id_of_part(&package, &worksheet)
+      .unwrap()
+      .to_owned();
+    workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Segments" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+    styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>
+      <fills count="1"><fill><patternFill patternType="none"/></fill></fills>
+      <borders count="4"><border/>
+      <border><left style="medium"><color rgb="FF0000FF"/></left><right style="medium"><color rgb="FF0000FF"/></right><top style="medium"><color rgb="FF0000FF"/></top><bottom style="medium"><color rgb="FF0000FF"/></bottom></border>
+      <border><left style="medium"><color rgb="FF00FF00"/></left><right style="medium"><color rgb="FF00FF00"/></right><top style="medium"><color rgb="FF00FF00"/></top><bottom style="medium"><color rgb="FF00FF00"/></bottom></border>
+      <border><left style="medium"><color rgb="FFFF0000"/></left><right style="medium"><color rgb="FFFF0000"/></right><top style="medium"><color rgb="FFFF0000"/></top><bottom style="medium"><color rgb="FFFF0000"/></bottom></border></borders>
+      <cellXfs count="4"><xf fontId="0" fillId="0" borderId="0"/><xf fontId="0" fillId="0" borderId="1" applyBorder="1"/><xf fontId="0" fillId="0" borderId="2" applyBorder="1"/><xf fontId="0" fillId="0" borderId="3" applyBorder="1"/></cellXfs></styleSheet>"#.to_vec()).unwrap();
+    // Office's colored anchor-only and scattered-edge controls retain only
+    // the original cell-sized perimeter segments, including on a later page.
+    for (merged, extra_cells, expected_colors) in [
+      ("B2:D2", "", [3, 0, 0]),
+      ("B2:D4", "", [2, 0, 0]),
+      (
+        "B2:D4",
+        r#"<row r="3" ht="24" customHeight="1"><c r="B3" s="2"/><c r="C3" s="2"/><c r="D3" s="3"/></row><row r="4" ht="24" customHeight="1"><c r="C4" s="1"/><c r="D4" s="3"/></row>"#,
+        [3, 1, 3],
+      ),
+    ] {
+      worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetFormatPr defaultRowHeight="24"/><cols><col min="1" max="5" width="12" customWidth="1"/></cols><sheetData><row r="2" ht="24" customHeight="1"><c r="B2" s="1"/></row>{extra_cells}</sheetData><mergeCells><mergeCell ref="{merged}"/></mergeCells></worksheet>"#).into_bytes()).unwrap();
+      let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+      let print = CalcPrintDocument::from_import(&import);
+      let page = &print.pages[0];
+      let range = CellRange::parse_a1_range(merged).unwrap();
+      for continuation in [false, true] {
+        if continuation && (range.end.row == range.start.row || extra_cells.is_empty()) {
+          continue;
+        }
+        let area = if continuation {
+          CellRange::new(CellAddress { col: 2, row: 3 }, range.end)
+        } else {
+          range
+        };
+        let fill_page = CellRect {
+          x_pt: 50.4,
+          y_pt: 54.0,
+          ..page.sheet.fixed_output_range_rect(area, 1.0)
+        };
+        let mut items = Vec::new();
+        render_cell_area(
+          &mut items,
+          &import,
+          page,
+          &page.cells,
+          area,
+          CellAreaRenderLayout {
+            origin_x_pt: fill_page.x_pt,
+            origin_y_pt: fill_page.y_pt,
+            zoom_scale: 1.0,
+            fill_page,
+            physical_page: CellRect {
+              x_pt: 0.0,
+              y_pt: 0.0,
+              width_pt: 600.0,
+              height_pt: 800.0,
+            },
+          },
+          &mut TextMetrics::new(),
+        );
+        let mut colors = [0, 0, 0];
+        let cell_width = page.sheet.fixed_output_column_range_width_pt(2, 2, 1.0);
+        for item in items {
+          let PageItem::Rect(rect) = item else {
+            continue;
+          };
+          let index = match rect.fill_color {
+            Some(RgbColor { r: 0, g: 0, b: 255 }) => 0,
+            Some(RgbColor { r: 0, g: 255, b: 0 }) => 1,
+            Some(RgbColor { r: 255, g: 0, b: 0 }) => 2,
+            _ => continue,
+          };
+          colors[index] += 1;
+          assert!(
+            rect.width_pt <= cell_width + 2.0,
+            "perimeter segment stretched across the merge"
+          );
+          assert!(
+            rect.height_pt <= 26.0,
+            "perimeter segment stretched across merged rows"
+          );
+        }
+        assert_eq!(
+          colors,
+          if continuation {
+            [1, 1, 3]
+          } else {
+            expected_colors
+          },
+          "{merged}, continuation={continuation}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn dashed_cell_borders_keep_device_phase_across_cell_boundaries() {
+    let border = BorderStyle {
+      width_pt: 1.0,
+      dash_pattern: crate::model::BorderDashPattern::Dashed,
+      ..Default::default()
+    };
+    let render = |start, length, scale, vertical| {
+      let mut items = Vec::new();
+      push_cell_border_rect(
+        &mut items,
+        border,
+        scale,
+        vertical,
+        CellRect {
+          x_pt: 0.0,
+          y_pt: 0.0,
+          width_pt: 600.0,
+          height_pt: 800.0,
+        },
+        RectItem {
+          x_pt: if vertical { 50.4 } else { start },
+          y_pt: if vertical { start } else { 50.4 },
+          width_pt: if vertical { 0.96 } else { length },
+          height_pt: if vertical { length } else { 0.96 },
+          fill_color: Some(border.color),
+          fill_opacity: 1.0,
+          stroke: None,
+          stroke_opacity: 1.0,
+        },
+      );
+      items
+        .into_iter()
+        .map(|item| {
+          let PageItem::Rect(rect) = item else {
+            unreachable!()
+          };
+          if vertical {
+            (rect.y_pt, rect.y_pt + rect.height_pt)
+          } else {
+            (rect.x_pt, rect.x_pt + rect.width_pt)
+          }
+        })
+        .collect::<Vec<_>>()
+    };
+    for vertical in [false, true] {
+      // Office's 95% matrix: complete dashes at 151.22..153.98 and
+      // 154.82..157.58 (PDF decimal serialization differs by < 0.03pt).
+      let spans = render(151.0, 7.0, 0.95, vertical);
+      assert_eq!(spans.len(), 2);
+      for ((start, end), (expected_start, expected_end)) in
+        spans.into_iter().zip([(151.2, 153.96), (154.8, 157.56)])
+      {
+        assert!((start - expected_start).abs() < 0.001);
+        assert!((end - expected_end).abs() < 0.001);
+      }
+      // Splitting an adjacent cell inside a gap must not restart its dash.
+      assert_eq!(
+        render(154.4, 3.6, 0.95, vertical),
+        render(154.0, 4.0, 0.95, vertical)
+      );
+      let spans = render(153.5, 4.0, 1.0, vertical);
+      assert!((spans[0].0 - 154.08).abs() < 0.001);
+      assert!((spans[0].1 - 156.96).abs() < 0.001);
+      let spans = render(-1.0e8, 2.0e8, 1.0, vertical);
+      assert!(
+        spans.len() < 220,
+        "merged border must be bounded by this page"
+      );
+      assert!(
+        spans
+          .iter()
+          .all(|(start, end)| *start >= -0.96 && *end <= if vertical { 800.96 } else { 600.96 })
+      );
+    }
   }
 
   #[test]
@@ -12700,6 +15785,61 @@ mod cell_alignment_tests {
 #[cfg(test)]
 mod header_footer_tests {
   use super::*;
+
+  #[test]
+  fn header_font_sizes_scale_through_twips_before_printer_pixels() {
+    let sizes = [
+      4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 14.0, 16.0, 20.0,
+    ];
+    for (scale, expected) in [
+      (
+        1.0,
+        [
+          3.96, 5.04, 6.0, 6.96, 8.04, 9.0, 9.96, 11.04, 12.0, 14.04, 15.96, 20.04,
+        ],
+      ),
+      (
+        0.71,
+        [
+          2.88, 3.6, 4.2, 4.92, 5.76, 6.36, 7.08, 7.8, 8.52, 9.96, 11.4, 14.16,
+        ],
+      ),
+      (
+        0.9,
+        [
+          3.6, 4.56, 5.4, 6.36, 7.2, 8.16, 9.0, 9.96, 10.8, 12.6, 14.4, 18.0,
+        ],
+      ),
+      (
+        0.45,
+        [
+          1.8, 2.28, 2.76, 3.12, 3.6, 4.08, 4.56, 4.92, 5.4, 6.36, 7.2, 9.0,
+        ],
+      ),
+    ] {
+      for (size, expected) in sizes.into_iter().zip(expected) {
+        let actual = fixed_output_header_font_size_pt(size, scale);
+        assert!(
+          (actual - expected).abs() < 1.0e-5,
+          "{size} at {scale}: {actual}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn header_baseline_intervals_use_the_scaled_printer_font_grid() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 10.0,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    for (scale, expected) in [(1.0, 12.36), (0.71, 8.76)] {
+      let actual = fixed_output_header_line_advance_pt(&style, scale, &mut metrics);
+      assert!((actual - expected).abs() < 1.0e-5);
+    }
+  }
 
   #[test]
   fn header_footer_clock_fields_preserve_escapes_and_active_style() {

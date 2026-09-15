@@ -4,9 +4,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   pub(crate) fn evaluate_name(&self, name: &Cow<'doc, str>) -> Option<FormulaValue<'doc>> {
     let local_key = name.trim_start_matches("_xlpm.").to_ascii_uppercase();
     if let Some(value) = self.locals.get(&local_key) {
-      return Some(value.clone());
+      return value.clone().into_value(self);
     }
-    if let Some(range) = parse_table_reference(self.book, name.as_ref(), self.current_cell) {
+    if let Some(range) = parse_table_reference(
+      self.book,
+      name.as_ref(),
+      self.current_sheet,
+      self.current_cell,
+    ) {
       return Some(FormulaValue::Reference(range));
     }
     self
@@ -65,22 +70,29 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   pub(crate) fn evaluate_defined_name(&self, name: &Cow<'doc, str>) -> Option<FormulaValue<'doc>> {
-    if let Some(array) = self
+    let (scope, name) = self
       .book
-      .defined_name_array(Some(self.current_sheet), name.as_ref())
-    {
+      .defined_name_scope(Some(self.current_sheet), name)?;
+    self.evaluate_defined_name_in_scope(scope, name)
+  }
+
+  fn evaluate_defined_name_in_scope(
+    &self,
+    scope: Option<SheetId>,
+    name: &str,
+  ) -> Option<FormulaValue<'doc>> {
+    let evaluation_sheet = scope.unwrap_or(self.current_sheet);
+    if let Some(array) = self.book.defined_name_array(scope, name) {
       return Some(FormulaValue::Matrix(array.clone()));
     }
-    let formula = self
-      .book
-      .defined_name_formula(Some(self.current_sheet), name.as_ref())?;
+    let formula = self.book.defined_name_formula(scope, name)?;
     if formula.trim().parse::<f64>().is_err()
-      && let Ok(reference) = QualifiedRange::parse_a1(self.current_sheet, formula.as_ref())
+      && let Ok(reference) = QualifiedRange::parse_a1(evaluation_sheet, formula.as_ref())
     {
       return Some(FormulaValue::Reference(reference));
     }
     let parsed = parse_formula(
-      self.current_sheet,
+      evaluation_sheet,
       Cow::Owned(formula.to_string()),
       self.grammar,
     );
@@ -91,7 +103,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       Cow::Borrowed(source) => Some(*source),
       Cow::Owned(_) => None,
     };
-    evaluate_program_with_context(parsed.program.as_ref()?, borrowed_source, self)
+    let scoped = self.with_current_sheet(evaluation_sheet);
+    evaluate_program_with_context(parsed.program.as_ref()?, borrowed_source, &scoped)
       .map(FormulaValue::into_owned)
   }
 
@@ -102,6 +115,29 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let link_index = reference.book.as_deref()?.parse::<usize>().ok()?;
     let name = reference.name.as_deref()?;
     let sheet_name = reference.sheet.as_deref();
+    // Workbook index zero identifies this workbook (Office 56737.xlsx),
+    // not an entry in its one-based external-link cache.
+    if link_index == 0 {
+      let scope = if let Some(sheet_name) = sheet_name {
+        let Some(sheet) = self
+          .book
+          .sheet_names
+          .iter()
+          .find(|sheet| sheet.name.eq_ignore_ascii_case(sheet_name))
+        else {
+          return Some(FormulaValue::Error(FormulaErrorValue::Ref));
+        };
+        if let Some(range) = crate::parser::parse_formula_range(sheet.id, name) {
+          return Some(FormulaValue::Reference(range));
+        }
+        Some(sheet.id)
+      } else {
+        None
+      };
+      return self
+        .evaluate_defined_name_in_scope(scope, name)
+        .or(Some(FormulaValue::Error(FormulaErrorValue::Name)));
+    }
     if sheet_name.is_none() {
       let formula = self
         .book
@@ -247,7 +283,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     } else {
       reference
     };
-    if let Some(table) = parse_table_reference(self.book, reference, self.current_cell) {
+    if let Some(table) =
+      parse_table_reference(self.book, reference, self.current_sheet, self.current_cell)
+    {
       return Some(table);
     }
     crate::parser::parse_formula_range(self.current_sheet, reference)

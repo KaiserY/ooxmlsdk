@@ -212,6 +212,7 @@ pub(crate) fn format_office_long_date(
 pub(crate) fn format_spreadsheet_system_long_date(
   language: Option<&str>,
   value: FieldUpdateDateTime,
+  compatibility_weekday: Option<u8>,
 ) -> Option<String> {
   let locale = field_locale(language)?;
   // Excel's F800 format omits the weekday in zh-CN fixed output, even
@@ -222,7 +223,36 @@ pub(crate) fn format_spreadsheet_system_long_date(
       .id
       .region
       .is_some_and(|region| region.as_str() == "CN");
-  format_office_long_date(language, value, !chinese_mainland)
+  if compatibility_weekday.is_none() {
+    return format_office_long_date(language, value, !chinese_mainland);
+  }
+  let date = field_date(spreadsheet_calendar_anchor(value))?;
+  let pattern = if chinese_mainland {
+    FixedCalendarDateTimeFormatter::<Gregorian, _>::try_new(
+      locale.into(),
+      YMD::long().with_year_style(YearStyle::Full),
+    )
+    .ok()?
+    .format(&date)
+    .pattern()
+    .to_string()
+  } else {
+    FixedCalendarDateTimeFormatter::<Gregorian, _>::try_new(
+      locale.into(),
+      YMDE::long().with_year_style(YearStyle::Full),
+    )
+    .ok()?
+    .format(&date)
+    .pattern()
+    .to_string()
+  };
+  let pattern = spreadsheet_calendar_pattern(&pattern, language, value, compatibility_weekday)?;
+  format_icu_picture(
+    &pattern,
+    language,
+    spreadsheet_calendar_anchor(value),
+    false,
+  )
 }
 
 pub(crate) fn format_office_short_time(
@@ -257,6 +287,25 @@ pub(crate) fn format_office_default_time(
   ))
 }
 
+pub(crate) fn format_spreadsheet_system_time(
+  language: Option<&str>,
+  value: FieldUpdateDateTime,
+) -> Option<String> {
+  let value = spreadsheet_calendar_anchor(value);
+  let locale = field_locale(language)?;
+  // Excel F400 uses Windows' unpadded zh-CN hour at 0, 6 and 9, even
+  // when the saved fallback picture contains hh. CLDR pads this hour.
+  if locale.id.language.as_str() == "zh"
+    && locale
+      .id
+      .region
+      .is_some_and(|region| region.as_str() == "CN")
+  {
+    return format_picture("H:mm:ss", language, value);
+  }
+  format_office_default_time(language, value)
+}
+
 fn format_office_document_date_time(
   language: Option<&str>,
   value: FieldUpdateDateTime,
@@ -277,7 +326,16 @@ fn format_picture(
   value: FieldUpdateDateTime,
 ) -> Option<String> {
   let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(picture)?;
-  let pattern = DateTimePattern::try_from_pattern_str(&pattern).ok()?;
+  format_icu_picture(&pattern, language, value, abbreviate_day_period)
+}
+
+fn format_icu_picture(
+  pattern: &str,
+  language: Option<&str>,
+  value: FieldUpdateDateTime,
+  abbreviate_day_period: bool,
+) -> Option<String> {
+  let pattern = DateTimePattern::try_from_pattern_str(pattern).ok()?;
   let locale = field_locale(language)?;
   let datetime = field_date_time(value)?;
   let mut names = FixedCalendarDateTimeNames::<Gregorian>::try_new(locale.into()).ok()?;
@@ -382,10 +440,91 @@ pub(crate) fn format_spreadsheet_date_picture(
   fallback_language: Option<&str>,
   value: FieldUpdateDateTime,
 ) -> Option<String> {
+  format_spreadsheet_date_picture_with_weekday(picture, fallback_language, value, None)
+}
+
+/// The first 61 days of Excel's 1900 calendar have compatibility weekdays,
+/// including the fictitious January 0 and February 29. Weekdays are Monday=0.
+pub(crate) fn format_spreadsheet_date_picture_with_weekday(
+  picture: &str,
+  fallback_language: Option<&str>,
+  value: FieldUpdateDateTime,
+  compatibility_weekday: Option<u8>,
+) -> Option<String> {
   let embedded_language = spreadsheet_date_picture_language(picture);
   let language = embedded_language.as_deref().or(fallback_language);
-  let picture = spreadsheet_date_picture_to_field_picture(picture, language, value)?;
-  format_picture(&picture, language, value)
+  let anchor = spreadsheet_calendar_anchor(value);
+  let picture = spreadsheet_date_picture_to_field_picture(picture, language, anchor)?;
+  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(&picture)?;
+  let pattern = spreadsheet_calendar_pattern(&pattern, language, value, compatibility_weekday)?;
+  format_icu_picture(&pattern, language, anchor, abbreviate_day_period)
+}
+
+fn spreadsheet_calendar_anchor(value: FieldUpdateDateTime) -> FieldUpdateDateTime {
+  let day = match (value.year, value.month, value.day) {
+    (1900, 1, 0) => 1,
+    (1900, 2, 29) => 28,
+    _ => value.day,
+  };
+  FieldUpdateDateTime { day, ..value }
+}
+
+fn spreadsheet_calendar_pattern(
+  pattern: &str,
+  language: Option<&str>,
+  value: FieldUpdateDateTime,
+  compatibility_weekday: Option<u8>,
+) -> Option<String> {
+  let replace_day = spreadsheet_calendar_anchor(value).day != value.day;
+  if !replace_day && compatibility_weekday.is_none() {
+    return Some(pattern.to_owned());
+  }
+  // Let ICU supply localized month/era/time names from a valid civil date,
+  // replacing only Excel's exceptional day and weekday fields with literals.
+  // This leaves the Gregorian validation of Word/PowerPoint fields intact.
+  let mut chars = pattern.chars().peekable();
+  let mut output = String::new();
+  while let Some(ch) = chars.next() {
+    if ch == '\'' {
+      let mut literal = String::new();
+      if chars.next_if_eq(&'\'').is_some() {
+        literal.push('\'');
+      } else {
+        loop {
+          let ch = chars.next()?;
+          if ch == '\'' {
+            if chars.next_if_eq(&'\'').is_none() {
+              break;
+            }
+          }
+          literal.push(ch);
+        }
+      }
+      push_icu_quoted_literal(&mut output, &literal);
+      continue;
+    }
+    let mut count = 1;
+    while chars.next_if_eq(&ch).is_some() {
+      count += 1;
+    }
+    if ch == 'd' && replace_day {
+      push_icu_quoted_literal(&mut output, &format!("{:0count$}", value.day));
+    } else if ch == 'E'
+      && let Some(weekday) = compatibility_weekday
+    {
+      let weekday_value = FieldUpdateDateTime {
+        year: 2000,
+        month: 1,
+        day: 3 + weekday, // January 3, 2000 was Monday.
+        ..value
+      };
+      let name = format_icu_picture(&"E".repeat(count), language, weekday_value, false)?;
+      push_icu_quoted_literal(&mut output, &name);
+    } else {
+      output.extend(std::iter::repeat_n(ch, count));
+    }
+  }
+  Some(output)
 }
 
 fn spreadsheet_date_picture_to_field_picture(
@@ -398,6 +537,7 @@ fn spreadsheet_date_picture_to_field_picture(
   let mut index = 0usize;
   let mut saw_date_token = false;
   let mut previous_field = None;
+  let mut month_width = None;
   let uses_day_period =
     picture.to_ascii_lowercase().contains("am/pm") || picture.to_ascii_lowercase().contains("a/p");
   while index < chars.len() {
@@ -488,7 +628,24 @@ fn spreadsheet_date_picture_to_field_picture(
           .min(5);
         let minute = previous_field == Some('h')
           || next_spreadsheet_date_time_field(&chars, index + count) == Some('s');
-        output.extend(std::iter::repeat_n(if minute { 'm' } else { 'M' }, count));
+        if !minute
+          && count == 4
+          && let Some(name) = office_spreadsheet_wide_month_name(language, value.month)
+        {
+          push_icu_quoted_literal(&mut output, name);
+        } else if !minute && month_width.is_some_and(|width| width != count) {
+          // ICU's pattern names store allows only one width per field.
+          // Excel permits a month name and its numeric/abbreviated form in
+          // the same picture. Resolve the additional width through ICU
+          // separately, without touching authored literals or minute fields.
+          let name = format_icu_picture(&"M".repeat(count), language, value, false)?;
+          push_icu_quoted_literal(&mut output, &name);
+        } else {
+          output.extend(std::iter::repeat_n(if minute { 'm' } else { 'M' }, count));
+          if !minute {
+            month_width = Some(count);
+          }
+        }
         saw_date_token = true;
         previous_field = Some('m');
         index += count;
@@ -677,6 +834,30 @@ fn push_icu_quoted_literal(output: &mut String, literal: &str) {
   output.push('\'');
 }
 
+fn office_spreadsheet_wide_month_name(language: Option<&str>, month: u8) -> Option<&'static str> {
+  // Excel's sr-Cyrl-BA twelve-month controls and Windows GetLocaleInfoEx
+  // agree on these two regional spellings; CLDR uses Serbia's јун/јул.
+  // Other months, abbreviations, weekdays and scripts remain ICU-owned.
+  let locale = canonical_locale(language?)?;
+  if locale.id.language.as_str() != "sr"
+    || locale
+      .id
+      .region
+      .is_none_or(|region| region.as_str() != "BA")
+    || locale
+      .id
+      .script
+      .is_some_and(|script| script.as_str() != "Cyrl")
+  {
+    return None;
+  }
+  match month {
+    6 => Some("јуни"),
+    7 => Some("јули"),
+    _ => None,
+  }
+}
+
 fn spreadsheet_lcid_language(value: &str) -> Option<&'static str> {
   // OOXML keeps legacy hexadecimal Windows LCIDs in number-format markers.
   // ICU4X owns locale data once the identifier is BCP 47; this deliberately
@@ -701,6 +882,8 @@ fn spreadsheet_lcid_language(value: &str) -> Option<&'static str> {
     // MS-LCID 2.2: Australian English is distinct from the caller's locale.
     0x0c09 => Some("en-AU"),
     0x0c0a => Some("es-ES"),
+    // MS-LCID 2.2: Serbian Cyrillic, Bosnia and Herzegovina.
+    0x1c1a => Some("sr-Cyrl-BA"),
     _ => None,
   }
 }
@@ -1143,6 +1326,26 @@ mod tests {
   }
 
   #[test]
+  fn fictitious_spreadsheet_dates_remain_invalid_document_field_dates() {
+    for (month, day) in [(1, 0), (2, 29)] {
+      let value = FieldUpdateDateTime {
+        year: 1900,
+        month,
+        day,
+        ..VALUE
+      };
+      assert_eq!(
+        super::format_date_time_picture("yyyy-MM-dd", Some("en-US"), value),
+        None
+      );
+      assert_eq!(
+        super::format_office_long_date(Some("zh-CN"), value, true),
+        None
+      );
+    }
+  }
+
+  #[test]
   fn spreadsheet_system_long_date_preserves_explicit_weekday_fields() {
     for (year, month, day, expected) in [
       (1904, 3, 1, "1904年3月1日"),
@@ -1157,7 +1360,7 @@ mod tests {
         ..VALUE
       };
       assert_eq!(
-        super::format_spreadsheet_system_long_date(Some("zh-CN"), value).as_deref(),
+        super::format_spreadsheet_system_long_date(Some("zh-CN"), value, None).as_deref(),
         Some(expected)
       );
       let explicit_weekday = super::format_office_long_date(Some("zh-CN"), value, true).unwrap();
@@ -1197,6 +1400,111 @@ mod tests {
       super::format_spreadsheet_date_picture(&format!("[$-7FFF]{picture}"), Some("fr-FR"), value,),
       french,
     );
+  }
+
+  #[test]
+  fn serbian_bosnia_date_lcid_keeps_office_month_names_and_literal_boundaries() {
+    // Excel 20326 exports: full year, abbreviations, initials, quoted
+    // month-looking literals and minutes, with Chinese and English UI.
+    let months = [
+      "јануар",
+      "фебруар",
+      "март",
+      "април",
+      "мај",
+      "јуни",
+      "јули",
+      "август",
+      "септембар",
+      "октобар",
+      "новембар",
+      "децембар",
+    ];
+    let abbreviated = [
+      "јан", "феб", "мар", "апр", "мај", "јун", "јул", "авг", "сеп", "окт", "нов", "дец",
+    ];
+    for fallback in ["zh-CN", "en-US"] {
+      for culture in ["1C1A", "1c1a", "001C1A", "sr-Cyrl-BA"] {
+        for (index, month_name) in months.into_iter().enumerate() {
+          let value = FieldUpdateDateTime {
+            year: 1972,
+            month: index as u8 + 1,
+            day: 17,
+            hour: 14,
+            minute: 23,
+            ..VALUE
+          };
+          for (picture, expected) in [
+            ("mmmm", month_name.to_owned()),
+            ("mmm", abbreviated[index].to_owned()),
+            ("mmmmm", month_name.chars().next().unwrap().to_string()),
+            (
+              r#""јун" mmmm "јул" mm "mmmm" hh:mm"#,
+              format!("јун {month_name} јул {:02} mmmm 14:23", index + 1),
+            ),
+          ] {
+            assert_eq!(
+              super::format_spreadsheet_date_picture(
+                &format!("[$-{culture}]{picture};@"),
+                Some(fallback),
+                value,
+              ),
+              Some(expected),
+              "{culture}, {fallback}, month={}, {picture}",
+              value.month,
+            );
+          }
+        }
+      }
+    }
+    for (index, weekday) in [
+      "понедјељак",
+      "уторак",
+      "сриједа",
+      "четвртак",
+      "петак",
+      "субота",
+      "недјеља",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+      let value = FieldUpdateDateTime {
+        year: 1972,
+        month: 6,
+        day: index as u8 + 12,
+        ..VALUE
+      };
+      assert_eq!(
+        super::format_spreadsheet_date_picture(
+          r"[$-1C1A]dddd\,\ d\.\ mmmm\ yyyy",
+          Some("zh-CN"),
+          value,
+        ),
+        Some(format!("{weekday}, {}. јуни 1972", value.day)),
+      );
+    }
+    // Neighboring locales keep their observed month spelling and script.
+    for (culture, expected) in [
+      ("sr-Cyrl-RS", "субота, 17. јун 1972"),
+      ("sr-Latn-BA", "subota, 17. jun 1972"),
+    ] {
+      assert_eq!(
+        super::format_spreadsheet_date_picture(
+          &format!(r"[$-{culture}]dddd\,\ d\.\ mmmm\ yyyy"),
+          Some("zh-CN"),
+          FieldUpdateDateTime {
+            year: 1972,
+            month: 6,
+            day: 17,
+            ..VALUE
+          },
+        )
+        .as_deref(),
+        Some(expected),
+        "{culture}",
+      );
+    }
   }
 
   #[test]

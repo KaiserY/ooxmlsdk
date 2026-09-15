@@ -4935,6 +4935,7 @@ mod tests {
         line_height: Pt(14.0),
         line_metrics_participant: true,
         paint_clip: None,
+        page_culling_bounds: None,
         style,
         font_id: None,
         color: color(0, 0, 0, u8::MAX),
@@ -6774,6 +6775,42 @@ mod tests {
       String::from_utf8_lossy(&render(&outside, &uncompressed_options()).unwrap()).into_owned();
     assert!(!outside_pdf.contains("/Subtype/Type0"), "{outside_pdf}");
     assert!(!outside_pdf.contains("\nBT "), "{outside_pdf}");
+
+    // A merged cell can own this page even when its complete glyph payload
+    // lies on another page. Its explicit ownership survives physical culling;
+    // a paint clip still suppresses all ink outside the worksheet page band.
+    let common::DisplayItem::Text(text) = &mut outside.pages[0].items[0] else {
+      unreachable!();
+    };
+    let owner = common::Rect {
+      origin: common::Point {
+        x: Pt(36.0),
+        y: Pt(36.0),
+      },
+      size: Size {
+        width: Pt(540.0),
+        height: Pt(720.0),
+      },
+    };
+    text.paint_clip = Some(owner);
+    let clipped_only_pdf =
+      String::from_utf8_lossy(&render(&outside, &uncompressed_options()).unwrap()).into_owned();
+    assert!(!clipped_only_pdf.contains("\nBT "), "{clipped_only_pdf}");
+    let common::DisplayItem::Text(text) = &mut outside.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.page_culling_bounds = Some(owner);
+    let owned_pdf =
+      String::from_utf8_lossy(&render(&outside, &uncompressed_options()).unwrap()).into_owned();
+    assert_eq!(owned_pdf.matches("\nBT ").count(), 1, "{owned_pdf}");
+    assert!(owned_pdf.contains("36 36 540 720 re\nW\nn"), "{owned_pdf}");
+    let common::DisplayItem::Text(text) = &mut outside.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.page_culling_bounds.as_mut().unwrap().origin.x = Pt(621.0);
+    let unowned_pdf =
+      String::from_utf8_lossy(&render(&outside, &uncompressed_options()).unwrap()).into_owned();
+    assert!(!unowned_pdf.contains("\nBT "), "{unowned_pdf}");
 
     let mut crossing = text_document("crossing", style);
     let common::DisplayItem::Text(text) = &mut crossing.pages[0].items[0] else {

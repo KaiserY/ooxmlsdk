@@ -663,6 +663,85 @@ impl TextMetrics {
       .map(Arc::from)
   }
 
+  /// The rotated alignment box uses the horizontal printer extent, with
+  /// quarter-digit insets on both sides and one final device pixel. This is
+  /// distinct from the projected advances used to paint the same run.
+  pub(crate) fn excel_rotated_layout_extents_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<(f32, f32)> {
+    let pixel = crate::units::POINTS_PER_INCH / crate::units::OFFICE_FIXED_OUTPUT_DPI;
+    let extent = |metrics: &mut Self, text: &str| {
+      let advances = metrics.gdi_device_character_advances_pt(
+        text,
+        style,
+        crate::units::OFFICE_FIXED_OUTPUT_DPI,
+      )?;
+      let shaped = metrics.shape_text(text, style)?;
+      let indices = one_glyph_per_character_indices(text, &shaped.glyphs)?;
+      let mut width = advances.iter().sum::<f32>();
+      for glyph in &shaped.glyphs {
+        if shaped.font_faces.get(glyph.font_index)?.synthetic_bold {
+          width += pixel;
+        }
+      }
+      (indices.len() == advances.len()).then_some(width)
+    };
+    let width = extent(self, text)?;
+    let digit = extent(self, "0")?;
+    let padding = (2.0 * ((digit / pixel).round() / 4.0).ceil() + 1.0) * pixel;
+    Some((width, padding))
+  }
+
+  /// Excel projects the integer advances of a slanted printer-font run onto
+  /// the device grid before emitting its PDF/XPS glyph positions. Off-axis
+  /// fonts retain fractional outline widths instead of horizontal hdmx widths.
+  pub(crate) fn excel_rotated_character_advances_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    degrees: f32,
+  ) -> Option<Arc<[f32]>> {
+    let angle = degrees.abs() % 90.0;
+    if !angle.is_finite() || angle <= f32::EPSILON {
+      return None;
+    }
+    let dpi = crate::units::OFFICE_FIXED_OUTPUT_DPI;
+    let shaped = self.shape_text(text, style)?;
+    let indices = one_glyph_per_character_indices(text, &shaped.glyphs)?;
+    let mut widths = vec![0.0_f64; indices.len()];
+    for (glyph, index) in shaped.glyphs.iter().zip(indices) {
+      let face = shaped.font_faces.get(glyph.font_index)?;
+      // GDI's off-axis ABC widths use sixteenth-pixel outline advances and
+      // one extra pixel for synthesized bold. Native SimSun/SimHei and Arial
+      // printer-DC controls distinguish this from integer hinted widths.
+      let ppem = (glyph.font_size_pt * dpi / crate::units::POINTS_PER_INCH).round();
+      let natural = glyph.x_advance_em as f64 * ppem as f64;
+      widths[index] = (natural * 16.0).ceil() / 16.0 + if face.synthetic_bold { 1.0 } else { 0.0 };
+    }
+    let (sin, cos) = angle.to_radians().sin_cos();
+    let mut cumulative = 0.0_f64;
+    let mut previous = 0.0_f64;
+    let advances = widths
+      .into_iter()
+      .map(|width| {
+        cumulative += width;
+        let rounded = cumulative.round();
+        let advance = (rounded - previous) as f32;
+        previous = rounded;
+        let x = (advance * cos).trunc();
+        let y = (advance * sin).trunc();
+        // Office's XPS Indices expose fifth-pixel distances after the
+        // integer projection. Keep f32 angles: at 60 degrees the cosine
+        // lies just below one half, which decides the device truncation.
+        let projected = (x.hypot(y) * 5.0).trunc() / 5.0;
+        projected * crate::units::POINTS_PER_INCH / dpi
+      })
+      .collect::<Vec<_>>();
+    Some(Arc::from(advances))
+  }
+
   /// Returns the cumulative FreeType-compatible hinted extent for a simple
   /// text run while preserving shaping adjustments such as kerning.
   ///
@@ -815,6 +894,35 @@ impl TextMetrics {
     }
     let natural_advances = natural_advances.into_iter().collect::<Option<Vec<_>>>()?;
     uniform_character_spacing_from_advances(&natural_advances, &device_advances)
+  }
+
+  /// Classic GDI adds one device pixel to each synthesized-bold advance.
+  /// Keep this worksheet adjustment separate from consumers that supply
+  /// their own positioned glyph advances or use outline measurements.
+  pub(crate) fn gdi_synthetic_bold_character_spacing_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    device_dpi: f32,
+  ) -> Option<f32> {
+    if text.is_empty() || !style.bold() {
+      return None;
+    }
+    let shaped = self.shape_text(text, style)?;
+    if shaped.font_faces.is_empty() || !shaped.font_faces.iter().all(|face| face.synthetic_bold) {
+      return None;
+    }
+    let character_indices = one_glyph_per_character_indices(text, &shaped.glyphs)?;
+    let mut natural_advances = vec![0.0; character_indices.len()];
+    for (glyph, index) in shaped.glyphs.iter().zip(character_indices) {
+      natural_advances[index] = glyph.x_advance_em * glyph.font_size_pt;
+    }
+    let device_advances = self.gdi_device_character_advances_pt(text, style, device_dpi)?;
+    let bold_advances = device_advances
+      .iter()
+      .map(|advance| advance + crate::units::POINTS_PER_INCH / device_dpi)
+      .collect::<Vec<_>>();
+    uniform_character_spacing_from_advances(&natural_advances, &bold_advances)
   }
 
   pub fn vertical_metrics(&mut self, style: &(impl FontStyleRef + ?Sized)) -> TextVerticalMetrics {
@@ -1518,6 +1626,102 @@ mod tests {
     assert!((spacing - 0.06).abs() < 0.0001);
     assert!(uniform_character_spacing_from_advances(&[5.22, 5.22], &[5.28, 5.16]).is_none());
     assert!(uniform_character_spacing_from_advances(&[5.22], &[5.28]).is_none());
+  }
+
+  #[test]
+  fn synthetic_bold_spacing_matches_windows_device_widths() {
+    let mut metrics = TextMetrics::new();
+    for (size, expected_advance) in [(9.48, 4.92), (13.32, 6.84), (17.16, 8.76)] {
+      let style = TextStyle {
+        font_family: Some("SimHei".into()),
+        font_size: Pt(size),
+        bold: true,
+        ..TextStyle::default()
+      };
+      let spacing = metrics
+        .gdi_synthetic_bold_character_spacing_pt("Blood Pressure Tracker", &style, 600.0)
+        .expect("SimHei synthetic bold");
+      assert!((size * 0.5 + spacing - expected_advance).abs() < 0.0001);
+      let regular = TextStyle {
+        bold: false,
+        ..style
+      };
+      assert!(
+        metrics
+          .gdi_synthetic_bold_character_spacing_pt("Blood", &regular, 600.0)
+          .is_none()
+      );
+    }
+    let real_bold = TextStyle {
+      font_family: Some("Arial".into()),
+      bold: true,
+      ..TextStyle::default()
+    };
+    assert!(
+      metrics
+        .gdi_synthetic_bold_character_spacing_pt("Blood", &real_bold, 600.0)
+        .is_none()
+    );
+  }
+
+  #[test]
+  fn rotated_alignment_extent_matches_office_top_bottom_controls() {
+    let mut metrics = TextMetrics::new();
+    for (size, text, width, padding) in [
+      (7.08, "CCCCCCCCCC", 37.2, 2.04),
+      (4.68, "CCCCCCCCCC", 25.2, 1.56),
+      (7.08, "Constructed Key Field", 78.12, 2.04),
+    ] {
+      let style = TextStyle {
+        font_family: Some("SimSun".into()),
+        font_size: Pt(size),
+        bold: true,
+        ..TextStyle::default()
+      };
+      let actual = metrics
+        .excel_rotated_layout_extents_pt(text, &style)
+        .expect("simple printer text");
+      assert!((actual.0 - width).abs() < 0.0001, "{actual:?}");
+      assert!((actual.1 - padding).abs() < 0.0001, "{actual:?}");
+    }
+  }
+
+  #[test]
+  fn rotated_printer_advances_match_office_xps_device_projection() {
+    let mut metrics = TextMetrics::new();
+    for (bold, angle, expected) in [
+      (true, 15.0, [3.6, 3.456]),
+      (true, 30.0, [3.6, 3.48]),
+      (true, 45.0, [3.552, 3.552]),
+      (true, 60.0, [3.6, 3.432]),
+      (false, 15.0, [3.456, 3.456]),
+      (false, 30.0, [3.48, 3.432]),
+      (false, 45.0, [3.552, 3.384]),
+      (false, 60.0, [3.432, 3.432]),
+    ] {
+      let style = TextStyle {
+        font_family: Some("SimSun".into()),
+        font_size: Pt(7.08),
+        bold,
+        ..TextStyle::default()
+      };
+      for sign in [-1.0, 1.0] {
+        let advances = metrics
+          .excel_rotated_character_advances_pt("CCCCCCCCCC", &style, angle * sign)
+          .expect("simple slanted run");
+        for (index, advance) in advances.iter().enumerate() {
+          assert!(
+            (advance - expected[index % 2]).abs() < 0.0001,
+            "bold={bold}, angle={angle}, character={index}: {advance}"
+          );
+        }
+      }
+      assert!(
+        metrics
+          .excel_rotated_character_advances_pt("CC", &style, 90.0)
+          .is_none()
+      );
+    }
   }
 
   #[test]

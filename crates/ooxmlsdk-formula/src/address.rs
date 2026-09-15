@@ -111,7 +111,18 @@ impl<'a> QualifiedRange<'a> {
       .map(|name| {
         split_unquoted_range_bounds(name)
           .map(|(start, end)| (unquote_sheet_name(start), Some(unquote_sheet_name(end))))
-          .unwrap_or_else(|| (unquote_sheet_name(name), None))
+          .unwrap_or_else(|| {
+            let name = unquote_sheet_name(name);
+            // Excel quotes the complete 3D sheet span, 'First:Last', with
+            // escaped apostrophes inside it. A colon cannot be in a sheet name.
+            if !name.contains('[')
+              && let Some((start, end)) = name.split_once(':')
+            {
+              (start.to_string(), Some(end.to_string()))
+            } else {
+              (name, None)
+            }
+          })
       })
       .map(|(start, end)| (Some(start), end))
       .unwrap_or((None, None));

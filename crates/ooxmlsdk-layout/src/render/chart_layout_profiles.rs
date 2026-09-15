@@ -34,6 +34,12 @@ pub(crate) const WORD_CARTESIAN_DEFAULTS: CartesianHostDefaults = CartesianHostD
   titled_top_legend_gap_ratio: 0.0375,
 };
 
+/// Standalone Excel chartsheet controls at 8/10pt and with Gill Sans MT,
+/// Arial and Calibri reserve roughly one and a half natural font line boxes
+/// per category level. Keep this font-based band separate from embedded
+/// charts' frame-height ratios; width/height controls retain the same band.
+pub(crate) const EXCEL_CHARTSHEET_AXIS_BAND_LINE_HEIGHTS: f32 = 1.53;
+
 pub(crate) const EXCEL_CARTESIAN_DEFAULTS: CartesianHostDefaults = CartesianHostDefaults {
   title_top_ratio: 0.024,
   category_bottom_ratio: 0.05,

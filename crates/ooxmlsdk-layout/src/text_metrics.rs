@@ -663,6 +663,45 @@ impl TextMetrics {
       .map(Arc::from)
   }
 
+  /// Returns Excel's unrotated fixed-output character advances.
+  ///
+  /// Excel's worksheet edit paint path disables pair positioning and standard
+  /// ligatures, rounds each unpositioned outline advance to the nearest
+  /// printer pixel, and writes the resulting character positions to the PDF
+  /// `TJ` array. This differs from the hdmx/ceiling behavior exposed by the
+  /// classic GDI helper above and from the projected off-axis path below.
+  pub(crate) fn excel_unrotated_character_advances_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<Arc<[f32]>> {
+    if text.is_empty()
+      || style.character_spacing_pt().abs() > f32::EPSILON
+      || (style.horizontal_scale() - 1.0).abs() > f32::EPSILON
+    {
+      return None;
+    }
+
+    let shaped = self.shape_text(text, style)?;
+    if shaped.font_faces.iter().any(|face| face.synthetic_bold) {
+      return None;
+    }
+    let character_indices = one_glyph_per_character_indices(text, &shaped.glyphs)?;
+    let pixel_pt = crate::units::POINTS_PER_INCH / crate::units::OFFICE_FIXED_OUTPUT_DPI;
+    let mut advances = vec![None; character_indices.len()];
+    for (glyph, character_index) in shaped.glyphs.iter().zip(character_indices) {
+      let device_pixels = (glyph.x_advance_em * glyph.font_size_pt / pixel_pt).round();
+      if !device_pixels.is_finite() {
+        return None;
+      }
+      advances[character_index] = Some(device_pixels * pixel_pt);
+    }
+    advances
+      .into_iter()
+      .collect::<Option<Vec<_>>>()
+      .map(Arc::from)
+  }
+
   /// The rotated alignment box uses the horizontal printer extent, with
   /// quarter-digit insets on both sides and one final device pixel. This is
   /// distinct from the projected advances used to paint the same run.

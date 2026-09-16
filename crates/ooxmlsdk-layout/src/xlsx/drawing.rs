@@ -93,6 +93,7 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) hyperlink_action: Option<String>,
   pub(crate) graphic_uri: Option<String>,
   pub(crate) text: String,
+  pub(crate) text_paragraphs: Vec<DrawingTextParagraphModel>,
   pub(crate) text_font_size_points100: Option<i32>,
   pub(crate) text_font_family: Option<String>,
   pub(crate) text_east_asia_font_family: Option<String>,
@@ -105,6 +106,7 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) text_vertical: Option<a::TextVerticalValues>,
   pub(crate) text_rotation_deg: f32,
   pub(crate) text_upright: bool,
+  pub(crate) text_word_wrap: bool,
   pub(crate) text_warp: Option<Box<a::PresetTextWarp>>,
   pub(crate) text_left_inset_emu: Option<i64>,
   pub(crate) text_top_inset_emu: Option<i64>,
@@ -139,6 +141,33 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) group_child_extent_emu: Option<(i64, i64)>,
   pub(crate) children: Vec<DrawingObjectModel>,
   pub(crate) geometry: Option<DrawingGeometryModel>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DrawingTextParagraphModel {
+  pub(crate) runs: Vec<DrawingTextRunModel>,
+  pub(crate) alignment: Option<a::TextAlignmentTypeValues>,
+  pub(crate) level: u8,
+  pub(crate) left_margin_emu: Option<i32>,
+  pub(crate) right_margin_emu: Option<i32>,
+  pub(crate) indent_emu: Option<i32>,
+  pub(crate) auto_number: Option<DrawingTextAutoNumberModel>,
+  pub(crate) empty_line_font_size_points100: Option<i32>,
+  pub(crate) list_default_run_properties: Option<Box<a::DefaultRunProperties>>,
+  pub(crate) level_default_run_properties: Option<Box<a::DefaultRunProperties>>,
+  pub(crate) paragraph_default_run_properties: Option<Box<a::DefaultRunProperties>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct DrawingTextAutoNumberModel {
+  pub(crate) scheme: a::TextAutoNumberSchemeValues,
+  pub(crate) start_at: Option<i32>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DrawingTextRunModel {
+  pub(crate) text: String,
+  pub(crate) run_properties: Option<Box<a::RunProperties>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -637,6 +666,11 @@ impl DrawingObjectModel {
         .as_deref()
         .map(xdr_text_body_text)
         .unwrap_or_default(),
+      text_paragraphs: shape
+        .text_body
+        .as_deref()
+        .map(xdr_text_body_paragraphs)
+        .unwrap_or_default(),
       text_font_size_points100: shape
         .text_body
         .as_deref()
@@ -686,6 +720,12 @@ impl DrawingObjectModel {
           .body_properties
           .up_right
           .is_some_and(|value| value.as_bool())
+      }),
+      text_word_wrap: shape.text_body.as_deref().is_some_and(|text_body| {
+        text_body
+          .body_properties
+          .wrap
+          .is_none_or(|wrap| wrap == a::TextWrappingValues::Square)
       }),
       text_warp: shape
         .text_body
@@ -779,6 +819,7 @@ impl DrawingObjectModel {
       hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: group_shape_text(group),
+      text_paragraphs: Vec::new(),
       text_font_size_points100: None,
       text_font_family: None,
       text_east_asia_font_family: None,
@@ -795,6 +836,7 @@ impl DrawingObjectModel {
       text_vertical: None,
       text_rotation_deg: 0.0,
       text_upright: false,
+      text_word_wrap: false,
       text_warp: None,
       text_len: group_shape_text_len(group),
       child_objects: group.group_shape_choice.len(),
@@ -904,6 +946,7 @@ impl DrawingObjectModel {
       hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: Some(frame.graphic.graphic_data.uri.clone()),
       text: String::new(),
+      text_paragraphs: Vec::new(),
       text_font_size_points100: None,
       text_font_family: None,
       text_east_asia_font_family: None,
@@ -920,6 +963,7 @@ impl DrawingObjectModel {
       text_vertical: None,
       text_rotation_deg: 0.0,
       text_upright: false,
+      text_word_wrap: false,
       text_warp: None,
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
       has_style: false,
@@ -995,6 +1039,7 @@ impl DrawingObjectModel {
       hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: String::new(),
+      text_paragraphs: Vec::new(),
       text_font_size_points100: None,
       text_font_family: None,
       text_east_asia_font_family: None,
@@ -1011,6 +1056,7 @@ impl DrawingObjectModel {
       text_vertical: None,
       text_rotation_deg: 0.0,
       text_upright: false,
+      text_word_wrap: false,
       text_warp: None,
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
@@ -1078,6 +1124,7 @@ impl DrawingObjectModel {
       hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: String::new(),
+      text_paragraphs: Vec::new(),
       text_font_size_points100: None,
       text_font_family: None,
       text_east_asia_font_family: None,
@@ -1094,6 +1141,7 @@ impl DrawingObjectModel {
       text_vertical: None,
       text_rotation_deg: 0.0,
       text_upright: false,
+      text_word_wrap: false,
       text_warp: None,
       child_objects: 0,
       has_style: picture.shape_style.is_some(),
@@ -1149,6 +1197,7 @@ impl DrawingObjectModel {
       hyperlink_invalid_url: None,
       hyperlink_action: None,
       text: String::new(),
+      text_paragraphs: Vec::new(),
       text_font_size_points100: None,
       text_font_family: None,
       text_east_asia_font_family: None,
@@ -1184,6 +1233,7 @@ impl DrawingObjectModel {
       hyperlink_action: None,
       graphic_uri: None,
       text: String::new(),
+      text_paragraphs: Vec::new(),
       text_font_size_points100: None,
       text_font_family: None,
       text_east_asia_font_family: None,
@@ -1200,6 +1250,7 @@ impl DrawingObjectModel {
       text_vertical: None,
       text_rotation_deg: 0.0,
       text_upright: false,
+      text_word_wrap: false,
       text_warp: None,
       child_objects: 0,
       has_style: false,
@@ -1424,6 +1475,222 @@ fn xdr_text_body_text(text_body: &xdr::TextBody) -> String {
   dml_paragraphs_text(&text_body.paragraph)
 }
 
+fn xdr_text_body_paragraphs(text_body: &xdr::TextBody) -> Vec<DrawingTextParagraphModel> {
+  text_body
+    .paragraph
+    .iter()
+    .filter_map(|paragraph| {
+      let layout = xdr_text_paragraph_layout(text_body, paragraph);
+      let runs = paragraph
+        .paragraph_choice
+        .iter()
+        .filter_map(|choice| match choice {
+          a::ParagraphChoice::Run(run) if !run.text.is_empty() => Some(DrawingTextRunModel {
+            text: run.text.clone(),
+            run_properties: run.run_properties.clone(),
+          }),
+          a::ParagraphChoice::Field(field) => field
+            .text
+            .as_ref()
+            .filter(|text| !text.is_empty())
+            .map(|text| DrawingTextRunModel {
+              text: text.clone(),
+              run_properties: field.run_properties.clone(),
+            }),
+          a::ParagraphChoice::Break(line_break) => Some(DrawingTextRunModel {
+            text: "\n".to_string(),
+            run_properties: line_break.run_properties.clone(),
+          }),
+          a::ParagraphChoice::TextMath(_) | a::ParagraphChoice::AlternateContent(_) => None,
+          a::ParagraphChoice::Run(_) => None,
+        })
+        .collect::<Vec<_>>();
+      if runs.is_empty() && layout.auto_number.is_none() {
+        return None;
+      }
+      let direct = paragraph.paragraph_properties.as_deref();
+      let list_style = text_body.list_style.as_deref();
+      Some(DrawingTextParagraphModel {
+        runs,
+        alignment: xdr_text_paragraph_alignment(text_body, paragraph),
+        level: layout.level,
+        left_margin_emu: layout.left_margin_emu,
+        right_margin_emu: layout.right_margin_emu,
+        indent_emu: layout.indent_emu,
+        auto_number: layout.auto_number,
+        empty_line_font_size_points100: paragraph
+          .end_paragraph_run_properties
+          .as_deref()
+          .and_then(|properties| properties.font_size),
+        list_default_run_properties: list_style
+          .and_then(|style| style.default_paragraph_properties.as_deref())
+          .and_then(|properties| properties.default_run_properties.clone()),
+        level_default_run_properties: list_style
+          .and_then(|style| list_level_default_run_properties(style, i32::from(layout.level)))
+          .cloned()
+          .map(Box::new),
+        paragraph_default_run_properties: direct
+          .and_then(|properties| properties.default_run_properties.clone()),
+      })
+    })
+    .collect()
+}
+
+#[derive(Default)]
+struct DrawingTextParagraphLayoutModel {
+  level: u8,
+  left_margin_emu: Option<i32>,
+  right_margin_emu: Option<i32>,
+  indent_emu: Option<i32>,
+  auto_number: Option<DrawingTextAutoNumberModel>,
+}
+
+fn xdr_text_paragraph_layout(
+  text_body: &xdr::TextBody,
+  paragraph: &a::Paragraph,
+) -> DrawingTextParagraphLayoutModel {
+  let direct = paragraph.paragraph_properties.as_deref();
+  let level = direct
+    .and_then(|properties| properties.level)
+    .unwrap_or(0)
+    .clamp(0, 8) as u8;
+  let mut layout = DrawingTextParagraphLayoutModel {
+    level,
+    ..DrawingTextParagraphLayoutModel::default()
+  };
+
+  macro_rules! apply_properties {
+    ($properties:expr, $bullet_field:ident, $bullet_choice:ident) => {{
+      let properties = $properties;
+      if let Some(value) = properties.left_margin {
+        layout.left_margin_emu = Some(value);
+      }
+      if let Some(value) = properties.right_margin {
+        layout.right_margin_emu = Some(value);
+      }
+      if let Some(value) = properties.indent {
+        layout.indent_emu = Some(value);
+      }
+      match properties.$bullet_field.as_ref() {
+        Some(a::$bullet_choice::AutoNumberedBullet(bullet)) => {
+          layout.auto_number = Some(DrawingTextAutoNumberModel {
+            scheme: bullet.r#type,
+            start_at: bullet.start_at,
+          });
+        }
+        Some(
+          a::$bullet_choice::NoBullet
+          | a::$bullet_choice::CharacterBullet(_)
+          | a::$bullet_choice::PictureBullet(_),
+        ) => layout.auto_number = None,
+        None => {}
+      }
+    }};
+  }
+
+  if let Some(style) = text_body.list_style.as_deref() {
+    if let Some(properties) = style.default_paragraph_properties.as_deref() {
+      apply_properties!(
+        properties,
+        default_paragraph_properties_choice4,
+        DefaultParagraphPropertiesChoice4
+      );
+    }
+    match level {
+      0 => {
+        if let Some(properties) = style.level1_paragraph_properties.as_deref() {
+          apply_properties!(
+            properties,
+            level1_paragraph_properties_choice4,
+            Level1ParagraphPropertiesChoice4
+          );
+        }
+      }
+      1 => {
+        if let Some(properties) = style.level2_paragraph_properties.as_deref() {
+          apply_properties!(
+            properties,
+            level2_paragraph_properties_choice4,
+            Level2ParagraphPropertiesChoice4
+          );
+        }
+      }
+      2 => {
+        if let Some(properties) = style.level3_paragraph_properties.as_deref() {
+          apply_properties!(
+            properties,
+            level3_paragraph_properties_choice4,
+            Level3ParagraphPropertiesChoice4
+          );
+        }
+      }
+      3 => {
+        if let Some(properties) = style.level4_paragraph_properties.as_deref() {
+          apply_properties!(
+            properties,
+            level4_paragraph_properties_choice4,
+            Level4ParagraphPropertiesChoice4
+          );
+        }
+      }
+      4 => {
+        if let Some(properties) = style.level5_paragraph_properties.as_deref() {
+          apply_properties!(
+            properties,
+            level5_paragraph_properties_choice4,
+            Level5ParagraphPropertiesChoice4
+          );
+        }
+      }
+      5 => {
+        if let Some(properties) = style.level6_paragraph_properties.as_deref() {
+          apply_properties!(
+            properties,
+            level6_paragraph_properties_choice4,
+            Level6ParagraphPropertiesChoice4
+          );
+        }
+      }
+      6 => {
+        if let Some(properties) = style.level7_paragraph_properties.as_deref() {
+          apply_properties!(
+            properties,
+            level7_paragraph_properties_choice4,
+            Level7ParagraphPropertiesChoice4
+          );
+        }
+      }
+      7 => {
+        if let Some(properties) = style.level8_paragraph_properties.as_deref() {
+          apply_properties!(
+            properties,
+            level8_paragraph_properties_choice4,
+            Level8ParagraphPropertiesChoice4
+          );
+        }
+      }
+      8 => {
+        if let Some(properties) = style.level9_paragraph_properties.as_deref() {
+          apply_properties!(
+            properties,
+            level9_paragraph_properties_choice4,
+            Level9ParagraphPropertiesChoice4
+          );
+        }
+      }
+      _ => unreachable!("DrawingML paragraph level is clamped above"),
+    }
+  }
+  if let Some(properties) = direct {
+    apply_properties!(
+      properties,
+      paragraph_properties_choice4,
+      ParagraphPropertiesChoice4
+    );
+  }
+  layout
+}
+
 fn xdr_text_body_first_run_font_size(text_body: &xdr::TextBody) -> Option<i32> {
   let properties = xdr_text_body_first_run_properties(text_body)?;
   properties
@@ -1565,6 +1832,13 @@ fn xdr_text_body_first_paragraph_alignment(
     .paragraph
     .iter()
     .find(|paragraph| !paragraph.paragraph_choice.is_empty())?;
+  xdr_text_paragraph_alignment(text_body, paragraph)
+}
+
+fn xdr_text_paragraph_alignment(
+  text_body: &xdr::TextBody,
+  paragraph: &a::Paragraph,
+) -> Option<a::TextAlignmentTypeValues> {
   let direct = paragraph.paragraph_properties.as_deref();
   let level = direct.and_then(|properties| properties.level).unwrap_or(0);
   direct
@@ -2728,6 +3002,99 @@ mod tests {
         ..
       }))
     ));
+  }
+
+  #[test]
+  fn shape_text_wrap_uses_drawingml_square_default_and_honors_none() {
+    for (wrap, expected) in [("", true), (r#" wrap="none""#, false)] {
+      let xml = format!(
+        r#"<xdr:sp xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:nvSpPr><xdr:cNvPr id="1" name="shape"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr/><xdr:txBody><a:bodyPr{wrap}/><a:lstStyle/><a:p><a:r><a:t>text</a:t></a:r></a:p></xdr:txBody></xdr:sp>"#
+      );
+      let shape = xdr::Shape::from_bytes(xml.as_bytes()).expect("shape");
+      assert_eq!(
+        DrawingObjectModel::from_shape(&shape).text_word_wrap,
+        expected
+      );
+    }
+  }
+
+  #[test]
+  fn shape_text_preserves_paragraph_defaults_run_styles_and_underline_fills() {
+    let shape = xdr::Shape::from_bytes(
+      br#"<xdr:sp xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:nvSpPr><xdr:cNvPr id="1" name="shape"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr/><xdr:txBody><a:bodyPr/><a:lstStyle><a:defPPr><a:defRPr sz="1200"/></a:defPPr></a:lstStyle><a:p><a:pPr algn="ctr"><a:defRPr b="1"/></a:pPr><a:r><a:rPr u="heavy"><a:uFillTx/></a:rPr><a:t>Text</a:t></a:r><a:r><a:rPr u="dbl"><a:uFill><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></a:uFill></a:rPr><a:t> Box</a:t></a:r></a:p></xdr:txBody></xdr:sp>"#,
+    )
+    .expect("shape");
+
+    let model = DrawingObjectModel::from_shape(&shape);
+    let [paragraph] = model.text_paragraphs.as_slice() else {
+      panic!("one drawing text paragraph");
+    };
+    assert_eq!(
+      paragraph.alignment,
+      Some(a::TextAlignmentTypeValues::Center)
+    );
+    assert!(paragraph.list_default_run_properties.is_some());
+    assert!(paragraph.paragraph_default_run_properties.is_some());
+    let [first, second] = paragraph.runs.as_slice() else {
+      panic!("two drawing text runs");
+    };
+    assert_eq!(first.text, "Text");
+    assert_eq!(second.text, " Box");
+    assert_eq!(
+      first
+        .run_properties
+        .as_deref()
+        .and_then(|properties| properties.underline),
+      Some(a::TextUnderlineValues::Heavy)
+    );
+    assert!(matches!(
+      first
+        .run_properties
+        .as_deref()
+        .and_then(|properties| properties.run_properties_choice4.as_ref()),
+      Some(a::RunPropertiesChoice4::UnderlineFillText)
+    ));
+    assert!(matches!(
+      second
+        .run_properties
+        .as_deref()
+        .and_then(|properties| properties.run_properties_choice4.as_ref()),
+      Some(a::RunPropertiesChoice4::UnderlineFill(_))
+    ));
+  }
+
+  #[test]
+  fn shape_text_preserves_auto_numbering_indents_and_empty_paragraphs() {
+    let shape = xdr::Shape::from_bytes(
+      br#"<xdr:sp xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:nvSpPr><xdr:cNvPr id="1" name="shape"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr/><xdr:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr marL="228600" indent="-228600"><a:buAutoNum type="arabicPeriod"/></a:pPr><a:r><a:rPr sz="1100"/><a:t>One</a:t></a:r></a:p><a:p><a:pPr marL="685800" lvl="1" indent="-228600"><a:buAutoNum type="arabicPeriod" startAt="3"/></a:pPr><a:endParaRPr sz="1100"/></a:p><a:p><a:pPr marL="685800" lvl="1" indent="-228600"><a:buAutoNum type="arabicPeriod" startAt="3"/></a:pPr><a:r><a:rPr sz="1100"/><a:t>Four</a:t></a:r></a:p></xdr:txBody></xdr:sp>"#,
+    )
+    .expect("shape");
+
+    let model = DrawingObjectModel::from_shape(&shape);
+    assert_eq!(model.text_paragraphs.len(), 3);
+    assert_eq!(model.text_paragraphs[0].level, 0);
+    assert_eq!(model.text_paragraphs[0].left_margin_emu, Some(228_600));
+    assert_eq!(model.text_paragraphs[0].indent_emu, Some(-228_600));
+    assert_eq!(
+      model.text_paragraphs[0].auto_number,
+      Some(DrawingTextAutoNumberModel {
+        scheme: a::TextAutoNumberSchemeValues::ArabicPeriod,
+        start_at: None,
+      })
+    );
+    assert!(model.text_paragraphs[1].runs.is_empty());
+    assert_eq!(model.text_paragraphs[1].level, 1);
+    assert_eq!(
+      model.text_paragraphs[1].empty_line_font_size_points100,
+      Some(1100)
+    );
+    assert_eq!(
+      model.text_paragraphs[2].auto_number,
+      Some(DrawingTextAutoNumberModel {
+        scheme: a::TextAutoNumberSchemeValues::ArabicPeriod,
+        start_at: Some(3),
+      })
+    );
   }
 
   #[test]

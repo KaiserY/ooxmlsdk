@@ -4,7 +4,9 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
+use icu_segmenter::{
+  GraphemeClusterSegmenter, LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions,
+};
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder, imageops::FilterType};
 use kurbo::{Affine, Rect as KurboRect};
@@ -25,9 +27,11 @@ use crate::model::{
   BorderStyle, ImageCrop, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PageSetup,
   PdfTextSegmentation, RectItem, RgbColor, TextItem, TextStyle, common_page_setup, common_point,
   common_rect, common_rgb, common_stroke_from_border, common_text_style,
+  drawingml_kerning_minimum_size_pt,
 };
 use crate::options::LayoutOptions;
 use crate::render::{chart as shared_chart, diagram as shared_diagram, emf_wmf};
+use crate::text_layout::{StyledTextSpan, break_text_lines};
 use crate::text_metrics::TextMetrics;
 use crate::units;
 
@@ -722,11 +726,26 @@ impl DrawingAreaRenderLayout {
   fn fixed_output_drawing_page_transform(self, page: &CalcPrintPage<'_>) -> SheetPageTransform {
     let source = self.area.map_or_else(CellRect::default, |area| {
       let logical = page.sheet.range_rect(area);
+      let modern_arial_grid = page
+        .sheet
+        .uses_modern_excel_arial_fixed_output_picture_grid();
       CellRect {
-        x_pt: logical.x_pt * self.zoom_scale,
-        y_pt: page
-          .sheet
-          .fixed_output_drawing_row_offset_pt(area.start.row, self.zoom_scale),
+        x_pt: if modern_arial_grid {
+          page
+            .sheet
+            .fixed_output_column_offset_pt(area.start.col, self.zoom_scale)
+        } else {
+          logical.x_pt * self.zoom_scale
+        },
+        y_pt: if modern_arial_grid {
+          page
+            .sheet
+            .fixed_output_row_offset_pt(area.start.row, self.zoom_scale)
+        } else {
+          page
+            .sheet
+            .fixed_output_drawing_row_offset_pt(area.start.row, self.zoom_scale)
+        },
         ..CellRect::default()
       }
     });
@@ -825,15 +844,13 @@ fn print_page_drawingml_items(
   layout: DrawingAreaRenderLayout,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
-  let output_scale = page
+  let legacy_output_scale = page
     .sheet
     .uses_legacy_excel12_fixed_output_grid()
     .then_some(layout.zoom_scale);
-  let page_transform = if output_scale.is_some() {
-    layout.fixed_output_drawing_page_transform(page)
-  } else {
-    layout.page_transform(page)
-  };
+  let modern_arial_grid = page
+    .sheet
+    .uses_modern_excel_arial_fixed_output_picture_grid();
   let mut page_clip_rect = layout.clip_rect(page, setup);
   if page.sheet.uses_indexed_scatter_print_grid() {
     page_clip_rect.width_pt += super::print::INDEXED_SCATTER_HORIZONTAL_CLIP_EXTENSION_PT;
@@ -846,6 +863,17 @@ fn print_page_drawingml_items(
       {
         continue;
       }
+      let output_scale = legacy_output_scale.or_else(|| {
+        (modern_arial_grid
+          && anchor.kind == super::drawing::DrawingAnchorKind::TwoCell
+          && anchor.object.kind == super::drawing::DrawingObjectKind::Picture)
+          .then_some(layout.zoom_scale)
+      });
+      let page_transform = if output_scale.is_some() {
+        layout.fixed_output_drawing_page_transform(page)
+      } else {
+        layout.page_transform(page)
+      };
       let Some((x_pt, y_pt, width_pt, height_pt)) =
         anchor_rect_in_coordinate_space_pt(page.sheet, anchor, output_scale)
       else {
@@ -883,6 +911,12 @@ fn print_page_drawingml_items(
           drawing_rect,
           page_transform,
           page_clip_rect,
+          physical_page_rect: CellRect {
+            x_pt: 0.0,
+            y_pt: 0.0,
+            width_pt: setup.width_pt,
+            height_pt: setup.height_pt,
+          },
           zoom_scale: layout.zoom_scale,
           chartsheet: page.sheet.sheet_type == super::worksheet::SheetType::Chartsheet,
         },
@@ -2747,6 +2781,27 @@ fn render_cell_area(
   let mut deferred_edit_text_items = Vec::new();
   let mut border_paints = Vec::new();
   let mut conditional_eval_cache = super::print::ConditionalFormatEvalCache::default();
+  let cell_baseline_grid = page
+    .sheet
+    .uses_modern_excel_arial11_cell_text_grid()
+    .then_some(ExcelCellBaselineGrid::ModernArial11)
+    .or_else(|| {
+      page
+        .sheet
+        .uses_legacy_excel12_japanese_fixed_output_profile()
+        .then_some(ExcelCellBaselineGrid::LegacyExcel12Japanese)
+    });
+  let printer_normal_descent_px = cell_baseline_grid.and_then(|_| {
+    let mut style = import.styles.default_font_text_style();
+    super::text::scale_text_style_for_fixed_output(&mut style, layout.zoom_scale);
+    let char_set = if import.styles.font_charset_for_cell(None) == Some(2) {
+      2
+    } else {
+      0
+    };
+    super::worksheet::printer_font_vertical_metrics(&style, char_set)
+      .map(|metrics| metrics.descent_px)
+  });
   for cell in cells {
     let merged_range = page.sheet.merged_range_for_cell(cell.address);
     let table_builtin_style = super::table::builtin_table_style_for_address(
@@ -3030,15 +3085,14 @@ fn render_cell_area(
     {
       continue;
     }
-    let render_style = measurement_style.clone();
     let alignment_indent = alignment.map_or(0i64, |alignment| {
       i64::from(alignment.indent.unwrap_or(0)) + i64::from(alignment.relative_indent.unwrap_or(0))
     });
     let alignment_indent_pt = if alignment_indent > 0 {
       let normal_style = import.styles.default_font_text_style();
       // ECMA-376 §18.8.1 defines one alignment-indent increment as three
-      // space widths in the Normal style font. relativeIndent is the signed
-      // differential-format adjustment to the same count.
+      // space widths in the Normal style font. Any relativeIndent reaching
+      // this point came from a differential format and adjusts that count.
       import
         .styles
         .fixed_output_alignment_indent_increment_pt(text_metrics.measure_text("   ", &normal_style))
@@ -3049,23 +3103,40 @@ fn render_cell_area(
     };
     let text_indent_pt =
       pivot_builtin_style.text_indent_pt() * layout.zoom_scale + alignment_indent_pt;
-    let text_cell_rect = if text_indent_pt > 0.0 {
-      let inset = text_indent_pt.min(cell_rect.width_pt);
-      if calc_cell_horizontal_alignment(cell, alignment) == x::HorizontalAlignmentValues::Right {
-        CellRect {
-          width_pt: cell_rect.width_pt - inset,
-          ..cell_rect
-        }
-      } else {
-        CellRect {
-          x_pt: cell_rect.x_pt + inset,
-          width_pt: cell_rect.width_pt - inset,
-          ..cell_rect
-        }
-      }
+    let cell_text_rect = if page.sheet.uses_modern_excel_arial11_cell_text_grid() {
+      modern_excel_arial11_cell_text_horizontal_rect(
+        cell_rect,
+        layout.fill_page,
+        alignment.is_some_and(|alignment| alignment.wrap_text),
+      )
     } else {
       cell_rect
     };
+    let text_cell_rect = if text_indent_pt > 0.0 {
+      let inset = text_indent_pt.min(cell_text_rect.width_pt);
+      if calc_cell_horizontal_alignment(cell, alignment) == x::HorizontalAlignmentValues::Right {
+        CellRect {
+          width_pt: cell_text_rect.width_pt - inset,
+          ..cell_text_rect
+        }
+      } else {
+        CellRect {
+          x_pt: cell_text_rect.x_pt + inset,
+          width_pt: cell_text_rect.width_pt - inset,
+          ..cell_text_rect
+        }
+      }
+    } else {
+      cell_text_rect
+    };
+    apply_plain_cell_shrink_to_fit(
+      cell,
+      alignment,
+      text_cell_rect,
+      &mut measurement_style,
+      text_metrics,
+    );
+    let render_style = measurement_style.clone();
     let output_area = calc_cell_output_area(
       CalcCellOutputContext {
         sheet: page.sheet,
@@ -3158,6 +3229,20 @@ fn render_cell_area(
             || borders.right.is_some()
             || borders.top.is_some()
             || borders.bottom.is_some(),
+        },
+        text_metrics,
+      );
+    }
+    if let (Some(grid), Some(normal_descent_px)) = (cell_baseline_grid, printer_normal_descent_px) {
+      align_excel_printer_cell_text_vertically(
+        &mut rendered_text_items,
+        ExcelCellVerticalAlignmentContext {
+          alignment,
+          cell: cell_rect,
+          page: layout.fill_page,
+          vertically_merged: merged_range.is_some_and(|merged| merged.start.row < merged.end.row),
+          normal_descent_px,
+          grid_profile: grid,
         },
         text_metrics,
       );
@@ -3772,6 +3857,71 @@ fn calc_cell_missing_width_by_alignment(
   }
 }
 
+fn apply_plain_cell_shrink_to_fit(
+  cell: &super::print::CalcPrintCell<'_>,
+  alignment: Option<super::styles::AlignmentRecord>,
+  rect: CellRect,
+  style: &mut TextStyle,
+  text_metrics: &mut TextMetrics,
+) {
+  let Some(alignment) = alignment else {
+    return;
+  };
+  if !alignment.shrink_to_fit
+    || alignment.wrap_text
+    || alignment.text_rotation.unwrap_or(0) != 0
+    || alignment.horizontal == Some(x::HorizontalAlignmentValues::Fill)
+    || !cell.rich_text_runs.is_empty()
+    || cell.number_format_layout.is_some()
+    || cell.rendered_text.contains(['\n', '\r'])
+  {
+    return;
+  }
+
+  let available_width_pt = (rect.width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(0.0);
+  let text_width_pt = text_metrics.measure_text(&cell.rendered_text, style);
+  let Some(percent) = cell_shrink_to_fit_percent(text_width_pt, available_width_pt) else {
+    return;
+  };
+
+  let scale = percent as f32 / 100.0;
+  let shrink_size = |size_pt: f32| {
+    let minimum_size_pt = size_pt.min(1.0);
+    units::quantize_points_to_office_print_grid((size_pt * scale).max(minimum_size_pt))
+  };
+  style.font_size_pt = units::quantize_points_to_office_print_grid(
+    (style.font_size_pt * scale).max(style.font_size_pt.min(1.0)),
+  );
+  style.complex_font_size_pt = style.complex_font_size_pt.map(shrink_size);
+  style.character_spacing_pt *= scale;
+  style.baseline_shift_pt =
+    units::quantize_points_to_office_print_grid(style.baseline_shift_pt * scale);
+  style.automatic_escapement_font_size_pt =
+    style.automatic_escapement_font_size_pt.map(shrink_size);
+  style.automatic_escapement_complex_font_size_pt = style
+    .automatic_escapement_complex_font_size_pt
+    .map(shrink_size);
+}
+
+fn cell_shrink_to_fit_percent(text_width_pt: f32, available_width_pt: f32) -> Option<u32> {
+  if !text_width_pt.is_finite()
+    || !available_width_pt.is_finite()
+    || text_width_pt <= f32::EPSILON
+    || text_width_pt <= available_width_pt
+  {
+    return None;
+  }
+
+  // Excel chooses an integral percentage before realizing the resulting font
+  // on its 600dpi fixed-output device. The integer step matters: the Apache
+  // POI control uses floor(47.4 / 228.62 * 100) = 20%, which maps Calibri
+  // 11.04pt to 18 printer dots (2.16pt).
+  Some(
+    ((f64::from(available_width_pt) * 100.0 / f64::from(text_width_pt)).floor() as u32)
+      .clamp(1, 100),
+  )
+}
+
 fn calc_cell_horizontal_alignment(
   cell: &super::print::CalcPrintCell<'_>,
   alignment: Option<super::styles::AlignmentRecord>,
@@ -4324,6 +4474,9 @@ fn position_rotated_cell_text(
       let mut rotated_style = text.style.clone();
       rotated_style.character_spacing_pt = 0.0;
       rotated_style.kerning_minimum_size_pt = Some(f32::INFINITY);
+      // Worksheet GDI emits one positioned glyph per source character. In
+      // particular, Calibri "ti" remains two glyphs in Office's PDF/XPS.
+      rotated_style.ligatures = Some(common::OpenTypeLigatures::default());
       text.x_pt += portion_shift;
       if let Some(advances) =
         text_metrics.excel_rotated_character_advances_pt(&text.text, &rotated_style, degrees)
@@ -4759,7 +4912,7 @@ fn cell_text_line_height_pt(style: &TextStyle, options: &CellTextRenderOptions, 
   if options
     .alignment
     .and_then(|alignment| alignment.text_rotation)
-    .is_some_and(|rotation| (1..=180).contains(&rotation))
+    .is_some_and(|rotation| (1..=180).contains(&rotation) || rotation == 255)
   {
     // Native Normal-font controls keep the rotated baseline's cell-relative
     // horizontal position fixed. The sheet's default row/line height must
@@ -4779,6 +4932,91 @@ fn cell_text_line_height_pt(style: &TextStyle, options: &CellTextRenderOptions, 
   }
 }
 
+fn stacked_cell_text_graphemes(text: &str) -> Vec<&str> {
+  let mut boundaries = GraphemeClusterSegmenter::new().segment_str(text);
+  let Some(mut start) = boundaries.next() else {
+    return Vec::new();
+  };
+  let mut graphemes = Vec::new();
+  for end in boundaries {
+    graphemes.push(&text[start..end]);
+    start = end;
+  }
+  graphemes
+}
+
+pub(super) fn stacked_cell_text_slot_count(text: &str) -> usize {
+  stacked_cell_text_graphemes(text).len().max(1)
+}
+
+fn render_stacked_cell_text(
+  items: &mut Vec<PageItem>,
+  text: &str,
+  rect: CellRect,
+  mut style: TextStyle,
+  options: &CellTextRenderOptions,
+  text_metrics: &mut TextMetrics,
+) {
+  let graphemes = stacked_cell_text_graphemes(text);
+  if graphemes.is_empty() {
+    return;
+  }
+
+  // [MS-OI29500] §2.1.693 assigns the otherwise out-of-range value 255 to
+  // Excel's Vertical Text mode. Characters remain upright and occupy one
+  // EditEngine line each; a whitespace character consumes its line without
+  // contributing a PDF text object.
+  style.rotation_deg = 0.0;
+  let line_height = cell_text_line_height_pt(&style, options, false);
+  let text_height = line_height * graphemes.len() as f32;
+  let vertical_alignment = options.alignment.and_then(|alignment| alignment.vertical);
+  let mut y_pt = match vertical_alignment {
+    Some(x::VerticalAlignmentValues::Center) => rect.y_pt + (rect.height_pt - text_height) / 2.0,
+    Some(x::VerticalAlignmentValues::Top) => rect.y_pt,
+    Some(x::VerticalAlignmentValues::Bottom) | None => rect.y_pt + rect.height_pt - text_height,
+    Some(x::VerticalAlignmentValues::Justify | x::VerticalAlignmentValues::Distributed) => {
+      rect.y_pt
+    }
+  };
+  let paint_clip = (options.clip_wrapped_text && text_height > rect.height_pt).then(|| {
+    common_rect(
+      rect.x_pt,
+      rect.y_pt,
+      rect.width_pt.max(0.0),
+      rect.height_pt.max(0.0),
+    )
+  });
+  for grapheme in graphemes {
+    if !grapheme.chars().all(char::is_whitespace) {
+      let width_pt = text_metrics.measure_text(grapheme, &style);
+      let preserve_text_portion = !grapheme.is_ascii() && !calc_text_can_shape_as_line(grapheme);
+      items.push(PageItem::Text(TextItem {
+        x_pt: cell_text_x_pt(rect, width_pt, options.horizontal_alignment, 0.0),
+        y_pt,
+        line_height_pt: line_height,
+        drawingml_text_effect_anchor: None,
+        paint_clip,
+        page_culling_bounds: None,
+        discard_if_horizontally_clipped: false,
+        text: grapheme.to_string(),
+        style: Box::new(style.clone()),
+        rotation_center_pt: None,
+        hyperlink_url: options.hyperlink_url.clone(),
+        form_widget_id: None,
+        paragraph_bidi: false,
+        preserve_text_portion,
+        pdf_text_segmentation: if preserve_text_portion {
+          PdfTextSegmentation::Portion
+        } else {
+          PdfTextSegmentation::Line
+        },
+        source_path: Vec::new(),
+      }));
+    }
+    y_pt += line_height;
+  }
+}
+
 fn render_cell_text(
   items: &mut Vec<PageItem>,
   text: &str,
@@ -4787,6 +5025,14 @@ fn render_cell_text(
   options: CellTextRenderOptions,
   text_metrics: &mut TextMetrics,
 ) {
+  if options
+    .alignment
+    .and_then(|alignment| alignment.text_rotation)
+    == Some(255)
+  {
+    render_stacked_cell_text(items, text, rect, style, &options, text_metrics);
+    return;
+  }
   let first_item = items.len();
   let line_height = cell_text_line_height_pt(&style, &options, false);
   let alignment = options.alignment;
@@ -4800,6 +5046,11 @@ fn render_cell_text(
   };
   let rendered_text;
   let wrapped_lines;
+  let fixed_output_gdi_paint = !options.formula
+    && alignment
+      .and_then(|alignment| alignment.text_rotation)
+      .unwrap_or(0)
+      == 0;
   let lines = if wrap_text && !options.formula {
     // ECMA-376 Part 1 §18.8.1 defines wrapText as line-wrapping the cell
     // contents within the cell. Explicit line breaks remain hard paragraph
@@ -4877,7 +5128,22 @@ fn render_cell_text(
     };
   }
   for line in lines {
-    let full_line_width_pt = text_metrics.measure_text(line, &style);
+    let (line_style, full_line_width_pt) = if fixed_output_gdi_paint {
+      if wrap_text {
+        fixed_output_gdi_cell_text_style(line, &style, text_metrics)
+          .unwrap_or_else(|| (style.clone(), text_metrics.measure_text(line, &style)))
+      } else {
+        // Excel's direct-string fixed-output pass disables GDI pair
+        // positioning and ligatures while retaining the natural outline
+        // advances represented by the PDF font. Its wrapped EditEngine pass
+        // below additionally writes explicit printer-grid character positions.
+        let gdi_style = fixed_output_gdi_base_cell_text_style(&style);
+        let width = text_metrics.measure_text(line, &gdi_style);
+        (gdi_style, width)
+      }
+    } else {
+      (style.clone(), text_metrics.measure_text(line, &style))
+    };
     let preserve_text_portion = !line.is_ascii() && !calc_text_can_shape_as_line(line);
     items.push(PageItem::Text(TextItem {
       x_pt: cell_text_x_pt(rect, full_line_width_pt, options.horizontal_alignment, 0.0),
@@ -4888,7 +5154,7 @@ fn render_cell_text(
       page_culling_bounds: None,
       discard_if_horizontally_clipped: false,
       text: line.to_string(),
-      style: Box::new(style.clone()),
+      style: Box::new(line_style),
       rotation_center_pt: (style.rotation_deg != 0.0).then_some((
         rect.x_pt + rect.width_pt / 2.0,
         rect.y_pt + rect.height_pt / 2.0,
@@ -4978,6 +5244,28 @@ fn wrap_cell_text(
     lines.push(String::new());
   }
   lines
+}
+
+fn fixed_output_gdi_cell_text_style(
+  text: &str,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> Option<(TextStyle, f32)> {
+  if text.is_empty() {
+    return Some((style.clone(), 0.0));
+  }
+  let mut gdi_style = fixed_output_gdi_base_cell_text_style(style);
+  let advances = text_metrics.excel_unrotated_character_advances_pt(text, &gdi_style)?;
+  let width = advances.iter().sum();
+  gdi_style.semantic_character_advances_pt = Some(advances);
+  Some((gdi_style, width))
+}
+
+fn fixed_output_gdi_base_cell_text_style(style: &TextStyle) -> TextStyle {
+  let mut gdi_style = style.clone();
+  gdi_style.kerning_minimum_size_pt = Some(f32::INFINITY);
+  gdi_style.ligatures = Some(common::OpenTypeLigatures::default());
+  gdi_style
 }
 
 fn office_line_break_points(text: &str) -> Vec<usize> {
@@ -5270,7 +5558,7 @@ fn recolor_border_region(items: &mut Vec<PageItem>, region: CellRect, color: Rgb
           width_pt: w,
           height_pt: h,
           fill_color: fill,
-          ..rect.clone()
+          ..rect
         }));
       }
     }
@@ -5355,6 +5643,135 @@ fn cell_border_device_rect(rect: CellRect, page: CellRect) -> CellRect {
     y_pt: grid(rect.y_pt, page.y_pt),
     width_pt: grid(rect.x_pt + rect.width_pt, page.x_pt) - grid(rect.x_pt, page.x_pt),
     height_pt: grid(rect.y_pt + rect.height_pt, page.y_pt) - grid(rect.y_pt, page.y_pt),
+  }
+}
+
+fn modern_excel_arial11_cell_text_horizontal_rect(
+  cell: CellRect,
+  page: CellRect,
+  wrap_text: bool,
+) -> CellRect {
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let border = cell_border_device_rect(cell, page);
+  // Excel aligns worksheet text from the trailing edge of the four-dot grid
+  // band and leaves ten printer dots at either horizontal edge. Express that
+  // geometry through the common 1.5pt cell inset so all existing overflow,
+  // clipping, rich-text, and number-format paths share the same rectangle.
+  let common_inset = XLSX_CELL_TEXT_INSET_PT;
+  let excel_inset = 10.0 * dot;
+  let inset_delta = common_inset - excel_inset;
+  let wrap_measure_padding = if wrap_text { 3.0 * dot } else { 0.0 };
+  CellRect {
+    x_pt: border.x_pt + 4.0 * dot - inset_delta,
+    y_pt: cell.y_pt,
+    width_pt: (border.width_pt + 2.0 * inset_delta - wrap_measure_padding).max(0.0),
+    height_pt: cell.height_pt,
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ExcelCellBaselineGrid {
+  ModernArial11,
+  LegacyExcel12Japanese,
+}
+
+#[derive(Clone, Copy)]
+struct ExcelCellVerticalAlignmentContext {
+  alignment: Option<super::styles::AlignmentRecord>,
+  cell: CellRect,
+  page: CellRect,
+  vertically_merged: bool,
+  normal_descent_px: f32,
+  grid_profile: ExcelCellBaselineGrid,
+}
+
+fn align_excel_printer_cell_text_vertically(
+  items: &mut [PageItem],
+  context: ExcelCellVerticalAlignmentContext,
+  text_metrics: &mut TextMetrics,
+) {
+  let ExcelCellVerticalAlignmentContext {
+    alignment,
+    cell,
+    page,
+    vertically_merged,
+    normal_descent_px,
+    grid_profile,
+  } = context;
+  let [PageItem::Text(text)] = items else {
+    return;
+  };
+  if text.style.rotation_deg.abs() > f32::EPSILON
+    || text.style.baseline_shift_pt.abs() > f32::EPSILON
+  {
+    return;
+  }
+  let char_set = if text.style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+    2
+  } else {
+    0
+  };
+  let Some(metrics) = super::worksheet::printer_font_vertical_metrics(&text.style, char_set) else {
+    return;
+  };
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let vertical = alignment.and_then(|alignment| alignment.vertical);
+  if grid_profile == ExcelCellBaselineGrid::LegacyExcel12Japanese
+    && vertically_merged
+    && vertical == Some(x::VerticalAlignmentValues::Center)
+  {
+    // Excel 12 keeps a vertically merged cell on the worksheet edit box's
+    // centered line position, then contributes half the printer font's
+    // external leading. Re-centering the complete GDI font box moves SimSun
+    // merged text another half-leading too far down.
+    text.y_pt += metrics.external_leading_px * dot / 2.0;
+    return;
+  }
+  let grid = cell_border_device_rect(cell, page);
+  let cell_height_px = (grid.height_pt / dot).round();
+  let Some(baseline_offset_px) = excel_printer_cell_baseline_offset_px(
+    vertical,
+    cell_height_px,
+    metrics,
+    normal_descent_px,
+    grid_profile,
+  ) else {
+    return;
+  };
+  let desired_baseline_pt = grid.y_pt + baseline_offset_px * dot;
+  let current_baseline_offset_pt =
+    text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt);
+  text.y_pt = desired_baseline_pt - current_baseline_offset_pt;
+}
+
+fn excel_printer_cell_baseline_offset_px(
+  vertical: Option<x::VerticalAlignmentValues>,
+  cell_height_px: f32,
+  metrics: super::worksheet::PrinterFontVerticalMetrics,
+  normal_descent_px: f32,
+  grid_profile: ExcelCellBaselineGrid,
+) -> Option<f32> {
+  match vertical {
+    Some(x::VerticalAlignmentValues::Top) => {
+      Some(4.0 + metrics.ascent_px + metrics.external_leading_px)
+    }
+    Some(x::VerticalAlignmentValues::Center) => {
+      let text_height_px = metrics.height_px() + metrics.external_leading_px;
+      let free_space_px = (cell_height_px - text_height_px).max(0.0) / 2.0;
+      // Excel 12's Japanese worksheet device rounds the centered free space
+      // to the nearest printer dot. The modern Arial 11 profile floors it;
+      // odd-height MS PGothic rows distinguish the two while SimSun's 13-dot
+      // external leading independently fixes its lower baseline.
+      let leading_space_px = match grid_profile {
+        ExcelCellBaselineGrid::ModernArial11 => free_space_px.floor(),
+        ExcelCellBaselineGrid::LegacyExcel12Japanese => free_space_px.round(),
+      };
+      Some(leading_space_px + metrics.ascent_px + metrics.external_leading_px)
+    }
+    Some(x::VerticalAlignmentValues::Bottom) | None => {
+      Some((cell_height_px - normal_descent_px - 8.0).max(0.0))
+    }
+    Some(x::VerticalAlignmentValues::Justify | x::VerticalAlignmentValues::Distributed) => None,
   }
 }
 
@@ -5510,7 +5927,7 @@ fn subtract_border_gap(items: &mut Vec<PageItem>, gap: CellRect) {
           y_pt: y,
           width_pt: w,
           height_pt: h,
-          ..rect.clone()
+          ..rect
         }));
       }
     }
@@ -5666,7 +6083,7 @@ fn push_cell_border_rect(
     let left = position.max(start);
     let right = (position + dash).min(end);
     if right > left {
-      let mut segment = rect.clone();
+      let mut segment = rect;
       if vertical {
         segment.y_pt = left;
         segment.height_pt = right - left;
@@ -5761,7 +6178,7 @@ fn push_grid_line(items: &mut Vec<PageItem>, exclusions: &[CellRect], line: Line
       .collect();
   }
   for (a, b) in intervals {
-    let mut segment = line.clone();
+    let mut segment = line;
     if vertical {
       segment.y1_pt = a;
       segment.y2_pt = b;
@@ -7857,6 +8274,7 @@ struct DrawingAnchorPageGeometry {
   drawing_rect: CellRect,
   page_transform: SheetPageTransform,
   page_clip_rect: CellRect,
+  physical_page_rect: CellRect,
   zoom_scale: f32,
   chartsheet: bool,
 }
@@ -7873,6 +8291,7 @@ fn push_page_drawing_anchor_text_items(
     drawing_rect,
     page_transform,
     page_clip_rect,
+    physical_page_rect,
     zoom_scale,
     chartsheet,
   } = geometry;
@@ -7889,6 +8308,7 @@ fn push_page_drawing_anchor_text_items(
       &anchor.object,
       drawing_rect,
       Affine::IDENTITY,
+      zoom_scale,
     );
     return;
   }
@@ -7910,15 +8330,88 @@ fn push_page_drawing_anchor_text_items(
     return;
   }
   let hyperlink_url = drawing_object_hyperlink_url(drawing, &anchor.object);
-  render_drawing_text(
-    items,
-    &text,
+  let mut text_items = Vec::new();
+  if !render_drawing_rich_text(
+    import,
+    &mut text_items,
+    &anchor.object,
     text_rect,
-    drawing_object_text_style(import, &anchor.object),
-    Some(drawing_object_text_layout(&anchor.object)),
+    drawing_object_text_layout(&anchor.object, zoom_scale),
     anchor.object.text_warp.as_deref(),
     hyperlink_url.as_deref(),
-  );
+  ) {
+    render_drawing_text(
+      &mut text_items,
+      &text,
+      text_rect,
+      drawing_object_text_style(import, &anchor.object),
+      Some(drawing_object_text_layout(&anchor.object, zoom_scale)),
+      anchor.object.text_warp.as_deref(),
+      hyperlink_url.as_deref(),
+    );
+  }
+  // The worksheet drawing layer clips paint to each printable page. Excel
+  // emits an ordinary shape-text run on a continuation page only when the run
+  // reaches that printable band; a run whose final glyph remains in the page
+  // margin is absent from the PDF text layer. Keep the physical-page glyph
+  // origin check as well, because ink overhang alone must not retain a run.
+  // Charts have separate, evidenced boundary rules in
+  // `clip_chart_items_to_rect`.
+  let mut text_metrics = TextMetrics::new();
+  text_items.retain(|item| match item {
+    PageItem::Text(text) => drawing_text_run_belongs_to_print_page(
+      text,
+      physical_page_rect,
+      page_clip_rect,
+      &mut text_metrics,
+    ),
+    _ => true,
+  });
+  items.extend(text_items);
+}
+
+fn drawing_text_run_belongs_to_print_page(
+  text: &TextItem,
+  physical_page: CellRect,
+  print_clip: CellRect,
+  text_metrics: &mut TextMetrics,
+) -> bool {
+  if !drawing_text_glyph_origin_intersects_page(text, physical_page, text_metrics) {
+    return false;
+  }
+  let (left, _, right, _) = text_item_bounds(text, text_metrics);
+  // Fixed output decides ownership with the printer-shaped run. The SDK's
+  // realized final advance can differ slightly at this boundary, especially
+  // for large bold text. A half-em band covers that last-glyph advance without
+  // admitting short runs that remain wholly in Excel's page margin.
+  let horizontal_slack = text.style.font_size_pt * 0.5;
+  right + horizontal_slack >= print_clip.x_pt
+    && left - horizontal_slack < print_clip.x_pt + print_clip.width_pt
+}
+
+fn drawing_text_glyph_origin_intersects_page(
+  text: &TextItem,
+  page: CellRect,
+  text_metrics: &mut TextMetrics,
+) -> bool {
+  let (_, top, _, bottom) = text_item_bounds(text, text_metrics);
+  if bottom <= page.y_pt || top >= page.y_pt + page.height_pt {
+    return false;
+  }
+  if text.style.rotation_deg.abs() > f32::EPSILON {
+    return text_item_intersects_rect(text, page, text_metrics);
+  }
+  let Some(shaped) = text_metrics.shape_text(&text.text, text.style.as_ref()) else {
+    return text_item_intersects_rect(text, page, text_metrics);
+  };
+  let left = page.x_pt;
+  let right = page.x_pt + page.width_pt;
+  let mut pen_x = text.x_pt;
+  shaped.glyphs.iter().any(|glyph| {
+    let origin_x = pen_x + glyph.x_offset_em * glyph.font_size_pt;
+    pen_x += glyph.x_advance_em * glyph.font_size_pt;
+    origin_x >= left && origin_x < right
+  })
 }
 
 fn push_group_text_items(
@@ -7928,11 +8421,20 @@ fn push_group_text_items(
   group: &super::drawing::DrawingObjectModel,
   rect: CellRect,
   parent_transform: Affine,
+  content_scale: f32,
 ) {
   let group_transform = parent_transform * drawing_object_path_transform(rect, group);
   for (child, child_rect) in drawing_group_child_rects(group, rect) {
     if child.kind == super::drawing::DrawingObjectKind::GroupShape {
-      push_group_text_items(import, drawing, items, child, child_rect, group_transform);
+      push_group_text_items(
+        import,
+        drawing,
+        items,
+        child,
+        child_rect,
+        group_transform,
+        content_scale,
+      );
       continue;
     }
     if child.text.trim().is_empty() {
@@ -7940,15 +8442,25 @@ fn push_group_text_items(
     }
     let mut child_items = Vec::new();
     let hyperlink_url = drawing_object_hyperlink_url(drawing, child);
-    render_drawing_text(
+    if !render_drawing_rich_text(
+      import,
       &mut child_items,
-      &child.text,
+      child,
       child_rect,
-      drawing_object_text_style(import, child),
-      Some(drawing_object_text_layout(child)),
+      drawing_object_text_layout(child, content_scale),
       child.text_warp.as_deref(),
       hyperlink_url.as_deref(),
-    );
+    ) {
+      render_drawing_text(
+        &mut child_items,
+        &child.text,
+        child_rect,
+        drawing_object_text_style(import, child),
+        Some(drawing_object_text_layout(child, content_scale)),
+        child.text_warp.as_deref(),
+        hyperlink_url.as_deref(),
+      );
+    }
     transform_group_text_items(&mut child_items, group_transform, child_rect);
     items.extend(child_items);
   }
@@ -9110,7 +9622,7 @@ fn lower_drawing_chart(
     shared_chart::automatic_chart_title(Some(import.styles.output_ui_language())),
     &ClusteredColumnStyle {
       layout_profile: ChartLayoutProfile::Excel,
-      chartsheet: chartsheet,
+      chartsheet,
       chart_style_id: chart_style.unwrap_or(2),
       modern_excel_profile: chart_style.is_some(),
       stroke_scale: drawing_scale,
@@ -9895,6 +10407,156 @@ fn apply_xlsx_run_properties(
   }
 }
 
+fn apply_xlsx_drawing_default_run_properties(
+  style: &mut TextStyle,
+  properties: &a::DefaultRunProperties,
+  import: &ExcelImport,
+) {
+  apply_xlsx_default_run_properties(style, properties, import);
+  if let Some(language) = properties.language.as_deref() {
+    style.language = Some(Arc::from(language));
+  }
+  if let Some(minimum_size_pt) = drawingml_kerning_minimum_size_pt(properties.kerning) {
+    style.kerning_minimum_size_pt = Some(minimum_size_pt);
+  }
+  apply_xlsx_drawing_common_run_properties(
+    style,
+    properties.underline,
+    properties.strike,
+    properties.capital,
+    properties.spacing.map(|spacing| spacing.to_points() as f32),
+    properties
+      .baseline
+      .map(|baseline| baseline.as_drawingml_percent() as f32),
+  );
+  apply_xlsx_drawing_script_fonts(
+    style,
+    properties.east_asian_font.as_ref(),
+    properties.complex_script_font.as_ref(),
+    properties.symbol_font.as_ref(),
+    import,
+  );
+  if let Some(a::DefaultRunPropertiesChoice::SolidFill(fill)) =
+    properties.default_run_properties_choice1.as_ref()
+    && let Some(color) = xlsx_drawing_text_solid_fill_color(fill, import)
+  {
+    style.color = color;
+  }
+  if let Some(fill) = properties.default_run_properties_choice4.as_ref() {
+    style.underline_color = match fill {
+      a::DefaultRunPropertiesChoice4::UnderlineFillText => None,
+      a::DefaultRunPropertiesChoice4::UnderlineFill(fill) => {
+        xlsx_drawing_underline_fill_color(fill, import)
+      }
+    };
+  }
+}
+
+fn apply_xlsx_drawing_run_properties(
+  style: &mut TextStyle,
+  properties: &a::RunProperties,
+  import: &ExcelImport,
+) {
+  apply_xlsx_run_properties(style, properties, import);
+  if let Some(language) = properties.language.as_deref() {
+    style.language = Some(Arc::from(language));
+  }
+  if let Some(minimum_size_pt) = drawingml_kerning_minimum_size_pt(properties.kerning) {
+    style.kerning_minimum_size_pt = Some(minimum_size_pt);
+  }
+  apply_xlsx_drawing_common_run_properties(
+    style,
+    properties.underline,
+    properties.strike,
+    properties.capital,
+    properties.spacing.map(|spacing| spacing.to_points() as f32),
+    properties
+      .baseline
+      .map(|baseline| baseline.as_drawingml_percent() as f32),
+  );
+  apply_xlsx_drawing_script_fonts(
+    style,
+    properties.east_asian_font.as_ref(),
+    properties.complex_script_font.as_ref(),
+    properties.symbol_font.as_ref(),
+    import,
+  );
+  if let Some(a::RunPropertiesChoice::SolidFill(fill)) = properties.run_properties_choice1.as_ref()
+    && let Some(color) = xlsx_drawing_text_solid_fill_color(fill, import)
+  {
+    style.color = color;
+  }
+  if let Some(fill) = properties.run_properties_choice4.as_ref() {
+    style.underline_color = match fill {
+      a::RunPropertiesChoice4::UnderlineFillText => None,
+      a::RunPropertiesChoice4::UnderlineFill(fill) => {
+        xlsx_drawing_underline_fill_color(fill, import)
+      }
+    };
+  }
+}
+
+fn apply_xlsx_drawing_common_run_properties(
+  style: &mut TextStyle,
+  underline: Option<a::TextUnderlineValues>,
+  strike: Option<a::TextStrikeValues>,
+  capital: Option<a::TextCapsValues>,
+  spacing_pt: Option<f32>,
+  baseline_percent: Option<f32>,
+) {
+  if let Some(underline) = underline {
+    style.underline = underline != a::TextUnderlineValues::None;
+  }
+  if let Some(strike) = strike {
+    style.strikethrough = strike != a::TextStrikeValues::NoStrike;
+  }
+  if let Some(capital) = capital {
+    style.uppercase = capital == a::TextCapsValues::All;
+    style.small_caps = capital == a::TextCapsValues::Small;
+  }
+  if let Some(spacing_pt) = spacing_pt {
+    style.character_spacing_pt = spacing_pt;
+  }
+  if let Some(baseline_percent) = baseline_percent {
+    style.baseline_shift_pt = style.font_size_pt * baseline_percent / 100_000.0;
+  }
+}
+
+fn apply_xlsx_drawing_script_fonts(
+  style: &mut TextStyle,
+  east_asian: Option<&a::EastAsianFont>,
+  complex: Option<&a::ComplexScriptFont>,
+  symbol: Option<&a::SymbolFont>,
+  import: &ExcelImport,
+) {
+  if let Some(typeface) = east_asian
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+  {
+    style.east_asia_font_family = Some(Arc::from(
+      import
+        .styles
+        .resolve_drawingml_theme_font_for_language(typeface, style.language.as_deref()),
+    ));
+  }
+  if let Some(typeface) = complex
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+  {
+    style.complex_font_family = Some(Arc::from(
+      import.styles.resolve_drawingml_theme_font(typeface),
+    ));
+  }
+  if let Some(typeface) = symbol
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+  {
+    style.symbol_font_family = Some(Arc::from(
+      import.styles.resolve_drawingml_theme_font(typeface),
+    ));
+  }
+}
+
 fn default_run_properties_color(
   properties: &a::DefaultRunProperties,
   import: &ExcelImport,
@@ -9928,6 +10590,45 @@ fn xlsx_chart_text_solid_fill_color(fill: &a::SolidFill, import: &ExcelImport) -
     }))
   };
   let color = color.resolve_rgb(&mut scheme_resolver, None)?;
+  Some(RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+  })
+}
+
+fn xlsx_drawing_text_solid_fill_color(
+  fill: &a::SolidFill,
+  import: &ExcelImport,
+) -> Option<RgbColor> {
+  let color = fill
+    .solid_fill_choice
+    .as_ref()
+    .and_then(Color::from_solid_fill_choice)?;
+  xlsx_drawing_text_color(color, import)
+}
+
+fn xlsx_drawing_underline_fill_color(
+  fill: &a::UnderlineFill,
+  import: &ExcelImport,
+) -> Option<RgbColor> {
+  let color = fill
+    .underline_fill_choice
+    .as_ref()
+    .and_then(Color::from_underline_fill_choice)?;
+  xlsx_drawing_text_color(color, import)
+}
+
+fn xlsx_drawing_text_color(color: Color, import: &ExcelImport) -> Option<RgbColor> {
+  let mut scheme_resolver = |value| {
+    let index = xlsx_scheme_color_index(value)?;
+    let color = import.styles.theme_color(index, 0.0)?;
+    Some(Color::RgbHex(RgbHexColor {
+      value: format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b),
+      transformations: Vec::new(),
+    }))
+  };
+  let color = color.resolve_rgb_preserving_transform_precision(&mut scheme_resolver, None)?;
   Some(RgbColor {
     r: color.r,
     g: color.g,
@@ -10897,6 +11598,565 @@ fn drawing_anchor_text<'a>(
   Cow::Borrowed("")
 }
 
+struct DrawingRichTextLine {
+  alignment: Option<a::TextAlignmentTypeValues>,
+  left_margin_pt: f32,
+  right_margin_pt: f32,
+  indent_pt: f32,
+  bullet_label: Option<String>,
+  fallback_style: TextStyle,
+  portions: Vec<(String, TextStyle)>,
+  preserve_empty: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct DrawingAutoNumberCounter {
+  scheme: a::TextAutoNumberSchemeValues,
+  declared_start: Option<i32>,
+  value: i32,
+}
+
+#[derive(Default)]
+struct DrawingAutoNumberingState {
+  levels: [Option<DrawingAutoNumberCounter>; 9],
+}
+
+impl DrawingAutoNumberingState {
+  fn resolve(
+    &mut self,
+    level: u8,
+    auto_number: Option<super::drawing::DrawingTextAutoNumberModel>,
+    has_printable_text: bool,
+  ) -> Option<String> {
+    if !has_printable_text {
+      return None;
+    }
+    let level = usize::from(level.min(8));
+    let Some(auto_number) = auto_number else {
+      self.levels[level] = None;
+      return None;
+    };
+    let previous = self.levels[level];
+    let continues_sequence = previous.is_some_and(|counter| {
+      counter.scheme == auto_number.scheme
+        && auto_number
+          .start_at
+          .is_none_or(|start| counter.declared_start == Some(start))
+    });
+    let value = previous.map_or_else(
+      || auto_number.start_at.unwrap_or(1),
+      |counter| {
+        if continues_sequence {
+          counter.value.saturating_add(1)
+        } else {
+          auto_number.start_at.unwrap_or(1)
+        }
+      },
+    );
+    self.levels[level] = Some(DrawingAutoNumberCounter {
+      scheme: auto_number.scheme,
+      declared_start: if continues_sequence {
+        previous.and_then(|counter| counter.declared_start)
+      } else {
+        auto_number.start_at
+      },
+      value,
+    });
+    self.levels[level + 1..].fill(None);
+    Some(format_drawing_auto_number(auto_number.scheme, value))
+  }
+}
+
+fn format_drawing_auto_number(scheme: a::TextAutoNumberSchemeValues, value: i32) -> String {
+  use a::TextAutoNumberSchemeValues as Scheme;
+
+  let value = value.max(1);
+  match scheme {
+    Scheme::AlphaLowerCharacterParenBoth => format!("({})", drawing_alpha_number(value, false)),
+    Scheme::AlphaUpperCharacterParenBoth => format!("({})", drawing_alpha_number(value, true)),
+    Scheme::AlphaLowerCharacterParenR => format!("{})", drawing_alpha_number(value, false)),
+    Scheme::AlphaUpperCharacterParenR => format!("{})", drawing_alpha_number(value, true)),
+    Scheme::AlphaLowerCharacterPeriod => format!("{}.", drawing_alpha_number(value, false)),
+    Scheme::AlphaUpperCharacterPeriod => format!("{}.", drawing_alpha_number(value, true)),
+    Scheme::ArabicParenBoth => format!("({value})"),
+    Scheme::ArabicParenR => format!("{value})"),
+    Scheme::ArabicPeriod => format!("{value}."),
+    Scheme::ArabicPlain => value.to_string(),
+    Scheme::RomanLowerCharacterParenBoth => format!("({})", drawing_roman_number(value, false)),
+    Scheme::RomanUpperCharacterParenBoth => format!("({})", drawing_roman_number(value, true)),
+    Scheme::RomanLowerCharacterParenR => format!("{})", drawing_roman_number(value, false)),
+    Scheme::RomanUpperCharacterParenR => format!("{})", drawing_roman_number(value, true)),
+    Scheme::RomanLowerCharacterPeriod => format!("{}.", drawing_roman_number(value, false)),
+    Scheme::RomanUpperCharacterPeriod => format!("{}.", drawing_roman_number(value, true)),
+    Scheme::EastAsianJapaneseKoreanPeriod => {
+      format!("{}.", drawing_east_asian_number(value))
+    }
+    Scheme::EastAsianJapaneseKoreanPlain => drawing_east_asian_number(value),
+    _ => format!("{value}."),
+  }
+}
+
+fn drawing_alpha_number(value: i32, uppercase: bool) -> String {
+  let zero_based = value.max(1) as usize - 1;
+  let character = if uppercase { b'A' } else { b'a' } + (zero_based % 26) as u8;
+  std::iter::repeat_n(char::from(character), zero_based / 26 + 1).collect()
+}
+
+fn drawing_roman_number(value: i32, uppercase: bool) -> String {
+  const TOKENS: &[(i32, &str)] = &[
+    (1000, "M"),
+    (900, "CM"),
+    (500, "D"),
+    (400, "CD"),
+    (100, "C"),
+    (90, "XC"),
+    (50, "L"),
+    (40, "XL"),
+    (10, "X"),
+    (9, "IX"),
+    (5, "V"),
+    (4, "IV"),
+    (1, "I"),
+  ];
+  let mut remainder = value.max(1);
+  let mut result = String::new();
+  for &(unit, token) in TOKENS {
+    while remainder >= unit {
+      result.push_str(token);
+      remainder -= unit;
+    }
+  }
+  if uppercase {
+    result
+  } else {
+    result.to_lowercase()
+  }
+}
+
+fn drawing_east_asian_number(value: i32) -> String {
+  const DIGITS: [&str; 10] = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+  const UNITS: [&str; 4] = ["", "十", "百", "千"];
+
+  let value = value.max(1);
+  if value >= 10_000 {
+    return value.to_string();
+  }
+  let mut result = String::new();
+  let mut emitted = false;
+  let mut pending_zero = false;
+  for position in (0..4).rev() {
+    let divisor = 10_i32.pow(position as u32);
+    let digit = (value / divisor) % 10;
+    if digit == 0 {
+      pending_zero = emitted;
+      continue;
+    }
+    if pending_zero {
+      result.push_str(DIGITS[0]);
+      pending_zero = false;
+    }
+    if !(digit == 1 && position == 1 && !emitted) {
+      result.push_str(DIGITS[digit as usize]);
+    }
+    result.push_str(UNITS[position]);
+    emitted = true;
+  }
+  result
+}
+
+fn wrap_drawing_rich_text_line(
+  line: DrawingRichTextLine,
+  maximum_width_pt: f32,
+  text_metrics: &mut TextMetrics,
+) -> Vec<DrawingRichTextLine> {
+  if line.portions.is_empty() || maximum_width_pt <= 0.0 {
+    return vec![line];
+  }
+
+  let mut text = String::new();
+  let mut portion_ranges = Vec::with_capacity(line.portions.len());
+  for (portion, _) in &line.portions {
+    let start = text.len();
+    text.push_str(portion);
+    portion_ranges.push(start..text.len());
+  }
+  let full_width = line
+    .portions
+    .iter()
+    .map(|(portion, style)| text_metrics.measure_text(portion, style))
+    .sum::<f32>();
+  if full_width <= maximum_width_pt {
+    return vec![line];
+  }
+
+  let spans = line
+    .portions
+    .iter()
+    .zip(&portion_ranges)
+    .map(|((_, style), range)| StyledTextSpan {
+      range: range.clone(),
+      style,
+    })
+    .collect::<Vec<_>>();
+  let Some(ranges) = break_text_lines(&text, &spans, Some(maximum_width_pt), text_metrics) else {
+    return vec![line];
+  };
+  if ranges.len() <= 1 {
+    return vec![line];
+  }
+
+  let mut wrapped = Vec::with_capacity(ranges.len());
+  for (line_index, range) in ranges.into_iter().enumerate() {
+    let source = &text[range.clone()];
+    let leading = source.len() - source.trim_start_matches(char::is_whitespace).len();
+    let trailing_end = source.trim_end_matches(char::is_whitespace).len();
+    let content_start = range.start + leading;
+    let content_end = range.start + trailing_end;
+    let mut portions = Vec::new();
+    if content_start < content_end {
+      for ((_, style), portion_range) in line.portions.iter().zip(&portion_ranges) {
+        let start = content_start.max(portion_range.start);
+        let end = content_end.min(portion_range.end);
+        if start < end {
+          portions.push((text[start..end].to_string(), style.clone()));
+        }
+      }
+    }
+    wrapped.push(DrawingRichTextLine {
+      alignment: line.alignment,
+      left_margin_pt: line.left_margin_pt,
+      right_margin_pt: line.right_margin_pt,
+      indent_pt: line.indent_pt,
+      bullet_label: (line_index == 0)
+        .then(|| line.bullet_label.clone())
+        .flatten(),
+      fallback_style: line.fallback_style.clone(),
+      preserve_empty: line.preserve_empty && portions.is_empty(),
+      portions,
+    });
+  }
+  wrapped
+}
+
+fn render_drawing_rich_text(
+  import: &ExcelImport,
+  items: &mut Vec<PageItem>,
+  object: &super::drawing::DrawingObjectModel,
+  rect: CellRect,
+  layout: DrawingTextLayout,
+  text_warp: Option<&a::PresetTextWarp>,
+  hyperlink_url: Option<&str>,
+) -> bool {
+  if object.text_paragraphs.is_empty() {
+    return false;
+  }
+
+  let base_style = drawing_object_rich_text_base_style(import, object);
+  let mut lines = Vec::<DrawingRichTextLine>::new();
+  let mut has_underline = false;
+  let mut has_character_spacing = false;
+  let mut first_run_style = None::<TextStyle>;
+  let mut has_run_style_variation = false;
+  let mut has_paragraph_alignment_variation = false;
+  let mut has_auto_numbering = false;
+  let mut auto_numbering = DrawingAutoNumberingState::default();
+  for paragraph in &object.text_paragraphs {
+    has_paragraph_alignment_variation |=
+      paragraph.alignment.unwrap_or(layout.alignment) != layout.alignment;
+    has_auto_numbering |= paragraph.auto_number.is_some();
+    let mut paragraph_style = base_style.clone();
+    for properties in [
+      paragraph.list_default_run_properties.as_deref(),
+      paragraph.level_default_run_properties.as_deref(),
+      paragraph.paragraph_default_run_properties.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+      apply_xlsx_drawing_default_run_properties(&mut paragraph_style, properties, import);
+    }
+    apply_xlsx_drawing_theme_east_asian_font(
+      &mut paragraph_style,
+      drawing_paragraph_default_east_asian_font(paragraph),
+      import,
+    );
+    let mut fallback_style = paragraph_style.clone();
+    if let Some(font_size) = paragraph.empty_line_font_size_points100 {
+      fallback_style.font_size_pt = font_size as f32 / 100.0;
+    }
+    let numbered = paragraph.auto_number.is_some();
+    let left_margin_pt = if numbered {
+      paragraph
+        .left_margin_emu
+        .map(|value| units::emu_to_points(i64::from(value)))
+        .unwrap_or_default()
+        * layout.content_scale
+    } else {
+      0.0
+    };
+    let right_margin_pt = if numbered {
+      paragraph
+        .right_margin_emu
+        .map(|value| units::emu_to_points(i64::from(value)))
+        .unwrap_or_default()
+        * layout.content_scale
+    } else {
+      0.0
+    };
+    let indent_pt = if numbered {
+      paragraph
+        .indent_emu
+        .map(|value| units::emu_to_points(i64::from(value)))
+        .unwrap_or_default()
+        * layout.content_scale
+    } else {
+      0.0
+    };
+    let paragraph_line_start = lines.len();
+    lines.push(DrawingRichTextLine {
+      alignment: paragraph.alignment,
+      left_margin_pt,
+      right_margin_pt,
+      indent_pt,
+      bullet_label: None,
+      fallback_style: fallback_style.clone(),
+      portions: Vec::new(),
+      preserve_empty: numbered,
+    });
+    for run in &paragraph.runs {
+      let mut style = paragraph_style.clone();
+      if let Some(properties) = run.run_properties.as_deref() {
+        apply_xlsx_drawing_run_properties(&mut style, properties, import);
+      }
+      apply_xlsx_drawing_theme_east_asian_font(
+        &mut style,
+        drawing_text_run_east_asian_font(paragraph, run),
+        import,
+      );
+      has_underline |= style.underline;
+      has_character_spacing |= style.character_spacing_pt.abs() > f32::EPSILON;
+      if let Some(first) = first_run_style.as_ref() {
+        has_run_style_variation |= first != &style;
+      } else {
+        first_run_style = Some(style.clone());
+      }
+      for (part_index, part) in run.text.split('\n').enumerate() {
+        if part_index > 0 {
+          lines.push(DrawingRichTextLine {
+            alignment: paragraph.alignment,
+            left_margin_pt,
+            right_margin_pt,
+            indent_pt,
+            bullet_label: None,
+            fallback_style: fallback_style.clone(),
+            portions: Vec::new(),
+            preserve_empty: numbered,
+          });
+        }
+        if !part.is_empty() {
+          lines
+            .last_mut()
+            .expect("drawing text line")
+            .portions
+            .push((part.to_string(), style.clone()));
+        }
+      }
+    }
+    let first_printable_line =
+      (paragraph_line_start..lines.len()).find(|index| !lines[*index].portions.is_empty());
+    let bullet_label = auto_numbering.resolve(
+      paragraph.level,
+      paragraph.auto_number,
+      first_printable_line.is_some(),
+    );
+    if let Some(index) = first_printable_line {
+      lines[index].bullet_label = bullet_label;
+    }
+  }
+  lines.retain(|line| !line.portions.is_empty() || line.preserve_empty);
+  if (!has_underline
+    && !has_character_spacing
+    && !has_run_style_variation
+    && !has_paragraph_alignment_variation
+    && !has_auto_numbering)
+    || lines.is_empty()
+  {
+    return false;
+  }
+
+  let item_start = items.len();
+  let mut vertical_rotation_deg = None;
+  for line in &mut lines {
+    let rotation = configure_drawing_text_style(&mut line.fallback_style, layout);
+    vertical_rotation_deg.get_or_insert(rotation);
+    for (_, style) in &mut line.portions {
+      configure_drawing_text_style(style, layout);
+    }
+  }
+  let vertical_rotation_deg = vertical_rotation_deg.unwrap_or_default();
+  // The same body/shape transform applies to every portion. The first value
+  // above therefore represents the writing direction for the whole frame.
+  let vertical_text = vertical_rotation_deg != 0.0;
+  let mut text_metrics = TextMetrics::new();
+  if layout.word_wrap && !vertical_text {
+    lines = lines
+      .into_iter()
+      .flat_map(|line| {
+        let maximum_width_pt = (rect.width_pt
+          - layout.left_inset_pt
+          - layout.right_inset_pt
+          - line.left_margin_pt
+          - line.right_margin_pt)
+          .max(0.0);
+        wrap_drawing_rich_text_line(line, maximum_width_pt, &mut text_metrics)
+      })
+      .collect();
+  }
+  let line_heights = lines
+    .iter()
+    .map(|line| {
+      if line.portions.is_empty() {
+        drawing_text_line_height(&line.fallback_style)
+      } else {
+        line
+          .portions
+          .iter()
+          .map(|(_, style)| drawing_text_line_height(style))
+          .fold(1.0_f32, f32::max)
+      }
+    })
+    .collect::<Vec<_>>();
+  let available_height = (rect.height_pt - layout.top_inset_pt - layout.bottom_inset_pt).max(0.0);
+  let text_height = line_heights.iter().sum::<f32>();
+  let vertical_offset = match layout.anchor {
+    a::TextAnchoringTypeValues::Center => (available_height - text_height).max(0.0) / 2.0,
+    a::TextAnchoringTypeValues::Bottom => (available_height - text_height).max(0.0),
+    a::TextAnchoringTypeValues::Top
+    | a::TextAnchoringTypeValues::Justified
+    | a::TextAnchoringTypeValues::Distributed => 0.0,
+  };
+  let mut line_y = rect.y_pt + layout.top_inset_pt + vertical_offset;
+  for (line_index, (line, line_height)) in lines.into_iter().zip(line_heights).enumerate() {
+    let y = if vertical_text {
+      rect.y_pt + (rect.height_pt - line_height) / 2.0
+    } else {
+      line_y
+    };
+    if !vertical_text && y > rect.y_pt + rect.height_pt - layout.bottom_inset_pt {
+      break;
+    }
+    let portions = line
+      .portions
+      .into_iter()
+      .map(|(text, style)| {
+        let width = text_metrics.measure_text(&text, &style);
+        (text, style, width)
+      })
+      .collect::<Vec<_>>();
+    let text_width = portions.iter().map(|(_, _, width)| *width).sum::<f32>();
+    let available_width = if vertical_text {
+      (rect.height_pt - layout.top_inset_pt - layout.bottom_inset_pt).max(0.0)
+    } else {
+      (rect.width_pt
+        - layout.left_inset_pt
+        - layout.right_inset_pt
+        - line.left_margin_pt
+        - line.right_margin_pt)
+        .max(0.0)
+    };
+    let paragraph_left = layout.left_inset_pt + line.left_margin_pt;
+    let aligned_offset = match line.alignment.unwrap_or(layout.alignment) {
+      a::TextAlignmentTypeValues::Center => {
+        paragraph_left + (available_width - text_width).max(0.0) / 2.0
+      }
+      a::TextAlignmentTypeValues::Right => paragraph_left + (available_width - text_width).max(0.0),
+      _ => paragraph_left,
+    };
+    let mut x = if vertical_text {
+      rect.x_pt + (rect.width_pt - text_width) / 2.0 + line_index as f32 * line_height
+    } else {
+      rect.x_pt + aligned_offset
+    };
+    let common_baseline_offset = portions
+      .iter()
+      .map(|(text, style, _)| {
+        text_metrics.baseline_offset_in_line_for_text(text, style, line_height)
+          + style.baseline_shift_pt
+      })
+      .fold(0.0_f32, f32::max);
+    if let Some(label) = line.bullet_label {
+      let bullet_style = portions
+        .first()
+        .map(|(_, style, _)| style.clone())
+        .unwrap_or_else(|| line.fallback_style.clone());
+      let bullet_baseline_offset =
+        text_metrics.baseline_offset_in_line_for_text(&label, &bullet_style, line_height)
+          + bullet_style.baseline_shift_pt;
+      let preserve_text_portion = !label.is_ascii() && !calc_text_can_shape_as_line(&label);
+      items.push(PageItem::Text(TextItem {
+        x_pt: x + line.indent_pt,
+        y_pt: y + common_baseline_offset - bullet_baseline_offset,
+        line_height_pt: line_height,
+        drawingml_text_effect_anchor: None,
+        paint_clip: None,
+        page_culling_bounds: None,
+        discard_if_horizontally_clipped: false,
+        text: label,
+        style: Box::new(bullet_style.clone()),
+        rotation_center_pt: (bullet_style.rotation_deg != 0.0).then_some((
+          rect.x_pt + rect.width_pt / 2.0,
+          rect.y_pt + rect.height_pt / 2.0,
+        )),
+        hyperlink_url: hyperlink_url.map(ToString::to_string),
+        form_widget_id: None,
+        paragraph_bidi: false,
+        preserve_text_portion,
+        pdf_text_segmentation: if preserve_text_portion {
+          PdfTextSegmentation::Portion
+        } else {
+          PdfTextSegmentation::Line
+        },
+        source_path: Vec::new(),
+      }));
+    }
+    for (text, style, width) in portions {
+      let run_baseline_offset =
+        text_metrics.baseline_offset_in_line_for_text(&text, &style, line_height)
+          + style.baseline_shift_pt;
+      let preserve_text_portion = !text.is_ascii() && !calc_text_can_shape_as_line(&text);
+      items.push(PageItem::Text(TextItem {
+        x_pt: x,
+        y_pt: y + common_baseline_offset - run_baseline_offset,
+        line_height_pt: line_height,
+        drawingml_text_effect_anchor: None,
+        paint_clip: None,
+        page_culling_bounds: None,
+        discard_if_horizontally_clipped: false,
+        text,
+        style: Box::new(style.clone()),
+        rotation_center_pt: (style.rotation_deg != 0.0).then_some((
+          rect.x_pt + rect.width_pt / 2.0,
+          rect.y_pt + rect.height_pt / 2.0,
+        )),
+        hyperlink_url: hyperlink_url.map(ToString::to_string),
+        form_widget_id: None,
+        paragraph_bidi: false,
+        preserve_text_portion,
+        pdf_text_segmentation: if preserve_text_portion {
+          PdfTextSegmentation::Portion
+        } else {
+          PdfTextSegmentation::Line
+        },
+        source_path: Vec::new(),
+      }));
+      x += width;
+    }
+    line_y += line_height;
+  }
+  apply_drawing_text_warp(&mut items[item_start..], text_warp, rect, &mut text_metrics);
+  true
+}
+
 fn render_drawing_text(
   items: &mut Vec<PageItem>,
   text: &str,
@@ -10909,6 +12169,88 @@ fn render_drawing_text(
   let item_start = items.len();
   let mut style = style.unwrap_or_default();
   let layout = layout.unwrap_or_default();
+  let vertical_rotation_deg = configure_drawing_text_style(&mut style, layout);
+  let vertical_text = vertical_rotation_deg != 0.0;
+  let line_height = drawing_text_line_height(&style);
+  let mut text_metrics = TextMetrics::new();
+  let available_width = if vertical_text {
+    (rect.height_pt - layout.top_inset_pt - layout.bottom_inset_pt).max(0.0)
+  } else {
+    (rect.width_pt - layout.left_inset_pt - layout.right_inset_pt).max(0.0)
+  };
+  let mut lines = if layout.word_wrap {
+    wrap_cell_text(text, available_width, &style, &mut text_metrics)
+  } else {
+    text.lines().map(ToString::to_string).collect::<Vec<_>>()
+  };
+  lines.retain(|line| !line.is_empty());
+  let available_height = (rect.height_pt - layout.top_inset_pt - layout.bottom_inset_pt).max(0.0);
+  let text_height = line_height * lines.len() as f32;
+  let vertical_offset = match layout.anchor {
+    a::TextAnchoringTypeValues::Center => (available_height - text_height).max(0.0) / 2.0,
+    a::TextAnchoringTypeValues::Bottom => (available_height - text_height).max(0.0),
+    a::TextAnchoringTypeValues::Top
+    | a::TextAnchoringTypeValues::Justified
+    | a::TextAnchoringTypeValues::Distributed => 0.0,
+  };
+  for (index, line) in lines.into_iter().enumerate() {
+    let y = if vertical_text {
+      rect.y_pt + (rect.height_pt - line_height) / 2.0
+    } else {
+      rect.y_pt + layout.top_inset_pt + vertical_offset + index as f32 * line_height
+    };
+    if !vertical_text && y > rect.y_pt + rect.height_pt - layout.bottom_inset_pt {
+      break;
+    }
+    let text_width = text_metrics.measure_text(&line, &style);
+    let aligned_offset = match layout.alignment {
+      a::TextAlignmentTypeValues::Center => {
+        layout.left_inset_pt + (available_width - text_width).max(0.0) / 2.0
+      }
+      a::TextAlignmentTypeValues::Right => {
+        layout.left_inset_pt + (available_width - text_width).max(0.0)
+      }
+      _ => layout.left_inset_pt,
+    };
+    let x = if vertical_text {
+      rect.x_pt + (rect.width_pt - text_width) / 2.0 + index as f32 * line_height
+    } else {
+      rect.x_pt + aligned_offset
+    };
+    items.push(PageItem::Text(TextItem {
+      x_pt: x,
+      y_pt: y,
+      line_height_pt: line_height,
+      drawingml_text_effect_anchor: None,
+      paint_clip: None,
+      page_culling_bounds: None,
+      discard_if_horizontally_clipped: false,
+      text: line,
+      style: Box::new(style.clone()),
+      rotation_center_pt: (style.rotation_deg != 0.0).then_some((
+        rect.x_pt + rect.width_pt / 2.0,
+        rect.y_pt + rect.height_pt / 2.0,
+      )),
+      hyperlink_url: hyperlink_url.map(ToString::to_string),
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+      source_path: Vec::new(),
+    }));
+  }
+  apply_drawing_text_warp(&mut items[item_start..], text_warp, rect, &mut text_metrics);
+}
+
+fn configure_drawing_text_style(style: &mut TextStyle, layout: DrawingTextLayout) -> f32 {
+  let effect_font_size_pt = style.drawingml_effect_font_size_pt;
+  super::text::scale_text_style_for_fixed_output(style, layout.content_scale);
+  style.character_spacing_pt *= layout.content_scale;
+  if let Some(effect_font_size_pt) = effect_font_size_pt {
+    style.drawingml_effect_font_size_pt = Some(units::quantize_points_to_office_print_grid(
+      effect_font_size_pt * layout.content_scale,
+    ));
+  }
   let vertical_rotation_deg = match layout.vertical {
     Some(a::TextVerticalValues::Vertical | a::TextVerticalValues::EastAsianVetical) => 90.0,
     Some(a::TextVerticalValues::Vertical270) => 270.0,
@@ -10933,74 +12275,16 @@ fn render_drawing_text(
     options.semantic_text_overlay = false;
     style.pdf_glyph_outline_options = Some(Arc::new(options));
   }
-  let vertical_text = vertical_rotation_deg != 0.0;
-  let line_height = (style.font_size_pt * 1.15).max(1.0);
-  let mut text_metrics = TextMetrics::new();
-  let lines = text
-    .lines()
-    .filter(|line| !line.is_empty())
-    .collect::<Vec<_>>();
-  let available_height = (rect.height_pt - layout.top_inset_pt - layout.bottom_inset_pt).max(0.0);
-  let text_height = line_height * lines.len() as f32;
-  let vertical_offset = match layout.anchor {
-    a::TextAnchoringTypeValues::Center => (available_height - text_height).max(0.0) / 2.0,
-    a::TextAnchoringTypeValues::Bottom => (available_height - text_height).max(0.0),
-    a::TextAnchoringTypeValues::Top
-    | a::TextAnchoringTypeValues::Justified
-    | a::TextAnchoringTypeValues::Distributed => 0.0,
-  };
-  for (index, line) in lines.into_iter().enumerate() {
-    let y = if vertical_text {
-      rect.y_pt + (rect.height_pt - line_height) / 2.0
-    } else {
-      rect.y_pt + layout.top_inset_pt + vertical_offset + index as f32 * line_height
-    };
-    if !vertical_text && y > rect.y_pt + rect.height_pt - layout.bottom_inset_pt {
-      break;
-    }
-    let available_width = if vertical_text {
-      (rect.height_pt - layout.top_inset_pt - layout.bottom_inset_pt).max(0.0)
-    } else {
-      (rect.width_pt - layout.left_inset_pt - layout.right_inset_pt).max(0.0)
-    };
-    let text_width = text_metrics.measure_text(line, &style);
-    let aligned_offset = match layout.alignment {
-      a::TextAlignmentTypeValues::Center => {
-        layout.left_inset_pt + (available_width - text_width).max(0.0) / 2.0
-      }
-      a::TextAlignmentTypeValues::Right => {
-        layout.left_inset_pt + (available_width - text_width).max(0.0)
-      }
-      _ => layout.left_inset_pt,
-    };
-    let x = if vertical_text {
-      rect.x_pt + (rect.width_pt - text_width) / 2.0 + index as f32 * line_height
-    } else {
-      rect.x_pt + aligned_offset
-    };
-    items.push(PageItem::Text(TextItem {
-      x_pt: x,
-      y_pt: y,
-      line_height_pt: line_height,
-      drawingml_text_effect_anchor: None,
-      paint_clip: None,
-      page_culling_bounds: None,
-      discard_if_horizontally_clipped: false,
-      text: line.to_string(),
-      style: Box::new(style.clone()),
-      rotation_center_pt: (style.rotation_deg != 0.0).then_some((
-        rect.x_pt + rect.width_pt / 2.0,
-        rect.y_pt + rect.height_pt / 2.0,
-      )),
-      hyperlink_url: hyperlink_url.map(ToString::to_string),
-      form_widget_id: None,
-      paragraph_bidi: false,
-      preserve_text_portion: false,
-      pdf_text_segmentation: PdfTextSegmentation::Line,
-      source_path: Vec::new(),
-    }));
-  }
-  apply_drawing_text_warp(&mut items[item_start..], text_warp, rect, &mut text_metrics);
+  vertical_rotation_deg
+}
+
+fn drawing_text_line_height(style: &TextStyle) -> f32 {
+  super::worksheet::printer_font_vertical_metrics(style, 0)
+    .map(|metrics| {
+      (metrics.height_px() + metrics.external_leading_px) * units::POINTS_PER_INCH
+        / units::OFFICE_FIXED_OUTPUT_DPI
+    })
+    .unwrap_or_else(|| (style.font_size_pt * 1.15).max(1.0))
 }
 
 fn apply_drawing_text_warp(
@@ -11027,6 +12311,7 @@ struct DrawingTextLayout {
   alignment: a::TextAlignmentTypeValues,
   anchor: a::TextAnchoringTypeValues,
   vertical: Option<a::TextVerticalValues>,
+  word_wrap: bool,
   left_inset_pt: f32,
   top_inset_pt: f32,
   right_inset_pt: f32,
@@ -11034,6 +12319,7 @@ struct DrawingTextLayout {
   text_rotation_deg: f32,
   shape_rotation_deg: f32,
   upright: bool,
+  content_scale: f32,
 }
 
 impl Default for DrawingTextLayout {
@@ -11042,6 +12328,7 @@ impl Default for DrawingTextLayout {
       alignment: a::TextAlignmentTypeValues::Left,
       anchor: a::TextAnchoringTypeValues::Top,
       vertical: None,
+      word_wrap: true,
       left_inset_pt: XLSX_CELL_TEXT_INSET_PT,
       top_inset_pt: XLSX_CELL_TEXT_INSET_PT,
       right_inset_pt: XLSX_CELL_TEXT_INSET_PT,
@@ -11049,32 +12336,42 @@ impl Default for DrawingTextLayout {
       text_rotation_deg: 0.0,
       shape_rotation_deg: 0.0,
       upright: false,
+      content_scale: 1.0,
     }
   }
 }
 
-fn drawing_object_text_layout(object: &super::drawing::DrawingObjectModel) -> DrawingTextLayout {
+fn drawing_object_text_layout(
+  object: &super::drawing::DrawingObjectModel,
+  content_scale: f32,
+) -> DrawingTextLayout {
   DrawingTextLayout {
     alignment: object.text_alignment.unwrap_or_default(),
     anchor: object
       .text_anchor
       .unwrap_or(a::TextAnchoringTypeValues::Top),
     vertical: object.text_vertical,
+    word_wrap: object.text_word_wrap,
     text_rotation_deg: object.text_rotation_deg,
     shape_rotation_deg: drawing_object_visual_rotation_degrees(object),
     upright: object.text_upright,
     left_inset_pt: object
       .text_left_inset_emu
-      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points),
+      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points)
+      * content_scale,
     top_inset_pt: object
       .text_top_inset_emu
-      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points),
+      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points)
+      * content_scale,
     right_inset_pt: object
       .text_right_inset_emu
-      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points),
+      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points)
+      * content_scale,
     bottom_inset_pt: object
       .text_bottom_inset_emu
-      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points),
+      .map_or(XLSX_CELL_TEXT_INSET_PT, units::emu_to_points)
+      * content_scale,
+    content_scale,
   }
 }
 
@@ -11083,6 +12380,10 @@ fn drawing_object_text_style(
   object: &super::drawing::DrawingObjectModel,
 ) -> Option<TextStyle> {
   let mut style = import.styles.default_drawing_text_style();
+  let language = drawing_object_first_run_language(object);
+  if let Some(language) = language {
+    style.language = Some(Arc::from(language));
+  }
   if let Some(font_size) = object.text_font_size_points100 {
     style.font_size_pt = font_size as f32 / 100.0;
   }
@@ -11104,17 +12405,136 @@ fn drawing_object_text_style(
       import.styles.resolve_drawingml_theme_font(typeface),
     ));
   }
-  if let Some(typeface) = object.text_east_asia_font_family.as_deref() {
-    style.east_asia_font_family = Some(Arc::from(
-      import.styles.resolve_drawingml_theme_font(typeface),
-    ));
-  }
+  apply_xlsx_drawing_theme_east_asian_font(
+    &mut style,
+    object.text_east_asia_font_family.as_deref(),
+    import,
+  );
   if let Some(typeface) = object.text_complex_font_family.as_deref() {
     style.complex_font_family = Some(Arc::from(
       import.styles.resolve_drawingml_theme_font(typeface),
     ));
   }
   Some(style)
+}
+
+fn drawing_object_first_run_language(object: &super::drawing::DrawingObjectModel) -> Option<&str> {
+  object.text_paragraphs.iter().find_map(|paragraph| {
+    let run = paragraph.runs.iter().find(|run| !run.text.is_empty())?;
+    drawing_text_run_language(paragraph, run)
+  })
+}
+
+fn drawing_text_run_language<'a>(
+  paragraph: &'a super::drawing::DrawingTextParagraphModel,
+  run: &'a super::drawing::DrawingTextRunModel,
+) -> Option<&'a str> {
+  run
+    .run_properties
+    .as_deref()
+    .and_then(|properties| properties.language.as_deref())
+    .or_else(|| drawing_paragraph_default_language(paragraph))
+    .filter(|language| !language.trim().is_empty())
+}
+
+fn drawing_paragraph_default_language(
+  paragraph: &super::drawing::DrawingTextParagraphModel,
+) -> Option<&str> {
+  paragraph
+    .paragraph_default_run_properties
+    .as_deref()
+    .and_then(|properties| properties.language.as_deref())
+    .or_else(|| {
+      paragraph
+        .level_default_run_properties
+        .as_deref()
+        .and_then(|properties| properties.language.as_deref())
+    })
+    .or_else(|| {
+      paragraph
+        .list_default_run_properties
+        .as_deref()
+        .and_then(|properties| properties.language.as_deref())
+    })
+    .filter(|language| !language.trim().is_empty())
+}
+
+fn drawing_text_run_east_asian_font<'a>(
+  paragraph: &'a super::drawing::DrawingTextParagraphModel,
+  run: &'a super::drawing::DrawingTextRunModel,
+) -> Option<&'a str> {
+  run
+    .run_properties
+    .as_deref()
+    .and_then(|properties| properties.east_asian_font.as_ref())
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.trim().is_empty())
+    .or_else(|| drawing_paragraph_default_east_asian_font(paragraph))
+}
+
+fn drawing_paragraph_default_east_asian_font(
+  paragraph: &super::drawing::DrawingTextParagraphModel,
+) -> Option<&str> {
+  [
+    paragraph.paragraph_default_run_properties.as_deref(),
+    paragraph.level_default_run_properties.as_deref(),
+    paragraph.list_default_run_properties.as_deref(),
+  ]
+  .into_iter()
+  .flatten()
+  .find_map(|properties| {
+    properties
+      .east_asian_font
+      .as_ref()
+      .and_then(|font| font.typeface.as_deref())
+      .filter(|typeface| !typeface.trim().is_empty())
+  })
+}
+
+fn apply_xlsx_drawing_theme_east_asian_font(
+  style: &mut TextStyle,
+  authored_typeface: Option<&str>,
+  import: &ExcelImport,
+) {
+  let language = style.language.as_deref();
+  let typeface = authored_typeface
+    .map(|typeface| {
+      import
+        .styles
+        .resolve_drawingml_theme_font_for_language(typeface, language)
+    })
+    .or_else(|| {
+      import
+        .styles
+        .drawingml_minor_east_asian_font_for_language(language)
+    });
+  if let Some(typeface) = typeface {
+    style.east_asia_font_family = Some(Arc::from(typeface));
+  }
+}
+
+fn drawing_object_rich_text_base_style(
+  import: &ExcelImport,
+  object: &super::drawing::DrawingObjectModel,
+) -> TextStyle {
+  let mut style = import.styles.default_drawing_text_style();
+  let font_reference_color = object.shape_style_refs.as_ref().and_then(|references| {
+    references
+      .font_reference
+      .placeholder_color
+      .clone()
+      .or_else(|| {
+        Some(Color::Scheme(SchemeColor {
+          value: a::SchemeColorValues::Text1,
+          transformations: Vec::new(),
+        }))
+      })
+  });
+  if let Some(color) = font_reference_color.and_then(|color| xlsx_drawing_text_color(color, import))
+  {
+    style.color = color;
+  }
+  style
 }
 
 fn print_page_vml_text_items(
@@ -12522,6 +13942,8 @@ fn render_header_footer_line(
         file_name: source_file_name.unwrap_or(""),
         date: date.as_deref(),
         time: time.as_deref(),
+        theme_heading_font: styles.header_footer_theme_font(true),
+        theme_body_font: styles.header_footer_theme_font(false),
       },
     );
     if runs.is_empty() {
@@ -12701,6 +14123,8 @@ struct HeaderFooterFieldValues<'a> {
   file_name: &'a str,
   date: Option<&'a str>,
   time: Option<&'a str>,
+  theme_heading_font: Option<&'a str>,
+  theme_body_font: Option<&'a str>,
 }
 
 #[derive(Clone, Debug)]
@@ -12778,8 +14202,14 @@ fn parse_header_footer_runs(
         let (font_name, font_style) = descriptor
           .split_once(',')
           .unwrap_or((descriptor.as_str(), ""));
-        if !font_name.is_empty() && font_name != "-" {
-          style.font_family = Some(Arc::from(font_name));
+        let font_family = match font_name {
+          "+" => fields.theme_heading_font,
+          "-" => fields.theme_body_font,
+          "" => None,
+          font_name => Some(font_name),
+        };
+        if let Some(font_family) = font_family {
+          style.font_family = Some(Arc::from(font_family));
         }
         style.bold = false;
         style.italic = false;
@@ -12870,6 +14300,161 @@ fn header_footer_italic_style(name: &str) -> bool {
 #[cfg(test)]
 mod drawing_page_tests {
   use super::*;
+
+  #[test]
+  fn drawing_text_run_must_reach_the_print_clip_after_entering_the_physical_page() {
+    let physical_page = CellRect {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 595.32,
+      height_pt: 841.92,
+    };
+    let print_clip = CellRect {
+      x_pt: 50.4,
+      y_pt: 54.0,
+      width_pt: 470.76,
+      height_pt: 733.92,
+    };
+    let style = TextStyle {
+      font_size_pt: 12.0,
+      ..TextStyle::default()
+    };
+    let text = "This one is not autofit.";
+    let mut metrics = TextMetrics::new();
+    let width = metrics.measure_text(text, &style);
+    let make_run = |right: f32| {
+      styled_header_text_with_line_height(
+        right - width,
+        80.0,
+        text.to_string(),
+        style.clone(),
+        14.0,
+      )
+    };
+
+    let PageItem::Text(margin_only) = make_run(10.0) else {
+      unreachable!();
+    };
+    assert!(drawing_text_glyph_origin_intersects_page(
+      &margin_only,
+      physical_page,
+      &mut metrics
+    ));
+    assert!(!drawing_text_run_belongs_to_print_page(
+      &margin_only,
+      physical_page,
+      print_clip,
+      &mut metrics,
+    ));
+
+    let PageItem::Text(near_boundary) = make_run(print_clip.x_pt - style.font_size_pt * 0.25)
+    else {
+      unreachable!();
+    };
+    assert!(drawing_text_run_belongs_to_print_page(
+      &near_boundary,
+      physical_page,
+      print_clip,
+      &mut metrics,
+    ));
+
+    let PageItem::Text(off_page) = make_run(-1.0) else {
+      unreachable!();
+    };
+    assert!(!drawing_text_run_belongs_to_print_page(
+      &off_page,
+      physical_page,
+      print_clip,
+      &mut metrics,
+    ));
+  }
+
+  #[test]
+  fn drawing_auto_numbering_tracks_levels_and_skips_empty_paragraphs() {
+    let arabic = super::super::drawing::DrawingTextAutoNumberModel {
+      scheme: a::TextAutoNumberSchemeValues::ArabicPeriod,
+      start_at: None,
+    };
+    let start_at_three = super::super::drawing::DrawingTextAutoNumberModel {
+      start_at: Some(3),
+      ..arabic
+    };
+    let mut state = DrawingAutoNumberingState::default();
+    assert_eq!(state.resolve(0, Some(arabic), true).as_deref(), Some("1."));
+    assert_eq!(state.resolve(1, Some(arabic), true).as_deref(), Some("1."));
+    assert_eq!(state.resolve(1, Some(arabic), true).as_deref(), Some("2."));
+    assert_eq!(state.resolve(1, Some(arabic), true).as_deref(), Some("3."));
+    assert_eq!(state.resolve(0, Some(arabic), true).as_deref(), Some("2."));
+    assert_eq!(
+      state.resolve(1, Some(start_at_three), true).as_deref(),
+      Some("3.")
+    );
+    assert_eq!(state.resolve(1, Some(start_at_three), false), None);
+    assert_eq!(
+      state.resolve(1, Some(start_at_three), true).as_deref(),
+      Some("4.")
+    );
+    assert_eq!(
+      format_drawing_auto_number(a::TextAutoNumberSchemeValues::AlphaUpperCharacterPeriod, 27),
+      "AA."
+    );
+  }
+
+  #[test]
+  fn drawing_text_wraps_at_unicode_word_boundaries_unless_disabled() {
+    let style = TextStyle {
+      font_size_pt: 11.0,
+      ..TextStyle::default()
+    };
+    let mut measured_style = style.clone();
+    configure_drawing_text_style(&mut measured_style, DrawingTextLayout::default());
+    let first_line_width = TextMetrics::new().measure_text("Lorem ipsum", &measured_style);
+    let rect = CellRect {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      width_pt: first_line_width + XLSX_CELL_TEXT_INSET_PT * 2.0 + 0.01,
+      height_pt: 100.0,
+    };
+
+    let mut wrapped = Vec::new();
+    render_drawing_text(
+      &mut wrapped,
+      "Lorem ipsum dolor",
+      rect,
+      Some(style.clone()),
+      Some(DrawingTextLayout::default()),
+      None,
+      None,
+    );
+    assert_eq!(
+      wrapped
+        .iter()
+        .map(|item| match item {
+          PageItem::Text(text) => text.text.as_str(),
+          _ => panic!("expected drawing text"),
+        })
+        .collect::<Vec<_>>(),
+      ["Lorem ipsum", "dolor"]
+    );
+
+    let mut unwrapped = Vec::new();
+    render_drawing_text(
+      &mut unwrapped,
+      "Lorem ipsum dolor",
+      rect,
+      Some(style),
+      Some(DrawingTextLayout {
+        word_wrap: false,
+        ..DrawingTextLayout::default()
+      }),
+      None,
+      None,
+    );
+    let [PageItem::Text(text)] = unwrapped.as_slice() else {
+      panic!("expected one unwrapped drawing text item");
+    };
+    assert_eq!(text.text, "Lorem ipsum dolor");
+  }
 
   #[test]
   fn chart_effect_opacity_preserves_native_alpha_rounding() {
@@ -13210,6 +14795,120 @@ mod drawing_page_tests {
         .is_none()
       );
     }
+  }
+
+  #[test]
+  fn modern_arial11_cell_text_uses_office_printer_insets() {
+    let page = CellRect {
+      x_pt: 31.181_103,
+      y_pt: 60.0,
+      width_pt: 779.16,
+      height_pt: 480.0,
+    };
+    let left_cell = CellRect {
+      x_pt: page.x_pt,
+      y_pt: 220.058_29,
+      width_pt: 165.96,
+      height_pt: 15.12,
+    };
+    let left = modern_excel_arial11_cell_text_horizontal_rect(left_cell, page, false);
+    assert!(
+      (cell_text_x_pt(left, 12.507_54, x::HorizontalAlignmentValues::Left, 0.0) - 33.24).abs()
+        < 1.0e-4
+    );
+
+    let centered_cell = CellRect {
+      x_pt: 314.141_1,
+      width_pt: 91.8,
+      ..left_cell
+    };
+    let centered = modern_excel_arial11_cell_text_horizontal_rect(centered_cell, page, false);
+    assert!((centered.x_pt - 314.7).abs() < 1.0e-4);
+    assert!((centered.width_pt - 92.4).abs() < 1.0e-4);
+    let wrapped = modern_excel_arial11_cell_text_horizontal_rect(centered_cell, page, true);
+    assert!(
+      (cell_text_x_pt(
+        wrapped,
+        15.016_113,
+        x::HorizontalAlignmentValues::Center,
+        0.0,
+      ) - 353.211_94)
+        .abs()
+        < 1.0e-4
+    );
+  }
+
+  #[test]
+  fn modern_arial11_cell_baselines_match_office_gdi_controls() {
+    let regular8 = super::super::worksheet::PrinterFontVerticalMetrics {
+      ascent_px: 60.0,
+      descent_px: 15.0,
+      external_leading_px: 2.0,
+    };
+    let bold8 = super::super::worksheet::PrinterFontVerticalMetrics {
+      ascent_px: 62.0,
+      descent_px: 16.0,
+      external_leading_px: 2.0,
+    };
+    let bold9 = super::super::worksheet::PrinterFontVerticalMetrics {
+      ascent_px: 70.0,
+      descent_px: 18.0,
+      external_leading_px: 2.0,
+    };
+    let offset = |vertical, metrics| {
+      excel_printer_cell_baseline_offset_px(
+        vertical,
+        126.0,
+        metrics,
+        20.0,
+        ExcelCellBaselineGrid::ModernArial11,
+      )
+      .unwrap()
+    };
+    assert_eq!(
+      offset(Some(x::VerticalAlignmentValues::Top), regular8),
+      66.0
+    );
+    assert_eq!(
+      offset(Some(x::VerticalAlignmentValues::Center), regular8),
+      86.0
+    );
+    assert_eq!(offset(None, regular8), 98.0);
+    assert_eq!(
+      offset(Some(x::VerticalAlignmentValues::Center), bold8),
+      87.0
+    );
+    assert_eq!(offset(Some(x::VerticalAlignmentValues::Top), bold9), 76.0);
+    assert_eq!(
+      offset(Some(x::VerticalAlignmentValues::Center), bold9),
+      90.0
+    );
+    assert_eq!(
+      offset(Some(x::VerticalAlignmentValues::Bottom), bold9),
+      98.0
+    );
+
+    let ms_pgothic = super::super::worksheet::PrinterFontVerticalMetrics {
+      ascent_px: 79.0,
+      descent_px: 13.0,
+      external_leading_px: 0.0,
+    };
+    let simsun = super::super::worksheet::PrinterFontVerticalMetrics {
+      external_leading_px: 13.0,
+      ..ms_pgothic
+    };
+    let japanese = |metrics| {
+      excel_printer_cell_baseline_offset_px(
+        Some(x::VerticalAlignmentValues::Center),
+        113.0,
+        metrics,
+        13.0,
+        ExcelCellBaselineGrid::LegacyExcel12Japanese,
+      )
+      .unwrap()
+    };
+    assert_eq!(japanese(ms_pgothic), 90.0);
+    assert_eq!(japanese(simsun), 96.0);
   }
 
   #[test]
@@ -13733,7 +15432,7 @@ mod drawing_page_tests {
     assert_eq!(text.style.rotation_deg, 0.0);
     assert!(!text.style.pdf_glyph_outlines);
     assert_eq!(text.rotation_center_pt, None);
-    let line_height = TextStyle::default().font_size_pt * 1.15;
+    let line_height = drawing_text_line_height(&text.style);
     let expected_y = rect.y_pt
       + XLSX_CELL_TEXT_INSET_PT
       + (rect.height_pt - XLSX_CELL_TEXT_INSET_PT * 2.0 - line_height) / 2.0;
@@ -13956,6 +15655,22 @@ mod drawing_page_tests {
     assert_eq!(
       office_drawing_gradient_interpolation(3),
       common::GradientInterpolation::LinearSrgb
+    );
+  }
+
+  #[test]
+  fn cell_shrink_to_fit_uses_integer_percent_before_printer_font_grid() {
+    let percent = cell_shrink_to_fit_percent(228.62, 47.4).unwrap();
+    assert_eq!(percent, 20);
+    assert_eq!(
+      units::quantize_points_to_office_print_grid(11.04 * percent as f32 / 100.0),
+      2.16
+    );
+    assert_eq!(cell_shrink_to_fit_percent(47.4, 47.4), None);
+    assert_eq!(cell_shrink_to_fit_percent(228.62, 0.5), Some(1));
+    assert_eq!(
+      units::quantize_points_to_office_print_grid((11.04_f32 * 0.01).max(1.0)),
+      0.96
     );
   }
 
@@ -14274,7 +15989,10 @@ mod cell_alignment_tests {
       };
       assert_eq!(text.text, "AB12");
       assert_eq!(text.style.rotation_deg, 15.0);
-      assert_eq!(text.style.font_size_pt, 5.0);
+      assert_eq!(
+        text.style.font_size_pt,
+        units::quantize_points_to_office_print_grid(5.0)
+      );
     }
     assert_eq!(neighboring_column(3, true, false), Some(4));
     assert_eq!(neighboring_column(3, true, true), Some(2));
@@ -14660,6 +16378,147 @@ mod cell_alignment_tests {
   }
 
   #[test]
+  fn rotated_cell_text_uses_one_gdi_advance_per_source_character() {
+    let mut metrics = TextMetrics::new();
+    let mut items = Vec::new();
+    let value = "TextRotation = 45";
+    render_cell_text(
+      &mut items,
+      value,
+      CellRect {
+        x_pt: 72.0,
+        y_pt: 0.0,
+        width_pt: 132.48,
+        height_pt: 96.96,
+      },
+      TextStyle {
+        font_family: Some(Arc::from("Calibri")),
+        font_size_pt: 10.44,
+        ..Default::default()
+      },
+      CellTextRenderOptions {
+        alignment: Some(super::super::styles::AlignmentRecord {
+          text_rotation: Some(45),
+          ..Default::default()
+        }),
+        horizontal_alignment: x::HorizontalAlignmentValues::Left,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 13.68,
+        clip_wrapped_text: false,
+        has_outer_border: false,
+      },
+      &mut metrics,
+    );
+    let PageItem::Text(text) = &items[0] else {
+      panic!("rotated text");
+    };
+    assert_eq!(
+      text.style.ligatures,
+      Some(common::OpenTypeLigatures::default())
+    );
+    assert_eq!(
+      text
+        .style
+        .semantic_character_advances_pt
+        .as_ref()
+        .map(|advances| advances.len()),
+      Some(value.chars().count())
+    );
+  }
+
+  #[test]
+  fn plain_and_wrapped_cell_text_use_distinct_gdi_advance_paths() {
+    let mut metrics = TextMetrics::new();
+    let mut items = Vec::new();
+    let value = "WrapText";
+    render_cell_text(
+      &mut items,
+      value,
+      CellRect {
+        x_pt: 72.0,
+        y_pt: 0.0,
+        width_pt: 132.48,
+        height_pt: 27.36,
+      },
+      TextStyle {
+        font_family: Some(Arc::from("Calibri")),
+        font_size_pt: 10.44,
+        ..Default::default()
+      },
+      CellTextRenderOptions {
+        alignment: Some(super::super::styles::AlignmentRecord {
+          wrap_text: true,
+          ..Default::default()
+        }),
+        horizontal_alignment: x::HorizontalAlignmentValues::Left,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 13.68,
+        clip_wrapped_text: false,
+        has_outer_border: false,
+      },
+      &mut metrics,
+    );
+    let PageItem::Text(text) = &items[0] else {
+      panic!("wrapped text");
+    };
+    assert_eq!(
+      text.style.ligatures,
+      Some(common::OpenTypeLigatures::default())
+    );
+    assert_eq!(text.style.kerning_minimum_size_pt, Some(f32::INFINITY));
+    let advances = text
+      .style
+      .semantic_character_advances_pt
+      .as_deref()
+      .expect("Calibri printer advances");
+    assert_eq!(advances.len(), value.chars().count());
+    for (actual, expected) in advances
+      .iter()
+      .zip([9.24, 3.6, 5.04, 5.52, 5.04, 5.16, 4.56, 3.48])
+    {
+      assert!((actual - expected).abs() < 1.0e-4, "{advances:?}");
+    }
+
+    let mut unwrapped = Vec::new();
+    render_cell_text(
+      &mut unwrapped,
+      value,
+      CellRect {
+        x_pt: 72.0,
+        y_pt: 0.0,
+        width_pt: 132.48,
+        height_pt: 13.68,
+      },
+      TextStyle {
+        font_family: Some(Arc::from("Calibri")),
+        font_size_pt: 10.44,
+        ..Default::default()
+      },
+      CellTextRenderOptions {
+        alignment: None,
+        horizontal_alignment: x::HorizontalAlignmentValues::Left,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 13.68,
+        clip_wrapped_text: false,
+        has_outer_border: false,
+      },
+      &mut metrics,
+    );
+    let PageItem::Text(text) = &unwrapped[0] else {
+      panic!("unwrapped text");
+    };
+    assert_eq!(
+      text.style.ligatures,
+      Some(common::OpenTypeLigatures::default())
+    );
+    assert_eq!(text.style.kerning_minimum_size_pt, Some(f32::INFINITY));
+    assert!(text.style.semantic_character_advances_pt.is_none());
+  }
+
+  #[test]
   fn rotated_cell_font_alignment_does_not_inherit_the_normal_line_height() {
     let mut metrics = TextMetrics::new();
     let mut previous = None;
@@ -14711,6 +16570,69 @@ mod cell_alignment_tests {
         assert_eq!(origin, previous);
       }
       previous = Some(origin);
+    }
+  }
+
+  #[test]
+  fn stacked_cell_text_keeps_graphemes_upright_and_spaces_as_empty_slots() {
+    assert_eq!(
+      stacked_cell_text_slot_count("A \u{1f1fa}\u{1f1f8} e\u{301}"),
+      5
+    );
+
+    let rect = CellRect {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      width_pt: 50.0,
+      height_pt: 100.0,
+    };
+    let mut items = Vec::new();
+    let mut metrics = TextMetrics::new();
+    render_cell_text(
+      &mut items,
+      "A B",
+      rect,
+      TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        font_size_pt: 10.44,
+        ..TextStyle::default()
+      },
+      CellTextRenderOptions {
+        alignment: Some(super::super::styles::AlignmentRecord {
+          horizontal: Some(x::HorizontalAlignmentValues::Center),
+          text_rotation: Some(255),
+          ..Default::default()
+        }),
+        horizontal_alignment: x::HorizontalAlignmentValues::Center,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 40.0,
+        clip_wrapped_text: false,
+        has_outer_border: false,
+      },
+      &mut metrics,
+    );
+    let text = items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Text(text) => Some(text),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(
+      text
+        .iter()
+        .map(|item| item.text.as_str())
+        .collect::<Vec<_>>(),
+      ["A", "B"]
+    );
+    assert_eq!(text[0].style.rotation_deg, 0.0);
+    assert_eq!(text[1].style.rotation_deg, 0.0);
+    assert!((text[1].y_pt - text[0].y_pt - 2.0 * text[0].line_height_pt).abs() < 1.0e-4);
+    assert!((text[1].y_pt + text[1].line_height_pt - (rect.y_pt + rect.height_pt)).abs() < 1.0e-4);
+    for item in text {
+      let width = metrics.measure_text(&item.text, &item.style);
+      assert!((item.x_pt + width / 2.0 - (rect.x_pt + rect.width_pt / 2.0)).abs() < 1.0e-4);
     }
   }
 
@@ -15910,6 +17832,27 @@ mod header_footer_tests {
       Some("Times New Roman")
     );
     assert_eq!(runs[0].style.font_size_pt, 12.0);
+  }
+
+  #[test]
+  fn header_footer_theme_font_descriptors_select_heading_and_body_faces() {
+    let runs = parse_header_footer_runs(
+      "&\"+,Bold\"Heading&\"-,Regular\"Body",
+      TextStyle::default(),
+      HeaderFooterFieldValues {
+        theme_heading_font: Some("SimHei"),
+        theme_body_font: Some("SimSun"),
+        ..Default::default()
+      },
+    );
+
+    assert_eq!(runs.len(), 2);
+    assert_eq!(runs[0].text, "Heading");
+    assert_eq!(runs[0].style.font_family.as_deref(), Some("SimHei"));
+    assert!(runs[0].style.bold);
+    assert_eq!(runs[1].text, "Body");
+    assert_eq!(runs[1].style.font_family.as_deref(), Some("SimSun"));
+    assert!(!runs[1].style.bold);
   }
 
   #[test]

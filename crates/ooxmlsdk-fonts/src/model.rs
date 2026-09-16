@@ -866,6 +866,11 @@ impl<'a> FontRegistry<'a> {
     let mut active = None::<usize>;
     for cluster in grapheme_clusters(text) {
       let cluster_text = &text[cluster.clone()];
+      let primary_supports_cluster = font_supports_text_cluster(
+        &fonts[0],
+        runtime_faces[0].as_deref().map(RuntimeFace::skrifa),
+        cluster_text,
+      );
       let variations = text_variation_sequences(cluster_text);
       let variant_font = if variations.is_empty() {
         None
@@ -889,23 +894,34 @@ impl<'a> FontRegistry<'a> {
           // fallback, default-emoji characters use an emoji face before
           // generic monochrome symbol faces. FE0E can still shape the same
           // font's text outline; it does not require a different family.
-          (cluster_text.chars().any(is_default_emoji)
-            && !font_supports_text_cluster(
-              &fonts[0],
-              runtime_faces[0].as_deref().map(RuntimeFace::skrifa),
-              cluster_text,
-            ))
-          .then(|| {
-            fonts.iter().enumerate().position(|(index, font)| {
-              font.face.is_some_and(|face| face.flags.color_glyphs)
-                && font_supports_text_cluster(
-                  font,
-                  runtime_faces[index].as_deref().map(RuntimeFace::skrifa),
-                  cluster_text,
-                )
+          (cluster_text.chars().any(is_default_emoji) && !primary_supports_cluster)
+            .then(|| {
+              fonts.iter().enumerate().position(|(index, font)| {
+                font.face.is_some_and(|face| face.flags.color_glyphs)
+                  && font_supports_text_cluster(
+                    font,
+                    runtime_faces[index].as_deref().map(RuntimeFace::skrifa),
+                    cluster_text,
+                  )
+              })
             })
-          })
-          .flatten()
+            .flatten()
+        })
+        .or_else(|| {
+          (!primary_supports_cluster)
+            .then(|| office_preferred_missing_glyph_family(cluster_text))
+            .flatten()
+            .and_then(|family| {
+              fonts.iter().enumerate().position(|(index, font)| {
+                index > 0
+                  && normalized_family_eq(&font.resolved.resolved_family, family)
+                  && font_supports_text_cluster(
+                    font,
+                    runtime_faces[index].as_deref().map(RuntimeFace::skrifa),
+                    cluster_text,
+                  )
+              })
+            })
         })
         .or_else(|| {
           fonts.iter().enumerate().position(|(index, font)| {
@@ -977,9 +993,15 @@ impl<'a> FontRegistry<'a> {
     let variations = text_variation_sequences(text);
     let needs_presentation_fallback = !variations.is_empty() || text.chars().any(is_default_emoji);
     let mut missing_chars = self.missing_chars_for_fonts(&fonts, text);
+    let needs_preferred_missing_glyph_fallback =
+      missing_chars.iter().copied().any(is_office_math_arrow);
 
     for family in self.fallback_families(request) {
-      if missing_chars.is_empty() && !needs_presentation_fallback {
+      let preferred_fallback_loaded = !needs_preferred_missing_glyph_fallback
+        || fonts
+          .iter()
+          .any(|font| normalized_family_eq(&font.resolved.resolved_family, "Cambria Math"));
+      if missing_chars.is_empty() && !needs_presentation_fallback && preferred_fallback_loaded {
         break;
       }
       if let Ok(resolved) = self
@@ -1147,10 +1169,15 @@ impl<'a> FontRegistry<'a> {
       }) {
         continue;
       }
-      if chain
-        .script
-        .is_some_and(|script| request.script != Some(script))
-      {
+      // Weak Common characters inherit a neighboring strong script during
+      // segmentation. A Common glyph-fallback policy must therefore remain
+      // available in every concrete script run, while an unspecified request
+      // (used by metrics and face discovery) still skips script-scoped faces.
+      if chain.script.is_some_and(|script| {
+        request
+          .script
+          .is_none_or(|requested| script != requested && script != TextScript::Common)
+      }) {
         continue;
       }
       if chain.language.as_deref().is_some_and(|language| {
@@ -3202,6 +3229,17 @@ fn default_glyph_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
         Cow::Borrowed("Noto Color Emoji"),
       ],
     },
+    FontFallbackChain {
+      requested_family: None,
+      script: Some(TextScript::Common),
+      language: None,
+      // Excel fixed output gives the second half of the Unicode Arrows block
+      // (U+21C0..U+21FF) a Cambria Math fallback when the requested face has
+      // no glyph. Keep this script-scoped so an unspecified request does not
+      // preload a math face; cluster selection promotes it over earlier
+      // generic symbol faces only for these arrows.
+      families: vec![Cow::Borrowed("Cambria Math")],
+    },
   ]);
   chains
 }
@@ -4033,6 +4071,16 @@ fn text_variation_sequences(text: &str) -> SmallVec<[(char, char); 2]> {
 
 fn is_default_emoji(ch: char) -> bool {
   CodePointSetData::new::<EmojiPresentation>().contains(ch)
+}
+
+fn is_office_math_arrow(ch: char) -> bool {
+  matches!(u32::from(ch), 0x21C0..=0x21FF)
+}
+
+fn office_preferred_missing_glyph_family(cluster: &str) -> Option<&'static str> {
+  let mut characters = cluster.chars().filter(|ch| !is_variation_selector(*ch));
+  let character = characters.next()?;
+  (characters.next().is_none() && is_office_math_arrow(character)).then_some("Cambria Math")
 }
 
 fn is_private_use_char(ch: char) -> bool {
@@ -5907,6 +5955,68 @@ mod tests {
   }
 
   #[test]
+  fn office_math_arrows_prefer_cambria_math_only_after_primary_coverage() {
+    let mut registry = FontRegistry::new();
+    let mut primary = FontFaceInfo::synthetic("primary", "Primary");
+    primary.coverage.unicode_ranges = std::iter::once(0x41..0x42).collect();
+    registry.register_face(FontSource::System, primary);
+    let mut primary_arrow = FontFaceInfo::synthetic("primary-arrow", "Primary Arrow");
+    primary_arrow.coverage.unicode_ranges = std::iter::once(0x21d2..0x21d3).collect();
+    registry.register_face(FontSource::System, primary_arrow);
+    let mut symbol = FontFaceInfo::synthetic("symbol", "Segoe UI Symbol");
+    symbol.coverage.unicode_ranges = vec![0x2192..0x2193, 0x21c0..0x2200, 0x2610..0x2611];
+    registry.register_face(FontSource::System, symbol);
+    let mut math = FontFaceInfo::synthetic("math", "Cambria Math");
+    math.coverage.unicode_ranges = std::iter::once(0x21c0..0x2200).collect();
+    registry.register_face(FontSource::System, math);
+    registry.book.fallback_chains.push(FontFallbackChain {
+      requested_family: None,
+      script: Some(TextScript::Common),
+      language: None,
+      families: vec![
+        Cow::Borrowed("Segoe UI Symbol"),
+        Cow::Borrowed("Cambria Math"),
+      ],
+    });
+
+    for (family, text, script, expected) in [
+      ("Primary", "⇒", TextScript::Common, "math"),
+      // Common characters inherit the neighboring strong script in mixed
+      // text, so Common fallback policy must remain available inside a Han
+      // script run as well.
+      ("Primary", "⇒", TextScript::Han, "math"),
+      ("Primary", "→", TextScript::Common, "symbol"),
+      ("Primary", "☐", TextScript::Common, "symbol"),
+      ("Primary Arrow", "⇒", TextScript::Common, "primary-arrow"),
+    ] {
+      let request = FontRequest {
+        family: Some(Cow::Borrowed(family)),
+        script: Some(script),
+        ..FontRequest::default()
+      };
+      let runs = registry
+        .shape_text_runs(&request, text, TextDirection::LeftToRight)
+        .unwrap();
+      assert_eq!(runs.len(), 1, "{family}: {text}");
+      assert_eq!(
+        runs[0].font_id,
+        FontId(Arc::from(expected)),
+        "{family}: {text}"
+      );
+
+      let chain = registry.resolve_font_chain(&request).unwrap();
+      let cached = registry
+        .shape_text_runs_with_font_chain(
+          &chain,
+          text,
+          &ShapeOptions::from_request(&request, TextDirection::LeftToRight),
+        )
+        .unwrap();
+      assert_eq!(cached, runs, "cached {family}: {text}");
+    }
+  }
+
+  #[test]
   fn system_query_prefers_supported_variation_sequences() {
     if !platform_has_font("Segoe UI Emoji", "SegoeUIEmoji")
       || !platform_has_font("Segoe UI Symbol", "SegoeUISymbol")
@@ -6117,7 +6227,7 @@ mod tests {
       for emphasized in [false, true] {
         let mut registry = FontRegistry::with_default_policy();
         let mut primary = FontFaceInfo::synthetic("primary", family);
-        primary.coverage.unicode_ranges = vec![0x430..0x431]; // а
+        primary.coverage.unicode_ranges = std::iter::once(0x430..0x431).collect(); // а
         registry.register_face(FontSource::System, primary);
         for name in ["DejaVu Sans", "Cambria", "Calibri"] {
           for bold_italic in [false, true] {

@@ -8,7 +8,7 @@ use crate::error::Result;
 use crate::field_datetime;
 use crate::localization::{OfficeLocaleContext, OfficeResourceLocale};
 use crate::model::{BorderDashPattern, BorderStyle, RgbColor, TextStyle};
-use crate::pptx::drawingml::color::{ResolvedColor, apply_excel_tint};
+use crate::pptx::drawingml::color::{Color, ResolvedColor, apply_excel_tint};
 use crate::pptx::drawingml::fill::FillProperties;
 use crate::pptx::drawingml::line::LineProperties;
 use crate::pptx::drawingml::shape_properties::EffectProperties;
@@ -32,6 +32,7 @@ pub(crate) struct StylesCatalog {
   theme_major_east_asian: Option<Arc<str>>,
   theme_minor_east_asian: Option<Arc<str>>,
   missing_theme_minor_from_document_language: bool,
+  modern_excel_stylesheet_extensions: bool,
   builtin_number_formats: BuiltinNumberFormatCodes,
   locales: OfficeLocaleContext,
 }
@@ -81,7 +82,7 @@ impl ThemeColorPalette {
     for (index, token) in tokens.into_iter().enumerate() {
       colors[index] = scheme
         .get_color(token)
-        .and_then(|color| color.resolve_rgb(&mut |_| None, None))
+        .and_then(resolve_spreadsheet_theme_color)
         .map(rgb_from_resolved);
     }
     Self { colors }
@@ -90,6 +91,24 @@ impl ThemeColorPalette {
   fn get(&self, index: u32) -> Option<RgbColor> {
     self.colors.get(index as usize).copied().flatten()
   }
+}
+
+fn resolve_spreadsheet_theme_color(color: &Color) -> Option<ResolvedColor> {
+  let mut color = color.clone();
+  if let Color::System(system) = &mut color {
+    // ECMA-376 Part 1 §20.1.10.58 binds sysClr to the viewing system and
+    // reserves lastClr for systems that cannot resolve it. The configured
+    // Windows Office environment exposes the two system colors used by
+    // spreadsheet theme backgrounds/text as white and black respectively.
+    // Keep the authored fallback for less common system colors until their
+    // fixed-output values are established independently.
+    system.last_color = match system.value {
+      a::SystemColorValues::Window => Some("FFFFFF".to_owned()),
+      a::SystemColorValues::WindowText => Some("000000".to_owned()),
+      _ => system.last_color.clone(),
+    };
+  }
+  color.resolve_rgb(&mut |_| None, None)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -486,6 +505,22 @@ impl StylesCatalog {
         .and_then(|fonts| fonts.resolve_font_for_language("+mn-ea", document_language))
         .map(Arc::from),
       missing_theme_minor_from_document_language: false,
+      modern_excel_stylesheet_extensions: stylesheet
+        .stylesheet_extension_list
+        .as_ref()
+        .is_some_and(|extensions| {
+          extensions.stylesheet_extension.iter().any(|extension| {
+            matches!(
+              extension.stylesheet_extension_choice.as_ref(),
+              Some(
+                x::StylesheetExtensionChoice::X14DifferentialFormats(_)
+                  | x::StylesheetExtensionChoice::SlicerStyles(_)
+                  | x::StylesheetExtensionChoice::X15DifferentialFormats(_)
+                  | x::StylesheetExtensionChoice::TimelineStyles(_)
+              )
+            )
+          })
+        }),
       theme_colors,
       indexed_colors,
       builtin_number_formats: builtin_number_format_codes(locales),
@@ -561,11 +596,49 @@ impl StylesCatalog {
   }
 
   pub(crate) fn resolve_drawingml_theme_font<'a>(&'a self, typeface: &'a str) -> &'a str {
+    self.resolve_drawingml_theme_font_for_language(typeface, None)
+  }
+
+  pub(crate) fn resolve_drawingml_theme_font_for_language<'a>(
+    &'a self,
+    typeface: &'a str,
+    language: Option<&str>,
+  ) -> &'a str {
+    let language = language.or(self.locales.default_document_language());
     self
       .theme_fonts
       .as_ref()
-      .and_then(|fonts| fonts.resolve_font(typeface))
+      .and_then(|fonts| fonts.resolve_font_for_language(typeface, language))
       .unwrap_or(typeface)
+  }
+
+  pub(crate) fn drawingml_minor_east_asian_font_for_language(
+    &self,
+    language: Option<&str>,
+  ) -> Option<&str> {
+    let language = language.or(self.locales.default_document_language());
+    self
+      .theme_fonts
+      .as_ref()
+      .and_then(|fonts| fonts.resolve_font_for_language("+mn-ea", language))
+      .or(self.theme_minor_east_asian.as_deref())
+  }
+
+  pub(crate) fn header_footer_theme_font(&self, heading: bool) -> Option<&str> {
+    let fonts = self.theme_fonts.as_ref()?;
+    let language = self.locales.default_document_language();
+    let (east_asian, latin) = if heading {
+      ("+mj-ea", "+mj-lt")
+    } else {
+      ("+mn-ea", "+mn-lt")
+    };
+    // Excel's header/footer `&"+"` and `&"-"` controls select the
+    // current theme's heading and body fonts. In a CJK document Office uses
+    // the matching supplemental theme face even for Latin header text; a
+    // theme without that script entry falls back to its Latin face.
+    fonts
+      .resolve_font_for_language(east_asian, language)
+      .or_else(|| fonts.resolve_font(latin))
   }
 
   pub(crate) fn text_style_for_cell(&self, style_index: Option<u32>) -> TextStyle {
@@ -706,6 +779,11 @@ impl StylesCatalog {
       )),
       east_asia_font_family: self.theme_minor_east_asian.clone(),
       wordprocessingml_font_slots: true,
+      // Excel realizes worksheet DrawingML text through the same Windows
+      // font metrics contract as PowerPoint shape text. The distinction is
+      // visible at large sizes: the 60pt character-spacing controls retain
+      // the Windows ascent inside their top-anchored line box.
+      use_windows_font_metrics: true,
       ..TextStyle::default()
     }
   }
@@ -903,7 +981,14 @@ impl StylesCatalog {
   }
 
   fn effective_cell_format(&self, style_index: Option<u32>) -> Option<CellFormatRecord> {
-    let mut format = self.cell_xfs.get(style_index? as usize)?.clone();
+    // ECMA-376 Part 1 §18.3.1.4: an omitted c@s selects cellXfs entry
+    // zero. Keep the optional source attribute at the worksheet boundary so
+    // serialized cells remain distinguishable from row/column-inherited
+    // virtual cells, but resolve both through Excel's default cell XF here.
+    let mut format = self
+      .cell_xfs
+      .get(style_index.unwrap_or(0) as usize)?
+      .clone();
     let Some(style_xf) = format
       .style_xf_id
       .and_then(|id| self.style_xfs.get(id as usize))
@@ -956,7 +1041,20 @@ impl StylesCatalog {
       style.fallback_font_family = Some(Arc::from("Arial"));
     } else if let Some(name) = &font.name {
       style.font_family = Some(Arc::clone(name));
-      style.fallback_font_family = font.missing_family_fallback(&self.locales).map(Arc::from);
+      let missing_family_fallback = font.missing_family_fallback(&self.locales).map(Arc::from);
+      style.fallback_font_family = missing_family_fallback.clone();
+      // SpreadsheetML has one cell-font face rather than independent script
+      // slots. Preserve the Shift-JIS mapper result for Japanese characters
+      // as well as Latin/Common text in the same cell.
+      style.east_asia_fallback_font_family = (font.charset == Some(128))
+        .then_some(missing_family_fallback.clone())
+        .flatten();
+      // SpreadsheetML has one cell-font face rather than Word's independent
+      // script slots. An Arabic charset substitution therefore applies to
+      // both the Latin prefix and the complex-script portion of the cell.
+      style.complex_fallback_font_family = (font.charset == Some(178))
+        .then_some(missing_family_fallback)
+        .flatten();
     }
   }
 
@@ -1038,6 +1136,10 @@ impl StylesCatalog {
       && normal_font.scheme == x::FontSchemeValues::None
   }
 
+  pub(crate) fn has_modern_excel_stylesheet_extensions(&self) -> bool {
+    self.modern_excel_stylesheet_extensions
+  }
+
   pub(crate) fn normal_style_uses_explicit_arial_10(&self) -> bool {
     let Some(normal_font) = self.font_records.first() else {
       return false;
@@ -1050,6 +1152,33 @@ impl StylesCatalog {
         .size_pt
         .is_some_and(|size| (size.get() - 10.0).abs() <= f64::EPSILON)
       && normal_font.scheme == x::FontSchemeValues::None
+  }
+
+  pub(crate) fn normal_style_uses_explicit_arial_11(&self) -> bool {
+    let Some(normal_font) = self.font_records.first() else {
+      return false;
+    };
+    normal_font
+      .name
+      .as_deref()
+      .is_some_and(|font| font.eq_ignore_ascii_case("Arial"))
+      && normal_font
+        .size_pt
+        .is_some_and(|size| (size.get() - 11.0).abs() <= f64::EPSILON)
+      && normal_font.scheme == x::FontSchemeValues::None
+  }
+
+  pub(crate) fn normal_style_uses_japanese_gothic_11_minor_theme(&self) -> bool {
+    let Some(normal_font) = self.font_records.first() else {
+      return false;
+    };
+    normal_font.name.as_deref().is_some_and(|font| {
+      font.eq_ignore_ascii_case("MS PGothic") || font.eq_ignore_ascii_case("ＭＳ Ｐゴシック")
+    }) && normal_font
+      .size_pt
+      .is_some_and(|size| (size.get() - 11.0).abs() <= f64::EPSILON)
+      && normal_font.charset == Some(128)
+      && normal_font.scheme == x::FontSchemeValues::Minor
   }
 
   pub(crate) fn fixed_output_alignment_indent_increment_pt(
@@ -1191,22 +1320,46 @@ impl CellFormatRecord {
       alignment: format
         .alignment
         .as_ref()
-        .map(AlignmentRecord::from_alignment),
+        .map(AlignmentRecord::from_cell_alignment),
     }
   }
 }
 
 impl FontRecord {
   fn missing_family_fallback(&self, locales: &OfficeLocaleContext) -> Option<&'static str> {
+    // SpreadsheetML family 3 is the Windows modern/fixed family and charset
+    // 128 is SHIFTJIS_CHARSET. Excel's fixed-output font mapper selects MS
+    // Gothic when the authored face is unavailable. An installed face with
+    // the same metadata remains primary, so retain this as a missing-family
+    // fallback rather than replacing every modern Shift-JIS font.
+    if self.family == Some(3) && self.charset == Some(128) {
+      return Some("MS Gothic");
+    }
+
+    if self.family != Some(2) {
+      return None;
+    }
+
     // Excel's Windows mapper uses SimSun for a missing Swiss face with
     // GB2312_CHARSET, or DEFAULT_CHARSET in the verified zh-CN environment.
     // Keep the authored face first: Arial with the same metadata stays Arial.
     // ANSI/omitted charset and Roman/Modern families have different Office
     // substitutes; they cannot establish this fallback from the name alone.
-    (self.family == Some(2)
-      && (self.charset == Some(134)
-        || (self.charset == Some(1) && locales.format_locale() == Some("zh-CN"))))
-    .then_some("SimSun")
+    if self.charset == Some(134)
+      || (self.charset == Some(1) && locales.format_locale() == Some("zh-CN"))
+    {
+      return Some("SimSun");
+    }
+
+    // Office maps a missing Arabic Typesetting face carrying ARABIC_CHARSET
+    // to Calibri. Limit this to the complete authored signature: other Arabic
+    // faces use their own system-font fallback chains.
+    (self.charset == Some(178)
+      && self
+        .name
+        .as_deref()
+        .is_some_and(|name| name.eq_ignore_ascii_case("Arabic Typesetting")))
+    .then_some("Calibri")
   }
 
   fn from_font_with_colors(
@@ -1426,13 +1579,26 @@ fn effective_number_format_code(format: &x::NumberingFormat) -> &str {
 }
 
 impl AlignmentRecord {
+  fn from_cell_alignment(alignment: &x::Alignment) -> Self {
+    let mut record = Self::from_alignment(alignment);
+    // ECMA-376 §18.8.1 limits relativeIndent to differential formatting.
+    // ClosedXML can serialize the property on a cell XF, but Excel ignores
+    // it there; retaining it would turn the sparse DXF adjustment into a
+    // six-space ordinary cell indent.
+    record.relative_indent = None;
+    record
+  }
+
   fn from_alignment(alignment: &x::Alignment) -> Self {
     let horizontal = alignment.horizontal.or_else(|| {
       // Alignment::importAlignment. Rotated OOXML cells default to left for
       // rotations below 90 degrees or exactly 180, and to right otherwise.
+      // Excel's special 255 Vertical Text mode centers each upright glyph.
       alignment.text_rotation.and_then(|rotation| {
         if rotation != 0 {
-          Some(if rotation < 90 || rotation == 180 {
+          Some(if rotation == 255 {
+            x::HorizontalAlignmentValues::Center
+          } else if rotation < 90 || rotation == 180 {
             x::HorizontalAlignmentValues::Left
           } else {
             x::HorizontalAlignmentValues::Right
@@ -1892,6 +2058,67 @@ mod tests {
   use super::*;
 
   #[test]
+  fn omitted_cell_style_index_selects_cell_xf_zero() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let stylesheet = x::Stylesheet::from_bytes(
+      br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <cellStyleXfs count="1"><xf><alignment vertical="center"/></xf></cellStyleXfs>
+        <cellXfs count="1"><xf xfId="0"><alignment vertical="center"/></xf></cellXfs>
+      </styleSheet>"#,
+    )
+    .expect("stylesheet with a default centered cell XF");
+    let catalog = StylesCatalog::from_stylesheet(
+      &stylesheet,
+      None,
+      ThemeColorPalette::default(),
+      &OfficeLocaleContext::new(None, Some("en-US"), None),
+    );
+
+    assert_eq!(
+      catalog
+        .alignment_for_cell(None)
+        .and_then(|alignment| alignment.vertical),
+      Some(x::VerticalAlignmentValues::Center)
+    );
+  }
+
+  #[test]
+  fn typed_x14_x15_stylesheet_extensions_mark_a_modern_excel_profile() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let modern = x::Stylesheet::from_bytes(
+      br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+          xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main">
+        <extLst>
+          <ext uri="{EB79DEF2-80B8-43e5-95BD-54CBDDF9020C}">
+            <x14:slicerStyles defaultSlicerStyle="SlicerStyleLight1"/>
+          </ext>
+          <ext uri="{9260A510-F301-46a8-8635-F512D64BE5F5}">
+            <x15:timelineStyles defaultTimelineStyle="TimeSlicerStyleLight1"/>
+          </ext>
+        </extLst>
+      </styleSheet>"#,
+    )
+    .expect("modern stylesheet extensions");
+    let legacy = x::Stylesheet::from_bytes(
+      br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#,
+    )
+    .expect("legacy stylesheet");
+    let locales = OfficeLocaleContext::new(None, Some("en-US"), None);
+
+    assert!(
+      StylesCatalog::from_stylesheet(&modern, None, ThemeColorPalette::default(), &locales,)
+        .has_modern_excel_stylesheet_extensions()
+    );
+    assert!(
+      !StylesCatalog::from_stylesheet(&legacy, None, ThemeColorPalette::default(), &locales,)
+        .has_modern_excel_stylesheet_extensions()
+    );
+  }
+
+  #[test]
   fn extended_number_format_code_precedes_the_fallback_in_cell_and_differential_styles() {
     use ooxmlsdk::sdk::SdkType;
 
@@ -1978,6 +2205,49 @@ mod tests {
     let theme = ThemeColorPalette::from_dml(&a::ColorScheme::from_bytes(xml.as_bytes()).unwrap());
     assert_eq!(theme.get(4), authored);
     assert_eq!(ThemeColorPalette::default().get(4), None);
+  }
+
+  #[test]
+  fn spreadsheet_theme_uses_configured_windows_system_colors_before_last_color() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let scheme = a::ColorScheme::from_bytes(
+      br#"<a:clrScheme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="System colors">
+        <a:dk1><a:sysClr val="windowText" lastClr="00FF00"/></a:dk1>
+        <a:lt1><a:sysClr val="window" lastClr="C8ECCC"/></a:lt1>
+        <a:dk2><a:sysClr val="menuText" lastClr="123456"/></a:dk2>
+        <a:lt2><a:srgbClr val="EEEEEE"/></a:lt2>
+        <a:accent1><a:srgbClr val="111111"/></a:accent1>
+        <a:accent2><a:srgbClr val="222222"/></a:accent2>
+        <a:accent3><a:srgbClr val="333333"/></a:accent3>
+        <a:accent4><a:srgbClr val="444444"/></a:accent4>
+        <a:accent5><a:srgbClr val="555555"/></a:accent5>
+        <a:accent6><a:srgbClr val="666666"/></a:accent6>
+        <a:hlink><a:srgbClr val="0000FF"/></a:hlink>
+        <a:folHlink><a:srgbClr val="800080"/></a:folHlink>
+      </a:clrScheme>"#,
+    )
+    .expect("theme color scheme");
+    let palette = ThemeColorPalette::from_dml(&scheme);
+
+    assert_eq!(
+      palette.get(0),
+      Some(RgbColor {
+        r: 255,
+        g: 255,
+        b: 255
+      })
+    );
+    assert_eq!(palette.get(1), Some(RgbColor { r: 0, g: 0, b: 0 }));
+    // Only independently established configured colors replace lastClr.
+    assert_eq!(
+      palette.get(3),
+      Some(RgbColor {
+        r: 0x12,
+        g: 0x34,
+        b: 0x56,
+      })
+    );
   }
 
   #[test]
@@ -2193,6 +2463,10 @@ mod tests {
       text_rotation: Some(0),
       ..x::Alignment::default()
     });
+    let stacked = AlignmentRecord::from_alignment(&x::Alignment {
+      text_rotation: Some(255),
+      ..x::Alignment::default()
+    });
 
     assert_eq!(left.horizontal, Some(x::HorizontalAlignmentValues::Left));
     assert_eq!(right.horizontal, Some(x::HorizontalAlignmentValues::Right));
@@ -2201,6 +2475,26 @@ mod tests {
       Some(x::HorizontalAlignmentValues::Left)
     );
     assert_eq!(horizontal.horizontal, None);
+    assert_eq!(
+      stacked.horizontal,
+      Some(x::HorizontalAlignmentValues::Center)
+    );
+  }
+
+  #[test]
+  fn relative_indent_is_retained_only_for_differential_alignment() {
+    let alignment = x::Alignment {
+      relative_indent: Some(2),
+      ..x::Alignment::default()
+    };
+    assert_eq!(
+      AlignmentRecord::from_alignment(&alignment).relative_indent,
+      Some(2)
+    );
+    assert_eq!(
+      AlignmentRecord::from_cell_alignment(&alignment).relative_indent,
+      None
+    );
   }
 
   #[test]
@@ -2240,6 +2534,100 @@ mod tests {
       assert_eq!(style.font_family.as_deref(), Some("FreeSans"));
       assert_eq!(style.fallback_font_family.as_deref(), expected);
     }
+  }
+
+  #[test]
+  fn arabic_typesetting_charset_selects_calibri_only_for_the_verified_signature() {
+    let catalog = StylesCatalog::default();
+    for (name, family, charset, expected) in [
+      ("Arabic Typesetting", 2, Some(178), Some("Calibri")),
+      ("arabic typesetting", 2, Some(178), Some("Calibri")),
+      ("Arabic Typesetting", 2, Some(1), None),
+      ("Arabic Typesetting", 1, Some(178), None),
+      ("Missing Arabic Face", 2, Some(178), None),
+    ] {
+      let font = FontRecord {
+        name: Some(Arc::from(name)),
+        family: Some(family),
+        charset,
+        ..FontRecord::default()
+      };
+      let mut style = TextStyle {
+        fallback_font_family: Some(Arc::from("inherited substitute")),
+        ..TextStyle::default()
+      };
+      catalog.apply_font_family(&font, &mut style);
+      assert_eq!(style.font_family.as_deref(), Some(name));
+      assert_eq!(style.fallback_font_family.as_deref(), expected);
+      assert_eq!(style.complex_fallback_font_family.as_deref(), expected);
+      if expected == Some("Calibri") {
+        let runs = crate::fonts::shape_text_runs("العربية التنضيد", &style).unwrap();
+        assert!(
+          runs
+            .iter()
+            .all(|run| run.font_id.0.to_ascii_lowercase().contains("calibri")),
+          "{runs:#?}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn modern_shiftjis_font_uses_ms_gothic_only_when_the_face_is_missing() {
+    let catalog = StylesCatalog::default();
+    for (name, family, charset, expected) in [
+      ("Arial Unicode MS", 3, Some(128), Some("MS Gothic")),
+      ("Missing Japanese Face", 3, Some(128), Some("MS Gothic")),
+      ("Arial Unicode MS", 3, Some(1), None),
+      ("Arial Unicode MS", 3, None, None),
+    ] {
+      let font = FontRecord {
+        name: Some(Arc::from(name)),
+        family: Some(family),
+        charset,
+        ..FontRecord::default()
+      };
+      let mut style = TextStyle::default();
+      catalog.apply_font_family(&font, &mut style);
+      assert_eq!(style.font_family.as_deref(), Some(name));
+      assert_eq!(style.fallback_font_family.as_deref(), expected);
+      assert_eq!(style.east_asia_fallback_font_family.as_deref(), expected);
+    }
+
+    let font = FontRecord {
+      name: Some(Arc::from("Arial Unicode MS")),
+      family: Some(3),
+      charset: Some(128),
+      ..FontRecord::default()
+    };
+    let mut style = TextStyle::default();
+    catalog.apply_font_family(&font, &mut style);
+    let runs = crate::fonts::shape_text_runs("Latin ← 「日本語」", &style).unwrap();
+    assert!(
+      runs.iter().all(|run| run
+        .font_id
+        .0
+        .to_ascii_lowercase()
+        .replace('-', "")
+        .contains("msgothic")),
+      "{runs:#?}"
+    );
+
+    let installed = FontRecord {
+      name: Some(Arc::from("Arial")),
+      family: Some(3),
+      charset: Some(128),
+      ..FontRecord::default()
+    };
+    let mut installed_style = TextStyle::default();
+    catalog.apply_font_family(&installed, &mut installed_style);
+    let installed_runs = crate::fonts::shape_text_runs("Latin", &installed_style).unwrap();
+    assert!(
+      installed_runs
+        .iter()
+        .all(|run| run.font_id.0.to_ascii_lowercase().contains("arial")),
+      "{installed_runs:#?}"
+    );
   }
 
   #[test]
@@ -2292,6 +2680,93 @@ mod tests {
   }
 
   #[test]
+  fn drawing_theme_east_asian_font_uses_the_run_language() {
+    let theme_fonts = ThemeFontScheme {
+      minor_supplemental_fonts: vec![
+        ("Hans".to_owned(), "SimSun".to_owned()),
+        ("Jpan".to_owned(), "MS PGothic".to_owned()),
+      ],
+      ..ThemeFontScheme::default()
+    };
+    let catalog = StylesCatalog {
+      theme_fonts: Some(theme_fonts),
+      theme_minor_east_asian: Some(Arc::from("SimSun")),
+      locales: OfficeLocaleContext::new(None, None, Some("zh-CN")),
+      ..StylesCatalog::default()
+    };
+
+    assert_eq!(
+      catalog.drawingml_minor_east_asian_font_for_language(Some("ja-JP")),
+      Some("MS PGothic")
+    );
+    assert_eq!(
+      catalog.resolve_drawingml_theme_font_for_language("+mn-ea", Some("ja-JP")),
+      "MS PGothic"
+    );
+    assert_eq!(
+      catalog.drawingml_minor_east_asian_font_for_language(None),
+      Some("SimSun")
+    );
+  }
+
+  #[test]
+  fn header_footer_theme_fonts_use_document_script_then_latin_fallback() {
+    let catalog = StylesCatalog {
+      theme_fonts: Some(ThemeFontScheme {
+        major_latin: Some("Cambria".to_owned()),
+        minor_latin: Some("Calibri".to_owned()),
+        major_supplemental_fonts: vec![("Hans".to_owned(), "SimHei".to_owned())],
+        minor_supplemental_fonts: vec![("Hans".to_owned(), "SimSun".to_owned())],
+        ..ThemeFontScheme::default()
+      }),
+      locales: OfficeLocaleContext::new(None, None, Some("zh-CN")),
+      ..StylesCatalog::default()
+    };
+
+    assert_eq!(catalog.header_footer_theme_font(true), Some("SimHei"));
+    assert_eq!(catalog.header_footer_theme_font(false), Some("SimSun"));
+
+    let latin_only = StylesCatalog {
+      theme_fonts: Some(ThemeFontScheme {
+        major_latin: Some("Cambria".to_owned()),
+        minor_latin: Some("Calibri".to_owned()),
+        ..ThemeFontScheme::default()
+      }),
+      locales: OfficeLocaleContext::new(None, Some("zh-CN"), None),
+      ..StylesCatalog::default()
+    };
+    assert_eq!(latin_only.header_footer_theme_font(true), Some("Cambria"));
+    assert_eq!(latin_only.header_footer_theme_font(false), Some("Calibri"));
+  }
+
+  #[test]
+  fn japanese_gothic_minor_theme_profile_uses_source_font_metadata() {
+    let catalog = StylesCatalog {
+      font_records: vec![FontRecord {
+        name: Some(Arc::from("ＭＳ Ｐゴシック")),
+        charset: Some(128),
+        size_pt: Some(OrderedF64::new(11.0)),
+        scheme: x::FontSchemeValues::Minor,
+        ..FontRecord::default()
+      }],
+      ..StylesCatalog::default()
+    };
+    assert!(catalog.normal_style_uses_japanese_gothic_11_minor_theme());
+
+    let resolved = StylesCatalog {
+      font_records: vec![FontRecord {
+        name: Some(Arc::from("SimSun")),
+        charset: Some(134),
+        size_pt: Some(OrderedF64::new(11.0)),
+        scheme: x::FontSchemeValues::Minor,
+        ..FontRecord::default()
+      }],
+      ..StylesCatalog::default()
+    };
+    assert!(!resolved.normal_style_uses_japanese_gothic_11_minor_theme());
+  }
+
+  #[test]
   fn builtin_short_date_format_follows_the_format_locale() {
     let simplified_chinese = StylesCatalog {
       builtin_number_formats: builtin_number_format_codes(&OfficeLocaleContext::new(
@@ -2339,6 +2814,7 @@ mod tests {
     let style = catalog.default_drawing_text_style();
 
     assert_eq!(style.font_family.as_deref(), Some("Calibri"));
+    assert!(style.use_windows_font_metrics);
   }
 
   #[test]

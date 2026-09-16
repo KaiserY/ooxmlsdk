@@ -4940,9 +4940,13 @@ fn format_serial_date_time(
     return text;
   }
   if let Some(text) = field_value.and_then(|value| {
+    // An ordinary SpreadsheetML formatCode keeps the package's invariant
+    // month/day-name vocabulary. The host format locale belongs only to the
+    // system F800/F400 formats handled above; a custom format selects another
+    // language only through an embedded [$-LCID] marker.
     crate::field_datetime::format_spreadsheet_date_picture_with_weekday(
       code,
-      format_locale,
+      None,
       value,
       compatibility_weekday,
     )
@@ -7373,7 +7377,7 @@ mod tests {
   }
 
   #[test]
-  fn embedded_date_locale_overrides_the_host_format_locale() {
+  fn custom_date_names_keep_package_language_unless_lcid_overrides() {
     assert_eq!(
       rendered_number_text_for_locale("43961", Some("[$-0409]d-mmm"), None, false, Some("zh-CN"),)
         .0,
@@ -7381,6 +7385,11 @@ mod tests {
     );
     assert_eq!(
       rendered_number_text_for_locale("43961", Some("d-mmm"), None, false, Some("zh-CN"),).0,
+      "10-May"
+    );
+    assert_eq!(
+      rendered_number_text_for_locale("43961", Some("[$-0804]d-mmm"), None, false, Some("en-US"),)
+        .0,
       "10-5月"
     );
   }

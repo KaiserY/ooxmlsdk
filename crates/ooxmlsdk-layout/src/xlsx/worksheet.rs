@@ -35,6 +35,11 @@ const OFFICE_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT: f32 = 52.306_667;
 // repeated icon grid in complex_icon_set and POI's NewStyleConditional-
 // Formattings independently expose the same boundary sequence.
 const OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT: f32 = 50.05;
+// Excel 12 Japanese workbooks retain the same 417-dot implicit column in
+// fixed output even though Excel 16 reports an 8.47-character, 51pt worksheet
+// column after opening the file. The second horizontal page of POI 50299.xlsx
+// exposes nine such columns before its continued A1 text.
+const OFFICE_EXCEL12_JAPANESE_IMPLICIT_COLUMN_WIDTH_PT: f32 = 50.05;
 // Excel 12's Calibri 11 worksheet drawing layer keeps its horizontal anchor
 // offsets in the legacy screen-device coordinate space while fixed output
 // paints the cell grid on the printer device. Apache POI and EPPlus both
@@ -72,6 +77,14 @@ const OFFICE_CALIBRI_11_EXPLICIT_DIGIT_WIDTH_PT: f32 =
 // the LibreOffice chart family resolves that Arial maximum to 46 device dots.
 const OFFICE_ARIAL_10_EXPLICIT_DIGIT_WIDTH_PT: f32 =
   46.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+// Excel 14+ fixed output restores explicit Arial 11 column widths on its
+// 192dpi worksheet device with a 16-pixel maximum digit width, then maps each
+// whole worksheet pixel through a 51-dot maximum digit width at 600dpi. The
+// Office width ramp around col@width=19.125 distinguishes this two-device
+// conversion from both the unhinted glyph advance and the Arial 10 profile.
+const OFFICE_ARIAL_11_SCREEN_DIGIT_WIDTH_PX: u32 = 16;
+const OFFICE_ARIAL_11_EXPLICIT_DIGIT_WIDTH_PT: f32 =
+  51.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
 // Excel 12 for Mac fixed output retains the worksheet's legacy screen grid
 // for a Verdana 10 Normal style. The serialized baseColWidth=10 is 91.76
 // screen pixels including the five pixels required by ECMA-376
@@ -201,6 +214,9 @@ pub(crate) struct SheetMetrics {
   indexed_scatter_print_grid: bool,
   legacy_excel12_arial_screen_column_grid: bool,
   modern_excel_arial_column_grid: bool,
+  modern_excel_arial11_column_grid: bool,
+  legacy_excel12_japanese_fixed_output_profile: bool,
+  inferred_modern_excel_calibri_grid: bool,
   modern_excel_implicit_columns: bool,
   legacy_calibri_implicit_columns: bool,
   compatibility_mode_implicit_columns: bool,
@@ -703,6 +719,18 @@ impl CalcSheet {
     self.metrics.legacy_excel12_calibri_fixed_output_grid
   }
 
+  pub(crate) fn uses_modern_excel_arial11_cell_text_grid(&self) -> bool {
+    self.metrics.modern_excel_arial11_column_grid
+  }
+
+  pub(crate) fn uses_modern_excel_arial_fixed_output_picture_grid(&self) -> bool {
+    self.metrics.modern_excel_arial_column_grid
+  }
+
+  pub(crate) fn uses_legacy_excel12_japanese_fixed_output_profile(&self) -> bool {
+    self.metrics.legacy_excel12_japanese_fixed_output_profile
+  }
+
   pub(crate) fn range_rect(&self, range: CellRange) -> CellRect {
     let start = self.cell_rect_with_merge(range.start, false);
     let width_pt = self
@@ -745,7 +773,8 @@ impl CalcSheet {
       column,
       scale,
       self.metrics.legacy_excel12_calibri_fixed_output_grid
-        || self.metrics.modern_excel_arial_column_grid,
+        || self.metrics.modern_excel_arial_column_grid
+        || self.metrics.modern_excel_arial11_column_grid,
     )
   }
 
@@ -764,7 +793,8 @@ impl CalcSheet {
       end,
       scale,
       self.metrics.legacy_excel12_calibri_fixed_output_grid
-        || self.metrics.modern_excel_arial_column_grid,
+        || self.metrics.modern_excel_arial_column_grid
+        || self.metrics.modern_excel_arial11_column_grid,
     )
   }
 
@@ -847,6 +877,27 @@ impl CalcSheet {
     marker: &super::drawing::DrawingMarkerModel,
     scale: f32,
   ) -> (f32, f32) {
+    if self.metrics.modern_excel_arial_column_grid {
+      let column = u32::try_from(marker.column).unwrap_or(0).saturating_add(1);
+      let row = u32::try_from(marker.row).unwrap_or(0).saturating_add(1);
+      let column_offset_pt = units::emu_to_points(marker.column_offset_emu);
+      let row_offset_pt = units::emu_to_points(marker.row_offset_emu);
+      let x_pt = self.fixed_output_column_offset_pt(column, scale)
+        + fixed_output_drawing_marker_offset_pt(
+          column_offset_pt,
+          self.modern_excel_arial_drawing_screen_column_width_pt(column),
+          self.fixed_output_column_range_width_pt(column, column, scale),
+          scale,
+        );
+      let y_pt = self.fixed_output_row_offset_pt(row, scale)
+        + fixed_output_drawing_marker_offset_pt(
+          row_offset_pt,
+          self.modern_excel_arial_drawing_screen_row_height_pt(row),
+          self.fixed_output_row_range_height_pt(row, row, scale),
+          scale,
+        );
+      return (x_pt, y_pt);
+    }
     let (x, _) = self.marker_position_pt(marker);
     let row = u32::try_from(marker.row).unwrap_or(0).saturating_add(1);
     (
@@ -854,6 +905,32 @@ impl CalcSheet {
       self.fixed_output_drawing_row_offset_pt(row, scale)
         + units::emu_to_points(marker.row_offset_emu) * scale,
     )
+  }
+
+  fn modern_excel_arial_drawing_screen_column_width_pt(&self, column: u32) -> Option<f32> {
+    let model = self
+      .metrics
+      .columns
+      .iter()
+      .find(|model| column >= model.first && column <= model.last)?;
+    if model.hidden {
+      return None;
+    }
+    model.width.map(|width| {
+      stored_column_width_to_screen_pixels(width, 15) * units::POINTS_PER_INCH
+        / OFFICE_WORKSHEET_FONT_DPI
+    })
+  }
+
+  fn modern_excel_arial_drawing_screen_row_height_pt(&self, row: u32) -> Option<f32> {
+    let model = self
+      .rows
+      .iter()
+      .find(|model| model.row_index == Some(row))?;
+    if model.hidden || !model.custom_height {
+      return None;
+    }
+    model.height.map(worksheet_device_manual_row_height_pt)
   }
 
   pub(crate) fn object_anchor_rect_pt(
@@ -1095,6 +1172,15 @@ impl SheetGeometry {
       // otherwise-correct drawing anchor by one device dot per preceding
       // column.
       units::quantize_points_to_office_print_grid(OFFICE_LEGACY_CALIBRI_11_IMPLICIT_COLUMN_WIDTH_PT)
+    } else if metrics.legacy_excel12_japanese_fixed_output_profile
+      && metrics.format.default_column_width.is_none()
+      && metrics.format.base_column_width.is_none()
+    {
+      // The serialized Japanese Normal style still owns authored widths, but
+      // an absent base/default width selects Excel 12's legacy application
+      // grid. Keep the localized SimSun text face from changing that implicit
+      // fixed-output boundary.
+      units::quantize_points_to_office_print_grid(OFFICE_EXCEL12_JAPANESE_IMPLICIT_COLUMN_WIDTH_PT)
     } else if metrics.legacy_mac_excel12_verdana10_grid {
       // ECMA-376 Part 1 §18.3.1.81 defines baseColWidth through the Normal
       // font's maximum digit width plus five screen pixels. Excel 12 for Mac
@@ -1456,6 +1542,16 @@ fn column_width_from_metrics(metrics: &SheetMetrics, column: u32, default_width_
           OFFICE_ARIAL_10_EXPLICIT_DIGIT_WIDTH_PT,
         );
       }
+      if metrics.modern_excel_arial11_column_grid {
+        return stored_column_width_to_printer_points(
+          width,
+          OFFICE_ARIAL_11_SCREEN_DIGIT_WIDTH_PX,
+          OFFICE_ARIAL_11_EXPLICIT_DIGIT_WIDTH_PT,
+        );
+      }
+      if metrics.inferred_modern_excel_calibri_grid {
+        return digit_width_to_lo_points(width as f32, OFFICE_CALIBRI_11_EXPLICIT_DIGIT_WIDTH_PT);
+      }
       if metrics.legacy_excel12_arial_screen_column_grid {
         return stored_column_width_to_screen_points(width, metrics.screen_digit_width_px);
       }
@@ -1765,6 +1861,11 @@ impl SheetMetrics {
             .width
             .is_some_and(|width| (width - 11.61).abs() <= 1.0e-6)
         });
+    let inferred_modern_excel_calibri_grid = should_infer_modern_excel_calibri_grid(
+      producer,
+      styles.normal_style_uses_explicit_calibri_11(),
+      styles.has_modern_excel_stylesheet_extensions(),
+    );
     let digit_width_pt = if libreoffice_arial10_1161_printer_grid {
       OFFICE_ARIAL_10_EXPLICIT_DIGIT_WIDTH_PT
     } else if mso_document
@@ -1795,25 +1896,26 @@ impl SheetMetrics {
         .is_none_or(|format| {
           format.base_column_width.is_none() && format.default_column_width.is_none()
         });
-    let default_digit_width_pt = if mso_document && latin_calibri_implicit_columns {
-      // Excel 14/15 controls with Calibri retained by the theme agree with
-      // explicit Calibri for implicit columns. The historical 50.05pt
-      // application grid belongs to the substituted theme face. Authored
-      // widths still use their existing document-font digit metric.
-      OFFICE_CALIBRI_11_EXPLICIT_DIGIT_WIDTH_PT
-    } else if styles.column_width_uses_application_default_minor_theme() {
-      quantize_digit_width_to_screen_pixel(measured_digit_width_pt(
-        &styles.default_font_text_style(),
-      ))
-    } else {
-      // A missing theme part does not replace an explicit Normal-font
-      // snapshot.  ECMA-376 18.3.1.13 defines both authored and default
-      // column widths through that Normal font's maximum digit width; POI's
-      // XSSFSheet contract and LibreOffice UnitConverter::finalizeImport keep
-      // the same owner.  A missing or theme-backed Normal font uses the
-      // installed application theme metric when theme1.xml is absent.
-      digit_width_pt
-    };
+    let default_digit_width_pt =
+      if inferred_modern_excel_calibri_grid || mso_document && latin_calibri_implicit_columns {
+        // Excel 14/15 controls with Calibri retained by the theme agree with
+        // explicit Calibri for implicit columns. The historical 50.05pt
+        // application grid belongs to the substituted theme face. Authored
+        // widths still use their existing document-font digit metric.
+        OFFICE_CALIBRI_11_EXPLICIT_DIGIT_WIDTH_PT
+      } else if styles.column_width_uses_application_default_minor_theme() {
+        quantize_digit_width_to_screen_pixel(measured_digit_width_pt(
+          &styles.default_font_text_style(),
+        ))
+      } else {
+        // A missing theme part does not replace an explicit Normal-font
+        // snapshot.  ECMA-376 18.3.1.13 defines both authored and default
+        // column widths through that Normal font's maximum digit width; POI's
+        // XSSFSheet contract and LibreOffice UnitConverter::finalizeImport keep
+        // the same owner.  A missing or theme-backed Normal font uses the
+        // installed application theme metric when theme1.xml is absent.
+        digit_width_pt
+      };
     let legacy_mac_excel12_verdana10_grid = producer.macintosh_excel
       && producer.excel_major_version == Some(12)
       && styles.normal_style_uses_explicit_verdana_10()
@@ -2011,6 +2113,17 @@ impl SheetMetrics {
           .excel_major_version
           .is_some_and(|version| version >= 14)
         && styles.normal_style_uses_explicit_arial_10(),
+      modern_excel_arial11_column_grid: mso_document
+        && !producer.macintosh_excel
+        && producer
+          .excel_major_version
+          .is_some_and(|version| version >= 14)
+        && styles.normal_style_uses_explicit_arial_11(),
+      legacy_excel12_japanese_fixed_output_profile: mso_document
+        && !producer.macintosh_excel
+        && producer.excel_major_version == Some(12)
+        && styles.normal_style_uses_japanese_gothic_11_minor_theme(),
+      inferred_modern_excel_calibri_grid,
       modern_excel_implicit_columns: mso_document
         && producer
           .excel_major_version
@@ -2096,6 +2209,24 @@ impl SheetMetrics {
   }
 }
 
+fn should_infer_modern_excel_calibri_grid(
+  producer: SpreadsheetProducerProfile,
+  normal_style_uses_explicit_calibri_11: bool,
+  has_modern_excel_stylesheet_extensions: bool,
+) -> bool {
+  // ClosedXML's Office-compatible package profile declares Microsoft Excel
+  // but can omit docProps/AppVersion while retaining typed x14/x15 stylesheet
+  // extensions. Controlled Office exports with AppVersion absent, 12, and 16
+  // produce identical column geometry. Treat the surviving extension as the
+  // modern profile boundary for Calibri 11 columns. Packages without that
+  // typed version evidence retain their existing grid.
+  producer.mso_document
+    && !producer.macintosh_excel
+    && producer.excel_major_version.is_none()
+    && normal_style_uses_explicit_calibri_11
+    && has_modern_excel_stylesheet_extensions
+}
+
 fn legacy_excel12_calibri_marker_x_pt(column: i32, column_offset_emu: i64) -> f32 {
   let column = u32::try_from(column).unwrap_or(0);
   let printer_column_width_pt =
@@ -2110,6 +2241,32 @@ fn legacy_excel12_calibri_marker_x_pt(column: i32, column_offset_emu: i64) -> f3
       * units::POINTS_PER_INCH as f64
       / units::OFFICE_FIXED_OUTPUT_DPI as f64;
   column as f32 * printer_column_width_pt + printer_offset_pt as f32
+}
+
+fn fixed_output_drawing_marker_offset_pt(
+  screen_offset_pt: f32,
+  screen_cell_extent_pt: Option<f32>,
+  output_cell_extent_pt: f32,
+  scale: f32,
+) -> f32 {
+  // Excel stores DrawingML marker offsets in the worksheet's screen-space
+  // cell grid. Fixed output first realizes the containing cell on the printer
+  // grid, then preserves the marker's fraction of that cell independently on
+  // each axis. Keep the prior direct scale when the source cell extent is not
+  // explicit enough to reconstruct without guessing.
+  screen_cell_extent_pt
+    .filter(|extent| *extent > f32::EPSILON)
+    .map_or(screen_offset_pt * scale, |screen_cell_extent_pt| {
+      screen_offset_pt * output_cell_extent_pt / screen_cell_extent_pt
+    })
+}
+
+fn worksheet_device_manual_row_height_pt(height_pt: f64) -> f32 {
+  let screen_quarters = (height_pt * f64::from(OFFICE_WORKSHEET_FONT_DPI) * 4.0
+    / f64::from(units::POINTS_PER_INCH))
+  .round();
+  (screen_quarters / 4.0 * f64::from(units::POINTS_PER_INCH) / f64::from(OFFICE_WORKSHEET_FONT_DPI))
+    as f32
 }
 
 fn legacy_excel12_arial_screen_column_grid(
@@ -2582,6 +2739,21 @@ fn apply_automatic_text_row_heights(
         continue;
       }
       let alignment = styles.alignment_for_cell(cell.style_index);
+      if alignment.and_then(|a| a.text_rotation) == Some(255) {
+        let measured = automatic_font_row_extents(styles, cell.style_index).map(|font| {
+          let slots = super::display::stacked_cell_text_slot_count(&cell.display_text);
+          (font.ascent_px + font.descent_px) * slots as f32
+        });
+        if let Some(screen_height) = measured {
+          let extra_pixels = u8::from(row.thick_top) + u8::from(row.thick_bottom);
+          height = height
+            .max(grid.print_height_from_screen_pixels(screen_height + f32::from(extra_pixels)));
+        } else if let Some(cached) = row.height {
+          height = height.max(cached as f32);
+        }
+        wrapped = true;
+        continue;
+      }
       if let Some(rotation @ 1..=180) = alignment.and_then(|a| a.text_rotation) {
         let style = styles.text_style_for_cell(cell.style_index);
         let measured = automatic_font_row_extents(styles, cell.style_index).and_then(|font| {
@@ -2656,6 +2828,12 @@ fn rotated_text_row_height_px(
   // Its two horizontal insets are quarter-digit widths, rounded to screen
   // pixels; the extent includes one final pixel. The 90-degree font/size/
   // bold/length controls establish this width independently of the angle.
+  // Excel's worksheet GDI path does not enable OpenType ligatures. Keeping
+  // HarfRust's default `liga` feature turns Calibri "ti" into one glyph and
+  // makes a one-device-advance-per-character measurement impossible.
+  let mut measurement_style = style.clone();
+  measurement_style.ligatures = Some(crate::common::OpenTypeLigatures::default());
+  let style = &measurement_style;
   let face = crate::fonts::cached_text_face(style)?;
   let mut extent = |text: &str| {
     if face.synthetic_bold {
@@ -2670,6 +2848,16 @@ fn rotated_text_row_height_px(
         .gdi_hinted_text_extents_pt(text, style, OFFICE_WORKSHEET_FONT_DPI)
         .map(|extent| {
           extent.unpositioned_width_pt * OFFICE_WORKSHEET_FONT_DPI / units::POINTS_PER_INCH
+        })
+        .or_else(|| {
+          // A space has an advance but no outline to run through the TrueType
+          // hinter. hdmx (or the existing scaled-device fallback) still owns
+          // its GDI width and keeps the complete rotated string measurable.
+          metrics
+            .gdi_device_character_advances_pt(text, style, OFFICE_WORKSHEET_FONT_DPI)
+            .map(|advances| {
+              advances.iter().sum::<f32>() * OFFICE_WORKSHEET_FONT_DPI / units::POINTS_PER_INCH
+            })
         })
     }
   };
@@ -2702,14 +2890,19 @@ fn digit_width_to_lo_points(value: f32, digit_width_pt: f32) -> f32 {
 }
 
 fn stored_column_width_to_screen_points(width: f64, maximum_digit_width_px: u32) -> f32 {
+  stored_column_width_to_screen_pixels(width, maximum_digit_width_px) * screen_pixel_width_pt()
+}
+
+fn stored_column_width_to_screen_pixels(width: f64, maximum_digit_width_px: u32) -> f32 {
   let maximum_digit_width_px = f64::from(maximum_digit_width_px.max(1));
-  // Restore the stored 1/256-character width to Excel's whole 96dpi
-  // worksheet pixels before any print transform. The half-MDW term is the
-  // inverse storage correction used by EPPlus for authored column widths.
+  // Restore the stored 1/256-character width to Excel's whole worksheet
+  // pixel count before applying the owning device's point scale. The
+  // half-MDW term is the inverse storage correction used by EPPlus for
+  // authored column widths.
   let width_px = (((256.0 * width + (128.0 / maximum_digit_width_px).trunc()) / 256.0)
     * maximum_digit_width_px)
     .trunc();
-  width_px as f32 * screen_pixel_width_pt()
+  width_px as f32
 }
 
 fn stored_column_width_to_printer_points(
@@ -2723,8 +2916,7 @@ fn stored_column_width_to_printer_points(
   // 46 dots at 600dpi. InvalidPrintArea's 5.5703125 restores 84 pixels,
   // hence 258 printer dots: multiplying col@width directly by 46 dots
   // loses enough width to put an extra column on its first printed page.
-  let pixels =
-    stored_column_width_to_screen_points(width, screen_digit_width_px) / screen_pixel_width_pt();
+  let pixels = stored_column_width_to_screen_pixels(width, screen_digit_width_px);
   units::quantize_points_to_office_print_grid(
     pixels * printer_digit_width_pt / screen_digit_width_px.max(1) as f32,
   )
@@ -2840,6 +3032,38 @@ pub(super) fn printer_font_line_height_pt(
   style: &crate::model::TextStyle,
   char_set: u8,
 ) -> Option<f32> {
+  let metrics = printer_font_vertical_metrics(style, char_set)?;
+  let padding_pixels = (screen_pixel_width_pt() + OFFICE_LEGACY_FONT_ROW_PRINTER_LEADING_PT)
+    * units::OFFICE_FIXED_OUTPUT_DPI
+    / units::POINTS_PER_INCH;
+  // Excel realizes automatic rows on the fixed-output device. VDMX can grow
+  // the hinted descent beyond the scaled hhea/OS2 box (Times New Roman 10:
+  // 94px height + 4px leading + the rounded-up padding = 106px = 12.72pt).
+  // Office controls ignore cached defaultRowHeight/dyDescent for this path.
+  Some(
+    (metrics.height_px() + metrics.external_leading_px + padding_pixels).ceil()
+      * units::POINTS_PER_INCH
+      / units::OFFICE_FIXED_OUTPUT_DPI,
+  )
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct PrinterFontVerticalMetrics {
+  pub(super) ascent_px: f32,
+  pub(super) descent_px: f32,
+  pub(super) external_leading_px: f32,
+}
+
+impl PrinterFontVerticalMetrics {
+  pub(super) fn height_px(self) -> f32 {
+    self.ascent_px + self.descent_px
+  }
+}
+
+pub(super) fn printer_font_vertical_metrics(
+  style: &crate::model::TextStyle,
+  char_set: u8,
+) -> Option<PrinterFontVerticalMetrics> {
   use skrifa::raw::TableProvider;
   use skrifa::raw::types::Tag;
 
@@ -2854,7 +3078,7 @@ pub(super) fn printer_font_line_height_pt(
   }
   let hhea = face.hhea().ok()?;
   let os2 = face.os2().ok()?;
-  let font_height_pixels = face
+  let (ascent_px, descent_px) = face
     .table_data(Tag::new(b"VDMX"))
     .and_then(|table| emfsdk::font::vdmx_vertical_device_metrics(table.as_bytes(), ppem, char_set))
     .map_or_else(
@@ -2864,27 +3088,23 @@ pub(super) fn printer_font_line_height_pt(
         // VDMX raises the same design descent to 20. Office marker controls
         // distinguish the resulting 13.56pt and 13.68pt automatic rows.
         let scale = f32::from(ppem) / units_per_em;
-        (f32::from(os2.us_win_ascent()) * scale).round()
-          + (f32::from(os2.us_win_descent()) * scale).round()
+        (
+          (f32::from(os2.us_win_ascent()) * scale).round(),
+          (f32::from(os2.us_win_descent()) * scale).round(),
+        )
       },
-      |metrics| metrics.ascent as f32 + metrics.descent as f32,
+      |metrics| (metrics.ascent as f32, metrics.descent as f32),
     );
   let design_leading = i32::from(hhea.ascender().to_i16()) - i32::from(hhea.descender().to_i16())
     + i32::from(hhea.line_gap().to_i16())
     - i32::from(os2.us_win_ascent())
     - i32::from(os2.us_win_descent());
-  let leading_pixels = (design_leading.max(0) as f32 * f32::from(ppem) / units_per_em).round();
-  let padding_pixels = (screen_pixel_width_pt() + OFFICE_LEGACY_FONT_ROW_PRINTER_LEADING_PT)
-    * units::OFFICE_FIXED_OUTPUT_DPI
-    / units::POINTS_PER_INCH;
-  // Excel realizes automatic rows on the fixed-output device. VDMX can grow
-  // the hinted descent beyond the scaled hhea/OS2 box (Times New Roman 10:
-  // 94px height + 4px leading + the rounded-up padding = 106px = 12.72pt).
-  // Office controls ignore cached defaultRowHeight/dyDescent for this path.
-  Some(
-    (font_height_pixels + leading_pixels + padding_pixels).ceil() * units::POINTS_PER_INCH
-      / units::OFFICE_FIXED_OUTPUT_DPI,
-  )
+  let external_leading_px = (design_leading.max(0) as f32 * f32::from(ppem) / units_per_em).round();
+  Some(PrinterFontVerticalMetrics {
+    ascent_px,
+    descent_px,
+    external_leading_px,
+  })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -3693,6 +3913,41 @@ mod tests {
   }
 
   #[test]
+  fn modern_arial11_columns_match_office_width_ramp() {
+    let widths = [19.0, 19.062_5, 19.125, 19.187_5, 19.25];
+    let dots = widths.map(|width| {
+      stored_column_width_to_printer_points(
+        width,
+        OFFICE_ARIAL_11_SCREEN_DIGIT_WIDTH_PX,
+        OFFICE_ARIAL_11_EXPLICIT_DIGIT_WIDTH_PT,
+      ) * units::OFFICE_FIXED_OUTPUT_DPI
+        / units::POINTS_PER_INCH
+    });
+    assert_eq!(dots.map(f32::round), [969.0, 972.0, 975.0, 979.0, 982.0]);
+    assert!(
+      (dots[2] * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI - 117.0).abs() < 1.0e-4
+    );
+
+    let metrics = SheetMetrics {
+      modern_excel_arial11_column_grid: true,
+      columns: vec![ColumnModel {
+        first: 2,
+        last: 2,
+        width: Some(19.125),
+        style_index: None,
+        hidden: false,
+        best_fit: false,
+        custom_width: true,
+        phonetic: false,
+        outline_level: 0,
+        collapsed: false,
+      }],
+      ..Default::default()
+    };
+    assert!((column_width_from_metrics(&metrics, 2, 50.0) - 117.0).abs() < 1.0e-4);
+  }
+
+  #[test]
   fn arial_print_centering_places_the_visible_clip_on_the_page_center() {
     use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
     use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
@@ -3967,6 +4222,68 @@ mod tests {
   }
 
   #[test]
+  fn modern_stylesheet_extension_recovers_missing_version_calibri_column_grid() {
+    let missing_version_excel = SpreadsheetProducerProfile {
+      mso_document: true,
+      ..Default::default()
+    };
+    assert!(should_infer_modern_excel_calibri_grid(
+      missing_version_excel,
+      true,
+      true
+    ));
+    assert!(!should_infer_modern_excel_calibri_grid(
+      SpreadsheetProducerProfile {
+        excel_major_version: Some(12),
+        ..missing_version_excel
+      },
+      true,
+      true
+    ));
+    assert!(!should_infer_modern_excel_calibri_grid(
+      SpreadsheetProducerProfile::default(),
+      true,
+      true
+    ));
+    assert!(!should_infer_modern_excel_calibri_grid(
+      missing_version_excel,
+      false,
+      true
+    ));
+    assert!(!should_infer_modern_excel_calibri_grid(
+      missing_version_excel,
+      true,
+      false
+    ));
+
+    let mut metrics = SheetMetrics {
+      digit_width_pt: 5.52,
+      default_digit_width_pt: 5.52,
+      inferred_modern_excel_calibri_grid: true,
+      columns: vec![ColumnModel {
+        first: 1,
+        last: 1,
+        width: Some(9.140_625),
+        style_index: None,
+        hidden: false,
+        best_fit: false,
+        custom_width: true,
+        phonetic: false,
+        outline_level: 0,
+        collapsed: false,
+      }],
+      ..Default::default()
+    };
+    assert!((column_width_from_metrics(&metrics, 1, 50.0) - 51.55).abs() < 1.0e-4);
+    metrics.default_digit_width_pt = OFFICE_CALIBRI_11_EXPLICIT_DIGIT_WIDTH_PT;
+    metrics.format.mso_document = true;
+    let geometry = SheetGeometry::new(&metrics, &[], None, None);
+    assert!((geometry.column_width_pt(2) - 51.3).abs() < 1.0e-4);
+    metrics.inferred_modern_excel_calibri_grid = false;
+    assert!((column_width_from_metrics(&metrics, 1, 50.0) - 50.45).abs() < 1.0e-4);
+  }
+
+  #[test]
   fn automatic_wrapped_row_uses_one_default_height_per_explicit_line() {
     let metrics = SheetMetrics::default();
     let mut row = empty_row(Some(2));
@@ -4059,6 +4376,55 @@ mod tests {
   }
 
   #[test]
+  fn modern_excel_arial_drawing_offsets_preserve_their_fraction_of_print_cells() {
+    let screen_column_width_pt = stored_column_width_to_screen_pixels(26.109_375, 15)
+      * units::POINTS_PER_INCH
+      / OFFICE_WORKSHEET_FONT_DPI;
+    let output_column_width_pt = stored_column_width_to_printer_points(
+      26.109_375,
+      15,
+      OFFICE_ARIAL_10_EXPLICIT_DIGIT_WIDTH_PT,
+    );
+    assert_eq!(screen_column_width_pt, 147.0);
+    assert_eq!(output_column_width_pt, 144.24);
+
+    let left = fixed_output_drawing_marker_offset_pt(
+      units::emu_to_points(158_003),
+      Some(screen_column_width_pt),
+      output_column_width_pt,
+      1.0,
+    );
+    let right = fixed_output_drawing_marker_offset_pt(
+      units::emu_to_points(1_206_765),
+      Some(screen_column_width_pt),
+      output_column_width_pt,
+      1.0,
+    );
+    assert!(((right - left) - 81.03).abs() < 0.01);
+
+    let screen_row_height_pt = worksheet_device_manual_row_height_pt(134.4);
+    assert_eq!(screen_row_height_pt, 134.4375);
+    let top = fixed_output_drawing_marker_offset_pt(
+      units::emu_to_points(815_788),
+      Some(screen_row_height_pt),
+      130.32,
+      1.0,
+    );
+    let bottom = fixed_output_drawing_marker_offset_pt(
+      units::emu_to_points(1_530_725),
+      Some(screen_row_height_pt),
+      130.32,
+      1.0,
+    );
+    assert!(((bottom - top) - 54.57).abs() < 0.01);
+
+    assert_eq!(
+      fixed_output_drawing_marker_offset_pt(20.0, None, 45.0, 0.8),
+      16.0
+    );
+  }
+
+  #[test]
   fn excel12_vml_only_forms_use_the_legacy_snapshot_anchor_grid() {
     let excel12 = SpreadsheetProducerProfile {
       mso_document: true,
@@ -4103,6 +4469,23 @@ mod tests {
       authored.column_width_pt(1),
       OFFICE_EXCEL12_VML_FORMS_IMPLICIT_COLUMN_WIDTH_PT
     );
+  }
+
+  #[test]
+  fn excel12_japanese_fixed_output_uses_the_legacy_implicit_column_grid() {
+    let mut metrics = SheetMetrics::default();
+    metrics.format.mso_document = true;
+    metrics.legacy_excel12_japanese_fixed_output_profile = true;
+
+    let geometry = SheetGeometry::new(&metrics, &[], None, None);
+    let expected =
+      units::quantize_points_to_office_print_grid(OFFICE_EXCEL12_JAPANESE_IMPLICIT_COLUMN_WIDTH_PT);
+    assert_eq!(geometry.column_width_pt(1), expected);
+    assert!((geometry.column_offset_pt(10) - expected * 9.0).abs() < 1.0e-4);
+
+    metrics.format.default_column_width = Some(9.0);
+    let authored = SheetGeometry::new(&metrics, &[], None, None);
+    assert_ne!(authored.column_width_pt(1), expected);
   }
 
   #[test]
@@ -4641,6 +5024,58 @@ Number</t></is></c></row><row r="4" ht="{cache}"><c r="A4" s="2" t="inlineStr"><
   }
 
   #[test]
+  fn stacked_text_autofit_counts_character_slots_but_preserves_manual_rows() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="1"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font></fonts>
+      <cellXfs count="2"><xf fontId="0"/><xf fontId="0" applyAlignment="1"><alignment textRotation="255"/></xf></cellXfs></styleSheet>"#.to_vec()).unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::new(None, Some("en-US"), None),
+    )
+    .unwrap();
+    let worksheet = x::Worksheet::from_bytes(
+      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <sheetFormatPr defaultRowHeight="15"/><sheetData>
+        <row r="1"><c r="A1" s="1" t="inlineStr"><is><t>A</t></is></c></row>
+        <row r="2"><c r="A2" s="1" t="inlineStr"><is><t>A B</t></is></c></row>
+        <row r="3" ht="30" customHeight="1"><c r="A3" s="1" t="inlineStr"><is><t>ABCDEFGHI</t></is></c></row>
+        </sheetData></worksheet>"#,
+    )
+    .unwrap();
+    let sheet = CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Stacked".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog::default(),
+      &[],
+      &styles,
+      SpreadsheetProducerProfile {
+        mso_document: true,
+        excel_major_version: Some(15),
+        ..Default::default()
+      },
+    );
+    let one_slot = sheet.row_height_pt(1);
+    let three_slots = sheet.row_height_pt(2);
+    assert!(three_slots > one_slot * 2.9, "{one_slot}, {three_slots}");
+    assert!(three_slots < one_slot * 3.1, "{one_slot}, {three_slots}");
+    assert!(sheet.row_height_pt(3) < three_slots);
+  }
+
+  #[test]
   fn rotated_autofit_uses_screen_advances_and_font_dependent_insets() {
     use std::sync::Arc;
     // Native GDI + AutoFit controls, measured in 192dpi screen pixels.
@@ -4690,6 +5125,30 @@ Number</t></is></c></row><row r="4" ht="{cache}"><c r="A4" s="2" t="inlineStr"><
         );
       }
     }
+  }
+
+  #[test]
+  fn rotated_autofit_measures_calibri_ligatures_and_spaces_as_gdi_characters() {
+    use std::sync::Arc;
+
+    let style = crate::model::TextStyle {
+      font_family: Some(Arc::from("Calibri")),
+      font_size_pt: 11.0,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    let height = rotated_text_row_height_px(
+      "TextRotation = 45",
+      &style,
+      AutomaticRowExtents {
+        ascent_px: 30.0,
+        descent_px: 8.0,
+      },
+      45,
+      &mut metrics,
+    )
+    .expect("Calibri GDI extent");
+    assert!(height > 100.0, "{height}");
   }
 
   #[test]

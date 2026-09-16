@@ -492,10 +492,8 @@ fn spreadsheet_calendar_pattern(
       } else {
         loop {
           let ch = chars.next()?;
-          if ch == '\'' {
-            if chars.next_if_eq(&'\'').is_none() {
-              break;
-            }
+          if ch == '\'' && chars.next_if_eq(&'\'').is_none() {
+            break;
           }
           literal.push(ch);
         }

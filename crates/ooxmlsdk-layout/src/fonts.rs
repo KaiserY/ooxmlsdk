@@ -1734,7 +1734,13 @@ fn script_fallback_font_family_for_slot(
     | Some(TextScript::Common | TextScript::Latin | TextScript::Cyrillic | TextScript::Greek) => {
       style.fallback_font_family()
     }
-    _ => None,
+    Some(TextScript::Han | TextScript::Hiragana | TextScript::Katakana | TextScript::Hangul) => {
+      style.east_asia_fallback_font_family()
+    }
+    Some(TextScript::Arabic | TextScript::Hebrew | TextScript::Devanagari | TextScript::Thai) => {
+      style.complex_fallback_font_family()
+    }
+    Some(TextScript::Other) => None,
   }
 }
 
@@ -1820,6 +1826,17 @@ fn build_style_font_registry_for_slot(
         && !requested_family.eq_ignore_ascii_case(fallback_family)
       {
         families.push(Cow::Owned(fallback_family.to_string()));
+        // Arial Unicode MS is a distinct legacy face, but the default policy
+        // aliases it to Arial for documents without mapper metadata. When a
+        // format supplies a verified missing-family result, keep the exact
+        // face eligible and let that document-scoped result precede the
+        // compatibility alias.
+        if requested_family.eq_ignore_ascii_case("Arial Unicode MS") {
+          registry
+            .book
+            .family_aliases
+            .retain(|alias| !alias.from.as_ref().eq_ignore_ascii_case(requested_family));
+        }
       }
       let family_class_fallback = match request.family_class {
         Some(FontFamilyClass::Serif | FontFamilyClass::OldStyle | FontFamilyClass::Schoolbook) => {
@@ -2434,6 +2451,28 @@ mod tests {
       request.family_class,
       Some(ooxmlsdk_fonts::FontFamilyClass::Serif)
     );
+  }
+
+  #[test]
+  fn script_specific_fallbacks_are_selected_without_wordprocessingml_slots() {
+    let style = TextStyle {
+      fallback_font_family: Some(Arc::from("Latin fallback")),
+      east_asia_fallback_font_family: Some(Arc::from("East Asian fallback")),
+      complex_fallback_font_family: Some(Arc::from("Complex fallback")),
+      ..TextStyle::default()
+    };
+
+    for (script, expected) in [
+      (TextScript::Latin, Some("Latin fallback")),
+      (TextScript::Han, Some("East Asian fallback")),
+      (TextScript::Arabic, Some("Complex fallback")),
+      (TextScript::Other, None),
+    ] {
+      assert_eq!(
+        script_fallback_font_family_for_slot(&style, Some(script), None),
+        expected
+      );
+    }
   }
 
   #[test]

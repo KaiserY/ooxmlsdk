@@ -4788,10 +4788,9 @@ fn chartsheet_marker_cosmetic_image(
 
 fn chartsheet_marker_demultiply_pixel(mut pixel: image::Rgba<u8>) -> image::Rgba<u8> {
   let alpha = u32::from(pixel[3]);
-  if alpha != 0 {
+  if let Some(reciprocal) = (255_u32 << 16).checked_div(alpha) {
     // A truncated reciprocal reproduces the GDI+ primitive color controls.
     // Exact integer division would round some bright edge colors up by one.
-    let reciprocal = (255_u32 << 16) / alpha;
     for channel in 0..3 {
       pixel[channel] = ((u32::from(pixel[channel]) * reciprocal) >> 16).min(255) as u8;
     }
@@ -4817,9 +4816,10 @@ fn chartsheet_marker_export_pixel(mut pixel: image::Rgba<u8>) -> image::Rgba<u8>
   // Native GDI+ color controls reproduce the PDF's RGB/soft-mask pair after
   // this additional truncated premultiply/unpremultiply conversion.
   let alpha = u32::from(pixel[3]);
-  if alpha != 0 {
-    for channel in 0..3 {
-      pixel[channel] = ((u32::from(pixel[channel]) * alpha / 255) * 255 / alpha) as u8;
+  for channel in 0..3 {
+    let premultiplied = u32::from(pixel[channel]) * alpha / 255;
+    if let Some(value) = (premultiplied * 255).checked_div(alpha) {
+      pixel[channel] = value as u8;
     }
   }
   pixel
@@ -11691,15 +11691,17 @@ fn lower_line_series(
       lower_chart_marker(
         items,
         Some(&mut *marker_backdrops),
-        (x, y),
-        marker,
-        chart_point_color(style, series_index, index).unwrap_or(color),
+        ChartMarkerRequest {
+          center: (x, y),
+          marker,
+          fallback_color: chart_point_color(style, series_index, index).unwrap_or(color),
+          point: ChartSeriesPoint {
+            series_index,
+            point_index: Some(index),
+          },
+        },
         series,
         style,
-        ChartSeriesPoint {
-          series_index,
-          point_index: Some(index),
-        },
       );
     }
     return;
@@ -11814,15 +11816,17 @@ fn lower_line_series(
     lower_chart_marker(
       items,
       Some(&mut *marker_backdrops),
-      (x, y),
-      marker,
-      chart_point_color(style, series_index, index).unwrap_or(color),
+      ChartMarkerRequest {
+        center: (x, y),
+        marker,
+        fallback_color: chart_point_color(style, series_index, index).unwrap_or(color),
+        point: ChartSeriesPoint {
+          series_index,
+          point_index: Some(index),
+        },
+      },
       series,
       style,
-      ChartSeriesPoint {
-        series_index,
-        point_index: Some(index),
-      },
     );
   }
 }
@@ -12238,15 +12242,17 @@ fn lower_scatter_series(
       lower_chart_marker(
         items,
         None,
-        (x, y),
-        marker,
-        chart_point_color(style, series_index, index).unwrap_or(color),
+        ChartMarkerRequest {
+          center: (x, y),
+          marker,
+          fallback_color: chart_point_color(style, series_index, index).unwrap_or(color),
+          point: ChartSeriesPoint {
+            series_index,
+            point_index: Some(index),
+          },
+        },
         series,
         style,
-        ChartSeriesPoint {
-          series_index,
-          point_index: Some(index),
-        },
       );
     }
     return;
@@ -12326,15 +12332,17 @@ fn lower_scatter_series(
       lower_chart_marker(
         items,
         None,
-        (x, y),
-        marker,
-        point_color,
+        ChartMarkerRequest {
+          center: (x, y),
+          marker,
+          fallback_color: point_color,
+          point: ChartSeriesPoint {
+            series_index,
+            point_index: Some(index),
+          },
+        },
         series,
         style,
-        ChartSeriesPoint {
-          series_index,
-          point_index: Some(index),
-        },
       );
     }
   }
@@ -12506,16 +12514,27 @@ fn chart_marker_stroke_width(
   Some(width)
 }
 
-fn lower_chart_marker(
-  items: &mut Vec<PageItem>,
-  marker_backdrops: Option<&mut Vec<PageItem>>,
+#[derive(Clone, Copy)]
+struct ChartMarkerRequest {
   center: (f32, f32),
   marker: ResolvedChartMarker,
   fallback_color: RgbColor,
+  point: ChartSeriesPoint,
+}
+
+fn lower_chart_marker(
+  items: &mut Vec<PageItem>,
+  marker_backdrops: Option<&mut Vec<PageItem>>,
+  request: ChartMarkerRequest,
   series: &crate::render::chart::ClusteredColumnSeries<'_>,
   style: &ClusteredColumnStyle,
-  point: ChartSeriesPoint,
 ) {
+  let ChartMarkerRequest {
+    center,
+    marker,
+    fallback_color,
+    point,
+  } = request;
   let (x, y) = center;
   let ChartSeriesPoint {
     series_index,
@@ -12868,15 +12887,17 @@ fn lower_radar_series(
       lower_chart_marker(
         items,
         None,
-        point,
-        marker,
-        chart_point_color(style, series_index, index).unwrap_or(color),
+        ChartMarkerRequest {
+          center: point,
+          marker,
+          fallback_color: chart_point_color(style, series_index, index).unwrap_or(color),
+          point: ChartSeriesPoint {
+            series_index,
+            point_index: Some(index),
+          },
+        },
         series,
         style,
-        ChartSeriesPoint {
-          series_index,
-          point_index: Some(index),
-        },
       );
     }
   }
@@ -15957,15 +15978,17 @@ fn push_cartesian_legend_key(
     lower_chart_marker(
       items,
       None,
-      (x_pt + size_pt * 0.5, y_pt + size_pt * 0.5),
-      marker,
-      entry.color.unwrap_or_default(),
+      ChartMarkerRequest {
+        center: (x_pt + size_pt * 0.5, y_pt + size_pt * 0.5),
+        marker,
+        fallback_color: entry.color.unwrap_or_default(),
+        point: ChartSeriesPoint {
+          series_index,
+          point_index: entry.point_index,
+        },
+      },
       series,
       style,
-      ChartSeriesPoint {
-        series_index,
-        point_index: entry.point_index,
-      },
     );
   } else if key_kind == CartesianLegendKeyKind::Bubble {
     // Bubble legend keys use the same circular data-point geometry; a square

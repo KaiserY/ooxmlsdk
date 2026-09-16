@@ -1480,6 +1480,7 @@ impl SlidePersist {
         shape.set_picture(
           Some(relationship_id.to_string()),
           None,
+          None,
           ImageCrop::default(),
           Vec::new(),
           Some(resource),
@@ -1559,6 +1560,7 @@ impl SlidePersist {
       shape.size = preview.size;
       shape.set_picture(
         Some(preview.image_relationship_id.clone()),
+        None,
         None,
         ImageCrop::default(),
         Vec::new(),
@@ -1740,6 +1742,7 @@ fn attach_vml_active_x_preview(
     shape.set_picture(
       Some(relationship_id.to_string()),
       None,
+      None,
       ImageCrop::default(),
       Vec::new(),
       Some(resource),
@@ -1769,6 +1772,7 @@ fn attach_vml_ole_preview(
   if shape.picture.is_none() {
     shape.set_picture(
       Some(relationship_id.to_string()),
+      None,
       None,
       ImageCrop::default(),
       Vec::new(),

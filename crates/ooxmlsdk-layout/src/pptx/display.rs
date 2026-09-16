@@ -296,6 +296,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       .map(Cow::Owned)
       .unwrap_or(Cow::Borrowed("application/octet-stream")),
     bytes: item.data,
+    blip_compression_state: item.blip_compression_state,
     metafile_monochrome_dib_palette_override: item.metafile_monochrome_dib_palette_override,
     metafile_background_color: item.metafile_background_color,
     metafile_external_header: item.metafile_external_header,
@@ -853,18 +854,27 @@ fn lower_background(
       _ => {}
     }
   } else {
+    let background_frame = TextFrame {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: slide.size.width_pt,
+      height_pt: slide.size.height_pt,
+    };
+    let Some(background_frame) = (match &fill_properties.kind {
+      FillKind::Blip(blip_fill) => {
+        positive_stretch_fill_rectangle_frame(blip_fill, background_frame)
+      }
+      _ => Some(background_frame),
+    }) else {
+      return;
+    };
     items.extend(
       blip_fill_image_items(
         import,
         slide,
         fill_properties,
         ImageFillPlacement {
-          frame: TextFrame {
-            x_pt: 0.0,
-            y_pt: 0.0,
-            width_pt: slide.size.width_pt,
-            height_pt: slide.size.height_pt,
-          },
+          frame: background_frame,
           rotation_deg: 0.0,
           flip_horizontal: false,
           flip_vertical: false,
@@ -1014,7 +1024,7 @@ fn lower_shape(
     // the default p:blipFill, with the outline in front. Stage the bitmap
     // here; lower_shape_bounds reorders the complete surface before applying
     // effects and static 3-D.
-    lower_picture(import, slide, shape, offset, fixed_output, items);
+    lower_picture(import, slide, shape, offset, locales, fixed_output, items);
     lower_shape_bounds(
       import,
       slide,
@@ -1240,7 +1250,7 @@ fn is_uninstantiated_placeholder(shape: &Shape) -> bool {
 
 fn is_disabled_header_footer_placeholder(slide: &SlidePersist, shape: &Shape) -> bool {
   if shape.shape_location != Some(super::slide::ShapeLocation::Slide) {
-    return false;
+    return is_disabled_inherited_slide_number_field(slide.header_footer.slide_number, shape);
   }
   match shape.sub_type {
     Some(p::PlaceholderValues::SlideNumber) => !slide.header_footer.slide_number,
@@ -1251,6 +1261,14 @@ fn is_disabled_header_footer_placeholder(slide: &SlidePersist, shape: &Shape) ->
   }
 }
 
+fn is_disabled_inherited_slide_number_field(slide_number_enabled: bool, shape: &Shape) -> bool {
+  // Legacy layouts can carry a generated "Slide Number Placeholder" with an
+  // empty p:nvPr instead of p:ph, while retaining an a:fld type="slidenum".
+  // It is still controlled by p:hf@sldNum. An explicit userDrawn marker makes
+  // the same field an ordinary inherited text box instead.
+  !slide_number_enabled && !shape.user_drawn && is_legacy_slide_number_placeholder(shape)
+}
+
 fn inherited_slide_number_field_is_enabled(slide: &SlidePersist, shape: &Shape) -> bool {
   slide.header_footer.slide_number
     // ECMA-376 Part 1 §19.3.1.33 distinguishes a user-drawn object from a
@@ -1258,7 +1276,19 @@ fn inherited_slide_number_field_is_enabled(slide: &SlidePersist, shape: &Shape) 
     // matching layout/slide instance; an explicitly user-drawn master text
     // box remains ordinary inherited slide content.
     && shape.user_drawn
-    && shape.sub_type.is_none()
+    && has_inherited_slide_number_field(shape)
+}
+
+fn is_legacy_slide_number_placeholder(shape: &Shape) -> bool {
+  has_inherited_slide_number_field(shape)
+    && shape
+      .name
+      .as_deref()
+      .is_some_and(|name| name.starts_with("Slide Number Placeholder"))
+}
+
+fn has_inherited_slide_number_field(shape: &Shape) -> bool {
+  shape.sub_type.is_none()
     && shape
       .shape_location
       .is_some_and(|location| location != super::slide::ShapeLocation::Slide)
@@ -1376,14 +1406,11 @@ fn lower_chart(
       import,
       slide,
       default_properties: chart_text_properties,
-      theme_language: if matches!(
-        chart.title.as_ref(),
-        Some(shared_chart::ChartTitleText::Automatic)
-      ) {
-        ui_language
-      } else {
-        default_document_language
-      },
+      // PowerPoint localizes a generated title from the host UI language,
+      // but resolves its DrawingML theme fonts from the document language.
+      // A zh-TW UI over a zh-CN document therefore emits the Traditional
+      // Chinese title with the theme's Hans face.
+      theme_language: default_document_language,
     };
     let label_text_style_context = ChartTextStyleContext {
       theme_language: default_document_language,
@@ -2037,14 +2064,9 @@ fn lower_chart(
         import,
         slide,
         default_properties: chart_text_properties,
-        theme_language: if matches!(
-          chart.title.as_ref(),
-          Some(shared_chart::ChartTitleText::Automatic)
-        ) {
-          ui_language
-        } else {
-          default_document_language
-        },
+        // The generated string follows the host UI language; theme-font
+        // selection remains owned by the document language.
+        theme_language: default_document_language,
       };
       let label_text_style_context = ChartTextStyleContext {
         theme_language: default_document_language,
@@ -2659,6 +2681,7 @@ fn chart_text_style(
     {
       apply_run_common(
         context.import,
+        Some(context.slide),
         RunCommon {
           language: properties.language.as_deref(),
           font_size: properties.font_size,
@@ -4555,6 +4578,7 @@ fn diagram_blip_placeholder_image_item(bounds: shared_diagram::DiagramBounds) ->
     flip_vertical: false,
     data: transparent_png_1x1()?,
     content_type: Some("image/png".to_string()),
+    blip_compression_state: common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -4602,6 +4626,7 @@ fn diagram_text_body(source: &shared_diagram::DiagramTextBody) -> TextBody {
         diagram_synthesized_bullet_left_margin: paragraph.synthesized_bullet_left_margin,
         diagram_synthesized_bullet_indent: paragraph.synthesized_bullet_indent,
         level: paragraph.level,
+        placeholder_paragraph_properties: None,
         paragraph_properties: paragraph.paragraph_properties.clone(),
         end_paragraph_run_properties: paragraph.end_paragraph_run_properties.clone(),
         master_paragraph_style: None,
@@ -6081,6 +6106,7 @@ fn lower_legacy_vml_fill_image(shape: &Shape, offset: DisplayOffset, items: &mut
       flip_vertical: fill.rotate_with_shape && shape.flip_v,
       data: fill.resource.data.clone(),
       content_type: fill.resource.content_type.clone(),
+      blip_compression_state: common::BlipCompressionState::Unspecified,
       metafile_monochrome_dib_palette_override: fill.resource.monochrome_dib_palette_override,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -6216,6 +6242,7 @@ fn lower_picture(
   slide: &SlidePersist,
   shape: &Shape,
   offset: DisplayOffset,
+  locales: &OfficeLocaleContext,
   fixed_output: PptxFixedOutputProfile,
   items: &mut Vec<PageItem>,
 ) {
@@ -6229,7 +6256,7 @@ fn lower_picture(
     && picture.link_relationship_id.is_some()
     && picture.image_resource.is_none();
   if picture.empty_blip_fill || unresolved_external_picture {
-    lower_empty_blip_fill_placeholder(shape, offset, items);
+    lower_empty_blip_fill_placeholder(shape, offset, locales.ui_language(), items);
     return;
   }
   let _embed_relationship_id = picture.embed_relationship_id.as_deref();
@@ -6333,6 +6360,7 @@ fn lower_picture(
     flip_vertical,
     data,
     content_type,
+    blip_compression_state: drawingml_blip_compression_state(picture.compression_state),
     metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
     metafile_background_color: None,
     metafile_external_header: resource.metafile_external_header,
@@ -6353,6 +6381,7 @@ fn lower_picture(
 fn lower_empty_blip_fill_placeholder(
   shape: &Shape,
   offset: DisplayOffset,
+  ui_language: Option<&str>,
   items: &mut Vec<PageItem>,
 ) {
   let frame = TextFrame {
@@ -6418,6 +6447,7 @@ fn lower_empty_blip_fill_placeholder(
     flip_vertical: shape.flip_v,
     data: missing_picture_icon_png(),
     content_type: Some("image/png".to_string()),
+    blip_compression_state: common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -6432,6 +6462,78 @@ fn lower_empty_blip_fill_placeholder(
     floating: false,
     behind_text: false,
   }));
+
+  lower_missing_picture_message(frame, shape, ui_language, items);
+}
+
+fn lower_missing_picture_message(
+  frame: TextFrame,
+  shape: &Shape,
+  ui_language: Option<&str>,
+  items: &mut Vec<PageItem>,
+) {
+  let resource = crate::localization::office_powerpoint_blocked_linked_image_resource(ui_language);
+  let family: Arc<str> = Arc::from(resource.font_family);
+  let rotation_deg = shape_visual_rotation_degrees(shape);
+  let style = TextStyle {
+    font_family: Some(Arc::clone(&family)),
+    east_asia_font_family: Some(family),
+    font_size_pt: 1.32,
+    line_vertical_alignment: common::LineVerticalAlignment::Top,
+    use_windows_font_metrics: true,
+    wordprocessingml_font_slots: true,
+    pdf_glyph_outlines: true,
+    rotation_deg,
+    color: RgbColor { r: 0, g: 0, b: 0 },
+    opacity: 1.0,
+    outline_opacity: 1.0,
+    ..TextStyle::default()
+  };
+  let max_width_pt = (frame.width_pt - 5.0).max(0.0);
+  if max_width_pt <= f32::EPSILON {
+    return;
+  }
+
+  let mut text_metrics = TextMetrics::new();
+  let mut lines = Vec::new();
+  let mut line = String::new();
+  for character in resource.text.chars() {
+    line.push(character);
+    if line.chars().count() > 1 && text_metrics.measure_text(&line, &style) > max_width_pt {
+      line.pop();
+      lines.push(std::mem::take(&mut line));
+      line.push(character);
+    }
+  }
+  if !line.is_empty() {
+    lines.push(line);
+  }
+
+  let rotation_center_pt = (rotation_deg.abs() > f32::EPSILON).then_some((
+    frame.x_pt + frame.width_pt / 2.0,
+    frame.y_pt + frame.height_pt / 2.0,
+  ));
+  let clip = common_rect(frame.x_pt, frame.y_pt, frame.width_pt, frame.height_pt);
+  for (line_index, text) in lines.into_iter().enumerate() {
+    items.push(PageItem::Text(TextItem {
+      x_pt: frame.x_pt + 3.5,
+      y_pt: frame.y_pt + 0.84 + line_index as f32 * 1.2,
+      line_height_pt: 1.2,
+      drawingml_text_effect_anchor: None,
+      paint_clip: Some(clip),
+      page_culling_bounds: None,
+      discard_if_horizontally_clipped: false,
+      text,
+      style: Box::new(style.clone()),
+      rotation_center_pt,
+      hyperlink_url: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+      source_path: Vec::new(),
+    }));
+  }
 }
 
 fn missing_picture_icon_png() -> Bytes {
@@ -6479,7 +6581,9 @@ fn lower_table(
   items: &mut Vec<PageItem>,
 ) {
   let import = context.import;
-  // table grid and row heights as the visible TableShape size.
+  // PowerPoint persists desired row heights, then expands each row to hold
+  // its cell content. The resulting grid, rather than a proportional stretch
+  // to graphicFrame/xfrm, is the visible TableShape size.
   let x0 = offset.x_pt(shape.position.x);
   let y0 = offset.y_pt(shape.position.y);
   let table_width = offset.width_pt(table.grid.iter().copied().sum::<i64>());
@@ -6504,7 +6608,7 @@ fn lower_table(
   // [MS-OI29500] §21.1.3.12 likewise leaves invalid references unstyled.
   // Keep explicit package/inline styles and recognized built-in references.
   let table_style = package_table_style.or(predefined_table_style.as_ref());
-  let row_heights = table_display_row_heights(context, table, table_style, shape.size.cy, offset);
+  let row_heights = table_display_row_heights(context, table, table_style, offset);
   let table_height = row_heights.iter().sum::<f32>();
   if table_height <= 0.0 {
     return;
@@ -6647,39 +6751,16 @@ fn lower_table_style_outer_borders(
   );
 }
 
-fn table_row_display_height(
-  row_height: i64,
-  row_height_sum: i64,
-  shape_height: i64,
-  scale_y: f32,
-) -> f32 {
-  let row_height = units::emu_to_points_f32(row_height as f32 * scale_y);
-  if row_height_sum <= 0 || shape_height <= row_height_sum {
-    return row_height;
-  }
-  row_height * shape_height as f32 / row_height_sum as f32
-}
-
 fn table_display_row_heights(
   context: PptxLoweringContext<'_>,
   table: &TableProperties,
   table_style: Option<&TableStyle>,
-  shape_height: i64,
   offset: DisplayOffset,
 ) -> Vec<f32> {
-  let row_height_sum = table.rows.iter().map(|row| row.height).sum::<i64>();
-  if table.rows.iter().all(|row| row.height > 0) {
-    return table
-      .rows
-      .iter()
-      .map(|row| {
-        table_row_display_height(row.height, row_height_sum, shape_height, offset.scale_y())
-      })
-      .collect();
-  }
-  // MS-OI29500 §21.1.3.18 permits h=0. Office measures those rows from
-  // their cells instead of hiding them or dividing the graphic-frame height
-  // equally among them. Existing positive row extents remain authored minima.
+  // ECMA-376 §21.1.3.18 stores a desired row height. PowerPoint expands a
+  // positive height when its cells need more room; h=0 starts at the Office
+  // minimum described by MS-OI29500 §21.1.3.18. Apache POI's XSLF table
+  // layout independently follows the same max(authored, content) rule.
   let mut heights = table
     .rows
     .iter()
@@ -6695,13 +6776,7 @@ fn table_display_row_heights(
         .rows
         .len()
         .min(row_index.saturating_add(table_cell_row_span(cell)));
-      if !cell.horizontal_merge
-        && !cell.vertical_merge
-        && grid_index < table.grid.len()
-        && table.rows[row_index..end_row]
-          .iter()
-          .any(|row| row.height <= 0)
-      {
+      if !cell.horizontal_merge && !cell.vertical_merge && grid_index < table.grid.len() {
         let width = offset.width_pt(
           table.grid[grid_index..table.grid.len().min(grid_index + span)]
             .iter()
@@ -6760,7 +6835,10 @@ fn table_display_row_heights(
         let required_height = margins + text_height.max(2.0);
         if end_row == row_index + 1 {
           heights[row_index] = heights[row_index].max(required_height);
-        } else {
+        } else if table.rows[row_index..end_row]
+          .iter()
+          .any(|row| row.height <= 0)
+        {
           merged_requirements.push((row_index, end_row, required_height));
         }
       }
@@ -6790,6 +6868,7 @@ fn table_cell_text_body(context: PptxLoweringContext<'_>, cell: &TableCell) -> O
       .other_text_style
       .as_ref()
       .or(context.slide.default_text_style.as_ref()),
+    None,
   );
   body.display_properties.vertical = cell.vertical;
   body.display_properties.anchor = cell.anchor;
@@ -8778,6 +8857,7 @@ fn finish_shape_effect_raster(
     } else {
       "image/png".to_string()
     }),
+    blip_compression_state: common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -9783,7 +9863,14 @@ fn blip_fill_image_items_from_resource(
 
   let crop = blip_fill_image_crop(blip_fill);
   if let Some(a::BlipFillChoice::Tile(tile)) = blip_fill.blip_fill_choice.as_ref() {
-    return tiled_blip_fill_image_items(image_data.data, content_type, tile, crop, placement);
+    return tiled_blip_fill_image_items(
+      image_data.data,
+      content_type,
+      tile,
+      crop,
+      drawingml_blip_compression_state(blip.compression_state),
+      placement,
+    );
   }
   // lclGetBitmapMode() defaults missing bitmap mode to XML_tile for MSO.
   if blip_fill.blip_fill_choice.is_none() {
@@ -9792,6 +9879,7 @@ fn blip_fill_image_items_from_resource(
       content_type,
       &a::Tile::default(),
       crop,
+      drawingml_blip_compression_state(blip.compression_state),
       placement,
     );
   }
@@ -9845,6 +9933,7 @@ fn blip_fill_image_items_from_resource(
     flip_vertical,
     data,
     content_type,
+    blip_compression_state: drawingml_blip_compression_state(blip.compression_state),
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -9862,6 +9951,7 @@ fn tiled_blip_fill_image_items(
   content_type: Option<String>,
   tile: &a::Tile,
   source_crop: ImageCrop,
+  blip_compression_state: common::BlipCompressionState,
   placement: ImageFillPlacement,
 ) -> Vec<ImageItem> {
   let natural_size =
@@ -9902,6 +9992,7 @@ fn tiled_blip_fill_image_items(
       flip_vertical: placement.flip_vertical ^ tile.flip_vertical,
       data: data.clone(),
       content_type: content_type.clone(),
+      blip_compression_state,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -9914,6 +10005,21 @@ fn tiled_blip_fill_image_items(
     }
   })
   .collect()
+}
+
+fn drawingml_blip_compression_state(
+  value: Option<a::BlipCompressionValues>,
+) -> common::BlipCompressionState {
+  match value {
+    None => common::BlipCompressionState::Unspecified,
+    Some(a::BlipCompressionValues::Email) => common::BlipCompressionState::Email,
+    Some(a::BlipCompressionValues::Screen) => common::BlipCompressionState::Screen,
+    Some(a::BlipCompressionValues::Print) => common::BlipCompressionState::Print,
+    Some(a::BlipCompressionValues::HighQualityPrint) => {
+      common::BlipCompressionState::HighQualityPrint
+    }
+    Some(a::BlipCompressionValues::None) => common::BlipCompressionState::None,
+  }
 }
 
 fn image_tile_size_pt(data: &[u8]) -> Option<(f32, f32)> {
@@ -10210,6 +10316,43 @@ fn blip_fill_image_crop(blip_fill: &a::BlipFill) -> ImageCrop {
         .map(image_crop_from_source_rectangle)
     })
     .unwrap_or_default()
+}
+
+fn positive_stretch_fill_rectangle_frame(
+  blip_fill: &a::BlipFill,
+  frame: TextFrame,
+) -> Option<TextFrame> {
+  let Some(a::BlipFillChoice::Stretch(stretch)) = blip_fill.blip_fill_choice.as_ref() else {
+    return Some(frame);
+  };
+  let Some(rect) = stretch.fill_rectangle.as_ref() else {
+    return Some(frame);
+  };
+  let left = drawingml_percent_ratio(rect.left.as_ref());
+  let top = drawingml_percent_ratio(rect.top.as_ref());
+  let right = drawingml_percent_ratio(rect.right.as_ref());
+  let bottom = drawingml_percent_ratio(rect.bottom.as_ref());
+  // ECMA-376 Part 1 20.1.8.30 defines positive fillRect edges as destination
+  // insets. Negative edges are already represented by the source-crop path
+  // below; keep that path until asymmetric rotated outsets carry an explicit
+  // rotation center in the display model.
+  if [left, top, right, bottom]
+    .into_iter()
+    .any(|edge| edge < 0.0)
+  {
+    return Some(frame);
+  }
+  let width_ratio = 1.0 - left - right;
+  let height_ratio = 1.0 - top - bottom;
+  if width_ratio <= f32::EPSILON || height_ratio <= f32::EPSILON {
+    return None;
+  }
+  Some(TextFrame {
+    x_pt: frame.x_pt + frame.width_pt * left,
+    y_pt: frame.y_pt + frame.height_pt * top,
+    width_pt: frame.width_pt * width_ratio,
+    height_pt: frame.height_pt * height_ratio,
+  })
 }
 
 fn image_crop_from_source_rectangle(rect: &a::SourceRectangle) -> ImageCrop {
@@ -10956,6 +11099,7 @@ fn materialize_drawingml_text_effects(
       flip_vertical: false,
       data: Bytes::from(png.into_inner()),
       content_type: Some("image/png".to_string()),
+      blip_compression_state: common::BlipCompressionState::Unspecified,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -11360,14 +11504,17 @@ fn text_base_style(
 ) -> TextStyle {
   let options = TextLoweringOptions::from_text_body(text_body);
   let base_font_size_pt = base_font_size_pt.unwrap_or(DEFAULT_TEXT_FONT_SIZE_PT);
+  let drawingml_text_static3d =
+    drawingml_text_static3d(import, slide, text_body.body_properties.as_deref());
+  let has_effective_text_3d = text_body
+    .body_properties
+    .as_deref()
+    .is_some_and(effective_text_3d);
   let vectorize_without_semantic_overlay = text_body
     .display_properties
     .text_area_rotation
     .is_some_and(|rotation| rotation != 0)
-    || text_body
-      .body_properties
-      .as_deref()
-      .is_some_and(|properties| properties.scene3_d_type.is_some());
+    || has_effective_text_3d;
   let pdf_glyph_outlines =
     vectorize_without_semantic_overlay || text_body.display_properties.from_word_art;
   // DrawingML shape creation seeds all three script families from the
@@ -11414,8 +11561,7 @@ fn text_base_style(
   if let Some(table_text_style) = table_text_style {
     apply_table_text_style(import, slide, table_text_style, &mut base_style);
   }
-  base_style.drawingml_text_static3d =
-    drawingml_text_static3d(import, slide, text_body.body_properties.as_deref());
+  base_style.drawingml_text_static3d = drawingml_text_static3d;
   base_style
 }
 
@@ -11430,6 +11576,9 @@ fn drawingml_text_static3d(
     a::BodyPropertiesChoice2::Shape3DType(shape) => shape,
     a::BodyPropertiesChoice2::FlatText(_) => return None,
   };
+  if !effective_text_static3d(scene, shape) {
+    return None;
+  }
   let resolver = PptxImageEffectColorResolver {
     import,
     slide,
@@ -11463,6 +11612,45 @@ fn drawingml_text_static3d(
     contour_color,
     wordprocessing_effect_plane_z_pt: None,
   })
+}
+
+fn effective_text_static3d(scene: &a::Scene3DType, shape: &a::Shape3DType) -> bool {
+  effective_text_scene3d(scene)
+    || shape.z.is_some()
+    || shape.extrusion_height.is_some()
+    || shape.contour_width.is_some()
+    || shape.preset_material.is_some()
+    || shape.bevel_top.is_some()
+    || shape.bevel_bottom.is_some()
+    || shape.extrusion_color.is_some()
+    || shape.contour_color.is_some()
+}
+
+fn effective_text_3d(properties: &a::BodyProperties) -> bool {
+  let Some(scene) = properties.scene3_d_type.as_ref() else {
+    return false;
+  };
+  match properties.body_properties_choice2.as_ref() {
+    Some(a::BodyPropertiesChoice2::Shape3DType(shape)) => effective_text_static3d(scene, shape),
+    Some(a::BodyPropertiesChoice2::FlatText(flat)) => {
+      effective_text_scene3d(scene) || flat.z.is_some()
+    }
+    None => effective_text_scene3d(scene),
+  }
+}
+
+fn effective_text_scene3d(scene: &a::Scene3DType) -> bool {
+  // PowerPoint templates commonly retain a front-facing scene plus an empty
+  // sp3d on title placeholders. That container carries no visible 3-D state:
+  // Office exports the inherited title as ordinary searchable text. Scene
+  // camera, lighting, or backdrop state makes the container effective even
+  // when the producer omits the optional sp3d/flatTx choice.
+  scene.camera.preset != a::PresetCameraValues::OrthographicFront
+    || scene.camera.field_of_view.is_some()
+    || scene.camera.zoom.is_some()
+    || scene.camera.rotation.is_some()
+    || scene.light_rig.rotation.is_some()
+    || scene.backdrop.is_some()
 }
 
 fn text_auto_fit_scales(options: &TextLoweringOptions) -> (f32, f32) {
@@ -11916,10 +12104,10 @@ impl TextLoweringOptions {
       column_spacing_pt: units::emu_to_points(text_body.display_properties.column_spacing_emu),
       right_to_left_columns: text_body.display_properties.right_to_left_columns,
       word_wrap: text_body.display_properties.word_wrap,
-      // PowerPoint's fixed-output path clips a no-autofit text frame at the
-      // shape edge even when bodyPr leaves vertOverflow at its schema default.
-      // Shape autofit is the exception because it grows the shape instead.
-      clip_vertical_overflow: text_body.display_properties.auto_fit == TextAutoFit::None
+      // PowerPoint's fixed-output path clips an explicit a:noAutofit text
+      // frame at the shape edge. An omitted autofit child remains distinct:
+      // ECMA-376 defines omitted bodyPr@vertOverflow as `overflow`.
+      clip_vertical_overflow: text_body.display_properties.auto_fit == TextAutoFit::NoAutoFit
         || (text_body.display_properties.clip_vertical_overflow
           && text_body.display_properties.auto_fit != TextAutoFit::Shape),
       // TextBodyFrame excludes the bottom inset, while PowerPoint clips fixed
@@ -12130,6 +12318,7 @@ fn lower_paragraph(
     context.slide,
     &mut paragraph_base_style,
   );
+  apply_empty_paragraph_end_run_font_size(paragraph, &mut paragraph_base_style);
   apply_text_scale(&mut paragraph_base_style, context.options);
   paragraph_style.apply_diagram_autofit_spacing_scale(paragraph, context.options);
   let mut bullet = paragraph_style.bullet(paragraph);
@@ -12394,6 +12583,16 @@ fn lower_paragraph(
           if paragraph_style.right_to_left {
             bullet_style.resolved_bidi_level = Some(1);
           }
+          let bullet_advance_pt = if paragraph_style.right_to_left {
+            0.0
+          } else {
+            (paragraph_style.indent_pt + bullet_width_pt).max(0.0)
+          };
+          if alignment == a::TextAlignmentTypeValues::Center {
+            run_x -= bullet_advance_pt / 2.0;
+          } else if alignment == a::TextAlignmentTypeValues::Right {
+            run_x -= bullet_advance_pt;
+          }
           push_text_item(
             items,
             TextItemPlacement {
@@ -12413,6 +12612,14 @@ fn lower_paragraph(
             bullet_style,
             context.shape_hyperlink_url.map(ToString::to_string),
           );
+          // A bullet without enough hanging indent still occupies its
+          // natural advance. PowerPoint places the first text character at
+          // max(marL, marL + indent + bullet width); otherwise an omitted
+          // marL/indent would paint the text directly over the bullet.
+          // Center and right alignment position that combined footprint as a
+          // unit. Apache POI's DrawTextParagraph independently uses the same
+          // non-overlap rule.
+          run_x += bullet_advance_pt;
         }
       }
 
@@ -13859,6 +14066,7 @@ fn bullet_graphic_item(
     flip_vertical: false,
     data: resource.data.clone(),
     content_type: resource.content_type.clone(),
+    blip_compression_state: common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: resource.monochrome_dib_palette_override,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -13972,6 +14180,7 @@ fn estimate_wrapped_text_body_height(
       context.slide,
       &mut paragraph_base_style,
     );
+    apply_empty_paragraph_end_run_font_size(paragraph, &mut paragraph_base_style);
     apply_text_scale(&mut paragraph_base_style, context.options);
     paragraph_style.apply_diagram_autofit_spacing_scale(paragraph, context.options);
     let bullet = paragraph_style.bullet(paragraph);
@@ -14180,6 +14389,7 @@ fn push_math_ole_preview_item(
     flip_vertical: false,
     data,
     content_type: Some("image/png".to_string()),
+    blip_compression_state: common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -14204,6 +14414,7 @@ fn transparent_png_1x1() -> Option<Bytes> {
 #[derive(Clone, Debug)]
 struct ParagraphDisplayStyle {
   left_margin_pt: f32,
+  has_explicit_left_margin: bool,
   right_margin_pt: f32,
   indent_pt: f32,
   alignment: a::TextAlignmentTypeValues,
@@ -14311,6 +14522,26 @@ fn paragraph_has_printable_run(paragraph: &TextParagraph) -> bool {
   paragraph.runs.iter().any(|run| {
     !run.text.is_empty() && !matches!(run.kind, TextRunKind::Break | TextRunKind::Placeholder)
   })
+}
+
+fn apply_empty_paragraph_end_run_font_size(paragraph: &TextParagraph, style: &mut TextStyle) {
+  if paragraph_has_printable_run(paragraph) {
+    return;
+  }
+  let Some(font_size) = paragraph
+    .end_paragraph_run_properties
+    .as_deref()
+    .and_then(|properties| properties.font_size)
+  else {
+    return;
+  };
+  // endParaRPr is the persisted insertion style after a paragraph. For an
+  // empty paragraph it is also the only authored character size available
+  // to determine that paragraph's line box. PowerPoint uses it before
+  // applying body-level autofit and line-spacing percentages.
+  let font_size_pt = ooxmlsdk::units::drawingml_text_size_to_points(font_size) as f32;
+  style.font_size_pt = font_size_pt;
+  style.drawingml_effect_font_size_pt = Some(font_size_pt);
 }
 
 fn format_auto_number(scheme: a::TextAutoNumberSchemeValues, value: i32) -> String {
@@ -14469,6 +14700,7 @@ impl Default for ParagraphDisplayStyle {
   fn default() -> Self {
     Self {
       left_margin_pt: 0.0,
+      has_explicit_left_margin: false,
       right_margin_pt: 0.0,
       indent_pt: 0.0,
       alignment: a::TextAlignmentTypeValues::Left,
@@ -14554,6 +14786,9 @@ impl ParagraphDisplayStyle {
       style.apply_text_list_style(master_style);
       style.master_default_run_properties = text_list_default_run_properties(master_style);
     }
+    if let Some(properties) = paragraph.placeholder_paragraph_properties.as_deref() {
+      style.apply_paragraph_bullet_properties(properties);
+    }
     if let Some(text_style) = &paragraph.text_paragraph_style {
       style.apply_text_list_style(text_style);
       style.text_default_run_properties = text_list_default_run_properties(text_style);
@@ -14561,6 +14796,7 @@ impl ParagraphDisplayStyle {
     if let Some(properties) = paragraph.paragraph_properties.as_deref() {
       if let Some(left_margin) = properties.left_margin {
         style.left_margin_pt = units::emu_to_points(i64::from(left_margin));
+        style.has_explicit_left_margin = true;
       }
       if let Some(right_margin) = properties.right_margin {
         style.right_margin_pt = units::emu_to_points(i64::from(right_margin));
@@ -14605,23 +14841,37 @@ impl ParagraphDisplayStyle {
       if let Some(space_after) = properties.space_after.as_deref() {
         style.space_after = paragraph_space_after(space_after);
       }
-      style.apply_bullet_size(&properties.paragraph_properties_choice2);
-      style.bullet.apply_color(paragraph_properties_bullet_color(
-        &properties.paragraph_properties_choice1,
-      ));
-      style.bullet.apply_font(paragraph_properties_bullet_font(
-        &properties.paragraph_properties_choice3,
-      ));
-      style.bullet.apply_kind(paragraph_properties_bullet(
-        &properties.paragraph_properties_choice4,
-      ));
+      style.apply_paragraph_bullet_properties(properties);
+    }
+    if !style.has_explicit_left_margin
+      && let Some(level) = paragraph.level.filter(|level| *level > 0)
+    {
+      // PowerPoint's application fallback advances unstyled outline levels
+      // by half of the 72 pt default tab interval. This applies when a
+      // package has neither defaultTextStyle nor a level style: lvl="1" in
+      // the Office control begins 36 pt after otherwise identical lvl="0".
+      style.left_margin_pt = 36.0 * f32::from(level);
     }
     style
+  }
+
+  fn apply_paragraph_bullet_properties(&mut self, properties: &a::ParagraphProperties) {
+    self.apply_bullet_size(&properties.paragraph_properties_choice2);
+    self.bullet.apply_color(paragraph_properties_bullet_color(
+      &properties.paragraph_properties_choice1,
+    ));
+    self.bullet.apply_font(paragraph_properties_bullet_font(
+      &properties.paragraph_properties_choice3,
+    ));
+    self.bullet.apply_kind(paragraph_properties_bullet(
+      &properties.paragraph_properties_choice4,
+    ));
   }
 
   fn apply_text_list_style(&mut self, style: &TextListParagraphStyle) {
     match style {
       TextListParagraphStyle::Default(properties) => {
+        self.has_explicit_left_margin |= properties.left_margin.is_some();
         self.left_margin_pt = properties
           .left_margin
           .map(|value| units::emu_to_points(i64::from(value)))
@@ -14699,6 +14949,7 @@ impl ParagraphDisplayStyle {
   fn apply_level_style(&mut self, properties: &TextListLevelParagraphProperties) {
     macro_rules! apply_level {
       ($properties:expr, $bullet_fn:ident, $choice:ident) => {{
+        self.has_explicit_left_margin |= $properties.left_margin.is_some();
         self.left_margin_pt = $properties
           .left_margin
           .map(|value| units::emu_to_points(i64::from(value)))
@@ -14860,15 +15111,9 @@ impl ParagraphDisplayStyle {
     if !has_printable_run {
       return BulletDisplay::default();
     }
-    let mut bullet = self.bullet.clone();
+    let bullet = self.bullet.clone();
     if bullet.disabled {
       return BulletDisplay::default();
-    }
-    if bullet.label.is_none() && bullet.auto_number.is_none() {
-      bullet.label = paragraph
-        .level
-        .filter(|level| *level > 0)
-        .map(|_| "\u{2022}".to_string());
     }
     bullet
   }
@@ -15751,6 +15996,7 @@ fn apply_drawingml_run_properties(
 ) {
   apply_run_common(
     import,
+    slide,
     RunCommon {
       language: properties.language.as_deref(),
       font_size: properties.font_size,
@@ -15815,6 +16061,7 @@ fn apply_default_run_properties(
 ) {
   apply_run_common(
     import,
+    slide,
     RunCommon {
       language: properties.language.as_deref(),
       font_size: properties.font_size,
@@ -15921,10 +16168,16 @@ struct RunCommon<'a> {
   symbol_font: Option<&'a a::SymbolFont>,
 }
 
-fn apply_run_common(import: &PowerPointImport, properties: RunCommon<'_>, style: &mut TextStyle) {
+fn apply_run_common(
+  import: &PowerPointImport,
+  slide: Option<&SlidePersist>,
+  properties: RunCommon<'_>,
+  style: &mut TextStyle,
+) {
   if let Some(language) = properties.language {
     style.language = Some(Arc::from(language));
   }
+  let theme_language = style.language.clone();
   if let Some(font_size) = properties.font_size {
     let font_size_pt = ooxmlsdk::units::drawingml_text_size_to_points(font_size) as f32;
     if properties.baseline.is_none() && style.baseline_shift_pt != 0.0 {
@@ -15971,29 +16224,64 @@ fn apply_run_common(import: &PowerPointImport, properties: RunCommon<'_>, style:
     .and_then(|font| font.typeface.as_ref())
     .filter(|typeface| !typeface.is_empty())
   {
-    style.font_family = Some(Arc::from(resolve_theme_font(import, typeface)));
+    style.font_family = Some(Arc::from(resolve_theme_font_for_language(
+      import,
+      slide,
+      typeface,
+      theme_language.as_deref(),
+    )));
   }
   if let Some(typeface) = properties
     .east_asian_font
     .and_then(|font| font.typeface.as_ref())
     .filter(|typeface| !typeface.is_empty())
   {
-    style.east_asia_font_family = Some(Arc::from(resolve_theme_font(import, typeface)));
+    style.east_asia_font_family = Some(Arc::from(resolve_theme_font_for_language(
+      import,
+      slide,
+      typeface,
+      theme_language.as_deref(),
+    )));
   }
   if let Some(typeface) = properties
     .complex_script_font
     .and_then(|font| font.typeface.as_ref())
     .filter(|typeface| !typeface.is_empty())
   {
-    style.complex_font_family = Some(Arc::from(resolve_theme_font(import, typeface)));
+    style.complex_font_family = Some(Arc::from(resolve_theme_font_for_language(
+      import,
+      slide,
+      typeface,
+      theme_language.as_deref(),
+    )));
   }
   if let Some(typeface) = properties
     .symbol_font
     .and_then(|font| font.typeface.as_ref())
     .filter(|typeface| !typeface.is_empty())
   {
-    style.symbol_font_family = Some(Arc::from(resolve_theme_font(import, typeface)));
+    style.symbol_font_family = Some(Arc::from(resolve_theme_font_for_language(
+      import,
+      slide,
+      typeface,
+      theme_language.as_deref(),
+    )));
   }
+}
+
+fn resolve_theme_font_for_language<'a>(
+  import: &'a PowerPointImport,
+  slide: Option<&SlidePersist>,
+  typeface: &'a str,
+  language: Option<&str>,
+) -> &'a str {
+  // DrawingML themes commonly leave a:ea empty and carry the physical face
+  // in the per-script supplemental table. Run language selects that face;
+  // producers can place the same +mj-ea/+mn-ea token in both a:latin and
+  // a:ea, so resolve every authored run font through the language-aware path.
+  import
+    .resolve_theme_font_for_slide_and_language(slide, typeface, language)
+    .unwrap_or(typeface)
 }
 
 fn resolve_theme_font<'a>(import: &'a PowerPointImport, typeface: &'a str) -> &'a str {
@@ -17724,6 +18012,61 @@ mod tests {
   }
 
   #[test]
+  fn omitted_autofit_preserves_default_vertical_overflow() {
+    let omitted = TextBody {
+      display_properties: TextBodyDisplayProperties::from_body_properties(
+        &a::BodyProperties::default(),
+      ),
+      ..TextBody::default()
+    };
+    let explicit_no_autofit = TextBody {
+      display_properties: TextBodyDisplayProperties::from_body_properties(&a::BodyProperties {
+        body_properties_choice1: Some(a::BodyPropertiesChoice::NoAutoFit),
+        ..a::BodyProperties::default()
+      }),
+      ..TextBody::default()
+    };
+
+    assert!(!TextLoweringOptions::from_text_body(&omitted).clip_vertical_overflow);
+    assert!(TextLoweringOptions::from_text_body(&explicit_no_autofit).clip_vertical_overflow);
+  }
+
+  #[test]
+  fn inherited_legacy_slide_number_field_obeys_the_header_footer_gate() {
+    let mut shape = Shape::new(ShapeService::Outliner);
+    shape.shape_location = Some(super::super::slide::ShapeLocation::Layout);
+    shape.name = Some("Slide Number Placeholder 17".to_string());
+    shape.text_body = Some(TextBody {
+      paragraphs: vec![TextParagraph {
+        runs: vec![TextRun {
+          text: "‹#›".to_string(),
+          kind: TextRunKind::Field,
+          hyperlink_url: None,
+          field_type: Some("slidenum".to_string()),
+          run_properties: None,
+          field_paragraph_properties: None,
+        }],
+        ..TextParagraph::default()
+      }],
+      ..TextBody::default()
+    });
+
+    assert!(has_inherited_slide_number_field(&shape));
+    assert!(is_legacy_slide_number_placeholder(&shape));
+    assert!(is_disabled_inherited_slide_number_field(false, &shape));
+    assert!(!is_disabled_inherited_slide_number_field(true, &shape));
+
+    shape.user_drawn = true;
+    assert!(!is_disabled_inherited_slide_number_field(false, &shape));
+
+    shape.user_drawn = false;
+    shape.name = Some("Google Shape;233;p55".to_string());
+    assert!(has_inherited_slide_number_field(&shape));
+    assert!(!is_legacy_slide_number_placeholder(&shape));
+    assert!(!is_disabled_inherited_slide_number_field(false, &shape));
+  }
+
+  #[test]
   fn powerpoint_text_effect_bitmap_ceil_does_not_change_continuous_extent() {
     let output = common::drawingml_image_effects::EffectOutputBounds {
       left_pt: -1.25,
@@ -17792,6 +18135,43 @@ mod tests {
         5.0
       );
     }
+  }
+
+  #[test]
+  fn empty_paragraph_uses_persisted_end_run_font_size() {
+    let mut paragraph = TextParagraph {
+      end_paragraph_run_properties: Some(Box::new(a::EndParagraphRunProperties {
+        font_size: Some(1_800),
+        ..a::EndParagraphRunProperties::default()
+      })),
+      ..TextParagraph::default()
+    };
+    let mut empty_style = TextStyle {
+      font_size_pt: 32.0,
+      drawingml_effect_font_size_pt: Some(32.0),
+      ..TextStyle::default()
+    };
+
+    apply_empty_paragraph_end_run_font_size(&paragraph, &mut empty_style);
+
+    assert_eq!(empty_style.font_size_pt, 18.0);
+    assert_eq!(empty_style.drawingml_effect_font_size_pt, Some(18.0));
+
+    paragraph.runs.push(TextRun {
+      text: "visible".to_string(),
+      kind: TextRunKind::Run,
+      hyperlink_url: None,
+      field_type: None,
+      run_properties: None,
+      field_paragraph_properties: None,
+    });
+    let mut visible_style = TextStyle {
+      font_size_pt: 32.0,
+      drawingml_effect_font_size_pt: Some(32.0),
+      ..TextStyle::default()
+    };
+    apply_empty_paragraph_end_run_font_size(&paragraph, &mut visible_style);
+    assert_eq!(visible_style.font_size_pt, 32.0);
   }
 
   #[test]
@@ -17942,6 +18322,36 @@ mod tests {
   fn horizontal_merge_continuation_does_not_consume_a_second_grid_column() {
     assert_eq!(table_grid_advance(false, 2), 2);
     assert_eq!(table_grid_advance(true, 1), 0);
+  }
+
+  #[test]
+  fn positive_background_fill_rectangle_insets_the_image_destination() {
+    let blip_fill = a::BlipFill {
+      blip_fill_choice: Some(a::BlipFillChoice::Stretch(Box::new(a::Stretch {
+        fill_rectangle: Some(a::FillRectangle {
+          top: Some(DrawingmlPercentageValue::Decimal(34_000)),
+          bottom: Some(DrawingmlPercentageValue::Decimal(11_000)),
+          ..Default::default()
+        }),
+        ..Default::default()
+      }))),
+      ..Default::default()
+    };
+    let frame = positive_stretch_fill_rectangle_frame(
+      &blip_fill,
+      TextFrame {
+        x_pt: 10.0,
+        y_pt: 20.0,
+        width_pt: 200.0,
+        height_pt: 100.0,
+      },
+    )
+    .unwrap();
+
+    assert!((frame.x_pt - 10.0).abs() < 0.001);
+    assert!((frame.y_pt - 54.0).abs() < 0.001);
+    assert!((frame.width_pt - 200.0).abs() < 0.001);
+    assert!((frame.height_pt - 55.0).abs() < 0.001);
   }
 
   #[test]
@@ -18223,6 +18633,21 @@ mod tests {
     assert!((style.available_width(633.6, bullet_left) - 560.7).abs() < 0.001);
     assert_eq!(style.available_width(50.0, bullet_left), 0.0);
 
+    let unstyled_level_two = ParagraphDisplayStyle::from_paragraph(&TextParagraph {
+      level: Some(1),
+      ..TextParagraph::default()
+    });
+    assert_eq!(unstyled_level_two.left_margin_pt, 36.0);
+    let explicit_zero = ParagraphDisplayStyle::from_paragraph(&TextParagraph {
+      level: Some(1),
+      paragraph_properties: Some(Box::new(a::ParagraphProperties {
+        left_margin: Some(0),
+        ..a::ParagraphProperties::default()
+      })),
+      ..TextParagraph::default()
+    });
+    assert_eq!(explicit_zero.left_margin_pt, 0.0);
+
     let hanging = ParagraphDisplayStyle {
       left_margin_pt: 8.781_496,
       indent_pt: -8.781_496,
@@ -18297,6 +18722,28 @@ mod tests {
   }
 
   #[test]
+  fn paragraph_level_without_bullet_declaration_stays_unbulleted() {
+    let paragraph = TextParagraph {
+      level: Some(1),
+      runs: vec![TextRun {
+        text: "Visible text".to_string(),
+        kind: TextRunKind::Run,
+        hyperlink_url: None,
+        field_type: None,
+        run_properties: None,
+        field_paragraph_properties: None,
+      }],
+      ..TextParagraph::default()
+    };
+
+    let bullet = ParagraphDisplayStyle::default().bullet(&paragraph);
+
+    assert!(bullet.label.is_none());
+    assert!(bullet.auto_number.is_none());
+    assert!(bullet.picture_relationship_id.is_none());
+  }
+
+  #[test]
   fn explicit_level_no_bullet_clears_inherited_bullet() {
     let mut style = ParagraphDisplayStyle {
       bullet: BulletDisplay {
@@ -18327,6 +18774,39 @@ mod tests {
 
     assert!(bullet.label.is_none());
     assert!(bullet.picture_relationship_id.is_none());
+  }
+
+  #[test]
+  fn placeholder_sample_paragraph_supplies_missing_character_bullet() {
+    let paragraph = TextParagraph {
+      level: Some(1),
+      placeholder_paragraph_properties: Some(Box::new(a::ParagraphProperties {
+        paragraph_properties_choice3: Some(a::ParagraphPropertiesChoice3::BulletFont(
+          a::BulletFont {
+            typeface: Some("Wingdings".into()),
+            ..a::BulletFont::default()
+          },
+        )),
+        paragraph_properties_choice4: Some(a::ParagraphPropertiesChoice4::CharacterBullet(
+          a::CharacterBullet { char: "§".into() },
+        )),
+        ..a::ParagraphProperties::default()
+      })),
+      runs: vec![TextRun {
+        text: "Visible text".to_string(),
+        kind: TextRunKind::Run,
+        hyperlink_url: None,
+        field_type: None,
+        run_properties: None,
+        field_paragraph_properties: None,
+      }],
+      ..TextParagraph::default()
+    };
+
+    let bullet = ParagraphDisplayStyle::from_paragraph(&paragraph).bullet(&paragraph);
+
+    assert_eq!(bullet.label.as_deref(), Some("§"));
+    assert_eq!(bullet.font.as_deref(), Some("Wingdings"));
   }
 
   #[test]
@@ -18531,5 +19011,31 @@ mod tests {
     assert_eq!(rgb.get_pixel(2, 2).0, [255, 0, 0]);
     assert_eq!(rgb.get_pixel(1, 3).0, [255, 204, 204]);
     assert_eq!(rgb.get_pixel(3, 4).0, [255, 255, 255]);
+  }
+
+  #[test]
+  fn front_facing_empty_text_3d_container_is_inert() {
+    let mut scene = a::Scene3DType::default();
+    scene.camera.preset = a::PresetCameraValues::OrthographicFront;
+    let shape = a::Shape3DType::default();
+
+    assert!(!effective_text_static3d(&scene, &shape));
+
+    let mut properties = a::BodyProperties {
+      scene3_d_type: Some(Box::new(scene.clone())),
+      ..a::BodyProperties::default()
+    };
+    assert!(!effective_text_3d(&properties));
+
+    properties
+      .scene3_d_type
+      .as_deref_mut()
+      .unwrap()
+      .camera
+      .rotation = Some(a::Rotation::default());
+    assert!(effective_text_3d(&properties));
+
+    scene.camera.preset = a::PresetCameraValues::IsometricRightUp;
+    assert!(effective_text_static3d(&scene, &shape));
   }
 }

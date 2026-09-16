@@ -6997,6 +6997,7 @@ fn into_common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       .map(Cow::Owned)
       .unwrap_or(Cow::Borrowed("application/octet-stream")),
     bytes: item.data,
+    blip_compression_state: common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: item.metafile_background_color,
     metafile_external_header: None,

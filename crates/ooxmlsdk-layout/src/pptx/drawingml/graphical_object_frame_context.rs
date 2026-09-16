@@ -207,6 +207,7 @@ fn model3d_preview_picture(
   Some(PictureRecord {
     embed_relationship_id: blip.embed.clone(),
     link_relationship_id: blip.link.clone(),
+    compression_state: None,
     crop: ImageCrop::default(),
     blip_choices: blip.blip_choice.iter().map(model3d_blip_choice).collect(),
     image_resource,
@@ -262,6 +263,7 @@ fn picture_record(picture: &p::Picture, slide_persist: &SlidePersist) -> Option<
   Some(PictureRecord {
     embed_relationship_id: blip.embed.clone(),
     link_relationship_id: blip.link.clone(),
+    compression_state: blip.compression_state,
     crop: image_crop_from_source_rectangle(blip_fill.source_rectangle.as_ref()),
     blip_choices: blip.blip_choice.clone(),
     image_resource,

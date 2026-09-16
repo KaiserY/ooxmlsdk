@@ -15,6 +15,7 @@ const FORMULA_ZERO_TOLERANCE: f64 = 1.0e-12;
 pub(crate) struct FormulaContext {
   date_system: ooxmlsdk_formula::DateSystem,
   today_serial: Option<f64>,
+  now_serial: Option<f64>,
   ui_language: Option<String>,
 }
 
@@ -29,20 +30,28 @@ impl FormulaContext {
     } else {
       ooxmlsdk_formula::DateSystem::Date1900
     };
-    // ECMA-376 §18.17.7.326: TODAY uses the workbook's date base.
-    // The supplied timestamp is already local civil time, so no time-zone
-    // conversion or time-of-day fraction belongs in this date-only value.
-    let today_serial = datetime.and_then(|datetime| {
-      ooxmlsdk_formula::calc::datetime::date_serial_with_system(
+    // The supplied timestamp is already local civil time. TODAY uses its
+    // integral date serial, while NOW retains the time-of-day fraction.
+    let now_serial = datetime.and_then(|datetime| {
+      if datetime.hour >= 24 || datetime.minute >= 60 || datetime.second >= 60 {
+        return None;
+      }
+      let date = ooxmlsdk_formula::calc::datetime::date_serial_with_system(
         datetime.year.into(),
         datetime.month.into(),
         datetime.day.into(),
         date_system,
-      )
+      )?;
+      let seconds = u32::from(datetime.hour) * 3_600
+        + u32::from(datetime.minute) * 60
+        + u32::from(datetime.second);
+      Some(date + f64::from(seconds) / 86_400.0)
     });
+    let today_serial = now_serial.map(f64::floor);
     Self {
       date_system,
       today_serial,
+      now_serial,
       ui_language: ui_language.map(str::to_owned),
     }
   }
@@ -57,6 +66,10 @@ pub(crate) fn recalculate_formula_cells(
 ) {
   let defined = DefinedNames::from_catalog(defined_names);
   let formulas = sheets.iter().map(formula_cells).collect::<Vec<_>>();
+  let data_tables = sheets
+    .iter()
+    .map(missing_data_table_cells)
+    .collect::<Vec<_>>();
   let mut book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
   let mut formula_book = formula_evaluation_book_from_calc_book(&book, source_file_name, context);
 
@@ -110,6 +123,20 @@ pub(crate) fn recalculate_formula_cells(
         sheet_index += 1;
       }
     });
+    for (sheet_index, tables) in data_tables.iter().enumerate() {
+      let current_sheet = formula_book_sheet_id(&book, sheet_index);
+      for table in tables {
+        let Some(value) = evaluate_data_table_cell(&formula_book, current_sheet, table)
+          .map(|value| calc_value_from_formula_value(&book, value))
+        else {
+          continue;
+        };
+        if replace_cell_value(&mut sheets[sheet_index], table.address, &value) {
+          changed = true;
+          changed_cells.push((sheet_index, table.address));
+        }
+      }
+    }
     if !changed {
       break;
     }
@@ -217,6 +244,45 @@ pub(crate) fn evaluate_relative_formula_as_number(
     .and_then(|value| formula_value_number(formula_book, &value))
 }
 
+pub(crate) fn evaluate_formula_as_ranges(
+  import: &super::import::ExcelImport,
+  sheet: &CalcSheet,
+  formula: &str,
+) -> Vec<CellRange> {
+  let Some(sheet_index) = calc_sheet_index(import, sheet) else {
+    return Vec::new();
+  };
+  let context = import.relative_formula_context();
+  let sheet_id = context.sheet_id(sheet_index);
+  let parsed = ooxmlsdk_formula::parse_formula_text(sheet_id, formula);
+  let Some(value) = context
+    .book
+    .evaluate_parsed_formula_raw(sheet_id, None, &parsed, false)
+  else {
+    return Vec::new();
+  };
+  match value {
+    ooxmlsdk_formula::FormulaValue::Reference(reference) => {
+      same_sheet_calc_range(reference, sheet_id)
+        .into_iter()
+        .collect()
+    }
+    ooxmlsdk_formula::FormulaValue::RefList(references) => references
+      .into_iter()
+      .filter_map(|reference| same_sheet_calc_range(reference, sheet_id))
+      .collect(),
+    _ => Vec::new(),
+  }
+}
+
+fn same_sheet_calc_range(
+  reference: ooxmlsdk_formula::QualifiedRange<'_>,
+  sheet: ooxmlsdk_formula::SheetId,
+) -> Option<CellRange> {
+  (reference.sheet == sheet && reference.end_sheet_name.is_none())
+    .then(|| calc_cell_range(reference.range))
+}
+
 #[derive(Debug)]
 pub(crate) struct RelativeFormulaEvaluationContext {
   sheet_workbook_indices: Vec<usize>,
@@ -272,6 +338,18 @@ struct FormulaCell {
 }
 
 #[derive(Clone, Debug)]
+struct DataTableCell {
+  address: CellAddress,
+  range: CellRange,
+  input1: Option<CellAddress>,
+  input2: Option<CellAddress>,
+  row_table: bool,
+  two_dimensional: bool,
+  input1_deleted: bool,
+  input2_deleted: bool,
+}
+
+#[derive(Clone, Debug)]
 struct SharedFormula {
   origin: CellAddress,
   formula: String,
@@ -323,6 +401,105 @@ fn formula_cells(sheet: &CalcSheet) -> Vec<FormulaCell> {
       })
     })
     .collect()
+}
+
+fn missing_data_table_cells(sheet: &CalcSheet) -> Vec<DataTableCell> {
+  sheet
+    .rows
+    .iter()
+    .flat_map(|row| row.cells.iter())
+    .filter_map(|cell| {
+      let address = cell.address()?;
+      let formula = cell.formula.as_ref()?;
+      if formula.formula_type != x::CellFormulaValues::DataTable
+        || !formula.calculate_cell
+        || cell.cached_value.is_some()
+      {
+        return None;
+      }
+      Some(DataTableCell {
+        address,
+        range: CellRange::parse_a1_range(formula.reference.as_deref()?)?,
+        input1: formula
+          .input1_reference
+          .as_deref()
+          .and_then(CellAddress::parse_a1),
+        input2: formula
+          .input2_reference
+          .as_deref()
+          .and_then(CellAddress::parse_a1),
+        row_table: formula.data_table_row,
+        two_dimensional: formula.data_table_2d,
+        input1_deleted: formula.input1_deleted,
+        input2_deleted: formula.input2_deleted,
+      })
+    })
+    .collect()
+}
+
+fn evaluate_data_table_cell<'doc>(
+  book: &ooxmlsdk_formula::FormulaEvaluationBook<'doc>,
+  sheet: ooxmlsdk_formula::SheetId,
+  table: &DataTableCell,
+) -> Option<ooxmlsdk_formula::FormulaValue<'doc>> {
+  if table.input1_deleted || table.two_dimensional && table.input2_deleted {
+    return Some(ooxmlsdk_formula::FormulaValue::Error(
+      ooxmlsdk_formula::FormulaErrorValue::Ref,
+    ));
+  }
+
+  let source = if table.two_dimensional {
+    CellAddress {
+      col: table.range.start.col.checked_sub(1)?,
+      row: table.range.start.row.checked_sub(1)?,
+    }
+  } else if table.row_table {
+    CellAddress {
+      col: table.range.start.col.checked_sub(1)?,
+      row: table.address.row,
+    }
+  } else {
+    CellAddress {
+      col: table.address.col,
+      row: table.range.start.row.checked_sub(1)?,
+    }
+  };
+  let source_address = formula_address(source);
+  let source_formula = book.formulas.get(&(sheet, source_address))?.text.clone();
+  let mut scenario = book.clone();
+
+  let input1 = formula_address(table.input1?);
+  let varying1 = if table.row_table || table.two_dimensional {
+    CellAddress {
+      col: table.address.col,
+      row: table.range.start.row.checked_sub(1)?,
+    }
+  } else {
+    CellAddress {
+      col: table.range.start.col.checked_sub(1)?,
+      row: table.address.row,
+    }
+  };
+  scenario.cells.insert(
+    (sheet, input1),
+    book.cell_value(sheet, formula_address(varying1)),
+  );
+  scenario.formulas.remove(&(sheet, input1));
+
+  if table.two_dimensional {
+    let input2 = formula_address(table.input2?);
+    let varying2 = CellAddress {
+      col: table.range.start.col.checked_sub(1)?,
+      row: table.address.row,
+    };
+    scenario.cells.insert(
+      (sheet, input2),
+      book.cell_value(sheet, formula_address(varying2)),
+    );
+    scenario.formulas.remove(&(sheet, input2));
+  }
+
+  scenario.evaluate_formula_text(sheet, Some(source_address), source_formula.as_ref())
 }
 
 fn cell_at(sheet: &CalcSheet, address: CellAddress) -> Option<&CalcCell> {
@@ -678,6 +855,7 @@ fn formula_evaluation_book_from_calc_book(
   ooxmlsdk_formula::FormulaEvaluationBook {
     date_system: context.date_system,
     today_serial: context.today_serial,
+    now_serial: context.now_serial,
     ui_language: context.ui_language.clone().map(Cow::Owned),
     source_file_name: source_file_name.map(|name| Cow::Owned(name.to_string())),
     sheet_names: book
@@ -1193,6 +1371,69 @@ mod tests {
       &FormulaContext::new(false, None, None),
     );
     for (address, expected) in [("A1", "0"), ("B1", "50000"), ("C1", "0")] {
+      assert_eq!(
+        cell_at(&sheets[0], CellAddress::parse_a1(address).unwrap())
+          .unwrap()
+          .display_text,
+        expected,
+        "{address}"
+      );
+    }
+  }
+
+  #[test]
+  fn requested_data_table_recalculation_fills_missing_anchor_values() {
+    use super::super::styles::StylesCatalog;
+    use super::super::worksheet::{SheetIdentity, SheetResourceCatalog};
+    use ooxmlsdk::sdk::SdkType;
+
+    let worksheet = x::Worksheet::from_bytes(
+      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <sheetData>
+          <row r="1"><c r="A1"><v>0.5</v></c></row>
+          <row r="3"><c r="C3"><f>A1*10</f></c></row>
+          <row r="4"><c r="B4"><v>1</v></c><c r="C4"><f t="dataTable" ref="C4:C8" r1="A1" ca="1"/></c></row>
+          <row r="10"><c r="A10" t="str"><v>Z</v></c></row>
+          <row r="11"><c r="C11" t="str"><v>A</v></c></row>
+          <row r="12"><c r="B12"><f>REPT(A10,2)</f></c><c r="C12"><f t="dataTable" ref="C12:G12" dtr="1" r1="A10" ca="1"/></c></row>
+          <row r="24"><c r="B24"><f>B27&amp;B28</f></c><c r="C24"><v>10</v></c></row>
+          <row r="25"><c r="B25" t="str"><v>Z</v></c><c r="C25"><f t="dataTable" ref="C25" dt2D="1" r1="B28" r2="B27" ca="1"/></c></row>
+          <row r="27"><c r="B27" t="str"><v>A</v></c></row>
+          <row r="28"><c r="B28"><v>1</v></c></row>
+          <row r="33"><c r="C33"><f>#REF!*3</f></c></row>
+          <row r="34"><c r="B34"><v>1</v></c><c r="C34"><f t="dataTable" ref="C34:C36" r1="A31" del1="1" ca="1"/></c></row>
+        </sheetData>
+      </worksheet>"#,
+    )
+    .unwrap();
+    let mut sheets = vec![CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Sheet1".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog::default(),
+      &[],
+      &StylesCatalog::default(),
+      Default::default(),
+    )];
+
+    recalculate_formula_cells(
+      &mut sheets,
+      &DefinedNamesCatalog::default(),
+      None,
+      &WorkbookCatalog::default(),
+      &FormulaContext::new(false, None, None),
+    );
+
+    for (address, expected) in [
+      ("C4", "10"),
+      ("C12", "AA"),
+      ("C25", "Z10"),
+      ("C34", "#REF!"),
+    ] {
       assert_eq!(
         cell_at(&sheets[0], CellAddress::parse_a1(address).unwrap())
           .unwrap()

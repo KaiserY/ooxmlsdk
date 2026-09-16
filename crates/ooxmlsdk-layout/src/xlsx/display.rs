@@ -350,6 +350,7 @@ fn common_image_item(item: ImageItem) -> common::ImageItem<'static> {
       .map(Cow::Owned)
       .unwrap_or(Cow::Borrowed("application/octet-stream")),
     bytes: item.data,
+    blip_compression_state: item.blip_compression_state,
     metafile_monochrome_dib_palette_override: item.metafile_monochrome_dib_palette_override,
     metafile_background_color: item.metafile_background_color,
     metafile_external_header: item.metafile_external_header,
@@ -1119,6 +1120,7 @@ fn push_vml_control_snapshot_image(items: &mut Vec<PageItem>, rect: CellRect, da
     flip_vertical: false,
     data,
     content_type: Some("image/png".to_string()),
+    blip_compression_state: common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -3343,6 +3345,9 @@ fn render_cell_area(
           page_clip_rect.height_pt,
         ));
       }
+      if let Some(clip) = calc_cell_overflow_paint_clip(output_area, alignment) {
+        intersect_text_paint_clip(text, clip);
+      }
       true
     });
     if page.sheet.merged_range_for_cell(cell.address).is_some() {
@@ -3728,6 +3733,7 @@ fn render_cell_icon_set(
     flip_vertical: false,
     data,
     content_type: Some("image/png".to_string()),
+    blip_compression_state: common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -3840,6 +3846,39 @@ fn calc_cell_output_area(
   output.left_clip_pt = left_missing_pt.max(0.0);
   output.right_clip_pt = right_missing_pt.max(0.0);
   output
+}
+
+fn calc_cell_overflow_paint_clip(
+  output: CalcCellOutputArea,
+  alignment: Option<super::styles::AlignmentRecord>,
+) -> Option<CellRect> {
+  let rotated = alignment
+    .and_then(|alignment| alignment.text_rotation)
+    .is_some_and(|rotation| rotation != 0);
+  (!rotated && (output.left_clip_pt > f32::EPSILON || output.right_clip_pt > f32::EPSILON))
+    .then_some(output.clip_rect)
+}
+
+fn intersect_text_paint_clip(text: &mut TextItem, clip: CellRect) {
+  let Some(existing) = text.paint_clip else {
+    text.paint_clip = Some(common_rect(
+      clip.x_pt,
+      clip.y_pt,
+      clip.width_pt,
+      clip.height_pt,
+    ));
+    return;
+  };
+  let left = existing.origin.x.0.max(clip.x_pt);
+  let top = existing.origin.y.0.max(clip.y_pt);
+  let right = (existing.origin.x.0 + existing.size.width.0).min(clip.x_pt + clip.width_pt);
+  let bottom = (existing.origin.y.0 + existing.size.height.0).min(clip.y_pt + clip.height_pt);
+  text.paint_clip = Some(common_rect(
+    left,
+    top,
+    (right - left).max(0.0),
+    (bottom - top).max(0.0),
+  ));
 }
 
 fn calc_cell_missing_width_by_alignment(
@@ -6368,6 +6407,7 @@ fn push_page_drawing_anchor_image_items(
           flip_vertical: false,
           data: placeholder_data,
           content_type: Some("image/png".to_string()),
+          blip_compression_state: common::BlipCompressionState::Unspecified,
           metafile_monochrome_dib_palette_override: None,
           metafile_background_color: None,
           metafile_external_header: None,
@@ -6648,6 +6688,7 @@ fn drawingml_blip_fill_items(
       flip_vertical: flip_vertical ^ placement.flip_vertical,
       data: data.clone(),
       content_type: content_type.clone(),
+      blip_compression_state: common::BlipCompressionState::Unspecified,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -6776,6 +6817,7 @@ fn vml_image_items(
       flip_vertical: is_fill && shape.fill_rotate_with_shape == Some(true) && flip_vertical,
       data: image_data.clone(),
       content_type: content_type.clone(),
+      blip_compression_state: common::BlipCompressionState::Unspecified,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -7675,6 +7717,7 @@ fn finish_xlsx_shape_effects(
     flip_vertical: false,
     data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
+    blip_compression_state: common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -16072,12 +16115,14 @@ mod cell_alignment_tests {
         assert_eq!(output.left_clip_pt, 0.0);
         assert_eq!(output.right_clip_pt, 0.0);
         assert!(output.clip_rect.width_pt > rect.width_pt);
+        assert_eq!(calc_cell_overflow_paint_clip(output, None), None);
         if merged {
           assert!(output.clip_rect.x_pt < rect.x_pt);
         }
       } else {
         assert!(output.right_clip_pt > 0.0);
         assert_eq!(output.clip_rect.width_pt, rect.width_pt);
+        assert_eq!(calc_cell_overflow_paint_clip(output, None), Some(rect));
       }
     }
   }

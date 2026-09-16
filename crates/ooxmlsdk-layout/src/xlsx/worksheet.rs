@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
+use ooxmlsdk::parts::dialogsheet_part::DialogsheetPart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
@@ -184,6 +185,7 @@ pub(crate) struct CellRect {
 pub(crate) enum SheetType {
   Worksheet,
   Chartsheet,
+  Dialogsheet,
   Unresolved,
 }
 
@@ -496,6 +498,49 @@ impl CalcSheet {
       cell_positions: HashMap::new(),
       row_positions: Box::default(),
     }
+  }
+
+  pub(crate) fn from_dialogsheet(
+    identity: SheetIdentity,
+    dialogsheet: x::DialogSheet,
+    resources: SheetResourceCatalog,
+    shared_strings: &[SharedStringModel],
+    styles: &StylesCatalog,
+    producer: SpreadsheetProducerProfile,
+  ) -> Self {
+    // Calc imports dialog sheets through WorksheetFragment. Preserve the
+    // shared sheet/page fields in the worksheet model so the existing VML
+    // and fixed-output paths use the authored dialog grid and margins.
+    let worksheet = x::Worksheet {
+      xmlns: dialogsheet.xmlns,
+      mc_ignorable: dialogsheet.mc_ignorable,
+      sheet_properties: dialogsheet.sheet_properties,
+      sheet_views: dialogsheet.sheet_views,
+      sheet_format_properties: dialogsheet.sheet_format_properties,
+      sheet_protection: dialogsheet.sheet_protection,
+      custom_sheet_views: dialogsheet.custom_sheet_views,
+      print_options: dialogsheet.print_options,
+      page_margins: dialogsheet.page_margins,
+      page_setup: dialogsheet.page_setup,
+      header_footer: dialogsheet.header_footer,
+      drawing: dialogsheet.drawing,
+      legacy_drawing: Some(dialogsheet.legacy_drawing),
+      legacy_drawing_header_footer: dialogsheet.legacy_drawing_header_footer,
+      drawing_header_footer: dialogsheet.drawing_header_footer,
+      ole_objects: dialogsheet.ole_objects,
+      controls: dialogsheet.controls,
+      ..x::Worksheet::default()
+    };
+    let mut sheet = Self::from_worksheet(
+      identity,
+      worksheet,
+      resources,
+      shared_strings,
+      styles,
+      producer,
+    );
+    sheet.sheet_type = SheetType::Dialogsheet;
+    sheet
   }
 
   pub(crate) fn unresolved(identity: SheetIdentity) -> Self {
@@ -2508,6 +2553,34 @@ impl SheetResourceCatalog {
     Ok(Self {
       drawings,
       object_resources: WorksheetObjectResourceCatalog::from_chartsheet_part(package, part),
+      printer_settings,
+      ..Self::default()
+    })
+  }
+
+  pub(crate) fn from_dialogsheet_part(
+    package: &SpreadsheetDocument,
+    part: &DialogsheetPart,
+    styles: &StylesCatalog,
+  ) -> Result<Self> {
+    let printer_settings = part
+      .spreadsheet_printer_settings_parts(package)
+      .find_map(|part| {
+        part
+          .data(package)
+          .and_then(WindowsPrinterSettings::from_bytes)
+      });
+    let drawings = part
+      .drawings_part(package)
+      .map(|drawing| {
+        DrawingResourceCatalog::from_part(package, &drawing, Some(styles.output_ui_language()))
+      })
+      .transpose()?
+      .map(|drawing| vec![drawing])
+      .unwrap_or_default();
+    Ok(Self {
+      drawings,
+      object_resources: WorksheetObjectResourceCatalog::from_dialogsheet_part(package, part),
       printer_settings,
       ..Self::default()
     })

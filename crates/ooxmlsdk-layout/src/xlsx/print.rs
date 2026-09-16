@@ -668,7 +668,14 @@ impl CalcPrintNamedRanges {
       .records_for_sheet(sheet.workbook_index, DefinedNameBuiltin::PrintTitles);
     let resolved_print_areas = print_areas
       .iter()
-      .flat_map(|record| parse_defined_name_ranges(&record.formula))
+      .flat_map(|record| {
+        let ranges = parse_defined_name_ranges(&record.formula);
+        if ranges.is_empty() {
+          super::formula::evaluate_formula_as_ranges(import, sheet, &record.formula)
+        } else {
+          ranges
+        }
+      })
       .collect();
     let (repeat_rows, repeat_columns) =
       print_titles
@@ -1205,7 +1212,9 @@ fn text_overflow_end_column(
   let needed_width_pt = calc_cached_print_text_width_pt(
     text_metrics.measure_text(&cell.display_text, style) + CALC_CELL_TEXT_MARGIN_PT,
   );
-  let mut missing = needed_width_pt - sheet.column_width_pt(address.col);
+  let column_width = sheet.column_width_pt(address.col);
+  let visible_column_width = oversized_text_column_page_width_pt(sheet, column_width);
+  let mut missing = needed_width_pt - visible_column_width;
   let mut column = address.col;
   while missing > 0.0 && column < XLSX_MAX_COLUMN {
     let next = column.saturating_add(1);
@@ -1220,6 +1229,38 @@ fn text_overflow_end_column(
     missing -= width;
   }
   column
+}
+
+fn oversized_text_column_page_width_pt(sheet: &CalcSheet, column_width_pt: f32) -> f32 {
+  let fit_to_page =
+    sheet.page_settings.fit_to_page || sheet.metrics.settings.properties.page_setup.fit_to_page;
+  if fit_to_page {
+    // Fit-to-page owns a metric-derived zoom that depends on the final print
+    // extent. Avoid feeding an approximate capacity back into that extent.
+    return column_width_pt;
+  }
+  let has_chart = sheet
+    .resources
+    .drawings
+    .iter()
+    .any(|drawing| !drawing.charts.is_empty() || !drawing.extended_charts.is_empty());
+  let page_size = sheet
+    .page_settings
+    .fixed_output_pagination_page_size_pt(has_chart);
+  let content_width = print_content_size_for_page(&sheet.page_settings, page_size).0;
+  let zoom = fixed_output_content_scale(
+    sheet.page_settings.scale.max(ZOOM_MIN),
+    sheet
+      .page_settings
+      .fixed_output_pagination_paper_scale_percent(has_chart),
+  )
+  .max(0.01);
+  // Excel evaluates an unwrapped string against each physical horizontal
+  // page band even when its own column is wider than that band. The text is
+  // clipped after the first band, but its remaining measured width keeps the
+  // following otherwise-empty pages printable. A 24pt string in a 255-unit
+  // column is the counterexample to subtracting the complete column width.
+  column_width_pt.min(content_width / zoom)
 }
 
 fn calc_cached_print_text_width_pt(width_pt: f32) -> f32 {
@@ -6261,6 +6302,38 @@ mod tests {
   }
 
   #[test]
+  fn dynamic_print_area_uses_the_evaluated_reference() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let id = workbook
+      .get_id_of_part(&package, &worksheet)
+      .unwrap()
+      .to_string();
+    workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets><definedNames><definedName name="Full_Print">'Sheet1'!$A$1:$J$497</definedName><definedName name="Header_Row">ROW('Sheet1'!$17:$17)</definedName><definedName name="Values_Entered">0</definedName><definedName name="Last_Row">IF(Values_Entered,99,Header_Row)</definedName><definedName name="_xlnm.Print_Area" localSheetId="0">OFFSET(Full_Print,0,0,Last_Row)</definedName></definedNames></workbook>"#).into_bytes()).unwrap();
+    worksheet
+      .set_data(
+        &mut package,
+        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:J497"/><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#
+          .to_vec(),
+      )
+      .unwrap();
+
+    let import = ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+    let names = CalcPrintNamedRanges::from_import(&import, &import.sheets[0]);
+    assert_eq!(
+      names.resolved_print_areas,
+      vec![CellRange::parse_a1_range("A1:J17").unwrap()]
+    );
+  }
+
+  #[test]
   fn fit_zoom_ignores_trailing_font_only_cells_retained_for_headers() {
     use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
     use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
@@ -6409,6 +6482,54 @@ mod tests {
     assert!(should_skip_empty_print_page(
       true, true, false, false, false
     ));
+  }
+
+  #[test]
+  fn oversized_text_cell_keeps_physical_horizontal_page_extent() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let id = workbook
+      .get_id_of_part(&package, &worksheet)
+      .unwrap()
+      .to_string();
+    workbook
+      .set_data(
+        &mut package,
+        format!(
+          r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#
+        )
+        .into_bytes(),
+      )
+      .unwrap();
+    let styles = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    styles
+      .set_data(
+        &mut package,
+        br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="24"/><name val="Calibri"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellXfs count="2"><xf fontId="0"/><xf fontId="1" applyFont="1"/></cellXfs></styleSheet>"#.to_vec(),
+      )
+      .unwrap();
+    worksheet
+      .set_data(
+        &mut package,
+        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="255" customWidth="1"/></cols><sheetData><row r="1"><c r="A1" s="1" t="inlineStr"><is><t>Content of the table is not important. All fields must be used, in order to save values as shared items</t></is></c></row></sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" scale="100"/></worksheet>"#.to_vec(),
+      )
+      .unwrap();
+
+    let import = ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+    let print = CalcPrintDocument::from_import(&import);
+    assert_eq!(print.pages.len(), 3);
+    assert_eq!(print.pages[0].area.unwrap().start.col, 1);
+    assert!(print.pages[1].area.unwrap().start.col > 1);
   }
 
   #[test]

@@ -257,6 +257,26 @@ pub fn office_missing_linked_image_resource(
   }
 }
 
+/// Returns the application text painted by PowerPoint when it blocks an
+/// external picture download. This differs from the generic broken-link text
+/// used by the other Office applications.
+///
+/// This is public only because `ooxmlsdk-pdf` is a separate crate; callers
+/// should select application locale through `LayoutOptions` or `PdfOptions`.
+#[doc(hidden)]
+pub fn office_powerpoint_blocked_linked_image_resource(
+  ui_language: Option<&str>,
+) -> OfficeMissingLinkedImageResource {
+  if resolve_resource_locale(ui_language) == OfficeResourceLocale::SimplifiedChinese {
+    return OfficeMissingLinkedImageResource {
+      // Current zh-CN PowerPoint fixed output for Apache POI 56812.pptx.
+      text: "为了帮助保护您的隐私，PowerPoint 已阻止自动下载此图片。",
+      font_family: "SimSun",
+    };
+  }
+  office_missing_linked_image_resource(ui_language)
+}
+
 pub(crate) fn drawingml_theme_script(value: &str) -> Option<Arc<str>> {
   let locale = maximized_locale(value)?;
   // Office's theme vocabulary is mostly ISO 15924, but its documented LCID

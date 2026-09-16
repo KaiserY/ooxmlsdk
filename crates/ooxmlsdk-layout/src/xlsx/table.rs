@@ -609,6 +609,19 @@ fn merge_custom_table_differential(
   if address.row == region.end.row && border.bottom.is_some() {
     result.borders.bottom = border.bottom;
   }
+  let (vertical, horizontal) = styles.differential_inner_borders(format_id);
+  if address.col > region.start.col && vertical.is_some() {
+    result.borders.left = vertical;
+  }
+  if address.col < region.end.col && vertical.is_some() {
+    result.borders.right = vertical;
+  }
+  if address.row > region.start.row && horizontal.is_some() {
+    result.borders.top = horizontal;
+  }
+  if address.row < region.end.row && horizontal.is_some() {
+    result.borders.bottom = horizontal;
+  }
 }
 
 fn light1_style(
@@ -1395,6 +1408,55 @@ mod tests {
         assert_eq!(cell.outline_borders.right.is_some(), col == 3);
         assert_eq!(cell.outline_borders.top.is_some(), row == 1);
         assert_eq!(cell.outline_borders.bottom.is_some(), row == 5);
+      }
+    }
+  }
+
+  #[test]
+  fn custom_table_style_applies_differential_inner_borders() {
+    let outer = RgbColor { r: 0, g: 128, b: 0 };
+    let vertical = RgbColor { r: 255, g: 0, b: 0 };
+    let horizontal = RgbColor { r: 0, g: 0, b: 255 };
+    let mut styles = StylesCatalog::default();
+    styles.differential_format_records = vec![DifferentialFormatRecord {
+      border: Some(grid_table_rules(Some(outer), 1.0)),
+      vertical_border: border(Some(vertical), 1.0, false),
+      horizontal_border: border(Some(horizontal), 1.0, false),
+      ..Default::default()
+    }];
+    styles.table_style_records = vec![TableStyleRecord {
+      name: "CustomStyle".to_string(),
+      elements: vec![TableStyleElementRecord {
+        r#type: x::TableStyleValues::WholeTable,
+        size: 1,
+        format_id: Some(0),
+      }],
+    }];
+    let table = custom_table("CustomStyle");
+
+    for row in 1..=5 {
+      for col in 1..=3 {
+        let cell = builtin_table_style_for_address(
+          std::slice::from_ref(&table),
+          &styles,
+          CellAddress { row, col },
+        );
+        assert_eq!(
+          cell.borders.left.map(|border| border.color),
+          Some(if col == 1 { outer } else { vertical })
+        );
+        assert_eq!(
+          cell.borders.right.map(|border| border.color),
+          Some(if col == 3 { outer } else { vertical })
+        );
+        assert_eq!(
+          cell.borders.top.map(|border| border.color),
+          Some(if row == 1 { outer } else { horizontal })
+        );
+        assert_eq!(
+          cell.borders.bottom.map(|border| border.color),
+          Some(if row == 5 { outer } else { horizontal })
+        );
       }
     }
   }

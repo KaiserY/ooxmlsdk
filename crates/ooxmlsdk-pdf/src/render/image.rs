@@ -14,7 +14,7 @@ use rustc_hash::FxHashMap as HashMap;
 
 use crate::error::{PdfError, Result};
 use crate::options::{PdfDocumentKind, PdfImageOptimizationPolicy, PdfOptimizeFor, PdfOptions};
-use ooxmlsdk_layout::render::emf_wmf;
+use ooxmlsdk_layout::{common::BlipCompressionState, render::emf_wmf};
 
 use super::native_png::NativeIndexedPng;
 
@@ -195,6 +195,7 @@ struct RasterExportOptions {
   use_gdiplus_jpeg_resampler: bool,
   allow_interpolation: bool,
   profile: RasterExportProfile,
+  blip_compression_state: BlipCompressionState,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -512,7 +513,13 @@ impl RasterExportOptions {
       // explicitly false archival form for every PDF/A profile.
       allow_interpolation: !archival,
       profile,
+      blip_compression_state: BlipCompressionState::Unspecified,
     }
+  }
+
+  fn for_blip_compression_state(mut self, state: BlipCompressionState) -> Self {
+    self.blip_compression_state = state;
+    self
   }
 
   fn for_raster_format(mut self, format: RasterImageFormat) -> Self {
@@ -749,16 +756,16 @@ impl ImageSet {
     content_type: Option<&str>,
     options: &PdfOptions,
     metafile_render_options: Option<emf_wmf::RenderOptions>,
-    display_width_pt: f32,
-    display_height_pt: f32,
+    display_size_pt: (f32, f32),
+    blip_compression_state: BlipCompressionState,
   ) -> Result<PreparedRasterImage> {
     self.prepared_raster(
       data,
       content_type,
       options,
       metafile_render_options,
-      display_width_pt,
-      display_height_pt,
+      display_size_pt,
+      blip_compression_state,
     )
   }
 
@@ -768,12 +775,14 @@ impl ImageSet {
     content_type: Option<&str>,
     options: &PdfOptions,
     metafile_render_options: Option<emf_wmf::RenderOptions>,
-    display_width_pt: f32,
-    display_height_pt: f32,
+    display_size_pt: (f32, f32),
+    blip_compression_state: BlipCompressionState,
   ) -> Result<PreparedRasterImage> {
+    let (display_width_pt, display_height_pt) = display_size_pt;
     let owner = RasterOwner::from_content_type(content_type);
     let export_options = RasterExportOptions::new(options, display_width_pt, display_height_pt)
-      .for_owner(owner, display_width_pt, display_height_pt);
+      .for_owner(owner, display_width_pt, display_height_pt)
+      .for_blip_compression_state(blip_compression_state);
     let key = image_data_key(data);
     if let Some(image) = self.rasters.get(&key).and_then(|images| {
       images.iter().find(|image| {
@@ -1601,6 +1610,17 @@ fn export_decoded_image(
     // Requested exports still preserve the caller's profile below.
     raster.icc_profile = None;
   }
+  if format == RasterImageFormat::Png
+    && owner == RasterOwner::Source
+    && export_options.profile.is_power_point_screen()
+  {
+    // PowerPoint Screen decodes source PNGs into its fixed-output bitmap
+    // surface and declares both resulting Flate and DCT color planes as
+    // DeviceRGB. A source ICC profile can remain as inert JPEG APP metadata,
+    // but it is not the PDF image color space: using ICCBased applies a color
+    // conversion which PowerPoint's output does not perform.
+    raster.icc_profile = None;
+  }
 
   let mut interpolate = raster_interpolation(format, export_options);
   if should_try_jpeg(format, export_options, owner) {
@@ -2384,7 +2404,8 @@ fn office_fixed_output_prefers_lossless(
   jpeg_has_real_physical_resolution: bool,
 ) -> bool {
   if !export_options.profile.is_office_fixed_output()
-    || export_options.profile.is_office_screen()
+    || (export_options.profile.is_office_screen()
+      && !export_options.profile.is_power_point_screen())
     || !matches!(
       owner,
       RasterOwner::Source
@@ -2400,6 +2421,15 @@ fn office_fixed_output_prefers_lossless(
   // enters the photographic owner, while unit 0 and absent JFIF metadata keep
   // the same small logo in the content classifier.
   if jpeg_has_real_physical_resolution {
+    return false;
+  }
+
+  // In PowerPoint's Screen export, only a Print-quality authored blip enters
+  // the palette-preservation classifier. Screen and unspecified blips use the
+  // screen JPEG path even when their decoded samples form a small palette.
+  if export_options.profile.is_power_point_screen()
+    && export_options.blip_compression_state != BlipCompressionState::Print
+  {
     return false;
   }
 
@@ -2423,6 +2453,13 @@ fn office_fixed_output_prefers_lossless(
   // not a PNG-format exception.
   if office_top_256_palette_gate_from_metrics(metrics) {
     return true;
+  }
+
+  // Non-palette PowerPoint Screen sources still use its JPEG path. The
+  // small-raster and per-channel gates below are established by Print controls
+  // and must not reclassify Screen images.
+  if export_options.profile.is_power_point_screen() {
+    return false;
   }
 
   // The next type-dependent gate uses uncompressed image size. Word and
@@ -3488,6 +3525,54 @@ mod tests {
   }
 
   #[test]
+  fn power_point_screen_preserves_print_state_palette_sources() {
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..Default::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    let screen_source = RasterExportOptions::new(&options, 182.0, 61.0);
+    let print_source = screen_source.for_blip_compression_state(BlipCompressionState::Print);
+
+    let palette = image::RgbaImage::from_fn(319, 107, |x, y| {
+      let alpha = (x + y) as u8;
+      Rgba([242, 47, 57, alpha])
+    });
+    let palette = apply_black_matte(&palette);
+    assert!(office_top_256_palette_gate_from_metrics(
+      office_rgb_histogram_metrics(&palette)
+    ));
+    assert!(office_fixed_output_prefers_lossless(
+      &palette,
+      print_source,
+      RasterOwner::Source,
+      false,
+    ));
+    assert!(!office_fixed_output_prefers_lossless(
+      &palette,
+      screen_source,
+      RasterOwner::Source,
+      false,
+    ));
+
+    let complex_small = image::RgbaImage::from_fn(100, 100, |x, y| {
+      let index = x + y * 100;
+      let value = index.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+      Rgba([value as u8, (value >> 8) as u8, (value >> 16) as u8, 255])
+    });
+    assert!(!office_top_256_palette_gate_from_metrics(
+      office_rgb_histogram_metrics(&complex_small)
+    ));
+    assert!(!office_fixed_output_prefers_lossless(
+      &complex_small,
+      print_source,
+      RasterOwner::Source,
+      false,
+    ));
+  }
+
+  #[test]
   fn microsoft_office_bitmap_targets_quantize_twips_and_count_inclusive_endpoints() {
     let pixels = |points, dpi| {
       RasterPixelLimits::from_office_fixed_output_display_size(points, points, dpi)
@@ -4032,6 +4117,7 @@ mod tests {
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: false,
+      blip_compression_state: BlipCompressionState::Unspecified,
       profile: RasterExportProfile::Requested,
     };
 
@@ -4072,6 +4158,7 @@ mod tests {
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
+      blip_compression_state: BlipCompressionState::Unspecified,
       profile: RasterExportProfile::Requested,
     };
 
@@ -4105,6 +4192,7 @@ mod tests {
         exact_downsample_trigger: false,
         use_gdiplus_jpeg_resampler: false,
         allow_interpolation: interpolate,
+        blip_compression_state: BlipCompressionState::Unspecified,
         profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
           document_kind: PdfDocumentKind::Docx,
           optimize_for: PdfOptimizeFor::Screen,
@@ -4260,6 +4348,61 @@ mod tests {
   }
 
   #[test]
+  fn power_point_screen_png_surfaces_use_device_rgb_in_both_compression_paths() {
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..Default::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    let profile = vec![23_u8; 132];
+
+    let palette = image::RgbaImage::from_fn(319, 107, |x, y| Rgba([242, 47, 57, (x + y) as u8]));
+    let lossless = export_decoded_image(
+      DecodedRasterImage {
+        image: DynamicImage::ImageRgba8(palette),
+        icc_profile: Some(profile.clone()),
+        jpeg_has_real_physical_resolution: false,
+      },
+      RasterImageFormat::Png,
+      RasterExportOptions::new(&options, 239.25, 80.25),
+      RasterOwner::Source,
+    )
+    .unwrap();
+    let DirectRasterEncoding::Sampled { pixels } = &lossless.direct().encoding else {
+      panic!(
+        "expected sampled raster, got {:?}",
+        lossless.direct().encoding
+      );
+    };
+    assert!(pixels.icc_profile.is_none());
+
+    let gradient = image::RgbaImage::from_fn(721, 18, |x, y| {
+      Rgba([
+        (57 + x * 183 / 720) as u8,
+        (50 + x * 182 / 720 + y % 3) as u8,
+        (60 + x * 158 / 720 + y % 5) as u8,
+        (144 + (x + y) % 112) as u8,
+      ])
+    });
+    let lossy = export_decoded_image(
+      DecodedRasterImage {
+        image: DynamicImage::ImageRgba8(gradient),
+        icc_profile: Some(profile),
+        jpeg_has_real_physical_resolution: false,
+      },
+      RasterImageFormat::Png,
+      RasterExportOptions::new(&options, 540.75, 13.5),
+      RasterOwner::Source,
+    )
+    .unwrap();
+    let DirectRasterEncoding::Dct { icc_profile, .. } = &lossy.direct().encoding else {
+      panic!("expected DCT raster, got {:?}", lossy.direct().encoding);
+    };
+    assert!(icc_profile.is_none());
+  }
+
+  #[test]
   fn office_reduced_jpeg_discards_pdf_icc_but_requested_export_preserves_it() {
     let source = image::RgbImage::from_fn(300, 300, |x, y| {
       let value = (x + y * 300)
@@ -4304,6 +4447,7 @@ mod tests {
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
+      blip_compression_state: BlipCompressionState::Unspecified,
       profile: RasterExportProfile::Requested,
     };
     let preserved = export_decoded_image(
@@ -4593,6 +4737,7 @@ mod tests {
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
+      blip_compression_state: BlipCompressionState::Unspecified,
       profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
         document_kind: PdfDocumentKind::Docx,
         optimize_for: PdfOptimizeFor::Screen,
@@ -4639,6 +4784,7 @@ mod tests {
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
+      blip_compression_state: BlipCompressionState::Unspecified,
       profile: RasterExportProfile::Requested,
     };
 
@@ -4691,6 +4837,7 @@ mod tests {
         exact_downsample_trigger: false,
         use_gdiplus_jpeg_resampler: false,
         allow_interpolation: true,
+        blip_compression_state: BlipCompressionState::Unspecified,
         profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
           document_kind: PdfDocumentKind::Docx,
           optimize_for: PdfOptimizeFor::Print,
@@ -4743,6 +4890,7 @@ mod tests {
         exact_downsample_trigger: false,
         use_gdiplus_jpeg_resampler: false,
         allow_interpolation: true,
+        blip_compression_state: BlipCompressionState::Unspecified,
         profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
           document_kind: PdfDocumentKind::Docx,
           optimize_for: PdfOptimizeFor::Print,
@@ -4793,6 +4941,7 @@ mod tests {
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
+      blip_compression_state: BlipCompressionState::Unspecified,
       profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
         document_kind: PdfDocumentKind::Docx,
         optimize_for: PdfOptimizeFor::Print,
@@ -4846,6 +4995,7 @@ mod tests {
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
+      blip_compression_state: BlipCompressionState::Unspecified,
       profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
         document_kind: PdfDocumentKind::Docx,
         optimize_for: PdfOptimizeFor::Print,
@@ -4890,6 +5040,7 @@ mod tests {
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
+      blip_compression_state: BlipCompressionState::Unspecified,
       profile: RasterExportProfile::MicrosoftOfficeFixedOutput {
         document_kind: PdfDocumentKind::Docx,
         optimize_for: PdfOptimizeFor::Print,
@@ -5056,10 +5207,24 @@ mod tests {
     let mut images = ImageSet::default();
 
     images
-      .raster_direct(&jpeg, Some("image/jpeg"), &options, Some(first), 72.0, 72.0)
+      .raster_direct(
+        &jpeg,
+        Some("image/jpeg"),
+        &options,
+        Some(first),
+        (72.0, 72.0),
+        BlipCompressionState::Unspecified,
+      )
       .unwrap();
     images
-      .raster_direct(&jpeg, Some("image/jpeg"), &options, Some(first), 72.0, 72.0)
+      .raster_direct(
+        &jpeg,
+        Some("image/jpeg"),
+        &options,
+        Some(first),
+        (72.0, 72.0),
+        BlipCompressionState::Unspecified,
+      )
       .unwrap();
     assert_eq!(images.rasters.values().map(Vec::len).sum::<usize>(), 1);
 
@@ -5069,8 +5234,8 @@ mod tests {
         Some("image/jpeg"),
         &options,
         Some(second),
-        72.0,
-        72.0,
+        (72.0, 72.0),
+        BlipCompressionState::Unspecified,
       )
       .unwrap();
     assert_eq!(images.rasters.values().map(Vec::len).sum::<usize>(), 2);
@@ -5093,10 +5258,24 @@ mod tests {
     let mut images = ImageSet::default();
 
     let full = images
-      .raster_direct(&jpeg, Some("image/jpeg"), &options, None, 60.0, 60.0)
+      .raster_direct(
+        &jpeg,
+        Some("image/jpeg"),
+        &options,
+        None,
+        (60.0, 60.0),
+        BlipCompressionState::Unspecified,
+      )
       .unwrap();
     let reduced = images
-      .raster_direct(&jpeg, Some("image/jpeg"), &options, None, 30.0, 30.0)
+      .raster_direct(
+        &jpeg,
+        Some("image/jpeg"),
+        &options,
+        None,
+        (30.0, 30.0),
+        BlipCompressionState::Unspecified,
+      )
       .unwrap();
 
     assert_eq!(full.size(), (60, 60));
@@ -5142,6 +5321,7 @@ mod tests {
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
+      blip_compression_state: BlipCompressionState::Unspecified,
       profile: RasterExportProfile::Requested,
     };
 

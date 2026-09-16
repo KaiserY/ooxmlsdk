@@ -1164,6 +1164,7 @@ fn evaluate_function_reader<'doc>(
       evaluate_iso_weeknum_reader(evaluator, args)
     }
     FormulaFunctionId::Today if args.is_empty() => evaluator.evaluate_today(),
+    FormulaFunctionId::Now if args.is_empty() => evaluator.evaluate_now(),
     FormulaFunctionId::Networkdays if (2..=4).contains(&args.len()) => {
       evaluator.evaluate_networkdays_reader(args, false)
     }

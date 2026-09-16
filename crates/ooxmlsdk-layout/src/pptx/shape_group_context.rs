@@ -430,6 +430,7 @@ impl PPTShapeGroupContext {
         shape.shape.set_picture(
           blip.embed.clone(),
           blip.link.clone(),
+          blip.compression_state,
           image_crop_from_source_rectangle(blip_fill.source_rectangle.as_ref()),
           blip.blip_choice.clone(),
           image_resource,

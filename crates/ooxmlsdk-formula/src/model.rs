@@ -1013,6 +1013,7 @@ pub struct FormulaEvaluationBook<'doc> {
   pub formula_search_type: FormulaSearchType,
   pub formula_match_whole_cell: bool,
   pub today_serial: Option<f64>,
+  pub now_serial: Option<f64>,
 }
 
 impl<'doc> Default for FormulaEvaluationBook<'doc> {
@@ -1037,6 +1038,7 @@ impl<'doc> Default for FormulaEvaluationBook<'doc> {
       formula_search_type: FormulaSearchType::default(),
       formula_match_whole_cell: true,
       today_serial: None,
+      now_serial: None,
     }
   }
 }
@@ -1161,6 +1163,11 @@ impl<'doc> FormulaEvaluationBookBuilder<'doc> {
 
   pub fn with_today_serial(mut self, today_serial: f64) -> Self {
     self.book.today_serial = Some(today_serial);
+    self
+  }
+
+  pub fn with_now_serial(mut self, now_serial: f64) -> Self {
+    self.book.now_serial = Some(now_serial);
     self
   }
 
@@ -4269,6 +4276,25 @@ mod tests {
         );
       }
     }
+  }
+
+  #[test]
+  fn today_and_now_use_the_supplied_calculation_clock() {
+    let date =
+      crate::calc::datetime::date_serial_with_system(2026, 9, 11, DateSystem::Date1900).unwrap();
+    let now = date + f64::from(13 * 3_600 + 14 * 60 + 15) / 86_400.0;
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_now_serial(now)
+      .build();
+
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "TODAY()"),
+      Some(FormulaValue::Number(date))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "NOW()"),
+      Some(FormulaValue::Number(now))
+    );
   }
 
   #[test]

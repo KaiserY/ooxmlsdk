@@ -157,6 +157,7 @@ pub(crate) struct OleObjectRecord {
 pub(crate) struct PictureRecord {
   pub(crate) embed_relationship_id: Option<String>,
   pub(crate) link_relationship_id: Option<String>,
+  pub(crate) compression_state: Option<a::BlipCompressionValues>,
   pub(crate) crop: ImageCrop,
   pub(crate) blip_choices: Vec<a::BlipChoice>,
   pub(crate) image_resource: Option<ImageResource>,
@@ -476,10 +477,7 @@ impl Shape {
       actual = Some(fill_ref);
     }
     if let Some(fill) = &self.fill_properties {
-      actual = match fill.kind {
-        FillKind::Group => parent_fill.cloned().or_else(|| Some(fill.clone())),
-        _ => Some(fill.clone()),
-      };
+      actual = merge_direct_fill_properties(actual, fill, parent_fill);
     }
     actual
   }
@@ -518,8 +516,12 @@ impl Shape {
   }
 
   pub(crate) fn apply_text_styles(&mut self) {
+    let placeholder_text_body = self
+      .placeholder
+      .as_deref()
+      .and_then(|placeholder| placeholder.text_body.as_ref());
     if let Some(text_body) = &mut self.text_body {
-      text_body.apply_text_styles(self.master_text_list_style.as_ref());
+      text_body.apply_text_styles(self.master_text_list_style.as_ref(), placeholder_text_body);
     }
     for child in &mut self.children {
       child.apply_text_styles();
@@ -611,6 +613,7 @@ impl Shape {
     &mut self,
     embed_relationship_id: Option<String>,
     link_relationship_id: Option<String>,
+    compression_state: Option<a::BlipCompressionValues>,
     crop: ImageCrop,
     blip_choices: Vec<a::BlipChoice>,
     image_resource: Option<ImageResource>,
@@ -620,6 +623,7 @@ impl Shape {
     self.picture = Some(PictureRecord {
       embed_relationship_id,
       link_relationship_id,
+      compression_state,
       crop,
       blip_choices,
       image_resource,
@@ -631,6 +635,7 @@ impl Shape {
     self.picture = Some(PictureRecord {
       embed_relationship_id: None,
       link_relationship_id: None,
+      compression_state: None,
       crop: ImageCrop::default(),
       blip_choices: Vec::new(),
       image_resource: None,
@@ -688,6 +693,54 @@ impl Shape {
   pub(crate) fn keep_diagram_drawing(&mut self) {
     self.frame_type = FrameType::Diagram;
   }
+}
+
+fn merge_direct_fill_properties(
+  inherited: Option<FillProperties>,
+  direct: &FillProperties,
+  parent_fill: Option<&FillProperties>,
+) -> Option<FillProperties> {
+  if matches!(direct.kind, FillKind::Group) {
+    return parent_fill.cloned().or_else(|| Some(direct.clone()));
+  }
+
+  let FillKind::Gradient(direct_gradient) = &direct.kind else {
+    return Some(direct.clone());
+  };
+  let direct_has_stops = direct_gradient
+    .gradient_stop_list
+    .as_ref()
+    .is_some_and(|list| !list.gradient_stop.is_empty());
+  if direct_has_stops {
+    return Some(direct.clone());
+  }
+  let Some(FillProperties {
+    kind: FillKind::Gradient(inherited_gradient),
+    placeholder_color,
+  }) = inherited.as_ref()
+  else {
+    return Some(direct.clone());
+  };
+  let Some(inherited_stops) = inherited_gradient
+    .gradient_stop_list
+    .as_ref()
+    .filter(|list| !list.gradient_stop.is_empty())
+  else {
+    return Some(direct.clone());
+  };
+
+  // PowerPoint treats a direct gradFill without gsLst as a geometry override
+  // of the referenced theme gradient. Keep its lin/path settings while using
+  // the theme's color stops and placeholder color (Apache POI 63200.pptx).
+  let mut gradient = (**direct_gradient).clone();
+  gradient.gradient_stop_list = Some(inherited_stops.clone());
+  Some(FillProperties {
+    kind: FillKind::Gradient(Box::new(gradient)),
+    placeholder_color: direct
+      .placeholder_color
+      .clone()
+      .or_else(|| placeholder_color.clone()),
+  })
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -752,6 +805,58 @@ mod tests {
   use super::*;
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
   use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn direct_gradient_without_stops_inherits_theme_stops_and_keeps_geometry() {
+    let inherited = a::GradientFill::from_bytes(
+      br#"<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:gsLst>
+          <a:gs pos="0"><a:schemeClr val="phClr"/></a:gs>
+          <a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="78000"/></a:schemeClr></a:gs>
+        </a:gsLst>
+        <a:lin ang="5400000" scaled="0"/>
+      </a:gradFill>"#,
+    )
+    .unwrap();
+    let direct = a::GradientFill::from_bytes(
+      br#"<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:lin ang="2700000" scaled="1"/><a:tileRect/>
+      </a:gradFill>"#,
+    )
+    .unwrap();
+    let merged = merge_direct_fill_properties(
+      Some(FillProperties {
+        kind: FillKind::Gradient(Box::new(inherited)),
+        placeholder_color: None,
+      }),
+      &FillProperties {
+        kind: FillKind::Gradient(Box::new(direct)),
+        placeholder_color: None,
+      },
+      None,
+    )
+    .unwrap();
+    let FillKind::Gradient(gradient) = merged.kind else {
+      panic!("expected merged gradient");
+    };
+    assert_eq!(
+      gradient
+        .gradient_stop_list
+        .as_ref()
+        .unwrap()
+        .gradient_stop
+        .len(),
+      2
+    );
+    let Some(a::GradientFillChoice::LinearGradientFill(linear)) =
+      gradient.gradient_fill_choice.as_ref()
+    else {
+      panic!("expected direct linear gradient geometry");
+    };
+    assert_eq!(linear.angle, Some(2_700_000));
+    assert!(linear.scaled.as_ref().is_some_and(|value| value.as_bool()));
+    assert!(gradient.tile_rectangle.is_some());
+  }
 
   #[test]
   fn pptx_line_style_only_overrides_survive_import_and_inheritance() {

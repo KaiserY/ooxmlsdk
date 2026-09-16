@@ -414,6 +414,22 @@ impl CalcPageSettings {
     {
       settings.valid_printer_settings = true;
     }
+    // Office also treats a matching standard-Letter DEVMODE as an initialized
+    // default-printer canvas when pageSetup keeps usePrinterDefaults at its
+    // true schema default. The SpreadsheetML paperSize remains the requested
+    // Letter canvas, while fixed output exposes the configured A4 page. An
+    // explicit usePrinterDefaults=false is the authored-canvas opt-out.
+    if microsoft_office
+      && settings.default_printer_canvas
+      && settings.explicit_paper_size
+      && settings.paper_size == MsPaperSize::Letter as u32
+      && printer_settings.is_some_and(|printer| {
+        printer.paper_size == Some(MsPaperSize::Letter as u32)
+          && printer.custom_paper_size_pt().is_none()
+      })
+    {
+      settings.valid_printer_settings = true;
+    }
     settings
   }
 
@@ -1115,6 +1131,37 @@ mod tests {
           expected_scale == 95
         );
       }
+    }
+  }
+
+  #[test]
+  fn explicit_related_letter_uses_default_canvas_unless_opted_out() {
+    let printer = WindowsPrinterSettings::from_bytes(&sample_windows_devmode(
+      DM_ORIENTATION | DM_PAPER_SIZE | DM_PRINT_QUALITY | DM_Y_RESOLUTION,
+    ))
+    .unwrap();
+
+    for (use_defaults, expected_size, expected_scale) in [
+      (None, (595.32, 841.92), 95),
+      (Some(true), (595.32, 841.92), 95),
+      (Some(false), (612.0, 792.0), 100),
+    ] {
+      let worksheet = x::Worksheet {
+        page_setup: Some(x::PageSetup {
+          paper_size: Some(MsPaperSize::Letter as u32),
+          use_printer_defaults: use_defaults.map(Into::into),
+          id: Some("rId1".to_string()),
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      let settings = CalcPageSettings::from_worksheet(&worksheet, true, Some(&printer));
+
+      assert_eq!(settings.page_size_pt(), expected_size);
+      assert_eq!(
+        settings.fixed_output_paper_scale_percent(false),
+        expected_scale
+      );
     }
   }
 

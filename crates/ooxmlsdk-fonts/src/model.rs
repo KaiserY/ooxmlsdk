@@ -3035,6 +3035,11 @@ const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
   // Apache POI bug65228.pptx carries a macOS Graphik theme, while Office's
   // fixed PDF substitutes Calibri for the unavailable family.
   ("Graphik", "Calibri"),
+  // PowerPoint fixed output substitutes Segoe UI for the unavailable Adobe
+  // Myriad Pro face. A controlled presentation matrix keeps this mapping for
+  // both VARIABLE+SWISS and unspecified pitch/family metadata, while unknown
+  // missing family names use PowerPoint's ordinary Calibri fallback.
+  ("Myriad Pro", "Segoe UI"),
   ("DINPro-Medium", "DINPro"),
   ("Univers 45 Light", "Univers Light"),
 ];
@@ -5475,6 +5480,10 @@ mod tests {
       FontSource::System,
       FontFaceInfo::synthetic("calibri", "Calibri"),
     );
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("segoe-ui", "Segoe UI"),
+    );
 
     for family in [
       "Arial Unicode MS",
@@ -5498,6 +5507,14 @@ mod tests {
       })
       .unwrap();
     assert_eq!(graphik.resolved_family, Cow::Borrowed("Calibri"));
+
+    let myriad = registry
+      .resolve(&FontRequest {
+        family: Some(Cow::Borrowed("Myriad Pro")),
+        ..FontRequest::default()
+      })
+      .unwrap();
+    assert_eq!(myriad.resolved_family, Cow::Borrowed("Segoe UI"));
   }
 
   #[test]

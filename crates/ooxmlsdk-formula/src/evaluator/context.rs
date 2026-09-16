@@ -321,7 +321,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   pub(crate) fn evaluate_today(&self) -> Option<FormulaValue<'doc>> {
-    if let Some(value) = self.book.today_serial {
+    if let Some(value) = self.book.today_serial.or(self.book.now_serial) {
       return Some(FormulaValue::Number(value.floor()));
     }
     let unix_days = SystemTime::now()
@@ -330,6 +330,20 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .map(|duration| duration.as_secs() / 86_400)?;
     Some(FormulaValue::Number(
       date_serial_with_system(1970, 1, 1, self.book.date_system)? + unix_days as f64,
+    ))
+  }
+
+  pub(crate) fn evaluate_now(&self) -> Option<FormulaValue<'doc>> {
+    if let Some(value) = self.book.now_serial.or(self.book.today_serial) {
+      return Some(FormulaValue::Number(value));
+    }
+    let unix_days = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .ok()?
+      .as_secs_f64()
+      / 86_400.0;
+    Some(FormulaValue::Number(
+      date_serial_with_system(1970, 1, 1, self.book.date_system)? + unix_days,
     ))
   }
 

@@ -6004,6 +6004,7 @@ fn data_point_effect_backdrop(
     flip_vertical: false,
     data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
+    blip_compression_state: crate::common::BlipCompressionState::Unspecified,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,

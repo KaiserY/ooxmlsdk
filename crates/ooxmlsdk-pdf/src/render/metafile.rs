@@ -283,6 +283,7 @@ mod tests {
       flip_vertical: false,
       data: Cow::Borrowed(&[]),
       content_type: Some(Cow::Borrowed("image/emf")),
+      blip_compression_state: common::BlipCompressionState::Unspecified,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,

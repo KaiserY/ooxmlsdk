@@ -753,7 +753,9 @@ fn write_page_document(
     options,
   )?;
 
-  Ok(pdf.finish())
+  let mut bytes = pdf.finish();
+  bytes.push(b'\n');
+  Ok(bytes)
 }
 
 struct CatalogObjects<'a, 'attachment> {
@@ -1580,13 +1582,19 @@ fn write_prepared_raster_image(
     return Ok(());
   }
 
+  let Some((display_width_pt, display_height_pt)) =
+    expanded_image_display_size(paint_width_pt, paint_height_pt, image.crop)
+  else {
+    return Ok(());
+  };
+
   let prepared = writer.image_policy.raster_direct(
     &image.data,
     image.content_type.as_deref(),
     writer.options,
     metafile_render_options,
-    image.width_pt,
-    image.height_pt,
+    (display_width_pt, display_height_pt),
+    image.blip_compression_state,
   )?;
   write_registered_raster_image(
     content,
@@ -1596,6 +1604,22 @@ fn write_prepared_raster_image(
     paint_width_pt,
     paint_height_pt,
   )
+}
+
+fn expanded_image_display_size(
+  width_pt: f32,
+  height_pt: f32,
+  crop: super::paint::ImageCrop,
+) -> Option<(f32, f32)> {
+  let visible_width = 1.0 - crop.left - crop.right;
+  let visible_height = 1.0 - crop.top - crop.bottom;
+  if visible_width <= f32::EPSILON || visible_height <= f32::EPSILON {
+    return None;
+  }
+  let display_width = width_pt / visible_width;
+  let display_height = height_pt / visible_height;
+  (display_width.is_finite() && display_height.is_finite())
+    .then_some((display_width, display_height))
 }
 
 fn write_registered_raster_image(
@@ -4985,6 +5009,7 @@ mod tests {
       flip_vertical: false,
       content_type: "image/png".into(),
       bytes: bytes.into(),
+      blip_compression_state: common::BlipCompressionState::Unspecified,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -5022,6 +5047,7 @@ mod tests {
       flip_vertical: false,
       data: Cow::Borrowed(&[]),
       content_type: Some(Cow::Borrowed("image/x-emf")),
+      blip_compression_state: common::BlipCompressionState::Unspecified,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -5108,6 +5134,7 @@ mod tests {
     let pdf = String::from_utf8_lossy(&bytes);
 
     assert!(pdf.starts_with("%PDF-1.7"));
+    assert!(bytes.ends_with(b"%%EOF\n"));
     assert!(pdf.contains("/Count 2"));
     let landscape = pdf.find("/MediaBox[0 0 720 540]").unwrap();
     let portrait = pdf.find("/MediaBox[0 0 612 792]").unwrap();
@@ -6473,6 +6500,47 @@ mod tests {
         .into_owned();
     assert!(pdf.contains("0 0 30 40 re\nW\nn"), "{pdf}");
     assert!(pdf.contains("60 0 0 -40 -15 40 cm/Im0 Do"));
+  }
+
+  #[test]
+  fn direct_writer_uses_expanded_crop_matrix_for_powerpoint_downsampling() {
+    let mut png = Vec::new();
+    {
+      let mut encoder = png::Encoder::new(&mut png, 160, 90);
+      encoder.set_color(png::ColorType::Rgb);
+      encoder.set_depth(png::BitDepth::Eight);
+      encoder
+        .write_header()
+        .unwrap()
+        .write_image_data(&vec![128; 160 * 90 * 3])
+        .unwrap();
+    }
+
+    let mut image = test_image_item(png);
+    image.bounds.size = Size {
+      width: Pt(72.0),
+      height: Pt(54.0),
+    };
+    let mut document = image_document(image.clone());
+    document.engine_kind = common::LayoutEngineKind::Pptx;
+    let mut options = uncompressed_options();
+    options.optimize_for = crate::PdfOptimizeFor::Screen;
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Pptx);
+
+    let uncropped = String::from_utf8_lossy(&render(&document, &options).unwrap()).into_owned();
+    assert!(uncropped.contains("/Width 95"), "{uncropped}");
+    assert!(uncropped.contains("/Height 90"), "{uncropped}");
+
+    image.crop = Some(common::ImageCrop {
+      right: 17.0 / 117.0,
+      ..Default::default()
+    });
+    let mut document = image_document(image);
+    document.engine_kind = common::LayoutEngineKind::Pptx;
+    let cropped = String::from_utf8_lossy(&render(&document, &options).unwrap()).into_owned();
+    assert!(cropped.contains("/Width 160"), "{cropped}");
+    assert!(cropped.contains("/Height 90"), "{cropped}");
   }
 
   #[test]

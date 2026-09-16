@@ -1,5 +1,6 @@
 use ooxmlsdk::parts::PartRef;
 use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
+use ooxmlsdk::parts::dialogsheet_part::DialogsheetPart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
@@ -126,6 +127,25 @@ impl WorkbookFragment {
           );
         }
 
+        if let Some(PartRef::DialogsheetPart(part)) =
+          self.workbook_part.get_part_by_id(package, rel_id)
+        {
+          return dialogsheet(
+            package,
+            &part,
+            sheet,
+            WorkbookSheetContext {
+              workbook_index,
+              state,
+              active: active_workbook_sheet == Some(workbook_index),
+              shared_strings: &self.shared_strings,
+              styles: &self.styles,
+              date_1904,
+              producer,
+            },
+          );
+        }
+
         Ok(CalcSheet::unresolved(SheetIdentity {
           workbook_index,
           name: sheet.name.as_str().to_string(),
@@ -201,6 +221,29 @@ fn chartsheet(
     },
     chartsheet,
     resources,
+  ))
+}
+
+fn dialogsheet(
+  package: &SpreadsheetDocument,
+  part: &DialogsheetPart,
+  sheet: &x::Sheet,
+  context: WorkbookSheetContext<'_>,
+) -> Result<CalcSheet> {
+  let dialogsheet = part.root_element(package)?.clone();
+  let resources = SheetResourceCatalog::from_dialogsheet_part(package, part, context.styles)?;
+  Ok(CalcSheet::from_dialogsheet(
+    SheetIdentity {
+      workbook_index: context.workbook_index,
+      name: sheet.name.as_str().to_string(),
+      state: context.state,
+      active: context.active,
+    },
+    dialogsheet,
+    resources,
+    context.shared_strings,
+    context.styles,
+    context.producer,
   ))
 }
 

@@ -586,6 +586,7 @@ pub(crate) struct ImageItem {
   pub flip_vertical: bool,
   pub data: Bytes,
   pub content_type: Option<String>,
+  pub blip_compression_state: common::BlipCompressionState,
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,
   pub metafile_background_color: Option<[u8; 3]>,
   pub metafile_external_header: Option<crate::render::emf_wmf::WmfExternalHeader>,

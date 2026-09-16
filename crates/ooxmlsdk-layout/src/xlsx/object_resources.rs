@@ -1,4 +1,5 @@
 use ooxmlsdk::parts::control_properties_part::ControlPropertiesPart;
+use ooxmlsdk::parts::dialogsheet_part::DialogsheetPart;
 use ooxmlsdk::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart;
 use std::collections::HashMap;
 
@@ -311,6 +312,24 @@ impl WorksheetObjectResourceCatalog {
         .map(|part| VmlDrawingResourceCatalog::from_part(package, part))
         .collect(),
       images: part.image_parts(package).count(),
+      ..Self::default()
+    }
+  }
+
+  pub(crate) fn from_dialogsheet_part(
+    package: &SpreadsheetDocument,
+    part: &DialogsheetPart,
+  ) -> Self {
+    let vml_drawing_parts = part.vml_drawing_parts(package).collect::<Vec<_>>();
+    Self {
+      vml_drawings: vml_drawing_parts
+        .iter()
+        .map(|part| VmlDrawingResourceCatalog::from_part(package, part))
+        .collect(),
+      embedded_objects: part
+        .embedded_object_parts(package)
+        .map(|part| BinaryResourceCatalog::from_part(&part))
+        .collect(),
       ..Self::default()
     }
   }

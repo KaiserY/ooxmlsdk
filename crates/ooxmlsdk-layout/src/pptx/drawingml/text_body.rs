@@ -45,7 +45,8 @@ pub(crate) struct TextBodyDisplayProperties {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum TextAutoFit {
   #[default]
-  None,
+  Unspecified,
+  NoAutoFit,
   Normal {
     font_scale: i32,
     line_space_reduction: i32,
@@ -59,6 +60,10 @@ pub(crate) struct TextParagraph {
   pub(crate) diagram_synthesized_bullet_left_margin: bool,
   pub(crate) diagram_synthesized_bullet_indent: bool,
   pub(crate) level: Option<u8>,
+  /// The matching placeholder's sample paragraph for this outline level.
+  /// PowerPoint layouts use these paragraphs to supply inherited bullet
+  /// properties even when their a:lstStyle does not contain a bullet.
+  pub(crate) placeholder_paragraph_properties: Option<Box<a::ParagraphProperties>>,
   pub(crate) paragraph_properties: Option<Box<a::ParagraphProperties>>,
   pub(crate) end_paragraph_run_properties: Option<Box<a::EndParagraphRunProperties>>,
   pub(crate) master_paragraph_style: Option<TextListParagraphStyle>,
@@ -175,9 +180,24 @@ impl TextBody {
     }
   }
 
-  pub(crate) fn apply_text_styles(&mut self, master_text_list_style: Option<&TextListStyle>) {
+  pub(crate) fn apply_text_styles(
+    &mut self,
+    master_text_list_style: Option<&TextListStyle>,
+    placeholder_text_body: Option<&TextBody>,
+  ) {
     for paragraph in &mut self.paragraphs {
-      paragraph.apply_text_styles(master_text_list_style, self.list_style.as_ref());
+      let placeholder_paragraph_properties = placeholder_text_body
+        .and_then(|text_body| {
+          text_body
+            .paragraphs
+            .get(usize::from(paragraph.level.unwrap_or(0).min(8)))
+        })
+        .and_then(|paragraph| paragraph.paragraph_properties.as_deref());
+      paragraph.apply_text_styles(
+        master_text_list_style,
+        self.list_style.as_ref(),
+        placeholder_paragraph_properties,
+      );
     }
   }
 
@@ -256,6 +276,21 @@ impl TextBody {
       properties.compatible_line_spacing = properties
         .compatible_line_spacing
         .or(inherited_properties.compatible_line_spacing);
+      // Presentation placeholders carry text 3-D as bodyPr children. A slide
+      // placeholder with an otherwise empty bodyPr still inherits the layout
+      // scene and its sp3d/flatTx choice, just as it inherits bodyPr
+      // attributes above. Keeping these typed children is also what selects
+      // PowerPoint's non-semantic glyph-outline path during fixed output.
+      if properties.scene3_d_type.is_none() {
+        properties
+          .scene3_d_type
+          .clone_from(&inherited_properties.scene3_d_type);
+      }
+      if properties.body_properties_choice2.is_none() {
+        properties
+          .body_properties_choice2
+          .clone_from(&inherited_properties.body_properties_choice2);
+      }
     }
     if let Some(properties) = self.body_properties.as_deref() {
       self.display_properties = TextBodyDisplayProperties::from_body_properties(properties);
@@ -295,7 +330,7 @@ impl Default for TextBodyDisplayProperties {
       preset_text_warp: None,
       preset_text_warp_geometry: None,
       upright: false,
-      auto_fit: TextAutoFit::None,
+      auto_fit: TextAutoFit::Unspecified,
     }
   }
 }
@@ -355,12 +390,12 @@ impl TextBodyDisplayProperties {
         .map(|warp| warp.preset),
       preset_text_warp_geometry: properties.preset_text_warp.clone(),
       upright: properties.up_right.is_some_and(|value| value.as_bool()),
-      auto_fit: TextAutoFit::None,
+      auto_fit: TextAutoFit::Unspecified,
     };
 
     match properties.body_properties_choice1.as_ref() {
-      Some(a::BodyPropertiesChoice::NoAutoFit) | None => {
-        result.auto_fit = TextAutoFit::None;
+      Some(a::BodyPropertiesChoice::NoAutoFit) => {
+        result.auto_fit = TextAutoFit::NoAutoFit;
       }
       Some(a::BodyPropertiesChoice::NormalAutoFit(auto_fit)) => {
         result.auto_fit = TextAutoFit::Normal {
@@ -377,7 +412,7 @@ impl TextBodyDisplayProperties {
             .unwrap_or(0),
         };
       }
-      Some(a::BodyPropertiesChoice::ShapeAutoFit) => {
+      Some(a::BodyPropertiesChoice::ShapeAutoFit)
         if !matches!(
           result.vertical,
           Some(
@@ -386,10 +421,11 @@ impl TextBodyDisplayProperties {
               | a::TextVerticalValues::Vertical270
               | a::TextVerticalValues::MongolianVertical
           )
-        ) {
-          result.auto_fit = TextAutoFit::Shape;
-        }
+        ) =>
+      {
+        result.auto_fit = TextAutoFit::Shape;
       }
+      Some(a::BodyPropertiesChoice::ShapeAutoFit) | None => {}
     }
     result
   }
@@ -397,7 +433,7 @@ impl TextBodyDisplayProperties {
   pub(crate) fn font_scale(&self) -> f32 {
     match self.auto_fit {
       TextAutoFit::Normal { font_scale, .. } => font_scale as f32 / 100_000.0,
-      TextAutoFit::None | TextAutoFit::Shape => 1.0,
+      TextAutoFit::Unspecified | TextAutoFit::NoAutoFit | TextAutoFit::Shape => 1.0,
     }
   }
 
@@ -407,7 +443,7 @@ impl TextBodyDisplayProperties {
         line_space_reduction,
         ..
       } => 1.0 - line_space_reduction as f32 / 100_000.0,
-      TextAutoFit::None | TextAutoFit::Shape => 1.0,
+      TextAutoFit::Unspecified | TextAutoFit::NoAutoFit | TextAutoFit::Shape => 1.0,
     }
   }
 
@@ -460,6 +496,7 @@ impl TextParagraph {
       diagram_synthesized_bullet_left_margin: false,
       diagram_synthesized_bullet_indent: false,
       level,
+      placeholder_paragraph_properties: None,
       paragraph_properties: source.paragraph_properties.clone(),
       end_paragraph_run_properties: source.end_paragraph_run_properties.clone(),
       master_paragraph_style: None,
@@ -472,6 +509,7 @@ impl TextParagraph {
     &mut self,
     master_text_list_style: Option<&TextListStyle>,
     text_list_style: Option<&TextListStyle>,
+    placeholder_paragraph_properties: Option<&a::ParagraphProperties>,
   ) {
     self.master_paragraph_style = master_text_list_style
       .and_then(|style| self.get_paragraph_style(style))
@@ -479,6 +517,7 @@ impl TextParagraph {
     self.text_paragraph_style = text_list_style
       .and_then(|style| self.get_paragraph_style(style))
       .map(TextListParagraphStyleRef::to_owned_style);
+    self.placeholder_paragraph_properties = placeholder_paragraph_properties.cloned().map(Box::new);
   }
 
   pub(crate) fn get_paragraph_style<'a>(
@@ -559,6 +598,18 @@ pub(crate) fn has_noninherited_body_properties(properties: &a::BodyProperties) -
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn omitted_autofit_is_distinct_from_explicit_no_autofit() {
+    let omitted = TextBodyDisplayProperties::from_body_properties(&a::BodyProperties::default());
+    let explicit = TextBodyDisplayProperties::from_body_properties(&a::BodyProperties {
+      body_properties_choice1: Some(a::BodyPropertiesChoice::NoAutoFit),
+      ..a::BodyProperties::default()
+    });
+
+    assert_eq!(omitted.auto_fit, TextAutoFit::Unspecified);
+    assert_eq!(explicit.auto_fit, TextAutoFit::NoAutoFit);
+  }
 
   #[test]
   fn empty_normal_autofit_keeps_full_line_height() {
@@ -647,6 +698,29 @@ mod tests {
   }
 
   #[test]
+  fn empty_placeholder_body_properties_inherit_text_3d() {
+    let inherited_properties = a::BodyProperties {
+      scene3_d_type: Some(Box::new(a::Scene3DType::default())),
+      body_properties_choice2: Some(a::BodyPropertiesChoice2::Shape3DType(Box::default())),
+      ..a::BodyProperties::default()
+    };
+    let inherited = TextBody::from_parts(&inherited_properties, None, &[]);
+    let mut direct = TextBody::from_parts(&a::BodyProperties::default(), None, &[]);
+
+    direct.inherit_placeholder_body_properties(&inherited);
+
+    let properties = direct
+      .body_properties
+      .as_deref()
+      .expect("direct text body should retain body properties");
+    assert_eq!(properties.scene3_d_type, inherited_properties.scene3_d_type);
+    assert_eq!(
+      properties.body_properties_choice2,
+      inherited_properties.body_properties_choice2
+    );
+  }
+
+  #[test]
   fn missing_compatible_line_spacing_keeps_powerpoint_legacy_spacing() {
     use ooxmlsdk::simple_type::BooleanValue;
 
@@ -720,6 +794,42 @@ mod tests {
     direct.inherit_placeholder_body_properties(&inherited);
 
     assert!(!direct.display_properties.word_wrap);
+  }
+
+  #[test]
+  fn placeholder_sample_paragraph_tracks_the_outline_level() {
+    let bullet_properties = a::ParagraphProperties {
+      paragraph_properties_choice4: Some(a::ParagraphPropertiesChoice4::CharacterBullet(
+        a::CharacterBullet { char: "§".into() },
+      )),
+      ..a::ParagraphProperties::default()
+    };
+    let placeholder = TextBody {
+      paragraphs: vec![
+        TextParagraph::default(),
+        TextParagraph {
+          paragraph_properties: Some(Box::new(bullet_properties.clone())),
+          ..TextParagraph::default()
+        },
+      ],
+      ..TextBody::default()
+    };
+    let mut direct = TextBody {
+      paragraphs: vec![TextParagraph {
+        level: Some(1),
+        ..TextParagraph::default()
+      }],
+      ..TextBody::default()
+    };
+
+    direct.apply_text_styles(None, Some(&placeholder));
+
+    assert_eq!(
+      direct.paragraphs[0]
+        .placeholder_paragraph_properties
+        .as_deref(),
+      Some(&bullet_properties)
+    );
   }
 
   #[test]

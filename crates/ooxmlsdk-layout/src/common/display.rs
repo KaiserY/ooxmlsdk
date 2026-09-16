@@ -202,6 +202,21 @@ pub enum MetafileFixedOutputProfile {
   ExcelVmlPicture,
 }
 
+/// Compression state authored on a DrawingML `a:blip` source.
+///
+/// The value describes the stored source and remains separate from the PDF
+/// export quality selected by the host application.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BlipCompressionState {
+  #[default]
+  Unspecified,
+  Email,
+  Screen,
+  Print,
+  HighQualityPrint,
+  None,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ImageItem<'doc> {
   pub bounds: Rect,
@@ -213,6 +228,7 @@ pub struct ImageItem<'doc> {
   pub flip_vertical: bool,
   pub content_type: Cow<'doc, str>,
   pub bytes: Bytes,
+  pub blip_compression_state: BlipCompressionState,
   /// Optional caller-specific realization colors for a one-bit WMF DIB
   /// pattern. Ordinary metafiles retain their embedded palettes.
   pub metafile_monochrome_dib_palette_override: Option<[[u8; 3]; 2]>,

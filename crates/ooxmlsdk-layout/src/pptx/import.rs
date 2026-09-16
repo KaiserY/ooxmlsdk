@@ -282,6 +282,19 @@ impl PowerPointImport {
       .and_then(|theme| theme.font_scheme.resolve_font(placeholder))
   }
 
+  pub(crate) fn resolve_theme_font_for_slide_and_language(
+    &self,
+    slide: Option<&SlidePersist>,
+    placeholder: &str,
+    language: Option<&str>,
+  ) -> Option<&str> {
+    self.get_theme_for_slide(slide).and_then(|theme| {
+      theme
+        .font_scheme
+        .resolve_font_for_language(placeholder, language)
+    })
+  }
+
   pub(crate) fn resolve_theme_font_for_language(
     &self,
     placeholder: &str,

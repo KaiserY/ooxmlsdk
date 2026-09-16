@@ -187,6 +187,8 @@ pub(crate) struct DifferentialFormatRecord {
   pub(crate) font: Option<FontRecord>,
   pub(crate) fill: Option<FillRecord>,
   pub(crate) border: Option<BorderRecord>,
+  pub(crate) vertical_border: Option<BorderStyle>,
+  pub(crate) horizontal_border: Option<BorderStyle>,
   pub(crate) alignment: Option<AlignmentRecord>,
   pub(crate) number_format: Option<NumberFormatRecord>,
 }
@@ -902,6 +904,18 @@ impl StylesCatalog {
       .and_then(|format| format.border)
   }
 
+  pub(crate) fn differential_inner_borders(
+    &self,
+    format_id: u32,
+  ) -> (Option<BorderStyle>, Option<BorderStyle>) {
+    self
+      .differential_format_records
+      .get(format_id as usize)
+      .map_or((None, None), |format| {
+        (format.vertical_border, format.horizontal_border)
+      })
+  }
+
   pub(crate) fn differential_alignment(&self, format_id: u32) -> Option<AlignmentRecord> {
     self
       .differential_format_records
@@ -1542,6 +1556,7 @@ impl DifferentialFormatRecord {
     indexed_colors: &[RgbColor],
     theme_colors: &ThemeColorPalette,
   ) -> Self {
+    let border = format.border.as_deref();
     Self {
       font: format
         .font
@@ -1550,10 +1565,28 @@ impl DifferentialFormatRecord {
       fill: format.fill.as_deref().map(|fill| {
         FillRecord::from_differential_fill_with_colors(fill, indexed_colors, theme_colors)
       }),
-      border: format
-        .border
-        .as_deref()
+      border: border
         .map(|border| BorderRecord::from_border_with_colors(border, indexed_colors, theme_colors)),
+      vertical_border: border
+        .and_then(|border| border.vertical_border.as_deref())
+        .and_then(|border| {
+          border_style(
+            border.style,
+            border.color.as_ref(),
+            indexed_colors,
+            theme_colors,
+          )
+        }),
+      horizontal_border: border
+        .and_then(|border| border.horizontal_border.as_deref())
+        .and_then(|border| {
+          border_style(
+            border.style,
+            border.color.as_ref(),
+            indexed_colors,
+            theme_colors,
+          )
+        }),
       alignment: format
         .alignment
         .as_ref()

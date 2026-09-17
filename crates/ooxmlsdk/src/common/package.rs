@@ -196,20 +196,11 @@ trait SharedSource: Read + Seek + Send {}
 
 impl<T: Read + Seek + Send> SharedSource for T {}
 
+#[derive(Clone)]
 struct SharedReader {
   inner: Arc<Mutex<Box<dyn SharedSource>>>,
   position: u64,
   length: u64,
-}
-
-impl Clone for SharedReader {
-  fn clone(&self) -> Self {
-    Self {
-      inner: Arc::clone(&self.inner),
-      position: self.position,
-      length: self.length,
-    }
-  }
 }
 
 impl std::fmt::Debug for SharedReader {

@@ -362,6 +362,22 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         Self::new_inner(reader, open_settings)
       }
 
+      pub fn new_from_shared_reader<R: std::io::Read + std::io::Seek + Send + 'static>(
+        reader: R,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::new_from_shared_reader_with_settings(reader, crate::sdk::OpenSettings::default())
+      }
+
+      pub fn new_from_shared_reader_with_settings<
+        R: std::io::Read + std::io::Seek + Send + 'static,
+      >(
+        reader: R,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        let storage = crate::common::SdkPackageStorage::open_shared(reader)?;
+        Self::from_storage(storage, open_settings)
+      }
+
       pub fn new_from_file<P: AsRef<std::path::Path>>(
         path: P,
       ) -> Result<Self, crate::common::SdkError> {

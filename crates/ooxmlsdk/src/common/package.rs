@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use bytes::Bytes;
 
@@ -189,6 +189,77 @@ enum ArchiveReader {
   #[cfg(any(unix, windows))]
   File(PositionedFileReader),
   Memory(Cursor<Bytes>),
+  Shared(SharedReader),
+}
+
+trait SharedSource: Read + Seek + Send {}
+
+impl<T: Read + Seek + Send> SharedSource for T {}
+
+struct SharedReader {
+  inner: Arc<Mutex<Box<dyn SharedSource>>>,
+  position: u64,
+  length: u64,
+}
+
+impl Clone for SharedReader {
+  fn clone(&self) -> Self {
+    Self {
+      inner: Arc::clone(&self.inner),
+      position: self.position,
+      length: self.length,
+    }
+  }
+}
+
+impl std::fmt::Debug for SharedReader {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("SharedReader")
+      .field("position", &self.position)
+      .field("length", &self.length)
+      .finish_non_exhaustive()
+  }
+}
+
+impl SharedReader {
+  fn new<R: Read + Seek + Send + 'static>(mut reader: R) -> Result<Self, SdkError> {
+    let length = reader.seek(SeekFrom::End(0))?;
+    reader.seek(SeekFrom::Start(0))?;
+    Ok(Self {
+      inner: Arc::new(Mutex::new(Box::new(reader) as Box<dyn SharedSource>)),
+      position: 0,
+      length,
+    })
+  }
+}
+
+impl Read for SharedReader {
+  fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+    let mut guard = self
+      .inner
+      .lock()
+      .map_err(|_| std::io::Error::other("shared reader poisoned"))?;
+    guard.seek(SeekFrom::Start(self.position))?;
+    let read = guard.read(buffer)?;
+    self.position = self
+      .position
+      .checked_add(read as u64)
+      .ok_or_else(|| std::io::Error::other("shared reader position overflow"))?;
+    Ok(read)
+  }
+}
+
+impl Seek for SharedReader {
+  fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+    let next = match position {
+      SeekFrom::Start(position) => i128::from(position),
+      SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
+      SeekFrom::End(offset) => i128::from(self.length) + i128::from(offset),
+    };
+    self.position = u64::try_from(next)
+      .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid seek"))?;
+    Ok(self.position)
+  }
 }
 
 impl Read for ArchiveReader {
@@ -197,6 +268,7 @@ impl Read for ArchiveReader {
       #[cfg(any(unix, windows))]
       Self::File(reader) => reader.read(buffer),
       Self::Memory(reader) => reader.read(buffer),
+      Self::Shared(reader) => reader.read(buffer),
     }
   }
 }
@@ -207,6 +279,7 @@ impl Seek for ArchiveReader {
       #[cfg(any(unix, windows))]
       Self::File(reader) => reader.seek(position),
       Self::Memory(reader) => reader.seek(position),
+      Self::Shared(reader) => reader.seek(position),
     }
   }
 }
@@ -1359,6 +1432,12 @@ impl SdkPackageStorage {
     })?;
     reader.read_to_end(&mut bytes)?;
     Self::open_memory(bytes.into())
+  }
+
+  pub(crate) fn open_shared<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self, SdkError> {
+    let reader = SharedReader::new(reader)?;
+    let archive = zip::ZipArchive::new(ArchiveReader::Shared(reader))?;
+    Self::open_archive(archive)
   }
 
   pub(crate) fn open_file(path: &Path) -> Result<Self, SdkError> {

@@ -23,7 +23,7 @@ pub(crate) use package::{
 };
 #[cfg(feature = "parts")]
 pub use package::{
-  ReferenceRelationshipKind, Relationship, RelationshipRef, RelationshipTargetKind,
+  ReadAt, ReferenceRelationshipKind, Relationship, RelationshipRef, RelationshipTargetKind,
 };
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;

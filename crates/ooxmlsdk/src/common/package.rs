@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 use bytes::Bytes;
 
@@ -189,58 +189,54 @@ enum ArchiveReader {
   #[cfg(any(unix, windows))]
   File(PositionedFileReader),
   Memory(Cursor<Bytes>),
-  Shared(SharedReader),
+  Positioned(PositionedSourceReader),
 }
 
-trait SharedSource: Read + Seek + Send {}
+pub trait ReadAt: Send + Sync {
+  fn read_at(&self, buffer: &mut [u8], offset: u64) -> std::io::Result<usize>;
 
-impl<T: Read + Seek + Send> SharedSource for T {}
+  fn size(&self) -> std::io::Result<u64>;
+}
 
 #[derive(Clone)]
-struct SharedReader {
-  inner: Arc<Mutex<Box<dyn SharedSource>>>,
+struct PositionedSourceReader {
+  source: Arc<dyn ReadAt>,
   position: u64,
   length: u64,
 }
 
-impl std::fmt::Debug for SharedReader {
+impl std::fmt::Debug for PositionedSourceReader {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.debug_struct("SharedReader")
+    f.debug_struct("PositionedSourceReader")
       .field("position", &self.position)
       .field("length", &self.length)
       .finish_non_exhaustive()
   }
 }
 
-impl SharedReader {
-  fn new<R: Read + Seek + Send + 'static>(mut reader: R) -> Result<Self, SdkError> {
-    let length = reader.seek(SeekFrom::End(0))?;
-    reader.seek(SeekFrom::Start(0))?;
+impl PositionedSourceReader {
+  fn new(source: Arc<dyn ReadAt>) -> Result<Self, SdkError> {
+    let length = source.size()?;
     Ok(Self {
-      inner: Arc::new(Mutex::new(Box::new(reader) as Box<dyn SharedSource>)),
+      source,
       position: 0,
       length,
     })
   }
 }
 
-impl Read for SharedReader {
+impl Read for PositionedSourceReader {
   fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
-    let mut guard = self
-      .inner
-      .lock()
-      .map_err(|_| std::io::Error::other("shared reader poisoned"))?;
-    guard.seek(SeekFrom::Start(self.position))?;
-    let read = guard.read(buffer)?;
+    let read = self.source.read_at(buffer, self.position)?;
     self.position = self
       .position
       .checked_add(read as u64)
-      .ok_or_else(|| std::io::Error::other("shared reader position overflow"))?;
+      .ok_or_else(|| std::io::Error::other("source reader position overflow"))?;
     Ok(read)
   }
 }
 
-impl Seek for SharedReader {
+impl Seek for PositionedSourceReader {
   fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
     let next = match position {
       SeekFrom::Start(position) => i128::from(position),
@@ -259,7 +255,7 @@ impl Read for ArchiveReader {
       #[cfg(any(unix, windows))]
       Self::File(reader) => reader.read(buffer),
       Self::Memory(reader) => reader.read(buffer),
-      Self::Shared(reader) => reader.read(buffer),
+      Self::Positioned(reader) => reader.read(buffer),
     }
   }
 }
@@ -270,7 +266,7 @@ impl Seek for ArchiveReader {
       #[cfg(any(unix, windows))]
       Self::File(reader) => reader.seek(position),
       Self::Memory(reader) => reader.seek(position),
-      Self::Shared(reader) => reader.seek(position),
+      Self::Positioned(reader) => reader.seek(position),
     }
   }
 }
@@ -1425,9 +1421,9 @@ impl SdkPackageStorage {
     Self::open_memory(bytes.into())
   }
 
-  pub(crate) fn open_shared<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self, SdkError> {
-    let reader = SharedReader::new(reader)?;
-    let archive = zip::ZipArchive::new(ArchiveReader::Shared(reader))?;
+  pub(crate) fn open_reader_at(source: Arc<dyn ReadAt>) -> Result<Self, SdkError> {
+    let reader = PositionedSourceReader::new(source)?;
+    let archive = zip::ZipArchive::new(ArchiveReader::Positioned(reader))?;
     Self::open_archive(archive)
   }
 

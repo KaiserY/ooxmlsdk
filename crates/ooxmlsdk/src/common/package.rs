@@ -189,6 +189,64 @@ enum ArchiveReader {
   #[cfg(any(unix, windows))]
   File(PositionedFileReader),
   Memory(Cursor<Bytes>),
+  Positioned(PositionedSourceReader),
+}
+
+pub trait ReadAt: Send + Sync {
+  fn read_at(&self, buffer: &mut [u8], offset: u64) -> std::io::Result<usize>;
+
+  fn size(&self) -> std::io::Result<u64>;
+}
+
+#[derive(Clone)]
+struct PositionedSourceReader {
+  source: Arc<dyn ReadAt>,
+  position: u64,
+  length: u64,
+}
+
+impl std::fmt::Debug for PositionedSourceReader {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("PositionedSourceReader")
+      .field("position", &self.position)
+      .field("length", &self.length)
+      .finish_non_exhaustive()
+  }
+}
+
+impl PositionedSourceReader {
+  fn new(source: Arc<dyn ReadAt>) -> Result<Self, SdkError> {
+    let length = source.size()?;
+    Ok(Self {
+      source,
+      position: 0,
+      length,
+    })
+  }
+}
+
+impl Read for PositionedSourceReader {
+  fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+    let read = self.source.read_at(buffer, self.position)?;
+    self.position = self
+      .position
+      .checked_add(read as u64)
+      .ok_or_else(|| std::io::Error::other("source reader position overflow"))?;
+    Ok(read)
+  }
+}
+
+impl Seek for PositionedSourceReader {
+  fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+    let next = match position {
+      SeekFrom::Start(position) => i128::from(position),
+      SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
+      SeekFrom::End(offset) => i128::from(self.length) + i128::from(offset),
+    };
+    self.position = u64::try_from(next)
+      .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid seek"))?;
+    Ok(self.position)
+  }
 }
 
 impl Read for ArchiveReader {
@@ -197,6 +255,7 @@ impl Read for ArchiveReader {
       #[cfg(any(unix, windows))]
       Self::File(reader) => reader.read(buffer),
       Self::Memory(reader) => reader.read(buffer),
+      Self::Positioned(reader) => reader.read(buffer),
     }
   }
 }
@@ -207,6 +266,7 @@ impl Seek for ArchiveReader {
       #[cfg(any(unix, windows))]
       Self::File(reader) => reader.seek(position),
       Self::Memory(reader) => reader.seek(position),
+      Self::Positioned(reader) => reader.seek(position),
     }
   }
 }
@@ -1359,6 +1419,12 @@ impl SdkPackageStorage {
     })?;
     reader.read_to_end(&mut bytes)?;
     Self::open_memory(bytes.into())
+  }
+
+  pub(crate) fn open_reader_at(source: Arc<dyn ReadAt>) -> Result<Self, SdkError> {
+    let reader = PositionedSourceReader::new(source)?;
+    let archive = zip::ZipArchive::new(ArchiveReader::Positioned(reader))?;
+    Self::open_archive(archive)
   }
 
   pub(crate) fn open_file(path: &Path) -> Result<Self, SdkError> {

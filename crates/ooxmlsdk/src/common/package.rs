@@ -3570,6 +3570,78 @@ fn is_relationships_part_path(path: &str) -> bool {
 mod tests {
   use super::*;
   use std::io::{Cursor, Write};
+  use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering as AtomicOrdering},
+  };
+
+  const LAZY_PAYLOAD_LEN: usize = 1024 * 1024;
+
+  struct CountingReadAt {
+    bytes: Bytes,
+    bytes_read: Arc<AtomicUsize>,
+  }
+
+  impl ReadAt for CountingReadAt {
+    fn read_at(&self, buffer: &mut [u8], offset: u64) -> std::io::Result<usize> {
+      let Ok(offset) = usize::try_from(offset) else {
+        return Ok(0);
+      };
+      let source = self.bytes.get(offset..).unwrap_or(&[]);
+      let read = buffer.len().min(source.len());
+      buffer[..read].copy_from_slice(&source[..read]);
+      self.bytes_read.fetch_add(read, AtomicOrdering::Relaxed);
+      Ok(read)
+    }
+
+    fn size(&self) -> std::io::Result<u64> {
+      Ok(self.bytes.len() as u64)
+    }
+  }
+
+  fn package_with_large_unloaded_part() -> Bytes {
+    let mut buffer = Cursor::new(Vec::new());
+    {
+      let mut zip = zip::ZipWriter::new(&mut buffer);
+      let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+      zip.start_file("[Content_Types].xml", options).unwrap();
+      zip
+        .write_all(
+          br#"<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="bin" ContentType="application/octet-stream"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"#,
+        )
+        .unwrap();
+
+      zip.start_file("_rels/.rels", options).unwrap();
+      zip
+        .write_all(
+          br#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#,
+        )
+        .unwrap();
+
+      zip.start_file("word/document.xml", options).unwrap();
+      zip
+        .write_all(
+          br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#,
+        )
+        .unwrap();
+
+      zip.start_file("word/media/unloaded.bin", options).unwrap();
+      let payload = vec![0x5a; LAZY_PAYLOAD_LEN];
+      zip.write_all(&payload).unwrap();
+      zip.finish().unwrap();
+    }
+    buffer.into_inner().into()
+  }
 
   #[test]
   fn relationship_set_separates_child_parts_and_caches_the_next_numeric_id() {
@@ -3609,6 +3681,39 @@ mod tests {
 
     relationships.remove("rId9").unwrap();
     assert_eq!(relationships.next_relationship_id(), "rId2");
+  }
+
+  #[test]
+  fn positional_reader_opens_lazily_and_raw_copies_unloaded_parts() {
+    let bytes = package_with_large_unloaded_part();
+    let bytes_read = Arc::new(AtomicUsize::new(0));
+    let source = CountingReadAt {
+      bytes,
+      bytes_read: Arc::clone(&bytes_read),
+    };
+
+    let document =
+      crate::parts::wordprocessing_document::WordprocessingDocument::new_from_reader_at(source)
+        .unwrap();
+    assert!(bytes_read.load(AtomicOrdering::Relaxed) < LAZY_PAYLOAD_LEN / 2);
+
+    let main_part = document.main_document_part().unwrap();
+    assert!(!main_part.is_root_element_loaded(&document));
+    main_part.root_element(&document).unwrap();
+    assert!(main_part.is_root_element_loaded(&document));
+    assert!(bytes_read.load(AtomicOrdering::Relaxed) < LAZY_PAYLOAD_LEN / 2);
+
+    let saved = document.to_package_bytes().unwrap();
+    assert!(bytes_read.load(AtomicOrdering::Relaxed) >= LAZY_PAYLOAD_LEN);
+
+    let reopened =
+      crate::parts::wordprocessing_document::WordprocessingDocument::new(Cursor::new(saved))
+        .unwrap();
+    reopened
+      .main_document_part()
+      .unwrap()
+      .root_element(&reopened)
+      .unwrap();
   }
 
   #[test]

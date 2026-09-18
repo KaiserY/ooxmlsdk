@@ -1224,7 +1224,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "ooxmlsdk"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "base64 0.23.1",
  "bytes",
@@ -1241,7 +1241,7 @@ dependencies = [
 
 [[package]]
 name = "ooxmlsdk-build"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "heck",
  "prettyplease",
@@ -1258,7 +1258,7 @@ dependencies = [
 
 [[package]]
 name = "ooxmlsdk-derive"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -1268,7 +1268,7 @@ dependencies = [
 
 [[package]]
 name = "ooxmlsdk-fonts"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "fontique",
  "harfrust 0.13.3",
@@ -1285,7 +1285,7 @@ dependencies = [
 
 [[package]]
 name = "ooxmlsdk-formula"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "bitflags 2.13.2",
  "encoding_rs",
@@ -1308,7 +1308,7 @@ dependencies = [
 
 [[package]]
 name = "ooxmlsdk-layout"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "base64 0.23.1",
  "bytes",
@@ -1345,7 +1345,7 @@ dependencies = [
 
 [[package]]
 name = "ooxmlsdk-pdf"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "emfsdk",
  "flate2",

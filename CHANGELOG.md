@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.13.1
+
+### Added
+
+- Added lazy package constructors for caller-supplied positional `ReadAt` sources, avoiding an eager whole-package copy in filesystem-free environments.
+
 ## 0.13.0
 
 ### Breaking Changes

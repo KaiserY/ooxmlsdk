@@ -29,6 +29,24 @@ pub(crate) enum DrawingEffectSource {
     effects: super::drawingml_image_effects::ImageEffectContainer,
     obscured: bool,
   },
+  /// A VML textpath shadow follows the warped glyph outline, rather than the
+  /// unpainted host rectangle used to lay out WordArt.
+  VmlTextShadow(VmlTextShadowSource),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct VmlTextShadowSource {
+  pub color: Color,
+  pub offset_x_pt: f32,
+  pub offset_y_pt: f32,
+  /// VML matrix order: sxx, sxy, syx, syy.
+  pub matrix: [f32; 4],
+  /// Perspective coefficients in inverse EMUs when the offset has absolute
+  /// units. Their numeric values can be tiny while their effect is visible
+  /// across a shape spanning hundreds of thousands of EMUs.
+  pub perspective_per_emu: [f32; 2],
+  /// Fractions of the shape extent measured from its center.
+  pub origin: (f32, f32),
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -274,6 +292,18 @@ pub enum Fill<'doc> {
     tile: bool,
   },
   Pattern(PatternFill),
+  /// A resolved full-color image brush, distinct from a two-color hatch.
+  Texture(Box<TextureFill>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextureFill {
+  pub bytes: bytes::Bytes,
+  pub content_type: Option<String>,
+  pub tile_size: super::Size,
+  /// Page-space top-left of a tile; the brush repeats in both directions.
+  pub origin: super::Point,
+  pub blip_compression_state: super::BlipCompressionState,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -599,6 +629,14 @@ pub struct RelativeRect {
 pub enum GradientInterpolation {
   #[default]
   LinearSrgb,
+  /// Fixed-function scene vertex colors on a normalized 1/128 lattice.
+  /// Stop RGB bytes encode the nearest 8-bit representation of each vertex;
+  /// reconstruct the lattice value before interpolation, then round only
+  /// when storing the raster sample.
+  FixedGouraud7,
+  /// VML's explicit sigma method uses the GDI+ sigma position falloff
+  /// while interpolating the authored sRGB channel values directly.
+  SigmaSrgb,
   /// Microsoft Office's fixed-format path for a two-stop DrawingML gradient
   /// uses the same gamma-correct sigma falloff exposed by the Windows GDI+
   /// linear gradient brush.

@@ -47,6 +47,7 @@ struct FontObjects {
 
 #[derive(Debug)]
 struct DirectFont {
+  integer_widths: bool,
   face: DirectFontFace,
   resource_name: Vec<u8>,
   objects: FontObjects,
@@ -56,8 +57,45 @@ struct DirectFont {
   advance_widths: HashMap<u16, f32>,
 }
 
+// Word preserves these legacy PostScript family names while embedding their
+// Windows TrueType substitutes. Ordinary aliases (e.g. Helv) and missing-font
+// fallback keep the physical face name. Native regular/bold/italic controls
+// distinguish all three cases.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum WordFontAlias {
+  Helvetica,
+  Times,
+}
+
+impl WordFontAlias {
+  fn from_family(family: &str) -> Option<Self> {
+    if family.eq_ignore_ascii_case("Helvetica") {
+      Some(Self::Helvetica)
+    } else if family.eq_ignore_ascii_case("Times") {
+      Some(Self::Times)
+    } else {
+      None
+    }
+  }
+
+  fn postscript_name(self, physical_name: &str) -> Option<&'static str> {
+    match (self, physical_name) {
+      (Self::Helvetica, "ArialMT") => Some("Helvetica"),
+      (Self::Helvetica, "Arial-ItalicMT") => Some("Helvetica,Italic"),
+      (Self::Helvetica, "Arial-BoldMT") => Some("Helvetica,Bold"),
+      (Self::Helvetica, "Arial-BoldItalicMT") => Some("Helvetica,BoldItalic"),
+      (Self::Times, "TimesNewRomanPSMT") => Some("Times"),
+      (Self::Times, "TimesNewRomanPS-ItalicMT") => Some("Times,Italic"),
+      (Self::Times, "TimesNewRomanPS-BoldMT") => Some("Times,Bold"),
+      (Self::Times, "TimesNewRomanPS-BoldItalicMT") => Some("Times,BoldItalic"),
+      _ => None,
+    }
+  }
+}
+
 #[derive(Clone, Debug)]
 struct DirectFontFace {
+  word_alias: Option<WordFontAlias>,
   data: Arc<FontBytes>,
   index: u32,
   id: Arc<str>,
@@ -67,6 +105,7 @@ struct DirectFontFace {
 impl DirectFontFace {
   fn from_layout(face: &FontFaceData) -> Self {
     Self {
+      word_alias: None,
       data: face.data.clone(),
       index: face.index,
       id: Arc::from(face.id()),
@@ -74,8 +113,10 @@ impl DirectFontFace {
     }
   }
 
-  fn key(&self) -> DirectFontKey {
+  fn key(&self, integer_widths: bool) -> DirectFontKey {
     DirectFontKey {
+      integer_widths,
+      word_alias: self.word_alias,
       id: self.id.clone(),
       index: self.index,
       variations: self
@@ -105,6 +146,8 @@ impl DirectFontFace {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct DirectFontKey {
+  integer_widths: bool,
+  word_alias: Option<WordFontAlias>,
   id: Arc<str>,
   index: u32,
   variations: Vec<DirectFontVariationKey>,
@@ -158,15 +201,57 @@ pub(super) struct DirectFontSet {
   fonts: Vec<DirectFont>,
   last_face: Option<(DirectFontKey, usize)>,
   external_sources: HashMap<DirectExternalFontCacheKey, DirectExternalFontSource>,
+  word_missing_glyph_face: Option<Option<FontFaceData>>,
 }
 
 impl DirectFontSet {
+  pub(super) fn word_missing_glyph_face(&mut self) -> Option<FontFaceData> {
+    self
+      .word_missing_glyph_face
+      .get_or_insert_with(|| {
+        ooxmlsdk_layout::fonts::FontResolver::default().cached_text_face(
+          &ooxmlsdk_layout::common::TextStyle {
+            font_family: Some("Calibri".into()),
+            ..Default::default()
+          },
+        )
+      })
+      .clone()
+  }
+
   pub(super) fn register_face(
     &mut self,
     face: &FontFaceData,
     alloc: impl FnMut() -> Result<Ref>,
   ) -> Result<FontHandle> {
-    self.register_direct_face(DirectFontFace::from_layout(face), alloc)
+    self.register_direct_face(DirectFontFace::from_layout(face), false, alloc)
+  }
+
+  pub(super) fn register_word_device_face(
+    &mut self,
+    face: &FontFaceData,
+    alloc: impl FnMut() -> Result<Ref>,
+  ) -> Result<FontHandle> {
+    self.register_direct_face(DirectFontFace::from_layout(face), true, alloc)
+  }
+
+  pub(super) fn register_text_face(
+    &mut self,
+    face: &FontFaceData,
+    integer_widths: bool,
+    word_family: Option<&str>,
+    alloc: impl FnMut() -> Result<Ref>,
+  ) -> Result<FontHandle> {
+    let Some(alias) = word_family.and_then(WordFontAlias::from_family) else {
+      return if integer_widths {
+        self.register_word_device_face(face, alloc)
+      } else {
+        self.register_face(face, alloc)
+      };
+    };
+    let mut direct_face = DirectFontFace::from_layout(face);
+    direct_face.word_alias = Some(alias);
+    self.register_direct_face(direct_face, integer_widths, alloc)
   }
 
   fn register_external_face(
@@ -179,11 +264,13 @@ impl DirectFontSet {
   ) -> Result<FontHandle> {
     self.register_direct_face(
       DirectFontFace {
+        word_alias: None,
         data,
         index,
         id,
         variations,
       },
+      false,
       alloc,
     )
   }
@@ -350,9 +437,14 @@ impl DirectFontSet {
   fn register_direct_face(
     &mut self,
     face: DirectFontFace,
+    integer_widths: bool,
     mut alloc: impl FnMut() -> Result<Ref>,
   ) -> Result<FontHandle> {
-    let key = face.key();
+    // Widths belong to the positioning contract, not just the physical face.
+    // Exact cluster painting and device text must not share one /W array:
+    // rounding also changes ActualText's extraction bounds, even when TJ
+    // compensates the visible pen positions.
+    let key = face.key(integer_widths);
     if let Some((last_key, index)) = self.last_face.as_ref()
       && last_key == &key
     {
@@ -367,6 +459,7 @@ impl DirectFontSet {
     let index = self.fonts.len();
     let metadata = FontMetadata::from_face(&face)?;
     self.fonts.push(DirectFont {
+      integer_widths,
       face: face.clone(),
       resource_name: format!("F{index}").into_bytes(),
       objects: FontObjects {
@@ -436,6 +529,11 @@ impl DirectFontSet {
           font.face.id()
         )));
       }
+      let width = if font.integer_widths {
+        width.round()
+      } else {
+        width
+      };
       font.advance_widths.insert(glyph_id, width);
       width
     };
@@ -520,9 +618,14 @@ impl DirectFont {
       .glyphs
       .remapped_gids()
       .map(|glyph_id| {
-        metrics
+        let width = metrics
           .advance_width(GlyphId::new(u32::from(glyph_id)))
-          .unwrap_or(0.0)
+          .unwrap_or(0.0);
+        if self.integer_widths {
+          width.round()
+        } else {
+          width
+        }
       })
       .collect::<Vec<_>>();
 
@@ -704,6 +807,14 @@ impl FontMetadata {
       .map(|name| name.to_string())
       .filter(|name| !name.is_empty())
       .unwrap_or_else(|| "unknown".to_string());
+    let postscript_name = if let Some(alias_name) = face_data
+      .word_alias
+      .and_then(|alias| alias.postscript_name(&postscript_name))
+    {
+      alias_name.to_owned()
+    } else {
+      postscript_name
+    };
     let weight = face.attributes().weight.value();
     Ok(Self {
       serif: postscript_name.contains("Serif"),
@@ -754,6 +865,67 @@ fn deflate(data: &[u8]) -> Result<Vec<u8>> {
 mod tests {
   use super::{FontMetadata, font_descriptor_flags};
   use pdf_writer::types::FontFlags;
+
+  #[test]
+  fn word_postscript_aliases_keep_distinct_resources_for_the_same_outline_face() {
+    let style = ooxmlsdk_layout::common::TextStyle {
+      font_family: Some("Arial".into()),
+      font_size: ooxmlsdk_layout::common::Pt(10.0),
+      ..Default::default()
+    };
+    let face = ooxmlsdk_layout::fonts::FontResolver::default()
+      .cached_text_face(&style)
+      .expect("Arial face");
+    let mut refs = 1;
+    let mut allocate = || {
+      let reference = pdf_writer::Ref::new(refs);
+      refs += 1;
+      Ok(reference)
+    };
+    let mut fonts = super::DirectFontSet::default();
+    for integer in [false, true] {
+      let physical = fonts
+        .register_text_face(&face, integer, Some("Arial"), &mut allocate)
+        .unwrap();
+      let alias = fonts
+        .register_text_face(&face, integer, Some("Helvetica"), &mut allocate)
+        .unwrap();
+      assert_ne!(physical, alias);
+      assert_eq!(fonts.fonts[physical.0].metadata.postscript_name, "ArialMT");
+      assert_eq!(fonts.fonts[alias.0].metadata.postscript_name, "Helvetica");
+      assert_eq!(
+        fonts.fonts[physical.0].face.id,
+        fonts.fonts[alias.0].face.id
+      );
+      assert_eq!(
+        fonts
+          .register_text_face(&face, integer, Some("Helv"), &mut allocate)
+          .unwrap(),
+        physical
+      );
+      assert_eq!(
+        fonts
+          .register_text_face(&face, integer, Some("Helvetica"), &mut allocate)
+          .unwrap(),
+        alias
+      );
+    }
+    assert_eq!(
+      super::WordFontAlias::Helvetica.postscript_name("Arial-BoldItalicMT"),
+      Some("Helvetica,BoldItalic")
+    );
+    assert_eq!(
+      super::WordFontAlias::Times.postscript_name("TimesNewRomanPS-ItalicMT"),
+      Some("Times,Italic")
+    );
+    assert_eq!(
+      super::WordFontAlias::Helvetica.postscript_name("Cambria"),
+      None
+    );
+    assert_eq!(super::WordFontAlias::Times.postscript_name("ArialMT"), None);
+    assert_eq!(super::WordFontAlias::from_family("Courier"), None);
+    assert_eq!(super::WordFontAlias::from_family("MissingProbeFont"), None);
+  }
 
   fn metadata() -> FontMetadata {
     FontMetadata {

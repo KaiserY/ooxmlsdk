@@ -208,8 +208,8 @@ fn paragraph_model_with_base_impl<'a>(
   .flatten()
   .any(|value| value != 0.0)
   {
-    // Word resolves w:*Chars against the document run default, independently
-    // of the effective paragraph/run style. In paraind.docx, Heading2 is 16pt
+    // Word resolves leftChars/rightChars against the document run default,
+    // independently of the effective paragraph/run style. In paraind.docx, Heading2 is 16pt
     // while rPrDefault is 10.5pt; Microsoft's fixed PDF uses the 10.5pt unit.
     // Writer also models FONT_CJK_ADVANCE as the bound CJK font height.
     format.character_indent_unit_pt = Some(effective_font_size_pt(&styles.doc_default_run, None));
@@ -261,6 +261,21 @@ fn paragraph_model_with_base_impl<'a>(
     });
   let mut paragraph_mark_style =
     properties::paragraph_mark_run_style(paragraph_mark_run_properties, run_style.clone(), styles);
+  if format.bidi
+    && let Some(size) = paragraph_mark_style
+      .automatic_escapement_complex_font_size_pt
+      .or(paragraph_mark_style.complex_font_size_pt)
+  {
+    // The paragraph mark has the paragraph's base direction. Native Word
+    // empty-paragraph controls use szCs for its size in a bidi paragraph,
+    // even with explicit rtl=0/cs=0. Those run flags still own the font face:
+    // a Latin mark keeps its Latin metrics at the complex-script size.
+    // Keep this on the mark layer; ordinary runs retain their own sz/szCs.
+    properties::set_font_size_preserving_automatic_escapement(&mut paragraph_mark_style, size);
+  }
+  // ECMA-376 §17.3.2.41 inherits vanish through the style hierarchy; the
+  // paragraph mark is not limited to a directly authored w:pPr/w:rPr.
+  format.hidden_separator = paragraph_mark_style.hidden;
   let has_direct_indentation = numbering_format_context.has_direct_indentation();
   // ECMA-376 Part 1 §17.9.24 makes w:lvl/w:rPr an overlay for numbering
   // text. Word/Writer start the number portion from the paragraph font, then
@@ -329,6 +344,26 @@ fn paragraph_model_with_base_impl<'a>(
     style_indent_overrides_numbering && numbering_list_tab_stop_pt.is_some();
   format.list_label_justification = list_label_justification;
   let has_numbering_label = list_label.is_some() || numbering_image.is_some();
+  if has_numbering_label {
+    format.list_label_direct_tabs_before_indent_pt = direct_paragraph_properties
+      .as_ref()
+      .and_then(|properties| properties.tabs())
+      .map(|tabs| {
+        tabs
+          .tab_stop
+          .iter()
+          .filter(|tab| {
+            matches!(
+              tab.val,
+              w::TabStopValues::Left | w::TabStopValues::Start | w::TabStopValues::Number
+            )
+          })
+          .filter_map(|tab| super::signed_twips_measure_to_points(&tab.position))
+          .filter(|stop| stop.is_finite() && *stop >= 0.0 && *stop < format.indent_left_pt)
+          .collect()
+      })
+      .unwrap_or_default();
+  }
   let blank_numbering_label = list_label
     .as_deref()
     .is_some_and(|label| label.chars().all(char::is_whitespace));
@@ -441,9 +476,7 @@ fn paragraph_model_with_base_impl<'a>(
       super::InlineItem::Text(run) => {
         run.style.line_vertical_alignment = line_vertical_alignment;
         run.style.use_windows_font_metrics = use_windows_font_metrics;
-        if wordprocessingml_cjk_text_metrics(&run.text, &run.style) {
-          run.style.wordprocessingml_cjk_line_metrics = true;
-        }
+        apply_wordprocessingml_cjk_text_metrics(&run.text, &mut run.style);
       }
       super::InlineItem::PositionalTab(tab) => {
         tab.style.line_vertical_alignment = line_vertical_alignment;
@@ -453,9 +486,14 @@ fn paragraph_model_with_base_impl<'a>(
         for run in ruby.base.iter_mut().chain(&mut ruby.guide) {
           run.style.line_vertical_alignment = line_vertical_alignment;
           run.style.use_windows_font_metrics = use_windows_font_metrics;
-          if wordprocessingml_cjk_text_metrics(&run.text, &run.style) {
-            run.style.wordprocessingml_cjk_line_metrics = true;
-          }
+          apply_wordprocessingml_cjk_text_metrics(&run.text, &mut run.style);
+        }
+      }
+      super::InlineItem::Overstrike(overstrike) => {
+        for run in overstrike.operands.iter_mut().flatten() {
+          run.style.line_vertical_alignment = line_vertical_alignment;
+          run.style.use_windows_font_metrics = use_windows_font_metrics;
+          apply_wordprocessingml_cjk_text_metrics(&run.text, &mut run.style);
         }
       }
       super::InlineItem::NoteReferenceMark(mark) => {
@@ -479,12 +517,17 @@ fn paragraph_model_with_base_impl<'a>(
       replacement_text,
     })
   });
-  if !has_authored_direct_indentation && let Some(legacy_image) = list_label_image.take() {
+  if !has_authored_direct_indentation
+    && numbering_list_tab_stop_pt.is_none()
+    && let Some(legacy_image) = list_label_image.take()
+  {
     // A style-owned legacy list keeps its graphic in the number portion's
     // inline line box. An authored direct w:ind switches Word to the fixed
     // label-alignment margin model handled by `list_label_image`; an explicit
     // zero character-unit indent still counts because it clears the inherited
-    // character indent under MS-OI29500 section 2.1.87.
+    // character indent under MS-OI29500 section 2.1.87. An authored list tab
+    // also keeps the picture in that margin: ECMA-376 Part 1 sections 17.9.28
+    // and 17.18.84 make it the tab between the numbering and paragraph text.
     let image_count = legacy_image.replacement_text.chars().count();
     for _ in 0..image_count {
       inlines.insert(0, super::InlineItem::Image(legacy_image.image.clone()));
@@ -540,6 +583,36 @@ fn paragraph_model_with_base_impl<'a>(
       super::automatic_text_color_for_background(background),
     );
   }
+  if !format.bidi
+    && format
+      .first_line_indent_character_units
+      .is_some_and(|units| units != 0.0)
+  {
+    // Native Word uses the initial text's em for firstLineChars/hangingChars,
+    // unlike leftChars/rightChars. A leading space owns this size too; the
+    // paragraph mark and a later larger run do not replace it. Keep non-text
+    // leading objects on their existing default-unit path.
+    let first = inlines.iter().find(|inline| match inline {
+      super::InlineItem::BookmarkStart(_) | super::InlineItem::LastRenderedPageBreak => false,
+      super::InlineItem::Text(run) => !run.text.is_empty(),
+      _ => true,
+    });
+    if let Some(super::InlineItem::Text(run)) = first {
+      format.first_line_character_indent_unit_pt = Some(effective_font_size_pt(&run.style, None));
+    }
+  }
+  super::fit_text::resolve(&mut inlines, &mut field_events);
+  merge_adjacent_continuous_text_runs(&mut inlines, &mut field_events);
+  preserve_interior_direction_control_metrics(&mut inlines, &mut field_events);
+  attach_arabic_leading_mark_context(&mut inlines);
+  if let Some(background) = format.shading.and_then(super::ShadingPaint::solid_color) {
+    super::apply_legacy_text_effect_background_to_paragraph_parts(
+      &mut paragraph_mark_style,
+      &mut list_label_style,
+      &mut inlines,
+      background,
+    );
+  }
   #[cfg(test)]
   let runs = inlines
     .iter()
@@ -548,7 +621,7 @@ fn paragraph_model_with_base_impl<'a>(
       super::InlineItem::NoteReferenceMark(_) => None,
       super::InlineItem::NoteSeparatorMark(_) => None,
       super::InlineItem::PositionalTab(_) => None,
-      super::InlineItem::Ruby(_) => None,
+      super::InlineItem::Ruby(_) | super::InlineItem::Overstrike(_) => None,
       super::InlineItem::LegacyFormCheckBox(_) => None,
       super::InlineItem::Image(_) => None,
       super::InlineItem::Shape(_) => None,
@@ -582,6 +655,370 @@ fn paragraph_model_with_base_impl<'a>(
   }
 }
 
+fn attach_arabic_leading_mark_context(inlines: &mut [super::InlineItem]) {
+  use super::InlineItem;
+
+  for index in 1..inlines.len() {
+    let (preceding, following) = inlines.split_at_mut(index);
+    let (InlineItem::Text(left), InlineItem::Text(right)) =
+      (&preceding[index - 1], &mut following[0])
+    else {
+      continue;
+    };
+    if !right
+      .text
+      .chars()
+      .next()
+      .is_some_and(crate::fonts::arabic_nonspacing_mark)
+      || !crate::fonts::arabic_shaping_properties_match(&left.style, &right.style)
+      || left.dynamic_field.is_some()
+      || right.dynamic_field.is_some()
+    {
+      continue;
+    }
+    // Native Word keeps a colored leading mark attached to its preceding
+    // base. A marks-only portion with a different bidi language is an
+    // independent shaping boundary and receives a dotted circle instead.
+    // A following base in the same portion preserves joining across a
+    // language boundary, as ordinary Arabic text already does.
+    if right.text.chars().all(crate::fonts::arabic_nonspacing_mark)
+      && left.style.bidi_language != right.style.bidi_language
+    {
+      continue;
+    }
+    let base = left
+      .text
+      .chars()
+      .rev()
+      .find(|&character| !crate::fonts::arabic_nonspacing_mark(character));
+    if base.is_none_or(|character| character.script() != Script::Arabic) {
+      continue;
+    }
+    right.style.shaping_context = Some(Arc::new(crate::common::TextShapingContext {
+      before: Arc::from(left.text.as_str()),
+      after: Arc::from(""),
+      leading_marks_only: true,
+    }));
+  }
+}
+
+fn preserve_interior_direction_control_metrics(
+  inlines: &mut Vec<super::InlineItem>,
+  field_events: &mut [super::ParagraphFieldEvent],
+) {
+  use super::{InlineItem, ParagraphFieldEvent};
+
+  if !inlines
+    .iter()
+    .any(|item| matches!(item, InlineItem::Text(run) if run.text.contains('\u{202c}')))
+  {
+    return;
+  }
+  // Native Word's itemization measures an interior sequence of two or more
+  // literal PDFs through the font's nominal glyphs. A single PDF and a
+  // paragraph's leading/trailing PDFs remain zero-width. XML w:dir boundaries
+  // are metadata and never participate. Preserve source bytes, and classify
+  // across equivalent w:r boundaries before assigning the measurement owner.
+  // Separate native Arabic/Latin, font, count and boundary controls establish
+  // this distinction; the width is a font metric, not a synthetic space.
+  let mut text = String::new();
+  for item in inlines.iter() {
+    if let InlineItem::Text(run) = item {
+      text.push_str(&run.text);
+    } else {
+      text.push('\0');
+    }
+  }
+  let control = |ch| matches!(ch, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}');
+  let visible = |ch: char| !ch.is_whitespace() && !control(ch);
+  let mut ranges = Vec::new();
+  let mut chars = text.char_indices().peekable();
+  while let Some((start, ch)) = chars.next() {
+    if ch != '\u{202c}' {
+      continue;
+    }
+    let mut end = start + ch.len_utf8();
+    let mut count = 1;
+    while let Some(&(index, '\u{202c}')) = chars.peek() {
+      chars.next();
+      end = index + ch.len_utf8();
+      count += 1;
+    }
+    let before = text[..start].rsplit('\0').next().unwrap_or_default();
+    let after = text[end..].split('\0').next().unwrap_or_default();
+    if count >= 2
+      && before.chars().any(visible)
+      && after.chars().any(visible)
+      && !before.chars().next_back().is_some_and(control)
+      && !after.chars().next().is_some_and(control)
+    {
+      ranges.push(start..end);
+    }
+  }
+  let scoped_controls = inlines.iter().any(|item| {
+    matches!(item, InlineItem::Text(run) if run.style.wordprocessing_bidi_scopes.is_some()
+      && run.text.chars().any(|ch| matches!(ch, '\u{202a}'..='\u{202e}')))
+  });
+  if ranges.is_empty() && !scoped_controls {
+    return;
+  }
+  let mut output = Vec::with_capacity(inlines.len() + ranges.len() * 2);
+  let mut offsets = Vec::with_capacity(inlines.len() + 1);
+  let mut position = 0;
+  for item in inlines.drain(..) {
+    offsets.push(output.len());
+    let InlineItem::Text(run) = &item else {
+      position += 1;
+      output.push(item);
+      continue;
+    };
+    let end = position + run.text.len();
+    let mut cuts = vec![position, end];
+    if run.style.wordprocessing_bidi_scopes.is_some() {
+      // Retain the consumed control prefix at a source boundary, so line
+      // splitting cannot resurrect an embedding closed on an earlier line.
+      let mut was_control = false;
+      for (offset, ch) in run.text.char_indices() {
+        let is_control = matches!(ch, '\u{202a}'..='\u{202e}');
+        if is_control != was_control {
+          cuts.push(position + offset);
+        }
+        was_control = is_control;
+      }
+    }
+    for range in &ranges {
+      if range.start < end && range.end > position {
+        cuts.extend([range.start.max(position), range.end.min(end)]);
+      }
+    }
+    cuts.sort_unstable();
+    cuts.dedup();
+    if cuts.len() == 1 {
+      output.push(item);
+    } else {
+      for part in cuts.windows(2) {
+        let mut portion = run.clone();
+        portion.text = run.text[(part[0] - position)..(part[1] - position)].to_owned();
+        portion.style.wordprocessing_nominal_control_metrics = run.style.right_to_left
+          == Some(true)
+          && ranges
+            .iter()
+            .any(|range| range.start <= part[0] && part[1] <= range.end);
+        output.push(InlineItem::Text(portion));
+      }
+    }
+    position = end;
+  }
+  offsets.push(output.len());
+  for event in field_events {
+    match event {
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
+      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+        *inline_offset = offsets[*inline_offset];
+      }
+      ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start,
+        inline_end,
+        ..
+      } => {
+        *inline_start = offsets[*inline_start];
+        *inline_end = offsets[*inline_end];
+      }
+      _ => {}
+    }
+  }
+  let mut region = None;
+  let mut prefix = String::new();
+  for item in &mut output {
+    let InlineItem::Text(run) = item else {
+      continue;
+    };
+    let current = (
+      run.style.wordprocessing_bidi_scopes.clone(),
+      run.style.right_to_left,
+    );
+    if region.as_ref() != Some(&current) {
+      prefix.clear();
+      region = Some(current);
+    }
+    if run.style.wordprocessing_bidi_scopes.is_some() {
+      run.style.wordprocessing_bidi_prefix =
+        (!prefix.is_empty()).then(|| Arc::from(prefix.as_str()));
+      prefix.extend(
+        run
+          .text
+          .chars()
+          .filter(|ch| matches!(ch, '\u{202a}'..='\u{202e}')),
+      );
+    }
+  }
+  *inlines = output;
+}
+
+fn merge_adjacent_continuous_text_runs(
+  inlines: &mut Vec<super::InlineItem>,
+  field_events: &mut [super::ParagraphFieldEvent],
+) {
+  use super::{InlineItem, ParagraphFieldEvent};
+
+  // Equivalent w:r boundaries inside a word are not shaping or word-break
+  // boundaries. Word keeps a word (including ZWNJ and its suffix) together
+  // when edits split it into otherwise identical RTL runs. It also fills
+  // overlong underscore form lines across otherwise identical runs: splitting
+  // those runs independently leaves premature breaks at their boundaries.
+  // Shape and fit one continuous portion while preserving semantic and
+  // formatting boundaries.
+  let same_style =
+    |left: &TextStyle, right: &TextStyle, allow_arabic_regions: bool, punctuation_pair: bool| {
+      if left == right {
+        return true;
+      }
+      if punctuation_pair {
+        // This bit is inferred from the portion's characters, not authored
+        // formatting. A punctuation-only portion lacks it while the adjacent
+        // CJK text has it; joining that pair takes the union of their metrics.
+        let mut right = right.clone();
+        right.wordprocessingml_cjk_line_metrics = left.wordprocessingml_cjk_line_metrics;
+        if *left == right {
+          return true;
+        }
+      }
+      // MS-OI29500 §2.1.88: w:rtl forces the complex-script font independently
+      // of rFonts@hint. A hint-only edit inside an Arabic word must therefore
+      // not break its joining context. Other style differences remain real
+      // boundaries, including the selected font families and run direction.
+      if left.right_to_left != Some(true) || right.right_to_left != Some(true) {
+        return false;
+      }
+      let mut right = right.clone();
+      right.wordprocessingml_font_hint = left.wordprocessingml_font_hint;
+      if left.bidi_language != right.bidi_language {
+        if !allow_arabic_regions {
+          return false;
+        }
+        let arabic = |language: Option<&str>| {
+          language
+            .and_then(|language| language.split(['-', '_']).next())
+            .is_some_and(|primary| primary.eq_ignore_ascii_case("ar"))
+        };
+        if !arabic(left.bidi_language.as_deref()) || !arabic(right.bidi_language.as_deref()) {
+          return false;
+        }
+        // Native Word retains Arabic ligatures across ar-SA/ar-JO and other
+        // Arabic region changes. They share the Arabic shaping language and
+        // numeric policy; other language families remain separate owners.
+        right.bidi_language = left.bidi_language.clone();
+      }
+      *left == right
+    };
+  // Compact identical-language portions first: a leading mark followed by
+  // a base in the same portion has valid joining context. Only then can
+  // ordinary text cross an Arabic region boundary without changing which
+  // marks are independent. The native three-portion controls distinguish
+  // this from merging greedily across the first region change.
+  for allow_arabic_regions in [false, true] {
+    let compatible = |left: &TextRun, right: &TextRun| {
+      (left.style.right_to_left == Some(true)
+      || (left.text.ends_with('_') && right.text.starts_with('_'))
+      // Identical-format XML runs must not hide an adjacent punctuation pair
+      // from shaping/line fit. Keep real style, field and semantic boundaries.
+      || crate::fonts::wordprocessingml_punctuation_pair_tightens(
+        left.text.chars().next_back(), right.text.chars().next(), &left.style)
+      // Native F/o/cal controls retain automatic hyphenation and identical
+      // painted glyphs when these otherwise identical Latin runs are joined.
+      || (left.text.chars().next_back().is_some_and(|c| c.is_ascii_alphabetic())
+        && right.text.chars().next().is_some_and(|c| c.is_ascii_alphabetic())))
+      && !left.text.is_empty()
+      && !right.text.is_empty()
+      && !left.preserve_text_portion
+      && !right.preserve_text_portion
+      && !left.style.wordprocessingml_field_group
+      && left.dynamic_field.is_none()
+      && right.dynamic_field.is_none()
+      // Unlike ordinary Arabic text, separately tagged marks and whitespace
+      // retain their native shaping boundaries. A foreign-region blank must
+      // not acquire cross-boundary GPOS adjustments from its neighboring text.
+      // Keep both edges, including the existing dotted-circle mark owner.
+      && (left.style.bidi_language == right.style.bidi_language
+        || (!left.text.chars().all(crate::fonts::arabic_nonspacing_mark)
+          && !right.text.chars().all(crate::fonts::arabic_nonspacing_mark)
+          && !left.text.chars().all(char::is_whitespace)
+          && !right.text.chars().all(char::is_whitespace)))
+      && same_style(&left.style, &right.style, allow_arabic_regions, crate::fonts::wordprocessingml_punctuation_pair_tightens(left.text.chars().next_back(), right.text.chars().next(), &left.style))
+      && left.hyperlink_url == right.hyperlink_url
+      && left.style_ref_keys == right.style_ref_keys
+      && left.style_ref_text == right.style_ref_text
+      && left.style_ref_numbering_text == right.style_ref_numbering_text
+    };
+    if !inlines.windows(2).any(|pair| {
+    matches!(&pair, [InlineItem::Text(left), InlineItem::Text(right)] if compatible(left, right))
+  }) {
+    continue;
+  }
+    let mut boundaries = vec![false; inlines.len() + 1];
+    for event in field_events.iter() {
+      match event {
+        ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
+        | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+          if let Some(boundary) = boundaries.get_mut(*inline_offset) {
+            *boundary = true;
+          }
+        }
+        ParagraphFieldEvent::ReferenceResultSpan {
+          inline_start,
+          inline_end,
+          ..
+        } => {
+          for offset in [*inline_start, *inline_end] {
+            if let Some(boundary) = boundaries.get_mut(offset) {
+              *boundary = true;
+            }
+          }
+        }
+        _ => {}
+      }
+    }
+    let mut merged = Vec::with_capacity(inlines.len());
+    let mut offsets = Vec::with_capacity(inlines.len() + 1);
+    for (index, item) in inlines.drain(..).enumerate() {
+      offsets.push(merged.len());
+      if !boundaries[index]
+        && let InlineItem::Text(right) = &item
+        && let Some(InlineItem::Text(left)) = merged.last_mut()
+        && compatible(left, right)
+      {
+        left.text.push_str(&right.text);
+        left.style.wordprocessingml_cjk_line_metrics |=
+          right.style.wordprocessingml_cjk_line_metrics;
+        // Arabic regions share the ordinary text behavior, but the next
+        // leading-mark boundary belongs to this portion's final source run.
+        left.style.bidi_language = right.style.bidi_language.clone();
+      } else {
+        merged.push(item);
+      }
+    }
+    offsets.push(merged.len());
+    for event in field_events.iter_mut() {
+      match event {
+        ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
+        | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+          *inline_offset = offsets[*inline_offset];
+        }
+        ParagraphFieldEvent::ReferenceResultSpan {
+          inline_start,
+          inline_end,
+          ..
+        } => {
+          *inline_start = offsets[*inline_start];
+          *inline_end = offsets[*inline_end];
+        }
+        _ => {}
+      }
+    }
+    *inlines = merged;
+  }
+}
+
 fn wordprocessingml_cjk_text_metrics(text: &str, style: &TextStyle) -> bool {
   // Word applies its CJK-capable font-height adjustment to visible East Asian
   // text even when `w:noLeading` is absent. Keep the document-level
@@ -598,6 +1035,12 @@ fn wordprocessingml_cjk_text_metrics(text: &str, style: &TextStyle) -> bool {
         Script::Bopomofo | Script::Han | Script::Hangul | Script::Hiragana | Script::Katakana
       )
     })
+}
+
+pub(super) fn apply_wordprocessingml_cjk_text_metrics(text: &str, style: &mut TextStyle) {
+  if wordprocessingml_cjk_text_metrics(text, style) {
+    style.wordprocessingml_cjk_line_metrics = true;
+  }
 }
 
 fn paragraph_text_owns_line_metrics(
@@ -622,7 +1065,12 @@ fn paragraph_uses_windows_font_metrics(
   // inline object participates in the line, however, that shared owner sets
   // the common baseline. Preserve the established compact/physical-line
   // boundary instead of applying usWinAscent a second time to the text run.
-  (text_owns_line_metrics && !(format.justification_set && format.justification.is_block()))
+  // Native mixed-font controls retain the same alignment baseline for left
+  // and block justification, including automatic sub/superscript portions.
+  // Justification changes horizontal advances, not the font boxes combined
+  // into a text-owned line. Switching to centered hhea boxes here fabricated
+  // extra height when Times New Roman and Calibri shared a proportional line.
+  text_owns_line_metrics
     || !matches!(format.line_height_rule, LineHeightRule::Auto)
     || !format
       .line_height_pt
@@ -726,6 +1174,643 @@ mod tests {
   };
 
   #[test]
+  fn literal_pdf_sequences_keep_native_metrics_and_field_boundaries() {
+    use crate::docx::{InlineItem, ParagraphFieldEvent};
+    let run = |text: &str| {
+      InlineItem::Text(TextRun {
+        text: text.to_owned(),
+        style: TextStyle {
+          complex_font_family: Some(Arc::from("Times New Roman")),
+          font_size_pt: 15.0,
+          complex_font_size_pt: Some(15.0),
+          right_to_left: Some(true),
+          wordprocessingml_font_slots: true,
+          ..Default::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let mut resolver = crate::fonts::FontResolver::default();
+    for count in [1, 2, 6] {
+      let controls = "\u{202c}".repeat(count);
+      for split in [false, true] {
+        let source = format!("A{controls}B");
+        let mut inlines = if split {
+          std::iter::once(run("A"))
+            .chain((0..count).map(|_| run("\u{202c}")))
+            .chain([run("B")])
+            .collect()
+        } else {
+          vec![run(&source)]
+        };
+        let mut events = vec![ParagraphFieldEvent::DeferredParagraphBreak {
+          inline_offset: inlines.len(),
+        }];
+        preserve_interior_direction_control_metrics(&mut inlines, &mut events);
+        let mut joined = String::new();
+        let mut width = 0.0;
+        for item in &inlines {
+          let InlineItem::Text(run) = item else {
+            unreachable!()
+          };
+          joined.push_str(&run.text);
+          if run.style.wordprocessing_nominal_control_metrics {
+            let shaped = resolver.shape_text_runs(&run.text, &run.style).unwrap();
+            width += shaped
+              .iter()
+              .flat_map(|run| run.glyphs.iter())
+              .map(|glyph| glyph.x_advance_pt)
+              .sum::<f32>();
+          }
+        }
+        assert_eq!(joined, source);
+        // Actual Word GetGlyphPlacements: TNR U+202C=1536/2048 em.
+        let expected = if count >= 2 {
+          count as f32 * 11.25
+        } else {
+          0.0
+        };
+        assert!(
+          (width - expected).abs() < 0.0001,
+          "{count} {split}: {width}"
+        );
+        assert!(
+          matches!(events[0], ParagraphFieldEvent::DeferredParagraphBreak {
+          inline_offset
+        } if inline_offset == inlines.len())
+        );
+      }
+    }
+    for count in [1, 2, 6] {
+      let controls = "\u{202c}".repeat(count);
+      let mut item = run(&format!("A{controls}B"));
+      let InlineItem::Text(text) = &mut item else {
+        unreachable!()
+      };
+      text.style.wordprocessing_bidi_scopes =
+        Some(Arc::from(vec![crate::model::WordprocessingBidiScope {
+          id: 1,
+          right_to_left: true,
+          override_direction: false,
+        }]));
+      let mut inlines = vec![item];
+      preserve_interior_direction_control_metrics(&mut inlines, &mut []);
+      let InlineItem::Text(last) = inlines.last().unwrap() else {
+        unreachable!()
+      };
+      assert_eq!(last.text, "B");
+      assert_eq!(
+        last.style.wordprocessing_bidi_prefix.as_deref(),
+        Some(controls.as_str())
+      );
+    }
+    for surrounding in [false, true] {
+      for control in [false, true] {
+        let mut inlines = vec![run("AAA"), run("\u{202c}\u{202c}"), run("BBB")];
+        for (index, item) in inlines.iter_mut().enumerate() {
+          let InlineItem::Text(text) = item else {
+            unreachable!()
+          };
+          text.style.right_to_left = Some(if index == 1 { control } else { surrounding });
+        }
+        preserve_interior_direction_control_metrics(&mut inlines, &mut []);
+        let InlineItem::Text(text) = &inlines[1] else {
+          unreachable!()
+        };
+        assert_eq!(text.style.wordprocessing_nominal_control_metrics, control);
+      }
+    }
+    for (family, advance) in [
+      ("Traditional Arabic", 45.0),
+      ("Times New Roman", 67.5),
+      ("Arial", 0.0),
+    ] {
+      let mut item = run("\u{202c}\u{202c}\u{202c}\u{202c}\u{202c}\u{202c}");
+      let InlineItem::Text(text) = &mut item else {
+        unreachable!()
+      };
+      text.style.complex_font_family = Some(Arc::from(family));
+      text.style.wordprocessing_nominal_control_metrics = true;
+      let shaped = resolver.shape_text_runs(&text.text, &text.style).unwrap();
+      let width = shaped.iter().map(|run| run.advance_pt).sum::<f32>();
+      assert!((width - advance).abs() < 0.0001, "{family}: {width}");
+      // A covered zero-advance glyph is authoritative; fallback applies only
+      // when the authored face has no cmap entry for the nominal control.
+      text.style.wordprocessing_nominal_control_metrics = false;
+      let hidden = resolver.shape_text_runs(&text.text, &text.style).unwrap();
+      assert_eq!(hidden.iter().map(|run| run.advance_pt).sum::<f32>(), 0.0);
+    }
+    for source in [
+      "\u{202c}\u{202c}AB",
+      "AB\u{202c}\u{202c}",
+      "A\u{202a}\u{202a}B",
+      "A\u{202b}\u{202b}B",
+      "A\u{202d}\u{202d}B",
+      "A\u{202e}\u{202e}B",
+      "A\u{200e}\u{200e}B",
+      "A\u{202c}B",
+    ] {
+      let mut inlines = vec![run(source)];
+      preserve_interior_direction_control_metrics(&mut inlines, &mut []);
+      assert!(
+        inlines
+          .iter()
+          .all(|item| matches!(item, InlineItem::Text(run)
+        if !run.style.wordprocessing_nominal_control_metrics)),
+        "{source:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn arabic_leading_marks_keep_color_context_and_language_boundaries() {
+    use crate::docx::InlineItem;
+
+    let run = |text: &str, language: &str, size: f32| {
+      InlineItem::Text(TextRun {
+        text: text.to_string(),
+        style: TextStyle {
+          complex_font_family: Some(Arc::from("Traditional Arabic")),
+          complex_font_size_pt: Some(size),
+          right_to_left: Some(true),
+          bidi_language: Some(Arc::from(language)),
+          ..Default::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    for (text, language, size, attached) in [
+      ("َ", "ar-EG", 15.0, true),
+      ("َ", "ar-JO", 15.0, false),
+      ("َ", "ar-EG", 18.0, false),
+      ("َي", "ar-JO", 15.0, true),
+      ("َي", "ar-EG", 18.0, false),
+    ] {
+      let mut inlines = vec![run("هدف", "ar-EG", 15.0), run(text, language, size)];
+      let InlineItem::Text(mark) = &mut inlines[1] else {
+        unreachable!()
+      };
+      mark.style.color = crate::model::RgbColor { r: 255, g: 0, b: 0 };
+      attach_arabic_leading_mark_context(&mut inlines);
+      let InlineItem::Text(mark) = &inlines[1] else {
+        unreachable!()
+      };
+      assert_eq!(
+        mark.style.shaping_context.is_some(),
+        attached,
+        "{text} {language} {size}"
+      );
+      if let Some(context) = &mark.style.shaping_context {
+        assert_eq!(&*context.before, "هدف");
+        assert!(context.leading_marks_only);
+      }
+    }
+    let mut inlines = vec![run("Latin", "ar-EG", 15.0), run("َ", "ar-EG", 15.0)];
+    attach_arabic_leading_mark_context(&mut inlines);
+    let InlineItem::Text(mark) = &inlines[1] else {
+      unreachable!()
+    };
+    assert!(mark.style.shaping_context.is_none());
+  }
+
+  #[test]
+  fn rtl_arabic_region_changes_keep_ligatures_and_independent_marks() {
+    use crate::docx::InlineItem;
+
+    let run = |text: &str, language: &str| {
+      InlineItem::Text(TextRun {
+        text: text.to_owned(),
+        style: TextStyle {
+          complex_font_family: Some(Arc::from("Traditional Arabic")),
+          complex_font_size_pt: Some(15.0),
+          right_to_left: Some(true),
+          resolved_bidi_level: Some(1),
+          wordprocessingml_font_slots: true,
+          bidi_language: Some(Arc::from(language)),
+          ..Default::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let mut resolver = crate::fonts::FontResolver::default();
+    // Actual Office controls retain these ligatures under each Arabic
+    // region, while a separately tagged marks-only run keeps two circles.
+    for language in ["ar-JO", "ar-EG", "ar-MA"] {
+      for (left, right, native) in [
+        ("ب", "القضاء", [160, 418, 468, 492, 499, 682].as_slice()),
+        ("ب", "َي", [200, 314].as_slice()),
+      ] {
+        let mut inlines = vec![run(left, "ar-SA"), run(right, language)];
+        merge_adjacent_continuous_text_runs(&mut inlines, &mut []);
+        assert_eq!(inlines.len(), 1, "{language} {left} {right}");
+        let InlineItem::Text(joined) = &inlines[0] else {
+          unreachable!()
+        };
+        let shaped = resolver
+          .shape_text_runs(&joined.text, &joined.style)
+          .unwrap();
+        let glyphs = shaped
+          .iter()
+          .flat_map(|run| run.glyphs.iter().map(|glyph| glyph.glyph_id))
+          .collect::<Vec<_>>();
+        assert_eq!(glyphs, native, "{language} {left} {right}");
+      }
+      let mut inlines = vec![run("ب", "ar-SA"), run("ِّ", language), run("م", "ar-SA")];
+      merge_adjacent_continuous_text_runs(&mut inlines, &mut []);
+      attach_arabic_leading_mark_context(&mut inlines);
+      assert_eq!(inlines.len(), 3);
+      let InlineItem::Text(mark) = &inlines[1] else {
+        unreachable!()
+      };
+      assert!(mark.style.shaping_context.is_none());
+      let shaped = resolver.shape_text_runs(&mark.text, &mark.style).unwrap();
+      assert_eq!(
+        shaped
+          .iter()
+          .flat_map(|run| run.glyphs.iter().map(|glyph| glyph.glyph_id))
+          .collect::<Vec<_>>(),
+        [202, 588, 203, 588]
+      );
+    }
+    for language in ["fa-IR", "en-GB"] {
+      let mut inlines = vec![run("ب", "ar-SA"), run("القضاء 12/34", language)];
+      merge_adjacent_continuous_text_runs(&mut inlines, &mut []);
+      assert_eq!(inlines.len(), 2, "{language}");
+      let InlineItem::Text(right) = &inlines[1] else {
+        unreachable!()
+      };
+      assert_eq!(right.style.bidi_language.as_deref(), Some(language));
+    }
+    // Native three-portion controls pin both the final language owner and
+    // the distinction between a marks-only run and one followed by a base.
+    for (parts, count, native) in [
+      (
+        [("ب", "ar-SA"), ("ا", "ar-JO"), ("َ", "ar-JO")],
+        1,
+        [200, 682].as_slice(),
+      ),
+      (
+        [("ب", "ar-SA"), ("ا", "ar-JO"), ("َ", "ar-SA")],
+        2,
+        [682, 200, 588].as_slice(),
+      ),
+      (
+        [("ب", "ar-SA"), ("ِّ", "ar-JO"), ("م", "ar-JO")],
+        1,
+        [202, 203, 312].as_slice(),
+      ),
+      (
+        [("ب", "ar-SA"), ("ِّ", "ar-JO"), ("م", "ar-EG")],
+        3,
+        [167, 202, 588, 203, 588, 191].as_slice(),
+      ),
+    ] {
+      let mut inlines = parts.map(|(text, language)| run(text, language)).to_vec();
+      merge_adjacent_continuous_text_runs(&mut inlines, &mut []);
+      attach_arabic_leading_mark_context(&mut inlines);
+      assert_eq!(inlines.len(), count, "{parts:?}");
+      let mut glyphs = Vec::new();
+      for inline in &inlines {
+        let InlineItem::Text(run) = inline else {
+          unreachable!()
+        };
+        glyphs.extend(
+          resolver
+            .shape_text_runs(&run.text, &run.style)
+            .unwrap()
+            .iter()
+            .flat_map(|run| run.glyphs.iter().map(|glyph| glyph.glyph_id)),
+        );
+      }
+      assert_eq!(glyphs, native, "{parts:?}");
+    }
+  }
+
+  #[test]
+  fn rtl_foreign_region_whitespace_keeps_native_space_advances() {
+    use crate::docx::InlineItem;
+
+    let run = |text: &str, language: &str| {
+      InlineItem::Text(TextRun {
+        text: text.to_owned(),
+        style: TextStyle {
+          complex_font_family: Some(Arc::from("Traditional Arabic")),
+          complex_font_size_pt: Some(15.0),
+          right_to_left: Some(true),
+          resolved_bidi_level: Some(1),
+          wordprocessingml_font_slots: true,
+          bidi_language: Some(Arc::from(language)),
+          horizontal_scale: Some(1.03),
+          wordprocessing_font_width_percent: Some(103),
+          wordprocessing_legacy_font_measurement: Some(true),
+          wordprocessing_kashida: Some(Arc::new(crate::common::WordprocessingKashida {
+            retain_trailing_blank: false,
+            unshaped_blanks: false,
+            font_width_percent: 103,
+            space_expansions: Vec::new(),
+          })),
+          ..Default::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let mut metrics = crate::text_metrics::TextMetrics::new();
+    for language in ["ar-EG", "ar-JO", "ar-SA", "ar-MA", "en-GB"] {
+      for blank in [" ", "  ", "\u{00a0}", "\u{202f}"] {
+        let mut inlines = vec![
+          run("هيمنةً", "ar-EG"),
+          run(blank, language),
+          run("كبيرةً", "ar-EG"),
+        ];
+        merge_adjacent_continuous_text_runs(&mut inlines, &mut []);
+        let count = if language == "ar-EG" { 1 } else { 3 };
+        assert_eq!(inlines.len(), count, "{language} {blank:?}");
+        if !matches!(blank, " " | "\u{202f}") || (blank == "\u{202f}" && count == 1) {
+          continue;
+        }
+        let InlineItem::Text(text) = &inlines[if count == 1 { 0 } else { 1 }] else {
+          unreachable!()
+        };
+        let shaped = metrics.shape_text(&text.text, &text.style).unwrap();
+        let space = if blank == " " {
+          shaped.glyphs.iter().find(|glyph| glyph.glyph_id == 3)
+        } else {
+          // The native XPS font is Times New Roman; its U+202F maps to
+          // glyph3031 and keeps a twenty-six-pixel advance on this grid.
+          shaped.glyphs.iter().find(|glyph| glyph.glyph_id == 3031)
+        }
+        .unwrap();
+        // Native exact-source controls: the same-region marked-word context
+        // realizes a twelve-pixel space, while the independent blank retains
+        // its thirty-one-pixel natural width before justification.
+        let expected = if blank == "\u{202f}" {
+          26
+        } else if count == 1 {
+          12
+        } else {
+          31
+        };
+        assert_eq!(
+          (space.x_advance_em * space.font_size_pt / 0.12).round() as i32,
+          expected,
+          "{language}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn rtl_run_compaction_keeps_field_spans_and_deferred_breaks_at_their_text() {
+    use crate::docx::{InlineItem, ParagraphFieldEvent};
+    let run = |text: &str| {
+      InlineItem::Text(TextRun {
+        text: text.to_string(),
+        style: TextStyle {
+          right_to_left: Some(true),
+          ..Default::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let mut inlines = vec![run("کتاب‌های"), run("ی"), run("آن"), run("‌ها"), run("پس")];
+    let mut events = vec![
+      ParagraphFieldEvent::ReferenceResultSpan {
+        field_id: 1,
+        bookmark_name: "target".into(),
+        inline_start: 2,
+        inline_end: 4,
+        merge_format: false,
+      },
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 4 },
+    ];
+    merge_adjacent_continuous_text_runs(&mut inlines, &mut events);
+    let texts = inlines
+      .iter()
+      .map(|inline| match inline {
+        InlineItem::Text(run) => run.text.as_str(),
+        _ => unreachable!(),
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(texts, ["کتاب‌هایی", "آن‌ها", "پس"]);
+    assert!(matches!(
+      events[0],
+      ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start: 1,
+        inline_end: 2,
+        ..
+      }
+    ));
+    assert_eq!(
+      events[1],
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 2 }
+    );
+
+    let mut styled = vec![run("کتاب‌های"), run("ی")];
+    let InlineItem::Text(second) = &mut styled[1] else {
+      unreachable!()
+    };
+    second.style.bold = true;
+    merge_adjacent_continuous_text_runs(&mut styled, &mut []);
+    assert_eq!(styled.len(), 2);
+
+    let mut hinted = vec![run("کر"), run("ی"), run("م")];
+    for (inline, hint) in hinted.iter_mut().zip([
+      ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia,
+      ooxmlsdk_fonts::WordprocessingFontTypeHint::ComplexScript,
+      ooxmlsdk_fonts::WordprocessingFontTypeHint::Default,
+    ]) {
+      let InlineItem::Text(run) = inline else {
+        unreachable!()
+      };
+      run.style.wordprocessingml_font_hint = Some(hint);
+    }
+    merge_adjacent_continuous_text_runs(&mut hinted, &mut []);
+    assert_eq!(hinted.len(), 1);
+    let InlineItem::Text(joined) = &hinted[0] else {
+      unreachable!()
+    };
+    assert_eq!(joined.text, "کریم");
+  }
+
+  #[test]
+  fn adjacent_punctuation_compaction_preserves_field_and_formatting_boundaries() {
+    use crate::docx::{InlineItem, ParagraphFieldEvent};
+    let run = |text: &str| {
+      InlineItem::Text(TextRun {
+        text: text.into(),
+        style: TextStyle {
+          font_family: Some("ＭＳ 明朝".into()),
+          east_asia_font_family: Some("ＭＳ 明朝".into()),
+          font_size_pt: 12.0,
+          wordprocessingml_font_slots: true,
+          wordprocessingml_punctuation_spacing: true,
+          ..TextStyle::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let mut plain = vec![run("漢。"), run("（漢")];
+    let InlineItem::Text(second) = &mut plain[1] else {
+      unreachable!()
+    };
+    second.style.wordprocessingml_cjk_line_metrics = true;
+    merge_adjacent_continuous_text_runs(&mut plain, &mut []);
+    assert_eq!(plain.len(), 1);
+    let InlineItem::Text(joined) = &plain[0] else {
+      unreachable!()
+    };
+    assert_eq!(joined.text, "漢。（漢");
+    assert!(joined.style.wordprocessingml_cjk_line_metrics);
+    // Native split and unsplit12pt controls have the same42pt logical width.
+    let mut metrics = crate::text_metrics::TextMetrics::new();
+    assert!((metrics.measure_text(&joined.text, &joined.style) - 42.0).abs() < 0.001);
+    let mut styled = vec![run("漢。"), run("（漢")];
+    let InlineItem::Text(second) = &mut styled[1] else {
+      unreachable!()
+    };
+    second.style.bold = true;
+    merge_adjacent_continuous_text_runs(&mut styled, &mut []);
+    assert_eq!(styled.len(), 2);
+    let mut fields = vec![run("漢。"), run("（漢")];
+    let mut events = [ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 1 }];
+    merge_adjacent_continuous_text_runs(&mut fields, &mut events);
+    assert_eq!(fields.len(), 2);
+    assert!(matches!(
+      events[0],
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 1 }
+    ));
+  }
+
+  #[test]
+  fn latin_word_compaction_preserves_field_and_formatting_boundaries() {
+    use crate::docx::{InlineItem, ParagraphFieldEvent};
+    let run = |text: &str| {
+      InlineItem::Text(TextRun {
+        text: text.to_string(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let texts = |inlines: &[InlineItem]| {
+      inlines
+        .iter()
+        .map(|inline| match inline {
+          InlineItem::Text(run) => run.text.clone(),
+          _ => unreachable!(),
+        })
+        .collect::<Vec<_>>()
+    };
+    let mut field_inlines = vec![run("Associate WID F"), run("o"), run("cal Point")];
+    let mut events = vec![ParagraphFieldEvent::ReferenceResultSpan {
+      field_id: 1,
+      bookmark_name: "target".into(),
+      inline_start: 2,
+      inline_end: 3,
+      merge_format: false,
+    }];
+    merge_adjacent_continuous_text_runs(&mut field_inlines, &mut events);
+    assert_eq!(texts(&field_inlines), ["Associate WID Fo", "cal Point"]);
+    assert!(matches!(
+      events[0],
+      ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start: 1,
+        inline_end: 2,
+        ..
+      }
+    ));
+
+    for preserve_portion in [false, true] {
+      let mut styled = vec![run("Associate WID F"), run("o"), run("cal Point")];
+      let InlineItem::Text(second) = &mut styled[1] else {
+        unreachable!()
+      };
+      if preserve_portion {
+        second.preserve_text_portion = true;
+      } else {
+        second.style.bold = true;
+      }
+      merge_adjacent_continuous_text_runs(&mut styled, &mut []);
+      assert_eq!(texts(&styled), ["Associate WID F", "o", "cal Point"]);
+    }
+
+    let mut separate_words = vec![run("Focal "), run("Point")];
+    merge_adjacent_continuous_text_runs(&mut separate_words, &mut []);
+    assert_eq!(texts(&separate_words), ["Focal ", "Point"]);
+  }
+
+  #[test]
+  fn split_underscore_form_line_is_one_continuous_text_portion() {
+    use crate::docx::{InlineItem, ParagraphFieldEvent};
+    let run = |text: &str| {
+      InlineItem::Text(TextRun {
+        text: text.to_string(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let mut inlines = vec![
+      run("label ____________________________"),
+      run("_____"),
+      run("_________________________________________________, next"),
+    ];
+    merge_adjacent_continuous_text_runs(&mut inlines, &mut []);
+    assert_eq!(inlines.len(), 1);
+    let InlineItem::Text(joined) = &inlines[0] else {
+      unreachable!()
+    };
+    assert!(joined.text.contains(&"_".repeat(82)));
+
+    let mut field_inlines = vec![run("____"), run("____")];
+    let mut events = vec![ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 1 }];
+    merge_adjacent_continuous_text_runs(&mut field_inlines, &mut events);
+    assert_eq!(field_inlines.len(), 2);
+    assert!(matches!(
+      events[0],
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 1 }
+    ));
+  }
+
+  #[test]
   fn cjk_text_metrics_require_a_visible_east_asian_script() {
     let style = TextStyle::default();
     for text in ["預期結果", "かな", "カナ", "결과", "ㄅㄆㄇ"] {
@@ -786,7 +1871,8 @@ mod tests {
         justification_set: true,
         ..format
       };
-      assert!(!paragraph_uses_windows_font_metrics(&justified, true));
+      assert!(paragraph_uses_windows_font_metrics(&justified, true));
+      assert!(!paragraph_uses_windows_font_metrics(&justified, false));
     }
   }
 
@@ -810,6 +1896,7 @@ mod tests {
       wrap_side: ImageWrapSide::BothSides,
       behind_text: true,
       layout_in_cell: true,
+      layout_in_cell_forced: false,
       allow_overlap: true,
       paint_order: FloatingPaintOrder::Unspecified,
       relative_width_to: None,

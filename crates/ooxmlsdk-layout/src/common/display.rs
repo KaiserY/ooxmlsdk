@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use kurbo::{Affine, BezPath, PathEl, Point as KurboPoint, flatten};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use ooxmlsdk_fonts::{FontId, ShapedGlyph, ShapedRun};
 
@@ -69,7 +70,7 @@ pub struct DisplayPage<'doc> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum DisplayItem<'doc> {
-  Text(TextRun<'doc>),
+  Text(Box<TextRun<'doc>>),
   Glyphs(GlyphRun<'doc>),
   Image(ImageItem<'doc>),
   Group(CompositingGroup<'doc>),
@@ -138,7 +139,13 @@ pub enum BlendMode {
 pub struct TextRun<'doc> {
   pub text: Cow<'doc, str>,
   pub origin: Point,
+  /// The formatter has already resolved the origin's Y coordinate to a
+  /// baseline, before the run's baseline shift. This survives flattening a
+  /// nested story whose table frame is absent from the final page frames.
+  pub origin_is_baseline: bool,
   pub line_height: Pt,
+  /// Completed ordinary Word line geometry for printer baseline realization.
+  pub wordprocessing_line_metrics: Option<WordprocessingLineMetrics>,
   /// Whether this painted run contributes font ascent/descent to its shared
   /// logical line metrics. Word can retain blank/tab portions in fixed output
   /// while excluding their font box from line-height and baseline maxima.
@@ -162,8 +169,39 @@ pub struct TextRun<'doc> {
   pub paragraph_bidi: bool,
   pub word_spacing_pt: f32,
   pub preserve_text_portion: bool,
+  /// Page-space start of a text decoration whose visible glyph advance is
+  /// empty, such as an underlined paragraph-terminal tab.
+  pub decoration_span_start_x: Option<Pt>,
   pub pdf_text_segmentation: PdfTextSegmentation,
   pub source: Option<DisplaySource<'doc>>,
+}
+
+/// Resolved Word line geometry for fixed-output baseline realization.
+///
+/// The complete line owns paragraph spacing as well as its font box. Keeping
+/// these distances until paint preserves printer rounding after pagination,
+/// cell alignment and movement of a containing frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WordprocessingLineMetrics {
+  /// Distance from this item's X origin to its containing line frame's origin.
+  /// Word converts that frame before applying paragraph-local Line Services
+  /// offsets. A relative distance survives movement of the containing story.
+  pub frame_origin_offset_x_pt: f64,
+  pub frame_width_pt: f64,
+  /// Paragraph-local alignment is independent of movement of its frame.
+  pub alignment: Option<WordprocessingLineAlignment>,
+  /// Distance from this text item's logical origin to the complete line bottom.
+  pub bottom_offset_pt: f32,
+  pub height_pt: f32,
+  pub baseline_from_bottom_pt: f32,
+  pub spacing_before_pt: f32,
+  pub spacing_after_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WordprocessingLineAlignment {
+  pub logical_offset_pt: f64,
+  pub device_offset_px: i32,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -200,6 +238,15 @@ pub enum MetafileFixedOutputProfile {
   Default,
   /// Excel VML `ObjectType="Pict"` replacement graphics, including OLE icons.
   ExcelVmlPicture,
+  /// Word inline VML pictures, including embedded-object replacement graphics.
+  WordInlineVmlPicture,
+  /// Word VML EMF pictures whose classic text is independent of later
+  /// graphics. Preserve the picture's affine font transform in fixed output.
+  WordVmlEmfPicture,
+  /// A legacy Excel.Sheet.8 content OLE preview whose Word fixed-output text
+  /// is regenerated from the embedded BIFF workbook rather than the cached
+  /// EMF text and Dx. The workbook's default FONT height is in twips.
+  LegacyExcelContentPreview { font_size_twips: u16 },
 }
 
 /// Compression state authored on a DrawingML `a:blip` source.
@@ -338,7 +385,7 @@ impl DrawingPathFillMode {
         pattern.foreground = self.apply_to_color(pattern.foreground);
         pattern.background = self.apply_to_color(pattern.background);
       }
-      Fill::None | Fill::Theme(_) | Fill::Image { .. } => {}
+      Fill::None | Fill::Theme(_) | Fill::Image { .. } | Fill::Texture(_) => {}
     }
     fill
   }
@@ -570,6 +617,43 @@ pub struct LayoutFontSizes {
   pub complex: Option<Pt>,
 }
 
+/// Source neighbors of a laid-out text portion. They affect contextual forms
+/// but are not part of this portion's glyphs or accessible text.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct TextShapingContext {
+  pub before: Arc<str>,
+  pub after: Arc<str>,
+  /// Imported context for a leading mark, rather than every wrapped portion
+  /// of the source run. Ordinary line-level joining context is unrestricted.
+  pub leading_marks_only: bool,
+}
+
+/// A layout-selected Arabic join extension. Source text remains unchanged;
+/// repeated font extenders belong to the original cluster for accessibility.
+#[derive(Clone, Debug, PartialEq)]
+pub struct KashidaExpansion {
+  /// UTF-8 offset of the cluster whose preceding join is extended.
+  pub byte_index: usize,
+  pub advance: Pt,
+  /// Chosen at layout size, retained when the output font is quantized.
+  pub glyph_count: usize,
+}
+
+/// Completed Word Kashida line realization, separate from its ideal fit widths.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WordprocessingKashida {
+  pub font_width_percent: u16,
+  /// UTF-8 space positions and their extra whole 600-DPI pixels. Native Word
+  /// spends the remaining glue on logical leading spaces first.
+  pub space_expansions: Vec<(usize, i32)>,
+  /// A completed foreign LTR tail participates in the justification budget.
+  /// Retain it in later alignment instead of aligning its last ink alone.
+  pub retain_trailing_blank: bool,
+  /// An independent ordinary blank outside a complex-script shaping run.
+  /// Its GDI Natural advance precedes LOGFONT width realization.
+  pub unshaped_blanks: bool,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextStyle<'doc> {
   pub font_family: Option<Cow<'doc, str>>,
@@ -592,6 +676,8 @@ pub struct TextStyle<'doc> {
   /// Effective WordprocessingML `w:rFonts/@w:hint` for ambiguous font slots.
   pub wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
   pub wordprocessingml_east_asia_language_is_chinese: bool,
+  /// Hebrew bidi language retains the family's real italic face in RTL runs.
+  pub wordprocessingml_bidi_language_is_hebrew: bool,
   pub font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   pub high_ansi_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   pub wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
@@ -611,6 +697,8 @@ pub struct TextStyle<'doc> {
   /// Unlike `right_to_left`, this affects shaping only and does not select
   /// WordprocessingML complex-script formatting.
   pub resolved_bidi_level: Option<u8>,
+  /// Preserve nominal metrics of a Word literal nonprinting control portion.
+  pub wordprocessing_nominal_control_metrics: bool,
   pub complex_bold: Option<bool>,
   pub complex_italic: Option<bool>,
   pub kerning_minimum_size: Option<Pt>,
@@ -622,9 +710,18 @@ pub struct TextStyle<'doc> {
   /// explicit `default`, `false`, or empty stylistic-set override.
   pub open_type_features: OpenTypeFeatureSettings,
   pub horizontal_scale: Option<f32>,
+  /// Authored Word font width percentage; geometric stretching stays separate.
+  pub wordprocessing_font_width_percent: Option<u16>,
+  /// Word97 font measurement profile retained through layout and painting.
+  pub wordprocessing_legacy_font_measurement: Option<bool>,
+  /// Native source advance and chunk direction for generated Word leaders.
+  pub wordprocessing_tab_leader: Option<super::wordprocessing_device::TabLeader>,
   /// Explicit distances in points between consecutive input-character
   /// origins for semantic GDI replacement text.
   pub semantic_character_advances_pt: Option<Arc<[f32]>>,
+  pub shaping_context: Option<Arc<TextShapingContext>>,
+  pub kashida_expansions: Option<Arc<[KashidaExpansion]>>,
+  pub wordprocessing_kashida: Option<Arc<WordprocessingKashida>>,
   pub character_spacing: Pt,
   pub baseline_shift: Pt,
   /// Original font size used by an automatic WordprocessingML
@@ -635,6 +732,10 @@ pub struct TextStyle<'doc> {
   pub line_vertical_alignment: LineVerticalAlignment,
   /// Retain searchable/taggable text without painting visible glyphs.
   pub semantic_only: bool,
+  /// Visible glyphs excluded from the tagged PDF's logical text structure.
+  /// Legacy Word shadow/relief layers retain real text operators in fixed
+  /// output; vectorizing them changes font realization and extraction.
+  pub pdf_painted_artifact: bool,
   /// Use the OS/2 Windows/GDI alignment-box ascent for the baseline. Office
   /// fixed output selects this for WordprocessingML and DrawingML text unless
   /// the face opts into typographic metrics.
@@ -646,6 +747,11 @@ pub struct TextStyle<'doc> {
   pub wordprocessingml_cjk_line_metrics: bool,
   /// Enable Word's document-level East Asian punctuation compression.
   pub cjk_punctuation_compression_ratio: f32,
+  pub wordprocessing_justification_expansion_pt: Option<Arc<[f32]>>,
+  /// Preserve legacy Word 95 punctuation spacing classes.
+  pub wordprocessingml_legacy_punctuation_spacing: bool,
+  /// Apply Word prose punctuation spacing independently of font-slot selection.
+  pub wordprocessingml_punctuation_spacing: bool,
   /// Balance qualifying ordinary spaces to half an ideographic em for the
   /// WordprocessingML compatibility setting of the same name.
   pub wordprocessingml_balance_single_byte_double_byte_width: bool,
@@ -690,6 +796,13 @@ pub enum PdfGlyphDefinitionWidthBasis {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PdfGlyphOutlineOptions {
   pub semantic_text_overlay: bool,
+  /// The outline came from WordprocessingML `w14:textOutline`. Word's PDF
+  /// writer uses a different contour start and round `sysDot` dash from the
+  /// PowerPoint/Excel DrawingML text path.
+  pub wordprocessing_outline: bool,
+  /// An unscaled WordArt text gradient uses the combined warped glyph bounds
+  /// as its definition rectangle in Word's fixed-format output.
+  pub wordprocessing_unscaled_linear_fill: bool,
   pub definition_width_basis: PdfGlyphDefinitionWidthBasis,
   /// Extra logical advance appended to an unresolved glyph-paint definition
   /// rectangle without moving or reshaping the visible glyphs. Word uses
@@ -701,6 +814,9 @@ pub struct PdfGlyphOutlineOptions {
   /// resolved fill here lets the PDF backend clip the authored gradient or
   /// pattern to the warped glyph outlines.
   pub fill: Option<Fill<'static>>,
+  /// Image placements for a legacy VML WordArt brush. The PDF writer clips
+  /// these page-space tiles to the warped glyph outlines.
+  pub image_fill: Option<Arc<Vec<ImageItem<'static>>>>,
   /// The Word 2010 text fill carries a nonzero authored `w14:alpha`
   /// transparency transform.
   ///
@@ -729,6 +845,81 @@ pub struct PdfGlyphOutlineOptions {
   /// preset follows a centerline; a multi-path preset interpolates piecewise
   /// across every authored warp boundary.
   pub text_warp: Option<Arc<TextWarp>>,
+  /// Page-space copy of a VML textpath glyph silhouette painted before its
+  /// foreground fill and outline.
+  pub vml_text_shadow: Option<VmlTextShadow>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VmlTextShadow {
+  pub transform: crate::common::Transform,
+  /// Perspective coefficients after converting inverse EMUs to inverse pt.
+  pub perspective_per_pt: [f32; 2],
+  pub origin: Point,
+  pub color: Color,
+}
+
+impl VmlTextShadow {
+  /// Apply the VML shadow homography around its authored origin. A projective
+  /// image of a cubic is rational, so flatten its source to 0.02 pt before
+  /// projecting; affine shadows retain their exact cubic outlines.
+  pub fn project_path(self, path: &BezPath) -> Option<BezPath> {
+    let transform = Affine::new([
+      f64::from(self.transform.m11),
+      f64::from(self.transform.m12),
+      f64::from(self.transform.m21),
+      f64::from(self.transform.m22),
+      f64::from(self.transform.dx.0),
+      f64::from(self.transform.dy.0),
+    ]);
+    if self.perspective_per_pt == [0.0, 0.0] {
+      return Some(transform * path.clone());
+    }
+    let origin = KurboPoint::new(f64::from(self.origin.x.0), f64::from(self.origin.y.0));
+    let anchor = transform * origin;
+    let [px, py] = self.perspective_per_pt.map(f64::from);
+    let project = |point: KurboPoint| {
+      let x = point.x - origin.x;
+      let y = point.y - origin.y;
+      let denominator = 1.0 + px * x + py * y;
+      if !denominator.is_finite() || denominator <= 1e-6 {
+        return None;
+      }
+      let mapped = KurboPoint::new(
+        anchor.x
+          + (f64::from(self.transform.m11) * x + f64::from(self.transform.m21) * y) / denominator,
+        anchor.y
+          + (f64::from(self.transform.m12) * x + f64::from(self.transform.m22) * y) / denominator,
+      );
+      (mapped.x.is_finite() && mapped.y.is_finite()).then_some(mapped)
+    };
+    let mut projected = BezPath::new();
+    let mut valid = true;
+    flatten(path.iter(), 0.02, |element| {
+      if !valid {
+        return;
+      }
+      match element {
+        PathEl::MoveTo(point) => {
+          if let Some(point) = project(point) {
+            projected.move_to(point);
+          } else {
+            valid = false;
+          }
+        }
+        PathEl::LineTo(point) => {
+          if let Some(point) = project(point) {
+            projected.line_to(point);
+          } else {
+            valid = false;
+          }
+        }
+        PathEl::ClosePath => projected.close_path(),
+        PathEl::QuadTo(..) | PathEl::CurveTo(..) => valid = false,
+      }
+    });
+    valid.then_some(projected)
+  }
 }
 
 impl PdfGlyphOutlineOptions {
@@ -749,6 +940,25 @@ pub struct TextWarp {
   /// WordArt gradient or pattern coordinates to different shape/text frames.
   pub paint_bounds: Rect,
   pub boundaries: Vec<Vec<PathCommand>>,
+  /// Legacy VML `fitpath`: fit logical text advances to one centerline while
+  /// retaining each glyph's outline as a rigid shape.
+  pub vml_fit_path: Option<VmlFitPath>,
+  /// Legacy VML `trim` fits one text line's visible ink into one authored
+  /// boundary pair, leaving interline gaps to the preset geometry itself.
+  pub vml_trim_band: Option<VmlTrimBand>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VmlFitPath {
+  pub start_x: Pt,
+  pub advance_width: Pt,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VmlTrimBand {
+  pub source_top: Pt,
+  pub source_bottom: Pt,
+  pub upper_boundary: usize,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

@@ -4,8 +4,9 @@
 //! matrices show that its 8-bit samples agree with libjpeg-turbo. The ordinary
 //! Rust decoder intentionally uses stb's faster IDCT, which differs by a few
 //! samples. This module translates the baseline sequential path from the local
-//! Wine/libjpeg sources (`jidctint.c`, `jdcolor.c`, and `jdsample.c`). Inputs
-//! outside that proven path return `None` and retain the general decoder.
+//! Wine/libjpeg sources (`jidctint.c`, `jdcolor.c`) and libjpeg-turbo's
+//! `src/jdsample.c` fancy upsampling, including its alternating half-tie bias.
+//! Inputs outside that proven path return `None` and retain the general decoder.
 
 use image::{GrayImage, RgbImage};
 
@@ -921,12 +922,14 @@ fn upsample_h2v1(input: &[u8], input_width: usize, output: &mut [u8]) -> Option<
     expanded[0] = input[0];
     expanded[1] = ((3 * u32::from(input[0]) + u32::from(input[1]) + 2) >> 2) as u8;
     for index in 1..input_width - 1 {
-      let sample = 3 * u32::from(input[index]) + 2;
-      expanded[index * 2] = ((sample + u32::from(input[index - 1])) >> 2) as u8;
-      expanded[index * 2 + 1] = ((sample + u32::from(input[index + 1])) >> 2) as u8;
+      // IJG jdsample.c alternates half-way rounding to avoid a positive
+      // chroma bias: the left interpolation rounds down, the right up.
+      let sample = 3 * u32::from(input[index]);
+      expanded[index * 2] = ((sample + u32::from(input[index - 1]) + 1) >> 2) as u8;
+      expanded[index * 2 + 1] = ((sample + u32::from(input[index + 1]) + 2) >> 2) as u8;
     }
     expanded[(input_width - 1) * 2] =
-      ((3 * u32::from(input[input_width - 1]) + u32::from(input[input_width - 2]) + 2) >> 2) as u8;
+      ((3 * u32::from(input[input_width - 1]) + u32::from(input[input_width - 2]) + 1) >> 2) as u8;
     expanded[(input_width - 1) * 2 + 1] = input[input_width - 1];
   }
   output.copy_from_slice(expanded.get(..output.len())?);
@@ -947,10 +950,12 @@ fn upsample_h2v2(near: &[u8], far: &[u8], input_width: usize, output: &mut [u8])
     for index in 1..input_width {
       let previous = current;
       current = 3 * u32::from(near[index]) + u32::from(far[index]);
-      expanded[index * 2 - 1] = ((3 * previous + current + 8) >> 4) as u8;
+      // h2v2_fancy_upsample uses the opposite phase to h2v1: odd
+      // output columns round half-way values down, even columns up.
+      expanded[index * 2 - 1] = ((3 * previous + current + 7) >> 4) as u8;
       expanded[index * 2] = ((3 * current + previous + 8) >> 4) as u8;
     }
-    expanded[input_width * 2 - 1] = ((current + 2) >> 2) as u8;
+    expanded[input_width * 2 - 1] = ((current + 1) >> 2) as u8;
   }
   output.copy_from_slice(expanded.get(..output.len())?);
   Some(())
@@ -1005,5 +1010,23 @@ mod tests {
     let mut output = [0_u8; 6];
     upsample_h2v1(&input, input.len(), &mut output).unwrap();
     assert_eq!(output, [10, 15, 25, 45, 75, 90]);
+  }
+
+  #[test]
+  fn libjpeg_fancy_chroma_half_ties_do_not_accumulate_positive_bias() {
+    // IJG jdsample.c uses opposite dither phases for h2v1 and h2v2.
+    // These half-integer interpolants distinguish that policy from ordinary
+    // round-to-nearest; the prior non-tie edge test cannot expose it.
+    let input = [10, 12, 10];
+    let mut output = [0_u8; 6];
+    upsample_h2v1(&input, input.len(), &mut output).unwrap();
+    assert_eq!(output, [10, 11, 11, 12, 10, 10]);
+    upsample_h2v2(&input, &input, input.len(), &mut output).unwrap();
+    assert_eq!(output, [10, 10, 12, 11, 11, 10]);
+
+    // Vertical interpolation can produce ties at the replicated horizontal
+    // edges too. The last column must keep the odd-column rounding phase.
+    upsample_h2v2(&[10; 3], &[12; 3], 3, &mut output).unwrap();
+    assert_eq!(output, [11, 10, 11, 10, 11, 10]);
   }
 }

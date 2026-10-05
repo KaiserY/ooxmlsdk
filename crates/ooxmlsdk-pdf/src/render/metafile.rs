@@ -26,6 +26,23 @@ struct MetafileFixedOutputRasterProfile {
 // contrast 1200. GDI applies SPI_GETFONTSMOOTHINGCONTRAST / 1000 as the
 // device-space gamma when classic EMF/WMF text is replayed into a color DIB.
 const OFFICE_REFERENCE_GDI_FONT_SMOOTHING_CONTRAST: u16 = 1200;
+// SetWinMetaFileBits reference DC captured from the configured Windows host.
+const OFFICE_REFERENCE_WMF_CONVERSION: ooxmlsdk_layout::render::emf_wmf::WmfConversionProfile =
+  ooxmlsdk_layout::render::emf_wmf::WmfConversionProfile {
+    dpi: [140, 140],
+    device_pixels: [3840, 2160],
+    device_millimeters: [697, 392],
+  };
+
+pub(super) fn word_wmf_conversion_profile(
+  options: &PdfOptions,
+) -> Option<ooxmlsdk_layout::render::emf_wmf::WmfConversionProfile> {
+  matches!(
+    options.images.optimization_policy,
+    PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx)
+  )
+  .then_some(OFFICE_REFERENCE_WMF_CONVERSION)
+}
 
 impl MetafileFixedOutputRasterProfile {
   fn playback_size(self, canvas_width: u32, canvas_height: u32) -> (u32, u32) {
@@ -138,12 +155,54 @@ fn fixed_output_raster_profile(
   }
 }
 
+pub(super) fn fixed_output_paint_image<'a>(
+  image: &ImageItem<'a>,
+  options: &PdfOptions,
+) -> Option<ImageItem<'a>> {
+  if image.metafile_fixed_output_profile != common::MetafileFixedOutputProfile::WordInlineVmlPicture
+    || !matches!(
+      options.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx)
+    )
+    || image.rotation_deg.abs() > f32::EPSILON
+    || image.crop != ImageCrop::default()
+    || image.metafile_semantic_text_includes_raster_backdrop
+  {
+    return None;
+  }
+  // Native Word PDF and XPS agree: inline VML uses integer printer origins
+  // and extents, converts each edge to twips, then paints at the half-dot
+  // offset. The DrawingML control keeps its authored rectangle instead.
+  // Realize paint geometry independently of paragraph advance. Screen-output
+  // metafile raster allocation follows the realized rectangle (below); the
+  // authored inline frame still owns layout.
+  let dot = f64::from(units::POINTS_PER_INCH) / f64::from(units::OFFICE_FIXED_OUTPUT_DPI);
+  let axis = |position: f32, extent: f32| {
+    let origin = (f64::from(position) / dot).round();
+    let extent = (f64::from(extent) / dot).round();
+    let edge = |dots: f64| (dots * dot * 20.0).round() / 20.0 + dot / 2.0;
+    let near = edge(origin);
+    (near as f32, (edge(origin + extent) - near) as f32)
+  };
+  let mut painted = image.clone();
+  (painted.x_pt, painted.width_pt) = axis(image.x_pt, image.width_pt);
+  (painted.y_pt, painted.height_pt) = axis(image.y_pt, image.height_pt);
+  Some(painted)
+}
+
 pub(super) fn render_options_for_image(
   image: &ImageItem<'_>,
   options: &PdfOptions,
 ) -> ooxmlsdk_layout::render::emf_wmf::RenderOptions {
   let raster_profile = fixed_output_raster_profile(image, options);
   let raster_dpi = raster_profile.raster_dpi;
+  // Word rasterizes inline VML on the same snapped printer rectangle it
+  // paints. At a 38.25 pt authored height, a 38.30 pt painted rectangle crosses
+  // the screen raster's 50/51-pixel endpoint boundary.
+  let raster_painted_image = (options.optimize_for == PdfOptimizeFor::Screen)
+    .then(|| fixed_output_paint_image(image, options))
+    .flatten();
+  let raster_image = raster_painted_image.as_ref().unwrap_or(image);
   let powerpoint_screen_fixed_output = matches!(
     options.images.optimization_policy,
     PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx)
@@ -155,13 +214,13 @@ pub(super) fn render_options_for_image(
   } else {
     Some((
       fixed_output_raster_pixels(
-        image.width_pt,
+        raster_image.width_pt,
         visible_width,
         raster_dpi,
         raster_profile.allocation,
       ),
       fixed_output_raster_pixels(
-        image.height_pt,
+        raster_image.height_pt,
         visible_height,
         raster_dpi,
         raster_profile.allocation,
@@ -186,10 +245,25 @@ pub(super) fn render_options_for_image(
       ));
   let playback_size =
     target_size.map(|(width, height)| raster_profile.playback_size(width, height));
-  let text_playback_size =
-    target_size.map(|(width, height)| raster_profile.text_playback_size(width, height));
-  let monochrome_text_playback_size =
-    target_size.map(|(width, height)| raster_profile.monochrome_text_playback_size(width, height));
+  let word_inline_vml_screen = options.optimize_for == PdfOptimizeFor::Screen
+    && matches!(
+      options.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx)
+    )
+    && image.metafile_fixed_output_profile
+      == common::MetafileFixedOutputProfile::WordInlineVmlPicture;
+  // The color bitmap keeps its inclusive far-edge playback rectangle, while
+  // Word's WMF-imported text is realized against the full raster surface.
+  let text_playback_size = if word_inline_vml_screen {
+    target_size
+  } else {
+    target_size.map(|(width, height)| raster_profile.text_playback_size(width, height))
+  };
+  let monochrome_text_playback_size = if word_inline_vml_screen {
+    target_size
+  } else {
+    target_size.map(|(width, height)| raster_profile.monochrome_text_playback_size(width, height))
+  };
 
   ooxmlsdk_layout::render::emf_wmf::RenderOptions {
     target_width_px: target_size.map(|size| size.0),
@@ -223,6 +297,8 @@ pub(super) fn render_options_for_image(
     suppress_solid_pattern_rects: image.metafile_semantic_text_includes_raster_backdrop,
     suppress_bitmap_layers: image.metafile_semantic_text_includes_raster_backdrop,
     wmf_external_header: image.metafile_external_header,
+    wmf_conversion_profile: word_wmf_conversion_profile(options),
+    emf_text_advance_quantization: Default::default(),
   }
 }
 
@@ -295,6 +371,83 @@ mod tests {
       signature_line: None,
       metafile_native_size: true,
     }
+  }
+
+  #[test]
+  fn word_inline_vml_paint_uses_printer_and_twip_edges() {
+    let mut image = test_image();
+    image.crop = ImageCrop::default();
+    image.metafile_fixed_output_profile = common::MetafileFixedOutputProfile::WordInlineVmlPicture;
+    image.width_pt = 68.25;
+    image.height_pt = 38.25;
+    image.y_pt = 56.699_997;
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    for (x, left, width) in [
+      (72.0, 72.06, 68.30),
+      (72.05, 72.06, 68.30),
+      (72.1, 72.16, 68.30),
+      (72.15, 72.16, 68.30),
+      (72.2, 72.31, 68.25),
+      (72.25, 72.31, 68.25),
+      (72.3, 72.41, 68.30),
+      (72.4, 72.41, 68.30),
+      (72.5, 72.56, 68.25),
+      (73.0, 73.01, 68.30),
+      (73.25, 73.26, 68.30),
+      (73.5, 73.61, 68.30),
+      (80.0, 80.11, 68.25),
+      (85.05, 85.16, 68.25),
+    ] {
+      image.x_pt = x;
+      let painted = fixed_output_paint_image(&image, &options).unwrap();
+      assert!(
+        (painted.x_pt - left).abs() < 0.0001,
+        "x={x}: {}",
+        painted.x_pt
+      );
+      assert!((painted.width_pt - width).abs() < 0.0001);
+      assert!((painted.y_pt - 56.71).abs() < 0.0001);
+      assert!((painted.height_pt - 38.25).abs() < 0.0001);
+      assert_eq!(image.width_pt, 68.25);
+    }
+    image.y_pt = 430.24567;
+    let painted = fixed_output_paint_image(&image, &options).unwrap();
+    assert!((painted.y_pt - 430.26).abs() < 0.0001);
+    assert!((painted.height_pt - 38.30).abs() < 0.0001);
+    image.metafile_fixed_output_profile = common::MetafileFixedOutputProfile::Default;
+    assert!(fixed_output_paint_image(&image, &options).is_none());
+    image.metafile_fixed_output_profile = common::MetafileFixedOutputProfile::WordInlineVmlPicture;
+    image.rotation_deg = 30.0;
+    assert!(fixed_output_paint_image(&image, &options).is_none());
+    image.rotation_deg = 0.0;
+    assert!(fixed_output_paint_image(&image, &PdfOptions::default()).is_none());
+  }
+
+  #[test]
+  fn word_inline_vml_screen_raster_uses_painted_extent() {
+    let mut image = test_image();
+    image.crop = ImageCrop::default();
+    image.metafile_fixed_output_profile = common::MetafileFixedOutputProfile::WordInlineVmlPicture;
+    image.x_pt = 85.05;
+    image.y_pt = 430.245_67;
+    image.width_pt = 54.0;
+    image.height_pt = 38.25;
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    options.optimize_for = PdfOptimizeFor::Screen;
+
+    let painted = fixed_output_paint_image(&image, &options).unwrap();
+    assert!((painted.height_pt - 38.3).abs() < 0.0001);
+    let raster = render_options_for_image(&image, &options);
+    assert_eq!(raster.target_width_px, Some(71));
+    assert_eq!(raster.target_height_px, Some(51));
+    assert_eq!(raster.playback_width_px, Some(70));
+    assert_eq!(raster.playback_height_px, Some(50));
+    assert_eq!(raster.text_playback_width_px, Some(71));
+    assert_eq!(raster.text_playback_height_px, Some(51));
   }
 
   #[test]

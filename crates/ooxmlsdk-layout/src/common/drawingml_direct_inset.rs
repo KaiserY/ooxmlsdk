@@ -12,6 +12,9 @@
 
 use std::collections::HashMap;
 
+mod search;
+use search::SweepIndex;
+
 const TIME_EPSILON: f64 = 1.0e-7;
 const POINT_EPSILON: f64 = 1.0e-6;
 const PARALLEL_EPSILON: f64 = 1.0e-12;
@@ -368,8 +371,13 @@ impl DirectInsetGraph {
   }
 
   fn earliest_event(&self, now: f64) -> Option<DirectInsetEvent> {
+    // Topology events append vertices and retire their predecessors. Walking
+    // that growing history inside every reflex-vertex search makes long text
+    // runs spend most of their time rejecting dead vertices. Compact once per
+    // event, retaining source order so equal-time event precedence is unchanged.
+    let live = self.live_vertices().collect::<Vec<_>>();
     let mut earliest = None;
-    for first_index in self.live_vertices() {
+    for &first_index in &live {
       let first = self.vertices[first_index];
       let second_index = first.next;
       let second = self.vertices[second_index];
@@ -408,28 +416,50 @@ impl DirectInsetGraph {
       }
     }
 
-    for vertex_index in self.live_vertices() {
+    // The source line is constant throughout this search. Keep only its hot
+    // fields beside the live edge IDs; fetch endpoint trajectories only after
+    // the line intersection survives the time test.
+    let split_targets = live
+      .iter()
+      .map(|&index| {
+        let vertex = &self.vertices[index];
+        let source = &self.source_edges[vertex.right_edge];
+        (
+          index,
+          vertex.next,
+          vertex.right_edge,
+          source.inward,
+          source.line_constant,
+        )
+      })
+      .collect::<Vec<_>>();
+    let search = earliest
+      .and_then(|event| SweepIndex::new(&self.vertices, &live, now, event.inset + TIME_EPSILON));
+    let mut candidates = (0..split_targets.len()).collect::<Vec<_>>();
+    for &vertex_index in &live {
       if !self.is_reflex(vertex_index) {
         continue;
       }
       let vertex = self.vertices[vertex_index];
       let vertex_now = vertex.position(now);
-      for edge_start_index in self.live_vertices() {
-        let edge_start = self.vertices[edge_start_index];
-        let edge_end_index = edge_start.next;
+      if let Some(search) = &search {
+        search.candidates(vertex, &mut candidates);
+      }
+      for &candidate_index in &candidates {
+        let (edge_start_index, edge_end_index, source_id, inward, line_constant) =
+          split_targets[candidate_index];
         if vertex_index == edge_start_index
           || vertex_index == edge_end_index
-          || edge_start.right_edge == vertex.left_edge
-          || edge_start.right_edge == vertex.right_edge
+          || source_id == vertex.left_edge
+          || source_id == vertex.right_edge
         {
           continue;
         }
-        let source_edge = self.source_edges[edge_start.right_edge];
-        let denominator = source_edge.inward.dot(vertex.velocity) - 1.0;
+        let denominator = inward.dot(vertex.velocity) - 1.0;
         if denominator.abs() <= PARALLEL_EPSILON {
           continue;
         }
-        let numerator = source_edge.line_constant + now - source_edge.inward.dot(vertex_now);
+        let numerator = line_constant + now - inward.dot(vertex_now);
         let event_delta = numerator / denominator;
         if event_delta < -TIME_EPSILON {
           continue;
@@ -439,7 +469,7 @@ impl DirectInsetGraph {
           continue;
         }
         let point = vertex.position(inset);
-        let stretch_start = edge_start.position(inset);
+        let stretch_start = self.vertices[edge_start_index].position(inset);
         let stretch_end = self.vertices[edge_end_index].position(inset);
         let stretch = stretch_end.sub(stretch_start);
         let length_squared = stretch.dot(stretch);
@@ -708,7 +738,14 @@ impl DirectInsetGraph {
         // vertex merge produced when an expanding counter becomes tangent to
         // the shrinking outer wavefront.
         if !self.chain_is_degenerate_at(first_next, second_previous, inset) {
-          return false;
+          return self.process_opposed_overlap(
+            &[first_index, second_index],
+            [first_previous, second_next],
+            [first.left_edge, second.right_edge],
+            [second_previous, first_next],
+            point,
+            inset,
+          );
         }
         let Some(replacement) = self.create_vertex(
           first_previous,
@@ -731,7 +768,14 @@ impl DirectInsetGraph {
       }
       (None, Some(_)) => {
         if !self.chain_is_degenerate_at(second_next, first_previous, inset) {
-          return false;
+          return self.process_opposed_overlap(
+            &[first_index, second_index],
+            [second_previous, first_next],
+            [second.left_edge, first.right_edge],
+            [first_previous, second_next],
+            point,
+            inset,
+          );
         }
         let Some(replacement) = self.create_vertex(
           second_previous,
@@ -1009,17 +1053,17 @@ impl DirectInsetGraph {
     true
   }
 
-  /// Resolves the degenerate form of a split event where one new crosswise
-  /// vertex has opposed incident edges and therefore no finite velocity.
+  /// Resolves a split or endpoint merge where one new crosswise vertex has
+  /// opposed incident edges and therefore no finite velocity.
   ///
   /// The two opposed stretches cancel over their common interval.  The part
   /// belonging to only one stretch remains in the wavefront, and cancellation
   /// continues across an alternating collinear chain until a finite pair of
   /// outside edges is reached.  The independent, non-opposed crosswise branch
   /// is emitted at the original hit point at the same time.
-  fn process_opposed_split_overlap(
+  fn process_opposed_overlap(
     &mut self,
-    event_vertex: usize,
+    event_vertices: &[usize],
     junction_vertices: [usize; 2],
     junction_edges: [usize; 2],
     overlap_vertices: [usize; 2],
@@ -1030,7 +1074,7 @@ impl DirectInsetGraph {
     let [junction_left_edge, junction_right_edge] = junction_edges;
     let [mut left_index, mut right_index] = overlap_vertices;
     let junction_point = meeting_point;
-    let mut dead = vec![event_vertex];
+    let mut dead = event_vertices.to_vec();
     let mut terminal = None;
 
     for _ in 0..=self.vertices.len() {
@@ -1246,8 +1290,8 @@ impl DirectInsetGraph {
     .is_some();
     match (first_is_finite, second_is_finite) {
       (false, true) => {
-        return self.process_opposed_split_overlap(
-          vertex_index,
+        return self.process_opposed_overlap(
+          &[vertex_index],
           [edge_start_index, next],
           [hit_edge, vertex.right_edge],
           [previous, edge_end_index],
@@ -1256,8 +1300,8 @@ impl DirectInsetGraph {
         );
       }
       (true, false) => {
-        return self.process_opposed_split_overlap(
-          vertex_index,
+        return self.process_opposed_overlap(
+          &[vertex_index],
           [previous, edge_end_index],
           [vertex.left_edge, hit_edge],
           [edge_start_index, next],
@@ -1366,6 +1410,66 @@ mod tests {
   fn boundary_points(cell: &super::DirectInsetCell, inner: bool) -> [(f32, f32); 2] {
     let boundary = if inner { cell.inner } else { cell.outer };
     boundary.endpoints.map(|endpoint| endpoint.point)
+  }
+
+  #[test]
+  fn collapsed_crossbar_keeps_both_stems_for_every_start_vertex_and_winding() {
+    // The crossbar vanishes at inset 1, splitting the wavefront into two
+    // stems. Both stems survive until inset 2; neither may be discarded as
+    // part of the opposed horizontal overlap at the endpoint merge.
+    let outline = [
+      (0.0, 0.0),
+      (4.0, 0.0),
+      (4.0, 5.0),
+      (8.0, 5.0),
+      (8.0, 0.0),
+      (12.0, 0.0),
+      (12.0, 12.0),
+      (8.0, 12.0),
+      (8.0, 7.0),
+      (4.0, 7.0),
+      (4.0, 12.0),
+      (0.0, 12.0),
+    ];
+    for reversed in [false, true] {
+      for start in 0..outline.len() {
+        let mut contour = outline.to_vec();
+        contour.rotate_left(start);
+        if reversed {
+          contour.reverse();
+        }
+        let cells = direct_inset_cells(&[&contour], !reversed, 3.0)
+          .unwrap_or_else(|| panic!("crossbar graph: start={start}, reversed={reversed}"));
+        assert!(
+          cells
+            .iter()
+            .any(|cell| cell.outer.inset >= 1.0 && cell.inner.inset > 1.0)
+        );
+        let maximum = cells
+          .iter()
+          .map(|cell| cell.inner.inset)
+          .fold(0.0, f32::max);
+        assert!((maximum - 2.0).abs() < 1.0e-5);
+        let area: f32 = cells
+          .iter()
+          .map(|cell| {
+            let outer = boundary_points(cell, false);
+            let inner = boundary_points(cell, true);
+            let points = [outer[0], outer[1], inner[1], inner[0]];
+            (0..4)
+              .map(|i| {
+                let (x, y) = points[i];
+                let (next_x, next_y) = points[(i + 1) % 4];
+                x * next_y - y * next_x
+              })
+              .sum::<f32>()
+              .abs()
+              * 0.5
+          })
+          .sum();
+        assert!((area - 104.0).abs() < 1.0e-4, "swept area: {area}");
+      }
+    }
   }
 
   #[test]

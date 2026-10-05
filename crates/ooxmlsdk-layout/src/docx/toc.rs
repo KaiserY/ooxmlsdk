@@ -504,6 +504,8 @@ struct TocSpan {
   end_ordinal: usize,
   locked: bool,
   dirty: bool,
+  starts_at_paragraph_start: bool,
+  ends_at_paragraph_end: bool,
   spec: TocSpec,
 }
 
@@ -550,6 +552,8 @@ fn scan_main_story(sections: &[ImportedSection]) -> StoryScan {
         end_ordinal: field.end_ordinal,
         locked: field.locked,
         dirty: field.dirty,
+        starts_at_paragraph_start: field.starts_at_paragraph_start,
+        ends_at_paragraph_end: field.ends_at_paragraph_end,
         spec,
       })
     })
@@ -874,17 +878,26 @@ pub(super) fn refresh_tables_of_contents(
       continue;
     }
     let has_empty_result_placeholder = toc_span_has_empty_result_placeholder(sections, &scan, span);
+    let mut clean_empty_result = false;
     let mut entries = None;
     if !span.dirty && !update_fields_on_open && !has_empty_result_placeholder {
       // Word also replaces a stored English empty-TOC diagnostic with the
       // current UI resource (sdt-before-table.docx). This does not authorize
       // rebuilding other clean caches, including an obsolete empty diagnostic
       // for which headings now exist.
-      if !toc_span_has_cached_empty_diagnostic(sections, &scan, span) {
-        continue;
-      }
       let current_entries = collect_toc_entry_sources(sections, &scan, span);
-      if !current_entries.is_empty() {
+      if toc_span_has_cached_empty_diagnostic(sections, &scan, span) {
+        if !current_entries.is_empty() {
+          continue;
+        }
+      } else if current_entries.is_empty() && toc_span_has_clean_empty_result(sections, &scan, span)
+      {
+        // Word still materializes the ordinary sentence-case result when a
+        // whole-paragraph TOC has neither a cached result nor any eligible
+        // source entry (group-spt202.docx). If entries do exist, an empty
+        // clean cache remains authoritative until an update is requested.
+        clean_empty_result = true;
+      } else {
         continue;
       }
       entries = Some(current_entries);
@@ -935,13 +948,11 @@ pub(super) fn refresh_tables_of_contents(
           .min_by_key(|(level, _)| *level)
           .map(|(_, paragraph)| paragraph)
       });
-      blocks.push(Block::paragraph(build_empty_toc_result(
-        &span.spec,
-        empty_template,
-        styles,
-        page,
-        ui_language,
-      )));
+      blocks.push(Block::paragraph(if clean_empty_result {
+        build_clean_empty_toc_result(empty_template, styles, ui_language)
+      } else {
+        build_empty_toc_result(&span.spec, empty_template, styles, page, ui_language)
+      }));
     }
     replacements.push(TocReplacement {
       span: span.clone(),
@@ -1254,6 +1265,7 @@ fn resolve_layout_stable_page_reference_run(
   let message = FieldMessage::UndefinedBookmark;
   run.text = localized_field_message(message, ui_language);
   apply_generated_field_message_style(&mut run.style, message, ui_language);
+  text::apply_wordprocessingml_cjk_text_metrics(&run.text, &mut run.style);
   run.dynamic_field = None;
   true
 }
@@ -1349,6 +1361,12 @@ fn build_missing_reference_result(
     .find_map(|inline| match inline {
       InlineItem::Text(run) => Some(run.style.clone()),
       InlineItem::Ruby(ruby) => ruby.base.first().map(|run| run.style.clone()),
+      InlineItem::Overstrike(overstrike) => overstrike
+        .operands
+        .iter()
+        .flatten()
+        .next()
+        .map(|run| run.style.clone()),
       _ => None,
     })
     .unwrap_or_else(|| paragraph.base_style.clone());
@@ -1358,6 +1376,7 @@ fn build_missing_reference_result(
   };
   apply_generated_field_message_style(&mut style, message, ui_language);
   let text = localized_field_message(message, ui_language);
+  text::apply_wordprocessingml_cjk_text_metrics(&text, &mut style);
   let run = TextRun {
     text: text.clone(),
     style,
@@ -1453,9 +1472,8 @@ fn collect_toc_entry_sources(
     let Some(level) = paragraph_toc_level(paragraph, &span.spec) else {
       continue;
     };
-    let Some(text) = paragraph_source_text(paragraph)
-      .map(|text| normalize_toc_entry_text(text, &span.spec))
-      .filter(|text| !text.is_empty())
+    let Some(text) =
+      paragraph_toc_source_text(paragraph, &span.spec).filter(|text| !text.is_empty())
     else {
       continue;
     };
@@ -1611,10 +1629,31 @@ fn paragraph_source_text(paragraph: &Paragraph) -> Option<String> {
           }
         }
       }
+      InlineItem::Overstrike(overstrike) => {
+        for run in overstrike.operands.iter().flatten() {
+          if !run.style.hidden {
+            text.push_str(&run.text);
+          }
+        }
+      }
       _ => {}
     }
   }
   (!text.trim().is_empty()).then_some(text)
+}
+
+fn paragraph_toc_source_text(paragraph: &Paragraph, spec: &TocSpec) -> Option<String> {
+  if let Some(text) = paragraph.style_ref_text.as_deref()
+    && !text.trim().is_empty()
+  {
+    // The numbering follow character belongs to Word's synthesized list
+    // label, not to the heading's authored tab entries controlled by TOC \w.
+    // Keep it so a tab suffix can land on the TOC paragraph's first tab stop.
+    let mut entry = paragraph.list_label.clone().unwrap_or_default();
+    entry.push_str(&normalize_toc_entry_text(text.to_string(), spec));
+    return Some(entry);
+  }
+  paragraph_source_text(paragraph).map(|text| normalize_toc_entry_text(text, spec))
 }
 
 fn normalize_toc_entry_text(text: String, spec: &TocSpec) -> String {
@@ -2070,6 +2109,39 @@ fn build_empty_toc_result(
   // ordinary TOC1 cached text. Its fixed PDF output is bold even when the
   // cached TOC paragraph was plain (redline-ends-before-toc.docx).
   apply_generated_field_message_style(&mut style, FieldMessage::EmptyTableOfContents, ui_language);
+  text::apply_wordprocessingml_cjk_text_metrics(&text, &mut style);
+  paragraph.inlines.push(InlineItem::Text(TextRun {
+    text,
+    style,
+    hyperlink_url: None,
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    style_ref_numbering_text: None,
+    preserve_text_portion: false,
+  }));
+  paragraph
+}
+
+fn build_clean_empty_toc_result(
+  template: Option<&Paragraph>,
+  styles: &StylesCatalog,
+  ui_language: Option<&str>,
+) -> Paragraph {
+  let mut paragraph = template
+    .cloned()
+    .unwrap_or_else(|| empty_toc_paragraph(styles, 1));
+  paragraph.inlines.clear();
+  paragraph.field_events.clear();
+  paragraph.footnote_reference_ids.clear();
+  paragraph.endnote_reference_ids.clear();
+  paragraph.list_label = None;
+  paragraph.list_label_hyperlink_url = None;
+  let text = localized_clean_empty_toc_message(ui_language);
+  paragraph.style_ref_text = Some(Arc::<str>::from(text.as_str()));
+  paragraph.style_ref_numbering_text = None;
+  let mut style = paragraph.base_style.clone();
+  text::apply_wordprocessingml_cjk_text_metrics(&text, &mut style);
   paragraph.inlines.push(InlineItem::Text(TextRun {
     text,
     style,
@@ -2126,6 +2198,24 @@ fn toc_span_has_empty_result_placeholder(
       has_cached_content && !has_visible_content
     })
   })
+}
+
+fn toc_span_has_clean_empty_result(
+  sections: &[ImportedSection],
+  scan: &StoryScan,
+  span: &TocSpan,
+) -> bool {
+  span.starts_at_paragraph_start
+    && span.ends_at_paragraph_end
+    && (span.start_ordinal..=span.end_ordinal).all(|ordinal| {
+      paragraph(sections, scan, ordinal).is_some_and(|paragraph| {
+        paragraph.inlines.iter().all(|inline| match inline {
+          InlineItem::Text(run) => run.text.trim().is_empty(),
+          InlineItem::BookmarkStart(_) => true,
+          _ => false,
+        })
+      })
+    })
 }
 
 fn replace_toc_span(
@@ -2263,7 +2353,7 @@ mod tests {
       page_break_before: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
-      cell_spacing_pt: 0.0,
+      cell_spacing: super::model::TableCellSpacing::Collapsed,
       rows: vec![TableRow {
         cells: vec![TableCell {
           blocks,
@@ -2286,7 +2376,7 @@ mod tests {
         repeat_header: false,
         keep_with_next: false,
         cant_split: false,
-        cell_spacing_pt: None,
+        cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
         width_before_pt: None,
@@ -2401,6 +2491,78 @@ mod tests {
       Block::Paragraph(source)
         if matches!(source.inlines.first(), Some(InlineItem::BookmarkStart(_)))
     ));
+  }
+
+  #[test]
+  fn clean_empty_toc_without_entries_materializes_ordinary_result_text() {
+    let mut first_cached = test_paragraph("");
+    first_cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: false,
+      },
+      ParagraphFieldEvent::Instruction(r#" TOC \o "1-3" \h "#.to_string()),
+      ParagraphFieldEvent::Separate,
+    ];
+    let mut second_cached = test_paragraph("");
+    second_cached.field_events = vec![ParagraphFieldEvent::End];
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(first_cached),
+      Block::paragraph(second_cached),
+    ])];
+
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("en-US"),
+    );
+
+    let [Block::Paragraph(result)] = sections[0].blocks.as_slice() else {
+      panic!("empty TOC result should replace both field boundary paragraphs");
+    };
+    assert_eq!(
+      paragraph_source_text(result).as_deref(),
+      Some("No table of contents entries found.")
+    );
+    let [InlineItem::Text(run)] = result.inlines.as_slice() else {
+      panic!("empty TOC result should contain one ordinary text run");
+    };
+    assert!(!run.style.bold);
+  }
+
+  #[test]
+  fn refreshed_japanese_empty_toc_restores_visible_cjk_line_metrics() {
+    let styles = StylesCatalog::default();
+    let template = test_paragraph("Chapter 1");
+    assert!(!template.base_style.wordprocessingml_cjk_line_metrics);
+
+    let japanese = build_empty_toc_result(
+      &TocSpec::default(),
+      Some(&template),
+      &styles,
+      PageSetup::default(),
+      Some("ja-JP"),
+    );
+    let [InlineItem::Text(run)] = japanese.inlines.as_slice() else {
+      panic!("empty TOC should contain one generated text run");
+    };
+    assert_eq!(run.text, "目次項目が見つかりません。");
+    assert!(run.style.wordprocessingml_cjk_line_metrics);
+    assert!(run.style.line_height_override_pt.is_none());
+    assert!(!japanese.base_style.wordprocessingml_cjk_line_metrics);
+
+    let english = build_empty_toc_result(
+      &TocSpec::default(),
+      Some(&template),
+      &styles,
+      PageSetup::default(),
+      Some("en-US"),
+    );
+    let [InlineItem::Text(run)] = english.inlines.as_slice() else {
+      panic!("empty TOC should contain one generated text run");
+    };
+    assert!(!run.style.wordprocessingml_cjk_line_metrics);
   }
 
   #[test]
@@ -2807,6 +2969,44 @@ mod tests {
     assert!(matches!(
       source.inlines.first(),
       Some(InlineItem::BookmarkStart(name)) if name == target.as_ref()
+    ));
+  }
+
+  #[test]
+  fn dirty_toc_includes_the_heading_numbering_label() {
+    let mut cached = test_paragraph("stale");
+    cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: true,
+      },
+      ParagraphFieldEvent::Instruction(r#" TOC \o "1-1" \h "#.to_string()),
+      ParagraphFieldEvent::Separate,
+      ParagraphFieldEvent::End,
+    ];
+    let mut heading = test_paragraph("Chapter");
+    heading.format.style_outline_level = Some(0);
+    heading.format.outline_level = Some(0);
+    heading.list_label = Some("2\t".to_string());
+    heading.style_ref_numbering_text = Some(Arc::<str>::from("2"));
+
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(cached),
+      Block::paragraph(heading),
+    ])];
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("en-US"),
+    );
+
+    let Block::Paragraph(entry) = &sections[0].blocks[0] else {
+      panic!("expected rebuilt TOC entry");
+    };
+    assert!(matches!(
+      entry.inlines.first(),
+      Some(InlineItem::Text(run)) if run.text == "2\tChapter"
     ));
   }
 

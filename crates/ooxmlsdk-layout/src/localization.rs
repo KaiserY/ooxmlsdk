@@ -105,7 +105,8 @@ const OFFICE_UI_STRING_OVERRIDES: &[OfficeUiStringOverrides] = &[
     language: "de",
     // Current Office tdf121744.docx PDF, automatic c:title without c:tx.
     chart_title: Some("Diagrammtitel"),
-    chart_axis_title: None,
+    // Current Office DisplayUnits.docx PDF, automatic c:catAx/c:title.
+    chart_axis_title: Some("Achsentitel"),
     waterfall_legend: None,
     boolean_values: Some(["FALSCH", "WAHR"]),
     invalid_citation_source: None,
@@ -113,7 +114,8 @@ const OFFICE_UI_STRING_OVERRIDES: &[OfficeUiStringOverrides] = &[
   OfficeUiStringOverrides {
     language: "ja",
     chart_title: Some("グラフ タイトル"),
-    chart_axis_title: None,
+    // Current Office testChartDataTable.docx PDF, automatic bare c:catAx/c:title.
+    chart_axis_title: Some("軸ラベル"),
     waterfall_legend: None,
     boolean_values: None,
     // sdt-citation-run.docx uses English bibliography language (1033),
@@ -224,6 +226,20 @@ pub(crate) enum ChartDisplayUnit {
   Trillions,
 }
 
+pub(crate) fn office_chart_display_unit(
+  ui_language: Option<&str>,
+  unit: ChartDisplayUnit,
+) -> &'static str {
+  match (
+    ui_string_overrides(ui_language).map(|strings| strings.language),
+    unit,
+  ) {
+    // Current Office DisplayUnits.docx PDF, c:builtInUnit val="billions".
+    (Some("de"), ChartDisplayUnit::Billions) => "Milliarden",
+    _ => OfficeStringCatalog::for_ui_language(ui_language).chart_display_unit(unit),
+  }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
 pub(crate) enum ChartTrendlineKind {
@@ -233,6 +249,25 @@ pub(crate) enum ChartTrendlineKind {
   Power,
   Polynomial,
   MovingAverage,
+}
+
+pub(crate) fn office_chart_trendline_legend_title(
+  ui_language: Option<&str>,
+  kind: ChartTrendlineKind,
+  series_name: &str,
+) -> String {
+  if matches!(
+    (
+      ui_string_overrides(ui_language).map(|strings| strings.language),
+      kind,
+    ),
+    (Some("ja"), ChartTrendlineKind::Power)
+  ) {
+    // Current Japanese Word fixed output for bubblechart.docx. Microsoft also
+    // names this Office trendline type `累乗近似曲線` in its Japanese UI docs.
+    return format!("累乗 ({series_name})");
+  }
+  OfficeStringCatalog::for_ui_language(ui_language).chart_trendline_legend_title(kind, series_name)
 }
 
 /// Cross-crate resource needed by the PDF lowering layer.

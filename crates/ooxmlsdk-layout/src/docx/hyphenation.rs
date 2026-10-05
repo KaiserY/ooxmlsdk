@@ -4,6 +4,42 @@ use super::TextStyle;
 
 pub(super) const SOFT_HYPHEN: char = '\u{00ad}';
 
+/// Automatic proofing resources are application inputs, not source run
+/// boundaries. Word exposes them through Language.ActiveHyphenationDictionary;
+/// a language without that dictionary still honors authored soft hyphens.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct AvailableLanguages(u64);
+
+impl Default for AvailableLanguages {
+  fn default() -> Self {
+    Self(u64::MAX)
+  }
+}
+
+impl AvailableLanguages {
+  pub(super) fn new(tags: Option<&[String]>) -> Self {
+    tags.map_or_else(Self::default, |tags| {
+      Self(
+        tags
+          .iter()
+          .filter_map(|tag| hypher_language(tag))
+          .fold(0, |mask, language| mask | Self::language_bit(language)),
+      )
+    })
+  }
+
+  fn language_bit(language: hypher::Lang) -> u64 {
+    // The bundled provider currently has fewer than 64 languages. The
+    // exhaustive ISO-language test below guards this compact internal set
+    // when its dependency is updated.
+    1_u64.checked_shl(language as u32).unwrap_or(0)
+  }
+
+  pub(super) fn supports(self, style: &TextStyle) -> bool {
+    automatic_language(style).is_some_and(|language| self.0 & Self::language_bit(language) != 0)
+  }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum CandidateKind {
   Explicit,
@@ -103,15 +139,7 @@ fn automatic_candidates(
   style: &TextStyle,
   do_not_hyphenate_caps: bool,
 ) -> Vec<Candidate> {
-  let language = if style.complex_script == Some(true) || style.right_to_left == Some(true) {
-    style.bidi_language.as_deref().or(style.language.as_deref())
-  } else {
-    style
-      .language
-      .as_deref()
-      .or(style.east_asia_language.as_deref())
-  };
-  let Some(language) = language.and_then(hypher_language) else {
+  let Some(language) = automatic_language(style) else {
     return Vec::new();
   };
   let mut output = Vec::new();
@@ -132,6 +160,18 @@ fn automatic_candidates(
     }
   }
   output
+}
+
+fn automatic_language(style: &TextStyle) -> Option<hypher::Lang> {
+  let language = if style.complex_script == Some(true) || style.right_to_left == Some(true) {
+    style.bidi_language.as_deref().or(style.language.as_deref())
+  } else {
+    style
+      .language
+      .as_deref()
+      .or(style.east_asia_language.as_deref())
+  };
+  language.and_then(hypher_language)
 }
 
 fn hyphenatable_word_ranges(text: &str) -> Vec<(usize, usize)> {
@@ -197,6 +237,23 @@ impl AutomaticCandidateProvider for HypherProvider {
     let mut offset = 0;
     for piece in pieces.iter().take(pieces.len().saturating_sub(1)) {
       offset += piece.len();
+      // Liang patterns can propose a consonant-only English prefix. Word's
+      // English hyphenator does not expose such a syllable: for example,
+      // CWCCI has no candidate, while CWCICI can break after its first I.
+      // Restrict this check to ASCII English; other languages and accented
+      // spellings retain their own dictionary rules. Authored soft hyphens
+      // are handled separately and remain authoritative.
+      if language == hypher::Lang::English
+        && word.is_ascii()
+        && !word[..offset].bytes().any(|character| {
+          matches!(
+            character.to_ascii_lowercase(),
+            b'a' | b'e' | b'i' | b'o' | b'u' | b'y'
+          )
+        })
+      {
+        continue;
+      }
       offsets.push(offset);
     }
     offsets
@@ -217,6 +274,28 @@ mod tests {
       language: Some(Arc::<str>::from("en-US")),
       ..TextStyle::default()
     }
+  }
+
+  #[test]
+  fn all_bundled_languages_fit_the_availability_set() {
+    let mut occupied = std::collections::HashSet::new();
+    for first in b'a'..=b'z' {
+      for second in b'a'..=b'z' {
+        if let Some(language) = hypher::Lang::from_iso([first, second]) {
+          let bit = super::AvailableLanguages::language_bit(language);
+          assert_ne!(
+            bit, 0,
+            "provider language {language:?} exceeds availability set"
+          );
+          occupied.insert((language, bit));
+        }
+      }
+    }
+    let unique_bits = occupied
+      .iter()
+      .map(|(_, bit)| bit)
+      .collect::<std::collections::HashSet<_>>();
+    assert_eq!(occupied.len(), unique_bits.len());
   }
 
   #[test]
@@ -246,6 +325,32 @@ mod tests {
       ]
     );
     assert_eq!(visible_text("extensive"), "extensive");
+  }
+
+  #[test]
+  fn english_automatic_breaks_require_a_syllabic_prefix() {
+    for word in ["CWCCI", "Cwcci", "cwcci"] {
+      assert!(candidates(word, &english_style(), true, false).is_empty());
+    }
+    assert!(!is_automatic_break_at_text_boundary(
+      "CW",
+      "CCI",
+      &english_style(),
+      false,
+    ));
+    assert_eq!(
+      candidates("CW\u{00ad}CCI", &english_style(), true, false),
+      vec![Candidate {
+        break_before: 2,
+        resume_at: 4,
+        kind: CandidateKind::Explicit,
+      }]
+    );
+    assert_eq!(
+      candidates("EXTENSIVE", &english_style(), true, false),
+      candidates("extensive", &english_style(), true, false),
+    );
+    assert!(!candidates("cycle", &english_style(), true, false).is_empty());
   }
 
   #[test]

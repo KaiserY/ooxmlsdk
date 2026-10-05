@@ -3,6 +3,62 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use crate::model::ImageCrop;
 use crate::units;
 
+/// Physical size of an image tile. JPEG/JFIF density overrides the CSS-pixel
+/// fallback; Word's VML tiles and PowerPoint's DrawingML tiles both use it.
+pub(crate) fn natural_size_pt(data: &[u8]) -> Option<(f32, f32)> {
+  let image = image::load_from_memory(data).ok()?;
+  if let Some((horizontal_dpi, vertical_dpi)) = jpeg_density_dpi(data) {
+    return Some((
+      image.width() as f32 * units::POINTS_PER_INCH / horizontal_dpi,
+      image.height() as f32 * units::POINTS_PER_INCH / vertical_dpi,
+    ));
+  }
+  Some((
+    image.width() as f32 * units::POINTS_PER_CSS_PIXEL,
+    image.height() as f32 * units::POINTS_PER_CSS_PIXEL,
+  ))
+}
+
+pub(crate) fn jpeg_density_dpi(data: &[u8]) -> Option<(f32, f32)> {
+  if !data.starts_with(&[0xff, 0xd8]) {
+    return None;
+  }
+  let mut offset = 2usize;
+  while offset + 4 <= data.len() {
+    while offset < data.len() && data[offset] == 0xff {
+      offset += 1;
+    }
+    let marker = *data.get(offset)?;
+    offset += 1;
+    if marker == 0xd9 || marker == 0xda {
+      break;
+    }
+    let length = usize::from(u16::from_be_bytes([
+      *data.get(offset)?,
+      *data.get(offset + 1)?,
+    ]));
+    if length < 2 || offset + length > data.len() {
+      return None;
+    }
+    let payload = &data[offset + 2..offset + length];
+    if marker == 0xe0 && payload.len() >= 12 && payload.starts_with(b"JFIF\0") {
+      let unit = payload[7];
+      let horizontal = f32::from(u16::from_be_bytes([payload[8], payload[9]]));
+      let vertical = f32::from(u16::from_be_bytes([payload[10], payload[11]]));
+      if horizontal <= 0.0 || vertical <= 0.0 {
+        return None;
+      }
+      return match unit {
+        1 => Some((horizontal, vertical)),
+        2 => Some((horizontal * 2.54, vertical * 2.54)),
+        _ => None,
+      };
+    }
+    offset += length;
+  }
+  None
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ImageTilePlacement {
   pub(crate) x_pt: f32,

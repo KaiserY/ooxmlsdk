@@ -23,10 +23,16 @@ pub(super) struct RegisteredTilingPattern {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct PatternKey {
-  fill: common::PatternFill,
-  sampling: PatternSampling,
-  matrix_bits: [u32; 6],
+enum PatternKey {
+  Hatch {
+    fill: common::PatternFill,
+    sampling: PatternSampling,
+    matrix_bits: [u32; 6],
+  },
+  Texture {
+    image_id: Ref,
+    matrix_bits: [u32; 6],
+  },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -47,7 +53,8 @@ struct PatternObject {
   key: PatternKey,
   registered: RegisteredTilingPattern,
   image: RegisteredImage,
-  pattern_units: f32,
+  pattern_width: f32,
+  pattern_height: f32,
   matrix: [f32; 6],
   content: Vec<u8>,
 }
@@ -112,7 +119,7 @@ impl DirectPatternSet {
     let sampling = self.resolved_sampling(fill);
     let (pattern_units, matrix) =
       resolved_pattern_geometry(fill, sampling, origin_x_pt, origin_y_pt, page_height_pt)?;
-    let key = PatternKey {
+    let key = PatternKey::Hatch {
       fill,
       sampling,
       matrix_bits: matrix.map(f32::to_bits),
@@ -153,7 +160,74 @@ impl DirectPatternSet {
       key,
       registered: registered.clone(),
       image,
-      pattern_units,
+      pattern_width: pattern_units,
+      pattern_height: pattern_units,
+      matrix,
+      content: content.finish().into_vec(),
+    });
+    Ok(registered)
+  }
+
+  pub(super) fn validate_texture(texture: &common::TextureFill) -> Result<()> {
+    let size = texture.tile_size;
+    if !size.width.0.is_finite()
+      || size.width.0 <= 0.0
+      || !size.height.0.is_finite()
+      || size.height.0 <= 0.0
+      || !texture.origin.x.0.is_finite()
+      || !texture.origin.y.0.is_finite()
+    {
+      return Err(PdfError::Writer("invalid image texture geometry".into()));
+    }
+    Ok(())
+  }
+
+  pub(super) fn register_texture(
+    &mut self,
+    texture: &common::TextureFill,
+    prepared: PreparedRasterImage,
+    page_height_pt: f32,
+    images: &mut DirectImageSet,
+    refs: &mut RefAllocator,
+  ) -> Result<RegisteredTilingPattern> {
+    Self::validate_texture(texture)?;
+    let width = prepared.direct().width as f32;
+    let height = prepared.direct().height as f32;
+    let image = images.register(prepared, || refs.alloc())?;
+    // PDF pattern space is y-up. Anchoring a cell's bottom at the page top
+    // is equivalent to anchoring the adjacent cell's top there. This is the
+    // Word texture brush representation, including its intrinsic pixel grid.
+    let matrix = [
+      texture.tile_size.width.0 / width,
+      0.0,
+      0.0,
+      texture.tile_size.height.0 / height,
+      texture.origin.x.0,
+      page_height_pt - texture.origin.y.0,
+    ];
+    let key = PatternKey::Texture {
+      image_id: image.id,
+      matrix_bits: matrix.map(f32::to_bits),
+    };
+    if let Some(pattern) = self.patterns.iter().find(|pattern| pattern.key == key) {
+      return Ok(pattern.registered.clone());
+    }
+    let registered = RegisteredTilingPattern {
+      name: format!("TP{}", self.patterns.len()).into_bytes(),
+      id: refs.alloc()?,
+    };
+    let mut content = Content::with_settings(Settings { pretty: false });
+    content
+      .save_state()
+      .transform([width, 0.0, 0.0, height, 0.0, 0.0])
+      .x_object(Name(&image.name))
+      .restore_state();
+    self.patterns.push(PatternObject {
+      key,
+      registered: registered.clone(),
+      image,
+      pattern_width: width,
+      pattern_height: height,
       matrix,
       content: content.finish().into_vec(),
     });
@@ -206,11 +280,11 @@ impl DirectPatternSet {
         .bbox(Rect::new(
           0.0,
           0.0,
-          pattern.pattern_units,
-          pattern.pattern_units,
+          pattern.pattern_width,
+          pattern.pattern_height,
         ))
-        .x_step(pattern.pattern_units)
-        .y_step(pattern.pattern_units)
+        .x_step(pattern.pattern_width)
+        .y_step(pattern.pattern_height)
         .matrix(pattern.matrix);
       {
         let mut resources = object.resources();

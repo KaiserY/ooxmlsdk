@@ -5187,10 +5187,22 @@ fn glow_image_on_raster(
             true,
           ),
         };
-        finite_gaussian_blur_alpha(
+        // The blur support is integral, but its Gaussian parameter is not.
+        // Word's WPG Print/Screen radius controls (including both sides of
+        // the 5.76pt density boundary) retain sigma = mapped radius / 6.
+        // The rounded bitmap dimensions own the mapping on each axis, just
+        // as they do for alphaOutset. All 20 independent rectangle edge
+        // profiles agree byte-for-byte; deriving sigma from floor(support)
+        // instead sharpens the blur. Explicit public blur graphs retain
+        // their separate radius contract.
+        let radius_x = radius_px * alpha_outset_surface_scale.x;
+        let radius_y = radius_px * alpha_outset_surface_scale.y;
+        finite_gaussian_blur_alpha_with_sigma(
           &spread,
-          word_group_public_blur_device_radius(radius_px * 0.5 * raster_scale.x),
-          word_group_public_blur_device_radius(radius_px * 0.5 * raster_scale.y),
+          word_group_public_blur_device_radius(radius_x * 0.5),
+          radius_x / 6.0,
+          word_group_public_blur_device_radius(radius_y * 0.5),
+          radius_y / 6.0,
         )
       }
       #[cfg(test)]
@@ -5534,6 +5546,7 @@ fn floating_point_gaussian_blur_alpha_xy(
     .expect("finite Gaussian output preserves the input dimensions")
 }
 
+#[cfg(test)]
 fn finite_gaussian_blur_alpha(
   alpha: &image::GrayImage,
   radius_x: usize,
@@ -8627,6 +8640,71 @@ mod tests {
         ..
       }] if (*spread_ratio - 0.5).abs() <= f32::EPSILON
     ));
+  }
+
+  #[test]
+  fn word_group_glow_retains_fractional_axis_radius_in_office_edge_profiles() {
+    // Independent Word rectangle controls: Screen R=18/36pt and Print
+    // R=36pt. These are complete nontrivial samples of one straight edge,
+    // not a fitted radius from the target triangle. Exercise both axes.
+    for (mapped_radius, expected) in [
+      (5.950_992_f32, &[14_u8, 76, 179, 241][..]),
+      (6.741_573, &[3, 21, 82, 173, 234, 252][..]),
+      (
+        14.261_02,
+        &[1, 2, 7, 17, 37, 67, 106, 149, 188, 218, 238, 248, 253, 254][..],
+      ),
+    ] {
+      for vertical in [false, true] {
+        let source = image::RgbaImage::from_fn(96, 96, |x, y| {
+          image::Rgba([
+            255,
+            255,
+            255,
+            if (if vertical { y } else { x }) >= 48 {
+              255
+            } else {
+              0
+            },
+          ])
+        });
+        let actual = super::glow_image(
+          &source,
+          super::GlowImageOptions {
+            radius_px: 12.0,
+            spread_ratio: 0.5,
+            spread_kernel: super::GlowSpreadKernel::AlphaOutset,
+            spread_radius_rounding: super::GlowSpreadRadiusRounding::Inward,
+            blur_kernel: super::GlowBlurKernel::WordGroupGaussian,
+            color: ResolvedEffectColor {
+              color: RgbColor {
+                r: 255,
+                g: 255,
+                b: 255,
+              },
+              alpha: 255,
+            },
+            alpha_outset_surface_scale: super::AlphaOutsetSurfaceScale {
+              x: if vertical { 1.0 } else { mapped_radius / 12.0 },
+              y: if vertical { mapped_radius / 12.0 } else { 1.0 },
+            },
+            color_alpha_mode: super::GlowColorAlphaMode::Straight,
+          },
+        );
+        let edge: Vec<_> = (16..72)
+          .map(|i| {
+            actual
+              .get_pixel(if vertical { 48 } else { i }, if vertical { i } else { 48 })
+              .0[3]
+          })
+          .filter(|&a| a > 0 && a < 255)
+          .collect();
+        assert_eq!(
+          edge, expected,
+          "radius={mapped_radius}, vertical={vertical}"
+        );
+      }
+    }
   }
 
   #[test]

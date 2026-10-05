@@ -226,6 +226,12 @@ pub struct PdfOptions {
   /// formatting conventions.
   pub default_document_language: Option<String>,
 
+  /// Available automatic hyphenation dictionaries, as BCP 47 language tags.
+  /// `None` uses the bundled provider's full language set. Set this when
+  /// matching an application installation with a restricted proofing set;
+  /// authored soft hyphens remain supported.
+  pub automatic_hyphenation_languages: Option<Vec<String>>,
+
   /// Local civil time used to refresh unlocked WordprocessingML DATE, TIME,
   /// PRINTDATE, SAVEDATE, and PresentationML datetime fields, and to evaluate
   /// SpreadsheetML TODAY(). When absent, Word/Presentation cached fields stay
@@ -263,6 +269,7 @@ impl Default for PdfOptions {
       ui_language: None,
       format_locale: None,
       default_document_language: None,
+      automatic_hyphenation_languages: None,
       field_update_datetime: None,
       field_update_time_zone: None,
       include_hidden_slides: false,
@@ -335,6 +342,7 @@ impl PdfOptions {
       ui_language: self.ui_language.clone(),
       format_locale: self.format_locale.clone(),
       default_document_language: self.default_document_language.clone(),
+      automatic_hyphenation_languages: self.automatic_hyphenation_languages.clone(),
       field_update_datetime: self.field_update_datetime,
       field_update_time_zone: self.field_update_time_zone.clone(),
       include_hidden_slides: self.include_hidden_slides,

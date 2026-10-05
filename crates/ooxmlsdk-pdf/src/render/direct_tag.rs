@@ -139,6 +139,9 @@ impl DirectPageTags {
 
 fn prepared_content_class(item: &PaintItem<'_>) -> ContentClass {
   match item {
+    PaintItem::Text(text) if text.item.style.pdf_painted_artifact && text.emits_page_content() => {
+      ContentClass::Artifact
+    }
     PaintItem::Text(text) if !text.item.text.is_empty() && text.emits_page_content() => {
       ContentClass::Text
     }
@@ -166,6 +169,7 @@ fn display_content_class(item: &common::DisplayItem<'_>) -> ContentClass {
     | common::DisplayItem::Line(_)
     | common::DisplayItem::Path(_)
     | common::DisplayItem::Group(_) => ContentClass::Artifact,
+    common::DisplayItem::Text(text) if text.style.pdf_painted_artifact => ContentClass::Artifact,
     common::DisplayItem::Text(text) if !text.text.is_empty() => ContentClass::Text,
     common::DisplayItem::Image(image)
       if image
@@ -621,7 +625,11 @@ fn build_page_part(
     };
     let mut annotations = annotation_children(record, annotation_refs)?;
     match item {
-      PaintItem::Text(text) if !text.item.text.is_empty() && text.emits_page_content() => {
+      PaintItem::Text(text)
+        if !text.item.style.pdf_painted_artifact
+          && !text.item.text.is_empty()
+          && text.emits_page_content() =>
+      {
         let mut child = tagged_leaf(record.mcid, annotations).ok_or_else(|| {
           PdfError::Writer(format!(
             "tagged text paint item {} has no marked-content identifier",

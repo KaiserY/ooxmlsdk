@@ -28,6 +28,11 @@ const OFFICE_LETTER_TO_DEFAULT_A4_SCALE_PERCENT: u32 = 95;
 // top/bottom-margin interpolation keeps the expected +0.975/-0.025 slopes,
 // proving this is a device-span term rather than a VML/object adjustment.
 const OFFICE_DEFAULT_A4_IMAGEABLE_HEIGHT_TRIM_DOTS: f32 = 23.0;
+// Office's landscape chartsheet MapPaperSize controls use a 28-dot logical
+// body-span compensation: with 0.7in left/right margins the chart frame starts
+// at 90.96pt, whereas the worksheet's 23-dot mapping starts it at 91.26pt.
+// Both printer DC physical offsets are zero; this is Excel's mapping term.
+const OFFICE_CHARTSHEET_LANDSCAPE_A4_MAPPING_TRIM_DOTS: f32 = 28.0;
 
 // [MS-RPRN] 2.2.2.1 describes the public DEVMODEW prefix written by Office
 // into the Printer Settings part ([MS-OE376] 2.1.36). Driver-private bytes may
@@ -727,8 +732,11 @@ impl CalcPageSettings {
   }
 
   pub(crate) fn fixed_output_body_origin_pt(&self, paper_scale_percent: u32) -> (f32, f32) {
-    let left = self.margin_left_in as f32 * units::POINTS_PER_INCH;
-    let top = self.margin_top_in as f32 * units::POINTS_PER_INCH;
+    // Convert the authored f64 inches before narrowing. Casting 0.7in first
+    // produces 50.399997pt and incorrectly truncates its 420-dot printer origin
+    // to 419 when the cell painter establishes its device grid.
+    let left = (self.margin_left_in * f64::from(units::POINTS_PER_INCH)) as f32;
+    let top = (self.margin_top_in * f64::from(units::POINTS_PER_INCH)) as f32;
     if paper_scale_percent >= DEFAULT_PRINT_SCALE_PERCENT {
       return (left, top);
     }
@@ -766,7 +774,11 @@ impl CalcPageSettings {
       portrait.margin_top_in = self.margin_left_in;
       portrait.margin_bottom_in = self.margin_right_in;
       (
-        left + portrait.printer_default_paper_body_offset_y_pt(scale),
+        left
+          + portrait.printer_default_paper_body_offset_y_pt_with_trim(
+            scale,
+            OFFICE_CHARTSHEET_LANDSCAPE_A4_MAPPING_TRIM_DOTS,
+          ),
         top,
       )
     } else {
@@ -778,6 +790,13 @@ impl CalcPageSettings {
   }
 
   fn printer_default_paper_body_offset_y_pt(&self, scale: f32) -> f32 {
+    self.printer_default_paper_body_offset_y_pt_with_trim(
+      scale,
+      OFFICE_DEFAULT_A4_IMAGEABLE_HEIGHT_TRIM_DOTS,
+    )
+  }
+
+  fn printer_default_paper_body_offset_y_pt_with_trim(&self, scale: f32, trim_dots: f32) -> f32 {
     if self.printer_default_paper_scale_percent() == DEFAULT_PRINT_SCALE_PERCENT {
       return 0.0;
     }
@@ -787,8 +806,7 @@ impl CalcPageSettings {
     let (_, requested_height) = requested.page_size_pt();
     let vertical_margins =
       (self.margin_top_in + self.margin_bottom_in) as f32 * units::POINTS_PER_INCH;
-    let imageable_trim_pt = OFFICE_DEFAULT_A4_IMAGEABLE_HEIGHT_TRIM_DOTS * units::POINTS_PER_INCH
-      / units::OFFICE_FIXED_OUTPUT_DPI;
+    let imageable_trim_pt = trim_dots * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
     let output_body = (output_height - vertical_margins - imageable_trim_pt).max(0.0);
     let requested_body = (requested_height - vertical_margins).max(0.0) * scale;
     ((output_body - requested_body) / 2.0).max(0.0)
@@ -1102,6 +1120,35 @@ mod tests {
     assert!((mapped.1 - 84.96).abs() < 0.001);
     assert!((unmapped.0 - 18.0).abs() < 0.001);
     assert!((unmapped.1 - 84.96).abs() < 0.001);
+  }
+
+  #[test]
+  fn landscape_chartsheet_uses_its_print_body_mapping() {
+    let printer = WindowsPrinterSettings::from_bytes(&sample_windows_devmode(
+      DM_ORIENTATION | DM_PAPER_SIZE | DM_SCALE,
+    ))
+    .unwrap();
+    let worksheet = x::Worksheet {
+      page_setup: Some(x::PageSetup {
+        id: Some("rId1".to_string()),
+        orientation: Some(x::OrientationValues::Landscape),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let mut settings = CalcPageSettings::from_worksheet(&worksheet, true, Some(&printer));
+    settings.margin_left_in = 0.7;
+    settings.margin_right_in = 0.7;
+    settings.margin_top_in = 0.75;
+    settings.margin_bottom_in = 0.75;
+
+    // Office chart-sheet PDF controls: chart x=90.96pt at these margins.
+    // The worksheet origin retains its independent 23-dot mapping.
+    let chart = settings.fixed_output_chartsheet_origin_pt();
+    let worksheet = settings.fixed_output_body_origin_pt(95);
+    assert!((chart.0 - 90.96).abs() < 0.001);
+    assert!((chart.1 - 54.0).abs() < 0.001);
+    assert!((worksheet.0 - 91.26).abs() < 0.001);
   }
 
   #[test]

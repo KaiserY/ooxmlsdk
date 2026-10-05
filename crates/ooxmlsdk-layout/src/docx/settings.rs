@@ -44,6 +44,7 @@ pub(super) fn hyphenation_settings(
 
   HyphenationSettings {
     automatic,
+    automatic_languages: Default::default(),
     consecutive_line_limit,
     zone_pt,
     do_not_hyphenate_caps,
@@ -202,6 +203,16 @@ pub(super) fn do_not_expand_shift_return(
     .is_some_and(do_not_expand_shift_return_value)
 }
 
+pub(super) fn suppress_top_spacing(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .is_some_and(suppress_top_spacing_value)
+}
+
 pub(super) fn use_far_east_layout(
   package: &WordprocessingDocument,
   main: &MainDocumentPart,
@@ -210,6 +221,62 @@ pub(super) fn use_far_east_layout(
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
     .is_some_and(use_far_east_layout_value)
+}
+
+pub(super) fn auto_space_like_word95(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .is_some_and(|settings| {
+      settings
+        .compatibility
+        .iter()
+        .find_map(|compatibility| compatibility.auto_space_like_word95.as_ref())
+        .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
+    })
+}
+
+pub(super) fn strict_first_and_last_chars(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| settings.strict_first_and_last_chars.as_ref())
+    .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
+}
+
+pub(super) fn no_punctuation_kerning(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| settings.no_punctuation_kerning.as_ref())
+    .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
+}
+
+pub(super) fn use_word97_line_break_rules(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .is_some_and(use_word97_line_break_rules_value)
+}
+
+fn use_word97_line_break_rules_value(settings: &w::Settings) -> bool {
+  settings
+    .compatibility
+    .iter()
+    .find_map(|compatibility| compatibility.use_word97_line_break_rules.as_ref())
+    .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
 }
 
 pub(super) fn balance_single_byte_double_byte_width(
@@ -242,6 +309,14 @@ fn do_not_expand_shift_return_value(settings: &w::Settings) -> bool {
     .compatibility
     .iter()
     .find_map(|compatibility| compatibility.do_not_expand_shift_return.as_ref())
+    .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
+}
+
+fn suppress_top_spacing_value(settings: &w::Settings) -> bool {
+  settings
+    .compatibility
+    .iter()
+    .find_map(|compatibility| compatibility.suppress_top_spacing.as_ref())
     .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
 }
 
@@ -322,6 +397,29 @@ mod tests {
     do_not_use_html_paragraph_auto_spacing_value, no_leading_value, page_bottom_hyphenation,
     parse_compatibility_on_off, resolve_adjust_line_height_in_table, use_far_east_layout_value, w,
   };
+
+  #[test]
+  fn word97_line_break_setting_preserves_absent_and_false() {
+    use ooxmlsdk::sdk::SdkType;
+    for (xml, expected) in [
+      ("", false),
+      ("<w:useWord97LineBreakRules/>", true),
+      ("<w:useWord97LineBreakRules w:val=\"0\"/>", false),
+      ("<w:useWord97LineBreakRules w:val=\"1\"/>", true),
+    ] {
+      let settings = w::Settings::from_bytes(
+        format!(
+          "<w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:compat>{xml}</w:compat></w:settings>"
+        )
+        .as_bytes(),
+      )
+      .expect("settings");
+      assert_eq!(
+        super::use_word97_line_break_rules_value(&settings),
+        expected
+      );
+    }
+  }
 
   #[test]
   fn table_grid_setting_keeps_part_omission_and_authored_false_distinct() {

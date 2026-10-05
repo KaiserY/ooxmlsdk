@@ -27,6 +27,8 @@ use crate::text_metrics::{MathFontMetrics, ShapedText, TextMetrics};
 const OFFICE_MATH_SVG_CONTENT_TYPE: &str = "application/vnd.ooxmlsdk.office-math+xml";
 const MIN_MATH_SIZE_PT: f32 = 1.0;
 const MIN_RULE_WIDTH_PT: f32 = 0.2;
+/// Paint-only inset around the generated formula SVG, excluded from line metrics.
+pub(super) const MATH_CANVAS_PADDING_PT: f32 = 0.2;
 const MAX_MATH_ASSEMBLY_EXTENDER_REPEATS: usize = 1024;
 const MATH_THIN_SPACE_EM: f32 = 1.0 / 6.0;
 const MATH_MEDIUM_SPACE_EM: f32 = 2.0 / 9.0;
@@ -356,16 +358,15 @@ pub(super) fn wordprocessing_math_zone_image<'a>(
     &mut math_box,
     &node,
     &line_style,
-    base_style.font_size_pt * 0.08,
-    base_style.font_size_pt * 0.08,
+    0.0,
+    0.0,
     &mut text_metrics,
   );
   if math_box.width_pt <= f32::EPSILON || math_box.ascent_pt + math_box.descent_pt <= f32::EPSILON {
     return None;
   }
   let line_layout =
-    office_math_line_layout(&root_parts, context, base_style, styles, &mut text_metrics)
-      .map(Arc::new);
+    office_math_line_layout(&root_parts, context, styles, &mut text_metrics).map(Arc::new);
   let mut image = inline_image_from_math_box(math_box, node.semantic_text());
   image.office_math_line_layout = line_layout;
   image.office_math_display_layout = display_layout;
@@ -437,20 +438,24 @@ fn finish_math_box(
   // final SVG canvas so large or otherwise ink-empty highlighted runs remain
   // visible without changing any internal math geometry.
   math_box.expand_to_background_bounds();
-  // OfficeMath's zone-surround spacing belongs only at the realized zone's
-  // two outer edges. Break fragments therefore receive one-sided padding.
+  // A math zone contributes exactly its realized mathematical advance.
+  // Callers may add authored fragment padding, but an m:oMath boundary does
+  // not create implicit horizontal glue beside adjacent Word text.
   math_box.pad_left(left_surround_pt);
   math_box.pad_right(right_surround_pt);
 }
 
 fn inline_image_from_math_box(math_box: MathBox, semantic_text: String) -> InlineImage {
   let svg = math_box.to_svg();
-  let padding = MIN_RULE_WIDTH_PT;
+  let padding = MATH_CANVAS_PADDING_PT;
   InlineImage {
     data: Bytes::from(svg.into_bytes()),
     content_type: Some(OFFICE_MATH_SVG_CONTENT_TYPE.to_string()),
+    blip_compression_state: crate::common::BlipCompressionState::Unspecified,
     picture_frame: None,
+    run_border: None,
     picture_frame_clips_image: false,
+    picture_paint_size_pt: None,
     effects: None,
     static3d: None,
     width_pt: math_box.width_pt + padding * 2.0,
@@ -478,6 +483,7 @@ fn inline_image_from_math_box(math_box: MathBox, semantic_text: String) -> Inlin
     semantic_metafile_font_family: None,
     native_ole_equation: None,
     metafile_native_size: false,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
     placement: ImagePlacement::Inline,
   }
 }
@@ -509,7 +515,6 @@ fn flatten_root_math_atoms(node: MathNode, output: &mut Vec<MathNode>) {
 fn office_math_line_layout(
   root_parts: &[RootMathPart],
   context: MathLayoutContext,
-  base_style: &TextStyle,
   styles: &StylesCatalog,
   text_metrics: &mut TextMetrics,
 ) -> Option<OfficeMathLineLayout> {
@@ -563,9 +568,7 @@ fn office_math_line_layout(
     });
   }
 
-  let surround_pt = base_style.font_size_pt * 0.08;
-  let operator_offsets_pt =
-    math_operator_offsets(&nodes, &classes, context, surround_pt, text_metrics);
+  let operator_offsets_pt = math_operator_offsets(&nodes, &classes, context, 0.0, text_metrics);
   let break_binary = styles.math_break_binary.unwrap_or_default();
   for (index, classes) in classes.iter().copied().enumerate() {
     if !math_classes_are_line_break_operator(classes) {
@@ -623,8 +626,8 @@ fn office_math_line_layout(
       &nodes[start..end],
       &classes[start..end],
       context,
-      if start == 0 { surround_pt } else { 0.0 },
-      if end == nodes.len() { surround_pt } else { 0.0 },
+      0.0,
+      0.0,
       text_metrics,
     )?;
     let boundary = boundaries[start];
@@ -661,11 +664,7 @@ fn office_math_line_layout(
           &variant_nodes,
           &classes[previous_start..start],
           context,
-          if previous_start == 0 {
-            surround_pt
-          } else {
-            0.0
-          },
+          0.0,
           0.0,
           text_metrics,
         );
@@ -681,7 +680,7 @@ fn office_math_line_layout(
         &nodes[start..end],
         &classes[start..end],
         context,
-        if start == 0 { surround_pt } else { 0.0 },
+        0.0,
         text_metrics,
       )
       .into_iter()
@@ -748,7 +747,7 @@ fn math_operator_offsets(
   metrics: &mut TextMetrics,
 ) -> Vec<f32> {
   let mut offsets = Vec::new();
-  let mut x = MIN_RULE_WIDTH_PT + left_surround_pt.max(0.0);
+  let mut x = MATH_CANVAS_PADDING_PT + left_surround_pt.max(0.0);
   let mut previous_spacing_node: Option<usize> = None;
   for (index, node) in nodes.iter().enumerate() {
     if let Some(right_classes) = classes[index] {
@@ -2579,7 +2578,7 @@ impl MathBox {
   }
 
   fn to_svg(&self) -> String {
-    let padding = MIN_RULE_WIDTH_PT;
+    let padding = MATH_CANVAS_PADDING_PT;
     let width = (self.width_pt + padding * 2.0).max(1.0);
     let height = (self.ascent_pt + self.descent_pt + padding * 2.0).max(1.0);
     let baseline = self.ascent_pt + padding;
@@ -2636,6 +2635,7 @@ impl MathBox {
           baseline_y_pt,
           horizontal_scale,
           opacity,
+          exact_glyph_id,
         } => {
           let family = xml_escape_attribute(
             style.font_family.as_deref().unwrap_or("Cambria Math"),
@@ -2645,8 +2645,12 @@ impl MathBox {
           let weight = if style.bold { "bold" } else { "normal" };
           let font_style = if style.italic { "italic" } else { "normal" };
           let opacity = opacity * style.opacity;
+          let marker = exact_glyph_id.map_or_else(
+            || format!("ooxmlsdk-math-visible-{item_index}"),
+            |glyph_id| format!("ooxmlsdk-math-visible-{item_index}-gid-{glyph_id}"),
+          );
           svg.push_str(&format!(
-            "<text id=\"ooxmlsdk-math-visible-{item_index}\" visibility=\"hidden\" x=\"0\" y=\"0\" transform=\"translate({:.4} {:.4}) scale({:.6} 1)\" font-family=\"{}\" font-size=\"{:.4}\" font-weight=\"{}\" font-style=\"{}\" fill=\"#{:02x}{:02x}{:02x}\" fill-opacity=\"{:.4}\" xml:space=\"preserve\">{}</text>",
+            "<text id=\"{marker}\" visibility=\"hidden\" x=\"0\" y=\"0\" transform=\"translate({:.4} {:.4}) scale({:.6} 1)\" font-family=\"{}\" font-size=\"{:.4}\" font-weight=\"{}\" font-style=\"{}\" fill=\"#{:02x}{:02x}{:02x}\" fill-opacity=\"{:.4}\" xml:space=\"preserve\">{}</text>",
             x_pt + padding,
             baseline + baseline_y_pt,
             horizontal_scale,
@@ -2819,6 +2823,9 @@ enum MathPaintItem {
     baseline_y_pt: f32,
     horizontal_scale: f32,
     opacity: f32,
+    /// Preserve a selected OpenType MATH glyph instead of reshaping the
+    /// source scalar without its math feature during SVG-to-PDF lowering.
+    exact_glyph_id: Option<u32>,
   },
   GlyphPath {
     path_data: Arc<str>,
@@ -3451,6 +3458,7 @@ fn layout_text(
       baseline_y_pt: 0.0,
       horizontal_scale: 1.0,
       opacity: 1.0,
+      exact_glyph_id: None,
     }],
   }
 }
@@ -3538,13 +3546,38 @@ fn layout_shaped_math_text(text: &str, style: &TextStyle, shaped: ShapedText) ->
     let scale_pt_per_unit = font_size_pt / units_per_em;
     let horizontal_scale = style.horizontal_scale.unwrap_or(1.0).max(f32::EPSILON);
     let cluster_origin_x_pt = cursor_x_pt;
+    let cluster_text = text.get(text_range.clone())?;
+    let single_source_glyph = cluster_text.chars().count() == 1
+      && shaped.glyphs[index + 1..].first().is_none_or(|next| {
+        next.font_index != font_index
+          || next.font_size_pt.to_bits() != font_size_pt.to_bits()
+          || next.text_range != text_range
+      })
+      && !face_data.synthetic_bold
+      && !face_data.synthetic_italic;
+    let mut painted_text_glyph = false;
 
     while let Some(glyph) = shaped.glyphs.get(index)
       && glyph.font_index == font_index
       && glyph.font_size_pt.to_bits() == font_size_pt.to_bits()
       && glyph.text_range == text_range
     {
-      if let Some(geometry) = math_glyph_geometry(&face, GlyphId::new(glyph.glyph_id)) {
+      let geometry = math_glyph_geometry(&face, GlyphId::new(glyph.glyph_id));
+      if single_source_glyph && glyph.bounds_em.is_some() && geometry.is_some() {
+        // A single source scalar with one selected MATH glyph can remain real
+        // PDF text. Keep the exact GID selected by `ssty` or a variant while
+        // preserving the glyph's own shaped origin and Unicode mapping.
+        items.push(MathPaintItem::Text {
+          text: cluster_text.to_string(),
+          style: face_style.clone(),
+          x_pt: cursor_x_pt + glyph.x_offset_em * glyph.font_size_pt,
+          baseline_y_pt: -glyph.y_offset_em * glyph.font_size_pt,
+          horizontal_scale,
+          opacity: 1.0,
+          exact_glyph_id: Some(glyph.glyph_id),
+        });
+        painted_text_glyph = true;
+      } else if let Some(geometry) = geometry {
         items.push(MathPaintItem::GlyphPath {
           path_data: geometry.path_data,
           style: face_style.clone(),
@@ -3580,21 +3613,22 @@ fn layout_shaped_math_text(text: &str, style: &TextStyle, shaped: ShapedText) ->
       if semantic_ranges.contains(&text_range) {
         return None;
       }
-      let cluster_text = text.get(text_range.clone())?;
       if !cluster_text.is_empty() {
-        let cluster_advance_pt = cursor_x_pt - cluster_origin_x_pt;
-        items.push(math_variant_semantic_text(
-          &face,
-          None,
-          cluster_text,
-          &face_style,
-          MathSemanticPlacement {
-            origin_x_units: cluster_origin_x_pt / scale_pt_per_unit,
-            advance_units: cluster_advance_pt / scale_pt_per_unit,
-            baseline_y_pt: 0.0,
-            scale_pt_per_unit,
-          },
-        ));
+        if !painted_text_glyph {
+          let cluster_advance_pt = cursor_x_pt - cluster_origin_x_pt;
+          items.push(math_variant_semantic_text(
+            &face,
+            None,
+            cluster_text,
+            &face_style,
+            MathSemanticPlacement {
+              origin_x_units: cluster_origin_x_pt / scale_pt_per_unit,
+              advance_units: cluster_advance_pt / scale_pt_per_unit,
+              baseline_y_pt: 0.0,
+              scale_pt_per_unit,
+            },
+          ));
+        }
         semantic_ranges.push(text_range);
       }
     }
@@ -3649,6 +3683,7 @@ fn math_script_style(
   // rules summarized by UnicodeMath/TeX. Do not leak the enclosing document's
   // Word text-justification trim into m:t glyph advances.
   style.cjk_punctuation_compression_ratio = 0.0;
+  style.wordprocessingml_punctuation_spacing = false;
   let script_level = context.style.script_level();
   if script_level > 0 {
     let math = metrics.math_font_metrics(source);
@@ -6067,10 +6102,11 @@ fn layout_matrix(
   let Some(style) = rows.iter().flatten().find_map(representative_style) else {
     return MathBox::empty();
   };
-  // SmMatrixNode derives the default column distance from three font heights
-  // times LibreOffice's DIS_MATRIXCOL=30%, i.e. 0.9 em.
-  let column_gap = style.font_size_pt * 0.9;
-  let row_gap = style.font_size_pt * 0.2;
+  // ECMA-376 Part 1 §22.1.2.18 defines the omitted cGp/cGpRule pair as a
+  // one-em column gap. Word likewise treats omitted rSp/rSpRule as single
+  // line spacing, measured from one matrix-row baseline to the next.
+  let column_gap = style.font_size_pt;
+  let single_line_spacing = metrics.vertical_metrics(style).line_height_pt();
   let row_metrics = boxes
     .iter()
     .map(|row| {
@@ -6088,11 +6124,15 @@ fn layout_matrix(
     .collect::<Vec<_>>();
   let total_width =
     column_widths.iter().sum::<f32>() + column_gap * column_count.saturating_sub(1) as f32;
+  let row_gaps = row_metrics
+    .windows(2)
+    .map(|rows| matrix_inter_row_gap(single_line_spacing, rows[0].1, rows[1].0))
+    .collect::<Vec<_>>();
   let total_height = row_metrics
     .iter()
     .map(|(ascent, descent)| ascent + descent)
     .sum::<f32>()
-    + row_gap * rows.len().saturating_sub(1) as f32;
+    + row_gaps.iter().sum::<f32>();
   let axis = metrics.math_font_metrics(style).axis_height_pt;
   let mut top = -axis - total_height / 2.0;
   let mut result = MathBox::empty();
@@ -6109,10 +6149,18 @@ fn layout_matrix(
       );
       x += column_widths[column_index] + column_gap;
     }
-    top += row_ascent + row_descent + row_gap;
+    top += row_ascent + row_descent + row_gaps.get(row_index).copied().unwrap_or(0.0);
   }
   result.width_pt = total_width;
   result
+}
+
+fn matrix_inter_row_gap(
+  baseline_spacing_pt: f32,
+  upper_descent_pt: f32,
+  lower_ascent_pt: f32,
+) -> f32 {
+  (baseline_spacing_pt - upper_descent_pt - lower_ascent_pt).max(0.0)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -6659,17 +6707,17 @@ mod tests {
 
   use super::{
     MATH_MEDIUM_SPACE_EM, MATH_THICK_SPACE_EM, MATH_THIN_SPACE_EM, MATH_VERY_THICK_SPACE_EM,
-    MathAssemblyPart, MathAtomClasses, MathBackgroundCoverage, MathBox, MathGlyphAssembly,
-    MathGlyphConstruction, MathGlyphKerns, MathGlyphVariant, MathLayoutContext, MathLayoutStyle,
-    MathNode, MathPaintItem, MathParser, MathSemanticTextPlacement, MathSpacing, MathSpacingClass,
-    MathSpacingOwner, MathStretchAxis, MathVariantSizePolicy, NaryLayoutPolicy, NaryLimitLayout,
-    apply_office_math_font_family, automatic_math_spacing, function_application_spacing,
-    group_character_aligns_character, layout_node, layout_user_space, limit_baseline_distance_pt,
-    math_argument_size_delta, math_background_coverage, math_character_class,
-    math_glyph_construction, math_glyph_kerns, math_is_extended_shape, math_italics_correction,
-    math_node_classes, math_node_is_vertical_fraction_object, math_script_style,
-    math_top_accent_attachment, nary_argument_spacing, nary_layout_policy,
-    normalize_automatic_math_text, office_math_object_surround_spacing,
+    MIN_RULE_WIDTH_PT, MathAssemblyPart, MathAtomClasses, MathBackgroundCoverage, MathBox,
+    MathGlyphAssembly, MathGlyphConstruction, MathGlyphKerns, MathGlyphVariant, MathLayoutContext,
+    MathLayoutStyle, MathNode, MathPaintItem, MathParser, MathSemanticTextPlacement, MathSpacing,
+    MathSpacingClass, MathSpacingOwner, MathStretchAxis, MathVariantSizePolicy, NaryLayoutPolicy,
+    NaryLimitLayout, apply_office_math_font_family, automatic_math_spacing,
+    function_application_spacing, group_character_aligns_character, layout_node, layout_user_space,
+    limit_baseline_distance_pt, math_argument_size_delta, math_background_coverage,
+    math_character_class, math_glyph_construction, math_glyph_kerns, math_is_extended_shape,
+    math_italics_correction, math_node_classes, math_node_is_vertical_fraction_object,
+    math_script_style, math_top_accent_attachment, matrix_inter_row_gap, nary_argument_spacing,
+    nary_layout_policy, normalize_automatic_math_text, office_math_object_surround_spacing,
     open_type_math_line_extents, plan_math_glyph_assembly, prepared_math_variant_for_target,
     representative_style, resolve_vary_math_classes, split_math_text, text_math_classes,
     wordprocessing_math_script_size, wordprocessing_math_zone_image,
@@ -7227,6 +7275,7 @@ mod tests {
       baseline_y_pt: 0.0,
       horizontal_scale: 1.0,
       opacity: 1.0,
+      exact_glyph_id: None,
     });
     math_box.items.push(MathPaintItem::SemanticText {
       text: ")".into(),
@@ -7985,6 +8034,7 @@ mod tests {
 
     let source = TextStyle {
       cjk_punctuation_compression_ratio: 1.0,
+      wordprocessingml_punctuation_spacing: true,
       ..TextStyle::default()
     };
     let mut metrics = TextMetrics::new();
@@ -7995,6 +8045,7 @@ mod tests {
     );
     assert_eq!(source.cjk_punctuation_compression_ratio, 1.0);
     assert_eq!(math.cjk_punctuation_compression_ratio, 0.0);
+    assert!(!math.wordprocessingml_punctuation_spacing);
   }
 
   #[test]
@@ -8127,6 +8178,40 @@ mod tests {
       !svg.contains("\u{2026}"),
       "SVG retained baseline ellipsis: {svg}"
     );
+  }
+
+  #[test]
+  fn inline_office_math_zone_has_no_implicit_horizontal_surround() {
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:sSub><m:e><m:r><m:t>β</m:t></m:r></m:e><m:sub><m:r><m:t>t</m:t></m:r></m:sub></m:sSub></m:oMath></w:p>"#;
+    let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+    let choice = paragraph.paragraph_choice.first().expect("inline math");
+    let base_style = TextStyle {
+      font_size_pt: 12.0,
+      ..TextStyle::default()
+    };
+    let styles = StylesCatalog::default();
+    let parser = MathParser {
+      base_style: &base_style,
+      styles: &styles,
+      math_font_family: Arc::from("Cambria Math"),
+    };
+    let node = parser
+      .wordprocessing_choice(choice)
+      .expect("parsed inline math");
+    let mut metrics = TextMetrics::new();
+    let content_width = layout_node(
+      &node,
+      MathLayoutContext::root(false, false, false),
+      &mut metrics,
+    )
+    .width_pt;
+    let image =
+      wordprocessing_math_zone_image(std::iter::once(choice), &base_style, &styles, false)
+        .expect("subscript math must produce an image");
+
+    // The remaining two MIN_RULE_WIDTH_PT insets only protect the SVG canvas
+    // from clipping strokes and outlines; they are not OfficeMath glue.
+    assert!((image.width_pt - content_width - MIN_RULE_WIDTH_PT * 2.0).abs() < 0.001);
   }
 
   #[test]
@@ -8763,5 +8848,16 @@ mod tests {
       m::BreakBinarySubtractionValues::MinusMinus,
     );
     assert!(!ignored.has_manual_break);
+  }
+
+  #[test]
+  fn matrix_single_line_spacing_is_a_baseline_distance() {
+    let upper_descent = 3.594_726_6_f32;
+    let lower_ascent = 5.601_562_5_f32;
+    let line_spacing = 14.068_359_f32;
+    let gap = matrix_inter_row_gap(line_spacing, upper_descent, lower_ascent);
+
+    assert!((upper_descent + gap + lower_ascent - line_spacing).abs() < 0.000_1);
+    assert_eq!(matrix_inter_row_gap(12.0, 7.0, 6.0), 0.0);
   }
 }

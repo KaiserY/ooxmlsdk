@@ -11,6 +11,7 @@ mod material_texture;
 mod physical_curve;
 mod raster_boundary;
 mod raster_extrusion;
+mod winding;
 pub(crate) use backdrop::BackdropTexturePlan;
 pub(crate) use material_texture::{
   TextMaterialTexture, TextMaterialTexturePlan, TextSurfaceRealizationPlan,
@@ -19,6 +20,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 pub(crate) use raster_boundary::RasterSourceBoundary;
 use smallvec::SmallVec;
 use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Transform};
+use winding::BoundaryWinding;
 
 use super::{
   DisplayItem, PathCommand, Point, Rect,
@@ -642,6 +644,25 @@ impl Static3dTextGeometry {
 }
 
 impl Static3dTextGeometryPaths {
+  /// Map the continuous page window into the physical mesh's coordinates.
+  /// In particular, retain its pixel-center conversion independently of the
+  /// integer crop and of the page geometry used to paint the backdrop.
+  pub(crate) fn physical_final_grid(
+    &self,
+    window: Rect,
+    dimensions: (u32, u32),
+  ) -> Option<Static3dTextFinalGrid> {
+    let geometry = &self.physical;
+    Static3dTextFinalGrid::new(
+      dimensions.0,
+      dimensions.1,
+      window.origin.x.0 * geometry.page_plane_scale_x + geometry.page_plane_translate_x,
+      window.origin.y.0 * geometry.page_plane_scale_y + geometry.page_plane_translate_y,
+      window.size.width.0 * geometry.page_plane_scale_x,
+      window.size.height.0 * geometry.page_plane_scale_y,
+    )
+  }
+
   /// Rebuild only the physical mesh at the target's projected density. Keep
   /// unflattened coverage and independently painted page geometry unchanged.
   pub(crate) fn with_physical_realization(
@@ -2719,15 +2740,49 @@ fn apply_static_3d_impl(
           Static3dShapeRasterization::Multisample8 => TextSurfaceRasterization::MultisampleSource,
         },
       );
-      if !projection.parallel
-        && back_cap_culled
-        && let Some(final_grid) = final_grid.as_mut()
-      {
+      if back_cap_culled && let Some(final_grid) = final_grid.as_mut() {
+        // Source-plane AreaA8 contour coverage belongs to the working bitmap.
+        // A separately requested physical target needs the contour's solid
+        // tubes in the same depth/sample buffer as its cap and bevel. Native
+        // orthographic meshes submit these front/back rings too; omitting
+        // them leaves the fine stems and serifs uncovered on the final grid.
+        let final_contour_triangles = contour
+          .filter(|_| source_plane_contour && has_physical_contour_host)
+          .map(|color| {
+            let mut triangles = text_surface_triangles.clone();
+            for base_z in [
+              Some(extrusion_front_z_px),
+              (depth_pt > f32::EPSILON).then_some(extrusion_back_z_px),
+            ]
+            .into_iter()
+            .flatten()
+            {
+              triangles.extend(text_projected_contour_triangles(
+                geometry,
+                TextProjectedContourOptions {
+                  width_px: contour_width_px,
+                  base_z,
+                  color,
+                  projection,
+                  model_surface,
+                  pixels_per_point,
+                },
+              ));
+            }
+            triangles
+          });
+        let final_input = TextSolidSurfaceInput {
+          triangles: final_contour_triangles
+            .as_deref()
+            .unwrap_or(surface_input.triangles),
+          contour: None,
+          ..surface_input
+        };
         let mut resolved = RgbaImage::new(final_grid.target.width_px, final_grid.target.height_px);
         composite_text_solid_surfaces(
           &mut resolved,
           &front_face,
-          surface_input,
+          final_input,
           TextSurfaceRasterization::Final(final_grid.target),
         );
         *final_grid.image = Some(resolved);
@@ -4640,7 +4695,6 @@ fn composite_projected_image(
   let Some(inverse) = inverse_3x3(matrix) else {
     return;
   };
-
   // The logical model owns the projection center/aspect, not a paint clip.
   // Centered strokes and miter tips can extend beyond it. Project the complete
   // source-pixel footprint, including the final pixel's far edge; otherwise
@@ -4686,24 +4740,27 @@ fn composite_projected_image(
 
   for target_y in min_y..=max_y {
     for target_x in min_x..=max_x {
-      let (source_local_x, source_local_y) = map_homogeneous(
-        inverse,
-        target_x as f32 + 0.5 - center_x,
-        target_y as f32 + 0.5 - center_y,
-      );
-      // The projection is expressed in geometric raster coordinates, where
-      // integer values are pixel edges. `image` sampling uses integer pixel
-      // indices, whose geometric centers are at index + 0.5.
-      let source_x = center_x + source_local_x - 0.5;
-      let source_y = center_y + source_local_y - 0.5;
-      if source_x < left as f32 - 0.5
-        || source_y < top as f32 - 0.5
-        || source_x > right as f32 + 0.5
-        || source_y > bottom as f32 + 0.5
-      {
-        continue;
-      }
-      let Some(mut pixel) = sample_bilinear(source, source_x, source_y) else {
+      let sample_at = |offset_x: f32, offset_y: f32| {
+        let (source_local_x, source_local_y) = map_homogeneous(
+          inverse,
+          target_x as f32 + offset_x - center_x,
+          target_y as f32 + offset_y - center_y,
+        );
+        // The projection is expressed in geometric raster coordinates, where
+        // integer values are pixel edges. `image` sampling uses integer pixel
+        // indices, whose geometric centers are at index + 0.5.
+        let source_x = center_x + source_local_x - 0.5;
+        let source_y = center_y + source_local_y - 0.5;
+        if source_x < left as f32 - 0.5
+          || source_y < top as f32 - 0.5
+          || source_x > right as f32 + 0.5
+          || source_y > bottom as f32 + 0.5
+        {
+          return None;
+        }
+        sample_bilinear(source, source_x, source_y)
+      };
+      let Some(mut pixel) = sample_at(0.5, 0.5) else {
         continue;
       };
       if let Some((color, shade)) = tint {
@@ -6808,7 +6865,7 @@ fn shade_fixed_gouraud_channel_with_specular(channel: u8, shade: f32, specular: 
   quantize_gouraud_channel(f32::from(channel) / 255.0 * shade + specular)
 }
 
-fn quantize_gouraud_channel(normalized: f32) -> u8 {
+pub(crate) fn quantize_gouraud_channel(normalized: f32) -> u8 {
   const FIXED_SCALE: u16 = 128;
   let fixed = (normalized.clamp(0.0, 1.0) * f32::from(FIXED_SCALE)).floor() as u16;
   ((fixed * 255 + FIXED_SCALE / 2) / FIXED_SCALE) as u8
@@ -7999,7 +8056,7 @@ impl TextPlanarInsetReflexJoin {
 
 struct TextPlanarInset {
   reflex_joins: Vec<TextPlanarInsetReflexJoin>,
-  terminal_edges: Option<Vec<[(f32, f32); 2]>>,
+  terminal_boundary: Option<BoundaryWinding>,
 }
 
 impl TextPlanarInset {
@@ -8009,17 +8066,18 @@ impl TextPlanarInset {
     direct_inset_cells: Option<&[DirectInsetCell]>,
     use_mesh_boundary: bool,
   ) -> Self {
-    let terminal_edges = direct_inset_cells
+    let terminal_boundary = direct_inset_cells
       .map(|cells| direct_inset_boundary_edges(cells, inset_px))
       .or_else(|| {
         (use_mesh_boundary && inset_px <= f32::EPSILON)
           .then(|| text_geometry_boundary_edges(geometry))
-      });
+      })
+      .map(BoundaryWinding::new);
     let mut reflex_joins = Vec::new();
     if inset_px <= f32::EPSILON {
       return Self {
         reflex_joins,
-        terminal_edges,
+        terminal_boundary,
       };
     }
     let inward_normal = |edge: (f32, f32)| {
@@ -8089,13 +8147,13 @@ impl TextPlanarInset {
     }
     Self {
       reflex_joins,
-      terminal_edges,
+      terminal_boundary,
     }
   }
 
   fn contains(&self, geometry: &Static3dTextGeometry, point: (f32, f32), inset_px: f32) -> bool {
-    if let Some(edges) = self.terminal_edges.as_deref() {
-      return text_direct_inset_boundary_contains(edges, point);
+    if let Some(edges) = &self.terminal_boundary {
+      return edges.contains(point);
     }
     text_geometry_inset_contains(geometry, point, inset_px)
       && !self.reflex_joins.iter().any(|join| join.contains(point))
@@ -8142,20 +8200,6 @@ fn direct_inset_boundary_edges(cells: &[DirectInsetCell], inset_px: f32) -> Vec<
       ((edge[0].0 - edge[1].0).hypot(edge[0].1 - edge[1].1) > INSET_EPSILON).then_some(edge)
     })
     .collect()
-}
-
-fn text_direct_inset_boundary_contains(edges: &[[(f32, f32); 2]], point: (f32, f32)) -> bool {
-  let mut winding = 0_i32;
-  for [first, second] in edges {
-    if first.1 <= point.1 {
-      if second.1 > point.1 && text_surface_edge(*first, *second, point) > 0.0 {
-        winding += 1;
-      }
-    } else if second.1 <= point.1 && text_surface_edge(*first, *second, point) < 0.0 {
-      winding -= 1;
-    }
-  }
-  winding != 0
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -9051,60 +9095,12 @@ fn composite_text_solid_surfaces(
               + second.color[channel] * color_weights[1]
               + third.color[channel] * color_weights[2]
           });
-          // The inset graph owns the primitive's coverage, while the unsplit
-          // source cell owns its lighting attributes. Evaluate that same cell
-          // at the graph primitive's centroid ONCE, rather than relighting
-          // newly inserted graph vertices or shading each coverage sample.
-          let reconstructed = if direct_inset_graph_triangle {
-            (|| {
-              let cells = direct_inset_material_cells.as_ref()?;
-              let bevel = direct_inset_bevel?;
-              let strips = direct_inset_profile_strips.as_deref()?;
-              let source = triangle.bevel_source?;
-              let collisions = [
-                first.bevel_collision?,
-                second.bevel_collision?,
-                third.bevel_collision?,
-              ];
-              let source_point = (
-                (0..3)
-                  .map(|i| collisions[i].source_point.0 * color_weights[i])
-                  .sum(),
-                (0..3)
-                  .map(|i| collisions[i].source_point.1 * color_weights[i])
-                  .sum(),
-              );
-              let boundary = TextGeometryBoundaryOwner {
-                contour_index: source.contour_index as usize,
-                edge_index: source.edge_index as usize,
-                distance: (0..3)
-                  .map(|i| collisions[i].inset_px * color_weights[i])
-                  .sum(),
-              };
-              let surface = text_direct_inset_surface_sample(
-                bevel,
-                strips,
-                source_point,
-                (center_x, center_y),
-                boundary.distance,
-                Some(usize::from(source.profile_strip_index)),
-              )?;
-              cells.color_at(
-                triangles,
-                material_images,
-                material_alpha_mask.as_ref(),
-                material,
-                TextDirectInsetMaterialPoint {
-                  boundary,
-                  surface,
-                  point: rasterization.raster_to_surface(centroid_point, destination_dimensions),
-                },
-              )
-            })()
-          } else {
-            None
-          };
-          let resolved = reconstructed.or_else(|| {
+          // Native direct-inset meshes carry diffuse/specular attributes on
+          // the final graph vertices. Interpolate those attributes at the
+          // primitive centroid, just like its texture coordinates. Looking up
+          // the unsplit source cell here replaces collision-ridge highlights
+          // with another surface's lighting.
+          let resolved =
             textured_material.and_then(|(first_material, second_material, third_material)| {
               let source_weights = color_weights;
               let vertex = TextSurfaceMaterialVertex {
@@ -9141,8 +9137,7 @@ fn composite_text_solid_surfaces(
                 vertex,
                 interpolated_color[3],
               )
-            })
-          });
+            });
           Some(resolved.unwrap_or(interpolated_color))
         } else {
           None
@@ -9411,11 +9406,10 @@ fn composite_text_solid_surfaces(
     // Microsoft's direct-inset bevel algorithm constructs the complete inset
     // graph before triangulation, including merges, splits, and interacting
     // outer/inner glyph contours. When available, that graph alone admits a
-    // surface sample and supplies its camera-visible source owner. The unsplit raw
-    // cells remain only attribute witnesses: their texture, diffuse, and
-    // specular values are interpolated without being recomputed at every
-    // graph event. If graph construction is unsupported, retain the bounded
-    // complete-outline reconstruction as the portable fallback.
+    // surface sample and supplies its camera-visible source owner. Final-grid
+    // samples retain the final triangle's interpolated vertex material. The
+    // source-grid path and unsupported graph construction retain the bounded
+    // source-cell reconstruction below.
     let center = (center_x, center_y);
     for sample_index in 0..samples.len() {
       let donor = &direct_samples[sample_index];
@@ -9472,7 +9466,7 @@ fn composite_text_solid_surfaces(
       if !text_geometry_contains(source_geometry, source_point) {
         continue;
       }
-      // Final-grid graph samples already carry the source-cell shader result
+      // Final-grid graph samples already carry the graph-vertex shader result
       // evaluated at their winning primitive's centroid. Keep that result
       // paired with the graph depth; re-evaluating at this coverage sample
       // would silently turn MSAA into supersampled material shading.
@@ -12649,6 +12643,78 @@ mod tests {
   }
 
   #[test]
+  fn orthographic_final_grid_keeps_solid_contour_coverage() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    // The physical square is [8,24]^2 after the Direct3D9 half-pixel
+    // conversion. On the half-size final target its face is [4,12]^2;
+    // a two-source-pixel contour extends each side by half a final pixel.
+    let geometry = Static3dTextGeometryPaths::from_page_path_for_direct3d9(
+      &[
+        PathCommand::MoveTo(point(8.5, 8.5)),
+        PathCommand::LineTo(point(24.5, 8.5)),
+        PathCommand::LineTo(point(24.5, 24.5)),
+        PathCommand::LineTo(point(8.5, 24.5)),
+        PathCommand::Close,
+      ],
+      Rect {
+        origin: point(0.0, 0.0),
+        size: Size {
+          width: Pt(32.0),
+          height: Pt(32.0),
+        },
+      },
+      1.0,
+    )
+    .expect("square outline")
+    .with_uniform_paint_opacity(Some(1.0));
+    let scene = scene(a::PresetCameraValues::OrthographicFront);
+    for (contour_width_emu, expected_edge_alpha) in [(0, 0), (25_400, 128)] {
+      let mut source = RgbaImage::from_pixel(32, 32, Rgba([180, 120, 60, 255]));
+      let final_image = super::apply_static_3d_text_with_outline_material_and_final_grid(
+        &mut source,
+        super::Static3dTextSurface {
+          geometry: &geometry,
+          front_fill_material: None,
+          front_outline_material: None,
+          front_outline_coverage: None,
+        },
+        &scene,
+        camera_projection(&scene, 0.0),
+        &a::Shape3DType {
+          extrusion_height: Some(ooxmlsdk::units::CoordinateValue::Emu(12_700)),
+          contour_width: Some(ooxmlsdk::units::CoordinateValue::Emu(contour_width_emu)),
+          ..Default::default()
+        },
+        Static3dRenderOptions {
+          extrusion_color: None,
+          contour_color: Some(Static3dColor {
+            color: RgbColor {
+              r: 30,
+              g: 140,
+              b: 60,
+            },
+            alpha: 255,
+          }),
+          pixels_per_point: 1.0,
+          model_surface: Some(Static3dSurface {
+            left_px: 0.0,
+            top_px: 0.0,
+            width_px: 32.0,
+            height_px: 32.0,
+          }),
+        },
+        super::Static3dTextFinalGrid::new(16, 16, 0.0, 0.0, 32.0, 32.0)
+          .expect("half-size final target"),
+      )
+      .expect("requested orthographic physical target");
+      assert_eq!(final_image.dimensions(), (16, 16));
+      assert_eq!(final_image.get_pixel(3, 7)[3], expected_edge_alpha);
+      assert_eq!(final_image.get_pixel(12, 7)[3], expected_edge_alpha);
+      assert_eq!(final_image.get_pixel(7, 7)[3], 255);
+    }
+  }
+
+  #[test]
   fn word_text_orthographic_alpha_depends_only_on_front_geometry_and_contour() {
     // Integer-aligned opaque rectangles hid the accidental reuse of beveled
     // triangles in the coverage pass. Fractional edges and varying paint
@@ -13336,6 +13402,124 @@ mod tests {
       geometry.physical.map_point_to(&geometry.page, (0.5, 0.5)),
       (1.0, 1.0)
     );
+  }
+
+  #[test]
+  fn physical_final_grid_preserves_page_window_across_source_rasters() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let commands = [
+      PathCommand::MoveTo(point(80.0, 160.0)),
+      PathCommand::LineTo(point(100.0, 160.0)),
+      PathCommand::LineTo(point(100.0, 180.0)),
+      PathCommand::Close,
+    ];
+    let window = Rect {
+      origin: point(71.76, 147.36),
+      size: Size {
+        width: Pt(300.48),
+        height: Pt(173.28),
+      },
+    };
+    for dpi in [96.0, 200.0, 600.0] {
+      for origin in [(72.0, 147.6), (71.13, 144.17)] {
+        let geometry = Static3dTextGeometryPaths::from_page_path_for_direct3d9(
+          &commands,
+          Rect {
+            origin: point(origin.0, origin.1),
+            size: window.size,
+          },
+          dpi / 72.0,
+        )
+        .unwrap();
+        let grid = geometry.physical_final_grid(window, (402, 232)).unwrap();
+        // A physical vertex must land at the same target point even when the
+        // working raster's origin/density (and thus integer crop) changes.
+        let vertex = geometry.physical.contours[0].points[0];
+        let x = (vertex.0 - grid.source_left_px) / grid.source_width_px * grid.width_px as f32;
+        let y = (vertex.1 - grid.source_top_px) / grid.source_height_px * grid.height_px as f32;
+        assert!((x - (80.0 - 71.76) / 300.48 * 402.0).abs() < 0.0001);
+        assert!((y - (160.0 - 147.36) / 173.28 * 232.0).abs() < 0.0001);
+      }
+    }
+  }
+
+  #[test]
+  fn orthographic_text_mesh_realization_is_independent_of_working_density() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let commands = [
+      PathCommand::MoveTo(point(4.0, 24.0)),
+      PathCommand::CubicTo {
+        control1: point(4.0, 2.0),
+        control2: point(28.0, 2.0),
+        end: point(28.0, 24.0),
+      },
+      PathCommand::Close,
+    ];
+    let bounds = Rect {
+      origin: point(0.0, 0.0),
+      size: Size {
+        width: Pt(32.0),
+        height: Pt(32.0),
+      },
+    };
+    let scene = scene(a::PresetCameraValues::OrthographicFront);
+    let mut reference: Option<Vec<(f32, f32)>> = None;
+    for working_dpi in [96.0, 200.0, 600.0] {
+      let scale = working_dpi / 72.0;
+      let geometry =
+        Static3dTextGeometryPaths::from_page_path_for_direct3d9(&commands, bounds, scale)
+          .expect("closed curved outline");
+      let plan = super::TextSurfaceRealizationPlan::new(
+        &geometry,
+        camera_projection(&scene, 0.0),
+        &a::Shape3DType::default(),
+        Static3dRenderOptions {
+          extrusion_color: None,
+          contour_color: None,
+          pixels_per_point: scale,
+          model_surface: Some(Static3dSurface {
+            left_px: 0.0,
+            top_px: 0.0,
+            width_px: 32.0 * scale,
+            height_px: 32.0 * scale,
+          }),
+        },
+        96.0 / 72.0,
+      )
+      .expect("orthographic projected realization");
+      let realized = geometry
+        .clone()
+        .with_physical_realization(Some(plan), scale);
+      assert_eq!(
+        realized.page.source_coverage_path,
+        geometry.page.source_coverage_path
+      );
+      assert_eq!(
+        realized.page.contours[0].points,
+        geometry.page.contours[0].points
+      );
+      let physical = &realized.physical;
+      let page_points = physical.contours[0]
+        .points
+        .iter()
+        .map(|&(x, y)| {
+          (
+            (x - physical.page_plane_translate_x) / physical.page_plane_scale_x,
+            (y - physical.page_plane_translate_y) / physical.page_plane_scale_y,
+          )
+        })
+        .collect::<Vec<_>>();
+      assert!(page_points.len() > 4, "curve must actually be subdivided");
+      if let Some(reference) = &reference {
+        assert_eq!(page_points.len(), reference.len());
+        for (actual, expected) in page_points.iter().zip(reference) {
+          assert!((actual.0 - expected.0).abs() < 0.0001);
+          assert!((actual.1 - expected.1).abs() < 0.0001);
+        }
+      } else {
+        reference = Some(page_points);
+      }
+    }
   }
 
   #[test]

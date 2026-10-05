@@ -1,3 +1,5 @@
+mod fixed_output_device;
+
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -141,6 +143,7 @@ const MULTICOMPONENT_DATA_LABEL_TEXT_CLIP_SLACK: ChartTextClipSlack = ChartTextC
 #[derive(Clone, Copy, Debug)]
 struct CalcCellOutputArea {
   align_rect: CellRect,
+  fit_width_pt: f32,
   clip_rect: CellRect,
   left_clip_pt: f32,
   right_clip_pt: f32,
@@ -270,7 +273,7 @@ fn common_display_page(setup: PageSetup, items: Vec<PageItem>) -> common::Displa
 
 fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
   match item {
-    PageItem::Text(item) => common::DisplayItem::Text(common_text_run(item)),
+    PageItem::Text(item) => common::DisplayItem::Text(Box::new(common_text_run(item))),
     PageItem::Image(item) => common::DisplayItem::Image(common_image_item(item)),
     PageItem::Group {
       mask,
@@ -305,6 +308,8 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     text: Cow::Owned(item.text),
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
+    wordprocessing_line_metrics: None,
+    origin_is_baseline: false,
     line_metrics_participant: true,
     paint_clip: item.paint_clip,
     page_culling_bounds: item.page_culling_bounds,
@@ -318,6 +323,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     paragraph_bidi: item.paragraph_bidi,
     word_spacing_pt: 0.0,
     preserve_text_portion: item.preserve_text_portion,
+    decoration_span_start_x: None,
     pdf_text_segmentation: match item.pdf_text_segmentation {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
       PdfTextSegmentation::WordLine => common::PdfTextSegmentation::WordLine,
@@ -725,20 +731,18 @@ impl DrawingAreaRenderLayout {
   }
 
   fn fixed_output_drawing_page_transform(self, page: &CalcPrintPage<'_>) -> SheetPageTransform {
+    let printer_picture_grid = page.sheet.uses_fixed_output_picture_marker_grid();
     let source = self.area.map_or_else(CellRect::default, |area| {
       let logical = page.sheet.range_rect(area);
-      let modern_arial_grid = page
-        .sheet
-        .uses_modern_excel_arial_fixed_output_picture_grid();
       CellRect {
-        x_pt: if modern_arial_grid {
+        x_pt: if printer_picture_grid {
           page
             .sheet
             .fixed_output_column_offset_pt(area.start.col, self.zoom_scale)
         } else {
           logical.x_pt * self.zoom_scale
         },
-        y_pt: if modern_arial_grid {
+        y_pt: if printer_picture_grid {
           page
             .sheet
             .fixed_output_row_offset_pt(area.start.row, self.zoom_scale)
@@ -750,10 +754,15 @@ impl DrawingAreaRenderLayout {
         ..CellRect::default()
       }
     });
+    let (origin_x_pt, origin_y_pt) = if printer_picture_grid {
+      fixed_output_device::printer_picture_page_origin(self.origin_x_pt, self.origin_y_pt)
+    } else {
+      (self.origin_x_pt, self.origin_y_pt)
+    };
     // The anchors are already in scaled worksheet coordinates. Only remove
     // the matching print-area origin and translate onto the physical page.
-    SheetPageTransform::new(self.origin_x_pt, self.origin_y_pt, 1.0, source).with_horizontal_order(
-      self.origin_x_pt,
+    SheetPageTransform::new(origin_x_pt, origin_y_pt, 1.0, source).with_horizontal_order(
+      origin_x_pt,
       self.area_width(page),
       sheet_right_to_left(page.sheet),
     )
@@ -849,9 +858,7 @@ fn print_page_drawingml_items(
     .sheet
     .uses_legacy_excel12_fixed_output_grid()
     .then_some(layout.zoom_scale);
-  let modern_arial_grid = page
-    .sheet
-    .uses_modern_excel_arial_fixed_output_picture_grid();
+  let printer_picture_grid = page.sheet.uses_fixed_output_picture_marker_grid();
   let mut page_clip_rect = layout.clip_rect(page, setup);
   if page.sheet.uses_indexed_scatter_print_grid() {
     page_clip_rect.width_pt += super::print::INDEXED_SCATTER_HORIZONTAL_CLIP_EXTENSION_PT;
@@ -865,7 +872,7 @@ fn print_page_drawingml_items(
         continue;
       }
       let output_scale = legacy_output_scale.or_else(|| {
-        (modern_arial_grid
+        (printer_picture_grid
           && anchor.kind == super::drawing::DrawingAnchorKind::TwoCell
           && anchor.object.kind == super::drawing::DrawingObjectKind::Picture)
           .then_some(layout.zoom_scale)
@@ -2043,7 +2050,9 @@ pub(crate) fn vml_tile_phase(
   )
 }
 
-fn vml_gradient_intermediate_stops(value: Option<&str>) -> Vec<common::GradientStop<'static>> {
+pub(crate) fn vml_gradient_intermediate_stops(
+  value: Option<&str>,
+) -> Vec<common::GradientStop<'static>> {
   let mut stops = value
     .into_iter()
     .flat_map(|value| value.split(';'))
@@ -2053,7 +2062,9 @@ fn vml_gradient_intermediate_stops(value: Option<&str>) -> Vec<common::GradientS
         .char_indices()
         .find(|(_, ch)| ch.is_whitespace())
         .map(|(index, _)| index)?;
-      let position = parse_vml_ratio(entry[..split].trim())?.clamp(0.0, 1.0);
+      // Office writes VML gradient stop positions as ST_Fraction, including
+      // 16.16 fixed-point values such as `13763f` (MS-OI29500, ST_Fraction).
+      let position = parse_vml_vector_component(entry[..split].trim())?.clamp(0.0, 1.0);
       let color = crate::docx::parse_vml_color(entry[split..].trim())?;
       Some(common::GradientStop {
         position,
@@ -2713,6 +2724,7 @@ fn render_cell_area(
   layout: CellAreaRenderLayout,
   text_metrics: &mut TextMetrics,
 ) {
+  let cell_paint_start = items.len();
   let area_rect = page.sheet.fixed_output_range_rect(area, layout.zoom_scale);
   let page_clip_rect = CellRect {
     x_pt: layout.origin_x_pt,
@@ -2787,6 +2799,12 @@ fn render_cell_area(
     .sheet
     .uses_modern_excel_arial11_cell_text_grid()
     .then_some(ExcelCellBaselineGrid::ModernArial11)
+    .or_else(|| {
+      page
+        .sheet
+        .uses_unprofiled_excel_font_grid()
+        .then_some(ExcelCellBaselineGrid::ExplicitNormalFont)
+    })
     .or_else(|| {
       page
         .sheet
@@ -3105,11 +3123,14 @@ fn render_cell_area(
     };
     let text_indent_pt =
       pivot_builtin_style.text_indent_pt() * layout.zoom_scale + alignment_indent_pt;
-    let cell_text_rect = if page.sheet.uses_modern_excel_arial11_cell_text_grid() {
-      modern_excel_arial11_cell_text_horizontal_rect(
+    let cell_text_rect = if page.sheet.uses_printer_cell_text_horizontal_grid() {
+      excel_printer_cell_text_horizontal_rect(
         cell_rect,
         layout.fill_page,
         alignment.is_some_and(|alignment| alignment.wrap_text),
+        calc_cell_horizontal_alignment(cell, alignment),
+        &measurement_style,
+        text_metrics,
       )
     } else {
       cell_rect
@@ -3139,6 +3160,11 @@ fn render_cell_area(
       text_metrics,
     );
     let render_style = measurement_style.clone();
+    let cell_clip_rect = if page.sheet.uses_printer_cell_text_horizontal_grid() {
+      printer_cell_text_clip_rect(cell_rect, layout.fill_page)
+    } else {
+      text_cell_rect
+    };
     let output_area = calc_cell_output_area(
       CalcCellOutputContext {
         sheet: page.sheet,
@@ -3147,6 +3173,7 @@ fn render_cell_area(
       },
       cell,
       text_cell_rect,
+      cell_clip_rect,
       &measurement_style,
       alignment,
       layout.zoom_scale,
@@ -3165,7 +3192,15 @@ fn render_cell_area(
         && alignment.is_some_and(|alignment| alignment.wrap_text && alignment.shrink_to_fit));
     let mut rendered_text_items = Vec::new();
     let mut number_layout_rendered = false;
-    if !cell.rich_text_runs.is_empty() && rendered_text.as_ref() == cell.text.as_ref() {
+    // Excel's text-format spacing owns a new string in the cell font, even
+    // when its visible characters equal the shared-string value. Native
+    // General/@ and color-only controls retain the rich runs; reserve/fill
+    // controls flatten them, including wrapped and RTL text. A spacing layout
+    // that cannot be placed below still needs the plain cell-font fallback.
+    if !cell.rich_text_runs.is_empty()
+      && cell.number_format_layout.is_none()
+      && rendered_text.as_ref() == cell.text.as_ref()
+    {
       render_cell_rich_text(
         &mut rendered_text_items,
         cell.rich_text_runs,
@@ -3193,7 +3228,10 @@ fn render_cell_area(
         number_layout_rendered = rendered_text.as_ref() == cell.rendered_text
           && render_number_format_layout(
             &mut rendered_text_items,
-            number_layout,
+            NumberFormatCellLayout {
+              items: number_layout,
+              value_state: cell.number_format_state,
+            },
             output_area.align_rect,
             &render_style,
             CellTextRenderOptions {
@@ -3294,13 +3332,19 @@ fn render_cell_area(
           // not reappear on a later page just because its full glyph payload
           // intersects that page.
           let clip = output_area.clip_rect;
-          if !rect_intersects_clip(
-            clip.x_pt,
-            clip.y_pt,
-            clip.x_pt + clip.width_pt,
-            clip.y_pt + clip.height_pt,
-            overflow_scan_rect,
-          ) || !text_item_intersects_rect(text, overflow_scan_rect, text_metrics)
+          let clip_reaches_scan = if page.sheet.uses_printer_cell_text_horizontal_grid() {
+            printer_cell_clip_reaches_overflow_scan(clip, page_clip_rect, overflow_scan_rect)
+          } else {
+            rect_intersects_clip(
+              clip.x_pt,
+              clip.y_pt,
+              clip.x_pt + clip.width_pt,
+              clip.y_pt + clip.height_pt,
+              overflow_scan_rect,
+            )
+          };
+          if !clip_reaches_scan
+            || !text_item_intersects_rect(text, overflow_scan_rect, text_metrics)
           {
             return false;
           }
@@ -3374,6 +3418,13 @@ fn render_cell_area(
   items.append(&mut deferred_edit_text_items);
   // Office paints cell borders after the backgrounds and strings. A later
   // filled cell must not erase its neighbor's right or bottom border.
+  fixed_output_device::render_cosmetic_cell_borders(
+    items,
+    &border_paints,
+    layout.zoom_scale,
+    layout.fill_page,
+    layout.physical_page,
+  );
   let grid_exclusions = render_cell_border_grid(
     items,
     &mut border_paints,
@@ -3392,6 +3443,11 @@ fn render_cell_area(
       &grid_exclusions,
     );
   }
+  fixed_output_device::replay_cell_paint(
+    &mut items[cell_paint_start..],
+    layout.physical_page,
+    text_metrics,
+  );
 }
 
 fn cell_border_shear(rotation: Option<u32>, borders: super::styles::BorderRecord) -> Option<f32> {
@@ -3766,6 +3822,7 @@ fn calc_cell_output_area(
   context: CalcCellOutputContext<'_>,
   cell: &super::print::CalcPrintCell<'_>,
   rect: CellRect,
+  clip_rect: CellRect,
   style: &TextStyle,
   alignment: Option<super::styles::AlignmentRecord>,
   zoom_scale: f32,
@@ -3774,17 +3831,34 @@ fn calc_cell_output_area(
     .text_metrics
     .measure_text(&cell.rendered_text, style);
   let needed_width_pt = text_width_pt + XLSX_CELL_TEXT_INSET_PT * 2.0;
+  // The eight-dot leading phase belongs to the left/center origins. Right
+  // alignment removes it from its positioning rectangle, but not from the
+  // font's available width. Native date-column controls retain the complete
+  // date at 10.078125 characters and use hashes at 10.0 characters.
+  let fit_width_pt = rect.width_pt
+    + if context.sheet.uses_printer_cell_text_horizontal_grid()
+      && calc_cell_horizontal_alignment(cell, alignment) == x::HorizontalAlignmentValues::Right
+      && context
+        .text_metrics
+        .excel_cell_text_inset_pt(style)
+        .is_some()
+    {
+      8.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
+    } else {
+      0.0
+    };
   let mut output = CalcCellOutputArea {
     align_rect: rect,
-    clip_rect: rect,
+    fit_width_pt,
+    clip_rect,
     left_clip_pt: 0.0,
     right_clip_pt: 0.0,
   };
-  if needed_width_pt <= rect.width_pt {
+  if needed_width_pt <= fit_width_pt {
     return output;
   }
 
-  let missing_width_pt = needed_width_pt - rect.width_pt;
+  let missing_width_pt = needed_width_pt - fit_width_pt;
   let (mut left_missing_pt, mut right_missing_pt) =
     calc_cell_missing_width_by_alignment(missing_width_pt, cell, alignment);
 
@@ -3968,11 +4042,23 @@ fn calc_cell_horizontal_alignment(
   match alignment.and_then(|alignment| alignment.horizontal) {
     Some(x::HorizontalAlignmentValues::General) | None => {
       match cell.number_format_state {
-        // ECMA-376 Part 1, General Format / Alignment: Boolean and error
-        // values are centered; numbers are right-aligned and strings left.
+        // General centers Boolean/error values and right-aligns numbers.
+        // Strings use contextual alignment: the first strong character owns
+        // the physical edge, independently of sheet mirroring/readingOrder.
+        // Native Hebrew/Latin/text-digit controls cover both sheet directions
+        // and all three reading orders (Microsoft's Office RTL contract).
         super::print::NumberFormatRenderState::Boolean
         | super::print::NumberFormatRenderState::Error => x::HorizontalAlignmentValues::Center,
         _ if calc_cell_is_value(cell) => x::HorizontalAlignmentValues::Right,
+        _ if cell
+          .text
+          .chars()
+          .map(bidi_class)
+          .find(|class| matches!(class, BidiClass::L | BidiClass::R | BidiClass::AL))
+          .is_some_and(|class| matches!(class, BidiClass::R | BidiClass::AL)) =>
+        {
+          x::HorizontalAlignmentValues::Right
+        }
         _ => x::HorizontalAlignmentValues::Left,
       }
     }
@@ -4003,7 +4089,7 @@ fn calc_cell_visible_text<'a>(
   if calc_cell_requires_date_hashes(cell) {
     return std::borrow::Cow::Owned(calc_cell_overflow_hash_text(
       style,
-      output_area.align_rect.width_pt,
+      output_area.fit_width_pt,
       text_metrics,
       1,
     ));
@@ -4021,7 +4107,7 @@ fn calc_cell_visible_text<'a>(
     }
     return std::borrow::Cow::Owned(calc_cell_overflow_hash_text(
       style,
-      output_area.align_rect.width_pt,
+      output_area.fit_width_pt,
       text_metrics,
       0,
     ));
@@ -4029,14 +4115,14 @@ fn calc_cell_visible_text<'a>(
   if calc_cell_is_value(cell) {
     if cell.number_format_state == super::print::NumberFormatRenderState::General
       && let Some(text) =
-        calc_fit_general_number_text(cell, style, output_area.align_rect.width_pt, text_metrics)
+        calc_fit_general_number_text(cell, style, output_area.fit_width_pt, text_metrics)
     {
       return std::borrow::Cow::Owned(text);
     }
     return if calc_cell_value_can_hash(cell) {
       std::borrow::Cow::Owned(calc_cell_overflow_hash_text(
         style,
-        output_area.align_rect.width_pt,
+        output_area.fit_width_pt,
         text_metrics,
         1,
       ))
@@ -4620,7 +4706,7 @@ fn position_rotated_cell_text(
   }
 }
 
-fn xlsx_rich_text_run_style(
+pub(super) fn xlsx_rich_text_run_style(
   base_style: &TextStyle,
   run: &super::workbook::SharedStringRun,
   print_scale: f32,
@@ -4840,21 +4926,145 @@ struct CellTextRenderOptions {
   has_outer_border: bool,
 }
 
+struct NumberFormatCellLayout<'a> {
+  items: &'a [super::print::NumberFormatLayoutItem],
+  value_state: super::print::NumberFormatRenderState,
+}
+
 fn render_number_format_layout(
   items: &mut Vec<PageItem>,
-  layout: &[super::print::NumberFormatLayoutItem],
+  formatted: NumberFormatCellLayout<'_>,
   rect: CellRect,
   style: &TextStyle,
   options: CellTextRenderOptions,
   text_metrics: &mut TextMetrics,
 ) -> bool {
   use super::print::NumberFormatLayoutItem;
+  let layout = formatted.items;
 
   if options
     .alignment
     .is_some_and(|alignment| alignment.text_rotation.unwrap_or(0) != 0)
   {
     return false;
+  }
+  let visible_text = layout
+    .iter()
+    .filter_map(|item| match item {
+      NumberFormatLayoutItem::Text(text) => Some(text.as_str()),
+      _ => None,
+    })
+    .collect::<String>();
+  let rtl = options
+    .alignment
+    .is_some_and(|alignment| alignment.reading_order == Some(2))
+    || visible_text
+      .chars()
+      .any(|ch| matches!(bidi_class(ch), BidiClass::R | BidiClass::AL));
+  if rtl
+    || formatted.value_state == super::print::NumberFormatRenderState::Text
+      && options
+        .alignment
+        .is_some_and(|alignment| alignment.wrap_text)
+  {
+    // Native underscore controls distinguish the two output owners:
+    // direct strings reserve physical widths; wrapped formatted strings
+    // insert spaces into the edit payload and keep its line-break spaces.
+    let Some(text_index) = layout
+      .iter()
+      .position(|item| matches!(item, NumberFormatLayoutItem::Text(_)))
+    else {
+      return false;
+    };
+    if layout.iter().enumerate().any(|(index, item)| {
+      index != text_index && !matches!(item, NumberFormatLayoutItem::Reserve(_))
+    }) {
+      return false;
+    }
+    let wrap_text = options
+      .alignment
+      .is_some_and(|alignment| alignment.wrap_text);
+    if wrap_text {
+      let formatted_text = format!(
+        "{}{}{}",
+        " ".repeat(text_index),
+        visible_text,
+        " ".repeat(layout.len() - text_index - 1),
+      );
+      let horizontal_alignment = options.horizontal_alignment;
+      let mut portions = Vec::new();
+      render_cell_text_with_break_whitespace(
+        &mut portions,
+        &formatted_text,
+        rect,
+        style.clone(),
+        (options, true),
+        text_metrics,
+      );
+      // Native wrapped-format controls retain logical portion order and
+      // shape each script portion, including explicit readingOrder1/2.
+      // The first-line '+' follows Hebrew on the physical right; changing
+      // the whole edit payload to an RTL paragraph reverses those portions.
+      reorder_cell_text_items(
+        &mut portions,
+        Some(1),
+        &formatted_text,
+        rect,
+        horizontal_alignment,
+        text_metrics,
+      );
+      items.extend(portions);
+      return true;
+    }
+    let reservation = |items: &[NumberFormatLayoutItem], metrics: &mut TextMetrics| {
+      items.iter().try_fold(0.0, |width, item| {
+        let NumberFormatLayoutItem::Reserve(ch) = item else {
+          return None;
+        };
+        let text = ch.to_string();
+        let advance = metrics
+          .gdi_hinted_text_extents_pt(&text, style, units::OFFICE_FIXED_OUTPUT_DPI)
+          .map_or_else(
+            || metrics.measure_text(&text, style),
+            |extent| extent.unpositioned_width_pt,
+          );
+        Some(width + advance)
+      })
+    };
+    let Some(left) = reservation(&layout[..text_index], text_metrics) else {
+      return false;
+    };
+    let Some(right) = reservation(&layout[text_index + 1..], text_metrics) else {
+      return false;
+    };
+    let inner_rect = CellRect {
+      x_pt: rect.x_pt + left,
+      width_pt: (rect.width_pt - left - right).max(0.0),
+      ..rect
+    };
+    let reading_order = options
+      .alignment
+      .and_then(|alignment| alignment.reading_order);
+    let horizontal_alignment = options.horizontal_alignment;
+    let mut portions = Vec::new();
+    render_cell_text(
+      &mut portions,
+      &visible_text,
+      inner_rect,
+      style.clone(),
+      options,
+      text_metrics,
+    );
+    reorder_cell_text_items(
+      &mut portions,
+      reading_order,
+      &visible_text,
+      inner_rect,
+      horizontal_alignment,
+      text_metrics,
+    );
+    items.extend(portions);
+    return true;
   }
   let widths = layout
     .iter()
@@ -4883,22 +5093,6 @@ fn render_number_format_layout(
     options.horizontal_alignment,
     0.0,
   );
-  let visible_text = layout
-    .iter()
-    .filter_map(|item| match item {
-      NumberFormatLayoutItem::Text(text) => Some(text.as_str()),
-      _ => None,
-    })
-    .collect::<String>();
-  if options
-    .alignment
-    .is_some_and(|alignment| alignment.reading_order == Some(2))
-    || visible_text
-      .chars()
-      .any(|ch| matches!(bidi_class(ch), BidiClass::R | BidiClass::AL))
-  {
-    return false;
-  }
   let mut template_items = Vec::new();
   render_cell_text(
     &mut template_items,
@@ -5060,8 +5254,19 @@ fn render_cell_text(
   items: &mut Vec<PageItem>,
   text: &str,
   rect: CellRect,
-  mut style: TextStyle,
+  style: TextStyle,
   options: CellTextRenderOptions,
+  text_metrics: &mut TextMetrics,
+) {
+  render_cell_text_with_break_whitespace(items, text, rect, style, (options, false), text_metrics);
+}
+
+fn render_cell_text_with_break_whitespace(
+  items: &mut Vec<PageItem>,
+  text: &str,
+  rect: CellRect,
+  mut style: TextStyle,
+  (options, preserve_break_whitespace): (CellTextRenderOptions, bool),
   text_metrics: &mut TextMetrics,
 ) {
   if options
@@ -5095,11 +5300,12 @@ fn render_cell_text(
     // contents within the cell. Explicit line breaks remain hard paragraph
     // boundaries; Calc's EditEngine then wraps each paragraph to the output
     // width (ScOutputData::DrawEdit in sc/source/ui/view/output2.cxx).
-    wrapped_lines = wrap_cell_text(
+    wrapped_lines = wrap_cell_text_with_break_whitespace(
       text,
       (rect.width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(1.0),
       &style,
       text_metrics,
+      preserve_break_whitespace,
     );
     wrapped_lines.iter().map(String::as_str).collect::<Vec<_>>()
   } else if text.contains('\n') || text.contains('\r') {
@@ -5235,6 +5441,16 @@ fn wrap_cell_text(
   style: &TextStyle,
   text_metrics: &mut TextMetrics,
 ) -> Vec<String> {
+  wrap_cell_text_with_break_whitespace(text, available_width_pt, style, text_metrics, false)
+}
+
+fn wrap_cell_text_with_break_whitespace(
+  text: &str,
+  available_width_pt: f32,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+  preserve_break_whitespace: bool,
+) -> Vec<String> {
   let mut lines = Vec::new();
   for paragraph in text
     .split('\n')
@@ -5256,7 +5472,11 @@ fn wrap_cell_text(
         && text_metrics.measure_text(current.trim_end(), style) > available_width_pt
       {
         current.truncate(previous_len);
-        lines.push(current.trim_end().to_string());
+        lines.push(if preserve_break_whitespace {
+          current.clone()
+        } else {
+          current.trim_end().to_string()
+        });
         current.clear();
         current.push_str(segment.trim_start());
       }
@@ -5270,7 +5490,11 @@ fn wrap_cell_text(
         && text_metrics.measure_text(current.trim_end(), style) > available_width_pt
       {
         current.truncate(previous_len);
-        lines.push(current.trim_end().to_string());
+        lines.push(if preserve_break_whitespace {
+          current.clone()
+        } else {
+          current.trim_end().to_string()
+        });
         current.clear();
         current.push_str(segment.trim_start());
       }
@@ -5685,19 +5909,79 @@ fn cell_border_device_rect(rect: CellRect, page: CellRect) -> CellRect {
   }
 }
 
-fn modern_excel_arial11_cell_text_horizontal_rect(
+fn printer_cell_text_clip_rect(cell: CellRect, page: CellRect) -> CellRect {
+  let border = cell_border_device_rect(cell, page);
+  // The cell grid owns clipping; the font inset owns alignment. In native
+  // continuation pages an occupied next column blocks the previous cell at
+  // the page's leading grid boundary, independently of its font rectangle.
+  // Remove the border band's phase and retain integral printer endpoints.
+  CellRect {
+    x_pt: border.x_pt - 4.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI,
+    width_pt: border.width_pt,
+    ..cell
+  }
+}
+
+fn printer_cell_clip_reaches_overflow_scan(
+  clip: CellRect,
+  page_clip: CellRect,
+  scan: CellRect,
+) -> bool {
+  let device =
+    |position: f32| (position * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).round();
+  let left = device(clip.x_pt);
+  let right = device(clip.x_pt + clip.width_pt);
+  // Native copyRows P7/P10/P11 overflow through the blank Q column. Their
+  // EMF clip ends exactly at R's first-data boundary (837), and the complete
+  // string remains owned. G7/G10/G11 and 58747 N1 end at the page's leading
+  // boundary and remain absent. Test physical intersection strictly, then
+  // reach of the search boundary inclusively, on the owning printer grid.
+  right > device(page_clip.x_pt)
+    && left < device(page_clip.x_pt + page_clip.width_pt)
+    && right >= device(scan.x_pt)
+    && left <= device(scan.x_pt + scan.width_pt)
+    && clip.y_pt + clip.height_pt > scan.y_pt
+    && clip.y_pt < scan.y_pt + scan.height_pt
+}
+
+fn excel_printer_cell_text_horizontal_rect(
   cell: CellRect,
   page: CellRect,
   wrap_text: bool,
+  horizontal_alignment: x::HorizontalAlignmentValues,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> CellRect {
+  let Some(inset) = text_metrics.excel_cell_text_inset_pt(style) else {
+    return cell;
+  };
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  // Native Arial/Calibri/DengXian 8/11/20-point controls establish a quarter
+  // digit inset from the realized cell font, not a fixed Normal-font margin.
+  // The rotated AutoFit path independently uses the same quarter-digit rule.
+  let mut rect = printer_cell_text_horizontal_rect(cell, page, wrap_text, inset);
+  if horizontal_alignment == x::HorizontalAlignmentValues::Right {
+    // Native numeric/string controls keep the eight-dot leading/centering
+    // phase out of right alignment. The right origin is the cell's trailing
+    // grid boundary minus the quarter-digit inset and the string advance.
+    rect.width_pt = (rect.width_pt - 8.0 * dot).max(0.0);
+  }
+  rect
+}
+
+fn printer_cell_text_horizontal_rect(
+  cell: CellRect,
+  page: CellRect,
+  wrap_text: bool,
+  excel_inset: f32,
 ) -> CellRect {
   let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
   let border = cell_border_device_rect(cell, page);
   // Excel aligns worksheet text from the trailing edge of the four-dot grid
-  // band and leaves ten printer dots at either horizontal edge. Express that
+  // band and leaves a font-derived inset. Express the left/center producer's
   // geometry through the common 1.5pt cell inset so all existing overflow,
   // clipping, rich-text, and number-format paths share the same rectangle.
   let common_inset = XLSX_CELL_TEXT_INSET_PT;
-  let excel_inset = 10.0 * dot;
   let inset_delta = common_inset - excel_inset;
   let wrap_measure_padding = if wrap_text { 3.0 * dot } else { 0.0 };
   CellRect {
@@ -5711,6 +5995,7 @@ fn modern_excel_arial11_cell_text_horizontal_rect(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ExcelCellBaselineGrid {
   ModernArial11,
+  ExplicitNormalFont,
   LegacyExcel12Japanese,
 }
 
@@ -5737,9 +6022,25 @@ fn align_excel_printer_cell_text_vertically(
     normal_descent_px,
     grid_profile,
   } = context;
-  let [PageItem::Text(text)] = items else {
+  let Some(PageItem::Text(text)) = items.first() else {
     return;
   };
+  if items.len() != 1 && grid_profile != ExcelCellBaselineGrid::ExplicitNormalFont {
+    return;
+  }
+  if items.iter().any(|item| {
+    let PageItem::Text(portion) = item else {
+      return true;
+    };
+    portion.style.font_family != text.style.font_family
+      || portion.style.font_size_pt != text.style.font_size_pt
+      || portion.style.bold != text.style.bold
+      || portion.style.italic != text.style.italic
+      || portion.style.rotation_deg.abs() > f32::EPSILON
+      || portion.style.baseline_shift_pt.abs() > f32::EPSILON
+  }) {
+    return;
+  }
   if text.style.rotation_deg.abs() > f32::EPSILON
     || text.style.baseline_shift_pt.abs() > f32::EPSILON
   {
@@ -5763,14 +6064,35 @@ fn align_excel_printer_cell_text_vertically(
     // centered line position, then contributes half the printer font's
     // external leading. Re-centering the complete GDI font box moves SimSun
     // merged text another half-leading too far down.
-    text.y_pt += metrics.external_leading_px * dot / 2.0;
+    if let Some(PageItem::Text(text)) = items.first_mut() {
+      text.y_pt += metrics.external_leading_px * dot / 2.0;
+    }
     return;
   }
   let grid = cell_border_device_rect(cell, page);
   let cell_height_px = (grid.height_pt / dot).round();
+  let baselines = items
+    .iter()
+    .filter_map(|item| {
+      let PageItem::Text(portion) = item else {
+        return None;
+      };
+      Some(
+        portion.y_pt
+          + text_metrics.baseline_offset_in_line_for_text(
+            &portion.text,
+            &portion.style,
+            portion.line_height_pt,
+          ),
+      )
+    })
+    .collect::<Vec<_>>();
+  let first_baseline = baselines.iter().copied().fold(f32::INFINITY, f32::min);
+  let last_baseline = baselines.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+  let line_advance_px = ((last_baseline - first_baseline) / dot).round();
   let Some(baseline_offset_px) = excel_printer_cell_baseline_offset_px(
     vertical,
-    cell_height_px,
+    cell_height_px - line_advance_px,
     metrics,
     normal_descent_px,
     grid_profile,
@@ -5778,9 +6100,12 @@ fn align_excel_printer_cell_text_vertically(
     return;
   };
   let desired_baseline_pt = grid.y_pt + baseline_offset_px * dot;
-  let current_baseline_offset_pt =
-    text_metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt);
-  text.y_pt = desired_baseline_pt - current_baseline_offset_pt;
+  let offset = desired_baseline_pt - first_baseline;
+  for item in items {
+    if let PageItem::Text(text) = item {
+      text.y_pt += offset;
+    }
+  }
 }
 
 fn excel_printer_cell_baseline_offset_px(
@@ -5802,7 +6127,9 @@ fn excel_printer_cell_baseline_offset_px(
       // odd-height MS PGothic rows distinguish the two while SimSun's 13-dot
       // external leading independently fixes its lower baseline.
       let leading_space_px = match grid_profile {
-        ExcelCellBaselineGrid::ModernArial11 => free_space_px.floor(),
+        ExcelCellBaselineGrid::ModernArial11 | ExcelCellBaselineGrid::ExplicitNormalFont => {
+          free_space_px.floor()
+        }
         ExcelCellBaselineGrid::LegacyExcel12Japanese => free_space_px.round(),
       };
       Some(leading_space_px + metrics.ascent_px + metrics.external_leading_px)
@@ -5980,7 +6307,6 @@ fn render_cell_borders(
   print_scale: f32,
   page: CellRect,
 ) {
-  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
   let rect = cell_border_device_rect(rect, page);
   if border_sides(borders)
     .into_iter()
@@ -6014,59 +6340,55 @@ fn render_cell_borders(
     items.append(&mut cell_items);
     return;
   }
-  let half_width = |width: f32| ((width / dot).round() / 2.0).floor() * dot;
-  let mut push_vertical_border = |x_pt: f32, border: BorderStyle| {
-    let width_pt = fixed_output_cell_border_width_pt(border.width_pt, print_scale);
-    push_cell_border_rect(
-      items,
-      border,
-      print_scale,
-      true,
-      page,
-      RectItem {
-        x_pt: x_pt - half_width(width_pt),
-        y_pt: rect.y_pt - half_width(width_pt),
-        width_pt,
-        height_pt: rect.height_pt + width_pt,
-        fill_color: Some(border.color),
-        fill_opacity: 1.0,
-        stroke: None,
-        stroke_opacity: 1.0,
-      },
-    );
-  };
-  if let Some(border) = borders.left {
-    push_vertical_border(rect.x_pt, border);
+  for (border, vertical, band) in single_cell_border_bands(rect, borders, print_scale) {
+    push_cell_border_rect(items, border, print_scale, vertical, page, band);
   }
-  if let Some(border) = borders.right {
-    push_vertical_border(rect.x_pt + rect.width_pt, border);
-  }
-  let mut push_horizontal_border = |y_pt: f32, border: BorderStyle| {
-    let width_pt = fixed_output_cell_border_width_pt(border.width_pt, print_scale);
-    push_cell_border_rect(
-      items,
-      border,
-      print_scale,
-      false,
-      page,
-      RectItem {
-        x_pt: rect.x_pt - half_width(width_pt),
-        y_pt: y_pt - half_width(width_pt),
-        width_pt: rect.width_pt + width_pt,
-        height_pt: width_pt,
-        fill_color: Some(border.color),
-        fill_opacity: 1.0,
-        stroke: None,
-        stroke_opacity: 1.0,
-      },
-    );
-  };
-  if let Some(border) = borders.top {
-    push_horizontal_border(rect.y_pt, border);
-  }
-  if let Some(border) = borders.bottom {
-    push_horizontal_border(rect.y_pt + rect.height_pt, border);
-  }
+}
+
+fn single_cell_border_bands(
+  rect: CellRect,
+  borders: super::styles::BorderRecord,
+  print_scale: f32,
+) -> impl Iterator<Item = (BorderStyle, bool, RectItem)> {
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  border_sides(borders)
+    .into_iter()
+    .enumerate()
+    .filter_map(move |(side, border)| {
+      let border = border?;
+      let width = fixed_output_cell_border_width_pt(border.width_pt, print_scale);
+      let half = ((width / dot).round() / 2.0).floor() * dot;
+      let vertical = side < 2;
+      let (x, y, w, h) = if vertical {
+        (
+          rect.x_pt + if side == 1 { rect.width_pt } else { 0.0 } - half,
+          rect.y_pt - half,
+          width,
+          rect.height_pt + width,
+        )
+      } else {
+        (
+          rect.x_pt - half,
+          rect.y_pt + if side == 3 { rect.height_pt } else { 0.0 } - half,
+          rect.width_pt + width,
+          width,
+        )
+      };
+      Some((
+        border,
+        vertical,
+        RectItem {
+          x_pt: x,
+          y_pt: y,
+          width_pt: w,
+          height_pt: h,
+          fill_color: Some(border.color),
+          fill_opacity: 1.0,
+          stroke: None,
+          stroke_opacity: 1.0,
+        },
+      ))
+    })
 }
 
 fn push_cell_border_rect(
@@ -7518,6 +7840,7 @@ fn finish_xlsx_shape_effects(
       common::drawingml_image_effects::from_effect_dag(source, None, &resolver)
     }
     Some(common::DrawingEffectSource::VmlSingleShadow { effects, .. }) => effects.clone(),
+    Some(common::DrawingEffectSource::VmlTextShadow(_)) => return,
     None => match theme_effects {
       Some((properties, _)) if properties.effect_list.is_some() => {
         common::drawingml_image_effects::from_effect_list(
@@ -8562,6 +8885,8 @@ fn transform_group_text_items(items: &mut [PageItem], transform: Affine, rect: C
           common::drawingml_geometry::transform_commands(commands.iter().copied(), transform)
         })
         .collect(),
+      vml_fit_path: warp.vml_fit_path,
+      vml_trim_band: warp.vml_trim_band,
     }));
     text.style.pdf_glyph_outline_options = Some(Arc::new(options));
   }
@@ -8848,6 +9173,7 @@ fn lower_drawing_chart(
       shared_chart::automatic_chart_title(Some(import.styles.output_ui_language())),
       &RadialChartStyle {
         layout_profile: ChartLayoutProfile::Excel,
+        fixed_output_raster_dpi: crate::units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
         title: title_style,
         legend: legend_label_style,
         data_label: data_label_style,
@@ -8857,6 +9183,8 @@ fn lower_drawing_chart(
         point_styles,
         point_image_effects,
         data_label_fill_colors,
+        data_label_shape_styles: Vec::new(),
+        data_label_image_effects: Vec::new(),
         leader_line_style: xlsx_chart_shape_style(
           chart.leader_line_shape_properties,
           import,
@@ -9118,6 +9446,13 @@ fn lower_drawing_chart(
   title_style.bold = true;
   let mut label_style = import.styles.default_chart_text_style();
   label_style.font_size_pt = 10.0;
+  if chartsheet {
+    // Excel's standalone chart auto-layout measures and paints labels without
+    // OpenType pair kerning. Office legend-width controls for Gill Sans MT,
+    // Arial and Calibri match their unkerned advances; authored `a:rPr/@kern`
+    // below may still override this automatic default.
+    label_style.kerning_minimum_size_pt = Some(f32::INFINITY);
+  }
   if resource.styles > 0 {
     // The checked-in Office ChartStyle 201 family uses tx1 with lumMod=65%
     // and lumOff=35% for title/axis/legend font references. Legacy charts
@@ -9665,6 +10000,7 @@ fn lower_drawing_chart(
     shared_chart::automatic_chart_title(Some(import.styles.output_ui_language())),
     &ClusteredColumnStyle {
       layout_profile: ChartLayoutProfile::Excel,
+      fixed_output_raster_dpi: crate::units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
       chartsheet,
       chart_style_id: chart_style.unwrap_or(2),
       modern_excel_profile: chart_style.is_some(),
@@ -9705,6 +10041,8 @@ fn lower_drawing_chart(
       axis_line_width_pt,
       category_major_gridline,
       category_minor_gridline,
+      value_minor_gridline: None,
+      category_major_gridline_stroke: None,
       series_colors,
       series_point_colors,
       series_styles,
@@ -14854,7 +15192,7 @@ mod drawing_page_tests {
       width_pt: 165.96,
       height_pt: 15.12,
     };
-    let left = modern_excel_arial11_cell_text_horizontal_rect(left_cell, page, false);
+    let left = printer_cell_text_horizontal_rect(left_cell, page, false, 1.2);
     assert!(
       (cell_text_x_pt(left, 12.507_54, x::HorizontalAlignmentValues::Left, 0.0) - 33.24).abs()
         < 1.0e-4
@@ -14865,10 +15203,10 @@ mod drawing_page_tests {
       width_pt: 91.8,
       ..left_cell
     };
-    let centered = modern_excel_arial11_cell_text_horizontal_rect(centered_cell, page, false);
+    let centered = printer_cell_text_horizontal_rect(centered_cell, page, false, 1.2);
     assert!((centered.x_pt - 314.7).abs() < 1.0e-4);
     assert!((centered.width_pt - 92.4).abs() < 1.0e-4);
-    let wrapped = modern_excel_arial11_cell_text_horizontal_rect(centered_cell, page, true);
+    let wrapped = printer_cell_text_horizontal_rect(centered_cell, page, true, 1.2);
     assert!(
       (cell_text_x_pt(
         wrapped,
@@ -14879,6 +15217,217 @@ mod drawing_page_tests {
         .abs()
         < 1.0e-4
     );
+  }
+
+  #[test]
+  fn printer_cell_text_insets_match_native_font_size_controls() {
+    let mut metrics = TextMetrics::new();
+    let mut settings = super::super::page_settings::CalcPageSettings::default();
+    settings.margin_left_in = 0.7;
+    let page = CellRect {
+      x_pt: settings.fixed_output_body_origin_pt(100).0,
+      y_pt: 94.68,
+      width_pt: 446.04,
+      height_pt: 12.0,
+    };
+    let cell = CellRect {
+      width_pt: 49.56,
+      ..page
+    };
+    for (family, size, expected_dot) in [
+      ("Arial", 11.0, 440.0),
+      ("Calibri", 11.0, 439.0),
+      ("DengXian", 11.0, 440.0),
+      ("Arial", 8.0, 437.0),
+      ("DengXian", 8.0, 437.0),
+      ("Arial", 20.0, 450.0),
+      ("Calibri", 20.0, 448.0),
+      ("DengXian", 20.0, 449.0),
+    ] {
+      let mut style = TextStyle {
+        font_family: Some(family.into()),
+        font_size_pt: size,
+        ..Default::default()
+      };
+      super::super::text::scale_text_style_for_fixed_output(&mut style, 0.95);
+      let rect = excel_printer_cell_text_horizontal_rect(
+        cell,
+        page,
+        false,
+        x::HorizontalAlignmentValues::Left,
+        &style,
+        &mut metrics,
+      );
+      let x = cell_text_x_pt(rect, 0.0, x::HorizontalAlignmentValues::Left, 0.0);
+      assert!(
+        (x - expected_dot * 0.12).abs() < 0.0001,
+        "{family} {size}: {x}"
+      );
+    }
+  }
+
+  #[test]
+  fn printer_overflow_search_keeps_exact_native_grid_boundary_ownership() {
+    let page = CellRect {
+      x_pt: 50.4,
+      y_pt: 54.0,
+      width_pt: 214.92,
+      height_pt: 182.64,
+    };
+    let scan = CellRect {
+      x_pt: 100.440_06,
+      width_pt: 164.88,
+      ..page
+    };
+    let clip = CellRect {
+      x_pt: -16.560_001,
+      y_pt: 141.72,
+      width_pt: 117.000_04,
+      height_pt: 27.12,
+    };
+    assert!(printer_cell_clip_reaches_overflow_scan(clip, page, scan));
+    assert!(!printer_cell_clip_reaches_overflow_scan(
+      CellRect {
+        width_pt: clip.width_pt - 0.12,
+        ..clip
+      },
+      page,
+      scan,
+    ));
+    // A blocked cell ending at the leading edge never owns a continuation,
+    // even when the first data column is also the page's first column.
+    assert!(!printer_cell_clip_reaches_overflow_scan(
+      CellRect {
+        width_pt: 66.96,
+        ..clip
+      },
+      page,
+      page,
+    ));
+  }
+
+  #[test]
+  fn font_insets_preserve_the_native_continuation_cell_clip() {
+    let page = CellRect {
+      x_pt: 50.4,
+      y_pt: 54.0,
+      width_pt: 482.16,
+      height_pt: 182.64,
+    };
+    let mut metrics = TextMetrics::new();
+    let style = TextStyle {
+      font_family: Some("SimSun".into()),
+      font_size_pt: 11.04,
+      ..Default::default()
+    };
+    // Native 58747 N1 and copyRows G7/G10/G11 stop at the next occupied
+    // column. Actual GDB source positions include accumulated f32 noise.
+    for (x, width) in [(-12.479_98, 62.880_005), (-32.400_024, 82.800_02)] {
+      let cell = CellRect {
+        x_pt: x,
+        width_pt: width,
+        height_pt: 13.56,
+        ..page
+      };
+      let align = excel_printer_cell_text_horizontal_rect(
+        cell,
+        page,
+        false,
+        x::HorizontalAlignmentValues::Left,
+        &style,
+        &mut metrics,
+      );
+      let clip = printer_cell_text_clip_rect(cell, page);
+      assert!((clip.x_pt + clip.width_pt - page.x_pt).abs() < 0.0001);
+      assert!(!rect_intersects_clip(
+        clip.x_pt,
+        clip.y_pt,
+        clip.x_pt + clip.width_pt,
+        clip.y_pt + clip.height_pt,
+        page,
+      ));
+      assert!(rect_intersects_clip(
+        align.x_pt,
+        align.y_pt,
+        align.x_pt + align.width_pt,
+        align.y_pt + align.height_pt,
+        page,
+      ));
+      // An unoccupied next column still extends the logical clip, retaining
+      // real overflow such as the long-URI continuation.
+      assert!(rect_intersects_clip(
+        clip.x_pt,
+        clip.y_pt,
+        clip.x_pt + clip.width_pt + 50.04,
+        clip.y_pt + clip.height_pt,
+        page,
+      ));
+    }
+  }
+
+  #[test]
+  fn printer_cell_text_alignment_phases_match_native_controls() {
+    let mut metrics = TextMetrics::new();
+    let page = CellRect {
+      x_pt: 50.4,
+      y_pt: 54.0,
+      width_pt: 494.52,
+      height_pt: 733.92,
+    };
+    for (scale, family, size, advance_dots, expected) in [
+      (1.0, "SimSun", 11.0, 138.0, [440.0, 833.0, 1218.0]),
+      (1.0, "DengXian", 11.0, 144.0, [440.0, 830.0, 1212.0]),
+      (1.0, "Calibri", 11.0, 141.0, [440.0, 831.0, 1215.0]),
+      (1.0, "Arial", 11.0, 153.0, [441.0, 825.0, 1202.0]),
+      (1.0, "SimSun", 20.0, 252.0, [449.0, 776.0, 1095.0]),
+      (0.95, "SimSun", 11.0, 132.0, [439.0, 812.0, 1178.0]),
+      (0.95, "DengXian", 11.0, 138.0, [440.0, 809.0, 1171.0]),
+      (0.95, "Calibri", 11.0, 132.0, [439.0, 812.0, 1178.0]),
+      (0.95, "Arial", 11.0, 144.0, [440.0, 806.0, 1165.0]),
+      (0.95, "SimSun", 20.0, 237.0, [448.0, 760.0, 1064.0]),
+    ] {
+      let cell = CellRect {
+        width_pt: units::quantize_points_to_office_print_grid(113.76 * scale),
+        height_pt: 20.0,
+        ..page
+      };
+      let mut style = TextStyle {
+        font_family: Some(family.into()),
+        font_size_pt: size,
+        ..Default::default()
+      };
+      super::super::text::scale_text_style_for_fixed_output(&mut style, scale);
+      for (alignment, expected) in [
+        x::HorizontalAlignmentValues::Left,
+        x::HorizontalAlignmentValues::Center,
+        x::HorizontalAlignmentValues::Right,
+      ]
+      .into_iter()
+      .zip(expected)
+      {
+        let rect = excel_printer_cell_text_horizontal_rect(
+          cell,
+          page,
+          false,
+          alignment,
+          &style,
+          &mut metrics,
+        );
+        let x = cell_text_x_pt(rect, advance_dots * 0.12, alignment, 0.0);
+        // The rectangle owns the alignment phase. Native centering also
+        // floors an odd remaining device width before halving it.
+        let x = if alignment == x::HorizontalAlignmentValues::Center {
+          ((x / 0.12) + 0.0001).floor() * 0.12
+        } else {
+          x
+        };
+        assert!(
+          (x - expected * 0.12).abs() < 0.0001,
+          "{family} {size} at {scale}, {alignment:?}: {x} != {}",
+          expected * 0.12
+        );
+      }
+    }
   }
 
   #[test]
@@ -14962,15 +15511,16 @@ mod drawing_page_tests {
     use ooxmlsdk::sdk::SpreadsheetDocumentType;
 
     // Office's fixed-output length matrices use explicit SimSun 11.
-    // Use an explicit 50.05pt column grid to keep producer/theme defaults
-    // separate from the observed overflow ownership. The second page is
+    // Its Normal-font device grid gives50.04pt default columns (native
+    // font/base-width controls), independently of application-theme defaults.
+    // The second page is
     // J:R; without owned data it retains lengths 127+, while
     // a value in L22 admits lengths 73+. A shorter explicit area J:K starts
     // at K instead. Empty strings and invisible values still own a column.
     for (last_column, extra_row, first_length) in [
       ("R", "", 127),
       ("K", "", 64),
-      ("R", r#"<row r="22"><c r="J22"><v>1</v></c></row>"#, 55),
+      ("R", r#"<row r="22"><c r="J22"><v>1</v></c></row>"#, 54),
       ("R", r#"<row r="22"><c r="L22"><v>1</v></c></row>"#, 73),
       ("R", r#"<row r="22"><c r="L22" s="1"/></row>"#, 127),
       (
@@ -15026,14 +15576,12 @@ mod drawing_page_tests {
           format!(r#"<row r="{row}"><c r="D{row}" t="inlineStr"><is><t>{text}</t></is></c></row>"#)
         })
         .collect::<String>();
-      // SimSun 11 has a 5.52pt digit on the Office 600dpi print grid.
-      let column_width = 50.05 / 5.52;
       worksheet
         .set_data(
           &mut package,
           format!(
             r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-        <sheetFormatPr defaultRowHeight="15" defaultColWidth="{column_width}"/><sheetData>{rows}{extra_row}</sheetData>
+        <sheetFormatPr defaultRowHeight="15"/><sheetData>{rows}{extra_row}</sheetData>
         <pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>
         <pageSetup paperSize="9"/></worksheet>"#
           )
@@ -15044,7 +15592,7 @@ mod drawing_page_tests {
       let print = CalcPrintDocument::from_import(&import);
       assert_eq!(print.pages.len(), 2);
       let page = &print.pages[1];
-      assert!((page.sheet.column_width_pt(1) - 50.05).abs() < 0.001);
+      assert!((page.sheet.column_width_pt(1) - 50.04).abs() < 0.001);
       let area = page.area.unwrap();
       assert_eq!(area.start.col, 10);
       let mut metrics = TextMetrics::new();
@@ -15690,6 +16238,24 @@ mod drawing_page_tests {
   }
 
   #[test]
+  fn vml_gradient_keeps_fixed_point_multicolor_stops() {
+    let shape = super::super::object_resources::VmlShapeModel {
+      fill_color: Some("#A603AB".into()),
+      fill_color2: Some("blue".into()),
+      fill_type: Some(vml::FillTypeValues::Gradient),
+      fill_colors: Some("0 #a603ab;13763f #0819fb;22938f #1a8d48;34079f yellow;47841f #ee3f17;57672f #e81766;1 #a603ab".into()),
+      ..Default::default()
+    };
+    let common::Fill::Gradient(gradient) = vml_shape_common_fill(&shape, Affine::IDENTITY) else {
+      panic!("expected VML gradient");
+    };
+    assert_eq!(gradient.stops.len(), 7);
+    assert!((gradient.stops[1].position - 13_763.0 / 65_536.0).abs() < 0.000_01);
+    assert_eq!(gradient.stops[1].color.b, 0xfb);
+    assert!((gradient.stops[5].position - 57_672.0 / 65_536.0).abs() < 0.000_01);
+  }
+
+  #[test]
   fn two_stop_drawingml_gradient_uses_office_sigma_interpolation() {
     assert_eq!(
       office_drawing_gradient_interpolation(2),
@@ -15812,6 +16378,7 @@ mod cell_alignment_tests {
     ] {
       let output = CalcCellOutputArea {
         align_rect: CellRect::default(),
+        fit_width_pt: 0.0,
         clip_rect: CellRect::default(),
         left_clip_pt,
         right_clip_pt,
@@ -15992,6 +16559,110 @@ mod cell_alignment_tests {
   }
 
   #[test]
+  fn right_aligned_date_fit_keeps_the_native_font_width_owner() {
+    use super::super::styles::StylesCatalog;
+    use super::super::worksheet::{
+      SheetIdentity, SheetResourceCatalog, SpreadsheetProducerProfile,
+    };
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part
+      .set_data(
+        &mut package,
+        br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <fonts count="1"><font><sz val="11"/><name val="Calibri"/><scheme val="minor"/></font></fonts>
+          <cellXfs count="1"><xf fontId="0"/></cellXfs>
+        </styleSheet>"#
+          .to_vec(),
+      )
+      .unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+    )
+    .unwrap();
+    let sheet = CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Sheet1".into(),
+        state: None,
+        active: true,
+      },
+      x::Worksheet::default(),
+      SheetResourceCatalog::default(),
+      &[],
+      &styles,
+      SpreadsheetProducerProfile {
+        mso_document: true,
+        excel_major_version: Some(16),
+        ..Default::default()
+      },
+    );
+    assert!(sheet.uses_printer_cell_text_horizontal_grid());
+    let style = TextStyle {
+      font_family: Some("DengXian".into()),
+      font_size_pt: 11.04,
+      ..Default::default()
+    };
+    let mut cell = print_cell(super::super::print::NumberFormatRenderState::DateTime);
+    cell.text = "37184".into();
+    cell.rendered_text = "2001/10/20".into();
+    let mut metrics = TextMetrics::new();
+    let occupied = HashMap::new();
+    // Actual fixed-format exports at five authored column widths. The
+    // printer widths below are the reconstructed screen-pixel boundaries.
+    for (dots, fits) in [
+      (470.0, false),
+      (480.0, false),
+      (483.0, true),
+      (486.0, true),
+      (493.0, true),
+    ] {
+      let clip = CellRect {
+        x_pt: 207.0,
+        y_pt: 54.0,
+        width_pt: dots * 0.12,
+        height_pt: 12.48,
+      };
+      let align = excel_printer_cell_text_horizontal_rect(
+        clip,
+        clip,
+        false,
+        x::HorizontalAlignmentValues::Right,
+        &style,
+        &mut metrics,
+      );
+      let output = calc_cell_output_area(
+        CalcCellOutputContext {
+          sheet: &sheet,
+          occupied_cells: &occupied,
+          text_metrics: &mut metrics,
+        },
+        &cell,
+        align,
+        clip,
+        &style,
+        None,
+        1.0,
+      );
+      let visible = calc_cell_visible_text(&sheet, &cell, &style, output, None, &mut metrics);
+      if fits {
+        assert_eq!(visible, "2001/10/20", "{dots} dots");
+      } else {
+        assert!(visible.chars().all(|c| c == '#'), "{dots} dots: {visible}");
+      }
+    }
+  }
+
+  #[test]
   fn rtl_sheet_anchor_placement_preserves_positive_extents_and_text_orientation() {
     let source = CellRect {
       x_pt: 10.0,
@@ -16103,6 +16774,7 @@ mod cell_alignment_tests {
           text_metrics: &mut metrics,
         },
         &cell,
+        rect,
         rect,
         &style,
         merged.then_some(super::super::styles::AlignmentRecord {
@@ -16219,6 +16891,7 @@ mod cell_alignment_tests {
                 },
                 &cell,
                 rect,
+                rect,
                 &style,
                 alignment,
                 1.0,
@@ -16251,6 +16924,7 @@ mod cell_alignment_tests {
       },
       &cell,
       rect,
+      rect,
       &style,
       None,
       1.0,
@@ -16272,6 +16946,38 @@ mod cell_alignment_tests {
         calc_cell_horizontal_alignment(&print_cell(state), None),
         x::HorizontalAlignmentValues::Center
       );
+    }
+  }
+
+  #[test]
+  fn general_text_alignment_uses_the_first_strong_character() {
+    use super::super::print::NumberFormatRenderState;
+    for (raw, expected) in [
+      ("הפקדות", x::HorizontalAlignmentValues::Right),
+      (" (הפקדות)", x::HorizontalAlignmentValues::Right),
+      ("ABCD", x::HorizontalAlignmentValues::Left),
+      ("1234", x::HorizontalAlignmentValues::Left),
+      ("English עברית", x::HorizontalAlignmentValues::Left),
+    ] {
+      let mut cell = print_cell(NumberFormatRenderState::Text);
+      cell.text = std::borrow::Cow::Borrowed(raw);
+      cell.rendered_text = raw.into();
+      for reading_order in [None, Some(1), Some(2)] {
+        let mut alignment = super::super::styles::AlignmentRecord {
+          horizontal: Some(x::HorizontalAlignmentValues::General),
+          reading_order,
+          ..Default::default()
+        };
+        assert_eq!(
+          calc_cell_horizontal_alignment(&cell, Some(alignment)),
+          expected
+        );
+        alignment.horizontal = Some(x::HorizontalAlignmentValues::Left);
+        assert_eq!(
+          calc_cell_horizontal_alignment(&cell, Some(alignment)),
+          x::HorizontalAlignmentValues::Left
+        );
+      }
     }
   }
 
@@ -16745,6 +17451,200 @@ mod cell_alignment_tests {
           };
           assert!((text[0].y_pt - expected_y).abs() < 0.001);
         }
+      }
+    }
+  }
+
+  #[test]
+  fn wrapped_accounting_numbers_keep_the_numeric_fill_owner() {
+    use super::super::print::{
+      NumberFormatLayoutItem::{Fill, Reserve, Text},
+      NumberFormatRenderState,
+    };
+
+    // The native BillingStatement H15 zero is a wrapped numeric formula,
+    // not a formatted text value. Its accounting fill still separates '$'
+    // and '-', as in the independent Office accounting-format controls.
+    let layout = [
+      Reserve('('),
+      Text("$".into()),
+      Fill(' '),
+      Text("-".into()),
+      Reserve('0'),
+      Reserve('0'),
+      Reserve(')'),
+    ];
+    let mut metrics = TextMetrics::new();
+    let mut items = Vec::new();
+    assert!(render_number_format_layout(
+      &mut items,
+      NumberFormatCellLayout {
+        items: &layout,
+        value_state: NumberFormatRenderState::Number
+      },
+      CellRect {
+        x_pt: 10.0,
+        y_pt: 20.0,
+        width_pt: 60.0,
+        height_pt: 20.0
+      },
+      &TextStyle {
+        font_family: Some(Arc::from("Gill Sans MT")),
+        font_size_pt: 10.56,
+        ..Default::default()
+      },
+      CellTextRenderOptions {
+        alignment: Some(super::super::styles::AlignmentRecord {
+          wrap_text: true,
+          ..Default::default()
+        }),
+        horizontal_alignment: x::HorizontalAlignmentValues::Right,
+        hyperlink_url: None,
+        formula: true,
+        default_line_height_pt: 16.0,
+        clip_wrapped_text: false,
+        has_outer_border: false,
+      },
+      &mut metrics,
+    ));
+    let text = items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Text(text) => Some(text),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    let currency = text.iter().find(|item| item.text == "$").unwrap();
+    let zero = text.iter().find(|item| item.text == "-").unwrap();
+    assert!(zero.x_pt - currency.x_pt > 20.0);
+  }
+
+  #[test]
+  fn rtl_number_format_reservation_keeps_its_physical_edge() {
+    use super::super::print::NumberFormatLayoutItem::{Reserve, Text};
+
+    let style = TextStyle {
+      font_family: Some(Arc::from("Lucida Sans Unicode")),
+      font_size_pt: 9.96,
+      ..Default::default()
+    };
+    let rect = CellRect {
+      x_pt: 10.0,
+      y_pt: 20.0,
+      width_pt: 100.0,
+      height_pt: 20.0,
+    };
+    let mut metrics = TextMetrics::new();
+    let mut origins = Vec::new();
+    for layout in [
+      vec![Reserve(' '), Text("ועד בית".into())],
+      vec![Text("ועד בית".into()), Reserve(' ')],
+      vec![Reserve(' '), Text("ועד בית".into()), Reserve(' ')],
+    ] {
+      let mut items = Vec::new();
+      assert!(render_number_format_layout(
+        &mut items,
+        NumberFormatCellLayout {
+          items: &layout,
+          value_state: super::super::print::NumberFormatRenderState::Text,
+        },
+        rect,
+        &style,
+        CellTextRenderOptions {
+          alignment: None,
+          horizontal_alignment: x::HorizontalAlignmentValues::Right,
+          hyperlink_url: None,
+          formula: false,
+          default_line_height_pt: 12.75,
+          clip_wrapped_text: false,
+          has_outer_border: false,
+        },
+        &mut metrics,
+      ));
+      let PageItem::Text(text) = &items[0] else {
+        panic!("reserved RTL text must render");
+      };
+      origins.push(text.x_pt);
+    }
+    // Native 04-leading-reserve retains the right-aligned origin, whereas
+    // 05-trailing-reserve and 00-both move it left by 26 printer dots.
+    assert!((origins[0] - origins[1] - 3.12).abs() < 0.001);
+    assert!((origins[1] - origins[2]).abs() < 0.001);
+  }
+
+  #[test]
+  fn formatted_text_spacing_uses_cell_font_and_plain_formats_keep_rich_fonts() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Native Excel controls vary only this format, preserving the same rich
+    // Lucida/Arial string. Both its wrapped and unwrapped cells flatten for
+    // spacing formats but retain Arial for General/@ and color-only formats.
+    for (format, rich) in [
+      ("General", true),
+      ("@", true),
+      ("0;0;0;@", true),
+      ("0;0;0;[Blue]@", true),
+      ("0;0;0;_ @", false),
+      ("0;0;0;@_ ", false),
+      ("0;0;0;* @", false),
+      ("0;0;0;@* ", false),
+      ("0;0;0;_ @_ ", false),
+    ] {
+      for wrap in [false, true] {
+        let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+        let workbook = package.add_workbook_part().unwrap();
+        let worksheet = workbook
+          .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+          .unwrap();
+        let styles = workbook
+          .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+          .unwrap();
+        let id = workbook
+          .get_id_of_part(&package, &worksheet)
+          .unwrap()
+          .to_owned();
+        workbook.set_data(&mut package, format!(
+          r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Text" sheetId="1" r:id="{id}"/></sheets></workbook>"#
+        ).into_bytes()).unwrap();
+        styles.set_data(&mut package, format!(
+          r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+            <numFmts count="1"><numFmt numFmtId="164" formatCode="{format}"/></numFmts>
+            <fonts count="1"><font><sz val="11"/><name val="Lucida Sans Unicode"/></font></fonts>
+            <cellXfs count="1"><xf fontId="0" numFmtId="164" applyNumberFormat="1" applyAlignment="1"><alignment wrapText="{wrap}"/></xf></cellXfs>
+          </styleSheet>"#
+        ).into_bytes()).unwrap();
+        worksheet.set_data(&mut package, r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetFormatPr defaultRowHeight="45"/><cols><col min="1" max="1" width="40" customWidth="1"/></cols>
+          <sheetData><row r="1"><c r="A1" s="0" t="inlineStr"><is>
+            <r><t xml:space="preserve">ועד בית </t></r><r><rPr><rFont val="Arial"/><sz val="11"/></rPr><t>2013</t></r>
+          </is></c></row></sheetData></worksheet>"#.as_bytes().to_vec()).unwrap();
+        let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+        let print = CalcPrintDocument::from_import(&import);
+        let page = &print.pages[0];
+        let items = print_page_items(&import, page, page_setup_from_calc(page));
+        let text = items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text) => Some(text),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        assert!(!text.is_empty(), "{format}, wrap={wrap}");
+        assert!(text.iter().any(|text| text.text.contains("2013")));
+        assert_eq!(
+          text
+            .iter()
+            .any(|text| text.style.font_family.as_deref() == Some("Arial")),
+          rich,
+          "{format}, wrap={wrap}"
+        );
+        assert!(text.iter().all(|text| matches!(
+          text.style.font_family.as_deref(),
+          Some("Lucida Sans Unicode") | Some("Arial")
+        )));
       }
     }
   }

@@ -13,6 +13,7 @@ mod direct_path_gradient;
 mod direct_pattern;
 mod direct_svg;
 mod direct_tag;
+mod direct_word_text;
 mod gradient;
 mod image;
 mod tiff_palette;

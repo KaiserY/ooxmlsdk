@@ -18,6 +18,11 @@ pub struct LayoutOptions {
   /// When absent, the user-interface language remains the compatibility
   /// fallback for callers of the pre-existing API.
   pub default_document_language: Option<String>,
+  /// Languages whose automatic hyphenation dictionaries are available to
+  /// the producing application. `None` uses all bundled dictionaries; an
+  /// empty list disables automatic dictionary breaks. Authored soft hyphens
+  /// remain available independently of this installation setting.
+  pub automatic_hyphenation_languages: Option<Vec<String>>,
   /// Local civil time to use when an application explicitly refreshes
   /// unlocked WordprocessingML DATE, TIME, PRINTDATE, and SAVEDATE fields or
   /// generated PresentationML `datetime` text fields. SpreadsheetML formula

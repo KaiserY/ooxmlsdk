@@ -115,10 +115,14 @@ pub struct PdfPageDiagnostics {
   pub text_runs: Vec<PdfTextRunDiagnostics>,
 }
 
-/// One positioned layout text run before it is emitted through Krilla.
+/// One positioned layout text run before direct PDF serialization.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PdfTextRunDiagnostics {
+  /// Layout text addressed by the portion and glyph UTF-8 ranges below.
   pub text: String,
+  /// Source-backed Unicode sent to PDF text mappings after display-semantic
+  /// substitutions, such as legacy symbol selectors and no-break hyphens.
+  pub pdf_text: String,
   /// Layout frame that owns this PDF text run, when the engine exposes one.
   pub source_frame_index: Option<usize>,
   /// Line within `source_frame_index` that owns this run.

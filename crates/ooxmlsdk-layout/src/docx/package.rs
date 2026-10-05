@@ -21,22 +21,27 @@ use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_2006_active_x as ax,
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
   schemas_microsoft_com_office_drawing_2012_chart_style as cs,
-  schemas_microsoft_com_office_drawing_2014_chartex as cx,
+  schemas_microsoft_com_office_drawing_2014_chartex as cx, schemas_microsoft_com_vml as v,
   schemas_openxmlformats_org_drawingml_2006_chart as c,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
   schemas_openxmlformats_org_drawingml_2006_main as a,
 };
 use ooxmlsdk::sdk::{RelatedPart, SdkPart, SdkType};
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+const EXTENDED_CHART_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/drawing/2014/chartex";
+
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {
+  pub(super) vml_shape_types: Vec<v::Shapetype>,
   pub(super) by_relationship_id: HashMap<String, ImageResource>,
   pub(super) signed_signature_line_images_by_id: HashMap<String, SignatureLineImages>,
   pub(super) active_x_text_style_by_relationship_id: HashMap<String, ActiveXTextStyle>,
   pub(super) math_type_by_relationship_id: HashMap<String, super::math_type::MathTypeEquation>,
+  pub(super) legacy_excel_font_size_twips_by_relationship_id: HashMap<String, u16>,
   pub(super) ograph_charts_by_relationship_id: HashMap<String, OgraphChartResource>,
   pub(super) charts_by_relationship_id: HashMap<String, ClassicChartResource>,
   pub(super) extended_charts_by_relationship_id: HashMap<String, ExtendedChartResource>,
@@ -54,6 +59,7 @@ pub(super) struct OgraphChartResource {
 #[derive(Clone, Debug)]
 pub(super) struct ClassicChartResource {
   pub(super) chart_space: c::ChartSpace,
+  pub(super) user_shapes: Option<c::UserShapes>,
   pub(super) image_resources: HashMap<String, ImageResource>,
   pub(super) theme_override: Option<a::ThemeOverride>,
 }
@@ -80,6 +86,31 @@ pub(super) struct HyperlinkCatalog {
 #[derive(Clone, Debug, Default)]
 pub(super) struct AltChunkCatalog {
   pub(super) by_relationship_id: HashMap<String, AltChunkResource>,
+}
+
+fn legacy_excel_default_font_size_twips(data: &[u8]) -> Option<u16> {
+  let compound = CompoundFile::from_bytes(data).ok()?;
+  let workbook = compound
+    .stream("Workbook")
+    .or_else(|| compound.stream("Book"))?;
+  biff_default_font_size_twips(workbook)
+}
+
+fn biff_default_font_size_twips(workbook: &[u8]) -> Option<u16> {
+  let mut offset = 0usize;
+  while offset.checked_add(4)? <= workbook.len() {
+    let record = u16::from_le_bytes(workbook.get(offset..offset + 2)?.try_into().ok()?);
+    let length = usize::from(u16::from_le_bytes(
+      workbook.get(offset + 2..offset + 4)?.try_into().ok()?,
+    ));
+    let body = workbook.get(offset + 4..offset.checked_add(4 + length)?)?;
+    if record == 0x0031 && body.len() >= 2 {
+      let twips = u16::from_le_bytes(body[..2].try_into().ok()?);
+      return (40..=1440).contains(&twips).then_some(twips);
+    }
+    offset += 4 + length;
+  }
+  None
 }
 
 #[derive(Clone, Debug)]
@@ -481,6 +512,14 @@ impl ImageCatalog {
         Some((related.relationship_id().to_string(), equation))
       })
       .collect();
+    catalog.legacy_excel_font_size_twips_by_relationship_id = part
+      .related_parts_of_type::<_, EmbeddedObjectPart>(package)
+      .filter_map(|related| {
+        let data = related.part().try_data_bytes(package).ok()?;
+        let size = legacy_excel_default_font_size_twips(&data)?;
+        Some((related.relationship_id().to_string(), size))
+      })
+      .collect();
     catalog.ograph_charts_by_relationship_id = part
       .related_parts_of_type::<_, EmbeddedObjectPart>(package)
       .filter_map(|related| {
@@ -557,10 +596,12 @@ impl ImageCatalog {
     }
 
     Self {
+      vml_shape_types: Vec::new(),
       by_relationship_id,
       signed_signature_line_images_by_id: HashMap::new(),
       active_x_text_style_by_relationship_id: HashMap::new(),
       math_type_by_relationship_id: HashMap::new(),
+      legacy_excel_font_size_twips_by_relationship_id: HashMap::new(),
       ograph_charts_by_relationship_id: HashMap::new(),
       charts_by_relationship_id: HashMap::new(),
       extended_charts_by_relationship_id: HashMap::new(),
@@ -580,7 +621,42 @@ impl ImageCatalog {
     let mut classic_by_relationship_id = HashMap::new();
     let mut extended_by_relationship_id = HashMap::new();
     for (relationship_id, chart_part) in chart_parts {
+      if let Ok(data) = chart_part.try_data_bytes(package)
+        && has_extended_chart_root(&data)
+      {
+        let Ok(chart_space) = cx::ChartSpace::from_bytes(&data) else {
+          continue;
+        };
+        // Some Office producers keep the legacy chart relationship/content
+        // type while storing a ChartEx root. The generated readers accept a
+        // matching local root name across namespaces, so select the typed
+        // root before asking ChartPart for its classic cached root.
+        let chart_style_parts: Vec<_> = chart_part.chart_style_parts(package).collect();
+        let chart_color_style_parts: Vec<_> = chart_part.chart_color_style_parts(package).collect();
+        let chart_styles = chart_style_parts
+          .iter()
+          .filter_map(|part| part.root_element(package).ok().cloned())
+          .collect();
+        let color_styles = chart_color_style_parts
+          .iter()
+          .filter_map(|part| part.root_element(package).ok().cloned())
+          .collect();
+        extended_by_relationship_id.insert(
+          relationship_id,
+          ExtendedChartResource {
+            chart_space,
+            chart_styles,
+            color_styles,
+          },
+        );
+        continue;
+      }
       if let Ok(chart_space) = chart_part.root_element(package) {
+        let user_shapes = chart_space.user_shapes_reference.as_ref().and_then(|_| {
+          chart_part
+            .chart_drawing_part(package)
+            .and_then(|part| part.root_element(package).ok().cloned())
+        });
         let image_resources = chart_part
           .related_parts_of_type::<_, ImagePart>(package)
           .filter_map(|related| {
@@ -601,32 +677,9 @@ impl ImageCatalog {
           relationship_id,
           ClassicChartResource {
             chart_space: chart_space.clone(),
+            user_shapes,
             image_resources,
             theme_override,
-          },
-        );
-      } else if let Ok(data) = chart_part.try_data_bytes(package)
-        && let Ok(chart_space) = cx::ChartSpace::from_bytes(&data)
-      {
-        // Some Office producers keep the legacy chart relationship/content
-        // type while storing a ChartEx root. Resolve by the typed root after
-        // package/MCE selection instead of falling back to the sibling chart.
-        let chart_style_parts: Vec<_> = chart_part.chart_style_parts(package).collect();
-        let chart_color_style_parts: Vec<_> = chart_part.chart_color_style_parts(package).collect();
-        let chart_styles = chart_style_parts
-          .iter()
-          .filter_map(|part| part.root_element(package).ok().cloned())
-          .collect();
-        let color_styles = chart_color_style_parts
-          .iter()
-          .filter_map(|part| part.root_element(package).ok().cloned())
-          .collect();
-        extended_by_relationship_id.insert(
-          relationship_id,
-          ExtendedChartResource {
-            chart_space,
-            chart_styles,
-            color_styles,
           },
         );
       }
@@ -709,11 +762,53 @@ impl ImageCatalog {
   }
 }
 
+fn has_extended_chart_root(xml: &[u8]) -> bool {
+  let mut reader = quick_xml::NsReader::from_reader(xml);
+  loop {
+    match reader.read_resolved_event() {
+      Ok((namespace, Event::Start(root) | Event::Empty(root))) => {
+        return root.local_name().as_ref() == b"chartSpace"
+          && matches!(namespace, ResolveResult::Bound(uri)
+            if uri.as_ref() == EXTENDED_CHART_NAMESPACE);
+      }
+      Ok((_, Event::Decl(_) | Event::Comment(_) | Event::PI(_) | Event::DocType(_))) => {}
+      Ok((_, Event::Text(text))) if text.iter().all(u8::is_ascii_whitespace) => {}
+      _ => return false,
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use base64::Engine;
 
-  use super::signature_line_images_from_xml;
+  use super::{
+    biff_default_font_size_twips, has_extended_chart_root, signature_line_images_from_xml,
+  };
+
+  #[test]
+  fn biff_default_font_size_reads_first_font_record_after_other_globals() {
+    let records = [
+      0x09, 0x08, 0x02, 0x00, 0x00, 0x06, // BOF
+      0x31, 0x00, 0x04, 0x00, 0xc8, 0x00, 0x00, 0x00, // FONT, 200 twips
+      0x31, 0x00, 0x02, 0x00, 0xa0, 0x00, // later FONT, 160 twips
+    ];
+    assert_eq!(biff_default_font_size_twips(&records), Some(200));
+    assert_eq!(biff_default_font_size_twips(&records[..9]), None);
+  }
+
+  #[test]
+  fn extended_chart_root_requires_the_chartex_namespace() {
+    assert!(has_extended_chart_root(
+      br#"<?xml version="1.0"?><cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"/>"#
+    ));
+    assert!(has_extended_chart_root(
+      br#"<chartSpace xmlns="http://schemas.microsoft.com/office/drawing/2014/chartex"/>"#
+    ));
+    assert!(!has_extended_chart_root(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
+    ));
+  }
 
   #[test]
   fn signature_line_images_require_signed_references_and_match_the_setup_id() {

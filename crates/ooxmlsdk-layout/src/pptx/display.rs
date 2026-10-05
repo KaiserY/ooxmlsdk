@@ -213,7 +213,7 @@ fn common_display_page(setup: PageSetup, items: Vec<PageItem>) -> common::Displa
 
 fn common_display_item(item: PageItem) -> common::DisplayItem<'static> {
   match item {
-    PageItem::Text(item) => common::DisplayItem::Text(common_text_run(item)),
+    PageItem::Text(item) => common::DisplayItem::Text(Box::new(common_text_run(item))),
     PageItem::Image(item) => common::DisplayItem::Image(common_image_item(item)),
     PageItem::Group {
       mask,
@@ -248,6 +248,8 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     text: Cow::Owned(item.text),
     origin: common_point(item.x_pt, item.y_pt),
     line_height: common::Pt(item.line_height_pt),
+    wordprocessing_line_metrics: None,
+    origin_is_baseline: false,
     line_metrics_participant: true,
     paint_clip: None,
     page_culling_bounds: None,
@@ -261,6 +263,7 @@ fn common_text_run(item: TextItem) -> common::TextRun<'static> {
     paragraph_bidi: item.paragraph_bidi,
     word_spacing_pt: 0.0,
     preserve_text_portion: item.preserve_text_portion,
+    decoration_span_start_x: None,
     pdf_text_segmentation: match item.pdf_text_segmentation {
       PdfTextSegmentation::Line => common::PdfTextSegmentation::Line,
       PdfTextSegmentation::WordLine => common::PdfTextSegmentation::WordLine,
@@ -1529,6 +1532,7 @@ fn lower_chart(
       shared_chart::automatic_chart_title(ui_language),
       &RadialChartStyle {
         layout_profile: ChartLayoutProfile::PowerPoint,
+        fixed_output_raster_dpi: crate::units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
         title: chart_text_style(
           title_text_style_context,
           title_properties,
@@ -1560,6 +1564,8 @@ fn lower_chart(
               })
           })
           .collect(),
+        data_label_shape_styles: Vec::new(),
+        data_label_image_effects: Vec::new(),
         leader_line_style: pptx_chart_shape_style(
           import,
           slide,
@@ -2134,6 +2140,7 @@ fn lower_chart(
         shared_chart::automatic_chart_title(ui_language),
         &ClusteredColumnStyle {
           layout_profile: ChartLayoutProfile::PowerPoint,
+          fixed_output_raster_dpi: crate::units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
           chartsheet: false,
           chart_style_id: shared_chart::chart_style_id(&chart_resource.chart_space).unwrap_or(2),
           modern_excel_profile: false,
@@ -2199,6 +2206,8 @@ fn lower_chart(
           axis_line_width_pt: None,
           category_major_gridline: None,
           category_minor_gridline: None,
+          value_minor_gridline: None,
+          category_major_gridline_stroke: None,
           series_colors,
           series_point_colors,
           series_styles,
@@ -9954,8 +9963,8 @@ fn tiled_blip_fill_image_items(
   blip_compression_state: common::BlipCompressionState,
   placement: ImageFillPlacement,
 ) -> Vec<ImageItem> {
-  let natural_size =
-    image_tile_size_pt(&data).unwrap_or((placement.frame.width_pt, placement.frame.height_pt));
+  let natural_size = common::drawingml_image_tile::natural_size_pt(&data)
+    .unwrap_or((placement.frame.width_pt, placement.frame.height_pt));
   common::drawingml_image_tile::placements(
     (
       placement.frame.x_pt,
@@ -10020,60 +10029,6 @@ fn drawingml_blip_compression_state(
     }
     Some(a::BlipCompressionValues::None) => common::BlipCompressionState::None,
   }
-}
-
-fn image_tile_size_pt(data: &[u8]) -> Option<(f32, f32)> {
-  let image = image::load_from_memory(data).ok()?;
-  if let Some((horizontal_dpi, vertical_dpi)) = jpeg_density_dpi(data) {
-    return Some((
-      image.width() as f32 * units::POINTS_PER_INCH / horizontal_dpi,
-      image.height() as f32 * units::POINTS_PER_INCH / vertical_dpi,
-    ));
-  }
-  Some((
-    image.width() as f32 * units::POINTS_PER_CSS_PIXEL,
-    image.height() as f32 * units::POINTS_PER_CSS_PIXEL,
-  ))
-}
-
-fn jpeg_density_dpi(data: &[u8]) -> Option<(f32, f32)> {
-  if !data.starts_with(&[0xff, 0xd8]) {
-    return None;
-  }
-  let mut offset = 2usize;
-  while offset + 4 <= data.len() {
-    while offset < data.len() && data[offset] == 0xff {
-      offset += 1;
-    }
-    let marker = *data.get(offset)?;
-    offset += 1;
-    if marker == 0xd9 || marker == 0xda {
-      break;
-    }
-    let length = usize::from(u16::from_be_bytes([
-      *data.get(offset)?,
-      *data.get(offset + 1)?,
-    ]));
-    if length < 2 || offset + length > data.len() {
-      return None;
-    }
-    let payload = &data[offset + 2..offset + length];
-    if marker == 0xe0 && payload.len() >= 12 && payload.starts_with(b"JFIF\0") {
-      let unit = payload[7];
-      let horizontal = f32::from(u16::from_be_bytes([payload[8], payload[9]]));
-      let vertical = f32::from(u16::from_be_bytes([payload[10], payload[11]]));
-      if horizontal <= 0.0 || vertical <= 0.0 {
-        return None;
-      }
-      return match unit {
-        1 => Some((horizontal, vertical)),
-        2 => Some((horizontal * 2.54, vertical * 2.54)),
-        _ => None,
-      };
-    }
-    offset += length;
-  }
-  None
 }
 
 struct ImportedImageData {
@@ -10950,7 +10905,7 @@ fn materialize_drawingml_text_effects(
       },
     };
     let source_text = text.clone();
-    let source_item = common::DisplayItem::Text(common_text_run(source_text.clone()));
+    let source_item = common::DisplayItem::Text(Box::new(common_text_run(source_text.clone())));
     let automatic_extrusion_color = common::drawingml_3d::automatic_extrusion_color_from_items(
       std::slice::from_ref(&source_item),
     );
@@ -11539,15 +11494,19 @@ fn text_base_style(
     pdf_glyph_outline_options: pdf_glyph_outlines.then(|| {
       Arc::new(common::PdfGlyphOutlineOptions {
         semantic_text_overlay: !vectorize_without_semantic_overlay,
+        wordprocessing_outline: false,
+        wordprocessing_unscaled_linear_fill: false,
         definition_width_basis: common::PdfGlyphDefinitionWidthBasis::AtLeastFontSize,
         definition_trailing_advance: common::Pt(0.0),
         fill: None,
+        image_fill: None,
         fill_has_authored_transparency: false,
         outline_fill: None,
         outline_stroke: None,
         outline_has_authored_transparency: false,
         transform: None,
         text_warp: None,
+        vml_text_shadow: None,
       })
     }),
     ..TextStyle::default()
@@ -16552,7 +16511,10 @@ fn apply_text_outline(
         common::Fill::Gradient(gradient) => common_stroke.gradient = Some(gradient),
         common::Fill::Pattern(pattern) => common_stroke.pattern = Some(pattern),
         common::Fill::Solid(color) => common_stroke.color = color,
-        common::Fill::None | common::Fill::Theme(_) | common::Fill::Image { .. } => {}
+        common::Fill::None
+        | common::Fill::Theme(_)
+        | common::Fill::Image { .. }
+        | common::Fill::Texture(_) => {}
       }
     } else {
       options.outline_fill = None;
@@ -16815,9 +16777,10 @@ fn line_stroke(
       spacing_pt: 0.0,
       color: paint.color,
       compound: false,
+      compound_pattern: crate::model::BorderCompoundPattern::Equal,
       dash_pattern: crate::model::BorderDashPattern::Solid,
       shadow: false,
-      inset_or_outset: false,
+      relief: None,
     },
     opacity: paint.opacity,
     common,
@@ -18361,7 +18324,10 @@ mod tests {
       0x4b, 0x00, 0x4b, 0x00, 0x00, 0xff, 0xd9,
     ];
 
-    assert_eq!(jpeg_density_dpi(&jpeg), Some((75.0, 75.0)));
+    assert_eq!(
+      common::drawingml_image_tile::jpeg_density_dpi(&jpeg),
+      Some((75.0, 75.0))
+    );
   }
 
   #[test]

@@ -68,6 +68,7 @@ toml = "1.1.4"
 fontique = { version = "0.11.0", features = ["fontconfig-dlopen", "system"] }
 harfrust = { version = "0.13.3", default-features = false, features = ["std"] }
 html5ever = "0.39.0"
+cssparser = "0.37.0"
 hypher = "0.1.7"
 icu_collator = { version = "2.2.1", features = ["compiled_data"] }
 icu_calendar = { version = "2.2.1", features = ["compiled_data"] }

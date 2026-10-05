@@ -2,7 +2,10 @@ use image::{
   RgbaImage,
   imageops::{FilterType, replace},
 };
-use kurbo::{Affine, BezPath, Point as KurboPoint, Shape as KurboShape};
+use kurbo::{
+  Affine, BezPath, Cap as KurboCap, Join as KurboJoin, Point as KurboPoint, Shape as KurboShape,
+  Stroke as KurboStroke, StrokeOpts, stroke as expand_stroke,
+};
 use skrifa::{
   FontRef, GlyphId, MetadataProvider,
   instance::{LocationRef, Size},
@@ -1350,7 +1353,7 @@ fn apply_wpf_grayscale_alpha_correction(image: &mut RgbaImage) {
   }
 }
 
-fn resize_premultiplied_rgba(
+pub(crate) fn resize_premultiplied_rgba(
   source: &RgbaImage,
   width: u32,
   height: u32,
@@ -1413,11 +1416,10 @@ pub(crate) fn rasterize_vector_items_for_effects_at_fixed_output_pixels_per_poin
   {
     return None;
   }
-  let pixels_per_point = effect_pixels_per_point_with_budget(
+  let pixels_per_point = fixed_output_effect_pixels_per_point(
     raster_bounds.size.width.0,
     raster_bounds.size.height.0,
     requested_pixels_per_point,
-    MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS,
   )
   .min(requested_pixels_per_point);
   let width = raster_pixel_extent(raster_bounds.size.width.0, pixels_per_point);
@@ -1785,7 +1787,7 @@ pub(crate) fn rasterize_text_outline_material_layer_at_pixels_per_point(
 ) -> Option<DrawingRaster> {
   let material = text_outline_material_item(item)?;
   let (image, pixels_per_point) = rasterize_vector_items_impl_at_pixels_per_point(
-    &[DisplayItem::Text(material)],
+    &[DisplayItem::Text(Box::new(material))],
     raster_bounds,
     pixels_per_point,
   )?;
@@ -1824,7 +1826,7 @@ pub(crate) fn rasterize_text_outline_coverage_layer_at_pixels_per_point(
   // the ordinary 4x4 scanner can quantize distinct edges to the same alpha.
   // Keep its conventional pixel-centre mapping (not GDI+ sample storage).
   let image = rasterize_vector_items_impl_with_mapping(
-    &[DisplayItem::Text(material)],
+    &[DisplayItem::Text(Box::new(material))],
     PageToRasterMapping {
       width_px: raster_pixel_extent(raster_bounds.size.width.0, pixels_per_point),
       height_px: raster_pixel_extent(raster_bounds.size.height.0, pixels_per_point),
@@ -1858,7 +1860,7 @@ pub(crate) fn rasterize_text_fill_material_layer_at_pixels_per_point(
 ) -> Option<DrawingRaster> {
   let material = text_fill_material_item(item);
   let (image, pixels_per_point) = rasterize_vector_items_impl_at_pixels_per_point(
-    &[DisplayItem::Text(material)],
+    &[DisplayItem::Text(Box::new(material))],
     raster_bounds,
     pixels_per_point,
   )?;
@@ -2055,7 +2057,7 @@ pub(crate) fn rasterize_static_3d_text_contour_effect_source(
 ) -> Option<RgbaImage> {
   let contour = static_3d_text_reflection_contour_item(item, width, color)?;
   rasterize_vector_items_impl_at_pixels_per_point_with_extent_and_antialiasing(
-    &[DisplayItem::Text(contour)],
+    &[DisplayItem::Text(Box::new(contour))],
     raster_bounds,
     pixels_per_point,
     RasterSourceExtent::Outward,
@@ -2097,7 +2099,7 @@ pub(crate) fn rasterize_static_3d_text_effect_mask(
   // Coverage filters read alpha only; retain the authored fill so gradient
   // realization, font selection and source-grid policy stay unchanged.
   let (image, pixels_per_point) = rasterize_vector_items_impl_at_pixels_per_point(
-    &[DisplayItem::Text(material.clone())],
+    &[DisplayItem::Text(Box::new(material.clone()))],
     raster_bounds,
     pixels_per_point,
   )?;
@@ -2348,7 +2350,7 @@ fn fill_has_visible_alpha(fill: &Fill<'_>) -> bool {
     Fill::Pattern(pattern) => pattern.foreground.a != 0 || pattern.background.a != 0,
     // Theme and image fills cannot occur in CT_TextOutlineEffect, but retain
     // their conservative visible-paint semantics for legacy callers.
-    Fill::Theme(_) | Fill::Image { .. } => true,
+    Fill::Theme(_) | Fill::Image { .. } | Fill::Texture(_) => true,
   }
 }
 
@@ -2372,7 +2374,7 @@ fn uniform_fill_opacity(fill: &Fill<'_>) -> Option<f32> {
     Fill::Pattern(pattern) => {
       (pattern.foreground.a == pattern.background.a).then_some(pattern.foreground.a)?
     }
-    Fill::Theme(_) | Fill::Image { .. } => return None,
+    Fill::Theme(_) | Fill::Image { .. } | Fill::Texture(_) => return None,
   };
   Some(f32::from(alpha) / 255.0)
 }
@@ -2432,7 +2434,9 @@ fn uniform_static_3d_text_paint_opacity(item: &TextRun<'static>) -> Option<f32> 
   let color = match options.and_then(|value| value.fill.as_ref()) {
     Some(Fill::Solid(color)) => *color,
     Some(Fill::None) => return Some(0.0),
-    Some(Fill::Theme(_) | Fill::Gradient(_) | Fill::Image { .. } | Fill::Pattern(_)) => {
+    Some(
+      Fill::Theme(_) | Fill::Gradient(_) | Fill::Image { .. } | Fill::Texture(_) | Fill::Pattern(_),
+    ) => {
       return None;
     }
     None => item.color,
@@ -2599,6 +2603,56 @@ pub(crate) fn rasterize_group_items_for_effects_at_pixels_per_point(
   )
 }
 
+/// Word's simple WPG glow evaluates an aliased source on its actual bitmap
+/// axes. The group surface retains rounded dimensions; its nominal density
+/// selects that surface but does not replace the resulting per-axis mapping.
+/// Native GFX CreateGlowEffect wraps the input in IEffectAliased before blur.
+pub(crate) fn rasterize_word_group_glow_source(
+  items: &[DisplayItem<'static>],
+  bounds: Rect,
+  pixels_per_point: f32,
+) -> Option<DrawingRaster> {
+  let width_px = raster_source_extent(
+    bounds.size.width.0,
+    pixels_per_point,
+    RasterSourceExtent::Round,
+  );
+  let height_px = raster_source_extent(
+    bounds.size.height.0,
+    pixels_per_point,
+    RasterSourceExtent::Round,
+  );
+  let scale_x = width_px as f32 / bounds.size.width.0;
+  let scale_y = height_px as f32 / bounds.size.height.0;
+  // As in Word's shape shadows, a present pen retains at least one
+  // effect-device pixel. Native zero/.1/.5/1/2/4/8pt and noFill controls
+  // distinguish the device hairline from an absent pen. The inverse device
+  // x-axis owns this width; keep source allocation and vector paint intact.
+  let mut source_items = items.to_vec();
+  realize_word_shadow_minimum_strokes(&mut source_items, scale_x);
+  let image = rasterize_vector_items_at_mapping(
+    &source_items,
+    PageToRasterMapping {
+      width_px,
+      height_px,
+      scale_x,
+      scale_y,
+      translate_x: -bounds.origin.x.0 * scale_x,
+      translate_y: -bounds.origin.y.0 * scale_y,
+      text_hinting: None,
+    },
+    RasterPrimitiveAntialiasing::Aliased,
+  )?;
+  Some(DrawingRaster {
+    children_image: Some(image.clone()),
+    image,
+    fill_image: None,
+    line_image: None,
+    fill_line_image: None,
+    pixels_per_point,
+  })
+}
+
 pub(crate) fn rasterize_group_items_for_effects_at_pixels_per_point_with_extent(
   items: &[DisplayItem<'static>],
   raster_bounds: Rect,
@@ -2703,7 +2757,7 @@ fn collect_source_layer_item(
       Some(DisplayItem::Rect(rect))
     }
     (SourceLayer::Fill, DisplayItem::Text(text)) => {
-      Some(DisplayItem::Text(text_fill_material_item(text)))
+      Some(DisplayItem::Text(Box::new(text_fill_material_item(text))))
     }
     (SourceLayer::Line, DisplayItem::Path(path)) => {
       let mut path = path.clone();
@@ -2821,6 +2875,21 @@ pub(crate) fn effect_pixels_per_point_with_max(
     height_pt,
     max_pixels_per_point,
     MAX_EFFECT_RASTER_PIXELS,
+  )
+}
+
+/// Preserve a fixed-output effect's requested source density independently
+/// of the preview budget, while retaining the output allocation ceiling.
+pub(crate) fn fixed_output_effect_pixels_per_point(
+  width_pt: f32,
+  height_pt: f32,
+  requested_pixels_per_point: f32,
+) -> f32 {
+  effect_pixels_per_point_with_budget(
+    width_pt,
+    height_pt,
+    requested_pixels_per_point,
+    MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS,
   )
 }
 
@@ -3029,9 +3098,14 @@ pub(crate) fn rasterize_vector_scene_at_mapping(
       mapping.translate_y + 0.5 - sample_y,
     );
     for item in items {
+      let item = scene_pixel_center_gradient(
+        item,
+        (sample_x - 0.5) / mapping.scale_x,
+        (sample_y - 0.5) / mapping.scale_y,
+      );
       draw_display_item(
         &mut pixmap,
-        item,
+        &item,
         transform,
         mapping.text_hinting,
         RasterPrimitiveAntialiasing::Aliased,
@@ -3056,6 +3130,49 @@ pub(crate) fn rasterize_vector_scene_at_mapping(
     pixel[3] = ((alpha + 4) / 8) as u8;
   }
   Some(output)
+}
+
+fn scene_pixel_center_gradient<'a>(
+  item: &'a DisplayItem<'static>,
+  dx: f32,
+  dy: f32,
+) -> std::borrow::Cow<'a, DisplayItem<'static>> {
+  let (fill, bounds) = match item {
+    DisplayItem::Path(path) => (&path.fill, path.bounds),
+    DisplayItem::Rect(rect) => (&rect.fill, rect.bounds),
+    _ => return std::borrow::Cow::Borrowed(item),
+  };
+  let Fill::Gradient(gradient) = fill else {
+    return std::borrow::Cow::Borrowed(item);
+  };
+  if gradient.path.is_some() {
+    return std::borrow::Cow::Borrowed(item);
+  }
+  // Direct3D MSAA evaluates interpolated color once at the pixel center;
+  // only coverage varies across samples. Cancel the coverage translation
+  // in the gradient's coordinate system to avoid supersampling its color.
+  // This matches the separate attribute/coverage paths of drawingml_3d.
+  let (mut start, mut end) = gradient.line.unwrap_or_else(|| {
+    linear_gradient_line(
+      gradient.definition_bounds.unwrap_or(bounds),
+      gradient.angle_degrees,
+      gradient.scaled,
+    )
+  });
+  start.x.0 += dx;
+  start.y.0 += dy;
+  end.x.0 += dx;
+  end.y.0 += dy;
+  let mut item = item.clone();
+  let fill = match &mut item {
+    DisplayItem::Path(path) => &mut path.fill,
+    DisplayItem::Rect(rect) => &mut rect.fill,
+    _ => unreachable!(),
+  };
+  if let Fill::Gradient(gradient) = fill {
+    gradient.line = Some((start, end));
+  }
+  std::borrow::Cow::Owned(item)
 }
 
 /// Paints vectors on exactly the supplied lattice and primitive sample grid.
@@ -3406,7 +3523,7 @@ fn draw_text(
       Fill::Solid(color) => resolved.color = color,
       Fill::Gradient(gradient) => resolved.gradient = Some(gradient),
       Fill::Pattern(pattern) => resolved.pattern = Some(pattern),
-      Fill::None | Fill::Theme(_) | Fill::Image { .. } => {}
+      Fill::None | Fill::Theme(_) | Fill::Image { .. } | Fill::Texture(_) => {}
     }
   }
   if let Some(stroke) = &stroke {
@@ -3591,6 +3708,294 @@ fn text_outline(
     commands,
     width_pt: shaped.width_pt,
   })
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct VmlWordartPaintBounds {
+  pub host: Rect,
+  pub flat: bool,
+  pub foreground: Rect,
+  pub shadow: Option<Rect>,
+  pub layout_bounds: Option<Rect>,
+}
+
+/// Painted bounds of a legacy VML WordArt envelope. Word's inline formatter
+/// encloses the outline and effects. Curved envelopes retain raw quadratic
+/// segments until seam splitting and deformation, using the direct writer's
+/// exact arclength sampler and mapped path commands.
+pub(crate) fn vml_wordart_paint_bounds(
+  item: &TextRun<'static>,
+  text_metrics: &mut TextMetrics,
+) -> Option<VmlWordartPaintBounds> {
+  let options = item.style.pdf_glyph_outline_options.as_deref()?;
+  let warp = options.text_warp.as_deref()?;
+  if warp.vml_fit_path.is_none() || warp.boundaries.len() != 2 {
+    return None;
+  }
+  let straight = |commands: &[PathCommand]| match commands {
+    [PathCommand::MoveTo(start), PathCommand::LineTo(end)] => Some((*start, *end)),
+    _ => None,
+  };
+  let flat = warp.boundaries.iter().all(|path| straight(path).is_some());
+  let path = if let (Some((upper_start, upper_end)), Some((lower_start, lower_end))) =
+    (straight(&warp.boundaries[0]), straight(&warp.boundaries[1]))
+  {
+    let source = warp.source_bounds;
+    let source_width = source.size.width.0;
+    let source_height = source.size.height.0;
+    if source_width <= f32::EPSILON || source_height <= f32::EPSILON {
+      return None;
+    }
+    let map = |point: super::Point| {
+      let u = ((point.x.0 - source.origin.x.0) / source_width).clamp(0.0, 1.0);
+      let v = ((point.y.0 - source.origin.y.0) / source_height).clamp(0.0, 1.0);
+      let upper_x = upper_start.x.0 + (upper_end.x.0 - upper_start.x.0) * u;
+      let upper_y = upper_start.y.0 + (upper_end.y.0 - upper_start.y.0) * u;
+      let lower_x = lower_start.x.0 + (lower_end.x.0 - lower_start.x.0) * u;
+      let lower_y = lower_start.y.0 + (lower_end.y.0 - lower_start.y.0) * u;
+      KurboPoint::new(
+        f64::from(upper_x + (lower_x - upper_x) * v),
+        f64::from(upper_y + (lower_y - upper_y) * v),
+      )
+    };
+    let mut path = BezPath::new();
+    for command in text_outline(item, None, text_metrics)?.commands {
+      match command {
+        PathCommand::MoveTo(point) => path.move_to(map(point)),
+        PathCommand::LineTo(point) => path.line_to(map(point)),
+        PathCommand::CubicTo {
+          control1,
+          control2,
+          end,
+        } => path.curve_to(map(control1), map(control2), map(end)),
+        PathCommand::Close => path.close_path(),
+      }
+    }
+    path
+  } else {
+    vml_envelope_text_outline(item, warp, text_metrics)?
+  };
+  if path.is_empty() {
+    return None;
+  }
+  let shadow = options
+    .vml_text_shadow
+    .and_then(|shadow| shadow.project_path(&path))
+    .map(|path| path.bounding_box());
+  let mut bounds = path.bounding_box();
+  let stroke = options.outline_stroke.as_ref();
+  let width = stroke.map_or(item.style.outline_width.0, |stroke| stroke.width.0);
+  let layout_bounds = if width > f32::EPSILON {
+    // The inline formatter measures its path on a 96-DPI device, retaining
+    // fractional pen widths above its one-pixel minimum (native 1pt is
+    // 4/3px). Only the final enclosure is integral; its bounds are
+    // independent of the PDF's painted joins.
+    let host = warp.paint_bounds;
+    let local_device = Affine::scale(1.0 / 0.75)
+      * Affine::translate((-f64::from(host.origin.x.0), -f64::from(host.origin.y.0)));
+    let device_path = local_device * &path;
+    let pen = (width / 0.75).max(1.0);
+    super::vml_path_bounds::stroked_bounds(&device_path, pen, 8.0).map(|bounds| {
+      // The shadow also belongs to the device enclosure. Combining its
+      // fractional painted extent after snapping the foreground loses a
+      // device row and moves subsequent paragraphs upwards.
+      let bounds = shadow.map_or(bounds, |shadow| {
+        bounds.union(local_device.transform_rect_bbox(shadow))
+      });
+      let left = bounds.x0.floor() as f32 * 0.75;
+      let top = bounds.y0.floor() as f32 * 0.75;
+      let right = bounds.x1.ceil() as f32 * 0.75;
+      let bottom = bounds.y1.ceil() as f32 * 0.75;
+      super::Rect {
+        origin: super::Point {
+          x: super::Pt(host.origin.x.0 + left),
+          y: super::Pt(host.origin.y.0 + top),
+        },
+        size: super::Size {
+          width: super::Pt(right - left),
+          height: super::Pt(bottom - top),
+        },
+      }
+    })
+  } else {
+    None
+  };
+  if width > f32::EPSILON {
+    let (join, limit) = match stroke.and_then(|stroke| stroke.join) {
+      Some(super::StrokeJoin::Round) => (KurboJoin::Round, 10.0),
+      Some(super::StrokeJoin::Bevel) => (KurboJoin::Bevel, 10.0),
+      Some(super::StrokeJoin::Miter { limit }) => {
+        (KurboJoin::Miter, f64::from(limit.unwrap_or(10.0)))
+      }
+      None => (KurboJoin::Miter, 10.0),
+    };
+    let cap = match stroke.and_then(|stroke| stroke.cap) {
+      Some(super::StrokeCap::Round) => KurboCap::Round,
+      Some(super::StrokeCap::Square) => KurboCap::Square,
+      Some(super::StrokeCap::Flat) | None => KurboCap::Butt,
+    };
+    let style = KurboStroke::new(f64::from(width))
+      .with_join(join)
+      .with_caps(cap)
+      .with_miter_limit(limit);
+    bounds =
+      bounds.union(expand_stroke(path.iter(), &style, &StrokeOpts::default(), 0.02).bounding_box());
+  }
+  let to_rect = |bounds: kurbo::Rect| {
+    let [left, top, right, bottom] = [bounds.x0, bounds.y0, bounds.x1, bounds.y1];
+    [left, top, right, bottom]
+      .into_iter()
+      .all(f64::is_finite)
+      .then_some(super::Rect {
+        origin: super::Point {
+          x: super::Pt(left as f32),
+          y: super::Pt(top as f32),
+        },
+        size: super::Size {
+          width: super::Pt((right - left) as f32),
+          height: super::Pt((bottom - top) as f32),
+        },
+      })
+  };
+  Some(VmlWordartPaintBounds {
+    host: warp.paint_bounds,
+    flat,
+    foreground: to_rect(bounds)?,
+    shadow: shadow.and_then(to_rect),
+    layout_bounds,
+  })
+}
+
+fn vml_envelope_shaped_text(
+  text: &str,
+  style: &super::TextStyle<'_>,
+  text_metrics: &mut TextMetrics,
+) -> Option<crate::text_metrics::ShapedText> {
+  let mut paint = text_metrics.shape_text(text, style)?;
+  let Some(sizes) = style.layout_font_sizes else {
+    return Some(paint);
+  };
+  if sizes.primary == style.font_size && sizes.complex == style.complex_font_size {
+    return Some(paint);
+  }
+  let mut logical_style = style.clone();
+  logical_style.font_size = sizes.primary;
+  logical_style.complex_font_size = sizes.complex;
+  let logical = text_metrics.shape_text(text, &logical_style)?;
+  // The PDF envelope retains logical positions while painting realized
+  // outlines. Its layout preview must enclose those same glyphs. Reject a
+  // changed shaping topology completely rather than transferring another
+  // cluster's origin or advance. Absolute spacing remains in point units.
+  if paint.glyphs.len() == logical.glyphs.len()
+    && paint
+      .glyphs
+      .iter()
+      .zip(&logical.glyphs)
+      .all(|(paint_glyph, logical_glyph)| {
+        paint.font_faces.get(paint_glyph.font_index)
+          == logical.font_faces.get(logical_glyph.font_index)
+          && paint_glyph.glyph_id == logical_glyph.glyph_id
+          && paint_glyph.text_range == logical_glyph.text_range
+          && paint_glyph.font_size_pt > f32::EPSILON
+      })
+  {
+    for (paint_glyph, logical_glyph) in paint.glyphs.iter_mut().zip(&logical.glyphs) {
+      let scale = logical_glyph.font_size_pt / paint_glyph.font_size_pt;
+      paint_glyph.x_advance_em = logical_glyph.x_advance_em * scale;
+      paint_glyph.y_advance_em = logical_glyph.y_advance_em * scale;
+      paint_glyph.x_offset_em = logical_glyph.x_offset_em * scale;
+      paint_glyph.y_offset_em = logical_glyph.y_offset_em * scale;
+    }
+    paint.width_pt = logical.width_pt;
+  }
+  Some(paint)
+}
+
+fn vml_envelope_text_outline(
+  item: &TextRun<'static>,
+  warp: &super::TextWarp,
+  text_metrics: &mut TextMetrics,
+) -> Option<BezPath> {
+  use super::text_warp_projection::{
+    GlyphOutlinePath, TextWarpBoundary, append_mapped_outline, common_commands_to_bez_path,
+    split_outline_at_warp_seams, text_warp_point, text_warp_source_seams,
+  };
+
+  let boundaries = warp
+    .boundaries
+    .iter()
+    .map(|commands| TextWarpBoundary::new(commands).ok())
+    .collect::<Option<Vec<_>>>()?;
+  let seams = if warp.vml_trim_band.is_none() {
+    text_warp_source_seams(warp, &boundaries)
+  } else {
+    Vec::new()
+  };
+  let shaped = vml_envelope_shaped_text(item.text.as_ref(), &item.style, text_metrics)?;
+  let baseline_offset = if item.style.use_windows_font_metrics {
+    text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+      item.text.as_ref(),
+      &item.style,
+      item.line_height.0,
+    )
+  } else {
+    text_metrics.baseline_offset_in_line_for_text(
+      item.text.as_ref(),
+      &item.style,
+      item.line_height.0,
+    )
+  };
+  let baseline_y = item.origin.y.0 + baseline_offset;
+  let horizontal_scale = item.style.horizontal_scale.unwrap_or(1.0);
+  let mut cursor_x = item.origin.x.0;
+  let mut commands = Vec::new();
+  for glyph in &shaped.glyphs {
+    let face_data = shaped.font_faces.get(glyph.font_index)?;
+    let face = FontRef::from_index(face_data.data.as_ref(), face_data.index).ok()?;
+    let units_per_em = f32::from(face.head().ok()?.units_per_em());
+    if units_per_em <= f32::EPSILON {
+      return None;
+    }
+    let origin_x = cursor_x + glyph.x_offset_em * glyph.font_size_pt;
+    let origin_y = baseline_y - glyph.y_offset_em * glyph.font_size_pt;
+    if let Some(outline) = face.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
+      let mut raw = GlyphOutlinePath::default();
+      outline
+        .draw(
+          DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
+          &mut raw,
+        )
+        .ok()?;
+      let scale = glyph.font_size_pt / units_per_em;
+      let glyph_to_page = |point: KurboPoint| {
+        let x = if face_data.synthetic_italic {
+          point.x + point.y / 3.0
+        } else {
+          point.x
+        };
+        KurboPoint::new(
+          f64::from(origin_x) + x * f64::from(scale * horizontal_scale),
+          f64::from(origin_y) - point.y * f64::from(scale),
+        )
+      };
+      let split = split_outline_at_warp_seams(&raw.path, glyph_to_page, &seams);
+      append_mapped_outline(
+        split.as_ref().unwrap_or(&raw.path),
+        |point| text_warp_point(warp, &boundaries, glyph_to_page(point)),
+        &mut commands,
+      )
+      .ok()?;
+    }
+    cursor_x += glyph.x_advance_em * glyph.font_size_pt;
+    if item
+      .text
+      .get(glyph.text_range.clone())
+      .is_some_and(|cluster| cluster.contains(' '))
+    {
+      cursor_x += item.word_spacing_pt;
+    }
+  }
+  Some(common_commands_to_bez_path(&commands))
 }
 
 fn resolve_text_raster_fill(fill: &mut Fill<'static>, bounds: Rect) {
@@ -4194,7 +4599,7 @@ fn draw_fill(
       pixmap.fill_path(path, &paint, FillRule::EvenOdd, page_to_raster, None);
       Some(())
     }
-    Fill::Theme(_) | Fill::Image { .. } => None,
+    Fill::Theme(_) | Fill::Image { .. } | Fill::Texture(_) => None,
   }
 }
 
@@ -4402,7 +4807,7 @@ fn paint_fill_mask(
       };
       paint_sample_mask(pixmap, mask, paint, page_to_raster)
     }
-    Fill::Theme(_) | Fill::Image { .. } => None,
+    Fill::Theme(_) | Fill::Image { .. } | Fill::Texture(_) => None,
   }
 }
 
@@ -4776,10 +5181,19 @@ fn linear_gradient_paint<'a>(
   let stops = resolved_stops
     .iter()
     .map(|stop| {
-      SkGradientStop::new(
-        stop.position.clamp(0.0, 1.0),
-        SkColor::from_rgba8(stop.color.r, stop.color.g, stop.color.b, stop.color.a),
-      )
+      let color = if gradient.interpolation == super::GradientInterpolation::FixedGouraud7 {
+        let channel = |value: u8| (f32::from(value) * 128.0 / 255.0).round() / 128.0;
+        SkColor::from_rgba(
+          channel(stop.color.r),
+          channel(stop.color.g),
+          channel(stop.color.b),
+          f32::from(stop.color.a) / 255.0,
+        )
+        .unwrap()
+      } else {
+        SkColor::from_rgba8(stop.color.r, stop.color.g, stop.color.b, stop.color.a)
+      };
+      SkGradientStop::new(stop.position.clamp(0.0, 1.0), color)
     })
     .collect();
   Some(Paint {
@@ -4862,6 +5276,176 @@ fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
+  #[test]
+  fn vml_envelope_preview_preserves_logical_positions_and_realized_outlines() {
+    use std::borrow::Cow;
+
+    use super::super::{LayoutFontSizes, Pt, TextStyle};
+    use crate::text_metrics::TextMetrics;
+
+    let mut metrics = TextMetrics::new();
+    for text in ["abc Transform ", "אב i Wm"] {
+      for family in ["Arial", "Times New Roman"] {
+        for spacing in [0.0, 1.5] {
+          for horizontal_scale in [0.8, 1.0, 1.2] {
+            let style = TextStyle {
+              font_family: Some(Cow::Borrowed(family)),
+              complex_font_family: Some(Cow::Borrowed(family)),
+              font_size: Pt(11.04),
+              complex_font_size: Some(Pt(14.04)),
+              character_spacing: Pt(spacing),
+              horizontal_scale: Some(horizontal_scale),
+              layout_font_sizes: Some(LayoutFontSizes {
+                primary: Pt(11.0),
+                complex: Some(Pt(14.0)),
+              }),
+              ..TextStyle::default()
+            };
+            let paint = metrics.shape_text(text, &style).unwrap();
+            let mut logical_style = style.clone();
+            logical_style.font_size = Pt(11.0);
+            logical_style.complex_font_size = Some(Pt(14.0));
+            let logical = metrics.shape_text(text, &logical_style).unwrap();
+            let preview = super::vml_envelope_shaped_text(text, &style, &mut metrics).unwrap();
+            assert_eq!(preview.width_pt, logical.width_pt);
+            assert_eq!(preview.glyphs.len(), logical.glyphs.len());
+            for ((actual, painted), expected) in preview
+              .glyphs
+              .iter()
+              .zip(&paint.glyphs)
+              .zip(&logical.glyphs)
+            {
+              assert_eq!(actual.font_size_pt, painted.font_size_pt);
+              assert_eq!(actual.bounds_em, painted.bounds_em);
+              assert!(
+                (actual.x_advance_em * actual.font_size_pt
+                  - expected.x_advance_em * expected.font_size_pt)
+                  .abs()
+                  < 0.00001
+              );
+              assert!(
+                (actual.x_offset_em * actual.font_size_pt
+                  - expected.x_offset_em * expected.font_size_pt)
+                  .abs()
+                  < 0.00001
+              );
+              assert!(
+                (actual.y_offset_em * actual.font_size_pt
+                  - expected.y_offset_em * expected.font_size_pt)
+                  .abs()
+                  < 0.00001
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn vector_scene_interpolates_fixed_gouraud_before_rounding_to_bytes() {
+    let gradient = super::GradientFill {
+      stops: [(0.0, 128), (1.0, 131)]
+        .into_iter()
+        .map(|(position, gray)| super::super::GradientStop {
+          position,
+          color: super::Color {
+            r: gray,
+            g: gray,
+            b: gray,
+            a: 255,
+          },
+          scheme: None,
+        })
+        .collect(),
+      interpolation: super::super::GradientInterpolation::FixedGouraud7,
+      line: Some((
+        crate::model::common_point(0.0, 0.0),
+        crate::model::common_point(1.0, 0.0),
+      )),
+      ..Default::default()
+    };
+    let items = [super::DisplayItem::Rect(super::RectItem {
+      bounds: crate::model::common_rect(0.0, 0.0, 1.0, 1.0),
+      fill: super::Fill::Gradient(gradient),
+      stroke: None,
+    })];
+    let image = super::rasterize_vector_scene_at_mapping(
+      &items,
+      super::PageToRasterMapping {
+        width_px: 1,
+        height_px: 1,
+        scale_x: 1.0,
+        scale_y: 1.0,
+        translate_x: 0.0,
+        translate_y: 0.0,
+        text_hinting: None,
+      },
+    )
+    .unwrap();
+    // Native vertex levels64/128 and66/128 interpolate to65/128, which
+    // rounds to129. Interpolating their already rounded RGB8 yields130.
+    assert_eq!(image.as_raw(), &[129, 129, 129, 255]);
+  }
+
+  #[test]
+  fn vector_scene_samples_gradient_color_at_pixel_center_even_on_partial_coverage() {
+    let items = [super::DisplayItem::Rect(super::RectItem {
+      bounds: crate::model::common_rect(0.0, 0.0, 1.6, 2.0),
+      fill: super::Fill::Gradient(super::GradientFill {
+        stops: [
+          (
+            0.0,
+            super::Color {
+              r: 0,
+              g: 0,
+              b: 0,
+              a: 255,
+            },
+          ),
+          (
+            1.0,
+            super::Color {
+              r: 255,
+              g: 255,
+              b: 255,
+              a: 255,
+            },
+          ),
+        ]
+        .into_iter()
+        .map(|(position, color)| super::super::GradientStop {
+          position,
+          color,
+          scheme: None,
+        })
+        .collect(),
+        line: Some((
+          crate::model::common_point(1.2, 0.0),
+          crate::model::common_point(1.4, 0.0),
+        )),
+        ..Default::default()
+      }),
+      stroke: None,
+    })];
+    let image = super::rasterize_vector_scene_at_mapping(
+      &items,
+      super::PageToRasterMapping {
+        width_px: 2,
+        height_px: 2,
+        scale_x: 1.0,
+        scale_y: 1.0,
+        translate_x: 0.0,
+        translate_y: 0.0,
+        text_hinting: None,
+      },
+    )
+    .unwrap();
+    let pixel = image.get_pixel(1, 0);
+    assert!(pixel[3] > 0 && pixel[3] < 255);
+    assert_eq!(&pixel.0[..3], &[255, 255, 255]);
+  }
+
   #[test]
   fn vector_scene_resolves_shared_face_coverage_without_background_seams() {
     let rect = |x, width, color| {
@@ -6170,13 +6754,15 @@ mod tests {
       })),
       ..TextStyle::default()
     };
-    let item = DisplayItem::Text(TextRun {
+    let item = DisplayItem::Text(Box::new(TextRun {
       text: Cow::Borrowed("Example"),
       origin: Point {
         x: Pt(0.0),
         y: Pt(0.0),
       },
       line_height: Pt(12.0),
+      wordprocessing_line_metrics: None,
+      origin_is_baseline: false,
       line_metrics_participant: true,
       paint_clip: None,
       page_culling_bounds: None,
@@ -6191,8 +6777,9 @@ mod tests {
       word_spacing_pt: 0.0,
       preserve_text_portion: false,
       pdf_text_segmentation: Default::default(),
+      decoration_span_start_x: None,
       source: None,
-    });
+    }));
 
     let mut fill_layer = Vec::new();
     collect_source_layer_item(&item, SourceLayer::Fill, &mut fill_layer).unwrap();
@@ -6296,7 +6883,9 @@ mod tests {
       let mut glyph = RgbaImage::new(mapping.width_px, mapping.height_px);
       for top in (0..mapping.height_px).step_by(64) {
         let band = super::rasterize_vector_items_at_mapping(
-          &[DisplayItem::Text(super::text_fill_material_item(authored))],
+          &[DisplayItem::Text(Box::new(super::text_fill_material_item(
+            authored,
+          )))],
           PageToRasterMapping {
             height_px: (mapping.height_px - top).min(64),
             translate_y: mapping.translate_y - top as f32,
@@ -6433,6 +7022,8 @@ mod tests {
       text: Cow::Borrowed("III"),
       origin: Point::default(),
       line_height: Pt(12.0),
+      wordprocessing_line_metrics: None,
+      origin_is_baseline: false,
       line_metrics_participant: true,
       paint_clip: None,
       page_culling_bounds: None,
@@ -6460,6 +7051,7 @@ mod tests {
       word_spacing_pt: 0.0,
       preserve_text_portion: false,
       pdf_text_segmentation: Default::default(),
+      decoration_span_start_x: None,
       source: None,
     };
     let pixels_per_point = 200.0 / 72.0;

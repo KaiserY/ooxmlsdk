@@ -21,13 +21,25 @@ pub(crate) mod drawingml_shape_raster;
 pub(crate) mod drawingml_stroke;
 pub(crate) mod drawingml_text_warp;
 mod drawingml_text_warp_data_generated;
+#[doc(hidden)]
+pub mod fixed_output_device;
 mod geom;
 mod style;
+pub mod text_warp_projection;
 mod units;
+mod vml_path_bounds;
+pub mod wordprocessing_device;
+
+/// Internal paint marker for a DrawingML picture whose embedded image part is
+/// absent while its authored host frame remains visible.
+pub const MISSING_EMBEDDED_PICTURE_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.missing-embedded-picture";
 
 pub use debug::*;
 pub use display::*;
-pub use drawingml_gradient::bind_path_transform_to_bounds;
+pub use drawingml_gradient::{
+  bind_path_transform_to_bounds, resolved_stops as resolve_gradient_stops,
+};
 pub use geom::*;
 pub use style::*;
 pub use units::*;

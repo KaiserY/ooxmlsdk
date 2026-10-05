@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
 use ooxmlsdk::parts::dialogsheet_part::DialogsheetPart;
@@ -138,6 +139,7 @@ pub(crate) struct SpreadsheetProducerProfile {
 #[derive(Clone, Debug)]
 struct SheetGeometry {
   column_offsets_pt: Box<[f32]>,
+  fixed_output_column_offsets: Arc<Mutex<HashMap<u32, Box<[f32]>>>>,
   row_overrides: Box<[RowGeometry]>,
   scaled_manual_rows: Box<[RowGeometry]>,
   merged_ranges: Box<[CellRange]>,
@@ -217,6 +219,9 @@ pub(crate) struct SheetMetrics {
   legacy_excel12_arial_screen_column_grid: bool,
   modern_excel_arial_column_grid: bool,
   modern_excel_arial11_column_grid: bool,
+  modern_excel_theme_cell_text_grid: bool,
+  unprofiled_excel_font_grid: bool,
+  theme_column_grid: Option<PrinterColumnGrid>,
   legacy_excel12_japanese_fixed_output_profile: bool,
   inferred_modern_excel_calibri_grid: bool,
   modern_excel_implicit_columns: bool,
@@ -234,6 +239,99 @@ pub(crate) struct SheetMetrics {
   pub(crate) objects: SheetObjectCatalog,
   pub(crate) protected_ranges: usize,
   pub(crate) scenarios: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct PrinterColumnGrid {
+  screen_digit_width_px: u32,
+  printer_digit_width_pt: f32,
+}
+
+impl PrinterColumnGrid {
+  fn from_style(style: &crate::model::TextStyle) -> Option<Self> {
+    use skrifa::MetadataProvider;
+    use skrifa::raw::TableProvider;
+
+    let mut metrics = TextMetrics::new();
+    let mut maximum_digit_width = |dpi: f32| {
+      // OpenType hdmx stores the device's integer advances. In particular,
+      // TNR11's 29-ppem digits are14px in both hdmx and native GDI, whereas
+      // re-running a different hinter can produce15px. Use the authored
+      // device record when complete, and hint missing sizes/fonts below.
+      let hdmx_width = crate::fonts::cached_text_face(style).and_then(|data| {
+        let font = skrifa::FontRef::from_index(data.data.as_slice(), data.index).ok()?;
+        let ppem = (style.font_size_pt * dpi / units::POINTS_PER_INCH).round() as u16;
+        let table = font.hdmx().ok()?;
+        let record = table.record_for_size(u8::try_from(ppem).ok()?)?;
+        let charmap = font.charmap();
+        ('0'..='9')
+          .map(|digit| {
+            record
+              .widths()
+              .get(charmap.map(digit)?.to_u32() as usize)
+              .copied()
+          })
+          .collect::<Option<Vec<_>>>()
+          .map(|widths| {
+            f32::from(widths.into_iter().max().unwrap_or(0)) * units::POINTS_PER_INCH / dpi
+          })
+      });
+      if hdmx_width.is_some() {
+        return hdmx_width;
+      }
+      ('0'..='9')
+        .map(|digit| {
+          let mut encoded = [0; 4];
+          metrics
+            .gdi_hinted_text_extents_pt(digit.encode_utf8(&mut encoded), style, dpi)
+            .map(|extent| extent.unpositioned_width_pt)
+        })
+        .collect::<Option<Vec<_>>>()
+        .map(|widths| widths.into_iter().fold(0.0_f32, f32::max))
+    };
+    let screen_width = maximum_digit_width(OFFICE_WORKSHEET_FONT_DPI)?;
+    let printer_digit_width_pt = maximum_digit_width(units::OFFICE_FIXED_OUTPUT_DPI)?;
+    (screen_width > 0.0 && printer_digit_width_pt > 0.0).then_some(Self {
+      screen_digit_width_px: (screen_width * OFFICE_WORKSHEET_FONT_DPI / units::POINTS_PER_INCH)
+        .round() as u32,
+      printer_digit_width_pt,
+    })
+  }
+
+  fn stored_width_pt(self, width: f64) -> f32 {
+    stored_column_width_to_printer_points(
+      width,
+      self.screen_digit_width_px,
+      self.printer_digit_width_pt,
+    )
+  }
+
+  fn default_width_pt(self, format: &SheetFormatModel) -> f32 {
+    if let Some(width) = format.default_column_width {
+      return self.stored_width_pt(width);
+    }
+    // Realize the default screen column before converting through the Normal
+    // font's printer MDW. Its base character count differs from authored
+    // defaultColWidth, which already includes the stored-width allowance.
+    let screen_pixels = self.default_screen_width_px(format);
+    units::quantize_points_to_office_print_grid(
+      screen_pixels * self.printer_digit_width_pt / self.screen_digit_width_px as f32,
+    )
+  }
+
+  fn default_screen_width_px(self, format: &SheetFormatModel) -> f32 {
+    if let Some(width) = format.default_column_width {
+      return stored_column_width_to_screen_pixels(width, self.screen_digit_width_px);
+    }
+    // Native base-width 8..11 controls across six Normal font/size profiles
+    // establish quarter-digit side padding and an eight-device-pixel block.
+    // 8.43 is a displayed character-width result, not an authored default
+    // base: reusing it fails for both baseColWidth=10 and larger Normal fonts.
+    let characters = f64::from(format.base_column_width.unwrap_or(8));
+    let digit_width = f64::from(self.screen_digit_width_px);
+    let padding = 2.0 * (digit_width / 4.0).ceil() + 1.0;
+    ((characters * digit_width + padding) / 8.0).ceil() as f32 * 8.0
+  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -768,8 +866,23 @@ impl CalcSheet {
     self.metrics.modern_excel_arial11_column_grid
   }
 
+  pub(crate) fn uses_printer_cell_text_horizontal_grid(&self) -> bool {
+    self.metrics.modern_excel_arial11_column_grid
+      || self.metrics.modern_excel_theme_cell_text_grid
+      || self.metrics.unprofiled_excel_font_grid
+  }
+
+  pub(crate) fn uses_unprofiled_excel_font_grid(&self) -> bool {
+    self.metrics.unprofiled_excel_font_grid
+  }
+
   pub(crate) fn uses_modern_excel_arial_fixed_output_picture_grid(&self) -> bool {
     self.metrics.modern_excel_arial_column_grid
+  }
+
+  pub(crate) fn uses_fixed_output_picture_marker_grid(&self) -> bool {
+    self.metrics.theme_column_grid.is_some()
+      || self.uses_modern_excel_arial_fixed_output_picture_grid()
   }
 
   pub(crate) fn uses_legacy_excel12_japanese_fixed_output_profile(&self) -> bool {
@@ -819,7 +932,8 @@ impl CalcSheet {
       scale,
       self.metrics.legacy_excel12_calibri_fixed_output_grid
         || self.metrics.modern_excel_arial_column_grid
-        || self.metrics.modern_excel_arial11_column_grid,
+        || self.metrics.modern_excel_arial11_column_grid
+        || self.metrics.theme_column_grid.is_some(),
     )
   }
 
@@ -839,7 +953,8 @@ impl CalcSheet {
       scale,
       self.metrics.legacy_excel12_calibri_fixed_output_grid
         || self.metrics.modern_excel_arial_column_grid
-        || self.metrics.modern_excel_arial11_column_grid,
+        || self.metrics.modern_excel_arial11_column_grid
+        || self.metrics.theme_column_grid.is_some(),
     )
   }
 
@@ -922,7 +1037,7 @@ impl CalcSheet {
     marker: &super::drawing::DrawingMarkerModel,
     scale: f32,
   ) -> (f32, f32) {
-    if self.metrics.modern_excel_arial_column_grid {
+    if self.metrics.modern_excel_arial_column_grid || self.metrics.theme_column_grid.is_some() {
       let column = u32::try_from(marker.column).unwrap_or(0).saturating_add(1);
       let row = u32::try_from(marker.row).unwrap_or(0).saturating_add(1);
       let column_offset_pt = units::emu_to_points(marker.column_offset_emu);
@@ -930,17 +1045,23 @@ impl CalcSheet {
       let x_pt = self.fixed_output_column_offset_pt(column, scale)
         + fixed_output_drawing_marker_offset_pt(
           column_offset_pt,
-          self.modern_excel_arial_drawing_screen_column_width_pt(column),
+          self
+            .theme_drawing_screen_column_width_pt(column)
+            .or_else(|| self.modern_excel_arial_drawing_screen_column_width_pt(column)),
           self.fixed_output_column_range_width_pt(column, column, scale),
           scale,
         );
       let y_pt = self.fixed_output_row_offset_pt(row, scale)
-        + fixed_output_drawing_marker_offset_pt(
-          row_offset_pt,
-          self.modern_excel_arial_drawing_screen_row_height_pt(row),
-          self.fixed_output_row_range_height_pt(row, row, scale),
-          scale,
-        );
+        + if self.metrics.modern_excel_arial_column_grid {
+          fixed_output_drawing_marker_offset_pt(
+            row_offset_pt,
+            self.modern_excel_arial_drawing_screen_row_height_pt(row),
+            self.fixed_output_row_range_height_pt(row, row, scale),
+            scale,
+          )
+        } else {
+          row_offset_pt * scale
+        };
       return (x_pt, y_pt);
     }
     let (x, _) = self.marker_position_pt(marker);
@@ -965,6 +1086,23 @@ impl CalcSheet {
       stored_column_width_to_screen_pixels(width, 15) * units::POINTS_PER_INCH
         / OFFICE_WORKSHEET_FONT_DPI
     })
+  }
+
+  fn theme_drawing_screen_column_width_pt(&self, column: u32) -> Option<f32> {
+    let grid = self.metrics.theme_column_grid?;
+    let model = self
+      .metrics
+      .columns
+      .iter()
+      .find(|model| column >= model.first && column <= model.last);
+    if model.is_some_and(|model| model.hidden) {
+      return None;
+    }
+    let pixels = model.and_then(|model| model.width).map_or_else(
+      || grid.default_screen_width_px(&self.metrics.format),
+      |width| stored_column_width_to_screen_pixels(width, grid.screen_digit_width_px),
+    );
+    Some(pixels * units::POINTS_PER_INCH / OFFICE_WORKSHEET_FONT_DPI)
   }
 
   fn modern_excel_arial_drawing_screen_row_height_pt(&self, row: u32) -> Option<f32> {
@@ -1184,7 +1322,9 @@ impl SheetGeometry {
         .columns
         .iter()
         .any(|column| column.best_fit && column.width.is_some());
-    let default_column_width_pt = if metrics.indexed_scatter_print_grid
+    let default_column_width_pt = if let Some(grid) = metrics.theme_column_grid {
+      grid.default_width_pt(&metrics.format)
+    } else if metrics.indexed_scatter_print_grid
       && metrics.format.mso_document
       && metrics.format.default_column_width.is_none()
       && metrics.format.base_column_width.is_none()
@@ -1382,6 +1522,7 @@ impl SheetGeometry {
 
     Self {
       column_offsets_pt: column_offsets_pt.into_boxed_slice(),
+      fixed_output_column_offsets: Arc::new(Mutex::new(HashMap::new())),
       row_overrides,
       scaled_manual_rows,
       merged_ranges: metrics
@@ -1432,12 +1573,27 @@ impl SheetGeometry {
       return self.column_offset_pt(column) * scale;
     }
     let preceding_columns = column.saturating_sub(1) as usize;
-    self
-      .column_offsets_pt
-      .windows(2)
-      .take(preceding_columns)
-      .map(|offsets| units::quantize_points_to_office_print_grid((offsets[1] - offsets[0]) * scale))
-      .sum()
+    let mut cache = self
+      .fixed_output_column_offsets
+      .lock()
+      .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let offsets = cache.entry(scale.to_bits()).or_insert_with(|| {
+      // Keep the original f32 accumulation order, including Sum's negative
+      // zero identity. A worksheet repeatedly queries the same scale, so
+      // realize its immutable column grid once instead of rescanning every
+      // preceding column for each cell on each continuation page.
+      let mut offsets = Vec::with_capacity(self.column_offsets_pt.len());
+      offsets.push(-0.0);
+      for columns in self.column_offsets_pt.windows(2) {
+        let width = units::quantize_points_to_office_print_grid((columns[1] - columns[0]) * scale);
+        offsets.push(offsets.last().copied().unwrap_or(-0.0) + width);
+      }
+      offsets.into_boxed_slice()
+    });
+    offsets
+      .get(preceding_columns)
+      .copied()
+      .unwrap_or_else(|| *offsets.last().unwrap_or(&-0.0))
   }
 
   fn fixed_output_column_range_width_pt(
@@ -1580,6 +1736,9 @@ fn column_width_from_metrics(metrics: &SheetMetrics, column: u32, default_width_
       return 0.0;
     }
     if let Some(width) = model.width {
+      if let Some(grid) = metrics.theme_column_grid {
+        return grid.stored_width_pt(width);
+      }
       if metrics.modern_excel_arial_column_grid {
         return stored_column_width_to_printer_points(
           width,
@@ -2025,13 +2184,39 @@ impl SheetMetrics {
               .height
               .is_none_or(|height| (height - format.default_row_height).abs() <= 1.0e-6)
         });
+    // The remaining explicit Windows Excel fonts still own a worksheet and
+    // printer device grid. Native Lucida/TNR/Arial/Calibri controls establish
+    // the inverse stored-width conversion and Normal-font row realization;
+    // AppVersion 12/16 and altered automatic ht caches do not change them.
+    // Retain the separately established producer/font compatibility paths.
+    let has_known_column_grid = legacy_excel12_calibri_fixed_output_grid
+      || inferred_modern_excel_calibri_grid
+      || legacy_excel12_arial_screen_column_grid(
+        producer,
+        styles.normal_style_uses_explicit_arial_10(),
+      )
+      || producer
+        .excel_major_version
+        .is_some_and(|version| version >= 14)
+        && (styles.normal_style_uses_explicit_calibri_11()
+          || styles.normal_style_uses_explicit_arial_10()
+          || styles.normal_style_uses_explicit_arial_11());
+    let unprofiled_column_grid = (mso_document
+      && !producer.macintosh_excel
+      && !styles.default_font_uses_theme()
+      && !styles.column_width_uses_application_default_minor_theme()
+      && !has_known_column_grid)
+      .then(|| column_font.as_ref().and_then(PrinterColumnGrid::from_style))
+      .flatten();
+    let unprofiled_excel_font_grid = unprofiled_column_grid.is_some();
     let custom_row_print_grid = (mso_document && !producer.macintosh_excel)
       .then(|| automatic_device_font_row_height_pt(styles))
       .flatten()
       .and_then(|height| AutomaticRowGrid::from_worksheet(worksheet, styles, height));
     let mut automatic_row_grid = if custom_row_print_grid.is_some()
       && (format.dy_descent_pt.is_some()
-        || styles.default_font_uses_theme() && !legacy_excel12_calibri_fixed_output_grid)
+        || styles.default_font_uses_theme() && !legacy_excel12_calibri_fixed_output_grid
+        || unprofiled_excel_font_grid)
     {
       // Excel rows can also carry stale automatic ht caches. The
       // 61605 Office replay prints its Tahoma 17 row at 20.64pt despite the
@@ -2053,7 +2238,8 @@ impl SheetMetrics {
       format.default_row_height =
         if (producer.excel_online
           || libreoffice_uniform_cached_row_grid
-          || worksheet.sheet_format_properties.is_none())
+          || worksheet.sheet_format_properties.is_none()
+          || unprofiled_excel_font_grid)
           && let Some(height) = automatic_device_font_row_height_pt(styles)
         {
           // Excel Online's cached ht values are recalculated on desktop open.
@@ -2127,6 +2313,16 @@ impl SheetMetrics {
           format.default_row_height as f32
         } as f64;
     }
+    let modern_excel_theme_cell_text_grid = mso_document
+      && !producer.macintosh_excel
+      && producer
+        .excel_major_version
+        .is_some_and(|version| version >= 14)
+      && (styles.default_font_uses_theme() || styles.uses_application_default_minor_theme());
+    let theme_column_grid = modern_excel_theme_cell_text_grid
+      .then(|| PrinterColumnGrid::from_style(&styles.default_font_text_style()))
+      .flatten()
+      .or(unprofiled_column_grid);
     Self {
       dimension: worksheet
         .sheet_dimension
@@ -2164,6 +2360,9 @@ impl SheetMetrics {
           .excel_major_version
           .is_some_and(|version| version >= 14)
         && styles.normal_style_uses_explicit_arial_11(),
+      modern_excel_theme_cell_text_grid,
+      unprofiled_excel_font_grid,
+      theme_column_grid,
       legacy_excel12_japanese_fixed_output_profile: mso_document
         && !producer.macintosh_excel
         && producer.excel_major_version == Some(12)
@@ -2750,6 +2949,33 @@ fn worksheet_rows(
             {
               fonts.include(font, styles.alignment_for_cell(Some(index)));
             }
+            if !cell.rich_text_runs.is_empty() {
+              let base_style = styles.text_style_for_cell(cell.style_index);
+              for run in &cell.rich_text_runs {
+                if run.text.is_empty() {
+                  continue;
+                }
+                // AutoFit uses the authored screen fonts even when a text
+                // number format later paints the value in the cell font.
+                // Native Lucida 8 / Arial 10 controls enlarge only the rows
+                // containing those rich portions, not their empty neighbors.
+                let mut style = super::display::xlsx_rich_text_run_style(&base_style, run, 1.0);
+                if run
+                  .vertical_alignment
+                  .is_none_or(|alignment| alignment == x::VerticalAlignmentRunValues::Baseline)
+                {
+                  style.font_size_pt = run.font_size_pt.unwrap_or(base_style.font_size_pt);
+                }
+                let char_set = if style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+                  2
+                } else {
+                  0
+                };
+                if let Some(font) = automatic_text_font_row_extents(&style, char_set) {
+                  fonts.include(font, styles.alignment_for_cell(cell.style_index));
+                }
+              }
+            }
           }
           let extra_pixels = u8::from(row.thick_top.is_some_and(|value| value.as_bool()))
             + u8::from(row.thick_bot.is_some_and(|value| value.as_bool()));
@@ -3330,11 +3556,23 @@ fn automatic_font_row_extents(
   styles: &StylesCatalog,
   style_index: Option<u32>,
 ) -> Option<AutomaticRowExtents> {
+  let style = styles.text_style_for_cell(style_index);
+  let char_set = if styles.font_charset_for_cell(style_index) == Some(2) {
+    2
+  } else {
+    0
+  };
+  automatic_text_font_row_extents(&style, char_set)
+}
+
+fn automatic_text_font_row_extents(
+  style: &crate::model::TextStyle,
+  char_set: u8,
+) -> Option<AutomaticRowExtents> {
   use skrifa::raw::TableProvider;
   use skrifa::raw::types::Tag;
 
-  let style = styles.text_style_for_cell(style_index);
-  let face_data = crate::fonts::cached_text_face(&style)?;
+  let face_data = crate::fonts::cached_text_face(style)?;
   let face = skrifa::FontRef::from_index(face_data.data.as_slice(), face_data.index).ok()?;
   let ppem = (style.font_size_pt * OFFICE_WORKSHEET_FONT_DPI / units::POINTS_PER_INCH)
     .round()
@@ -3346,26 +3584,29 @@ fn automatic_font_row_extents(
   let os2 = face.os2().ok()?;
   let hhea = face.hhea().ok()?;
   let scale = f32::from(ppem) / units_per_em;
-  let char_set = if styles.font_charset_for_cell(style_index) == Some(2) {
-    2
-  } else {
-    0
-  };
-  let descent = face
+  let device_metrics = face
     .table_data(Tag::new(b"VDMX"))
-    .and_then(|table| emfsdk::font::vdmx_vertical_device_metrics(table.as_bytes(), ppem, char_set))
-    .map_or_else(
-      || (f32::from(os2.us_win_descent()) * scale).round(),
-      |metrics| metrics.descent as f32,
-    );
+    .and_then(|table| emfsdk::font::vdmx_vertical_device_metrics(table.as_bytes(), ppem, char_set));
+  let ascent = device_metrics.as_ref().map_or_else(
+    || (f32::from(os2.us_win_ascent()) * scale).round(),
+    |metrics| metrics.ascent as f32,
+  );
+  let descent = device_metrics.as_ref().map_or_else(
+    || (f32::from(os2.us_win_descent()) * scale).round(),
+    |metrics| metrics.descent as f32,
+  );
   let design_leading = i32::from(hhea.ascender().to_i16()) - i32::from(hhea.descender().to_i16())
     + i32::from(hhea.line_gap().to_i16())
     - i32::from(os2.us_win_ascent())
     - i32::from(os2.us_win_descent());
   let leading = (design_leading.max(0) as f32 * scale).round();
+  // Native screen EMFs place Lucida10's baseline29px into a36px row:
+  // its hinted ascent28 exceeds the27px em. Keep that overshoot on both
+  // sides of the row baseline;8/12pt and Arial/TNR/Calibri controls have none.
+  let overshoot = (ascent - f32::from(ppem)).max(0.0);
   Some(AutomaticRowExtents::from_device_metrics(
-    f32::from(ppem),
-    descent,
+    f32::from(ppem) + overshoot,
+    descent + overshoot,
     leading,
   ))
 }
@@ -3913,6 +4154,156 @@ mod tests {
   }
 
   #[test]
+  fn explicit_font_grids_match_native_lucida_and_times_device_metrics() {
+    // Actual GDI controls at worksheet 192 DPI and output 600 DPI. Natural
+    // advances and a doubled 96-DPI MDW fail these independent font/size cases.
+    for (family, size, screen, printer) in [
+      ("Lucida Sans Unicode", 8.0, 13, 42.0),
+      ("Lucida Sans Unicode", 10.0, 17, 52.0),
+      ("Lucida Sans Unicode", 11.0, 18, 58.0),
+      ("Lucida Sans Unicode", 12.0, 20, 63.0),
+      ("Times New Roman", 8.0, 11, 34.0),
+      ("Times New Roman", 10.0, 14, 42.0),
+      ("Times New Roman", 11.0, 14, 46.0),
+      ("Times New Roman", 12.0, 16, 50.0),
+    ] {
+      let grid = PrinterColumnGrid::from_style(&crate::model::TextStyle {
+        font_family: Some(family.into()),
+        font_size_pt: size,
+        ..Default::default()
+      })
+      .unwrap();
+      assert_eq!(grid.screen_digit_width_px, screen, "{family} {size}");
+      assert!(
+        (grid.printer_digit_width_pt - printer * 0.12).abs() < 0.0001,
+        "{family} {size}: {grid:?}"
+      );
+    }
+    let grid = PrinterColumnGrid::from_style(&crate::model::TextStyle {
+      font_family: Some("Lucida Sans Unicode".into()),
+      font_size_pt: 10.0,
+      ..Default::default()
+    })
+    .unwrap();
+    // Native authored-width controls; cumulative first-seven width is468.72pt.
+    for (stored, expected) in [
+      (10.6216216216216, 66.48),
+      (11.2522522522523, 70.08),
+      (11.1216216216216, 69.36),
+      (9.0, 56.16),
+      (10.9954954954955, 68.64),
+    ] {
+      assert!((grid.stored_width_pt(stored) - expected).abs() < 0.0001);
+    }
+  }
+
+  #[test]
+  fn automatic_font_boxes_include_native_hinted_ascent_overshoot() {
+    // Independent xlScreen EMFs cover sizes on both sides of Lucida's
+    // hinted ascent > em boundary; the other three families have no overshoot.
+    for (family, size, pixels) in [
+      ("Lucida Sans Unicode", 8.0, 26.0),
+      ("Lucida Sans Unicode", 9.0, 30.0),
+      ("Lucida Sans Unicode", 9.5, 33.0),
+      ("Lucida Sans Unicode", 10.0, 36.0),
+      ("Lucida Sans Unicode", 10.5, 35.0),
+      ("Lucida Sans Unicode", 11.0, 36.0),
+      ("Lucida Sans Unicode", 12.0, 40.0),
+      ("Lucida Sans Unicode", 14.0, 46.0),
+      ("Times New Roman", 10.0, 35.0),
+      ("Arial", 10.0, 34.0),
+      ("Calibri", 11.0, 38.0),
+    ] {
+      let font = automatic_text_font_row_extents(
+        &crate::model::TextStyle {
+          font_family: Some(family.into()),
+          font_size_pt: size,
+          ..Default::default()
+        },
+        0,
+      )
+      .unwrap();
+      assert_eq!(
+        font.ascent_px + font.descent_px,
+        pixels,
+        "{family} {size}: {font:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn explicit_excel_fonts_ignore_automatic_caches_and_preserve_manual_heights() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    for (size, native_height) in [(8, 10.68), (10, 13.08), (12, 15.48)] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let part = workbook
+        .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+        .unwrap();
+      part.set_data(&mut package, format!(r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <fonts><font><sz val="{size}"/><name val="Lucida Sans Unicode"/><charset val="177"/></font></fonts>
+        <cellXfs><xf fontId="0"/></cellXfs></styleSheet>"#).into_bytes()).unwrap();
+      let styles = StylesCatalog::from_workbook_part(
+        &package,
+        &workbook,
+        &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+      )
+      .unwrap();
+      for version in [None, Some(12), Some(16)] {
+        for cache in ["", " ht=\"30\""] {
+          let worksheet = x::Worksheet::from_bytes(format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+            <sheetFormatPr defaultRowHeight="30"/>
+            <sheetData>
+              <row r="1"{cache}><c r="A1" t="inlineStr"><is><t>value</t></is></c></row>
+              <row r="2" ht="30" customHeight="true"><c r="A2"><v>2</v></c></row>
+              <row r="4"{cache}><c r="A4" t="inlineStr"><is><r><rPr><rFont val="Arial"/><sz val="10"/></rPr><t>rich</t></r></is></c></row>
+            </sheetData></worksheet>"#).as_bytes()).unwrap();
+          let metrics = SheetMetrics::from_worksheet(
+            &worksheet,
+            &styles,
+            SpreadsheetProducerProfile {
+              mso_document: true,
+              excel_major_version: version,
+              ..Default::default()
+            },
+          );
+          assert!(metrics.unprofiled_excel_font_grid);
+          let rows = worksheet_rows(
+            &worksheet,
+            &[],
+            &styles,
+            metrics.automatic_row_grid,
+            metrics.format.recalculate_explicit_font_rows,
+          );
+          let geometry = SheetGeometry::new(&metrics, &rows, None, None);
+          for row in [1, 3] {
+            assert!(
+              (geometry.row_height_pt(row) - native_height).abs() < 0.0001,
+              "size {size}, version {version:?}, cache {cache}, row {row}: {}",
+              geometry.row_height_pt(row)
+            );
+          }
+          assert_eq!(rows[1].height, Some(30.0));
+          assert!(geometry.row_height_pt(2) > native_height);
+          if size == 10 {
+            // Native manual-height control:242 printer dots between rows.
+            assert!((geometry.row_height_pt(2) - 29.04).abs() < 0.0001);
+          }
+          // The native Lucida8/Arial10 control grows only rich rows. At10/12
+          // the Normal font already contains the Arial font's screen box.
+          if size == 8 {
+            assert!(geometry.row_height_pt(4) > native_height);
+          } else {
+            assert!((geometry.row_height_pt(4) - native_height).abs() < 0.0001);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn application_default_maximum_digit_width_is_quantized_to_a_96_dpi_pixel() {
     assert_eq!(quantize_digit_width_to_screen_pixel(5.79), 6.0);
     assert_eq!(
@@ -3983,6 +4374,228 @@ mod tests {
     assert!(geometry.column_offset_pt(16) + 32.4 > 595.32 - 2.0 * 50.4);
     metrics.columns[0].hidden = true;
     assert_eq!(column_width_from_metrics(&metrics, 1, 50.0), 0.0);
+  }
+
+  #[test]
+  fn cached_printer_columns_preserve_the_original_accumulation_bits() {
+    let metrics = SheetMetrics {
+      default_digit_width_pt: 5.52,
+      ..Default::default()
+    };
+    let geometry = SheetGeometry::new(&metrics, &[], None, None);
+    for scale in [1.0, 0.95, 0.37, 1.43] {
+      for column in [0_u32, 1, 2, 17, 200, 10_001, 16_385, 16_400] {
+        let original = geometry
+          .column_offsets_pt
+          .windows(2)
+          .take(column.saturating_sub(1) as usize)
+          .map(|offsets| {
+            units::quantize_points_to_office_print_grid((offsets[1] - offsets[0]) * scale)
+          })
+          .sum::<f32>();
+        assert_eq!(
+          geometry
+            .fixed_output_column_offset_pt(column, scale, true)
+            .to_bits(),
+          original.to_bits(),
+          "column {column}, scale {scale}"
+        );
+      }
+    }
+    assert_eq!(
+      geometry.fixed_output_column_offsets.lock().unwrap().len(),
+      4
+    );
+    let cloned = geometry.clone();
+    assert!(Arc::ptr_eq(
+      &geometry.fixed_output_column_offsets,
+      &cloned.fixed_output_column_offsets
+    ));
+    assert_eq!(
+      cloned.fixed_output_column_offset_pt(16_385, 0.95, true),
+      geometry.fixed_output_column_offset_pt(16_385, 0.95, true)
+    );
+  }
+
+  #[test]
+  fn printer_column_font_metrics_match_native_gdi_devices() {
+    for (family, size, screen, printer) in [
+      ("DengXian", 8.0, 11, 35.0),
+      ("DengXian", 10.0, 14, 44.0),
+      ("DengXian", 11.0, 15, 48.0),
+      ("DengXian", 12.0, 17, 53.0),
+      ("DengXian", 20.0, 28, 88.0),
+      ("Calibri", 8.0, 11, 34.0),
+      ("Calibri", 10.0, 14, 42.0),
+      ("Calibri", 11.0, 15, 47.0),
+      ("Calibri", 12.0, 16, 51.0),
+      ("Calibri", 20.0, 27, 85.0),
+      ("Arial", 8.0, 12, 37.0),
+      ("Arial", 10.0, 15, 46.0),
+      ("Arial", 11.0, 16, 51.0),
+      ("Arial", 12.0, 18, 56.0),
+      ("Arial", 20.0, 29, 93.0),
+      ("SimSun", 8.0, 11, 34.0),
+      ("SimSun", 10.0, 14, 42.0),
+      ("SimSun", 11.0, 15, 46.0),
+      ("SimSun", 12.0, 16, 50.0),
+      ("SimSun", 20.0, 27, 84.0),
+    ] {
+      let grid = PrinterColumnGrid::from_style(&crate::model::TextStyle {
+        font_family: Some(family.into()),
+        font_size_pt: size,
+        ..Default::default()
+      })
+      .unwrap();
+      assert_eq!(grid.screen_digit_width_px, screen, "{family} {size}");
+      assert!(
+        (grid.printer_digit_width_pt - printer * 0.12).abs() < 0.0001,
+        "{family} {size}: {grid:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn theme_columns_match_native_default_and_authored_width_controls() {
+    for (family, size, scaled_dots) in [
+      ("DengXian", 11.0, 413.0),
+      ("Calibri", 11.0, 405.0),
+      ("Arial", 11.0, 436.0),
+      ("Calibri", 10.0, 365.0),
+      ("Calibri", 12.0, 436.0),
+      ("Arial", 10.0, 396.0),
+    ] {
+      let grid = PrinterColumnGrid::from_style(&crate::model::TextStyle {
+        font_family: Some(family.into()),
+        font_size_pt: size,
+        ..Default::default()
+      })
+      .unwrap();
+      let width = grid.default_width_pt(&SheetFormatModel::default());
+      let scaled = units::quantize_points_to_office_print_grid(width * 0.95);
+      assert!(
+        (scaled - scaled_dots * 0.12).abs() < 0.0001,
+        "{family} {size}"
+      );
+    }
+    let grid = PrinterColumnGrid::from_style(&crate::model::TextStyle {
+      font_family: Some("DengXian".into()),
+      font_size_pt: 11.0,
+      ..Default::default()
+    })
+    .unwrap();
+    for (base, stored, dots) in [
+      (None, None, 413.0),
+      (Some(8), None, 413.0),
+      (Some(9), None, 438.0),
+      (None, Some(8.43), 383.0),
+      (None, Some(8.38), 383.0),
+      (None, Some(8.0), 365.0),
+    ] {
+      let width = grid.default_width_pt(&SheetFormatModel {
+        base_column_width: base,
+        default_column_width: stored,
+        ..Default::default()
+      });
+      assert!(
+        (units::quantize_points_to_office_print_grid(width * 0.95) - dots * 0.12).abs() < 0.0001
+      );
+    }
+    let grid = PrinterColumnGrid::from_style(&crate::model::TextStyle {
+      font_family: Some("SimSun".into()),
+      font_size_pt: 11.0,
+      ..Default::default()
+    })
+    .unwrap();
+    assert!((grid.default_width_pt(&SheetFormatModel::default()) - 50.04).abs() < 0.0001);
+    for (width, dots) in [
+      (11.425_781_25, 524.0),
+      (23.570_312_5, 1086.0),
+      (15.0, 690.0),
+      (8.425_781_25, 386.0),
+    ] {
+      assert!((grid.stored_width_pt(width) - dots * 0.12).abs() < 0.0001);
+    }
+  }
+
+  #[test]
+  fn default_column_blocks_match_native_base_and_normal_font_controls() {
+    // Actual Excel screen widths (192 DPI), with baseColWidth=8/9/10/11.
+    // In particular, the larger-font controls distinguish quarter-digit
+    // padding from a fixed nine-pixel allowance.
+    for (family, size, expected) in [
+      ("SimSun", 11.0, [136.0, 144.0, 160.0, 176.0]),
+      ("DengXian", 11.0, [136.0, 144.0, 160.0, 176.0]),
+      ("DengXian", 12.0, [152.0, 168.0, 184.0, 200.0]),
+      ("DengXian", 20.0, [240.0, 272.0, 296.0, 328.0]),
+      ("Arial", 11.0, [144.0, 160.0, 176.0, 192.0]),
+      ("Calibri", 12.0, [144.0, 160.0, 176.0, 192.0]),
+    ] {
+      let grid = PrinterColumnGrid::from_style(&crate::model::TextStyle {
+        font_family: Some(family.into()),
+        font_size_pt: size,
+        ..Default::default()
+      })
+      .unwrap();
+      for (base, expected) in (8..=11).zip(expected) {
+        assert_eq!(
+          grid.default_screen_width_px(&SheetFormatModel {
+            base_column_width: Some(base),
+            ..Default::default()
+          }),
+          expected,
+          "{family} {size}, base {base}"
+        );
+      }
+      assert_eq!(
+        grid.default_screen_width_px(&SheetFormatModel::default()),
+        expected[0]
+      );
+    }
+  }
+
+  #[test]
+  fn theme_picture_offsets_match_native_screen_and_printer_owners() {
+    for (family, base, stored, authored, expected) in [
+      ("DengXian", None, None, None, 279.48),
+      ("DengXian", None, Some(8.43), None, 260.28),
+      ("DengXian", None, Some(8.0), None, 248.88),
+      ("DengXian", Some(9), None, None, 295.08),
+      ("SimSun", None, None, None, 267.84),
+      ("Arial", None, None, None, 293.76),
+      ("DengXian", None, None, Some(12.0), 364.08),
+    ] {
+      let grid = PrinterColumnGrid::from_style(&crate::model::TextStyle {
+        font_family: Some(family.into()),
+        font_size_pt: 11.0,
+        ..Default::default()
+      })
+      .unwrap();
+      let format = SheetFormatModel {
+        base_column_width: base,
+        default_column_width: stored,
+        ..Default::default()
+      };
+      let screen_pixels = authored.map_or_else(
+        || grid.default_screen_width_px(&format),
+        |width| stored_column_width_to_screen_pixels(width, grid.screen_digit_width_px),
+      );
+      let printed_column = authored.map_or_else(
+        || grid.default_width_pt(&format),
+        |width| grid.stored_width_pt(width),
+      );
+      // Actual Office picture controls end in column F, 18 screen points
+      // inside that column. EMU offsets preserve this fraction on the
+      // printer grid; direct EMU-to-point addition is the counterexample.
+      let offset = fixed_output_drawing_marker_offset_pt(
+        18.0,
+        Some(screen_pixels * units::POINTS_PER_INCH / OFFICE_WORKSHEET_FONT_DPI),
+        printed_column,
+        1.0,
+      );
+      let actual = units::quantize_points_to_office_print_grid(5.0 * printed_column + offset);
+      assert!((actual - expected).abs() < 0.0001, "{family}: {actual}");
+    }
   }
 
   #[test]

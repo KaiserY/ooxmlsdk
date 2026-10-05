@@ -15,14 +15,31 @@ pub struct CellBordersModel {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BorderRelief {
+  pub inset: bool,
+  pub automatic_color: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BorderStyle {
   pub width_pt: f32,
   pub spacing_pt: f32,
   pub color: RgbColor,
   pub compound: bool,
+  pub compound_pattern: BorderCompoundPattern,
   pub dash_pattern: BorderDashPattern,
   pub shadow: bool,
-  pub inset_or_outset: bool,
+  pub relief: Option<BorderRelief>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BorderCompoundPattern {
+  #[default]
+  Equal,
+  ThinThickSmallGap,
+  ThickThinSmallGap,
+  ThinThickMediumGap,
+  ThickThinMediumGap,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -66,9 +83,10 @@ impl Default for BorderStyle {
       spacing_pt: 0.0,
       color: RgbColor { r: 0, g: 0, b: 0 },
       compound: false,
+      compound_pattern: BorderCompoundPattern::Equal,
       dash_pattern: BorderDashPattern::Solid,
       shadow: false,
-      inset_or_outset: false,
+      relief: None,
     }
   }
 }
@@ -94,8 +112,28 @@ pub(crate) enum WordprocessingRunColor {
   },
 }
 
+/// A WordprocessingML directional container in logical source order. The
+/// paragraph-local ID distinguishes adjacent containers with equal direction.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct WordprocessingBidiScope {
+  pub id: usize,
+  pub right_to_left: bool,
+  pub override_direction: bool,
+}
+
+/// Authored Word fit-text region. Equal IDs join contiguous source runs;
+/// layout resolves the first run's width before applying distributed pitch.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct WordprocessingFitText {
+  pub id: i32,
+  pub width_pt: f32,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
+  /// Effective Word run border. The outer option retains cascade presence;
+  /// `Some(None)` explicitly clears an inherited border with `w:val="nil"`.
+  pub word_run_border: Option<Option<BorderStyle>>,
   pub font_family: Option<Arc<str>>,
   /// Effective WordprocessingML `w:rFonts/@w:hAnsi` face. Word classifies
   /// this slot independently from ASCII even when both usually resolve to
@@ -156,6 +194,15 @@ pub struct TextStyle {
   /// portion. This controls glyph order and mirroring without selecting the
   /// WordprocessingML complex-script formatting attached to `w:rtl`.
   pub(crate) resolved_bidi_level: Option<u8>,
+  /// Nested w:dir/w:bdo boundaries used by paragraph bidi resolution. These
+  /// are layout metadata, not additional characters in PDF semantic text.
+  pub(crate) wordprocessing_bidi_scopes: Option<Arc<[WordprocessingBidiScope]>>,
+  /// A literal interior control portion measured through nominal font glyphs
+  /// by Word. Its source characters stay nonprinting in PDF output.
+  pub(crate) wordprocessing_nominal_control_metrics: bool,
+  /// Literal directional controls consumed before this portion in the same
+  /// Word direction region. Replayed when a new line resumes that region.
+  pub(crate) wordprocessing_bidi_prefix: Option<Arc<str>>,
   pub complex_bold: Option<bool>,
   pub complex_italic: Option<bool>,
   /// Minimum WordprocessingML font size at which OpenType kerning is active.
@@ -169,23 +216,39 @@ pub struct TextStyle {
   /// Horizontal WordprocessingML character scale. `None` means 100% and
   /// preserves explicit 100% overrides in style inheritance.
   pub horizontal_scale: Option<f32>,
+  /// Authored Word `w:w`, independently of later geometric text transforms.
+  pub(crate) wordprocessing_font_width_percent: Option<u16>,
+  /// Legacy Word97 measurement, enabled only before compatibility mode 15.
+  pub(crate) wordprocessing_legacy_font_measurement: Option<bool>,
+  pub(crate) wordprocessing_tab_leader: Option<common::wordprocessing_device::TabLeader>,
+  /// Authored tab endpoints relative to the generated item's origin, retained
+  /// until RTL reflection can place its cells on the physical page grid.
+  pub(crate) wordprocessing_tab_leader_span: Option<(f32, f32)>,
   /// Explicit PDF-semantic distances between consecutive character origins.
-  /// This is populated only for GDI `ExtTextOut` replacement layers whose
-  /// nonuniform `Dx` array cannot be represented by ordinary character
-  /// spacing or a single horizontal scale.
+  /// Used for GDI `ExtTextOut` replacement layers and Word tab leaders whose
+  /// device advances must remain independent of the rounded paint font size.
   pub(crate) semantic_character_advances_pt: Option<Arc<[f32]>>,
+  pub(crate) shaping_context: Option<Arc<common::TextShapingContext>>,
+  pub(crate) kashida_expansions: Option<Arc<[common::KashidaExpansion]>>,
+  pub(crate) wordprocessing_kashida: Option<Arc<common::WordprocessingKashida>>,
   pub character_spacing_pt: f32,
+  pub(crate) wordprocessing_fit_text: Option<WordprocessingFitText>,
   pub baseline_shift_pt: f32,
   /// Original WordprocessingML font size retained for the line box when
   /// automatic `w:vertAlign` shrinks and shifts the painted glyph.
   pub(crate) automatic_escapement_font_size_pt: Option<f32>,
   /// Complex-script counterpart of `automatic_escapement_font_size_pt`.
   pub(crate) automatic_escapement_complex_font_size_pt: Option<f32>,
+  /// Word 97 compatibility rounds automatic escapement half-point ties up.
+  /// This document policy is inactive in compatibility mode 15 and later.
+  pub(crate) wordprocessingml_legacy_escapement_rounding: bool,
   /// Layout-only minimum line box for generated resources whose Office UI
   /// metrics are taller than their embedded glyph bounds.
   pub(crate) line_height_override_pt: Option<f32>,
   pub line_vertical_alignment: common::LineVerticalAlignment,
   pub semantic_only: bool,
+  /// Visible PDF text used as decoration rather than logical document text.
+  pub pdf_painted_artifact: bool,
   pub use_windows_font_metrics: bool,
   /// Select Common characters using the WordprocessingML rFonts slot table.
   pub wordprocessingml_font_slots: bool,
@@ -194,6 +257,13 @@ pub struct TextStyle {
   pub wordprocessingml_cjk_line_metrics: bool,
   /// Fraction of Word's maximum full-width punctuation compression to apply.
   pub cjk_punctuation_compression_ratio: f32,
+  /// Completed-line character adjustments, including negative trailing
+  /// side-bearing compression for hanging punctuation.
+  pub wordprocessing_justification_expansion_pt: Option<Arc<[f32]>>,
+  /// Word 95 spacing classes, active only in pre-Word-2013 compatibility.
+  pub wordprocessingml_legacy_punctuation_spacing: bool,
+  /// Apply Word prose punctuation spacing, excluded from OMML math zones.
+  pub wordprocessingml_punctuation_spacing: bool,
   /// Apply WordprocessingML's document-level half-width/full-width space
   /// balancing compatibility rule before line justification.
   pub wordprocessingml_balance_single_byte_double_byte_width: bool,
@@ -215,6 +285,8 @@ pub struct TextStyle {
   pub(crate) legacy_shadow: bool,
   /// Resolved legacy WordprocessingML `w:emboss`/`w:imprint` relief.
   pub(crate) legacy_relief: LegacyTextRelief,
+  /// Logical paragraph/cell background used by legacy text effects.
+  pub(crate) legacy_effect_background: Option<RgbColor>,
   /// Resolved DrawingML `a:effectLst`/`a:effectDag` attached to character
   /// properties. This remains on the implementation-side style until the
   /// owning text body materializes the visible glyph raster.
@@ -242,10 +314,14 @@ pub struct TextStyle {
   /// Writer's `SwTextGuess` excludes every field portion from hanging
   /// punctuation even when `w:overflowPunct` is otherwise enabled.
   pub(crate) wordprocessingml_field_group: bool,
-  /// Office keeps the field-generated trailing blank after an ADDRESSBLOCK
-  /// placeholder in the fixed PDF stream; it is a layout advance, not visible
-  /// normalized paragraph text.
-  pub(crate) wordprocessingml_address_block_placeholder: bool,
+  /// Blank legacy FORMTEXT results reserve five digit-sized form cells in
+  /// Word fixed output, even when their cached XML uses en-space characters.
+  /// This is a field layout semantic, not ordinary U+2002 font shaping.
+  pub(crate) wordprocessingml_form_text_blank_cell: bool,
+  /// Office keeps the field-generated trailing blank after an unresolved
+  /// mail-merge placeholder in the fixed PDF stream; it is a layout advance,
+  /// not visible normalized paragraph text.
+  pub(crate) wordprocessingml_mail_merge_placeholder: bool,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
@@ -272,6 +348,7 @@ pub struct TextStyle {
 impl Default for TextStyle {
   fn default() -> Self {
     Self {
+      word_run_border: None,
       font_family: None,
       high_ansi_font_family: None,
       fallback_font_family: None,
@@ -304,24 +381,40 @@ impl Default for TextStyle {
       complex_script: None,
       right_to_left: None,
       resolved_bidi_level: None,
+      wordprocessing_bidi_scopes: None,
+      wordprocessing_nominal_control_metrics: false,
+      wordprocessing_bidi_prefix: None,
       complex_bold: None,
       complex_italic: None,
       kerning_minimum_size_pt: None,
       ligatures: None,
       open_type_features: common::OpenTypeFeatureSettings::default(),
       horizontal_scale: None,
+      wordprocessing_font_width_percent: None,
+      wordprocessing_legacy_font_measurement: None,
+      wordprocessing_tab_leader: None,
+      wordprocessing_tab_leader_span: None,
       semantic_character_advances_pt: None,
+      shaping_context: None,
+      kashida_expansions: None,
+      wordprocessing_kashida: None,
       character_spacing_pt: 0.0,
+      wordprocessing_fit_text: None,
       baseline_shift_pt: 0.0,
       automatic_escapement_font_size_pt: None,
       automatic_escapement_complex_font_size_pt: None,
+      wordprocessingml_legacy_escapement_rounding: false,
       line_height_override_pt: None,
       line_vertical_alignment: common::LineVerticalAlignment::Auto,
       semantic_only: false,
+      pdf_painted_artifact: false,
       use_windows_font_metrics: false,
       wordprocessingml_font_slots: false,
       wordprocessingml_cjk_line_metrics: false,
       cjk_punctuation_compression_ratio: 0.0,
+      wordprocessing_justification_expansion_pt: None,
+      wordprocessingml_legacy_punctuation_spacing: false,
+      wordprocessingml_punctuation_spacing: false,
       wordprocessingml_balance_single_byte_double_byte_width: false,
       pdf_glyph_outlines: false,
       pdf_glyph_outline_options: None,
@@ -332,13 +425,15 @@ impl Default for TextStyle {
       legacy_outline: false,
       legacy_shadow: false,
       legacy_relief: LegacyTextRelief::None,
+      legacy_effect_background: None,
       drawingml_text_effects: None,
       drawingml_text_static3d: None,
       wordprocessingml_field_bold_override: None,
       wordprocessingml_generated_field_diagnostic: false,
       wordprocessingml_index_field_diagnostic: false,
       wordprocessingml_field_group: false,
-      wordprocessingml_address_block_placeholder: false,
+      wordprocessingml_form_text_blank_cell: false,
+      wordprocessingml_mail_merge_placeholder: false,
       bold: false,
       italic: false,
       underline: false,
@@ -412,6 +507,8 @@ pub struct PageSetup {
   pub background: Option<RgbColor>,
   pub borders: CellBordersModel,
   pub borders_offset_from_text: bool,
+  pub page_border_art: Option<PageBorderArt>,
+  pub page_border_display: PageBorderDisplay,
   pub line_numbering: Option<LineNumbering>,
   pub doc_grid_line_pitch_pt: Option<f32>,
   /// Line pitch retained for Word 2007-and-later fixed output's
@@ -451,6 +548,8 @@ impl Default for PageSetup {
       background: None,
       borders: CellBordersModel::default(),
       borders_offset_from_text: false,
+      page_border_art: None,
+      page_border_display: PageBorderDisplay::AllPages,
       line_numbering: None,
       doc_grid_line_pitch_pt: None,
       table_cell_doc_grid_line_pitch_pt: None,
@@ -460,6 +559,20 @@ impl Default for PageSetup {
       page_number_format: FieldNumberFormat::Decimal,
     }
   }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PageBorderArt {
+  BasicWideMidline,
+  MapleMuffins,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PageBorderDisplay {
+  #[default]
+  AllPages,
+  FirstPage,
+  NotFirstPage,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -709,6 +822,13 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
       .as_deref()
       .and_then(|language| language.split(['-', '_']).next())
       .is_some_and(|language| language.eq_ignore_ascii_case("zh")),
+    wordprocessingml_bidi_language_is_hebrew: style
+      .bidi_language
+      .as_deref()
+      .and_then(|language| language.split(['-', '_']).next())
+      .is_some_and(|language| {
+        language.eq_ignore_ascii_case("he") || language.eq_ignore_ascii_case("iw")
+      }),
     font_charset: style.font_charset,
     high_ansi_font_charset: style.high_ansi_font_charset,
     wordprocessingml_east_asia_font_charset: style.east_asia_font_charset,
@@ -723,13 +843,20 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     complex_script: style.complex_script,
     right_to_left: style.right_to_left,
     resolved_bidi_level: style.resolved_bidi_level,
+    wordprocessing_nominal_control_metrics: style.wordprocessing_nominal_control_metrics,
     complex_bold: style.complex_bold,
     complex_italic: style.complex_italic,
     kerning_minimum_size: style.kerning_minimum_size_pt.map(common::Pt),
     ligatures: style.ligatures,
     open_type_features: style.open_type_features,
     horizontal_scale: style.horizontal_scale,
+    wordprocessing_font_width_percent: style.wordprocessing_font_width_percent,
+    wordprocessing_legacy_font_measurement: style.wordprocessing_legacy_font_measurement,
+    wordprocessing_tab_leader: style.wordprocessing_tab_leader,
     semantic_character_advances_pt: style.semantic_character_advances_pt,
+    shaping_context: style.shaping_context,
+    kashida_expansions: style.kashida_expansions,
+    wordprocessing_kashida: style.wordprocessing_kashida,
     character_spacing: common::Pt(style.character_spacing_pt),
     baseline_shift: common::Pt(style.baseline_shift_pt),
     automatic_escapement_font_size: style.automatic_escapement_font_size_pt.map(common::Pt),
@@ -738,10 +865,16 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
       .map(common::Pt),
     line_vertical_alignment: style.line_vertical_alignment,
     semantic_only: style.semantic_only,
+    pdf_painted_artifact: style.pdf_painted_artifact,
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
     wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
+    wordprocessing_justification_expansion_pt: style
+      .wordprocessing_justification_expansion_pt
+      .clone(),
+    wordprocessingml_legacy_punctuation_spacing: style.wordprocessingml_legacy_punctuation_spacing,
+    wordprocessingml_punctuation_spacing: style.wordprocessingml_punctuation_spacing,
     wordprocessingml_balance_single_byte_double_byte_width: style
       .wordprocessingml_balance_single_byte_double_byte_width,
     pdf_glyph_outlines: style.pdf_glyph_outlines,

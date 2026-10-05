@@ -123,13 +123,24 @@ pub(super) fn pdf_page_dimension(engine_kind: common::LayoutEngineKind, dimensio
     common::LayoutEngineKind::Docx => {
       let print_grid_position = dimension_pt * ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_DPI
         / ooxmlsdk_layout::units::POINTS_PER_INCH;
-      // Word MediaBoxes use the same 600 dpi grid, but real corpus half-grid
-      // dimensions round in both directions depending on printer/page state
-      // that is not represented by w:pgSz. Preserve an exact half-grid source
-      // dimension instead of choosing a contradicted tie rule. Non-ties have
-      // one nearest device coordinate and can be normalized safely.
+      // Word MediaBoxes use the same 600 dpi grid. At exact half-grid sizes,
+      // its native conversion can choose either adjacent device coordinate.
+      // These twip sizes were checked against independent one-page Word exports
+      // after removing page borders, paper codes and document content. Leave
+      // unmeasured ties unchanged rather than assuming a universal tie rule.
       if (print_grid_position.fract() - 0.5).abs() <= 0.001 {
-        dimension_pt
+        let source_twips = (dimension_pt * 20.0).round() as i32;
+        match source_twips {
+          5_670 | 6_750 | 14_742 => {
+            print_grid_position.ceil() * ooxmlsdk_layout::units::POINTS_PER_INCH
+              / ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_DPI
+          }
+          5_754 | 7_938 | 8_838 | 23_814 => {
+            print_grid_position.floor() * ooxmlsdk_layout::units::POINTS_PER_INCH
+              / ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_DPI
+          }
+          _ => dimension_pt,
+        }
       } else {
         ooxmlsdk_layout::units::quantize_points_to_office_print_grid(dimension_pt)
       }

@@ -89,7 +89,7 @@ pub(super) fn render(input: HostedBackdropInput<'_>) -> Option<HostedBackdropOut
   let (mapping, crop_x, crop_y) = plan.working_mapping(target_bounds)?;
   let draw = |text: &common::TextRun<'static>, aa| {
     raster::rasterize_vector_items_at_mapping(
-      &[common::DisplayItem::Text(text.clone())],
+      &[common::DisplayItem::Text(Box::new(text.clone()))],
       mapping,
       aa,
     )

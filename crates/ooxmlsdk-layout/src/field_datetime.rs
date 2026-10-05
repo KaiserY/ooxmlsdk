@@ -70,7 +70,7 @@ pub(crate) fn format_date_time_field(
     }
   }
   if let Some(picture) = picture {
-    return format_picture(picture, language, value);
+    return format_word_picture(picture, language, value);
   }
   match default_format {
     DefaultFieldFormat::Date => format_office_short_date(language, value),
@@ -325,7 +325,27 @@ fn format_picture(
   language: Option<&str>,
   value: FieldUpdateDateTime,
 ) -> Option<String> {
-  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(picture)?;
+  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(picture, false)?;
+  format_icu_picture(&pattern, language, value, abbreviate_day_period)
+}
+
+fn format_word_picture(
+  picture: &str,
+  language: Option<&str>,
+  value: FieldUpdateDateTime,
+) -> Option<String> {
+  // Word formats field-picture day periods with Windows NLS data. Spanish
+  // (Spain) exposes empty NLS AM/PM designators even though ICU supplies
+  // localized `a. m.`/`p. m.` names. Keep this Word-only so DrawingML and
+  // SpreadsheetML continue to use their separately verified ICU behavior.
+  let empty_day_period = language.and_then(canonical_locale).is_some_and(|locale| {
+    locale.id.language.as_str() == "es"
+      && locale
+        .id
+        .region
+        .is_some_and(|region| region.as_str() == "ES")
+  });
+  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(picture, empty_day_period)?;
   format_icu_picture(&pattern, language, value, abbreviate_day_period)
 }
 
@@ -353,7 +373,7 @@ fn format_icu_picture(
   Some(normalize_office_field_output(formatted, language))
 }
 
-fn office_picture_to_icu_pattern(picture: &str) -> Option<(String, bool)> {
+fn office_picture_to_icu_pattern(picture: &str, empty_day_period: bool) -> Option<(String, bool)> {
   let chars = picture.chars().collect::<Vec<_>>();
   let mut output = String::new();
   let mut index = 0;
@@ -384,15 +404,19 @@ fn office_picture_to_icu_pattern(picture: &str) -> Option<(String, bool)> {
       continue;
     }
     if ascii_prefix_eq_ignore_case(&chars[index..], "am/pm") {
-      output.push('a');
+      if !empty_day_period {
+        output.push('a');
+      }
       index += "am/pm".len();
       continue;
     }
     if ascii_prefix_eq_ignore_case(&chars[index..], "a/p") {
-      output.push('\'');
-      output.push(ABBREVIATED_DAY_PERIOD_MARKER);
-      output.push('\'');
-      abbreviate_day_period = true;
+      if !empty_day_period {
+        output.push('\'');
+        output.push(ABBREVIATED_DAY_PERIOD_MARKER);
+        output.push('\'');
+        abbreviate_day_period = true;
+      }
       index += "a/p".len();
       continue;
     }
@@ -455,7 +479,7 @@ pub(crate) fn format_spreadsheet_date_picture_with_weekday(
   let language = embedded_language.as_deref().or(fallback_language);
   let anchor = spreadsheet_calendar_anchor(value);
   let picture = spreadsheet_date_picture_to_field_picture(picture, language, anchor)?;
-  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(&picture)?;
+  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(&picture, false)?;
   let pattern = spreadsheet_calendar_pattern(&pattern, language, value, compatibility_weekday)?;
   format_icu_picture(&pattern, language, anchor, abbreviate_day_period)
 }
@@ -1131,6 +1155,25 @@ mod tests {
         VALUE,
       ),
       Some("8:19:00 PM".to_string())
+    );
+  }
+
+  #[test]
+  fn word_spanish_spain_time_picture_uses_empty_windows_day_period() {
+    for language in ["es-ES", "es-ES_tradnl"] {
+      for picture in ["h:mm am/pm", "h:mm AM/PM", "h:mm a/p"] {
+        assert_eq!(
+          format_date_time_field(&tokens(&["TIME", r"\@", picture]), Some(language), VALUE),
+          Some("8:19 ".to_string()),
+          "{language}: {picture}"
+        );
+      }
+    }
+
+    // DrawingML fields keep their separately verified ICU day-period names.
+    assert_eq!(
+      super::format_date_time_picture("h:mm am/pm", Some("es-ES"), VALUE).as_deref(),
+      Some("8:19 p. m.")
     );
   }
 

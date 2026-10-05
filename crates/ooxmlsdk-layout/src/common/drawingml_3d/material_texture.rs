@@ -46,10 +46,11 @@ impl TextSurfaceRealizationPlan {
     options: Static3dRenderOptions,
     target_pixels_per_point: f32,
   ) -> Option<Self> {
-    // The perspective textured-solid route is distinct from the orthographic
-    // independent front-coverage route. Do not change the latter's paint grid.
-    if projection.parallel || !target_pixels_per_point.is_finite() || target_pixels_per_point <= 0.0
-    {
+    // Projected density owns curve and bevel subdivision for both camera
+    // families. Native orthographic vertex buffers use this same realization;
+    // falling back to the working bitmap's fixed tolerance changes their mesh.
+    // Paint allocation remains an independent decision at the caller.
+    if !target_pixels_per_point.is_finite() || target_pixels_per_point <= 0.0 {
       return None;
     }
     let model = options.model_surface?;

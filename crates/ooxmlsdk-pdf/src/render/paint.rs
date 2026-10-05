@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::ops::Range;
 use std::sync::Arc;
 
+use icu_properties::{CodePointMapData, props::GeneralCategory};
 use rustc_hash::FxHashMap as HashMap;
 use skrifa::{
   FontRef as SkrifaFontRef, MetadataProvider,
@@ -22,6 +23,11 @@ use ooxmlsdk_layout::common;
 use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef};
 use ooxmlsdk_layout::text_metrics::{TextMetrics, TextVerticalMetrics};
 
+#[path = "paint_word_advances.rs"]
+mod word_advances;
+#[path = "paint_word_baselines.rs"]
+mod word_baselines;
+
 type PaintTextPortionRanges = SmallVec<[(PaintTextPortionKind, Range<usize>); 2]>;
 pub(super) type PaintGlyphFontRuns = SmallVec<[PaintGlyphFontRun; 2]>;
 
@@ -30,7 +36,7 @@ pub(super) fn prepare_for_direct<'doc>(
   options: &PdfOptions,
 ) -> PaintDocument<'doc> {
   let mut text_metrics = TextMetrics::new();
-  PaintDocument::from_layout(document, &mut text_metrics, options.ui_language.as_deref())
+  PaintDocument::from_layout(document, &mut text_metrics, options)
 }
 
 #[derive(Clone, Debug)]
@@ -70,6 +76,8 @@ pub(super) struct TextItem<'doc> {
   pub(super) x_pt: f32,
   pub(super) y_pt: f32,
   pub(super) line_height_pt: f32,
+  origin_is_baseline: bool,
+  pub(super) wordprocessing_line_metrics: Option<common::WordprocessingLineMetrics>,
   line_metrics_participant: bool,
   pub(super) paint_clip: Option<PaintClipRect>,
   page_culling_bounds: Option<PaintClipRect>,
@@ -86,8 +94,8 @@ pub(super) struct TextItem<'doc> {
   paragraph_bidi: bool,
   word_spacing_pt: f32,
   preserve_text_portion: bool,
-  decoration_span_start_x_pt: Option<f32>,
-  pdf_text_segmentation: common::PdfTextSegmentation,
+  pub(super) decoration_span_start_x_pt: Option<f32>,
+  pub(super) pdf_text_segmentation: common::PdfTextSegmentation,
   source_path: Option<&'doc [usize]>,
   semantic_target_width_pt: Option<f32>,
 }
@@ -140,6 +148,7 @@ pub(super) enum RectFill<'doc> {
   Solid { color: RgbColor, opacity: f32 },
   Gradient(&'doc common::GradientFill<'static>),
   Pattern(&'doc common::PatternFill),
+  Texture(&'doc common::TextureFill),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -226,15 +235,22 @@ pub(super) struct TextStyle<'doc> {
   pub(super) explicit_symbol_character: bool,
   font_size_pt: f32,
   complex_font_size_pt: Option<f32>,
-  layout_font_sizes: Option<common::LayoutFontSizes>,
+  pub(super) layout_font_sizes: Option<common::LayoutFontSizes>,
   complex_script: Option<bool>,
   right_to_left: Option<bool>,
   resolved_bidi_level: Option<u8>,
+  wordprocessing_nominal_control_metrics: bool,
   kerning_minimum_size_pt: Option<f32>,
   ligatures: Option<common::OpenTypeLigatures>,
   open_type_features: common::OpenTypeFeatureSettings,
   pub(super) horizontal_scale: Option<f32>,
+  pub(super) wordprocessing_font_width_percent: Option<u16>,
+  wordprocessing_legacy_font_measurement: Option<bool>,
+  pub(super) wordprocessing_tab_leader: Option<common::wordprocessing_device::TabLeader>,
   semantic_character_advances_pt: Option<Arc<[f32]>>,
+  shaping_context: Option<Arc<common::TextShapingContext>>,
+  kashida_expansions: Option<Arc<[common::KashidaExpansion]>>,
+  wordprocessing_kashida: Option<Arc<common::WordprocessingKashida>>,
   character_spacing_pt: f32,
   baseline_shift_pt: f32,
   automatic_escapement_font_size_pt: Option<f32>,
@@ -245,6 +261,7 @@ pub(super) struct TextStyle<'doc> {
   wordprocessingml_cjk_line_metrics: bool,
   wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
   wordprocessingml_east_asia_language_is_chinese: bool,
+  wordprocessingml_bidi_language_is_hebrew: bool,
   font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   high_ansi_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
@@ -254,6 +271,9 @@ pub(super) struct TextStyle<'doc> {
   east_asia_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   complex_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   cjk_punctuation_compression_ratio: f32,
+  wordprocessing_justification_expansion_pt: Option<Arc<[f32]>>,
+  wordprocessingml_legacy_punctuation_spacing: bool,
+  wordprocessingml_punctuation_spacing: bool,
   wordprocessingml_balance_single_byte_double_byte_width: bool,
   pub(super) pdf_glyph_outlines: bool,
   pub(super) pdf_glyph_outline_options: Option<common::PdfGlyphOutlineOptions>,
@@ -267,6 +287,7 @@ pub(super) struct TextStyle<'doc> {
   pub(super) small_caps: bool,
   pub(super) hidden: bool,
   pub(super) semantic_only: bool,
+  pub(super) pdf_painted_artifact: bool,
   /// The text origin is already the metafile playback baseline rather than a
   /// document-layout line-box origin.
   metafile_reference_baseline: bool,
@@ -362,6 +383,10 @@ impl FontStyleRef for TextStyle<'_> {
     self.right_to_left == Some(true)
   }
 
+  fn wordprocessing_nominal_control_metrics(&self) -> bool {
+    self.wordprocessing_nominal_control_metrics
+  }
+
   fn resolved_bidi_level(&self) -> Option<u8> {
     self.resolved_bidi_level
   }
@@ -372,6 +397,17 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn complex_italic(&self) -> Option<bool> {
     self.complex_italic
+  }
+
+  fn shaping_context(&self) -> Option<&common::TextShapingContext> {
+    self.shaping_context.as_deref()
+  }
+
+  fn kashida_expansions(&self) -> &[common::KashidaExpansion] {
+    self.kashida_expansions.as_deref().unwrap_or_default()
+  }
+  fn wordprocessing_kashida(&self) -> Option<&common::WordprocessingKashida> {
+    self.wordprocessing_kashida.as_deref()
   }
 
   fn character_spacing_pt(&self) -> f32 {
@@ -415,6 +451,9 @@ impl FontStyleRef for TextStyle<'_> {
   fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
     self.wordprocessingml_east_asia_language_is_chinese
   }
+  fn wordprocessingml_bidi_language_is_hebrew(&self) -> bool {
+    self.wordprocessingml_bidi_language_is_hebrew
+  }
 
   fn font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
     self.font_charset
@@ -448,8 +487,21 @@ impl FontStyleRef for TextStyle<'_> {
     self.complex_font_pitch
   }
 
+  fn wordprocessing_justification_expansion_pt(&self) -> &[f32] {
+    self
+      .wordprocessing_justification_expansion_pt
+      .as_deref()
+      .unwrap_or_default()
+  }
+
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     self.cjk_punctuation_compression_ratio
+  }
+  fn wordprocessingml_legacy_punctuation_spacing(&self) -> bool {
+    self.wordprocessingml_legacy_punctuation_spacing
+  }
+  fn wordprocessingml_punctuation_spacing(&self) -> bool {
+    self.wordprocessingml_punctuation_spacing
   }
 
   fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
@@ -477,6 +529,23 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn horizontal_scale(&self) -> f32 {
     self.horizontal_scale.unwrap_or(1.0)
+  }
+  fn wordprocessing_layout_font_sizes(&self) -> Option<common::LayoutFontSizes> {
+    self.layout_font_sizes
+  }
+
+  fn wordprocessing_measurement_profile(&self) -> Option<(bool, u16)> {
+    // An already realized paint em must not be quantized as an ideal font.
+    // text_layout_glyphs restores the authored sizes and clears this marker.
+    if self.layout_font_sizes.is_some() {
+      return None;
+    }
+    self.wordprocessing_legacy_font_measurement.map(|legacy| {
+      (
+        legacy,
+        self.wordprocessing_font_width_percent.unwrap_or(100),
+      )
+    })
   }
 }
 
@@ -653,6 +722,21 @@ pub(super) fn word_no_break_hyphen_semantic_text(text: &str) -> Cow<'_, str> {
   )
 }
 
+pub(super) fn pdf_semantic_text<'a>(
+  text: &'a str,
+  small_caps: bool,
+  font_family: Option<&str>,
+) -> Cow<'a, str> {
+  let mut semantic = word_small_caps_semantic_text(text, small_caps);
+  if let Cow::Owned(mapped) = symbol_font_semantic_text(semantic.as_ref(), font_family) {
+    semantic = Cow::Owned(mapped);
+  }
+  if let Cow::Owned(mapped) = word_no_break_hyphen_semantic_text(semantic.as_ref()) {
+    semantic = Cow::Owned(mapped);
+  }
+  semantic
+}
+
 pub(super) fn remap_glyph_text_ranges<'a>(
   glyphs: &'a [PaintGlyph],
   source_text: &str,
@@ -692,6 +776,50 @@ pub(super) fn remap_glyph_text_ranges<'a>(
     remapped.push(glyph);
   }
   Some(Cow::Owned(remapped))
+}
+
+pub(super) fn merge_word_font_runs(glyph_runs: &PaintGlyphFontRuns) -> Cow<'_, PaintGlyphFontRuns> {
+  let contiguous = |left: &PaintGlyphFontRun, right: &PaintGlyphFontRun| {
+    if left.font_face != right.font_face
+      || left.font_face.synthetic_bold != right.font_face.synthetic_bold
+      || left.font_face.synthetic_italic != right.font_face.synthetic_italic
+      || left.font_size_pt.to_bits() != right.font_size_pt.to_bits()
+    {
+      return false;
+    }
+    let mut end = left.x_offset_pt;
+    let mut magnitude = end.abs();
+    for glyph in &left.glyphs {
+      let advance = glyph.x_advance * left.font_size_pt;
+      end += advance;
+      magnitude += advance.abs();
+    }
+    // Positions and advances have passed through separate FLOAT sums and
+    // EM normalization. Admit their arithmetic error, never a layout gap.
+    let error = f32::EPSILON * (left.glyphs.len() + 4) as f32 * magnitude;
+    (end - right.x_offset_pt).abs() <= error
+  };
+  if !glyph_runs
+    .windows(2)
+    .any(|pair| contiguous(&pair[0], &pair[1]))
+  {
+    return Cow::Borrowed(glyph_runs);
+  }
+  let mut merged = PaintGlyphFontRuns::new();
+  for (index, run) in glyph_runs.iter().enumerate() {
+    // Compare original adjacent runs so accumulation stays linear and the
+    // rounding bound cannot grow across an entire merged line.
+    if index > 0 && contiguous(&glyph_runs[index - 1], run) {
+      merged
+        .last_mut()
+        .unwrap()
+        .glyphs
+        .extend_from_slice(&run.glyphs);
+    } else {
+      merged.push(run.clone());
+    }
+  }
+  Cow::Owned(merged)
 }
 
 pub(super) fn merge_variation_selector_font_runs<'a>(
@@ -889,6 +1017,27 @@ pub(super) fn symbol_font_semantic_text<'a>(
   }
 }
 
+// Groups and their Form XObjects keep their own paint lists. Observations must
+// visit those lists in the same depth-first order as the direct serializer.
+fn paint_text_items<'paint, 'doc>(
+  items: &'paint [PaintItem<'doc>],
+) -> impl Iterator<Item = &'paint PaintText<'doc>> {
+  let mut pending = SmallVec::<[_; 4]>::new();
+  pending.push(items.iter());
+  std::iter::from_fn(move || {
+    loop {
+      match pending.last_mut()?.next() {
+        Some(PaintItem::Text(text)) => return Some(text.as_ref()),
+        Some(PaintItem::Group { items, .. }) => pending.push(items.iter()),
+        Some(_) => {}
+        None => {
+          pending.pop();
+        }
+      }
+    }
+  })
+}
+
 pub(super) fn conversion_diagnostics(paint: &PaintDocument<'_>) -> PdfConversionDiagnostics {
   let mut fonts = Vec::new();
   let mut font_indices = HashMap::default();
@@ -897,13 +1046,8 @@ pub(super) fn conversion_diagnostics(paint: &PaintDocument<'_>) -> PdfConversion
     .iter()
     .enumerate()
     .map(|(page_index, page)| {
-      let text_runs = page
-        .items
-        .iter()
-        .filter_map(|item| match item {
-          PaintItem::Text(text) => Some(text_run_diagnostics(text, &mut fonts, &mut font_indices)),
-          _ => None,
-        })
+      let text_runs = paint_text_items(&page.items)
+        .map(|text| text_run_diagnostics(text, &mut fonts, &mut font_indices))
         .collect();
       PdfPageDiagnostics {
         page_index,
@@ -927,11 +1071,7 @@ pub(super) fn conversion_font_audit_for_direct(paint: &PaintDocument<'_>) -> Pdf
   let mut audit = PdfFontAudit::default();
   let mut font_indices = HashMap::default();
   for (page_index, page) in paint.pages.iter().enumerate() {
-    let mut text_run_index = 0;
-    for item in &page.items {
-      let PaintItem::Text(text) = item else {
-        continue;
-      };
+    for (text_run_index, text) in paint_text_items(&page.items).enumerate() {
       for (portion_index, portion) in text.portions.iter().enumerate() {
         audit.text_portion_count += 1;
         let visible = !matches!(portion.kind, PaintTextPortionKind::Tab)
@@ -1144,7 +1284,6 @@ pub(super) fn conversion_font_audit_for_direct(paint: &PaintDocument<'_>) -> Pdf
           }
         }
       }
-      text_run_index += 1;
     }
   }
   audit
@@ -1177,9 +1316,10 @@ fn glyph_requires_font_coverage(
 
   // Ordinary PUA text has font-specific semantics rather than portable
   // character coverage. Excluding it from a missing-character audit does not
-  // suppress painting: the selected face's .notdef can have a visible outline
-  // (as in Word's Times New Roman PUA output). Explicit w:sym selectors are
-  // accounted for separately by the caller, even for an inkless glyph.
+  // decide painting: the selected face's .notdef can have a visible outline,
+  // while Word fixed output has a separate transparent missing-PUA path.
+  // Explicit w:sym selectors are accounted for separately by the caller,
+  // even for an inkless glyph.
   let private_use_only =
     !explicit_symbol_character && !source.is_empty() && source.chars().all(is_unicode_private_use);
   if !private_use_only {
@@ -1267,6 +1407,12 @@ fn text_run_diagnostics(
     .collect();
   PdfTextRunDiagnostics {
     text: text.item.text.to_string(),
+    pdf_text: pdf_semantic_text(
+      &text.item.text,
+      text.item.style.small_caps,
+      text.item.style.pdf_font_family(),
+    )
+    .into_owned(),
     source_frame_index: text.source_frame_index,
     source_line_index: text.source_line_index,
     source_path: text
@@ -1500,9 +1646,16 @@ impl<'doc> PaintDocument<'doc> {
   fn from_layout(
     document: &'doc common::LayoutDocument<'static>,
     text_metrics: &mut TextMetrics,
-    ui_language: Option<&str>,
+    options: &PdfOptions,
   ) -> Self {
+    let ui_language = options.ui_language.as_deref();
+    let conversion = super::metafile::word_wmf_conversion_profile(options);
     let separate_path_fill_and_stroke = document.engine_kind == common::LayoutEngineKind::Pptx;
+    let mut natural_metrics = word_advances::NaturalMetricsCache::default();
+    let word_fixed_output = matches!(
+      options.images.optimization_policy,
+      crate::PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
+    );
     let pages = document
       .pages
       .iter()
@@ -1525,11 +1678,11 @@ impl<'doc> PaintDocument<'doc> {
           .collect::<Vec<_>>();
         let (layout_items, line_owners) = coalesced_writer_text_items(page_items, text_metrics);
         let (layout_items, line_owners) =
-          expand_metafile_semantic_text_items(layout_items, line_owners, ui_language);
+          expand_metafile_semantic_text_items(layout_items, line_owners, ui_language, conversion);
         let common_line_baselines =
           common_writer_line_baselines(&layout_items, &line_owners, text_metrics);
         let decoration_metadata = decoration_render_metadata(&layout_items);
-        let items = layout_items
+        let mut items: Vec<_> = layout_items
           .into_iter()
           .enumerate()
           .map(|(item_index, item)| {
@@ -1542,7 +1695,8 @@ impl<'doc> PaintDocument<'doc> {
                   text.style.underline = false;
                   text.style.strikethrough = false;
                 }
-                text.decoration_span_start_x_pt = metadata.span_start_x_pt;
+                text.decoration_span_start_x_pt =
+                  metadata.span_start_x_pt.or(text.decoration_span_start_x_pt);
                 PaintItem::Text(Box::new(PaintText::from_layout_text(
                   *text,
                   owner,
@@ -1611,6 +1765,9 @@ impl<'doc> PaintDocument<'doc> {
             }
           })
           .collect();
+        if word_fixed_output {
+          word_advances::realize(&mut items, &mut natural_metrics);
+        }
         PaintPage {
           width_pt: pdf_page_dimension(document.engine_kind, page.setup.size.width.0),
           height_pt: pdf_page_dimension(document.engine_kind, page.setup.size.height.0),
@@ -1626,11 +1783,17 @@ fn expand_metafile_semantic_text_items<'doc>(
   items: Vec<PageItem<'doc>>,
   owners: Vec<Option<PaintLineOwner>>,
   ui_language: Option<&str>,
+  conversion: Option<ooxmlsdk_layout::render::emf_wmf::WmfConversionProfile>,
 ) -> (Vec<PageItem<'doc>>, Vec<Option<PaintLineOwner>>) {
   let mut expanded_items = Vec::with_capacity(items.len());
   let mut expanded_owners = Vec::with_capacity(owners.len());
   for (item, owner) in items.into_iter().zip(owners) {
-    expanded_items.push(expand_metafile_semantic_text_item(item, owner, ui_language));
+    expanded_items.push(expand_metafile_semantic_text_item(
+      item,
+      owner,
+      ui_language,
+      conversion,
+    ));
     expanded_owners.push(owner);
   }
   (expanded_items, expanded_owners)
@@ -1640,6 +1803,7 @@ fn expand_metafile_semantic_text_item<'doc>(
   item: PageItem<'doc>,
   owner: Option<PaintLineOwner>,
   ui_language: Option<&str>,
+  conversion: Option<ooxmlsdk_layout::render::emf_wmf::WmfConversionProfile>,
 ) -> PageItem<'doc> {
   match item {
     PageItem::Group {
@@ -1654,8 +1818,12 @@ fn expand_metafile_semantic_text_item<'doc>(
     } => {
       let child_owner = inherit_text_line_owner.then_some(owner).flatten();
       let child_count = items.len();
-      let (items, _) =
-        expand_metafile_semantic_text_items(items, vec![child_owner; child_count], ui_language);
+      let (items, _) = expand_metafile_semantic_text_items(
+        items,
+        vec![child_owner; child_count],
+        ui_language,
+        conversion,
+      );
       PageItem::Group {
         mask,
         clip,
@@ -1667,7 +1835,7 @@ fn expand_metafile_semantic_text_item<'doc>(
         items,
       }
     }
-    PageItem::Image(image)
+    PageItem::Image(mut image)
       if (image.semantic_metafile_text || image.signature_line.is_some())
         && image.rotation_deg.abs() <= f32::EPSILON
         && !image.flip_horizontal
@@ -1676,6 +1844,14 @@ fn expand_metafile_semantic_text_item<'doc>(
     {
       let extraction_options = ooxmlsdk_layout::render::emf_wmf::RenderOptions {
         wmf_external_header: image.metafile_external_header,
+        wmf_conversion_profile: conversion,
+        emf_text_advance_quantization: if image.metafile_fixed_output_profile
+          == common::MetafileFixedOutputProfile::WordVmlEmfPicture
+        {
+          ooxmlsdk_layout::render::emf_wmf::EmfTextAdvanceQuantization::IndividualProjectedCells
+        } else {
+          ooxmlsdk_layout::render::emf_wmf::EmfTextAdvanceQuantization::CumulativeOrigins
+        },
         ..ooxmlsdk_layout::render::emf_wmf::RenderOptions::default()
       };
       if let Some(signature_line) = image
@@ -1711,6 +1887,31 @@ fn expand_metafile_semantic_text_item<'doc>(
         };
       }
       let include_raster_backdrop_text = image.metafile_semantic_text_includes_raster_backdrop;
+      let native_picture_transform = (image.metafile_fixed_output_profile
+        == common::MetafileFixedOutputProfile::WordVmlEmfPicture)
+        .then(|| {
+          let physical = ooxmlsdk_layout::render::emf_wmf::metafile_physical_size(
+            &image.data,
+            image.content_type.as_deref(),
+          )?;
+          let transform = common::Transform {
+            m11: image.width_pt / physical.natural_width_px as f32,
+            m22: image.height_pt / physical.natural_height_px as f32,
+            dx: common::Pt(image.x_pt),
+            dy: common::Pt(image.y_pt),
+            ..common::Transform::default()
+          };
+          // GDI realizes character cells on the recording device first; the
+          // Word picture then transforms both font axes and all Dx origins.
+          // Stretching only the summed string width changes the glyph shape
+          // and loses rotated labels under anisotropic picture scaling.
+          image.x_pt = 0.0;
+          image.y_pt = 0.0;
+          image.width_pt = physical.natural_width_px as f32;
+          image.height_pt = physical.natural_height_px as f32;
+          Some(transform)
+        })
+        .flatten();
       let localize_signature_ui_text = image
         .signature_line
         .as_ref()
@@ -1798,22 +1999,46 @@ fn expand_metafile_semantic_text_item<'doc>(
       let semantic_runs = semantic_runs
         .into_iter()
         .map(|mut run| {
+          let workbook_font_size_pt =
+            if let common::MetafileFixedOutputProfile::LegacyExcelContentPreview {
+              font_size_twips,
+            } = image.metafile_fixed_output_profile
+            {
+              // Word regenerates Excel.Sheet.8 content text from the embedded
+              // BIFF workbook: changing both cached EMF Dx and UTF-16 text
+              // leaves Office's PDF unchanged. The workbook FONT height and
+              // natural glyph advances describe its text geometry. Other OLE
+              // servers (Word.Document.8, Excel.Sheet.12) honor cached EMF Dx.
+              run.advances = None;
+              run.width = None;
+              Some(f32::from(font_size_twips) / 20.0)
+            } else {
+              None
+            };
           run.font_family = localized_metafile_ui_font_family(
             run.font_family,
             ui_language,
             localize_signature_ui_text,
           );
-          let font_size_pt = run
-            .font_size
-            .map(|size| size * image.height_pt)
+          let font_size_pt = workbook_font_size_pt
+            .or_else(|| run.font_size.map(|size| size * image.height_pt))
             .unwrap_or(11.0)
             .max(1.0);
           PageItem::Text(Box::new(TextItem {
             x_pt: image.x_pt + run.x * image.width_pt,
             y_pt: image.y_pt + run.y * image.height_pt,
             line_height_pt: (font_size_pt * 1.15).max(1.0),
+            wordprocessing_line_metrics: None,
+            origin_is_baseline: false,
             line_metrics_participant: true,
-            paint_clip: None,
+            paint_clip: native_picture_transform
+              .and(run.clip)
+              .map(|edges| PaintClipRect {
+                x_pt: edges[0] * image.width_pt,
+                y_pt: edges[1] * image.height_pt,
+                width_pt: (edges[2] - edges[0]).max(0.0) * image.width_pt,
+                height_pt: (edges[3] - edges[1]).max(0.0) * image.height_pt,
+              }),
             page_culling_bounds: None,
             text: Cow::Owned(run.text),
             style: TextStyle {
@@ -1821,6 +2046,15 @@ fn expand_metafile_semantic_text_item<'doc>(
               font_size_pt,
               bold: run.bold,
               italic: run.italic,
+              color: if native_picture_transform.is_some() {
+                RgbColor {
+                  r: run.color[0],
+                  g: run.color[1],
+                  b: run.color[2],
+                }
+              } else {
+                RgbColor::default()
+              },
               semantic_only: !paint_native_text,
               metafile_reference_baseline: true,
               rotation_deg: run.rotation_degrees,
@@ -1843,7 +2077,10 @@ fn expand_metafile_semantic_text_item<'doc>(
             decoration_span_start_x_pt: None,
             pdf_text_segmentation: common::PdfTextSegmentation::Line,
             source_path: None,
-            semantic_target_width_pt: run.width.map(|width| width * image.width_pt),
+            semantic_target_width_pt: native_picture_transform
+              .is_none()
+              .then(|| run.width.map(|width| width * image.width_pt))
+              .flatten(),
           }))
         })
         .collect::<Vec<_>>();
@@ -1872,11 +2109,11 @@ fn expand_metafile_semantic_text_item<'doc>(
       PageItem::Group {
         mask: None,
         clip: None,
-        transform: None,
+        transform: native_picture_transform,
         blend_mode: common::BlendMode::Normal,
         opacity: 1.0,
         flatten_identity: flatten_native_emf_text,
-        inherit_text_line_owner: true,
+        inherit_text_line_owner: native_picture_transform.is_none(),
         items,
       }
     }
@@ -2034,6 +2271,8 @@ fn word_signature_line_text_item<'doc>(
     x_pt,
     y_pt: baseline_y_pt,
     line_height_pt: font_size_pt * 1.15,
+    wordprocessing_line_metrics: None,
+    origin_is_baseline: false,
     line_metrics_participant: true,
     paint_clip: None,
     page_culling_bounds: None,
@@ -2141,6 +2380,8 @@ fn image_page_item_from_common<'doc>(
           x_pt: text_x_pt,
           y_pt: text_y_pt + line_index as f32 * 1.2,
           line_height_pt: 1.2,
+          wordprocessing_line_metrics: None,
+          origin_is_baseline: false,
           line_metrics_participant: true,
           paint_clip: clip,
           page_culling_bounds: None,
@@ -2282,6 +2523,8 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
     x_pt: text.origin.x.0,
     y_pt: text.origin.y.0,
     line_height_pt: text.line_height.0,
+    wordprocessing_line_metrics: text.wordprocessing_line_metrics,
+    origin_is_baseline: text.origin_is_baseline,
     line_metrics_participant: text.line_metrics_participant,
     paint_clip: text.paint_clip.map(paint_clip_from_common),
     page_culling_bounds: text.page_culling_bounds.map(paint_clip_from_common),
@@ -2301,14 +2544,16 @@ fn text_item_from_common<'doc>(text: &'doc common::TextRun<'static>) -> TextItem
     paragraph_bidi: text.paragraph_bidi,
     word_spacing_pt: text.word_spacing_pt,
     preserve_text_portion: text.preserve_text_portion,
-    decoration_span_start_x_pt: None,
+    decoration_span_start_x_pt: text.decoration_span_start_x.map(|start| start.0),
     pdf_text_segmentation: text.pdf_text_segmentation,
     source_path: text.source.as_ref().map(|source| source.path.as_slice()),
     semantic_target_width_pt: None,
   }
 }
 
-fn image_item_from_common<'doc>(image: &'doc common::ImageItem<'static>) -> ImageItem<'doc> {
+pub(super) fn image_item_from_common<'doc>(
+  image: &'doc common::ImageItem<'static>,
+) -> ImageItem<'doc> {
   ImageItem {
     x_pt: image.bounds.origin.x.0,
     y_pt: image.bounds.origin.y.0,
@@ -2416,6 +2661,7 @@ fn rect_item_from_common<'doc>(rect: &'doc common::RectItem<'static>) -> RectIte
     }),
     common::Fill::Gradient(gradient) => Some(RectFill::Gradient(gradient)),
     common::Fill::Pattern(pattern) => Some(RectFill::Pattern(pattern)),
+    common::Fill::Texture(texture) => Some(RectFill::Texture(texture)),
     common::Fill::None | common::Fill::Theme(_) | common::Fill::Image { .. } => None,
   };
   RectItem {
@@ -2518,11 +2764,18 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     complex_script: style.complex_script,
     right_to_left: style.right_to_left,
     resolved_bidi_level: style.resolved_bidi_level(),
+    wordprocessing_nominal_control_metrics: style.wordprocessing_nominal_control_metrics(),
     kerning_minimum_size_pt: style.kerning_minimum_size.map(|size| size.0),
     ligatures: style.ligatures,
     open_type_features: style.open_type_features,
     horizontal_scale: style.horizontal_scale,
+    wordprocessing_font_width_percent: style.wordprocessing_font_width_percent,
+    wordprocessing_legacy_font_measurement: style.wordprocessing_legacy_font_measurement,
+    wordprocessing_tab_leader: style.wordprocessing_tab_leader,
     semantic_character_advances_pt: style.semantic_character_advances_pt.clone(),
+    shaping_context: style.shaping_context.clone(),
+    kashida_expansions: style.kashida_expansions.clone(),
+    wordprocessing_kashida: style.wordprocessing_kashida.clone(),
     character_spacing_pt: style.character_spacing.0,
     baseline_shift_pt: style.baseline_shift.0,
     automatic_escapement_font_size_pt: style.automatic_escapement_font_size.map(|size| size.0),
@@ -2536,6 +2789,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     wordprocessingml_font_hint: style.wordprocessingml_font_hint,
     wordprocessingml_east_asia_language_is_chinese: style
       .wordprocessingml_east_asia_language_is_chinese,
+    wordprocessingml_bidi_language_is_hebrew: style.wordprocessingml_bidi_language_is_hebrew,
     font_charset: style.font_charset,
     high_ansi_font_charset: style.high_ansi_font_charset,
     wordprocessingml_east_asia_font_charset: style.wordprocessingml_east_asia_font_charset,
@@ -2545,6 +2799,11 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     east_asia_font_pitch: style.east_asia_font_pitch,
     complex_font_pitch: style.complex_font_pitch,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
+    wordprocessing_justification_expansion_pt: style
+      .wordprocessing_justification_expansion_pt
+      .clone(),
+    wordprocessingml_legacy_punctuation_spacing: style.wordprocessingml_legacy_punctuation_spacing,
+    wordprocessingml_punctuation_spacing: style.wordprocessingml_punctuation_spacing,
     wordprocessingml_balance_single_byte_double_byte_width: style
       .wordprocessingml_balance_single_byte_double_byte_width,
     pdf_glyph_outlines: style.pdf_glyph_outlines,
@@ -2559,6 +2818,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     small_caps: style.small_caps,
     hidden: style.hidden,
     semantic_only: style.semantic_only,
+    pdf_painted_artifact: style.pdf_painted_artifact,
     metafile_reference_baseline: false,
     rotation_deg: style.rotation_degrees,
     color: rgb(style.color),
@@ -2713,6 +2973,7 @@ fn writer_text_items_coalesce(
     return false;
   }
   if current.style != next.style
+    || current.origin_is_baseline != next.origin_is_baseline
     || current.hyperlink_url != next.hyperlink_url
     || current.dynamic_field != next.dynamic_field
     || current.paragraph_bidi != next.paragraph_bidi
@@ -2867,6 +3128,7 @@ impl<'doc> PaintText<'doc> {
       let measured_width_pt = text_metrics.measure_text(&text.text, &text.style);
       if measured_width_pt > f32::EPSILON {
         text.style.horizontal_scale = Some((target_width_pt / measured_width_pt).max(0.01));
+        text.style.wordprocessing_font_width_percent = None;
       }
     }
     let text_ref = &text;
@@ -2881,17 +3143,41 @@ impl<'doc> PaintText<'doc> {
       .pdf_glyph_outline_options
       .as_ref()
       .is_some_and(|options| options.text_warp.is_some());
-    let layout_glyphs = (has_text_warp || text_ref.style.highlight.is_some())
-      .then(|| {
-        text_layout_glyphs(
+    // Justification and punctuation spacing use logical character cells. Remeasuring
+    // those cells at the rounded PDF em (e.g. 13pt -> 12.96pt) shortens every
+    // word while retaining the original space expansion, so the line no
+    // longer reaches its laid-out right edge. Native Line Services arrays
+    // retain the 13pt ideal widths and add space expansion independently.
+    let has_logical_spacing = text_ref.pdf_text_segmentation
+      == common::PdfTextSegmentation::WordLine
+      && (text_ref.word_spacing_pt != 0.0
+        || text_ref
+          .style
+          .wordprocessing_justification_expansion_pt
+          .is_some()
+        || ooxmlsdk_layout::fonts::wordprocessingml_punctuation_affects_advances(
           &text_ref.text,
           &text_ref.style,
-          text_ref.word_spacing_pt,
-          text_metrics,
-        )
-      })
-      .flatten();
-    if has_text_warp && let (Some(paint), Some(layout)) = (glyphs.as_mut(), layout_glyphs.as_ref())
+        ))
+      && !text_ref.paragraph_bidi
+      && text_ref.style.rotation_deg == 0.0
+      && text_ref.style.horizontal_scale.unwrap_or(1.0) == 1.0
+      && text_ref.style.pdf_glyph_outline_options.is_none()
+      && !text_ref.style.semantic_only
+      && text_ref.style.semantic_character_advances_pt.is_none();
+    let layout_glyphs =
+      (has_text_warp || has_logical_spacing || text_ref.style.highlight.is_some())
+        .then(|| {
+          text_layout_glyphs(
+            &text_ref.text,
+            &text_ref.style,
+            text_ref.word_spacing_pt,
+            text_metrics,
+          )
+        })
+        .flatten();
+    if (has_text_warp || has_logical_spacing)
+      && let (Some(paint), Some(layout)) = (glyphs.as_mut(), layout_glyphs.as_ref())
     {
       retain_layout_glyph_positions(paint, layout);
     }
@@ -2905,6 +3191,11 @@ impl<'doc> PaintText<'doc> {
       // baseline by emfsdk's raster replay. Preserve that exact coordinate
       // instead of applying the surrounding document line-box metrics.
       text_ref.y_pt
+    } else if text_ref.origin_is_baseline {
+      // Nested table stories can lose their page-level frame owner when a
+      // containing shape is flattened. Their formatter already supplied the
+      // baseline; a second font ascent would move every glyph below the cell.
+      text_ref.y_pt - text_ref.style.baseline_shift_pt
     } else {
       match owner.map(|owner| owner.frame_kind) {
         Some(FollowFrameKind::Table) => text_ref.y_pt - text_ref.style.baseline_shift_pt,
@@ -3069,7 +3360,13 @@ fn text_paint_portions<'doc>(
   let mut portions = Vec::with_capacity(ranges.len().max(1));
   let mut x_pt = text.x_pt;
   let mut highlight_x_pt = text.x_pt;
-  for (kind, range) in ranges {
+  for (portion_index, (kind, range)) in ranges.into_iter().enumerate() {
+    if let Some(native) = text.style.wordprocessing_tab_leader {
+      // Each native32-character operation starts on its source device grid;
+      // RTL100em rounding applies only to the positions within that operation.
+      x_pt = text.x_pt + text.text[..range.start].chars().count() as f32 * native.source_advance_pt;
+      highlight_x_pt = x_pt;
+    }
     let portion_clip = paint_clip_for_portion(clip, &kind, page_width_pt);
     let portion_glyphs = if can_move_glyphs {
       glyphs.take()
@@ -3104,10 +3401,10 @@ fn text_paint_portions<'doc>(
         .map(|rect| paint_rect_for_portion(rect, highlight_x_pt, highlight_width)),
       underline: underline
         .as_ref()
-        .map(|line| paint_line_for_portion(line, x_pt, portion_width)),
+        .map(|line| paint_line_for_portion(line, x_pt, portion_width, portion_index == 0)),
       strikethrough: strikethrough
         .as_ref()
-        .map(|line| paint_line_for_portion(line, x_pt, portion_width)),
+        .map(|line| paint_line_for_portion(line, x_pt, portion_width, portion_index == 0)),
       link: link
         .as_ref()
         .map(|link| paint_link_for_portion(link, x_pt, portion_width)),
@@ -3136,6 +3433,9 @@ fn text_paint_portions<'doc>(
 
 fn visually_ordered_text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionRanges {
   let mut ranges = text_portion_ranges(text);
+  if text.style.wordprocessing_tab_leader.is_some() {
+    return ranges;
+  }
   if text
     .style
     .resolved_bidi_level
@@ -3258,6 +3558,25 @@ fn office_tab_leader_portion_ranges(text: &TextItem<'_>) -> Option<PaintTextPort
     PaintTextPortionKind::Text
   };
   let mut ranges = PaintTextPortionRanges::new();
+  if text
+    .style
+    .wordprocessing_tab_leader
+    .is_some_and(|native| native.paragraph_bidi)
+  {
+    let mut ends = text
+      .text
+      .char_indices()
+      .map(|(index, _)| index)
+      .collect::<Vec<_>>();
+    ends.push(text.text.len());
+    let mut end = ends.len() - 1;
+    while end > 0 {
+      let start = end.saturating_sub(OFFICE_TAB_LEADER_PORTION_CHARACTERS);
+      ranges.push((kind, ends[start]..ends[end]));
+      end = start;
+    }
+    return Some(ranges);
+  }
   let mut start = 0;
   for (character_index, (byte_index, _)) in text.text.char_indices().enumerate() {
     if character_index > 0 && character_index.is_multiple_of(OFFICE_TAB_LEADER_PORTION_CHARACTERS) {
@@ -3289,6 +3608,11 @@ fn edge_whitespace_text_portion_ranges(text: &TextItem<'_>) -> PaintTextPortionR
   let mut ranges = PaintTextPortionRanges::new();
   if leading_end > 0 {
     ranges.push((kind, 0..leading_end));
+  }
+  // A whitespace-only run has one range. It is both leading and trailing
+  // whitespace, but emitting it twice duplicates its advance and decoration.
+  if leading_end == text.text.len() {
+    return ranges;
   }
   if leading_end < trailing_start {
     ranges.push((kind, leading_end..trailing_start));
@@ -3381,9 +3705,16 @@ fn paint_rect_for_portion(rect: &PaintRect, x_pt: f32, width_pt: f32) -> PaintRe
   }
 }
 
-fn paint_line_for_portion(line: &PaintStrokeLine, x_pt: f32, width_pt: f32) -> PaintStrokeLine {
+fn paint_line_for_portion(
+  line: &PaintStrokeLine,
+  x_pt: f32,
+  width_pt: f32,
+  first_portion: bool,
+) -> PaintStrokeLine {
   PaintStrokeLine {
-    x1_pt: x_pt,
+    // The final text item can own the decoration of earlier coalesced
+    // items. Its first visual portion must retain that carried start.
+    x1_pt: if first_portion { line.x1_pt } else { x_pt },
     x2_pt: x_pt + width_pt,
     ..*line
   }
@@ -3492,6 +3823,14 @@ fn table_cell_clip_bounds(
   item_index: usize,
   item: &common::DisplayItem<'_>,
 ) -> Option<common::Rect> {
+  // Layout has the exact cell owner before flattening nested rows. A tab
+  // leader or hanging text can originate in an adjacent cell, so preserve
+  // that explicit clip instead of selecting a neighbor from its origin.
+  if let common::DisplayItem::Text(text) = item
+    && let Some(clip) = text.paint_clip
+  {
+    return Some(clip);
+  }
   let cell_fragments = || {
     fragments
       .iter()
@@ -3841,6 +4180,7 @@ fn text_layout_glyphs(
   let sizes = style.layout_font_sizes?;
   if sizes.primary.0 == style.font_size_pt
     && sizes.complex.map(|size| size.0) == style.complex_font_size_pt
+    && style.wordprocessing_legacy_font_measurement.is_none()
   {
     return None;
   }
@@ -3851,6 +4191,7 @@ fn text_layout_glyphs(
   let mut logical_style = style.clone();
   logical_style.font_size_pt = sizes.primary.0;
   logical_style.complex_font_size_pt = sizes.complex.map(|size| size.0);
+  logical_style.layout_font_sizes = None;
   shaped_pdf_glyphs(text, &logical_style, word_spacing_pt, text_metrics)
 }
 
@@ -3934,10 +4275,103 @@ fn shaped_pdf_glyphs(
   {
     glyph.text_range.end = text.len();
   }
+  for run in &mut font_runs {
+    if !run
+      .glyphs
+      .windows(2)
+      .any(|pair| pair[0].text_range == pair[1].text_range)
+    {
+      continue;
+    }
+    let Ok(face) = SkrifaFontRef::from_index(run.font_face.data.as_slice(), run.font_face.index)
+    else {
+      continue;
+    };
+    let charmap = face.charmap();
+    split_nominal_nonspacing_mark_clusters(text, &mut run.glyphs, |character| {
+      charmap.map(character).map(|glyph| glyph.to_u32())
+    });
+  }
   Some(PaintGlyphRun {
     width_pt: x_offset_pt,
     font_runs,
   })
+}
+
+/// Keep an isolated, separately painted base and mark separately extractable.
+/// HarfBuzz gives both glyphs one source cluster; a single PDF ActualText span
+/// then gives the small mark the base glyph's full text box. A run containing
+/// several combining marks needs its original cluster spans: Poppler can omit
+/// some of the independently mapped zero-advance glyphs in dense Arabic text.
+/// Only split the isolated case when the font cmap identifies the mark glyph.
+fn split_nominal_nonspacing_mark_clusters(
+  text: &str,
+  glyphs: &mut [PaintGlyph],
+  mut nominal_glyph: impl FnMut(char) -> Option<u32>,
+) {
+  let categories = CodePointMapData::<GeneralCategory>::new();
+  if text
+    .chars()
+    .filter(|&character| categories.get(character) == GeneralCategory::NonspacingMark)
+    .take(2)
+    .count()
+    != 1
+  {
+    return;
+  }
+  let mut start = 0;
+  while start + 1 < glyphs.len() {
+    if glyphs[start].text_range != glyphs[start + 1].text_range {
+      start += 1;
+      continue;
+    }
+    let cluster_range = glyphs[start].text_range.clone();
+    let mut end = start + 2;
+    while end < glyphs.len() && glyphs[end].text_range == cluster_range {
+      end += 1;
+    }
+    if end - start == 2
+      && let Some(cluster) = text.get(cluster_range.clone())
+    {
+      let mut scalars = cluster.char_indices();
+      if let (Some((_, first)), Some((second_start, second)), None) =
+        (scalars.next(), scalars.next(), scalars.next())
+      {
+        let first_is_mark = categories.get(first) == GeneralCategory::NonspacingMark;
+        let second_is_mark = categories.get(second) == GeneralCategory::NonspacingMark;
+        let (mark, base_range, mark_range) = if first_is_mark && second.is_alphabetic() {
+          (
+            first,
+            cluster_range.start + second_start..cluster_range.end,
+            cluster_range.start..cluster_range.start + second_start,
+          )
+        } else if second_is_mark && first.is_alphabetic() {
+          (
+            second,
+            cluster_range.start..cluster_range.start + second_start,
+            cluster_range.start + second_start..cluster_range.end,
+          )
+        } else {
+          start = end;
+          continue;
+        };
+        if let Some(mark_glyph_id) = nominal_glyph(mark) {
+          let pair = &mut glyphs[start..end];
+          let mark_index = pair
+            .iter()
+            .position(|glyph| glyph.glyph_id == mark_glyph_id && glyph.x_advance.abs() <= 1.0e-4);
+          if let Some(mark_index) = mark_index
+            && pair[1 - mark_index].glyph_id != mark_glyph_id
+            && pair[1 - mark_index].x_advance > 1.0e-4
+          {
+            pair[mark_index].text_range = mark_range;
+            pair[1 - mark_index].text_range = base_range;
+          }
+        }
+      }
+    }
+    start = end;
+  }
 }
 
 fn semantic_advance_for_text_range(
@@ -3962,10 +4396,135 @@ mod tests {
 
   use super::{
     PaintGlyph, display_item_paint_owner_origin, remap_glyph_text_ranges,
-    symbol_font_semantic_text, table_cell_clip_bounds, text_style_from_common,
-    word_no_break_hyphen_semantic_text, word_small_caps_semantic_text,
+    split_nominal_nonspacing_mark_clusters, symbol_font_semantic_text, table_cell_clip_bounds,
+    text_style_from_common, word_no_break_hyphen_semantic_text, word_small_caps_semantic_text,
   };
   use ooxmlsdk_layout::common;
+
+  #[test]
+  fn exact_and_word_device_widths_do_not_share_a_font_resource() {
+    let style = super::TextStyle {
+      font_family: Some("Times New Roman".into()),
+      font_size_pt: 12.0,
+      ..Default::default()
+    };
+    let shaped = ooxmlsdk_layout::text_metrics::shape_text("f", &style).unwrap();
+    let face = &shaped.font_faces[0];
+    let glyph = shaped.glyphs[0].glyph_id;
+    let mut next = 1;
+    let mut alloc = || {
+      let reference = pdf_writer::Ref::new(next);
+      next += 1;
+      Ok(reference)
+    };
+    let mut fonts = crate::render::direct_font::DirectFontSet::default();
+    let exact = fonts.register_face(face, &mut alloc).unwrap();
+    let device = fonts.register_word_device_face(face, &mut alloc).unwrap();
+    assert_ne!(exact, device);
+    assert_eq!(fonts.register_face(face, &mut alloc).unwrap(), exact);
+    assert_eq!(
+      fonts.register_word_device_face(face, &mut alloc).unwrap(),
+      device
+    );
+    let exact_width = fonts
+      .register_glyph(exact, glyph, Some("f"))
+      .unwrap()
+      .natural_advance_pdf_units;
+    let device_width = fonts
+      .register_glyph(device, glyph, Some("f"))
+      .unwrap()
+      .natural_advance_pdf_units;
+    assert_ne!(exact_width, device_width);
+    assert_eq!(exact_width.round(), device_width);
+  }
+
+  #[test]
+  fn word_font_runs_keep_font_changes_and_explicit_position_gaps() {
+    let mut metrics = super::TextMetrics::new();
+    let style = super::TextStyle {
+      font_family: Some(Cow::Borrowed("Times New Roman")),
+      font_size_pt: 12.0,
+      ..Default::default()
+    };
+    let shaped = super::shaped_pdf_glyphs("abcd", &style, 0.0, &mut metrics).unwrap();
+    let mut split = super::PaintGlyphFontRuns::new();
+    let mut offset = 0.0;
+    for run in &shaped.font_runs {
+      for glyph in &run.glyphs {
+        split.push(super::PaintGlyphFontRun {
+          x_offset_pt: offset,
+          glyphs: vec![glyph.clone()],
+          ..run.clone()
+        });
+        offset += glyph.x_advance * run.font_size_pt;
+      }
+    }
+    let merged = super::merge_word_font_runs(&split);
+    assert_eq!(merged.len(), 1);
+    assert_eq!(merged[0].glyphs.len(), 4);
+    assert_eq!(merged[0].glyphs[3].text_range, 3..4);
+    assert_eq!(merged[0].x_offset_pt, 0.0);
+    for (merged, original) in merged[0].glyphs.iter().zip(split.iter()) {
+      assert_eq!(merged.x_advance, original.glyphs[0].x_advance);
+    }
+    split[1].font_face.synthetic_bold = true;
+    assert_eq!(super::merge_word_font_runs(&split).len(), 3);
+    split[1].font_face.synthetic_bold = false;
+    split[1].font_face.synthetic_italic = true;
+    assert_eq!(super::merge_word_font_runs(&split).len(), 3);
+    split[1].font_face.synthetic_italic = false;
+    split[1].x_offset_pt += 1.0;
+    assert_eq!(super::merge_word_font_runs(&split).len(), 3);
+  }
+
+  #[test]
+  fn nominal_zero_advance_mark_keeps_its_own_pdf_text_mapping() {
+    let glyph = |glyph_id, text_range, x_advance| PaintGlyph {
+      glyph_id,
+      text_range,
+      x_advance,
+      x_offset: 0.0,
+      y_offset: 0.0,
+      y_advance: 0.0,
+      bounds_em: None,
+    };
+
+    // HarfBuzz's visual RTL order is mark then shaped base; Office's PDF
+    // exposes the two painted glyphs independently in that same order.
+    let mut arabic = [glyph(282, 0..4, 0.0), glyph(47, 0..4, 0.291)];
+    split_nominal_nonspacing_mark_clusters("ا\u{64b}", &mut arabic, |character| {
+      (character == '\u{64b}').then_some(282)
+    });
+    assert_eq!(arabic[0].text_range, 2..4);
+    assert_eq!(arabic[1].text_range, 0..2);
+    assert_eq!(arabic[0].x_advance, 0.0);
+    assert_eq!(arabic[1].x_advance, 0.291);
+
+    let mut latin = [glyph(8, 0..3, 0.5), glyph(9, 0..3, 0.0)];
+    split_nominal_nonspacing_mark_clusters("a\u{301}", &mut latin, |character| {
+      (character == '\u{301}').then_some(9)
+    });
+    assert_eq!(latin[0].text_range, 0..1);
+    assert_eq!(latin[1].text_range, 1..3);
+
+    let mut unsupported = [glyph(282, 0..4, 0.0), glyph(47, 0..4, 0.291)];
+    split_nominal_nonspacing_mark_clusters("ا\u{64b}", &mut unsupported, |_| Some(999));
+    assert!(unsupported.iter().all(|glyph| glyph.text_range == (0..4)));
+
+    let mut dense = [
+      glyph(282, 0..4, 0.0),
+      glyph(47, 0..4, 0.291),
+      glyph(282, 4..8, 0.0),
+      glyph(47, 4..8, 0.291),
+    ];
+    split_nominal_nonspacing_mark_clusters("ا\u{64b}ب\u{64b}", &mut dense, |character| {
+      (character == '\u{64b}').then_some(282)
+    });
+    assert_eq!(dense[0].text_range, 0..4);
+    assert_eq!(dense[1].text_range, 0..4);
+    assert_eq!(dense[2].text_range, 4..8);
+    assert_eq!(dense[3].text_range, 4..8);
+  }
 
   #[test]
   fn wordart_positions_keep_layout_advances_and_realized_glyph_sizes() {
@@ -4052,6 +4611,85 @@ mod tests {
     let before = format!("{paint:?}");
     super::retain_layout_glyph_positions(&mut paint, &layout);
     assert_eq!(format!("{paint:?}"), before);
+  }
+
+  #[test]
+  fn justified_word_text_keeps_logical_advances_and_realized_outlines() {
+    for (logical_size, paint_size) in [(13.0, 12.96), (11.0, 11.04), (12.0, 12.0)] {
+      for word_spacing in [0.315_429_7, 2.270_345, -0.25] {
+        let common::DisplayItem::Text(mut run) = text_item(point(72.0, 81.0), None, 0.0) else {
+          unreachable!()
+        };
+        run.text = Cow::Borrowed("In the present endeavor, we propose a methodologic framework");
+        run.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+        run.word_spacing_pt = word_spacing;
+        run.style.font_family = Some(Cow::Borrowed("Times New Roman"));
+        run.style.font_size = common::Pt(paint_size);
+        run.style.layout_font_sizes = Some(common::LayoutFontSizes {
+          primary: common::Pt(logical_size),
+          complex: None,
+        });
+        let mut metrics = super::TextMetrics::new();
+        let text = super::text_item_from_common(&run);
+        let mut logical_style = text.style.clone();
+        logical_style.font_size_pt = logical_size;
+        let expected =
+          super::shaped_pdf_glyphs(&text.text, &logical_style, word_spacing, &mut metrics)
+            .expect("logical glyphs")
+            .width_pt;
+        let paint = super::PaintText::from_layout_text(text, None, None, 612.0, &mut metrics);
+        assert!((paint.width_pt - expected).abs() < 0.0001);
+        for portion in &paint.portions {
+          for font in portion.glyphs.as_ref().expect("painted glyphs") {
+            assert_eq!(font.font_size_pt, paint_size);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn word_ideal_measurement_stays_separate_from_realized_paint_fonts() {
+    use ooxmlsdk_layout::fonts::FontStyleRef;
+    let mut metrics = super::TextMetrics::new();
+    for legacy in [false, true] {
+      // Office's ideal font and printer font differ even when both sizes
+      // happen to be exactly 15pt. Font-size equality cannot merge the owners.
+      let mut common_style = common::TextStyle {
+        font_family: Some("Arial".into()),
+        complex_font_family: Some("Arial".into()),
+        font_size: common::Pt(15.0),
+        complex_font_size: Some(common::Pt(15.0)),
+        right_to_left: Some(true),
+        wordprocessingml_font_slots: true,
+        horizontal_scale: Some(1.03),
+        wordprocessing_font_width_percent: Some(103),
+        wordprocessing_legacy_font_measurement: Some(legacy),
+        ..Default::default()
+      };
+      let logical = super::text_style_from_common(&common_style);
+      let expected =
+        super::shaped_pdf_glyphs("باء -", &logical, 0.0, &mut metrics).expect("logical test font");
+      assert_eq!(
+        logical.wordprocessing_measurement_profile(),
+        Some((legacy, 103))
+      );
+      common_style.layout_font_sizes = Some(common::LayoutFontSizes {
+        primary: common::Pt(15.0),
+        complex: Some(common::Pt(15.0)),
+      });
+      let painted = super::text_style_from_common(&common_style);
+      assert_eq!(common_style.wordprocessing_measurement_profile(), None);
+      assert_eq!(painted.wordprocessing_measurement_profile(), None);
+      let restored = super::text_layout_glyphs("باء -", &painted, 0.0, &mut metrics)
+        .expect("same-size fonts still have distinct measurement profiles");
+      assert_eq!(restored.width_pt, expected.width_pt);
+      for (actual, expected) in restored.font_runs.iter().zip(&expected.font_runs) {
+        for (actual, expected) in actual.glyphs.iter().zip(&expected.glyphs) {
+          assert_eq!(actual.x_advance, expected.x_advance);
+        }
+      }
+    }
   }
 
   #[test]
@@ -4213,10 +4851,12 @@ mod tests {
       rotation_degrees,
       ..common::TextStyle::default()
     };
-    common::DisplayItem::Text(common::TextRun {
+    common::DisplayItem::Text(Box::new(common::TextRun {
       text: Cow::Borrowed("x"),
       origin,
       line_height: common::Pt(12.0),
+      wordprocessing_line_metrics: None,
+      origin_is_baseline: false,
       line_metrics_participant: true,
       paint_clip: None,
       page_culling_bounds: None,
@@ -4235,9 +4875,114 @@ mod tests {
       paragraph_bidi: false,
       word_spacing_pt: 0.0,
       preserve_text_portion: false,
+      decoration_span_start_x: None,
       pdf_text_segmentation: common::PdfTextSegmentation::default(),
       source: None,
-    })
+    }))
+  }
+
+  #[test]
+  fn split_text_paint_retains_carried_decorations_without_repeating_blanks() {
+    let mut metrics = super::TextMetrics::new();
+    for contents in ["     ", "  text  "] {
+      let common::DisplayItem::Text(mut run) = text_item(point(20.0, 30.0), None, 0.0) else {
+        unreachable!()
+      };
+      run.text = Cow::Borrowed("prefix");
+      run.style.font_size = common::Pt(10.0);
+      run.style.font_family = Some(Cow::Borrowed("Calibri"));
+      run.style.underline = true;
+      run.style.strikethrough = true;
+      let first = super::text_item_from_common(&run);
+      let mut following = run.clone();
+      following.origin.x.0 += metrics.measure_text("prefix", &first.style);
+      following.text = Cow::Borrowed(contents);
+      let last = super::text_item_from_common(&following);
+      let items = vec![
+        super::PageItem::Text(Box::new(first)),
+        super::PageItem::Text(Box::new(last)),
+      ];
+      let metadata = super::decoration_render_metadata(&items);
+      assert!(metadata[0].suppress);
+      assert_eq!(metadata[1].span_start_x_pt, Some(20.0));
+      let super::PageItem::Text(mut last) = items.into_iter().last().unwrap() else {
+        unreachable!()
+      };
+      last.decoration_span_start_x_pt = metadata[1].span_start_x_pt;
+      let paint = super::PaintText::from_layout_text(*last, None, None, 612.0, &mut metrics);
+      let ranges = paint
+        .portions
+        .iter()
+        .map(|portion| portion.text_range.clone())
+        .collect::<Vec<_>>();
+      let expected = if contents.trim().is_empty() {
+        std::iter::once(0..5).collect::<Vec<_>>()
+      } else {
+        vec![0..2, 2..6, 6..8]
+      };
+      assert_eq!(ranges, expected);
+      assert_eq!(paint.portions[0].underline.as_ref().unwrap().x1_pt, 20.0);
+      assert_eq!(
+        paint.portions[0].strikethrough.as_ref().unwrap().x1_pt,
+        20.0
+      );
+      for pair in paint.portions.windows(2) {
+        assert_eq!(
+          pair[0].underline.as_ref().unwrap().x2_pt,
+          pair[1].underline.as_ref().unwrap().x1_pt
+        );
+        assert_eq!(
+          pair[0].strikethrough.as_ref().unwrap().x2_pt,
+          pair[1].strikethrough.as_ref().unwrap().x1_pt
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn resolved_cell_baselines_survive_missing_page_frame_owners() {
+    let mut metrics = super::TextMetrics::new();
+    for shift in [-2.0, 0.0, 3.0] {
+      let common::DisplayItem::Text(mut text) = text_item(point(59.75, 66.16), None, 0.0) else {
+        unreachable!()
+      };
+      text.style.baseline_shift = common::Pt(shift);
+      let table_owner = Some(super::PaintLineOwner {
+        frame_index: 0,
+        line_index: 0,
+        frame_kind: super::FollowFrameKind::Table,
+        clip: None,
+      });
+      let owned_baseline = super::PaintText::from_layout_text(
+        super::text_item_from_common(&text),
+        table_owner,
+        None,
+        612.0,
+        &mut metrics,
+      )
+      .baseline_y;
+      text.origin_is_baseline = true;
+      let flattened = super::PaintText::from_layout_text(
+        super::text_item_from_common(&text),
+        None,
+        Some(20.0),
+        612.0,
+        &mut metrics,
+      );
+      assert_eq!(flattened.baseline_y, owned_baseline);
+      assert_eq!(flattened.baseline_y, 66.16 - shift);
+      let flattened_baseline = flattened.baseline_y;
+      drop(flattened);
+      text.origin_is_baseline = false;
+      let paragraph = super::PaintText::from_layout_text(
+        super::text_item_from_common(&text),
+        None,
+        Some(20.0),
+        612.0,
+        &mut metrics,
+      );
+      assert!((paragraph.baseline_y - flattened_baseline - 20.0).abs() < 0.0001);
+    }
   }
 
   fn table_cell_fragment(
@@ -4473,10 +5218,15 @@ mod tests {
     open_type_features.stylistic_sets = Some(stylistic_sets);
     let common_style = common::TextStyle {
       open_type_features,
+      wordprocessingml_bidi_language_is_hebrew: true,
       ..Default::default()
     };
 
     let paint_style = text_style_from_common(&common_style);
+
+    assert!(
+      ooxmlsdk_layout::fonts::FontStyleRef::wordprocessingml_bidi_language_is_hebrew(&paint_style)
+    );
 
     assert_eq!(
       paint_style.open_type_features,
@@ -4515,6 +5265,24 @@ mod tests {
       table_cell_clip_bounds(&[owning_range], 2, &item),
       Some(cell)
     );
+  }
+
+  #[test]
+  fn explicit_cell_clip_survives_a_text_origin_in_the_neighbor() {
+    let owner = rect(88.6, 100.0, 451.4, 23.0);
+    let neighbor = rect(48.3, 100.0, 40.3, 23.0);
+    let fragments = [
+      table_cell_fragment(neighbor, 0..1),
+      table_cell_fragment(owner, 1..3),
+    ];
+    for x in [88.55, 87.6, 78.6] {
+      let mut item = text_item(point(x, 114.0), None, 0.0);
+      let common::DisplayItem::Text(text) = &mut item else {
+        unreachable!()
+      };
+      text.paint_clip = Some(owner);
+      assert_eq!(table_cell_clip_bounds(&fragments, 2, &item), Some(owner));
+    }
   }
 
   #[test]

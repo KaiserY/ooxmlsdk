@@ -10,8 +10,7 @@ use crate::error::{PdfError, Result};
 #[derive(Debug)]
 struct DirectForm {
   id: Ref,
-  width_pt: f32,
-  height_pt: f32,
+  bounds: [f32; 4],
   content: Vec<u8>,
   resources: PageResources,
   compress: bool,
@@ -40,16 +39,14 @@ impl DirectFormSet {
   pub(super) fn register(
     &mut self,
     id: Ref,
-    width_pt: f32,
-    height_pt: f32,
+    bounds: [f32; 4],
     content: Vec<u8>,
     resources: PageResources,
     compress: bool,
   ) {
     self.forms.push(DirectForm {
       id,
-      width_pt,
-      height_pt,
+      bounds,
       content,
       resources,
       compress,
@@ -78,7 +75,12 @@ impl DirectFormSet {
       if form.compress {
         object.filter(Filter::FlateDecode);
       }
-      object.bbox(Rect::new(0.0, 0.0, form.width_pt, form.height_pt));
+      object.bbox(Rect::new(
+        form.bounds[0],
+        form.bounds[1],
+        form.bounds[2],
+        form.bounds[3],
+      ));
       {
         let mut resources = object.resources();
         form.resources.write_dictionary(&mut resources);

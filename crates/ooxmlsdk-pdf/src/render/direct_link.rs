@@ -6,6 +6,7 @@ use super::direct::RefAllocator;
 use super::link::{InternalLinkTargets, LinkRect, ResolvedLink, ResolvedLinkTarget, resolve_link};
 use crate::error::{PdfError, Result};
 use crate::options::PdfOptions;
+use ooxmlsdk_layout::common;
 
 #[derive(Debug)]
 struct DirectLinkAnnotation {
@@ -42,6 +43,49 @@ impl DirectPageLinks {
 
   pub(super) fn len(&self) -> usize {
     self.annotations.len()
+  }
+
+  pub(super) fn transform_since(
+    &mut self,
+    start: usize,
+    transform: common::Transform,
+  ) -> Result<()> {
+    for annotation in &mut self.annotations[start..] {
+      let rect = annotation.link.rect;
+      let mut bounds = [
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+      ];
+      for (x, y) in [
+        (rect.x_pt, rect.y_pt),
+        (rect.x_pt + rect.width_pt, rect.y_pt),
+        (rect.x_pt, rect.y_pt + rect.height_pt),
+        (rect.x_pt + rect.width_pt, rect.y_pt + rect.height_pt),
+      ] {
+        let mapped_x = transform.m11 * x + transform.m21 * y + transform.dx.0;
+        let mapped_y = transform.m12 * x + transform.m22 * y + transform.dy.0;
+        bounds = [
+          bounds[0].min(mapped_x),
+          bounds[1].min(mapped_y),
+          bounds[2].max(mapped_x),
+          bounds[3].max(mapped_y),
+        ];
+      }
+      if !bounds.into_iter().all(f32::is_finite) {
+        return Err(PdfError::Writer(
+          "link bounds overflow under group transform".into(),
+        ));
+      }
+      annotation.link.rect = LinkRect {
+        x_pt: bounds[0],
+        y_pt: bounds[1],
+        width_pt: bounds[2] - bounds[0],
+        height_pt: bounds[3] - bounds[1],
+      };
+    }
+    Ok(())
   }
 
   pub(super) fn assign_struct_parent(&mut self, index: usize, key: i32) -> Result<Ref> {

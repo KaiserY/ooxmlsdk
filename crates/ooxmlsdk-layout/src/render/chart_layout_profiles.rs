@@ -34,11 +34,17 @@ pub(crate) const WORD_CARTESIAN_DEFAULTS: CartesianHostDefaults = CartesianHostD
   titled_top_legend_gap_ratio: 0.0375,
 };
 
-/// Standalone Excel chartsheet controls at 8/10pt and with Gill Sans MT,
-/// Arial and Calibri reserve roughly one and a half natural font line boxes
-/// per category level. Keep this font-based band separate from embedded
-/// charts' frame-height ratios; width/height controls retain the same band.
-pub(crate) const EXCEL_CHARTSHEET_AXIS_BAND_LINE_HEIGHTS: f32 = 1.53;
+/// Standalone Excel chartsheet controls at 8/10pt, including flat one-level
+/// categories, reserve 1.5341 natural font line boxes per category level.
+/// Keep this font-based band separate from embedded charts' frame-height
+/// ratios; width/height controls retain the same band.
+pub(crate) const EXCEL_CHARTSHEET_AXIS_BAND_LINE_HEIGHTS: f32 = 1.5341;
+
+/// Word's automatic horizontal-bar label band uses the same natural-line
+/// reservation. Office width/height and 8/11/14pt controls, including Calibri,
+/// Arial and Times New Roman, separate this band from the fixed outer inset.
+pub(crate) const WORD_HORIZONTAL_BAR_AXIS_BAND_LINE_HEIGHTS: f32 =
+  EXCEL_CHARTSHEET_AXIS_BAND_LINE_HEIGHTS;
 
 pub(crate) const EXCEL_CARTESIAN_DEFAULTS: CartesianHostDefaults = CartesianHostDefaults {
   title_top_ratio: 0.024,
@@ -1015,6 +1021,51 @@ pub(crate) const WORD_RADIAL_DEFAULTS: RadialHostDefaults = RadialHostDefaults {
   side_legend_center_offset_em: 0.09,
 };
 
+/// Word's 2-D, automatically positioned pie/doughnut plot with an explicit
+/// title and a right-side legend. Word's Chart COM geometry for independent
+/// 360x216pt and 432x252pt documents puts the plot 41.975pt below the chart
+/// top and keeps an 11pt bottom margin; the remaining height is the square
+/// pie viewport. The values include Word's 4pt chart-interior origin.
+pub(crate) const WORD_TITLED_RIGHT_RADIAL_PLOT_TOP_PT: f32 = 41.975_04;
+pub(crate) const WORD_TITLED_RIGHT_RADIAL_PLOT_BOTTOM_PT: f32 = 11.0;
+/// Word reserves one sixteenth of the below-title area at each edge for
+/// automatic/outside labels, before its fixed 11pt plot margins. Office COM
+/// controls across three heights, label sizes and pie/doughnut types agree;
+/// an explicit series-level Center placement removes this reservation.
+pub(crate) const WORD_RADIAL_AUTOMATIC_LABEL_MARGIN_RATIO: f32 = 1.0 / 16.0;
+/// Word reports ChartTitle.Top=2pt relative to the 4pt chart interior. An
+/// unqualified title a:bodyPr adds its DrawingML 3.6pt top text inset.
+pub(crate) const WORD_TITLED_RIGHT_RADIAL_TITLE_TEXT_TOP_PT: f32 = 4.0 + 2.0 + 3.6;
+/// Word's automatic right-side legend uses the same content width for framed
+/// and unframed entries, but reserves 0.49em or 5pt at each frame edge. Its
+/// pie plot center is half the chart width left of the legend frame plus a
+/// further 6pt. Measured from Word Chart COM in both pie and doughnut charts.
+pub(crate) const WORD_RIGHT_RADIAL_LEGEND_MARKER_EM: f32 = 0.55;
+/// Word COM legend width, PDF marker/text origins, and the Calibri digit
+/// advance give a 0.235em marker-to-text gap for the 9pt pie legend.
+pub(crate) const WORD_RIGHT_RADIAL_LEGEND_MARKER_GAP_EM: f32 = 0.235;
+pub(crate) const WORD_RIGHT_RADIAL_FRAMED_LEGEND_PADDING_EM: f32 = 0.49;
+pub(crate) const WORD_RIGHT_RADIAL_UNFRAMED_LEGEND_PADDING_PT: f32 = 5.0;
+pub(crate) const WORD_RIGHT_RADIAL_PLOT_CENTER_MARGIN_PT: f32 = 6.0;
+pub(crate) const WORD_RIGHT_RADIAL_LEGEND_ENTRY_HEIGHT_EM: f32 = 1.22;
+pub(crate) const WORD_RIGHT_RADIAL_LEGEND_ROW_GAP_PT: f32 = 5.89;
+pub(crate) const WORD_RIGHT_RADIAL_FRAMED_SIDE_INSET_EM: f32 = 0.293;
+/// For Word's edge-seeking best-fit pie labels, the label rectangle stays
+/// approximately 4pt inside the circle independent of the chart's size.
+/// Word COM controls at 360x216, 432x252 and 480x288pt agree within 0.2pt.
+pub(crate) const WORD_PIE_BEST_FIT_ARC_INSET_PT: f32 = 4.0;
+/// Word fixed output positions data-label glyph baselines lower inside their
+/// label rectangles than our generic DrawingML line-box origin. The 8, 10
+/// and 12pt Calibri controls share this font-relative text baseline policy.
+pub(crate) const WORD_RADIAL_DATA_LABEL_BASELINE_OFFSET_EM: f32 = 0.094;
+/// Word's centered data-label rectangles use a 1.2205-em natural line box
+/// with their authored DrawingML insets. The 8/10/12pt Word COM controls
+/// measured 12.765/15.205/17.65pt outer heights with 3pt vertical insets.
+pub(crate) const WORD_RADIAL_CENTER_LABEL_LINE_HEIGHT_EM: f32 = 1.2205;
+/// Word rounds automatically fitted pie-label rectangles onto the 96-DPI
+/// fixed-output point grid. Three chart-size controls have exact 0.75pt
+/// coordinates while ordinary centered labels retain fractional positions.
+pub(crate) const WORD_RADIAL_BEST_FIT_LABEL_GRID_PT: f32 = 0.75;
 pub(crate) const EXCEL_RADIAL_DEFAULTS: RadialHostDefaults = RadialHostDefaults {
   title_height_scale: 1.5,
   side_legend_width_em: 2.12,

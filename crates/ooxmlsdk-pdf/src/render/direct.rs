@@ -6,11 +6,11 @@ use std::sync::{Arc, OnceLock};
 use flate2::Compression;
 use flate2::write::ZlibEncoder;
 use pdf_writer::types::{
-  Direction, LineCapStyle, LineJoinStyle, NumberingStyle, PageLayout, PageMode, TabOrder,
-  TextRenderingMode,
+  LineCapStyle, LineJoinStyle, NumberingStyle, PageLayout, PageMode, TabOrder, TextRenderingMode,
 };
 use pdf_writer::{Content, Filter, Finish, Name, Null, Pdf, Rect, Ref, Settings, Str, TextStr};
 use rustc_hash::FxHashMap as HashMap;
+use skrifa::MetadataProvider;
 
 use super::direct_conformance::{ConformanceObjects, DirectConformance};
 use super::direct_font::{DirectFontSet, RegisteredGlyph};
@@ -275,8 +275,8 @@ fn ensure_group_supported(group: &common::CompositingGroup<'static>) -> Result<(
   if group.mask.is_some() {
     return unsupported("group alpha masks");
   }
-  if group.transform.is_some() {
-    return unsupported("transformed compositing groups");
+  if let Some(transform) = group.transform {
+    group_local_bounds([0.0, 0.0, 1.0, 1.0], transform)?;
   }
   if group.blend_mode != common::BlendMode::Normal {
     return unsupported("group blend modes");
@@ -289,6 +289,56 @@ fn ensure_group_supported(group: &common::CompositingGroup<'static>) -> Result<(
     ensure_display_item_supported(item)?;
   }
   Ok(())
+}
+
+fn group_local_bounds(bounds: [f32; 4], transform: common::Transform) -> Result<[f32; 4]> {
+  let values = [
+    transform.m11,
+    transform.m12,
+    transform.m21,
+    transform.m22,
+    transform.dx.0,
+    transform.dy.0,
+  ];
+  if !values.into_iter().all(f32::is_finite) {
+    return Err(PdfError::Writer("non-finite group transform".into()));
+  }
+  let [a, b, c, d, tx, ty] = values.map(f64::from);
+  let determinant = a * d - b * c;
+  if determinant == 0.0 {
+    return Err(PdfError::Writer("non-invertible group transform".into()));
+  }
+  let mut local = [
+    f64::INFINITY,
+    f64::INFINITY,
+    f64::NEG_INFINITY,
+    f64::NEG_INFINITY,
+  ];
+  for (x, y) in [
+    (bounds[0], bounds[1]),
+    (bounds[0], bounds[3]),
+    (bounds[2], bounds[1]),
+    (bounds[2], bounds[3]),
+  ] {
+    let (x, y) = (f64::from(x) - tx, f64::from(y) - ty);
+    let (x, y) = (
+      (d * x - c * y) / determinant,
+      (-b * x + a * y) / determinant,
+    );
+    local = [
+      local[0].min(x),
+      local[1].min(y),
+      local[2].max(x),
+      local[3].max(y),
+    ];
+  }
+  let local = local.map(|value| value as f32);
+  if !local.into_iter().all(f32::is_finite) {
+    return Err(PdfError::Writer(
+      "group bounds overflow under inverse transform".into(),
+    ));
+  }
+  Ok(local)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -304,6 +354,7 @@ fn ensure_fill_supported(fill: &common::Fill<'static>, bounds: common::Rect) -> 
     common::Fill::Solid(_) => Ok(()),
     common::Fill::Gradient(gradient) => DirectGradientSet::validate(gradient, bounds),
     common::Fill::Pattern(pattern) => DirectPatternSet::validate(*pattern),
+    common::Fill::Texture(texture) => DirectPatternSet::validate_texture(texture),
     common::Fill::Theme(_) => unsupported("unresolved theme fills"),
     common::Fill::Image { .. } => unsupported("image fills"),
   }
@@ -532,6 +583,9 @@ fn write_page_document(
     .transpose()?;
   let mut fonts = DirectFontSet::default();
   let mut image_policy = ImageSet::default();
+  if let Some(paint) = paint {
+    observe_word_jpeg_displays(paint, options, &mut image_policy);
+  }
   let mut images = DirectImageSet::default();
   let mut patterns = DirectPatternSet::new(
     options.compress_content_streams,
@@ -604,6 +658,7 @@ fn write_page_document(
         forbids_private_use_mappings: conformance.forbids_private_use_mappings(),
         page_width_pt: width_pt,
         page_height_pt: height_pt,
+        group_bounds: [0.0, 0.0, width_pt, height_pt],
       };
       // The prepared display list can retain table cells and drawing objects
       // outside the physical page. PDF page boxes suppress their ink but not
@@ -758,6 +813,55 @@ fn write_page_document(
   Ok(bytes)
 }
 
+fn observe_word_jpeg_displays(
+  paint: &super::paint::PaintDocument<'_>,
+  options: &PdfOptions,
+  image_policy: &mut ImageSet,
+) {
+  for page in &paint.pages {
+    for item in page
+      .items
+      .iter()
+      .filter(|item| super::paint::paint_item_intersects_page(item, page.width_pt, page.height_pt))
+    {
+      observe_word_jpeg_display_item(item, options, image_policy);
+    }
+  }
+}
+
+fn observe_word_jpeg_display_item(
+  item: &super::paint::PaintItem<'_>,
+  options: &PdfOptions,
+  image_policy: &mut ImageSet,
+) {
+  match item {
+    super::paint::PaintItem::Image(image) => {
+      let Some(display_size_pt) =
+        expanded_image_display_size(image.width_pt, image.height_pt, image.crop)
+      else {
+        return;
+      };
+      image_policy.observe_word_jpeg_display(
+        &image.data,
+        image.content_type.as_deref(),
+        options,
+        display_size_pt,
+        image.blip_compression_state,
+      );
+    }
+    super::paint::PaintItem::Group { items, .. } => {
+      for item in items {
+        observe_word_jpeg_display_item(item, options, image_policy);
+      }
+    }
+    super::paint::PaintItem::Text(_)
+    | super::paint::PaintItem::LinkArea(_)
+    | super::paint::PaintItem::Rect(_)
+    | super::paint::PaintItem::Line(_)
+    | super::paint::PaintItem::Polyline(_) => {}
+  }
+}
+
 struct CatalogObjects<'a, 'attachment> {
   catalog_id: Ref,
   page_tree_id: Ref,
@@ -855,7 +959,14 @@ fn write_catalog(
       catalog.page_layout(PageLayout::OneColumn);
     }
     PdfPageLayout::ContinuousFacing => {
-      catalog.page_layout(PageLayout::TwoColumnRight);
+      // The catalog's PageLayout controls which side holds odd-numbered
+      // pages. ViewerPreferences/Direction instead declares the predominant
+      // text reading order; changing it can reverse extracted Unicode text.
+      catalog.page_layout(if options.viewer.first_page_left {
+        PageLayout::TwoColumnLeft
+      } else {
+        PageLayout::TwoColumnRight
+      });
     }
   }
 
@@ -874,7 +985,6 @@ fn write_catalog(
     || options.viewer.hide_window_controls
     || options.viewer.fit_window
     || options.viewer.center_window
-    || options.viewer.first_page_left
     || options.viewer.full_screen
     || display_document_title;
   if needs_preferences {
@@ -896,9 +1006,6 @@ fn write_catalog(
     }
     if display_document_title {
       preferences.display_doc_title(true);
-    }
-    if options.viewer.first_page_left {
-      preferences.direction(Direction::R2L);
     }
     if options.viewer.full_screen {
       preferences.non_full_screen_page_mode(requested_page_mode);
@@ -1095,6 +1202,7 @@ fn display_items_need_preparation(items: &[common::DisplayItem<'static>]) -> boo
     common::DisplayItem::Text(_)
     | common::DisplayItem::Image(_)
     | common::DisplayItem::LinkArea(_) => true,
+    common::DisplayItem::Rect(rect) => matches!(rect.fill, common::Fill::Texture(_)),
     common::DisplayItem::Path(path) => path
       .stroke
       .as_ref()
@@ -1108,7 +1216,6 @@ fn display_items_need_preparation(items: &[common::DisplayItem<'static>]) -> boo
     | common::DisplayItem::AnnotationHint(_)
     | common::DisplayItem::Clip(_)
     | common::DisplayItem::Transform(_)
-    | common::DisplayItem::Rect(_)
     | common::DisplayItem::Line(_) => false,
   })
 }
@@ -1128,6 +1235,7 @@ struct PreparedPageWriter<'a> {
   forbids_private_use_mappings: bool,
   page_width_pt: f32,
   page_height_pt: f32,
+  group_bounds: [f32; 4],
 }
 
 fn write_prepared_item(
@@ -1154,13 +1262,12 @@ fn write_prepared_item(
       if mask.is_some() {
         return unsupported("group alpha masks");
       }
-      if transform.is_some() {
-        return unsupported("transformed compositing groups");
-      }
       if *blend_mode != common::BlendMode::Normal {
         return unsupported("group blend modes");
       }
       let alpha = opacity_alpha(*opacity)?;
+      let parent_bounds = writer.group_bounds;
+      let annotation_start = writer.page_links.len();
       let pushed_clip = clip.is_some_and(|clip| {
         if clip.width_pt <= 0.0 || clip.height_pt <= 0.0 {
           return false;
@@ -1172,7 +1279,18 @@ fn write_prepared_item(
           .end_path();
         true
       });
-      if *flatten_identity && alpha == u8::MAX {
+      if let Some(transform) = transform {
+        writer.group_bounds = group_local_bounds(parent_bounds, *transform)?;
+        content.save_state().transform([
+          transform.m11,
+          transform.m12,
+          transform.m21,
+          transform.m22,
+          transform.dx.0,
+          transform.dy.0,
+        ]);
+      }
+      if *flatten_identity && alpha == u8::MAX && transform.is_none() {
         for child in items {
           write_prepared_item(content, child, writer)?;
         }
@@ -1187,6 +1305,13 @@ fn write_prepared_item(
         if alpha != u8::MAX {
           content.restore_state();
         }
+      }
+      if let Some(transform) = transform {
+        content.restore_state();
+        writer.group_bounds = parent_bounds;
+        writer
+          .page_links
+          .transform_since(annotation_start, *transform)?;
       }
       if pushed_clip {
         content.restore_state();
@@ -1257,6 +1382,7 @@ fn write_isolated_prepared_group(
       forbids_private_use_mappings: writer.forbids_private_use_mappings,
       page_width_pt: writer.page_width_pt,
       page_height_pt: writer.page_height_pt,
+      group_bounds: writer.group_bounds,
     };
     for item in items {
       write_prepared_item(&mut group_content, item, &mut group_writer)?;
@@ -1265,8 +1391,7 @@ fn write_isolated_prepared_group(
   group_content.restore_state();
   writer.forms.register(
     id,
-    writer.page_width_pt,
-    writer.page_height_pt,
+    writer.group_bounds,
     group_content.finish().into_vec(),
     resources,
     writer.options.compress_content_streams,
@@ -1283,7 +1408,7 @@ fn write_prepared_image(
 ) -> Result<()> {
   ensure_image_supported(image)?;
   if image.data.is_empty() {
-    return write_missing_linked_image(content, image, writer);
+    return write_missing_image_placeholder(content, image, writer);
   }
   if is_office_math_svg(image) {
     return write_prepared_office_math_svg(content, image, writer);
@@ -1305,7 +1430,7 @@ fn write_prepared_image(
   )
 }
 
-fn write_missing_linked_image(
+fn write_missing_image_placeholder(
   content: &mut Content,
   image: &super::paint::ImageItem<'_>,
   writer: &mut PreparedPageWriter<'_>,
@@ -1341,9 +1466,13 @@ fn write_missing_linked_image(
       .restore_state();
   }
 
-  let icon = writer
-    .images
-    .register(missing_linked_image_icon(), || writer.refs.alloc())?;
+  let icon = if image.content_type.as_deref() == Some(common::MISSING_EMBEDDED_PICTURE_CONTENT_TYPE)
+  {
+    missing_embedded_picture_icon()
+  } else {
+    missing_linked_image_icon()
+  };
+  let icon = writer.images.register(icon, || writer.refs.alloc())?;
   writer.resources.register_image(&icon.name, icon.id);
   content
     .save_state()
@@ -1380,6 +1509,36 @@ fn missing_linked_image_icon() -> PreparedRasterImage {
           pixels: Arc::new(PdfRasterPixels {
             width: 4,
             height: 5,
+            rgb: PIXELS.to_vec(),
+            alpha: None,
+            icc_profile: None,
+          }),
+        },
+        interpolate: false,
+        soft_mask_interpolate: false,
+        matte: None,
+      })
+    })
+    .clone()
+}
+
+fn missing_embedded_picture_icon() -> PreparedRasterImage {
+  static ICON: OnceLock<PreparedRasterImage> = OnceLock::new();
+  ICON
+    .get_or_init(|| {
+      const PIXELS: [u8; 12] = [
+        128, 128, 128, 128, 128, 128, // row 1
+        128, 128, 128, 255, 0, 0, // row 2
+      ];
+      PreparedRasterImage::new(DirectRasterImage {
+        width: 2,
+        height: 2,
+        color_space: DirectRasterColorSpace::Rgb,
+        bits_per_component: 8,
+        encoding: DirectRasterEncoding::Sampled {
+          pixels: Arc::new(PdfRasterPixels {
+            width: 2,
+            height: 2,
             rgb: PIXELS.to_vec(),
             alpha: None,
             icc_profile: None,
@@ -1548,6 +1707,16 @@ fn write_prepared_metafile(
   }
 
   let render_options = super::metafile::render_options_for_image(image, writer.options);
+  if image.metafile_fixed_output_profile == common::MetafileFixedOutputProfile::WordVmlEmfPicture
+    && let Ok(Some(drawing)) =
+      ooxmlsdk_layout::render::emf_wmf::extract_metafile_vector_drawing_with_options(
+        &image.data,
+        image.content_type.as_deref(),
+        render_options,
+      )
+  {
+    return write_metafile_vector_drawing(content, image, &drawing);
+  }
   if let Ok(Some(scene)) =
     ooxmlsdk_layout::render::emf_wmf::extract_metafile_vector_scene_with_options(
       &image.data,
@@ -1558,6 +1727,8 @@ fn write_prepared_metafile(
     return write_metafile_vector_scene(content, image, &scene);
   }
 
+  let painted_image = super::metafile::fixed_output_paint_image(image, writer.options);
+  let image = painted_image.as_ref().unwrap_or(image);
   let (paint_width_pt, paint_height_pt) =
     super::metafile::native_paint_size(image).unwrap_or((image.width_pt, image.height_pt));
   write_prepared_raster_image(
@@ -1743,6 +1914,156 @@ fn write_metafile_vector_scene(
       Ok(())
     },
   )
+}
+
+fn write_metafile_vector_drawing(
+  content: &mut Content,
+  image: &super::paint::ImageItem<'_>,
+  drawing: &ooxmlsdk_layout::render::emf_wmf::MetafileVectorDrawing,
+) -> Result<()> {
+  use ooxmlsdk_layout::render::emf_wmf::MetafileVectorDraw;
+  // Reject incomplete/non-finite caller input before touching the stream.
+  for operation in &drawing.operations {
+    let (subpaths, clip) = match operation {
+      MetafileVectorDraw::Fill { fill, clip } => (&fill.subpaths, clip),
+      MetafileVectorDraw::Stroke {
+        subpaths,
+        width,
+        clip,
+        ..
+      } => {
+        if width
+          .iter()
+          .any(|value| !value.is_finite() || *value <= 0.0)
+        {
+          return Err(PdfError::Writer(
+            "metafile vector drawing has an invalid pen width".into(),
+          ));
+        }
+        (subpaths, clip)
+      }
+    };
+    if subpaths
+      .iter()
+      .flatten()
+      .any(|point| !point.x.is_finite() || !point.y.is_finite())
+      || clip.is_some_and(|edges| edges.iter().any(|edge| !edge.is_finite()))
+    {
+      return Err(PdfError::Writer(
+        "metafile vector drawing has a non-finite coordinate".into(),
+      ));
+    }
+  }
+  let (paint_width_pt, paint_height_pt) =
+    super::metafile::native_paint_size(image).unwrap_or((image.width_pt, image.height_pt));
+  write_transformed_image_content(
+    content,
+    image,
+    paint_width_pt,
+    paint_height_pt,
+    image.crop,
+    |content, draw_width, draw_height, local_transform| {
+      if local_transform != IDENTITY_TRANSFORM {
+        content.transform(local_transform);
+      }
+      for operation in &drawing.operations {
+        let clip = match operation {
+          MetafileVectorDraw::Fill { clip, .. } | MetafileVectorDraw::Stroke { clip, .. } => clip,
+        };
+        content.save_state();
+        if let Some(edges) = clip {
+          content
+            .rect(
+              edges[0] * draw_width,
+              edges[1] * draw_height,
+              (edges[2] - edges[0]).max(0.0) * draw_width,
+              (edges[3] - edges[1]).max(0.0) * draw_height,
+            )
+            .clip_nonzero()
+            .end_path();
+        }
+        match operation {
+          MetafileVectorDraw::Fill { fill, .. } => {
+            if append_metafile_vector_path(content, &fill.subpaths, draw_width, draw_height, true) {
+              content.set_fill_rgb(
+                f32::from(fill.color[0]) / 255.0,
+                f32::from(fill.color[1]) / 255.0,
+                f32::from(fill.color[2]) / 255.0,
+              );
+              match fill.fill_rule {
+                ooxmlsdk_layout::render::emf_wmf::MetafileVectorFillRule::Alternate => {
+                  content.fill_even_odd();
+                }
+                ooxmlsdk_layout::render::emf_wmf::MetafileVectorFillRule::Winding => {
+                  content.fill_nonzero();
+                }
+              }
+            }
+          }
+          MetafileVectorDraw::Stroke {
+            subpaths,
+            color,
+            width,
+            closed,
+            ..
+          } => {
+            // A cosmetic pen is one recording-device pixel, before the two
+            // independent picture axes. Scaling the CTM retains that ellipse
+            // under anisotropic pictures; a scalar page-space width does not.
+            content
+              .transform(scale(draw_width * width[0], draw_height * width[1]))
+              .set_line_width(1.0)
+              .set_line_cap(if *closed {
+                LineCapStyle::ButtCap
+              } else {
+                LineCapStyle::ProjectingSquareCap
+              })
+              .set_line_join(LineJoinStyle::RoundJoin)
+              .set_stroke_rgb(
+                f32::from(color[0]) / 255.0,
+                f32::from(color[1]) / 255.0,
+                f32::from(color[2]) / 255.0,
+              );
+            if append_metafile_vector_path(
+              content,
+              subpaths,
+              1.0 / width[0],
+              1.0 / width[1],
+              *closed,
+            ) {
+              content.stroke();
+            }
+          }
+        }
+        content.restore_state();
+      }
+      Ok(())
+    },
+  )
+}
+
+fn append_metafile_vector_path(
+  content: &mut Content,
+  subpaths: &[Vec<ooxmlsdk_layout::render::emf_wmf::MetafileVectorPoint>],
+  width: f32,
+  height: f32,
+  closed: bool,
+) -> bool {
+  let mut has_path = false;
+  for subpath in subpaths {
+    let Some(first) = subpath.first() else {
+      continue;
+    };
+    content.move_to(first.x * width, first.y * height);
+    for point in &subpath[1..] {
+      content.line_to(point.x * width, point.y * height);
+    }
+    if closed {
+      content.close_path();
+    }
+    has_path = true;
+  }
+  has_path
 }
 
 fn write_transformed_image_content(
@@ -1990,19 +2311,26 @@ fn write_prepared_text(
     .collect::<Result<Vec<_>>>()?;
   let horizontal_scale = text.item.style.horizontal_scale.unwrap_or(1.0);
   let outlined = direct_text_requires_glyph_outlines(&text.item.style);
-  let paints_glyphs = super::paint::text_has_visible_glyph_paint(&text.item.style);
-  if text.item.text.is_empty() {
+  let word_gradient_path_bounds = if outlined {
+    wordprocessing_gradient_glyph_path_bounds(text)?
+  } else {
+    None
+  };
+  let paints_glyphs =
+    !text.item.text.is_empty() && super::paint::text_has_visible_glyph_paint(&text.item.style);
+  if text.item.text.is_empty()
+    && !text.portions.iter().any(|portion| {
+      portion.highlight.is_some() || portion.underline.is_some() || portion.strikethrough.is_some()
+    })
+  {
     return Ok(());
   }
 
-  let small_caps_semantic_text =
-    super::paint::word_small_caps_semantic_text(&text.item.text, text.item.style.small_caps);
-  let glyph_semantic_text = super::paint::symbol_font_semantic_text(
-    small_caps_semantic_text.as_ref(),
+  let glyph_semantic_text = super::paint::pdf_semantic_text(
+    &text.item.text,
+    text.item.style.small_caps,
     text.item.style.pdf_font_family(),
   );
-  let glyph_semantic_text =
-    super::paint::word_no_break_hyphen_semantic_text(glyph_semantic_text.as_ref());
 
   let color = text.item.style.color;
   if paints_glyphs {
@@ -2041,7 +2369,14 @@ fn write_prepared_text(
         })?;
       let variation_glyph_runs =
         super::paint::merge_variation_selector_font_runs(glyph_runs, &text.item.text);
-      for run in variation_glyph_runs.as_ref() {
+      // Shaping can split one physical face by script or whitespace. Those
+      // bookkeeping boundaries must not reset Word's PDF width accumulator.
+      let word_glyph_runs = if !outlined && word_text_uses_fixed_output(text, writer) {
+        super::paint::merge_word_font_runs(variation_glyph_runs.as_ref())
+      } else {
+        Cow::Borrowed(variation_glyph_runs.as_ref())
+      };
+      for run in word_glyph_runs.as_ref() {
         let remapped_glyphs = super::paint::remap_glyph_text_ranges(
           &run.glyphs,
           &text.item.text,
@@ -2051,8 +2386,37 @@ fn write_prepared_text(
           Some(glyphs) => (glyph_semantic_text.as_ref(), glyphs.as_ref()),
           None => (text.item.text.as_ref(), run.glyphs.as_slice()),
         };
+        let font_horizontal_scale = if !outlined
+          && text.item.style.layout_font_sizes.is_some()
+          && matches!(
+            writer.options.images.optimization_policy,
+            PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
+          ) {
+          text
+            .item
+            .style
+            .wordprocessing_font_width_percent
+            .and_then(|percent| {
+              super::direct_word_text::font_horizontal_scale(
+                &run.font_face,
+                run.font_size_pt,
+                percent,
+              )
+              .map(|scale| (horizontal_scale / (f32::from(percent) / 100.0)) * scale)
+            })
+            .unwrap_or(horizontal_scale)
+        } else {
+          horizontal_scale
+        };
         if outlined {
-          write_prepared_glyph_outline_run(content, text, portion, run, writer)?;
+          write_prepared_glyph_outline_run(
+            content,
+            text,
+            portion,
+            run,
+            word_gradient_path_bounds,
+            writer,
+          )?;
           if text
             .item
             .style
@@ -2063,28 +2427,65 @@ fn write_prepared_text(
             write_prepared_font_run_as_text(
               content,
               PreparedTextRun {
+                word_font_family: None,
                 portion,
                 run,
                 semantic_text: run_semantic_text,
                 glyphs: run_glyphs,
                 horizontal_scale,
+                font_horizontal_scale,
                 color: super::paint::RgbColor { r: 0, g: 0, b: 0 },
                 kind: PreparedTextRunKind::TransparentSemanticOverlay,
+                device_coordinates: None,
+                word_text_spacing: false,
+                word_leader_spacing_scale: None,
               },
               writer,
             )?;
           }
         } else {
-          write_prepared_font_run_as_text(
+          let write_run = if text.item.style.explicit_symbol_character {
+            write_prepared_font_run_as_text
+          } else {
+            write_prepared_word_font_run_as_text
+          };
+          write_run(
             content,
             PreparedTextRun {
+              word_font_family: word_text_uses_fixed_output(text, writer)
+                .then(|| text.item.style.pdf_font_family())
+                .flatten(),
               portion,
               run,
               semantic_text: run_semantic_text,
               glyphs: run_glyphs,
               horizontal_scale,
+              font_horizontal_scale,
               color,
               kind: PreparedTextRunKind::Ordinary,
+              device_coordinates: word_text_device_coordinates(text, writer),
+              word_text_spacing: word_text_uses_fixed_output(text, writer)
+                || word_tab_leader_uses_fixed_output(text, writer),
+              word_leader_spacing_scale: text
+                .item
+                .style
+                .wordprocessing_tab_leader
+                .filter(|native| {
+                  !(native.paragraph_bidi
+                    && ooxmlsdk_layout::fonts::FontStyleRef::right_to_left(&text.item.style))
+                })
+                .and_then(|_| {
+                  common::wordprocessing_device::font_width_ratio(
+                    &run.font_face,
+                    run.font_size_pt,
+                    text
+                      .item
+                      .style
+                      .wordprocessing_font_width_percent
+                      .unwrap_or(100),
+                  )
+                })
+                .map(|ratio| ratio as f32),
             },
             writer,
           )?;
@@ -2093,10 +2494,14 @@ fn write_prepared_text(
     }
     if paints_portion {
       if let Some(underline) = portion.underline.as_ref() {
-        write_prepared_text_decoration(content, underline)?;
+        write_prepared_text_decoration(
+          content,
+          underline,
+          text.item.decoration_span_start_x_pt.is_some(),
+        )?;
       }
       if let Some(strikethrough) = portion.strikethrough.as_ref() {
-        write_prepared_text_decoration(content, strikethrough)?;
+        write_prepared_text_decoration(content, strikethrough, false)?;
       }
     }
     match (&portion.link, text.item.hyperlink_url.as_deref()) {
@@ -2140,13 +2545,162 @@ enum PreparedTextRunKind {
 }
 
 struct PreparedTextRun<'a> {
+  word_font_family: Option<&'a str>,
   portion: &'a super::paint::PaintTextPortion,
   run: &'a super::paint::PaintGlyphFontRun,
   semantic_text: &'a str,
   glyphs: &'a [super::paint::PaintGlyph],
   horizontal_scale: f32,
+  font_horizontal_scale: f32,
   color: super::paint::RgbColor,
   kind: PreparedTextRunKind,
+  device_coordinates: Option<common::wordprocessing_device::PageCoordinates>,
+  word_text_spacing: bool,
+  word_leader_spacing_scale: Option<f32>,
+}
+
+fn word_missing_private_use_glyph(glyph: &super::paint::PaintGlyph, source: &str) -> bool {
+  glyph.glyph_id == 0
+    && source.get(glyph.text_range.clone()).is_some_and(|text| {
+      !text.is_empty() && text.chars().all(super::paint::is_unicode_private_use)
+    })
+}
+
+fn write_prepared_word_font_run_as_text(
+  content: &mut Content,
+  text_run: PreparedTextRun<'_>,
+  writer: &mut PreparedPageWriter<'_>,
+) -> Result<()> {
+  if !text_run.word_text_spacing
+    || text_run.glyphs.iter().any(|glyph| glyph.y_advance != 0.0)
+    || !text_run
+      .glyphs
+      .iter()
+      .any(|glyph| word_missing_private_use_glyph(glyph, text_run.semantic_text))
+  {
+    return write_prepared_font_run_as_text(content, text_run, writer);
+  }
+  if skrifa::FontRef::from_index(
+    text_run.run.font_face.data.as_slice(),
+    text_run.run.font_face.index,
+  )
+  .is_ok_and(|face| face.charmap().is_symbol())
+  {
+    // Windows symbol cmaps use the F000..F0FF transport range as their
+    // character repertoire. Native Word keeps an unavailable symbol on that
+    // physical face and paints its .notdef outline (MT Extra controls).
+    // The transparent missing-Unicode-PUA path below belongs to ordinary
+    // Unicode fonts; it must not erase a symbol font's drawable missing box.
+    return write_prepared_font_run_as_text(content, text_run, writer);
+  }
+  // Word's PDF and XPS exports carry an unavailable PUA in transparent Calibri
+  // text, with an entirely transparent raster fallback. The original face still
+  // owns its advance. Do not paint that face's .notdef box or substitute Calibri
+  // widths. XPS preserves each source scalar; PDF's reused CID 0 mapping does
+  // not, so retain our existing ActualText handling for semantic conflicts.
+  let carrier_face = writer
+    .fonts
+    .word_missing_glyph_face()
+    .unwrap_or_else(|| text_run.run.font_face.clone());
+  let mut start = 0;
+  let mut advance_em = 0.0;
+  while start < text_run.glyphs.len() {
+    let missing = word_missing_private_use_glyph(&text_run.glyphs[start], text_run.semantic_text);
+    let mut end = start + 1;
+    // Each missing glyph is a separate native text object; preserve ordinary
+    // contiguous text so its Word PDF width accumulator is not reset per glyph.
+    if !missing {
+      while end < text_run.glyphs.len()
+        && !word_missing_private_use_glyph(&text_run.glyphs[end], text_run.semantic_text)
+      {
+        end += 1;
+      }
+    }
+    let run = super::paint::PaintGlyphFontRun {
+      font_face: if missing {
+        carrier_face.clone()
+      } else {
+        text_run.run.font_face.clone()
+      },
+      font_size_pt: text_run.run.font_size_pt,
+      x_offset_pt: text_run.run.x_offset_pt + advance_em * text_run.run.font_size_pt,
+      glyphs: Vec::new(),
+    };
+    write_prepared_font_run_as_text(
+      content,
+      PreparedTextRun {
+        run: &run,
+        glyphs: &text_run.glyphs[start..end],
+        kind: if missing {
+          PreparedTextRunKind::TransparentSemanticOverlay
+        } else {
+          text_run.kind
+        },
+        color: if missing {
+          super::paint::RgbColor { r: 0, g: 0, b: 0 }
+        } else {
+          text_run.color
+        },
+        ..text_run
+      },
+      writer,
+    )?;
+    for glyph in &text_run.glyphs[start..end] {
+      advance_em += glyph.x_advance;
+    }
+    start = end;
+  }
+  Ok(())
+}
+
+fn word_text_uses_fixed_output(
+  text: &super::paint::PaintText<'_>,
+  writer: &PreparedPageWriter<'_>,
+) -> bool {
+  // Ordinary Word stories use page-space EMF text origins. Drawing-layer
+  // portions and rotated/outlined text have their own realization transforms.
+  matches!(
+    writer.options.images.optimization_policy,
+    PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
+  ) && text.item.pdf_text_segmentation == common::PdfTextSegmentation::WordLine
+    && text.item.style.rotation_deg.abs() <= f32::EPSILON
+}
+
+fn word_tab_leader_uses_fixed_output(
+  text: &super::paint::PaintText<'_>,
+  writer: &PreparedPageWriter<'_>,
+) -> bool {
+  text.item.style.wordprocessing_tab_leader.is_some()
+    && text.item.style.rotation_deg.abs() <= f32::EPSILON
+    && matches!(
+      writer.options.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
+    )
+}
+
+fn word_text_device_coordinates(
+  text: &super::paint::PaintText<'_>,
+  writer: &PreparedPageWriter<'_>,
+) -> Option<common::wordprocessing_device::PageCoordinates> {
+  // Number portions share their Word line's page-space origin but retain
+  // their own horizontal segmentation and font resource policy. Coordinate
+  // ownership must not implicitly enable WordLine run merging or spacing.
+  let completed_line = text.item.wordprocessing_line_metrics.is_some()
+    && text.item.style.rotation_deg.abs() <= f32::EPSILON
+    && matches!(
+      writer.options.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
+    );
+  if !word_text_uses_fixed_output(text, writer)
+    && !word_tab_leader_uses_fixed_output(text, writer)
+    && !completed_line
+  {
+    return None;
+  }
+  common::wordprocessing_device::PageCoordinates::for_standard_size(
+    writer.page_width_pt,
+    writer.page_height_pt,
+  )
 }
 
 fn write_prepared_font_run_as_text(
@@ -2155,25 +2709,49 @@ fn write_prepared_font_run_as_text(
   writer: &mut PreparedPageWriter<'_>,
 ) -> Result<()> {
   let PreparedTextRun {
+    word_font_family,
     portion,
     run,
     semantic_text,
     glyphs,
     horizontal_scale,
+    font_horizontal_scale,
     color,
     kind,
+    device_coordinates,
+    word_text_spacing,
+    word_leader_spacing_scale,
   } = text_run;
-  let visible_glyphs = without_bidi_control_glyphs(glyphs, semantic_text);
+  let visible_glyphs = without_nonprinting_control_glyphs(glyphs, semantic_text);
   let glyphs = visible_glyphs.as_ref();
   if glyphs.is_empty() {
     return Ok(());
   }
-  let handle = writer
-    .fonts
-    .register_face(&run.font_face, || writer.refs.alloc())?;
+  // The observed Word device-array contract covers independently advanced
+  // horizontal glyphs. Positioned marks and multi-glyph clusters retain
+  // exact widths and placement, including their ActualText bounds.
+  let word_text_spacing = word_text_spacing
+    && glyphs.iter().all(|glyph| {
+      glyph.x_advance > 0.0
+        && glyph.x_offset == 0.0
+        && glyph.y_offset == 0.0
+        && glyph.y_advance == 0.0
+    })
+    && glyphs
+      .windows(2)
+      .all(|pair| pair[0].text_range != pair[1].text_range);
+  let handle =
+    writer
+      .fonts
+      .register_text_face(&run.font_face, word_text_spacing, word_font_family, || {
+        writer.refs.alloc()
+      })?;
   let (resource_name, font_id) = writer.fonts.resource(handle)?;
   let resource_name = resource_name.to_vec();
   writer.resources.register_font(&resource_name, font_id);
+  let baseline_y = device_coordinates
+    .map(|device| device.map_point(0.0, portion.baseline_y).1)
+    .unwrap_or(portion.baseline_y);
   let synthesis = DirectTextSynthesis {
     // Explicit vector outlines already contain the authored visible stroke.
     // Their separate Office search layer is transparent and must not add an
@@ -2183,7 +2761,11 @@ fn write_prepared_font_run_as_text(
     italic: run.font_face.synthetic_italic,
     color,
     font_size_pt: run.font_size_pt,
-    baseline_y: portion.baseline_y,
+    word_fixed_output: matches!(
+      writer.options.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
+    ),
+    baseline_y,
   };
   if kind == PreparedTextRunKind::TransparentSemanticOverlay {
     content.save_state();
@@ -2196,10 +2778,13 @@ fn write_prepared_font_run_as_text(
   }
   synthesis.begin(content);
   let glyph_context = GlyphWriteContext {
+    word_text_spacing,
+    word_leader_spacing_scale,
     source: semantic_text,
-    baseline_y: portion.baseline_y,
+    baseline_y,
     font_size_pt: run.font_size_pt,
     horizontal_scale,
+    font_horizontal_scale,
     resource_name: &resource_name,
     handle,
     rendering_mode: synthesis.rendering_mode(),
@@ -2208,7 +2793,7 @@ fn write_prepared_font_run_as_text(
   let mut consumed_advance_em = 0.0f32;
   let mut consumed_y_advance_em = 0.0f32;
   while segment_start < glyphs.len() {
-    let segment = next_glyph_segment(glyphs, segment_start);
+    let segment = next_glyph_segment(semantic_text, glyphs, segment_start);
     let actual_text = segment
       .actual_text_range
       .as_ref()
@@ -2218,6 +2803,14 @@ fn write_prepared_font_run_as_text(
           .ok_or_else(|| PdfError::Writer("ActualText cluster has an invalid range".to_string()))
       })
       .transpose()?;
+    let x_pt = scaled_text_x(
+      portion.x_pt,
+      run.x_offset_pt + consumed_advance_em * run.font_size_pt,
+      horizontal_scale,
+    )?;
+    let x_pt = device_coordinates
+      .map(|device| device.map_point(x_pt, 0.0).0)
+      .unwrap_or(x_pt);
     consumed_advance_em += write_positioned_glyph_segment(
       content,
       PositionedGlyphSegment {
@@ -2225,11 +2818,7 @@ fn write_prepared_font_run_as_text(
         actual_text,
         requires_codepoint_mappings: writer.requires_codepoint_mappings,
         forbids_private_use_mappings: writer.forbids_private_use_mappings,
-        x_pt: scaled_text_x(
-          portion.x_pt,
-          run.x_offset_pt + consumed_advance_em * run.font_size_pt,
-          horizontal_scale,
-        )?,
+        x_pt,
       },
       &glyph_context,
       &mut consumed_y_advance_em,
@@ -2244,14 +2833,107 @@ fn write_prepared_font_run_as_text(
   Ok(())
 }
 
+fn wordprocessing_unresolved_path_gradient(gradient: &common::GradientFill<'static>) -> bool {
+  gradient.definition_bounds.is_none()
+    && gradient.path.as_ref().is_some_and(|path| {
+      matches!(
+        path.kind,
+        common::GradientPathKind::Circle | common::GradientPathKind::Rectangle
+      ) && path.context == common::GradientPathContext::WordprocessingText
+        && !path.mirror_tile
+    })
+}
+
+fn wordprocessing_unresolved_glyph_bounds_gradient(
+  gradient: &common::GradientFill<'static>,
+  options: &common::PdfGlyphOutlineOptions,
+) -> bool {
+  wordprocessing_unresolved_path_gradient(gradient)
+    || (options.wordprocessing_unscaled_linear_fill
+      && gradient.definition_bounds.is_none()
+      && gradient.line.is_none()
+      && gradient.path.is_none()
+      && !gradient.scaled)
+}
+
+fn wordprocessing_gradient_glyph_path_bounds(
+  text: &super::paint::PaintText<'_>,
+) -> Result<Option<common::Rect>> {
+  let Some(options) = text.item.style.pdf_glyph_outline_options.as_ref() else {
+    return Ok(None);
+  };
+  let Some(common::Fill::Gradient(gradient)) = options.fill.as_ref() else {
+    return Ok(None);
+  };
+  if !wordprocessing_unresolved_glyph_bounds_gradient(gradient, options) {
+    return Ok(None);
+  }
+  let mut union: Option<common::Rect> = None;
+  for portion in &text.portions {
+    if matches!(portion.kind, super::paint::PaintTextPortionKind::Tab) {
+      continue;
+    }
+    let Some(glyph_runs) = portion.glyphs.as_ref() else {
+      continue;
+    };
+    let font_runs = super::paint::merge_variation_selector_font_runs(glyph_runs, &text.item.text);
+    for run in font_runs.as_ref() {
+      let path = build_glyph_outline_path(
+        run,
+        GlyphOutlinePlacement {
+          anchor_x_pt: portion.x_pt,
+          run_x_offset_pt: run.x_offset_pt,
+          baseline_y_pt: portion.baseline_y,
+          horizontal_scale: text.item.style.horizontal_scale.unwrap_or(1.0),
+          vertical_scale: 1.0,
+        },
+        options.transform,
+        options.text_warp.as_deref(),
+        false,
+      )?;
+      let Some(bounds) = path.paint_bounds() else {
+        continue;
+      };
+      union = Some(match union {
+        None => bounds,
+        Some(existing) => {
+          let left = existing.origin.x.0.min(bounds.origin.x.0);
+          let top = existing.origin.y.0.min(bounds.origin.y.0);
+          let right = (existing.origin.x.0 + existing.size.width.0)
+            .max(bounds.origin.x.0 + bounds.size.width.0);
+          let bottom = (existing.origin.y.0 + existing.size.height.0)
+            .max(bounds.origin.y.0 + bounds.size.height.0);
+          common::Rect {
+            origin: common::Point {
+              x: common::Pt(left),
+              y: common::Pt(top),
+            },
+            size: common::Size {
+              width: common::Pt(right - left),
+              height: common::Pt(bottom - top),
+            },
+          }
+        }
+      });
+    }
+  }
+  Ok(union)
+}
+
 fn write_prepared_glyph_outline_run(
   content: &mut Content,
   text: &super::paint::PaintText<'_>,
   portion: &super::paint::PaintTextPortion,
   run: &super::paint::PaintGlyphFontRun,
+  word_gradient_path_bounds: Option<common::Rect>,
   writer: &mut PreparedPageWriter<'_>,
 ) -> Result<()> {
   let options = text.item.style.pdf_glyph_outline_options.as_ref();
+  let stroke = resolved_glyph_outline_stroke(
+    &text.item.style,
+    run.font_size_pt,
+    run.font_face.synthetic_bold,
+  )?;
   let path = build_glyph_outline_path(
     run,
     GlyphOutlinePlacement {
@@ -2265,9 +2947,31 @@ fn write_prepared_glyph_outline_run(
     },
     options.and_then(|options| options.transform),
     options.and_then(|options| options.text_warp.as_deref()),
+    options.is_some_and(|options| options.wordprocessing_outline)
+      && stroke
+        .as_ref()
+        .is_some_and(|stroke| office_round_sys_dot_glyph_stroke(&stroke.style)),
   )?;
   if path.is_empty() {
     return Ok(());
+  }
+
+  if let Some(shadow) = options.and_then(|options| options.vml_text_shadow)
+    && let Some(shadow_path) = path.vml_shadowed(shadow)
+  {
+    write_glyph_outline_fill(
+      content,
+      GlyphOutlinePaintContext {
+        text,
+        portion,
+        font_size_pt: run.font_size_pt,
+        options: None,
+        word_gradient_path_bounds: None,
+      },
+      &shadow_path,
+      &common::Fill::Solid(shadow.color),
+      writer,
+    )?;
   }
 
   let fill = options
@@ -2278,15 +2982,12 @@ fn write_prepared_glyph_outline_run(
     portion,
     font_size_pt: run.font_size_pt,
     options,
+    word_gradient_path_bounds,
   };
   write_glyph_outline_fill(content, paint_context, &path, &fill, writer)?;
 
-  if let Some(stroke) = resolved_glyph_outline_stroke(
-    &text.item.style,
-    run.font_size_pt,
-    run.font_face.synthetic_bold,
-  )? {
-    write_glyph_outline_stroke(content, paint_context, &path, &stroke, writer)?;
+  if let Some(stroke) = stroke.as_ref() {
+    write_glyph_outline_stroke(content, paint_context, &path, stroke, writer)?;
   }
   Ok(())
 }
@@ -2297,6 +2998,7 @@ struct GlyphOutlinePaintContext<'a, 'text> {
   portion: &'a super::paint::PaintTextPortion,
   font_size_pt: f32,
   options: Option<&'a common::PdfGlyphOutlineOptions>,
+  word_gradient_path_bounds: Option<common::Rect>,
 }
 
 fn resolved_glyph_outline_gradient(
@@ -2329,12 +3031,34 @@ fn write_glyph_outline_fill(
     portion,
     font_size_pt,
     options,
+    word_gradient_path_bounds,
   } = context;
+  if let Some(images) = options.and_then(|options| options.image_fill.as_deref()) {
+    content.save_state();
+    append_path_commands(content, path.commands());
+    content.clip_even_odd().end_path();
+    for image in images {
+      write_prepared_image(
+        content,
+        &super::paint::image_item_from_common(image),
+        writer,
+      )?;
+    }
+    content.restore_state();
+    return Ok(());
+  }
   match fill {
     common::Fill::None => Ok(()),
     common::Fill::Solid(color) => paint_solid_glyph_fill(content, path, *color, writer, true),
     common::Fill::Gradient(gradient) => {
-      let bounds = outlined_glyph_paint_bounds(text, portion, font_size_pt, options)?;
+      let bounds = match (word_gradient_path_bounds, options) {
+        (Some(bounds), Some(options))
+          if wordprocessing_unresolved_glyph_bounds_gradient(gradient, options) =>
+        {
+          bounds
+        }
+        _ => outlined_glyph_paint_bounds(text, portion, font_size_pt, options)?,
+      };
       let gradient = resolved_glyph_outline_gradient(gradient, bounds);
       match writer.resources.gradients.register_pattern(
         &gradient,
@@ -2388,7 +3112,9 @@ fn write_glyph_outline_fill(
       )
     }
     common::Fill::Theme(_) => unsupported("unresolved theme outlined glyph fills"),
-    common::Fill::Image { .. } => unsupported("image outlined glyph fills"),
+    common::Fill::Image { .. } | common::Fill::Texture(_) => {
+      unsupported("image outlined glyph fills")
+    }
   }
 }
 
@@ -2424,7 +3150,9 @@ fn write_glyph_outline_stroke(
     portion,
     font_size_pt,
     options,
+    word_gradient_path_bounds: _,
   } = context;
+  let wordprocessing_outline = options.is_some_and(|options| options.wordprocessing_outline);
   match &stroke.paint {
     common::Fill::None => Ok(()),
     common::Fill::Solid(color) => {
@@ -2439,7 +3167,7 @@ fn write_glyph_outline_stroke(
         style.color = *color;
         content.save_state();
         set_alpha(content, writer.resources, writer.refs, Some(color.a), None)?;
-        set_stroke(content, &style);
+        set_glyph_outline_stroke(content, &style, wordprocessing_outline);
         append_path_commands(content, path.commands());
         content.stroke().restore_state();
         Ok(())
@@ -2467,7 +3195,7 @@ fn write_glyph_outline_stroke(
             style.color = color;
             content.save_state();
             set_alpha(content, writer.resources, writer.refs, Some(color.a), None)?;
-            set_stroke(content, &style);
+            set_glyph_outline_stroke(content, &style, wordprocessing_outline);
             append_path_commands(content, path.commands());
             content.stroke().restore_state();
             Ok(())
@@ -2499,12 +3227,37 @@ fn write_glyph_outline_stroke(
     }
     common::Fill::Pattern(_) => unsupported("pattern outlined glyph strokes"),
     common::Fill::Theme(_) => unsupported("unresolved theme outlined glyph strokes"),
-    common::Fill::Image { .. } => unsupported("image outlined glyph strokes"),
+    common::Fill::Image { .. } | common::Fill::Texture(_) => {
+      unsupported("image outlined glyph strokes")
+    }
   }
 }
 
 fn glyph_stroke_uses_filled_geometry(stroke: &common::Stroke<'static>) -> bool {
   !matches!(stroke.compound, None | Some(common::StrokeCompound::Single))
+}
+
+fn office_round_sys_dot_glyph_stroke(stroke: &common::Stroke<'static>) -> bool {
+  stroke.dash.is_none()
+    && stroke.preset_dash == Some(common::StrokeDashPreset::SystemDot)
+    && stroke.cap == Some(common::StrokeCap::Round)
+    && matches!(stroke.compound, None | Some(common::StrokeCompound::Single))
+    && stroke.dash_offset.0 == 0.0
+}
+
+fn set_glyph_outline_stroke(
+  content: &mut Content,
+  stroke: &common::Stroke<'static>,
+  wordprocessing_outline: bool,
+) {
+  set_stroke(content, stroke);
+  if wordprocessing_outline && office_round_sys_dot_glyph_stroke(stroke) {
+    // Word's fixed-format outlined text uses a zero-length round dot and a
+    // two-width gap. Independent 6, 12 and 18pt WordArt controls all emit
+    // [0, 2*w] in the PDF; the generic positive-length fallback remains for
+    // consumers that cannot represent a zero-length dash.
+    content.set_dash_pattern([0.0, stroke.width.0 * 2.0], 0.0);
+  }
 }
 
 fn outlined_glyph_paint_bounds(
@@ -2705,6 +3458,7 @@ fn write_prepared_text_highlight(
 fn write_prepared_text_decoration(
   content: &mut Content,
   line: &super::paint::PaintStrokeLine,
+  word_tab_underline: bool,
 ) -> Result<()> {
   if ![
     line.x1_pt,
@@ -2720,6 +3474,26 @@ fn write_prepared_text_decoration(
     return Err(PdfError::Writer(
       "text decoration contains invalid line geometry".to_string(),
     ));
+  }
+  if word_tab_underline {
+    // Word exports the underline across a preserved tab as a filled printer-
+    // grid rectangle beginning at the decoration coordinate. A centered PDF
+    // stroke covers a different device row even with the same nominal width.
+    let width_pt = ooxmlsdk_layout::units::quantize_points_to_office_print_grid(line.width_pt).max(
+      ooxmlsdk_layout::units::POINTS_PER_INCH / ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_DPI,
+    );
+    content.save_state();
+    set_prepared_fill_rgb(content, line.color);
+    content
+      .rect(
+        line.x1_pt.min(line.x2_pt),
+        line.y1_pt,
+        (line.x2_pt - line.x1_pt).abs(),
+        width_pt,
+      )
+      .fill_nonzero();
+    content.restore_state();
+    return Ok(());
   }
   content.save_state();
   set_prepared_stroke_rgb(content, line.color);
@@ -2741,6 +3515,7 @@ struct DirectTextSynthesis {
   italic: bool,
   color: super::paint::RgbColor,
   font_size_pt: f32,
+  word_fixed_output: bool,
   baseline_y: f32,
 }
 
@@ -2752,7 +3527,12 @@ impl DirectTextSynthesis {
     content.save_state();
     if self.bold {
       set_prepared_stroke_rgb(content, self.color);
-      content.set_line_width(self.font_size_pt / 30.0);
+      // Word's ordinary synthetic-bold text uses a stroke of one thirty-
+      // fifth of the realized em. Native fixed-output controls agree for
+      // six unrelated regular-only fonts at six sizes; genuine bold faces
+      // emit no synthetic stroke. Preserve the generic writer's own policy.
+      let divisor = if self.word_fixed_output { 35.0 } else { 30.0 };
+      content.set_line_width(self.font_size_pt / divisor);
     }
     if self.italic {
       content.transform([
@@ -2792,7 +3572,11 @@ struct GlyphSegment {
   actual_text_range: Option<std::ops::Range<usize>>,
 }
 
-fn next_glyph_segment(glyphs: &[super::paint::PaintGlyph], start: usize) -> GlyphSegment {
+fn next_glyph_segment(
+  source: &str,
+  glyphs: &[super::paint::PaintGlyph],
+  start: usize,
+) -> GlyphSegment {
   debug_assert!(start < glyphs.len());
   if start + 1 < glyphs.len() && glyphs[start].text_range == glyphs[start + 1].text_range {
     let mut end = start + 2;
@@ -2806,8 +3590,31 @@ fn next_glyph_segment(glyphs: &[super::paint::PaintGlyph], start: usize) -> Glyp
   }
 
   let mut end = start + 1;
+  let mut source_range = glyphs[start].text_range.clone();
   while end < glyphs.len() {
     if end + 1 < glyphs.len() && glyphs[end].text_range == glyphs[end + 1].text_range {
+      break;
+    }
+    if !adjacent_text_clusters_overlap(source, &glyphs[end - 1], &glyphs[end]) {
+      break;
+    }
+    source_range.start = source_range.start.min(glyphs[end].text_range.start);
+    source_range.end = source_range.end.max(glyphs[end].text_range.end);
+    end += 1;
+  }
+  if end > start + 1 {
+    return GlyphSegment {
+      end,
+      actual_text_range: Some(source_range),
+    };
+  }
+
+  let mut end = start + 1;
+  while end < glyphs.len() {
+    if end + 1 < glyphs.len()
+      && (glyphs[end].text_range == glyphs[end + 1].text_range
+        || adjacent_text_clusters_overlap(source, &glyphs[end], &glyphs[end + 1]))
+    {
       break;
     }
     end += 1;
@@ -2816,6 +3623,49 @@ fn next_glyph_segment(glyphs: &[super::paint::PaintGlyph], start: usize) -> Glyp
     end,
     actual_text_range: None,
   }
+}
+
+fn adjacent_text_clusters_overlap(
+  source: &str,
+  previous: &super::paint::PaintGlyph,
+  next: &super::paint::PaintGlyph,
+) -> bool {
+  if (previous.text_range.end != next.text_range.start
+    && next.text_range.end != previous.text_range.start)
+    || previous.x_advance <= 0.0
+    || next.x_advance <= 0.0
+    || previous.y_advance != 0.0
+    || next.y_advance != 0.0
+    || previous.y_offset != next.y_offset
+  {
+    return false;
+  }
+  let distance = previous.x_advance + next.x_offset - previous.x_offset;
+  if distance < 0.0 || distance >= previous.x_advance {
+    return false;
+  }
+  // A positioned ligature can overlap a neighboring glyph with the same
+  // leading Unicode scalar. Readers can mistake these distinct source
+  // clusters for overprinted bold text and discard a character. Preserve
+  // their contiguous source span as replacement text (PDF 1.7, 10.8.3),
+  // retaining both original glyph positions and their ToUnicode mappings.
+  let Some(previous) = source.get(previous.text_range.clone()) else {
+    return false;
+  };
+  let Some(next) = source.get(next.text_range.clone()) else {
+    return false;
+  };
+  let mut previous_chars = previous.chars();
+  let mut next_chars = next.chars();
+  let previous_first = previous_chars.next();
+  let next_first = next_chars.next();
+  // Ordinary single-character kerning already has one lossless CID mapping
+  // per glyph. Replacement is needed for an overlapping ligature cluster,
+  // whose glyph carries multiple source scalars. Unnecessary ActualText on
+  // an invisible metafile search layer has no painted bounds for readers.
+  previous_first.is_some()
+    && previous_first == next_first
+    && (previous_chars.next().is_some() || next_chars.next().is_some())
 }
 
 fn begin_actual_text(content: &mut Content, text: &str) {
@@ -2828,10 +3678,13 @@ fn begin_actual_text(content: &mut Content, text: &str) {
 
 #[derive(Clone, Copy)]
 struct GlyphWriteContext<'a> {
+  word_text_spacing: bool,
+  word_leader_spacing_scale: Option<f32>,
   source: &'a str,
   baseline_y: f32,
   font_size_pt: f32,
   horizontal_scale: f32,
+  font_horizontal_scale: f32,
   resource_name: &'a [u8],
   handle: super::direct_font::FontHandle,
   rendering_mode: TextRenderingMode,
@@ -2860,7 +3713,7 @@ fn write_positioned_glyph_segment(
     x_pt,
   } = segment;
   if let Some(actual_text) = actual_text {
-    let actual_text = without_bidi_controls(actual_text);
+    let actual_text = without_nonprinting_controls(actual_text);
     let mut prepared = Vec::with_capacity(glyphs.len());
     for (index, glyph) in glyphs.iter().enumerate() {
       let semantic = glyph_semantic_text(context.source, glyph)?;
@@ -2872,7 +3725,10 @@ fn write_positioned_glyph_segment(
       let registered = fonts.register_glyph(
         context.handle,
         glyph.glyph_id,
-        (index == 0 || requires_codepoint_mappings).then_some(semantic.as_ref()),
+        (index == 0
+          || glyph.text_range != glyphs[index - 1].text_range
+          || requires_codepoint_mappings)
+          .then_some(semantic.as_ref()),
       )?;
       prepared.push(PreparedGlyph { glyph, registered });
     }
@@ -2938,38 +3794,49 @@ fn glyph_semantic_text<'a>(
 ) -> Result<Cow<'a, str>> {
   source
     .get(glyph.text_range.clone())
-    .map(without_bidi_controls)
+    .map(without_nonprinting_controls)
     .ok_or_else(|| PdfError::Writer("shaped glyph has an invalid text range".to_string()))
 }
 
 // Unicode UAX #9, section 2: Bidi_Control characters affect ordering, not
 // visible glyphs. Their effect is already resolved by layout. Word fixed output
 // omits their inkless glyphs and text mappings (tdf104649's nine RLMs).
-fn is_bidi_control(character: char) -> bool {
-  matches!(character, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+// U+200B likewise only supplies a line-break opportunity (UAX #14): native
+// stress012 retains all sixteen in the document, but none in the PDF text.
+// Filter after shaping/layout so these controls still affect line placement.
+fn is_nonprinting_control(character: char) -> bool {
+  matches!(character, '\u{200b}' | '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
 }
 
-fn without_bidi_controls(text: &str) -> Cow<'_, str> {
-  if text.chars().any(is_bidi_control) {
-    Cow::Owned(text.chars().filter(|&ch| !is_bidi_control(ch)).collect())
+fn without_nonprinting_controls(text: &str) -> Cow<'_, str> {
+  if text.chars().any(is_nonprinting_control) {
+    Cow::Owned(
+      text
+        .chars()
+        .filter(|&ch| !is_nonprinting_control(ch))
+        .collect(),
+    )
   } else {
     Cow::Borrowed(text)
   }
 }
 
-fn glyph_contains_only_bidi_controls(source: &str, glyph: &super::paint::PaintGlyph) -> bool {
+fn glyph_contains_only_nonprinting_controls(
+  source: &str,
+  glyph: &super::paint::PaintGlyph,
+) -> bool {
   source
     .get(glyph.text_range.clone())
-    .is_some_and(|text| !text.is_empty() && text.chars().all(is_bidi_control))
+    .is_some_and(|text| !text.is_empty() && text.chars().all(is_nonprinting_control))
 }
 
-fn without_bidi_control_glyphs<'a>(
+fn without_nonprinting_control_glyphs<'a>(
   glyphs: &'a [super::paint::PaintGlyph],
   source: &str,
 ) -> Cow<'a, [super::paint::PaintGlyph]> {
   if !glyphs
     .iter()
-    .any(|glyph| glyph_contains_only_bidi_controls(source, glyph))
+    .any(|glyph| glyph_contains_only_nonprinting_controls(source, glyph))
   {
     return Cow::Borrowed(glyphs);
   }
@@ -2977,7 +3844,7 @@ fn without_bidi_control_glyphs<'a>(
   let mut leading_x = 0.0;
   let mut leading_y = 0.0;
   for glyph in glyphs {
-    if glyph_contains_only_bidi_controls(source, glyph) {
+    if glyph_contains_only_nonprinting_controls(source, glyph) {
       if let Some(previous) = visible.last_mut() {
         previous.x_advance += glyph.x_advance;
         previous.y_advance += glyph.y_advance;
@@ -3072,6 +3939,12 @@ fn write_horizontal_glyph_segment(
   if glyphs.is_empty() {
     return 0.0;
   }
+  if context.word_text_spacing && glyphs.iter().all(|glyph| glyph.glyph.x_offset == 0.0) {
+    return write_word_horizontal_glyph_segment(content, glyphs, x_pt, context);
+  }
+  // PDF glyph-space uses the realized font width; source advances and marks
+  // retain their independently measured physical positions.
+  let advance_scale = context.horizontal_scale / context.font_horizontal_scale;
   let mut positioned = Vec::new();
   let mut encoded = Vec::with_capacity(glyphs.len() * 2);
   let mut adjustment_em = 0.0f32;
@@ -3079,7 +3952,7 @@ fn write_horizontal_glyph_segment(
   for prepared in glyphs {
     let glyph = prepared.glyph;
     let registered = prepared.registered;
-    adjustment_em += glyph.x_offset;
+    adjustment_em += glyph.x_offset * advance_scale;
     if adjustment_em.abs() > 1.0e-7 {
       if !encoded.is_empty() {
         positioned.push(PositionedTextItem::Show(std::mem::take(&mut encoded)));
@@ -3091,8 +3964,9 @@ fn write_horizontal_glyph_segment(
     }
     encoded.push((registered.cid >> 8) as u8);
     encoded.push(registered.cid as u8);
-    adjustment_em += glyph.x_advance - registered.natural_advance_pdf_units / PDF_TEXT_UNITS_PER_EM;
-    adjustment_em -= glyph.x_offset;
+    adjustment_em += glyph.x_advance * advance_scale
+      - registered.natural_advance_pdf_units / PDF_TEXT_UNITS_PER_EM;
+    adjustment_em -= glyph.x_offset * advance_scale;
     total_advance_em += glyph.x_advance;
   }
   if !encoded.is_empty() {
@@ -3104,7 +3978,7 @@ fn write_horizontal_glyph_segment(
     .set_text_rendering_mode(context.rendering_mode)
     .set_font(Name(context.resource_name), context.font_size_pt)
     .set_text_matrix([
-      context.horizontal_scale,
+      context.font_horizontal_scale,
       0.0,
       0.0,
       -1.0,
@@ -3130,6 +4004,74 @@ fn write_horizontal_glyph_segment(
 }
 
 const PDF_TEXT_UNITS_PER_EM: f32 = 1000.0;
+
+fn write_word_horizontal_glyph_segment(
+  content: &mut Content,
+  glyphs: &[PreparedGlyph<'_>],
+  x_pt: f32,
+  context: &GlyphWriteContext<'_>,
+) -> f32 {
+  let widths = glyphs
+    .iter()
+    .map(|glyph| glyph.registered.natural_advance_pdf_units)
+    .collect::<Vec<_>>();
+  let advances = glyphs
+    .iter()
+    .map(|glyph| glyph.glyph.x_advance * context.font_size_pt * context.horizontal_scale)
+    .collect::<Vec<_>>();
+  let positioning = super::direct_word_text::WordTextPositioning::new(
+    &widths,
+    &advances,
+    context.font_size_pt,
+    context
+      .word_leader_spacing_scale
+      .unwrap_or(context.font_horizontal_scale),
+  );
+  let character_spacing = if context.word_leader_spacing_scale.is_some() {
+    super::direct_word_text::serialize_leader_character_spacing(positioning.character_spacing_pt)
+  } else {
+    positioning.character_spacing_pt
+  };
+  content
+    .begin_text()
+    .set_text_rendering_mode(context.rendering_mode)
+    .set_font(Name(context.resource_name), context.font_size_pt)
+    .set_char_spacing(character_spacing)
+    .set_text_matrix([
+      context.font_horizontal_scale,
+      0.0,
+      0.0,
+      -1.0,
+      x_pt,
+      context.baseline_y,
+    ]);
+  let mut show = content.show_positioned();
+  let mut items = show.items();
+  let mut encoded = Vec::new();
+  let mut adjustments = positioning.adjustments.into_iter().peekable();
+  let mut total_advance = 0.0;
+  for (index, glyph) in glyphs.iter().enumerate() {
+    encoded.extend_from_slice(&glyph.registered.cid.to_be_bytes());
+    total_advance += glyph.glyph.x_advance;
+    if let Some(&(boundary, amount)) = adjustments.peek()
+      && boundary == index
+    {
+      items.show(Str(&encoded));
+      encoded.clear();
+      items.adjust(amount as f32);
+      adjustments.next();
+    }
+  }
+  if !encoded.is_empty() {
+    items.show(Str(&encoded));
+  }
+  items.finish();
+  show.finish();
+  // Text-state operators persist outside BT/ET; avoid carrying Tc into an
+  // independently positioned drawing, semantic overlay or later exact run.
+  content.set_char_spacing(0.0).end_text();
+  total_advance
+}
 
 enum PositionedTextItem {
   Show(Vec<u8>),
@@ -3244,6 +4186,33 @@ fn write_prepared_rect(
 ) -> Result<()> {
   if let Some(fill) = rect.fill {
     match fill {
+      super::paint::RectFill::Texture(texture) => {
+        let prepared = writer.image_policy.raster_direct(
+          &texture.bytes,
+          texture.content_type.as_deref(),
+          writer.options,
+          None,
+          (texture.tile_size.width.0, texture.tile_size.height.0),
+          texture.blip_compression_state,
+        )?;
+        let pattern = writer.patterns.register_texture(
+          texture,
+          prepared,
+          writer.page_height_pt,
+          writer.images,
+          writer.refs,
+        )?;
+        writer
+          .resources
+          .register_tiling_pattern(&pattern.name, pattern.id);
+        content
+          .save_state()
+          .set_fill_color_space(Name(b"Pattern"))
+          .set_fill_pattern(std::iter::empty(), Name(&pattern.name))
+          .rect(rect.x_pt, rect.y_pt, rect.width_pt, rect.height_pt)
+          .fill_even_odd()
+          .restore_state();
+      }
       super::paint::RectFill::Solid { color, opacity } => {
         content.save_state();
         set_alpha(
@@ -3699,7 +4668,7 @@ fn write_prepared_polyline_fill_only(
       true,
     ),
     common::Fill::Theme(_) => unsupported("unresolved theme path fills"),
-    common::Fill::Image { .. } => unsupported("image path fills"),
+    common::Fill::Image { .. } | common::Fill::Texture(_) => unsupported("image path fills"),
   }
 }
 
@@ -4154,7 +5123,7 @@ fn write_rect_item(
       true,
     )?,
     common::Fill::None => {}
-    common::Fill::Theme(_) | common::Fill::Image { .. } => {
+    common::Fill::Theme(_) | common::Fill::Image { .. } | common::Fill::Texture(_) => {
       return unsupported("non-solid rectangle fills");
     }
   }
@@ -4265,7 +5234,7 @@ fn write_path_fill_only(
       true,
     ),
     common::Fill::Theme(_) => unsupported("unresolved theme path fills"),
-    common::Fill::Image { .. } => unsupported("image path fills"),
+    common::Fill::Image { .. } | common::Fill::Texture(_) => unsupported("image path fills"),
   }
 }
 
@@ -4797,14 +5766,11 @@ fn paint_items_require_actual_text(
 ) -> bool {
   items.iter().any(|item| match item {
     super::paint::PaintItem::Text(text) => {
-      let small_caps_semantic_text =
-        super::paint::word_small_caps_semantic_text(&text.item.text, text.item.style.small_caps);
-      let glyph_semantic_text = super::paint::symbol_font_semantic_text(
-        small_caps_semantic_text.as_ref(),
+      let glyph_semantic_text = super::paint::pdf_semantic_text(
+        &text.item.text,
+        text.item.style.small_caps,
         text.item.style.pdf_font_family(),
       );
-      let glyph_semantic_text =
-        super::paint::word_no_break_hyphen_semantic_text(glyph_semantic_text.as_ref());
       for portion in &text.portions {
         if matches!(portion.kind, super::paint::PaintTextPortionKind::Tab) {
           continue;
@@ -4824,10 +5790,10 @@ fn paint_items_require_actual_text(
             Some(glyphs) => (glyph_semantic_text.as_ref(), glyphs.as_ref()),
             None => (text.item.text.as_ref(), run.glyphs.as_slice()),
           };
-          if run_glyphs
-            .windows(2)
-            .any(|pair| pair[0].text_range == pair[1].text_range)
-          {
+          if run_glyphs.windows(2).any(|pair| {
+            pair[0].text_range == pair[1].text_range
+              || adjacent_text_clusters_overlap(run_semantic_text, &pair[0], &pair[1])
+          }) {
             return true;
           }
           let font_mappings = mappings.entry(run.font_face.cache_key()).or_default();
@@ -4950,13 +5916,15 @@ mod tests {
     let mut document = blank_document(&[(612.0, 792.0)]);
     document.pages[0]
       .items
-      .push(common::DisplayItem::Text(common::TextRun {
+      .push(common::DisplayItem::Text(Box::new(common::TextRun {
         text: text.to_string().into(),
         origin: common::Point {
           x: Pt(72.0),
           y: Pt(72.0),
         },
         line_height: Pt(14.0),
+        wordprocessing_line_metrics: None,
+        origin_is_baseline: false,
         line_metrics_participant: true,
         paint_clip: None,
         page_culling_bounds: None,
@@ -4970,9 +5938,10 @@ mod tests {
         paragraph_bidi: false,
         word_spacing_pt: 0.0,
         preserve_text_portion: false,
+        decoration_span_start_x: None,
         pdf_text_segmentation: common::PdfTextSegmentation::default(),
         source: None,
-      }));
+      })));
     document
   }
 
@@ -5160,12 +6129,18 @@ mod tests {
     let pdf = String::from_utf8_lossy(&bytes);
 
     assert!(pdf.contains("/PageMode/UseThumbs"));
-    assert!(pdf.contains("/PageLayout/TwoColumnRight"));
+    assert!(pdf.contains("/PageLayout/TwoColumnLeft"));
     assert!(pdf.contains("/HideToolbar true"));
     assert!(pdf.contains("/HideWindowUI true"));
     assert!(pdf.contains("/FitWindow true"));
-    assert!(pdf.contains("/Direction/R2L"));
+    assert!(!pdf.contains("/Direction"));
     assert!(pdf.contains("/OpenAction[5 0 R/FitBH null]"));
+
+    options.viewer.first_page_left = false;
+    let bytes = render(&document, &options).unwrap();
+    let pdf = String::from_utf8_lossy(&bytes);
+    assert!(pdf.contains("/PageLayout/TwoColumnRight"));
+    assert!(!pdf.contains("/Direction"));
   }
 
   #[test]
@@ -5766,6 +6741,103 @@ mod tests {
     assert_eq!(output.diagnostics.pages[1].width_pt, 612.0);
     assert_eq!(output.diagnostics.pages[1].height_pt, 792.0);
     assert_eq!(output.diagnostics.pages[1].text_runs[0].text, "first");
+  }
+
+  #[test]
+  fn direct_writer_observes_text_inside_nested_compositing_groups() {
+    let style = common::TextStyle {
+      font_family: Some("Liberation Serif".into()),
+      font_size: Pt(12.0),
+      color: color(0, 0, 0, u8::MAX),
+      ..Default::default()
+    };
+    let text_item = |text: &str| {
+      text_document(text, style.clone())
+        .pages
+        .remove(0)
+        .items
+        .remove(0)
+    };
+    for flatten_identity in [false, true] {
+      let group = |items| {
+        common::DisplayItem::Group(common::CompositingGroup {
+          mask: None,
+          clip: None,
+          transform: None,
+          blend_mode: common::BlendMode::Normal,
+          opacity: 1.0,
+          flatten_identity,
+          inherit_text_line_owner: false,
+          items,
+        })
+      };
+      let mut document = blank_document(&[(612.0, 792.0)]);
+      document.pages[0].items = vec![
+        text_item("top"),
+        group(vec![text_item("middle"), group(vec![text_item("nested")])]),
+        text_item("last"),
+      ];
+      let options = uncompressed_options();
+      let output = render_with_diagnostics(&document, &options).unwrap();
+      let audit = render_with_font_audit(&document, &options).unwrap();
+
+      assert_eq!(output.pdf, render(&document, &options).unwrap());
+      assert_eq!(output.pdf, audit.pdf);
+      assert_eq!(
+        output.diagnostics.pages[0]
+          .text_runs
+          .iter()
+          .map(|run| run.text.as_str())
+          .collect::<Vec<_>>(),
+        ["top", "middle", "nested", "last"]
+      );
+      assert_eq!(output.diagnostics.fonts.len(), 1);
+      assert_eq!(audit.audit.text_portion_count, 4);
+      assert_eq!(audit.audit.explicit_glyph_portion_count, 4);
+      assert_eq!(audit.audit.glyph_count, 19);
+      assert_eq!(audit.audit.fonts.len(), 1);
+      assert!(audit.audit.issues.is_empty(), "{:?}", audit.audit.issues);
+    }
+  }
+
+  #[test]
+  fn direct_writer_diagnostics_keep_layout_ranges_and_pdf_semantics_separate() {
+    for (source, family, small_caps, expected) in [
+      ("A\u{2011}B", "Liberation Serif", false, "A-B"),
+      ("Mixed", "Liberation Serif", true, "MIXED"),
+      ("\u{f0b7}", "Symbol", false, "\u{2022}"),
+    ] {
+      let document = text_document(
+        source,
+        common::TextStyle {
+          font_family: Some(family.into()),
+          font_size: Pt(12.0),
+          color: color(0, 0, 0, u8::MAX),
+          small_caps,
+          ..Default::default()
+        },
+      );
+      let options = uncompressed_options();
+      let output = render_with_diagnostics(&document, &options).unwrap();
+      assert_eq!(output.pdf, render(&document, &options).unwrap());
+      let run = &output.diagnostics.pages[0].text_runs[0];
+      assert_eq!(run.text, source);
+      assert_eq!(run.pdf_text, expected);
+      for portion in &run.portions {
+        assert!(
+          source
+            .get(portion.text_range_start..portion.text_range_end)
+            .is_some()
+        );
+        for glyph in portion.glyph_runs.iter().flat_map(|run| &run.glyphs) {
+          assert!(
+            source
+              .get(glyph.text_range_start..glyph.text_range_end)
+              .is_some()
+          );
+        }
+      }
+    }
   }
 
   #[test]
@@ -6382,6 +7454,31 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_paints_the_office_missing_embedded_picture_frame_and_icon() {
+    let mut image = test_image_item(Vec::new());
+    image.content_type = common::MISSING_EMBEDDED_PICTURE_CONTENT_TYPE.into();
+    image.relationship_id = Some("rId6".into());
+    let pdf =
+      String::from_utf8_lossy(&render(&image_document(image), &uncompressed_options()).unwrap())
+        .into_owned();
+
+    assert_eq!(pdf.matches("/Subtype/Image").count(), 1, "{pdf}");
+    assert!(
+      pdf.contains("/Width 2/Height 2/BitsPerComponent 8/ColorSpace/DeviceRGB"),
+      "{pdf}"
+    );
+    assert!(!pdf.contains("/Interpolate"), "{pdf}");
+    assert!(
+      pdf.contains("0 0 0 RG 0.14 w 0 J 0 j[]0 d 10.07 20.07 29.86 39.86 re\nS"),
+      "{pdf}"
+    );
+    assert!(
+      pdf.contains("1.68 0 0 -1.92 10.84 22.76 cm/Im0 Do"),
+      "{pdf}"
+    );
+  }
+
+  #[test]
   fn missing_linked_image_icon_is_the_fixed_office_rgb_sample_plane() {
     const EXPECTED: [u8; 60] = [
       128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, // row 1
@@ -6400,6 +7497,28 @@ mod tests {
     assert!(direct.matte.is_none());
     let DirectRasterEncoding::Sampled { pixels } = &direct.encoding else {
       panic!("missing-image icon must use the unencoded sampled transport");
+    };
+    assert_eq!(pixels.rgb, EXPECTED);
+    assert!(pixels.alpha.is_none());
+    assert!(pixels.icc_profile.is_none());
+  }
+
+  #[test]
+  fn missing_embedded_picture_icon_is_the_fixed_office_rgb_sample_plane() {
+    const EXPECTED: [u8; 12] = [
+      128, 128, 128, 128, 128, 128, // row 1
+      128, 128, 128, 255, 0, 0, // row 2
+    ];
+    let icon = missing_embedded_picture_icon();
+    let direct = icon.direct();
+
+    assert_eq!((direct.width, direct.height), (2, 2));
+    assert_eq!(direct.color_space, DirectRasterColorSpace::Rgb);
+    assert_eq!(direct.bits_per_component, 8);
+    assert!(!direct.interpolate);
+    assert!(direct.matte.is_none());
+    let DirectRasterEncoding::Sampled { pixels } = &direct.encoding else {
+      panic!("missing embedded-picture icon must use the unencoded sampled transport");
     };
     assert_eq!(pixels.rgb, EXPECTED);
     assert!(pixels.alpha.is_none());
@@ -6764,6 +7883,61 @@ mod tests {
         if message == "metafile vector scene contains a non-finite point"
     ));
     assert!(untouched.finish().into_vec().is_empty());
+  }
+
+  #[test]
+  fn direct_writer_keeps_clipped_metafile_cosmetic_pens_on_both_picture_axes() {
+    use ooxmlsdk_layout::render::emf_wmf::{
+      MetafileVectorDraw, MetafileVectorDrawing, MetafileVectorFill, MetafileVectorFillRule,
+      MetafileVectorPoint,
+    };
+    let subpaths = vec![vec![
+      MetafileVectorPoint { x: 0.0, y: 0.5 },
+      MetafileVectorPoint { x: 1.0, y: 0.5 },
+    ]];
+    let drawing = MetafileVectorDrawing {
+      operations: vec![
+        MetafileVectorDraw::Fill {
+          fill: MetafileVectorFill {
+            subpaths: subpaths.clone(),
+            color: [255, 0, 0],
+            fill_rule: MetafileVectorFillRule::Alternate,
+          },
+          clip: None,
+        },
+        MetafileVectorDraw::Stroke {
+          subpaths,
+          color: [0, 0, 255],
+          width: [0.1, 0.05],
+          closed: false,
+          clip: Some([0.25, 0.0, 0.75, 1.0]),
+        },
+      ],
+    };
+    let mut content = Content::with_settings(Settings { pretty: false });
+    write_metafile_vector_drawing(&mut content, &paint_metafile_item(), &drawing).unwrap();
+    let stream = String::from_utf8(content.finish().into_vec()).unwrap();
+    let tokens = stream
+      .split_ascii_whitespace()
+      .collect::<Vec<_>>()
+      .join(" ");
+    assert!(tokens.contains("7.5 0 15 40 re W n"), "{stream}");
+    assert!(tokens.contains("3 0 0 2 0 0 cm"), "{stream}");
+    assert!(tokens.contains("1 w 2 J 1 j 0 0 1 RG"), "{stream}");
+    assert!(tokens.contains("0 10 m 10 10 l S"), "{stream}");
+    assert!(tokens.find("1 0 0 rg f*").unwrap() < tokens.find("0 0 1 RG").unwrap());
+    assert!(!tokens.contains(" Do"));
+    let mut invalid = drawing;
+    let MetafileVectorDraw::Stroke { width, .. } = &mut invalid.operations[1] else {
+      unreachable!()
+    };
+    width[0] = f32::NAN;
+    let mut content = Content::with_settings(Settings { pretty: false });
+    assert!(write_metafile_vector_drawing(&mut content, &paint_metafile_item(), &invalid).is_err());
+    assert!(
+      content.finish().is_empty(),
+      "invalid input must not leave partial output"
+    );
   }
 
   #[test]
@@ -8245,8 +9419,8 @@ mod tests {
   }
 
   #[test]
-  fn direct_writer_omits_bidi_controls_without_changing_shaped_positions() {
-    let source = "\u{200f}a\u{200e}b\u{061c}";
+  fn direct_writer_omits_nonprinting_controls_without_changing_shaped_positions() {
+    let source = "\u{200f}a\u{200b}b\u{061c}";
     let glyphs = source
       .char_indices()
       .map(|(start, ch)| super::super::paint::PaintGlyph {
@@ -8259,7 +9433,7 @@ mod tests {
         bounds_em: None,
       })
       .collect::<Vec<_>>();
-    let visible = without_bidi_control_glyphs(&glyphs, source);
+    let visible = without_nonprinting_control_glyphs(&glyphs, source);
     assert_eq!(visible.len(), 2);
     let positions = |glyphs: &[super::super::paint::PaintGlyph]| {
       let mut pen = (0.0, 0.0);
@@ -8278,19 +9452,19 @@ mod tests {
     assert_eq!(visible.iter().map(|g| g.x_advance).sum::<f32>(), 2.5);
     assert_eq!(visible.iter().map(|g| g.y_advance).sum::<f32>(), 1.25);
     for codepoint in [
-      0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068,
-      0x2069,
+      0x061c, 0x200b, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067,
+      0x2068, 0x2069,
     ] {
       let control = char::from_u32(codepoint).unwrap();
-      assert_eq!(without_bidi_controls(&format!("a{control}b")), "ab");
+      assert_eq!(without_nonprinting_controls(&format!("a{control}b")), "ab");
     }
     // Joiners and variation selectors retain their separate shaping semantics.
     assert_eq!(
-      without_bidi_controls("a\u{200c}\u{200d}\u{fe0f}b"),
+      without_nonprinting_controls("a\u{200c}\u{200d}\u{fe0f}b"),
       "a\u{200c}\u{200d}\u{fe0f}b"
     );
     assert!(matches!(
-      without_bidi_control_glyphs(&glyphs[1..2], source),
+      without_nonprinting_control_glyphs(&glyphs[1..2], source),
       Cow::Borrowed(_)
     ));
   }
@@ -8385,16 +9559,16 @@ mod tests {
       glyph(5..6),
     ];
 
-    let first = next_glyph_segment(&glyphs, 0);
+    let first = next_glyph_segment("abcdef", &glyphs, 0);
     assert_eq!(first.end, 1);
     assert_eq!(first.actual_text_range, None);
-    let second = next_glyph_segment(&glyphs, first.end);
+    let second = next_glyph_segment("abcdef", &glyphs, first.end);
     assert_eq!(second.end, 3);
     assert_eq!(second.actual_text_range, Some(1..4));
-    let third = next_glyph_segment(&glyphs, second.end);
+    let third = next_glyph_segment("abcdef", &glyphs, second.end);
     assert_eq!(third.end, 4);
     assert_eq!(third.actual_text_range, None);
-    let fourth = next_glyph_segment(&glyphs, third.end);
+    let fourth = next_glyph_segment("abcdef", &glyphs, third.end);
     assert_eq!(fourth.end, glyphs.len());
     assert_eq!(fourth.actual_text_range, Some(5..6));
 
@@ -8405,6 +9579,66 @@ mod tests {
     assert_eq!(content.matches("/ActualText").count(), 1);
     assert!(content.starts_with("/Span<</ActualText(ffi)>>BDC"));
     assert!(content.ends_with("EMC"));
+  }
+
+  #[test]
+  fn direct_writer_keeps_overlapping_source_clusters_in_one_replacement_span() {
+    let glyph = |text_range, x_offset| super::super::paint::PaintGlyph {
+      glyph_id: 1,
+      text_range,
+      x_advance: 1.0,
+      x_offset,
+      y_offset: 0.0,
+      y_advance: 0.0,
+      bounds_em: None,
+    };
+    let latin = [
+      glyph(0..1, 0.0),
+      glyph(1..2, 0.0),
+      glyph(2..4, -0.25),
+      glyph(4..5, 0.0),
+    ];
+    let first = next_glyph_segment("-ffix", &latin, 0);
+    assert_eq!(first.end, 1);
+    assert_eq!(first.actual_text_range, None);
+    let overlap = next_glyph_segment("-ffix", &latin, first.end);
+    assert_eq!(overlap.end, 3);
+    assert_eq!(overlap.actual_text_range, Some(1..4));
+    let last = next_glyph_segment("-ffix", &latin, overlap.end);
+    assert_eq!(last.end, 4);
+    assert_eq!(last.actual_text_range, None);
+
+    let arabic = [glyph(4..6, 0.0), glyph(0..4, -0.25)];
+    let overlap = next_glyph_segment("يري", &arabic, 0);
+    assert_eq!(overlap.end, 2);
+    assert_eq!(overlap.actual_text_range, Some(0..6));
+
+    let chain = [glyph(0..1, 0.0), glyph(1..3, -0.25), glyph(3..6, -0.5)];
+    let overlap = next_glyph_segment("ffiffi", &chain, 0);
+    assert_eq!(overlap.end, 3);
+    assert_eq!(overlap.actual_text_range, Some(0..6));
+
+    let separate = |source: &str, glyphs: &[super::super::paint::PaintGlyph]| {
+      assert_eq!(
+        next_glyph_segment(source, glyphs, 0).actual_text_range,
+        None
+      );
+    };
+    separate("يري", &[glyph(4..6, 0.0), glyph(0..4, 0.0)]);
+    separate("tt", &[glyph(0..1, 0.0), glyph(1..2, -0.00390625)]);
+    separate(
+      "fff",
+      &[glyph(0..1, 0.0), glyph(1..2, -0.25), glyph(2..3, -0.5)],
+    );
+    separate("يرة", &arabic);
+    separate("ير ي", &[glyph(5..7, 0.0), glyph(0..4, -0.25)]);
+    separate("يري", &[glyph(4..6, 0.0), glyph(0..4, -1.25)]);
+    let mut raised = arabic.clone();
+    raised[1].y_offset = 0.25;
+    separate("يري", &raised);
+    let mut vertical = arabic.clone();
+    vertical[1].y_advance = 1.0;
+    separate("يري", &vertical);
   }
 
   #[test]
@@ -8519,6 +9753,124 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_word_symbol_notdef_keeps_its_physical_face_visible() {
+    let style = common::TextStyle {
+      font_family: Some("MT Extra".into()),
+      font_size: Pt(28.0),
+      color: color(0, 0, 0, u8::MAX),
+      ..Default::default()
+    };
+    // MT Extra is an optional Office-installed face. Exercise its real symbol
+    // cmap when available without importing a proprietary font fixture.
+    let Some(face) = ooxmlsdk_layout::fonts::FontResolver::default().cached_text_face(&style)
+    else {
+      return;
+    };
+    if !face.id().split(':').any(|part| part == "MT-Extra") {
+      return;
+    }
+    let mut document = text_document("\u{f02a}\u{f035}", style);
+    let common::DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+    let mut options = uncompressed_options();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx);
+    let paint = super::super::paint::prepare_for_direct(&document, &options);
+    let super::super::paint::PaintItem::Text(text) = &paint.pages[0].items[0] else {
+      unreachable!();
+    };
+    let runs = text.portions[0].glyphs.as_ref().unwrap();
+    assert_eq!(runs.len(), 1);
+    assert!(runs[0].glyphs.iter().all(|glyph| glyph.glyph_id == 0));
+    assert!(
+      skrifa::FontRef::from_index(runs[0].font_face.data.as_slice(), runs[0].font_face.index)
+        .unwrap()
+        .charmap()
+        .is_symbol()
+    );
+    let selection = PageSelection::from_range(document.pages.len(), None).unwrap();
+    let conformance = DirectConformance::from_options(&options).unwrap();
+    let pdf =
+      write_page_document(&document, &options, &selection, Some(&paint), conformance).unwrap();
+    let serialized = String::from_utf8_lossy(&pdf);
+    assert!(serialized.contains("MT-Extra"));
+    assert!(!serialized.contains("/ca 0"));
+    assert!(serialized.contains("/ActualText<FEFFF035>"));
+  }
+
+  #[test]
+  fn direct_writer_word_missing_private_use_is_transparent_but_preserves_text() {
+    let mut document = text_document(
+      "A\u{e037}B\u{e038}C",
+      common::TextStyle {
+        font_family: Some("Liberation Serif".into()),
+        font_size: Pt(13.0),
+        color: color(0, 0, 0, u8::MAX),
+        ..Default::default()
+      },
+    );
+    let common::DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+    let mut options = uncompressed_options();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx);
+    let mut paint = super::super::paint::prepare_for_direct(&document, &options);
+    let super::super::paint::PaintItem::Text(text) = &mut paint.pages[0].items[0] else {
+      unreachable!();
+    };
+    let mut missing_count = 0;
+    for portion in &mut text.portions {
+      for run in portion.glyphs.as_mut().unwrap() {
+        for glyph in &mut run.glyphs {
+          if text.item.text[glyph.text_range.clone()]
+            .chars()
+            .any(super::super::paint::is_unicode_private_use)
+          {
+            glyph.glyph_id = 0;
+            missing_count += 1;
+          }
+        }
+      }
+    }
+    assert_eq!(missing_count, 2);
+    let selection = PageSelection::from_range(document.pages.len(), None).unwrap();
+    let conformance = DirectConformance::from_options(&options).unwrap();
+    let pdf =
+      write_page_document(&document, &options, &selection, Some(&paint), conformance).unwrap();
+    let serialized = String::from_utf8_lossy(&pdf);
+    assert!(serialized.contains("/ca 0"));
+    assert!(serialized.contains("/ActualText<FEFFE038>"));
+    let mut cmaps = String::new();
+    for (start, _) in pdf
+      .windows(10)
+      .enumerate()
+      .filter(|(_, s)| *s == b"/Type/CMap")
+    {
+      let stream = start
+        + pdf[start..]
+          .windows(7)
+          .position(|s| s == b"stream\n")
+          .unwrap()
+        + 7;
+      let mut decoder = flate2::read::ZlibDecoder::new(&pdf[stream..]);
+      std::io::Read::read_to_string(&mut decoder, &mut cmaps).unwrap();
+    }
+    assert!(cmaps.contains("<E037>"), "{cmaps}");
+
+    // Other producers retain ordinary .notdef painting for the same source.
+    let options = uncompressed_options();
+    let conformance = DirectConformance::from_options(&options).unwrap();
+    let pdf =
+      write_page_document(&document, &options, &selection, Some(&paint), conformance).unwrap();
+    let pdf = String::from_utf8_lossy(&pdf);
+    assert!(!pdf.contains("/ca 0"), "{pdf}");
+  }
+
+  #[test]
   fn direct_writer_accepts_the_source_backed_pdf_semantic_remapping_families() {
     let base_style = common::TextStyle {
       font_family: Some("Liberation Serif".into()),
@@ -8614,6 +9966,7 @@ mod tests {
         b: 56,
       },
       font_size_pt: 18.0,
+      word_fixed_output: false,
       baseline_y: 96.0,
     };
     let mut content = Content::with_settings(Settings { pretty: false });
@@ -8635,6 +9988,30 @@ mod tests {
     assert!(content.contains("2 Tr"), "{content}");
     assert!(content.ends_with('Q'), "{content}");
 
+    for (size, native_width) in [
+      (8.04, 0.22971),
+      (9.48, 0.27086),
+      (9.96, 0.28457),
+      (12.0, 0.34286),
+      (18.0, 0.51429),
+      (24.0, 0.68571),
+    ] {
+      let word = DirectTextSynthesis {
+        word_fixed_output: true,
+        font_size_pt: size,
+        ..synthesis
+      };
+      let mut content = Content::with_settings(Settings { pretty: false });
+      word.begin(&mut content);
+      word.end(&mut content);
+      let content = String::from_utf8(content.finish().into_vec()).unwrap();
+      let tokens = content.split_whitespace().collect::<Vec<_>>();
+      let width = tokens.windows(2).find(|pair| pair[1] == "w").unwrap()[0]
+        .parse::<f32>()
+        .unwrap();
+      assert!((width - native_width).abs() < 0.00001);
+    }
+
     let ordinary = DirectTextSynthesis {
       bold: false,
       italic: false,
@@ -8644,6 +10021,7 @@ mod tests {
         b: 56,
       },
       font_size_pt: 18.0,
+      word_fixed_output: false,
       baseline_y: 96.0,
     };
     let mut ordinary_content = Content::with_settings(Settings { pretty: false });
@@ -8761,7 +10139,7 @@ mod tests {
       color: super::super::paint::RgbColor { r: 0, g: 0, b: 0 },
     };
     assert!(matches!(
-      write_prepared_text_decoration(&mut invalid_content, &invalid),
+      write_prepared_text_decoration(&mut invalid_content, &invalid, false),
       Err(PdfError::Writer(message)) if message.contains("text decoration")
     ));
     assert!(invalid_content.finish().into_vec().is_empty());
@@ -9138,6 +10516,29 @@ mod tests {
     assert!(pdf.contains("/MarkInfo<</Marked true>>"), "{pdf}");
     assert!(pdf.contains("/S/Document"), "{pdf}");
     assert!(pdf.contains("/S/Part"), "{pdf}");
+    assert!(!pdf.contains("/MCID"), "{pdf}");
+    assert!(!pdf.contains("/StructParents"), "{pdf}");
+    assert!(!pdf.contains("/ParentTree"), "{pdf}");
+  }
+
+  #[test]
+  fn direct_writer_painted_text_artifact_retains_font_operators_without_a_logical_text_node() {
+    let style = common::TextStyle {
+      font_family: Some("Liberation Serif".into()),
+      font_size: Pt(12.0),
+      color: color(192, 192, 192, u8::MAX),
+      pdf_painted_artifact: true,
+      ..Default::default()
+    };
+    let document = text_document("Shadow", style);
+    let mut options = uncompressed_options();
+    options.general.tagged_pdf = true;
+    let bytes = render(&document, &options).unwrap();
+    let pdf = String::from_utf8_lossy(&bytes);
+    assert!(pdf.contains("/Artifact<</Type/Layout>>BDC"), "{pdf}");
+    assert!(pdf.contains("BT"), "{pdf}");
+    assert!(pdf.contains("/Subtype/Type0"), "{pdf}");
+    assert!(pdf.contains("/ToUnicode"), "{pdf}");
     assert!(!pdf.contains("/MCID"), "{pdf}");
     assert!(!pdf.contains("/StructParents"), "{pdf}");
     assert!(!pdf.contains("/ParentTree"), "{pdf}");
@@ -9653,6 +11054,108 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_transforms_isolated_groups_without_clipping_large_local_coordinates() {
+    let mut document = blank_document(&[(612.0, 792.0)]);
+    let mut group = common::CompositingGroup {
+      mask: None,
+      clip: None,
+      transform: None,
+      blend_mode: common::BlendMode::Normal,
+      opacity: 1.0,
+      flatten_identity: false,
+      inherit_text_line_owner: false,
+      items: vec![common::DisplayItem::Rect(common::RectItem {
+        bounds: common::Rect {
+          origin: common::Point {
+            x: Pt(1400.0),
+            y: Pt(1800.0),
+          },
+          size: Size {
+            width: Pt(40.0),
+            height: Pt(30.0),
+          },
+        },
+        fill: common::Fill::Solid(color(255, 0, 0, 255)),
+        stroke: None,
+      })],
+    };
+    group.transform = Some(common::Transform {
+      m11: 0.25,
+      m22: 0.25,
+      dx: Pt(100.0),
+      dy: Pt(50.0),
+      ..common::Transform::default()
+    });
+    document.pages[0]
+      .items
+      .push(common::DisplayItem::Group(group));
+    let bytes = render(&document, &uncompressed_options()).unwrap();
+    let pdf = String::from_utf8_lossy(&bytes);
+    assert!(pdf.contains("0.25 0 0 0.25 100 50 cm"), "{pdf}");
+    assert!(pdf.contains("/BBox[-400 -200 2048 2968]"), "{pdf}");
+    assert!(pdf.contains("1400 1800 40 30 re"), "{pdf}");
+    assert!(pdf.contains("/Fm0 Do"), "{pdf}");
+  }
+
+  #[test]
+  fn direct_writer_transforms_nested_group_link_bounds_once_per_parent() {
+    let mut document = blank_document(&[(612.0, 792.0)]);
+    let mut child = common::CompositingGroup {
+      mask: None,
+      clip: None,
+      transform: None,
+      blend_mode: common::BlendMode::Normal,
+      opacity: 1.0,
+      flatten_identity: false,
+      inherit_text_line_owner: false,
+      items: vec![common::DisplayItem::LinkArea(common::LinkArea {
+        bounds: common::Rect {
+          origin: common::Point {
+            x: Pt(20.0),
+            y: Pt(30.0),
+          },
+          size: Size {
+            width: Pt(40.0),
+            height: Pt(10.0),
+          },
+        },
+        target: Cow::Borrowed("https://example.com/"),
+      })],
+    };
+    child.transform = Some(common::Transform {
+      m11: 2.0,
+      m22: 3.0,
+      dx: Pt(10.0),
+      dy: Pt(20.0),
+      ..common::Transform::default()
+    });
+    let mut parent = common::CompositingGroup {
+      mask: None,
+      clip: None,
+      transform: None,
+      blend_mode: common::BlendMode::Normal,
+      opacity: 1.0,
+      flatten_identity: false,
+      inherit_text_line_owner: false,
+      items: vec![common::DisplayItem::Group(child)],
+    };
+    parent.transform = Some(common::Transform {
+      m11: 0.5,
+      m22: 0.5,
+      dx: Pt(100.0),
+      dy: Pt(50.0),
+      ..common::Transform::default()
+    });
+    document.pages[0]
+      .items
+      .push(common::DisplayItem::Group(parent));
+    let bytes = render(&document, &uncompressed_options()).unwrap();
+    let pdf = String::from_utf8_lossy(&bytes);
+    assert!(pdf.contains("/Rect[125 672 165 687]"), "{pdf}");
+    assert_eq!(pdf.matches("/Subtype/Link").count(), 1);
+  }
+
+  #[test]
   fn direct_writer_keeps_other_group_compositing_states_independent() {
     let base = common::CompositingGroup {
       mask: None,
@@ -9676,11 +11179,11 @@ mod tests {
 
     let mut transformed = base.clone();
     transformed.transform = Some(common::Transform::default());
+    assert!(ensure_group_supported(&transformed).is_ok());
+    transformed.transform.as_mut().unwrap().m11 = f32::NAN;
     assert!(matches!(
       ensure_group_supported(&transformed),
-      Err(PdfError::DirectWriterUnsupported {
-        feature: "transformed compositing groups"
-      })
+      Err(PdfError::Writer(_))
     ));
 
     let mut blended = base.clone();
@@ -10016,5 +11519,42 @@ mod tests {
         feature: "tiling-pattern strokes"
       })
     ));
+  }
+
+  #[test]
+  fn direct_writer_texture_preserves_period_phase_and_shared_image() {
+    let texture = common::TextureFill {
+      bytes: opaque_test_png().into(),
+      content_type: Some("image/png".into()),
+      tile_size: Size {
+        width: Pt(12.0),
+        height: Pt(18.0),
+      },
+      origin: common::Point {
+        x: Pt(3.0),
+        y: Pt(5.0),
+      },
+      blip_compression_state: common::BlipCompressionState::Unspecified,
+    };
+    let mut document = blank_document(&[(120.0, 192.0), (120.0, 288.0)]);
+    for page in &mut document.pages {
+      page.items.push(common::DisplayItem::Rect(common::RectItem {
+        bounds: common::Rect {
+          origin: common::Point::default(),
+          size: page.setup.size,
+        },
+        fill: common::Fill::Texture(Box::new(texture.clone())),
+        stroke: None,
+      }));
+    }
+    let bytes = render(&document, &uncompressed_options()).unwrap();
+    let source = String::from_utf8_lossy(&bytes);
+    assert_eq!(source.matches("/Subtype/Image").count(), 1);
+    assert_eq!(source.matches("/PatternType 1").count(), 2);
+    assert!(source.contains("/BBox[0 0 2 2]"));
+    assert!(source.contains("/Matrix[6 0 0 9 3 187]"));
+    assert!(source.contains("/Matrix[6 0 0 9 3 283]"));
+    assert!(source.contains("/Pattern cs/TP0 scn"));
+    assert!(source.contains("/Pattern cs/TP1 scn"));
   }
 }

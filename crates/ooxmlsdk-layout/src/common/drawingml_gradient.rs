@@ -159,9 +159,11 @@ fn resolve_path_gradient_tile(
   (fill_to, transform, mirror_tile)
 }
 
-pub(crate) fn resolved_stops(gradient: &GradientFill<'static>) -> Vec<GradientStop<'static>> {
-  if gradient.interpolation != GradientInterpolation::PowerPointGammaSigma
-    || gradient.stops.len() < 2
+pub fn resolved_stops(gradient: &GradientFill<'static>) -> Vec<GradientStop<'static>> {
+  if !matches!(
+    gradient.interpolation,
+    GradientInterpolation::PowerPointGammaSigma | GradientInterpolation::SigmaSrgb
+  ) || gradient.stops.len() < 2
   {
     return gradient.stops.clone();
   }
@@ -181,7 +183,11 @@ pub(crate) fn resolved_stops(gradient: &GradientFill<'static>) -> Vec<GradientSt
       let blend = f32::from(*blend) / 255.0;
       stops.push(GradientStop {
         position: start.position + (end.position - start.position) * position_ratio,
-        color: gamma_correct_color(start.color, end.color, blend),
+        color: if gradient.interpolation == GradientInterpolation::SigmaSrgb {
+          linear_color(start.color, end.color, blend)
+        } else {
+          gamma_correct_color(start.color, end.color, blend)
+        },
         scheme: None,
       });
     }
@@ -207,17 +213,7 @@ pub(crate) fn sample(stops: &[GradientStop<'static>], position: f32) -> Color {
       } else {
         ((position - start.position) / span).clamp(0.0, 1.0)
       };
-      let channel = |start: u8, end: u8| {
-        (f32::from(start) + (f32::from(end) - f32::from(start)) * ratio)
-          .round()
-          .clamp(0.0, 255.0) as u8
-      };
-      return Color {
-        r: channel(start.color.r, end.color.r),
-        g: channel(start.color.g, end.color.g),
-        b: channel(start.color.b, end.color.b),
-        a: channel(start.color.a, end.color.a),
-      };
+      return linear_color(start.color, end.color, ratio);
     }
   }
   stops.last().map_or(first.color, |stop| stop.color)
@@ -384,6 +380,20 @@ fn point_in_polygons(point: KurboPoint, polygons: &[Vec<KurboPoint>]) -> bool {
     }
   }
   inside
+}
+
+fn linear_color(start: Color, end: Color, blend: f32) -> Color {
+  let channel = |start: u8, end: u8| {
+    (f32::from(start) + (f32::from(end) - f32::from(start)) * blend)
+      .round()
+      .clamp(0.0, 255.0) as u8
+  };
+  Color {
+    r: channel(start.r, end.r),
+    g: channel(start.g, end.g),
+    b: channel(start.b, end.b),
+    a: channel(start.a, end.a),
+  }
 }
 
 fn gamma_correct_color(start: Color, end: Color, blend: f32) -> Color {

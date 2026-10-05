@@ -1215,6 +1215,15 @@ impl RelationshipSet {
 
     for relationship in relationships.relationship {
       let info = relationship_info(relationship, &source_parent_path, by_path);
+      // The OPC relationships schema declares Id as xsd:ID, so a later
+      // duplicate cannot be addressed independently. Word's malformed-package
+      // recovery keeps the first relationship with that ID (tdf93284 uses a
+      // later image relationship that collides with an earlier font/theme
+      // relationship). Keep lookup and typed relationship iteration on the
+      // same first-wins view instead of exposing both incompatible targets.
+      if set.contains_id(info.id()) {
+        continue;
+      }
       set.push_relationship_unchecked(info);
     }
 
@@ -1423,8 +1432,7 @@ impl SdkPackageStorage {
 
   pub(crate) fn open_reader_at(source: Arc<dyn ReadAt>) -> Result<Self, SdkError> {
     let reader = PositionedSourceReader::new(source)?;
-    let archive = zip::ZipArchive::new(ArchiveReader::Positioned(reader))?;
-    Self::open_archive(archive)
+    Self::open_archive(ArchiveReader::Positioned(reader))
   }
 
   pub(crate) fn open_file(path: &Path) -> Result<Self, SdkError> {
@@ -1432,8 +1440,7 @@ impl SdkPackageStorage {
     {
       let file = open_package_file(path)?;
       let reader = PositionedFileReader::new(file)?;
-      let archive = zip::ZipArchive::new(ArchiveReader::File(reader))?;
-      Self::open_archive(archive)
+      Self::open_archive(ArchiveReader::File(reader))
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -1442,12 +1449,14 @@ impl SdkPackageStorage {
   }
 
   fn open_memory(bytes: Bytes) -> Result<Self, SdkError> {
-    let archive = zip::ZipArchive::new(ArchiveReader::Memory(Cursor::new(bytes)))?;
-    Self::open_archive(archive)
+    Self::open_archive(ArchiveReader::Memory(Cursor::new(bytes)))
   }
 
-  fn open_archive(mut archive: zip::ZipArchive<ArchiveReader>) -> Result<Self, SdkError> {
-    let opened = read_archive_model(&mut archive)?;
+  fn open_archive(reader: ArchiveReader) -> Result<Self, SdkError> {
+    let mut raw_reader = reader.clone();
+    let mut archive = zip::ZipArchive::new(reader)?;
+    let entry_names = read_archive_entry_names(&mut archive, &mut raw_reader)?;
+    let opened = read_archive_model(&mut archive, &entry_names)?;
     let OpenedArchiveModel {
       content_types,
       content_types_archive_entry_index,
@@ -2830,8 +2839,8 @@ struct OpenedArchiveModel {
 }
 
 struct ContentTypeResolver<'a> {
-  overrides: HashMap<&'a str, &'a str>,
-  defaults: HashMap<&'a str, &'a str>,
+  overrides: HashMap<String, &'a str>,
+  defaults: HashMap<String, &'a str>,
 }
 
 impl<'a> ContentTypeResolver<'a> {
@@ -2843,13 +2852,16 @@ impl<'a> ContentTypeResolver<'a> {
       match child {
         TypesChoice::Override(override_type) => {
           overrides.insert(
-            override_type.part_name.trim_start_matches('/'),
+            override_type
+              .part_name
+              .trim_start_matches('/')
+              .to_ascii_lowercase(),
             override_type.content_type.as_str(),
           );
         }
         TypesChoice::Default(default_type) => {
           defaults.insert(
-            default_type.extension.as_str(),
+            default_type.extension.to_ascii_lowercase(),
             default_type.content_type.as_str(),
           );
         }
@@ -2863,7 +2875,8 @@ impl<'a> ContentTypeResolver<'a> {
   }
 
   fn content_type_for_part(&self, path: &str) -> Option<&'a str> {
-    self.overrides.get(path).copied().or_else(|| {
+    let path = path.to_ascii_lowercase();
+    self.overrides.get(&path).copied().or_else(|| {
       path
         .rsplit_once('.')
         .and_then(|(_, extension)| self.defaults.get(extension).copied())
@@ -3374,11 +3387,19 @@ fn media_data_part_content_type(content_type: &str) -> bool {
 
 fn read_archive_model<R: Read + Seek>(
   archive: &mut zip::ZipArchive<R>,
+  entry_names: &[Box<str>],
 ) -> Result<OpenedArchiveModel, SdkError> {
-  let (content_types, content_types_archive_entry_index) = read_content_types(archive)?;
-  let raw_parts = read_raw_parts(archive, &content_types)?;
+  let mut entry_indices = HashMap::with_capacity(entry_names.len());
+  for (entry_index, entry_name) in entry_names.iter().enumerate() {
+    entry_indices
+      .entry(entry_name.as_ref())
+      .or_insert(entry_index);
+  }
+  let (content_types, content_types_archive_entry_index) =
+    read_content_types(archive, &entry_indices)?;
+  let raw_parts = read_raw_parts(entry_names, &content_types);
   let (package_relationships, part_relationships) =
-    read_required_relationship_entries(archive, &raw_parts)?;
+    read_required_relationship_entries(archive, &entry_indices, &raw_parts)?;
 
   Ok(OpenedArchiveModel {
     content_types,
@@ -3397,6 +3418,7 @@ enum RelationshipEntryTarget {
 
 fn read_required_relationship_entries<R: Read + Seek>(
   archive: &mut zip::ZipArchive<R>,
+  entry_indices: &HashMap<&str, usize>,
   raw_parts: &[RawPart],
 ) -> Result<
   (
@@ -3406,14 +3428,12 @@ fn read_required_relationship_entries<R: Read + Seek>(
   SdkError,
 > {
   let mut required = Vec::with_capacity(raw_parts.len() + 1);
-  if let Some(entry_index) = archive.index_for_name("_rels/.rels") {
+  if let Some(entry_index) = archive_entry_index(entry_indices, "_rels/.rels") {
     required.push((entry_index, RelationshipEntryTarget::Package));
   }
   for (part_index, raw_part) in raw_parts.iter().enumerate() {
     let path = part_relationships_path(&raw_part.path);
-    let entry_index = archive.index_for_name(&path).or_else(|| {
-      lowercase_zip_filename(&path).and_then(|fallback| archive.index_for_name(&fallback))
-    });
+    let entry_index = archive_entry_index(entry_indices, &path);
     if let Some(entry_index) = entry_index {
       required.push((entry_index, RelationshipEntryTarget::Part(part_index)));
     }
@@ -3446,11 +3466,26 @@ fn read_required_relationship_entries<R: Read + Seek>(
   Ok((package_relationships, part_relationships))
 }
 
+fn archive_entry_index(entry_indices: &HashMap<&str, usize>, path: &str) -> Option<usize> {
+  entry_indices.get(path).copied().or_else(|| {
+    entry_indices
+      .iter()
+      .filter_map(|(entry_name, entry_index)| {
+        entry_name
+          .eq_ignore_ascii_case(path)
+          .then_some(*entry_index)
+      })
+      .min()
+  })
+}
+
 fn read_content_types<R: Read + Seek>(
   archive: &mut zip::ZipArchive<R>,
+  entry_indices: &HashMap<&str, usize>,
 ) -> Result<(Types, usize), SdkError> {
-  let entry_index = archive
-    .index_for_name("[Content_Types].xml")
+  let entry_index = entry_indices
+    .get("[Content_Types].xml")
+    .copied()
     .ok_or(zip::result::ZipError::FileNotFound)?;
   let bytes = read_archive_entry_by_index(archive, entry_index)?;
   Ok((
@@ -3459,20 +3494,21 @@ fn read_content_types<R: Read + Seek>(
   ))
 }
 
-fn read_raw_parts<R: Read + Seek>(
-  archive: &mut zip::ZipArchive<R>,
-  content_types: &Types,
-) -> Result<Vec<RawPart>, SdkError> {
+fn read_raw_parts(entry_names: &[Box<str>], content_types: &Types) -> Vec<RawPart> {
   let mut parts = Vec::new();
+  let mut seen_paths = HashSet::new();
   let content_type_resolver = ContentTypeResolver::new(content_types);
 
-  for (index, entry_name) in archive.file_names().enumerate() {
+  for (index, entry_name) in entry_names.iter().enumerate() {
     if entry_name.ends_with('/') {
       continue;
     }
 
     let path = resolve_zip_file_path(entry_name);
-    if path == "[Content_Types].xml" || is_relationships_part_path(&path) {
+    if path == "[Content_Types].xml"
+      || is_relationships_part_path(&path)
+      || !seen_paths.insert(path.to_ascii_lowercase())
+    {
       continue;
     }
 
@@ -3489,7 +3525,75 @@ fn read_raw_parts<R: Read + Seek>(
   }
 
   parts.sort_by(|left, right| left.path.cmp(&right.path));
-  Ok(parts)
+  parts
+}
+
+const ZIP_UNICODE_PATH_EXTRA_FIELD_ID: u16 = 0x7075;
+const ZIP_UTF8_FILE_NAME_FLAG: u16 = 1 << 11;
+const ZIP_CENTRAL_HEADER_LEN: usize = 46;
+
+fn read_archive_entry_names<R: Read + Seek>(
+  archive: &mut zip::ZipArchive<R>,
+  raw_reader: &mut R,
+) -> Result<Box<[Box<str>]>, SdkError> {
+  let mut names = Vec::with_capacity(archive.len());
+  for entry_index in 0..archive.len() {
+    let entry = archive.by_index_raw(entry_index)?;
+    let mut name = entry.name().to_string();
+    let has_unicode_path = entry
+      .extra_data()
+      .is_some_and(|extra| zip_extra_field_present(extra, ZIP_UNICODE_PATH_EXTRA_FIELD_ID));
+    let central_header_start = entry.central_header_start();
+    drop(entry);
+
+    if has_unicode_path
+      && let Some(raw_name) = read_utf8_central_directory_name(raw_reader, central_header_start)?
+    {
+      name = raw_name;
+    }
+    names.push(name.into_boxed_str());
+  }
+  Ok(names.into_boxed_slice())
+}
+
+fn zip_extra_field_present(mut extra: &[u8], expected_id: u16) -> bool {
+  while extra.len() >= 4 {
+    let field_id = u16::from_le_bytes([extra[0], extra[1]]);
+    let field_len = usize::from(u16::from_le_bytes([extra[2], extra[3]]));
+    let Some(field_end) = 4usize.checked_add(field_len) else {
+      return false;
+    };
+    if field_end > extra.len() {
+      return false;
+    }
+    if field_id == expected_id {
+      return true;
+    }
+    extra = &extra[field_end..];
+  }
+  false
+}
+
+fn read_utf8_central_directory_name<R: Read + Seek>(
+  reader: &mut R,
+  header_start: u64,
+) -> Result<Option<String>, SdkError> {
+  let mut header = [0; ZIP_CENTRAL_HEADER_LEN];
+  reader.seek(SeekFrom::Start(header_start))?;
+  reader.read_exact(&mut header)?;
+  if header[..4] != *b"PK\x01\x02" {
+    return Ok(None);
+  }
+
+  let flags = u16::from_le_bytes([header[8], header[9]]);
+  if flags & ZIP_UTF8_FILE_NAME_FLAG == 0 {
+    return Ok(None);
+  }
+
+  let name_len = usize::from(u16::from_le_bytes([header[28], header[29]]));
+  let mut raw_name = vec![0; name_len];
+  reader.read_exact(&mut raw_name)?;
+  Ok(String::from_utf8(raw_name).ok())
 }
 
 fn read_archive_entry_by_index<R: Read + Seek>(
@@ -3514,20 +3618,6 @@ fn read_archive_entry_by_index<R: Read + Seek>(
   Ok(bytes)
 }
 
-fn lowercase_zip_filename(path: &str) -> Option<String> {
-  let (parent_path, file_name) = path.rsplit_once('/')?;
-  let lower_file_name = file_name.to_ascii_lowercase();
-  if file_name == lower_file_name {
-    return None;
-  }
-
-  let mut fallback = String::with_capacity(path.len());
-  fallback.push_str(parent_path);
-  fallback.push('/');
-  fallback.push_str(&lower_file_name);
-  Some(fallback)
-}
-
 fn relationship_info(
   relationship: OpcRelationship,
   source_parent_path: &str,
@@ -3543,7 +3633,14 @@ fn relationship_info(
         source_parent_path,
         &relationship.target,
       ));
-      match by_path.get(target_path.as_str()).copied() {
+      let target_part_slot = by_path.get(target_path.as_str()).copied().or_else(|| {
+        by_path.iter().find_map(|(path, part_slot)| {
+          path
+            .eq_ignore_ascii_case(&target_path)
+            .then_some(*part_slot)
+        })
+      });
+      match target_part_slot {
         Some(part_id) => (RelationshipTargetKind::InternalPart, Some(part_id)),
         None => (RelationshipTargetKind::Missing, None),
       }
@@ -3576,6 +3673,34 @@ mod tests {
   };
 
   const LAZY_PAYLOAD_LEN: usize = 1024 * 1024;
+
+  #[test]
+  fn relationship_set_keeps_the_first_duplicate_id() {
+    let relationships = Relationships {
+      relationship: vec![
+        OpcRelationship {
+          id: "duplicate".into(),
+          r#type: "urn:first".into(),
+          target: "https://example.test/first".into(),
+          target_mode: Some(TargetMode::External),
+        },
+        OpcRelationship {
+          id: "duplicate".into(),
+          r#type: "urn:second".into(),
+          target: "https://example.test/second".into(),
+          target_mode: Some(TargetMode::External),
+        },
+      ],
+      ..Default::default()
+    };
+
+    let set = RelationshipSet::from_relationships(Some(relationships), "", &HashMap::new());
+
+    assert_eq!(set.iter().count(), 1);
+    let relationship = set.get("duplicate").expect("first relationship");
+    assert_eq!(relationship.relationship_type(), "urn:first");
+    assert_eq!(relationship.target(), "https://example.test/first");
+  }
 
   struct CountingReadAt {
     bytes: Bytes,
@@ -3641,6 +3766,79 @@ mod tests {
       zip.finish().unwrap();
     }
     buffer.into_inner().into()
+  }
+
+  fn unicode_path_options(target_name: &str) -> zip::write::FullFileOptions<'static> {
+    let mut options =
+      zip::write::FullFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    let mut unicode_path = vec![1, 0, 0, 0, 0];
+    unicode_path.extend_from_slice(target_name.as_bytes());
+    options
+      .add_extra_data(ZIP_UNICODE_PATH_EXTRA_FIELD_ID, unicode_path, false)
+      .unwrap();
+    options
+  }
+
+  fn patch_unicode_path_entry(
+    package: &mut [u8],
+    raw_name: &str,
+    raw_name_crc32: u32,
+    set_utf8_flag: bool,
+  ) {
+    let mut patched_headers = 0;
+    for header_start in 0..package.len().saturating_sub(4) {
+      let (fixed_len, flags_offset, name_len_offset, extra_len_offset) =
+        match package.get(header_start..header_start + 4) {
+          Some(b"PK\x03\x04") => (30, 6, 26, 28),
+          Some(b"PK\x01\x02") => (ZIP_CENTRAL_HEADER_LEN, 8, 28, 30),
+          _ => continue,
+        };
+      if header_start + fixed_len > package.len() {
+        continue;
+      }
+      let name_len = usize::from(u16::from_le_bytes([
+        package[header_start + name_len_offset],
+        package[header_start + name_len_offset + 1],
+      ]));
+      let extra_len = usize::from(u16::from_le_bytes([
+        package[header_start + extra_len_offset],
+        package[header_start + extra_len_offset + 1],
+      ]));
+      let name_start = header_start + fixed_len;
+      let extra_start = name_start + name_len;
+      let extra_end = extra_start + extra_len;
+      if extra_end > package.len()
+        || package.get(name_start..extra_start) != Some(raw_name.as_bytes())
+      {
+        continue;
+      }
+
+      if set_utf8_flag {
+        let flags_start = header_start + flags_offset;
+        let flags = u16::from_le_bytes([package[flags_start], package[flags_start + 1]])
+          | ZIP_UTF8_FILE_NAME_FLAG;
+        package[flags_start..flags_start + 2].copy_from_slice(&flags.to_le_bytes());
+      }
+
+      let mut field_start = extra_start;
+      while field_start + 4 <= extra_end {
+        let field_id = u16::from_le_bytes([package[field_start], package[field_start + 1]]);
+        let field_len = usize::from(u16::from_le_bytes([
+          package[field_start + 2],
+          package[field_start + 3],
+        ]));
+        let field_end = field_start + 4 + field_len;
+        assert!(field_end <= extra_end);
+        if field_id == ZIP_UNICODE_PATH_EXTRA_FIELD_ID {
+          assert!(field_len >= 5);
+          package[field_start + 5..field_start + 9].copy_from_slice(&raw_name_crc32.to_le_bytes());
+          patched_headers += 1;
+          break;
+        }
+        field_start = field_end;
+      }
+    }
+    assert_eq!(patched_headers, 2);
   }
 
   #[test]
@@ -3794,6 +3992,149 @@ mod tests {
       &storage.parts[part_id.index()].data,
       StoredPartData::Archived { bytes, .. } if bytes.get().is_some()
     ));
+  }
+
+  #[test]
+  fn storage_prefers_utf8_header_name_over_conflicting_unicode_path() {
+    let mut buffer = Cursor::new(Vec::new());
+    {
+      let mut zip = zip::ZipWriter::new(&mut buffer);
+      let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+      zip.start_file("[Content_Types].xml", options).unwrap();
+      zip.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"#,
+      )
+      .unwrap();
+
+      zip.start_file("_rels/.rels", options).unwrap();
+      zip.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#,
+      )
+      .unwrap();
+
+      zip
+        .start_file(
+          "word/document.xml",
+          unicode_path_options("zip-test-additional-file"),
+        )
+        .unwrap();
+      zip.write_all(b"first document").unwrap();
+
+      zip
+        .start_file(
+          "zip-test-additional-file",
+          unicode_path_options("word/document.xml"),
+        )
+        .unwrap();
+      zip.write_all(b"second document").unwrap();
+      zip.finish().unwrap();
+    }
+
+    let mut package = buffer.into_inner();
+    patch_unicode_path_entry(&mut package, "word/document.xml", 0xdfcf_77e6, true);
+    patch_unicode_path_entry(&mut package, "zip-test-additional-file", 0x4f88_9334, false);
+
+    let storage = SdkPackageStorage::open(Cursor::new(package)).unwrap();
+    let main_part_id = storage
+      .package_relationships()
+      .get("rId1")
+      .and_then(RelationshipInfo::target_part_slot)
+      .unwrap();
+
+    assert_eq!(storage.parts().len(), 1);
+    assert_eq!(
+      storage.part(main_part_id).unwrap().path(),
+      "word/document.xml"
+    );
+    assert_eq!(storage.part_bytes(main_part_id).unwrap(), b"first document");
+  }
+
+  #[test]
+  fn storage_uses_first_ascii_case_equivalent_part() {
+    let mut buffer = Cursor::new(Vec::new());
+    {
+      let mut zip = zip::ZipWriter::new(&mut buffer);
+      let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+      zip.start_file("[Content_Types].xml", options).unwrap();
+      zip
+        .write_all(
+          br#"<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>"#,
+        )
+        .unwrap();
+
+      zip.start_file("_rels/.rels", options).unwrap();
+      zip
+        .write_all(
+          br#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#,
+        )
+        .unwrap();
+
+      zip.start_file("WORD/DOCUMENT.XML", options).unwrap();
+      zip.write_all(b"first document").unwrap();
+      zip.start_file("word/document.xml", options).unwrap();
+      zip.write_all(b"second document").unwrap();
+
+      zip
+        .start_file("word/_rels/document.xml.rels", options)
+        .unwrap();
+      zip
+        .write_all(
+          br#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>"#,
+        )
+        .unwrap();
+
+      zip.start_file("word/styles.xml", options).unwrap();
+      zip.write_all(b"styles").unwrap();
+      zip.finish().unwrap();
+    }
+
+    let storage = SdkPackageStorage::open(Cursor::new(buffer.into_inner())).unwrap();
+    let relationship = storage.package_relationships().get("rId1").unwrap();
+    let main_part_id = relationship.target_part_slot().unwrap();
+    let main_part = storage.part(main_part_id).unwrap();
+
+    assert_eq!(storage.parts().len(), 2);
+    assert_eq!(main_part.path(), "WORD/DOCUMENT.XML");
+    assert_eq!(
+      main_part.content_type(),
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    );
+    assert_eq!(
+      relationship.target_kind(),
+      RelationshipTargetKind::InternalPart
+    );
+    let styles_relationship = storage
+      .relationships(main_part_id)
+      .and_then(|relationships| relationships.get("rIdStyles"))
+      .unwrap();
+    let styles_part_id = styles_relationship.target_part_slot().unwrap();
+    assert_eq!(
+      storage.part(styles_part_id).unwrap().path(),
+      "word/styles.xml"
+    );
+    assert_eq!(storage.part_bytes(main_part_id).unwrap(), b"first document");
   }
 
   #[test]

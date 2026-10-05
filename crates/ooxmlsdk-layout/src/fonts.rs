@@ -5,10 +5,11 @@ use std::time::Instant;
 
 use ooxmlsdk_fonts::{
   FeatureValue, FontBytes, FontCharset, FontFallbackChain, FontFamilyClass, FontId, FontRegistry,
-  FontRequest, FontSize, ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun,
+  FontRequest, FontSize, FontSlant, ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun,
   TextDirection, TextScript, WordprocessingFontSlot, script_direction_runs_with_options,
 };
 use rustc_hash::FxHashMap as HashMap;
+use skrifa::raw::{FontRef, TableProvider};
 
 use crate::common;
 use crate::docx::TextStyle;
@@ -130,6 +131,15 @@ pub trait FontStyleRef {
   fn complex_italic(&self) -> Option<bool> {
     None
   }
+  fn shaping_context(&self) -> Option<&common::TextShapingContext> {
+    None
+  }
+  fn kashida_expansions(&self) -> &[common::KashidaExpansion] {
+    &[]
+  }
+  fn wordprocessing_kashida(&self) -> Option<&common::WordprocessingKashida> {
+    None
+  }
   fn character_spacing_pt(&self) -> f32;
   fn baseline_shift_pt(&self) -> f32;
   fn automatic_escapement_font_sizes_pt(&self) -> Option<(f32, Option<f32>)> {
@@ -150,7 +160,21 @@ pub trait FontStyleRef {
   fn horizontal_scale(&self) -> f32 {
     1.0
   }
+  /// Authored sizes retained when a Word display font has been realized.
+  fn wordprocessing_layout_font_sizes(&self) -> Option<common::LayoutFontSizes> {
+    None
+  }
+  /// Word's document measurement profile and authored font width percentage.
+  fn wordprocessing_measurement_profile(&self) -> Option<(bool, u16)> {
+    None
+  }
   fn wordprocessingml_font_slots(&self) -> bool {
+    false
+  }
+  fn wordprocessing_nominal_control_metrics(&self) -> bool {
+    false
+  }
+  fn wordprocessingml_form_text_blank_cell(&self) -> bool {
     false
   }
   fn wordprocessingml_cjk_line_metrics(&self) -> bool {
@@ -160,6 +184,9 @@ pub trait FontStyleRef {
     None
   }
   fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
+    false
+  }
+  fn wordprocessingml_bidi_language_is_hebrew(&self) -> bool {
     false
   }
   fn font_charset(&self) -> Option<FontCharset> {
@@ -186,8 +213,19 @@ pub trait FontStyleRef {
   fn complex_font_pitch(&self) -> Option<ooxmlsdk_fonts::FontPitch> {
     None
   }
+  /// Per-source-character expansion resolved by the completed Word line.
+  fn wordprocessing_justification_expansion_pt(&self) -> &[f32] {
+    &[]
+  }
+
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     0.0
+  }
+  fn wordprocessingml_legacy_punctuation_spacing(&self) -> bool {
+    false
+  }
+  fn wordprocessingml_punctuation_spacing(&self) -> bool {
+    false
   }
   fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
     false
@@ -275,6 +313,16 @@ impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
     (**self).complex_italic()
   }
 
+  fn shaping_context(&self) -> Option<&common::TextShapingContext> {
+    (**self).shaping_context()
+  }
+  fn kashida_expansions(&self) -> &[common::KashidaExpansion] {
+    (**self).kashida_expansions()
+  }
+  fn wordprocessing_kashida(&self) -> Option<&common::WordprocessingKashida> {
+    (**self).wordprocessing_kashida()
+  }
+
   fn character_spacing_pt(&self) -> f32 {
     (**self).character_spacing_pt()
   }
@@ -314,9 +362,23 @@ impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
   fn horizontal_scale(&self) -> f32 {
     (**self).horizontal_scale()
   }
+  fn wordprocessing_layout_font_sizes(&self) -> Option<common::LayoutFontSizes> {
+    (**self).wordprocessing_layout_font_sizes()
+  }
+
+  fn wordprocessing_measurement_profile(&self) -> Option<(bool, u16)> {
+    (**self).wordprocessing_measurement_profile()
+  }
 
   fn wordprocessingml_font_slots(&self) -> bool {
     (**self).wordprocessingml_font_slots()
+  }
+  fn wordprocessing_nominal_control_metrics(&self) -> bool {
+    (**self).wordprocessing_nominal_control_metrics()
+  }
+
+  fn wordprocessingml_form_text_blank_cell(&self) -> bool {
+    (**self).wordprocessingml_form_text_blank_cell()
   }
 
   fn wordprocessingml_cjk_line_metrics(&self) -> bool {
@@ -329,6 +391,9 @@ impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
 
   fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
     (**self).wordprocessingml_east_asia_language_is_chinese()
+  }
+  fn wordprocessingml_bidi_language_is_hebrew(&self) -> bool {
+    (**self).wordprocessingml_bidi_language_is_hebrew()
   }
 
   fn font_charset(&self) -> Option<FontCharset> {
@@ -363,8 +428,18 @@ impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
     (**self).complex_font_pitch()
   }
 
+  fn wordprocessing_justification_expansion_pt(&self) -> &[f32] {
+    (**self).wordprocessing_justification_expansion_pt()
+  }
+
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     (**self).cjk_punctuation_compression_ratio()
+  }
+  fn wordprocessingml_legacy_punctuation_spacing(&self) -> bool {
+    (**self).wordprocessingml_legacy_punctuation_spacing()
+  }
+  fn wordprocessingml_punctuation_spacing(&self) -> bool {
+    (**self).wordprocessingml_punctuation_spacing()
   }
 
   fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
@@ -476,6 +551,100 @@ fn effective_italic(style: &(impl FontStyleRef + ?Sized), _script: Option<TextSc
   } else {
     style.italic()
   }
+}
+
+fn wordprocessingml_synthetic_rtl_italic(style: &(impl FontStyleRef + ?Sized)) -> bool {
+  style.wordprocessingml_font_slots()
+    && style.right_to_left()
+    && effective_italic(style, None)
+    && !style.wordprocessingml_bidi_language_is_hebrew()
+}
+
+fn apply_wordprocessingml_rtl_italic_face(
+  request: &mut FontRequest<'_>,
+  registry: &FontRegistry<'_>,
+  style: &(impl FontStyleRef + ?Sized),
+) {
+  if !wordprocessingml_synthetic_rtl_italic(style) {
+    return;
+  }
+  let Ok(primary) = registry.resolve(request) else {
+    return;
+  };
+  if registry
+    .face(&primary.font_id)
+    .is_none_or(|face| face.slant == FontSlant::Upright)
+    || registered_font_has_arabic_charset(registry, &primary.font_id) != Some(false)
+  {
+    return;
+  }
+  let mut upright_request = request.clone();
+  upright_request.slant = Some(FontSlant::Upright);
+  if let Ok(upright) = registry.resolve(&upright_request)
+    && upright
+      .resolved_family
+      .eq_ignore_ascii_case(&primary.resolved_family)
+    && registry
+      .face(&upright.font_id)
+      .is_some_and(|face| face.slant == FontSlant::Upright)
+    && registered_font_has_arabic_charset(registry, &upright.font_id) == Some(true)
+  {
+    // Word's Arabic RTL font realization preserves the family when its
+    // italic face lacks Arabic: use the upright face with synthetic italics,
+    // including Latin portions of that run. A real Arabic italic face (e.g.
+    // Amiri) remains preferred. Hebrew bidi language and w:cs alone retain
+    // ordinary italic selection. This is font selection, not text fallback.
+    request.slant = Some(FontSlant::Upright);
+  }
+}
+
+fn registered_font_has_arabic_charset(
+  registry: &FontRegistry<'_>,
+  font_id: &FontId,
+) -> Option<bool> {
+  let (data, index) = registry.font_face_binary(font_id)?;
+  let face = FontRef::from_index(data.as_ref(), index).ok()?;
+  // OpenType OS/2 ulCodePageRange1 bit 6 is Windows Arabic (1256), the
+  // physical-font charset used by GDI. Missing metadata is not a mismatch.
+  Some(face.os2().ok()?.ul_code_page_range_1()? & (1 << 6) != 0)
+}
+
+pub(crate) fn arabic_shaping_properties_match(left: &TextStyle, right: &TextStyle) -> bool {
+  let script = Some(TextScript::Arabic);
+  let same_family = match (
+    script_font_family_for_slot(left, script, None),
+    script_font_family_for_slot(right, script, None),
+  ) {
+    (Some(left), Some(right)) => left.eq_ignore_ascii_case(right),
+    (None, None) => true,
+    _ => false,
+  };
+  // Word ends Arabic joining at an authored font, size, emphasis, spacing
+  // or scaling change,
+  // even when different missing families resolve to the same fallback face.
+  // Paint, language and baseline changes retain the joining context. Compare
+  // the selected properties, so an unused ASCII font change in a w:rtl run
+  // cannot interrupt its complex-script text.
+  same_family
+    && effective_font_size_pt(left, script) == effective_font_size_pt(right, script)
+    && effective_bold(left, script) == effective_bold(right, script)
+    && effective_italic(left, script) == effective_italic(right, script)
+    && left.character_spacing_pt == right.character_spacing_pt
+    && left.horizontal_scale() == right.horizontal_scale()
+}
+
+pub(crate) fn arabic_nonspacing_mark(character: char) -> bool {
+  use icu_properties::{CodePointMapData, props::GeneralCategory};
+  use unicode_script::{Script, UnicodeScript};
+
+  let scripts = character.script_extension();
+  // Common/Inherited extensions intersect every script; they do not establish
+  // Arabic ownership. In particular, emoji variation selectors must remain
+  // ignorable rather than acquiring Arabic BOT/dotted-circle behavior.
+  CodePointMapData::<GeneralCategory>::new().get(character) == GeneralCategory::NonspacingMark
+    && !scripts.is_common()
+    && !scripts.is_inherited()
+    && scripts.contains_script(Script::Arabic)
 }
 
 pub(crate) fn materialize_wordprocessingml_source_font_slot(
@@ -616,6 +785,10 @@ impl FontStyleRef for TextStyle {
     self.right_to_left == Some(true)
   }
 
+  fn wordprocessing_nominal_control_metrics(&self) -> bool {
+    self.wordprocessing_nominal_control_metrics
+  }
+
   fn resolved_bidi_level(&self) -> Option<u8> {
     self.resolved_bidi_level
   }
@@ -626,6 +799,16 @@ impl FontStyleRef for TextStyle {
 
   fn complex_italic(&self) -> Option<bool> {
     self.complex_italic
+  }
+
+  fn shaping_context(&self) -> Option<&common::TextShapingContext> {
+    self.shaping_context.as_deref()
+  }
+  fn kashida_expansions(&self) -> &[common::KashidaExpansion] {
+    self.kashida_expansions.as_deref().unwrap_or_default()
+  }
+  fn wordprocessing_kashida(&self) -> Option<&common::WordprocessingKashida> {
+    self.wordprocessing_kashida.as_deref()
   }
 
   fn character_spacing_pt(&self) -> f32 {
@@ -671,9 +854,21 @@ impl FontStyleRef for TextStyle {
   fn horizontal_scale(&self) -> f32 {
     self.horizontal_scale.unwrap_or(1.0)
   }
+  fn wordprocessing_measurement_profile(&self) -> Option<(bool, u16)> {
+    self.wordprocessing_legacy_font_measurement.map(|legacy| {
+      (
+        legacy,
+        self.wordprocessing_font_width_percent.unwrap_or(100),
+      )
+    })
+  }
 
   fn wordprocessingml_font_slots(&self) -> bool {
     self.wordprocessingml_font_slots
+  }
+
+  fn wordprocessingml_form_text_blank_cell(&self) -> bool {
+    self.wordprocessingml_form_text_blank_cell
   }
 
   fn wordprocessingml_cjk_line_metrics(&self) -> bool {
@@ -690,6 +885,15 @@ impl FontStyleRef for TextStyle {
       .as_deref()
       .and_then(|language| language.split(['-', '_']).next())
       .is_some_and(|language| language.eq_ignore_ascii_case("zh"))
+  }
+  fn wordprocessingml_bidi_language_is_hebrew(&self) -> bool {
+    self
+      .bidi_language
+      .as_deref()
+      .and_then(|language| language.split(['-', '_']).next())
+      .is_some_and(|language| {
+        language.eq_ignore_ascii_case("he") || language.eq_ignore_ascii_case("iw")
+      })
   }
 
   fn font_charset(&self) -> Option<FontCharset> {
@@ -724,8 +928,21 @@ impl FontStyleRef for TextStyle {
     self.complex_font_pitch
   }
 
+  fn wordprocessing_justification_expansion_pt(&self) -> &[f32] {
+    self
+      .wordprocessing_justification_expansion_pt
+      .as_deref()
+      .unwrap_or_default()
+  }
+
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     self.cjk_punctuation_compression_ratio
+  }
+  fn wordprocessingml_legacy_punctuation_spacing(&self) -> bool {
+    self.wordprocessingml_legacy_punctuation_spacing
+  }
+  fn wordprocessingml_punctuation_spacing(&self) -> bool {
+    self.wordprocessingml_punctuation_spacing
   }
 
   fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
@@ -814,6 +1031,10 @@ impl FontStyleRef for common::TextStyle<'_> {
     self.right_to_left == Some(true)
   }
 
+  fn wordprocessing_nominal_control_metrics(&self) -> bool {
+    self.wordprocessing_nominal_control_metrics
+  }
+
   fn resolved_bidi_level(&self) -> Option<u8> {
     self.resolved_bidi_level
   }
@@ -824,6 +1045,16 @@ impl FontStyleRef for common::TextStyle<'_> {
 
   fn complex_italic(&self) -> Option<bool> {
     self.complex_italic
+  }
+
+  fn shaping_context(&self) -> Option<&common::TextShapingContext> {
+    self.shaping_context.as_deref()
+  }
+  fn kashida_expansions(&self) -> &[common::KashidaExpansion] {
+    self.kashida_expansions.as_deref().unwrap_or_default()
+  }
+  fn wordprocessing_kashida(&self) -> Option<&common::WordprocessingKashida> {
+    self.wordprocessing_kashida.as_deref()
   }
 
   fn character_spacing_pt(&self) -> f32 {
@@ -874,6 +1105,22 @@ impl FontStyleRef for common::TextStyle<'_> {
   fn horizontal_scale(&self) -> f32 {
     self.horizontal_scale.unwrap_or(1.0)
   }
+  fn wordprocessing_layout_font_sizes(&self) -> Option<common::LayoutFontSizes> {
+    self.layout_font_sizes
+  }
+
+  fn wordprocessing_measurement_profile(&self) -> Option<(bool, u16)> {
+    // Realized display fonts own paint metrics, not Word's ideal layout font.
+    if self.layout_font_sizes.is_some() {
+      return None;
+    }
+    self.wordprocessing_legacy_font_measurement.map(|legacy| {
+      (
+        legacy,
+        self.wordprocessing_font_width_percent.unwrap_or(100),
+      )
+    })
+  }
 
   fn wordprocessingml_font_slots(&self) -> bool {
     self.wordprocessingml_font_slots
@@ -889,6 +1136,9 @@ impl FontStyleRef for common::TextStyle<'_> {
 
   fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
     self.wordprocessingml_east_asia_language_is_chinese
+  }
+  fn wordprocessingml_bidi_language_is_hebrew(&self) -> bool {
+    self.wordprocessingml_bidi_language_is_hebrew
   }
 
   fn font_charset(&self) -> Option<FontCharset> {
@@ -923,8 +1173,21 @@ impl FontStyleRef for common::TextStyle<'_> {
     self.complex_font_pitch
   }
 
+  fn wordprocessing_justification_expansion_pt(&self) -> &[f32] {
+    self
+      .wordprocessing_justification_expansion_pt
+      .as_deref()
+      .unwrap_or_default()
+  }
+
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     self.cjk_punctuation_compression_ratio
+  }
+  fn wordprocessingml_legacy_punctuation_spacing(&self) -> bool {
+    self.wordprocessingml_legacy_punctuation_spacing
+  }
+  fn wordprocessingml_punctuation_spacing(&self) -> bool {
+    self.wordprocessingml_punctuation_spacing
   }
 
   fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
@@ -948,14 +1211,176 @@ fn full_width_punctuation_side(ch: char) -> Option<FullWidthPunctuationSide> {
     | '\u{3019}' | '\u{301B}' | '\u{301E}' | '\u{301F}' | '\u{FF09}' | '\u{FF3D}' | '\u{FF5D}' => {
       Some(Right)
     }
-    '\u{3001}' | '\u{3002}' | '\u{FF0C}' | '\u{FF0E}' | '\u{FF1A}' | '\u{FF1B}' => Some(Middle),
+    '\u{3001}' | '\u{3002}' | '\u{FF0C}' | '\u{FF0E}' => Some(Right),
+    '\u{FF1A}' | '\u{FF1B}' => Some(Middle),
     _ => None,
   }
 }
 
-fn apply_wordprocessingml_punctuation_compression(run: &mut ShapedRun<'_, '_>, ratio: f32) {
+fn punctuation_pair_tightens(
+  first: Option<FullWidthPunctuationSide>,
+  second: Option<FullWidthPunctuationSide>,
+  legacy: bool,
+) -> bool {
+  use FullWidthPunctuationSide::{Left, Middle, Right};
+  first.is_some()
+    && second.is_some()
+    && !(legacy && (first == Some(Middle) || second == Some(Middle)))
+    && (second == Some(Left) || first == Some(Right))
+}
+
+pub(crate) fn wordprocessingml_punctuation_pair_tightens(
+  left: Option<char>,
+  right: Option<char>,
+  style: &(impl FontStyleRef + ?Sized),
+) -> bool {
+  style.wordprocessingml_punctuation_spacing()
+    && punctuation_pair_tightens(
+      left.and_then(full_width_punctuation_side),
+      right.and_then(full_width_punctuation_side),
+      style.wordprocessingml_legacy_punctuation_spacing(),
+    )
+}
+
+/// Whether Word's formatter changed punctuation advances from the face's
+/// ordinary metrics. PDF natural-width balancing must preserve these explicit
+/// spacing decisions instead of treating them as device rounding residuals.
+pub fn wordprocessingml_punctuation_affects_advances(
+  text: &str,
+  style: &(impl FontStyleRef + ?Sized),
+) -> bool {
+  let mut previous = None;
+  for ch in text.chars() {
+    let current = full_width_punctuation_side(ch);
+    if current.is_some() && style.cjk_punctuation_compression_ratio() > 0.0 {
+      return true;
+    }
+    if style.wordprocessingml_punctuation_spacing()
+      && punctuation_pair_tightens(
+        previous,
+        current,
+        style.wordprocessingml_legacy_punctuation_spacing(),
+      )
+    {
+      return true;
+    }
+    previous = current;
+  }
+  false
+}
+
+#[cfg(test)]
+mod punctuation_spacing_tests {
+  use super::*;
+
+  #[test]
+  fn word_justification_expansion_preserves_script_offsets_and_measure_cache() {
+    let mut metrics = crate::text_metrics::TextMetrics::new();
+    let mut style = TextStyle {
+      font_family: Some("Century".into()),
+      east_asia_font_family: Some("ＭＳ 明朝".into()),
+      font_size_pt: 12.0,
+      wordprocessingml_font_slots: true,
+      ..TextStyle::default()
+    };
+    let text = "漢AB漢";
+    let natural = metrics.shape_text(text, &style).unwrap();
+    let width = metrics.measure_text(text, &style);
+    // Native12pt automatic script gaps use3pt on either side of AB. The
+    // source-character slots must survive the Latin/CJK shaping-run split.
+    style.wordprocessing_justification_expansion_pt = Some(Arc::from([3.0, 0.0, 3.0, 0.0]));
+    let expanded = metrics.shape_text(text, &style).unwrap();
+    for ((before, after), extra) in natural
+      .glyphs
+      .iter()
+      .zip(&expanded.glyphs)
+      .zip([3.0, 0.0, 3.0, 0.0])
+    {
+      assert_eq!(before.glyph_id, after.glyph_id);
+      assert_eq!(before.text_range, after.text_range);
+      assert!(
+        (after.x_advance_em * after.font_size_pt
+          - before.x_advance_em * before.font_size_pt
+          - extra)
+          .abs()
+          < 0.001
+      );
+    }
+    assert!((metrics.measure_text(text, &style) - width - 6.0).abs() < 0.001);
+    style.wordprocessing_justification_expansion_pt = Some(Arc::from([1.0, 0.0, 1.0, 0.0]));
+    assert!((metrics.measure_text(text, &style) - width - 2.0).abs() < 0.001);
+    style.wordprocessing_justification_expansion_pt = None;
+    assert_eq!(metrics.measure_text(text, &style), width);
+  }
+
+  #[test]
+  fn word_pair_spacing_is_independent_of_line_compression() {
+    let mut resolver = FontResolver::default();
+    let mut style = TextStyle {
+      font_family: Some("ＭＳ 明朝".into()),
+      east_asia_font_family: Some("ＭＳ 明朝".into()),
+      font_size_pt: 12.0,
+      wordprocessingml_font_slots: true,
+      wordprocessingml_punctuation_spacing: true,
+      ..Default::default()
+    };
+    for (text, modern, legacy) in [
+      ("漢。（漢", 42.0, 42.0),
+      ("漢（（漢", 42.0, 42.0),
+      ("漢）、漢", 42.0, 42.0),
+      ("漢：（漢", 42.0, 48.0),
+      ("漢）：漢", 42.0, 48.0),
+      ("漢：；漢", 48.0, 48.0),
+      ("漢（）漢", 48.0, 48.0),
+      ("漢。漢", 36.0, 36.0),
+    ] {
+      for (old_spacing, expected) in [(false, modern), (true, legacy)] {
+        style.wordprocessingml_legacy_punctuation_spacing = old_spacing;
+        let runs = resolver.shape_text_runs(text, &style).unwrap();
+        let width: f32 = runs.iter().map(|run| run.advance_pt).sum();
+        assert!((width - expected).abs() < 0.001, "{text}: {width}");
+      }
+    }
+    style.wordprocessingml_font_slots = false;
+    style.wordprocessingml_punctuation_spacing = false;
+    let width: f32 = resolver
+      .shape_text_runs("漢。（漢", &style)
+      .unwrap()
+      .iter()
+      .map(|run| run.advance_pt)
+      .sum();
+    assert_eq!(width, 48.0);
+  }
+
+  #[test]
+  fn compression_moves_opening_ink_but_preserves_trailing_punctuation_ink() {
+    let mut resolver = FontResolver::default();
+    let style = TextStyle {
+      font_family: Some("ＭＳ 明朝".into()),
+      east_asia_font_family: Some("ＭＳ 明朝".into()),
+      font_size_pt: 12.0,
+      wordprocessingml_font_slots: true,
+      wordprocessingml_punctuation_spacing: true,
+      cjk_punctuation_compression_ratio: 1.0,
+      ..Default::default()
+    };
+    for (text, offset) in [("（", -6.0), ("）", 0.0), ("。", 0.0), ("：", -3.0)] {
+      let runs = resolver.shape_text_runs(text, &style).unwrap();
+      assert_eq!(runs[0].advance_pt, 6.0);
+      assert_eq!(runs[0].glyphs[0].x_offset_pt, offset);
+    }
+  }
+}
+
+fn apply_wordprocessingml_punctuation_compression(
+  run: &mut ShapedRun<'_, '_>,
+  text: &str,
+  ratio: f32,
+  wordprocessing: bool,
+  legacy_spacing: bool,
+) {
   let ratio = ratio.clamp(0.0, 1.0);
-  if ratio <= f32::EPSILON {
+  if ratio <= f32::EPSILON && !wordprocessing {
     return;
   }
   let minimum_full_width = run.font_size_pt.0 * 0.75;
@@ -967,6 +1392,21 @@ fn apply_wordprocessingml_punctuation_compression(run: &mut ShapedRun<'_, '_>, r
     if glyph.x_advance_pt < minimum_full_width {
       continue;
     }
+    let next = text
+      .get(glyph.text_range.end..)
+      .and_then(|tail| tail.chars().next())
+      .and_then(full_width_punctuation_side);
+    // JLREQ §3.1.4: consecutive opening/closing punctuation shares its
+    // inter-character half-em space. Word applies this natural pair spacing
+    // even with characterSpacingControl=doNotCompress; it is not capacity
+    // which the line formatter may later return. Native Mincho/SimSun pair
+    // matrices also distinguish centered colons from trailing commas/stops.
+    if wordprocessing && punctuation_pair_tightens(Some(side), next, legacy_spacing) {
+      let reduction = glyph.x_advance_pt * 0.5;
+      glyph.x_advance_pt -= reduction;
+      total_reduction += reduction;
+      continue;
+    }
     // ECMA-376 Part 1 §17.15.1.18 limits this setting to full-width
     // punctuation. A full-width punctuation cell has at most one half-em of
     // removable side-bearing; the line formatter below returns whatever
@@ -974,8 +1414,8 @@ fn apply_wordprocessingml_punctuation_compression(run: &mut ShapedRun<'_, '_>, r
     let reduction = glyph.x_advance_pt * 0.5 * ratio;
     glyph.x_advance_pt -= reduction;
     match side {
-      FullWidthPunctuationSide::Left => {}
-      FullWidthPunctuationSide::Right => glyph.x_offset_pt -= reduction,
+      FullWidthPunctuationSide::Left => glyph.x_offset_pt -= reduction,
+      FullWidthPunctuationSide::Right => {}
       FullWidthPunctuationSide::Middle => glyph.x_offset_pt -= reduction * 0.5,
     }
     total_reduction += reduction;
@@ -1093,9 +1533,30 @@ pub struct FontResolver {
 }
 
 impl FontResolver {
+  pub(crate) fn has_exact_ascii_face(&mut self, style: &(impl FontStyleRef + ?Sized)) -> bool {
+    let script = Some(TextScript::Latin);
+    let slot = Some(WordprocessingFontSlot::Ascii);
+    let request = font_request_for_slot(style, script, slot);
+    let Some(family) = request.family.as_deref() else {
+      return false;
+    };
+    let registry = self.style_font_registry_for_slot(style, script, slot);
+    registry
+      .resolve(&request)
+      .ok()
+      .and_then(|resolved| registry.face(&resolved.font_id))
+      .is_some_and(|face| {
+        face
+          .family_names
+          .iter()
+          .any(|name| name.trim().eq_ignore_ascii_case(family.trim()))
+      })
+  }
+
   pub fn load_text_face(&mut self, style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
-    let request = font_request(style, None);
+    let mut request = font_request(style, None);
     let registry = self.style_font_registry(style, None);
+    apply_wordprocessingml_rtl_italic_face(&mut request, &registry, style);
     let resolved = registry.resolve(&request).ok()?;
     self.font_synthesis_cache.insert(
       resolved.font_id.clone(),
@@ -1214,36 +1675,33 @@ impl FontResolver {
       let metrics = self
         .font_metrics_for_slot(style, Some(run.script), metrics_slot)?
         .vertical;
-      if let Some(combined) = &mut combined {
-        combined.ascent_pt = combined.ascent_pt.max(metrics.ascent_pt);
-        combined.descent_pt = combined.descent_pt.max(metrics.descent_pt);
-        combined.internal_leading_pt = combined
-          .internal_leading_pt
-          .max(metrics.internal_leading_pt);
-        combined.external_leading_pt = combined
-          .external_leading_pt
-          .max(metrics.external_leading_pt);
-        combined.line_gap_pt = combined.line_gap_pt.max(metrics.line_gap_pt);
-        combined.ink_height_pt = combined.ink_height_pt.max(metrics.ink_height_pt);
-        combined.baseline_offset_pt = combined.baseline_offset_pt.max(metrics.baseline_offset_pt);
-        combined.directwrite_baseline_offset_pt = combined
-          .directwrite_baseline_offset_pt
-          .max(metrics.directwrite_baseline_offset_pt);
-        combined.hanging_baseline_pt = combined
-          .hanging_baseline_pt
-          .max(metrics.hanging_baseline_pt);
-        combined.cjk_horizontal_advance_pt = combined
-          .cjk_horizontal_advance_pt
-          .max(metrics.cjk_horizontal_advance_pt);
-        combined.cjk_vertical_advance_pt = combined
-          .cjk_vertical_advance_pt
-          .max(metrics.cjk_vertical_advance_pt);
-        combined.wordprocessingml_cjk_line_metrics |= metrics.wordprocessingml_cjk_line_metrics;
-      } else {
-        combined = Some(metrics);
-      }
+      include_vertical_metrics(&mut combined, metrics);
     }
     combined
+  }
+
+  pub(crate) fn wordprocessingml_line_metric_runs(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<Vec<ooxmlsdk_fonts::VerticalMetrics>> {
+    if !style.wordprocessingml_font_slots() || !style.wordprocessingml_cjk_line_metrics() {
+      return None;
+    }
+    let mut metrics = Vec::new();
+    for run in script_direction_runs_with_options(
+      text,
+      FontSize(style.font_size_pt()),
+      script_scan_options(style, style.small_caps()),
+    ) {
+      let slot = wordprocessing_line_metrics_font_slot(style, run.wordprocessingml_font_slot);
+      metrics.push(
+        self
+          .font_metrics_for_slot(style, Some(run.script), slot)?
+          .vertical,
+      );
+    }
+    (!metrics.is_empty()).then_some(metrics)
   }
 
   fn font_metrics(
@@ -1252,6 +1710,46 @@ impl FontResolver {
     script: Option<TextScript>,
   ) -> Option<FontMetrics> {
     self.font_metrics_for_slot(style, script, None)
+  }
+
+  pub(crate) fn wordprocessingml_default_charset_line_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+    text: &str,
+  ) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
+    if !style.wordprocessingml_font_slots()
+      || ![
+        style.font_charset(),
+        style.high_ansi_font_charset(),
+        style.wordprocessingml_east_asia_font_charset(),
+        style.complex_font_charset(),
+      ]
+      .contains(&Some(FontCharset::Other(1)))
+    {
+      return None;
+    }
+    let mut combined = None;
+    let mut has_default_charset = false;
+    for run in script_direction_runs_with_options(
+      text,
+      FontSize(style.font_size_pt()),
+      script_scan_options(style, style.small_caps()),
+    ) {
+      let slot = wordprocessing_line_metrics_font_slot(style, run.wordprocessingml_font_slot);
+      let metrics = self.font_metrics_for_slot(style, Some(run.script), slot)?;
+      let vertical = if let Some(logical) = metrics.wordprocessingml_default_charset {
+        has_default_charset = true;
+        word_font_side_leading(logical)
+      } else if style.wordprocessingml_cjk_line_metrics()
+        && metrics.vertical.wordprocessingml_cjk_line_metrics
+      {
+        word_font_side_leading(metrics.vertical)
+      } else {
+        metrics.vertical
+      };
+      include_vertical_metrics(&mut combined, vertical);
+    }
+    has_default_charset.then_some(combined).flatten()
   }
 
   fn font_metrics_for_slot(
@@ -1271,13 +1769,17 @@ impl FontResolver {
       self.last_font_metrics = Some((key, metrics));
       return Some(metrics);
     }
-    let request = font_request_for_slot(style, script, wordprocessingml_font_slot);
+    let mut request = font_request_for_slot(style, script, wordprocessingml_font_slot);
     let registry = self.style_font_registry_for_slot(style, script, wordprocessingml_font_slot);
+    apply_wordprocessingml_rtl_italic_face(&mut request, &registry, style);
     let resolved = registry.resolve(&request).ok()?;
     let metrics_at_size = resolved.metrics_at_size(FontSize(effective_font_size_pt(style, script)));
     let metrics = FontMetrics {
       vertical: metrics_at_size.vertical,
       decoration: metrics_at_size.decoration,
+      wordprocessingml_default_charset: wordprocessingml_default_charset_metrics(
+        &request, &resolved,
+      ),
     };
     self.font_metrics_cache.insert(key.clone(), metrics);
     self.last_font_metrics = Some((key, metrics));
@@ -1291,17 +1793,84 @@ impl FontResolver {
     additional_features: &[FeatureValue<'_>],
   ) -> Option<Vec<ShapedRun<'text, 'static>>> {
     let base_size = style.font_size_pt();
-    let script_runs = script_direction_runs_with_options(
+    let mut script_runs = script_direction_runs_with_options(
       text,
       FontSize(base_size),
       script_scan_options(style, style.small_caps()),
     );
+    if style.wordprocessingml_font_slots()
+      && style
+        .shaping_context()
+        .is_none_or(|context| context.before.is_empty())
+      && script_runs.iter().any(|run| {
+        text[run.text_range.clone()]
+          .chars()
+          .take_while(|&ch| arabic_nonspacing_mark(ch))
+          .count()
+          > 1
+      })
+    {
+      // Uniscribe gives each baseless Arabic mark its own dotted-circle
+      // base. HarfRust supplies one for a whole leading cluster instead.
+      // Preserve source ranges and let its normal single-mark shaping own
+      // the glyph, fallback, positioning and advance of each orphan.
+      let mut separated = Vec::with_capacity(script_runs.len());
+      let combining =
+        icu_properties::CodePointMapData::<icu_properties::props::CanonicalCombiningClass>::new();
+      for run in script_runs {
+        let mut marks = text[run.text_range.clone()]
+          .char_indices()
+          .take_while(|&(_, ch)| arabic_nonspacing_mark(ch))
+          .collect::<Vec<_>>();
+        if marks.len() <= 1 {
+          separated.push(run);
+          continue;
+        }
+        let prefix_end = run.text_range.start
+          + marks
+            .last()
+            .map_or(0, |&(offset, ch)| offset + ch.len_utf8());
+        // Word's Arabic mark ordering puts shadda before the vowel marks,
+        // independently of their serialized order. Splitting must retain
+        // that order without changing the source text or character ranges.
+        marks.sort_by_key(|&(_, ch)| (ch != '\u{0651}', combining.get(ch)));
+        for (offset, ch) in marks {
+          let mut mark = run.clone();
+          let start = run.text_range.start + offset;
+          mark.text_range = start..start + ch.len_utf8();
+          separated.push(mark);
+        }
+        if prefix_end < run.text_range.end {
+          let mut suffix = run;
+          suffix.text_range.start = prefix_end;
+          separated.push(suffix);
+        }
+      }
+      script_runs = separated;
+    }
     let mut output = Vec::with_capacity(script_runs.len());
-    for script_run in script_runs {
+    for mut script_run in script_runs {
+      let segment_text = &text[script_run.text_range.clone()];
+      let leading_arabic_mark = segment_text
+        .chars()
+        .next()
+        .is_some_and(arabic_nonspacing_mark);
+      if style.wordprocessingml_font_slots()
+        && script_run.script == TextScript::Common
+        && leading_arabic_mark
+        && segment_text.chars().all(arabic_nonspacing_mark)
+      {
+        // A standalone Arabic diacritic has Unicode Script=Inherited.
+        // Word still uses the Arabic engine for its dotted-circle fallback,
+        // including Arabic mark positioning and ideal font measurements.
+        script_run.script = TextScript::Arabic;
+        script_run.direction = TextDirection::RightToLeft;
+      }
       let slot = script_run.wordprocessingml_font_slot;
       let key = FontFaceKey::from_style_for_slot(style, Some(script_run.script), slot);
       let registry = self.style_font_registry_for_slot(style, Some(script_run.script), slot);
       let mut request = font_request_for_slot(style, Some(script_run.script), slot);
+      apply_wordprocessingml_rtl_italic_face(&mut request, &registry, style);
       request
         .features
         .extend(additional_features.iter().map(|feature| FeatureValue {
@@ -1330,11 +1899,62 @@ impl FontResolver {
           }
         });
       let mut options = ShapeOptions::from_request(&request, direction);
-      options.character_spacing_pt = style.character_spacing_pt();
+      // Completed Word lines add authored pitch on the source device grid,
+      // after glyph placement. Keep it separate from the design advance so
+      // the device owner rounds the font and the pitch independently.
+      options.character_spacing_pt = if style.wordprocessing_kashida().is_some() {
+        0.0
+      } else {
+        style.character_spacing_pt()
+      };
+      options.character_spacing_by_cluster = style.wordprocessingml_font_slots();
+      options.wordprocessingml_blank_separators = style.wordprocessingml_font_slots();
       options.horizontal_scale = style.horizontal_scale();
+      options.preserve_default_ignorables = style.wordprocessing_nominal_control_metrics()
+        && !segment_text.is_empty()
+        && segment_text.chars().all(|ch| ch == '\u{202c}');
       options.small_caps = script_run.small_caps;
+      if options.small_caps && style.wordprocessingml_font_slots() {
+        let authored_sizes = style.wordprocessing_layout_font_sizes();
+        let nominal_size = authored_sizes.map_or(request.size_pt.0, |sizes| {
+          if uses_complex_run_properties(style) {
+            sizes.complex.unwrap_or(sizes.primary).0
+          } else {
+            sizes.primary.0
+          }
+        });
+        // Word synthesizes small caps on its half-point font-size grid,
+        // then realizes that font on the output device. Scaling an already
+        // realized em changes both ink and advances (16pt -> 13pt -> 12.96pt).
+        let nominal_small_caps = (nominal_size * 0.8 * 2.0).round() / 2.0;
+        options.small_caps_size_pt = Some(FontSize(if authored_sizes.is_some() {
+          crate::units::quantize_points_to_office_print_grid(nominal_small_caps)
+        } else {
+          nominal_small_caps
+        }));
+      }
+      options.preserve_arabic_mark_components =
+        style.wordprocessingml_font_slots() && script_run.script == TextScript::Arabic;
+      // Uniscribe inserts a dotted circle for an independent leading mark;
+      // it does not add one when the caller supplies a valid preceding base.
+      // HarfRust implements this with BOT and explicit pre-context. Leave
+      // other consumers' shaping-boundary policy unchanged.
+      options.beginning_of_text = style.wordprocessingml_font_slots() && leading_arabic_mark;
       options.scan_registered_fallbacks = false;
-      let segment_text = &text[script_run.text_range.clone()];
+      if let Some(context) = style.shaping_context()
+        && (!context.leading_marks_only || leading_arabic_mark)
+      {
+        options.pre_context = Some(Cow::Owned(format!(
+          "{}{}",
+          context.before,
+          &text[..script_run.text_range.start]
+        )));
+        options.post_context = Some(Cow::Owned(format!(
+          "{}{}",
+          &text[script_run.text_range.end..],
+          context.after
+        )));
+      }
       if !self.font_selection_cache.contains_key(&key) {
         let selection = registry.resolve_font_chain(&request).ok()?;
         self.font_selection_cache.insert(key.clone(), selection);
@@ -1365,6 +1985,19 @@ impl FontResolver {
         let _ = self.font_face_data_from_registry(&registry, &run.font_id);
       }
       for run in &mut runs {
+        if script_run.script == TextScript::Arabic
+          && style.wordprocessingml_font_slots()
+          && style.wordprocessing_kashida().is_none()
+          && !style.small_caps()
+          && style.character_spacing_pt().is_finite()
+          && let Some((legacy, percent)) = style.wordprocessing_measurement_profile()
+          && (style.horizontal_scale() - f32::from(percent) / 100.0).abs() < 0.00001
+          && let Some(face) = self.font_face_data(&run.font_id)
+          && let Some(measurement) =
+            common::wordprocessing_device::ArabicMeasurement::new(&face, legacy, percent)
+        {
+          measurement.apply(run, style.horizontal_scale(), style.character_spacing_pt());
+        }
         if style.wordprocessingml_balance_single_byte_double_byte_width() {
           // ECMA-376 Part 1 §17.15.3.3 balances half-width and full-width
           // spaces at 1:2. Writer's BalanceCjkSpaces applies the adjustment
@@ -1375,13 +2008,31 @@ impl FontResolver {
             style.character_spacing_pt(),
           );
         }
+        run.offset_text_range(script_run.text_range.start);
         apply_wordprocessingml_punctuation_compression(
           run,
+          text,
           style.cjk_punctuation_compression_ratio(),
+          style.wordprocessingml_punctuation_spacing(),
+          style.wordprocessingml_legacy_punctuation_spacing(),
         );
-        run.offset_text_range(script_run.text_range.start);
       }
       output.extend(runs);
+    }
+    let expansion = style.wordprocessing_justification_expansion_pt();
+    if !expansion.is_empty() && expansion.len() == text.chars().count() {
+      let starts: Vec<_> = text.char_indices().map(|(index, _)| index).collect();
+      for run in &mut output {
+        let mut added = 0.0;
+        for glyph in run.glyphs.to_mut() {
+          let start = starts.partition_point(|&byte| byte < glyph.text_range.start);
+          let end = starts.partition_point(|&byte| byte < glyph.text_range.end);
+          let extra: f32 = expansion[start..end].iter().sum();
+          glyph.x_advance_pt += extra;
+          added += extra;
+        }
+        run.advance_pt += added;
+      }
     }
     if style
       .resolved_bidi_level()
@@ -1480,7 +2131,13 @@ fn font_request_for_slot<'a>(
 ) -> FontRequest<'a> {
   let mut features = vec![FeatureValue {
     tag: Cow::Borrowed("kern"),
-    value: u32::from(style.kerning_enabled()),
+    // Arabic kern is a required positioning feature in Microsoft's Arabic
+    // shaping model. Native Word controls preserve its placement arrays when
+    // w:kern exceeds the run size; that threshold still owns Western kerning.
+    value: u32::from(
+      style.kerning_enabled()
+        || (style.wordprocessingml_font_slots() && script == Some(TextScript::Arabic)),
+    ),
   }];
   if let Some(ligatures) = style.ligatures() {
     // [MS-DOCX] 2.3.32 maps the four Word ligature categories to the
@@ -1488,7 +2145,15 @@ fn font_request_for_slot<'a>(
     features.extend([
       FeatureValue {
         tag: Cow::Borrowed("liga"),
-        value: u32::from(ligatures.standard),
+        // Word's optional typography switch does not disable the Arabic
+        // shaping engine's standard ligatures. Native controls retain these
+        // with w14:ligatures absent or explicitly "none", including Arial's
+        // Allah ligature stored in GSUB liga rather than rlig. Keep this
+        // script-specific policy out of Latin and non-Word font requests.
+        value: u32::from(
+          ligatures.standard
+            || (style.wordprocessingml_font_slots() && script == Some(TextScript::Arabic)),
+        ),
       },
       FeatureValue {
         tag: Cow::Borrowed("clig"),
@@ -1553,15 +2218,18 @@ fn font_request_for_slot<'a>(
   if let Some(enabled) = open_type_features.contextual_alternates {
     features.push(FeatureValue {
       tag: Cow::Borrowed("calt"),
-      value: u32::from(enabled),
+      value: u32::from(
+        enabled || (style.wordprocessingml_font_slots() && script == Some(TextScript::Arabic)),
+      ),
     });
   } else if style.wordprocessingml_font_slots() {
-    // [MS-DOCX] cntxtAlts specifies that contextual alternates are disabled
-    // when w14:cntxtAlts is absent. HarfBuzz enables `calt` by default, so
-    // WordprocessingML requests must carry the explicit zero.
+    // Microsoft's Arabic shaping model always applies calt for connection
+    // forms, including older fonts without rclt. Native Word retains these
+    // forms with cntxtAlts absent or false. Its optional typography switch
+    // still owns Western alternates; preserve their explicit default zero.
     features.push(FeatureValue {
       tag: Cow::Borrowed("calt"),
-      value: 0,
+      value: u32::from(script == Some(TextScript::Arabic)),
     });
   }
   FontRequest {
@@ -1585,9 +2253,9 @@ fn script_font_family_for_slot(
   script: Option<TextScript>,
   wordprocessingml_font_slot: Option<WordprocessingFontSlot>,
 ) -> Option<&str> {
-  // Word fixed output keeps U+0030..U+0039 on the ASCII rFonts family even
-  // when w:cs/w:rtl selects complex-script formatting for the run. The font
-  // scanner emits Ascii under that narrow exception; let it precede the run
+  // Word fixed output keeps ASCII digits and their numeric separators on
+  // the ASCII rFonts family even when w:cs/w:rtl selects complex-script
+  // formatting. The scanner emits Ascii under that exception; precede the run
   // override without changing szCs/bCs/iCs selection.
   if wordprocessingml_font_slot == Some(WordprocessingFontSlot::Ascii) {
     return style.font_family();
@@ -1758,9 +2426,14 @@ fn script_font_family_class_for_slot(
     return style.font_family_class();
   }
   if let Some(force_complex) = style.complex_script_override() {
-    return (!force_complex)
-      .then(|| style.font_family_class())
-      .flatten();
+    // The override selects the complex-script face and its font-table
+    // metadata together, just as it does for charset and pitch. Dropping
+    // family here bypasses the document's substitution classification.
+    return if force_complex {
+      style.complex_font_family_class()
+    } else {
+      style.font_family_class()
+    };
   }
   if let Some(slot) = wordprocessingml_font_slot {
     return match slot {
@@ -1819,6 +2492,20 @@ fn build_style_font_registry_for_slot(
     let mut request = font_request_for_slot(style, script, wordprocessingml_font_slot);
     request.script = script;
     let mut registry = FontRegistry::with_default_policy();
+    if style.wordprocessing_nominal_control_metrics() {
+      // Read-only Word font creation and placement agree on MS Mincho
+      // (256 units/em, U+202C glyph854/advance128) when the authored face
+      // lacks this nominal control. Keep covered primary glyphs, and scope
+      // the link to measured controls rather than all Common symbols.
+      registry.book.fallback_chains.insert(
+        0,
+        FontFallbackChain {
+          unicode_ranges: std::iter::once(0x202c..0x202d).collect(),
+          families: vec![Cow::Borrowed("MS Mincho")],
+          ..Default::default()
+        },
+      );
+    }
     if let Some(requested_family) = request.family.as_deref() {
       let mut families: Vec<Cow<'static, str>> = Vec::new();
       if let Some(fallback_family) =
@@ -1862,6 +2549,7 @@ fn build_style_font_registry_for_slot(
         registry.book.family_substitution_chains.insert(
           0,
           FontFallbackChain {
+            unicode_ranges: Vec::new(),
             requested_family: Some(Cow::Owned(requested_family.to_string())),
             script,
             language: None,
@@ -1887,6 +2575,7 @@ fn build_style_font_registry_for_slot(
         registry.book.family_substitution_chains.insert(
           insertion,
           FontFallbackChain {
+            unicode_ranges: Vec::new(),
             requested_family: Some(Cow::Owned(requested_family.to_string())),
             script,
             language: None,
@@ -1904,6 +2593,20 @@ fn build_style_font_registry_for_slot(
       fallback_request.family = None;
       registry
         .register_system_query_fonts(&fallback_request)
+        .unwrap_or_default();
+    }
+    if wordprocessingml_synthetic_rtl_italic(style)
+      && let Ok(primary) = registry.resolve(&request)
+      && registry
+        .face(&primary.font_id)
+        .is_some_and(|face| face.slant != FontSlant::Upright)
+      && registered_font_has_arabic_charset(&registry, &primary.font_id) == Some(false)
+    {
+      let mut upright = request.clone();
+      upright.family = Some(primary.resolved_family);
+      upright.slant = Some(FontSlant::Upright);
+      registry
+        .register_system_query_fonts(&upright)
         .unwrap_or_default();
     }
     registry
@@ -1933,8 +2636,10 @@ struct FontFaceKey {
   pitch: Option<ooxmlsdk_fonts::FontPitch>,
   bold: bool,
   italic: bool,
+  synthetic_rtl_italic: bool,
   script: Option<TextScript>,
   wordprocessingml_missing_family_fallback: Option<&'static str>,
+  wordprocessing_nominal_control_metrics: bool,
 }
 
 impl FontFaceKey {
@@ -1961,6 +2666,8 @@ impl FontFaceKey {
       pitch: font_pitch_for_slot(style, script, wordprocessingml_font_slot),
       bold: effective_bold(style, script),
       italic: effective_italic(style, script),
+      synthetic_rtl_italic: wordprocessingml_synthetic_rtl_italic(style),
+      wordprocessing_nominal_control_metrics: style.wordprocessing_nominal_control_metrics(),
       script,
       wordprocessingml_missing_family_fallback: wordprocessingml_missing_family_fallback_for_slot(
         style,
@@ -1993,6 +2700,9 @@ impl FontFaceKey {
       && self.pitch == font_pitch_for_slot(style, script, wordprocessingml_font_slot)
       && self.bold == effective_bold(style, script)
       && self.italic == effective_italic(style, script)
+      && self.synthetic_rtl_italic == wordprocessingml_synthetic_rtl_italic(style)
+      && self.wordprocessing_nominal_control_metrics
+        == style.wordprocessing_nominal_control_metrics()
       && self.script == script
       && self.wordprocessingml_missing_family_fallback
         == wordprocessingml_missing_family_fallback_for_slot(
@@ -2007,6 +2717,152 @@ impl FontFaceKey {
 struct FontMetrics {
   vertical: ooxmlsdk_fonts::VerticalMetrics,
   decoration: ooxmlsdk_fonts::DecorationMetrics,
+  wordprocessingml_default_charset: Option<ooxmlsdk_fonts::VerticalMetrics>,
+}
+
+fn wordprocessingml_default_charset_metrics(
+  request: &FontRequest<'_>,
+  resolved: &ooxmlsdk_fonts::ResolvedFont<'_>,
+) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
+  if request.charset != Some(FontCharset::Other(1))
+    || !request
+      .family
+      .as_deref()
+      .is_some_and(|family| family.eq_ignore_ascii_case(&resolved.resolved_family))
+  {
+    return None;
+  }
+  // Word's logical font record is distinct from GDI's realized TEXTMETRIC.
+  // [MS-OI29500] 17.8(a) permits replacement of document font metadata by
+  // records already loaded in the session. Isolated Office 16 exports and
+  // saved font tables normalize DEFAULT_CHARSET to ANSI for these families;
+  // Calibri and Courier New are counterexamples and must not join this set.
+  // This is a charset policy, not a table of per-font line-height constants.
+  if [
+    "Arial",
+    "Arial Black",
+    "Times New Roman",
+    "Cambria",
+    "Constantia",
+    "Century",
+    "Century Gothic",
+    "Georgia",
+    "Verdana",
+  ]
+  .iter()
+  .any(|family| resolved.resolved_family.eq_ignore_ascii_case(family))
+  {
+    return None;
+  }
+  let data = resolved.source.data()?;
+  let Ok(face) = FontRef::from_index(data, resolved.face_index) else {
+    return None;
+  };
+  let Ok(os2) = face.os2() else {
+    return None;
+  };
+  // East Asian and symbol faces realize their own concrete charset rather
+  // than retaining the Latin DEFAULT_CHARSET record (for example PMingLiU
+  // realizes BIG5_CHARSET=136). Their existing compatibility path remains
+  // responsible for line metrics.
+  if os2
+    .ul_code_page_range_1()
+    .is_some_and(|bits| bits & 0x801e_0000 != 0)
+  {
+    return None;
+  }
+  let fixed = face.post().is_ok_and(|post| post.is_fixed_pitch() != 0);
+  let pitch = if fixed {
+    ooxmlsdk_fonts::FontPitch::Fixed
+  } else {
+    ooxmlsdk_fonts::FontPitch::Variable
+  };
+  let panose = os2.panose_10();
+  let family = if fixed {
+    Some(FontFamilyClass::Fixed)
+  } else if panose[0] == 2 {
+    match panose[1] {
+      2..=10 => Some(FontFamilyClass::Serif),
+      11..=15 => Some(FontFamilyClass::SansSerif),
+      _ => None,
+    }
+  } else {
+    None
+  };
+  // Auto/absent or mismatched family and pitch cause Word to realize a new
+  // font record, replacing the authored default charset with its ANSI value.
+  if family.is_none() || request.family_class != family || request.pitch != Some(pitch) {
+    return None;
+  }
+  // The retained legacy charset uses the GDI/Windows font box even when
+  // the face opts into USE_TYPO_METRICS. Calibri's native charset01 control
+  // distinguishes this from simply scaling the typographic line box.
+  let scale = request.size_pt.0 / f32::from(face.head().ok()?.units_per_em().max(1));
+  let ascent = f32::from(os2.us_win_ascent()) * scale;
+  let descent = f32::from(os2.us_win_descent()) * scale;
+  let hhea = face.hhea().ok()?;
+  let height = f32::from(hhea.ascender().to_i16()) - f32::from(hhea.descender().to_i16())
+    + f32::from(hhea.line_gap().to_i16());
+  let gap = (height * scale - ascent - descent).max(0.0);
+  Some(ooxmlsdk_fonts::VerticalMetrics {
+    ascent_pt: ascent,
+    descent_pt: descent,
+    windows_line_height_pt: ascent + descent,
+    baseline_offset_pt: ascent,
+    directwrite_baseline_offset_pt: ascent + gap,
+    line_gap_pt: gap,
+    ink_height_pt: ascent + descent,
+    ..resolved.metrics_at_size(request.size_pt).vertical
+  })
+}
+
+fn include_vertical_metrics(
+  combined: &mut Option<ooxmlsdk_fonts::VerticalMetrics>,
+  metrics: ooxmlsdk_fonts::VerticalMetrics,
+) {
+  if let Some(combined) = combined {
+    combined.ascent_pt = combined.ascent_pt.max(metrics.ascent_pt);
+    combined.descent_pt = combined.descent_pt.max(metrics.descent_pt);
+    combined.internal_leading_pt = combined
+      .internal_leading_pt
+      .max(metrics.internal_leading_pt);
+    combined.external_leading_pt = combined
+      .external_leading_pt
+      .max(metrics.external_leading_pt);
+    combined.line_gap_pt = combined.line_gap_pt.max(metrics.line_gap_pt);
+    combined.ink_height_pt = combined.ink_height_pt.max(metrics.ink_height_pt);
+    combined.baseline_offset_pt = combined.baseline_offset_pt.max(metrics.baseline_offset_pt);
+    combined.directwrite_baseline_offset_pt = combined
+      .directwrite_baseline_offset_pt
+      .max(metrics.directwrite_baseline_offset_pt);
+    combined.hanging_baseline_pt = combined
+      .hanging_baseline_pt
+      .max(metrics.hanging_baseline_pt);
+    combined.cjk_horizontal_advance_pt = combined
+      .cjk_horizontal_advance_pt
+      .max(metrics.cjk_horizontal_advance_pt);
+    combined.cjk_vertical_advance_pt = combined
+      .cjk_vertical_advance_pt
+      .max(metrics.cjk_vertical_advance_pt);
+    combined.wordprocessingml_cjk_line_metrics |= metrics.wordprocessingml_cjk_line_metrics;
+  } else {
+    *combined = Some(metrics);
+  }
+}
+
+fn word_font_side_leading(
+  mut metrics: ooxmlsdk_fonts::VerticalMetrics,
+) -> ooxmlsdk_fonts::VerticalMetrics {
+  let side = ((metrics.ascent_pt + metrics.descent_pt)
+    * crate::text_metrics::WORDPROCESSINGML_CJK_SIDE_LEADING_RATIO
+    - metrics.line_gap_pt / 2.0)
+    .max(0.0);
+  metrics.ascent_pt += side;
+  metrics.descent_pt += side;
+  metrics.windows_line_height_pt += side * 2.0;
+  metrics.baseline_offset_pt += side;
+  metrics.directwrite_baseline_offset_pt += side;
+  metrics
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -2018,6 +2874,7 @@ struct FontMetricsKey {
   pitch: Option<ooxmlsdk_fonts::FontPitch>,
   bold: bool,
   italic: bool,
+  synthetic_rtl_italic: bool,
   script: Option<TextScript>,
   size_pt_bits: u32,
   wordprocessingml_missing_family_fallback: Option<&'static str>,
@@ -2044,6 +2901,7 @@ impl FontMetricsKey {
       bold: effective_bold(style, script),
       italic: effective_italic(style, script),
       script,
+      synthetic_rtl_italic: wordprocessingml_synthetic_rtl_italic(style),
       size_pt_bits: effective_font_size_pt(style, script).to_bits(),
       wordprocessingml_missing_family_fallback: wordprocessingml_missing_family_fallback_for_slot(
         style,
@@ -2069,6 +2927,7 @@ impl FontMetricsKey {
       && self.bold == effective_bold(style, script)
       && self.italic == effective_italic(style, script)
       && self.script == script
+      && self.synthetic_rtl_italic == wordprocessingml_synthetic_rtl_italic(style)
       && self.size_pt_bits == effective_font_size_pt(style, script).to_bits()
       && self.wordprocessingml_missing_family_fallback
         == wordprocessingml_missing_family_fallback_for_slot(
@@ -2267,6 +3126,77 @@ mod tests {
     assert_eq!(
       wordprocessing_line_metrics_font_slot(&ordinary, Some(WordprocessingFontSlot::Ascii)),
       Some(WordprocessingFontSlot::Ascii)
+    );
+  }
+
+  #[test]
+  fn wordprocessing_rtl_numeric_punctuation_keeps_complex_run_properties() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Latin Face")),
+      complex_font_family: Some(Arc::from("Complex Face")),
+      font_size_pt: 10.0,
+      complex_font_size_pt: Some(20.0),
+      right_to_left: Some(true),
+      bold: false,
+      complex_bold: Some(true),
+      italic: true,
+      complex_italic: Some(false),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    for text in ["44.2", "44,2", "44:2", "44،2", "44٫2"] {
+      let runs = script_direction_runs_with_options(
+        text,
+        FontSize(style.font_size_pt),
+        script_scan_options(&style, false),
+      );
+      for run in runs {
+        let request =
+          font_request_for_slot(&style, Some(run.script), run.wordprocessingml_font_slot);
+        assert_eq!(request.family.as_deref(), Some("Latin Face"), "{text}");
+        assert_eq!(request.size_pt.0, 20.0);
+        assert!(request.bold);
+        assert!(!request.italic);
+        assert_eq!(
+          wordprocessing_line_metrics_font_slot(&style, run.wordprocessingml_font_slot),
+          Some(WordprocessingFontSlot::ComplexScript)
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn forced_complex_font_keeps_its_own_family_class() {
+    use ooxmlsdk_fonts::FontFamilyClass;
+    let style = TextStyle {
+      font_family: Some(Arc::from("Latin Face")),
+      complex_font_family: Some(Arc::from("Missing Roman Face")),
+      font_family_class: Some(FontFamilyClass::SansSerif),
+      complex_font_family_class: Some(FontFamilyClass::Serif),
+      complex_script: Some(true),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    for slot in [None, Some(WordprocessingFontSlot::ComplexScript)] {
+      let request = font_request_for_slot(&style, Some(TextScript::Arabic), slot);
+      assert_eq!(request.family.as_deref(), Some("Missing Roman Face"));
+      assert_eq!(request.family_class, Some(FontFamilyClass::Serif));
+    }
+    // Word's ASCII-digit exception must retain the Latin face and metadata.
+    let digits = font_request_for_slot(
+      &style,
+      Some(TextScript::Common),
+      Some(WordprocessingFontSlot::Ascii),
+    );
+    assert_eq!(digits.family.as_deref(), Some("Latin Face"));
+    assert_eq!(digits.family_class, Some(FontFamilyClass::SansSerif));
+    let unclassified = TextStyle {
+      complex_font_family_class: None,
+      ..style
+    };
+    assert_eq!(
+      font_request(&unclassified, Some(TextScript::Arabic)).family_class,
+      None
     );
   }
 
@@ -2738,6 +3668,547 @@ mod tests {
         .iter()
         .any(|feature| feature.tag == "calt" && feature.value == 0)
     );
+  }
+
+  #[test]
+  fn wordprocessingml_arabic_connection_forms_survive_optional_alternate_switches() {
+    let mut style = TextStyle {
+      font_family: Some(Arc::from("Traditional Arabic")),
+      complex_font_family: Some(Arc::from("Traditional Arabic")),
+      font_size_pt: 15.0,
+      complex_font_size_pt: Some(15.0),
+      wordprocessingml_font_slots: true,
+      right_to_left: Some(true),
+      ..Default::default()
+    };
+    let mut resolver = super::FontResolver::default();
+    for enabled in [None, Some(false), Some(true)] {
+      style.open_type_features.contextual_alternates = enabled;
+      for (text, native) in [
+        ("يُعَرّف", [187, 203, 450, 200, 480, 201, 186, 519]),
+        ("تُنَظَّم", [502, 267, 476, 200, 508, 201, 186, 427]),
+      ] {
+        let runs = resolver.shape_text_runs(text, &style).unwrap();
+        let glyphs = runs
+          .iter()
+          .flat_map(|run| run.glyphs.iter().map(|glyph| glyph.glyph_id))
+          .collect::<Vec<_>>();
+        // Native natural glyphs include GSUB's Tatweel before justification.
+        // All three authored switch states give the same connection forms.
+        assert_eq!(glyphs, native, "{text} {enabled:?}");
+      }
+      let western = super::font_request(&style, Some(ooxmlsdk_fonts::TextScript::Latin));
+      assert!(western.features.iter().any(|feature| {
+        feature.tag == "calt" && feature.value == u32::from(enabled.unwrap_or(false))
+      }));
+    }
+  }
+
+  #[test]
+  fn wordprocessingml_rtl_italic_uses_upright_outlines_without_crossing_cached_styles() {
+    let mut style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      complex_font_family: Some(Arc::from("Arial")),
+      wordprocessingml_font_slots: true,
+      right_to_left: Some(true),
+      italic: true,
+      complex_italic: Some(true),
+      ..Default::default()
+    };
+    let mut resolver = super::FontResolver::default();
+    for bold in [false, true] {
+      style.bold = bold;
+      style.complex_bold = Some(bold);
+      let mut upright = style.clone();
+      upright.italic = false;
+      upright.complex_italic = Some(false);
+      for text in ["بسم", "abc 123", "אבג"] {
+        let expected = resolver.shape_text_runs(text, &upright).unwrap();
+        let actual = resolver.shape_text_runs(text, &style).unwrap();
+        assert_eq!(actual.len(), expected.len());
+        for (actual, expected) in actual.iter().zip(&expected) {
+          assert_eq!(actual.font_id, expected.font_id);
+          assert_eq!(actual.glyphs, expected.glyphs);
+          assert!(
+            resolver
+              .font_face_data(&actual.font_id)
+              .unwrap()
+              .synthetic_italic
+          );
+        }
+      }
+    }
+
+    // The same resolver must not reuse the synthetic face for ordinary
+    // italics or w:cs, even when family, weight and effective italics agree.
+    let synthetic = resolver.cached_text_face(&style).unwrap();
+    for complex_script in [None, Some(true)] {
+      let mut ordinary = style.clone();
+      ordinary.right_to_left = Some(false);
+      ordinary.complex_script = complex_script;
+      ordinary.resolved_bidi_level = Some(1);
+      assert_eq!(font_request(&ordinary, None).slant, None);
+      let face = resolver.cached_text_face(&ordinary).unwrap();
+      assert!(!face.synthetic_italic);
+      assert_ne!(face.id(), synthetic.id());
+      assert_eq!(
+        resolver.cached_text_face(&style).unwrap().id(),
+        synthetic.id()
+      );
+    }
+    let mut generic = style.clone();
+    generic.wordprocessingml_font_slots = false;
+    assert_eq!(font_request(&generic, None).slant, None);
+    let mut hebrew = style.clone();
+    hebrew.bidi_language = Some(Arc::from("he-IL"));
+    let face = resolver.cached_text_face(&hebrew).unwrap();
+    assert!(!face.synthetic_italic);
+    assert_ne!(face.id(), synthetic.id());
+    assert_eq!(
+      resolver.cached_text_face(&style).unwrap().id(),
+      synthetic.id()
+    );
+
+    // Arabic-capable italic families must retain their authored face. This
+    // covers table-ltr.docx, which mixes real Amiri italics with upright runs.
+    let mut amiri = style.clone();
+    amiri.font_family = Some(Arc::from("Amiri"));
+    amiri.complex_font_family = Some(Arc::from("Amiri"));
+    let face = resolver.cached_text_face(&amiri).unwrap();
+    assert!(!face.synthetic_italic);
+    assert!(face.id().to_ascii_lowercase().contains("italic"));
+  }
+
+  #[test]
+  fn wordprocessingml_tracked_arabic_retains_native_measurement_width() {
+    use super::FontResolver;
+
+    let mut resolver = FontResolver::default();
+    // Native Word placement/conversion arrays for "بالقرآن ", width90:
+    // mode14 without Word97 measurement and mode15 use em2048, lfWidth847;
+    // mode14 with Word97 measurement uses em1000, lfWidth414. Source pitch
+    // changes neither font request nor the integer natural glyph advances.
+    for (legacy, expected_units) in [
+      (false, [21540, 9240, 16350, 10740, 12930, 23460, 13500]),
+      (true, [21565, 9216, 16343, 10752, 12902, 23470, 13516]),
+    ] {
+      for spacing in [-0.1, 0.1] {
+        let style = TextStyle {
+          font_family: Some(Arc::from("Traditional Arabic")),
+          complex_font_family: Some(Arc::from("Traditional Arabic")),
+          font_size_pt: 15.0,
+          horizontal_scale: Some(0.9),
+          wordprocessing_font_width_percent: Some(90),
+          wordprocessing_legacy_font_measurement: Some(legacy),
+          character_spacing_pt: spacing,
+          right_to_left: Some(true),
+          resolved_bidi_level: Some(1),
+          wordprocessingml_font_slots: true,
+          ..Default::default()
+        };
+        let runs = resolver.shape_text_runs("بالقرآن ", &style).unwrap();
+        let glyphs = runs
+          .iter()
+          .flat_map(|run| run.glyphs.iter())
+          .collect::<Vec<_>>();
+        assert_eq!(
+          glyphs
+            .iter()
+            .rev()
+            .map(|glyph| glyph.glyph_id)
+            .collect::<Vec<_>>(),
+          [682, 499, 492, 450, 161, 192, 3]
+        );
+        assert_eq!(
+          glyphs
+            .iter()
+            .rev()
+            .map(|glyph| ((glyph.x_advance_pt - spacing) * 4096.0).round() as i32)
+            .collect::<Vec<_>>(),
+          expected_units,
+          "legacy {legacy}, pitch {spacing}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn wordprocessingml_arabic_orphan_mark_groups_match_native_glyphs() {
+    use super::FontResolver;
+
+    let cases = [
+      ("َّ", [200, 203].as_slice(), [267].as_slice()),
+      ("َّ", [200, 203].as_slice(), [267].as_slice()),
+      ("ُّ", [201, 203].as_slice(), [268].as_slice()),
+      ("ُّ", [201, 203].as_slice(), [268].as_slice()),
+      ("ِّ", [202, 203].as_slice(), [202, 203].as_slice()),
+      ("ِّ", [202, 203].as_slice(), [202, 203].as_slice()),
+      ("ُُ", [201, 201].as_slice(), [201, 201].as_slice()),
+      ("ُِّ", [202, 201, 203].as_slice(), [202, 268].as_slice()),
+    ];
+    let mut resolver = FontResolver::default();
+    // Native Word's 64 controls: two fonts, eight mark sequences, and
+    // standalone/leading/attached/foreign-language boundaries. The glyph
+    // arrays below omit only the native run's empty trailing space glyph.
+    for (family, circle, base) in [("Traditional Arabic", 588, 167), ("Arial", 2825, 911)] {
+      let style = TextStyle {
+        font_family: Some(Arc::from(family)),
+        complex_font_family: Some(Arc::from(family)),
+        font_size_pt: 15.0,
+        horizontal_scale: Some(1.03),
+        wordprocessing_font_width_percent: Some(103),
+        wordprocessing_legacy_font_measurement: Some(true),
+        right_to_left: Some(true),
+        resolved_bidi_level: Some(1),
+        wordprocessingml_font_slots: true,
+        ..Default::default()
+      };
+      for (sequence, marks, attached_marks) in cases {
+        let map = |id| match (family, id) {
+          ("Arial", 200) => 756,
+          ("Arial", 201) => 757,
+          ("Arial", 202) => 758,
+          ("Arial", 203) => 759,
+          ("Arial", 267) => 841,
+          ("Arial", 268) => 842,
+          _ => id,
+        };
+        let expected = marks
+          .iter()
+          .flat_map(|&id| [map(id), circle])
+          .collect::<Vec<_>>();
+        for (text, attached) in [
+          (sequence.to_owned(), false),
+          (format!("{sequence}ب"), false),
+          (format!("ب{sequence}"), true),
+        ] {
+          let runs = resolver.shape_text_runs(&text, &style).unwrap();
+          let glyphs = runs
+            .iter()
+            .flat_map(|run| run.glyphs.iter().map(|glyph| glyph.glyph_id))
+            .collect::<Vec<_>>();
+          let expected = if attached {
+            attached_marks
+              .iter()
+              .map(|&id| map(id))
+              .chain([base])
+              .collect::<Vec<_>>()
+          } else if text.ends_with('ب') {
+            std::iter::once(base)
+              .chain(expected.iter().copied())
+              .collect()
+          } else {
+            expected.clone()
+          };
+          assert_eq!(glyphs, expected, "{family} {text:?}");
+          for run in &runs {
+            for glyph in run.glyphs.iter() {
+              assert!(text.is_char_boundary(glyph.text_range.start));
+              assert!(text.is_char_boundary(glyph.text_range.end));
+              assert!(glyph.text_range.end <= text.len());
+            }
+          }
+        }
+        // A valid preceding Arabic base retains one continuous mark group
+        // even though the text passed to the shaper starts with the marks.
+        let mut contextual = style.clone();
+        contextual.shaping_context = Some(Arc::new(crate::common::TextShapingContext {
+          before: Arc::from("ب"),
+          after: Arc::from(""),
+          leading_marks_only: true,
+        }));
+        let runs = resolver.shape_text_runs(sequence, &contextual).unwrap();
+        assert!(
+          runs
+            .iter()
+            .flat_map(|run| run.glyphs.iter())
+            .all(|glyph| glyph.glyph_id != circle)
+        );
+      }
+      // Additional native basic-mark pairs distinguish canonical mark
+      // ordering from preserving serialized order after separating circles.
+      for (sequence, native) in [
+        ("ُِ", [202, 201]),
+        ("َُ", [201, 200]),
+        ("ًَ", [200, 197]),
+        ("ّْ", [204, 203]),
+      ] {
+        let glyphs = resolver
+          .shape_text_runs(sequence, &style)
+          .unwrap()
+          .iter()
+          .flat_map(|run| run.glyphs.iter().map(|glyph| glyph.glyph_id))
+          .collect::<Vec<_>>();
+        let expected = native
+          .into_iter()
+          .flat_map(|id| {
+            let id = if family == "Arial" { id + 556 } else { id };
+            [id, circle]
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(glyphs, expected, "{family} {sequence:?}");
+      }
+    }
+  }
+
+  #[test]
+  fn wordprocessingml_arabic_leading_marks_preserve_valid_base_context() {
+    use super::FontResolver;
+    use skrifa::MetadataProvider;
+
+    let style = TextStyle {
+      font_family: Some(Arc::from("Traditional Arabic")),
+      complex_font_family: Some(Arc::from("Traditional Arabic")),
+      font_size_pt: 15.0,
+      right_to_left: Some(true),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let mut resolver = FontResolver::default();
+    let orphan = resolver.shape_text_runs("َ", &style).unwrap();
+    assert_eq!(orphan.len(), 1);
+    assert_eq!(orphan[0].script, Some(TextScript::Arabic));
+    let face = resolver.font_face_data(&orphan[0].font_id).unwrap();
+    let font = skrifa::FontRef::from_index(face.data.as_slice(), face.index).unwrap();
+    let circle = font.charmap().map('\u{25cc}').unwrap().to_u32();
+    assert_eq!(orphan[0].glyphs.len(), 2);
+    assert!(
+      orphan[0]
+        .glyphs
+        .iter()
+        .any(|glyph| glyph.glyph_id == circle)
+    );
+    assert!(orphan[0].advance_pt > 0.0);
+    assert!(
+      orphan[0]
+        .glyphs
+        .iter()
+        .all(|glyph| glyph.text_range == (0.."َ".len()))
+    );
+
+    let mut attached = style.clone();
+    attached.shaping_context = Some(Arc::new(crate::common::TextShapingContext {
+      before: Arc::from("هدف"),
+      after: Arc::from(""),
+      leading_marks_only: true,
+    }));
+    let mark = resolver.shape_text_runs("َ", &attached).unwrap();
+    assert_eq!(mark[0].glyphs.len(), 1);
+    assert_eq!(mark[0].advance_pt, 0.0);
+    // Wrapping the rest of a run must not apply its leading mark's context
+    // to a later ordinary Arabic word.
+    let later = "كفالة";
+    assert_eq!(
+      resolver.shape_text_runs(later, &style).unwrap(),
+      resolver.shape_text_runs(later, &attached).unwrap()
+    );
+    let mut generic = style;
+    generic.wordprocessingml_font_slots = false;
+    let mark = resolver.shape_text_runs("َ", &generic).unwrap();
+    assert_eq!(mark[0].glyphs.len(), 1);
+    assert_eq!(mark[0].advance_pt, 0.0);
+  }
+
+  #[test]
+  fn wordprocessingml_variation_selectors_do_not_acquire_arabic_mark_fallback() {
+    use super::arabic_nonspacing_mark;
+
+    for mark in ['\u{064b}', '\u{064e}', '\u{0651}', '\u{06e1}'] {
+      assert!(arabic_nonspacing_mark(mark), "U+{:04X}", u32::from(mark));
+    }
+    let style = TextStyle {
+      font_family: Some(Arc::from("Calibri")),
+      complex_font_family: Some(Arc::from("Calibri")),
+      font_size_pt: 11.0,
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let mut resolver = super::FontResolver::default();
+    for selector in ['\u{fe0e}', '\u{fe0f}', '\u{e0100}'] {
+      assert!(!arabic_nonspacing_mark(selector));
+      let text = selector.to_string();
+      let runs = resolver.shape_text_runs(&text, &style).unwrap();
+      assert_eq!(runs.iter().map(|run| run.glyphs.len()).sum::<usize>(), 1);
+      assert_eq!(runs.iter().map(|run| run.advance_pt).sum::<f32>(), 0.0);
+    }
+    for mark in ['\u{0305}', '\u{05b0}', '\u{093a}'] {
+      assert!(!arabic_nonspacing_mark(mark), "U+{:04X}", u32::from(mark));
+    }
+  }
+
+  #[test]
+  fn wordprocessingml_preserves_explicit_arabic_mark_components() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      complex_font_family: Some(Arc::from("Arial")),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let mut generic = style.clone();
+    generic.wordprocessingml_font_slots = false;
+    let text = "لَآ";
+    let word = shape_text_runs(text, &style).unwrap();
+    let ordinary = shape_text_runs(text, &generic).unwrap();
+    assert_eq!(word.iter().map(|r| r.text).collect::<String>(), text);
+    assert_eq!(
+      word.iter().map(|r| r.glyphs.len()).sum::<usize>(),
+      ordinary.iter().map(|r| r.glyphs.len()).sum::<usize>() + 1
+    );
+    // An authored precomposed alef remains precomposed in both policies.
+    let glyph_ids = |style: &TextStyle| {
+      shape_text_runs("لَآ", style)
+        .unwrap()
+        .iter()
+        .flat_map(|run| run.glyphs.iter().map(|glyph| glyph.glyph_id))
+        .collect::<Vec<_>>()
+    };
+    assert_eq!(glyph_ids(&style), glyph_ids(&generic));
+  }
+
+  #[test]
+  fn wordprocessingml_arabic_retains_standard_shaping_ligatures() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      complex_font_family: Some(Arc::from("Arial")),
+      wordprocessingml_font_slots: true,
+      ligatures: Some(OpenTypeLigatures::default()),
+      ..Default::default()
+    };
+    let liga = |style: &TextStyle, script| {
+      font_request(style, Some(script))
+        .features
+        .iter()
+        .find(|feature| feature.tag == "liga")
+        .expect("explicit standard ligature setting")
+        .value
+    };
+    assert_eq!(liga(&style, TextScript::Arabic), 1);
+    assert_eq!(liga(&style, TextScript::Latin), 0);
+    let mut generic = style.clone();
+    generic.wordprocessingml_font_slots = false;
+    assert_eq!(liga(&generic, TextScript::Arabic), 0);
+
+    // Exercise shaping as well as feature selection: a Word request whose
+    // optional ligatures are off must retain the engine's Arabic ligature
+    // glyphs and advances. Semantic source ranges still cover the full word.
+    let word = "الله";
+    let actual = shape_text_runs(word, &style).expect("Word Arabic shaping");
+    let mut enabled = style.clone();
+    enabled.ligatures.as_mut().unwrap().standard = true;
+    let expected = shape_text_runs(word, &enabled).expect("Arabic standard ligatures");
+    let glyphs = |runs: &[ShapedRun<'_, '_>]| {
+      runs
+        .iter()
+        .flat_map(|run| run.glyphs.iter())
+        .map(|glyph| (glyph.glyph_id, glyph.text_range.clone(), glyph.x_advance_pt))
+        .collect::<Vec<_>>()
+    };
+    assert_eq!(glyphs(&actual), glyphs(&expected));
+    assert!(
+      actual
+        .iter()
+        .flat_map(|run| run.glyphs.iter())
+        .any(|glyph| { glyph.text_range.start == 0 && glyph.text_range.end == word.len() })
+    );
+  }
+
+  #[test]
+  fn word_fractional_blanks_follow_unshaped_font_metrics() {
+    // Actual Word ideal arrays at12pt. Proportional Mincho's em dash is171
+    // design units /256, not one em. Meiryo's Latin GPOS kern feature selects
+    // shaped metrics; Consolas lacks the East Asian code-page capability.
+    for (family, thirds, sixths) in [
+      ("MS Mincho", 8192, 4096),
+      ("MS Gothic", 8192, 4096),
+      ("MS PMincho", 10944, 5472),
+      ("MS PGothic", 10944, 5472),
+      ("Meiryo", 16392, 8184),
+      ("Consolas", 27024, 27024),
+    ] {
+      for size in [12.0, 18.0] {
+        for (ch, ideal) in [('\u{2004}', thirds), ('\u{2006}', sixths)] {
+          let text = format!("A{ch}{ch}{ch}A");
+          let mut style = TextStyle {
+            font_family: Some(Arc::from(family)),
+            high_ansi_font_family: Some(Arc::from(family)),
+            font_size_pt: size,
+            wordprocessingml_font_slots: true,
+            ..Default::default()
+          };
+          let runs = shape_text_runs(&text, &style).expect("Word fractional space");
+          let blanks = runs
+            .iter()
+            .flat_map(|run| run.glyphs.iter())
+            .filter(|glyph| glyph.source_char == Some(ch))
+            .collect::<Vec<_>>();
+          assert_eq!(blanks.len(), 3);
+          for glyph in blanks {
+            let expected = ideal as f32 / 4096.0 * size / 12.0;
+            assert!(
+              (glyph.x_advance_pt - expected).abs() < 0.0003,
+              "{family} {size} {ch:?}: {} != {expected}",
+              glyph.x_advance_pt
+            );
+            assert_eq!(&text[glyph.text_range.clone()], ch.to_string());
+          }
+          style.wordprocessingml_font_slots = false;
+          let generic = shape_text_runs(&text, &style).expect("generic fractional space");
+          if matches!(family, "MS Mincho" | "MS Gothic") {
+            assert!(
+              generic
+                .iter()
+                .flat_map(|run| run.glyphs.iter())
+                .all(|glyph| {
+                  glyph.source_char != Some(ch) || (glyph.x_advance_pt - size * 0.5).abs() < 0.001
+                })
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn word_literal_separators_keep_primary_face_and_native_blank_width() {
+    for (family, em_width) in [("Calibri", 0.5), ("Arial", 0.5), ("Times New Roman", 1.0)] {
+      for size in [8.0, 11.0, 16.0, 22.0] {
+        for text in ["\u{2028}", "\u{2029}"] {
+          let style = TextStyle {
+            font_family: Some(Arc::from(family)),
+            high_ansi_font_family: Some(Arc::from(family)),
+            font_size_pt: size,
+            wordprocessingml_font_slots: true,
+            ..Default::default()
+          };
+          let primary = load_text_face(&style).expect("primary Office font");
+          let runs = shape_text_runs(text, &style).expect("literal separator");
+          assert_eq!(runs.len(), 1);
+          assert_eq!(runs[0].font_id.0.as_ref(), primary.id());
+          assert!((runs[0].advance_pt - size * em_width).abs() < 0.01);
+          assert_eq!(runs[0].glyphs[0].source_char, text.chars().next());
+          assert_eq!(runs[0].glyphs[0].text_range, 0..text.len());
+          if family != "Times New Roman" {
+            assert!(
+              runs[0].glyphs[0].bounds.is_none_or(|bounds| {
+                bounds.x_min_pt == bounds.x_max_pt || bounds.y_min_pt == bounds.y_max_pt
+              }),
+              "{family} {size} {text:?}: {:?}",
+              runs[0].glyphs[0]
+            );
+          } else {
+            // This face contains visible LS/PS control glyphs; native Word
+            // retains both their outlines and their full-em advances.
+            assert!(runs[0].glyphs[0].bounds.is_some());
+          }
+          let mut generic = style.clone();
+          generic.wordprocessingml_font_slots = false;
+          let generic_runs = shape_text_runs(text, &generic).expect("generic separator");
+          if family != "Times New Roman" {
+            assert_ne!(generic_runs[0].font_id, runs[0].font_id);
+          }
+        }
+      }
+    }
   }
 
   #[test]

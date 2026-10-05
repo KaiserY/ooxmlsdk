@@ -1,7 +1,8 @@
 pub use emfsdk::render::{
-  DecodedMetafile, MetafileBitmapLayer, MetafilePhysicalSize, MetafileSolidRect,
-  MetafileVectorFill, MetafileVectorFillRule, MetafileVectorPoint, MetafileVectorScene,
-  RenderOptions, WmfExternalHeader,
+  DecodedMetafile, EmfTextAdvanceQuantization, MetafileBitmapLayer, MetafilePhysicalSize,
+  MetafileSolidRect, MetafileVectorDraw, MetafileVectorDrawing, MetafileVectorFill,
+  MetafileVectorFillRule, MetafileVectorPoint, MetafileVectorScene, RenderOptions,
+  WmfConversionProfile, WmfExternalHeader,
 };
 
 #[derive(Clone, Debug)]
@@ -14,6 +15,8 @@ pub struct MetafileTextRun {
   pub font_family: Option<String>,
   pub bold: bool,
   pub italic: bool,
+  pub color: [u8; 3],
+  pub clip: Option<[f32; 4]>,
   pub width: Option<f32>,
   pub advances: Option<Vec<f32>>,
 }
@@ -47,6 +50,15 @@ pub fn extract_metafile_vector_scene_with_options(
   options: RenderOptions,
 ) -> Result<Option<MetafileVectorScene>, String> {
   emfsdk::render::extract_metafile_vector_scene_with_options(data, content_type, options)
+    .map_err(|err| err.to_string())
+}
+
+pub fn extract_metafile_vector_drawing_with_options(
+  data: &[u8],
+  content_type: Option<&str>,
+  options: RenderOptions,
+) -> Result<Option<MetafileVectorDrawing>, String> {
+  emfsdk::render::extract_metafile_vector_drawing_with_options(data, content_type, options)
     .map_err(|err| err.to_string())
 }
 
@@ -97,6 +109,8 @@ pub fn extract_metafile_text_runs_with_options(
         font_family: run.font_family,
         bold: run.bold,
         italic: run.italic,
+        color: run.color,
+        clip: run.clip,
         width: run.width,
         advances: run.advances,
       }
@@ -116,6 +130,10 @@ pub fn metafile_text_requires_raster_backdrop(data: &[u8], content_type: Option<
   emfsdk::render::extract_metafile_text_runs(data, content_type)
     .iter()
     .any(|run| run.requires_raster_backdrop)
+}
+
+pub fn metafile_text_can_be_lifted(data: &[u8], content_type: Option<&str>) -> bool {
+  emfsdk::render::metafile_text_can_be_lifted(data, content_type)
 }
 
 pub fn extract_metafile_solid_rects(

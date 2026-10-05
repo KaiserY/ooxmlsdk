@@ -5,7 +5,9 @@ use std::borrow::Cow;
 
 use crate::common::color_math;
 use crate::field_datetime;
-use crate::localization::{ChartDisplayUnit, ChartTrendlineKind, OfficeStringCatalog};
+use crate::localization::{
+  ChartDisplayUnit, ChartTrendlineKind, OfficeStringCatalog, office_chart_trendline_legend_title,
+};
 use crate::model::RgbColor;
 use crate::options::FieldUpdateDateTime;
 use crate::{render::math::text_math_text, units};
@@ -420,6 +422,10 @@ pub struct ClusteredColumnSeries<'a> {
   /// Worksheet reference backing scatter/bubble X values.
   pub x_value_formula: Option<&'a str>,
   pub x_values: Vec<Option<f64>>,
+  /// Whether absent slots in `x_values` are authored blanks in a numeric X
+  /// sequence. Scatter and bubble charts omit those points; only text or
+  /// unavailable X sources use the ordinal 1, 2, ... fallback.
+  pub x_values_preserve_missing: bool,
   /// Cached number format for a scatter/bubble X-value sequence.  Numeric X
   /// and Y axes can both be `c:valAx`, but `sourceLinked` resolves them from
   /// different data roles.
@@ -526,6 +532,8 @@ pub struct ClusteredColumnDataLabel<'a> {
   pub value_format_code: Option<&'a str>,
   pub separator: &'a str,
   pub position: c::DataLabelPositionValues,
+  /// True when c:dLblPos was authored at chart-group, series, or point level.
+  pub position_explicit: bool,
   /// Individual `c:dLbl/c:layout/c:manualLayout` position. Group and series
   /// `c:dLbls` do not own this rectangle.
   pub layout: Option<ChartManualLayout>,
@@ -702,6 +710,7 @@ pub struct PieChartModel<'a> {
   pub view_3d: Option<Chart3DView>,
   pub title: Option<ChartTitleText>,
   pub title_layout: Option<ChartManualLayout>,
+  pub title_text_body_properties: Option<&'a a::BodyProperties>,
   pub title_rotation_deg: f32,
   /// Formatting index of the displayed first series and the highest index in
   /// the radial chart group. When `varyColors` is false, classic chart-style
@@ -742,6 +751,16 @@ pub struct PieChartModel<'a> {
   pub visible_legend_indices: Vec<usize>,
   pub legend_layout: Option<ChartManualLayout>,
   pub plot_layout: Option<ChartManualLayout>,
+  /// Whether the displayed series explicitly deletes its own `c:dLbls`.
+  ///
+  /// Some producers retain chart-group label settings alongside that marker.
+  /// Hosts may need the source bit to distinguish an application fallback
+  /// from an ordinary visible data label.
+  pub series_data_labels_deleted: bool,
+  /// Series/group label placement before individual point overrides. Word
+  /// reserves automatic label space from this setting, even when a doughnut
+  /// resolves its individual labels to Center.
+  pub data_label_default_position: Option<c::DataLabelPositionValues>,
   pub data_labels: Vec<ClusteredColumnDataLabel<'a>>,
   pub data_label_text_properties: Option<&'a c::TextProperties>,
   pub show_leader_lines: bool,
@@ -765,13 +784,25 @@ pub(crate) struct LinearAxisScaleOptions {
   /// extra 1/21 border interval for every 3-D plotter. Two-dimensional
   /// plotters retain it so markers and line strokes do not sit on the frame.
   pub expand_if_values_close_to_border: bool,
-  /// Smallest automatically selected major unit for an ordinal numeric axis.
+  /// Optional host minimum for the automatically selected numeric major unit.
   ///
-  /// Scatter charts whose `xVal` sequence contains text are repaired by
-  /// Office to one-based ordinal positions.  Those positions may be thinned
-  /// when the plot is crowded, but fractional positions do not exist and an
-  /// automatic 0.5-unit scale would expose synthetic half-categories.
+  /// A textual scatter `xVal` cache resolves to one-based data positions, but
+  /// Word and Excel may still use fractional numeric ticks between those
+  /// points. Apply a whole-unit restriction only for a host that requires it.
   pub minimum_automatic_major_unit: Option<f64>,
+}
+
+/// Returns the semantic percentage domain used to autoscale a 100%-stacked
+/// value axis. A logarithmic axis cannot contain the ordinary zero lower
+/// bound; Office repairs that automatic bound to one logarithmic interval
+/// below 100% while retaining the authored base.
+pub(crate) fn percent_stacked_axis_scale_values(axis: Option<&c::ValueAxis>) -> [f64; 2] {
+  let logarithmic_minimum = axis
+    .and_then(|axis| axis.scaling.log_base.as_ref())
+    .map(|base| base.val)
+    .filter(|base| base.is_finite() && *base > 1.0)
+    .map(|base| 1.0 / base);
+  [logarithmic_minimum.unwrap_or(0.0), 1.0]
 }
 
 impl Default for LinearAxisScaleOptions {
@@ -915,6 +946,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       number_format_code: series_number_format_code(series_ref),
       x_value_formula: series_x_value_formula(series_ref),
       x_values: Vec::new(),
+      x_values_preserve_missing: false,
       x_number_format_code: None,
       bubble_size_formula: series_bubble_size_formula(series_ref),
       bubble_sizes: Vec::new(),
@@ -2322,7 +2354,7 @@ fn append_cartesian_series<'a>(
     }
     let source_categories = source_labels.flat;
     let values = chart_series_numeric_values(source);
-    let x_values = chart_series_x_numeric_values(source);
+    let (x_values, x_values_preserve_missing) = chart_series_x_numeric_values(source);
     let error_bars = resolved_error_bars(source.error_bars);
     let label_categories = if source_categories.is_empty() {
       (1..=values.len()).map(|index| index.to_string()).collect()
@@ -2348,6 +2380,7 @@ fn append_cartesian_series<'a>(
       value_formula: series_value_formula(source),
       x_value_formula: series_x_value_formula(source),
       x_values,
+      x_values_preserve_missing,
       x_number_format_code: series_x_number_format_code(source),
       bubble_size_formula: series_bubble_size_formula(source),
       bubble_sizes: bubble_sizes.clone(),
@@ -2623,6 +2656,22 @@ fn chart_3d_view(chart: &c::Chart) -> Chart3DView {
   }
 }
 
+fn pie_3d_view(chart: &c::Chart) -> Chart3DView {
+  let mut view = chart_3d_view(chart);
+  // In a 3-D pie, c:rotY is the clockwise first-slice angle rather than the
+  // Cartesian camera yaw. Its schema default is zero; the 20-degree host
+  // default in chart_3d_view belongs to 3-D bar/area/line charts.
+  view.rotate_y_deg = f32::from(
+    chart
+      .view3_d
+      .as_deref()
+      .and_then(|view| view.rotate_y.as_ref())
+      .and_then(|rotation| rotation.val)
+      .unwrap_or(0),
+  );
+  view
+}
+
 fn default_data_label_position(
   kind: ChartSeriesKind,
   grouping: ChartSeriesGrouping,
@@ -2636,12 +2685,15 @@ fn default_data_label_position(
     {
       c::DataLabelPositionValues::Center
     }
-    ChartSeriesKind::Column | ChartSeriesKind::Bar => c::DataLabelPositionValues::OutsideEnd,
+    // MS-OI29500 21.2.2.48: radar labels default to OutsideEnd, like
+    // clustered bars, rather than the Right default of line/scatter charts.
+    ChartSeriesKind::Column | ChartSeriesKind::Bar | ChartSeriesKind::Radar => {
+      c::DataLabelPositionValues::OutsideEnd
+    }
     ChartSeriesKind::Area | ChartSeriesKind::Surface => c::DataLabelPositionValues::Center,
     ChartSeriesKind::Line
     | ChartSeriesKind::Scatter
     | ChartSeriesKind::Bubble
-    | ChartSeriesKind::Radar
     | ChartSeriesKind::Stock => c::DataLabelPositionValues::Right,
   }
 }
@@ -2695,10 +2747,11 @@ pub(crate) fn trendline_legend_title<'a>(
     c::TrendlineValues::Polynomial => ChartTrendlineKind::Polynomial,
     c::TrendlineValues::MovingAverage => ChartTrendlineKind::MovingAverage,
   };
-  Cow::Owned(
-    OfficeStringCatalog::for_ui_language(ui_language)
-      .chart_trendline_legend_title(kind, series_name),
-  )
+  Cow::Owned(office_chart_trendline_legend_title(
+    ui_language,
+    kind,
+    series_name,
+  ))
 }
 
 fn chart_layout(layout: Option<&c::Layout>) -> Option<ChartManualLayout> {
@@ -2904,6 +2957,9 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
       )),
       _ => None,
     })?;
+  let view_3d = (radial_kind == RadialChartKind::Pie3D).then(|| pie_3d_view(&chart_space.chart));
+  let first_slice_angle_deg =
+    view_3d.map_or(first_slice_angle_deg, |view| f64::from(view.rotate_y_deg));
   let series = pie_series.first()?;
   let values = series
     .values
@@ -3046,9 +3102,21 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
 
   Some(PieChartModel {
     kind: radial_kind,
-    view_3d: (radial_kind == RadialChartKind::Pie3D).then(|| chart_3d_view(&chart_space.chart)),
+    view_3d,
     title,
     title_layout: chart_title_layout(&chart_space.chart),
+    title_text_body_properties: chart_space.chart.title.as_deref().and_then(|title| {
+      title
+        .text_properties
+        .as_deref()
+        .map(|text| text.body_properties.as_ref())
+        .or_else(
+          || match title.chart_text.as_deref()?.chart_text_choice.as_ref()? {
+            c::ChartTextChoice::RichText(rich) => Some(rich.body_properties.as_ref()),
+            _ => None,
+          },
+        )
+    }),
     title_rotation_deg: chart_title_rotation_degrees(&chart_space.chart),
     series_formatting_index: series_ref.formatting_index,
     maximum_series_formatting_index,
@@ -3090,6 +3158,12 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
     visible_legend_indices,
     legend_layout: legend.and_then(|legend| chart_layout(legend.layout.as_deref())),
     plot_layout: chart_layout(chart_space.chart.plot_area.layout.as_deref()),
+    series_data_labels_deleted: series_labels_deleted,
+    data_label_default_position: series
+      .data_labels
+      .as_deref()
+      .and_then(data_labels_position)
+      .or_else(|| chart_group_labels.and_then(data_labels_position)),
     data_labels,
     data_label_text_properties,
     show_leader_lines: series
@@ -3504,6 +3578,7 @@ fn resolved_data_labels<'a>(
         value_format_code: point_settings.value_format_code,
         separator,
         position: point_settings.position,
+        position_explicit: point_settings.position_explicit,
         layout: point_layout,
         text_frame_layout,
         text_properties,
@@ -3568,6 +3643,7 @@ struct ClusteredColumnDataLabelSettings<'a> {
   value_format_code: Option<&'a str>,
   percentage_format_code: Option<&'a str>,
   position: c::DataLabelPositionValues,
+  position_explicit: bool,
   shape_properties: Option<&'a c::ChartShapeProperties>,
   text_frame_layout: Option<ChartManualLayout>,
 }
@@ -3592,6 +3668,7 @@ impl Default for ClusteredColumnDataLabelSettings<'_> {
       // MS-OI29500 §21.2.2.48 specifies OutsideEnd as the Office default
       // for a clustered bar/column chart when c:dLblPos is omitted.
       position: c::DataLabelPositionValues::OutsideEnd,
+      position_explicit: false,
     }
   }
 }
@@ -3707,6 +3784,7 @@ fn apply_data_labels_sequence_settings<'a>(
   }
   if let Some(position) = sequence.data_label_position.as_ref() {
     settings.position = position.val;
+    settings.position_explicit = true;
   }
   if let Some(properties) = sequence.chart_shape_properties.as_deref() {
     settings.shape_properties = Some(properties);
@@ -3716,6 +3794,16 @@ fn apply_data_labels_sequence_settings<'a>(
 fn data_labels_text_properties(labels: &c::DataLabels) -> Option<&c::TextProperties> {
   match labels.data_labels_choice.as_ref() {
     Some(c::DataLabelsChoice::Sequence(sequence)) => sequence.text_properties.as_deref(),
+    _ => None,
+  }
+}
+
+fn data_labels_position(labels: &c::DataLabels) -> Option<c::DataLabelPositionValues> {
+  match labels.data_labels_choice.as_ref() {
+    Some(c::DataLabelsChoice::Sequence(sequence)) => sequence
+      .data_label_position
+      .as_ref()
+      .map(|position| position.val),
     _ => None,
   }
 }
@@ -3772,6 +3860,7 @@ fn apply_data_label_sequence_presentation_settings<'a>(
   }
   if let Some(position) = sequence.data_label_position.as_ref() {
     settings.position = position.val;
+    settings.position_explicit = true;
   }
   if let Some(properties) = sequence.chart_shape_properties.as_deref() {
     settings.shape_properties = Some(properties);
@@ -4453,65 +4542,15 @@ pub fn explicit_axis_title_texts(chart_space: &c::ChartSpace) -> Vec<String> {
   texts
 }
 
-/// Returns the first explicit Latin typeface applied to fixed-output chart
-/// text. Chart-local text properties take precedence over the host theme.
+/// Returns the chart-wide Latin typeface from `c:chartSpace/c:txPr`.
+///
+/// Fonts authored on a title, axis, legend, or data label are local to that
+/// element and must not replace the host theme for unrelated chart text.
 pub fn fixed_output_latin_font_family(chart_space: &c::ChartSpace) -> Option<&str> {
   chart_space
     .text_properties
     .as_deref()
     .and_then(text_properties_latin_font_family)
-    .or_else(|| {
-      chart_space
-        .chart
-        .title
-        .as_deref()
-        .and_then(|title| title.text_properties.as_deref())
-        .and_then(text_properties_latin_font_family)
-    })
-    .or_else(|| {
-      chart_space
-        .chart
-        .title
-        .as_deref()
-        .and_then(|title| title.chart_text.as_deref())
-        .and_then(|text| match text.chart_text_choice.as_ref() {
-          Some(c::ChartTextChoice::RichText(rich)) => paragraphs_latin_font_family(&rich.paragraph),
-          _ => None,
-        })
-    })
-    .or_else(|| {
-      chart_space
-        .chart
-        .plot_area
-        .plot_area_choice2
-        .iter()
-        .find_map(|choice| match choice {
-          c::PlotAreaChoice2::CategoryAxis(axis) => axis
-            .text_properties
-            .as_deref()
-            .and_then(text_properties_latin_font_family),
-          c::PlotAreaChoice2::DateAxis(axis) => axis
-            .text_properties
-            .as_deref()
-            .and_then(text_properties_latin_font_family),
-          c::PlotAreaChoice2::SeriesAxis(axis) => axis
-            .text_properties
-            .as_deref()
-            .and_then(text_properties_latin_font_family),
-          c::PlotAreaChoice2::ValueAxis(axis) => axis
-            .text_properties
-            .as_deref()
-            .and_then(text_properties_latin_font_family),
-        })
-    })
-    .or_else(|| {
-      chart_space
-        .chart
-        .legend
-        .as_deref()
-        .and_then(|legend| legend.text_properties.as_deref())
-        .and_then(text_properties_latin_font_family)
-    })
 }
 
 fn text_properties_latin_font_family(properties: &c::TextProperties) -> Option<&str> {
@@ -4649,23 +4688,21 @@ pub fn fixed_output_texts_for_host_ui_language(
       axis_series
     };
     let mode = value_mode_for_axis(chart_space, axis.axis_id.val);
-    let scale_values = scale_values(&axis_series, mode);
+    let scale_values = if mode == ChartValueMode::PercentStacked {
+      percent_stacked_axis_scale_values(Some(axis)).to_vec()
+    } else {
+      scale_values(&axis_series, mode)
+    };
     let scale = if mode == ChartValueMode::PercentStacked {
-      Some(LinearAxisScale {
-        minimum: axis
-          .scaling
-          .min_axis_value
-          .as_ref()
-          .map_or(0.0, |value| value.val),
-        maximum: axis
-          .scaling
-          .max_axis_value
-          .as_ref()
-          .map_or(1.0, |value| value.val),
-        major_unit: axis.major_unit.as_ref().map_or(0.1, |unit| unit.val),
-        logarithmic_base: None,
-        reversed: false,
-      })
+      linear_axis_scale_with_options(
+        scale_values,
+        Some(axis),
+        10,
+        LinearAxisScaleOptions {
+          expand_if_values_close_to_border: false,
+          minimum_automatic_major_unit: None,
+        },
+      )
     } else {
       linear_axis_scale_with_options(
         scale_values,
@@ -5158,10 +5195,47 @@ fn axis_tick_values(scale: LinearAxisScale) -> Vec<f64> {
   {
     return Vec::new();
   }
+  if let Some(base) = scale.logarithmic_base.filter(|base| *base > 1.0)
+    && let Some((first, last)) =
+      logarithmic_axis_exponent_bounds(scale.minimum, scale.maximum, base)
+  {
+    return (first..=last).map(|exponent| base.powi(exponent)).collect();
+  }
   let count = axis_interval_count(scale.minimum, scale.maximum, scale.major_unit, 1_000);
   (0..=count)
     .map(|index| scale.minimum + scale.major_unit * index as f64)
     .collect()
+}
+
+/// Resolves inclusive power bounds without losing an endpoint to the binary
+/// representation of an exact power such as `0.1 = 10^-1`.
+pub(crate) fn logarithmic_axis_exponent_bounds(
+  minimum: f64,
+  maximum: f64,
+  base: f64,
+) -> Option<(i32, i32)> {
+  if !minimum.is_finite()
+    || !maximum.is_finite()
+    || !base.is_finite()
+    || minimum <= 0.0
+    || maximum <= 0.0
+    || maximum < minimum
+    || base <= 1.0
+  {
+    return None;
+  }
+  let stable_exponent = |value: f64| {
+    let raw = value.log(base);
+    let nearest = raw.round();
+    if (raw - nearest).abs() <= 1.0e-10 * raw.abs().max(1.0) {
+      nearest
+    } else {
+      raw
+    }
+  };
+  let first = stable_exponent(minimum).ceil() as i32;
+  let last = stable_exponent(maximum).floor() as i32;
+  (first <= last).then_some((first, last))
 }
 
 /// Counts complete axis intervals while tolerating the binary representation
@@ -5342,10 +5416,10 @@ pub(crate) fn value_axis_display_unit_label_text(
   let c::DisplayUnitsChoice::BuiltInUnit(unit) = units.display_units_choice.as_ref()? else {
     return None;
   };
-  let strings = OfficeStringCatalog::for_ui_language(ui_language);
   Some(
-    strings
-      .chart_display_unit(match unit.val.unwrap_or_default() {
+    crate::localization::office_chart_display_unit(
+      ui_language,
+      match unit.val.unwrap_or_default() {
         c::BuiltInUnitValues::Hundreds => ChartDisplayUnit::Hundreds,
         c::BuiltInUnitValues::Thousands => ChartDisplayUnit::Thousands,
         c::BuiltInUnitValues::TenThousands => ChartDisplayUnit::TenThousands,
@@ -5355,8 +5429,9 @@ pub(crate) fn value_axis_display_unit_label_text(
         c::BuiltInUnitValues::HundredMillions => ChartDisplayUnit::HundredMillions,
         c::BuiltInUnitValues::Billions => ChartDisplayUnit::Billions,
         c::BuiltInUnitValues::Trillions => ChartDisplayUnit::Trillions,
-      })
-      .to_string(),
+      },
+    )
+    .to_string(),
   )
 }
 
@@ -5565,34 +5640,39 @@ fn chart_series_numeric_values(series: ChartSeriesRef<'_>) -> Vec<Option<f64>> {
   Vec::new()
 }
 
-fn chart_series_x_numeric_values(series: ChartSeriesRef<'_>) -> Vec<Option<f64>> {
+fn chart_series_x_numeric_values(series: ChartSeriesRef<'_>) -> (Vec<Option<f64>>, bool) {
   let Some(values) = series.x_values else {
-    return Vec::new();
+    return (Vec::new(), false);
   };
   match values.x_values_choice.as_ref() {
     Some(c::XValuesChoice::NumberReference(reference)) => reference
       .numbering_cache
       .as_deref()
-      .map(|cache| indexed_numeric_values(&cache.numeric_point))
-      .unwrap_or_default(),
-    Some(c::XValuesChoice::NumberLiteral(literal)) => {
-      indexed_numeric_values(&literal.numeric_point)
-    }
+      .map_or((Vec::new(), false), |cache| {
+        (
+          indexed_numeric_values_with_point_count(&cache.numeric_point, cache.point_count.as_ref()),
+          true,
+        )
+      }),
+    Some(c::XValuesChoice::NumberLiteral(literal)) => (
+      indexed_numeric_values_with_point_count(&literal.numeric_point, literal.point_count.as_ref()),
+      true,
+    ),
     Some(c::XValuesChoice::StringReference(reference)) => reference
       .string_cache
       .as_deref()
-      .map(|cache| indexed_string_numeric_values(&cache.string_point))
+      .map(|cache| (indexed_string_numeric_values(&cache.string_point), false))
       .unwrap_or_default(),
     Some(c::XValuesChoice::StringLiteral(literal)) => {
-      indexed_string_numeric_values(&literal.string_point)
+      (indexed_string_numeric_values(&literal.string_point), false)
     }
     Some(c::XValuesChoice::MultiLevelStringReference(reference)) => reference
       .multi_level_string_cache
       .as_deref()
       .and_then(|cache| cache.level.first())
-      .map(|level| indexed_string_numeric_values(&level.string_point))
+      .map(|level| (indexed_string_numeric_values(&level.string_point), false))
       .unwrap_or_default(),
-    None => Vec::new(),
+    None => (Vec::new(), false),
   }
 }
 
@@ -5627,11 +5707,22 @@ fn indexed_string_numeric_values(points: &[c::StringPoint]) -> Vec<Option<f64>> 
 }
 
 fn indexed_numeric_values(points: &[c::NumericPoint]) -> Vec<Option<f64>> {
-  let length = points
+  indexed_numeric_values_with_point_count(points, None)
+}
+
+fn indexed_numeric_values_with_point_count(
+  points: &[c::NumericPoint],
+  point_count: Option<&c::PointCount>,
+) -> Vec<Option<f64>> {
+  let indexed_length = points
     .iter()
     .filter_map(|point| usize::try_from(point.index).ok())
     .max()
     .map_or(0, |index| index + 1);
+  let declared_length = point_count
+    .and_then(|count| usize::try_from(count.val).ok())
+    .unwrap_or_default();
+  let length = indexed_length.max(declared_length);
   let mut result = vec![None; length];
   for point in points {
     let Ok(index) = usize::try_from(point.index) else {
@@ -5657,7 +5748,12 @@ fn is_general_chart_number_format(code: &str) -> bool {
   // zero. LibreOffice's complete locale-data set currently resolves that
   // keyword to this finite set; its scanner accepts the localized name and
   // English `General` interchangeably. Leading NatNum/locale modifiers do
-  // not change the underlying General format.
+  // not change the underlying General format. A conditional or sign/zero
+  // fallback section still changes the program even when its first section is
+  // General, so let the shared SpreadsheetML formatter select that section.
+  if code.contains(';') {
+    return false;
+  }
   let mut keyword = code.split(';').next().unwrap_or(code).trim();
   while let Some(rest) = keyword.strip_prefix('[')
     && let Some(end) = rest.find(']')
@@ -6794,13 +6890,33 @@ pub fn date_axis_minor_tick_positions_with_maximum_auto_increment_count(
 /// that enter or leave an explicitly narrowed date window retain their exact
 /// boundary intersection.
 pub fn date_axis_data_position(chart: &ClusteredColumnChart<'_>, serial: f64) -> Option<f64> {
+  date_axis_data_position_with_shift(chart, serial, false)
+}
+
+/// Maps a stock-series date to the center of its shifted category slot.
+///
+/// Stock high-low lines and up/down bars use the category-axis scale rather
+/// than the unshifted line-series scale. With `crossBetween="between"`, the
+/// date value therefore receives the same half-unit shift as its axis label.
+pub fn shifted_date_axis_data_position(
+  chart: &ClusteredColumnChart<'_>,
+  serial: f64,
+) -> Option<f64> {
+  date_axis_data_position_with_shift(chart, serial, chart.category_axis_shifted)
+}
+
+fn date_axis_data_position_with_shift(
+  chart: &ClusteredColumnChart<'_>,
+  serial: f64,
+  shifted: bool,
+) -> Option<f64> {
   if !serial.is_finite() {
     return None;
   }
   let scale = date_axis_scale(chart)?;
   let minimum = date_axis_scaled_serial_value(chart, scale, scale.minimum, false)?;
   let maximum = date_axis_scaled_serial_value(chart, scale, scale.maximum, false)?;
-  let value = date_axis_scaled_serial_value(chart, scale, serial, false)?;
+  let value = date_axis_scaled_serial_value(chart, scale, serial, shifted)?;
   (maximum > minimum).then_some((value - minimum) / (maximum - minimum))
 }
 
@@ -7276,30 +7392,21 @@ fn is_source_linked_short_date_format(code: &str) -> bool {
 }
 
 fn indexed_values(values: &c::Values) -> Vec<Option<f64>> {
-  let points = match values.values_choice.as_ref() {
+  let cache = match values.values_choice.as_ref() {
     Some(c::ValuesChoice::NumberReference(reference)) => reference
       .numbering_cache
       .as_deref()
-      .map(|cache| cache.numeric_point.as_slice()),
-    Some(c::ValuesChoice::NumberLiteral(literal)) => Some(literal.numeric_point.as_slice()),
+      .map(|cache| (cache.numeric_point.as_slice(), cache.point_count.as_ref())),
+    Some(c::ValuesChoice::NumberLiteral(literal)) => Some((
+      literal.numeric_point.as_slice(),
+      literal.point_count.as_ref(),
+    )),
     None => None,
   };
-  let Some(points) = points else {
+  let Some((points, point_count)) = cache else {
     return Vec::new();
   };
-  let length = points
-    .iter()
-    .filter_map(|point| usize::try_from(point.index).ok())
-    .max()
-    .map_or(0, |index| index + 1);
-  let mut result = vec![None; length];
-  for point in points {
-    let Ok(index) = usize::try_from(point.index) else {
-      continue;
-    };
-    result[index] = point.numeric_value.trim().parse::<f64>().ok();
-  }
-  result
+  indexed_numeric_values_with_point_count(points, point_count)
 }
 
 fn indexed_string_points(points: &[c::StringPoint]) -> Vec<String> {
@@ -7983,10 +8090,21 @@ mod tests {
     format_chart_date, format_chart_number, has_indexed_scatter_multicomponent_data_labels,
     indexed_category_axis_labels, largest_remainder_percentages, linear_axis_scale,
     linear_axis_scale_with_options, office_automatic_marker_size_pt,
-    ordinary_clustered_column_chart, pie_chart_model,
+    ordinary_clustered_column_chart, pie_chart_model, trendline_legend_title,
   };
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
   use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn radar_default_label_position_follows_office_outside_end() {
+    assert_eq!(
+      super::default_data_label_position(
+        super::ChartSeriesKind::Radar,
+        super::ChartSeriesGrouping::Standard
+      ),
+      c::DataLabelPositionValues::OutsideEnd
+    );
+  }
 
   #[test]
   fn automatic_title_uses_the_output_ui_language_not_the_chart_editing_language() {
@@ -8000,7 +8118,9 @@ mod tests {
     assert_eq!(automatic_chart_title(Some("ja-JP")), "グラフ タイトル");
     assert_eq!(automatic_chart_title(None), "Chart Title");
     assert_eq!(super::automatic_axis_title(Some("es-MX")), "Título del eje");
+    assert_eq!(super::automatic_axis_title(Some("de-DE")), "Achsentitel");
     assert_eq!(super::automatic_axis_title(Some("zh-CN")), "坐标轴标题");
+    assert_eq!(super::automatic_axis_title(Some("ja-JP")), "軸ラベル");
     assert_eq!(super::automatic_axis_title(None), "Axis Title");
   }
 
@@ -8009,6 +8129,19 @@ mod tests {
     assert_eq!(automatic_series_title(Some("zh-CN"), 1), "系列 1");
     assert_eq!(automatic_series_title(Some("zh-TW"), 2), "數列 2");
     assert_eq!(automatic_series_title(Some("en-US"), 3), "Series 3");
+  }
+
+  #[test]
+  fn automatic_power_trendline_title_uses_the_japanese_ui_resource() {
+    let trendline = c::Trendline::from_bytes(
+      br#"<c:trendline xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:trendlineType val="power"/></c:trendline>"#,
+    )
+    .expect("power trendline");
+
+    assert_eq!(
+      trendline_legend_title(&trendline, "Y-Values", Some("ja-JP")),
+      "累乗 (Y-Values)"
+    );
   }
 
   #[test]
@@ -8264,6 +8397,17 @@ mod tests {
   }
 
   #[test]
+  fn conditional_general_chart_format_uses_its_literal_fallback_section() {
+    let primary = r#"[<>0]General;"kt""#;
+    let secondary = r#"[<>0]General;\ "2011-12 $/t""#;
+
+    assert_eq!(format_chart_number(500.0, Some(primary)), "500");
+    assert_eq!(format_chart_number(0.0, Some(primary)), "kt");
+    assert_eq!(format_chart_number(200.0, Some(secondary)), "200");
+    assert_eq!(format_chart_number(0.0, Some(secondary)), " 2011-12 $/t");
+  }
+
+  #[test]
   fn largest_remainder_percentages_rejects_mixed_sign_and_invalid_totals() {
     assert_eq!(
       largest_remainder_percentages(&[Some(1.0), Some(-1.0)], f64::EPSILON * 2.0),
@@ -8382,6 +8526,16 @@ mod tests {
   }
 
   #[test]
+  fn fixed_output_does_not_promote_a_rich_title_font_to_chart_default() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr><a:latin typeface="Times New Roman"/></a:rPr><a:t>Local title</a:t></a:r></a:p></c:rich></c:tx></c:title><c:plotArea/></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+
+    assert_eq!(fixed_output_latin_font_family(&chart_space), None);
+  }
+
+  #[test]
   fn pie_percent_labels_use_largest_remainder_rounding() {
     let chart_space = c::ChartSpace::from_bytes(
       br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:showVal val="0"/><c:showCatName val="1"/><c:showPercent val="1"/></c:dLbls><c:cat><c:strLit><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt><c:pt idx="2"><c:v>C</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>1</c:v></c:pt><c:pt idx="2"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#,
@@ -8421,6 +8575,29 @@ mod tests {
       pie.title,
       Some(ChartTitleText::Explicit("col1".to_string()))
     );
+  }
+
+  #[test]
+  fn pie3d_y_rotation_controls_first_slice_angle_and_uses_zero_default() {
+    for (xml, expected) in [
+      (
+        br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:view3D><c:rotY val="30"/></c:view3D><c:plotArea><c:pie3DChart><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pie3DChart></c:plotArea></c:chart></c:chartSpace>"#
+          .as_slice(),
+        30.0,
+      ),
+      (
+        br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:pie3DChart><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pie3DChart></c:plotArea></c:chart></c:chartSpace>"#
+          .as_slice(),
+        0.0,
+      ),
+    ] {
+      let chart_space = c::ChartSpace::from_bytes(xml).expect("3-D pie chart");
+      let pie = pie_chart_model(&chart_space).expect("pie model");
+
+      assert_eq!(pie.kind, super::RadialChartKind::Pie3D);
+      assert_eq!(pie.first_slice_angle_deg, expected);
+      assert_eq!(pie.view_3d.expect("3-D view").rotate_y_deg, expected as f32);
+    }
   }
 
   #[test]
@@ -8569,6 +8746,38 @@ mod tests {
   }
 
   #[test]
+  fn radial_chart_retains_series_label_placement_before_point_overrides() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:dLbl><c:idx val="0"/><c:dLblPos val="bestFit"/></c:dLbl><c:dLblPos val="ctr"/><c:showVal val="1"/></c:dLbls><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser><c:dLbls><c:dLblPos val="outEnd"/></c:dLbls></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    let chart = super::pie_chart_model(&chart_space).expect("pie chart");
+    assert_eq!(
+      chart.data_label_default_position,
+      Some(c::DataLabelPositionValues::Center)
+    );
+    assert_eq!(
+      chart.data_labels[0].position,
+      c::DataLabelPositionValues::BestFit
+    );
+    assert_eq!(
+      chart.data_labels[1].position,
+      c::DataLabelPositionValues::Center
+    );
+
+    let doughnut = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:doughnutChart><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:showVal val="1"/></c:dLbls><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser><c:holeSize val="50"/></c:doughnutChart></c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    let chart = super::pie_chart_model(&doughnut).expect("doughnut chart");
+    assert_eq!(chart.data_label_default_position, None);
+    assert_eq!(
+      chart.data_labels[0].position,
+      c::DataLabelPositionValues::Center
+    );
+  }
+
+  #[test]
   fn series_data_label_settings_expand_to_points_before_point_deletes() {
     let chart_space = c::ChartSpace::from_bytes(
       br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Revenue</c:v></c:tx><c:dLbls><c:dLbl><c:idx val="1"/><c:delete val="1"/></c:dLbl><c:dLblPos val="outEnd"/><c:showVal val="1"/><c:showCatName val="1"/><c:separator>, </c:separator></c:dLbls><c:cat><c:strLit><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>"#,
@@ -8694,6 +8903,14 @@ mod tests {
       .as_deref(),
       Some("十亿")
     );
+    assert_eq!(
+      super::value_axis_display_unit_label_text(
+        chart.value_axis.expect("value axis"),
+        Some("de-DE"),
+      )
+      .as_deref(),
+      Some("Milliarden")
+    );
   }
 
   #[test]
@@ -8735,6 +8952,40 @@ mod tests {
     assert_eq!(scale.minimum, 0.0);
     assert_eq!(scale.maximum, 5.0);
     assert_eq!(scale.major_unit, 0.5);
+  }
+
+  #[test]
+  fn percent_stacked_logarithmic_axis_keeps_the_authored_base() {
+    let chart_space = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:valAx><c:axId val="2"/><c:scaling><c:logBase val="10"/></c:scaling><c:axPos val="l"/><c:crossAx val="1"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .expect("chart space");
+    let axis = chart_space
+      .chart
+      .plot_area
+      .plot_area_choice2
+      .iter()
+      .find_map(|choice| match choice {
+        c::PlotAreaChoice2::ValueAxis(axis) => Some(axis.as_ref()),
+        _ => None,
+      })
+      .expect("value axis");
+
+    let scale = linear_axis_scale_with_options(
+      super::percent_stacked_axis_scale_values(Some(axis)),
+      Some(axis),
+      10,
+      LinearAxisScaleOptions {
+        expand_if_values_close_to_border: false,
+        minimum_automatic_major_unit: None,
+      },
+    )
+    .expect("logarithmic percentage scale");
+
+    assert_eq!(scale.minimum, 0.1);
+    assert_eq!(scale.maximum, 1.0);
+    assert_eq!(scale.logarithmic_base, Some(10.0));
+    assert_eq!(super::axis_tick_values(scale), [0.1, 1.0]);
   }
 
   #[test]

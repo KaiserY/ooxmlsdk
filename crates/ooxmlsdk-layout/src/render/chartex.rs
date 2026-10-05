@@ -1709,11 +1709,19 @@ fn chart_bands(
   label_font_size_pt: f32,
   has_category_axis_title: bool,
 ) -> (PlotRect, Option<PlotRect>, Option<PlotRect>) {
+  // Word's ChartEx frame keeps a physical 5.04pt edge inset as chart height
+  // changes. Native 216/252/288pt box-whisker controls keep the title and
+  // top grid at the same page position while the bottom grid follows height.
+  let edge_inset = if host == ChartExHost::Word {
+    5.04
+  } else {
+    frame.height_pt * 0.02
+  };
   let mut plot = PlotRect {
     x: frame.x_pt,
-    y: frame.y_pt + frame.height_pt * 0.02,
+    y: frame.y_pt + edge_inset,
     width: frame.width_pt,
-    height: frame.height_pt * 0.96,
+    height: (frame.height_pt - 2.0 * edge_inset).max(1.0),
   };
   let mut title_slot = None;
   let mut legend_slot = None;
@@ -1732,26 +1740,32 @@ fn chart_bands(
   if let Some(title) = title {
     let overlay = title.overlay.is_some_and(|value| value.as_bool());
     let side = title.pos.unwrap_or(cx::SidePos::T);
-    let mut thickness = if matches!(side, cx::SidePos::T | cx::SidePos::B) {
-      frame.height_pt
-        * if automatic_title_with_top_legend && side == cx::SidePos::T {
-          0.125
-        } else if excel_top_title_with_top_legend && side == cx::SidePos::T {
-          0.112
-        } else if host == ChartExHost::PowerPoint
-          && side == cx::SidePos::T
-          && chart_title_text(title).is_empty()
-        {
-          // PowerPoint's empty ChartEx title reserves a compact one-line UI
-          // resource band. The Office 2016 waterfall, box-whisker, and
-          // sunburst decks all retain 95% of the inset plot height below it.
-          0.05
-        } else {
-          0.09
-        }
-    } else {
-      frame.width_pt * 0.14
-    };
+    let mut thickness =
+      if host == ChartExHost::Word && side == cx::SidePos::T && !chart_title_text(title).is_empty()
+      {
+        // The authored Word ChartEx title owns a 19.2pt band independent of
+        // chart height; its text baseline is fixed in the same three controls.
+        19.2
+      } else if matches!(side, cx::SidePos::T | cx::SidePos::B) {
+        frame.height_pt
+          * if automatic_title_with_top_legend && side == cx::SidePos::T {
+            0.125
+          } else if excel_top_title_with_top_legend && side == cx::SidePos::T {
+            0.112
+          } else if host == ChartExHost::PowerPoint
+            && side == cx::SidePos::T
+            && chart_title_text(title).is_empty()
+          {
+            // PowerPoint's empty ChartEx title reserves a compact one-line UI
+            // resource band. The Office 2016 waterfall, box-whisker, and
+            // sunburst decks all retain 95% of the inset plot height below it.
+            0.05
+          } else {
+            0.09
+          }
+      } else {
+        frame.width_pt * 0.14
+      };
     if matches!(side, cx::SidePos::T | cx::SidePos::B) {
       // An authored title outline participates in Office's automatic title
       // box.  The stroke is centered on the shape boundary, so half of its
@@ -3785,7 +3799,7 @@ fn lower_box_whisker_chart(
     // Cartesian grid. Word remains the counterexample and keeps the generic
     // statistical inset.
     ChartExHost::Excel => 11.40,
-    ChartExHost::Word => 5.95,
+    ChartExHost::Word => 7.5,
   };
   let data_plot = cartesian_plot_with_top_inset(
     plot,

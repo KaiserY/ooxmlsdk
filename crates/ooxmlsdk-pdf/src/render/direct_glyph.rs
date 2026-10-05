@@ -1,21 +1,27 @@
 use kurbo::{
-  Arc, BezPath, Cap as KurboCap, CubicBez, Join as KurboJoin, ParamCurve, ParamCurveArclen, PathEl,
-  PathSeg, Point, Shape, Stroke as KurboStroke, StrokeOpts, Vec2, offset::offset_cubic,
-  stroke as expand_stroke,
+  Arc, BezPath, Cap as KurboCap, CubicBez, Join as KurboJoin, PathEl, Point, Shape,
+  Stroke as KurboStroke, StrokeOpts, Vec2, offset::offset_cubic, stroke as expand_stroke,
 };
 use skrifa::{
   FontRef, GlyphId, MetadataProvider,
   instance::{LocationRef, Size},
-  outline::{DrawSettings, OutlinePen},
+  outline::DrawSettings,
   raw::TableProvider,
 };
 
 use super::paint::{PaintGlyph, PaintGlyphFontRun};
 use crate::error::{PdfError, Result};
 use ooxmlsdk_layout::common;
+use ooxmlsdk_layout::common::text_warp_projection::{
+  GlyphOutlinePath as SkrifaGlyphOutline, TextWarpBoundary, common_commands_to_bez_path,
+  split_outline_at_warp_seams, text_warp_point, text_warp_source_seams,
+};
 
 const SYNTHETIC_ITALIC_SHEAR: f32 = 1.0 / 3.0;
-const TEXT_WARP_ARCLEN_ACCURACY_PT: f64 = 0.0001;
+// Controlled Word PDF outlines retain this fitpath fraction across three
+// typefaces, four strings, and 100/156/250 pt host widths. Keep it distinct
+// from DrawingML envelope geometry and ordinary text scaling.
+const VML_FIT_PATH_TEXT_SCALE: f64 = 0.9961;
 const GLYPH_STROKE_EXPANSION_TOLERANCE_PT: f64 = 0.02;
 
 #[derive(Clone, Copy, Debug)]
@@ -41,6 +47,14 @@ impl DirectOutlinePath {
 
   pub(super) fn commands(&self) -> &[common::PathCommand] {
     &self.commands
+  }
+
+  pub(super) fn vml_shadowed(&self, shadow: common::VmlTextShadow) -> Option<Self> {
+    let source = common_commands_to_bez_path(&self.commands);
+    let projected = shadow.project_path(&source)?;
+    let mut commands = Vec::new();
+    append_mapped_outline(&projected, |point| point, &mut commands).ok()?;
+    Some(Self { commands })
   }
 
   pub(super) fn is_empty(&self) -> bool {
@@ -675,27 +689,6 @@ fn kurbo_join(stroke: &common::Stroke<'static>) -> Result<(KurboJoin, f64)> {
   Ok((join, miter_limit))
 }
 
-fn common_commands_to_bez_path(commands: &[common::PathCommand]) -> BezPath {
-  let mut path = BezPath::new();
-  for command in commands {
-    match *command {
-      common::PathCommand::MoveTo(point) => path.move_to(common_point(point)),
-      common::PathCommand::LineTo(point) => path.line_to(common_point(point)),
-      common::PathCommand::CubicTo {
-        control1,
-        control2,
-        end,
-      } => path.curve_to(
-        common_point(control1),
-        common_point(control2),
-        common_point(end),
-      ),
-      common::PathCommand::Close => path.close_path(),
-    }
-  }
-  path
-}
-
 /// Converts the exact shaped glyph IDs into page-space PDF path geometry.
 ///
 /// The font design coordinate system is Y-up, whereas the shared layout and
@@ -708,6 +701,7 @@ pub(super) fn build_glyph_outline_path(
   placement: GlyphOutlinePlacement,
   transform: Option<common::Transform>,
   warp: Option<&common::TextWarp>,
+  office_dashed_contours: bool,
 ) -> Result<DirectOutlinePath> {
   validate_placement(placement)?;
   let face =
@@ -732,12 +726,26 @@ pub(super) fn build_glyph_outline_path(
     )));
   }
   let design_scale = run.font_size_pt / units_per_em;
+  // VML fitpath places a font-wide vertical anchor on the path, rather than
+  // the bottom of the glyphs actually present (which moves with `g`). The
+  // typographic ascender relative to half the Windows ascent reproduces the
+  // font-dependent offset observed in controlled Word PDF outlines. The
+  // remaining centerline origin is 1/40 em below that metric: the same
+  // offset is visible for Arial Black O/A/I/g across different path widths.
+  let vml_centerline_offset_pt = face.os2().ok().map_or(0.0, |os2| {
+    (f64::from(os2.s_typo_ascender()) - f64::from(os2.us_win_ascent()) / 2.0
+      + f64::from(units_per_em) / 40.0)
+      .max(0.0)
+      * f64::from(design_scale)
+  });
   let warp_boundaries = warp
     .map(|warp| {
       warp
         .boundaries
         .iter()
-        .map(|commands| TextWarpBoundary::new(commands))
+        .map(|commands| {
+          TextWarpBoundary::new(commands).map_err(|message| PdfError::Writer(message.into()))
+        })
         .collect::<Result<Vec<_>>>()
     })
     .transpose()?;
@@ -746,8 +754,15 @@ pub(super) fn build_glyph_outline_path(
       "outlined glyph text warp has no usable boundary".to_string(),
     ));
   }
-  let source_seams = match (warp, warp_boundaries.as_deref()) {
-    (Some(warp), Some(boundaries)) => text_warp_source_seams(warp, boundaries),
+  let vml_fit_path = match (warp, warp_boundaries.as_deref()) {
+    (Some(warp), Some([_])) => warp.vml_fit_path,
+    _ => None,
+  };
+  let source_seams = match (warp, warp_boundaries.as_deref(), vml_fit_path) {
+    (_, _, Some(_)) => Vec::new(),
+    (Some(warp), Some(boundaries), None) if warp.vml_trim_band.is_none() => {
+      text_warp_source_seams(warp, boundaries)
+    }
     _ => Vec::new(),
   };
 
@@ -781,6 +796,9 @@ pub(super) fn build_glyph_outline_path(
 
     let origin_x_pt = cursor_x_pt + glyph.x_offset * run.font_size_pt * placement.horizontal_scale;
     let origin_y_pt = cursor_y_pt - glyph.y_offset * run.font_size_pt * placement.vertical_scale;
+    let glyph_center_x = f64::from(origin_x_pt)
+      + f64::from(glyph.x_advance * run.font_size_pt * placement.horizontal_scale) / 2.0;
+    let centerline_y = f64::from(origin_y_pt) - vml_centerline_offset_pt;
     let glyph_to_page = |point: kurbo::Point| {
       let design_x = if run.font_face.synthetic_italic {
         point.x + point.y * f64::from(SYNTHETIC_ITALIC_SHEAR)
@@ -794,7 +812,9 @@ pub(super) fn build_glyph_outline_path(
     };
     let map = |point: kurbo::Point| {
       let point = glyph_to_page(point);
-      if let (Some(warp), Some(boundaries)) = (warp, warp_boundaries.as_deref()) {
+      if let (Some(fit), Some([boundary])) = (vml_fit_path, warp_boundaries.as_deref()) {
+        vml_fit_path_glyph_point(fit, boundary, glyph_center_x, centerline_y, point)
+      } else if let (Some(warp), Some(boundaries)) = (warp, warp_boundaries.as_deref()) {
         text_warp_point(warp, boundaries, point)
       } else if let Some(transform) = transform {
         transform_point(transform, point)
@@ -802,131 +822,70 @@ pub(super) fn build_glyph_outline_path(
         point
       }
     };
-    let split = split_outline_at_warp_seams(&raw.path, glyph_to_page, &source_seams);
-    append_mapped_outline(split.as_ref().unwrap_or(&raw.path), map, &mut commands)?;
+    // Word's outlined-text PDF path begins at the upper-leftmost on-curve
+    // point of each contour and emits contours in reverse font order. The
+    // starting point is visible with round dotted strokes, so select it in
+    // design space before applying the WordArt transform or seam splits.
+    let source = if office_dashed_contours {
+      office_dashed_glyph_contours(&raw.path)
+    } else {
+      raw.path
+    };
+    let split = split_outline_at_warp_seams(&source, glyph_to_page, &source_seams);
+    append_mapped_outline(split.as_ref().unwrap_or(&source), map, &mut commands)?;
     advance_cursor(&mut cursor_x_pt, &mut cursor_y_pt, glyph, run, placement);
   }
 
   Ok(DirectOutlinePath { commands })
 }
 
-fn text_warp_source_seams(warp: &common::TextWarp, boundaries: &[TextWarpBoundary]) -> Vec<f64> {
-  let mut seams = Vec::new();
-  for boundary in boundaries {
-    if boundary.total <= f64::EPSILON {
-      continue;
-    }
-    for &end in &boundary.ends[..boundary.ends.len() - 1] {
-      let fraction = end / boundary.total;
-      if fraction > 0.0 && fraction < 1.0 {
-        seams.push(
-          f64::from(warp.source_bounds.origin.x.0)
-            + fraction * f64::from(warp.source_bounds.size.width.0),
-        );
-      }
-    }
-  }
-  seams.sort_by(f64::total_cmp);
-  seams.dedup_by(|a, b| (*a - *b).abs() < TEXT_WARP_ARCLEN_ACCURACY_PT);
-  seams
-}
-
-/// Office splits the original glyph geometry at the joins of an envelope's
-/// boundary segments. Mapping one unsplit segment across that join replaces
-/// the piecewise deformation with a different curve. Keep quadratics quadratic
-/// until after the warp, and retain untouched outlines byte-for-byte.
-fn split_outline_at_warp_seams(
-  path: &BezPath,
-  glyph_to_page: impl Fn(Point) -> Point,
-  seams: &[f64],
-) -> Option<BezPath> {
-  if seams.is_empty() {
-    return None;
-  }
-  let mut result = None;
-  let mut current = Point::ZERO;
-  let mut start = Point::ZERO;
-  for (index, &element) in path.elements().iter().enumerate() {
-    let segment = match element {
-      PathEl::MoveTo(point) => {
-        current = point;
-        start = point;
-        None
-      }
-      PathEl::LineTo(end) => Some(PathSeg::Line(kurbo::Line::new(current, end))),
-      PathEl::QuadTo(control, end) => {
-        Some(PathSeg::Quad(kurbo::QuadBez::new(current, control, end)))
-      }
-      PathEl::CurveTo(a, b, end) => Some(PathSeg::Cubic(CubicBez::new(current, a, b, end))),
-      PathEl::ClosePath => Some(PathSeg::Line(kurbo::Line::new(current, start))),
+fn office_dashed_glyph_contours(source: &BezPath) -> BezPath {
+  let mut contours = Vec::new();
+  for subpath in source.subpaths() {
+    let Some(PathEl::MoveTo(start)) = subpath.first().copied() else {
+      return source.clone();
     };
-    let mut cuts = Vec::new();
-    if let Some(segment) = segment {
-      let x = |point| glyph_to_page(point).x;
-      let (coefficients, min, max) = match segment {
-        PathSeg::Line(line) => {
-          let (a, b) = (x(line.p0), x(line.p1));
-          ([a, b - a, 0.0, 0.0], a.min(b), a.max(b))
-        }
-        PathSeg::Quad(quad) => {
-          let (a, b, c) = (x(quad.p0), x(quad.p1), x(quad.p2));
-          (
-            [a, 2.0 * (b - a), a - 2.0 * b + c, 0.0],
-            a.min(b).min(c),
-            a.max(b).max(c),
-          )
-        }
-        PathSeg::Cubic(cubic) => {
-          let (a, b, c, d) = (x(cubic.p0), x(cubic.p1), x(cubic.p2), x(cubic.p3));
-          (
-            [
-              a,
-              3.0 * (b - a),
-              3.0 * (a - 2.0 * b + c),
-              d - a + 3.0 * (b - c),
-            ],
-            a.min(b).min(c).min(d),
-            a.max(b).max(c).max(d),
-          )
-        }
+    if !matches!(subpath.last(), Some(PathEl::ClosePath)) {
+      return source.clone();
+    }
+    let mut segments = subpath[1..subpath.len() - 1].to_vec();
+    if segments.is_empty() {
+      return source.clone();
+    }
+    let endpoint = |element: &PathEl| match element {
+      PathEl::LineTo(point) | PathEl::QuadTo(_, point) | PathEl::CurveTo(_, _, point) => {
+        Some(*point)
+      }
+      _ => None,
+    };
+    let Some(last) = segments.last().and_then(endpoint) else {
+      return source.clone();
+    };
+    if last != start {
+      segments.push(PathEl::LineTo(start));
+    }
+    let mut best = start;
+    let mut best_index = segments.len() - 1;
+    for (index, segment) in segments.iter().enumerate() {
+      let Some(point) = endpoint(segment) else {
+        return source.clone();
       };
-      for &seam in seams {
-        if seam <= min || seam >= max {
-          continue;
-        }
-        cuts.extend(
-          kurbo::common::solve_cubic(
-            coefficients[0] - seam,
-            coefficients[1],
-            coefficients[2],
-            coefficients[3],
-          )
-          .into_iter()
-          .filter(|&t| t > 1e-9 && t < 1.0 - 1e-9),
-        );
-      }
-      current = segment.end();
-      cuts.sort_by(f64::total_cmp);
-      cuts.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
-      if !cuts.is_empty() {
-        let result =
-          result.get_or_insert_with(|| BezPath::from_vec(path.elements()[..index].to_vec()));
-        let mut from = 0.0;
-        for to in cuts.into_iter().chain(std::iter::once(1.0)) {
-          result.push(segment.subsegment(from..to).as_path_el());
-          from = to;
-        }
-        if element == PathEl::ClosePath {
-          result.close_path();
-        }
-        continue;
+      if point.y > best.y || (point.y == best.y && point.x < best.x) {
+        best = point;
+        best_index = index;
       }
     }
-    if let Some(result) = &mut result {
-      result.push(element);
-    }
+    contours.push((best, best_index, segments));
   }
-  result
+  let mut reordered = BezPath::new();
+  for (start, index, segments) in contours.into_iter().rev() {
+    reordered.move_to(start);
+    for offset in 1..=segments.len() {
+      reordered.push(segments[(index + offset) % segments.len()]);
+    }
+    reordered.close_path();
+  }
+  reordered
 }
 
 fn validate_placement(placement: GlyphOutlinePlacement) -> Result<()> {
@@ -966,110 +925,13 @@ fn advance_cursor(
   *cursor_y_pt -= glyph.y_advance * run.font_size_pt * placement.vertical_scale;
 }
 
-#[derive(Default)]
-struct SkrifaGlyphOutline {
-  path: BezPath,
-}
-
-impl OutlinePen for SkrifaGlyphOutline {
-  fn move_to(&mut self, x: f32, y: f32) {
-    self.path.move_to((f64::from(x), f64::from(y)));
-  }
-
-  fn line_to(&mut self, x: f32, y: f32) {
-    self.path.line_to((f64::from(x), f64::from(y)));
-  }
-
-  fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-    self
-      .path
-      .quad_to((f64::from(x1), f64::from(y1)), (f64::from(x), f64::from(y)));
-  }
-
-  fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-    self.path.curve_to(
-      (f64::from(x1), f64::from(y1)),
-      (f64::from(x2), f64::from(y2)),
-      (f64::from(x), f64::from(y)),
-    );
-  }
-
-  fn close(&mut self) {
-    self.path.close_path();
-  }
-}
-
 fn append_mapped_outline(
   path: &BezPath,
   map: impl Fn(kurbo::Point) -> kurbo::Point,
   commands: &mut Vec<common::PathCommand>,
 ) -> Result<()> {
-  let mut current = None;
-  for element in path.elements() {
-    match *element {
-      PathEl::MoveTo(point) => {
-        let point = checked_point(map(point))?;
-        commands.push(common::PathCommand::MoveTo(point));
-        current = Some(point);
-      }
-      PathEl::LineTo(point) => {
-        let point = checked_point(map(point))?;
-        commands.push(common::PathCommand::LineTo(point));
-        current = Some(point);
-      }
-      PathEl::QuadTo(control, end) => {
-        let start = current.ok_or_else(|| {
-          PdfError::Writer("outlined glyph quadratic segment has no current point".to_string())
-        })?;
-        let control = checked_point(map(control))?;
-        let end = checked_point(map(end))?;
-        let control1 = common::Point {
-          x: common::Pt(start.x.0 + (control.x.0 - start.x.0) * (2.0 / 3.0)),
-          y: common::Pt(start.y.0 + (control.y.0 - start.y.0) * (2.0 / 3.0)),
-        };
-        let control2 = common::Point {
-          x: common::Pt(end.x.0 + (control.x.0 - end.x.0) * (2.0 / 3.0)),
-          y: common::Pt(end.y.0 + (control.y.0 - end.y.0) * (2.0 / 3.0)),
-        };
-        commands.push(common::PathCommand::CubicTo {
-          control1,
-          control2,
-          end,
-        });
-        current = Some(end);
-      }
-      PathEl::CurveTo(control1, control2, end) => {
-        let control1 = checked_point(map(control1))?;
-        let control2 = checked_point(map(control2))?;
-        let end = checked_point(map(end))?;
-        commands.push(common::PathCommand::CubicTo {
-          control1,
-          control2,
-          end,
-        });
-        current = Some(end);
-      }
-      PathEl::ClosePath => {
-        commands.push(common::PathCommand::Close);
-        current = None;
-      }
-    }
-  }
-  Ok(())
-}
-
-fn checked_point(point: kurbo::Point) -> Result<common::Point> {
-  let x = point.x as f32;
-  let y = point.y as f32;
-  if !x.is_finite() || !y.is_finite() {
-    return Err(PdfError::Writer(
-      "outlined glyph path contains a non-finite coordinate".to_string(),
-    ));
-  }
-  Ok(common::Point {
-    x: common::Pt(x),
-    y: common::Pt(y),
-  })
+  common::text_warp_projection::append_mapped_outline(path, map, commands)
+    .map_err(|message| PdfError::Writer(message.into()))
 }
 
 fn transform_point(transform: common::Transform, point: kurbo::Point) -> kurbo::Point {
@@ -1083,107 +945,67 @@ fn transform_point(transform: common::Transform, point: kurbo::Point) -> kurbo::
   )
 }
 
-/// A DrawingML envelope is sampled by distance along its original curves, not
-/// along coarse chords. Keep segment lengths once per run; mapping each glyph
-/// control point then needs only a segment lookup and inverse arc length.
-struct TextWarpBoundary {
-  segments: Vec<PathSeg>,
-  ends: Vec<f64>,
-  total: f64,
-}
-
-impl TextWarpBoundary {
-  fn new(commands: &[common::PathCommand]) -> Result<Self> {
-    let path = common_commands_to_bez_path(commands);
-    if !path.is_finite() {
-      return Err(PdfError::Writer(
-        "outlined glyph text warp has an invalid boundary".to_string(),
-      ));
-    }
-    let segments: Vec<_> = path.segments().collect();
-    if segments.is_empty() {
-      return Err(PdfError::Writer(
-        "outlined glyph text warp has no boundary segments".to_string(),
-      ));
-    }
-    let accuracy = TEXT_WARP_ARCLEN_ACCURACY_PT / segments.len() as f64;
-    let mut total = 0.0;
-    let ends = segments
-      .iter()
-      .map(|segment| {
-        total += segment.arclen(accuracy);
-        total
-      })
-      .collect();
-    Ok(Self {
-      segments,
-      ends,
-      total,
-    })
-  }
-
-  fn sample(&self, position: f64) -> Point {
-    if self.total <= f64::EPSILON || position <= 0.0 {
-      return self.segments[0].start();
-    }
-    if position >= 1.0 {
-      return self.segments.last().expect("validated boundary").end();
-    }
-    let target = position.clamp(0.0, 1.0) * self.total;
-    let index = self
-      .ends
-      .partition_point(|&end| end < target)
-      .min(self.segments.len() - 1);
-    let start = if index == 0 {
-      0.0
-    } else {
-      self.ends[index - 1]
-    };
-    let segment = &self.segments[index];
-    segment.eval(segment.inv_arclen(target - start, TEXT_WARP_ARCLEN_ACCURACY_PT))
-  }
-}
-
-fn common_point(point: common::Point) -> kurbo::Point {
-  kurbo::Point::new(f64::from(point.x.0), f64::from(point.y.0))
-}
-
-fn text_warp_point(
-  warp: &common::TextWarp,
-  boundaries: &[TextWarpBoundary],
+fn vml_fit_path_glyph_point(
+  fit: common::VmlFitPath,
+  boundary: &TextWarpBoundary,
+  glyph_center_x: f64,
+  centerline_y: f64,
   point: kurbo::Point,
 ) -> kurbo::Point {
-  let source = warp.source_bounds;
-  let width = f64::from(source.size.width.0).max(f64::EPSILON);
-  let height = f64::from(source.size.height.0).max(f64::EPSILON);
-  let u = ((point.x - f64::from(source.origin.x.0)) / width).clamp(0.0, 1.0);
-  let v = ((point.y - f64::from(source.origin.y.0)) / height).clamp(0.0, 1.0);
-  if boundaries.len() >= 2 {
-    let grid_position = v * (boundaries.len() - 1) as f64;
-    let upper_index = (grid_position.floor() as usize).min(boundaries.len() - 2);
-    let local_v = (grid_position - upper_index as f64).clamp(0.0, 1.0);
-    let upper = boundaries[upper_index].sample(u);
-    let lower = boundaries[upper_index + 1].sample(u);
-    return upper + (lower - upper) * local_v;
+  let width = f64::from(fit.advance_width.0);
+  if width <= f64::EPSILON || boundary.total <= f64::EPSILON {
+    return point;
   }
-
-  let center = boundaries[0].sample(u);
-  let before = boundaries[0].sample((u - 0.001).max(0.0));
-  let after = boundaries[0].sample((u + 0.001).min(1.0));
-  let tangent = after - before;
-  let length = tangent.hypot();
-  if length <= f64::EPSILON {
+  // fitpath measures the text by its logical advances. Each glyph is scaled
+  // uniformly and rotated at its own advance center, rather than bending its
+  // outline point-by-point like a DrawingML deformation envelope.
+  let logical_u = ((glyph_center_x - f64::from(fit.start_x.0)) / width).clamp(0.0, 1.0);
+  let u = 0.5 + (logical_u - 0.5) * VML_FIT_PATH_TEXT_SCALE;
+  let center = boundary.sample(u);
+  let tangent = boundary.sample((u + 0.001).min(1.0)) - boundary.sample((u - 0.001).max(0.0));
+  let tangent_length = tangent.hypot();
+  if tangent_length <= f64::EPSILON {
     return center;
   }
-  let normal = kurbo::Vec2::new(-tangent.y / length, tangent.x / length);
-  center + normal * ((v - 0.5) * height)
+  let tangent = tangent / tangent_length;
+  let normal = Vec2::new(-tangent.y, tangent.x);
+  let scale = boundary.total / width * VML_FIT_PATH_TEXT_SCALE;
+  center
+    + tangent * ((point.x - glyph_center_x) * scale)
+    + normal * ((point.y - centerline_y) * scale)
 }
 
 #[cfg(test)]
 mod tests {
-  use kurbo::{Circle, Rect, Shape};
+  use kurbo::{Circle, ParamCurve, ParamCurveArclen, PathSeg, Rect, Shape};
 
   use super::*;
+
+  #[test]
+  fn office_dashed_glyph_contours_reverse_order_and_start_at_upper_left_on_curve() {
+    let mut source = BezPath::new();
+    source.move_to((0.0, 0.0));
+    source.line_to((2.0, 2.0));
+    source.line_to((4.0, 2.0));
+    source.close_path();
+    source.move_to((10.0, 0.0));
+    source.line_to((12.0, 4.0));
+    source.line_to((10.0, 4.0));
+    source.close_path();
+
+    let reordered = office_dashed_glyph_contours(&source);
+    let starts = reordered
+      .elements()
+      .iter()
+      .filter_map(|element| match element {
+        PathEl::MoveTo(point) => Some(*point),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(starts, vec![Point::new(10.0, 4.0), Point::new(2.0, 2.0)]);
+    assert!((reordered.area() - source.area()).abs() < 1e-9);
+    assert_eq!(reordered.bounding_box(), source.bounding_box());
+  }
 
   #[test]
   fn text_warp_seams_split_lines_and_implicit_closure_without_changing_geometry() {

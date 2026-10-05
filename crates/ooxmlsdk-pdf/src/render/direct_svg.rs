@@ -16,7 +16,7 @@ const OFFICE_MATH_SEMANTIC_CLIP_ID: &str = "math-semantic-clip";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum OfficeMathTextMarker {
-  Visible,
+  Visible { exact_glyph_id: Option<u32> },
   Semantic { exact_glyph_id: Option<u32> },
 }
 
@@ -797,6 +797,20 @@ fn write_text(
   if semantic_source.is_some_and(|source| source.id != text.id() || source.marker != marker) {
     return unsupported("OfficeMath SVG source/tree semantic marker mismatch");
   }
+  if matches!(
+    marker,
+    OfficeMathTextMarker::Visible {
+      exact_glyph_id: Some(_)
+    }
+  ) && text
+    .layouted()
+    .iter()
+    .map(|span| span.positioned_glyphs.len())
+    .sum::<usize>()
+    != 1
+  {
+    return unsupported("exact OfficeMath visible text must contain one glyph");
+  }
 
   let mut wrote_exact_glyph = false;
   let mut wrote_any_glyph = false;
@@ -817,11 +831,16 @@ fn write_text(
     let color = solid_color(fill.paint())?;
     for positioned in &span.positioned_glyphs {
       let glyph_id = match marker {
-        OfficeMathTextMarker::Visible
+        OfficeMathTextMarker::Visible {
+          exact_glyph_id: None,
+        }
         | OfficeMathTextMarker::Semantic {
           exact_glyph_id: None,
         } => u32::from(positioned.id.0),
-        OfficeMathTextMarker::Semantic {
+        OfficeMathTextMarker::Visible {
+          exact_glyph_id: Some(glyph_id),
+        }
+        | OfficeMathTextMarker::Semantic {
           exact_glyph_id: Some(glyph_id),
         } => glyph_id,
       };
@@ -859,7 +878,7 @@ fn write_text(
             feature: "OfficeMath SVG exact semantic glyph source",
           },
         )?,
-        OfficeMathTextMarker::Visible
+        OfficeMathTextMarker::Visible { .. }
         | OfficeMathTextMarker::Semantic {
           exact_glyph_id: None,
         } => positioned.text.as_str(),
@@ -1025,8 +1044,16 @@ fn write_registered_glyph(
 
 fn office_math_text_marker(id: &str) -> Option<OfficeMathTextMarker> {
   if let Some(item_index) = id.strip_prefix(OFFICE_MATH_VISIBLE_GLYPH_PREFIX) {
+    if item_index.parse::<usize>().is_ok() {
+      return Some(OfficeMathTextMarker::Visible {
+        exact_glyph_id: None,
+      });
+    }
+    let (item_index, glyph_id) = item_index.rsplit_once("-gid-")?;
     item_index.parse::<usize>().ok()?;
-    return Some(OfficeMathTextMarker::Visible);
+    return Some(OfficeMathTextMarker::Visible {
+      exact_glyph_id: Some(glyph_id.parse::<u32>().ok()?),
+    });
   }
   let marker = id.strip_prefix(OFFICE_MATH_SEMANTIC_GLYPH_PREFIX)?;
   if marker.parse::<usize>().is_ok() {
@@ -1173,7 +1200,15 @@ mod tests {
   fn office_math_text_markers_are_closed_and_exact() {
     assert_eq!(
       office_math_text_marker("ooxmlsdk-math-visible-16"),
-      Some(OfficeMathTextMarker::Visible)
+      Some(OfficeMathTextMarker::Visible {
+        exact_glyph_id: None
+      })
+    );
+    assert_eq!(
+      office_math_text_marker("ooxmlsdk-math-visible-16-gid-2869"),
+      Some(OfficeMathTextMarker::Visible {
+        exact_glyph_id: Some(2869)
+      })
     );
     assert_eq!(
       office_math_text_marker("ooxmlsdk-math-semantic-17"),
@@ -1188,6 +1223,10 @@ mod tests {
       })
     );
     assert_eq!(office_math_text_marker("ooxmlsdk-math-visible-x"), None);
+    assert_eq!(
+      office_math_text_marker("ooxmlsdk-math-visible-16-gid-x"),
+      None
+    );
     assert_eq!(
       office_math_text_marker("ooxmlsdk-math-semantic-17-gid-x"),
       None

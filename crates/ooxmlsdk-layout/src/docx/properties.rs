@@ -1,7 +1,7 @@
 use super::{
   LO_SUBSCRIPT_BASELINE_SHIFT_SCALE, LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE, LegacyTextRelief,
   MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat, ParagraphProps, RunProps, RunStyleOverrides,
-  StylesCatalog, TextStyle, ThemeColors, ThemeFonts, WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE,
+  StylesCatalog, TextStyle, ThemeColors, ThemeFonts, WORD_DEFAULT_ESCAPEMENT_HEIGHT_PERCENT,
   apply_w14_rgb_effect_transforms, apply_w14_scheme_effect_transforms,
   automatic_text_color_for_background, drawingml_text_effect_common_fill,
   drawingml_text_outline_effect_common_fill, merge_paragraph_format_with_theme,
@@ -57,12 +57,14 @@ pub(super) fn paragraph_format(
   direct_properties: Option<ParagraphProps<'_>>,
 ) -> ParagraphFormat {
   let mut format = styles.paragraph_format_with_base(style_id, base_format);
+  let inherited_bidi = format.bidi;
   merge_paragraph_format_with_theme(
     &mut format,
     direct_properties,
     styles.import_settings,
     &styles.theme_colors,
   );
+  format.bidi_differs_from_style = format.bidi != inherited_bidi;
   format
 }
 
@@ -398,6 +400,9 @@ fn merge_run_style_with_policy(
     // selects the higher-contrast neutral for a dark run background.
     style.highlight = Some(background);
   }
+  if let Some(border) = properties.border() {
+    style.word_run_border = Some(super::run_border_style(border, theme_colors));
+  }
   let has_solid_text_fill = properties.text_fill().is_some_and(|fill_effect| {
     matches!(
       fill_effect.fill_text_effect_choice.as_ref(),
@@ -462,7 +467,8 @@ fn merge_run_style_with_policy(
       None => {}
       Some(common::Fill::Pattern(_))
       | Some(common::Fill::Theme(_))
-      | Some(common::Fill::Image { .. }) => {
+      | Some(common::Fill::Image { .. })
+      | Some(common::Fill::Texture(_)) => {
         // The Word 2010 text-effect schema cannot produce these variants.
       }
     }
@@ -497,6 +503,7 @@ fn merge_run_style_with_policy(
         // It keeps a separate semantic layer only when w14:textFill removes
         // the interior, as in fdo80897's outlined warped text.
         options.semantic_text_overlay = style.opacity <= f32::EPSILON;
+        options.wordprocessing_outline = true;
         options.outline_fill = Some(fill);
         options.outline_stroke =
           wordprocessing_text_outline_common_stroke(outline_effect, theme_colors);
@@ -520,6 +527,7 @@ fn merge_run_style_with_policy(
           // and TextEffects_Groupshapes), while noFill still needs it for the
           // independently painted outline (fdo80897).
           options.semantic_text_overlay = has_solid_text_fill || style.opacity <= f32::EPSILON;
+          options.wordprocessing_outline = true;
           options.outline_fill = Some(fill);
           options.outline_stroke =
             wordprocessing_text_outline_common_stroke(outline_effect, theme_colors);
@@ -530,7 +538,8 @@ fn merge_run_style_with_policy(
       None => {}
       Some(common::Fill::Pattern(_))
       | Some(common::Fill::Theme(_))
-      | Some(common::Fill::Image { .. }) => {}
+      | Some(common::Fill::Image { .. })
+      | Some(common::Fill::Texture(_)) => {}
     }
   }
   if let Some(glow) = properties.text_glow()
@@ -604,6 +613,15 @@ fn merge_run_style_with_policy(
     parts.extrusion_color = Some(extrusion_color);
     parts.contour_color = Some(contour_color);
   }
+  if let Some(fit) = properties.fit_text()
+    && let Some(width_pt) = super::twips_measure_to_points(&fit.val)
+  {
+    style.wordprocessing_fit_text = Some(crate::model::WordprocessingFitText {
+      // MS-OE376 §2.1.79: Word links omitted IDs as ID zero.
+      id: fit.id.unwrap_or(0),
+      width_pt: width_pt.clamp(0.0, 1584.0),
+    });
+  }
   if let Some(spacing) = properties.spacing() {
     style.character_spacing_pt = units::twips_to_points(spacing.val as f32);
   }
@@ -616,9 +634,16 @@ fn merge_run_style_with_policy(
       .filter(|percentage| (1..=600).contains(percentage))
       .unwrap_or(100);
     style.horizontal_scale = Some(percentage as f32 / 100.0);
+    style.wordprocessing_font_width_percent = Some(percentage as u16);
   }
   if let Some(kern) = properties.kern() {
-    style.kerning_minimum_size_pt = Some(kern.val as f32 / 2.0);
+    // Word uses zero to disable kerning, including an inherited positive
+    // threshold. Positive values specify the minimum size in half-points.
+    style.kerning_minimum_size_pt = Some(if kern.val == 0 {
+      f32::INFINITY
+    } else {
+      kern.val as f32 / 2.0
+    });
   }
   if let Some(ligatures) = properties.ligatures() {
     use w14::LigaturesValues as Value;
@@ -760,6 +785,13 @@ pub(super) fn apply_vertical_text_alignment(
       apply_automatic_escapement(style, LO_SUBSCRIPT_BASELINE_SHIFT_SCALE);
     }
     w::VerticalPositionValues::Baseline => {
+      // Baseline cancels the inherited automatic escapement, including its
+      // glyph-size reduction. Direct sz/szCs overrides have already updated
+      // these original sizes through the preserving setters above.
+      if let Some(original_size) = style.automatic_escapement_font_size_pt {
+        style.font_size_pt = original_size;
+        style.complex_font_size_pt = style.automatic_escapement_complex_font_size_pt;
+      }
       style.baseline_shift_pt = 0.0;
       style.automatic_escapement_font_size_pt = None;
       style.automatic_escapement_complex_font_size_pt = None;
@@ -791,10 +823,29 @@ fn apply_automatic_escapement(style: &mut TextStyle, baseline_shift_scale: f32) 
   style.automatic_escapement_font_size_pt = Some(original_font_size);
   style.automatic_escapement_complex_font_size_pt = original_complex_font_size;
   style.baseline_shift_pt = effective_original_size * baseline_shift_scale;
-  style.font_size_pt =
-    (original_font_size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
-  style.complex_font_size_pt = original_complex_font_size
-    .map(|size| (size * WORD_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+  let legacy_rounding = style.wordprocessingml_legacy_escapement_rounding;
+  style.font_size_pt = automatic_escapement_glyph_size(original_font_size, legacy_rounding);
+  style.complex_font_size_pt =
+    original_complex_font_size.map(|size| automatic_escapement_glyph_size(size, legacy_rounding));
+}
+
+fn automatic_escapement_glyph_size(original_size: f32, legacy_rounding: bool) -> f32 {
+  // Word first realizes the reduced size in half points; this owns layout
+  // advances as well as the later PDF em. Native controls across four fonts,
+  // both vertical alignments and 35 sizes resolve exact half-point ties down
+  // (5pt -> 3pt, 12pt -> 8pt, 15pt -> 9.5pt). Word's useWord97LineBreakRules
+  // path instead rounds ties up (5pt -> 3.5pt, 15pt -> 10pt, 25pt -> 16.5pt).
+  // Single-setting Office controls and native LOGFONT captures establish
+  // this additional compatibility behavior; mode 15 ignores that switch.
+  // Keep the percentage arithmetic exact for authored half-point sizes.
+  let half_points =
+    f64::from(original_size) * 2.0 * f64::from(WORD_DEFAULT_ESCAPEMENT_HEIGHT_PERCENT) / 100.0;
+  let realized_half_points = if legacy_rounding {
+    half_points.round()
+  } else {
+    (half_points - 0.5).ceil()
+  };
+  ((realized_half_points * 0.5) as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT)
 }
 
 pub(super) fn set_font_size_preserving_automatic_escapement(

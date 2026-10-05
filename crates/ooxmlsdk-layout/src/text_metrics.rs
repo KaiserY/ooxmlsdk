@@ -1,3 +1,5 @@
+mod kashida;
+
 use std::sync::Arc;
 
 use ooxmlsdk_fonts::{FeatureValue, TextScript};
@@ -58,6 +60,10 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
     self.style.right_to_left()
   }
 
+  fn wordprocessing_nominal_control_metrics(&self) -> bool {
+    self.style.wordprocessing_nominal_control_metrics()
+  }
+
   fn resolved_bidi_level(&self) -> Option<u8> {
     self.style.resolved_bidi_level()
   }
@@ -105,17 +111,38 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
   fn horizontal_scale(&self) -> f32 {
     self.style.horizontal_scale()
   }
+  fn wordprocessing_layout_font_sizes(&self) -> Option<crate::common::LayoutFontSizes> {
+    self.style.wordprocessing_layout_font_sizes()
+  }
+
+  fn wordprocessing_measurement_profile(&self) -> Option<(bool, u16)> {
+    self.style.wordprocessing_measurement_profile()
+  }
 
   fn wordprocessingml_font_slots(&self) -> bool {
     self.style.wordprocessingml_font_slots()
+  }
+
+  fn wordprocessingml_form_text_blank_cell(&self) -> bool {
+    self.style.wordprocessingml_form_text_blank_cell()
   }
 
   fn wordprocessingml_cjk_line_metrics(&self) -> bool {
     self.style.wordprocessingml_cjk_line_metrics()
   }
 
+  fn wordprocessing_justification_expansion_pt(&self) -> &[f32] {
+    self.style.wordprocessing_justification_expansion_pt()
+  }
+
   fn cjk_punctuation_compression_ratio(&self) -> f32 {
     self.style.cjk_punctuation_compression_ratio()
+  }
+  fn wordprocessingml_legacy_punctuation_spacing(&self) -> bool {
+    self.style.wordprocessingml_legacy_punctuation_spacing()
+  }
+  fn wordprocessingml_punctuation_spacing(&self) -> bool {
+    self.style.wordprocessingml_punctuation_spacing()
   }
 
   fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
@@ -138,7 +165,7 @@ const FALLBACK_LINE_GAP_EM: f32 = 0.05;
 // gives a 33.84pt single-line advance from a 26.05pt ink box and moves the
 // first baseline down by 3.90pt, independently confirming the two 15% bands.
 // Writer's tdf#129808 path confirms the same four-code-page capability rule.
-const WORDPROCESSINGML_CJK_SIDE_LEADING_RATIO: f32 = 0.15;
+pub(crate) const WORDPROCESSINGML_CJK_SIDE_LEADING_RATIO: f32 = 0.15;
 // FontMetricData::ImplInitTextLineSize.
 const LO_TEXT_LINE_DESCENT_FALLBACK_DIVISOR: f32 = 10.0;
 const LO_TEXT_LINE_MAX_DESCENT_DIVISOR: f32 = 3.0;
@@ -338,6 +365,7 @@ pub struct ShapedGlyph {
   pub font_size_pt: f32,
   pub glyph_id: u32,
   pub text_range: std::ops::Range<usize>,
+  pub safe_to_insert_tatweel: bool,
   pub x_advance_em: f32,
   pub x_offset_em: f32,
   pub y_offset_em: f32,
@@ -355,6 +383,7 @@ pub struct ShapedGlyphBounds {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct MeasureStyleKey {
+  shaping_context: Option<crate::common::TextShapingContext>,
   font_family: Option<Box<str>>,
   high_ansi_font_family: Option<Box<str>>,
   fallback_font_family: Option<Box<str>>,
@@ -372,8 +401,11 @@ struct MeasureStyleKey {
   complex_script_override: Option<bool>,
   right_to_left: bool,
   resolved_bidi_level: Option<u8>,
+  wordprocessing_nominal_control_metrics: bool,
   character_spacing_bits: u32,
   horizontal_scale_bits: u32,
+  wordprocessing_measurement_profile: Option<(bool, u16)>,
+  wordprocessing_layout_font_size_bits: Option<(u32, Option<u32>)>,
   bold: bool,
   italic: bool,
   complex_bold: Option<bool>,
@@ -386,6 +418,7 @@ struct MeasureStyleKey {
   wordprocessingml_cjk_line_metrics: bool,
   wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
   wordprocessingml_east_asia_language_is_chinese: bool,
+  wordprocessingml_bidi_language_is_hebrew: bool,
   font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   high_ansi_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
@@ -395,12 +428,16 @@ struct MeasureStyleKey {
   east_asia_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   complex_font_pitch: Option<ooxmlsdk_fonts::FontPitch>,
   cjk_punctuation_compression_ratio_bits: u32,
+  wordprocessing_justification_expansion_bits: Vec<u32>,
+  wordprocessingml_legacy_punctuation_spacing: bool,
+  wordprocessingml_punctuation_spacing: bool,
   wordprocessingml_balance_single_byte_double_byte_width: bool,
 }
 
 impl MeasureStyleKey {
   fn from_style(style: &(impl FontStyleRef + ?Sized)) -> Self {
     Self {
+      shaping_context: style.shaping_context().cloned(),
       font_family: style.font_family().map(Into::into),
       high_ansi_font_family: style.high_ansi_font_family().map(Into::into),
       fallback_font_family: style.fallback_font_family().map(Into::into),
@@ -418,8 +455,16 @@ impl MeasureStyleKey {
       complex_script_override: style.complex_script_override(),
       right_to_left: style.right_to_left(),
       resolved_bidi_level: style.resolved_bidi_level(),
+      wordprocessing_nominal_control_metrics: style.wordprocessing_nominal_control_metrics(),
       character_spacing_bits: style.character_spacing_pt().to_bits(),
       horizontal_scale_bits: style.horizontal_scale().to_bits(),
+      wordprocessing_measurement_profile: style.wordprocessing_measurement_profile(),
+      wordprocessing_layout_font_size_bits: style.wordprocessing_layout_font_sizes().map(|sizes| {
+        (
+          sizes.primary.0.to_bits(),
+          sizes.complex.map(|size| size.0.to_bits()),
+        )
+      }),
       bold: style.bold(),
       italic: style.italic(),
       complex_bold: style.complex_bold(),
@@ -433,6 +478,7 @@ impl MeasureStyleKey {
       wordprocessingml_font_hint: style.wordprocessingml_font_hint(),
       wordprocessingml_east_asia_language_is_chinese: style
         .wordprocessingml_east_asia_language_is_chinese(),
+      wordprocessingml_bidi_language_is_hebrew: style.wordprocessingml_bidi_language_is_hebrew(),
       font_charset: style.font_charset(),
       high_ansi_font_charset: style.high_ansi_font_charset(),
       wordprocessingml_east_asia_font_charset: style.wordprocessingml_east_asia_font_charset(),
@@ -442,13 +488,22 @@ impl MeasureStyleKey {
       east_asia_font_pitch: style.east_asia_font_pitch(),
       complex_font_pitch: style.complex_font_pitch(),
       cjk_punctuation_compression_ratio_bits: style.cjk_punctuation_compression_ratio().to_bits(),
+      wordprocessing_justification_expansion_bits: style
+        .wordprocessing_justification_expansion_pt()
+        .iter()
+        .map(|value| value.to_bits())
+        .collect(),
+      wordprocessingml_legacy_punctuation_spacing: style
+        .wordprocessingml_legacy_punctuation_spacing(),
+      wordprocessingml_punctuation_spacing: style.wordprocessingml_punctuation_spacing(),
       wordprocessingml_balance_single_byte_double_byte_width: style
         .wordprocessingml_balance_single_byte_double_byte_width(),
     }
   }
 
   fn matches(&self, style: &(impl FontStyleRef + ?Sized)) -> bool {
-    self.font_family.as_deref() == style.font_family()
+    self.shaping_context.as_ref() == style.shaping_context()
+      && self.font_family.as_deref() == style.font_family()
       && self.high_ansi_font_family.as_deref() == style.high_ansi_font_family()
       && self.fallback_font_family.as_deref() == style.fallback_font_family()
       && self.high_ansi_fallback_font_family.as_deref() == style.high_ansi_fallback_font_family()
@@ -465,8 +520,18 @@ impl MeasureStyleKey {
       && self.complex_script_override == style.complex_script_override()
       && self.right_to_left == style.right_to_left()
       && self.resolved_bidi_level == style.resolved_bidi_level()
+      && self.wordprocessing_nominal_control_metrics
+        == style.wordprocessing_nominal_control_metrics()
       && self.character_spacing_bits == style.character_spacing_pt().to_bits()
       && self.horizontal_scale_bits == style.horizontal_scale().to_bits()
+      && self.wordprocessing_measurement_profile == style.wordprocessing_measurement_profile()
+      && self.wordprocessing_layout_font_size_bits
+        == style.wordprocessing_layout_font_sizes().map(|sizes| {
+          (
+            sizes.primary.0.to_bits(),
+            sizes.complex.map(|size| size.0.to_bits()),
+          )
+        })
       && self.bold == style.bold()
       && self.italic == style.italic()
       && self.complex_bold == style.complex_bold()
@@ -480,6 +545,8 @@ impl MeasureStyleKey {
       && self.wordprocessingml_font_hint == style.wordprocessingml_font_hint()
       && self.wordprocessingml_east_asia_language_is_chinese
         == style.wordprocessingml_east_asia_language_is_chinese()
+      && self.wordprocessingml_bidi_language_is_hebrew
+        == style.wordprocessingml_bidi_language_is_hebrew()
       && self.font_charset == style.font_charset()
       && self.high_ansi_font_charset == style.high_ansi_font_charset()
       && self.wordprocessingml_east_asia_font_charset
@@ -489,8 +556,21 @@ impl MeasureStyleKey {
       && self.high_ansi_font_pitch == style.high_ansi_font_pitch()
       && self.east_asia_font_pitch == style.east_asia_font_pitch()
       && self.complex_font_pitch == style.complex_font_pitch()
+      && self
+        .wordprocessing_justification_expansion_bits
+        .iter()
+        .copied()
+        .eq(
+          style
+            .wordprocessing_justification_expansion_pt()
+            .iter()
+            .map(|value| value.to_bits()),
+        )
       && self.cjk_punctuation_compression_ratio_bits
         == style.cjk_punctuation_compression_ratio().to_bits()
+      && self.wordprocessingml_legacy_punctuation_spacing
+        == style.wordprocessingml_legacy_punctuation_spacing()
+      && self.wordprocessingml_punctuation_spacing == style.wordprocessingml_punctuation_spacing()
       && self.wordprocessingml_balance_single_byte_double_byte_width
         == style.wordprocessingml_balance_single_byte_double_byte_width()
   }
@@ -511,6 +591,8 @@ pub struct TextMetrics {
   measure_widths: Vec<HashMap<Arc<str>, f32>>,
   gdi_hinted_extents: Vec<GdiHintedExtentCache>,
   gdi_hinting_instances: GdiHintingInstanceCache,
+  word_natural_instances: WordNaturalMetricCache,
+  excel_cell_text_insets: HashMap<usize, Option<f32>>,
   last_measure_style: Option<usize>,
 }
 
@@ -528,9 +610,81 @@ impl std::fmt::Debug for GdiHintingInstanceCache {
   }
 }
 
+#[derive(Default)]
+struct WordNaturalMetricCache {
+  instances: HashMap<(FontFaceCacheKey, u16), Option<emfsdk::render::GdiNaturalMetrics>>,
+}
+
+impl WordNaturalMetricCache {
+  fn advance(&mut self, face: &FontFaceData, pixels: u16, glyph: u32) -> Option<i32> {
+    self
+      .instances
+      .entry((face.cache_key(), pixels))
+      .or_insert_with(|| {
+        emfsdk::render::GdiNaturalMetrics::new(Arc::from(face.data.as_slice()), face.index, pixels)
+      })
+      .as_mut()?
+      .glyph_advance_px(glyph)
+  }
+}
+
+impl std::fmt::Debug for WordNaturalMetricCache {
+  fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    formatter
+      .debug_struct("WordNaturalMetricCache")
+      .field("len", &self.instances.len())
+      .finish()
+  }
+}
+
 impl TextMetrics {
   pub fn new() -> Self {
     Self::default()
+  }
+
+  /// Word dot leaders repeat an integer GDI Natural device advance. RTL
+  /// fixed output normalizes that advance to integral hundredths of an em
+  /// before converting it back to points. Source counting retains the device
+  /// advance. Native ExtTextOut/PDF captures cover 288 independent rows.
+  pub(crate) fn word_dot_leader_advances(
+    &mut self,
+    style: &crate::model::TextStyle,
+    bidi: bool,
+  ) -> Option<(f32, f32)> {
+    let percent = style.wordprocessing_font_width_percent.unwrap_or(100);
+    if !style.character_spacing_pt.is_finite()
+      || (style.horizontal_scale.unwrap_or(1.0) - f32::from(percent) / 100.0).abs() > 0.00001
+    {
+      return None;
+    }
+    let shaped = self.shape_text(".", style)?;
+    let glyph = shaped.glyphs.first()?;
+    let face = shaped.font_faces.get(glyph.font_index)?;
+    let ratio =
+      crate::common::wordprocessing_device::font_width_ratio(face, glyph.font_size_pt, percent)?;
+    let pixel_pt = crate::units::POINTS_PER_INCH / crate::units::OFFICE_FIXED_OUTPUT_DPI;
+    let pixels = (glyph.font_size_pt / pixel_pt).round();
+    if !(1.0..=f32::from(u16::MAX)).contains(&pixels) {
+      return None;
+    }
+    let natural = self
+      .word_natural_instances
+      .advance(face, pixels as u16, glyph.glyph_id)?;
+    // Native ExtTextOut advances add authored spacing after the physical
+    // font-width transform. Round its printer pixels independently; applying
+    // the font ratio to the spacing changes scaled TOC leader counts.
+    let advance =
+      (f64::from(natural) * ratio).round() as f32 + (style.character_spacing_pt / pixel_pt).round();
+    if advance <= 0.0 {
+      return None;
+    }
+    let source = advance * pixel_pt;
+    let paint = if bidi && style.right_to_left == Some(true) {
+      (advance / pixels * 100.0).round() * (pixels * pixel_pt) / 100.0
+    } else {
+      source
+    };
+    Some((source, paint))
   }
 
   pub fn into_font_resolver(self) -> FontResolver {
@@ -540,6 +694,29 @@ impl TextMetrics {
   pub fn measure_text(&mut self, text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
     if text.is_empty() {
       return 0.0;
+    }
+
+    // Word's empty legacy text form field reserves five digit cells. Its
+    // serialized result can contain en spaces, whose glyph advances are not
+    // the field's layout width. Use the authored marker face's digit advance
+    // only when that face is available: substituting another face's digits
+    // for a missing marker font changes the field width (tdf92472). Preserve
+    // the cached en-space fallback when the authored metric is unknown.
+    if style.wordprocessingml_form_text_blank_cell()
+      && text.chars().all(|character| character == '\u{2002}')
+      && self.fonts.has_exact_ascii_face(style)
+    {
+      return self
+        .shape_text(&"0".repeat(text.chars().count()), style)
+        .map_or(0.0, |shaped| shaped.width_pt);
+    }
+
+    // Justification belongs to this laid-out portion, not the natural-width
+    // cache. Subsequent unadjusted measurements must remain unchanged.
+    if !style.kashida_expansions().is_empty() || style.wordprocessing_kashida().is_some() {
+      return self
+        .shape_text(text, style)
+        .map_or(0.0, |shaped| shaped.width_pt);
     }
 
     let style_index = self.measure_style_index(style);
@@ -589,7 +766,33 @@ impl TextMetrics {
     }
 
     let runs = self.fonts.shape_text_runs(text, style)?;
-    shaped_text_from_runs(runs, |font_id| self.fonts.font_face_data(font_id))
+    let shaped = shaped_text_from_runs(runs, |font_id| self.fonts.font_face_data(font_id))?;
+    let shaped = wordprocessingml_synthetic_bold_advances(text, shaped, style);
+    let shaped = if let Some(device) = style.wordprocessing_kashida() {
+      kashida::realize_device(
+        text,
+        shaped,
+        style.horizontal_scale(),
+        device,
+        style.character_spacing_pt(),
+        &mut self.word_natural_instances,
+      )?
+    } else {
+      shaped
+    };
+    Some(kashida::expand(shaped, style))
+  }
+
+  pub(crate) fn kashida_opportunities(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Vec<kashida::KashidaOpportunity> {
+    self
+      .shape_text(text, style)
+      .map_or_else(Vec::new, |shaped| {
+        kashida::opportunities(text, &shaped, style)
+      })
   }
 
   pub(crate) fn shape_text_with_features(
@@ -610,6 +813,8 @@ impl TextMetrics {
       .fonts
       .shape_text_runs_with_features(text, style, features)?;
     shaped_text_from_runs(runs, |font_id| self.fonts.font_face_data(font_id))
+      .map(|shaped| wordprocessingml_synthetic_bold_advances(text, shaped, style))
+      .map(|shaped| kashida::expand(shaped, style))
   }
 
   /// Returns the integer device advances used by classic GDI for a simple
@@ -702,6 +907,33 @@ impl TextMetrics {
       .map(Arc::from)
   }
 
+  /// Returns the quarter-digit inset of Excel's realized cell font.
+  ///
+  /// A worksheet reuses this metric for every cell and continuation page.
+  /// Cache it by the same complete font/shaping key as natural text widths,
+  /// rather than shaping the ten digits again for each cell.
+  pub(crate) fn excel_cell_text_inset_pt(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<f32> {
+    let style_index = self.measure_style_index(style);
+    let cacheable = style.kashida_expansions().is_empty();
+    if cacheable && let Some(inset) = self.excel_cell_text_insets.get(&style_index) {
+      return *inset;
+    }
+    let inset = self
+      .excel_unrotated_character_advances_pt("0123456789", style)
+      .map(|advances| {
+        let dot = crate::units::POINTS_PER_INCH / crate::units::OFFICE_FIXED_OUTPUT_DPI;
+        let digit_dots = advances.iter().copied().fold(0.0_f32, f32::max) / dot;
+        (digit_dots / 4.0).ceil() * dot
+      });
+    if cacheable {
+      self.excel_cell_text_insets.insert(style_index, inset);
+    }
+    inset
+  }
+
   /// The rotated alignment box uses the horizontal printer extent, with
   /// quarter-digit insets on both sides and one final device pixel. This is
   /// distinct from the projected advances used to paint the same run.
@@ -781,27 +1013,10 @@ impl TextMetrics {
     Some(Arc::from(advances))
   }
 
-  /// Returns the cumulative FreeType-compatible hinted extent for a simple
-  /// text run while preserving shaping adjustments such as kerning.
-  ///
-  /// Classic GDI loads each glyph with `FT_LOAD_DEFAULT`, accumulates its
-  /// hinted 26.6 advance, and rounds the complete extent for
-  /// `GetTextExtentExPoint`. Skrifa exposes the same adjusted advance through
-  /// its embedded TrueType hinter. Unsupported clusters and synthesized bold
-  /// faces stay on the ordinary shaping path.
-  pub(crate) fn gdi_hinted_text_extent_pt(
-    &mut self,
-    text: &str,
-    style: &(impl FontStyleRef + ?Sized),
-    device_dpi: f32,
-  ) -> Option<f32> {
-    self
-      .gdi_hinted_text_extents_pt(text, style, device_dpi)
-      .map(|extents| extents.positioned_width_pt)
-  }
-
   /// Returns both the shaped and unpositioned GDI-compatible hinted extents.
   ///
+  /// Classic GDI accumulates hinted 26.6 advances and rounds the complete
+  /// extent; Skrifa exposes the adjusted advances through its TrueType hinter.
   /// `GetTextExtentPoint32W` accumulates the hinted advance of each
   /// character without applying the pairs exposed by `GetKerningPairsW`.
   /// DrawingML paint can independently enable kerning, so callers that model
@@ -1032,6 +1247,26 @@ impl TextMetrics {
       .unwrap_or(fallback)
   }
 
+  /// Legacy Word's first justification level expands a blank up to the
+  /// selected face's OS/2 average character width. This is an expansion hint,
+  /// not a replacement for the blank's actual glyph advance.
+  pub(crate) fn legacy_word_space_expansion_capacity(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<f32> {
+    let shaped = self.shape_text(" ", style)?;
+    let glyph = shaped.glyphs.first()?;
+    let face = shaped.font_faces.get(glyph.font_index)?;
+    let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
+    let size = Size::new(glyph.font_size_pt);
+    let location = LocationRef::default();
+    let average = font.metrics(size, location).average_width?;
+    let space = font
+      .glyph_metrics(size, location)
+      .advance_width(GlyphId::new(glyph.glyph_id))?;
+    Some((average - space).max(0.0) * style.horizontal_scale())
+  }
+
   pub fn baseline_offset_in_line(
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
@@ -1125,6 +1360,26 @@ impl TextMetrics {
     text: &str,
     style: &(impl FontStyleRef + ?Sized),
   ) -> TextVerticalMetrics {
+    if style.automatic_escapement_font_sizes_pt().is_none() {
+      if let Some(logical) = self
+        .fonts
+        .wordprocessingml_default_charset_line_metrics(style, text)
+      {
+        return text_vertical_metrics_from_font_metrics(logical);
+      }
+      if let Some(runs) = self.fonts.wordprocessingml_line_metric_runs(text, style)
+        && runs
+          .iter()
+          .any(|metrics| metrics.wordprocessingml_cjk_line_metrics)
+      {
+        // Word adjusts the line box of each selected face before combining
+        // portions. Combining Calibri and Batang's raw ascent, descent and
+        // gap first fabricates a taller font, then adds CJK leading to that
+        // synthetic box. The resulting Korean mixed-script line is about
+        // 1.7 pt too tall at 11 pt despite neither face needing that height.
+        return combine_wordprocessingml_line_metric_runs(style, &runs);
+      }
+    }
     let metrics = if let Some((font_size_pt, complex_font_size_pt)) =
       style.automatic_escapement_font_sizes_pt()
     {
@@ -1151,7 +1406,7 @@ impl TextMetrics {
 
 fn wordprocessingml_line_vertical_metrics(
   style: &(impl FontStyleRef + ?Sized),
-  mut metrics: TextVerticalMetrics,
+  metrics: TextVerticalMetrics,
 ) -> TextVerticalMetrics {
   // Keep the physical font metrics available to callers that are sizing an
   // implicit paragraph mark, drawing, or other non-line geometry. Word's
@@ -1166,6 +1421,55 @@ fn wordprocessingml_line_vertical_metrics(
     return metrics;
   }
 
+  wordprocessingml_side_leading(metrics)
+}
+
+fn combine_wordprocessingml_line_metric_runs(
+  style: &(impl FontStyleRef + ?Sized),
+  runs: &[ooxmlsdk_fonts::VerticalMetrics],
+) -> TextVerticalMetrics {
+  let adjusted = runs
+    .iter()
+    .map(|metrics| {
+      wordprocessingml_line_vertical_metrics(
+        style,
+        text_vertical_metrics_from_font_metrics(*metrics),
+      )
+    })
+    .collect::<Vec<_>>();
+  let top = adjusted
+    .iter()
+    .map(|metrics| metrics.directwrite_baseline_offset_pt)
+    .fold(0.0, f32::max);
+  let bottom = adjusted
+    .iter()
+    .map(|metrics| (metrics.line_height_pt() - metrics.directwrite_baseline_offset_pt).max(0.0))
+    .fold(0.0, f32::max);
+  if let Some(dominant) = adjusted.iter().find(|metrics| {
+    (metrics.directwrite_baseline_offset_pt - top).abs() < f32::EPSILON
+      && (metrics.line_height_pt() - metrics.directwrite_baseline_offset_pt - bottom).abs()
+        < f32::EPSILON
+  }) {
+    return *dominant;
+  }
+  TextVerticalMetrics {
+    ascent_pt: top,
+    descent_pt: bottom,
+    windows_line_height_pt: adjusted
+      .iter()
+      .map(|metrics| metrics.windows_line_height_pt())
+      .fold(0.0, f32::max),
+    line_gap_pt: 0.0,
+    baseline_offset_pt: adjusted
+      .iter()
+      .map(|metrics| metrics.baseline_offset_pt)
+      .fold(0.0, f32::max),
+    directwrite_baseline_offset_pt: top,
+    wordprocessingml_cjk_line_metrics: true,
+  }
+}
+
+fn wordprocessingml_side_leading(mut metrics: TextVerticalMetrics) -> TextVerticalMetrics {
   let required_side_leading_pt = metrics.ink_height_pt() * WORDPROCESSINGML_CJK_SIDE_LEADING_RATIO;
   let additional_side_leading_pt = (required_side_leading_pt - metrics.leading_above_pt()).max(0.0);
   metrics.ascent_pt += additional_side_leading_pt;
@@ -1416,6 +1720,50 @@ pub fn shape_text(text: &str, style: &(impl FontStyleRef + ?Sized)) -> Option<Sh
   TextMetrics::new().shape_text(text, style)
 }
 
+fn wordprocessingml_synthetic_bold_advances(
+  text: &str,
+  mut shaped: ShapedText,
+  style: &(impl FontStyleRef + ?Sized),
+) -> ShapedText {
+  if !style.wordprocessingml_font_slots()
+    || !shaped.font_faces.iter().any(|face| face.synthetic_bold)
+    || one_glyph_per_character_indices(text, &shaped.glyphs).is_none()
+  {
+    return shaped;
+  }
+
+  // Word obtains its independent-character ideal advances with a font at
+  // design-unit height. GDI's extra synthetic-bold pixel consequently owns
+  // one design unit, including on blanks. Pinned native MSLS input arrays
+  // confirm this for 84 font/size/weight controls, with 256 and 2048 upem.
+  // This is distinct from the 600-dpi advance and em/35 painted stroke.
+  // Complex clusters retain their existing shaping measurements.
+  let additions = shaped
+    .font_faces
+    .iter()
+    .map(|face| {
+      if !face.synthetic_bold {
+        return 0.0;
+      }
+      FontRef::from_index(face.data.as_ref(), face.index)
+        .ok()
+        .and_then(|font| font.head().ok())
+        .map(|head| head.units_per_em())
+        .filter(|&upem| upem != 0)
+        .map_or(0.0, |upem| style.horizontal_scale() / f32::from(upem))
+    })
+    .collect::<Vec<_>>();
+  for glyph in &mut shaped.glyphs {
+    if glyph.x_advance_em <= 0.0 {
+      continue;
+    }
+    let addition = additions[glyph.font_index];
+    glyph.x_advance_em += addition;
+    shaped.width_pt += addition * glyph.font_size_pt;
+  }
+  shaped
+}
+
 fn shaped_text_from_runs(
   runs: Vec<ooxmlsdk_fonts::ShapedRun<'_, '_>>,
   mut font_face: impl FnMut(&ooxmlsdk_fonts::FontId) -> Option<FontFaceData>,
@@ -1435,6 +1783,7 @@ fn shaped_text_from_runs(
       font_size_pt,
       glyph_id: glyph.glyph_id,
       text_range: glyph.text_range.clone(),
+      safe_to_insert_tatweel: glyph.safe_to_insert_tatweel,
       x_advance_em: glyph.x_advance_pt / em_divisor,
       x_offset_em: glyph.x_offset_pt / em_divisor,
       y_offset_em: glyph.y_offset_pt / em_divisor,
@@ -1531,6 +1880,29 @@ mod tests {
   }
 
   #[test]
+  fn blank_form_cells_measure_digit_advances_without_changing_plain_en_spaces() {
+    let mut style = crate::model::TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 10.0,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    let blank = "\u{2002}".repeat(5);
+    let plain_width = metrics.measure_text(&blank, &style);
+    style.wordprocessingml_form_text_blank_cell = true;
+    let form_width = metrics.measure_text(&blank, &style);
+    let digit_width = metrics.measure_text("00000", &style);
+    assert!((form_width - digit_width).abs() < 0.001);
+    style.wordprocessingml_form_text_blank_cell = false;
+    assert!((metrics.measure_text(&blank, &style) - plain_width).abs() < 0.001);
+
+    style.font_family = Some(Arc::from("OOXMLSDK Missing Form Placeholder Family"));
+    let unavailable_plain_width = metrics.measure_text(&blank, &style);
+    style.wordprocessingml_form_text_blank_cell = true;
+    assert!((metrics.measure_text(&blank, &style) - unavailable_plain_width).abs() < 0.001);
+  }
+
+  #[test]
   fn shaped_text_exposes_glyph_advances_for_pdf_paint() {
     let style = test_style();
     let shaped = shape_text("office", &style).expect("shaped text");
@@ -1544,6 +1916,340 @@ mod tests {
         .all(|glyph| glyph.text_range.end <= "office".len())
     );
     assert!(shaped.glyphs.iter().any(|glyph| glyph.bounds_em.is_some()));
+  }
+
+  #[test]
+  fn word_arabic_punctuation_retains_required_contextual_positioning() {
+    // Native Word's regular/bold and enabled/disabled w:kern controls retain
+    // the same Arabic placement arrays. This space has a contextual advance
+    // of 200 design units (upem2048), rather than its nominal 500 units.
+    let text = "الخصوص. كما ترجو اللجنة ";
+    let space = text.find('.').unwrap() + 1;
+    let mut metrics = TextMetrics::new();
+    for bold in [false, true] {
+      for minimum in [Some(7.0), Some(16383.5)] {
+        let mut style = crate::model::TextStyle {
+          font_family: Some(Arc::from("Traditional Arabic")),
+          complex_font_family: Some(Arc::from("Traditional Arabic")),
+          font_size_pt: 15.0,
+          complex_font_size_pt: Some(15.0),
+          bold,
+          complex_bold: Some(bold),
+          kerning_minimum_size_pt: minimum,
+          horizontal_scale: Some(1.03),
+          wordprocessing_font_width_percent: Some(103),
+          wordprocessing_legacy_font_measurement: Some(true),
+          wordprocessingml_font_slots: true,
+          right_to_left: Some(true),
+          complex_script: Some(true),
+          ..Default::default()
+        };
+        let ideal = metrics.shape_text(text, &style).unwrap();
+        let blank = ideal
+          .glyphs
+          .iter()
+          .find(|glyph| glyph.text_range.start == space)
+          .unwrap();
+        assert_eq!((blank.x_advance_em * 15.0 * 4096.0).round(), 6144.0);
+        style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
+          retain_trailing_blank: false,
+          unshaped_blanks: false,
+          font_width_percent: 103,
+          space_expansions: Vec::new(),
+        }));
+        let device = metrics.shape_text(text, &style).unwrap();
+        let blank = device
+          .glyphs
+          .iter()
+          .find(|glyph| glyph.text_range.start == space)
+          .unwrap();
+        assert!((blank.x_advance_em * 15.0 - 1.44).abs() < 0.00001);
+      }
+    }
+  }
+
+  #[test]
+  fn word_kashida_nbsp_retains_native_unshaped_space_metrics() {
+    // Read-only Word lowKashida draw callbacks, before Kashida insertion.
+    // U+00A0 is a separate U+0020 Unicode draw run. These are observed whole
+    // device widths at 600 DPI, not expectations calculated by this code.
+    let cases = [
+      (
+        "Traditional Arabic",
+        false,
+        [[24, 25, 26], [31, 32, 34], [37, 38, 40]],
+      ),
+      (
+        "Traditional Arabic",
+        true,
+        [[24, 25, 26], [31, 32, 34], [37, 38, 41]],
+      ),
+      ("Arial", false, [[28, 29, 31], [35, 36, 38], [42, 43, 46]]),
+      ("Arial", true, [[28, 29, 30], [35, 36, 39], [42, 43, 46]]),
+      (
+        "Times New Roman",
+        false,
+        [[25, 26, 28], [31, 32, 34], [38, 39, 42]],
+      ),
+      (
+        "Times New Roman",
+        true,
+        [[25, 26, 27], [31, 32, 34], [38, 39, 42]],
+      ),
+    ];
+    let mut metrics = TextMetrics::new();
+    for (family, bold, widths) in cases {
+      for (size_index, size) in [12.0, 15.0, 18.0].into_iter().enumerate() {
+        for (percent_index, percent) in [100, 103, 110].into_iter().enumerate() {
+          let mut style = crate::model::TextStyle {
+            font_family: Some(Arc::from(family)),
+            complex_font_family: Some(Arc::from(family)),
+            font_size_pt: size,
+            complex_font_size_pt: Some(size),
+            bold,
+            complex_bold: Some(bold),
+            horizontal_scale: Some(f32::from(percent) / 100.0),
+            wordprocessing_font_width_percent: Some(percent),
+            wordprocessing_legacy_font_measurement: Some(true),
+            wordprocessingml_font_slots: true,
+            right_to_left: Some(true),
+            complex_script: Some(true),
+            ..Default::default()
+          };
+          let text = "السياسات\u{00a0}التعليم";
+          let ideal = metrics.measure_text(text, &style);
+          style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
+            retain_trailing_blank: false,
+            unshaped_blanks: false,
+            font_width_percent: percent,
+            space_expansions: Vec::new(),
+          }));
+          let shaped = metrics.shape_text(text, &style).unwrap();
+          let blank = shaped
+            .glyphs
+            .iter()
+            .find(|glyph| text.get(glyph.text_range.clone()) == Some("\u{00a0}"))
+            .unwrap();
+          assert_eq!(
+            (blank.x_advance_em * size
+              / (crate::units::POINTS_PER_INCH / crate::units::OFFICE_FIXED_OUTPUT_DPI))
+              .round() as i32,
+            widths[size_index][percent_index],
+            "{family}, bold={bold}, size={size}, width={percent}"
+          );
+          style.wordprocessing_kashida = None;
+          assert_eq!(metrics.measure_text(text, &style), ideal);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn word_cursive_advances_preserve_native_signed_conversion() {
+    let mut metrics = TextMetrics::new();
+    for size in [13.0, 15.0] {
+      for percent in [100, 103] {
+        for italic in [false, true] {
+          let mut style = crate::model::TextStyle {
+            font_family: Some(Arc::from("Traditional Arabic")),
+            complex_font_family: Some(Arc::from("Traditional Arabic")),
+            font_size_pt: size,
+            complex_font_size_pt: Some(size),
+            italic,
+            complex_italic: Some(italic),
+            horizontal_scale: Some(f32::from(percent) / 100.0),
+            wordprocessing_font_width_percent: Some(percent),
+            wordprocessing_legacy_font_measurement: Some(true),
+            wordprocessingml_font_slots: true,
+            right_to_left: Some(true),
+            complex_script: Some(true),
+            ..Default::default()
+          };
+          for text in [
+            " في مركز بنغلاديش ",
+            "قدم هذا المركز اقتراحا بتوفير التدريب التقني لـ ",
+          ] {
+            // The native placement API retains the negative cursive width;
+            // Word converts it to -5 ideal pixels and zero printer pixels.
+            let ideal = metrics.shape_text(text, &style).unwrap();
+            let glyph = ideal.glyphs.iter().find(|g| g.glyph_id == 450).unwrap();
+            let expected = if size == 13.0 { -266.0 } else { -307.0 };
+            assert_eq!((glyph.x_advance_em * size * 4096.0).round(), expected);
+            style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
+              retain_trailing_blank: false,
+              unshaped_blanks: false,
+              font_width_percent: percent,
+              space_expansions: Vec::new(),
+            }));
+            let device = metrics.shape_text(text, &style).unwrap();
+            assert!(device.width_pt > 0.0);
+            assert_eq!(device.glyphs.len(), ideal.glyphs.len());
+            let glyph = device.glyphs.iter().find(|g| g.glyph_id == 450).unwrap();
+            assert_eq!(glyph.x_advance_em, 0.0);
+            style.wordprocessing_kashida = None;
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn word_synthetic_italic_preserves_native_ideal_and_device_advances() {
+    // Native Word's 32 Arabic controls retain identical ideal and device
+    // arrays in every regular/italic pair: two regular-only font families,
+    // two sizes, two width percentages, and two paragraph widths. GDI and
+    // actual CreateFontIndirectW observations independently retain averages.
+    let mut metrics = TextMetrics::new();
+    for family in ["Traditional Arabic", "Tahoma"] {
+      for size in [15.0, 19.0] {
+        for percent in [100, 103] {
+          for device in [false, true] {
+            let mut style = crate::model::TextStyle {
+              font_family: Some(Arc::from(family)),
+              complex_font_family: Some(Arc::from(family)),
+              font_size_pt: size,
+              complex_font_size_pt: Some(size),
+              horizontal_scale: Some(f32::from(percent) / 100.0),
+              wordprocessing_font_width_percent: Some(percent),
+              wordprocessing_legacy_font_measurement: Some(true),
+              wordprocessingml_font_slots: true,
+              right_to_left: Some(true),
+              complex_script: Some(true),
+              kerning_minimum_size_pt: Some(32767.0),
+              wordprocessing_kashida: device.then(|| {
+                Arc::new(crate::common::WordprocessingKashida {
+                  retain_trailing_blank: false,
+                  unshaped_blanks: false,
+                  font_width_percent: percent,
+                  space_expansions: Vec::new(),
+                })
+              }),
+              ..Default::default()
+            };
+            let text = "التدابير الملائمة التدابير الملائمة";
+            let regular = metrics.shape_text(text, &style).unwrap();
+            style.italic = true;
+            style.complex_italic = Some(true);
+            let italic = metrics.shape_text(text, &style).unwrap();
+            assert!(italic.font_faces.iter().all(|face| face.synthetic_italic));
+            assert_eq!(
+              regular.width_pt, italic.width_pt,
+              "{family}, {size}, {percent}, device={device}"
+            );
+            assert_eq!(
+              regular
+                .glyphs
+                .iter()
+                .map(|g| (g.glyph_id, g.x_advance_em))
+                .collect::<Vec<_>>(),
+              italic
+                .glyphs
+                .iter()
+                .map(|g| (g.glyph_id, g.x_advance_em))
+                .collect::<Vec<_>>(),
+              "{family}, {size}, {percent}, device={device}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn word_synthetic_bold_ideal_advances_match_native_font_units() {
+    // Native Line Services ideal arrays, captured independently at six sizes
+    // for regular-only faces. The space entries also own the extra unit.
+    let cases = [
+      (
+        "Lucida Sans Unicode",
+        2048,
+        [
+          1413, 1289, 1049, 648, 1295, 1295, 1295, 648, 1256, 1070, 1174,
+        ],
+      ),
+      ("Lucida Console", 2048, [1234; 11]),
+      (
+        "Sylfaen",
+        2048,
+        [1454, 1075, 913, 512, 1024, 1024, 1024, 512, 999, 1061, 920],
+      ),
+      ("MS Gothic", 256, [128; 11]),
+      (
+        "Cambria Math",
+        2048,
+        [1276, 1121, 903, 451, 1134, 1134, 1134, 451, 990, 1032, 931],
+      ),
+    ];
+    let mut metrics = TextMetrics::new();
+    for (family, upem, widths) in cases {
+      for size in [8.0, 9.5, 10.0, 12.0, 18.0, 24.0] {
+        let style = crate::model::TextStyle {
+          font_family: Some(Arc::from(family)),
+          font_size_pt: size,
+          bold: true,
+          // These native controls have no authored Word kerning threshold.
+          kerning_minimum_size_pt: Some(f32::MAX),
+          wordprocessingml_font_slots: true,
+          ..Default::default()
+        };
+        let shaped = metrics
+          .shape_text("Abc 123 xyz", &style)
+          .expect("native face");
+        assert!(
+          shaped.font_faces.iter().all(|face| face.synthetic_bold),
+          "{family}"
+        );
+        assert_eq!(shaped.glyphs.len(), widths.len(), "{family}");
+        for (glyph, width) in shaped.glyphs.iter().zip(widths) {
+          let expected = (width + 1) as f32 * size / upem as f32;
+          assert!(
+            (glyph.x_advance_em * glyph.font_size_pt - expected).abs() < 0.0001,
+            "{family} {size}: {glyph:?}"
+          );
+        }
+        let expected = (widths.iter().sum::<i32>() + 11) as f32 * size / upem as f32;
+        assert!(
+          (shaped.width_pt - expected).abs() < 0.0001,
+          "{family} {size}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn word_synthetic_bold_prefix_preserves_generic_and_real_bold_metrics() {
+    let mut metrics = TextMetrics::new();
+    let mut style = crate::model::TextStyle {
+      font_family: Some(Arc::from("Lucida Calligraphy")),
+      font_size_pt: 16.0,
+      bold: true,
+      ..Default::default()
+    };
+    let text = format!("{}L", " ".repeat(27));
+    let generic = metrics.measure_text(&text, &style);
+    assert!((generic - 154.148_44).abs() < 0.0001);
+    style.wordprocessingml_font_slots = true;
+    assert!((metrics.measure_text(&text, &style) - 154.367_19).abs() < 0.0001);
+    style.wordprocessingml_font_slots = false;
+    assert_eq!(metrics.measure_text(&text, &style), generic);
+
+    style.font_family = Some(Arc::from("Times New Roman"));
+    let generic = metrics
+      .shape_text("Abc 123 xyz", &style)
+      .expect("real bold face");
+    assert!(generic.font_faces.iter().all(|face| !face.synthetic_bold));
+    style.wordprocessingml_font_slots = true;
+    let word = metrics
+      .shape_text("Abc 123 xyz", &style)
+      .expect("real bold face");
+    assert_eq!(word.width_pt, generic.width_pt);
+    assert_eq!(word.glyphs.len(), generic.glyphs.len());
+    for (word, generic) in word.glyphs.iter().zip(&generic.glyphs) {
+      assert_eq!(word.glyph_id, generic.glyph_id);
+      assert_eq!(word.text_range, generic.text_range);
+      assert_eq!(word.x_advance_em, generic.x_advance_em);
+      assert_eq!(word.bounds_em, generic.bounds_em);
+    }
   }
 
   #[test]
@@ -1578,6 +2284,60 @@ mod tests {
   }
 
   #[test]
+  fn word_small_caps_realizes_half_point_sizes_before_device_sizes() {
+    // Native Word Cambria controls: nominal, synthesized nominal, painted em.
+    // Capital letters and punctuation retain the full run size.
+    let cases = [
+      (4.5, 3.5, 3.48),
+      (8.0, 6.5, 6.48),
+      (8.5, 7.0, 6.96),
+      (9.5, 7.5, 7.56),
+      (10.0, 8.0, 8.04),
+      (11.0, 9.0, 9.0),
+      (12.0, 9.5, 9.48),
+      (14.0, 11.0, 11.04),
+      (16.0, 13.0, 12.96),
+      (18.0, 14.5, 14.52),
+      (20.0, 16.0, 15.96),
+    ];
+    let mut metrics = TextMetrics::new();
+    for (nominal, synthesized, painted) in cases {
+      for realized in [false, true] {
+        let full = if realized {
+          crate::units::quantize_points_to_office_print_grid(nominal)
+        } else {
+          nominal
+        };
+        let style = TextStyle {
+          font_family: Some("Cambria".into()),
+          font_size: Pt(full),
+          small_caps: true,
+          wordprocessingml_font_slots: true,
+          layout_font_sizes: realized.then_some(crate::common::LayoutFontSizes {
+            primary: Pt(nominal),
+            complex: None,
+          }),
+          ..test_style()
+        };
+        let shaped = metrics.shape_text("Aa,1", &style).expect("small caps");
+        assert_eq!(shaped.glyphs.len(), 4);
+        for glyph in &shaped.glyphs {
+          let expected = if glyph.text_range.start == 1 {
+            if realized { painted } else { synthesized }
+          } else {
+            full
+          };
+          assert!(
+            (glyph.font_size_pt - expected).abs() < 0.001,
+            "nominal={nominal} realized={realized}: {:?}",
+            glyph
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
   fn repeated_measurement_reuses_the_shaped_width() {
     let style = test_style();
     let mut metrics = TextMetrics::new();
@@ -1605,6 +2365,9 @@ mod tests {
     let mut metrics = TextMetrics::new();
 
     let plain_index = metrics.measure_style_index(&plain);
+    let mut nominal_controls = plain.clone();
+    nominal_controls.wordprocessing_nominal_control_metrics = true;
+    assert_ne!(plain_index, metrics.measure_style_index(&nominal_controls));
     let old_style_index = metrics.measure_style_index(&old_style);
     let ligature_index = metrics.measure_style_index(&ligatures);
 
@@ -1630,8 +2393,9 @@ mod tests {
     let mut metrics = TextMetrics::new();
     let device_dpi = 600.0;
     let extent_pt = metrics
-      .gdi_hinted_text_extent_pt("iiii", &style, device_dpi)
-      .expect("simple hinted run");
+      .gdi_hinted_text_extents_pt("iiii", &style, device_dpi)
+      .expect("simple hinted run")
+      .positioned_width_pt;
     let extent_px = extent_pt * device_dpi / crate::units::POINTS_PER_INCH;
 
     assert!((extent_px - extent_px.round()).abs() < 0.0001);
@@ -1644,13 +2408,13 @@ mod tests {
     let device_dpi = 600.0;
 
     metrics
-      .gdi_hinted_text_extent_pt("iiii", &style, device_dpi)
+      .gdi_hinted_text_extents_pt("iiii", &style, device_dpi)
       .expect("first simple hinted run");
     let instance_count = metrics.gdi_hinting_instances.instances.len();
     assert!(instance_count > 0);
 
     metrics
-      .gdi_hinted_text_extent_pt("WWWW", &style, device_dpi)
+      .gdi_hinted_text_extents_pt("WWWW", &style, device_dpi)
       .expect("second simple hinted run");
     assert_eq!(
       metrics.gdi_hinting_instances.instances.len(),
@@ -1775,6 +2539,91 @@ mod tests {
 
     assert!((baseline - 22.48).abs() < 0.01);
     assert_eq!(fit_windows_baseline_to_line(9.0, 3.0, 14.4), 9.0);
+  }
+
+  #[test]
+  fn word_default_charset_line_leading_matches_native_font_records() {
+    use ooxmlsdk_fonts::{FontCharset, FontFamilyClass, FontPitch};
+    let mut metrics = TextMetrics::new();
+    for (family, class, pitch, expected_step) in [
+      (
+        "Liberation Serif",
+        FontFamilyClass::Serif,
+        FontPitch::Variable,
+        17.28,
+      ),
+      (
+        "Liberation Sans",
+        FontFamilyClass::SansSerif,
+        FontPitch::Variable,
+        17.4,
+      ),
+      (
+        "Calibri",
+        FontFamilyClass::SansSerif,
+        FontPitch::Variable,
+        19.08,
+      ),
+      (
+        "Courier New",
+        FontFamilyClass::Fixed,
+        FontPitch::Fixed,
+        17.64,
+      ),
+      (
+        "Arial",
+        FontFamilyClass::SansSerif,
+        FontPitch::Variable,
+        13.8,
+      ),
+      (
+        "Times New Roman",
+        FontFamilyClass::Serif,
+        FontPitch::Variable,
+        13.8,
+      ),
+    ] {
+      let style = TextStyle {
+        font_family: Some(family.into()),
+        font_family_class: Some(class),
+        font_charset: Some(FontCharset::Other(1)),
+        font_pitch: Some(pitch),
+        font_size: Pt(12.0),
+        wordprocessingml_font_slots: true,
+        ..TextStyle::default()
+      };
+      // Native PDF steps are rounded to the export device; allow one twip.
+      let actual = metrics.line_vertical_metrics_for_text("Text", &style);
+      assert!(
+        (actual.line_height_pt() - expected_step).abs() < 0.05,
+        "{family}: {actual:?}"
+      );
+      let physical = metrics.vertical_metrics(&style);
+      let drawing = TextStyle {
+        wordprocessingml_font_slots: false,
+        ..style.clone()
+      };
+      assert_eq!(
+        metrics.line_vertical_metrics_for_text("Text", &drawing),
+        physical
+      );
+      let ansi = TextStyle {
+        font_charset: Some(FontCharset::Ansi),
+        ..style.clone()
+      };
+      assert_eq!(
+        metrics.line_vertical_metrics_for_text("Text", &ansi),
+        physical
+      );
+      let automatic_family = TextStyle {
+        font_family_class: None,
+        ..style
+      };
+      assert_eq!(
+        metrics.line_vertical_metrics_for_text("Text", &automatic_family),
+        physical
+      );
+    }
   }
 
   #[test]

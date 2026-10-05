@@ -115,6 +115,8 @@ pub(crate) fn text_warp(
     source_bounds,
     paint_bounds,
     boundaries,
+    vml_fit_path: None,
+    vml_trim_band: None,
   }))
 }
 

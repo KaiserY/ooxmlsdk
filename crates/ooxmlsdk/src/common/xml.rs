@@ -1951,6 +1951,9 @@ fn write_escaped_attr_bytes<W: std::io::Write>(
       b'<' => Some(b"&lt;"),
       b'&' => Some(b"&amp;"),
       b'"' => Some(b"&quot;"),
+      b'\t' => Some(b"&#9;"),
+      b'\n' => Some(b"&#10;"),
+      b'\r' => Some(b"&#13;"),
       _ => None,
     };
 
@@ -2274,6 +2277,13 @@ mod tests {
     assert_eq!(
       String::from_utf8(attr).expect("utf-8 attr"),
       "&lt;tag attr=&quot;one&amp;two&quot;>'text'&lt;/tag>"
+    );
+
+    let mut attr = Vec::new();
+    write_escaped_str(&mut attr, "a\tb\nc\r\nd &#9;").expect("write attr");
+    assert_eq!(
+      String::from_utf8(attr).expect("utf-8 attr"),
+      "a&#9;b&#10;c&#13;&#10;d &amp;#9;"
     );
 
     let mut content = Vec::new();

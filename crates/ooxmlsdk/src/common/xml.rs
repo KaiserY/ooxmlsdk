@@ -2332,7 +2332,9 @@ mod tests {
     let PayloadEvent::Start(start, false) = reader.next().expect("start event") else {
       panic!("expected start element");
     };
-    let read_back = reader.read_text(start.name(), "T", "text").expect("read text");
+    let read_back = reader
+      .read_text(start.name(), "T", "text")
+      .expect("read text");
     assert_eq!(read_back, value);
   }
 }

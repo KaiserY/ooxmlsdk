@@ -1,0 +1,43 @@
+{
+  "Root": "visio:VisioDocument_Type",
+  "Name": "VisioDocumentPart",
+  "Base": "OpenXmlPart",
+  "ContentType": "application/vnd.ms-visio.drawing.main+xml",
+  "RelationshipType": "http://schemas.microsoft.com/visio/2010/relationships/document",
+  "Target": "document",
+  "RootElement": "VisioDocument",
+  "Paths": {
+    "General": "visio"
+  },
+  "Children": [
+    {
+      "ApiName": "VisioConnectionsPart",
+      "Name": "VisioConnectionsPart"
+    },
+    {
+      "ApiName": "VisioMastersPart",
+      "Name": "VisioMastersPart"
+    },
+    {
+      "ApiName": "VisioPagesPart",
+      "Name": "VisioPagesPart"
+    },
+    {
+      "ApiName": "VisioRecordsetsPart",
+      "Name": "VisioRecordsetsPart"
+    },
+    {
+      "ApiName": "ThemePart",
+      "Name": "ThemePart",
+      "HasFixedContent": true
+    },
+    {
+      "ApiName": "VisioCommentsPart",
+      "Name": "VisioCommentsPart"
+    },
+    {
+      "ApiName": "VisioExtensionsPart",
+      "Name": "VisioExtensionsPart"
+    }
+  ]
+}

@@ -6,8 +6,11 @@
 
 - Added a general XSD -> `data/schemas` producer (`ooxmlsdk-build`'s
   `sdk_data::xsd_schema_gen`) that derives stage-1 schema metadata from an XSD.
-  It is not wired into `gen_sdk_data`. Acceptance tests reproduce the
-  `additionalCharacteristics` and `bibliography` namespaces on the XSD-derivable
+  `gen_sdk_data` loads `schemas/VisioXMLSchema/visio-main.xsd` when that file is
+  present and keeps the schema in memory. Checked-in `data/schemas` files stay
+  as they are. The Visio namespace remains
+  `http://schemas.microsoft.com/office/visio/2011/1/core`. Acceptance tests reproduce
+  the `additionalCharacteristics` and `bibliography` namespaces on the XSD-derivable
   projection, and so do `pml`, `sml`, and `wml`. `bibliography` elements typed
   as `s:ST_String` or `s:ST_Lang` are emitted as `b:ST_String255` through an
   explicit alias, because that SDK name is not in the transitional XSD. `pml`,

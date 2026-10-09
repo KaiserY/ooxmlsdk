@@ -23,11 +23,13 @@ use crate::sdk_data::{
   context::Context,
   mce::gen_mc_schema_from_xsd,
   opc_schemas::read_opc_schemas,
+  open_xml::OpenXmlSchema,
   parts::gen_parts,
   schema_extensions::{
     apply_codegen_ir_schema_extensions, apply_schema_extensions, read_schema_extensions,
   },
   schemas::{assign_schema_particle_ids, gen_schemas},
+  xsd_schema_gen::gen_visio_schema,
 };
 
 pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
@@ -43,6 +45,13 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
     .ok_or_else(|| "failed to resolve schemas/mce directory".to_string())?;
   if let Some(mc_schema) = gen_mc_schema_from_xsd(&mc_schema_dir)? {
     gen_context.schemas.push(mc_schema);
+  }
+  if let Some(visio_schema) = gen_visio_schema(
+    data_dir.as_ref(),
+    &gen_context.parts,
+    &gen_context.namespace_uri_prefix_map,
+  )? {
+    register_generated_schema(&mut gen_context, visio_schema);
   }
   gen_context
     .schemas
@@ -92,6 +101,15 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   }
 
   Ok(())
+}
+
+fn register_generated_schema(gen_context: &mut Context, schema: OpenXmlSchema) {
+  for schema_type in &schema.types {
+    gen_context
+      .type_name_module_name_map
+      .insert(schema_type.name.clone(), schema.module_name.clone());
+  }
+  gen_context.schemas.push(schema);
 }
 
 fn write_json<P: AsRef<Path>, T: Serialize>(path: P, value: &T) -> Result<()> {

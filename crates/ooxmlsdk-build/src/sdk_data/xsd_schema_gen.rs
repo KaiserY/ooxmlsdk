@@ -30,7 +30,7 @@ use crate::{
   Result,
   sdk_data::{
     open_xml::{
-      OpenXmlSchema, OpenXmlSchemaEnum, OpenXmlSchemaEnumFacet, OpenXmlSchemaType,
+      OpenXmlPart, OpenXmlSchema, OpenXmlSchemaEnum, OpenXmlSchemaEnumFacet, OpenXmlSchemaType,
       OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeAttributeValidator, OpenXmlSchemaTypeChild,
       OpenXmlSchemaTypeParticle, OpenXmlSchemaTypeParticleOccur,
     },
@@ -40,6 +40,62 @@ use crate::{
     },
   },
 };
+
+pub(crate) const VISIO_MODULE_NAME: &str = "schemas_microsoft_com_office_visio_2011_1_core";
+const VISIO_PREFIX: &str = "visio";
+const VISIO_RELATIONSHIP_PREFIX: &str = "http://schemas.microsoft.com/visio/2010/relationships/";
+
+/// Load Visio stage-1 metadata from `schemas/VisioXMLSchema/visio-main.xsd`
+/// when that file is next to `data_dir`. Returns `None` when the XSD is absent
+/// so OOXML generation still runs. The result stays in memory: this function
+/// does not write `data/schemas`.
+///
+/// `simple_type_aliases` and `class_name_overrides` stay empty. `xsd:alternative`
+/// and `xsd:assert` are left unread, so `Cell` and `Section` stay the generic
+/// types declared on the element.
+pub(crate) fn gen_visio_schema(
+  data_dir: &Path,
+  parts: &[OpenXmlPart],
+  namespace_prefixes: &HashMap<String, String>,
+) -> Result<Option<OpenXmlSchema>> {
+  let Some(xsd_path) = data_dir
+    .parent()
+    .map(|root| root.join("schemas/VisioXMLSchema/visio-main.xsd"))
+  else {
+    return Ok(None);
+  };
+  if !xsd_path.is_file() {
+    return Ok(None);
+  }
+
+  let source = std::fs::read_to_string(&xsd_path)?;
+  let mut part_root_elements = HashMap::new();
+  for part in parts {
+    if part
+      .relationship_type
+      .starts_with(VISIO_RELATIONSHIP_PREFIX)
+      && !part.root_element.is_empty()
+    {
+      part_root_elements.insert(part.root_element.clone(), part.name.clone());
+    }
+  }
+  let cfg = NamespaceGenConfig {
+    prefix: VISIO_PREFIX.to_string(),
+    namespace_prefixes: namespace_prefixes.clone(),
+    part_root_elements,
+    schema_dir: xsd_path.parent().map(Path::to_path_buf),
+    ..Default::default()
+  };
+  let mut schema = gen_open_xml_schema_from_xsd(&source, &cfg)?;
+  schema.module_name = VISIO_MODULE_NAME.to_string();
+  for schema_type in &mut schema.types {
+    schema_type.module_name = schema.module_name.clone();
+  }
+  for schema_enum in &mut schema.enums {
+    schema_enum.module_name = schema.module_name.clone();
+  }
+  Ok(Some(schema))
+}
 
 /// Configuration supplied by the caller (namespace prefix, part roots, overrides).
 #[derive(Clone, Debug, Default)]
@@ -1074,4 +1130,149 @@ fn split_qname(q_name: &str) -> (&str, &str) {
 
 fn qname_local(q_name: &str) -> &str {
   split_qname(q_name).1
+}
+
+#[cfg(test)]
+mod tests {
+  use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    path::{Path, PathBuf},
+    time::SystemTime,
+  };
+
+  use super::{
+    NamespaceGenConfig, VISIO_MODULE_NAME, VISIO_RELATIONSHIP_PREFIX, gen_open_xml_schema_from_xsd,
+    gen_visio_schema,
+  };
+  use crate::sdk_data::open_xml::{OpenXmlPart, OpenXmlSchema};
+
+  fn workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .parent()
+      .and_then(|path| path.parent())
+      .expect("workspace root")
+      .to_path_buf()
+  }
+
+  fn schema_fingerprint(dir: &Path) -> BTreeMap<String, (u64, SystemTime)> {
+    let mut files = BTreeMap::new();
+    for entry in fs::read_dir(dir).expect("read data/schemas") {
+      let entry = entry.expect("schema dir entry");
+      let meta = entry.metadata().expect("schema metadata");
+      if meta.is_file() {
+        files.insert(
+          entry.file_name().to_string_lossy().into_owned(),
+          (meta.len(), meta.modified().expect("schema mtime")),
+        );
+      }
+    }
+    files
+  }
+
+  fn assert_generic_cell_and_section(schema: &OpenXmlSchema) {
+    assert!(
+      schema
+        .types
+        .iter()
+        .any(|schema_type| schema_type.name == "visio:Cell_Type/visio:Cell")
+    );
+    assert!(
+      schema
+        .types
+        .iter()
+        .any(|schema_type| schema_type.name == "visio:Section_Type/visio:Section")
+    );
+    assert!(
+      schema
+        .types
+        .iter()
+        .all(|schema_type| !schema_type.name.contains("PinX_Type"))
+    );
+  }
+
+  #[test]
+  fn visio_cell_and_section_stay_generic() {
+    let root = workspace_root();
+    let schemas_dir = root.join("data/schemas");
+    let before = schema_fingerprint(&schemas_dir);
+    assert!(!before.is_empty());
+
+    let xsd_path = root.join("schemas/VisioXMLSchema/visio-main.xsd");
+    let source = fs::read_to_string(&xsd_path).expect("read visio-main.xsd");
+    let cfg = NamespaceGenConfig {
+      prefix: "visio".to_string(),
+      schema_dir: xsd_path.parent().map(Path::to_path_buf),
+      ..Default::default()
+    };
+    assert!(cfg.simple_type_aliases.is_empty());
+    assert!(cfg.class_name_overrides.is_empty());
+    let direct = gen_open_xml_schema_from_xsd(&source, &cfg).expect("generate visio schema");
+    let wired = gen_visio_schema(&root.join("data"), &[], &HashMap::new())
+      .expect("load visio schema")
+      .expect("visio-main.xsd is present");
+
+    assert_eq!(wired.module_name, VISIO_MODULE_NAME);
+    assert_eq!(
+      wired.target_namespace,
+      "http://schemas.microsoft.com/office/visio/2011/1/core"
+    );
+    assert_generic_cell_and_section(&direct);
+    assert_generic_cell_and_section(&wired);
+    assert_eq!(before, schema_fingerprint(&schemas_dir));
+  }
+
+  #[test]
+  fn visio_part_roots_follow_relationship_parts() {
+    let root = workspace_root();
+    let mut parts = Vec::new();
+    for entry in fs::read_dir(root.join("data/parts")).expect("read data/parts") {
+      let path = entry.expect("part dir entry").path();
+      let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+      if !file_name.starts_with("Visio")
+        || path.extension().and_then(|ext| ext.to_str()) != Some("json")
+      {
+        continue;
+      }
+      let file = fs::File::open(&path).expect("open visio part");
+      parts.push(serde_json::from_reader::<_, OpenXmlPart>(file).expect("parse visio part"));
+    }
+    assert!(!parts.is_empty());
+
+    let schema = gen_visio_schema(&root.join("data"), &parts, &HashMap::new())
+      .expect("load visio schema")
+      .expect("visio-main.xsd is present");
+
+    let mut marked = 0usize;
+    for part in &parts {
+      if !part
+        .relationship_type
+        .starts_with(VISIO_RELATIONSHIP_PREFIX)
+        || part.root_element.is_empty()
+      {
+        continue;
+      }
+      let binding = format!(
+        "visio:{}_Type/visio:{}",
+        part.root_element, part.root_element
+      );
+      let schema_type = schema
+        .types
+        .iter()
+        .find(|schema_type| schema_type.name == binding)
+        .unwrap_or_else(|| panic!("missing {binding}"));
+      if part.root_element == "Comments" {
+        assert!(schema_type.part.is_empty());
+        continue;
+      }
+      assert_eq!(schema_type.part, part.name);
+      assert_eq!(schema_type.base_class, "OpenXmlPartRootElement");
+      assert_eq!(schema_type.class_name, part.root_element);
+      marked += 1;
+    }
+    assert_eq!(marked, 8);
+  }
 }

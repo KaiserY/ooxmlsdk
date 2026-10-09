@@ -1,0 +1,12 @@
+{
+  "Root": "visio:Comments_Type",
+  "Name": "VisioCommentsPart",
+  "Base": "OpenXmlPart",
+  "ContentType": "application/vnd.ms-visio.comments+xml",
+  "RelationshipType": "http://schemas.microsoft.com/visio/2010/relationships/comments",
+  "Target": "comments",
+  "RootElement": "Comments",
+  "Paths": {
+    "General": "visio"
+  }
+}

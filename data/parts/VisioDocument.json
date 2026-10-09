@@ -1,0 +1,36 @@
+{
+  "Name": "VisioDocument",
+  "Base": "OpenXmlPackage",
+  "Paths": {},
+  "Children": [
+    {
+      "MinOccursIsNonZero": true,
+      "ApiName": "VisioDocumentPart",
+      "Name": "VisioDocumentPart"
+    },
+    {
+      "ApiName": "CoreFilePropertiesPart",
+      "Name": "CoreFilePropertiesPart",
+      "HasFixedContent": true
+    },
+    {
+      "ApiName": "ExtendedFilePropertiesPart",
+      "Name": "ExtendedFilePropertiesPart",
+      "HasFixedContent": true
+    },
+    {
+      "ApiName": "CustomFilePropertiesPart",
+      "Name": "CustomFilePropertiesPart",
+      "HasFixedContent": true
+    },
+    {
+      "ApiName": "ThumbnailPart",
+      "Name": "ThumbnailPart"
+    },
+    {
+      "ApiName": "DigitalSignatureOriginPart",
+      "Name": "DigitalSignatureOriginPart",
+      "HasFixedContent": true
+    }
+  ]
+}

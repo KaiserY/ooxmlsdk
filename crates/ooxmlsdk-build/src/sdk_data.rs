@@ -6,11 +6,13 @@ pub mod context;
 pub mod mce;
 pub mod opc_schemas;
 pub mod open_xml;
+pub mod oracle;
 pub mod parts;
 pub mod schema_extensions;
 pub mod schemas;
 pub mod sdk_data_model;
 pub mod xsd;
+pub mod xsd_schema_gen;
 
 use crate::Result;
 use crate::sdk_code::codegen_ir::annotate_estimated_type_sizes;

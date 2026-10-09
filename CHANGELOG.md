@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Added
+
+- Added a general XSD -> `data/schemas` producer (`ooxmlsdk-build`'s
+  `sdk_data::xsd_schema_gen`) that derives stage-1 schema metadata from an XSD.
+  It is not wired into `gen_sdk_data`. Acceptance tests reproduce the
+  `additionalCharacteristics` and `bibliography` namespaces on the XSD-derivable
+  projection, and so does `pml`. `bibliography` elements typed as `s:ST_String`
+  or `s:ST_Lang` are emitted as `b:ST_String255` through an explicit alias,
+  because that SDK name is not in the transitional XSD. `pml` is not aligned
+  with aliases: the comparison leaves out per-parent extension lists, Office
+  2010 attributes and elements, versioned occurs, and type names that exist
+  only in the checked-in JSON. `xsd:element/@ref` resolves to the referenced
+  element's type, so `a:graphic` is `a:CT_GraphicalObject`.
+- Added a regeneration oracle (`ooxmlsdk-build`'s `sdk_data::oracle`) that diffs a
+  generated schema against the checked-in `data/schemas` metadata on XSD-derivable
+  projections (`CompositeType`, `BaseClass`, class names, summaries, and enum
+  names are excluded).
+- Extended the XSD parser (`ooxmlsdk-build`'s `sdk_data::xsd`) to capture element
+  type references, annotations, `complexContent`/`simpleContent` derivations,
+  `abstract`, `xs:any`/`anyAttribute`, simple-type bases, and `xmlns` prefix
+  mappings. The additions are backward compatible.
+
 ## 0.13.1
 
 ### Added

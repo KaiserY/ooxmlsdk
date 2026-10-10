@@ -322,6 +322,13 @@ fn text_value_type_from_sources(ty: &crate::sdk_data::open_xml::OpenXmlSchemaTyp
     return value_type;
   }
 
+  if !ty.text_value_type.is_empty() {
+    let mapped = crate::simple_type::simple_type_mapping(&ty.text_value_type);
+    if mapped != ty.text_value_type {
+      return mapped.to_string();
+    }
+  }
+
   ty.name
     .split_once('/')
     .and_then(|(type_name, _)| xsd_measure_value_type(type_name))

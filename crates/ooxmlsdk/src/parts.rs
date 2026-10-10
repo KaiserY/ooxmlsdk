@@ -109,6 +109,16 @@ pub mod user_defined_tags_part;
 pub mod vba_data_part;
 pub mod vba_project_part;
 pub mod view_properties_part;
+pub mod visio_comments_part;
+pub mod visio_connections_part;
+pub mod visio_document;
+pub mod visio_document_part;
+pub mod visio_extensions_part;
+pub mod visio_master_part;
+pub mod visio_masters_part;
+pub mod visio_page_part;
+pub mod visio_pages_part;
+pub mod visio_recordsets_part;
 pub mod vml_drawing_part;
 pub mod volatile_dependencies_part;
 pub mod web_ex_taskpanes_part;
@@ -1116,6 +1126,96 @@ pub enum PartRef {
         )
     )]
     ViewPropertiesPart(crate::parts::view_properties_part::ViewPropertiesPart),
+    #[sdk(
+        relationship_type = "http://schemas.microsoft.com/visio/2010/relationships/comments",
+        target_name = "comments",
+        path_prefix = "visio",
+        content_type = "application/vnd.ms-visio.comments+xml",
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_visio_2012_main::Comments
+        )
+    )]
+    VisioCommentsPart(crate::parts::visio_comments_part::VisioCommentsPart),
+    #[sdk(
+        relationship_type = "http://schemas.microsoft.com/visio/2010/relationships/connections",
+        target_name = "connections",
+        path_prefix = "visio",
+        content_type = "application/vnd.ms-visio.connections+xml",
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_visio_2012_main::DataConnections
+        )
+    )]
+    VisioConnectionsPart(crate::parts::visio_connections_part::VisioConnectionsPart),
+    #[sdk(
+        relationship_type = "http://schemas.microsoft.com/visio/2010/relationships/document",
+        target_name = "document",
+        path_prefix = "visio",
+        content_type = "application/vnd.ms-visio.drawing.main+xml",
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_visio_2012_main::VisioDocument
+        )
+    )]
+    VisioDocumentPart(crate::parts::visio_document_part::VisioDocumentPart),
+    #[sdk(
+        relationship_type = "http://schemas.microsoft.com/visio/2010/relationships/extensions",
+        target_name = "extensions",
+        path_prefix = "visio",
+        content_type = "application/vnd.ms-visio.extensions+xml",
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_visio_2012_main::Extensions
+        )
+    )]
+    VisioExtensionsPart(crate::parts::visio_extensions_part::VisioExtensionsPart),
+    #[sdk(
+        relationship_type = "http://schemas.microsoft.com/visio/2010/relationships/master",
+        target_name = "master",
+        path_prefix = "visio/masters",
+        content_type = "application/vnd.ms-visio.master+xml",
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_visio_2012_main::MasterContents
+        )
+    )]
+    VisioMasterPart(crate::parts::visio_master_part::VisioMasterPart),
+    #[sdk(
+        relationship_type = "http://schemas.microsoft.com/visio/2010/relationships/masters",
+        target_name = "masters",
+        path_prefix = "visio/masters",
+        content_type = "application/vnd.ms-visio.masters+xml",
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_visio_2012_main::Masters
+        )
+    )]
+    VisioMastersPart(crate::parts::visio_masters_part::VisioMastersPart),
+    #[sdk(
+        relationship_type = "http://schemas.microsoft.com/visio/2010/relationships/page",
+        target_name = "page",
+        path_prefix = "visio/pages",
+        content_type = "application/vnd.ms-visio.page+xml",
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_visio_2012_main::PageContents
+        )
+    )]
+    VisioPagePart(crate::parts::visio_page_part::VisioPagePart),
+    #[sdk(
+        relationship_type = "http://schemas.microsoft.com/visio/2010/relationships/pages",
+        target_name = "pages",
+        path_prefix = "visio/pages",
+        content_type = "application/vnd.ms-visio.pages+xml",
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_visio_2012_main::Pages
+        )
+    )]
+    VisioPagesPart(crate::parts::visio_pages_part::VisioPagesPart),
+    #[sdk(
+        relationship_type = "http://schemas.microsoft.com/visio/2010/relationships/recordsets",
+        target_name = "recordsets",
+        path_prefix = "visio",
+        content_type = "application/vnd.ms-visio.recordsets+xml",
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_visio_2012_main::DataRecordSets
+        )
+    )]
+    VisioRecordsetsPart(crate::parts::visio_recordsets_part::VisioRecordsetsPart),
     #[sdk(
         relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
         target_name = "vmldrawing",

@@ -30,12 +30,12 @@ Specifications schemas and carry the redistribution notice in their
   `visio-main.xsd` (no `DocumentProperties`, `Validation`, `Solutions`,
   `Windows`, `DataTransferInfo`, and no per-cell types).
 
-## Namespace reconciliation (known)
+## Namespace
 
 Real Visio 2013+ files use
 `http://schemas.microsoft.com/office/visio/2012/main` (per the per-element
-"Visio XML" reference pages and Apache POI's vendored `visio.xsd`), while the
-publicly published full schema is under `2011/1/core`. The element/type structure
-is the same family; the generator must reconcile the namespace (config knob) or
-obtain the `2012/main` schema from the Visio SDK. This is tracked in
-`docs/specs/visio.md`.
+"Visio XML" reference pages and Apache POI's vendored `visio.xsd`). The
+publicly published full schema, and both files in this directory, stay under
+`2011/1/core`. `gen_visio_schema` emits `2012/main` through
+`NamespaceGenConfig::emitted_target_namespace` and does not rewrite these XSD
+files.

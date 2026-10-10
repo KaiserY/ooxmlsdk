@@ -41,8 +41,9 @@ use crate::{
   },
 };
 
-pub(crate) const VISIO_MODULE_NAME: &str = "schemas_microsoft_com_office_visio_2011_1_core";
+pub(crate) const VISIO_MODULE_NAME: &str = "schemas_microsoft_com_office_visio_2012_main";
 const VISIO_PREFIX: &str = "visio";
+const VISIO_EMITTED_TARGET_NAMESPACE: &str = "http://schemas.microsoft.com/office/visio/2012/main";
 const VISIO_RELATIONSHIP_PREFIX: &str = "http://schemas.microsoft.com/visio/2010/relationships/";
 
 /// Load Visio stage-1 metadata from `schemas/VisioXMLSchema/visio-main.xsd`
@@ -52,7 +53,9 @@ const VISIO_RELATIONSHIP_PREFIX: &str = "http://schemas.microsoft.com/visio/2010
 ///
 /// `simple_type_aliases` and `class_name_overrides` stay empty. `xsd:alternative`
 /// and `xsd:assert` are left unread, so `Cell` and `Section` stay the generic
-/// types declared on the element.
+/// types declared on the element. The XSD file keeps
+/// `http://schemas.microsoft.com/office/visio/2011/1/core`. The emitted schema
+/// URI is `http://schemas.microsoft.com/office/visio/2012/main`.
 pub(crate) fn gen_visio_schema(
   data_dir: &Path,
   parts: &[OpenXmlPart],
@@ -81,6 +84,7 @@ pub(crate) fn gen_visio_schema(
   }
   let cfg = NamespaceGenConfig {
     prefix: VISIO_PREFIX.to_string(),
+    emitted_target_namespace: Some(VISIO_EMITTED_TARGET_NAMESPACE.to_string()),
     namespace_prefixes: namespace_prefixes.clone(),
     part_root_elements,
     schema_dir: xsd_path.parent().map(Path::to_path_buf),
@@ -116,6 +120,10 @@ pub struct NamespaceGenConfig {
   /// Directory of the XSD being generated, so `xsd:import/@schemaLocation`
   /// siblings can be loaded. Unset when the source is not a file.
   pub schema_dir: Option<std::path::PathBuf>,
+  /// URI written on the generated `OpenXmlSchema`. When unset, the parsed XSD
+  /// `targetNamespace` is emitted. Prefix resolution and imports keep the
+  /// parsed URI.
+  pub emitted_target_namespace: Option<String>,
 }
 
 /// Produce an `OpenXmlSchema` (stage 1) from XSD source text.
@@ -311,9 +319,13 @@ fn build_open_xml_schema(
   }
 
   let enums = build_enums(xsd, cfg);
+  disambiguate_shared_element_class_names(&mut types);
 
   OpenXmlSchema {
-    target_namespace: xsd.target_namespace.clone(),
+    target_namespace: cfg
+      .emitted_target_namespace
+      .clone()
+      .unwrap_or_else(|| xsd.target_namespace.clone()),
     types,
     enums,
     ..Default::default()
@@ -578,6 +590,7 @@ fn build_type(
     } else {
       build_particle(schemas, type_owner, &flat)
     },
+    text_value_type: flat.text_value_type.clone().unwrap_or_default(),
     ..Default::default()
   }
 }
@@ -1102,6 +1115,38 @@ fn resolve_prefix(xsd: &ParsedXsd, cfg: &NamespaceGenConfig, prefix: &str) -> St
   prefix.to_string()
 }
 
+/// Element bindings that share a local name (`visio:Row` on nineteen complex
+/// types) cannot share one Rust class name. Use the complex type's local name,
+/// without a trailing `_Type`, for those bindings only.
+fn disambiguate_shared_element_class_names(types: &mut [OpenXmlSchemaType]) {
+  let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+  for schema_type in types.iter() {
+    *counts.entry(schema_type.class_name.as_str()).or_insert(0) += 1;
+  }
+  let shared: BTreeSet<String> = counts
+    .into_iter()
+    .filter(|(_, count)| *count > 1)
+    .map(|(name, _)| name.to_string())
+    .collect();
+  if shared.is_empty() {
+    return;
+  }
+  for schema_type in types.iter_mut() {
+    if !shared.contains(schema_type.class_name.as_str()) {
+      continue;
+    }
+    let Some((type_name, _)) = schema_type.name.split_once('/') else {
+      continue;
+    };
+    if type_name.is_empty() {
+      continue;
+    }
+    let local = qname_local(type_name);
+    let local = local.strip_suffix("_Type").unwrap_or(local);
+    schema_type.class_name = local.to_upper_camel_case();
+  }
+}
+
 fn occur_list(min: u64, max: u64) -> Vec<OpenXmlSchemaTypeParticleOccur> {
   if min == 1 && max == 1 {
     return Vec::new();
@@ -1170,6 +1215,46 @@ mod tests {
     files
   }
 
+  fn class_name<'a>(schema: &'a OpenXmlSchema, name: &str) -> &'a str {
+    schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.name == name)
+      .unwrap_or_else(|| panic!("missing {name}"))
+      .class_name
+      .as_str()
+  }
+
+  fn assert_unique_class_names(schema: &OpenXmlSchema) {
+    let mut seen = BTreeMap::new();
+    for schema_type in &schema.types {
+      if schema_type.class_name.is_empty() {
+        continue;
+      }
+      let count = seen.entry(schema_type.class_name.clone()).or_insert(0);
+      *count += 1;
+    }
+    let duplicates: Vec<_> = seen
+      .into_iter()
+      .filter(|(_, count)| *count > 1)
+      .map(|(name, _)| name)
+      .collect();
+    assert!(
+      duplicates.is_empty(),
+      "duplicate class names: {duplicates:?}"
+    );
+  }
+
+  fn text_value_type<'a>(schema: &'a OpenXmlSchema, name: &str) -> &'a str {
+    schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.name == name)
+      .unwrap_or_else(|| panic!("missing {name}"))
+      .text_value_type
+      .as_str()
+  }
+
   fn assert_generic_cell_and_section(schema: &OpenXmlSchema) {
     assert!(
       schema
@@ -1207,18 +1292,43 @@ mod tests {
     };
     assert!(cfg.simple_type_aliases.is_empty());
     assert!(cfg.class_name_overrides.is_empty());
+    assert!(cfg.emitted_target_namespace.is_none());
+    let parsed = crate::sdk_data::xsd::parse_xsd(&source).expect("parse visio-main.xsd");
     let direct = gen_open_xml_schema_from_xsd(&source, &cfg).expect("generate visio schema");
     let wired = gen_visio_schema(&root.join("data"), &[], &HashMap::new())
       .expect("load visio schema")
       .expect("visio-main.xsd is present");
 
+    assert_eq!(
+      parsed.target_namespace,
+      "http://schemas.microsoft.com/office/visio/2011/1/core"
+    );
+    assert_eq!(direct.target_namespace, parsed.target_namespace);
     assert_eq!(wired.module_name, VISIO_MODULE_NAME);
     assert_eq!(
       wired.target_namespace,
-      "http://schemas.microsoft.com/office/visio/2011/1/core"
+      "http://schemas.microsoft.com/office/visio/2012/main"
     );
     assert_generic_cell_and_section(&direct);
     assert_generic_cell_and_section(&wired);
+    assert_eq!(
+      text_value_type(&wired, "visio:Title_Type/visio:Title"),
+      "xsd:string"
+    );
+    assert_eq!(
+      text_value_type(&wired, "visio:PreviewPicture_Type/visio:PreviewPicture"),
+      "xsd:base64Binary"
+    );
+    assert_eq!(
+      text_value_type(&wired, "visio:GlueSettings_Type/visio:GlueSettings"),
+      "xsd:int"
+    );
+    assert_unique_class_names(&wired);
+    assert_eq!(
+      class_name(&wired, "visio:UserRow_Type/visio:Row"),
+      "UserRow"
+    );
+    assert_eq!(class_name(&wired, "visio:Cell_Type/visio:Cell"), "Cell");
     assert_eq!(before, schema_fingerprint(&schemas_dir));
   }
 

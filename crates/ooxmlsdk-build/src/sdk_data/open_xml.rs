@@ -70,6 +70,10 @@ pub struct OpenXmlSchemaType {
   pub attributes: Vec<OpenXmlSchemaTypeAttribute>,
   pub children: Vec<OpenXmlSchemaTypeChild>,
   pub particle: OpenXmlSchemaTypeParticle,
+  /// XSD simple-content base, such as `xsd:string`. Empty when the type has no
+  /// text value. Stage 2 maps this through `simple_type_mapping`.
+  #[serde(default, skip_serializing_if = "String::is_empty")]
+  pub text_value_type: String,
   #[serde(skip)]
   pub module_name: String,
 }

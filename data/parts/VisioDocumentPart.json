@@ -38,6 +38,11 @@
     {
       "ApiName": "VisioExtensionsPart",
       "Name": "VisioExtensionsPart"
+    },
+    {
+      "ApiName": "VbaProjectPart",
+      "Name": "VbaProjectPart",
+      "HasFixedContent": true
     }
   ]
 }

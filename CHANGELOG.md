@@ -8,8 +8,9 @@
   `sdk_data::xsd_schema_gen`) that derives stage-1 schema metadata from an XSD.
   `gen_sdk_data` loads `schemas/VisioXMLSchema/visio-main.xsd` when that file is
   present and keeps the schema in memory. Checked-in `data/schemas` files stay
-  as they are. The Visio namespace remains
-  `http://schemas.microsoft.com/office/visio/2011/1/core`. Acceptance tests reproduce
+  as they are. The Visio XSD file keeps
+  `http://schemas.microsoft.com/office/visio/2011/1/core`. The generated schema
+  URI is `http://schemas.microsoft.com/office/visio/2012/main`. Acceptance tests reproduce
   the `additionalCharacteristics` and `bibliography` namespaces on the XSD-derivable
   projection, and so do `pml`, `sml`, and `wml`. `bibliography` elements typed
   as `s:ST_String` or `s:ST_Lang` are emitted as `b:ST_String255` through an
@@ -19,6 +20,13 @@
   occurs, and type names that exist only in the checked-in JSON.
   `xsd:element/@ref` resolves to the referenced
   element's type, so `a:graphic` is `a:CT_GraphicalObject`.
+- Added `VisioDocumentType` for the six Visio main-part content types. The part
+  JSON keeps the drawing content type. Macro-enabled packages can carry the
+  existing `VbaProjectPart` as an optional child of `VisioDocumentPart`.
+  `simpleContent` text follows the XSD base, so `Title` is `StringValue`.
+  The nineteen `Row` bindings each take the complex type's name (`UserRow`,
+  and the rest). The reader calls its start element `__ooxmlsdk_element`, so
+  an attribute field named `e` does not hide it.
 - Added a regeneration oracle (`ooxmlsdk-build`'s `sdk_data::oracle`) that diffs a
   generated schema against the checked-in `data/schemas` metadata on XSD-derivable
   projections (`CompositeType`, `BaseClass`, class names, summaries, and enum

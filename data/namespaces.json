@@ -445,7 +445,7 @@
   },
   {
     "Prefix": "visio",
-    "Uri": "http://schemas.microsoft.com/office/visio/2011/1/core"
+    "Uri": "http://schemas.microsoft.com/office/visio/2012/main"
   },
   {
     "Prefix": "vt",

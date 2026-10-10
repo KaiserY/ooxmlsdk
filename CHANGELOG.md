@@ -35,6 +35,9 @@
 - Recognized all six Visio main content types on the document part. Drawing,
   stencil, and template packages, including the macro-enabled forms, open
   without a pages part. Macro-enabled packages keep `vbaProject` bytes.
+- Added `ooxmlsdk-visio` to look up pages, masters, and shapes by id and to read
+  a section cell's stored value, formula text, unit, and error. Formulas are
+  not evaluated.
 - Added a regeneration oracle (`ooxmlsdk-build`'s `sdk_data::oracle`) that diffs a
   generated schema against the checked-in `data/schemas` metadata on XSD-derivable
   projections (`CompositeType`, `BaseClass`, class names, summaries, and enum

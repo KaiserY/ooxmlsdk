@@ -27,6 +27,10 @@
   The nineteen `Row` bindings each take the complex type's name (`UserRow`,
   and the rest). The reader calls its start element `__ooxmlsdk_element`, so
   an attribute field named `e` does not hide it.
+- Folded structural `xsd:alternative` bodies into the element a document reads.
+  Assert-only alternatives such as `PinX_Type` stay off the type list. `Section`
+  keeps one row that can hold `Del`, `N`, `LocalName`, `IX`, `T`, repeated cells,
+  and `Tab`.
 - Added a regeneration oracle (`ooxmlsdk-build`'s `sdk_data::oracle`) that diffs a
   generated schema against the checked-in `data/schemas` metadata on XSD-derivable
   projections (`CompositeType`, `BaseClass`, class names, summaries, and enum

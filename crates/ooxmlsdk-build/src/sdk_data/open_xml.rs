@@ -126,6 +126,11 @@ pub struct OpenXmlSchemaTypeParticle {
   pub initial_version: String,
   pub require_filter: bool,
   pub namespace: String,
+  /// `xsd:alternative/@test` values for this element. Empty when the schema
+  /// has no alternatives. Assert-only replacement types stay off the type list;
+  /// their tests are recorded here.
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub alternative_tests: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

@@ -182,10 +182,12 @@ fn any_particle() -> OpenXmlSchemaTypeParticle {
       initial_version: "Office2007".to_string(),
       require_filter: false,
       namespace: String::new(),
+      alternative_tests: Vec::new(),
     }],
     initial_version: String::new(),
     require_filter: false,
     namespace: String::new(),
+    alternative_tests: Vec::new(),
   }
 }
 

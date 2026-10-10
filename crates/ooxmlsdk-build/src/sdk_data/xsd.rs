@@ -109,6 +109,16 @@ pub(crate) struct ParsedChildElement {
   pub max_occurs: u64,
   pub complex_type: Option<ParsedComplexType>,
   pub documentation: String,
+  /// `xsd:alternative` entries on this element (`test`, replacement type).
+  pub alternatives: Vec<ParsedAlternative>,
+}
+
+/// One `xsd:alternative` on an element: the XPath-like `test` and the type it
+/// selects. The parser records these and does not expand them.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ParsedAlternative {
+  pub test: String,
+  pub type_name: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -752,6 +762,7 @@ fn parse_child_element(
 
   let mut complex_type = None;
   let mut documentation = String::new();
+  let mut alternatives = Vec::new();
   let mut depth = 1usize;
   let saw_body = !empty;
 
@@ -762,6 +773,13 @@ fn parse_child_element(
       }
       Event::Start(e) if local_name(e.name().as_ref()) == b"annotation" => {
         documentation = parse_annotation(reader)?;
+      }
+      Event::Start(e) if local_name(e.name().as_ref()) == b"alternative" => {
+        alternatives.push(parsed_alternative(reader, &e)?);
+        skip_element(reader, e.name().as_ref())?;
+      }
+      Event::Empty(e) if local_name(e.name().as_ref()) == b"alternative" => {
+        alternatives.push(parsed_alternative(reader, &e)?);
       }
       Event::Start(e) => {
         depth += 1;
@@ -800,6 +818,17 @@ fn parse_child_element(
       .unwrap_or(1),
     complex_type,
     documentation,
+    alternatives,
+  })
+}
+
+fn parsed_alternative(
+  reader: &Reader<&[u8]>,
+  element: &BytesStart<'_>,
+) -> Result<ParsedAlternative> {
+  Ok(ParsedAlternative {
+    test: optional_attr(reader, element, b"test")?.unwrap_or_default(),
+    type_name: optional_attr(reader, element, b"type")?.unwrap_or_default(),
   })
 }
 
@@ -1161,6 +1190,34 @@ mod tests {
     assert_eq!(particle.kind, ParsedParticleKind::Choice);
     assert_eq!(particle.min_occurs, 1);
     assert_eq!(particle.max_occurs, u64::MAX);
+  }
+
+  #[test]
+  fn reads_element_alternatives() {
+    let xsd = parse_xsd(
+      r#"
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:test">
+        <xsd:complexType name="Sheet_Type">
+          <xsd:sequence>
+            <xsd:element name="Cell" type="Cell_Type">
+              <xsd:alternative test="@N = 'PinX'" type="PinX_Type"/>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      "#,
+    )
+    .expect("parse xsd");
+
+    let sheet = xsd.complex_types.get("Sheet_Type").expect("Sheet_Type");
+    let cell = sheet
+      .children
+      .iter()
+      .find(|child| child.q_name == "cp:Cell" || child.q_name == "Cell")
+      .expect("Cell");
+    assert_eq!(cell.alternatives.len(), 1);
+    assert_eq!(cell.alternatives[0].test, "@N = 'PinX'");
+    assert_eq!(cell.alternatives[0].type_name, "PinX_Type");
   }
 
   #[test]

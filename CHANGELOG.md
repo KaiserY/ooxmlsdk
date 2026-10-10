@@ -40,7 +40,9 @@
   not evaluated. A missing instance cell uses the master shape's stored value.
   A local value wins. A row or section marked deleted does not inherit.
   Page, master, and shape ids are allocated from separate counters. A minimal
-  drawing with one page, `PinX`, and a Geometry `LineTo` round-trips.
+  drawing with one page, `PinX`, and a Geometry `LineTo` round-trips. `Connect`
+  records resolve `FromSheet` and `ToSheet` to shapes on the same page. An
+  unknown sheet id is an error.
 - Added a regeneration oracle (`ooxmlsdk-build`'s `sdk_data::oracle`) that diffs a
   generated schema against the checked-in `data/schemas` metadata on XSD-derivable
   projections (`CompositeType`, `BaseClass`, class names, summaries, and enum

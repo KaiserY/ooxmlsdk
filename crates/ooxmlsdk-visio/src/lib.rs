@@ -1,9 +1,11 @@
 //! Visio sheet lookup. Formulas stay text. This crate does not evaluate them.
 
+mod connect;
 mod drawing;
 mod ids;
 mod sheet;
 
+pub use connect::{ConnectError, ResolvedConnect, resolve_connects};
 pub use drawing::minimal_drawing;
 pub use ids::Ids;
 pub use sheet::{

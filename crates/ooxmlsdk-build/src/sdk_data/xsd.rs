@@ -49,8 +49,9 @@ pub(crate) struct ParsedComplexType {
   /// For `xs:simpleContent` extension/restriction: the base QName.
   pub text_value_type: Option<String>,
   /// For `xs:complexContent`/`xs:simpleContent`: the derivation (base + body),
-  /// kept separate from the direct `particle`/`children`/`attributes` so that
-  /// existing consumers observe the same shape as before this extension.
+  /// kept separate from the direct `particle`/`children`/`attributes`.
+  /// simpleContent attributes stay on `derivation.body`. `opc_schemas` appends
+  /// those when it builds Relationship and Keyword.
   pub derivation: Option<Box<ParsedDerivation>>,
 }
 
@@ -412,8 +413,8 @@ fn parse_complex_type_body(
 
 /// Parse the content of a type body until `end_tag`. When `allow_derivation` is
 /// set, `xs:complexContent`/`xs:simpleContent` are captured into
-/// `complex_type.derivation` (kept separate from the direct particle/children/
-/// attributes so existing consumers observe the same shape as before).
+/// `complex_type.derivation` and kept off the direct particle, children, and
+/// attributes. simpleContent attributes stay on the derivation body.
 fn parse_type_content(
   reader: &mut Reader<&[u8]>,
   complex_type: &mut ParsedComplexType,

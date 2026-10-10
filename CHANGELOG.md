@@ -22,7 +22,9 @@
 - Extended the XSD parser (`ooxmlsdk-build`'s `sdk_data::xsd`) to capture element
   type references, annotations, `complexContent`/`simpleContent` derivations,
   `abstract`, `xs:any`/`anyAttribute`, simple-type bases, and `xmlns` prefix
-  mappings. The additions are backward compatible.
+  mappings. The additions are backward compatible. OPC `Relationship` keeps
+  `Id`, `Target`, `Type`, and `TargetMode`, and core-properties `Keyword` keeps
+  `xml:lang`, when those attributes are declared inside `simpleContent`.
 
 ## 0.13.1
 

@@ -43,6 +43,37 @@ pub fn shape_cell<'a>(shape: &'a Shape, section: &str, cell: &str) -> Option<Cel
   cell_in_sections(sections, section, cell)
 }
 
+/// Shapes that belong to one master, keyed by the master's id.
+pub struct MasterShapes<'a> {
+  pub id: u32,
+  pub shapes: &'a Shapes,
+}
+
+/// Local cell when the instance has one. Otherwise the master shape's stored
+/// cell, addressed by `Shape.Master` and `Shape.MasterShape`. A deleted section
+/// or row does not inherit. Formulas are not evaluated.
+pub fn effective_shape_cell<'a>(
+  shape: &'a Shape,
+  section: &str,
+  cell: &str,
+  masters: &[MasterShapes<'a>],
+) -> Option<CellRecord<'a>> {
+  match local_cell(shape, section, cell) {
+    LocalCell::Found(record) => return Some(record),
+    LocalCell::Blocked => return None,
+    LocalCell::Absent => {}
+  }
+  let master_id = shape.master?;
+  let master_shape_id = shape.master_shape?;
+  let master_shapes = masters.iter().find(|master| master.id == master_id)?.shapes;
+  let master_shape = shape_by_id(master_shapes, master_shape_id)?;
+  let (record, row) = master_cell(master_shape, section, cell)?;
+  if local_row_deleted(shape, section, row) {
+    return None;
+  }
+  Some(record)
+}
+
 pub fn page_sheet_cell<'a>(
   sheet: &'a PageSheet,
   section: &str,
@@ -104,4 +135,106 @@ fn record(cell: &Cell) -> CellRecord<'_> {
 
 fn is_deleted(flag: Option<BooleanValue>) -> bool {
   matches!(flag, Some(BooleanValue::True | BooleanValue::One))
+}
+
+enum LocalCell<'a> {
+  Found(CellRecord<'a>),
+  Blocked,
+  Absent,
+}
+
+#[derive(Clone, Copy)]
+struct RowKey<'a> {
+  name: Option<&'a str>,
+  kind: Option<&'a str>,
+  index: Option<u32>,
+}
+
+fn local_cell<'a>(shape: &'a Shape, section_name: &str, cell_name: &str) -> LocalCell<'a> {
+  for choice in &shape.shape_choice {
+    let ShapeChoice::Section(section) = choice else {
+      continue;
+    };
+    if section.n != section_name {
+      continue;
+    }
+    if is_deleted(section.del) {
+      return LocalCell::Blocked;
+    }
+    for item in &section.section_choice {
+      match item {
+        SectionChoice::Cell(cell) if cell.n == cell_name => return LocalCell::Found(record(cell)),
+        SectionChoice::RowUnion(row) if !is_deleted(row.del) => {
+          if let Some(found) = cell_in_row(row, cell_name) {
+            return LocalCell::Found(found);
+          }
+        }
+        _ => {}
+      }
+    }
+  }
+  LocalCell::Absent
+}
+
+fn master_cell<'a>(
+  shape: &'a Shape,
+  section_name: &str,
+  cell_name: &str,
+) -> Option<(CellRecord<'a>, Option<RowKey<'a>>)> {
+  for choice in &shape.shape_choice {
+    let ShapeChoice::Section(section) = choice else {
+      continue;
+    };
+    if section.n != section_name || is_deleted(section.del) {
+      continue;
+    }
+    for item in &section.section_choice {
+      match item {
+        SectionChoice::Cell(cell) if cell.n == cell_name => {
+          return Some((record(cell), None));
+        }
+        SectionChoice::RowUnion(row) if !is_deleted(row.del) => {
+          if let Some(found) = cell_in_row(row, cell_name) {
+            return Some((
+              found,
+              Some(RowKey {
+                name: row.n.as_deref(),
+                kind: row.t.as_deref(),
+                index: row.ix,
+              }),
+            ));
+          }
+        }
+        _ => {}
+      }
+    }
+  }
+  None
+}
+
+fn local_row_deleted(shape: &Shape, section_name: &str, row: Option<RowKey<'_>>) -> bool {
+  let Some(row) = row else {
+    return false;
+  };
+  shape.shape_choice.iter().any(|choice| {
+    let ShapeChoice::Section(section) = choice else {
+      return false;
+    };
+    if section.n != section_name || is_deleted(section.del) {
+      return false;
+    }
+    section.section_choice.iter().any(|item| {
+      let SectionChoice::RowUnion(local) = item else {
+        return false;
+      };
+      is_deleted(local.del) && same_row(local, row)
+    })
+  })
+}
+
+fn same_row(local: &RowUnion, master: RowKey<'_>) -> bool {
+  if master.name.is_some() {
+    return local.n.as_deref() == master.name;
+  }
+  local.t.as_deref() == master.kind && local.ix == master.index
 }

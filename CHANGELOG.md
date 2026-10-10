@@ -37,7 +37,8 @@
   without a pages part. Macro-enabled packages keep `vbaProject` bytes.
 - Added `ooxmlsdk-visio` to look up pages, masters, and shapes by id and to read
   a section cell's stored value, formula text, unit, and error. Formulas are
-  not evaluated.
+  not evaluated. A missing instance cell uses the master shape's stored value.
+  A local value wins. A row or section marked deleted does not inherit.
 - Added a regeneration oracle (`ooxmlsdk-build`'s `sdk_data::oracle`) that diffs a
   generated schema against the checked-in `data/schemas` metadata on XSD-derivable
   projections (`CompositeType`, `BaseClass`, class names, summaries, and enum

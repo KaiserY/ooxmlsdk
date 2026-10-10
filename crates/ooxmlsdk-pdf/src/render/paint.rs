@@ -230,6 +230,7 @@ pub(super) struct TextStyle<'doc> {
   east_asia_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   complex_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   east_asia_font_family: Option<Cow<'doc, str>>,
+  drawingml_japanese_font_family: Option<Cow<'doc, str>>,
   complex_font_family: Option<Cow<'doc, str>>,
   symbol_font_family: Option<Cow<'doc, str>>,
   pub(super) explicit_symbol_character: bool,
@@ -260,6 +261,7 @@ pub(super) struct TextStyle<'doc> {
   wordprocessingml_font_slots: bool,
   wordprocessingml_cjk_line_metrics: bool,
   wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
+  wordprocessingml_resolved_font_slot: Option<ooxmlsdk_fonts::WordprocessingFontSlot>,
   wordprocessingml_east_asia_language_is_chinese: bool,
   wordprocessingml_bidi_language_is_hebrew: bool,
   font_charset: Option<ooxmlsdk_fonts::FontCharset>,
@@ -356,6 +358,10 @@ impl FontStyleRef for TextStyle<'_> {
       .or_else(|| self.font_family())
   }
 
+  fn drawingml_japanese_font_family(&self) -> Option<&str> {
+    self.drawingml_japanese_font_family.as_deref()
+  }
+
   fn complex_font_family(&self) -> Option<&str> {
     self
       .complex_font_family
@@ -377,6 +383,10 @@ impl FontStyleRef for TextStyle<'_> {
     } else {
       None
     }
+  }
+
+  fn complex_script_property(&self) -> Option<bool> {
+    self.complex_script
   }
 
   fn right_to_left(&self) -> bool {
@@ -446,6 +456,9 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn wordprocessingml_font_hint(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontTypeHint> {
     self.wordprocessingml_font_hint
+  }
+  fn wordprocessingml_resolved_font_slot(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontSlot> {
+    self.wordprocessingml_resolved_font_slot
   }
 
   fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
@@ -2749,6 +2762,10 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
       .east_asia_font_family
       .as_ref()
       .map(|value| Cow::Borrowed(value.as_ref())),
+    drawingml_japanese_font_family: style
+      .drawingml_japanese_font_family
+      .as_ref()
+      .map(|value| Cow::Borrowed(value.as_ref())),
     complex_font_family: style
       .complex_font_family
       .as_ref()
@@ -2787,6 +2804,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
     wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics,
     wordprocessingml_font_hint: style.wordprocessingml_font_hint,
+    wordprocessingml_resolved_font_slot: style.wordprocessingml_resolved_font_slot,
     wordprocessingml_east_asia_language_is_chinese: style
       .wordprocessingml_east_asia_language_is_chinese,
     wordprocessingml_bidi_language_is_hebrew: style.wordprocessingml_bidi_language_is_hebrew,
@@ -4646,6 +4664,55 @@ mod tests {
         }
       }
     }
+  }
+
+  #[test]
+  fn drawingml_chart_theme_fonts_reach_the_pdf_glyph_runs() {
+    let common_style = common::TextStyle {
+      font_family: Some("Calibri".into()),
+      east_asia_font_family: Some("SimSun".into()),
+      drawingml_japanese_font_family: Some("MS Mincho".into()),
+      font_size: common::Pt(10.0),
+      wordprocessingml_font_slots: true,
+      bold: true,
+      ..Default::default()
+    };
+    let painted = super::text_style_from_common(&common_style);
+    let mut metrics = super::TextMetrics::new();
+    let text = "軸ラベルA";
+    let glyphs = super::shaped_pdf_glyphs(text, &painted, 0.0, &mut metrics).unwrap();
+    assert_eq!(glyphs.font_runs.len(), 3);
+    let simsun = glyphs.font_runs[0].font_face.clone();
+    for (actual, (part, family)) in
+      glyphs
+        .font_runs
+        .iter()
+        .zip([("軸", "SimSun"), ("ラベル", "MS Mincho"), ("A", "Calibri")])
+    {
+      let explicit = super::TextStyle {
+        font_family: Some(family.into()),
+        font_size_pt: 10.0,
+        bold: true,
+        ..Default::default()
+      };
+      let expected = super::shaped_pdf_glyphs(part, &explicit, 0.0, &mut metrics).unwrap();
+      assert_eq!(actual.font_face, expected.font_runs[0].font_face);
+      assert_eq!(
+        actual.glyphs.iter().map(|g| g.glyph_id).collect::<Vec<_>>(),
+        expected.font_runs[0]
+          .glyphs
+          .iter()
+          .map(|g| g.glyph_id)
+          .collect::<Vec<_>>()
+      );
+    }
+    let explicit_ea = common::TextStyle {
+      drawingml_japanese_font_family: None,
+      ..common_style
+    };
+    let painted = super::text_style_from_common(&explicit_ea);
+    let glyphs = super::shaped_pdf_glyphs("軸ラベル", &painted, 0.0, &mut metrics).unwrap();
+    assert!(glyphs.font_runs.iter().all(|run| run.font_face == simsun));
   }
 
   #[test]

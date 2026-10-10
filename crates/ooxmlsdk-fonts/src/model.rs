@@ -355,6 +355,7 @@ impl<'a> FontRegistry<'a> {
     {
       for family in family
         .split(';')
+        .take(request.family_selection.limit())
         .map(str::trim)
         .filter(|family| !family.is_empty())
       {
@@ -1151,13 +1152,13 @@ impl<'a> FontRegistry<'a> {
     &'book self,
     request: &FontRequest<'_>,
   ) -> SmallVec<[(&'book str, FontSubstitutionReason); 8]> {
-    let Some(requested_family) = request.family.as_deref() else {
+    if request.family.is_none() {
       return SmallVec::new();
-    };
+    }
     let mut families = SmallVec::<[(&'book str, FontSubstitutionReason); 8]>::new();
     for chain in &self.book.family_substitution_chains {
       let reason = if let Some(family) = chain.requested_family.as_deref() {
-        if !normalized_family_eq(family, requested_family) {
+        if !requested_family_matches(request, family) {
           continue;
         }
         FontSubstitutionReason::MissingFamily
@@ -1214,11 +1215,12 @@ impl<'a> FontRegistry<'a> {
     request: &FontRequest<'_>,
   ) -> FallbackFontLinks<'book> {
     let mut links = FallbackFontLinks::new();
-    let requested_family = request.family.as_deref();
     for chain in &self.book.fallback_chains {
-      if chain.requested_family.as_deref().is_some_and(|family| {
-        requested_family.is_none_or(|requested| !normalized_family_eq(requested, family))
-      }) {
+      if chain
+        .requested_family
+        .as_deref()
+        .is_some_and(|family| !requested_family_matches(request, family))
+      {
         continue;
       }
       // Weak Common characters inherit a neighboring strong script during
@@ -1440,6 +1442,13 @@ impl<'a> FontBook<'a> {
   ) -> Result<ResolvedFont<'a>> {
     let mut substitution = None;
     let target_family_names = family_override.or(request.family.as_deref()).map(|family| {
+      // A fallback/link has its own family name. The request's primary-name
+      // policy governs the authored name only, before aliases/substitution.
+      let family = if family_override.is_none() {
+        request.family_selection.primary_name(family)
+      } else {
+        family
+      };
       let aliased = resolve_family_alias(self, Cow::Borrowed(family));
       let rule = find_substitution_rule(self, aliased.as_ref());
       let target = rule
@@ -1753,6 +1762,7 @@ pub struct GlyphFallbackCacheEntry<'a> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FontRequestKey<'a> {
   pub family: Option<Cow<'a, str>>,
+  pub family_selection: FontFamilySelection,
   pub weight: Option<FontWeight>,
   pub slant: Option<FontSlant>,
   pub stretch: Option<FontStretch>,
@@ -1942,9 +1952,38 @@ impl<'a> ThemeFontMap<'a> {
   }
 }
 
+/// Interpretation of a semicolon-separated primary family request.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum FontFamilySelection {
+  /// Search the supplied families using the shared resolver's list policy.
+  #[default]
+  List,
+  /// Select the first family, then substitute it if it is unavailable.
+  /// Word fixed-format output does not try later families in an authored
+  /// rFonts string, unlike LibreOffice's VCL family-list lookup.
+  First,
+}
+
+impl FontFamilySelection {
+  fn limit(self) -> usize {
+    match self {
+      Self::List => usize::MAX,
+      Self::First => 1,
+    }
+  }
+
+  fn primary_name(self, family: &str) -> &str {
+    match self {
+      Self::List => family,
+      Self::First => family.split(';').next().unwrap_or(family).trim(),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FontRequest<'a> {
   pub family: Option<Cow<'a, str>>,
+  pub family_selection: FontFamilySelection,
   pub theme_family: Option<ThemeFontKind>,
   pub family_class: Option<FontFamilyClass>,
   pub bold: bool,
@@ -2574,15 +2613,20 @@ pub struct ScriptScanOptions {
   /// Resolve weak and ECMA-376 conditionally classified characters through
   /// the effective `w:rFonts/@w:hint` slot.
   pub wordprocessingml_font_hint: Option<WordprocessingFontTypeHint>,
+  /// Font slot selected from the complete source portion before line breaking.
+  pub wordprocessingml_resolved_font_slot: Option<WordprocessingFontSlot>,
   /// Whether effective `w:lang/@w:eastAsia` has a `zh` language component.
   pub wordprocessingml_east_asia_language_is_chinese: bool,
   /// Character set declared for the effective East Asian font-table entry.
   pub wordprocessingml_east_asia_font_charset: Option<FontCharset>,
   /// A run-level `w:cs` or `w:rtl` selects Word's complex-script font for the
-  /// run, independently from its Unicode scripts. Word fixed output retains
-  /// the ASCII family for Basic Latin decimal digits; complex-script run
+  /// run, independently from its Unicode scripts. Complex-script run
   /// properties such as size remain a separate layout decision.
   pub wordprocessingml_complex_font_override: bool,
+  /// A `w:rtl` override without `w:cs` retains the ASCII face for numeric
+  /// portions. Latin text following a leading number shares that portion;
+  /// numbers following strong LTR text instead share its complex-script face.
+  pub wordprocessingml_rtl_font_override: bool,
   /// Word uses the ASCII face for East Asian-classified characters when the
   /// effective East Asian face is Times New Roman and ASCII and High ANSI
   /// resolve to the same face.
@@ -2596,9 +2640,11 @@ impl Default for ScriptScanOptions {
       small_caps: false,
       wordprocessingml_font_slots: false,
       wordprocessingml_font_hint: None,
+      wordprocessingml_resolved_font_slot: None,
       wordprocessingml_east_asia_language_is_chinese: false,
       wordprocessingml_east_asia_font_charset: None,
       wordprocessingml_complex_font_override: false,
+      wordprocessingml_rtl_font_override: false,
       wordprocessingml_east_asia_uses_ascii: false,
     }
   }
@@ -2718,11 +2764,12 @@ fn script_direction_runs_for_segment(
 
   let mut start = 0usize;
   let mut active_slot = None;
+  let mut rtl_fonts = WordprocessingRtlFontContext::default();
   for (index, ch) in text.char_indices() {
-    let slot = if options.wordprocessingml_complex_font_override
-      && wordprocessing_numeric_separator(text, index, ch)
-    {
-      WordprocessingFontSlot::Ascii
+    let slot = if let Some(slot) = options.wordprocessingml_resolved_font_slot {
+      slot
+    } else if options.wordprocessingml_rtl_font_override {
+      rtl_fonts.font_slot(text, index, ch)
     } else {
       wordprocessing_font_slot(ch, options)
     };
@@ -3340,6 +3387,11 @@ pub enum TextScript {
 
 const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
   ("Courier", "Courier New"),
+  // Windows FontSubstitutes resolves these legacy GDI names to Arial.
+  // Native Word controls retain Helvetica as a logical PDF name while
+  // embedding Arial; this name mapping precedes missing-face metadata.
+  ("Helvetica", "Arial"),
+  ("Helv", "Arial"),
   // Windows exposes this legacy GDI name through the system FontSubstitutes
   // table. Office therefore resolves authored `Times` text to the installed
   // Times New Roman face before fixed-format export.
@@ -3401,6 +3453,11 @@ fn default_family_specific_chains<'a>() -> Vec<FontFallbackChain<'a>> {
       &["Courier New", "Liberation Mono", "DejaVu Sans Mono"],
     ),
     office_family_fallback("Arial", &["Liberation Sans", "Arimo"]),
+    // Word's missing-family mapper selects Arial for Albany, including an
+    // authored semicolon name whose primary family is Albany. Keep this a
+    // substitution chain: a font-table alternate for the complete authored
+    // name precedes it, and an installed Albany face remains authoritative.
+    office_family_fallback("Albany", &["Arial"]),
     office_family_fallback("Arial Black", &["Arial", "Liberation Sans"]),
     // Microsoft's SimSun family inventory lists SimSun-ExtB and SimSun as
     // members of the same family. Prefer the installed base face for covered
@@ -3800,6 +3857,17 @@ fn normalized_family_eq_normalized(candidate: &str, normalized: &str) -> bool {
 
 fn normalized_family_eq(left: &str, right: &str) -> bool {
   normalized_family_chars(left).eq(normalized_family_chars(right))
+}
+
+fn requested_family_matches(request: &FontRequest<'_>, family: &str) -> bool {
+  request.family.as_deref().is_some_and(|requested| {
+    // Keep a document-scoped mapping for the complete authored key eligible,
+    // while retaining shared aliases/substitutions for the primary family.
+    normalized_family_eq(requested, family)
+      || (request.family_selection == FontFamilySelection::First
+        && requested.contains(';')
+        && normalized_family_eq(request.family_selection.primary_name(requested), family))
+  })
 }
 
 fn normalized_family_chars(value: &str) -> impl Iterator<Item = char> + '_ {
@@ -5078,21 +5146,58 @@ fn wordprocessing_numeric_separator(text: &str, index: usize, ch: char) -> bool 
       .is_some_and(|next| next.is_ascii_digit())
 }
 
+#[derive(Default)]
+struct WordprocessingRtlFontContext {
+  preceding_ltr: bool,
+  numeric_latin_portion: bool,
+}
+
+impl WordprocessingRtlFontContext {
+  fn font_slot(&mut self, text: &str, index: usize, ch: char) -> WordprocessingFontSlot {
+    use WordprocessingFontSlot::{Ascii, ComplexScript};
+    use unicode_bidi::{BidiClass, bidi_class};
+
+    // [MS-OI29500] §2.1.88 supplies the cs override. Native Word PDF/XPS
+    // controls establish its RTL-only numeric boundary: A1/A 1 use cs,
+    // 1A/123A45 use ASCII, and a neutral boundary in 1 A ends that numeric
+    // portion. These decisions precede shaping, rather than switching fonts
+    // independently for each digit. An explicit w:cs has no such exception.
+    let class = bidi_class(ch);
+    let slot = if ch.is_ascii_digit() {
+      if self.numeric_latin_portion || !self.preceding_ltr {
+        self.numeric_latin_portion = true;
+        Ascii
+      } else {
+        ComplexScript
+      }
+    } else if self.numeric_latin_portion
+      && ((ch.script() == UnicodeScriptValue::Latin && ch.is_alphabetic())
+        || is_nonspacing_mark(ch)
+        || wordprocessing_numeric_separator(text, index, ch))
+    {
+      Ascii
+    } else {
+      self.numeric_latin_portion = false;
+      ComplexScript
+    };
+    match class {
+      BidiClass::L => self.preceding_ltr = true,
+      BidiClass::R | BidiClass::AL => self.preceding_ltr = false,
+      _ => {}
+    }
+    slot
+  }
+}
+
 fn wordprocessing_font_slot(ch: char, options: ScriptScanOptions) -> WordprocessingFontSlot {
   use WordprocessingFontSlot::{Ascii, ComplexScript, HighAnsi};
 
   // [MS-OI29500] section 2.1.88 documents that either run-level property
-  // forces the cs face for every Unicode value. Word fixed output has one
-  // narrower compatibility exception: U+0030..U+0039 retain the ASCII family,
-  // along with the contextual numeric separators selected by the caller.
-  // Keep this at the font-slot boundary; szCs/bCs/iCs still apply to the whole
-  // run in the layout layer.
+  // forces the cs face for every Unicode value. The RTL-only numeric
+  // compatibility path has already selected its contextual slot above;
+  // an explicit w:cs keeps digits on cs as well.
   if options.wordprocessingml_complex_font_override {
-    return if ch.is_ascii_digit() {
-      Ascii
-    } else {
-      ComplexScript
-    };
+    return ComplexScript;
   }
 
   // Word treats Mathematical Alphanumeric Symbols as Latin rather than
@@ -5559,6 +5664,115 @@ fn harf_script_for_shape_options(options: &ShapeOptions<'_>) -> Option<HarfScrip
 mod tests {
   use super::*;
 
+  #[test]
+  fn first_family_substitution_does_not_try_later_list_members() {
+    let mut registry = FontRegistry::new();
+    for name in ["Installed", "Recovered"] {
+      registry.register_face(FontSource::System, FontFaceInfo::synthetic(name, name));
+    }
+    registry
+      .book
+      .family_substitution_chains
+      .push(FontFallbackChain {
+        requested_family: Some(Cow::Borrowed("Missing")),
+        families: vec![Cow::Borrowed("Recovered")],
+        ..FontFallbackChain::default()
+      });
+    let mut request = FontRequest {
+      family: Some(Cow::Borrowed("Missing;Installed")),
+      ..FontRequest::default()
+    };
+    assert_eq!(
+      registry.resolve(&request).unwrap().resolved_family,
+      "Installed"
+    );
+    request.family_selection = FontFamilySelection::First;
+    assert_eq!(
+      registry.resolve(&request).unwrap().resolved_family,
+      "Recovered"
+    );
+
+    // A font-table alternate for the complete authored key still precedes
+    // the shared missing-family rule for its primary name.
+    registry.book.family_substitution_chains.insert(
+      0,
+      FontFallbackChain {
+        requested_family: Some(Cow::Borrowed("Missing;Installed")),
+        families: vec![Cow::Borrowed("Installed")],
+        ..FontFallbackChain::default()
+      },
+    );
+    assert_eq!(
+      registry.resolve(&request).unwrap().resolved_family,
+      "Installed"
+    );
+  }
+
+  #[test]
+  fn first_family_keeps_installed_names_and_empty_primary_substitution() {
+    let mut registry = FontRegistry::new();
+    for name in ["Zeta", "Alpha", "Recovered"] {
+      registry.register_face(FontSource::System, FontFaceInfo::synthetic(name, name));
+    }
+    registry
+      .book
+      .family_substitution_chains
+      .push(FontFallbackChain {
+        families: vec![Cow::Borrowed("Recovered")],
+        ..FontFallbackChain::default()
+      });
+    for (family, expected) in [
+      ("Zeta;Alpha", "Zeta"),
+      ("Zeta", "Zeta"),
+      (";Alpha", "Recovered"),
+    ] {
+      let request = FontRequest {
+        family: Some(Cow::Borrowed(family)),
+        family_selection: FontFamilySelection::First,
+        ..FontRequest::default()
+      };
+      assert_eq!(
+        registry.resolve(&request).unwrap().resolved_family,
+        expected
+      );
+    }
+  }
+
+  #[test]
+  fn albany_substitution_preserves_installed_faces_and_document_alternates() {
+    let mut registry = FontRegistry::with_default_policy();
+    for name in ["Arial", "Cambria"] {
+      registry.register_face(FontSource::System, FontFaceInfo::synthetic(name, name));
+    }
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Albany;Cambria")),
+      family_selection: FontFamilySelection::First,
+      ..FontRequest::default()
+    };
+    assert_eq!(registry.resolve(&request).unwrap().resolved_family, "Arial");
+
+    registry.book.family_substitution_chains.insert(
+      0,
+      FontFallbackChain {
+        requested_family: Some(Cow::Borrowed("Albany;Cambria")),
+        families: vec![Cow::Borrowed("Cambria")],
+        ..FontFallbackChain::default()
+      },
+    );
+    assert_eq!(
+      registry.resolve(&request).unwrap().resolved_family,
+      "Cambria"
+    );
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("Albany", "Albany"),
+    );
+    assert_eq!(
+      registry.resolve(&request).unwrap().resolved_family,
+      "Albany"
+    );
+  }
+
   fn platform_has_font(family: &str, postscript_name: &str) -> bool {
     let request = FontRequest {
       family: Some(Cow::Borrowed(family)),
@@ -5871,6 +6085,36 @@ mod tests {
 
     assert_eq!(resolved.font_id, FontId(Arc::from("times-new-roman")));
     assert_eq!(resolved.resolved_family, Cow::Borrowed("Times New Roman"));
+  }
+
+  #[test]
+  fn windows_helvetica_aliases_precede_missing_family_defaults() {
+    for family in ["Helvetica", "Helv"] {
+      let mut registry = FontRegistry::with_default_policy();
+      registry.register_face(
+        FontSource::System,
+        FontFaceInfo::synthetic("arial", "Arial"),
+      );
+      registry.register_face(
+        FontSource::System,
+        FontFaceInfo::synthetic("calibri", "Calibri"),
+      );
+      registry
+        .book
+        .family_substitution_chains
+        .insert(0, office_family_fallback(family, &["Calibri"]));
+      let resolved = registry
+        .resolve(&FontRequest {
+          family: Some(Cow::Borrowed(family)),
+          ..FontRequest::default()
+        })
+        .unwrap();
+      assert_eq!(resolved.font_id, FontId(Arc::from("arial")), "{family}");
+      assert_eq!(
+        resolved.substitution.unwrap().reason,
+        FontSubstitutionReason::Alias
+      );
+    }
   }
 
   #[test]
@@ -7327,6 +7571,7 @@ mod tests {
     let complex = ScriptScanOptions {
       wordprocessingml_font_slots: true,
       wordprocessingml_complex_font_override: true,
+      wordprocessingml_rtl_font_override: true,
       ..ScriptScanOptions::default()
     };
     for text in ["الخصوص. كما ترجو اللجنة ", "سلام: عليكم ", "سلام، عليكم "]
@@ -7358,6 +7603,7 @@ mod tests {
       FontSize(15.0),
       ScriptScanOptions {
         wordprocessingml_complex_font_override: false,
+        wordprocessingml_rtl_font_override: false,
         ..complex
       },
     );
@@ -7380,8 +7626,7 @@ mod tests {
       run.wordprocessingml_font_slot == Some(WordprocessingFontSlot::ComplexScript)
     }));
 
-    // Word fixed output keeps Basic Latin decimal digits on the ASCII family.
-    // The adjacent Latin and CJK counterexamples above remain on cs.
+    // An explicit w:cs also forces Basic Latin decimal digits to cs.
     let decimal_digit = script_direction_runs_with_options(
       "0",
       FontSize(11.0),
@@ -7393,7 +7638,7 @@ mod tests {
     );
     assert_eq!(
       decimal_digit[0].wordprocessingml_font_slot,
-      Some(WordprocessingFontSlot::Ascii)
+      Some(WordprocessingFontSlot::ComplexScript)
     );
 
     let east_asia_as_ascii = script_direction_runs_with_options(
@@ -7416,6 +7661,7 @@ mod tests {
     let options = ScriptScanOptions {
       wordprocessingml_font_slots: true,
       wordprocessingml_complex_font_override: true,
+      wordprocessingml_rtl_font_override: true,
       ..ScriptScanOptions::default()
     };
     let slots = |text: &str| {
@@ -7456,6 +7702,78 @@ mod tests {
         .iter()
         .all(|run| run.wordprocessingml_font_slot.is_none())
     );
+  }
+
+  #[test]
+  fn wordprocessingml_rtl_numeric_font_portions_follow_native_context() {
+    use WordprocessingFontSlot::{Ascii, ComplexScript};
+    let rtl = ScriptScanOptions {
+      wordprocessingml_font_slots: true,
+      wordprocessingml_complex_font_override: true,
+      wordprocessingml_rtl_font_override: true,
+      ..ScriptScanOptions::default()
+    };
+    // Independent Word PDF/XPS controls, including equivalent split XML runs.
+    // Every tuple describes the complete source text's expected font owners.
+    for parts in [
+      vec![("A1", ComplexScript)],
+      vec![("1A", Ascii)],
+      vec![("A1B", ComplexScript)],
+      vec![("123", Ascii)],
+      vec![("A 1", ComplexScript)],
+      vec![("1", Ascii), (" A", ComplexScript)],
+      vec![("A-1", ComplexScript)],
+      vec![("1", Ascii), ("-A", ComplexScript)],
+      vec![("A.1", ComplexScript)],
+      vec![("1", Ascii), (".A", ComplexScript)],
+      vec![("A1 23", ComplexScript)],
+      vec![("123A45", Ascii)],
+      vec![("a1b2", ComplexScript)],
+      vec![("α1", ComplexScript)],
+      vec![("א", ComplexScript), ("1", Ascii)],
+      vec![("ا", ComplexScript), ("1", Ascii)],
+      vec![("中1", ComplexScript)],
+      vec![("1", Ascii), ("ا", ComplexScript)],
+      vec![("1", Ascii), ("א", ComplexScript)],
+      vec![("$", ComplexScript), ("123", Ascii)],
+      vec![("x123.45", ComplexScript)],
+      vec![("123.45x", Ascii)],
+      vec![("A1 23B", ComplexScript)],
+      vec![("A 1 B", ComplexScript)],
+    ] {
+      let text = parts.iter().map(|(text, _)| *text).collect::<String>();
+      let expected = parts
+        .iter()
+        .flat_map(|(text, slot)| text.chars().map(move |_| *slot))
+        .collect::<Vec<_>>();
+      for explicit_cs in [false, true] {
+        let runs = script_direction_runs_with_options(
+          &text,
+          FontSize(11.0),
+          ScriptScanOptions {
+            wordprocessingml_rtl_font_override: !explicit_cs,
+            ..rtl
+          },
+        );
+        let slots = runs
+          .iter()
+          .flat_map(|run| {
+            text[run.text_range.clone()]
+              .chars()
+              .map(move |_| run.wordprocessingml_font_slot.unwrap())
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(
+          slots,
+          if explicit_cs {
+            vec![ComplexScript; text.chars().count()]
+          } else {
+            expected.clone()
+          },
+          "text={text}, explicit cs={explicit_cs}"
+        );
+      }
+    }
   }
 
   #[test]

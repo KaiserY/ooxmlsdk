@@ -232,10 +232,12 @@ mod tests {
       text_rotation_deg: None,
     };
     Table {
+      recovered_absolute_grid: false,
       column_widths_pt: vec![53.0; 3],
       preferred_width_pt: Some(159.0),
       preferred_width_pct: None,
       layout: TableLayoutMode::Fixed,
+      containing_table_layout: None,
       indent_left_pt: 0.0,
       alignment: TableAlignment::Left,
       right_to_left: false,

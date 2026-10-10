@@ -431,6 +431,8 @@ pub(crate) enum RasterSourceExtent {
 pub(crate) enum RasterPrimitiveAntialiasing {
   PerPrimitive,
   Aliased,
+  /// Classify vector-fill boundaries at pixel centers before scanner rounding.
+  ExactAliasedFill,
   /// Resolve the standard four-sample lattice independently for each path.
   /// Text retains its separate rasterization policy.
   Direct2dStandard4,
@@ -490,7 +492,9 @@ impl RasterPrimitiveAntialiasing {
         OFFICE_ANTIALIAS_8X4_HORIZONTAL_SAMPLES,
         OFFICE_ANTIALIAS_8X4_VERTICAL_SAMPLES,
       ),
-      Self::PerPrimitive | Self::Aliased | Self::Direct2dStandard4 => (1, 1),
+      Self::PerPrimitive | Self::Aliased | Self::ExactAliasedFill | Self::Direct2dStandard4 => {
+        (1, 1)
+      }
     }
   }
 }
@@ -1163,15 +1167,12 @@ fn realize_word_shadow_minimum_strokes(items: &mut [DisplayItem<'static>], pixel
   }
 }
 
-/// Rasterizes a standalone WordprocessingShape backdrop from its
-/// base-resolution source surface before resolving to the balanced-blur
-/// surface tier.
+/// Rasterizes a standalone WordprocessingShape backdrop on its effect surface.
 ///
-/// Word first realizes the shape at the fixed-output base density. Its
-/// balanced Gaussian implementation then pre-scales that source when the
-/// selected effect tier is lower. Keeping these two surfaces distinct is
-/// observable at every fractional source edge and at the 200-to-100-DPI tier
-/// boundary.
+/// A shadow retains its antialiased base-resolution source through the
+/// balanced-blur pre-scale. A glow instead wraps the primitive in an aliased
+/// effect: its coverage is realized after the reduced-surface transform. These
+/// owners differ at fractional edges and narrow tips, even with the same blur.
 pub(crate) fn rasterize_word_shape_effect_source_via_base_surface(
   items: &[DisplayItem<'static>],
   effects: &super::drawingml_image_effects::ImageEffectContainer,
@@ -1194,6 +1195,42 @@ pub(crate) fn rasterize_word_shape_effect_source_via_base_surface(
     || target_pixels_per_point <= 0.0
   {
     return None;
+  }
+
+  if profile == WordShapeEffectSourceProfile::Glow
+    && target_pixels_per_point + f32::EPSILON < base_pixels_per_point
+  {
+    // Native GFX IEffectAliased/Blur observations and independent Word
+    // star/triangle/ellipse, radius, phase and Print/Screen controls separate
+    // this from resizing an already painted base bitmap. Bilinear sampling
+    // creates fractional coverage outside an aliased edge; alphaOutset then
+    // ceilings every nonzero sample, enlarging thin tips and sloping edges.
+    // Realize the primitive on the selected effect lattice instead. The
+    // continuous base rectangle owns the transform, while the caller owns
+    // the independently rounded reduced bitmap allocation.
+    let scale_x = target_width_px as f32 / base_surface_bounds.size.width.0;
+    let scale_y = target_height_px as f32 / base_surface_bounds.size.height.0;
+    let image = rasterize_vector_items_at_mapping(
+      items,
+      PageToRasterMapping {
+        width_px: target_width_px,
+        height_px: target_height_px,
+        scale_x,
+        scale_y,
+        translate_x: -base_surface_bounds.origin.x.0 * scale_x,
+        translate_y: -base_surface_bounds.origin.y.0 * scale_y,
+        text_hinting: None,
+      },
+      RasterPrimitiveAntialiasing::ExactAliasedFill,
+    )?;
+    return Some(DrawingRaster {
+      image,
+      fill_image: None,
+      line_image: None,
+      fill_line_image: None,
+      children_image: None,
+      pixels_per_point: target_pixels_per_point,
+    });
   }
 
   let primitive_antialiasing = match profile {
@@ -1965,7 +2002,9 @@ pub(crate) fn rasterize_static_3d_text_reflection_source_with_mapping(
     RasterPrimitiveAntialiasing::PerPrimitive | RasterPrimitiveAntialiasing::Direct2dStandard4 => {
       (4, 4, RasterPrimitiveAntialiasing::Aliased)
     }
-    RasterPrimitiveAntialiasing::Aliased => (1, 1, RasterPrimitiveAntialiasing::Aliased),
+    RasterPrimitiveAntialiasing::Aliased | RasterPrimitiveAntialiasing::ExactAliasedFill => {
+      (1, 1, antialiasing)
+    }
     RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 => (8, 4, antialiasing),
   };
   for top in (0..height).step_by(64) {
@@ -4555,6 +4594,14 @@ fn draw_fill(
   if antialiasing == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
     return draw_office_8x4_fill(pixmap, path, fill, bounds, commands, page_to_raster);
   }
+  if antialiasing == RasterPrimitiveAntialiasing::ExactAliasedFill {
+    if matches!(fill, Fill::None) {
+      return Some(());
+    }
+    let transformed = path.clone().transform(page_to_raster)?;
+    let mask = exact_aliased_sample_mask(pixmap, &transformed, FillRule::EvenOdd, 0.5)?;
+    return paint_fill_mask(pixmap, &mask, fill, bounds, commands, page_to_raster);
+  }
   if antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
     if matches!(fill, Fill::None) {
       return Some(());
@@ -4621,10 +4668,46 @@ fn office_8x4_sample_mask(
   let transformed = path
     .clone()
     .transform(office_8x4_storage_transform(page_to_raster))?;
+  exact_aliased_sample_mask(pixmap, &transformed, fill_rule, 0.0)
+}
+
+/// Retains the scanner's fast interior while classifying its boundary against
+/// the continuous path. tiny-skia's aliased edges truncate to a 1/64-pixel
+/// lattice; a few changed samples can grow into a large alphaOutset difference.
+/// The caller selects integer GDI+ samples or ordinary half-pixel centers.
+fn exact_aliased_sample_mask(
+  pixmap: &Pixmap,
+  transformed: &Path,
+  fill_rule: FillRule,
+  sample_offset: f64,
+) -> Option<Mask> {
   let mut mask = Mask::new(pixmap.width(), pixmap.height())?;
-  mask.fill_path(&transformed, fill_rule, false, SkTransform::identity());
+  mask.fill_path(transformed, fill_rule, false, SkTransform::identity());
   let preliminary = mask.data().to_vec();
-  let exact_path = tiny_path_as_kurbo(&transformed);
+  // A thin tip or a disconnected contour may contain a sample even when the
+  // scanner drops every sample in its neighborhood. Seed the candidate band
+  // from the path as well as the preliminary bitmap. One device pixel on
+  // either side covers the scanner's 1/64-pixel endpoint truncation and the
+  // half-pixel difference between the two supported sampling grids. This
+  // stroke selects samples to classify; it never supplies painted coverage.
+  let mut geometric_boundary = Mask::new(pixmap.width(), pixmap.height())?;
+  if let Some(boundary_path) = transformed.stroke(
+    &SkStroke {
+      width: 2.0,
+      line_cap: LineCap::Round,
+      line_join: LineJoin::Round,
+      ..SkStroke::default()
+    },
+    1.0,
+  ) {
+    geometric_boundary.fill_path(
+      &boundary_path,
+      FillRule::Winding,
+      false,
+      SkTransform::identity(),
+    );
+  }
+  let exact_path = tiny_path_as_kurbo(transformed);
   let width = pixmap.width() as usize;
   let height = pixmap.height() as usize;
 
@@ -4632,7 +4715,7 @@ fn office_8x4_sample_mask(
     for x in 0..width {
       let index = y * width + x;
       let preliminary_alpha = preliminary[index];
-      let mut boundary = false;
+      let mut boundary = geometric_boundary.data()[index] != 0;
       for offset_y in -1_i32..=1 {
         for offset_x in -1_i32..=1 {
           if offset_x == 0 && offset_y == 0 {
@@ -4662,7 +4745,10 @@ fn office_8x4_sample_mask(
         continue;
       }
 
-      let winding = exact_path.winding(KurboPoint::new(x as f64, y as f64));
+      let winding = exact_path.winding(KurboPoint::new(
+        x as f64 + sample_offset,
+        y as f64 + sample_offset,
+      ));
       let inside = match fill_rule {
         FillRule::Winding => winding != 0,
         FillRule::EvenOdd => winding.rem_euclid(2) != 0,
@@ -6449,6 +6535,123 @@ mod tests {
     }
     assert!(render(&zero, surface, (f32::NAN, 0.0), 1.0).is_none());
     assert!(render(&zero, rect(0.0, 0.0, 100_000.0, 100_000.0), (0.0, 0.0), 1.0).is_none());
+  }
+
+  #[test]
+  fn exact_aliased_fill_does_not_move_a_sloping_edge_onto_a_pixel_center() {
+    let mut builder = SkPathBuilder::new();
+    builder.move_to(0.0, 0.0);
+    builder.line_to(2.99, 0.999);
+    builder.line_to(0.0, 2.0);
+    builder.close();
+    let path = builder.finish().unwrap();
+    let pixmap = SkPixmap::new(3, 2).unwrap();
+    let mask = super::exact_aliased_sample_mask(&pixmap, &path, SkFillRule::EvenOdd, 0.5).unwrap();
+    // At y=0.5 the right edge is x=2.99*0.5/0.999 < 1.5.
+    // Truncating its endpoints to 1/64 pixel reverses that classification.
+    assert_eq!(mask.data(), &[255, 0, 0, 255, 0, 0]);
+    let mut scanner = tiny_skia::Mask::new(3, 2).unwrap();
+    scanner.fill_path(
+      &path,
+      SkFillRule::EvenOdd,
+      false,
+      tiny_skia::Transform::identity(),
+    );
+    assert_eq!(scanner.data()[1], 255);
+  }
+
+  #[test]
+  fn exact_aliased_fill_keeps_a_tip_missing_from_the_scanner_neighborhood() {
+    let mut builder = SkPathBuilder::new();
+    builder.move_to(0.0, 3.7);
+    builder.line_to(8.9, 0.34);
+    builder.line_to(0.0, 4.0);
+    builder.close();
+    let path = builder.finish().unwrap();
+    let pixmap = SkPixmap::new(10, 4).unwrap();
+    let mask = super::exact_aliased_sample_mask(&pixmap, &path, SkFillRule::EvenOdd, 0.5).unwrap();
+    // At y=0.5 the two edges cross near x=8.476 and x=8.511, so the
+    // isolated sample at (8.5, 0.5) lies inside the continuous triangle.
+    assert_eq!(mask.data()[8], 255);
+    let mut scanner = tiny_skia::Mask::new(10, 4).unwrap();
+    scanner.fill_path(
+      &path,
+      SkFillRule::EvenOdd,
+      false,
+      tiny_skia::Transform::identity(),
+    );
+    for y in 0..=1 {
+      assert_eq!(&scanner.data()[y * 10 + 7..y * 10 + 10], &[0, 0, 0]);
+    }
+  }
+
+  #[test]
+  fn word_glow_prescale_realizes_aliased_coverage_on_the_reduced_surface() {
+    let surface = rect(0.0, 0.0, 18.25, 16.25);
+    let content = rect(3.2, 3.3, 10.4, 8.6);
+    let item = DisplayItem::Path(PathItem {
+      bounds: content,
+      points: Vec::new(),
+      commands: vec![
+        PathCommand::MoveTo(super::super::Point {
+          x: Pt(8.4),
+          y: Pt(3.3),
+        }),
+        PathCommand::LineTo(super::super::Point {
+          x: Pt(13.6),
+          y: Pt(11.9),
+        }),
+        PathCommand::LineTo(super::super::Point {
+          x: Pt(3.2),
+          y: Pt(11.9),
+        }),
+        PathCommand::Close,
+      ],
+      closed: true,
+      fill: Fill::Solid(Color {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+      }),
+      stroke: None,
+    });
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+    for divisor in [2.0, 3.0, 5.0] {
+      let target_pixels_per_point = (96.0 / 72.0) / divisor;
+      let raster = |profile| {
+        rasterize_word_shape_effect_source_via_base_surface(
+          std::slice::from_ref(&item),
+          &effects,
+          super::WordShapeEffectSurface {
+            profile,
+            base_bounds: surface,
+            content_bounds: content,
+            base_pixels_per_point: 96.0 / 72.0,
+            target_width_px: super::inclusive_far_edge_raster_pixel_extent(
+              surface.size.width.0,
+              target_pixels_per_point,
+            ),
+            target_height_px: super::inclusive_far_edge_raster_pixel_extent(
+              surface.size.height.0,
+              target_pixels_per_point,
+            ),
+            target_pixels_per_point,
+          },
+        )
+        .unwrap()
+        .image
+      };
+      let glow = raster(WordShapeEffectSourceProfile::Glow);
+      let shadow = raster(WordShapeEffectSourceProfile::OuterShadow);
+      assert!(glow.pixels().all(|pixel| matches!(pixel[3], 0 | 255)));
+      assert!(glow.pixels().any(|pixel| pixel[3] == 255));
+      assert!(shadow.pixels().any(|pixel| (1..=254).contains(&pixel[3])));
+      assert_ne!(glow, shadow);
+    }
   }
 
   #[test]

@@ -7,6 +7,7 @@ pub(super) struct Placement {
   pub height: f32,
   pub before: f32,
   pub after: f32,
+  pub text_extents: WordLineTextExtents,
 }
 
 /// Recover an authored twip box only when its f32 representation is exact.
@@ -100,8 +101,34 @@ pub(super) fn bind(
   // and minimum-height text. Exact lines, grids and objects have separate
   // contracts; preserve their existing owners.
   let minimum = matches!(paragraph.format.line_height_rule, LineHeightRule::AtLeast);
-  let text_owned = if minimum {
-    paragraph.list_label_image.is_none()
+  // Ordinary body numbers share the completed text line's baseline. Their
+  // ascent reserve is independent of proportional spacing; their descent
+  // never replaces the body's. CJK gap, recovered and cell-cursor contracts
+  // remain separate from these native Latin body controls.
+  let numbered_body = matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    && flow.text_segmentation == TextSegmentation::Body
+    && paragraph.list_label.is_some()
+    && !paragraph.format.office_recovered_line_height
+    && paragraph.format.vertical_text_flow.is_none()
+    && placement.text_extents.has_text
+    && !paragraph.inlines.iter().any(|inline| {
+      matches!(inline, InlineItem::Text(run) if run.text.chars().any(|character| {
+        matches!(character.script(),
+          Script::Han | Script::Hiragana | Script::Katakana | Script::Hangul
+          | Script::Bopomofo | Script::Yi)
+      }))
+    });
+  // Picture numbering uses the body font's baseline, including recovered
+  // Auto spacing. A larger bitmap reserves ascent; proportional leading is
+  // below that union. Native independent run/mark/font controls establish
+  // this separately from textual numbering's legacy spacing contract.
+  let picture_body = matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    && flow.text_segmentation == TextSegmentation::Body
+    && paragraph.list_label_image.is_some()
+    && paragraph.format.vertical_text_flow.is_none()
+    && placement.text_extents.has_text;
+  let text_owned = if minimum || numbered_body || picture_body {
+    (paragraph.list_label_image.is_none() || picture_body)
       && paragraph
         .inlines
         .iter()
@@ -145,18 +172,26 @@ pub(super) fn bind(
   {
     return;
   }
-  let Some(metrics) = items
-    .iter()
-    .filter_map(|item| match item {
-      PageItem::Text(text)
-        if text.line_metrics_participant && text.wordprocessing_effect_host.is_none() =>
-      {
-        wordprocessing_line_metrics(item, text_metrics)
-      }
-      _ => None,
+  let metrics = if numbered_body || picture_body {
+    Some(WordprocessingLineMetrics {
+      ascent_pt: placement.text_extents.font_ascent_pt,
+      descent_pt: placement.text_extents.font_descent_pt,
+      top_aligned: false,
     })
-    .reduce(WordprocessingLineMetrics::include)
-  else {
+  } else {
+    items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Text(text)
+          if text.line_metrics_participant && text.wordprocessing_effect_host.is_none() =>
+        {
+          wordprocessing_line_metrics(item, text_metrics)
+        }
+        _ => None,
+      })
+      .reduce(WordprocessingLineMetrics::include)
+  };
+  let Some(metrics) = metrics else {
     return;
   };
   let natural = metrics.content_height_pt();
@@ -169,6 +204,25 @@ pub(super) fn bind(
   let scaled = |pt| {
     let ideal = word_fixed_output_reference_units(pt).unwrap_or(0);
     word_fixed_output_positive_mul_div_round(ideal, i64::from(line_units), 240) as f32 / 4096.0
+  };
+  let numbering_ascent = if picture_body {
+    paragraph.list_label_image.as_ref().map_or(0.0, |label| {
+      let has_marker = items
+        .iter()
+        .any(|item| picture_numbering_image(item, &label.image).is_some());
+      if has_marker {
+        let image = numbering_image_metrics(label, flow.content_width, &paragraph.list_label_style);
+        (inline_image_ascent(image) - metrics.ascent_pt).max(0.0)
+      } else {
+        0.0
+      }
+    })
+  } else if numbered_body {
+    placement.text_extents.numbering.map_or(0.0, |numbering| {
+      (numbering.ascent_pt - placement.text_extents.font_ascent_pt).max(0.0)
+    })
+  } else {
+    0.0
   };
   let compressed_legacy_reference = !minimum
     && flow.compatibility_mode < 15
@@ -186,7 +240,7 @@ pub(super) fn bind(
   let natural = if compressed_legacy_reference {
     placement.height
   } else {
-    scaled(natural)
+    scaled(natural) + numbering_ascent
   };
   let extra = (placement.height - natural).max(0.0);
   // Word's minimum-line controls retain the natural descent and place all
@@ -196,7 +250,7 @@ pub(super) fn bind(
   let ascent = if compressed_legacy_reference {
     natural - scaled(metrics.descent_pt)
   } else {
-    scaled(metrics.ascent_pt) + leading_above
+    scaled(metrics.ascent_pt) + numbering_ascent + leading_above
   };
   let cursor_offset =
     if flow.text_segmentation == TextSegmentation::TableCell && flow.layout_cell_bounds.is_some() {
@@ -224,7 +278,7 @@ pub(super) fn bind(
       0.0
     };
   let bottom = placement.y - cursor_offset + placement.height + placement.after;
-  for item in items {
+  for item in items.iter_mut() {
     let PageItem::Text(text) = item else { continue };
     if text.wordprocessing_effect_host.is_some() {
       // Flattening a floating WPS story does not transfer its baseline to
@@ -242,6 +296,67 @@ pub(super) fn bind(
       spacing_after_pt: placement.after + leading_below,
     });
   }
+  if picture_body
+    && let Some(label) = paragraph.list_label_image.as_ref()
+    && let Some(baseline) = items.iter().find_map(|item| {
+      let PageItem::Text(text) = item else {
+        return None;
+      };
+      common::wordprocessing_device::line_baseline(text.wordprocessing_line_metrics?, text.y_pt)
+    })
+  {
+    for item in items {
+      realize_picture_numbering(
+        item,
+        &label.image,
+        f64::from(flow.content_left_pt),
+        baseline,
+      );
+    }
+  }
+}
+
+fn picture_numbering_image<'a>(
+  item: &'a PageItem,
+  source: &crate::docx::InlineImage,
+) -> Option<&'a ImageItem> {
+  let PageItem::InlineObjectGroup(parts) = item else {
+    return None;
+  };
+  parts.iter().find_map(|part| {
+    let PageItem::Image(image) = part else {
+      return None;
+    };
+    (image.data == source.data).then_some(image)
+  })
+}
+
+fn realize_picture_numbering(
+  item: &mut PageItem,
+  source: &crate::docx::InlineImage,
+  frame_x: f64,
+  baseline: f32,
+) {
+  // Paint-only resized surfaces retain their separate host contract.
+  if source.picture_paint_size_pt.is_some() {
+    return;
+  }
+  let Some(mut image) = picture_numbering_image(item, source).cloned() else {
+    return;
+  };
+  let device = wordprocessing_table_device::source_coordinate_precise;
+  let x = device(frame_x) + device(f64::from(image.x_pt) - frame_x);
+  let width = device(f64::from(image.width_pt));
+  let height = device(f64::from(image.height_pt));
+  let y = device(f64::from(baseline)) - height - device(f64::from(image.inline_baseline_gap_pt));
+  (image.x_pt, image.width_pt) = crate::docx::picture_bullet::paint_axis(x, width);
+  (image.y_pt, image.height_pt) = crate::docx::picture_bullet::paint_axis(y, height);
+  // Regenerate from the original host, preserving fill/stroke/clipping and
+  // effects against the same realized bitmap box rather than moving only its
+  // pixels. There are no other inline object stories in this text-owned lane.
+  let mut parts = Vec::new();
+  push_docx_picture_image(&mut parts, source, image);
+  *item = PageItem::InlineObjectGroup(parts);
 }
 
 /// Move line content within its frame without transferring the frame's origin.
@@ -285,7 +400,7 @@ pub(super) fn align(
     }
     PageItem::Group(items)
     | PageItem::InlineObjectGroup(items)
-    | PageItem::OpacityGroup { items, .. } => {
+    | PageItem::CompositingGroup { items, .. } => {
       for item in items {
         align(item, alignment, logical_offset, bounds);
       }

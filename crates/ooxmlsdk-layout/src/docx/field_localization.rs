@@ -76,6 +76,9 @@ pub(super) fn localized_field_message(
     }
     FieldMessage::MissingStyle(style_name) => strings.field_missing_style(style_name),
     FieldMessage::EmptyTableOfContents => {
+      if strings.resource_locale() == OfficeResourceLocale::TraditionalChinese {
+        return "找不到目錄項目。".to_string();
+      }
       // Word's en-US resource uses an all-caps fixed-format diagnostic for a
       // clean empty TOC. Other UI resources, including the ko-KR fallback,
       // retain sentence case (the paired redline-ends-before-toc control).
@@ -311,22 +314,11 @@ pub(super) fn apply_generated_field_message_style(
     return;
   }
   let resource_locale = OfficeStringCatalog::for_ui_language(ui_language).resource_locale();
-  if resource_locale == OfficeResourceLocale::TraditionalChinese
-    && matches!(message, FieldMessage::UndefinedBookmark)
+  if matches!(
+    message,
+    FieldMessage::UndefinedBookmark | FieldMessage::EmptyTableOfContents
+  ) && apply_traditional_chinese_diagnostic_font_slots(style, ui_language)
   {
-    // The established Traditional Chinese bookmark resource uses PMingLiU
-    // for Han text and keeps the field's Latin face for its ASCII ! and space.
-    // Keep the locale-independent explicit bold override applied above.
-    style.wordprocessingml_font_slots = true;
-    style.wordprocessingml_font_hint = Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia);
-    style.east_asia_font_family = Some(Arc::<str>::from("PMingLiU"));
-    style.east_asia_language = ui_language
-      .and_then(crate::localization::canonical_locale)
-      .map(|language| Arc::<str>::from(language.to_string()));
-    style.east_asia_fallback_font_family = None;
-    style.east_asia_font_family_class = None;
-    style.east_asia_font_charset = None;
-    style.east_asia_font_pitch = None;
     return;
   }
   if resource_locale != OfficeResourceLocale::SimplifiedChinese {
@@ -395,6 +387,31 @@ pub(super) fn apply_generated_field_message_style(
     FieldMessage::EmptyTableOfContents => {}
     FieldMessage::PageRefRelative { .. } | FieldMessage::PageRefOnPage(_) => {}
   }
+}
+
+pub(super) fn apply_traditional_chinese_diagnostic_font_slots(
+  style: &mut TextStyle,
+  ui_language: Option<&str>,
+) -> bool {
+  if OfficeStringCatalog::for_ui_language(ui_language).resource_locale()
+    != OfficeResourceLocale::TraditionalChinese
+  {
+    return false;
+  }
+  // Word's bookmark and empty-TOC UI resources bind Han text to PMingLiU,
+  // including when the source explicitly requests a different East Asian
+  // face. Keep the authored Latin slots, size and resource-route bold state.
+  style.wordprocessingml_font_slots = true;
+  style.wordprocessingml_font_hint = Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia);
+  style.east_asia_font_family = Some(Arc::<str>::from("PMingLiU"));
+  style.east_asia_language = ui_language
+    .and_then(crate::localization::canonical_locale)
+    .map(|language| Arc::<str>::from(language.to_string()));
+  style.east_asia_fallback_font_family = None;
+  style.east_asia_font_family_class = None;
+  style.east_asia_font_charset = None;
+  style.east_asia_font_pitch = None;
+  true
 }
 
 pub(super) fn apply_bidi_outline_missing_context_style(style: &mut TextStyle) {
@@ -466,7 +483,7 @@ mod tests {
         FieldMessage::BookmarkNameNotSpecified,
         "錯誤! 未提供書籤名稱。",
       ),
-      (FieldMessage::EmptyTableOfContents, "錯誤! 找不到目錄項目。"),
+      (FieldMessage::EmptyTableOfContents, "找不到目錄項目。"),
     ] {
       assert_eq!(localized_field_message(message, Some("zh-TW")), expected);
     }
@@ -638,7 +655,7 @@ mod tests {
     );
     assert_eq!(
       localized_field_message(FieldMessage::EmptyTableOfContents, Some("zh-Hant-HK")),
-      "錯誤! 找不到目錄項目。"
+      "找不到目錄項目。"
     );
   }
 

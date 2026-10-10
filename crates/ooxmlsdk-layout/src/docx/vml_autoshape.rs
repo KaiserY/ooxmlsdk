@@ -1,4 +1,4 @@
-//! Native Office AutoShape faces absent from the serialized VML outline.
+//! Native Office AutoShape geometry absent from the serialized VML outline.
 //!
 //! The legacy Ribbon2 (spt54) and HorizontalScroll (spt98) definitions serialize
 //! their face boundaries as `nf` paths. Office supplies separate shaded faces
@@ -12,9 +12,42 @@ use ooxmlsdk::schemas::{a, v};
 use super::{
   InlineShape, InlineShapeGeometry, vml_adjustment_values, vml_coordinate_pair,
   vml_path_coordinate_pair, vml_path_tokens, vml_shape_adjustments, vml_shape_formulas,
-  vml_shape_path, vml_shapetype_formulas, vml_shapetype_path,
+  vml_shape_path, vml_shape_type_number, vml_shapetype_formulas, vml_shapetype_path,
 };
 use crate::common::{self, DrawingPathFillMode};
+
+pub(super) fn restore_omitted_preset_geometry(
+  inline: &mut InlineShape,
+  shape: &v::Shape,
+  shape_type: Option<&v::Shapetype>,
+) {
+  let number = shape_type
+    .and_then(|shape_type| shape_type.optional_number)
+    .or_else(|| shape.r#type.as_deref().and_then(vml_shape_type_number));
+  let kind = match number {
+    // MS-ODRAW §2.4.24: spt128 is FlowChartMerge, not a rectangle. Word
+    // recognizes an undeclared _x0000_t128 reference and supplies its native
+    // downward triangle. Its vertices also match the DrawingML preset.
+    Some(128) => a::ShapeTypeValues::FlowChartMerge,
+    _ => return,
+  };
+  let preset = a::PresetGeometry {
+    preset: kind,
+    ..Default::default()
+  };
+  if let Some(paths) = common::drawingml_preset_geometry::paths(
+    Some(&preset),
+    0.0,
+    0.0,
+    inline.width_pt,
+    inline.height_pt,
+  ) {
+    inline.geometry = InlineShapeGeometry::Path {
+      paths,
+      outline: None,
+    };
+  }
+}
 
 const SCROLL_PATH: &str = "m0@5qy@2@1l@0@1@0@2qy@7,,21600@2l21600@9qy@7@10l@1@10@1@11qy@2,21600,0@11xem0@5nfqy@2@6@1@5@3@4@2@5l@2@6em@1@5nfl@1@10em21600@2nfqy@7@1l@0@1em@0@2nfqy@8@3@7@2l@7@1e";
 const SCROLL_GUIDES: &[&str] = &[

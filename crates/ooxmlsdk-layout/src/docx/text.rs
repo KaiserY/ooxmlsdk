@@ -170,9 +170,6 @@ fn paragraph_model_with_base_impl<'a>(
   } else {
     paragraph_properties.map(ParagraphProps::Direct)
   };
-  let has_authored_direct_indentation = direct_paragraph_properties
-    .as_ref()
-    .is_some_and(|properties| properties.indentation().is_some());
   let numbering_format_context = NumberingFormatMergeContext {
     direct_tab_stops: direct_paragraph_properties
       .as_ref()
@@ -191,6 +188,7 @@ fn paragraph_model_with_base_impl<'a>(
     .outline_level;
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
+  format.list_label_default_tab_stop_pt = styles.default_tab_stop_pt;
   format.additive_paragraph_spacing = styles.import_settings.fixed_html_paragraph_auto_spacing;
   // The Word-compatible proportional-gap path is driven by the paragraph's
   // directly authored line spacing. A line value inherited from a style still
@@ -309,6 +307,7 @@ fn paragraph_model_with_base_impl<'a>(
     style_ref_numbering_text,
     numbering_image,
     numbering_image_replacement_text,
+    numbering_image_follow,
     mut list_label_style,
     list_label_justification,
     numbering_list_tab_stop_pt,
@@ -316,6 +315,7 @@ fn paragraph_model_with_base_impl<'a>(
   ) = numbering_label.map_or_else(
     || {
       (
+        None,
         None,
         None,
         None,
@@ -332,6 +332,7 @@ fn paragraph_model_with_base_impl<'a>(
         label.suppressed_non_numerical_text,
         label.image,
         label.image_replacement_text,
+        label.image_follow,
         label.style,
         label.justification,
         label.list_tab_stop_pt,
@@ -512,32 +513,14 @@ fn paragraph_model_with_base_impl<'a>(
   let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
   let mut list_label_image = numbering_image.and_then(|image| {
     let replacement_text = numbering_image_replacement_text?;
+    let intrinsic_height_pt = super::picture_bullet::intrinsic_height_pt(&image.data);
     (!replacement_text.is_empty()).then_some(ListLabelImage {
       image,
       replacement_text,
+      intrinsic_height_pt,
+      follow: numbering_image_follow,
     })
   });
-  if !has_authored_direct_indentation
-    && numbering_list_tab_stop_pt.is_none()
-    && let Some(legacy_image) = list_label_image.take()
-  {
-    // A style-owned legacy list keeps its graphic in the number portion's
-    // inline line box. An authored direct w:ind switches Word to the fixed
-    // label-alignment margin model handled by `list_label_image`; an explicit
-    // zero character-unit indent still counts because it clears the inherited
-    // character indent under MS-OI29500 section 2.1.87. An authored list tab
-    // also keeps the picture in that margin: ECMA-376 Part 1 sections 17.9.28
-    // and 17.18.84 make it the tab between the numbering and paragraph text.
-    let image_count = legacy_image.replacement_text.chars().count();
-    for _ in 0..image_count {
-      inlines.insert(0, super::InlineItem::Image(legacy_image.image.clone()));
-    }
-    for event in &mut field_events {
-      if let super::ParagraphFieldEvent::DeferredParagraphBreak { inline_offset } = event {
-        *inline_offset += image_count;
-      }
-    }
-  }
   let page_break_only_paragraph = inlines.iter().any(|inline| {
     matches!(
       inline,
@@ -603,6 +586,7 @@ fn paragraph_model_with_base_impl<'a>(
   }
   super::fit_text::resolve(&mut inlines, &mut field_events);
   merge_adjacent_continuous_text_runs(&mut inlines, &mut field_events);
+  resolve_wordprocessingml_rtl_font_portions(&mut inlines, &mut field_events);
   preserve_interior_direction_control_metrics(&mut inlines, &mut field_events);
   attach_arabic_leading_mark_context(&mut inlines);
   if let Some(background) = format.shading.and_then(super::ShadingPaint::solid_color) {
@@ -883,8 +867,8 @@ fn merge_adjacent_continuous_text_runs(
           return true;
         }
       }
-      // MS-OI29500 §2.1.88: w:rtl forces the complex-script font independently
-      // of rFonts@hint. A hint-only edit inside an Arabic word must therefore
+      // MS-OI29500 §2.1.88: Arabic w:rtl text selects the complex-script font
+      // independently of rFonts@hint. A hint-only edit inside a word must therefore
       // not break its joining context. Other style differences remain real
       // boundaries, including the selected font families and run direction.
       if left.right_to_left != Some(true) || right.right_to_left != Some(true) {
@@ -892,6 +876,11 @@ fn merge_adjacent_continuous_text_runs(
       }
       let mut right = right.clone();
       right.wordprocessingml_font_hint = left.wordprocessingml_font_hint;
+      // CJK line metrics are inferred from the characters of each XML run.
+      // They must not separate otherwise identical RTL source portions:
+      // native split 中/1 controls select the same CS digit face as 中1.
+      // The merged portion takes the union of these metrics below.
+      right.wordprocessingml_cjk_line_metrics = left.wordprocessingml_cjk_line_metrics;
       if left.bidi_language != right.bidi_language {
         if !allow_arabic_regions {
           return false;
@@ -1017,6 +1006,89 @@ fn merge_adjacent_continuous_text_runs(
     }
     *inlines = merged;
   }
+}
+
+fn resolve_wordprocessingml_rtl_font_portions(
+  inlines: &mut Vec<super::InlineItem>,
+  field_events: &mut [super::ParagraphFieldEvent],
+) {
+  use super::{InlineItem, ParagraphFieldEvent};
+  use ooxmlsdk_fonts::{FontSize, script_direction_runs_with_options};
+
+  // Native Word selects the font from the complete RTL source portion. A
+  // later automatic-spacing or line-break boundary must not turn the `1` in
+  // A1 or 中1 into an independent ASCII number. Keep the painted slot separate
+  // from cs/rtl, which still owns the complex run properties and line metrics.
+  if !inlines.iter().any(|item| {
+    matches!(item, InlineItem::Text(run) if run.style.wordprocessingml_font_slots
+      && run.style.right_to_left == Some(true) && run.dynamic_field.is_none())
+  }) {
+    return;
+  }
+  let mut output = Vec::with_capacity(inlines.len());
+  let mut offsets = Vec::with_capacity(inlines.len() + 1);
+  for item in inlines.drain(..) {
+    offsets.push(output.len());
+    let InlineItem::Text(run) = &item else {
+      output.push(item);
+      continue;
+    };
+    if !run.style.wordprocessingml_font_slots
+      || run.style.right_to_left != Some(true)
+      || run.dynamic_field.is_some()
+      || run.text.is_empty()
+    {
+      output.push(item);
+      continue;
+    }
+    let script_runs = script_direction_runs_with_options(
+      &run.text,
+      FontSize(run.style.font_size_pt),
+      crate::fonts::script_scan_options(&run.style, false),
+    );
+    let mut portions: Vec<(
+      std::ops::Range<usize>,
+      ooxmlsdk_fonts::WordprocessingFontSlot,
+    )> = Vec::with_capacity(script_runs.len());
+    for script_run in script_runs {
+      let Some(slot) = script_run.wordprocessingml_font_slot else {
+        continue;
+      };
+      if let Some((range, previous_slot)) = portions.last_mut()
+        && *previous_slot == slot
+        && range.end == script_run.text_range.start
+      {
+        range.end = script_run.text_range.end;
+      } else {
+        portions.push((script_run.text_range, slot));
+      }
+    }
+    for (range, slot) in portions {
+      let mut portion = run.clone();
+      portion.text = run.text[range].to_owned();
+      portion.style.wordprocessingml_resolved_font_slot = Some(slot);
+      output.push(InlineItem::Text(portion));
+    }
+  }
+  offsets.push(output.len());
+  for event in field_events {
+    match event {
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
+      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+        *inline_offset = offsets[*inline_offset];
+      }
+      ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start,
+        inline_end,
+        ..
+      } => {
+        *inline_start = offsets[*inline_start];
+        *inline_end = offsets[*inline_end];
+      }
+      _ => {}
+    }
+  }
+  *inlines = output;
 }
 
 fn wordprocessingml_cjk_text_metrics(text: &str, style: &TextStyle) -> bool {
@@ -1172,6 +1244,123 @@ mod tests {
     FloatingImagePlacement, FloatingPaintOrder, HorizontalImageReference, ImagePlacement,
     ImageWrapMode, ImageWrapSide, ParagraphAdjust, ParagraphJustification, VerticalImageReference,
   };
+
+  #[test]
+  fn rtl_font_portions_preserve_source_context_and_field_boundaries() {
+    use crate::docx::{InlineItem, ParagraphFieldEvent};
+    use ooxmlsdk_fonts::WordprocessingFontSlot::{Ascii, ComplexScript};
+
+    for (text, expected) in [
+      ("A1", vec![("A1", ComplexScript)]),
+      ("中1", vec![("中1", ComplexScript)]),
+      ("1A", vec![("1A", Ascii)]),
+      ("1 A", vec![("1", Ascii), (" A", ComplexScript)]),
+    ] {
+      let mut inlines = vec![InlineItem::Text(TextRun {
+        text: text.to_owned(),
+        style: TextStyle {
+          font_family: Some(Arc::from("Calibri")),
+          complex_font_family: Some(Arc::from("Times New Roman")),
+          right_to_left: Some(true),
+          wordprocessingml_font_slots: true,
+          ..Default::default()
+        },
+        hyperlink_url: Some("https://example.com/".to_owned()),
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })];
+      let mut events = vec![
+        ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 1 },
+        ParagraphFieldEvent::ReferenceResultSpan {
+          field_id: 7,
+          bookmark_name: "target".to_owned(),
+          inline_start: 0,
+          inline_end: 1,
+          merge_format: false,
+        },
+      ];
+      resolve_wordprocessingml_rtl_font_portions(&mut inlines, &mut events);
+      assert_eq!(inlines.len(), expected.len());
+      for (item, (text, slot)) in inlines.iter().zip(&expected) {
+        let InlineItem::Text(run) = item else {
+          panic!("literal text")
+        };
+        assert_eq!(run.text, *text);
+        assert_eq!(run.style.wordprocessingml_resolved_font_slot, Some(*slot));
+        assert_eq!(
+          run.style.complex_font_family.as_deref(),
+          Some("Times New Roman")
+        );
+        assert_eq!(run.hyperlink_url.as_deref(), Some("https://example.com/"));
+        // Formatting either side of a CJK/number boundary independently
+        // retains the slot selected from the complete source portion.
+        for character in run.text.chars() {
+          let mut buffer = [0; 4];
+          let shaped = ooxmlsdk_fonts::script_direction_runs_with_options(
+            character.encode_utf8(&mut buffer),
+            ooxmlsdk_fonts::FontSize(11.0),
+            crate::fonts::script_scan_options(&run.style, false),
+          );
+          assert!(
+            shaped
+              .iter()
+              .all(|part| part.wordprocessingml_font_slot == Some(*slot))
+          );
+        }
+      }
+      assert!(
+        matches!(events[0], ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
+        if inline_offset == expected.len())
+      );
+      assert!(
+        matches!(events[1], ParagraphFieldEvent::ReferenceResultSpan { inline_start: 0, inline_end, .. }
+        if inline_end == expected.len())
+      );
+    }
+  }
+
+  #[test]
+  fn identical_rtl_runs_with_cjk_metrics_share_font_selection_context() {
+    use crate::docx::InlineItem;
+    use ooxmlsdk_fonts::WordprocessingFontSlot::ComplexScript;
+
+    let run = |text: &str| {
+      let mut style = TextStyle {
+        font_family: Some(Arc::from("Calibri")),
+        complex_font_family: Some(Arc::from("Times New Roman")),
+        right_to_left: Some(true),
+        wordprocessingml_font_slots: true,
+        ..Default::default()
+      };
+      apply_wordprocessingml_cjk_text_metrics(text, &mut style);
+      InlineItem::Text(TextRun {
+        text: text.to_owned(),
+        style,
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let mut inlines = vec![run("中"), run("1")];
+    merge_adjacent_continuous_text_runs(&mut inlines, &mut []);
+    resolve_wordprocessingml_rtl_font_portions(&mut inlines, &mut []);
+    assert_eq!(inlines.len(), 1);
+    let InlineItem::Text(run) = &inlines[0] else {
+      panic!("literal text")
+    };
+    assert_eq!(run.text, "中1");
+    assert!(run.style.wordprocessingml_cjk_line_metrics);
+    assert_eq!(
+      run.style.wordprocessingml_resolved_font_slot,
+      Some(ComplexScript)
+    );
+  }
 
   #[test]
   fn literal_pdf_sequences_keep_native_metrics_and_field_boundaries() {

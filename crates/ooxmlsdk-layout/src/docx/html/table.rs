@@ -190,6 +190,7 @@ impl TableBuilder {
     })();
     Self {
       table: Table {
+        recovered_absolute_grid: false,
         column_widths_pt: Vec::new(),
         preferred_width_pt: style.width_pt,
         preferred_width_pct: style.width_pct,
@@ -198,6 +199,7 @@ impl TableBuilder {
         } else {
           TableLayoutMode::AutoFit
         },
+        containing_table_layout: None,
         indent_left_pt: 0.0,
         alignment: style.alignment.unwrap_or_default(),
         right_to_left: context.paragraph_format.bidi,

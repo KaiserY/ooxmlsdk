@@ -668,6 +668,7 @@ pub struct TextStyle<'doc> {
   pub east_asia_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   pub complex_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   pub east_asia_font_family: Option<Cow<'doc, str>>,
+  pub drawingml_japanese_font_family: Option<Cow<'doc, str>>,
   pub complex_font_family: Option<Cow<'doc, str>>,
   pub symbol_font_family: Option<Cow<'doc, str>>,
   /// The owning OOXML construct explicitly transports one legacy symbol
@@ -675,6 +676,7 @@ pub struct TextStyle<'doc> {
   pub explicit_symbol_character: bool,
   /// Effective WordprocessingML `w:rFonts/@w:hint` for ambiguous font slots.
   pub wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
+  pub wordprocessingml_resolved_font_slot: Option<ooxmlsdk_fonts::WordprocessingFontSlot>,
   pub wordprocessingml_east_asia_language_is_chinese: bool,
   /// Hebrew bidi language retains the family's real italic face in RTL runs.
   pub wordprocessingml_bidi_language_is_hebrew: bool,

@@ -521,7 +521,6 @@ mod tests {
         ..Default::default()
       },
       endnote_separator_stories: Default::default(),
-      uses_office_recovered_paragraph_defaults: false,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
       hyphenation: Default::default(),
       compatibility_mode: 15,

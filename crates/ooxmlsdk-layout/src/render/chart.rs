@@ -553,6 +553,11 @@ pub struct ClusteredColumnDataLabel<'a> {
   /// Resolved c:dLbls/c:dLbl shape properties after applying Office's
   /// chart-group < series < point override hierarchy.
   pub shape_properties: Option<&'a c::ChartShapeProperties>,
+  /// Office 2013's c15:showLeaderLines enables custom-position connectors
+  /// for Cartesian charts. The classic switch applies only to radial charts
+  /// (MS-OI29500 21.2.2.183), so it must not enable these connectors.
+  pub show_custom_leader_lines: bool,
+  pub leader_line_shape_properties: Option<&'a c::ChartShapeProperties>,
 }
 
 impl ClusteredColumnDataLabel<'_> {
@@ -931,6 +936,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
         supports_percent: false,
         separator: ", ",
       },
+      ChartHostApplication::Spreadsheet,
     );
     series.push(ClusteredColumnSeries {
       formatting_index: series_ref.formatting_index,
@@ -1478,7 +1484,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             false,
           ),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         push_cartesian_group_decorations(
           &mut group_decorations,
@@ -1503,7 +1509,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             true,
           ),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         let gap_depth_percent = chart
           .gap_depth
@@ -1536,7 +1542,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             false,
           ),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         // [MS-OI29500] specifies that Office ignores lineChart/c:marker.
         // Marker omission at series scope is `auto`; an explicit series
@@ -1561,7 +1567,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
           chart.data_labels.as_deref(),
           (ChartSeriesKind::Line, grouping(Some(&chart.grouping)), true),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         let gap_depth_percent = chart
           .gap_depth
@@ -1590,7 +1596,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
           chart.data_labels.as_deref(),
           (ChartSeriesKind::Stock, ChartSeriesGrouping::Standard, false),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         push_cartesian_group_decorations(
           &mut group_decorations,
@@ -1611,7 +1617,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
           chart.data_labels.as_deref(),
           (ChartSeriesKind::Radar, ChartSeriesGrouping::Standard, false),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         match chart.radar_style.val {
           c::RadarStyleValues::Marker => {
@@ -1638,7 +1644,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             false,
           ),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         let style = chart
           .scatter_style
@@ -1694,7 +1700,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             false,
           ),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
       }
       c::PlotAreaChoice::Bar3DChart(chart) => {
@@ -1725,7 +1731,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             true,
           ),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         let shape = chart
           .shape
@@ -1757,7 +1763,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             false,
           ),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         surface_groups.push(SurfaceChartGroup {
           first_series_index,
@@ -1784,7 +1790,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             true,
           ),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         surface_groups.push(SurfaceChartGroup {
           first_series_index,
@@ -1811,7 +1817,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             false,
           ),
           axis_set_index,
-          ui_language,
+          (host, ui_language),
         );
         let group_bubble_3d = chart
           .bubble3_d
@@ -2331,8 +2337,9 @@ fn append_cartesian_series<'a>(
   chart_group_labels: Option<&'a c::DataLabels>,
   series_spec: (ChartSeriesKind, ChartSeriesGrouping, bool),
   axis_set_index: usize,
-  ui_language: Option<&str>,
+  host_locale: (ChartHostApplication, Option<&str>),
 ) {
+  let (host, ui_language) = host_locale;
   let (categories, category_hierarchy) = category_state;
   let (kind, grouping, is_3d) = series_spec;
   for source in sources {
@@ -2409,6 +2416,7 @@ fn append_cartesian_series<'a>(
           supports_percent: false,
           separator: ", ",
         },
+        host,
       ),
       axis_set_index,
       values,
@@ -2807,11 +2815,18 @@ fn chart_manual_text_layout(manual: &c::ManualLayout) -> Option<ChartManualLayou
 fn data_label_text_layout(
   label: &c::DataLabel,
   legacy_layout: Option<&c::Layout>,
+  host: ChartHostApplication,
 ) -> Option<ChartManualLayout> {
+  // Word's classic pie formatter uses c:layout for the position, including
+  // alongside an empty or conflicting c15:layout. Native extension removal,
+  // zero and negative c15-coordinate controls all preserve the legacy box.
+  // c15 text-frame dimensions have a separate owner below.
+  if host == ChartHostApplication::Wordprocessing {
+    return chart_text_layout(legacy_layout);
+  }
   // Office 2013 introduced c15:layout specifically for a data label or its
-  // parent dLbls object. Its presence is the current layout state; an empty
-  // extension therefore means automatic placement and supersedes a legacy
-  // c:layout retained for older consumers. PowerPoint emits both forms in
+  // parent dLbls object. PowerPoint's empty extension means automatic
+  // placement and supersedes a compatibility c:layout. It emits both forms in
   // percentage-number-formats.pptx, and its fixed output follows the empty
   // c15 form rather than applying the stale legacy offset.
   if let Some(layout) = data_label_extension_layout(label) {
@@ -2893,6 +2908,14 @@ pub fn ordinary_clustered_column_chart(
 /// series are present. Keeping those Office rules here prevents fixed-output
 /// renderers from merging cached series that are not visible.
 pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>> {
+  pie_chart_model_for_host(chart_space, ChartHostApplication::Spreadsheet)
+}
+
+/// Extracts pie-family semantics with the application's data-label layout policy.
+pub fn pie_chart_model_for_host(
+  chart_space: &c::ChartSpace,
+  host: ChartHostApplication,
+) -> Option<PieChartModel<'_>> {
   let (
     radial_kind,
     pie_series,
@@ -3034,6 +3057,7 @@ pub fn pie_chart_model(chart_space: &c::ChartSpace) -> Option<PieChartModel<'_>>
       supports_percent: true,
       separator: ", ",
     },
+    host,
   );
   // LibreOffice writes a series-level delete marker for doughnut remainder
   // points while retaining chart-group percentage labels. Office applies the
@@ -3185,6 +3209,18 @@ fn data_labels_show_leader_lines(labels: &c::DataLabels) -> Option<bool> {
   // retaining a stale classic value for down-level consumers.  LibreOffice's
   // DataLabelsContext feeds both through the same model in document order, so
   // the extension wins when present.
+  data_labels_show_custom_leader_lines(labels).or_else(|| {
+    let c::DataLabelsChoice::Sequence(sequence) = labels.data_labels_choice.as_ref()? else {
+      return None;
+    };
+    sequence
+      .show_leader_lines
+      .as_ref()
+      .map(|show| show.val.is_none_or(|value| value.as_bool()))
+  })
+}
+
+fn data_labels_show_custom_leader_lines(labels: &c::DataLabels) -> Option<bool> {
   labels
     .d_lbls_extension_list
     .as_ref()
@@ -3197,18 +3233,24 @@ fn data_labels_show_leader_lines(labels: &c::DataLabels) -> Option<bool> {
       }
       _ => None,
     })
-    .or_else(|| {
-      let c::DataLabelsChoice::Sequence(sequence) = labels.data_labels_choice.as_ref()? else {
-        return None;
-      };
-      sequence
-        .show_leader_lines
-        .as_ref()
-        .map(|show| show.val.is_none_or(|value| value.as_bool()))
-    })
 }
 
 fn data_labels_leader_line_shape_properties(
+  labels: &c::DataLabels,
+) -> Option<&c::ChartShapeProperties> {
+  data_labels_custom_leader_line_shape_properties(labels).or_else(|| {
+    let c::DataLabelsChoice::Sequence(sequence) = labels.data_labels_choice.as_ref()? else {
+      return None;
+    };
+    sequence
+      .leader_lines
+      .as_deref()?
+      .chart_shape_properties
+      .as_deref()
+  })
+}
+
+fn data_labels_custom_leader_line_shape_properties(
   labels: &c::DataLabels,
 ) -> Option<&c::ChartShapeProperties> {
   labels
@@ -3220,16 +3262,6 @@ fn data_labels_leader_line_shape_properties(
     .find_map(|choice| match choice {
       c::DLblsExtensionChoice::LeaderLines(lines) => lines.chart_shape_properties.as_deref(),
       _ => None,
-    })
-    .or_else(|| {
-      let c::DataLabelsChoice::Sequence(sequence) = labels.data_labels_choice.as_ref()? else {
-        return None;
-      };
-      sequence
-        .leader_lines
-        .as_deref()?
-        .chart_shape_properties
-        .as_deref()
     })
 }
 
@@ -3377,6 +3409,7 @@ fn resolved_data_labels<'a>(
   chart_group_labels: Option<&'a c::DataLabels>,
   data: DataLabelSeriesData<'_>,
   defaults: DataLabelDefaults<'a>,
+  host: ChartHostApplication,
 ) -> Vec<ClusteredColumnDataLabel<'a>> {
   let DataLabelSeriesData {
     series_name,
@@ -3457,7 +3490,7 @@ fn resolved_data_labels<'a>(
             _ => None,
           })
         {
-          point_layout = data_label_text_layout(label, sequence.layout.as_deref());
+          point_layout = data_label_text_layout(label, sequence.layout.as_deref(), host);
           if sequence.text_properties.is_some() {
             text_properties = sequence.text_properties.as_deref();
           }
@@ -3584,6 +3617,8 @@ fn resolved_data_labels<'a>(
         text_properties,
         text_body_properties,
         shape_properties: point_settings.shape_properties,
+        show_custom_leader_lines: point_settings.show_custom_leader_lines,
+        leader_line_shape_properties: point_settings.leader_line_shape_properties,
       })
     })
     .collect()
@@ -3646,6 +3681,8 @@ struct ClusteredColumnDataLabelSettings<'a> {
   position_explicit: bool,
   shape_properties: Option<&'a c::ChartShapeProperties>,
   text_frame_layout: Option<ChartManualLayout>,
+  show_custom_leader_lines: bool,
+  leader_line_shape_properties: Option<&'a c::ChartShapeProperties>,
 }
 
 impl Default for ClusteredColumnDataLabelSettings<'_> {
@@ -3665,6 +3702,8 @@ impl Default for ClusteredColumnDataLabelSettings<'_> {
       percentage_format_code: None,
       shape_properties: None,
       text_frame_layout: None,
+      show_custom_leader_lines: false,
+      leader_line_shape_properties: None,
       // MS-OI29500 §21.2.2.48 specifies OutsideEnd as the Office default
       // for a clustered bar/column chart when c:dLblPos is omitted.
       position: c::DataLabelPositionValues::OutsideEnd,
@@ -3680,6 +3719,12 @@ fn apply_data_labels_settings<'a>(
   let Some(labels) = labels else {
     return;
   };
+  if let Some(show) = data_labels_show_custom_leader_lines(labels) {
+    settings.show_custom_leader_lines = show;
+  }
+  if let Some(properties) = data_labels_custom_leader_line_shape_properties(labels) {
+    settings.leader_line_shape_properties = Some(properties);
+  }
   if let Some(layout) = data_labels_extension_layout(labels) {
     settings.text_frame_layout = layout
       .manual_layout
@@ -8536,6 +8581,76 @@ mod tests {
   }
 
   #[test]
+  fn pie_label_extension_position_preserves_host_ownership() {
+    let source = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:c15="http://schemas.microsoft.com/office/drawing/2012/chart"><c:chart><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:dLbl><c:idx val="0"/><c:layout><c:manualLayout><c:x val="0.2"/><c:y val="0.1"/></c:manualLayout></c:layout><c:extLst><c:ext uri="{CE6537A1-D6FC-4f65-9D91-7224C49458BB}"><c15:layout/></c:ext></c:extLst></c:dLbl><c:showVal val="1"/></c:dLbls><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .unwrap();
+    let word =
+      super::pie_chart_model_for_host(&source, super::ChartHostApplication::Wordprocessing)
+        .unwrap();
+    let layout = word.data_labels[0].layout.unwrap();
+    assert_eq!(layout.x, Some(0.2));
+    assert_eq!(layout.y, Some(0.1));
+    assert_eq!(layout.x_mode, super::ChartLayoutMode::Factor);
+    assert_eq!(layout.y_mode, super::ChartLayoutMode::Factor);
+    let powerpoint =
+      super::pie_chart_model_for_host(&source, super::ChartHostApplication::Presentation).unwrap();
+    assert!(powerpoint.data_labels[0].layout.is_none());
+    let modern = c::ChartSpace::from_bytes(
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:c15="http://schemas.microsoft.com/office/drawing/2012/chart"><c:chart><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:dLbl><c:idx val="0"/><c:layout><c:manualLayout><c:x val="0.2"/><c:y val="0.1"/></c:manualLayout></c:layout><c:extLst><c:ext uri="{CE6537A1-D6FC-4f65-9D91-7224C49458BB}"><c15:layout><c:manualLayout><c:x val="-0.2"/><c:y val="-0.2"/></c:manualLayout></c15:layout></c:ext></c:extLst></c:dLbl><c:showVal val="1"/></c:dLbls><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#,
+    )
+    .unwrap();
+    let word =
+      super::pie_chart_model_for_host(&modern, super::ChartHostApplication::Wordprocessing)
+        .unwrap();
+    assert_eq!(word.data_labels[0].layout, Some(layout));
+    let powerpoint =
+      super::pie_chart_model_for_host(&modern, super::ChartHostApplication::Presentation).unwrap();
+    assert_eq!(powerpoint.data_labels[0].layout.unwrap().x, Some(-0.2));
+    assert_eq!(powerpoint.data_labels[0].layout.unwrap().y, Some(-0.2));
+  }
+
+  #[test]
+  fn cartesian_label_extension_position_preserves_host_ownership() {
+    // Word controls retain c:layout for both an empty c15:layout and one
+    // containing different coordinates. PowerPoint uses the modern position.
+    for modern in [
+      "",
+      r#"<c:manualLayout><c:x val="-0.2"/><c:y val="-0.2"/></c:manualLayout>"#,
+    ] {
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:c15="http://schemas.microsoft.com/office/drawing/2012/chart"><c:chart><c:plotArea><c:bar3DChart><c:barDir val="col"/><c:grouping val="clustered"/><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:dLbl><c:idx val="0"/><c:layout><c:manualLayout><c:x val="0.2"/><c:y val="0.1"/></c:manualLayout></c:layout><c:extLst><c:ext uri="{{CE6537A1-D6FC-4f65-9D91-7224C49458BB}}"><c15:layout>{modern}</c15:layout></c:ext></c:extLst></c:dLbl><c:showVal val="1"/></c:dLbls><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:bar3DChart></c:plotArea></c:chart></c:chartSpace>"#
+      );
+      let source = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+      let word = super::cartesian_chart_for_host_locales(
+        &source,
+        super::ChartHostApplication::Wordprocessing,
+        None,
+        None,
+      )
+      .unwrap();
+      let layout = word.series[0].data_labels[0].layout.unwrap();
+      assert_eq!(layout.x, Some(0.2));
+      assert_eq!(layout.y, Some(0.1));
+      let powerpoint = super::cartesian_chart_for_host_locales(
+        &source,
+        super::ChartHostApplication::Presentation,
+        None,
+        None,
+      )
+      .unwrap();
+      if modern.is_empty() {
+        assert!(powerpoint.series[0].data_labels[0].layout.is_none());
+      } else {
+        let layout = powerpoint.series[0].data_labels[0].layout.unwrap();
+        assert_eq!(layout.x, Some(-0.2));
+        assert_eq!(layout.y, Some(-0.2));
+      }
+    }
+  }
+
+  #[test]
   fn pie_percent_labels_use_largest_remainder_rounding() {
     let chart_space = c::ChartSpace::from_bytes(
       br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:showVal val="0"/><c:showCatName val="1"/><c:showPercent val="1"/></c:dLbls><c:cat><c:strLit><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt><c:pt idx="2"><c:v>C</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>1</c:v></c:pt><c:pt idx="2"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#,
@@ -8775,6 +8890,55 @@ mod tests {
       chart.data_labels[0].position,
       c::DataLabelPositionValues::Center
     );
+  }
+
+  #[test]
+  fn cartesian_data_labels_retain_c15_leader_state_and_independent_line_paint() {
+    use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+    let extension = |show: bool, width| {
+      format!(
+        r#"<c:extLst><c:ext uri="{{CE6537A1-D6FC-4f65-9D91-7224C49458BB}}"><c15:showLeaderLines val="{}"/><c15:leaderLines><c:spPr><a:ln w="{width}"><a:noFill/></a:ln></c:spPr></c15:leaderLines></c:ext></c:extLst>"#,
+        u8::from(show),
+      )
+    };
+    for (group, series, enabled, width) in [
+      (extension(true, 9525), String::new(), true, Some(9525)),
+      (
+        extension(true, 9525),
+        extension(false, 12700),
+        false,
+        Some(12700),
+      ),
+      (String::new(), String::new(), false, None),
+      (
+        extension(false, 9525),
+        extension(true, 25400),
+        true,
+        Some(25400),
+      ),
+    ] {
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:c15="http://schemas.microsoft.com/office/drawing/2012/chart"><c:chart><c:plotArea><c:lineChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:dLbls><c:dLbl><c:idx val="0"/><c:layout><c:manualLayout><c:x val="0"/><c:y val="0"/></c:manualLayout></c:layout></c:dLbl><c:showVal val="1"/><c:showLeaderLines val="1"/>{series}</c:dLbls><c:val><c:numLit><c:pt idx="0"><c:v>2.5</c:v></c:pt></c:numLit></c:val></c:ser><c:dLbls><c:showVal val="1"/>{group}</c:dLbls></c:lineChart></c:plotArea></c:chart></c:chartSpace>"#,
+      );
+      let space = c::ChartSpace::from_bytes(xml.as_bytes()).expect("leader chart");
+      let chart = super::cartesian_chart_for_ui_language(&space, None).expect("line chart");
+      let label = &chart.series[0].data_labels[0];
+      assert!(
+        label.layout.is_some(),
+        "zero-offset manual labels retain ownership"
+      );
+      assert_eq!(label.show_custom_leader_lines, enabled);
+      let outline = label
+        .leader_line_shape_properties
+        .and_then(|properties| properties.outline.as_deref());
+      assert_eq!(outline.and_then(|line| line.width), width);
+      if let Some(outline) = outline {
+        assert!(matches!(
+          outline.outline_choice1.as_ref(),
+          Some(a::OutlineChoice::NoFill(_))
+        ));
+      }
+    }
   }
 
   #[test]

@@ -7,15 +7,30 @@
 use super::{
   BlockArea, DEFAULT_ORPHAN_LINES, DEFAULT_TAB_STOP_PT, EstimatedParagraphContentExtents,
   FlowContext, FrameFragmentKind, InlineItem, PageSetup, TextFrameLayout, TextMetrics,
-  TextSegmentation, UNBOUNDED_LAYOUT_EXTENT_PT, empty_section_page, paragraph_content_width,
-  paragraph_frame, resolved_paragraph_indents, table_cell_soft_break_line_height_delta,
-  table_cell_soft_break_next_line_styles, wordprocessing_line_geometry,
+  TextSegmentation, UNBOUNDED_LAYOUT_EXTENT_PT, cell_horizontal_border_widths, empty_section_page,
+  paragraph_content_width, paragraph_frame, resolved_paragraph_indents, row_has_separate_borders,
+  table_cell_soft_break_line_height_delta, table_cell_soft_break_next_line_styles,
+  wordprocessing_line_geometry,
 };
 
 #[derive(Clone, Copy)]
 pub(super) struct TableCellMeasureContext {
   pub setup: PageSetup,
   pub default_tab_stop_pt: f32,
+  pub horizontal_borders: Option<(f32, f32, bool)>,
+}
+
+impl TableCellMeasureContext {
+  pub(super) fn with_cell_borders(
+    mut self,
+    table: &crate::docx::Table,
+    row: &crate::docx::TableRow,
+    cell: &crate::docx::TableCell,
+  ) -> Self {
+    let (left, right) = cell_horizontal_border_widths(table, row, cell);
+    self.horizontal_borders = Some((left, right, row_has_separate_borders(table, row)));
+    self
+  }
 }
 
 impl From<PageSetup> for TableCellMeasureContext {
@@ -23,6 +38,7 @@ impl From<PageSetup> for TableCellMeasureContext {
     Self {
       setup,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+      horizontal_borders: None,
     }
   }
 }
@@ -32,6 +48,7 @@ impl From<BlockArea> for TableCellMeasureContext {
     Self {
       setup: area.setup,
       default_tab_stop_pt: area.default_tab_stop_pt,
+      horizontal_borders: None,
     }
   }
 }

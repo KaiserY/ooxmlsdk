@@ -765,6 +765,9 @@ pub struct GeometryRow {
   pub ix: crate::simple_type::UInt32Value,
   #[sdk(attr(qname = ":T"))]
   pub t: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "visio:Cell"))]
+  pub cell: Vec<Cell>,
 }
 ///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1241,6 +1244,28 @@ pub struct ForeignData {
 }
 ///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "visio:Row")]
+pub struct RowUnion {
+  #[sdk(attr(qname = ":Del"))]
+  pub del: Option<crate::simple_type::BooleanValue>,
+  #[sdk(attr(qname = ":N"))]
+  pub n: Option<crate::simple_type::StringValue>,
+  #[sdk(attr(qname = ":LocalName"))]
+  pub local_name: Option<crate::simple_type::StringValue>,
+  #[sdk(attr(qname = ":IX"))]
+  pub ix: Option<crate::simple_type::UInt32Value>,
+  #[sdk(attr(qname = ":T"))]
+  pub t: Option<crate::simple_type::StringValue>,
+  #[sdk(
+        choice(
+            child(variant = Cell, boxed, qname = "visio:Cell"),
+            child(variant = Tab, qname = "visio:Tab")
+        )
+    )]
+  pub row_union_choice: Vec<RowUnionChoice>,
+}
+///
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Section")]
 pub struct Section {
   #[sdk(attr(qname = ":N"))]
@@ -1249,6 +1274,13 @@ pub struct Section {
   pub del: Option<crate::simple_type::BooleanValue>,
   #[sdk(attr(qname = ":IX"))]
   pub ix: Option<crate::simple_type::UInt32Value>,
+  #[sdk(
+        choice(
+            child(variant = Cell, boxed, qname = "visio:Cell"),
+            child(variant = RowUnion, boxed, qname = "visio:Row")
+        )
+    )]
+  pub section_choice: Vec<SectionChoice>,
 }
 ///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1751,6 +1783,16 @@ pub enum TextChoice {
   Pp(Pp),
   Tp(Tp),
   Fld(Fld),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum RowUnionChoice {
+  Cell(std::boxed::Box<Cell>),
+  Tab(Tab),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum SectionChoice {
+  Cell(std::boxed::Box<Cell>),
+  RowUnion(std::boxed::Box<RowUnion>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapeChoice {

@@ -1,6 +1,6 @@
 use ooxmlsdk::schemas::schemas_microsoft_com_office_visio_2012_main::{
   Cell, Master, Masters, Page, PageSheet, PageSheetChoice, Pages, RowUnion, RowUnionChoice,
-  Section, SectionChoice, Shape, ShapeChoice, Shapes,
+  Section, SectionChoice, Shape, ShapeChoice, Shapes, StyleSheet, StyleSheetChoice,
 };
 use ooxmlsdk::simple_type::BooleanValue;
 
@@ -72,6 +72,42 @@ pub fn effective_shape_cell<'a>(
     return None;
   }
   Some(record)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StyleSlot {
+  Line,
+  Fill,
+  Text,
+}
+
+/// Local section cell when the shape has one. Otherwise the stored cell on the
+/// style sheet named by `LineStyle`, `FillStyle`, or `TextStyle`. Theme
+/// formulas stay as text.
+pub fn styled_shape_cell<'a>(
+  shape: &'a Shape,
+  styles: &'a [StyleSheet],
+  slot: StyleSlot,
+  section: &str,
+  cell: &str,
+) -> Option<CellRecord<'a>> {
+  if let Some(local) = shape_cell(shape, section, cell) {
+    return Some(local);
+  }
+  let style_id = match slot {
+    StyleSlot::Line => shape.line_style,
+    StyleSlot::Fill => shape.fill_style,
+    StyleSlot::Text => shape.text_style,
+  }?;
+  let style = styles.iter().find(|style| style.id == style_id)?;
+  let sections = style
+    .style_sheet_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      StyleSheetChoice::Section(section) => Some(section),
+      _ => None,
+    });
+  cell_in_sections(sections, section, cell)
 }
 
 pub fn page_sheet_cell<'a>(

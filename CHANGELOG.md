@@ -42,7 +42,9 @@
   Page, master, and shape ids are allocated from separate counters. A minimal
   drawing with one page, `PinX`, and a Geometry `LineTo` round-trips. `Connect`
   records resolve `FromSheet` and `ToSheet` to shapes on the same page. An
-  unknown sheet id is an error.
+  unknown sheet id is an error. Text marks (`cp`, `pp`, `tp`, `fld`) round-trip
+  in order. A missing shape cell uses the stored value on the style sheet named
+  by `LineStyle`, `FillStyle`, or `TextStyle`. Theme formulas stay as text.
 - Added a regeneration oracle (`ooxmlsdk-build`'s `sdk_data::oracle`) that diffs a
   generated schema against the checked-in `data/schemas` metadata on XSD-derivable
   projections (`CompositeType`, `BaseClass`, class names, summaries, and enum

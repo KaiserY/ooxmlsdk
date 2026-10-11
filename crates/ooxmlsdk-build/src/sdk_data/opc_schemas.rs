@@ -7,7 +7,7 @@ use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind, SchemaTypeAttribute,
   SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind,
 };
-use crate::sdk_data::xsd::{ParsedAttribute, ParsedChildElement, parse_xsd};
+use crate::sdk_data::xsd::{ParsedAttribute, ParsedChildElement, ParsedComplexType, parse_xsd};
 
 pub fn read_opc_schemas(schemas_dir: &Path) -> Result<Vec<Schema>> {
   let mut schemas = vec![];
@@ -122,8 +122,7 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
         extra_xmlns: Vec::new(),
         text_value_type: String::new(),
         api_kind: SchemaTypeApiKind::Struct,
-        attributes: relationship
-          .attributes
+        attributes: declared_attributes(relationship)
           .iter()
           .map(|attribute| SchemaTypeAttribute {
             q_name: attribute.q_name.clone(),
@@ -235,13 +234,13 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
         "pct:CT_Default/pct:Default",
         "Default",
         "Default content type.",
-        &default_type.attributes,
+        &declared_attributes(default_type),
       ),
       simple_leaf_type(
         "pct:CT_Override/pct:Override",
         "Override",
         "Override content type.",
-        &override_type.attributes,
+        &declared_attributes(override_type),
       ),
     ],
     enums: Vec::new(),
@@ -340,7 +339,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
     extra_xmlns: Vec::new(),
     text_value_type: "StringValue".to_string(),
     api_kind: SchemaTypeApiKind::Struct,
-    attributes: keyword_attributes(&keywords.attributes),
+    attributes: keyword_attributes(&declared_attributes(keywords)),
     children: keywords
       .children
       .iter()
@@ -378,7 +377,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
     extra_xmlns: Vec::new(),
     text_value_type: "StringValue".to_string(),
     api_kind: SchemaTypeApiKind::Struct,
-    attributes: keyword_attributes(&keyword.attributes),
+    attributes: keyword_attributes(&declared_attributes(keyword)),
     children: Vec::new(),
   });
 
@@ -552,6 +551,25 @@ fn keyword_attributes(attributes: &[ParsedAttribute]) -> Vec<SchemaTypeAttribute
   attributes_to_schema(attributes)
 }
 
+/// Attributes OPC generation keeps on a complex type.
+///
+/// `xs:simpleContent` stores its attributes on `derivation.body`. Relationship
+/// declares `Id`, `Target`, `Type`, and `TargetMode` there, and Keyword
+/// declares `xml:lang` there. Copying them onto `ParsedComplexType.attributes`
+/// would make the schema generator emit each one twice, so this reader appends
+/// them when building the OPC schema.
+fn declared_attributes(complex_type: &ParsedComplexType) -> Vec<ParsedAttribute> {
+  let mut attributes = complex_type.attributes.clone();
+  if let Some(derivation) = complex_type
+    .derivation
+    .as_ref()
+    .filter(|derivation| derivation.body.text_value_type.is_some())
+  {
+    attributes.extend(derivation.body.attributes.clone());
+  }
+  attributes
+}
+
 fn attributes_to_schema(attributes: &[ParsedAttribute]) -> Vec<SchemaTypeAttribute> {
   attributes
     .iter()
@@ -565,4 +583,75 @@ fn attributes_to_schema(attributes: &[ParsedAttribute]) -> Vec<SchemaTypeAttribu
       ..Default::default()
     })
     .collect()
+}
+
+#[cfg(test)]
+mod tests {
+  use std::path::PathBuf;
+
+  use super::{parse_opc_core_properties_xsd, parse_opc_relationships_xsd};
+
+  fn schema_source(name: &str) -> String {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .parent()
+      .and_then(|path| path.parent())
+      .expect("workspace root")
+      .join("schemas/OpenPackagingConventions-XMLSchema")
+      .join(name);
+    std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err}", path.display()))
+  }
+
+  #[test]
+  fn relationship_keeps_simple_content_attributes() {
+    let schema = parse_opc_relationships_xsd(&schema_source("opc-relationships.xsd"))
+      .expect("parse relationships");
+    let relationship = schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "Relationship")
+      .expect("Relationship");
+    let attributes: Vec<_> = relationship
+      .attributes
+      .iter()
+      .map(|attribute| (attribute.q_name.as_str(), attribute.required))
+      .collect();
+    assert_eq!(
+      attributes,
+      vec![
+        ("TargetMode", false),
+        ("Target", true),
+        ("Type", true),
+        ("Id", true),
+      ]
+    );
+  }
+
+  #[test]
+  fn keyword_keeps_simple_content_lang() {
+    let schema = parse_opc_core_properties_xsd(&schema_source("opc-coreProperties.xsd"))
+      .expect("parse core properties");
+    let keyword = schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "Keyword")
+      .expect("Keyword");
+    assert!(
+      keyword
+        .attributes
+        .iter()
+        .any(|attribute| attribute.q_name == "xml:lang" && !attribute.required)
+    );
+
+    let keywords = schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "Keywords")
+      .expect("Keywords");
+    assert!(
+      keywords
+        .attributes
+        .iter()
+        .any(|attribute| attribute.q_name == "xml:lang")
+    );
+  }
 }

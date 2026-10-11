@@ -1394,6 +1394,14 @@ pub(crate) fn fast_bytes_text_to_string(
   ty: &'static str,
   field: &'static str,
 ) -> Result<String, SdkError> {
+  // Normalize literal CR/CRLF before character references are resolved.
+  if memchr::memchr(b'\r', text.as_ref()).is_some() {
+    return text
+      .xml10_content()
+      .map(Cow::into_owned)
+      .map_err(|err| invalid_field_value(ty, field, err.to_string()));
+  }
+
   match String::from_utf8(text.into_inner().into_owned()) {
     Ok(value) => Ok(value),
     Err(err) => Err(invalid_field_value(ty, field, err.to_string())),
@@ -1951,6 +1959,9 @@ fn write_escaped_attr_bytes<W: std::io::Write>(
       b'<' => Some(b"&lt;"),
       b'&' => Some(b"&amp;"),
       b'"' => Some(b"&quot;"),
+      b'\t' => Some(b"&#9;"),
+      b'\n' => Some(b"&#10;"),
+      b'\r' => Some(b"&#13;"),
       _ => None,
     };
 
@@ -1985,6 +1996,7 @@ fn write_escaped_content_bytes<W: std::io::Write>(
     let replacement: Option<&[u8]> = match byte {
       b'<' => Some(b"&lt;"),
       b'&' => Some(b"&amp;"),
+      b'\r' => Some(b"&#13;"),
       _ => None,
     };
 
@@ -2243,7 +2255,8 @@ mod tests {
   use quick_xml::{Reader, events::Event};
 
   use super::{
-    parse_bytes_list_attr, parse_u32_bytes, write_escaped_content_str, write_escaped_str,
+    PayloadEvent, SliceReader, parse_bytes_list_attr, parse_u32_bytes, write_escaped_content_str,
+    write_escaped_str,
   };
 
   fn parse_u32_list_attr(xml: &str) -> Vec<u32> {
@@ -2276,6 +2289,13 @@ mod tests {
       "&lt;tag attr=&quot;one&amp;two&quot;>'text'&lt;/tag>"
     );
 
+    let mut attr = Vec::new();
+    write_escaped_str(&mut attr, "a\tb\nc\r\nd &#9;").expect("write attr");
+    assert_eq!(
+      String::from_utf8(attr).expect("utf-8 attr"),
+      "a&#9;b&#10;c&#13;&#10;d &amp;#9;"
+    );
+
     let mut content = Vec::new();
     write_escaped_content_str(&mut content, r#"<tag attr="one&two">'text'</tag>"#)
       .expect("write content");
@@ -2283,5 +2303,46 @@ mod tests {
       String::from_utf8(content).expect("utf-8 content"),
       r#"&lt;tag attr="one&amp;two">'text'&lt;/tag>"#
     );
+
+    let mut content = Vec::new();
+    write_escaped_content_str(&mut content, "a\tb\nc\r\nd\re").expect("write content");
+    assert_eq!(
+      String::from_utf8(content).expect("utf-8 content"),
+      "a\tb\nc&#13;\nd&#13;e"
+    );
+  }
+
+  #[test]
+  fn xml_writer_whitespace_round_trips_through_reader() {
+    let value = " \t a  b \nc\r\nd\re &#9; ";
+
+    let mut xml = b"<x a=\"".to_vec();
+    write_escaped_str(&mut xml, value).expect("write attr");
+    xml.extend_from_slice(b"\"/>");
+    let mut reader = Reader::from_reader(xml.as_slice());
+    let Event::Empty(event) = reader.read_event().expect("empty event") else {
+      panic!("expected empty element");
+    };
+    let attr = event
+      .attributes()
+      .next()
+      .expect("attribute")
+      .expect("valid attribute");
+    let read_back = attr
+      .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+      .expect("decode attr");
+    assert_eq!(read_back, value);
+
+    let mut xml = b"<t>".to_vec();
+    write_escaped_content_str(&mut xml, value).expect("write content");
+    xml.extend_from_slice(b"</t>");
+    let mut reader = SliceReader::new(Reader::from_reader(xml.as_slice()));
+    let PayloadEvent::Start(start, false) = reader.next().expect("start event") else {
+      panic!("expected start element");
+    };
+    let read_back = reader
+      .read_text(start.name(), "T", "text")
+      .expect("read text");
+    assert_eq!(read_back, value);
   }
 }

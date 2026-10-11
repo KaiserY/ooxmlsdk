@@ -27,7 +27,6 @@ pub(crate) struct DocxDocument {
   pub note_separator_style: TextStyle,
   pub footnote_separator_stories: NoteSeparatorStories,
   pub endnote_separator_stories: NoteSeparatorStories,
-  pub uses_office_recovered_paragraph_defaults: bool,
   pub default_tab_stop_pt: f32,
   pub hyphenation: HyphenationSettings,
   pub compatibility_mode: u16,
@@ -243,6 +242,9 @@ pub(crate) struct ListLabelImage {
   pub image: InlineImage,
   /// The visible `w:lvlText` characters replaced by instances of the image.
   pub replacement_text: String,
+  /// Natural bitmap height, including physical density, before list autosizing.
+  pub intrinsic_height_pt: Option<f64>,
+  pub follow: Option<char>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -334,10 +336,15 @@ impl TableCellSpacing {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Table {
+  /// The incomplete source grid was rebuilt from absolute row boundaries.
+  /// Word preserves these recovered separators and breaks overflowing text
+  /// inside them instead of redistributing the normalized grid a second time.
+  pub recovered_absolute_grid: bool,
   pub column_widths_pt: Vec<f32>,
   pub preferred_width_pt: Option<f32>,
   pub preferred_width_pct: Option<f32>,
   pub layout: TableLayoutMode,
+  pub containing_table_layout: Option<TableLayoutMode>,
   pub indent_left_pt: f32,
   pub alignment: TableAlignment,
   pub right_to_left: bool,
@@ -661,6 +668,9 @@ pub(crate) struct ParagraphFormat {
   pub tab_stops_set: bool,
   pub list_label_width_aware_tab: bool,
   pub list_label_uses_explicit_tab_stop: bool,
+  /// Intrinsic cell sizing has no flow frame; retain the same document tab
+  /// grid used to place an overflowing numbering suffix in actual layout.
+  pub list_label_default_tab_stop_pt: Option<f32>,
   /// Paragraph-authored left tabs before the numbered text indent. Word can
   /// use one of these for the list suffix even when the level also has a
   /// numbering tab at the indent; inherited style tabs do not have this role.
@@ -676,9 +686,10 @@ pub(crate) struct ParagraphFormat {
   pub justification_set: bool,
   pub bidi: bool,
   pub bidi_set: bool,
-  /// Direct paragraph formatting changes the direction inherited from its
-  /// style. Word treats this as content in an otherwise empty header story.
-  pub bidi_differs_from_style: bool,
+  /// Direct layout properties differ from the paragraph style. Word treats
+  /// the resulting line frame as content in an otherwise empty header story;
+  /// matching overrides and run/paragraph-mark fonts do not activate it.
+  pub header_layout_differs_from_style: bool,
   /// Presence records an authored/inherited `w:shd`; `None` inside the paint
   /// is represented by [`ShadingPaint::None`] so `w:val="nil"` can cancel an
   /// inherited value without becoming indistinguishable from omission.
@@ -697,6 +708,9 @@ pub(crate) struct ParagraphFormat {
   pub widow_control: Option<bool>,
   pub contextual_spacing: bool,
   pub contextual_spacing_set: bool,
+  /// The final cell paragraph shares the implicit cell-end marker's default
+  /// paragraph style. Keep this boundary when page fragments clone its blocks.
+  pub cell_end_style_matches: bool,
   pub suppress_auto_hyphens: Option<bool>,
   pub suppress_line_numbers: Option<bool>,
   pub suppress_overlap: Option<bool>,
@@ -1503,10 +1517,13 @@ pub(crate) struct InlineChart {
   pub data_label_style: TextStyle,
   pub data_label_styles: Vec<Vec<Option<TextStyle>>>,
   pub data_label_rich_text_styles: Vec<Vec<Vec<TextStyle>>>,
+  pub data_label_leader_line_styles: Vec<Vec<common::ShapeStyle<'static>>>,
   pub gridline_color: RgbColor,
   pub automatic_series_line_width_pt: f32,
   pub value_gridline_width_pt: Option<f32>,
   pub axis_line_width_pt: Option<f32>,
+  pub category_axis_line_color: Option<RgbColor>,
+  pub value_axis_line_color: Option<RgbColor>,
   pub category_major_gridline: Option<(RgbColor, f32)>,
   pub category_minor_gridline: Option<(RgbColor, f32)>,
   pub value_minor_gridline: Option<crate::common::Stroke<'static>>,

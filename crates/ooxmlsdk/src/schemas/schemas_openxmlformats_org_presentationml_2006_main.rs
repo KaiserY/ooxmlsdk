@@ -794,7 +794,7 @@ pub struct Extension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<[u8]>>,
+  pub xml_children: std::boxed::Box<[u8]>,
 }
 /// Browse Slide Show Mode.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

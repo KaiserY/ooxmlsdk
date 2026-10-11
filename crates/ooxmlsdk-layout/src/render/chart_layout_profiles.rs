@@ -191,9 +191,18 @@ pub(crate) const POWERPOINT_AUTOMATIC_MAJOR_TICK_LENGTH_PT: f32 = 5.71;
 /// §21.2.2.152). The projection therefore follows the ordinary pinhole
 /// relation `distance = aperture / tan(field_of_view / 2)`. The aperture is
 /// expressed in the unit-width chart volume used by the lowering code and is
-/// calibrated against Microsoft's immutable O12 PowerPoint fixed output; the
-/// same camera is shared by Word, Excel, and PowerPoint chart hosts.
+/// calibrated against Microsoft's immutable O12 PowerPoint fixed output.
+/// Word perspective columns instead fit their camera to the rotated volume.
 pub(crate) const OFFICE_CARTESIAN_3D_CAMERA_HALF_APERTURE: f32 = 0.414_75;
+
+/// Word's extra left, bottom and back extent, relative to model width.
+/// Native chart bounds use 0.014 units for a 100-unit-wide model.
+pub(crate) const WORD_PERSPECTIVE_MODEL_GUARD_RATIO: f32 = 0.000_14;
+
+/// Word expands each side of the camera fitting interval by 1.4%.
+/// Native camera controls varying height, view angles, perspective and depth
+/// retain this padding before deriving the distance and camera-plane center.
+pub(crate) const WORD_PERSPECTIVE_FRUSTUM_PADDING_RATIO: f32 = 0.014;
 
 /// Office's default directional-light response for the receding side of a
 /// solid cartesian 3-D box.
@@ -921,8 +930,6 @@ pub(crate) const WORD_SIDE_PIE_LEGEND: SideLegendProfile = SideLegendProfile {
   row_step_height_ratio: 0.066_914_94,
 };
 
-pub(crate) const WORD_SIDE_PIE_FRAME_Y_OFFSET_RATIO: f32 = 0.013_606_33;
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct RadialHostDefaults {
   pub title_height_scale: f32,
@@ -1021,12 +1028,9 @@ pub(crate) const WORD_RADIAL_DEFAULTS: RadialHostDefaults = RadialHostDefaults {
   side_legend_center_offset_em: 0.09,
 };
 
-/// Word's 2-D, automatically positioned pie/doughnut plot with an explicit
-/// title and a right-side legend. Word's Chart COM geometry for independent
-/// 360x216pt and 432x252pt documents puts the plot 41.975pt below the chart
-/// top and keeps an 11pt bottom margin; the remaining height is the square
-/// pie viewport. The values include Word's 4pt chart-interior origin.
-pub(crate) const WORD_TITLED_RIGHT_RADIAL_PLOT_TOP_PT: f32 = 41.975_04;
+/// Word's automatic pie/doughnut keeps an 11pt edge margin after reserving
+/// the title's natural line and frame clearance. Native controls at several
+/// title sizes and chart dimensions retain this margin.
 pub(crate) const WORD_TITLED_RIGHT_RADIAL_PLOT_BOTTOM_PT: f32 = 11.0;
 /// Word reserves one sixteenth of the below-title area at each edge for
 /// automatic/outside labels, before its fixed 11pt plot margins. Office COM

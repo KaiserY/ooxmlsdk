@@ -494,6 +494,7 @@ struct StoryField {
   instruction: String,
   locked: bool,
   dirty: bool,
+  inside_toc_result: bool,
   starts_at_paragraph_start: bool,
   ends_at_paragraph_end: bool,
 }
@@ -656,6 +657,9 @@ fn scan_story_paragraph(
             instruction: field.instruction,
             locked: field.locked,
             dirty: field.dirty,
+            inside_toc_result: fields
+              .iter()
+              .any(|parent| parent.separated && TocSpec::parse(&parent.instruction).is_some()),
             starts_at_paragraph_start: field.starts_at_paragraph_start,
             ends_at_paragraph_end: !paragraph.field_events[event_index + 1..]
               .iter()
@@ -673,6 +677,9 @@ fn scan_story_paragraph(
         instruction: instruction.clone(),
         locked: *locked,
         dirty: *dirty,
+        inside_toc_result: fields
+          .iter()
+          .any(|parent| parent.separated && TocSpec::parse(&parent.instruction).is_some()),
         starts_at_paragraph_start: !paragraph.field_events[..event_index]
           .iter()
           .any(|event| matches!(event, ParagraphFieldEvent::Content)),
@@ -867,8 +874,8 @@ pub(super) fn refresh_tables_of_contents(
     normalize_cached_toc_hyperlink_style(sections, &scan, span, styles);
     // ECMA-376 §17.16.18 defines everything after the optional separator as
     // the current field result. That result may legitimately be empty. Its
-    // absence is not an implicit update request: a TOC is recalculated only
-    // when its begin character is dirty or settings request field updates.
+    // absence is not an implicit update request. Keep empty-cache recovery
+    // separate from dirty/settings requests and invalid page-reference caches.
     // Word's empty-result placeholder is a narrow exception: a cached TOC
     // paragraph containing only a blank run (the empty hyperlink cache in
     // tdf155736_PageNumbers_footer.docx) is replaced by the fixed-format
@@ -878,14 +885,32 @@ pub(super) fn refresh_tables_of_contents(
       continue;
     }
     let has_empty_result_placeholder = toc_span_has_empty_result_placeholder(sections, &scan, span);
+    // Word updates a cached TOC's page references during fixed-format export.
+    // If a cached entry has lost its bookmark and current heading sources
+    // exist, that page-number update rebuilds the outer TOC. Without source
+    // entries, Word retains the cache and prints its PAGEREF errors.
+    // Valid caches and references outside the TOC retain their own behavior;
+    // the enclosing field lock above remains authoritative.
+    let has_missing_page_reference = toc_span_has_missing_page_reference(&scan, span);
     let mut clean_empty_result = false;
-    let mut entries = None;
-    if !span.dirty && !update_fields_on_open && !has_empty_result_placeholder {
+    let mut entries =
+      has_missing_page_reference.then(|| collect_toc_entry_sources(sections, &scan, span));
+    // With no current entry sources, Word preserves the cached TOC and
+    // prints its missing-bookmark errors. Only recover a populated source
+    // list here; an explicit dirty/settings update retains its own path.
+    let rebuild_invalid_cache = entries.as_ref().is_some_and(|entries| !entries.is_empty());
+    if !span.dirty
+      && !update_fields_on_open
+      && !has_empty_result_placeholder
+      && !rebuild_invalid_cache
+    {
       // Word also replaces a stored English empty-TOC diagnostic with the
       // current UI resource (sdt-before-table.docx). This does not authorize
       // rebuilding other clean caches, including an obsolete empty diagnostic
       // for which headings now exist.
-      let current_entries = collect_toc_entry_sources(sections, &scan, span);
+      let current_entries = entries
+        .take()
+        .unwrap_or_else(|| collect_toc_entry_sources(sections, &scan, span));
       if toc_span_has_cached_empty_diagnostic(sections, &scan, span) {
         if !current_entries.is_empty() {
           continue;
@@ -938,18 +963,38 @@ pub(super) fn refresh_tables_of_contents(
         templates.get(&entry.level),
         styles,
         page,
+        rebuild_invalid_cache,
       )));
     }
 
     if blocks.is_empty() {
+      // An absent result remains distinct from a persisted blank text run.
+      // Native single/multiple-paragraph and dirty/clean controls use the
+      // same sentence-case resource for the former. Its source paragraph
+      // owns spacing/font size even when it is not a TOC-style paragraph.
+      let absent_result = toc_span_has_clean_empty_result(sections, &scan, span)
+        && (span.start_ordinal..=span.end_ordinal).all(|ordinal| {
+          paragraph(sections, &scan, ordinal).is_some_and(|paragraph| {
+            !paragraph
+              .field_events
+              .iter()
+              .any(|event| matches!(event, ParagraphFieldEvent::Content))
+          })
+        });
       let empty_template = templates.get(&1).or_else(|| {
         templates
           .iter()
           .min_by_key(|(level, _)| *level)
           .map(|(_, paragraph)| paragraph)
       });
-      blocks.push(Block::paragraph(if clean_empty_result {
-        build_clean_empty_toc_result(empty_template, styles, ui_language)
+      let uses_toc_template = empty_template.is_some();
+      let empty_template = empty_template.or_else(|| {
+        absent_result
+          .then(|| paragraph(sections, &scan, span.start_ordinal))
+          .flatten()
+      });
+      blocks.push(Block::paragraph(if clean_empty_result || absent_result {
+        build_clean_empty_toc_result(empty_template, styles, ui_language, uses_toc_template)
       } else {
         build_empty_toc_result(&span.spec, empty_template, styles, page, ui_language)
       }));
@@ -1969,6 +2014,7 @@ fn build_toc_entry_paragraph(
   template: Option<&Paragraph>,
   styles: &StylesCatalog,
   page: PageSetup,
+  rebuild_tabs_from_style: bool,
 ) -> Paragraph {
   let mut paragraph = template
     .cloned()
@@ -1991,7 +2037,16 @@ fn build_toc_entry_paragraph(
     .then(|| format!("ooxmlsdk-pdf:bookmark:{bookmark_name}"));
   // TOC \h creates a link target without applying the ordinary blue
   // Hyperlink character appearance in Word's fixed output.
-  let run_style = paragraph.base_style.clone();
+  // A cached paragraph's base_style includes its paragraph-mark rPr, which
+  // ECMA-376 §17.3.1.29 applies only to that mark. Regenerated entry text uses
+  // the TOC paragraph style instead; native mark/style controls vary these
+  // independently. Preserve the cached mark and paragraph layout properties.
+  let mut run_style = styles.run_style_with_base(
+    paragraph.format.style_id.as_deref(),
+    TextStyle::default(),
+    RunStyleOverrides::default(),
+  );
+  run_style.line_vertical_alignment = paragraph.base_style.line_vertical_alignment;
   paragraph.inlines.push(InlineItem::Text(TextRun {
     text: entry.text.clone(),
     style: run_style.clone(),
@@ -2016,7 +2071,7 @@ fn build_toc_entry_paragraph(
         preserve_text_portion: false,
       }));
     } else {
-      ensure_toc_page_tab_stop(&mut paragraph, page);
+      ensure_toc_page_tab_stop(&mut paragraph, styles, page, rebuild_tabs_from_style);
       paragraph.inlines.push(InlineItem::Text(TextRun {
         text: "\t".to_string(),
         style: run_style.clone(),
@@ -2058,19 +2113,40 @@ fn build_toc_entry_paragraph(
   paragraph
 }
 
-fn ensure_toc_page_tab_stop(paragraph: &mut Paragraph, page: PageSetup) {
+fn ensure_toc_page_tab_stop(
+  paragraph: &mut Paragraph,
+  styles: &StylesCatalog,
+  page: PageSetup,
+  rebuild_tabs_from_style: bool,
+) {
+  // Missing-reference recovery recreates TOC tabs from the paragraph style.
+  // Ordinary dirty/result updates preserve cached tab formatting, including
+  // numbering follow-tabs (tdf150086). ECMA-376 §17.3.1.38 supplies the style
+  // inheritance; native style/direct/clear and deleted-result controls
+  // distinguish these field-update paths.
+  if rebuild_tabs_from_style {
+    let style_format = styles.paragraph_format_with_base(
+      paragraph.format.style_id.as_deref(),
+      ParagraphFormat::default(),
+    );
+    paragraph.format.tab_stops = style_format.tab_stops;
+    if style_format.tab_stops_set {
+      // An authored style with only left stops deliberately has no page
+      // leader; Word uses the subsequent ordinary tab (native no-right
+      // controls). Do not manufacture a right stop in that explicit set.
+      paragraph.format.tab_stops_set = true;
+      return;
+    }
+  }
   let content_width = (page.width_pt - page.margin_left_pt - page.margin_right_pt).max(1.0);
   let position_pt =
     (content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt).max(1.0);
-  if let Some(stop) = paragraph
+  if !paragraph
     .format
     .tab_stops
-    .iter_mut()
-    .find(|stop| matches!(stop.alignment, TabStopAlignment::Right))
+    .iter()
+    .any(|stop| matches!(stop.alignment, TabStopAlignment::Right))
   {
-    stop.position_pt = position_pt;
-    stop.leader = TabLeader::Dot;
-  } else {
     paragraph.format.tab_stops.push(TabStop {
       position_pt,
       alignment: TabStopAlignment::Right,
@@ -2127,6 +2203,7 @@ fn build_clean_empty_toc_result(
   template: Option<&Paragraph>,
   styles: &StylesCatalog,
   ui_language: Option<&str>,
+  uses_toc_template: bool,
 ) -> Paragraph {
   let mut paragraph = template
     .cloned()
@@ -2141,6 +2218,12 @@ fn build_clean_empty_toc_result(
   paragraph.style_ref_text = Some(Arc::<str>::from(text.as_str()));
   paragraph.style_ref_numbering_text = None;
   let mut style = paragraph.base_style.clone();
+  // Word's empty-result resource is regular in an existing TOC template,
+  // and bold in an ordinary paragraph. Paragraph-mark bold does not change
+  // either generated route; populated caches retain their separate policy.
+  style.bold = !uses_toc_template;
+  style.complex_bold = Some(style.bold);
+  apply_traditional_chinese_diagnostic_font_slots(&mut style, ui_language);
   text::apply_wordprocessingml_cjk_text_metrics(&text, &mut style);
   paragraph.inlines.push(InlineItem::Text(TextRun {
     text,
@@ -2197,6 +2280,19 @@ fn toc_span_has_empty_result_placeholder(
       });
       has_cached_content && !has_visible_content
     })
+  })
+}
+
+fn toc_span_has_missing_page_reference(scan: &StoryScan, span: &TocSpan) -> bool {
+  scan.fields.iter().any(|field| {
+    field.inside_toc_result
+      && field.start_ordinal >= span.start_ordinal
+      && field.end_ordinal <= span.end_ordinal
+      && matches!(
+        dynamic_field_kind(&field.instruction),
+        Some(DynamicFieldKind::PageRef { bookmark_name, .. })
+          if !scan.bookmark_names.iter().any(|name| name.eq_ignore_ascii_case(&bookmark_name))
+      )
   })
 }
 
@@ -2336,10 +2432,12 @@ mod tests {
 
   fn test_table(blocks: Vec<Block>) -> Table {
     Table {
+      recovered_absolute_grid: false,
       column_widths_pt: vec![300.0],
       preferred_width_pt: None,
       preferred_width_pct: None,
       layout: TableLayoutMode::AutoFit,
+      containing_table_layout: None,
       indent_left_pt: 0.0,
       alignment: TableAlignment::Left,
       right_to_left: false,
@@ -2494,8 +2592,213 @@ mod tests {
   }
 
   #[test]
+  fn cached_toc_with_missing_page_reference_rebuilds_only_its_unlocked_owner() {
+    for (valid, outer_locked, nested_locked, outside, has_sources, rebuilds) in [
+      (false, false, false, false, true, true),
+      (true, false, false, false, true, false),
+      (false, true, false, false, true, false),
+      (false, false, true, false, true, true),
+      (false, false, false, true, true, false),
+      (false, false, false, false, false, false),
+    ] {
+      let mut cached = test_paragraph("Cached entry");
+      cached.field_events = vec![
+        ParagraphFieldEvent::Begin {
+          locked: outer_locked,
+          dirty: false,
+        },
+        ParagraphFieldEvent::Instruction(r#"TOC \o "1-2""#.to_string()),
+        ParagraphFieldEvent::Separate,
+        ParagraphFieldEvent::Content,
+      ];
+      if outside {
+        cached.field_events.push(ParagraphFieldEvent::End);
+      }
+      cached.field_events.extend([
+        ParagraphFieldEvent::Begin {
+          locked: nested_locked,
+          dirty: false,
+        },
+        ParagraphFieldEvent::Instruction("PAGEREF Target".to_string()),
+        ParagraphFieldEvent::Separate,
+        ParagraphFieldEvent::Content,
+        ParagraphFieldEvent::End,
+      ]);
+      if !outside {
+        cached.field_events.push(ParagraphFieldEvent::End);
+      }
+      let mut heading = test_paragraph("Current heading");
+      heading.format.style_outline_level = Some(0);
+      heading.format.outline_level = Some(0);
+      if valid {
+        heading.field_events = vec![
+          ParagraphFieldEvent::BookmarkStart {
+            id: "1".to_string(),
+            name: "tArGeT".to_string(),
+          },
+          ParagraphFieldEvent::Content,
+          ParagraphFieldEvent::BookmarkEnd {
+            id: "1".to_string(),
+          },
+        ];
+      }
+      let mut blocks = vec![Block::paragraph(cached)];
+      if has_sources {
+        blocks.push(Block::paragraph(heading));
+      }
+      let mut sections = vec![default_section(blocks)];
+      refresh_tables_of_contents(
+        &mut sections,
+        &StylesCatalog::default(),
+        false,
+        Some("en-US"),
+      );
+      let Block::Paragraph(result) = &sections[0].blocks[0] else {
+        panic!("TOC paragraph")
+      };
+      let text = paragraph_source_text(result).unwrap();
+      assert_eq!(
+        text.starts_with("Current heading"),
+        rebuilds,
+        "valid={valid}, outer={outer_locked}, nested={nested_locked}, outside={outside}, sources={has_sources}"
+      );
+      assert_eq!(text.starts_with("Cached entry"), !rebuilds);
+    }
+  }
+
+  #[test]
+  fn rebuilt_toc_text_and_tabs_use_style_without_cached_mark_or_tab_overrides() {
+    for (size, bold, color) in [
+      (
+        12.0,
+        true,
+        RgbColor {
+          r: 79,
+          g: 129,
+          b: 189,
+        },
+      ),
+      (
+        15.0,
+        false,
+        RgbColor {
+          r: 0,
+          g: 160,
+          b: 96,
+        },
+      ),
+    ] {
+      let style_tab = TabStop {
+        position_pt: if bold { 496.8 } else { 480.0 },
+        alignment: TabStopAlignment::Right,
+        leader: if bold {
+          TabLeader::Dot
+        } else {
+          TabLeader::Hyphen
+        },
+      };
+      let mut styles = StylesCatalog::default();
+      styles.styles.insert(
+        "TOC1".to_string(),
+        StyleEntry {
+          style_type: Some(w::StyleValues::Paragraph),
+          paragraph_format: ParagraphFormat {
+            tab_stops: vec![style_tab],
+            tab_stops_set: true,
+            ..ParagraphFormat::default()
+          },
+          run_style: TextStyle {
+            color,
+            ..TextStyle::default()
+          },
+          run_overrides: RunStyleOverrides {
+            font_size_pt: Some(size),
+            bold: Some(bold),
+            color_is_automatic: Some(false),
+            ..RunStyleOverrides::default()
+          },
+          ..StyleEntry::default()
+        },
+      );
+      for marker_size in [11.0, 18.0] {
+        let mut cached = test_paragraph("Old cache");
+        cached.base_style.font_size_pt = marker_size;
+        cached.base_style.bold = false;
+        cached.base_style.color = RgbColor {
+          r: 255,
+          g: 0,
+          b: 255,
+        };
+        cached.format.tab_stops = vec![TabStop {
+          position_pt: 504.0,
+          alignment: TabStopAlignment::Right,
+          leader: TabLeader::Underscore,
+        }];
+        cached.format.tab_stops_set = true;
+        cached.field_events = vec![
+          ParagraphFieldEvent::Begin {
+            locked: false,
+            dirty: false,
+          },
+          ParagraphFieldEvent::Instruction(r#"TOC \o "1-2""#.to_string()),
+          ParagraphFieldEvent::Separate,
+          ParagraphFieldEvent::Content,
+          ParagraphFieldEvent::Begin {
+            locked: false,
+            dirty: false,
+          },
+          ParagraphFieldEvent::Instruction("PAGEREF MissingEntry".to_string()),
+          ParagraphFieldEvent::Separate,
+          ParagraphFieldEvent::Content,
+          ParagraphFieldEvent::End,
+          ParagraphFieldEvent::End,
+        ];
+        let mut heading = test_paragraph("Current heading");
+        heading.format.style_outline_level = Some(0);
+        heading.format.outline_level = Some(0);
+        let mut sections = vec![default_section(vec![
+          Block::paragraph(cached),
+          Block::paragraph(heading),
+        ])];
+        refresh_tables_of_contents(&mut sections, &styles, false, Some("en-US"));
+        let Block::Paragraph(entry) = &sections[0].blocks[0] else {
+          panic!("TOC entry")
+        };
+        assert_eq!(entry.base_style.font_size_pt, marker_size);
+        assert_eq!(entry.format.tab_stops.len(), 1);
+        assert_eq!(entry.format.tab_stops[0].position_pt, style_tab.position_pt);
+        assert_eq!(entry.format.tab_stops[0].alignment, style_tab.alignment);
+        assert_eq!(entry.format.tab_stops[0].leader, style_tab.leader);
+        assert_eq!(
+          entry.base_style.color,
+          RgbColor {
+            r: 255,
+            g: 0,
+            b: 255
+          }
+        );
+        let runs = entry
+          .inlines
+          .iter()
+          .filter_map(|inline| match inline {
+            InlineItem::Text(run) => Some(run),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 3);
+        for run in runs {
+          assert_eq!(run.style.font_size_pt, size);
+          assert_eq!(run.style.bold, bold);
+          assert_eq!(run.style.color, color);
+        }
+      }
+    }
+  }
+
+  #[test]
   fn clean_empty_toc_without_entries_materializes_ordinary_result_text() {
     let mut first_cached = test_paragraph("");
+    first_cached.format.style_id = Some(Arc::from("TOC1"));
     first_cached.field_events = vec![
       ParagraphFieldEvent::Begin {
         locked: false,
@@ -2529,6 +2832,73 @@ mod tests {
       panic!("empty TOC result should contain one ordinary text run");
     };
     assert!(!run.style.bold);
+  }
+
+  #[test]
+  fn absent_toc_result_retains_ordinary_source_format_for_clean_and_dirty_fields() {
+    for ui in ["en-US", "zh-TW"] {
+      for simple in [false, true] {
+        for dirty in [false, true] {
+          for spacing_after in [6.0, 18.0] {
+            let mut source = test_paragraph("");
+            source.format.style_id = Some(Arc::from("Body"));
+            source.format.spacing_after_pt = spacing_after;
+            source.format.line_height_pt = Some(278.0 / 240.0);
+            source.format.indent_left_pt = 9.0;
+            source.base_style.font_family = Some(Arc::from("Arial"));
+            source.base_style.font_size_pt = 11.0;
+            source.base_style.east_asia_font_family = Some(Arc::from("SimSun"));
+            source.base_style.wordprocessingml_field_bold_override = Some(false);
+            let instruction = r#"TOC \o "1-3""#.to_string();
+            source.field_events = if simple {
+              vec![ParagraphFieldEvent::Simple {
+                instruction,
+                locked: false,
+                dirty,
+              }]
+            } else {
+              vec![
+                ParagraphFieldEvent::Begin {
+                  locked: false,
+                  dirty,
+                },
+                ParagraphFieldEvent::Instruction(instruction),
+                ParagraphFieldEvent::Separate,
+                ParagraphFieldEvent::End,
+              ]
+            };
+            let mut sections = vec![default_section(vec![
+              Block::paragraph(source),
+              Block::paragraph(test_paragraph("AFTER")),
+            ])];
+            refresh_tables_of_contents(&mut sections, &StylesCatalog::default(), false, Some(ui));
+            let [Block::Paragraph(result), Block::Paragraph(following)] =
+              sections[0].blocks.as_slice()
+            else {
+              panic!("one generated result and the following paragraph");
+            };
+            assert_eq!(paragraph_source_text(following).as_deref(), Some("AFTER"));
+            assert_eq!(result.format.style_id.as_deref(), Some("Body"));
+            assert_eq!(result.format.spacing_after_pt, spacing_after);
+            assert_eq!(result.format.line_height_pt, Some(278.0 / 240.0));
+            assert_eq!(result.format.indent_left_pt, 9.0);
+            let [InlineItem::Text(run)] = result.inlines.as_slice() else {
+              panic!("generated TOC resource");
+            };
+            assert_eq!(run.style.font_family.as_deref(), Some("Arial"));
+            assert_eq!(run.style.font_size_pt, 11.0);
+            assert!(run.style.bold);
+            if ui == "zh-TW" {
+              assert_eq!(run.text, "找不到目錄項目。");
+              assert_eq!(run.style.east_asia_font_family.as_deref(), Some("PMingLiU"));
+              assert_eq!(run.style.east_asia_language.as_deref(), Some("zh-TW"));
+            } else {
+              assert_eq!(run.text, "No table of contents entries found.");
+            }
+          }
+        }
+      }
+    }
   }
 
   #[test]
@@ -2975,6 +3345,19 @@ mod tests {
   #[test]
   fn dirty_toc_includes_the_heading_numbering_label() {
     let mut cached = test_paragraph("stale");
+    cached.format.tab_stops = vec![
+      TabStop {
+        position_pt: 22.0,
+        alignment: TabStopAlignment::Left,
+        leader: TabLeader::None,
+      },
+      TabStop {
+        position_pt: 450.8,
+        alignment: TabStopAlignment::Right,
+        leader: TabLeader::Dot,
+      },
+    ];
+    cached.format.tab_stops_set = true;
     cached.field_events = vec![
       ParagraphFieldEvent::Begin {
         locked: false,
@@ -3008,6 +3391,9 @@ mod tests {
       entry.inlines.first(),
       Some(InlineItem::Text(run)) if run.text == "2\tChapter"
     ));
+    assert_eq!(entry.format.tab_stops.len(), 2);
+    assert_eq!(entry.format.tab_stops[0].position_pt, 22.0);
+    assert_eq!(entry.format.tab_stops[1].position_pt, 450.8);
   }
 
   #[test]

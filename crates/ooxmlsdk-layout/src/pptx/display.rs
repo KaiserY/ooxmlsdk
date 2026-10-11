@@ -2201,9 +2201,29 @@ fn lower_chart(
           data_label: data_label_style,
           data_label_styles,
           data_label_rich_text_styles,
+          data_label_leader_line_styles: chart
+            .series
+            .iter()
+            .map(|series| {
+              series
+                .data_labels
+                .iter()
+                .map(|label| {
+                  pptx_chart_shape_style(
+                    import,
+                    slide,
+                    chart_resource,
+                    label.leader_line_shape_properties,
+                  )
+                })
+                .collect()
+            })
+            .collect(),
           gridline_color,
           value_gridline_width_pt: None,
           axis_line_width_pt: None,
+          category_axis_line_color: None,
+          value_axis_line_color: None,
           category_major_gridline: None,
           category_minor_gridline: None,
           value_minor_gridline: None,

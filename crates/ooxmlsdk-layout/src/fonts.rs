@@ -4,9 +4,10 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use ooxmlsdk_fonts::{
-  FeatureValue, FontBytes, FontCharset, FontFallbackChain, FontFamilyClass, FontId, FontRegistry,
-  FontRequest, FontSize, FontSlant, ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun,
-  TextDirection, TextScript, WordprocessingFontSlot, script_direction_runs_with_options,
+  FeatureValue, FontBytes, FontCharset, FontFallbackChain, FontFamilyClass, FontFamilySelection,
+  FontId, FontRegistry, FontRequest, FontScriptRun, FontSize, FontSlant, ResolvedFontChain,
+  ScriptScanOptions, ShapeOptions, ShapedRun, TextDirection, TextScript, WordprocessingFontSlot,
+  script_direction_runs_with_options,
 };
 use rustc_hash::FxHashMap as HashMap;
 use skrifa::raw::{FontRef, TableProvider};
@@ -109,6 +110,9 @@ pub trait FontStyleRef {
   fn east_asia_font_family(&self) -> Option<&str> {
     self.font_family()
   }
+  fn drawingml_japanese_font_family(&self) -> Option<&str> {
+    None
+  }
   fn complex_font_family(&self) -> Option<&str> {
     self.font_family()
   }
@@ -117,6 +121,9 @@ pub trait FontStyleRef {
     None
   }
   fn complex_script_override(&self) -> Option<bool> {
+    None
+  }
+  fn complex_script_property(&self) -> Option<bool> {
     None
   }
   fn right_to_left(&self) -> bool {
@@ -181,6 +188,9 @@ pub trait FontStyleRef {
     false
   }
   fn wordprocessingml_font_hint(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontTypeHint> {
+    None
+  }
+  fn wordprocessingml_resolved_font_slot(&self) -> Option<WordprocessingFontSlot> {
     None
   }
   fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
@@ -280,6 +290,9 @@ impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
   fn east_asia_font_family(&self) -> Option<&str> {
     (**self).east_asia_font_family()
   }
+  fn drawingml_japanese_font_family(&self) -> Option<&str> {
+    (**self).drawingml_japanese_font_family()
+  }
 
   fn complex_font_family(&self) -> Option<&str> {
     (**self).complex_font_family()
@@ -295,6 +308,10 @@ impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
 
   fn complex_script_override(&self) -> Option<bool> {
     (**self).complex_script_override()
+  }
+
+  fn complex_script_property(&self) -> Option<bool> {
+    (**self).complex_script_property()
   }
 
   fn right_to_left(&self) -> bool {
@@ -388,6 +405,9 @@ impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
   fn wordprocessingml_font_hint(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontTypeHint> {
     (**self).wordprocessingml_font_hint()
   }
+  fn wordprocessingml_resolved_font_slot(&self) -> Option<WordprocessingFontSlot> {
+    (**self).wordprocessingml_resolved_font_slot()
+  }
 
   fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
     (**self).wordprocessingml_east_asia_language_is_chinese()
@@ -465,7 +485,7 @@ fn uses_complex_run_properties(style: &(impl FontStyleRef + ?Sized)) -> bool {
   style.complex_script_override() == Some(true)
 }
 
-fn script_scan_options(
+pub(crate) fn script_scan_options(
   style: &(impl FontStyleRef + ?Sized),
   small_caps: bool,
 ) -> ScriptScanOptions {
@@ -473,10 +493,13 @@ fn script_scan_options(
     small_caps,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
     wordprocessingml_font_hint: style.wordprocessingml_font_hint(),
+    wordprocessingml_resolved_font_slot: style.wordprocessingml_resolved_font_slot(),
     wordprocessingml_east_asia_language_is_chinese: style
       .wordprocessingml_east_asia_language_is_chinese(),
     wordprocessingml_east_asia_font_charset: style.wordprocessingml_east_asia_font_charset(),
     wordprocessingml_complex_font_override: style.complex_script_override() == Some(true),
+    wordprocessingml_rtl_font_override: style.right_to_left()
+      && style.complex_script_property() != Some(true),
     wordprocessingml_east_asia_uses_ascii: wordprocessingml_east_asia_uses_ascii(style),
     ..ScriptScanOptions::default()
   }
@@ -762,6 +785,10 @@ impl FontStyleRef for TextStyle {
       .or_else(|| self.font_family())
   }
 
+  fn drawingml_japanese_font_family(&self) -> Option<&str> {
+    self.drawingml_japanese_font_family.as_deref()
+  }
+
   fn complex_font_family(&self) -> Option<&str> {
     self
       .complex_font_family
@@ -779,6 +806,10 @@ impl FontStyleRef for TextStyle {
 
   fn complex_script_override(&self) -> Option<bool> {
     complex_script_override(self.complex_script, self.right_to_left)
+  }
+
+  fn complex_script_property(&self) -> Option<bool> {
+    self.complex_script
   }
 
   fn right_to_left(&self) -> bool {
@@ -877,6 +908,9 @@ impl FontStyleRef for TextStyle {
 
   fn wordprocessingml_font_hint(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontTypeHint> {
     self.wordprocessingml_font_hint
+  }
+  fn wordprocessingml_resolved_font_slot(&self) -> Option<WordprocessingFontSlot> {
+    self.wordprocessingml_resolved_font_slot
   }
 
   fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
@@ -1008,6 +1042,10 @@ impl FontStyleRef for common::TextStyle<'_> {
       .or_else(|| self.font_family())
   }
 
+  fn drawingml_japanese_font_family(&self) -> Option<&str> {
+    self.drawingml_japanese_font_family.as_deref()
+  }
+
   fn complex_font_family(&self) -> Option<&str> {
     self
       .complex_font_family
@@ -1025,6 +1063,10 @@ impl FontStyleRef for common::TextStyle<'_> {
 
   fn complex_script_override(&self) -> Option<bool> {
     complex_script_override(self.complex_script, self.right_to_left)
+  }
+
+  fn complex_script_property(&self) -> Option<bool> {
+    self.complex_script
   }
 
   fn right_to_left(&self) -> bool {
@@ -1132,6 +1174,9 @@ impl FontStyleRef for common::TextStyle<'_> {
 
   fn wordprocessingml_font_hint(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontTypeHint> {
     self.wordprocessingml_font_hint
+  }
+  fn wordprocessingml_resolved_font_slot(&self) -> Option<WordprocessingFontSlot> {
+    self.wordprocessingml_resolved_font_slot
   }
 
   fn wordprocessingml_east_asia_language_is_chinese(&self) -> bool {
@@ -1669,13 +1714,109 @@ impl FontResolver {
     }
 
     let mut combined: Option<ooxmlsdk_fonts::VerticalMetrics> = None;
-    for run in script_runs {
-      let metrics_slot =
-        wordprocessing_line_metrics_font_slot(style, run.wordprocessingml_font_slot);
-      let metrics = self
-        .font_metrics_for_slot(style, Some(run.script), metrics_slot)?
-        .vertical;
+    self.for_each_script_vertical_metric(text, style, &script_runs, |metrics| {
       include_vertical_metrics(&mut combined, metrics);
+    })?;
+    combined
+  }
+
+  fn for_each_script_vertical_metric(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    script_runs: &[FontScriptRun],
+    mut include: impl FnMut(ooxmlsdk_fonts::VerticalMetrics),
+  ) -> Option<()> {
+    if !script_runs.iter().any(|run| {
+      wordprocessingml_east_asia_font_mapping(
+        style,
+        wordprocessing_line_metrics_font_slot(style, run.wordprocessingml_font_slot),
+      )
+    }) {
+      for run in script_runs {
+        let segment = &text[run.text_range.clone()];
+        if style.wordprocessingml_font_slots()
+          && !segment.is_empty()
+          && segment.chars().all(wordprocessingml_join_control)
+        {
+          continue;
+        }
+        include(
+          self
+            .font_metrics_for_slot(
+              style,
+              Some(run.script),
+              wordprocessing_line_metrics_font_slot(style, run.wordprocessingml_font_slot),
+            )?
+            .vertical,
+        );
+      }
+      return Some(());
+    }
+
+    // The EA mapper and subsequent glyph link can select different physical
+    // faces for one declared font. Word's line and paint baselines use those
+    // realized faces, not the unsupported request. Shape the complete source
+    // once so neutral characters keep the same script context as the painter.
+    let shaped_runs = self.shape_text_runs(text, style)?;
+    for shaped in shaped_runs {
+      if !shaped.text.is_empty() && shaped.text.chars().all(wordprocessingml_join_control) {
+        // A zero-width joining control can link to a different font, but its
+        // invisible glyph does not add that face's box to the Word line.
+        // Native 14/56pt ZWJ/ZWNJ controls retain the adjacent 14pt text box
+        // for Latin, Arabic-substitute and physical CJK font requests alike.
+        // Keep the control in shaping and PDF source text.
+        continue;
+      }
+      let index = script_runs.partition_point(|run| run.text_range.end <= shaped.text_range.start);
+      let run = script_runs.get(index)?;
+      let slot = wordprocessing_line_metrics_font_slot(style, run.wordprocessingml_font_slot);
+      let vertical = if wordprocessingml_east_asia_font_mapping(style, slot) {
+        let registry = self.style_font_registry_for_slot(style, Some(run.script), slot);
+        registry
+          .face(&shaped.font_id)?
+          .metrics
+          // Automatic escapement and small caps keep the authored line size;
+          // their reduced display glyphs must not shrink the surrounding box.
+          .scaled(effective_font_size_pt(style, Some(run.script)))
+          .vertical
+      } else {
+        self
+          .font_metrics_for_slot(style, Some(run.script), slot)?
+          .vertical
+      };
+      include(vertical);
+    }
+    Some(())
+  }
+
+  pub(crate) fn realized_cjk_vertical_metrics(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
+    let runs = self.shape_text_runs(text, style)?;
+    let mut combined = None;
+    for run in runs {
+      if !matches!(
+        run.script,
+        Some(TextScript::Han | TextScript::Hiragana | TextScript::Katakana | TextScript::Hangul)
+      ) || run.text.chars().all(char::is_whitespace)
+      {
+        continue;
+      }
+      let slot = style
+        .wordprocessingml_font_slots()
+        .then_some(WordprocessingFontSlot::EastAsia);
+      let registry = self.style_font_registry_for_slot(style, run.script, slot);
+      // A requested EA face may lack Hangul, for example SimSun. Use the
+      // face that actually shaped the glyphs, including registered fallback,
+      // rather than measuring the unsupported request or a Latin separator.
+      let metrics = registry
+        .face(&run.font_id)?
+        .metrics
+        .scaled(run.font_size_pt.0);
+      include_vertical_metrics(&mut combined, metrics.vertical);
     }
     combined
   }
@@ -1685,22 +1826,16 @@ impl FontResolver {
     text: &str,
     style: &(impl FontStyleRef + ?Sized),
   ) -> Option<Vec<ooxmlsdk_fonts::VerticalMetrics>> {
-    if !style.wordprocessingml_font_slots() || !style.wordprocessingml_cjk_line_metrics() {
+    if !style.wordprocessingml_font_slots() {
       return None;
     }
-    let mut metrics = Vec::new();
-    for run in script_direction_runs_with_options(
+    let runs = script_direction_runs_with_options(
       text,
       FontSize(style.font_size_pt()),
       script_scan_options(style, style.small_caps()),
-    ) {
-      let slot = wordprocessing_line_metrics_font_slot(style, run.wordprocessingml_font_slot);
-      metrics.push(
-        self
-          .font_metrics_for_slot(style, Some(run.script), slot)?
-          .vertical,
-      );
-    }
+    );
+    let mut metrics = Vec::new();
+    self.for_each_script_vertical_metric(text, style, &runs, |vertical| metrics.push(vertical))?;
     (!metrics.is_empty()).then_some(metrics)
   }
 
@@ -1771,6 +1906,12 @@ impl FontResolver {
     }
     let mut request = font_request_for_slot(style, script, wordprocessingml_font_slot);
     let registry = self.style_font_registry_for_slot(style, script, wordprocessingml_font_slot);
+    apply_wordprocessingml_east_asia_font_mapping(
+      &mut request,
+      &registry,
+      style,
+      wordprocessingml_font_slot,
+    );
     apply_wordprocessingml_rtl_italic_face(&mut request, &registry, style);
     let resolved = registry.resolve(&request).ok()?;
     let metrics_at_size = resolved.metrics_at_size(FontSize(effective_font_size_pt(style, script)));
@@ -1870,6 +2011,7 @@ impl FontResolver {
       let key = FontFaceKey::from_style_for_slot(style, Some(script_run.script), slot);
       let registry = self.style_font_registry_for_slot(style, Some(script_run.script), slot);
       let mut request = font_request_for_slot(style, Some(script_run.script), slot);
+      apply_wordprocessingml_east_asia_font_mapping(&mut request, &registry, style, slot);
       apply_wordprocessingml_rtl_italic_face(&mut request, &registry, style);
       request
         .features
@@ -2236,6 +2378,11 @@ fn font_request_for_slot<'a>(
     family: script_font_family_for_slot(style, script, wordprocessingml_font_slot)
       .filter(|family| !family.trim().is_empty())
       .map(Cow::Borrowed),
+    family_selection: if style.wordprocessingml_font_slots() {
+      FontFamilySelection::First
+    } else {
+      FontFamilySelection::List
+    },
     bold: effective_bold(style, script),
     italic: effective_italic(style, script),
     size_pt: FontSize(effective_font_size_pt(style, script)),
@@ -2267,17 +2414,26 @@ fn script_font_family_for_slot(
       style.font_family()
     };
   }
+  let east_asia_family = || {
+    if matches!(script, Some(TextScript::Hiragana | TextScript::Katakana)) {
+      style
+        .drawingml_japanese_font_family()
+        .or_else(|| style.east_asia_font_family())
+    } else {
+      style.east_asia_font_family()
+    }
+  };
   if let Some(slot) = wordprocessingml_font_slot {
     return match slot {
       WordprocessingFontSlot::Ascii => style.font_family(),
       WordprocessingFontSlot::HighAnsi => style.high_ansi_font_family(),
-      WordprocessingFontSlot::EastAsia => style.east_asia_font_family(),
+      WordprocessingFontSlot::EastAsia => east_asia_family(),
       WordprocessingFontSlot::ComplexScript => style.complex_font_family(),
     };
   }
   match script {
     Some(TextScript::Han | TextScript::Hiragana | TextScript::Katakana | TextScript::Hangul) => {
-      style.east_asia_font_family()
+      east_asia_family()
     }
     Some(TextScript::Arabic | TextScript::Hebrew | TextScript::Devanagari | TextScript::Thai) => {
       style.complex_font_family()
@@ -2483,6 +2639,54 @@ fn wordprocessingml_missing_family_fallback_for_slot(
   latin_slot.then_some("Cambria")
 }
 
+fn wordprocessingml_east_asia_font_mapping(
+  style: &(impl FontStyleRef + ?Sized),
+  slot: Option<WordprocessingFontSlot>,
+) -> bool {
+  style.wordprocessingml_font_slots()
+    && style.wordprocessingml_font_hint()
+      == Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia)
+    && slot == Some(WordprocessingFontSlot::EastAsia)
+}
+
+pub(crate) fn wordprocessingml_join_control(ch: char) -> bool {
+  // Unicode Core Specification, chapter 23: these format characters affect
+  // adjacent joining/ligatures rather than supplying a visible glyph.
+  matches!(ch, '\u{200c}' | '\u{200d}')
+}
+
+fn apply_wordprocessingml_east_asia_font_mapping(
+  request: &mut FontRequest<'_>,
+  registry: &FontRegistry<'static>,
+  style: &(impl FontStyleRef + ?Sized),
+  slot: Option<WordprocessingFontSlot>,
+) {
+  if !wordprocessingml_east_asia_font_mapping(style, slot) {
+    return;
+  }
+  let Ok(primary) = registry.resolve(request) else {
+    return;
+  };
+  if primary.metrics.vertical.wordprocessingml_cjk_line_metrics {
+    return;
+  }
+  // MS-OI29500 17.3.2.26 assigns hinted symbols/Greek/Cyrillic to the EA
+  // slot independently of Unicode script. Isolated Word font/repertoire
+  // controls map Latin-only EA faces to SimSun, even when the authored face
+  // covers the symbol. A physical CJK face (for example Meiryo) stays selected;
+  // missing SimSun glyphs then follow the ordinary glyph-link policy.
+  let mut east_asia = request.clone();
+  east_asia.family = Some(Cow::Borrowed("SimSun"));
+  if registry.resolve(&east_asia).is_ok_and(|resolved| {
+    resolved.resolved_family.eq_ignore_ascii_case("SimSun")
+      && resolved.metrics.vertical.wordprocessingml_cjk_line_metrics
+  }) {
+    // Change the primary request only. A family-wide alias would also redirect
+    // a later Segoe UI Symbol glyph link back to SimSun and lose its coverage.
+    request.family = east_asia.family;
+  }
+}
+
 fn build_style_font_registry_for_slot(
   style: &(impl FontStyleRef + ?Sized),
   script: Option<TextScript>,
@@ -2524,6 +2728,20 @@ fn build_style_font_registry_for_slot(
             .family_aliases
             .retain(|alias| !alias.from.as_ref().eq_ignore_ascii_case(requested_family));
         }
+      }
+      if requested_family.eq_ignore_ascii_case("Eurostile")
+        && wordprocessingml_missing_family_fallback_for_slot(
+          style,
+          script,
+          wordprocessingml_font_slot,
+        )
+        .is_some()
+      {
+        // Word's named missing-face mapping precedes a generic family class.
+        // Native body/WPS/WPG controls recover Eurostile as Agency FB; saving
+        // the document materializes that altName. Authored alternate names
+        // above still win, and an installed Eurostile remains the primary.
+        families.push(Cow::Borrowed("Agency FB"));
       }
       let family_class_fallback = match request.family_class {
         Some(FontFamilyClass::Serif | FontFamilyClass::OldStyle | FontFamilyClass::Schoolbook) => {
@@ -2595,6 +2813,17 @@ fn build_style_font_registry_for_slot(
         .register_system_query_fonts(&fallback_request)
         .unwrap_or_default();
     }
+    if wordprocessingml_east_asia_font_mapping(style, wordprocessingml_font_slot)
+      && registry
+        .resolve(&request)
+        .is_ok_and(|primary| !primary.metrics.vertical.wordprocessingml_cjk_line_metrics)
+    {
+      let mut east_asia = request.clone();
+      east_asia.family = Some(Cow::Borrowed("SimSun"));
+      registry
+        .register_system_query_fonts(&east_asia)
+        .unwrap_or_default();
+    }
     if wordprocessingml_synthetic_rtl_italic(style)
       && let Ok(primary) = registry.resolve(&request)
       && registry
@@ -2630,6 +2859,7 @@ fn font_face_data_from_registry_binary(
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct FontFaceKey {
   family: Option<String>,
+  wordprocessingml_font_slots: bool,
   fallback_family: Option<String>,
   family_class: Option<FontFamilyClass>,
   charset: Option<FontCharset>,
@@ -2640,6 +2870,7 @@ struct FontFaceKey {
   script: Option<TextScript>,
   wordprocessingml_missing_family_fallback: Option<&'static str>,
   wordprocessing_nominal_control_metrics: bool,
+  wordprocessingml_east_asia_font_mapping: bool,
 }
 
 impl FontFaceKey {
@@ -2655,6 +2886,7 @@ impl FontFaceKey {
     Self {
       family: script_font_family_for_slot(style, script, wordprocessingml_font_slot)
         .map(str::to_string),
+      wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
       fallback_family: script_fallback_font_family_for_slot(
         style,
         script,
@@ -2668,6 +2900,10 @@ impl FontFaceKey {
       italic: effective_italic(style, script),
       synthetic_rtl_italic: wordprocessingml_synthetic_rtl_italic(style),
       wordprocessing_nominal_control_metrics: style.wordprocessing_nominal_control_metrics(),
+      wordprocessingml_east_asia_font_mapping: wordprocessingml_east_asia_font_mapping(
+        style,
+        wordprocessingml_font_slot,
+      ),
       script,
       wordprocessingml_missing_family_fallback: wordprocessingml_missing_family_fallback_for_slot(
         style,
@@ -2692,6 +2928,7 @@ impl FontFaceKey {
     wordprocessingml_font_slot: Option<WordprocessingFontSlot>,
   ) -> bool {
     self.family.as_deref() == script_font_family_for_slot(style, script, wordprocessingml_font_slot)
+      && self.wordprocessingml_font_slots == style.wordprocessingml_font_slots()
       && self.fallback_family.as_deref()
         == script_fallback_font_family_for_slot(style, script, wordprocessingml_font_slot)
       && self.family_class
@@ -2703,6 +2940,8 @@ impl FontFaceKey {
       && self.synthetic_rtl_italic == wordprocessingml_synthetic_rtl_italic(style)
       && self.wordprocessing_nominal_control_metrics
         == style.wordprocessing_nominal_control_metrics()
+      && self.wordprocessingml_east_asia_font_mapping
+        == wordprocessingml_east_asia_font_mapping(style, wordprocessingml_font_slot)
       && self.script == script
       && self.wordprocessingml_missing_family_fallback
         == wordprocessingml_missing_family_fallback_for_slot(
@@ -2868,6 +3107,7 @@ fn word_font_side_leading(
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct FontMetricsKey {
   family: Option<String>,
+  wordprocessingml_font_slots: bool,
   fallback_family: Option<String>,
   family_class: Option<FontFamilyClass>,
   charset: Option<FontCharset>,
@@ -2878,6 +3118,7 @@ struct FontMetricsKey {
   script: Option<TextScript>,
   size_pt_bits: u32,
   wordprocessingml_missing_family_fallback: Option<&'static str>,
+  wordprocessingml_east_asia_font_mapping: bool,
 }
 
 impl FontMetricsKey {
@@ -2889,6 +3130,7 @@ impl FontMetricsKey {
     Self {
       family: script_font_family_for_slot(style, script, wordprocessingml_font_slot)
         .map(str::to_string),
+      wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
       fallback_family: script_fallback_font_family_for_slot(
         style,
         script,
@@ -2903,6 +3145,10 @@ impl FontMetricsKey {
       script,
       synthetic_rtl_italic: wordprocessingml_synthetic_rtl_italic(style),
       size_pt_bits: effective_font_size_pt(style, script).to_bits(),
+      wordprocessingml_east_asia_font_mapping: wordprocessingml_east_asia_font_mapping(
+        style,
+        wordprocessingml_font_slot,
+      ),
       wordprocessingml_missing_family_fallback: wordprocessingml_missing_family_fallback_for_slot(
         style,
         script,
@@ -2918,6 +3164,7 @@ impl FontMetricsKey {
     wordprocessingml_font_slot: Option<WordprocessingFontSlot>,
   ) -> bool {
     self.family.as_deref() == script_font_family_for_slot(style, script, wordprocessingml_font_slot)
+      && self.wordprocessingml_font_slots == style.wordprocessingml_font_slots()
       && self.fallback_family.as_deref()
         == script_fallback_font_family_for_slot(style, script, wordprocessingml_font_slot)
       && self.family_class
@@ -2929,6 +3176,8 @@ impl FontMetricsKey {
       && self.script == script
       && self.synthetic_rtl_italic == wordprocessingml_synthetic_rtl_italic(style)
       && self.size_pt_bits == effective_font_size_pt(style, script).to_bits()
+      && self.wordprocessingml_east_asia_font_mapping
+        == wordprocessingml_east_asia_font_mapping(style, wordprocessingml_font_slot)
       && self.wordprocessingml_missing_family_fallback
         == wordprocessingml_missing_family_fallback_for_slot(
           style,
@@ -2964,6 +3213,42 @@ mod tests {
     shape_text_runs, wordprocessing_line_metrics_font_slot,
     wordprocessingml_missing_family_fallback_for_slot,
   };
+
+  #[test]
+  fn word_primary_family_selection_has_distinct_face_and_metrics_caches() {
+    let common = TextStyle {
+      font_family: Some(Arc::from("Missing;Arial")),
+      high_ansi_font_family: Some(Arc::from("Missing;Arial")),
+      east_asia_font_family: Some(Arc::from("Missing;Arial")),
+      complex_font_family: Some(Arc::from("Missing;Arial")),
+      ..TextStyle::default()
+    };
+    let word = TextStyle {
+      wordprocessingml_font_slots: true,
+      ..common.clone()
+    };
+    // Scriptless/EA requests do not necessarily have Word's Latin missing-
+    // face fallback; they must still keep this interpretation in the key.
+    for script in [None, Some(TextScript::Latin), Some(TextScript::Han)] {
+      assert_eq!(
+        font_request(&common, script).family_selection,
+        ooxmlsdk_fonts::FontFamilySelection::List
+      );
+      assert_eq!(
+        font_request(&word, script).family_selection,
+        ooxmlsdk_fonts::FontFamilySelection::First
+      );
+      let face = super::FontFaceKey::from_style(&common, script);
+      assert_ne!(face, super::FontFaceKey::from_style(&word, script));
+      assert!(!face.matches_style(&word, script));
+      let metrics = super::FontMetricsKey::from_style_for_slot(&common, script, None);
+      assert_ne!(
+        metrics,
+        super::FontMetricsKey::from_style_for_slot(&word, script, None)
+      );
+      assert!(!metrics.matches_style_for_slot(&word, script, None));
+    }
+  }
 
   fn synthetic_space_run(text: &'static str, script: TextScript) -> ShapedRun<'static, 'static> {
     let glyphs = text
@@ -3071,8 +3356,7 @@ mod tests {
   }
 
   #[test]
-  fn wordprocessing_rtl_digits_keep_ascii_family_and_complex_run_properties() {
-    let text = "1A";
+  fn wordprocessing_rtl_numeric_portions_keep_complex_run_properties() {
     let style = TextStyle {
       font_family: Some(Arc::from("Latin Face")),
       complex_font_family: Some(Arc::from("Complex Face")),
@@ -3083,41 +3367,44 @@ mod tests {
       ..Default::default()
     };
 
-    let runs = script_direction_runs_with_options(
-      text,
-      FontSize(style.font_size_pt),
-      script_scan_options(&style, false),
-    );
-    assert_eq!(runs.len(), 2);
-    assert_eq!(&text[runs[0].text_range.clone()], "1");
-    assert_eq!(
-      runs[0].wordprocessingml_font_slot,
-      Some(WordprocessingFontSlot::Ascii)
-    );
-    let digit = font_request_for_slot(
-      &style,
-      Some(runs[0].script),
-      runs[0].wordprocessingml_font_slot,
-    );
-    assert_eq!(digit.family.as_deref(), Some("Latin Face"));
-    assert_eq!(digit.size_pt.0, 20.0);
-    assert_eq!(
-      wordprocessing_line_metrics_font_slot(&style, runs[0].wordprocessingml_font_slot),
-      Some(WordprocessingFontSlot::ComplexScript)
-    );
-
-    assert_eq!(&text[runs[1].text_range.clone()], "A");
-    assert_eq!(
-      runs[1].wordprocessingml_font_slot,
-      Some(WordprocessingFontSlot::ComplexScript)
-    );
-    let letter = font_request_for_slot(
-      &style,
-      Some(runs[1].script),
-      runs[1].wordprocessingml_font_slot,
-    );
-    assert_eq!(letter.family.as_deref(), Some("Complex Face"));
-    assert_eq!(letter.size_pt.0, 20.0);
+    // Native Word uses one face for each of these entire portions. Reversing
+    // the number/letter order changes the painted face, but never szCs or
+    // the complex-script face that contributes the line metrics.
+    for (text, explicit_cs, slot, family) in [
+      ("1A", None, WordprocessingFontSlot::Ascii, "Latin Face"),
+      (
+        "A1",
+        None,
+        WordprocessingFontSlot::ComplexScript,
+        "Complex Face",
+      ),
+      (
+        "1A",
+        Some(true),
+        WordprocessingFontSlot::ComplexScript,
+        "Complex Face",
+      ),
+    ] {
+      let style = TextStyle {
+        complex_script: explicit_cs,
+        ..style.clone()
+      };
+      let runs = script_direction_runs_with_options(
+        text,
+        FontSize(style.font_size_pt),
+        script_scan_options(&style, false),
+      );
+      assert_eq!(runs.len(), 1);
+      assert_eq!(&text[runs[0].text_range.clone()], text);
+      assert_eq!(runs[0].wordprocessingml_font_slot, Some(slot));
+      let request = font_request_for_slot(&style, Some(runs[0].script), Some(slot));
+      assert_eq!(request.family.as_deref(), Some(family));
+      assert_eq!(request.size_pt.0, 20.0);
+      assert_eq!(
+        wordprocessing_line_metrics_font_slot(&style, Some(slot)),
+        Some(WordprocessingFontSlot::ComplexScript)
+      );
+    }
 
     let ordinary = TextStyle {
       wordprocessingml_font_slots: true,
@@ -3222,6 +3509,246 @@ mod tests {
     assert_eq!(
       font_request(&style, Some(TextScript::Han)).family_class,
       None
+    );
+  }
+
+  #[test]
+  fn drawingml_chart_theme_keeps_han_kana_and_latin_faces_independent() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Calibri")),
+      east_asia_font_family: Some(Arc::from("SimSun")),
+      drawingml_japanese_font_family: Some(Arc::from("MS Mincho")),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    for slot in [None, Some(WordprocessingFontSlot::EastAsia)] {
+      for (script, family) in [
+        (TextScript::Han, "SimSun"),
+        (TextScript::Hiragana, "MS Mincho"),
+        (TextScript::Katakana, "MS Mincho"),
+      ] {
+        let request = font_request_for_slot(&style, Some(script), slot);
+        assert_eq!(request.family.as_deref(), Some(family));
+      }
+    }
+    let latin = font_request_for_slot(
+      &style,
+      Some(TextScript::Katakana),
+      Some(WordprocessingFontSlot::Ascii),
+    );
+    assert_eq!(latin.family.as_deref(), Some("Calibri"));
+    let painted = crate::model::common_text_style(style.clone());
+    assert_eq!(
+      font_request(&painted, Some(TextScript::Katakana))
+        .family
+        .as_deref(),
+      Some("MS Mincho"),
+    );
+    let explicit = TextStyle {
+      drawingml_japanese_font_family: None,
+      ..style
+    };
+    assert_eq!(
+      font_request(&explicit, Some(TextScript::Katakana))
+        .family
+        .as_deref(),
+      Some("SimSun"),
+    );
+  }
+
+  #[test]
+  fn wordprocessingml_hinted_east_asia_maps_latin_faces_before_glyph_fallback() {
+    use super::FontResolver;
+    use ooxmlsdk_fonts::WordprocessingFontTypeHint;
+
+    let mut resolver = FontResolver::default();
+    for family in [
+      "DejaVu Sans",
+      "DejaVu Serif",
+      "Arial",
+      "Segoe UI Symbol",
+      "Cambria Math",
+    ] {
+      let style = TextStyle {
+        font_family: Some(Arc::from(family)),
+        high_ansi_font_family: Some(Arc::from(family)),
+        east_asia_font_family: Some(Arc::from(family)),
+        wordprocessingml_font_slots: true,
+        wordprocessingml_font_hint: Some(WordprocessingFontTypeHint::EastAsia),
+        ..Default::default()
+      };
+      // Native ordinary-run repertoire controls: mapping precedes coverage,
+      // so even a covered star moves to the CJK face. The unsupported ballot
+      // boxes link from that face to Segoe UI Symbol, independently of SDTs.
+      for (text, expected) in [("★□→√ΩА€§¤", "SimSun"), ("☒☐", "SegoeUISymbol")] {
+        let runs = resolver.shape_text_runs(text, &style).unwrap();
+        assert!(
+          runs.iter().all(|run| run.font_id.0.contains(expected)),
+          "{family} {text}: {runs:?}"
+        );
+      }
+      let latin = resolver.shape_text_runs("Aé", &style).unwrap();
+      let ordinary = TextStyle {
+        wordprocessingml_font_hint: None,
+        ..style
+      };
+      assert_eq!(latin, resolver.shape_text_runs("Aé", &ordinary).unwrap());
+    }
+  }
+
+  #[test]
+  fn wordprocessingml_hinted_east_asia_preserves_physical_cjk_faces_and_other_consumers() {
+    use super::FontResolver;
+    use ooxmlsdk_fonts::WordprocessingFontTypeHint;
+
+    let mut resolver = FontResolver::default();
+    let style = TextStyle {
+      font_family: Some(Arc::from("DejaVu Sans")),
+      high_ansi_font_family: Some(Arc::from("DejaVu Sans")),
+      east_asia_font_family: Some(Arc::from("DejaVu Sans")),
+      wordprocessingml_font_slots: true,
+      wordprocessingml_font_hint: Some(WordprocessingFontTypeHint::EastAsia),
+      ..Default::default()
+    };
+    let ordinary = TextStyle {
+      wordprocessingml_font_hint: None,
+      ..style.clone()
+    };
+    let covered = resolver.shape_text_runs("☒", &ordinary).unwrap();
+    assert!(covered[0].font_id.0.contains("DejaVuSans"));
+    assert_eq!(covered[0].glyphs[0].glyph_id, 3818);
+    let mapped = resolver.shape_text_runs("☒", &style).unwrap();
+    assert_eq!(mapped[0].glyphs[0].glyph_id, 1409);
+    // Reuse the same resolver in both directions to catch registry/selection
+    // cache contamination between hinted and ordinary Common-script text.
+    assert_eq!(covered, resolver.shape_text_runs("☒", &ordinary).unwrap());
+    let non_word = TextStyle {
+      wordprocessingml_font_slots: false,
+      ..style.clone()
+    };
+    assert_eq!(
+      resolver.shape_text_runs("☒", &non_word).unwrap()[0].font_id,
+      covered[0].font_id
+    );
+    let cjk = TextStyle {
+      font_family: Some(Arc::from("Meiryo")),
+      high_ansi_font_family: Some(Arc::from("Meiryo")),
+      east_asia_font_family: Some(Arc::from("Meiryo")),
+      ..style
+    };
+    let runs = resolver.shape_text_runs("☒★Ωé", &cjk).unwrap();
+    assert!(runs.iter().all(|run| run.font_id.0.contains("Meiryo")));
+    assert_eq!(runs[0].glyphs[0].glyph_id, 21398);
+  }
+
+  #[test]
+  fn wordprocessingml_hinted_east_asia_uses_realized_face_line_metrics() {
+    use super::FontResolver;
+    use ooxmlsdk_fonts::WordprocessingFontTypeHint;
+
+    let mut resolver = FontResolver::default();
+    let mut style = TextStyle {
+      font_family: Some(Arc::from("DejaVu Sans")),
+      high_ansi_font_family: Some(Arc::from("DejaVu Sans")),
+      east_asia_font_family: Some(Arc::from("DejaVu Sans")),
+      wordprocessingml_font_slots: true,
+      wordprocessingml_font_hint: Some(WordprocessingFontTypeHint::EastAsia),
+      ..Default::default()
+    };
+    for size in [8.0, 11.0, 14.0] {
+      style.font_size_pt = size;
+      let actual = resolver.text_vertical_metrics("☒", &style).unwrap();
+      // Native physical Segoe metrics are 2210/514/0 at UPEM2048. The
+      // declared SimSun mapper face is 220/36/36 at UPEM256 and must not
+      // determine this linked glyph's baseline or the following line.
+      assert!((actual.ascent_pt - size * 2210.0 / 2048.0).abs() < 0.0001);
+      assert!((actual.descent_pt - size * 514.0 / 2048.0).abs() < 0.0001);
+      assert_eq!(actual.line_gap_pt, 0.0);
+      assert_eq!(actual.directwrite_baseline_offset_pt, actual.ascent_pt);
+      assert!(!actual.wordprocessingml_cjk_line_metrics);
+      let cjk = resolver.text_vertical_metrics("★", &style).unwrap();
+      assert!((cjk.ascent_pt - size * 220.0 / 256.0).abs() < 0.0001);
+      assert!(cjk.wordprocessingml_cjk_line_metrics);
+    }
+    style.wordprocessingml_cjk_line_metrics = true;
+    let runs = resolver
+      .wordprocessingml_line_metric_runs("☒★", &style)
+      .unwrap();
+    assert_eq!(runs.len(), 2);
+    assert!(!runs[0].wordprocessingml_cjk_line_metrics);
+    assert!(runs[1].wordprocessingml_cjk_line_metrics);
+  }
+
+  #[test]
+  fn wordprocessingml_join_controls_do_not_add_linked_face_metrics() {
+    use super::FontResolver;
+    use ooxmlsdk_fonts::WordprocessingFontTypeHint;
+
+    let mut resolver = FontResolver::default();
+    let style = TextStyle {
+      font_family: Some(Arc::from("DejaVu Sans")),
+      high_ansi_font_family: Some(Arc::from("DejaVu Sans")),
+      east_asia_font_family: Some(Arc::from("DejaVu Sans")),
+      wordprocessingml_font_slots: true,
+      wordprocessingml_font_hint: Some(WordprocessingFontTypeHint::EastAsia),
+      ..Default::default()
+    };
+    let latin = resolver.text_vertical_metrics("AA", &style).unwrap();
+    for text in ["A\u{200c}A", "A\u{200d}A"] {
+      let shaped = resolver.shape_text_runs(text, &style).unwrap();
+      assert_eq!(shaped.iter().map(|run| run.text).collect::<String>(), text);
+      assert_eq!(resolver.text_vertical_metrics(text, &style), Some(latin));
+      assert!(
+        resolver
+          .wordprocessingml_line_metric_runs(
+            text,
+            &TextStyle {
+              wordprocessingml_cjk_line_metrics: true,
+              ..style.clone()
+            },
+          )
+          .unwrap()
+          .iter()
+          .all(|metrics| !metrics.wordprocessingml_cjk_line_metrics)
+      );
+    }
+    // The same link is a real line owner when it paints a visible ballot box.
+    let symbol = resolver.text_vertical_metrics("☒", &style).unwrap();
+    assert!(symbol.ascent_pt > latin.ascent_pt);
+  }
+
+  #[test]
+  fn wordprocessingml_hinted_east_asia_separates_primary_metric_caches() {
+    use super::FontResolver;
+    use ooxmlsdk_fonts::WordprocessingFontTypeHint;
+
+    let mut resolver = FontResolver::default();
+    let mut style = TextStyle {
+      font_family: Some(Arc::from("DejaVu Sans")),
+      east_asia_font_family: Some(Arc::from("DejaVu Sans")),
+      font_size_pt: 11.0,
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let slot = Some(WordprocessingFontSlot::EastAsia);
+    let original = resolver
+      .font_metrics_for_slot(&style, Some(TextScript::Common), slot)
+      .unwrap()
+      .vertical;
+    style.wordprocessingml_font_hint = Some(WordprocessingFontTypeHint::EastAsia);
+    let mapped = resolver
+      .font_metrics_for_slot(&style, Some(TextScript::Common), slot)
+      .unwrap()
+      .vertical;
+    assert!(!original.wordprocessingml_cjk_line_metrics);
+    assert!(mapped.wordprocessingml_cjk_line_metrics);
+    style.wordprocessingml_font_hint = None;
+    assert_eq!(
+      resolver
+        .font_metrics_for_slot(&style, Some(TextScript::Common), slot)
+        .unwrap()
+        .vertical,
+      original
     );
   }
 

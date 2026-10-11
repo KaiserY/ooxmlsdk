@@ -4,14 +4,17 @@
 //! identify a six-sided tube. Its initial axis is -Z, its hexagon has vertices
 //! at 30 + 60n degrees, and a shortest-arc rotation aligns it to the edge.
 //! A screen-space stroke loses both this angular footprint and cap occlusion.
+//! Linear gradient materials use the analytic source-sector box on every
+//! face. Native meshes retain the same UV at both extrusion depths, separate
+//! seven-bit white lighting from the texture, and project UV through clip W.
 
 use super::{
   Chart3DView, ImageItem, PlotRect, RadialChartStyle, RadialPerspectiveProjection, RadialSlice,
   RgbColor, chart_3d_scene_image, common_rect, office_perspective_chart_diffuse_color,
-  word_pie_3d_pen_width, word_pie_cut_face_color,
+  word_chart_lathe_maximum_step, word_pie_3d_pen_width,
 };
 use crate::common::drawingml_shape_raster::PageToRasterMapping;
-use crate::common::{Fill, ShapeStyleValue};
+use crate::common::{Fill, GradientFill, GradientStop, ShapeStyleValue};
 use image::{Rgba, RgbaImage};
 
 const HEX_APOTHEM: f64 = 0.866_025_403_784_438_6;
@@ -22,11 +25,53 @@ struct Vertex {
   point: [f64; 2],
   depth: f64,
   color: [f64; 3],
+  // u/W, v/W and 1/W; lighting remains a screen-linear vertex attribute.
+  texture: [f64; 3],
+}
+
+#[derive(Clone, Copy)]
+struct Triangle {
+  vertices: [Vertex; 3],
+  material: Option<usize>,
+}
+
+struct LinearMaterial {
+  stops: Vec<GradientStop<'static>>,
+  axis: [f64; 2],
+  offset: f64,
+}
+
+impl LinearMaterial {
+  fn new(gradient: &GradientFill<'static>, bounds: [f64; 4]) -> Self {
+    let size = [bounds[2] - bounds[0], bounds[3] - bounds[1]];
+    let angle = f64::from(gradient.angle_degrees.unwrap_or(0.0)).to_radians();
+    let (sine, cosine) = angle.sin_cos();
+    let mut direction = [cosine, sine];
+    if gradient.scaled {
+      direction = [cosine * size[0], sine * size[1]];
+    }
+    let length = direction[0].hypot(direction[1]);
+    direction = direction.map(|v| v / length.max(f64::EPSILON));
+    let span = direction[0].abs() * size[0] + direction[1].abs() * size[1];
+    let axis = [direction[0] * size[0] / span, direction[1] * size[1] / span];
+    Self {
+      stops: crate::common::drawingml_gradient::resolved_stops(gradient),
+      axis,
+      offset: 0.5 - (axis[0] + axis[1]) * 0.5,
+    }
+  }
+
+  fn color(&self, uv: [f64; 2]) -> [f64; 3] {
+    let position = (uv[0] * self.axis[0] + uv[1] * self.axis[1] + self.offset) as f32;
+    let c = crate::common::drawingml_gradient::sample(&self.stops, position);
+    [f64::from(c.r), f64::from(c.g), f64::from(c.b)]
+  }
 }
 
 #[derive(Default)]
 pub(super) struct Scene {
-  triangles: Vec<[Vertex; 3]>,
+  triangles: Vec<Triangle>,
+  materials: Vec<LinearMaterial>,
 }
 
 struct Projector {
@@ -59,6 +104,15 @@ impl Projector {
         denominator.recip()
       },
       color,
+      texture: [
+        0.0,
+        0.0,
+        if self.parallel {
+          1.0
+        } else {
+          denominator.recip()
+        },
+      ],
     }
   }
 }
@@ -70,8 +124,47 @@ fn rgb(color: RgbColor) -> [f64; 3] {
 fn diffuse(color: RgbColor, normal: [f32; 3]) -> [f64; 3] {
   // Recover the native seven-bit vertex attributes before interpolation,
   // matching the existing FixedGouraud7 scene gradient path.
-  rgb(office_perspective_chart_diffuse_color(color, normal))
-    .map(|c| (c * 128.0 / 255.0).round() * 255.0 / 128.0)
+  vertex_rgb(office_perspective_chart_diffuse_color(color, normal))
+}
+
+fn vertex_rgb(color: RgbColor) -> [f64; 3] {
+  rgb(color).map(|c| (c * 128.0 / 255.0).round() * 255.0 / 128.0)
+}
+
+fn pie_texture_bounds(start: f32, sweep: f32) -> [f64; 4] {
+  let (start, end) = (f64::from(start), f64::from(start + sweep));
+  let point = |angle: f64| [angle.sin(), -angle.cos()];
+  let mut bounds = [0.0_f64; 4];
+  let quadrant = std::f64::consts::FRAC_PI_2;
+  for angle in [start, end].into_iter().chain(
+    ((start / quadrant).ceil() as i32..=(end / quadrant).floor() as i32)
+      .map(|q| f64::from(q) * quadrant),
+  ) {
+    let p = point(angle);
+    bounds[0] = bounds[0].min(p[0]);
+    bounds[1] = bounds[1].min(p[1]);
+    bounds[2] = bounds[2].max(p[0]);
+    bounds[3] = bounds[3].max(p[1]);
+  }
+  bounds
+}
+
+fn pie_ring(start: f32, sweep: f32, segments: usize) -> Vec<(f32, Point3)> {
+  (0..=segments)
+    .map(|i| {
+      let angle = start + sweep * i as f32 / segments as f32;
+      (
+        angle,
+        [f64::from(angle.sin()), -f64::from(angle.cos()), 0.0],
+      )
+    })
+    .collect()
+}
+
+fn cut_light(color: RgbColor, angle: f32, elevation: f32, direction: f32) -> [f64; 3] {
+  let (s, c) = elevation.to_radians().sin_cos();
+  let normal = [direction * angle.cos(), direction * angle.sin()];
+  diffuse(color, [normal[0], s * normal[1], -c * normal[1]])
 }
 
 pub(super) fn lower(
@@ -81,20 +174,31 @@ pub(super) fn lower(
   view: Chart3DView,
   plot: PlotRect,
 ) -> Option<ImageItem> {
-  // Complex paints keep their existing realization until the mesh has the
-  // corresponding material support. Unoutlined scenes retain that path too.
+  // Retain the prior realization for materials the mesh cannot represent.
   let mut outlined = false;
+  let mut textured = false;
   for slice in slices {
     if style
       .point_image_effects
       .get(slice.index)
-      .is_some_and(Option::is_some)
+      .and_then(Option::as_ref)
+      .is_some_and(|effects| !effects.effects.is_empty())
     {
       return None;
     }
     if let Some(paint) = style.point_styles.get(slice.index) {
       match &paint.fill {
         ShapeStyleValue::Paint(Fill::Solid(c)) if c.a == 255 => {}
+        ShapeStyleValue::Paint(Fill::Gradient(gradient))
+          if gradient.path.is_none()
+            && gradient.line.is_none()
+            && gradient.definition_bounds.is_none()
+            && gradient.rotate_with_shape != Some(false)
+            && !gradient.stops.is_empty()
+            && gradient.stops.iter().all(|stop| stop.color.a == 255) =>
+        {
+          textured = true;
+        }
         ShapeStyleValue::Paint(Fill::None)
         | ShapeStyleValue::NoPaint
         | ShapeStyleValue::Unspecified => {}
@@ -113,7 +217,7 @@ pub(super) fn lower(
       }
     }
   }
-  if !outlined {
+  if !outlined && !textured {
     return None;
   }
   let thickness = f64::from(0.24 * (view.height_percent / 100.0).clamp(0.05, 5.0));
@@ -128,6 +232,15 @@ pub(super) fn lower(
       parallel: view.right_angle_axes,
     };
     let paint = style.point_styles.get(slice.index);
+    let bounds = pie_texture_bounds(slice.start_angle, slice.sweep);
+    let material = match paint.map(|p| &p.fill) {
+      Some(ShapeStyleValue::Paint(Fill::Gradient(gradient))) => {
+        let index = scene.materials.len();
+        scene.materials.push(LinearMaterial::new(gradient, bounds));
+        Some(index)
+      }
+      _ => None,
+    };
     let fill = match paint.map(|p| &p.fill) {
       Some(ShapeStyleValue::NoPaint | ShapeStyleValue::Paint(Fill::None)) => None,
       Some(ShapeStyleValue::Paint(Fill::Solid(color))) => Some(RgbColor {
@@ -135,18 +248,19 @@ pub(super) fn lower(
         g: color.g,
         b: color.b,
       }),
+      Some(ShapeStyleValue::Paint(Fill::Gradient(_))) => Some(RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      }),
       _ => Some(slice.color),
     };
-    let segments = ((slice.sweep.to_degrees().abs() / 2.0).ceil() as usize).max(2);
-    let ring: Vec<_> = (0..=segments)
-      .map(|i| {
-        let angle = slice.start_angle + slice.sweep * i as f32 / segments as f32;
-        (
-          angle,
-          [f64::from(angle.sin()), -f64::from(angle.cos()), 0.0],
-        )
-      })
-      .collect();
+    // GFX's source-radius-100 chord error also governs partial pie arcs.
+    // Independent native sweeps have 5/13/6/19/30 segments. Derive the
+    // partial count before rounding the full-circle count.
+    let segments = (slice.sweep.abs() / word_chart_lathe_maximum_step(1.0)).ceil() as usize;
+    let segments = segments.max(1);
+    let ring = pie_ring(slice.start_angle, slice.sweep, segments);
     let bottom = |mut p: Point3| {
       p[2] = -thickness;
       p
@@ -159,28 +273,63 @@ pub(super) fn lower(
         let [(a, first), (b, second)] = pair else {
           unreachable!()
         };
-        scene.triangle(&projector, [hub, *first, *second], [cap; 3]);
-        scene.triangle(
+        scene.face(
+          &projector,
+          [hub, *first, *second],
+          [cap; 3],
+          material,
+          bounds,
+        );
+        scene.face(
           &projector,
           [bottom(hub), bottom(*second), bottom(*first)],
           [base; 3],
+          material,
+          bounds,
         );
         let light = |angle: f32| diffuse(color, [angle.sin(), -s * angle.cos(), c * angle.cos()]);
         let (ca, cb) = (light(*a), light(*b));
-        scene.triangle(&projector, [*first, bottom(*first), *second], [ca, ca, cb]);
-        scene.triangle(
+        scene.face(
+          &projector,
+          [*first, bottom(*first), *second],
+          [ca, ca, cb],
+          material,
+          bounds,
+        );
+        scene.face(
           &projector,
           [*second, bottom(*first), bottom(*second)],
           [cb, ca, cb],
+          material,
+          bounds,
         );
       }
-      for &(angle, outer) in [ring[0], ring[segments]].iter() {
-        let color = rgb(word_pie_cut_face_color(color, angle, view.rotate_x_deg));
-        scene.triangle(&projector, [hub, outer, bottom(outer)], [color; 3]);
-        scene.triangle(&projector, [hub, bottom(outer), bottom(hub)], [color; 3]);
+      for (direction, (angle, outer)) in [(1.0, ring[0]), (-1.0, ring[segments])] {
+        // Native uploaded cut normals belong to the start/end plane, even
+        // when it is back-facing. An angle-sign shortcut only works after
+        // visibility rejection and reverses a cut at a complete-turn seam.
+        let color = cut_light(color, angle, view.rotate_x_deg, direction);
+        scene.face(
+          &projector,
+          [hub, outer, bottom(outer)],
+          [color; 3],
+          material,
+          bounds,
+        );
+        scene.face(
+          &projector,
+          [hub, bottom(outer), bottom(hub)],
+          [color; 3],
+          material,
+          bounds,
+        );
       }
     }
     if let Some(ShapeStyleValue::Paint(stroke)) = paint.map(|p| &p.stroke) {
+      // Preserve the independently verified wire tessellation. Material
+      // boundaries and six-sided pen tubes are separate native primitives.
+      let segments = ((slice.sweep.to_degrees().abs() / 2.0).ceil() as usize).max(2);
+      let ring = pie_ring(slice.start_angle, slice.sweep, segments);
       let radius =
         f64::from(word_pie_3d_pen_width(stroke.width.0, projection) / projection.radii.0)
           / (2.0 * HEX_APOTHEM);
@@ -242,9 +391,28 @@ fn tube_ring(direction: Point3, radius: f64) -> [Point3; 6] {
 
 impl Scene {
   fn triangle(&mut self, projector: &Projector, points: [Point3; 3], colors: [[f64; 3]; 3]) {
-    self.triangles.push(std::array::from_fn(|i| {
-      projector.vertex(points[i], colors[i])
-    }));
+    self.triangles.push(Triangle {
+      vertices: std::array::from_fn(|i| projector.vertex(points[i], colors[i])),
+      material: None,
+    });
+  }
+
+  fn face(
+    &mut self,
+    projector: &Projector,
+    points: [Point3; 3],
+    colors: [[f64; 3]; 3],
+    material: Option<usize>,
+    bounds: [f64; 4],
+  ) {
+    let vertices = std::array::from_fn(|i| {
+      let mut vertex = projector.vertex(points[i], colors[i]);
+      let q = vertex.texture[2];
+      vertex.texture[0] = (points[i][0] - bounds[0]) / (bounds[2] - bounds[0]) * q;
+      vertex.texture[1] = (points[i][1] - bounds[1]) / (bounds[3] - bounds[1]) * q;
+      vertex
+    });
+    self.triangles.push(Triangle { vertices, material });
   }
 
   fn tube(
@@ -286,13 +454,17 @@ impl Scene {
       .triangles
       .iter()
       .map(|triangle| {
-        triangle.map(|mut v| {
+        let vertices = triangle.vertices.map(|mut v| {
           v.point = [
             v.point[0] * f64::from(mapping.scale_x) + f64::from(mapping.translate_x),
             v.point[1] * f64::from(mapping.scale_y) + f64::from(mapping.translate_y),
           ];
           v
-        })
+        });
+        Triangle {
+          vertices,
+          material: triangle.material,
+        }
       })
       .collect();
     let mut depth = vec![f64::NEG_INFINITY; count];
@@ -302,12 +474,13 @@ impl Scene {
       depth.fill(f64::NEG_INFINITY);
       for triangle in &triangles {
         raster_triangle(
-          triangle,
+          &triangle.vertices,
           width,
           height,
           [f64::from(sx), f64::from(sy)],
           &mut depth,
           &mut colors,
+          triangle.material.map(|index| &self.materials[index]),
         );
       }
       for ((z, color), sum) in depth.iter().zip(&colors).zip(&mut sums) {
@@ -346,6 +519,7 @@ fn raster_triangle(
   sample: [f64; 2],
   depth: &mut [f64],
   colors: &mut [[u8; 3]],
+  material: Option<&LinearMaterial>,
 ) {
   let mut t = *triangle;
   let mut area = edge(t[0].point, t[1].point, t[2].point);
@@ -394,11 +568,11 @@ fn raster_triangle(
       depth[index] = z;
       // As in D3D MSAA and the vector scene, color is evaluated once at
       // pixel center; only visibility/coverage is evaluated at each sample.
-      let color = if flat {
+      let center = [x as f64 + 0.5, y as f64 + 0.5];
+      let weights = edges.map(|(a, b)| edge(a, b, center) / area);
+      let mut color = if flat {
         t[0].color
       } else {
-        let center = [x as f64 + 0.5, y as f64 + 0.5];
-        let weights = edges.map(|(a, b)| edge(a, b, center) / area);
         std::array::from_fn(|channel| {
           let value = (0..3)
             .map(|i| weights[i] * t[i].color[channel])
@@ -414,6 +588,12 @@ fn raster_triangle(
           value.clamp(low, high)
         })
       };
+      if let Some(material) = material {
+        let uvw: [f64; 3] =
+          std::array::from_fn(|channel| (0..3).map(|i| weights[i] * t[i].texture[channel]).sum());
+        let texture = material.color([uvw[0] / uvw[2], uvw[1] / uvw[2]]);
+        color = std::array::from_fn(|i| color[i] * texture[i] / 255.0);
+      }
       colors[index] = color.map(|v| v.round().clamp(0.0, 255.0) as u8);
     }
   }
@@ -422,6 +602,131 @@ fn raster_triangle(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn gradient_sector_geometry_matches_native_mesh_counts_and_source_uv() {
+    // Native GFX buffers for five independent sweeps, unchanged when
+    // switching the material angle or elevation. Radius is 100 model units.
+    for (sweep, expected) in [
+      (22.41398_f32, 5),
+      (66.45549, 13),
+      (26.34626, 6),
+      (92.60513, 19),
+      (152.17914, 30),
+    ] {
+      assert_eq!(
+        (sweep.to_radians() / word_chart_lathe_maximum_step(1.0)).ceil() as usize,
+        expected
+      );
+    }
+    // The sampled ring misses the analytic x extremum; the texture still
+    // uses that extremum, not the tessellated or projected shape's box.
+    let start = (360.0_f32 - 152.17914).to_radians();
+    let bounds = pie_texture_bounds(start, 152.17914_f32.to_radians());
+    let hub_u = -bounds[0] / (bounds[2] - bounds[0]);
+    let hub_v = -bounds[1] / (bounds[3] - bounds[1]);
+    assert!((bounds[0] + 1.0).abs() < 1.0e-6);
+    assert!((hub_u - 1.0).abs() < 1.0e-6);
+    assert!((hub_v - 0.5306698084).abs() < 1.0e-6);
+    let white = RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    };
+    let (sine, cosine) = 30.0_f32.to_radians().sin_cos();
+    assert_eq!(
+      diffuse(white, [0.0, -cosine, -sine]),
+      [255.0 * 126.0 / 128.0; 3]
+    );
+  }
+
+  #[test]
+  fn pie_cut_lighting_matches_native_start_and_end_attributes() {
+    let white = RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    };
+    // Native white material attributes, including the back-facing planes.
+    for (angle, direction, channel) in [
+      (0.0_f32, 1.0, 51),
+      (22.41398, -1.0, 94),
+      (22.41398, 1.0, 51),
+      (88.86947, -1.0, 51),
+      (88.86947, 1.0, 70),
+      (115.21573, -1.0, 51),
+      (115.21573, 1.0, 93),
+      (207.82086, -1.0, 51),
+      (207.82086, 1.0, 90),
+      (360.0, -1.0, 106),
+    ] {
+      assert_eq!(
+        cut_light(white, angle.to_radians(), 30.0, direction),
+        [255.0 * f64::from(channel) / 128.0; 3]
+      );
+    }
+  }
+
+  #[test]
+  fn gradient_texture_uses_clip_w_independently_of_vertex_lighting() {
+    let gradient = GradientFill {
+      stops: vec![
+        GradientStop {
+          position: 0.0,
+          color: crate::common::Color {
+            r: 255,
+            g: 255,
+            b: 255,
+            a: 255,
+          },
+          scheme: None,
+        },
+        GradientStop {
+          position: 1.0,
+          color: crate::common::Color {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 255,
+          },
+          scheme: None,
+        },
+      ],
+      angle_degrees: Some(0.0),
+      ..GradientFill::default()
+    };
+    let vertex = |point, texture| Vertex {
+      point,
+      texture,
+      color: [255.0; 3],
+      depth: 1.0,
+    };
+    let scene = Scene {
+      triangles: vec![Triangle {
+        vertices: [
+          vertex([0.0, 0.0], [0.0, 0.0, 1.0]),
+          vertex([2.0, 0.0], [0.5, 0.0, 0.5]),
+          vertex([0.0, 2.0], [0.0, 1.0, 1.0]),
+        ],
+        material: Some(0),
+      }],
+      materials: vec![LinearMaterial::new(&gradient, [0.0, 0.0, 1.0, 1.0])],
+    };
+    let image = scene
+      .rasterize(PageToRasterMapping {
+        width_px: 2,
+        height_px: 2,
+        scale_x: 1.0,
+        scale_y: 1.0,
+        translate_x: 0.0,
+        translate_y: 0.0,
+        text_hinting: None,
+      })
+      .unwrap();
+    // At pixel center u=(.25*.5)/(.5+.25*.5+.25)=1/7.
+    // An affine interpolation would instead produce gray 191.
+    assert_eq!(image.get_pixel(0, 0).0, [219, 219, 219, 255]);
+  }
 
   #[test]
   fn intersecting_surfaces_use_sample_depth_independently_of_submission_order() {
@@ -434,6 +739,7 @@ mod tests {
         } else {
           [0.0, 0.0, 255.0]
         },
+        texture: [0.0, 0.0, 1.0],
       };
       let corners = [
         vertex(0.0, 0.0),
@@ -456,7 +762,15 @@ mod tests {
       text_hinting: None,
     };
     let mut scene = Scene {
-      triangles: plane(true).into_iter().chain(plane(false)).collect(),
+      triangles: plane(true)
+        .into_iter()
+        .chain(plane(false))
+        .map(|vertices| Triangle {
+          vertices,
+          material: None,
+        })
+        .collect(),
+      materials: Vec::new(),
     };
     let forward = scene.rasterize(mapping).unwrap();
     scene.triangles.reverse();

@@ -10,6 +10,9 @@
 // with Excel's ordinary worksheet-cell output.
 pub use super::fixed_output_device::PageCoordinates;
 
+mod line_baseline;
+pub use line_baseline::realize as line_baseline;
+
 /// Convert one integral Word layout point to the source printer coordinate.
 /// Frame points and paragraph-local distances retain independent ownership.
 pub fn source_coordinate(pt: f32) -> i64 {

@@ -10036,9 +10036,29 @@ fn lower_drawing_chart(
       data_label: data_label_style,
       data_label_styles,
       data_label_rich_text_styles,
+      data_label_leader_line_styles: chart
+        .series
+        .iter()
+        .map(|series| {
+          series
+            .data_labels
+            .iter()
+            .map(|label| {
+              xlsx_chart_shape_style(
+                label.leader_line_shape_properties,
+                import,
+                resource,
+                common::ShapeStyle::default(),
+              )
+            })
+            .collect()
+        })
+        .collect(),
       gridline_color,
       value_gridline_width_pt,
       axis_line_width_pt,
+      category_axis_line_color: None,
+      value_axis_line_color: None,
       category_major_gridline,
       category_minor_gridline,
       value_minor_gridline: None,

@@ -1394,6 +1394,14 @@ pub(crate) fn fast_bytes_text_to_string(
   ty: &'static str,
   field: &'static str,
 ) -> Result<String, SdkError> {
+  // Normalize literal CR/CRLF before character references are resolved.
+  if memchr::memchr(b'\r', text.as_ref()).is_some() {
+    return text
+      .xml10_content()
+      .map(Cow::into_owned)
+      .map_err(|err| invalid_field_value(ty, field, err.to_string()));
+  }
+
   match String::from_utf8(text.into_inner().into_owned()) {
     Ok(value) => Ok(value),
     Err(err) => Err(invalid_field_value(ty, field, err.to_string())),

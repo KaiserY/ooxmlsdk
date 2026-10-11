@@ -2059,21 +2059,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           )?);
         }
         ContentModelDecl::SequenceAnyOnly => {
-          let any_field = type_decl.members.iter().find_map(|member| match member {
-            MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
-            _ => None,
-          });
-          let field_type: Type =
-            parse_str("std::boxed::Box<[u8]>").expect("std::boxed::Box<[u8]> type");
-          let field_attrs = module_version_cfg_attrs(
-            any_field.map(|field| field.version.as_str()).unwrap_or(""),
-            field_version_cfg,
-          );
-          fields.push(quote! {
-            #( #field_attrs )*
-            #[sdk(any)]
-            pub xml_children: Vec<#field_type>,
-          });
+          fields.push(gen_any_only_field(type_decl, field_version_cfg)?);
         }
         ContentModelDecl::SequenceDirectChildren => {
           fields.extend(gen_direct_child_fields_from_decl(
@@ -2400,21 +2386,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           )?);
         }
         ContentModelDecl::SequenceAnyOnly => {
-          let any_field = type_decl.members.iter().find_map(|member| match member {
-            MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
-            _ => None,
-          });
-          let field_type: Type =
-            parse_str("std::boxed::Box<[u8]>").expect("std::boxed::Box<[u8]> type");
-          let field_attrs = module_version_cfg_attrs(
-            any_field.map(|field| field.version.as_str()).unwrap_or(""),
-            field_version_cfg,
-          );
-          fields.push(quote! {
-            #( #field_attrs )*
-            #[sdk(any)]
-            pub xml_children: Vec<#field_type>,
-          });
+          fields.push(gen_any_only_field(type_decl, field_version_cfg)?);
         }
         ContentModelDecl::None => {
           if !choice_fields.is_empty() {
@@ -4934,6 +4906,29 @@ fn gen_direct_child_fields_from_decl_with_context(
   Ok(tokens)
 }
 
+fn gen_any_only_field(type_decl: &TypeDecl, field_cfg: VersionCfgContext) -> Result<TokenStream> {
+  let field = type_decl
+    .members
+    .iter()
+    .find_map(|member| match member {
+      MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
+      _ => None,
+    })
+    .ok_or_else(|| format!("type {} missing IR any field", type_decl.rust_name))?;
+  let attrs = module_version_cfg_attrs(&field.version, field_cfg);
+  let payload = quote! { std::boxed::Box<[u8]> };
+  let field_type = match field.cardinality {
+    Cardinality::One => payload,
+    Cardinality::Optional => quote! { Option<#payload> },
+    Cardinality::Many => quote! { Vec<#payload> },
+  };
+  Ok(quote! {
+    #( #attrs )*
+    #[sdk(any)]
+    pub xml_children: #field_type,
+  })
+}
+
 fn gen_flatten_one_sequence_fields_from_decl(
   fields: &[&FieldDecl],
   owner_rust_name: &str,
@@ -5624,6 +5619,63 @@ mod tests {
     assert!(generated.contains("pub c_sld_moniker :"));
     assert!(generated.contains("pub sld_moniker :"));
     assert!(generated.contains("pub unknown_xml : Vec < std :: boxed :: Box < [u8] > >"));
+  }
+
+  #[test]
+  fn any_only_fields_preserve_ir_cardinality() {
+    for (cardinality, expected) in [
+      (Cardinality::One, "std :: boxed :: Box < [u8] >"),
+      (
+        Cardinality::Optional,
+        "Option < std :: boxed :: Box < [u8] > >",
+      ),
+      (Cardinality::Many, "Vec < std :: boxed :: Box < [u8] > >"),
+    ] {
+      for element_kind in [ElementKind::Composite, ElementKind::Derived] {
+        let schema = SchemaModuleDecl {
+          module_name: "test_module".to_string(),
+          prefix: "t".to_string(),
+          target_namespace: "urn:test".to_string(),
+          types: vec![
+            TypeDecl {
+              rust_name: "Base".to_string(),
+              kind: TypeKind::ElementStruct,
+              element_kind: Some(ElementKind::Composite),
+              ..Default::default()
+            },
+            TypeDecl {
+              rust_name: "AnyHolder".to_string(),
+              xml_qname: Some("t:CT_Any/t:any".to_string()),
+              kind: TypeKind::ElementStruct,
+              element_kind: Some(element_kind),
+              base_rust_name: Some("Base".to_string()),
+              content_model: Some(ContentModelDecl::SequenceAnyOnly),
+              support: SystemSupportDecl {
+                have_xmlns_fields: true,
+                ..Default::default()
+              },
+              members: vec![MemberDecl::Field(FieldDecl {
+                rust_name: "unknown_xml".to_string(),
+                wire: FieldWireDecl::Any,
+                cardinality,
+                type_ref: TypeRefDecl {
+                  rust_type: "std::boxed::Box<[u8]>".to_string(),
+                  module_path: None,
+                },
+                ..Default::default()
+              })],
+              ..Default::default()
+            },
+          ],
+          ..Default::default()
+        };
+        let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+        assert!(
+          generated.contains(&format!("pub xml_children : {expected} ,")),
+          "{element_kind:?} {cardinality:?}: {generated}"
+        );
+      }
+    }
   }
 
   #[test]
@@ -8310,7 +8362,7 @@ mod tests {
   }
 
   #[test]
-  fn generates_sequence_any_only_without_source_composite_kind() {
+  fn generates_repeated_sequence_any_only_alias_without_source_composite_kind() {
     let schema = Schema {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -8323,6 +8375,7 @@ mod tests {
         children: vec![SchemaTypeChild {
           kind: SchemaTypeChildKind::Any,
           property_name: "UnknownXml".to_string(),
+          repeated: true,
           ..Default::default()
         }],
         ..Default::default()

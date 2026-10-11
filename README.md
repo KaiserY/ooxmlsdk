@@ -81,14 +81,14 @@ than skipped files.
 
 | Corpus | Files | Round-trip candidates | Open-only | Invalid | Result |
 | --- | ---: | ---: | ---: | ---: | --- |
-| Apache POI | 682 | 613 | 5 | 64 | 682 passed / 0 failed |
-| LibreOffice | 3388 | 3358 | 4 | 26 | 3388 passed / 0 failed |
+| Apache POI | 682 | 612 | 6 | 64 | 682 passed / 0 failed |
+| LibreOffice | 3388 | 3355 | 7 | 26 | 3388 passed / 0 failed |
 | Open-XML-SDK | 886 | 880 | 3 | 3 | 886 passed / 0 failed |
 | Pandoc | 235 | 235 | 0 | 0 | 235 passed / 0 failed |
 | ClosedXML | 286 | 284 | 0 | 2 | 286 passed / 0 failed |
-| **Total** | **5477** | **5370** | **12** | **95** | **5477 passed / 0 failed** |
+| **Total** | **5477** | **5366** | **16** | **95** | **5477 passed / 0 failed** |
 
-Last full run: 2026-08-16. Per-corpus commands, classifications, and run history
+Last full run: 2026-10-11. Per-corpus commands, classifications, and run history
 are maintained in the test-suite documentation.
 
 ## Status

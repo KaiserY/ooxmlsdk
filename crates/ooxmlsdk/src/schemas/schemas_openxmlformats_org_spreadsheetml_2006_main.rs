@@ -1572,7 +1572,7 @@ pub struct Extension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<[u8]>>,
+  pub xml_children: Option<std::boxed::Box<[u8]>>,
 }
 /// Calculation Chain Info.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2941,7 +2941,7 @@ pub struct Schema {
   #[sdk(attr(qname = ":Namespace"))]
   pub namespace: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<[u8]>>,
+  pub xml_children: Option<std::boxed::Box<[u8]>>,
 }
 /// XML Mapping Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2998,7 +2998,7 @@ pub struct DataBinding {
   #[sdk(attr(qname = ":DataBindingLoadMode"))]
   pub data_binding_load_mode: crate::simple_type::UInt32Value,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<[u8]>>,
+  pub xml_children: Option<std::boxed::Box<[u8]>>,
 }
 /// Connection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

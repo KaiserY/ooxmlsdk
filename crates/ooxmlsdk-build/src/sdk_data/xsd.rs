@@ -91,13 +91,18 @@ pub(crate) enum ParsedParticleNode {
     _min_occurs: u64,
     _max_occurs: u64,
   },
-  /// `xs:any` wildcard (its position within the particle matters).
-  Any,
+  /// `xs:any` wildcard, including its occurrence bounds.
+  Any {
+    min_occurs: u64,
+    max_occurs: u64,
+  },
 }
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ParsedChildElement {
   pub q_name: String,
+  /// Distinguishes `ref` from `name`, including unprefixed global references.
+  pub is_reference: bool,
   /// Namespace prefix of the element: the `ref` prefix, or empty for a
   /// name-based (own-namespace) child. Unlike `q_name`, this is not rewritten
   /// for OPC consumers.
@@ -271,7 +276,7 @@ fn collect_repeatable_group_choice_element_names(
       }
     }
     ParsedParticleNode::Element(_) => {}
-    ParsedParticleNode::Any => {}
+    ParsedParticleNode::Any { .. } => {}
     ParsedParticleNode::GroupRef {
       _reference,
       _max_occurs,
@@ -338,7 +343,7 @@ fn collect_group_element_names(
       let group_name = xsd_local_name(_reference);
       collect_choice_group_element_names(xsd, group_name, group_stack, names);
     }
-    ParsedParticleNode::Any => {}
+    ParsedParticleNode::Any { .. } => {}
   }
 }
 
@@ -385,7 +390,7 @@ fn collect_repeatable_choice_element_names(
       }
       group_stack.remove(group_name);
     }
-    ParsedParticleNode::Any => {}
+    ParsedParticleNode::Any { .. } => {}
   }
 }
 
@@ -768,6 +773,7 @@ fn parse_child_element(
 
   Ok(ParsedChildElement {
     q_name,
+    is_reference: reference.is_some(),
     element_prefix,
     r#type: optional_attr(reader, element, b"type")?.unwrap_or_default(),
     min_occurs: optional_attr(reader, element, b"minOccurs")?
@@ -825,10 +831,16 @@ fn parse_particle_node(
           children.push(parse_group_ref(reader, &e)?);
         }
         Event::Empty(e) if local_name(e.name().as_ref()) == b"any" => {
-          children.push(ParsedParticleNode::Any);
+          children.push(ParsedParticleNode::Any {
+            min_occurs: parse_min_occurs(reader, &e)?,
+            max_occurs: parse_max_occurs(reader, &e)?,
+          });
         }
         Event::Start(e) if local_name(e.name().as_ref()) == b"any" => {
-          children.push(ParsedParticleNode::Any);
+          children.push(ParsedParticleNode::Any {
+            min_occurs: parse_min_occurs(reader, &e)?,
+            max_occurs: parse_max_occurs(reader, &e)?,
+          });
           skip_element(reader, e.name().as_ref())?;
         }
         Event::End(e) if e.name().as_ref() == element.name().as_ref() => break,
@@ -887,7 +899,7 @@ fn collect_particle_elements(node: &ParsedParticleNode, children: &mut Vec<Parse
     }
     ParsedParticleNode::Element(element) => children.push((**element).clone()),
     ParsedParticleNode::GroupRef { .. } => {}
-    ParsedParticleNode::Any => {}
+    ParsedParticleNode::Any { .. } => {}
   }
 }
 

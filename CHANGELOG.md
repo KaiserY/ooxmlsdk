@@ -1,30 +1,36 @@
 # Change Log
 
-## Unreleased
+## 0.13.2
 
-### Added
+### Breaking Changes
 
-- Added a general XSD -> `data/schemas` producer (`ooxmlsdk-build`'s
-  `sdk_data::xsd_schema_gen`) that derives stage-1 schema metadata from an XSD.
-  It is not wired into `gen_sdk_data`. Acceptance tests reproduce the
-  `additionalCharacteristics` and `bibliography` namespaces on the XSD-derivable
-  projection, and so does `pml`. `bibliography` elements typed as `s:ST_String`
-  or `s:ST_Lang` are emitted as `b:ST_String255` through an explicit alias,
-  because that SDK name is not in the transitional XSD. `pml` is not aligned
-  with aliases: the comparison leaves out per-parent extension lists, Office
-  2010 attributes and elements, versioned occurs, and type names that exist
-  only in the checked-in JSON. `xsd:element/@ref` resolves to the referenced
-  element's type, so `a:graphic` is `a:CT_GraphicalObject`.
-- Added a regeneration oracle (`ooxmlsdk-build`'s `sdk_data::oracle`) that diffs a
-  generated schema against the checked-in `data/schemas` metadata on XSD-derivable
-  projections (`CompositeType`, `BaseClass`, class names, summaries, and enum
-  names are excluded).
-- Extended the XSD parser (`ooxmlsdk-build`'s `sdk_data::xsd`) to capture element
-  type references, annotations, `complexContent`/`simpleContent` derivations,
-  `abstract`, `xs:any`/`anyAttribute`, simple-type bases, and `xmlns` prefix
-  mappings. The additions are backward compatible. OPC `Relationship` keeps
-  `Id`, `Target`, `Type`, and `TargetMode`, and core-properties `Keyword` keeps
-  `xml:lang`, when those attributes are declared inside `simpleContent`.
+- Generated `xml_children` fields for single-occurrence wildcard content now
+  use `Box<[u8]>` for required content and `Option<Box<[u8]>>` for optional
+  content, instead of `Vec<Box<[u8]>>`. This affects ten fields across the PML,
+  DrawingML, chart, SpreadsheetML, Word extension, shared extension, and label
+  metadata schemas. Duplicate single-occurrence children follow the existing
+  last-value-wins parsing behavior; a missing required child reports
+  `MissingField`.
+
+### Fixed
+
+- Preserve tabs, line feeds, and carriage returns in XML attribute values
+  through character references, and preserve carriage returns in element text.
+  Fast text reads normalize literal CR and CRLF according to XML line-ending
+  rules while retaining carriage returns supplied by character references.
+- Preserve effective wildcard cardinality in IR construction and Rust field
+  generation. MCE `Choice` and `Fallback` explicitly retain their zero-or-more
+  wildcard metadata and continue preserving all child elements.
+- Improve package recovery for conflicting ZIP Unicode path metadata,
+  case-insensitive content-type and relationship lookup, and duplicate
+  relationship IDs, consistently retaining the first relationship with an ID.
+
+### Testing
+
+- Passed all 5,477 corpus expectations: 5,366 round-trip cases, 16 open-only
+  cases, and 95 invalid-package cases. Added a regression proving that dropping
+  duplicate single-occurrence wildcard children is detected against the
+  original XML, even when subsequent save/reopen cycles are stable.
 
 ## 0.13.1
 

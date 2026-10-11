@@ -267,7 +267,11 @@ fn attribute_signatures(schema_type: &OpenXmlSchemaType) -> Vec<String> {
 
 /// A compact, comparable rendering of a particle tree.
 fn particle_signature(particle: &OpenXmlSchemaTypeParticle) -> String {
-  if particle.kind.is_empty() && particle.items.is_empty() {
+  if particle.kind.is_empty()
+    && particle.name.is_empty()
+    && particle.items.is_empty()
+    && particle.occurs.is_empty()
+  {
     return String::new();
   }
 
@@ -385,6 +389,41 @@ mod tests {
   }
 
   #[test]
+  fn diff_reports_element_particle_name_occurs_and_sequence_order() {
+    let expected = OpenXmlSchema {
+      types: vec![OpenXmlSchemaType {
+        name: "t:CT_Root/t:root".into(),
+        particle: OpenXmlSchemaTypeParticle {
+          kind: "Sequence".into(),
+          items: ["t:CT_A/t:a", "t:CT_B/t:b"]
+            .into_iter()
+            .map(|name| OpenXmlSchemaTypeParticle {
+              name: name.into(),
+              ..Default::default()
+            })
+            .collect(),
+          ..Default::default()
+        },
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    for mutation in ["name", "occurs", "order"] {
+      let mut actual = expected.clone();
+      let items = &mut actual.types[0].particle.items;
+      match mutation {
+        "name" => items[0].name = "t:CT_B/t:b".into(),
+        "occurs" => items[0].occurs.push(Default::default()), // 0..unbounded
+        "order" => items.swap(0, 1),
+        _ => unreachable!(),
+      }
+      let diffs = diff_schemas(&expected, &actual);
+      assert_eq!(diffs.len(), 1, "undetected {mutation}: {diffs:?}");
+      assert_eq!(diffs[0].field, "particle");
+    }
+  }
+
+  #[test]
   fn ooxml_xsds_resolve_to_checked_in_schemas() {
     let root = workspace_root();
     let xsd_dir = root.join("schemas/OfficeOpenXML-XMLSchema-Transitional");
@@ -499,6 +538,8 @@ mod tests {
   /// are aligned to the generated name with the same element local name. The
   /// JSON-only type entries are then dropped. Their bodies are not renamed
   /// onto the XSD types.
+  /// The JSON omits the `CT_Extension` wildcard's `0..unbounded` bounds;
+  /// restore that specific XSD constraint in the expected projection.
   #[test]
   fn generator_reproduces_pml() {
     use crate::sdk_data::xsd_schema_gen::{NamespaceGenConfig, gen_open_xml_schema_from_xsd};
@@ -527,6 +568,20 @@ mod tests {
       .get(&actual.target_namespace)
       .expect("checked-in pml schema")
       .clone();
+
+    // pml.xsd declares CT_Extension's wildcard as 0..unbounded, whereas
+    // the SDK JSON omits Occurs. Use the explicit XSD bounds here, never
+    // the generated value, so a regression in wildcard generation still fails.
+    let extension = expected
+      .types
+      .iter_mut()
+      .find(|ty| ty.name == "p:CT_Extension/p:ext")
+      .expect("checked-in extension type");
+    assert_eq!(extension.particle.items.len(), 1);
+    let wildcard = &mut extension.particle.items[0];
+    assert_eq!(wildcard.kind, "Any");
+    assert!(wildcard.occurs.is_empty());
+    wildcard.occurs.push(Default::default());
 
     // Enum facet sets are checked against the XSD above. The JSON adds and
     // drops values, and it copies shared simple types into the `p` prefix.

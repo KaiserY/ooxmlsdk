@@ -174,7 +174,8 @@ fn any_particle() -> OpenXmlSchemaTypeParticle {
     items: vec![OpenXmlSchemaTypeParticle {
       kind: "Any".to_string(),
       name: String::new(),
-      occurs: vec![],
+      // Choice and Fallback contain zero or more elements (schemas/mce/mc.xsd).
+      occurs: vec![Default::default()],
       items: vec![],
       initial_version: "Office2007".to_string(),
       require_filter: false,
@@ -249,5 +250,12 @@ mod tests {
         .iter()
         .any(|attribute| attribute.q_name == "mc:ProcessContent")
     );
+    for ty in [choice, fallback] {
+      let wildcard = &ty.particle.items[0];
+      assert_eq!(wildcard.kind, "Any");
+      assert_eq!(wildcard.occurs.len(), 1);
+      assert_eq!(wildcard.occurs[0].min, None);
+      assert_eq!(wildcard.occurs[0].max, None);
+    }
   }
 }

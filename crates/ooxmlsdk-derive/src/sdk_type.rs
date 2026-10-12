@@ -5609,8 +5609,14 @@ fn expand_named_struct(
       .copied()
       .unwrap_or_default();
     let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
-    let (decl_tokens, init_tokens) =
-      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    let (decl_tokens, init_tokens) = if !field.repeated && !field.optional {
+      (
+        quote! { let mut #field_ident = None; },
+        quote! { #field_ident: #field_ident.unwrap_or_default() },
+      )
+    } else {
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional)
+    };
     any_decl_tokens.push(decl_tokens);
     any_init_tokens.push(init_tokens);
     any_parse_tokens_borrowed.push(build_any_child_parse_tokens(

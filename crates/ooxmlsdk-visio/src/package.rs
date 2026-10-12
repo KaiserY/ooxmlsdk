@@ -2,11 +2,15 @@ use ooxmlsdk::common::SdkError;
 use ooxmlsdk::parts::image_part::ImagePart;
 use ooxmlsdk::parts::visio_comments_part::VisioCommentsPart;
 use ooxmlsdk::parts::visio_document::VisioDocument as VisioPackage;
+use ooxmlsdk::parts::visio_master_part::VisioMasterPart;
+use ooxmlsdk::parts::visio_masters_part::VisioMastersPart;
 use ooxmlsdk::parts::visio_page_part::VisioPagePart;
 use ooxmlsdk::parts::visio_pages_part::VisioPagesPart;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_visio_2012_main::{
-  AuthorEntry, AuthorList, CommentEntry, CommentList, Comments, ForeignData, Page, PageChoice,
-  PageContents, PageSheet, Pages, Rel, Shape, ShapeChoice,
+  AuthorEntry, AuthorList, ColorEntry, Colors, CommentEntry, CommentList, Comments, FaceName,
+  FaceNames, ForeignData, Master, MasterChoice, MasterContents, Masters, Page, PageChoice,
+  PageContents, PageSheet, Pages, Rel, Shape, ShapeChoice, StyleSheet, StyleSheets,
+  VisioDocument as Drawing,
 };
 use ooxmlsdk::sdk::{SdkPart, SdkType};
 use ooxmlsdk::simple_type::BooleanValue;
@@ -16,6 +20,8 @@ use crate::ids::Ids;
 
 const PAGES: &str = "http://schemas.microsoft.com/visio/2010/relationships/pages";
 const PAGE: &str = "http://schemas.microsoft.com/visio/2010/relationships/page";
+const MASTERS: &str = "http://schemas.microsoft.com/visio/2010/relationships/masters";
+const MASTER: &str = "http://schemas.microsoft.com/visio/2010/relationships/master";
 const COMMENTS: &str = "http://schemas.microsoft.com/visio/2010/relationships/comments";
 const IMAGE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 
@@ -57,6 +63,84 @@ pub fn add_page(
   pages_part.set_data(package, pages.to_xml()?.into_bytes())?;
   page_part.set_data(package, PageContents::default().to_xml()?.into_bytes())?;
   Ok(page_id)
+}
+
+/// Append a master and its master part. The master id comes from `ids`.
+pub fn add_master(
+  package: &mut VisioPackage,
+  ids: &mut Ids,
+  name: Option<&str>,
+) -> Result<u32, SdkError> {
+  let document = package.visio_document_part()?;
+  let masters_part =
+    match document.child_part_by_relationship_type::<_, VisioMastersPart>(package, MASTERS) {
+      Some(part) => part,
+      None => document.add_new_part_auto_id::<_, VisioMastersPart>(package)?,
+    };
+  let mut masters = read_xml::<Masters>(package, &masters_part)?;
+  let before = related_ids::<_, VisioMasterPart>(&masters_part, package, MASTER);
+  let master_part = masters_part.add_new_part_auto_id::<_, VisioMasterPart>(package)?;
+  let rel_id = related_ids::<_, VisioMasterPart>(&masters_part, package, MASTER)
+    .into_iter()
+    .find(|id| !before.iter().any(|existing| existing == id))
+    .ok_or_else(|| SdkError::CommonError("master relationship id is missing".to_string()))?;
+  let master_id = ids.master();
+  masters.master.push(Master {
+    id: master_id,
+    name: name.map(str::to_string),
+    master_choice: vec![MasterChoice::Rel(Rel { id: Some(rel_id) })],
+    ..Default::default()
+  });
+  masters_part.set_data(package, masters.to_xml()?.into_bytes())?;
+  master_part.set_data(package, MasterContents::default().to_xml()?.into_bytes())?;
+  Ok(master_id)
+}
+
+/// Append a style sheet. The caller supplies the style id.
+pub fn add_style(package: &mut VisioPackage, id: u32, name: Option<&str>) -> Result<(), SdkError> {
+  let mut drawing = read_drawing(package)?;
+  let sheets = drawing
+    .style_sheets
+    .get_or_insert_with(StyleSheets::default);
+  sheets.style_sheet.push(StyleSheet {
+    id,
+    name: name.map(str::to_string),
+    ..Default::default()
+  });
+  write_drawing(package, &drawing)
+}
+
+/// Append a font face the `Character` `Font` cell can name by id.
+pub fn add_face_name(package: &mut VisioPackage, id: u32, name: &str) -> Result<(), SdkError> {
+  let mut drawing = read_drawing(package)?;
+  let faces = drawing.face_names.get_or_insert_with(FaceNames::default);
+  faces.face_name.push(FaceName {
+    id,
+    name: name.to_string(),
+    ..Default::default()
+  });
+  write_drawing(package, &drawing)
+}
+
+/// Append a color table entry.
+pub fn add_color(package: &mut VisioPackage, index: u32, rgb: &str) -> Result<(), SdkError> {
+  let mut drawing = read_drawing(package)?;
+  let colors = drawing.colors.get_or_insert_with(Colors::default);
+  colors.color_entry.push(ColorEntry {
+    ix: index,
+    rgb: rgb.to_string(),
+  });
+  write_drawing(package, &drawing)
+}
+
+pub(crate) fn read_drawing(package: &VisioPackage) -> Result<Drawing, SdkError> {
+  let part = package.visio_document_part()?;
+  read_xml(package, &part)
+}
+
+pub(crate) fn write_drawing(package: &mut VisioPackage, drawing: &Drawing) -> Result<(), SdkError> {
+  let part = package.visio_document_part()?;
+  part.set_data(package, drawing.to_xml()?.into_bytes())
 }
 
 /// Bytes for one image on a page, plus the `ForeignData` attributes from the

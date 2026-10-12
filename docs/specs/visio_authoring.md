@@ -163,6 +163,57 @@ The section name is `Property`. Each row has `N`. Cells are `Value`, `Prompt`,
 `Label`, `Format`, `SortKey`, `Type`, `Invisible`, `Verify`, `DataLinked`,
 `LangID`, and `Calendar`.
 
+## Masters
+
+Adding a master appends a `Master` to the masters part and a master part for
+its contents. `Ids` supplies the master id. The master stores `Rel` with the
+package relationship id of that master part.
+
+A shape on the page or on the master is appended to that part's `Shapes`.
+A group child is still appended under the parent shape's `Shapes`. The caller
+sets `Type`.
+
+An instance stores `Master` and `MasterShape`. Cells the instance does not
+have still come from the master through the existing inheritance read. This
+layer does not copy the master's cells onto the instance.
+
+## Styles and the document sheet
+
+A style sheet is appended to `StyleSheets`. The caller supplies its id.
+Direct cells and section cells on a `StyleSheet` and on `DocumentSheet` use
+the same `V` and `F` rules as a shape. A missing section or row is created.
+
+## More sections
+
+These helpers address `Section` and `Row`. The caller passes stored cell
+text. A named row uses `N`. An indexed row receives the next `IX`. A row
+that has both receives `N` and, when the row is new, the next `IX`.
+
+| Section | Row key | Cells |
+| --- | --- | --- |
+| `User` | `N` | `Value`, `Prompt` |
+| `ActionTag` | `N` | `X`, `Y`, `TagName`, `XJustify`, `YJustify`, `DisplayMode`, `ButtonFace`, `Disabled`, `Description` |
+| `Actions` | `N` and `IX` | `Menu`, `Action`, `Checked`, `Disabled`, `ReadOnly`, `Invisible`, `BeginGroup`, `FlyoutChild`, `TagName`, `ButtonFace`, `SortKey` |
+| `Connection` | `N` and `IX` | `X`, `Y`, `DirX`, `DirY`, `Type`, `AutoGen`, `Prompt` |
+| `Control` | `N` and `IX` | `X`, `Y`, `XDyn`, `YDyn`, `XCon`, `YCon`, `CanGlue`, `Prompt` |
+| `Character` | `IX` | the character cells listed under Text |
+| `Paragraph` | `IX` | the paragraph cells listed under Text |
+| `Scratch` | `IX` | `X`, `Y`, `A`, `B`, `C`, `D` |
+| `Field` | `IX` | `Value`, `Format`, `Type`, `UICat`, `UICod`, `UIFmt`, `Calendar`, `ObjectKind` |
+| `Reviewer` | `IX` | `Name`, `Initials`, `Color`, `ReviewerID`, `CurrentIndex` |
+| `Annotation` | `IX` | `X`, `Y`, `ReviewerID`, `MarkerIndex`, `Date`, `Comment`, `LangID` |
+| `LineGradient`, `FillGradient` | `IX` | `GradientStopColor`, `GradientStopColorTrans`, `GradientStopPosition` |
+
+`Tabs` rows contain `Tab` children, not ordinary cells. Each tab stores
+`Position` and `Alignment`. Appending a tab uses the first `Tabs` row and
+assigns the next tab `IX`.
+
+## Fonts and colors
+
+`FaceNames` stores a `FaceName` with `ID` and `Name`. `Colors` stores a
+`ColorEntry` with `IX` and `RGB`. `Character` `Font` can store the face id.
+This layer does not resolve the face to a theme font.
+
 ## Tests
 
 Each write has a round trip through the generated XML in `ooxmlsdk-visio`

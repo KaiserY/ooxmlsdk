@@ -48,16 +48,28 @@ pub fn shape_by_id_mut(shapes: &mut Shapes, id: u32) -> Option<&mut Shape> {
   })
 }
 
-/// Append a child shape and take its id from `ids`. The caller sets `Type`
-/// when the parent is a group.
-pub fn append_child_shape(parent: &mut Shape, ids: &mut crate::ids::Ids) -> u32 {
+/// Append a shape and take its id from `ids`.
+pub fn append_shape(shapes: &mut Shapes, ids: &mut crate::ids::Ids) -> u32 {
   let id = ids.shape();
-  let shapes = parent.shapes.get_or_insert_with(Shapes::default);
   shapes.shape.push(Shape {
     id,
     ..Default::default()
   });
   id
+}
+
+/// Append a child shape and take its id from `ids`. The caller sets `Type`
+/// when the parent is a group.
+pub fn append_child_shape(parent: &mut Shape, ids: &mut crate::ids::Ids) -> u32 {
+  let shapes = parent.shapes.get_or_insert_with(Shapes::default);
+  append_shape(shapes, ids)
+}
+
+/// Store the master and master-shape ids on an instance. Local cells still
+/// override the master when they are present.
+pub fn set_master_instance(shape: &mut Shape, master_id: u32, master_shape_id: u32) {
+  shape.master = Some(master_id);
+  shape.master_shape = Some(master_shape_id);
 }
 
 pub fn shape_cell<'a>(shape: &'a Shape, section: &str, cell: &str) -> Option<CellRecord<'a>> {

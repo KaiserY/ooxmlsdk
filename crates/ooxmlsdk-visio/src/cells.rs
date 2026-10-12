@@ -1,6 +1,6 @@
 use ooxmlsdk::schemas::schemas_microsoft_com_office_visio_2012_main::{
-  Cell, PageSheet, PageSheetChoice, RowUnion, RowUnionChoice, Section, SectionChoice, Shape,
-  ShapeChoice,
+  Cell, DocumentSheet, DocumentSheetChoice, PageSheet, PageSheetChoice, RowUnion, RowUnionChoice,
+  Section, SectionChoice, Shape, ShapeChoice, StyleSheet, StyleSheetChoice, Tab,
 };
 use ooxmlsdk::simple_type::BooleanValue;
 
@@ -182,6 +182,127 @@ pub fn write_page_section_cell(
 ) {
   let index = ensure_page_section(sheet, section);
   let PageSheetChoice::Section(section) = &mut sheet.page_sheet_choice[index] else {
+    return;
+  };
+  write_in_section(section, row, cell, value, formula);
+}
+
+pub fn read_style_direct_cell<'a>(style: &'a StyleSheet, name: &str) -> Option<CellRecord<'a>> {
+  style
+    .style_sheet_choice
+    .iter()
+    .find_map(|choice| match choice {
+      StyleSheetChoice::Cell(cell) if cell.n == name => Some(record(cell)),
+      _ => None,
+    })
+}
+
+pub fn write_style_direct_cell(
+  style: &mut StyleSheet,
+  name: &str,
+  value: &str,
+  formula: Option<&str>,
+) {
+  if let Some(index) = style
+    .style_sheet_choice
+    .iter()
+    .position(|choice| matches!(choice, StyleSheetChoice::Cell(cell) if cell.n == name))
+  {
+    let StyleSheetChoice::Cell(cell) = &mut style.style_sheet_choice[index] else {
+      return;
+    };
+    store_value(cell, value, formula);
+    return;
+  }
+  style
+    .style_sheet_choice
+    .push(StyleSheetChoice::Cell(Box::new(new_cell(
+      name, value, formula,
+    ))));
+}
+
+pub fn read_style_section_cell<'a>(
+  style: &'a StyleSheet,
+  section: SectionAddress<'_>,
+  row: Option<RowAddress<'_>>,
+  cell: &str,
+) -> Option<CellRecord<'a>> {
+  let section = find_style_section(style, section)?;
+  read_in_section(section, row, cell)
+}
+
+pub fn write_style_section_cell(
+  style: &mut StyleSheet,
+  section: SectionAddress<'_>,
+  row: Option<RowAddress<'_>>,
+  cell: &str,
+  value: &str,
+  formula: Option<&str>,
+) {
+  let index = ensure_style_section(style, section);
+  let StyleSheetChoice::Section(section) = &mut style.style_sheet_choice[index] else {
+    return;
+  };
+  write_in_section(section, row, cell, value, formula);
+}
+
+pub fn read_document_direct_cell<'a>(
+  sheet: &'a DocumentSheet,
+  name: &str,
+) -> Option<CellRecord<'a>> {
+  sheet
+    .document_sheet_choice
+    .iter()
+    .find_map(|choice| match choice {
+      DocumentSheetChoice::Cell(cell) if cell.n == name => Some(record(cell)),
+      _ => None,
+    })
+}
+
+pub fn write_document_direct_cell(
+  sheet: &mut DocumentSheet,
+  name: &str,
+  value: &str,
+  formula: Option<&str>,
+) {
+  if let Some(index) = sheet
+    .document_sheet_choice
+    .iter()
+    .position(|choice| matches!(choice, DocumentSheetChoice::Cell(cell) if cell.n == name))
+  {
+    let DocumentSheetChoice::Cell(cell) = &mut sheet.document_sheet_choice[index] else {
+      return;
+    };
+    store_value(cell, value, formula);
+    return;
+  }
+  sheet
+    .document_sheet_choice
+    .push(DocumentSheetChoice::Cell(Box::new(new_cell(
+      name, value, formula,
+    ))));
+}
+
+pub fn read_document_section_cell<'a>(
+  sheet: &'a DocumentSheet,
+  section: SectionAddress<'_>,
+  row: Option<RowAddress<'_>>,
+  cell: &str,
+) -> Option<CellRecord<'a>> {
+  let section = find_document_section(sheet, section)?;
+  read_in_section(section, row, cell)
+}
+
+pub fn write_document_section_cell(
+  sheet: &mut DocumentSheet,
+  section: SectionAddress<'_>,
+  row: Option<RowAddress<'_>>,
+  cell: &str,
+  value: &str,
+  formula: Option<&str>,
+) {
+  let index = ensure_document_section(sheet, section);
+  let DocumentSheetChoice::Section(section) = &mut sheet.document_sheet_choice[index] else {
     return;
   };
   write_in_section(section, row, cell, value, formula);
@@ -459,6 +580,202 @@ pub fn write_property(shape: &mut Shape, row_name: &str, cells: &[(&str, &str)])
   write_named_row(shape, "Property", row_name, cells);
 }
 
+/// Write cells on a `User` row named `row_name`.
+pub fn write_user(shape: &mut Shape, row_name: &str, cells: &[(&str, &str)]) {
+  write_named_row(shape, "User", row_name, cells);
+}
+
+/// Write cells on an `ActionTag` row named `row_name`.
+pub fn write_action_tag(shape: &mut Shape, row_name: &str, cells: &[(&str, &str)]) {
+  write_named_row(shape, "ActionTag", row_name, cells);
+}
+
+/// Write cells on an `Actions` row named `row_name` and assign `IX` when the
+/// row is new.
+pub fn write_actions(shape: &mut Shape, row_name: &str, cells: &[(&str, &str)]) -> u32 {
+  write_named_indexed_row(shape, "Actions", row_name, cells)
+}
+
+/// Write cells on a `Connection` row named `row_name` and assign `IX` when the
+/// row is new.
+pub fn write_connection(shape: &mut Shape, row_name: &str, cells: &[(&str, &str)]) -> u32 {
+  write_named_indexed_row(shape, "Connection", row_name, cells)
+}
+
+/// Write cells on a `Control` row named `row_name` and assign `IX` when the
+/// row is new.
+pub fn write_control(shape: &mut Shape, row_name: &str, cells: &[(&str, &str)]) -> u32 {
+  write_named_indexed_row(shape, "Control", row_name, cells)
+}
+
+/// Append a `Character` row and assign the next `IX`.
+pub fn append_character_row(shape: &mut Shape, cells: &[(&str, &str)]) -> u32 {
+  append_indexed_row(shape, "Character", cells)
+}
+
+/// Append a `Paragraph` row and assign the next `IX`.
+pub fn append_paragraph_row(shape: &mut Shape, cells: &[(&str, &str)]) -> u32 {
+  append_indexed_row(shape, "Paragraph", cells)
+}
+
+/// Append a `Scratch` row and assign the next `IX`.
+pub fn append_scratch_row(shape: &mut Shape, cells: &[(&str, &str)]) -> u32 {
+  append_indexed_row(shape, "Scratch", cells)
+}
+
+/// Append a `Field` row and assign the next `IX`.
+pub fn append_field_row(shape: &mut Shape, cells: &[(&str, &str)]) -> u32 {
+  append_indexed_row(shape, "Field", cells)
+}
+
+/// Append a `Reviewer` row and assign the next `IX`.
+pub fn append_reviewer_row(shape: &mut Shape, cells: &[(&str, &str)]) -> u32 {
+  append_indexed_row(shape, "Reviewer", cells)
+}
+
+/// Append an `Annotation` row and assign the next `IX`.
+pub fn append_annotation_row(shape: &mut Shape, cells: &[(&str, &str)]) -> u32 {
+  append_indexed_row(shape, "Annotation", cells)
+}
+
+/// Append a `LineGradient` stop and assign the next `IX`.
+pub fn append_line_gradient_row(shape: &mut Shape, cells: &[(&str, &str)]) -> u32 {
+  append_indexed_row(shape, "LineGradient", cells)
+}
+
+/// Append a `FillGradient` stop and assign the next `IX`.
+pub fn append_fill_gradient_row(shape: &mut Shape, cells: &[(&str, &str)]) -> u32 {
+  append_indexed_row(shape, "FillGradient", cells)
+}
+
+/// Append a tab stop on the first `Tabs` row. The returned `IX` is the tab's.
+pub fn append_tab(shape: &mut Shape, position: &str, alignment: &str) -> u32 {
+  let index = ensure_shape_section(
+    shape,
+    SectionAddress {
+      name: "Tabs",
+      index: None,
+    },
+  );
+  let ShapeChoice::Section(section) = &mut shape.shape_choice[index] else {
+    return 0;
+  };
+  if !section
+    .section_choice
+    .iter()
+    .any(|item| matches!(item, SectionChoice::RowUnion(row) if !is_deleted(row.del)))
+  {
+    let ix = next_row_index(section);
+    section
+      .section_choice
+      .push(SectionChoice::RowUnion(Box::new(RowUnion {
+        ix: Some(ix),
+        ..Default::default()
+      })));
+  }
+  let Some(row_index) = section
+    .section_choice
+    .iter()
+    .position(|item| matches!(item, SectionChoice::RowUnion(row) if !is_deleted(row.del)))
+  else {
+    return 0;
+  };
+  let SectionChoice::RowUnion(row) = &mut section.section_choice[row_index] else {
+    return 0;
+  };
+  let tab_ix = row
+    .row_union_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      RowUnionChoice::Tab(tab) => tab.ix,
+      RowUnionChoice::Cell(_) => None,
+    })
+    .max()
+    .map(|ix| ix.saturating_add(1))
+    .unwrap_or(0);
+  row.row_union_choice.push(RowUnionChoice::Tab(Tab {
+    ix: Some(tab_ix),
+    cell: vec![
+      new_cell("Position", position, None),
+      new_cell("Alignment", alignment, None),
+    ],
+  }));
+  tab_ix
+}
+
+fn append_indexed_row(shape: &mut Shape, section_name: &str, cells: &[(&str, &str)]) -> u32 {
+  let index = ensure_shape_section(
+    shape,
+    SectionAddress {
+      name: section_name,
+      index: None,
+    },
+  );
+  let ShapeChoice::Section(section) = &mut shape.shape_choice[index] else {
+    return 0;
+  };
+  let ix = next_row_index(section);
+  section
+    .section_choice
+    .push(SectionChoice::RowUnion(Box::new(named_row(
+      None,
+      Some(ix),
+      cells,
+    ))));
+  ix
+}
+
+fn write_named_indexed_row(
+  shape: &mut Shape,
+  section_name: &str,
+  row_name: &str,
+  cells: &[(&str, &str)],
+) -> u32 {
+  let index = ensure_shape_section(
+    shape,
+    SectionAddress {
+      name: section_name,
+      index: None,
+    },
+  );
+  let ShapeChoice::Section(section) = &mut shape.shape_choice[index] else {
+    return 0;
+  };
+  let address = RowAddress {
+    index: None,
+    name: Some(row_name),
+  };
+  let row_index = match section
+    .section_choice
+    .iter()
+    .position(|item| matches!(item, SectionChoice::RowUnion(row) if row_matches(row, address)))
+  {
+    Some(found) => found,
+    None => {
+      let ix = next_row_index(section);
+      section
+        .section_choice
+        .push(SectionChoice::RowUnion(Box::new(RowUnion {
+          n: Some(row_name.to_string()),
+          ix: Some(ix),
+          ..Default::default()
+        })));
+      section.section_choice.len() - 1
+    }
+  };
+  let ix = match &section.section_choice[row_index] {
+    SectionChoice::RowUnion(row) => row.ix.unwrap_or(0),
+    SectionChoice::Cell(_) => 0,
+  };
+  for (name, value) in cells {
+    let SectionChoice::RowUnion(row) = &mut section.section_choice[row_index] else {
+      return ix;
+    };
+    write_row_cell(row, name, value, None);
+  }
+  ix
+}
+
 fn write_named_row(shape: &mut Shape, section_name: &str, row_name: &str, cells: &[(&str, &str)]) {
   let section = SectionAddress {
     name: section_name,
@@ -636,6 +953,56 @@ fn ensure_shape_section(shape: &mut Shape, address: SectionAddress<'_>) -> usize
   shape
     .shape_choice
     .push(ShapeChoice::Section(new_section(address)));
+  index
+}
+
+fn find_style_section<'a>(
+  style: &'a StyleSheet,
+  address: SectionAddress<'_>,
+) -> Option<&'a Section> {
+  style.style_sheet_choice.iter().find_map(|choice| {
+    let StyleSheetChoice::Section(section) = choice else {
+      return None;
+    };
+    section_matches(section, address).then_some(section)
+  })
+}
+
+fn find_document_section<'a>(
+  sheet: &'a DocumentSheet,
+  address: SectionAddress<'_>,
+) -> Option<&'a Section> {
+  sheet.document_sheet_choice.iter().find_map(|choice| {
+    let DocumentSheetChoice::Section(section) = choice else {
+      return None;
+    };
+    section_matches(section, address).then_some(section)
+  })
+}
+
+fn ensure_style_section(style: &mut StyleSheet, address: SectionAddress<'_>) -> usize {
+  if let Some(index) = style.style_sheet_choice.iter().position(|choice| {
+    matches!(choice, StyleSheetChoice::Section(section) if section_matches(section, address))
+  }) {
+    return index;
+  }
+  let index = style.style_sheet_choice.len();
+  style
+    .style_sheet_choice
+    .push(StyleSheetChoice::Section(new_section(address)));
+  index
+}
+
+fn ensure_document_section(sheet: &mut DocumentSheet, address: SectionAddress<'_>) -> usize {
+  if let Some(index) = sheet.document_sheet_choice.iter().position(|choice| {
+    matches!(choice, DocumentSheetChoice::Section(section) if section_matches(section, address))
+  }) {
+    return index;
+  }
+  let index = sheet.document_sheet_choice.len();
+  sheet
+    .document_sheet_choice
+    .push(DocumentSheetChoice::Section(new_section(address)));
   index
 }
 

@@ -94,6 +94,7 @@ pub(crate) fn gen_visio_schema(
   };
   let mut schema = gen_open_xml_schema_from_xsd(&source, &cfg)?;
   schema.module_name = VISIO_MODULE_NAME.to_string();
+  widen_visio_rel(&mut schema);
   for schema_type in &mut schema.types {
     schema_type.module_name = schema.module_name.clone();
   }
@@ -126,6 +127,78 @@ pub struct NamespaceGenConfig {
   /// `targetNamespace` is emitted. Prefix resolution and imports keep the
   /// parsed URI.
   pub emitted_target_namespace: Option<String>,
+}
+
+/// Drawing files store the package relationship id on `Rel`. The published
+/// `Rel_Type` has no attributes, so this stays off the alias table and off the
+/// generic XSD projection.
+fn widen_visio_rel(schema: &mut OpenXmlSchema) {
+  for schema_type in &mut schema.types {
+    if schema_type.class_name != "Rel" {
+      continue;
+    }
+    if schema_type
+      .attributes
+      .iter()
+      .any(|attribute| attribute.q_name == "r:id")
+    {
+      continue;
+    }
+    schema_type.attributes.push(OpenXmlSchemaTypeAttribute {
+      q_name: "r:id".to_string(),
+      property_name: "Id".to_string(),
+      r#type: "StringValue".to_string(),
+      property_comments: "Relationship identifier.".to_string(),
+      ..Default::default()
+    });
+  }
+}
+
+/// Character data between `cp`, `pp`, `tp`, and `fld` is not in the published
+/// `Text_Type`. Add it only to this module's choice, not through an alias.
+pub(crate) fn widen_visio_text_choice(
+  ir: &mut crate::sdk_code::codegen_ir::SchemaModuleDecl,
+) -> Result<()> {
+  use crate::sdk_code::codegen_ir::{
+    MemberDecl, TypeKind, TypeRefDecl, VariantDecl, VariantWireDecl,
+  };
+
+  let Some(text_choice) = ir.types.iter_mut().find(|type_decl| {
+    type_decl.kind == TypeKind::ChoiceEnum
+      && type_decl.members.iter().any(|member| {
+        matches!(
+          member,
+          MemberDecl::Variant(variant) if variant.rust_name == "Cp"
+        )
+      })
+      && type_decl.members.iter().any(|member| {
+        matches!(
+          member,
+          MemberDecl::Variant(variant) if variant.rust_name == "Fld"
+        )
+      })
+  }) else {
+    return Err("visio Text choice is missing".into());
+  };
+  if text_choice.members.iter().any(|member| {
+    matches!(
+      member,
+      MemberDecl::Variant(variant) if variant.wire == VariantWireDecl::Text
+    )
+  }) {
+    return Ok(());
+  }
+  text_choice.members.push(MemberDecl::Variant(VariantDecl {
+    rust_name: "Text".to_string(),
+    docs: "Character data between text marks.".to_string(),
+    version: String::new(),
+    wire: VariantWireDecl::Text,
+    payload: TypeRefDecl {
+      rust_type: "StringValue".to_string(),
+      module_path: Some("crate::simple_type".to_string()),
+    },
+  }));
+  Ok(())
 }
 
 /// Produce an `OpenXmlSchema` (stage 1) from XSD source text.
@@ -1529,6 +1602,49 @@ mod tests {
   }
 
   #[test]
+  fn visio_text_choice_keeps_character_data() {
+    use crate::sdk_code::codegen_ir::{
+      MemberDecl, SchemaModuleDecl, TypeDecl, TypeKind, VariantDecl, VariantWireDecl,
+    };
+
+    let mut ir = SchemaModuleDecl::default();
+    ir.types.push(TypeDecl {
+      rust_name: "TextChoice".to_string(),
+      kind: TypeKind::ChoiceEnum,
+      members: vec![
+        MemberDecl::Variant(VariantDecl {
+          rust_name: "Cp".to_string(),
+          wire: VariantWireDecl::Child {
+            qnames: vec!["visio:cp".to_string()],
+          },
+          ..Default::default()
+        }),
+        MemberDecl::Variant(VariantDecl {
+          rust_name: "Fld".to_string(),
+          wire: VariantWireDecl::Child {
+            qnames: vec!["visio:fld".to_string()],
+          },
+          ..Default::default()
+        }),
+      ],
+      ..Default::default()
+    });
+    super::widen_visio_text_choice(&mut ir).expect("add character data");
+    super::widen_visio_text_choice(&mut ir).expect("stay idempotent");
+    let text_variants = ir.types[0]
+      .members
+      .iter()
+      .filter(|member| {
+        matches!(
+          member,
+          MemberDecl::Variant(variant) if variant.wire == VariantWireDecl::Text
+        )
+      })
+      .count();
+    assert_eq!(text_variants, 1);
+  }
+
+  #[test]
   fn visio_cell_and_section_stay_generic() {
     let root = workspace_root();
     let schemas_dir = root.join("data/schemas");
@@ -1581,6 +1697,32 @@ mod tests {
       "UserRow"
     );
     assert_eq!(class_name(&wired, "visio:Cell_Type/visio:Cell"), "Cell");
+    assert!(
+      direct
+        .types
+        .iter()
+        .filter(|schema_type| schema_type.class_name == "Rel")
+        .all(|schema_type| {
+          schema_type
+            .attributes
+            .iter()
+            .all(|attribute| attribute.q_name != "r:id")
+        })
+    );
+    assert!(
+      wired
+        .types
+        .iter()
+        .any(|schema_type| schema_type.class_name == "Rel"
+          && schema_type
+            .attributes
+            .iter()
+            .any(|attribute| attribute.q_name == "r:id"
+              && !attribute
+                .validators
+                .iter()
+                .any(|validator| validator.name == "RequiredValidator")))
+    );
     assert_eq!(before, schema_fingerprint(&schemas_dir));
   }
 

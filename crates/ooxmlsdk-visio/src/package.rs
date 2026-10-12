@@ -1,0 +1,293 @@
+use ooxmlsdk::common::SdkError;
+use ooxmlsdk::parts::image_part::ImagePart;
+use ooxmlsdk::parts::visio_comments_part::VisioCommentsPart;
+use ooxmlsdk::parts::visio_document::VisioDocument as VisioPackage;
+use ooxmlsdk::parts::visio_page_part::VisioPagePart;
+use ooxmlsdk::parts::visio_pages_part::VisioPagesPart;
+use ooxmlsdk::schemas::schemas_microsoft_com_office_visio_2012_main::{
+  AuthorEntry, AuthorList, CommentEntry, CommentList, Comments, ForeignData, Page, PageChoice,
+  PageContents, PageSheet, Pages, Rel, Shape, ShapeChoice,
+};
+use ooxmlsdk::sdk::{SdkPart, SdkType};
+use ooxmlsdk::simple_type::BooleanValue;
+
+use crate::cells::{page_height, page_width};
+use crate::ids::Ids;
+
+const PAGES: &str = "http://schemas.microsoft.com/visio/2010/relationships/pages";
+const PAGE: &str = "http://schemas.microsoft.com/visio/2010/relationships/page";
+const COMMENTS: &str = "http://schemas.microsoft.com/visio/2010/relationships/comments";
+const IMAGE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+
+/// Append a page, its page part, and the page sheet's `PageWidth` and
+/// `PageHeight`. The page id comes from `ids`.
+pub fn add_page(
+  package: &mut VisioPackage,
+  ids: &mut Ids,
+  name: Option<&str>,
+  width: &str,
+  height: &str,
+) -> Result<u32, SdkError> {
+  let document = package.visio_document_part()?;
+  let pages_part =
+    match document.child_part_by_relationship_type::<_, VisioPagesPart>(package, PAGES) {
+      Some(part) => part,
+      None => document.add_new_part_auto_id::<_, VisioPagesPart>(package)?,
+    };
+  let mut pages = read_xml::<Pages>(package, &pages_part)?;
+  let before = related_ids::<_, VisioPagePart>(&pages_part, package, PAGE);
+  let page_part = pages_part.add_new_part_auto_id::<_, VisioPagePart>(package)?;
+  let rel_id = related_ids::<_, VisioPagePart>(&pages_part, package, PAGE)
+    .into_iter()
+    .find(|id| !before.iter().any(|existing| existing == id))
+    .ok_or_else(|| SdkError::CommonError("page relationship id is missing".to_string()))?;
+  let page_id = ids.page();
+  let mut sheet = PageSheet::default();
+  page_width(&mut sheet, width);
+  page_height(&mut sheet, height);
+  pages.page.push(Page {
+    id: page_id,
+    name: name.map(str::to_string),
+    page_choice: vec![
+      PageChoice::PageSheet(Box::new(sheet)),
+      PageChoice::Rel(Rel { id: Some(rel_id) }),
+    ],
+    ..Default::default()
+  });
+  pages_part.set_data(package, pages.to_xml()?.into_bytes())?;
+  page_part.set_data(package, PageContents::default().to_xml()?.into_bytes())?;
+  Ok(page_id)
+}
+
+/// Bytes for one image on a page, plus the `ForeignData` attributes from the
+/// schema. The relationship id is written on `Rel`.
+pub struct ImageBytes<'a> {
+  pub content_type: &'a str,
+  pub bytes: &'a [u8],
+  pub foreign_type: &'a str,
+  pub object_type: Option<u32>,
+  pub show_as_icon: Option<bool>,
+  pub object_width: Option<f64>,
+  pub object_height: Option<f64>,
+  pub mapping_mode: Option<u16>,
+  pub extent_x: Option<f64>,
+  pub extent_y: Option<f64>,
+  pub compression_type: Option<&'a str>,
+  pub compression_level: Option<f64>,
+}
+
+/// Store image bytes on the page and point the shape's `ForeignData` at that
+/// part. Other shape children stay in place.
+pub fn attach_image(
+  shape: &mut Shape,
+  page_part: &VisioPagePart,
+  package: &mut VisioPackage,
+  image: ImageBytes<'_>,
+) -> Result<String, SdkError> {
+  let before = related_ids::<_, ImagePart>(page_part, package, IMAGE);
+  let image_part = page_part.add_image_part(package, image.content_type.to_string())?;
+  image_part.set_data(package, image.bytes.to_vec())?;
+  let rel_id = related_ids::<_, ImagePart>(page_part, package, IMAGE)
+    .into_iter()
+    .find(|id| !before.iter().any(|existing| existing == id))
+    .ok_or_else(|| SdkError::CommonError("image relationship id is missing".to_string()))?;
+  let foreign = ShapeChoice::ForeignData(Box::new(ForeignData {
+    foreign_type: image.foreign_type.to_string(),
+    object_type: image.object_type,
+    show_as_icon: image.show_as_icon.map(flag),
+    object_width: image.object_width,
+    object_height: image.object_height,
+    mapping_mode: image.mapping_mode,
+    extent_x: image.extent_x,
+    extent_y: image.extent_y,
+    compression_type: image.compression_type.map(str::to_string),
+    compression_level: image.compression_level,
+    rel: Rel {
+      id: Some(rel_id.clone()),
+    },
+  }));
+  let first = shape
+    .shape_choice
+    .iter()
+    .position(|choice| matches!(choice, ShapeChoice::ForeignData(_)));
+  shape
+    .shape_choice
+    .retain(|choice| !matches!(choice, ShapeChoice::ForeignData(_)));
+  if let Some(index) = first {
+    shape.shape_choice.insert(index, foreign);
+  } else {
+    shape.shape_choice.push(foreign);
+  }
+  Ok(rel_id)
+}
+
+pub fn image_relationship_id(shape: &Shape) -> Option<&str> {
+  shape.shape_choice.iter().find_map(|choice| {
+    let ShapeChoice::ForeignData(data) = choice else {
+      return None;
+    };
+    data.rel.id.as_deref()
+  })
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AuthorRecord {
+  pub id: u32,
+  pub name: Option<String>,
+  pub initials: Option<String>,
+  pub sip: Option<String>,
+  pub smtp: Option<String>,
+  pub resolution_id: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CommentRecord {
+  pub author_id: u32,
+  pub page_id: u32,
+  pub comment_id: u32,
+  pub date: String,
+  pub text: Option<String>,
+  pub shape_id: Option<u32>,
+  pub edit_date: Option<String>,
+  pub done: Option<BooleanValue>,
+  pub auto_comment_type: Option<u32>,
+}
+
+pub fn authors(comments: &Comments) -> Vec<AuthorRecord> {
+  comments
+    .author_list
+    .iter()
+    .flat_map(|list| &list.author_entry)
+    .map(|author| AuthorRecord {
+      id: author.id,
+      name: author.name.clone(),
+      initials: author.initials.clone(),
+      sip: author.sip.clone(),
+      smtp: author.smtp.clone(),
+      resolution_id: author.resolution_id.clone(),
+    })
+    .collect()
+}
+
+pub fn push_author(comments: &mut Comments, author: AuthorRecord) {
+  let list = comments.author_list.get_or_insert_with(AuthorList::default);
+  list.author_entry.push(AuthorEntry {
+    id: author.id,
+    name: author.name,
+    initials: author.initials,
+    sip: author.sip,
+    smtp: author.smtp,
+    resolution_id: author.resolution_id,
+  });
+}
+
+pub fn comment_entries(comments: &Comments) -> Vec<CommentRecord> {
+  comments
+    .comment_list
+    .iter()
+    .flat_map(|list| &list.comment_entry)
+    .map(|comment| CommentRecord {
+      author_id: comment.author_id,
+      page_id: comment.page_id,
+      comment_id: comment.comment_id,
+      date: comment.date.clone(),
+      text: comment.xml_content.clone(),
+      shape_id: comment.shape_id,
+      edit_date: comment.edit_date.clone(),
+      done: comment.done,
+      auto_comment_type: comment.auto_comment_type,
+    })
+    .collect()
+}
+
+pub fn push_comment(comments: &mut Comments, comment: CommentRecord) {
+  let list = comments
+    .comment_list
+    .get_or_insert_with(CommentList::default);
+  list.comment_entry.push(CommentEntry {
+    author_id: comment.author_id,
+    page_id: comment.page_id,
+    comment_id: comment.comment_id,
+    date: comment.date,
+    xml_content: comment.text,
+    shape_id: comment.shape_id,
+    edit_date: comment.edit_date,
+    done: comment.done,
+    auto_comment_type: comment.auto_comment_type,
+  });
+}
+
+pub fn list_authors(package: &VisioPackage) -> Result<Vec<AuthorRecord>, SdkError> {
+  Ok(authors(&read_comments(package)?))
+}
+
+pub fn add_author(package: &mut VisioPackage, author: AuthorRecord) -> Result<(), SdkError> {
+  let mut comments = read_comments(package)?;
+  push_author(&mut comments, author);
+  write_comments(package, &comments)
+}
+
+pub fn list_comments(package: &VisioPackage) -> Result<Vec<CommentRecord>, SdkError> {
+  Ok(comment_entries(&read_comments(package)?))
+}
+
+pub fn add_comment(package: &mut VisioPackage, comment: CommentRecord) -> Result<(), SdkError> {
+  let mut comments = read_comments(package)?;
+  push_comment(&mut comments, comment);
+  write_comments(package, &comments)
+}
+
+fn read_comments(package: &VisioPackage) -> Result<Comments, SdkError> {
+  let document = package.visio_document_part()?;
+  let Some(part) =
+    document.child_part_by_relationship_type::<_, VisioCommentsPart>(package, COMMENTS)
+  else {
+    return Ok(Comments::default());
+  };
+  read_xml(package, &part)
+}
+
+fn write_comments(package: &mut VisioPackage, comments: &Comments) -> Result<(), SdkError> {
+  let document = package.visio_document_part()?;
+  let part =
+    match document.child_part_by_relationship_type::<_, VisioCommentsPart>(package, COMMENTS) {
+      Some(part) => part,
+      None => document.add_new_part_auto_id::<_, VisioCommentsPart>(package)?,
+    };
+  part.set_data(package, comments.to_xml()?.into_bytes())
+}
+
+fn read_xml<T>(package: &VisioPackage, part: &impl SdkPart) -> Result<T, SdkError>
+where
+  T: SdkType + Default,
+{
+  let mut bytes = Vec::new();
+  if part.write_data_to(package, &mut bytes)? && !bytes.is_empty() {
+    T::from_bytes(&bytes)
+  } else {
+    Ok(T::default())
+  }
+}
+
+fn related_ids<Parent, Child>(
+  parent: &Parent,
+  package: &VisioPackage,
+  relationship_type: &str,
+) -> Vec<String>
+where
+  Parent: SdkPart,
+  Child: SdkPart,
+{
+  parent
+    .child_related_parts_by_relationship_type::<_, Child>(package, relationship_type)
+    .map(|related| related.relationship_id().to_string())
+    .collect()
+}
+
+fn flag(value: bool) -> BooleanValue {
+  if value {
+    BooleanValue::One
+  } else {
+    BooleanValue::Zero
+  }
+}

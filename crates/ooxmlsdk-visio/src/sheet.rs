@@ -35,6 +35,31 @@ pub fn shape_by_id(shapes: &Shapes, id: u32) -> Option<&Shape> {
   None
 }
 
+pub fn shape_by_id_mut(shapes: &mut Shapes, id: u32) -> Option<&mut Shape> {
+  shapes.shape.iter_mut().find_map(|shape| {
+    if shape.id == id {
+      Some(shape)
+    } else {
+      shape
+        .shapes
+        .as_mut()
+        .and_then(|nested| shape_by_id_mut(nested, id))
+    }
+  })
+}
+
+/// Append a child shape and take its id from `ids`. The caller sets `Type`
+/// when the parent is a group.
+pub fn append_child_shape(parent: &mut Shape, ids: &mut crate::ids::Ids) -> u32 {
+  let id = ids.shape();
+  let shapes = parent.shapes.get_or_insert_with(Shapes::default);
+  shapes.shape.push(Shape {
+    id,
+    ..Default::default()
+  });
+  id
+}
+
 pub fn shape_cell<'a>(shape: &'a Shape, section: &str, cell: &str) -> Option<CellRecord<'a>> {
   let sections = shape.shape_choice.iter().filter_map(|choice| match choice {
     ShapeChoice::Section(section) => Some(section),

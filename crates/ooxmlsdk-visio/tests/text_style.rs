@@ -19,6 +19,7 @@ fn text_marks_round_trip_in_order() {
   let runs = vec![
     TextRun::Character(0),
     TextRun::Paragraph(0),
+    TextRun::Chars("Hello".to_string()),
     TextRun::Tabs(1),
     TextRun::Field {
       index: 2,
@@ -27,12 +28,10 @@ fn text_marks_round_trip_in_order() {
   ];
   write_shape_text(&mut shape, &runs);
   assert_eq!(read_shape_text(&shape), runs);
-  assert!(
-    shape
-      .shape_choice
-      .iter()
-      .any(|choice| matches!(choice, ShapeChoice::Cell(_)))
-  );
+  assert!(matches!(
+    shape.shape_choice.first(),
+    Some(ShapeChoice::Cell(_))
+  ));
 }
 
 #[test]

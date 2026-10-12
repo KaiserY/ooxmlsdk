@@ -84,6 +84,9 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
       )
     })?;
     apply_codegen_ir_schema_extensions(&schema.module_name, &mut ir, &schema_extensions)?;
+    if schema.module_name == xsd_schema_gen::VISIO_MODULE_NAME {
+      xsd_schema_gen::widen_visio_text_choice(&mut ir)?;
+    }
     annotate_estimated_type_sizes(&mut ir);
     write_json(
       out_schemas_dir_path.join(format!("{}.json", schema.module_name)),

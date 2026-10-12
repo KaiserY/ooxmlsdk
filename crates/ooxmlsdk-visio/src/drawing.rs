@@ -3,8 +3,8 @@ use ooxmlsdk::parts::visio_document::VisioDocument as VisioPackage;
 use ooxmlsdk::parts::visio_page_part::VisioPagePart;
 use ooxmlsdk::parts::visio_pages_part::VisioPagesPart;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_visio_2012_main::{
-  Cell, Page, PageChoice, PageContents, Pages, RowUnion, RowUnionChoice, Section, SectionChoice,
-  Shape, ShapeChoice, Shapes, VisioDocument,
+  Cell, Page, PageChoice, PageContents, Pages, Rel, RowUnion, RowUnionChoice, Section,
+  SectionChoice, Shape, ShapeChoice, Shapes, VisioDocument,
 };
 use ooxmlsdk::sdk::{SdkType, VisioDocumentType};
 
@@ -28,7 +28,7 @@ pub fn minimal_drawing(ids: &mut Ids) -> Result<VisioPackage, SdkError> {
     page: vec![Page {
       id: page_id,
       name: Some("Page-1".to_string()),
-      page_choice: vec![PageChoice::Rel],
+      page_choice: vec![PageChoice::Rel(Rel::default())],
       ..Default::default()
     }],
     ..Default::default()

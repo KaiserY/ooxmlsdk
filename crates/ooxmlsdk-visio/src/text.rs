@@ -2,13 +2,14 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_visio_2012_main::{
   Cp, Fld, Pp, Shape, ShapeChoice, Text, TextChoice, Tp,
 };
 
-/// One mark inside `visio:Text`, in document order.
+/// One mark or character run inside `visio:Text`, in document order.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TextRun {
   Character(u32),
   Paragraph(u32),
   Tabs(u32),
   Field { index: u32, text: Option<String> },
+  Chars(String),
 }
 
 pub fn read_shape_text(shape: &Shape) -> Vec<TextRun> {
@@ -26,25 +27,34 @@ pub fn read_shape_text(shape: &Shape) -> Vec<TextRun> {
           index: field.ix,
           text: field.xml_content.clone(),
         },
+        TextChoice::Text(text) => TextRun::Chars(text.clone()),
       });
     }
   }
   runs
 }
 
+/// Replace the shape's `Text` child. Other children, such as `PinX`, stay
+/// where they are.
 pub fn write_shape_text(shape: &mut Shape, runs: &[TextRun]) {
+  let first = shape
+    .shape_choice
+    .iter()
+    .position(|choice| matches!(choice, ShapeChoice::Text(_)));
   shape
     .shape_choice
     .retain(|choice| !matches!(choice, ShapeChoice::Text(_)));
   if runs.is_empty() {
     return;
   }
-  shape.shape_choice.insert(
-    0,
-    ShapeChoice::Text(Text {
-      text_choice: runs.iter().map(run_to_choice).collect(),
-    }),
-  );
+  let text = ShapeChoice::Text(Text {
+    text_choice: runs.iter().map(run_to_choice).collect(),
+  });
+  if let Some(index) = first {
+    shape.shape_choice.insert(index, text);
+  } else {
+    shape.shape_choice.push(text);
+  }
 }
 
 fn run_to_choice(run: &TextRun) -> TextChoice {
@@ -56,5 +66,6 @@ fn run_to_choice(run: &TextRun) -> TextChoice {
       ix: *index,
       xml_content: text.clone(),
     }),
+    TextRun::Chars(text) => TextChoice::Text(text.clone()),
   }
 }

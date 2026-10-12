@@ -5256,14 +5256,14 @@ fn expand_named_struct(
       };
       if field.repeated {
         quote! {
-          #field_ident.push(#choice_ty::#text_variant(#string_expr.to_string()));
+          #field_ident.push(#choice_ty::#text_variant((#string_expr).to_string()));
           #xml_child_slot_assign
           handled_text = true;
         }
       } else {
         quote! {
           if !handled_text {
-            #field_ident = Some(#choice_ty::#text_variant(#string_expr.to_string()));
+            #field_ident = Some(#choice_ty::#text_variant((#string_expr).to_string()));
             #xml_child_slot_assign
             handled_text = true;
           }

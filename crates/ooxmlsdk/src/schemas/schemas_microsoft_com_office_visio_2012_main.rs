@@ -467,6 +467,14 @@ pub struct DataConnection {
 }
 ///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "visio:Rel")]
+pub struct Rel {
+  /// Relationship identifier.
+  #[sdk(attr(qname = "r:id"))]
+  pub id: Option<crate::simple_type::StringValue>,
+}
+///
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:DataColumns")]
 pub struct DataColumns {
   #[sdk(attr(qname = ":SortColumn"))]
@@ -554,8 +562,8 @@ pub struct DataRecordSet {
   #[sdk(empty_child(qname = "visio:ADOData"))]
   pub ado_data: Option<()>,
   /// _
-  #[sdk(empty_child(qname = "visio:Rel"))]
-  pub rel: (),
+  #[sdk(child(qname = "visio:Rel"))]
+  pub rel: Rel,
   /// _
   #[sdk(child(qname = "visio:DataColumns"))]
   pub data_columns: std::boxed::Box<DataColumns>,
@@ -984,7 +992,7 @@ pub struct Master {
   #[sdk(
         choice(
             child(variant = PageSheet, boxed, qname = "visio:PageSheet"),
-            empty_child(variant = Rel, qname = "visio:Rel"),
+            child(variant = Rel, qname = "visio:Rel"),
             text_child(variant = Icon, qname = "visio:Icon")
         )
     )]
@@ -1053,7 +1061,7 @@ pub struct Page {
   #[sdk(
         choice(
             child(variant = PageSheet, boxed, qname = "visio:PageSheet"),
-            empty_child(variant = Rel, qname = "visio:Rel")
+            child(variant = Rel, qname = "visio:Rel")
         )
     )]
   pub page_choice: Vec<PageChoice>,
@@ -1203,7 +1211,8 @@ pub struct Text {
             child(variant = Cp, qname = "visio:cp"),
             child(variant = Pp, qname = "visio:pp"),
             child(variant = Tp, qname = "visio:tp"),
-            child(variant = Fld, qname = "visio:fld")
+            child(variant = Fld, qname = "visio:fld"),
+            text
         )
     )]
   pub text_choice: Vec<TextChoice>,
@@ -1239,8 +1248,8 @@ pub struct ForeignData {
   #[sdk(attr(qname = ":CompressionLevel"))]
   pub compression_level: Option<crate::simple_type::DoubleValue>,
   /// _
-  #[sdk(empty_child(qname = "visio:Rel"))]
-  pub rel: (),
+  #[sdk(child(qname = "visio:Rel"))]
+  pub rel: Rel,
 }
 ///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1340,8 +1349,8 @@ pub struct Solution {
   #[sdk(attr(qname = ":Name"))]
   pub name: crate::simple_type::StringValue,
   /// _
-  #[sdk(empty_child(qname = "visio:Rel"))]
-  pub rel: (),
+  #[sdk(child(qname = "visio:Rel"))]
+  pub rel: Rel,
 }
 ///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1769,13 +1778,13 @@ pub enum PageSheetChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum MasterChoice {
   PageSheet(std::boxed::Box<PageSheet>),
-  Rel,
+  Rel(Rel),
   Icon(Icon),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum PageChoice {
   PageSheet(std::boxed::Box<PageSheet>),
-  Rel,
+  Rel(Rel),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextChoice {
@@ -1783,6 +1792,8 @@ pub enum TextChoice {
   Pp(Pp),
   Tp(Tp),
   Fld(Fld),
+  /// Character data between text marks.
+  Text(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RowUnionChoice {

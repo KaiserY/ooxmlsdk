@@ -86,4 +86,6 @@ ids on that same page, including nested shapes. A missing id is an error.
 ## Out of scope
 
 Formula evaluation, dependency recalculation, theme function results, and PDF
-rendering are not part of this layer.
+rendering are not part of this layer. Writes for cells, geometry, text,
+images, groups, layers, comments, hyperlinks, and shape data are specified in
+`visio_authoring.md`.

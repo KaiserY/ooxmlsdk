@@ -69,3 +69,6 @@ is the existing Office one,
 - It does not evaluate ShapeSheet formulas.
 - It does not draw pages to PDF.
 - It does not parse legacy `.vsd` files.
+
+Constructing further pages, images, and comments is specified in
+`visio_authoring.md`.

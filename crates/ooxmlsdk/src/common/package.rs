@@ -1454,7 +1454,16 @@ impl SdkPackageStorage {
 
   fn open_archive(reader: ArchiveReader) -> Result<Self, SdkError> {
     let mut raw_reader = reader.clone();
-    let mut archive = zip::ZipArchive::new(reader)?;
+    // zip 9's automatic offset detection scans the whole archive. Most OPC
+    // packages start at offset zero; retain lazy reads for them and fall back
+    // to automatic detection for archives with a prepended prefix.
+    let mut archive = zip::ZipArchive::with_config(
+      zip::read::Config {
+        archive_offset: zip::read::ArchiveOffset::Known(0),
+      },
+      reader.clone(),
+    )
+    .or_else(|_| zip::ZipArchive::new(reader))?;
     let entry_names = read_archive_entry_names(&mut archive, &mut raw_reader)?;
     let opened = read_archive_model(&mut archive, &entry_names)?;
     let OpenedArchiveModel {
@@ -3528,6 +3537,7 @@ fn read_raw_parts(entry_names: &[Box<str>], content_types: &Types) -> Vec<RawPar
   parts
 }
 
+#[cfg(test)]
 const ZIP_UNICODE_PATH_EXTRA_FIELD_ID: u16 = 0x7075;
 const ZIP_UTF8_FILE_NAME_FLAG: u16 = 1 << 11;
 const ZIP_CENTRAL_HEADER_LEN: usize = 46;
@@ -3539,10 +3549,10 @@ fn read_archive_entry_names<R: Read + Seek>(
   let mut names = Vec::with_capacity(archive.len());
   for entry_index in 0..archive.len() {
     let entry = archive.by_index_raw(entry_index)?;
-    let mut name = entry.name().to_string();
+    let mut name = entry.name()?.into_owned();
     let has_unicode_path = entry
-      .extra_data()
-      .is_some_and(|extra| zip_extra_field_present(extra, ZIP_UNICODE_PATH_EXTRA_FIELD_ID));
+      .extra_data_fields()
+      .any(|field| matches!(field, zip::extra_fields::ExtraField::UnicodePath(_)));
     let central_header_start = entry.central_header_start();
     drop(entry);
 
@@ -3554,24 +3564,6 @@ fn read_archive_entry_names<R: Read + Seek>(
     names.push(name.into_boxed_str());
   }
   Ok(names.into_boxed_slice())
-}
-
-fn zip_extra_field_present(mut extra: &[u8], expected_id: u16) -> bool {
-  while extra.len() >= 4 {
-    let field_id = u16::from_le_bytes([extra[0], extra[1]]);
-    let field_len = usize::from(u16::from_le_bytes([extra[2], extra[3]]));
-    let Some(field_end) = 4usize.checked_add(field_len) else {
-      return false;
-    };
-    if field_end > extra.len() {
-      return false;
-    }
-    if field_id == expected_id {
-      return true;
-    }
-    extra = &extra[field_end..];
-  }
-  false
 }
 
 fn read_utf8_central_directory_name<R: Read + Seek>(
@@ -3604,14 +3596,14 @@ fn read_archive_entry_by_index<R: Read + Seek>(
   let capacity = usize::try_from(entry.size()).map_err(|_| {
     SdkError::CommonError(format!(
       "ZIP entry {} is too large for this platform",
-      entry.name()
+      String::from_utf8_lossy(entry.name_raw())
     ))
   })?;
   let mut bytes = Vec::new();
   bytes.try_reserve_exact(capacity).map_err(|error| {
     SdkError::CommonError(format!(
       "cannot allocate {capacity} bytes for ZIP entry {}: {error}",
-      entry.name()
+      String::from_utf8_lossy(entry.name_raw())
     ))
   })?;
   entry.read_to_end(&mut bytes)?;
@@ -3768,13 +3760,13 @@ mod tests {
     buffer.into_inner().into()
   }
 
-  fn unicode_path_options(target_name: &str) -> zip::write::FullFileOptions<'static> {
+  fn unicode_path_options(target_name: &str) -> zip::write::FullFileOptions<'static, 'static> {
     let mut options =
       zip::write::FullFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     let mut unicode_path = vec![1, 0, 0, 0, 0];
     unicode_path.extend_from_slice(target_name.as_bytes());
     options
-      .add_extra_data(ZIP_UNICODE_PATH_EXTRA_FIELD_ID, unicode_path, false)
+      .add_extra_field(ZIP_UNICODE_PATH_EXTRA_FIELD_ID, unicode_path, false)
       .unwrap();
     options
   }
@@ -3904,6 +3896,29 @@ mod tests {
     let saved = document.to_package_bytes().unwrap();
     assert!(bytes_read.load(AtomicOrdering::Relaxed) >= LAZY_PAYLOAD_LEN);
 
+    let reopened =
+      crate::parts::wordprocessing_document::WordprocessingDocument::new(Cursor::new(saved))
+        .unwrap();
+    reopened
+      .main_document_part()
+      .unwrap()
+      .root_element(&reopened)
+      .unwrap();
+  }
+
+  #[test]
+  fn storage_opens_and_saves_packages_with_a_prepended_prefix() {
+    let mut prefixed = b"prefix before the ZIP archive".to_vec();
+    prefixed.extend_from_slice(&package_with_large_unloaded_part());
+    let document =
+      crate::parts::wordprocessing_document::WordprocessingDocument::new(Cursor::new(prefixed))
+        .unwrap();
+    document
+      .main_document_part()
+      .unwrap()
+      .root_element(&document)
+      .unwrap();
+    let saved = document.to_package_bytes().unwrap();
     let reopened =
       crate::parts::wordprocessing_document::WordprocessingDocument::new(Cursor::new(saved))
         .unwrap();

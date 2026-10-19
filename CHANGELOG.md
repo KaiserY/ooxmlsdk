@@ -1,14 +1,29 @@
 # Change Log
 
-## Unreleased
+## 0.14.0
 
-### Added
+### Breaking Changes
 
-- Reproduced `sml` and `wml` on the XSD projection. `generator_reproduces_sml`
-  and `generator_reproduces_wml` match the checked-in JSON on the XSD-derivable
-  fields. Alias tables for those namespaces stay empty. The `bibliography`
-  name `b:ST_String255` remains an alias on that test only. SDK-only rewrites
-  stay out of the comparison.
+- Upgrade `zip` from 8.6.0 to 9.0.5. `SdkError::ZipError` and its `From`
+  implementation now use `zip::result::ZipError` from zip 9; callers that
+  construct or match this payload using a direct zip dependency must upgrade
+  that dependency as well. The SDK's package entry points are unchanged.
+
+### Changed
+
+- Update compatible `syn` and `thiserror` dependencies while retaining Rust
+  1.88 as the minimum supported Rust version for the published crates.
+- Use zip 9's parsed extra fields for Unicode path recovery without allocating
+  a re-encoded extra-field buffer. Preserve lazy package opening by trying
+  zero-offset ZIP metadata first, with automatic offset detection as a fallback
+  for archives with prepended data. Enable zip's `unreserved` feature so raw
+  copying entries with registered Unix extra fields continues to save.
+
+### Testing
+
+- Passed all 5,477 corpus expectations with zip 9.0.5: 5,366 round-trip cases,
+  16 open-only cases, and 95 invalid-package cases, without changing comparison
+  rules or fixture classifications.
 
 ## 0.13.2
 

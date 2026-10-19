@@ -9,6 +9,8 @@ use crate::simple_type::simple_type_mapping;
 #[derive(Debug, Default)]
 pub(crate) struct ParsedXsd {
   pub target_namespace: String,
+  /// `attributeFormDefault="qualified"` on the schema element.
+  pub attribute_form_qualified: bool,
   /// `xmlns:*` declarations from the schema element: prefix -> URI.
   pub prefixes: BTreeMap<String, String>,
   pub root_elements: BTreeMap<String, ParsedComplexType>,
@@ -134,6 +136,8 @@ pub(crate) fn parse_xsd(source: &str) -> Result<ParsedXsd> {
       Event::Start(e) => match local_name(e.name().as_ref()) {
         b"schema" => {
           parsed.target_namespace = required_attr(&reader, &e, b"targetNamespace")?;
+          parsed.attribute_form_qualified =
+            optional_attr(&reader, &e, b"attributeFormDefault")?.as_deref() == Some("qualified");
           parsed.prefixes = collect_namespaces(&reader, &e)?;
         }
         b"element" => {
@@ -470,6 +474,12 @@ fn parse_type_content(
           }
           skip_element(reader, e.name().as_ref())?;
         }
+        b"group" => {
+          if complex_type.particle.is_none() {
+            complex_type.particle = Some(Box::new(parse_group_ref(reader, &e)?));
+          }
+          skip_element(reader, e.name().as_ref())?;
+        }
         _ => skip_element(reader, e.name().as_ref())?,
       },
       Event::Empty(e) => match local_name(e.name().as_ref()) {
@@ -495,6 +505,9 @@ fn parse_type_content(
           if let Some(reference) = optional_attr(reader, &e, b"ref")? {
             complex_type.attribute_group_refs.push(reference);
           }
+        }
+        b"group" if complex_type.particle.is_none() => {
+          complex_type.particle = Some(Box::new(parse_group_ref(reader, &e)?));
         }
         _ => {}
       },

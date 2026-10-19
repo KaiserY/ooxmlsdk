@@ -1657,8 +1657,9 @@ pub struct PublishSettings {
 }
 ///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "visio:Comments")]
+#[sdk(xml_header, qname = "visio:Comments")]
 pub struct Comments {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(attr(qname = ":ShowCommentTags"))]
   pub show_comment_tags: Option<crate::simple_type::BooleanValue>,
   /// _

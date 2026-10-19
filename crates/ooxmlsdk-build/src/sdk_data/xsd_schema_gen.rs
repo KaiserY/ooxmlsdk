@@ -95,6 +95,15 @@ pub(crate) fn gen_visio_schema(
   let mut schema = gen_open_xml_schema_from_xsd(&source, &cfg)?;
   schema.module_name = VISIO_MODULE_NAME.to_string();
   widen_visio_rel(&mut schema);
+  // `Comments` is also a child of the document, so the element binding is not
+  // the part-root pass. The comments part still uses that element as its root.
+  for schema_type in &mut schema.types {
+    if schema_type.part.is_empty()
+      && let Some(part_name) = cfg.part_root_elements.get(&schema_type.class_name)
+    {
+      schema_type.part = part_name.clone();
+    }
+  }
   for schema_type in &mut schema.types {
     schema_type.module_name = schema.module_name.clone();
   }
@@ -1853,16 +1862,14 @@ mod tests {
         .iter()
         .find(|schema_type| schema_type.name == binding)
         .unwrap_or_else(|| panic!("missing {binding}"));
-      if part.root_element == "Comments" {
-        assert!(schema_type.part.is_empty());
-        continue;
-      }
       assert_eq!(schema_type.part, part.name);
-      assert_eq!(schema_type.base_class, "OpenXmlPartRootElement");
+      if part.root_element != "Comments" {
+        assert_eq!(schema_type.base_class, "OpenXmlPartRootElement");
+      }
       assert_eq!(schema_type.class_name, part.root_element);
       marked += 1;
     }
-    assert_eq!(marked, 8);
+    assert_eq!(marked, 9);
   }
 
   fn generate(body: &str) -> OpenXmlSchema {

@@ -852,7 +852,8 @@ fn build_type(
   let is_leaf_element = !is_leaf_text && children.is_empty() && flat.particle.is_none();
   // `is_derived` means the element binding shares its complex type with other
   // elements. An `xs:extension` base is inlined instead, matching the
-  // checked-in metadata.
+  // checked-in metadata. `sml` and `wml` depend on that. Marking every
+  // derivation derived would bring those projections back.
   let is_derived = shape.derived;
 
   let cfg = schemas.cfg;
@@ -1072,8 +1073,12 @@ fn build_particle_node(
       *_max_occurs,
       stack,
     ),
-    ParsedParticleNode::Any => OpenXmlSchemaTypeParticle {
+    ParsedParticleNode::Any {
+      min_occurs,
+      max_occurs,
+    } => OpenXmlSchemaTypeParticle {
       kind: "Any".to_string(),
+      occurs: occur_list(*min_occurs, *max_occurs),
       ..Default::default()
     },
   }
@@ -1176,7 +1181,7 @@ fn append_group_ref_elements(
         append_group_ref_elements(schemas, owner_prefix, child, children, stack);
       }
     }
-    ParsedParticleNode::Element(_) | ParsedParticleNode::Any => {}
+    ParsedParticleNode::Element(_) | ParsedParticleNode::Any { .. } => {}
     ParsedParticleNode::GroupRef { _reference, .. } => {
       let Some((group, group_prefix)) = schemas.group(owner_prefix, _reference) else {
         return;
@@ -1213,7 +1218,7 @@ fn collect_resolved_elements(
     ParsedParticleNode::GroupRef { .. } => {
       append_group_ref_elements(schemas, owner_prefix, node, children, stack);
     }
-    ParsedParticleNode::Any => {}
+    ParsedParticleNode::Any { .. } => {}
   }
 }
 
@@ -1363,23 +1368,23 @@ fn child_name(schemas: &Schemas<'_>, owner_prefix: &str, child: &ParsedChildElem
 /// Type QName of a child element. An `xsd:element/@ref` has no `type` of its
 /// own; the type is the referenced global element's `type`.
 ///
-/// Name-based children in this parser store an OPC prefix on `q_name` and leave
-/// `element_prefix` empty, so a ref is recognized only when `element_prefix`
-/// is already the prefix of `q_name`.
+/// The parser records `ref` independently from its prefix: a reference using
+/// the schema's default namespace has no lexical prefix.
 fn binding_type(schemas: &Schemas<'_>, child: &ParsedChildElement) -> String {
   if !child.r#type.is_empty() {
     return child.r#type.clone();
   }
-  if child.element_prefix.is_empty()
-    || !child
-      .q_name
-      .starts_with(&format!("{}:", child.element_prefix))
-  {
+  if !child.is_reference {
     return String::new();
   }
 
+  let prefix = if child.element_prefix.is_empty() {
+    schemas.cfg.prefix.as_str()
+  } else {
+    child.element_prefix.as_str()
+  };
   let local = qname_local(&child.q_name);
-  let Some(schema) = schemas.schema_for_prefix(&child.element_prefix) else {
+  let Some(schema) = schemas.schema_for_prefix(prefix) else {
     return String::new();
   };
   let Some(declaration) = schema.root_elements.get(local) else {
@@ -1392,7 +1397,7 @@ fn binding_type(schemas: &Schemas<'_>, child: &ParsedChildElement) -> String {
   if element_type.contains(':') {
     element_type.to_string()
   } else {
-    format!("{}:{element_type}", child.element_prefix)
+    format!("{prefix}:{element_type}")
   }
 }
 
@@ -1858,5 +1863,101 @@ mod tests {
       marked += 1;
     }
     assert_eq!(marked, 8);
+  }
+
+  fn generate(body: &str) -> OpenXmlSchema {
+    let source = format!(
+      r#"<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+          xmlns="urn:test" xmlns:t="urn:test" targetNamespace="urn:test">
+          {body}</xs:schema>"#
+    );
+    gen_open_xml_schema_from_xsd(
+      &source,
+      &NamespaceGenConfig {
+        prefix: "t".into(),
+        ..Default::default()
+      },
+    )
+    .unwrap()
+  }
+
+  #[test]
+  fn simple_content_preserves_text_and_attributes() {
+    for derivation in ["extension", "restriction"] {
+      let schema = generate(&format!(
+        r#"
+        <xs:complexType name="CT_Base"><xs:simpleContent>
+          <xs:extension base="xs:string"><xs:attribute name="id" type="xs:string"/>
+          </xs:extension></xs:simpleContent></xs:complexType>
+        <xs:complexType name="CT_Text"><xs:simpleContent>
+          <xs:{derivation} base="CT_Base"><xs:attribute name="id" type="xs:string"/>
+          </xs:{derivation}></xs:simpleContent></xs:complexType>
+        <xs:element name="text" type="CT_Text"/>"#
+      ));
+      let text = schema
+        .types
+        .iter()
+        .find(|ty| ty.name == "t:CT_Text/t:text")
+        .unwrap();
+      assert!(text.is_leaf_text, "{derivation}");
+      assert!(!text.is_leaf_element);
+      assert_eq!(text.base_class, "OpenXmlLeafTextElement");
+      assert_eq!(text.attributes.len(), 1);
+      assert_eq!(text.attributes[0].q_name, ":id");
+    }
+  }
+
+  #[test]
+  fn global_element_references_resolve_with_and_without_prefix() {
+    for reference in ["child", "t:child"] {
+      let schema = generate(&format!(
+        r#"
+        <xs:element name="root" type="CT_Root"/>
+        <xs:element name="child" type="CT_Child"/>
+        <xs:complexType name="CT_Child"><xs:attribute name="id" type="xs:string"/></xs:complexType>
+        <xs:complexType name="CT_Root"><xs:sequence>
+          <xs:element ref="{reference}"/>
+        </xs:sequence></xs:complexType>"#
+      ));
+      let root = schema
+        .types
+        .iter()
+        .find(|ty| ty.name == "t:CT_Root/t:root")
+        .unwrap();
+      assert_eq!(root.children[0].name, "t:CT_Child/t:child", "{reference}");
+      assert_eq!(root.particle.items[0].name, "t:CT_Child/t:child");
+    }
+  }
+
+  #[test]
+  fn wildcard_occurrences_preserve_optional_repeated_and_default_bounds() {
+    for (attributes, bounds) in [
+      (r#"minOccurs="0" maxOccurs="unbounded""#, Some((None, None))),
+      (r#"minOccurs="2" maxOccurs="3""#, Some((Some(2), Some(3)))),
+      ("", None),
+    ] {
+      for content in [
+        format!("<xs:any {attributes}/>"),
+        format!("<xs:any {attributes}><xs:annotation/></xs:any>"),
+      ] {
+        let schema = generate(&format!(
+          r#"
+          <xs:element name="root" type="CT_Root"/>
+          <xs:complexType name="CT_Root"><xs:sequence>{content}</xs:sequence></xs:complexType>"#
+        ));
+        let root = schema
+          .types
+          .iter()
+          .find(|ty| ty.name == "t:CT_Root/t:root")
+          .unwrap();
+        let wildcard = &root.particle.items[0];
+        assert_eq!(wildcard.kind, "Any");
+        assert_eq!(wildcard.occurs.len(), usize::from(bounds.is_some()));
+        assert_eq!(
+          wildcard.occurs.first().map(|occur| (occur.min, occur.max)),
+          bounds
+        );
+      }
+    }
   }
 }

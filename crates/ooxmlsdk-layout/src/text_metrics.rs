@@ -39,6 +39,9 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
   fn east_asia_font_family(&self) -> Option<&str> {
     self.style.east_asia_font_family()
   }
+  fn drawingml_japanese_font_family(&self) -> Option<&str> {
+    self.style.drawingml_japanese_font_family()
+  }
 
   fn complex_font_family(&self) -> Option<&str> {
     self.style.complex_font_family()
@@ -54,6 +57,9 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
 
   fn complex_script_override(&self) -> Option<bool> {
     self.style.complex_script_override()
+  }
+  fn complex_script_property(&self) -> Option<bool> {
+    self.style.complex_script_property()
   }
 
   fn right_to_left(&self) -> bool {
@@ -121,6 +127,9 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
 
   fn wordprocessingml_font_slots(&self) -> bool {
     self.style.wordprocessingml_font_slots()
+  }
+  fn wordprocessingml_resolved_font_slot(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontSlot> {
+    self.style.wordprocessingml_resolved_font_slot()
   }
 
   fn wordprocessingml_form_text_blank_cell(&self) -> bool {
@@ -395,10 +404,12 @@ struct MeasureStyleKey {
   east_asia_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   complex_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   east_asia_font_family: Option<Box<str>>,
+  drawingml_japanese_font_family: Option<Box<str>>,
   complex_font_family: Option<Box<str>>,
   font_size_bits: u32,
   complex_font_size_bits: Option<u32>,
   complex_script_override: Option<bool>,
+  complex_script_property: Option<bool>,
   right_to_left: bool,
   resolved_bidi_level: Option<u8>,
   wordprocessing_nominal_control_metrics: bool,
@@ -417,6 +428,7 @@ struct MeasureStyleKey {
   wordprocessingml_font_slots: bool,
   wordprocessingml_cjk_line_metrics: bool,
   wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
+  wordprocessingml_resolved_font_slot: Option<ooxmlsdk_fonts::WordprocessingFontSlot>,
   wordprocessingml_east_asia_language_is_chinese: bool,
   wordprocessingml_bidi_language_is_hebrew: bool,
   font_charset: Option<ooxmlsdk_fonts::FontCharset>,
@@ -449,10 +461,12 @@ impl MeasureStyleKey {
       east_asia_font_family_class: style.east_asia_font_family_class(),
       complex_font_family_class: style.complex_font_family_class(),
       east_asia_font_family: style.east_asia_font_family().map(Into::into),
+      drawingml_japanese_font_family: style.drawingml_japanese_font_family().map(Into::into),
       complex_font_family: style.complex_font_family().map(Into::into),
       font_size_bits: style.font_size_pt().to_bits(),
       complex_font_size_bits: style.complex_font_size_pt().map(f32::to_bits),
       complex_script_override: style.complex_script_override(),
+      complex_script_property: style.complex_script_property(),
       right_to_left: style.right_to_left(),
       resolved_bidi_level: style.resolved_bidi_level(),
       wordprocessing_nominal_control_metrics: style.wordprocessing_nominal_control_metrics(),
@@ -476,6 +490,7 @@ impl MeasureStyleKey {
       wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
       wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics(),
       wordprocessingml_font_hint: style.wordprocessingml_font_hint(),
+      wordprocessingml_resolved_font_slot: style.wordprocessingml_resolved_font_slot(),
       wordprocessingml_east_asia_language_is_chinese: style
         .wordprocessingml_east_asia_language_is_chinese(),
       wordprocessingml_bidi_language_is_hebrew: style.wordprocessingml_bidi_language_is_hebrew(),
@@ -514,10 +529,12 @@ impl MeasureStyleKey {
       && self.east_asia_font_family_class == style.east_asia_font_family_class()
       && self.complex_font_family_class == style.complex_font_family_class()
       && self.east_asia_font_family.as_deref() == style.east_asia_font_family()
+      && self.drawingml_japanese_font_family.as_deref() == style.drawingml_japanese_font_family()
       && self.complex_font_family.as_deref() == style.complex_font_family()
       && self.font_size_bits == style.font_size_pt().to_bits()
       && self.complex_font_size_bits == style.complex_font_size_pt().map(f32::to_bits)
       && self.complex_script_override == style.complex_script_override()
+      && self.complex_script_property == style.complex_script_property()
       && self.right_to_left == style.right_to_left()
       && self.resolved_bidi_level == style.resolved_bidi_level()
       && self.wordprocessing_nominal_control_metrics
@@ -543,6 +560,7 @@ impl MeasureStyleKey {
       && self.wordprocessingml_font_slots == style.wordprocessingml_font_slots()
       && self.wordprocessingml_cjk_line_metrics == style.wordprocessingml_cjk_line_metrics()
       && self.wordprocessingml_font_hint == style.wordprocessingml_font_hint()
+      && self.wordprocessingml_resolved_font_slot == style.wordprocessingml_resolved_font_slot()
       && self.wordprocessingml_east_asia_language_is_chinese
         == style.wordprocessingml_east_asia_language_is_chinese()
       && self.wordprocessingml_bidi_language_is_hebrew
@@ -689,6 +707,10 @@ impl TextMetrics {
 
   pub fn into_font_resolver(self) -> FontResolver {
     self.fonts
+  }
+
+  pub(crate) fn has_exact_ascii_face(&mut self, style: &(impl FontStyleRef + ?Sized)) -> bool {
+    self.fonts.has_exact_ascii_face(style)
   }
 
   pub fn measure_text(&mut self, text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
@@ -1213,6 +1235,17 @@ impl TextMetrics {
       .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt()))
   }
 
+  pub(crate) fn realized_cjk_vertical_metrics_for_text(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<TextVerticalMetrics> {
+    self
+      .fonts
+      .realized_cjk_vertical_metrics(text, style)
+      .map(text_vertical_metrics_from_font_metrics)
+  }
+
   pub fn text_decoration_metrics(
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
@@ -1355,6 +1388,34 @@ impl TextMetrics {
     wordprocessingml_line_vertical_metrics(style, metrics)
   }
 
+  pub(crate) fn wordprocessingml_paragraph_mark_line_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<TextVerticalMetrics> {
+    if style.automatic_escapement_font_sizes_pt().is_some() {
+      return None;
+    }
+    if let Some(logical) = self
+      .fonts
+      .wordprocessingml_default_charset_line_metrics(style, " ")
+    {
+      return Some(text_vertical_metrics_from_font_metrics(logical));
+    }
+    if style.wordprocessingml_font_slots()
+      && let Some(runs) = self.fonts.wordprocessingml_line_metric_runs(" ", style)
+      && runs
+        .iter()
+        .any(|metrics| metrics.wordprocessingml_cjk_line_metrics)
+    {
+      // An empty Word paragraph still owns its mark's realized font line
+      // cell. Native empty/visible DengXian, SimSun and Batang controls use
+      // the same CJK side leading. Keep physical font geometry and automatic
+      // escapement separate from this paragraph-mark layout API.
+      return Some(combine_wordprocessingml_line_metric_runs(style, &runs));
+    }
+    None
+  }
+
   pub fn line_vertical_metrics_for_text(
     &mut self,
     text: &str,
@@ -1367,7 +1428,8 @@ impl TextMetrics {
       {
         return text_vertical_metrics_from_font_metrics(logical);
       }
-      if let Some(runs) = self.fonts.wordprocessingml_line_metric_runs(text, style)
+      if style.wordprocessingml_cjk_line_metrics()
+        && let Some(runs) = self.fonts.wordprocessingml_line_metric_runs(text, style)
         && runs
           .iter()
           .any(|metrics| metrics.wordprocessingml_cjk_line_metrics)
@@ -1394,6 +1456,19 @@ impl TextMetrics {
     } else {
       self.vertical_metrics_for_text(text, style)
     };
+    if style.automatic_escapement_font_sizes_pt().is_none()
+      && style.wordprocessingml_font_slots()
+      && metrics.wordprocessingml_cjk_line_metrics
+      && let Some(runs) = self.fonts.wordprocessingml_line_metric_runs(text, style)
+    {
+      // Word's CJK font line cell is independent of noLeading/useFELayout.
+      // Native DengXian, SimSun and Batang controls retain their side leading
+      // with either setting omitted, disabled or enabled, for Latin and CJK
+      // text. Adjust each realized face before combining a mixed line. Keep
+      // automatic escapement and the generic no-text metric API on their
+      // established physical-metric paths.
+      return combine_wordprocessingml_line_metric_runs(style, &runs);
+    }
     wordprocessingml_line_vertical_metrics(style, metrics)
   }
 
@@ -1431,7 +1506,7 @@ fn combine_wordprocessingml_line_metric_runs(
   let adjusted = runs
     .iter()
     .map(|metrics| {
-      wordprocessingml_line_vertical_metrics(
+      wordprocessingml_text_line_vertical_metrics(
         style,
         text_vertical_metrics_from_font_metrics(*metrics),
       )
@@ -1466,6 +1541,17 @@ fn combine_wordprocessingml_line_metric_runs(
       .fold(0.0, f32::max),
     directwrite_baseline_offset_pt: top,
     wordprocessingml_cjk_line_metrics: true,
+  }
+}
+
+fn wordprocessingml_text_line_vertical_metrics(
+  style: &(impl FontStyleRef + ?Sized),
+  metrics: TextVerticalMetrics,
+) -> TextVerticalMetrics {
+  if style.wordprocessingml_font_slots() && metrics.wordprocessingml_cjk_line_metrics {
+    wordprocessingml_side_leading(metrics)
+  } else {
+    metrics
   }
 }
 
@@ -2351,6 +2437,52 @@ mod tests {
   }
 
   #[test]
+  fn wordprocessing_rtl_measurement_separates_explicit_cs_and_painted_slots() {
+    let rtl = crate::model::TextStyle {
+      font_family: Some(Arc::from("Calibri")),
+      complex_font_family: Some(Arc::from("Times New Roman")),
+      right_to_left: Some(true),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let cs = crate::model::TextStyle {
+      complex_script: Some(true),
+      ..rtl.clone()
+    };
+    let selected_cs = crate::model::TextStyle {
+      wordprocessingml_resolved_font_slot: Some(
+        ooxmlsdk_fonts::WordprocessingFontSlot::ComplexScript,
+      ),
+      ..rtl.clone()
+    };
+    let mut metrics = TextMetrics::new();
+    let latin_width = metrics.measure_text("123", &rtl);
+    let complex_width = metrics.measure_text("123", &cs);
+    assert!((latin_width - complex_width).abs() > 0.1);
+    assert_eq!(metrics.measure_text("123", &selected_cs), complex_width);
+    assert_eq!(metrics.measure_text("123", &rtl), latin_width);
+  }
+
+  #[test]
+  fn drawingml_chart_measurement_cache_distinguishes_the_japanese_theme_face() {
+    let style = crate::model::TextStyle {
+      east_asia_font_family: Some(Arc::from("SimSun")),
+      drawingml_japanese_font_family: Some(Arc::from("MS Mincho")),
+      ..Default::default()
+    };
+    let key = super::MeasureStyleKey::from_style(&style);
+    assert!(key.matches(&style));
+    let explicit = crate::model::TextStyle {
+      drawingml_japanese_font_family: None,
+      ..style
+    };
+    assert!(
+      !key.matches(&explicit),
+      "equal Han faces do not imply equal kana faces"
+    );
+  }
+
+  #[test]
   fn measurement_cache_keys_every_shaping_feature() {
     let plain = test_style();
     let mut old_style = plain.clone();
@@ -2598,6 +2730,13 @@ mod tests {
         (actual.line_height_pt() - expected_step).abs() < 0.05,
         "{family}: {actual:?}"
       );
+      let implicit_mark = metrics
+        .wordprocessingml_paragraph_mark_line_metrics(&style)
+        .unwrap_or_else(|| metrics.line_vertical_metrics(&style));
+      assert!(
+        (implicit_mark.line_height_pt() - expected_step).abs() < 0.05,
+        "{family} paragraph mark: {implicit_mark:?}"
+      );
       let physical = metrics.vertical_metrics(&style);
       let drawing = TextStyle {
         wordprocessingml_font_slots: false,
@@ -2674,6 +2813,15 @@ mod tests {
       wordprocessingml_line_vertical_metrics(&no_leading_unset, metrics),
       metrics
     );
+    // Native noLeading/useFELayout controls leave actual Word text's CJK
+    // line cell unchanged. The no-text API above still exposes raw metrics.
+    let text_adjusted = wordprocessingml_text_line_vertical_metrics(&no_leading_unset, metrics);
+    assert!((text_adjusted.line_height_pt() - 33.8).abs() < 0.0001);
+    assert!((text_adjusted.directwrite_baseline_offset_pt - 23.9).abs() < 0.0001);
+    assert_eq!(
+      wordprocessingml_text_line_vertical_metrics(&drawingml, metrics),
+      metrics
+    );
     assert_eq!(
       wordprocessingml_line_vertical_metrics(
         &style,
@@ -2687,6 +2835,75 @@ mod tests {
         ..metrics
       }
     );
+  }
+
+  #[test]
+  fn word_cjk_text_line_metrics_ignore_the_legacy_switch_and_keep_geometry_physical() {
+    let mut metrics = TextMetrics::new();
+    for (family, expected_height) in [("DengXian", 14.900488), ("SimSun", 14.3), ("Batang", 14.3)] {
+      let mut previous_line = None;
+      for legacy_cjk_switch in [false, true] {
+        let style = crate::model::TextStyle {
+          font_family: Some(Arc::from(family)),
+          high_ansi_font_family: Some(Arc::from(family)),
+          east_asia_font_family: Some(Arc::from(family)),
+          font_size_pt: 11.0,
+          use_windows_font_metrics: true,
+          wordprocessingml_font_slots: true,
+          wordprocessingml_cjk_line_metrics: legacy_cjk_switch,
+          ..Default::default()
+        };
+        let line = metrics.line_vertical_metrics_for_text("TARGET", &style);
+        assert!(
+          (line.line_height_pt() - expected_height).abs() < 0.03,
+          "{family}: {line:?}"
+        );
+        if let Some(previous) = previous_line {
+          assert_eq!(line, previous, "{family}");
+        }
+        previous_line = Some(line);
+        if family == "DengXian" {
+          assert!((line.directwrite_baseline_offset_pt - 10.629932).abs() < 0.0001);
+        }
+        let physical = metrics.vertical_metrics_for_text("TARGET", &style);
+        assert!(physical.line_height_pt() < line.line_height_pt());
+        assert_eq!(
+          metrics.wordprocessingml_paragraph_mark_line_metrics(&style),
+          Some(line),
+          "{family}: empty mark keeps the same CJK line cell"
+        );
+        let automatic_mark = crate::model::TextStyle {
+          automatic_escapement_font_size_pt: Some(style.font_size_pt),
+          ..style.clone()
+        };
+        assert!(
+          metrics
+            .wordprocessingml_paragraph_mark_line_metrics(&automatic_mark)
+            .is_none()
+        );
+        if !legacy_cjk_switch {
+          assert_eq!(metrics.line_vertical_metrics(&style), physical);
+        }
+      }
+    }
+    for family in ["Arial", "Calibri"] {
+      let style = crate::model::TextStyle {
+        font_family: Some(Arc::from(family)),
+        font_size_pt: 11.0,
+        use_windows_font_metrics: true,
+        wordprocessingml_font_slots: true,
+        ..Default::default()
+      };
+      assert_eq!(
+        metrics.line_vertical_metrics_for_text("TARGET", &style),
+        metrics.vertical_metrics_for_text("TARGET", &style)
+      );
+      assert!(
+        metrics
+          .wordprocessingml_paragraph_mark_line_metrics(&style)
+          .is_none()
+      );
+    }
   }
 
   fn test_style() -> TextStyle<'static> {

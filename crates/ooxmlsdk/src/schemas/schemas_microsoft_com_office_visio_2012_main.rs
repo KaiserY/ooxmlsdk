@@ -176,7 +176,7 @@ pub struct VisioDocument {
   pub comments: Option<std::boxed::Box<Comments>>,
   /// _
   #[sdk(any)]
-  pub unknown_xml: std::boxed::Box<[u8]>,
+  pub unknown_xml: Vec<std::boxed::Box<[u8]>>,
 }
 ///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

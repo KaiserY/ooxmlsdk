@@ -150,6 +150,10 @@ pub struct TextStyle {
   pub east_asia_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   pub complex_font_family_class: Option<ooxmlsdk_fonts::FontFamilyClass>,
   pub east_asia_font_family: Option<Arc<str>>,
+  /// DrawingML's unresolved East Asian theme slot selects Jpan for kana,
+  /// independently of the Han face selected by the authoring language.
+  /// An explicit East Asian typeface clears this supplemental theme choice.
+  pub drawingml_japanese_font_family: Option<Arc<str>>,
   pub complex_font_family: Option<Arc<str>>,
   pub symbol_font_family: Option<Arc<str>>,
   /// This text was authored through an explicit OOXML symbol-character
@@ -165,6 +169,9 @@ pub struct TextStyle {
   pub bidi_language: Option<Arc<str>>,
   /// Effective WordprocessingML `w:rFonts/@w:hint` for ambiguous font slots.
   pub wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
+  /// Painted font slot selected from the complete source portion, independently
+  /// of later line-break, automatic-spacing and shaping-script boundaries.
+  pub wordprocessingml_resolved_font_slot: Option<ooxmlsdk_fonts::WordprocessingFontSlot>,
   /// Character sets declared by the effective WordprocessingML font-table
   /// entries.  These belong to the four rFonts faces independently; they do
   /// not reclassify the Unicode characters into another rFonts slot.
@@ -360,6 +367,7 @@ impl Default for TextStyle {
       east_asia_font_family_class: None,
       complex_font_family_class: None,
       east_asia_font_family: None,
+      drawingml_japanese_font_family: None,
       complex_font_family: None,
       symbol_font_family: None,
       explicit_symbol_character: false,
@@ -367,6 +375,7 @@ impl Default for TextStyle {
       east_asia_language: None,
       bidi_language: None,
       wordprocessingml_font_hint: None,
+      wordprocessingml_resolved_font_slot: None,
       font_charset: None,
       high_ansi_font_charset: None,
       east_asia_font_charset: None,
@@ -809,6 +818,9 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     east_asia_font_family: style
       .east_asia_font_family
       .map(|value| Cow::Owned(value.to_string())),
+    drawingml_japanese_font_family: style
+      .drawingml_japanese_font_family
+      .map(|value| Cow::Owned(value.to_string())),
     complex_font_family: style
       .complex_font_family
       .map(|value| Cow::Owned(value.to_string())),
@@ -817,6 +829,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
       .map(|value| Cow::Owned(value.to_string())),
     explicit_symbol_character: style.explicit_symbol_character,
     wordprocessingml_font_hint: style.wordprocessingml_font_hint,
+    wordprocessingml_resolved_font_slot: style.wordprocessingml_resolved_font_slot,
     wordprocessingml_east_asia_language_is_chinese: style
       .east_asia_language
       .as_deref()

@@ -3463,7 +3463,13 @@ fn build_generic_children_members(
       docs: "Arbitrary child XML elements.".to_string(),
       version: effective_version(resolved_children[0].version, choice_version.as_str()).to_string(),
       wire: FieldWireDecl::Any,
-      cardinality: Cardinality::Many,
+      cardinality: if resolved_children[0].repeated {
+        Cardinality::Many
+      } else if resolved_children[0].optional {
+        Cardinality::Optional
+      } else {
+        Cardinality::One
+      },
       type_ref: TypeRefDecl {
         rust_type: "std::boxed::Box<[u8]>".to_string(),
         module_path: None,
@@ -6845,54 +6851,63 @@ mod tests {
 
   #[test]
   fn classifies_any_only_without_source_composite_kind() {
-    let schema = Schema {
-      module_name: "test_module".to_string(),
-      target_namespace: "urn:test".to_string(),
-      prefix: "t".to_string(),
-      typed_namespace: "Test.Namespace".to_string(),
-      types: vec![SchemaType {
-        name: "t:CT_Any/t:any".to_string(),
-        class_name: "AnyHolder".to_string(),
-        kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
-        children: vec![SchemaTypeChild {
-          particle_id: String::new(),
-          kind: SchemaTypeChildKind::Any,
-          property_name: "UnknownXml".to_string(),
+    for (optional, repeated, expected) in [
+      (false, false, Cardinality::One),
+      (true, false, Cardinality::Optional),
+      (false, true, Cardinality::Many),
+      (true, true, Cardinality::Many),
+    ] {
+      let schema = Schema {
+        module_name: "test_module".to_string(),
+        target_namespace: "urn:test".to_string(),
+        prefix: "t".to_string(),
+        typed_namespace: "Test.Namespace".to_string(),
+        types: vec![SchemaType {
+          name: "t:CT_Any/t:any".to_string(),
+          class_name: "AnyHolder".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          children: vec![SchemaTypeChild {
+            particle_id: String::new(),
+            kind: SchemaTypeChildKind::Any,
+            property_name: "UnknownXml".to_string(),
+            optional,
+            repeated,
+            ..Default::default()
+          }],
           ..Default::default()
         }],
         ..Default::default()
-      }],
-      ..Default::default()
-    };
-    let context = CodegenContext::new(std::slice::from_ref(&schema));
+      };
+      let context = CodegenContext::new(std::slice::from_ref(&schema));
 
-    let ir = build_codegen_ir(&schema, &context).unwrap();
+      let ir = build_codegen_ir(&schema, &context).unwrap();
 
-    let holder = ir
-      .types
-      .iter()
-      .find(|ty| ty.rust_name == "AnyHolder")
-      .unwrap();
-    assert_eq!(
-      holder.content_model,
-      Some(ContentModelDecl::SequenceAnyOnly)
-    );
-    let field = holder
-      .members
-      .iter()
-      .find_map(|member| match member {
-        MemberDecl::Field(field) => Some(field),
-        _ => None,
-      })
-      .unwrap();
-    assert_eq!(field.cardinality, Cardinality::Many);
-    assert_eq!(field.rust_name, "xml_children");
-    assert!(matches!(field.wire, FieldWireDecl::Any));
-    assert_eq!(field.type_ref.rust_type, "std::boxed::Box<[u8]>");
-    assert!(
-      ir.types.iter().all(|ty| ty.rust_name != "AnyHolderChoice"),
-      "single-any holders should not emit wrapper choice enums"
-    );
+      let holder = ir
+        .types
+        .iter()
+        .find(|ty| ty.rust_name == "AnyHolder")
+        .unwrap();
+      assert_eq!(
+        holder.content_model,
+        Some(ContentModelDecl::SequenceAnyOnly)
+      );
+      let field = holder
+        .members
+        .iter()
+        .find_map(|member| match member {
+          MemberDecl::Field(field) => Some(field),
+          _ => None,
+        })
+        .unwrap();
+      assert_eq!(field.cardinality, expected);
+      assert_eq!(field.rust_name, "xml_children");
+      assert!(matches!(field.wire, FieldWireDecl::Any));
+      assert_eq!(field.type_ref.rust_type, "std::boxed::Box<[u8]>");
+      assert!(
+        ir.types.iter().all(|ty| ty.rust_name != "AnyHolderChoice"),
+        "single-any holders should not emit wrapper choice enums"
+      );
+    }
   }
 
   #[test]

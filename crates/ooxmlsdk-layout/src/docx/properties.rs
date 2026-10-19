@@ -57,14 +57,66 @@ pub(super) fn paragraph_format(
   direct_properties: Option<ParagraphProps<'_>>,
 ) -> ParagraphFormat {
   let mut format = styles.paragraph_format_with_base(style_id, base_format);
-  let inherited_bidi = format.bidi;
+  // Word ignores a sole empty header paragraph while its layout properties
+  // retain the paragraph style. Native controls activate that story when
+  // direct alignment, direction, spacing, pagination, indent or tabs differ.
+  // Run/paragraph-mark fonts and merely authoring the same value do not.
+  // Compare resolved values before source-presence flags obscure inheritance.
+  let header_layout = |format: &ParagraphFormat| {
+    let mut justification = format.justification;
+    justification.adjust = match justification.adjust {
+      super::ParagraphAdjust::Start => super::ParagraphAdjust::Left,
+      super::ParagraphAdjust::End => super::ParagraphAdjust::Right,
+      value => value,
+    };
+    justification.logical_start = false;
+    justification.physical_left = false;
+    (
+      (
+        format.bidi,
+        format.alignment,
+        justification,
+        format.keep_with_next,
+        format.keep_lines,
+        format.widow_control.unwrap_or(true),
+        format.contextual_spacing,
+      ),
+      (
+        format.spacing_before_pt,
+        format.spacing_before_lines.unwrap_or(0.0),
+        format.spacing_before_auto.unwrap_or(false),
+        format.spacing_before_auto_pt.unwrap_or(0.0),
+        format.spacing_after_pt,
+        format.spacing_after_lines.unwrap_or(0.0),
+        format.spacing_after_auto.unwrap_or(false),
+        format.spacing_after_auto_pt.unwrap_or(0.0),
+      ),
+      (
+        format.line_height_rule,
+        format.line_height_pt.unwrap_or(1.0),
+      ),
+      (
+        format.indent_left_pt,
+        format.indent_right_pt,
+        format.first_line_indent_pt,
+        format.indent_left_character_units,
+        format.indent_right_character_units,
+        format.first_line_indent_character_units,
+      ),
+      (
+        format.tab_stops.clone(),
+        format.tab_stop_clear_positions_pt.clone(),
+      ),
+    )
+  };
+  let inherited_header_layout = header_layout(&format);
   merge_paragraph_format_with_theme(
     &mut format,
     direct_properties,
     styles.import_settings,
     &styles.theme_colors,
   );
-  format.bidi_differs_from_style = format.bidi != inherited_bidi;
+  format.header_layout_differs_from_style = header_layout(&format) != inherited_header_layout;
   format
 }
 
@@ -1099,13 +1151,6 @@ fn w14_effect_alignment(alignment: Option<w14::RectangleAlignmentValues>) -> (f3
   }
 }
 
-fn is_explicit_font_family(value: &str) -> bool {
-  let value = value.trim();
-  !value.is_empty()
-    && !value.eq_ignore_ascii_case("default")
-    && !value.eq_ignore_ascii_case("inherit")
-}
-
 fn resolve_word_run_font(
   direct: Option<&str>,
   theme: Option<w::ThemeFontValues>,
@@ -1120,8 +1165,11 @@ fn resolve_word_run_font(
       // theme recovery itself.
       .or_else(|| Some(Arc::from("Times New Roman")));
   }
+  // ECMA-376 Part 1 §17.3.2.26 supplies a font name (ST_String), not a CSS
+  // value. Only an absent name inherits: native Word retains "inherit" and
+  // "default" as explicit missing faces, then applies its font mapper.
   direct
-    .filter(|value| is_explicit_font_family(value))
+    .filter(|value| !value.trim().is_empty())
     .map(Arc::from)
 }
 
@@ -1190,6 +1238,137 @@ fn highlight_color(value: w::HighlightColorValues) -> Option<super::RgbColor> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn word_font_names_do_not_use_css_inheritance_keywords() {
+    for name in ["inherit", "default", "InHerIt", "DEFAULT"] {
+      let xml = format!(
+        r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rFonts w:ascii="{name}" w:hAnsi="{name}" w:eastAsia="{name}" w:cs="{name}"/></w:rPr>"#
+      );
+      let direct = w::RunProperties::from_bytes(xml.as_bytes()).unwrap();
+      let mut style = TextStyle {
+        font_family: Some(Arc::from("Aptos")),
+        high_ansi_font_family: Some(Arc::from("Arial")),
+        east_asia_font_family: Some(Arc::from("SimSun")),
+        complex_font_family: Some(Arc::from("Times New Roman")),
+        ..TextStyle::default()
+      };
+      merge_run_style(
+        &mut style,
+        Some(RunProps::Direct(&direct)),
+        &ThemeFonts::default(),
+        &ThemeColors::default(),
+      );
+      assert_eq!(style.font_family.as_deref(), Some(name));
+      assert_eq!(style.high_ansi_font_family.as_deref(), Some(name));
+      assert_eq!(style.east_asia_font_family.as_deref(), Some(name));
+      assert_eq!(style.complex_font_family.as_deref(), Some(name));
+    }
+  }
+
+  #[test]
+  fn literal_word_font_names_keep_same_element_theme_precedence() {
+    let theme = ThemeFonts {
+      minor_ascii: Some(Arc::from("Aptos")),
+      ..ThemeFonts::default()
+    };
+    for name in ["inherit", "default"] {
+      assert_eq!(
+        resolve_word_run_font(Some(name), Some(w::ThemeFontValues::MinorAscii), &theme).as_deref(),
+        Some("Aptos")
+      );
+    }
+    assert_eq!(resolve_word_run_font(None, None, &theme), None);
+    assert_eq!(resolve_word_run_font(Some(" "), None, &theme), None);
+  }
+
+  #[test]
+  fn empty_header_layout_compares_effective_paragraph_properties() {
+    let styles = StylesCatalog {
+      doc_default_paragraph: ParagraphFormat {
+        spacing_after_pt: 10.0,
+        line_height_pt: Some(1.15),
+        ..ParagraphFormat::default()
+      },
+      ..StylesCatalog::default()
+    };
+    for (properties, changed) in [
+      ("", false),
+      (r#"<w:jc w:val="left"/>"#, false),
+      (r#"<w:jc w:val="center"/>"#, true),
+      (r#"<w:jc w:val="right"/>"#, true),
+      (r#"<w:bidi w:val="0"/>"#, false),
+      (r#"<w:bidi/>"#, true),
+      (r#"<w:widowControl/>"#, false),
+      (r#"<w:widowControl w:val="0"/>"#, true),
+      (
+        r#"<w:spacing w:before="0" w:after="200" w:line="276" w:lineRule="auto"/>"#,
+        false,
+      ),
+      (r#"<w:spacing w:before="200"/>"#, true),
+      (r#"<w:spacing w:after="0"/>"#, true),
+      (r#"<w:spacing w:line="480" w:lineRule="exact"/>"#, true),
+      (r#"<w:keepNext w:val="0"/>"#, false),
+      (r#"<w:keepNext/>"#, true),
+      (r#"<w:keepLines/>"#, true),
+      (r#"<w:contextualSpacing w:val="0"/>"#, false),
+      (r#"<w:contextualSpacing/>"#, true),
+      (r#"<w:ind w:left="720"/>"#, true),
+      (
+        r#"<w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs>"#,
+        true,
+      ),
+      (
+        r#"<w:rPr><w:rFonts w:ascii="Calibri"/><w:sz w:val="48"/><w:lang w:val="en-AU"/></w:rPr>"#,
+        false,
+      ),
+    ] {
+      let xml = format!(
+        r#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{properties}</w:pPr>"#
+      );
+      let direct = w::ParagraphProperties::from_bytes(xml.as_bytes()).unwrap();
+      let got = paragraph_format(
+        &styles,
+        None,
+        ParagraphFormat::default(),
+        Some(ParagraphProps::Direct(&direct)),
+      );
+      assert_eq!(
+        got.header_layout_differs_from_style, changed,
+        "{properties}"
+      );
+    }
+  }
+
+  #[test]
+  fn empty_header_layout_keeps_identical_style_overrides_inactive() {
+    let styles = StylesCatalog {
+      doc_default_paragraph: ParagraphFormat {
+        alignment: super::super::ParagraphAlignment::Center,
+        justification: super::super::ParagraphJustification {
+          adjust: super::super::ParagraphAdjust::Center,
+          ..Default::default()
+        },
+        widow_control: Some(false),
+        ..ParagraphFormat::default()
+      },
+      ..StylesCatalog::default()
+    };
+    for (alignment, changed) in [("center", false), ("left", true)] {
+      let xml = format!(
+        r#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:widowControl w:val="0"/><w:jc w:val="{alignment}"/></w:pPr>"#
+      );
+      let direct = w::ParagraphProperties::from_bytes(xml.as_bytes()).unwrap();
+      let got = paragraph_format(
+        &styles,
+        None,
+        ParagraphFormat::default(),
+        Some(ParagraphProps::Direct(&direct)),
+      );
+      assert_eq!(got.header_layout_differs_from_style, changed);
+    }
+  }
 
   #[test]
   fn word_highlight_palette_matches_ecma_and_office() {

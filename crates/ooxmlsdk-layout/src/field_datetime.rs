@@ -74,7 +74,7 @@ pub(crate) fn format_date_time_field(
   }
   match default_format {
     DefaultFieldFormat::Date => format_office_short_date(language, value),
-    DefaultFieldFormat::Time => format_office_default_time(language, value),
+    DefaultFieldFormat::Time => format_word_default_time(language, value),
     DefaultFieldFormat::DocumentDateTime => format_office_document_date_time(language, value),
   }
 }
@@ -84,6 +84,36 @@ enum DefaultFieldFormat {
   Date,
   Time,
   DocumentDateTime,
+}
+
+fn format_word_default_time(language: Option<&str>, value: FieldUpdateDateTime) -> Option<String> {
+  // ECMA-376 §17.16.5.65 leaves the omitted picture application-defined.
+  // Native Word fields differ from both CLDR medium time and the Windows
+  // short-time picture: e.g. Russian/English-GB use a twelve-hour clock,
+  // Chinese uses units, and Japanese puts the day period before those units.
+  // Keep the independently verified SpreadsheetML/DrawingML path unchanged.
+  let locale = language.and_then(canonical_locale);
+  let profile = locale.as_ref().map(|locale| {
+    (
+      locale.id.language.as_str(),
+      locale.id.region.as_ref().map(|region| region.as_str()),
+    )
+  });
+  match profile {
+    Some(("zh", Some("CN"))) => format_word_picture("H'时'm'分'", language, value),
+    Some(("ja", Some("JP"))) => format_word_picture("am/pmh'時'm'分'", language, value),
+    // The default Taiwan field uses English AM/PM; an explicit picture
+    // instead uses the document language's Chinese designators.
+    Some(("zh", Some("TW"))) => format_word_picture("h:mm am/pm", Some("en-US"), value),
+    Some(("en", Some("US" | "GB" | "IN")))
+    | Some(("ru", Some("RU")))
+    | Some(("de", Some("DE")))
+    | Some(("fr", Some("FR")))
+    | Some(("es", Some("ES" | "MX"))) => format_word_picture("h:mm am/pm", language, value),
+    // Preserve existing behavior for locales without native default-field
+    // evidence; never infer a Word policy from a CLDR or NLS pattern alone.
+    _ => format_office_default_time(language, value),
+  }
 }
 
 pub(crate) fn format_office_short_date(
@@ -325,7 +355,7 @@ fn format_picture(
   language: Option<&str>,
   value: FieldUpdateDateTime,
 ) -> Option<String> {
-  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(picture, false)?;
+  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(picture, None)?;
   format_icu_picture(&pattern, language, value, abbreviate_day_period)
 }
 
@@ -334,18 +364,23 @@ fn format_word_picture(
   language: Option<&str>,
   value: FieldUpdateDateTime,
 ) -> Option<String> {
-  // Word formats field-picture day periods with Windows NLS data. Spanish
-  // (Spain) exposes empty NLS AM/PM designators even though ICU supplies
-  // localized `a. m.`/`p. m.` names. Keep this Word-only so DrawingML and
+  // Word formats field-picture day periods with Windows NLS data. Russian,
+  // German, French and Spanish (Spain) expose empty NLS AM/PM designators
+  // even though ICU supplies localized names; Mexican Spanish has spaces
+  // in its NLS designators. Keep this Word-only so DrawingML and
   // SpreadsheetML continue to use their separately verified ICU behavior.
-  let empty_day_period = language.and_then(canonical_locale).is_some_and(|locale| {
-    locale.id.language.as_str() == "es"
-      && locale
-        .id
-        .region
-        .is_some_and(|region| region.as_str() == "ES")
+  let day_period_override = language.and_then(canonical_locale).and_then(|locale| {
+    match (
+      locale.id.language.as_str(),
+      locale.id.region.as_ref().map(|region| region.as_str()),
+    ) {
+      ("es", Some("ES")) | ("ru", Some("RU")) | ("de", Some("DE")) | ("fr", Some("FR")) => Some(""),
+      ("es", Some("MX")) => Some(if value.hour < 12 { "a. m." } else { "p. m." }),
+      _ => None,
+    }
   });
-  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(picture, empty_day_period)?;
+  let (pattern, abbreviate_day_period) =
+    office_picture_to_icu_pattern(picture, day_period_override)?;
   format_icu_picture(&pattern, language, value, abbreviate_day_period)
 }
 
@@ -373,7 +408,10 @@ fn format_icu_picture(
   Some(normalize_office_field_output(formatted, language))
 }
 
-fn office_picture_to_icu_pattern(picture: &str, empty_day_period: bool) -> Option<(String, bool)> {
+fn office_picture_to_icu_pattern(
+  picture: &str,
+  day_period_override: Option<&str>,
+) -> Option<(String, bool)> {
   let chars = picture.chars().collect::<Vec<_>>();
   let mut output = String::new();
   let mut index = 0;
@@ -404,14 +442,22 @@ fn office_picture_to_icu_pattern(picture: &str, empty_day_period: bool) -> Optio
       continue;
     }
     if ascii_prefix_eq_ignore_case(&chars[index..], "am/pm") {
-      if !empty_day_period {
+      if let Some(designator) = day_period_override {
+        if !designator.is_empty() {
+          push_icu_quoted_literal(&mut output, designator);
+        }
+      } else {
         output.push('a');
       }
       index += "am/pm".len();
       continue;
     }
     if ascii_prefix_eq_ignore_case(&chars[index..], "a/p") {
-      if !empty_day_period {
+      if let Some(designator) = day_period_override {
+        if let Some(abbreviated) = designator.chars().next() {
+          push_icu_quoted_literal(&mut output, &abbreviated.to_string());
+        }
+      } else {
         output.push('\'');
         output.push(ABBREVIATED_DAY_PERIOD_MARKER);
         output.push('\'');
@@ -479,7 +525,7 @@ pub(crate) fn format_spreadsheet_date_picture_with_weekday(
   let language = embedded_language.as_deref().or(fallback_language);
   let anchor = spreadsheet_calendar_anchor(value);
   let picture = spreadsheet_date_picture_to_field_picture(picture, language, anchor)?;
-  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(&picture, false)?;
+  let (pattern, abbreviate_day_period) = office_picture_to_icu_pattern(&picture, None)?;
   let pattern = spreadsheet_calendar_pattern(&pattern, language, value, compatibility_weekday)?;
   format_icu_picture(&pattern, language, anchor, abbreviate_day_period)
 }
@@ -1040,6 +1086,75 @@ mod tests {
 
   fn tokens(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_string()).collect()
+  }
+
+  #[test]
+  fn word_default_time_uses_native_field_pictures_without_changing_shared_time() {
+    for (locale, expected) in [
+      ("ru-RU", "8:19 "),
+      ("en-US", "8:19 PM"),
+      ("en-GB", "8:19 PM"),
+      ("en-IN", "8:19 PM"),
+      ("de-DE", "8:19 "),
+      ("fr-FR", "8:19 "),
+      ("es-ES", "8:19 "),
+      ("es-MX", "8:19 p. m."),
+      ("zh-CN", "20时19分"),
+      ("zh-TW", "8:19 PM"),
+      ("ja-JP", "午後8時19分"),
+    ] {
+      assert_eq!(
+        format_date_time_field(
+          &tokens(&["TIME", r"\*", "MERGEFORMAT"]),
+          Some(locale),
+          VALUE
+        )
+        .as_deref(),
+        Some(expected),
+        "{locale}"
+      );
+      assert_eq!(
+        format_date_time_field(&tokens(&["TIME", r"\@", "H:mm:ss"]), Some(locale), VALUE)
+          .as_deref(),
+        Some("20:19:54")
+      );
+    }
+    assert_eq!(
+      format_office_default_time(Some("ru-RU"), VALUE).as_deref(),
+      Some("20:19:54")
+    );
+    assert_eq!(
+      format_office_default_time(Some("zh-CN"), VALUE).as_deref(),
+      Some("20:19:54")
+    );
+    for (hour, expected) in [(0, "12:19 "), (6, "6:19 "), (12, "12:19 "), (18, "6:19 ")] {
+      assert_eq!(
+        format_date_time_field(
+          &tokens(&["TIME"]),
+          Some("ru-RU"),
+          FieldUpdateDateTime { hour, ..VALUE }
+        )
+        .as_deref(),
+        Some(expected)
+      );
+    }
+  }
+
+  #[test]
+  fn word_explicit_day_period_uses_proven_empty_windows_designators() {
+    for locale in ["ru-RU", "de-DE", "fr-FR", "es-ES"] {
+      for picture in ["h:mm am/pm", "h:mm AM/PM", "h:mm a/p"] {
+        assert_eq!(
+          format_date_time_field(&tokens(&["TIME", r"\@", picture]), Some(locale), VALUE)
+            .as_deref(),
+          Some("8:19 ")
+        );
+      }
+    }
+    assert_eq!(
+      super::format_date_time_picture("h:mm am/pm", Some("ru-RU"), VALUE).as_deref(),
+      Some("8:19 PM")
+    );
   }
 
   #[test]

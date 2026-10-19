@@ -4,22 +4,11 @@
 
 ### Added
 
-- Added a general XSD -> `data/schemas` producer (`ooxmlsdk-build`'s
-  `sdk_data::xsd_schema_gen`) that derives stage-1 schema metadata from an XSD.
-  `gen_sdk_data` loads `schemas/VisioXMLSchema/visio-main.xsd` when that file is
-  present and keeps the schema in memory. Checked-in `data/schemas` files stay
-  as they are. The Visio XSD file keeps
-  `http://schemas.microsoft.com/office/visio/2011/1/core`. The generated schema
-  URI is `http://schemas.microsoft.com/office/visio/2012/main`. Acceptance tests reproduce
-  the `additionalCharacteristics` and `bibliography` namespaces on the XSD-derivable
-  projection, and so do `pml`, `sml`, and `wml`. `bibliography` elements typed
-  as `s:ST_String` or `s:ST_Lang` are emitted as `b:ST_String255` through an
-  explicit alias, because that SDK name is not in the transitional XSD. `pml`,
-  `sml`, and `wml` are not aligned with aliases: the comparison leaves out
-  per-parent extension lists, Office 2010 attributes and elements, versioned
-  occurs, and type names that exist only in the checked-in JSON.
-  `xsd:element/@ref` resolves to the referenced
-  element's type, so `a:graphic` is `a:CT_GraphicalObject`.
+- Reproduced `sml` and `wml` on the XSD projection. `generator_reproduces_sml`
+  and `generator_reproduces_wml` match the checked-in JSON on the XSD-derivable
+  fields. Alias tables for those namespaces stay empty. The `bibliography`
+  name `b:ST_String255` remains an alias on that test only. SDK-only rewrites
+  stay out of the comparison.
 - Added `VisioDocumentType` for the six Visio main-part content types. The part
   JSON keeps the drawing content type. Macro-enabled packages can carry the
   existing `VbaProjectPart` as an optional child of `VisioDocumentPart`.
@@ -30,33 +19,51 @@
 - Folded structural `xsd:alternative` bodies into the element a document reads.
   Assert-only alternatives such as `PinX_Type` stay off the type list. `Section`
   keeps one row that can hold `Del`, `N`, `LocalName`, `IX`, `T`, repeated cells,
-  and `Tab`.   A page-contents round trip keeps a Geometry `LineTo` (`X`, `Y`) and
+  and `Tab`. A page-contents round trip keeps a Geometry `LineTo` (`X`, `Y`) and
   a User row (`Value`, `Prompt`).
 - Recognized all six Visio main content types on the document part. Drawing,
   stencil, and template packages, including the macro-enabled forms, open
   without a pages part. Macro-enabled packages keep `vbaProject` bytes.
 - Added `ooxmlsdk-visio` to look up pages, masters, and shapes by id and to read
-  a section cell's stored value, formula text, unit, and error. Formulas are
-  not evaluated. A missing instance cell uses the master shape's stored value.
-  A local value wins. A row or section marked deleted does not inherit.
-  Page, master, and shape ids are allocated from separate counters. A minimal
-  drawing with one page, `PinX`, and a Geometry `LineTo` round-trips. `Connect`
-  records resolve `FromSheet` and `ToSheet` to shapes on the same page. An
-  unknown sheet id is an error. Text marks (`cp`, `pp`, `tp`, `fld`) round-trip
-  in order. A missing shape cell uses the stored value on the style sheet named
-  by `LineStyle`, `FillStyle`, or `TextStyle`. Theme formulas stay as text.
-  Package and ShapeSheet behavior is described in `docs/specs/visio_parts.md`
-  and `docs/specs/visio_shapesheet.md`.
-- Added a regeneration oracle (`ooxmlsdk-build`'s `sdk_data::oracle`) that diffs a
-  generated schema against the checked-in `data/schemas` metadata on XSD-derivable
-  projections (`CompositeType`, `BaseClass`, class names, summaries, and enum
-  names are excluded).
-- Extended the XSD parser (`ooxmlsdk-build`'s `sdk_data::xsd`) to capture element
-  type references, annotations, `complexContent`/`simpleContent` derivations,
-  `abstract`, `xs:any`/`anyAttribute`, simple-type bases, and `xmlns` prefix
-  mappings. The additions are backward compatible. OPC `Relationship` keeps
-  `Id`, `Target`, `Type`, and `TargetMode`, and core-properties `Keyword` keeps
-  `xml:lang`, when those attributes are declared inside `simpleContent`.
+  and write stored ShapeSheet values. Formulas are not evaluated. A missing
+  instance cell uses the master shape's stored value. A local value wins. A row
+  or section marked deleted does not inherit. Page, master, and shape ids are
+  allocated from separate counters. Text marks and the character data between
+  them round-trip in order. Package, ShapeSheet, and authoring behavior is
+  described in `docs/specs/visio_parts.md`, `docs/specs/visio_shapesheet.md`,
+  and `docs/specs/visio_authoring.md`.
+
+## 0.13.2
+
+### Breaking Changes
+
+- Generated `xml_children` fields for single-occurrence wildcard content now
+  use `Box<[u8]>` for required content and `Option<Box<[u8]>>` for optional
+  content, instead of `Vec<Box<[u8]>>`. This affects ten fields across the PML,
+  DrawingML, chart, SpreadsheetML, Word extension, shared extension, and label
+  metadata schemas. Duplicate single-occurrence children follow the existing
+  last-value-wins parsing behavior; a missing required child reports
+  `MissingField`.
+
+### Fixed
+
+- Preserve tabs, line feeds, and carriage returns in XML attribute values
+  through character references, and preserve carriage returns in element text.
+  Fast text reads normalize literal CR and CRLF according to XML line-ending
+  rules while retaining carriage returns supplied by character references.
+- Preserve effective wildcard cardinality in IR construction and Rust field
+  generation. MCE `Choice` and `Fallback` explicitly retain their zero-or-more
+  wildcard metadata and continue preserving all child elements.
+- Improve package recovery for conflicting ZIP Unicode path metadata,
+  case-insensitive content-type and relationship lookup, and duplicate
+  relationship IDs, consistently retaining the first relationship with an ID.
+
+### Testing
+
+- Passed all 5,477 corpus expectations: 5,366 round-trip cases, 16 open-only
+  cases, and 95 invalid-package cases. Added a regression proving that dropping
+  duplicate single-occurrence wildcard children is detected against the
+  original XML, even when subsequent save/reopen cycles are stable.
 
 ## 0.13.1
 

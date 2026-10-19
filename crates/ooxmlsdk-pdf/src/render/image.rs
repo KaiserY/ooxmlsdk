@@ -1036,15 +1036,22 @@ fn decode_image(
     );
   }
   if owner == RasterOwner::MaterializedSourceRectangleCrop {
-    // `a:srcRect` has already been rounded against and materialized from the
-    // source pixels by the DOCX importer. Word embeds that visible source
-    // rectangle at its native sample count even under Screen optimization;
-    // applying the displayed-frame DPI cap here would downsample it twice.
-    // Compression remains active and may still choose a JPEG color stream.
+    // Materializing srcRect chooses the visible source pixels; it does not
+    // establish the final fixed-output grid. Native Word Screen controls with
+    // cropped JPEG/PNG, with and without luminance effects, still reduce a
+    // high-density rectangle through the ordinary source-bitmap policy.
+    // That policy retains low-density rectangles. Other owners/profiles keep
+    // their independently established native-count contract.
+    let (export_options, owner) =
+      if export_options.profile.is_word() && export_options.profile.is_office_screen() {
+        (export_options, RasterOwner::Source)
+      } else {
+        (export_options.without_downsampling(), owner)
+      };
     return export_decoded_image(
       decode_dynamic_image(data, RasterImageFormat::Png)?,
       RasterImageFormat::Png,
-      export_options.without_downsampling(),
+      export_options,
       owner,
     );
   }
@@ -1942,7 +1949,28 @@ fn export_decoded_image(
   } else {
     raster.image
   };
-  let pdf_raster = PdfRasterImage::from_dynamic_with_icc(image, raster.icc_profile);
+  let pdf_raster = if owner == RasterOwner::Source
+    && format == RasterImageFormat::Gif
+    && export_options.profile.is_word()
+    && !resized
+  {
+    // Native Word GIF controls with black/green/pink transparent palette
+    // entries all export white RGB beneath their unchanged binary masks.
+    // Clearing it to black changes edge sampling in PDF viewers even though
+    // the fully transparent sample points themselves paint no color.
+    let mut rgba = image.into_rgba8();
+    for pixel in rgba.pixels_mut() {
+      if pixel[3] == 0 {
+        pixel.0[..3].fill(255);
+      }
+    }
+    PdfRasterImage::from_dynamic_preserving_hidden_rgb(
+      DynamicImage::ImageRgba8(rgba),
+      raster.icc_profile,
+    )
+  } else {
+    PdfRasterImage::from_dynamic_with_icc(image, raster.icc_profile)
+  };
   prepare_sampled_image(
     pdf_raster,
     interpolate,
@@ -3998,6 +4026,41 @@ mod tests {
   }
 
   #[test]
+  fn word_gif_transparent_palette_entries_export_white_with_a_binary_mask() {
+    // Independent Native Word black/green/pink transparent-palette controls
+    // all retain white hidden RGB. Opaque color and the mask are unchanged.
+    for hidden in [[0, 0, 0], [0, 255, 0], [250, 40, 90]] {
+      let rgba = image::RgbaImage::from_fn(3, 1, |x, _| {
+        if x == 1 {
+          Rgba([20, 120, 40, 255])
+        } else {
+          Rgba([hidden[0], hidden[1], hidden[2], 0])
+        }
+      });
+      let mut gif = Vec::new();
+      image::codecs::gif::GifEncoder::new(&mut gif)
+        .encode_frame(image::Frame::new(rgba))
+        .unwrap();
+      let mut options = PdfOptions::default();
+      options.images.optimization_policy =
+        PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+      let actual = decode_image(
+        &gif,
+        Some("image/gif"),
+        RasterExportOptions::new(&options, 72.0, 72.0),
+        None,
+      )
+      .unwrap();
+      let DirectRasterEncoding::Sampled { pixels } = &actual.direct().encoding else {
+        panic!("native GIF samples")
+      };
+      assert_eq!(pixels.rgb, [255, 255, 255, 20, 120, 40, 255, 255, 255]);
+      assert_eq!(pixels.alpha.as_deref(), Some([0, 255, 0].as_slice()));
+      assert_eq!(actual.direct().matte, None);
+    }
+  }
+
+  #[test]
   fn microsoft_word_fixed_output_preserves_unscaled_binary_alpha_png_losslessly() {
     let source = image::RgbaImage::from_fn(64, 64, |x, y| {
       if (12..52).contains(&x) && (12..52).contains(&y) {
@@ -5950,6 +6013,36 @@ mod tests {
     // Rounding the 25.333px height limit first would incorrectly produce
     // 136x25 for content-control-header.docx instead of Word's 138x25.
     assert_eq!(downsample_size((316, 58), limits), Some((138, 25)));
+  }
+
+  #[test]
+  fn word_screen_source_rectangle_crop_retains_low_density_and_reduces_high_density() {
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..PdfOptions::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    // Low-density native-count counterexample and the independent cropped
+    // JPEG/PNG Office controls, including zero/positive luminance effects.
+    for (width, height, display_width, display_height, expected) in [
+      (440, 356, 263.25, 213.0, (440, 356)),
+      (1511, 627, 494.75, 205.0, (659, 273)),
+    ] {
+      let source = image::RgbImage::from_pixel(width, height, image::Rgb([120, 140, 160]));
+      let mut png = Vec::new();
+      PngEncoder::new(&mut png)
+        .write_image(source.as_raw(), width, height, ColorType::Rgb8.into())
+        .unwrap();
+      let cropped = decode_image(
+        &png,
+        Some(SOURCE_RECTANGLE_CROP_BITMAP_CONTENT_TYPE),
+        RasterExportOptions::new(&options, display_width, display_height),
+        None,
+      )
+      .unwrap();
+      assert_eq!(cropped.size(), expected);
+    }
   }
 
   #[test]

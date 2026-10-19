@@ -40,6 +40,8 @@ pub enum BorderCompoundPattern {
   ThickThinSmallGap,
   ThinThickMediumGap,
   ThickThinMediumGap,
+  ThinThickLargeGap,
+  ThickThinLargeGap,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -131,6 +133,7 @@ pub(crate) struct WordprocessingFitText {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
+  pub embedded_fonts: Option<Arc<crate::fonts::EmbeddedFontSet>>,
   /// Effective Word run border. The outer option retains cascade presence;
   /// `Some(None)` explicitly clears an inherited border with `w:val="nil"`.
   pub word_run_border: Option<Option<BorderStyle>>,
@@ -235,17 +238,29 @@ pub struct TextStyle {
   /// Used for GDI `ExtTextOut` replacement layers and Word tab leaders whose
   /// device advances must remain independent of the rounded paint font size.
   pub(crate) semantic_character_advances_pt: Option<Arc<[f32]>>,
+  /// The cell's GDI paint advances use Office PDF integer-width text arrays.
+  /// Other semantic advance owners, such as VML and rotated text, stay separate.
+  pub(crate) office_text_array: bool,
   pub(crate) shaping_context: Option<Arc<common::TextShapingContext>>,
   pub(crate) kashida_expansions: Option<Arc<[common::KashidaExpansion]>>,
   pub(crate) wordprocessing_kashida: Option<Arc<common::WordprocessingKashida>>,
   pub character_spacing_pt: f32,
   pub(crate) wordprocessing_fit_text: Option<WordprocessingFitText>,
   pub baseline_shift_pt: f32,
+  /// Authored w:position stays independent of automatic w:vertAlign. Import
+  /// composes both displacements after resolving the physical script font.
+  pub(crate) wordprocessingml_position_pt: Option<f32>,
   /// Original WordprocessingML font size retained for the line box when
   /// automatic `w:vertAlign` shrinks and shifts the painted glyph.
   pub(crate) automatic_escapement_font_size_pt: Option<f32>,
   /// Complex-script counterpart of `automatic_escapement_font_size_pt`.
   pub(crate) automatic_escapement_complex_font_size_pt: Option<f32>,
+  /// Preserve the automatic alignment independently of an explicit w:position
+  /// or a completed line normalizing its painted baseline shift.
+  pub(crate) automatic_escapement_is_subscript: bool,
+  /// The paragraph has already incorporated this script displacement into
+  /// its line box. A naturally zero script shift is a separate state.
+  pub(crate) automatic_escapement_baseline_normalized: bool,
   /// Word 97 compatibility rounds automatic escapement half-point ties up.
   /// This document policy is inactive in compatibility mode 15 and later.
   pub(crate) wordprocessingml_legacy_escapement_rounding: bool,
@@ -355,6 +370,7 @@ pub struct TextStyle {
 impl Default for TextStyle {
   fn default() -> Self {
     Self {
+      embedded_fonts: None,
       word_run_border: None,
       font_family: None,
       high_ansi_font_family: None,
@@ -404,14 +420,18 @@ impl Default for TextStyle {
       wordprocessing_tab_leader: None,
       wordprocessing_tab_leader_span: None,
       semantic_character_advances_pt: None,
+      office_text_array: false,
       shaping_context: None,
       kashida_expansions: None,
       wordprocessing_kashida: None,
       character_spacing_pt: 0.0,
       wordprocessing_fit_text: None,
       baseline_shift_pt: 0.0,
+      wordprocessingml_position_pt: None,
       automatic_escapement_font_size_pt: None,
       automatic_escapement_complex_font_size_pt: None,
+      automatic_escapement_is_subscript: false,
+      automatic_escapement_baseline_normalized: false,
       wordprocessingml_legacy_escapement_rounding: false,
       line_height_override_pt: None,
       line_vertical_alignment: common::LineVerticalAlignment::Auto,
@@ -795,6 +815,7 @@ pub(crate) fn common_page_setup(setup: PageSetup) -> common::PageSetup {
 
 pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> {
   common::TextStyle {
+    embedded_fonts: style.embedded_fonts,
     font_family: style.font_family.map(|value| Cow::Owned(value.to_string())),
     high_ansi_font_family: style
       .high_ansi_font_family
@@ -867,6 +888,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     wordprocessing_legacy_font_measurement: style.wordprocessing_legacy_font_measurement,
     wordprocessing_tab_leader: style.wordprocessing_tab_leader,
     semantic_character_advances_pt: style.semantic_character_advances_pt,
+    office_text_array: style.office_text_array,
     shaping_context: style.shaping_context,
     kashida_expansions: style.kashida_expansions,
     wordprocessing_kashida: style.wordprocessing_kashida,
@@ -876,6 +898,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     automatic_escapement_complex_font_size: style
       .automatic_escapement_complex_font_size_pt
       .map(common::Pt),
+    automatic_escapement_baseline_normalized: style.automatic_escapement_baseline_normalized,
     line_vertical_alignment: style.line_vertical_alignment,
     semantic_only: style.semantic_only,
     pdf_painted_artifact: style.pdf_painted_artifact,

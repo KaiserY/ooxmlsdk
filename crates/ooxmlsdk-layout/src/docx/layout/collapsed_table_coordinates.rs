@@ -94,10 +94,9 @@ impl Coordinates {
     if !simple(Some(border)) || border.width_pt <= 0.0 {
       return false;
     }
-    let Some(device) = wordprocessing_table_device::PageCoordinates::for_standard_size(
-      page.setup.width_pt,
-      page.setup.height_pt,
-    ) else {
+    let Some(device) =
+      wordprocessing_table_device::page_coordinates(page.setup.width_pt, page.setup.height_pt)
+    else {
       return false;
     };
     let (x1, y1, x2, y2) = bounds;

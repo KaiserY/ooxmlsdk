@@ -656,6 +656,7 @@ pub struct WordprocessingKashida {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextStyle<'doc> {
+  pub embedded_fonts: Option<Arc<crate::fonts::EmbeddedFontSet>>,
   pub font_family: Option<Cow<'doc, str>>,
   pub high_ansi_font_family: Option<Cow<'doc, str>>,
   /// Document-scoped substitute preferred before generic system fallbacks.
@@ -721,6 +722,8 @@ pub struct TextStyle<'doc> {
   /// Explicit distances in points between consecutive input-character
   /// origins for semantic GDI replacement text.
   pub semantic_character_advances_pt: Option<Arc<[f32]>>,
+  /// Office cell GDI paint owns integer font widths and PDF text adjustments.
+  pub office_text_array: bool,
   pub shaping_context: Option<Arc<TextShapingContext>>,
   pub kashida_expansions: Option<Arc<[KashidaExpansion]>>,
   pub wordprocessing_kashida: Option<Arc<WordprocessingKashida>>,
@@ -731,6 +734,8 @@ pub struct TextStyle<'doc> {
   pub automatic_escapement_font_size: Option<Pt>,
   /// Complex-script counterpart of `automatic_escapement_font_size`.
   pub automatic_escapement_complex_font_size: Option<Pt>,
+  /// The paragraph line box already owns the automatic script displacement.
+  pub automatic_escapement_baseline_normalized: bool,
   pub line_vertical_alignment: LineVerticalAlignment,
   /// Retain searchable/taggable text without painting visible glyphs.
   pub semantic_only: bool,
@@ -942,12 +947,22 @@ pub struct TextWarp {
   /// WordArt gradient or pattern coordinates to different shape/text frames.
   pub paint_bounds: Rect,
   pub boundaries: Vec<Vec<PathCommand>>,
+  /// A single DrawingML path carries complete, rigid glyphs. Its uniform
+  /// fit is independent of the two-boundary contour-deformation contract.
+  pub follow_path: Option<TextFollowPath>,
   /// Legacy VML `fitpath`: fit logical text advances to one centerline while
   /// retaining each glyph's outline as a rigid shape.
   pub vml_fit_path: Option<VmlFitPath>,
   /// Legacy VML `trim` fits one text line's visible ink into one authored
   /// boundary pair, leaving interline gaps to the preset geometry itself.
   pub vml_trim_band: Option<VmlTrimBand>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextFollowPath {
+  pub scale: f64,
+  pub(crate) sampler: Arc<super::text_warp_projection::TextFollowPathSampler>,
+  pub(crate) translation: Point,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

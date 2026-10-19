@@ -212,6 +212,7 @@ impl PptShape {
       hyperlink_url: None,
       field_type: None,
       run_properties: None,
+      math_source: None,
       field_paragraph_properties: None,
     });
   }

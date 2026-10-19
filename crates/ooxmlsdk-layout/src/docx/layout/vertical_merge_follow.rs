@@ -31,6 +31,7 @@ pub(super) struct VerticalMergeFragment {
   pub height_pt: f32,
   pub content_offset_pt: f32,
   pub tracks_content: bool,
+  pub continues_content: bool,
 }
 
 impl VerticalMergeFragment {
@@ -70,15 +71,10 @@ impl VerticalMergeFollows {
       row_index
     };
     let end_row = vertical_merge_follow_end_row(table, origin_row, grid_start)?;
-    if row_index > end_row
-      || table.rows[origin_row..=end_row]
-        .iter()
-        .any(|row| row.exact_height)
-      || row_cell_at_grid(&table.rows[origin_row], grid_start)?
-        .text_rotation_deg
-        .is_some()
-    {
-      // Fixed-height/cache compatibility has its established follow hierarchy.
+    let rotated = row_cell_at_grid(&table.rows[origin_row], grid_start)?
+      .text_rotation_deg
+      .is_some();
+    if row_index > end_row {
       return None;
     }
     if cell.vertical_merge_continue
@@ -112,9 +108,16 @@ impl VerticalMergeFollows {
         .get(&(origin_row, grid_start))
         .copied()
         .unwrap_or(0.0),
-      tracks_content: first_row > origin_row
-        || last_row < end_row
-        || (physical_row_height - row_heights.get(row_index)?).abs() > LAYOUT_EPSILON_PT,
+      // A rotated story wraps against the first physical merged frame's
+      // height and expands across its width. It does not become a block-flow
+      // text follow on the next page, even when that cross-axis paint clips.
+      tracks_content: (!rotated || first_row == origin_row)
+        && (first_row > origin_row
+          || last_row < end_row
+          || (physical_row_height - row_heights.get(row_index)?).abs() > LAYOUT_EPSILON_PT),
+      continues_content: !rotated
+        && (last_row < end_row
+          || physical_row_height + LAYOUT_EPSILON_PT < *row_heights.get(row_index)?),
     })
   }
 
@@ -360,6 +363,82 @@ mod tests {
       .chars()
       .filter(|c| !c.is_whitespace())
       .collect()
+  }
+
+  #[test]
+  fn exact_merged_rows_keep_their_physical_heights_and_follow_text_cursor() {
+    // Independent native controls keep the fixed rows while a merged story
+    // continues across the page. The final fixed cell retains overflowing
+    // semantic text with its paint clip, just like an unmerged exact cell.
+    for cached in [false, true] {
+      let mut table = table(3, cached);
+      for row in &mut table.rows {
+        row.exact_height = true;
+        row.height_pt = Some(17.0);
+      }
+      table.rows[0].cells[0].blocks = vec![paragraph("one\ntwo\nthree\nfour", cached)];
+      let pages = format(&table, 35.0);
+      assert_eq!(pages.len(), 2, "cached {cached}");
+      assert_eq!(text_in_column(&pages[0], 0), "onetwo", "cached {cached}");
+      assert_eq!(text_in_column(&pages[1], 0), "threefour", "cached {cached}");
+      for page in &pages {
+        for row in page
+          .frame_fragments
+          .iter()
+          .filter(|f| f.kind == FrameFragmentKind::TableRow)
+        {
+          assert!(row.bounds.unwrap().height_pt < 20.0);
+        }
+      }
+      let clipped = pages[1]
+        .items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Text(text) if text.text == "four" => Some(text),
+          _ => None,
+        })
+        .expect("the final frame owns the complete remaining semantic stream");
+      assert!(clipped.paint_clip.is_some());
+    }
+  }
+
+  #[test]
+  fn merged_text_follow_consumes_number_portions_with_their_first_line() {
+    for cached in [false, true] {
+      let mut table = table(3, cached);
+      for row in &mut table.rows {
+        row.exact_height = true;
+        row.height_pt = Some(17.0);
+      }
+      let mut first = paragraph("one\ntwo\nthree", cached);
+      let mut last = paragraph("", false);
+      for (block, label) in [(&mut first, "a)"), (&mut last, "b)")] {
+        let Block::Paragraph(p) = block else {
+          unreachable!()
+        };
+        p.list_label = Some(label.into());
+        p.list_label_style = p.base_style.clone();
+      }
+      table.rows[0].cells[0].blocks = vec![first, last];
+      let pages = format(&table, 35.0);
+      assert_eq!(pages.len(), 2);
+      let labels = pages
+        .iter()
+        .map(|page| {
+          page
+            .items
+            .iter()
+            .filter_map(|item| match item {
+              PageItem::Text(text) if text.text == "a)" || text.text == "b)" => {
+                Some(text.text.as_str())
+              }
+              _ => None,
+            })
+            .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(labels, [vec!["a)"], vec!["b)"]], "cached {cached}");
+    }
   }
 
   #[test]
@@ -667,6 +746,57 @@ mod tests {
         expected,
         "available {available}"
       );
+    }
+  }
+
+  #[test]
+  fn rotated_merge_owns_only_the_first_physical_story_frame() {
+    for rotation in [-90.0, 90.0] {
+      for exact in [false, true] {
+        let mut table = table(3, false);
+        table.rows[0].cells[0].text_rotation_deg = Some(rotation);
+        table.rows[0].exact_height = exact;
+        let heights = [90.0, 110.0, 70.0];
+        let mut follows = VerticalMergeFollows::default();
+        follows.set_rows_on_page(0..2);
+        let master = follows
+          .fragment(&table, &heights, 0, 0, 10.0..100.0, 300.0)
+          .unwrap();
+        assert_eq!((master.top_pt, master.height_pt), (10.0, 200.0));
+        assert!(master.owns_content(0));
+        follows.finish_cell(0, 0, master, None);
+        follows.set_rows_on_page(2..3);
+        let follow = follows
+          .fragment(&table, &heights, 2, 0, 20.0..90.0, 300.0)
+          .unwrap();
+        assert_eq!((follow.top_pt, follow.height_pt), (20.0, 70.0));
+        assert!(!follow.owns_content(2));
+        follows.finish_cell(2, 0, follow, None);
+        assert!(follows.content_cursor(0, 0).is_none());
+      }
+    }
+  }
+
+  #[test]
+  fn rotated_text_does_not_inflate_merged_or_unmerged_physical_rows() {
+    for merged in [false, true] {
+      for rotation in [-90.0, 90.0] {
+        let mut table = table(3, false);
+        if !merged {
+          for row in &mut table.rows {
+            row.cells[0].vertical_merge_continue = false;
+          }
+        }
+        table.rows[0].cells[0].text_rotation_deg = Some(rotation);
+        table.rows[0].cells[0].blocks = vec![paragraph(&"long text ".repeat(100), false)];
+        let mut metrics = TextMetrics::new();
+        let long =
+          table_row_heights_with_widths(&table, &[53.0; 3], PageSetup::default(), 11, &mut metrics);
+        table.rows[0].cells[0].blocks = vec![paragraph("short", false)];
+        let short =
+          table_row_heights_with_widths(&table, &[53.0; 3], PageSetup::default(), 11, &mut metrics);
+        assert_eq!(long, short, "rotation {rotation}, merged {merged}");
+      }
     }
   }
 

@@ -35,6 +35,18 @@ pub(crate) fn paths(
   drawingml_custom_geometry::paths(&geometry, left, top, width, height)
 }
 
+pub(crate) fn follow_path_device_paths(
+  preset: &a::PresetTextWarp,
+  left: f32,
+  top: f32,
+  width: f32,
+  height: f32,
+) -> Option<Vec<DrawingPath>> {
+  let definition = generated::definition(preset.preset)?;
+  let geometry = geometry(definition, preset.adjust_value_list.as_ref());
+  drawingml_custom_geometry::paths_with_quadrant_arcs(&geometry, left, top, width, height)
+}
+
 pub(crate) fn apply_to_text_items(
   items: &mut [PageItem],
   preset: &a::PresetTextWarp,
@@ -115,6 +127,7 @@ pub(crate) fn text_warp(
     source_bounds,
     paint_bounds,
     boundaries,
+    follow_path: None,
     vml_fit_path: None,
     vml_trim_band: None,
   }))
@@ -261,7 +274,49 @@ fn schema_point(point: &super::drawingml_preset_data::PointDef) -> a::Point {
 mod tests {
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
-  use super::{generated, paths};
+  use super::{follow_path_device_paths, generated, paths};
+
+  #[test]
+  fn printer_centerline_preserves_native_quadrant_controls() {
+    use crate::common::PathCommand;
+
+    let preset = a::PresetTextWarp {
+      preset: a::TextShapeValues::TextArchUp,
+      ..Default::default()
+    };
+    // IPathingLine factory readbacks in 600-dpi device coordinates. The
+    // wider path would acquire a third cubic with a fixed 0.1-dot tolerance.
+    for (x, y, width, height, first_control_y, midpoint_x) in [
+      (141.0, 166.0, 970.0, 97.0, 187.7141876220703, 626.0),
+      (305.0, 80.0, 575.0, 73.0, 96.34160614013672, 592.5),
+    ] {
+      let paths = follow_path_device_paths(&preset, x, y, width, height).unwrap();
+      let [path] = paths.as_slice() else {
+        panic!("expected one centerline");
+      };
+      let [
+        PathCommand::MoveTo(start),
+        PathCommand::CubicTo {
+          control1,
+          control2,
+          end: midpoint,
+        },
+        PathCommand::CubicTo { end, .. },
+      ] = path.commands.as_slice()
+      else {
+        panic!("expected two quadrant cubics: {:?}", path.commands);
+      };
+      assert_eq!(start.x.0, x);
+      assert_eq!(start.y.0, y + height * 0.5);
+      assert_eq!(control1.x.0, x);
+      assert_eq!(control1.y.0, first_control_y as f32);
+      assert_eq!(control2.y.0, y);
+      assert_eq!(midpoint.x.0, midpoint_x);
+      assert_eq!(midpoint.y.0, y);
+      assert_eq!(end.x.0, x + width);
+      assert_eq!(end.y.0, start.y.0);
+    }
+  }
 
   #[test]
   fn generated_text_warp_inventory_is_complete() {

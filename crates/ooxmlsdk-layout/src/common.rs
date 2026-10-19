@@ -40,6 +40,7 @@ pub use display::*;
 pub use drawingml_gradient::{
   bind_path_transform_to_bounds, resolved_stops as resolve_gradient_stops,
 };
+pub use drawingml_stroke::drawingml_triangle_stroke_outline;
 pub use geom::*;
 pub use style::*;
 pub use units::*;

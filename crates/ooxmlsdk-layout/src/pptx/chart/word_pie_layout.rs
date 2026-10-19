@@ -198,6 +198,24 @@ impl Label {
     }
   }
 
+  pub fn formatting_width(&self) -> i32 {
+    let selected = &self.shapes[self.shape];
+    // Native LLPieLabel2 reuses the first realized paragraph for identical
+    // intrinsic outlines. Fitting candidates remain separate search states;
+    // intermediate trials do not replace that cached paragraph's width.
+    self
+      .shapes
+      .iter()
+      .find(|shape| {
+        shape.bounds == selected.bounds
+          && shape.vertices == selected.vertices
+          && shape.attachments == selected.attachments
+          && shape.lines == selected.lines
+      })
+      .unwrap_or(selected)
+      .width
+  }
+
   fn outline(&self) -> Outline {
     let shape = &self.shapes[self.shape];
     Outline {
@@ -1428,6 +1446,58 @@ pub(super) fn place(sectors: &[Sector], labels: &mut [Label], obstacles: &[Bound
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn equivalent_pie_outlines_reuse_the_first_realized_paragraph() {
+    // Native automatic eight-caption controls retain a96-cell formatting
+    // width while the search tries87/71-cell widths with identical outlines.
+    let original = TextShape {
+      width: 96,
+      bounds: [0.0, 0.0, 63.220_26, 14.646_72],
+      vertices: rectangle_vertices([0.0, 0.0, 63.220_26, 14.646_72]).to_vec(),
+      attachments: vec![0; 5],
+      lines: 1,
+      overflowed_word: false,
+    };
+    let mut narrow = original.clone();
+    narrow.width = 87;
+    let mut narrower = original.clone();
+    narrower.width = 71;
+    let mut wrapped = original.clone();
+    wrapped.width = 40;
+    wrapped.lines = 2;
+    wrapped.bounds[3] *= 2.0;
+    wrapped.vertices = rectangle_vertices(wrapped.bounds).to_vec();
+    let mut same_wrapped = wrapped.clone();
+    same_wrapped.width = 42;
+    let mut label = Label::new(
+      0,
+      original.bounds,
+      vec![original, narrow, narrower, wrapped, same_wrapped],
+      0,
+      true,
+      false,
+    );
+    label.shape = 1;
+    assert_eq!(label.formatting_width(), 96);
+    label.shape = 2;
+    assert_eq!(label.shape, 2);
+    assert_eq!(label.formatting_width(), 96);
+    label.shape = 3;
+    assert_eq!(label.formatting_width(), 40);
+    label.shape = 4;
+    assert_eq!(label.formatting_width(), 40);
+    // Returning from a genuinely wrapped trial still reuses the original
+    // paragraph; a mutable per-label formatting width would retain87 here.
+    label.shape = 1;
+    assert_eq!(label.formatting_width(), 96);
+    // Native four-sector controls start inside at87cells, while their first
+    // equivalent paragraph was realized at96. Original fitting width alone
+    // therefore cannot identify the paragraph used by the paint consumer.
+    let inside = Label::new(0, label.bounds, label.shapes, 1, false, false);
+    assert_eq!(inside.original_width, 87);
+    assert_eq!(inside.formatting_width(), 96);
+  }
 
   #[test]
   fn projected_pie_label_fitting_matches_native_narrow_and_wide_sectors() {

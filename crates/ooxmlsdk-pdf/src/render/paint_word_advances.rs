@@ -4,22 +4,68 @@
 //! ideal line accumulation across face/style runs, independently of PDF Tc/TJ.
 use super::{HashMap, PaintItem, PaintText, PaintTextPortionKind, common};
 use emfsdk::render::GdiNaturalMetrics;
-use ooxmlsdk_layout::fonts::{FontFaceCacheKey, FontFaceData};
-use skrifa::MetadataProvider;
+use ooxmlsdk_layout::fonts::{FontFaceCacheKey, FontFaceData, FontStyleRef};
+use skrifa::{MetadataProvider, raw::TableProvider};
 use std::sync::Arc;
 
 const POINTS_PER_PIXEL: f32 = 72.0 / 600.0;
 const IDEAL_UNITS_PER_POINT: f32 = 4096.0;
-const SCALE: i64 = 4267; // round(600 * 2^21 / (72 * 4096))
-const HALF: i64 = 1 << 20;
-const LIMIT: i64 = (i32::MAX as i64 - HALF) / SCALE;
+use common::wordprocessing_device::{MAX_IDEAL_ADVANCE, balance_advances};
 
 #[derive(Default)]
 pub(super) struct NaturalMetricsCache {
   bytes: HashMap<FontFaceCacheKey, Arc<[u8]>>,
   instances: HashMap<(FontFaceCacheKey, u16), Option<GdiNaturalMetrics>>,
+  design_units: HashMap<FontFaceCacheKey, Option<u16>>,
 }
 impl NaturalMetricsCache {
+  fn device_advance(
+    &mut self,
+    face: &FontFaceData,
+    size_pt: f32,
+    glyph: u32,
+    source: &str,
+    kerning_advance_em: Option<f32>,
+  ) -> Option<i32> {
+    // These Word separators have an independent unshaped/dash-division
+    // metric owner, even when their surrounding run enables kerning.
+    if let Some(advance_em) = kerning_advance_em
+      && !matches!(source, "\u{2004}" | "\u{2006}" | "\u{2028}" | "\u{2029}")
+    {
+      return self.kerning_advance(face, size_pt, advance_em);
+    }
+    self.advance(face, size_pt, glyph, source)
+  }
+
+  fn kerning_advance(&mut self, face: &FontFaceData, size_pt: f32, advance_em: f32) -> Option<i32> {
+    if face.synthetic_bold || face.synthetic_italic || !advance_em.is_finite() {
+      return None;
+    }
+    let pixels = (size_pt / POINTS_PER_PIXEL).round();
+    if !pixels.is_finite() || !(1.0..=u16::MAX as f32).contains(&pixels) {
+      return None;
+    }
+    let units = *self
+      .design_units
+      .entry(face.cache_key())
+      .or_insert_with(|| {
+        let font = skrifa::FontRef::from_index(face.data.as_slice(), face.index).ok()?;
+        font.glyf().ok()?;
+        if font.fvar().is_ok() {
+          return None;
+        }
+        let units = font.head().ok()?.units_per_em();
+        (units != 0).then_some(units)
+      });
+    let units = f64::from(units?);
+    // Native Word's enabled w:kern path rounds the positioned design advance
+    // on the realized printer em. It does not use the hinted Natural width.
+    // Recover integral font units before rounding exact half-pixel advances.
+    let design = (f64::from(advance_em) * units).round();
+    let advance = (design * f64::from(pixels) / units + 0.5).trunc();
+    (advance >= 0.0 && advance <= f64::from(i32::MAX)).then_some(advance as i32)
+  }
+
   fn advance(
     &mut self,
     face: &FontFaceData,
@@ -313,11 +359,31 @@ fn measure_line(
               logical_size
             };
           let ideal = (ideal_pt * IDEAL_UNITS_PER_POINT).round();
-          if !ideal.is_finite() || ideal < 0.0 || ideal > LIMIT as f32 {
+          if !ideal.is_finite() || ideal < 0.0 || ideal > MAX_IDEAL_ADVANCE as f32 {
             return None;
           }
-          let mut natural =
-            cache.advance(&run.font_face, run.font_size_pt, glyph.glyph_id, cluster)?;
+          let kerning_advance_em = style.kerning_enabled().then(|| {
+            if let Some(adjustment) = terminal_adjustment {
+              // A completed-line correction is normalized by the PDF em.
+              // Recover its unadjusted logical design advance; the existing
+              // independent device correction below still owns compression.
+              let own_adjustment = if glyph.text_range.end == text.item.text.len() {
+                adjustment
+              } else {
+                0.0
+              };
+              (ideal_pt - own_adjustment) / logical_size
+            } else {
+              glyph.x_advance
+            }
+          });
+          let mut natural = cache.device_advance(
+            &run.font_face,
+            run.font_size_pt,
+            glyph.glyph_id,
+            cluster,
+            kerning_advance_em,
+          )?;
           if glyph.text_range.end == text.item.text.len()
             && let Some(adjustment) = terminal_adjustment
           {
@@ -348,54 +414,6 @@ fn terminal_compression(text: &str, style: &super::TextStyle<'_>) -> Option<f32>
     && adjustments.len() == text.chars().count()
     && preceding.iter().all(|&value| value == 0.0))
   .then_some(last)
-}
-
-fn balance_advances(advances: &[(i32, i32)]) -> Vec<i32> {
-  let mut output: Vec<i32> = Vec::with_capacity(advances.len());
-  let mut ideal_sum = 0i64;
-  let mut previous_rounded = 0;
-  let mut previous_error = 0;
-  let mut previous = false;
-  for &(ideal, natural) in advances {
-    if ideal_sum + i64::from(ideal) > LIMIT {
-      // Native restarts before its signed 32-bit multiply would overflow.
-      ideal_sum = 0;
-      previous_rounded = 0;
-      previous = false;
-    }
-    ideal_sum += i64::from(ideal);
-    let rounded = ((ideal_sum * SCALE + HALF) >> 21) as i32;
-    let mut value = rounded - previous_rounded;
-    let error = natural - value;
-    if previous {
-      let difference = error - previous_error;
-      let floor = difference >> 1;
-      let ceil = floor + (difference & 1);
-      let prior = output.last_mut().expect("previous advance");
-      let delta = if difference > 0 {
-        (*prior).min(if previous_error >= -error {
-          floor
-        } else {
-          ceil
-        })
-      } else if difference < 0 {
-        (-value).max(if error >= -previous_error {
-          floor
-        } else {
-          ceil
-        })
-      } else {
-        0
-      };
-      *prior -= delta;
-      value += delta;
-    }
-    output.push(value);
-    previous_error = natural - value;
-    previous_rounded = rounded;
-    previous = true;
-  }
-  output
 }
 
 #[cfg(test)]
@@ -429,6 +447,90 @@ mod tests {
         }
       }
     }
+  }
+
+  #[test]
+  fn native_enabled_kerning_uses_shaped_design_device_metrics() {
+    // Actual MSLS70 input arrays: 3 fonts, 14pt logical / 117px realized,
+    // same text with a 1pt kerning threshold and a nonbinding 200pt threshold.
+    let text = "Universal PROBE minimum WHITE 01234";
+    let controls = [
+      (
+        "Times New Roman",
+        [
+          41412, 28672, 15932, 28672, 25452, 19096, 22316, 25452, 15932, 14336, 31892, 38248,
+          41412, 38248, 35028, 14336, 44604, 15932, 28672, 15932, 44604, 28672, 44604, 13300,
+          54124, 41412, 19096, 35028, 35028, 14336, 28672, 28672, 28672, 28672, 28672,
+        ],
+        [
+          84, 59, 33, 59, 52, 39, 46, 52, 33, 29, 65, 78, 84, 78, 71, 29, 91, 33, 59, 33, 91, 59,
+          91, 27, 110, 84, 39, 71, 71, 29, 59, 59, 59, 59, 59,
+        ],
+        [
+          85, 59, 33, 59, 52, 39, 46, 52, 33, 29, 65, 78, 85, 78, 72, 29, 91, 33, 59, 33, 91, 59,
+          91, 29, 110, 85, 39, 72, 72, 29, 59, 59, 59, 59, 59,
+        ],
+      ),
+      (
+        "Arial",
+        [
+          41412, 31892, 12740, 28672, 31892, 19096, 28672, 31892, 12740, 15932, 38248, 41412,
+          44604, 38248, 38248, 15932, 47768, 12740, 31892, 12740, 47768, 31892, 47768, 15932,
+          54124, 41412, 15932, 35028, 38248, 15932, 31892, 31892, 31892, 31892, 31892,
+        ],
+        [
+          84, 65, 26, 59, 65, 39, 59, 65, 26, 33, 78, 84, 91, 78, 78, 33, 97, 26, 65, 26, 97, 65,
+          97, 33, 110, 84, 33, 71, 78, 33, 65, 65, 65, 65, 65,
+        ],
+        [
+          85, 65, 26, 59, 65, 39, 59, 65, 26, 33, 78, 85, 91, 78, 78, 33, 98, 26, 65, 26, 98, 65,
+          98, 33, 111, 85, 33, 72, 78, 33, 65, 65, 65, 65, 65,
+        ],
+      ),
+      (
+        "Calibri",
+        [
+          36792, 30128, 13160, 25340, 28532, 19012, 22428, 27468, 13160, 12964, 29624, 30576,
+          37968, 31192, 28000, 12964, 45808, 13160, 30128, 13160, 45808, 30128, 45808, 12964,
+          51016, 35728, 14448, 27944, 28000, 12964, 29064, 29064, 29064, 29064, 29064,
+        ],
+        [
+          75, 61, 27, 52, 58, 39, 46, 56, 27, 26, 60, 62, 77, 64, 57, 26, 93, 27, 61, 27, 93, 61,
+          93, 26, 104, 73, 29, 57, 57, 26, 59, 59, 59, 59, 59,
+        ],
+        [
+          75, 62, 27, 53, 58, 41, 46, 56, 27, 26, 60, 64, 78, 64, 57, 26, 94, 27, 62, 27, 94, 62,
+          94, 26, 104, 73, 30, 57, 57, 26, 59, 59, 59, 59, 59,
+        ],
+      ),
+    ];
+    let mut cache = NaturalMetricsCache::default();
+    for (family, ideal, positioned, natural) in controls {
+      let style = super::super::TextStyle {
+        font_family: Some(family.into()),
+        high_ansi_font_family: Some(family.into()),
+        font_size_pt: 14.04,
+        ..Default::default()
+      };
+      let face = ooxmlsdk_layout::fonts::load_text_face(&style).expect("native control face");
+      let font = skrifa::FontRef::from_index(face.data.as_slice(), face.index).unwrap();
+      for (index, character) in text.chars().enumerate() {
+        let glyph = font.charmap().map(character).unwrap().to_u32();
+        let source = character.to_string();
+        let advance_em = ideal[index] as f32 / (14.0 * IDEAL_UNITS_PER_POINT);
+        assert_eq!(
+          cache.device_advance(&face, 14.04, glyph, &source, Some(advance_em)),
+          Some(positioned[index]),
+          "{family} kerning {index}:{character:?}"
+        );
+        assert_eq!(
+          cache.device_advance(&face, 14.04, glyph, &source, None),
+          Some(natural[index]),
+          "{family} Natural {index}:{character:?}"
+        );
+      }
+    }
+    assert_eq!(cache.design_units.len(), 3);
   }
 
   #[test]

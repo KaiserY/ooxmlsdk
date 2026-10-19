@@ -4,6 +4,11 @@ use kurbo::{BezPath, CubicBez, ParamCurve, ParamCurveArclen, PathEl, PathSeg, Po
 
 use super::{PathCommand, Point as LayoutPoint, Pt, TextWarp};
 
+mod follow_path;
+pub use follow_path::{
+  TextFollowPathFontCell, TextFollowPathSampler, text_follow_path_glyph_transform,
+};
+
 const TEXT_WARP_ARCLEN_ACCURACY_PT: f64 = 0.0001;
 
 pub fn common_commands_to_bez_path(commands: &[PathCommand]) -> BezPath {
@@ -341,4 +346,68 @@ fn checked_point(point: kurbo::Point) -> Result<LayoutPoint, &'static str> {
     return Err("outlined glyph path contains a non-finite coordinate");
   }
   Ok(LayoutPoint { x: Pt(x), y: Pt(y) })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::common::{Point as CommonPoint, Rect, Size, TextFollowPath};
+
+  #[test]
+  fn text_follow_path_preserves_a_glyphs_affine_geometry() {
+    let point = |x, y| CommonPoint { x: Pt(x), y: Pt(y) };
+    let warp = TextWarp {
+      source_bounds: Rect {
+        origin: point(10.0, 20.0),
+        size: Size {
+          width: Pt(100.0),
+          height: Pt(10.0),
+        },
+      },
+      paint_bounds: Rect {
+        origin: point(0.0, 0.0),
+        size: Size {
+          width: Pt(100.0),
+          height: Pt(50.0),
+        },
+      },
+      boundaries: vec![vec![
+        PathCommand::MoveTo(point(0.0, 50.0)),
+        PathCommand::CubicTo {
+          control1: point(10.0, 0.0),
+          control2: point(90.0, 0.0),
+          end: point(100.0, 50.0),
+        },
+      ]],
+      follow_path: None,
+      vml_fit_path: None,
+      vml_trim_band: None,
+    };
+    let mut warp = warp;
+    warp.follow_path = TextFollowPath::from_path(0.75, &warp.boundaries[0]);
+    let mut metrics = crate::text_metrics::TextMetrics::new();
+    let shaped = metrics
+      .shape_text("A", &crate::model::TextStyle::default())
+      .unwrap();
+    let face = &shaped.font_faces[0];
+    let font = skrifa::FontRef::from_index(face.data.as_ref(), face.index).unwrap();
+    let cell = TextFollowPathFontCell::from_font(&font, 10.0).unwrap();
+    for left in [10.0, 30.0, 70.0] {
+      let transform =
+        text_follow_path_glyph_transform(&warp, Point::new(left, 30.0), 8.0, cell).unwrap();
+      let a = Point::new(left, 20.0);
+      let b = Point::new(left + 8.0, 20.0);
+      let c = Point::new(left, 30.0);
+      assert!(((transform * b - transform * a).hypot() - 6.0).abs() < 1e-10);
+      assert!(((transform * c - transform * a).hypot() - 7.5).abs() < 1e-10);
+      assert!(
+        (transform * (a.midpoint(b)) - (transform * a).midpoint(transform * b)).hypot() < 1e-10
+      );
+    }
+    let mut envelope = warp;
+    envelope.follow_path = None;
+    assert!(
+      text_follow_path_glyph_transform(&envelope, Point::new(10.0, 30.0), 8.0, cell).is_none()
+    );
+  }
 }

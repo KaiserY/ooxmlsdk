@@ -9,7 +9,8 @@ use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
   alternative_format_import_part::AlternativeFormatImportPart, chart_part::ChartPart,
   diagram_colors_part::DiagramColorsPart, diagram_data_part::DiagramDataPart,
-  diagram_persist_layout_part::DiagramPersistLayoutPart,
+  diagram_layout_definition_part::DiagramLayoutDefinitionPart,
+  diagram_persist_layout_part::DiagramPersistLayoutPart, diagram_style_part::DiagramStylePart,
   embedded_control_persistence_part::EmbeddedControlPersistencePart,
   embedded_object_part::EmbeddedObjectPart, endnotes_part::EndnotesPart,
   extended_chart_part::ExtendedChartPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
@@ -47,6 +48,8 @@ pub(super) struct ImageCatalog {
   pub(super) extended_charts_by_relationship_id: HashMap<String, ExtendedChartResource>,
   pub(super) diagram_colors_by_relationship_id: HashMap<String, dgm::ColorsDefinition>,
   pub(super) diagram_data_by_relationship_id: HashMap<String, dgm::DataModelRoot>,
+  pub(super) diagram_layouts_by_relationship_id: HashMap<String, dgm::LayoutDefinition>,
+  pub(super) diagram_styles_by_relationship_id: HashMap<String, dgm::StyleDefinition>,
   pub(super) diagram_drawings_by_relationship_id: HashMap<String, dsp::Drawing>,
 }
 
@@ -565,6 +568,25 @@ impl ImageCatalog {
       .collect::<Vec<_>>();
     catalog.diagram_data_by_relationship_id = Self::diagram_data_parts(package, diagram_data_parts);
 
+    catalog.diagram_layouts_by_relationship_id = part
+      .related_parts_of_type::<_, DiagramLayoutDefinitionPart>(package)
+      .filter_map(|related| {
+        Some((
+          related.relationship_id().to_string(),
+          related.part().root_element(package).ok()?.clone(),
+        ))
+      })
+      .collect();
+    catalog.diagram_styles_by_relationship_id = part
+      .related_parts_of_type::<_, DiagramStylePart>(package)
+      .filter_map(|related| {
+        Some((
+          related.relationship_id().to_string(),
+          related.part().root_element(package).ok()?.clone(),
+        ))
+      })
+      .collect();
+
     let diagram_drawing_parts = part
       .related_parts_of_type::<_, DiagramPersistLayoutPart>(package)
       .map(|related| (related.relationship_id().to_string(), related.into_part()))
@@ -607,6 +629,8 @@ impl ImageCatalog {
       extended_charts_by_relationship_id: HashMap::new(),
       diagram_colors_by_relationship_id: HashMap::new(),
       diagram_data_by_relationship_id: HashMap::new(),
+      diagram_layouts_by_relationship_id: HashMap::new(),
+      diagram_styles_by_relationship_id: HashMap::new(),
       diagram_drawings_by_relationship_id: HashMap::new(),
     }
   }

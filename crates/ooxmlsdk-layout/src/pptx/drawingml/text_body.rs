@@ -1,5 +1,6 @@
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
+  schemas_microsoft_com_office_drawing_2010_main as a14,
   schemas_openxmlformats_org_drawingml_2006_main as a,
   schemas_openxmlformats_org_presentationml_2006_main as p,
 };
@@ -75,6 +76,9 @@ pub(crate) struct TextParagraph {
 pub(crate) struct TextRun {
   pub(crate) text: String,
   pub(crate) kind: TextRunKind,
+  /// Retain the native OMML tree: its 2D geometry cannot be reconstructed
+  /// from the flattened text used by presentation summaries.
+  pub(crate) math_source: Option<Box<a14::TextMath>>,
   pub(crate) hyperlink_url: Option<String>,
   pub(crate) field_type: Option<String>,
   pub(crate) run_properties: Option<Box<a::RunProperties>>,
@@ -383,7 +387,10 @@ impl TextBodyDisplayProperties {
       from_word_art: properties
         .from_word_art
         .is_some_and(|value| value.as_bool())
-        || properties.preset_text_warp.is_some(),
+        || properties
+          .preset_text_warp
+          .as_deref()
+          .is_some_and(|warp| warp.preset != a::TextShapeValues::TextNoShape),
       preset_text_warp: properties
         .preset_text_warp
         .as_deref()
@@ -534,6 +541,7 @@ impl TextRun {
       a::ParagraphChoice::Run(run) => Some(Self {
         text: run.text.clone(),
         kind: TextRunKind::Run,
+        math_source: None,
         hyperlink_url: None,
         field_type: None,
         run_properties: run.run_properties.clone(),
@@ -542,6 +550,7 @@ impl TextRun {
       a::ParagraphChoice::Break(line_break) => Some(Self {
         text: "\n".to_string(),
         kind: TextRunKind::Break,
+        math_source: None,
         hyperlink_url: None,
         field_type: None,
         run_properties: line_break.run_properties.clone(),
@@ -550,6 +559,7 @@ impl TextRun {
       a::ParagraphChoice::Field(field) => field.text.as_ref().map(|text| Self {
         text: text.clone(),
         kind: TextRunKind::Field,
+        math_source: None,
         hyperlink_url: None,
         field_type: field.r#type.clone(),
         run_properties: field.run_properties.clone(),
@@ -558,6 +568,7 @@ impl TextRun {
       a::ParagraphChoice::TextMath(math) => Some(Self {
         text: text_math_text(math),
         kind: TextRunKind::Math,
+        math_source: Some(Box::new(math.clone())),
         hyperlink_url: None,
         field_type: None,
         run_properties: None,
@@ -643,6 +654,43 @@ mod tests {
       display.preset_text_warp,
       Some(a::TextShapeValues::TextPlain)
     );
+  }
+
+  #[test]
+  fn no_shape_text_warp_keeps_ordinary_text_searchable() {
+    use ooxmlsdk::simple_type::BooleanValue;
+    // textNoShape explicitly disables a warp; its mere presence does not
+    // turn an ordinary DrawingML body into WordArt. Keep an authored
+    // fromWordArt flag independent from the preset geometry.
+    for (preset, explicit_word_art, expected) in [
+      (None, None, false),
+      (Some(a::TextShapeValues::TextNoShape), None, false),
+      (Some(a::TextShapeValues::TextPlain), None, true),
+      (
+        Some(a::TextShapeValues::TextNoShape),
+        Some(BooleanValue::True),
+        true,
+      ),
+      (
+        Some(a::TextShapeValues::TextNoShape),
+        Some(BooleanValue::False),
+        false,
+      ),
+    ] {
+      let properties = a::BodyProperties {
+        from_word_art: explicit_word_art,
+        preset_text_warp: preset.map(|preset| {
+          Box::new(a::PresetTextWarp {
+            preset,
+            ..a::PresetTextWarp::default()
+          })
+        }),
+        ..a::BodyProperties::default()
+      };
+      let display = TextBodyDisplayProperties::from_body_properties(&properties);
+      assert_eq!(display.from_word_art, expected);
+      assert_eq!(display.preset_text_warp, preset);
+    }
   }
 
   #[test]

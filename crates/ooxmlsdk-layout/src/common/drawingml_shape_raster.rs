@@ -108,6 +108,41 @@ pub(crate) fn office_shape_shadow_bitmap_sample_bounds(
   crate::model::common_rect(left, top, right - left, bottom - top)
 }
 
+/// Encloses a caster and its intermediate blur while keeping the final
+/// shadow's sample lattice fixed. Padding is an integral number of pixels,
+/// so later cropping does not change source coverage or world placement.
+pub(crate) fn office_shape_shadow_working_bounds(
+  required: Rect,
+  sample: Rect,
+  pixels_per_point: f32,
+) -> Rect {
+  let axis = |near: f32, length: f32, origin: f32, sample_length: f32| {
+    let scale = f64::from(pixels_per_point);
+    let far =
+      (f64::from(near) + f64::from(length)).max(f64::from(origin) + f64::from(sample_length));
+    let near = f64::from(near).min(f64::from(origin));
+    let first = ((near - f64::from(origin)) * scale).floor();
+    let last = ((far - f64::from(origin)) * scale).ceil();
+    (
+      (f64::from(origin) + first / scale) as f32,
+      ((last - first) / scale) as f32,
+    )
+  };
+  let (left, width) = axis(
+    required.origin.x.0,
+    required.size.width.0,
+    sample.origin.x.0,
+    sample.size.width.0,
+  );
+  let (top, height) = axis(
+    required.origin.y.0,
+    required.size.height.0,
+    sample.origin.y.0,
+    sample.size.height.0,
+  );
+  crate::model::common_rect(left, top, width, height)
+}
+
 #[derive(Debug)]
 pub(crate) struct DrawingRaster {
   pub(crate) image: RgbaImage,
@@ -3911,41 +3946,56 @@ fn vml_envelope_shaped_text(
   text_metrics: &mut TextMetrics,
 ) -> Option<crate::text_metrics::ShapedText> {
   let mut paint = text_metrics.shape_text(text, style)?;
-  let Some(sizes) = style.layout_font_sizes else {
-    return Some(paint);
-  };
-  if sizes.primary == style.font_size && sizes.complex == style.complex_font_size {
-    return Some(paint);
-  }
-  let mut logical_style = style.clone();
-  logical_style.font_size = sizes.primary;
-  logical_style.complex_font_size = sizes.complex;
-  let logical = text_metrics.shape_text(text, &logical_style)?;
-  // The PDF envelope retains logical positions while painting realized
-  // outlines. Its layout preview must enclose those same glyphs. Reject a
-  // changed shaping topology completely rather than transferring another
-  // cluster's origin or advance. Absolute spacing remains in point units.
-  if paint.glyphs.len() == logical.glyphs.len()
-    && paint
-      .glyphs
-      .iter()
-      .zip(&logical.glyphs)
-      .all(|(paint_glyph, logical_glyph)| {
-        paint.font_faces.get(paint_glyph.font_index)
-          == logical.font_faces.get(logical_glyph.font_index)
-          && paint_glyph.glyph_id == logical_glyph.glyph_id
-          && paint_glyph.text_range == logical_glyph.text_range
-          && paint_glyph.font_size_pt > f32::EPSILON
-      })
+  if let Some(sizes) = style.layout_font_sizes
+    && (sizes.primary != style.font_size || sizes.complex != style.complex_font_size)
   {
-    for (paint_glyph, logical_glyph) in paint.glyphs.iter_mut().zip(&logical.glyphs) {
-      let scale = logical_glyph.font_size_pt / paint_glyph.font_size_pt;
-      paint_glyph.x_advance_em = logical_glyph.x_advance_em * scale;
-      paint_glyph.y_advance_em = logical_glyph.y_advance_em * scale;
-      paint_glyph.x_offset_em = logical_glyph.x_offset_em * scale;
-      paint_glyph.y_offset_em = logical_glyph.y_offset_em * scale;
+    let mut logical_style = style.clone();
+    logical_style.font_size = sizes.primary;
+    logical_style.complex_font_size = sizes.complex;
+    let logical = text_metrics.shape_text(text, &logical_style)?;
+    // The PDF envelope retains logical positions while painting realized
+    // outlines. Its layout preview must enclose those same glyphs. Reject a
+    // changed shaping topology completely rather than transferring another
+    // cluster's origin or advance. Absolute spacing remains in point units.
+    if paint.glyphs.len() == logical.glyphs.len()
+      && paint
+        .glyphs
+        .iter()
+        .zip(&logical.glyphs)
+        .all(|(paint_glyph, logical_glyph)| {
+          paint.font_faces.get(paint_glyph.font_index)
+            == logical.font_faces.get(logical_glyph.font_index)
+            && paint_glyph.glyph_id == logical_glyph.glyph_id
+            && paint_glyph.text_range == logical_glyph.text_range
+            && paint_glyph.font_size_pt > f32::EPSILON
+        })
+    {
+      for (paint_glyph, logical_glyph) in paint.glyphs.iter_mut().zip(&logical.glyphs) {
+        let scale = logical_glyph.font_size_pt / paint_glyph.font_size_pt;
+        paint_glyph.x_advance_em = logical_glyph.x_advance_em * scale;
+        paint_glyph.y_advance_em = logical_glyph.y_advance_em * scale;
+        paint_glyph.x_offset_em = logical_glyph.x_offset_em * scale;
+        paint_glyph.y_offset_em = logical_glyph.y_offset_em * scale;
+      }
+      paint.width_pt = logical.width_pt;
     }
-    paint.width_pt = logical.width_pt;
+  }
+  if let Some(advances) = style.semantic_character_advances_pt.as_deref()
+    && advances.len() == text.chars().count()
+  {
+    let mut offsets: Vec<_> = text.char_indices().map(|(index, _)| index).collect();
+    offsets.push(text.len());
+    let mut prefix = Vec::with_capacity(advances.len() + 1);
+    prefix.push(0.0);
+    for &advance in advances {
+      prefix.push(prefix.last().copied().unwrap_or(0.0) + advance);
+    }
+    for glyph in &mut paint.glyphs {
+      let start = offsets.binary_search(&glyph.text_range.start).ok()?;
+      let end = offsets.binary_search(&glyph.text_range.end).ok()?;
+      glyph.x_advance_em = (prefix[end] - prefix[start]) / glyph.font_size_pt;
+    }
+    paint.width_pt = prefix.last().copied().unwrap_or(0.0);
   }
   Some(paint)
 }
@@ -3956,16 +4006,18 @@ fn vml_envelope_text_outline(
   text_metrics: &mut TextMetrics,
 ) -> Option<BezPath> {
   use super::text_warp_projection::{
-    GlyphOutlinePath, TextWarpBoundary, append_mapped_outline, common_commands_to_bez_path,
-    split_outline_at_warp_seams, text_warp_point, text_warp_source_seams,
+    GlyphOutlinePath, TextFollowPathFontCell, TextWarpBoundary, append_mapped_outline,
+    common_commands_to_bez_path, split_outline_at_warp_seams, text_follow_path_glyph_transform,
+    text_warp_point, text_warp_source_seams,
   };
 
   let boundaries = warp
     .boundaries
     .iter()
+    .filter(|_| warp.follow_path.is_none())
     .map(|commands| TextWarpBoundary::new(commands).ok())
     .collect::<Option<Vec<_>>>()?;
-  let seams = if warp.vml_trim_band.is_none() {
+  let seams = if warp.vml_trim_band.is_none() && warp.follow_path.is_none() {
     text_warp_source_seams(warp, &boundaries)
   } else {
     Vec::new()
@@ -4018,9 +4070,26 @@ fn vml_envelope_text_outline(
         )
       };
       let split = split_outline_at_warp_seams(&raw.path, glyph_to_page, &seams);
+      let follow_path_transform = if warp.follow_path.is_some() {
+        let cell = TextFollowPathFontCell::from_font(&face, glyph.font_size_pt)?;
+        Some(text_follow_path_glyph_transform(
+          warp,
+          KurboPoint::new(f64::from(origin_x), f64::from(origin_y)),
+          f64::from(glyph.x_advance_em * glyph.font_size_pt),
+          cell,
+        )?)
+      } else {
+        None
+      };
       append_mapped_outline(
         split.as_ref().unwrap_or(&raw.path),
-        |point| text_warp_point(warp, &boundaries, glyph_to_page(point)),
+        |point| {
+          let point = glyph_to_page(point);
+          follow_path_transform.map_or_else(
+            || text_warp_point(warp, &boundaries, point),
+            |transform| transform * point,
+          )
+        },
         &mut commands,
       )
       .ok()?;
@@ -4364,6 +4433,23 @@ fn draw_path(
         Some(item),
         page_to_raster,
       );
+    }
+    if let Some(commands) = super::drawingml_stroke::drawingml_triangle_stroke_outline(
+      &item.commands,
+      &item.points,
+      item.closed,
+      stroke,
+    ) {
+      let outline = path_from_commands(&commands, &[], false)?;
+      let mut paint = solid_paint(stroke.color);
+      paint.anti_alias = primitive_antialiasing.enabled();
+      if primitive_antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
+        let mask = direct2d_four_sample_mask(pixmap, &outline, FillRule::Winding, page_to_raster)?;
+        paint_sample_mask(pixmap, &mask, paint, page_to_raster)?;
+      } else {
+        pixmap.fill_path(&outline, &paint, FillRule::Winding, page_to_raster, None);
+      }
+      return Some(());
     }
     let shortened_path = shortened_straight_stroke_path(item, stroke);
     draw_stroke(
@@ -5114,6 +5200,19 @@ fn draw_device_stroke(
     local.stroke = Some(realized.clone());
     local
   });
+  if let Some(outline_commands) = local_item.as_ref().and_then(|item| {
+    super::drawingml_stroke::drawingml_triangle_stroke_outline(
+      &item.commands,
+      &item.points,
+      item.closed,
+      &realized,
+    )
+  }) {
+    let outline = path_from_commands(&outline_commands, &[], false)?;
+    let mask = direct2d_four_sample_mask(pixmap, &outline, FillRule::Winding, local_to_raster)?;
+    paint_stroke_mask(pixmap, &mask, stroke, bounds, commands, page_to_raster)?;
+    return Some(());
+  }
   let shortened = local_item
     .as_ref()
     .and_then(|item| shortened_straight_stroke_path(item, &realized));
@@ -5362,6 +5461,80 @@ fn pattern_origin(value: f32, tile_size_pt: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
+  #[test]
+  fn triangle_stroke_applies_translucent_paint_once_including_device_masks() {
+    use crate::common::{
+      DrawingMlDeviceStroke, StrokeCap, StrokeEnd, StrokeEndKind, StrokeEndSize,
+    };
+
+    for device in [false, true] {
+      for antialiasing in [
+        RasterPrimitiveAntialiasing::PerPrimitive,
+        RasterPrimitiveAntialiasing::Direct2dStandard4,
+      ] {
+        let mut pixmap = tiny_skia::Pixmap::new(160, 60).unwrap();
+        let item = crate::common::PathItem {
+          bounds: rect(10.0, 15.0, 130.0, 30.0),
+          commands: Vec::new(),
+          points: vec![
+            Point {
+              x: Pt(10.0),
+              y: Pt(30.0),
+            },
+            Point {
+              x: Pt(140.0),
+              y: Pt(30.0),
+            },
+          ],
+          closed: false,
+          fill: Fill::None,
+          stroke: Some(Stroke {
+            width: Pt(6.0),
+            color: Color {
+              r: 0,
+              g: 0,
+              b: 0,
+              a: 128,
+            },
+            cap: Some(StrokeCap::Flat),
+            tail_end: Some(StrokeEnd {
+              kind: StrokeEndKind::Triangle,
+              width: StrokeEndSize::Medium,
+              length: StrokeEndSize::Medium,
+            }),
+            drawingml_device: device.then(|| {
+              Box::new(DrawingMlDeviceStroke {
+                width_emu: 76_200,
+                emu_to_points: [1.0 / 12_700.0, 0.0, 0.0, 1.0 / 12_700.0],
+                snap: false,
+                realized_width_emu: Some(76_200.0),
+              })
+            }),
+            ..Stroke::default()
+          }),
+        };
+        super::draw_path(
+          &mut pixmap,
+          &item,
+          tiny_skia::Transform::identity(),
+          antialiasing,
+        )
+        .unwrap();
+        assert_eq!(pixmap.pixel(60, 30).unwrap().alpha(), 128, "shaft");
+        assert_eq!(
+          pixmap.pixel(123, 30).unwrap().alpha(),
+          128,
+          "overlap must not overpaint to 192"
+        );
+        assert_eq!(
+          pixmap.pixel(139, 32).unwrap().alpha(),
+          0,
+          "triangle tip has no square shaft corner"
+        );
+      }
+    }
+  }
+
   #[test]
   fn vml_envelope_preview_preserves_logical_positions_and_realized_outlines() {
     use std::borrow::Cow;

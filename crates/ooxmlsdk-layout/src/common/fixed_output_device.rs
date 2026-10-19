@@ -8,8 +8,18 @@
 #[cfg(test)]
 use crate::model::PageSetup;
 
-const SOURCE_DPI: f64 = 600.0;
+pub(super) const SOURCE_DPI: f64 = 600.0;
 const OUTPUT_DPI: f64 = 3000.0;
+
+// Reference DC sizes from the configured Office printer, in portrait order.
+pub(super) const STANDARD_REFERENCES: [([i32; 2], [i32; 2]); 6] = [
+  ([5100, 6600], [216, 279]),
+  ([5100, 8400], [216, 356]),
+  ([7016, 9921], [297, 420]),
+  ([4961, 7016], [210, 297]),
+  ([3496, 4961], [148, 210]),
+  ([4299, 6071], [182, 257]),
+];
 
 #[derive(Clone, Copy)]
 struct Axis {
@@ -52,6 +62,17 @@ pub struct PageCoordinates {
 }
 
 impl PageCoordinates {
+  pub(super) fn from_reference(
+    viewport: [i32; 2],
+    reference_dots: [i32; 2],
+    reference_mm: [i32; 2],
+  ) -> Self {
+    Self {
+      x: Axis::new(viewport[0], reference_dots[0], reference_mm[0]),
+      y: Axis::new(viewport[1], reference_dots[1], reference_mm[1]),
+    }
+  }
+
   pub fn for_standard_size(width_pt: f32, height_pt: f32) -> Option<Self> {
     let viewport =
       [width_pt, height_pt].map(|pt| (f64::from(pt) * SOURCE_DPI / 72.0).round() as i32);
@@ -60,20 +81,10 @@ impl PageCoordinates {
     // the actual page has its device extent. Other/custom paper keeps its
     // existing paint path until its reference-DC selection is established;
     // deriving a reference DC from arbitrary page millimeters is incorrect.
-    for (dots, mm) in [
-      ([5100, 6600], [216, 279]),
-      ([5100, 8400], [216, 356]),
-      ([7016, 9921], [297, 420]),
-      ([4961, 7016], [210, 297]),
-      ([3496, 4961], [148, 210]),
-      ([4299, 6071], [182, 257]),
-    ] {
+    for (dots, mm) in STANDARD_REFERENCES {
       for (dots, mm) in [(dots, mm), ([dots[1], dots[0]], [mm[1], mm[0]])] {
         if viewport == dots {
-          return Some(Self {
-            x: Axis::new(viewport[0], dots[0], mm[0]),
-            y: Axis::new(viewport[1], dots[1], mm[1]),
-          });
+          return Some(Self::from_reference(viewport, dots, mm));
         }
       }
     }

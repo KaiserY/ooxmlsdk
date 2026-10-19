@@ -249,6 +249,10 @@ impl StylesCatalog {
     self.locales.ui_language_or_default()
   }
 
+  pub(crate) fn auxiliary_line_break_font(&self) -> Option<&'static str> {
+    self.locales.excel_auxiliary_line_break_font()
+  }
+
   pub(crate) fn output_format_locale(&self) -> Option<&str> {
     self.locales.format_locale()
   }
@@ -1072,7 +1076,13 @@ impl StylesCatalog {
     }
   }
 
-  pub(crate) fn resolve_rich_text_run_font(&self, run: &mut super::workbook::SharedStringRun) {
+  pub(crate) fn resolve_rich_text_run(&self, run: &mut super::workbook::SharedStringRun) {
+    if let Some(color) = &run.color_definition {
+      // Rich runs use the same workbook palette/theme as cell fonts. Parsing
+      // only rgb loses an explicit indexed or theme color, which must not be
+      // confused with an omitted run color's automatic default.
+      run.color = self.spreadsheet_color(color);
+    }
     let Some(scheme) = run.font_scheme else {
       return;
     };
@@ -1197,20 +1207,16 @@ impl StylesCatalog {
 
   pub(crate) fn fixed_output_alignment_indent_increment_pt(
     &self,
-    measured_three_spaces_pt: f32,
+    text_metrics: &mut crate::text_metrics::TextMetrics,
   ) -> f32 {
-    if self.normal_style_uses_explicit_arial_10() {
-      // ECMA-376 Part 1 §18.8.1 defines an indent increment as three
-      // Normal-font spaces. Calc's UnitConverter::finalizeImport obtains that
-      // space from the document ReferenceDevice through XFont::getCharWidth,
-      // rather than from the eventual PDF font. Excel's fixed-output Arial 10
-      // reference device resolves the three-space increment to 15 screen
-      // pixels; retaining that hinted device metric also matches the Arial 10
-      // digit-grid profile used for authored column widths.
-      15.0 * units::POINTS_PER_CSS_PIXEL
-    } else {
-      measured_three_spaces_pt
-    }
+    let normal_style = self.default_font_text_style();
+    // ECMA-376 §18.8.1 owns the three spaces in the Normal font. Native
+    // zoom/cell-font/Normal-font controls keep this unscaled reference-device
+    // metric: Arial10/20 and TNR10 give8.28/16.56/7.56pt at every sheet zoom.
+    text_metrics
+      .excel_unrotated_character_advances_pt("   ", &normal_style)
+      .map(|advances| advances.iter().sum())
+      .unwrap_or_else(|| text_metrics.measure_text("   ", &normal_style))
   }
 
   pub(crate) fn normal_style_uses_explicit_verdana_10(&self) -> bool {
@@ -2393,6 +2399,46 @@ mod tests {
   }
 
   #[test]
+  fn rich_run_colors_resolve_in_the_workbook_palette_and_theme() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let parsed = |attributes: &str| {
+      let xml = format!(
+        r#"<r xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><rPr><color {attributes}/></rPr><t>Run</t></r>"#
+      );
+      super::super::workbook::shared_string_run(&x::Run::from_bytes(xml.as_bytes()).unwrap())
+    };
+    let mut catalog = StylesCatalog {
+      theme_colors: ThemeColorPalette::office_default(),
+      ..StylesCatalog::default()
+    };
+    // No font scheme is authored: color resolution must happen before the
+    // optional theme-font path returns. Index55 is the billing template's
+    // native gray, and a custom palette owns the same index independently.
+    let mut indexed = parsed(r#"indexed="55""#);
+    assert!(indexed.color_definition.is_some());
+    assert!(indexed.color.is_none());
+    catalog.resolve_rich_text_run(&mut indexed);
+    assert_eq!(indexed.color, Some(indexed_rgb(0x969696)));
+    catalog.indexed_colors = vec![indexed_rgb(0x000000); 56];
+    catalog.indexed_colors[55] = indexed_rgb(0x12AB34);
+    catalog.resolve_rich_text_run(&mut indexed);
+    assert_eq!(indexed.color, Some(indexed_rgb(0x12AB34)));
+
+    for (attributes, expected) in [
+      (r#"theme="4""#, Some(indexed_rgb(0x156082))),
+      (r#"theme="4" tint="1""#, Some(indexed_rgb(0xFFFFFF))),
+      (r#"rgb="FF123456""#, Some(indexed_rgb(0x123456))),
+      (r#"rgb="FF123456" tint="-1""#, Some(indexed_rgb(0x000000))),
+      (r#"auto="1""#, None),
+    ] {
+      let mut run = parsed(attributes);
+      catalog.resolve_rich_text_run(&mut run);
+      assert_eq!(run.color, expected, "{attributes}");
+    }
+  }
+
+  #[test]
   fn omitted_indexed_color_table_uses_the_implied_ecma_palette() {
     assert_eq!(
       indexed_color(&[], 22),
@@ -2512,6 +2558,35 @@ mod tests {
       stacked.horizontal,
       Some(x::HorizontalAlignmentValues::Center)
     );
+  }
+
+  #[test]
+  fn alignment_indent_uses_unscaled_normal_font_printer_spaces() {
+    use ooxmlsdk::sdk::SdkType;
+    let mut metrics = crate::text_metrics::TextMetrics::new();
+    for (family, size, native) in [
+      ("Arial", 10, 8.28),
+      ("Arial", 20, 16.56),
+      ("Times New Roman", 10, 7.56),
+    ] {
+      let stylesheet = x::Stylesheet::from_bytes(format!(
+        r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <fonts count="1"><font><sz val="{size}"/><name val="{family}"/></font></fonts>
+        <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+        <cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>
+        <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#
+      ).as_bytes()).unwrap();
+      let catalog = StylesCatalog::from_stylesheet(
+        &stylesheet,
+        None,
+        ThemeColorPalette::office_default(),
+        &OfficeLocaleContext::default(),
+      );
+      assert!(
+        (catalog.fixed_output_alignment_indent_increment_pt(&mut metrics) - native).abs() < 0.001,
+        "{family} {size}"
+      );
+    }
   }
 
   #[test]
@@ -2706,7 +2781,7 @@ mod tests {
       );
       let mut run =
         super::super::workbook::shared_string_run(&x::Run::from_bytes(xml.as_bytes()).unwrap());
-      catalog.resolve_rich_text_run_font(&mut run);
+      catalog.resolve_rich_text_run(&mut run);
       assert_eq!(run.font_family.as_deref(), Some(expected), "{scheme}");
       assert_eq!(run.fallback_font_family.as_deref(), fallback, "{scheme}");
     }

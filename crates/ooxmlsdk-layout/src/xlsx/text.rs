@@ -110,20 +110,30 @@ pub(crate) fn scale_text_style_for_fixed_output(style: &mut TextStyle, print_sca
       .expect("automatic alignment retains its original size");
     let original_complex_size_pt = style.automatic_escapement_complex_font_size_pt;
     restore_automatic_escapement(style);
-    style.font_size_pt =
-      units::quantize_points_to_office_print_grid(original_size_pt * print_scale);
-    style.complex_font_size_pt = original_complex_size_pt
-      .map(|size_pt| units::quantize_points_to_office_print_grid(size_pt * print_scale));
+    style.font_size_pt = fixed_output_font_size_pt(original_size_pt, print_scale);
+    style.complex_font_size_pt =
+      original_complex_size_pt.map(|size_pt| fixed_output_font_size_pt(size_pt, print_scale));
     apply_fixed_output_vertical_text_alignment(style, vertical_alignment);
     return;
   }
 
-  style.font_size_pt =
-    units::quantize_points_to_office_print_grid(style.font_size_pt * print_scale);
+  style.font_size_pt = fixed_output_font_size_pt(style.font_size_pt, print_scale);
   style.complex_font_size_pt = style
     .complex_font_size_pt
-    .map(|size_pt| units::quantize_points_to_office_print_grid(size_pt * print_scale));
+    .map(|size_pt| fixed_output_font_size_pt(size_pt, print_scale));
   style.baseline_shift_pt *= print_scale;
+}
+
+pub(super) fn fixed_output_font_size_pt(font_size_pt: f32, print_scale: f32) -> f32 {
+  // The composed worksheet percentage is integral before font realization.
+  // Retain that rational operand until rounding the 600dpi character height:
+  // Native 6pt at 59/95% becomes 30/48 dots. Multiplying f32 first puts exact
+  // half-dot values just below the tie and incorrectly rounds them downward.
+  let percentage = (f64::from(print_scale) * 100.0).round();
+  let dots = f64::from(font_size_pt) * percentage * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+    / (100.0 * f64::from(units::POINTS_PER_INCH));
+  (dots.round() * f64::from(units::POINTS_PER_INCH) / f64::from(units::OFFICE_FIXED_OUTPUT_DPI))
+    as f32
 }
 
 fn restore_automatic_escapement(style: &mut TextStyle) {
@@ -153,6 +163,23 @@ fn vertical_alignment_parameters(vertical_alignment: x::VerticalAlignmentRunValu
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn fixed_output_font_height_preserves_half_dot_percentage_ties() {
+    // Native font controls at 59/95% print both plain and inherited rich 6pt
+    // characters at 30/48 dots. Keep superscript's separately calibrated path.
+    for (size, scale, expected) in [(6.0, 0.59, 3.6), (6.0, 0.95, 5.76), (12.0, 0.95, 11.4)] {
+      assert!((fixed_output_font_size_pt(size, scale) - expected).abs() < 1.0e-5);
+      let mut style = TextStyle {
+        font_size_pt: size,
+        complex_font_size_pt: Some(size),
+        ..Default::default()
+      };
+      scale_text_style_for_fixed_output(&mut style, scale);
+      assert!((style.font_size_pt - expected).abs() < 1.0e-5);
+      assert!((style.complex_font_size_pt.unwrap() - expected).abs() < 1.0e-5);
+    }
+  }
 
   #[test]
   fn excel_superscript_fixed_output_uses_the_frozen_printer_device_transform() {

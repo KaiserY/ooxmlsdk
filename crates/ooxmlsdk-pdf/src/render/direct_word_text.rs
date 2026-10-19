@@ -1,8 +1,9 @@
-//! Word fixed-output text-array realization, independent of line layout.
+//! Office fixed-output text-array realization, independent of line layout.
 //!
 //! Native PDF-export observations cover 1,737 runs and 5,840 adjustments.
 //! The exporter accumulates nominal PDF widths and requested paint advances
 //! separately in FLOAT, then emits an integer adjustment at each boundary.
+//! Independent Excel GDI/PDF controls share this same width-array contract.
 
 use super::common;
 
@@ -42,16 +43,16 @@ fn font_horizontal_scale_from_average(average_pixels: u32, percent: u16) -> Opti
     .map(serialize_font_width_ratio)
 }
 
-pub(super) struct WordTextPositioning {
+pub(super) struct OfficeTextPositioning {
   pub character_spacing_pt: f32,
   /// Index of the last glyph before the adjustment, and its PDF text units.
   pub adjustments: Vec<(usize, i32)>,
 }
 
-impl WordTextPositioning {
+impl OfficeTextPositioning {
   pub fn new(widths: &[f32], advances_pt: &[f32], size_pt: f32, scale: f32) -> Self {
     debug_assert_eq!(widths.len(), advances_pt.len());
-    // Word tests at most the first seven nonterminal advances for a uniform
+    // Office tests at most the first seven nonterminal advances for a uniform
     // character-space term. The final advance has no following glyph to move.
     let mut differences = widths
       .iter()
@@ -94,7 +95,7 @@ impl WordTextPositioning {
 
 #[cfg(test)]
 mod tests {
-  use super::{WordTextPositioning, font_horizontal_scale_from_average};
+  use super::{OfficeTextPositioning, font_horizontal_scale_from_average};
 
   #[test]
   fn native_leader_tc_uses_three_significant_digits() {
@@ -107,6 +108,72 @@ mod tests {
     ] {
       assert_eq!(super::serialize_leader_character_spacing(value), expected);
     }
+  }
+
+  #[test]
+  fn native_excel_text_array_shares_integer_width_and_adjustment_realization() {
+    // Independent Arial printer/PDF control: "CS Worksheet  (the Child
+    // Support Worksheet)". Its59-pixel paint font has a58-dot hinted W;
+    // the Office PDF carries integer CID widths and a-38 text adjustment.
+    let widths = [
+      722., 667., 278., 944., 556., 333., 500., 500., 556., 556., 556., 278., 278., 278., 333.,
+      278., 556., 556., 278., 722., 556., 222., 222., 556., 278., 667., 556., 556., 556., 556.,
+      333., 278., 278., 944., 556., 333., 500., 500., 556., 556., 556., 278., 333.,
+    ];
+    let advances = [
+      43., 39., 16., 58., 33., 20., 30., 30., 33., 33., 33., 16., 16., 16., 20., 16., 33., 33.,
+      16., 43., 33., 13., 13., 33., 16., 39., 33., 33., 33., 33., 20., 16., 16., 58., 33., 20.,
+      30., 30., 33., 33., 33., 16., 20.,
+    ]
+    .map(|dots| dots * 0.12);
+    let result = OfficeTextPositioning::new(&widths, &advances, 7.08, 1.0);
+    assert_eq!(result.character_spacing_pt, 0.0);
+    assert_eq!(
+      result.adjustments,
+      [
+        (0, -6),
+        (1, 6),
+        (2, 7),
+        (3, -38),
+        (4, -2),
+        (5, -5),
+        (6, -7),
+        (7, -7),
+        (8, -2),
+        (9, -2),
+        (10, -2),
+        (11, 7),
+        (12, 7),
+        (13, 7),
+        (14, -5),
+        (15, 7),
+        (16, -2),
+        (17, -2),
+        (18, 7),
+        (19, -6),
+        (20, -2),
+        (22, 3),
+        (23, -2),
+        (24, 7),
+        (25, 6),
+        (26, -2),
+        (27, -2),
+        (28, -2),
+        (29, -2),
+        (30, -5),
+        (31, 7),
+        (32, 7),
+        (33, -38),
+        (34, -2),
+        (35, -5),
+        (36, -7),
+        (37, -7),
+        (38, -2),
+        (39, -2),
+        (40, -2),
+        (41, 7),
+      ]
+    );
   }
 
   #[test]
@@ -145,7 +212,7 @@ mod tests {
       0x412147ae, 0x40d70a3e, 0x40570a3e, 0x40a8f5c2,
     ]
     .map(f32::from_bits);
-    let result = WordTextPositioning::new(&widths, &advances, 12.0, 1.0);
+    let result = OfficeTextPositioning::new(&widths, &advances, 12.0, 1.0);
     assert_eq!(result.character_spacing_pt, 0.0);
     assert_eq!(
       result.adjustments,
@@ -157,7 +224,7 @@ mod tests {
   fn native_word_character_space_ignores_the_terminal_advance() {
     let widths = [500.; 4];
     let advances = [67., 67., 67., 66.].map(|dots| dots * 0.12);
-    let result = WordTextPositioning::new(&widths, &advances, 15.96, 1.0);
+    let result = OfficeTextPositioning::new(&widths, &advances, 15.96, 1.0);
     assert_eq!(result.character_spacing_pt, 0.059999943);
     assert!(result.adjustments.is_empty());
   }

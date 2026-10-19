@@ -1151,11 +1151,11 @@ impl DrawingObjectModel {
       fill_gradient: None,
       no_fill: false,
       use_group_fill: false,
-      line_color: None,
-      line_pattern: None,
-      line_gradient: None,
-      line_width_emu: None,
-      no_line: false,
+      line_color: shape_line_color(&picture.shape_properties),
+      line_pattern: shape_line_pattern(&picture.shape_properties),
+      line_gradient: shape_line_gradient(&picture.shape_properties),
+      line_width_emu: shape_line_width_emu(&picture.shape_properties),
+      no_line: shape_no_line(&picture.shape_properties),
       rotation_deg: transform_rotation_deg(picture.shape_properties.transform2_d.as_deref()),
       flip_horizontal: transform_flip_horizontal(picture.shape_properties.transform2_d.as_deref()),
       flip_vertical: transform_flip_vertical(picture.shape_properties.transform2_d.as_deref()),
@@ -2957,6 +2957,27 @@ mod tests {
         ..Default::default()
       }),
       ..Default::default()
+    }
+  }
+
+  #[test]
+  fn pictures_retain_direct_outline_properties_and_explicit_no_line() {
+    for (fill, no_line) in [
+      (
+        r#"<a:solidFill><a:srgbClr val="000000"/></a:solidFill>"#,
+        false,
+      ),
+      ("<a:noFill/>", true),
+    ] {
+      let picture = xdr::Picture::from_bytes(format!(r#"<xdr:pic xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:nvPicPr><xdr:cNvPr id="10" name="Picture"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill/><xdr:spPr><a:prstGeom prst="rect"/><a:ln w="38100" cap="sq">{fill}<a:prstDash val="solid"/><a:miter lim="800000"/></a:ln></xdr:spPr></xdr:pic>"#).as_bytes()).unwrap();
+      let model = DrawingObjectModel::from_picture(&picture);
+      assert_eq!(model.line_width_emu, Some(38_100));
+      assert_eq!(model.no_line, no_line);
+      assert_eq!(model.line_color.is_some(), !no_line);
+      let Some(DrawingGeometryModel::Preset { outline, .. }) = model.geometry else {
+        panic!("picture outline geometry");
+      };
+      assert_eq!(outline.unwrap().cap_type, Some(a::LineCapValues::Square));
     }
   }
 

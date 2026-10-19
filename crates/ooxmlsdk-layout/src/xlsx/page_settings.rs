@@ -22,17 +22,39 @@ enum MsPaperSize {
 
 const DEFAULT_PRINT_SCALE_PERCENT: u32 = 100;
 const OFFICE_LETTER_TO_DEFAULT_A4_SCALE_PERCENT: u32 = 95;
-// Excel fixed-format output exposes the physical A4 MediaBox on the 600dpi
-// device, but its Letter-to-default-A4 worksheet transform centers against an
-// imageable vertical span 23 dots shorter than that physical page. Independent
-// top/bottom-margin interpolation keeps the expected +0.975/-0.025 slopes,
-// proving this is a device-span term rather than a VML/object adjustment.
+// Retained for the separate chartsheet origin profile. Worksheets use the
+// integer MapPaperSize calculation and hundredth-inch margin conversion below.
 const OFFICE_DEFAULT_A4_IMAGEABLE_HEIGHT_TRIM_DOTS: f32 = 23.0;
 // Office's landscape chartsheet MapPaperSize controls use a 28-dot logical
 // body-span compensation: with 0.7in left/right margins the chart frame starts
 // at 90.96pt, whereas the worksheet's 23-dot mapping starts it at 91.26pt.
 // Both printer DC physical offsets are zero; this is Excel's mapping term.
 const OFFICE_CHARTSHEET_LANDSCAPE_A4_MAPPING_TRIM_DOTS: f32 = 28.0;
+
+fn office_margin_dots(inches: f64) -> i64 {
+  (inches * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)).trunc() as i64
+}
+
+fn office_print_mul_div(value: i64, numerator: i64, denominator: i64) -> i64 {
+  // Win32 MulDiv rounds half integers away from zero, independently of the
+  // truncating percentage division performed by MapPaperSize.
+  let product = value * numerator;
+  (product + product.signum() * (denominator / 2)) / denominator
+}
+
+fn office_margin_origin_pt(inches: f64) -> f32 {
+  let dots = office_margin_dots(inches) as f32;
+  let mut point = (f64::from(dots) * f64::from(units::POINTS_PER_INCH)
+    / f64::from(units::OFFICE_FIXED_OUTPUT_DPI)) as f32;
+  // Cell paint receives points but floors its origin in device units. Encode
+  // the already integral origin so f32 narrowing cannot floor it a second
+  // time to the preceding dot (e.g. 448 dots -> 53.759998pt). This changes
+  // only the representation of the same device coordinate.
+  if point * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH < dots {
+    point = point.next_up();
+  }
+  point
+}
 
 // [MS-RPRN] 2.2.2.1 describes the public DEVMODEW prefix written by Office
 // into the Printer Settings part ([MS-OE376] 2.1.36). Driver-private bytes may
@@ -689,10 +711,34 @@ impl CalcPageSettings {
       || self.related_printer_letter_canvas
       || self.default_printer_canvas
     {
-      self.printer_default_paper_scale_percent()
+      if self.printer_default_paper_scale_percent() < DEFAULT_PRINT_SCALE_PERCENT {
+        self.worksheet_paper_mapping_scale_percent()
+      } else {
+        DEFAULT_PRINT_SCALE_PERCENT
+      }
     } else {
       DEFAULT_PRINT_SCALE_PERCENT
     }
+  }
+
+  fn worksheet_paper_mapping_scale_percent(&self) -> u32 {
+    // Excel chooses the integral print percentage on the short paper axis.
+    // Native 600dpi controls expose Letter's 5,100 dots, MulDiv(5100,2159,2100)
+    // = 5,243, and independently truncated authored margin dots. Divide the
+    // two printable widths, then subtract one percent. The 215.9/210mm ratio
+    // is Letter/A4 width; using the final A4 MediaBox changes the boundaries.
+    let (leading, trailing) = if self.orientation == Some(x::OrientationValues::Landscape) {
+      (self.margin_top_in, self.margin_bottom_in)
+    } else {
+      (self.margin_left_in, self.margin_right_in)
+    };
+    let margins = office_margin_dots(leading) + office_margin_dots(trailing);
+    let requested_body = 5_100 - margins;
+    let mapped_body = office_print_mul_div(5_100, 2_159, 2_100) - margins;
+    if requested_body <= 0 || mapped_body <= 0 {
+      return OFFICE_LETTER_TO_DEFAULT_A4_SCALE_PERCENT;
+    }
+    (requested_body * 100 / mapped_body - 1).clamp(1, 100) as u32
   }
 
   pub(crate) fn fixed_output_pagination_paper_scale_percent(&self, has_chart: bool) -> u32 {
@@ -709,57 +755,105 @@ impl CalcPageSettings {
     }
   }
 
+  pub(crate) fn requested_page_size_pt(&self) -> (f32, f32) {
+    let mut requested = self.clone();
+    requested.valid_printer_settings = false;
+    requested.page_size_pt()
+  }
+
   pub(crate) fn fixed_output_pagination_page_size_pt(&self, has_chart: bool) -> (f32, f32) {
     // With worksheet-zoom pagination, the requested printer canvas owns the
-    // width before its Letter-to-A4 transform. 59264.xlsx starts its second
+    // dimensions before its Letter-to-A4 transform. 59264.xlsx starts its second
     // horizontal page at K: ten 50.05pt columns fit the Letter body. Chart
     // pages already paginate with the transformed output-page footprint.
-    // Row breaks retain the output height: GraphPaper_TP10193274 fits three
-    // explicit-height grids on A4; the shorter Letter height splits two grids.
+    // Native implicit/explicit Letter controls at 86/100% paginate fewer rows
+    // than A4 with the same margins, titles, and automatic/manual row sizes.
+    // GraphPaper retains its three pages with the realized manual-row grid;
+    // unconverted cached heights must not select a different paper height.
     if self.fixed_output_paper_scale_percent(has_chart) < DEFAULT_PRINT_SCALE_PERCENT
       && self.fixed_output_pagination_paper_scale_percent(has_chart) == DEFAULT_PRINT_SCALE_PERCENT
     {
-      let mut requested = self.clone();
-      requested.valid_printer_settings = false;
-      (requested.page_size_pt().0, self.page_size_pt().1)
+      self.requested_page_size_pt()
     } else {
       self.page_size_pt()
     }
   }
 
+  #[cfg(test)]
   pub(crate) fn fixed_output_body_top_pt(&self, paper_scale_percent: u32) -> f32 {
     self.fixed_output_body_origin_pt(paper_scale_percent).1
   }
 
+  #[cfg(test)]
   pub(crate) fn fixed_output_body_origin_pt(&self, paper_scale_percent: u32) -> (f32, f32) {
-    // Convert the authored f64 inches before narrowing. Casting 0.7in first
-    // produces 50.399997pt and incorrectly truncates its 420-dot printer origin
-    // to 419 when the cell painter establishes its device grid.
-    let left = (self.margin_left_in * f64::from(units::POINTS_PER_INCH)) as f32;
-    let top = (self.margin_top_in * f64::from(units::POINTS_PER_INCH)) as f32;
+    self.fixed_output_body_origin_pt_with_reference(paper_scale_percent, self)
+  }
+
+  pub(crate) fn fixed_output_body_origin_pt_with_reference(
+    &self,
+    paper_scale_percent: u32,
+    mapping_reference: &Self,
+  ) -> (f32, f32) {
     if paper_scale_percent >= DEFAULT_PRINT_SCALE_PERCENT {
-      return (left, top);
+      // Unmapped drawing anchors retain authored double-precision margins.
+      // Their EMU positions are not cell-painter device coordinates: snapping
+      // a 5mm page margin here moves an otherwise unchanged A4 picture.
+      return (
+        (self.margin_left_in * f64::from(units::POINTS_PER_INCH)) as f32,
+        (self.margin_top_in * f64::from(units::POINTS_PER_INCH)) as f32,
+      );
     }
-    let scale = paper_scale_percent as f32 / 100.0;
+    // The printer converts the f64 margin to integer dots before the cell
+    // painter and clipping establish their grids. Narrowing inches or points
+    // first can move an exact dot boundary to the preceding device pixel.
+    let left = office_margin_origin_pt(self.margin_left_in);
+    let top = office_margin_origin_pt(self.margin_top_in);
+    let offset_in = self.worksheet_paper_mapping_offset_in(paper_scale_percent, mapping_reference);
     if self.orientation == Some(x::OrientationValues::Landscape) {
       // The default-paper mapping follows the long paper axis. Landscape
       // worksheets, like chartsheets, translate horizontally: Office's
       // centered/un-centered Letter/A4 controls retain the physical top
       // margin while exposing the same independently derived paper offset.
-      let mut portrait = self.clone();
-      portrait.orientation = Some(x::OrientationValues::Portrait);
-      portrait.margin_top_in = self.margin_left_in;
-      portrait.margin_bottom_in = self.margin_right_in;
       (
-        left + portrait.printer_default_paper_body_offset_y_pt(scale),
+        office_margin_origin_pt(self.margin_left_in + offset_in),
         top,
       )
     } else {
       (
         left,
-        top + self.printer_default_paper_body_offset_y_pt(scale),
+        office_margin_origin_pt(self.margin_top_in + offset_in),
       )
     }
+  }
+
+  fn worksheet_paper_mapping_offset_in(
+    &self,
+    paper_scale_percent: u32,
+    mapping_reference: &Self,
+  ) -> f64 {
+    let (leading, trailing) = if self.orientation == Some(x::OrientationValues::Landscape) {
+      (
+        mapping_reference.margin_left_in,
+        mapping_reference.margin_right_in,
+      )
+    } else {
+      (
+        mapping_reference.margin_top_in,
+        mapping_reference.margin_bottom_in,
+      )
+    };
+    // The previous printed worksheet owns the cached long-axis body, while
+    // the current worksheet owns the short-axis percentage and authored margin.
+    // Excel combines the 17.6/297mm paper difference and the unscaled fraction
+    // of that cached body using Win32 MulDiv. It converts the sum to inches,
+    // rounds to a hundredth, divides by two, then adds the authored margin.
+    // Preserve this order: rounding each half separately changes half-cent
+    // offsets, and continuous point arithmetic loses the printer origin.
+    let cached_body = (6_600 - office_margin_dots(leading) - office_margin_dots(trailing)).max(0);
+    let gap_dots = office_print_mul_div(6_600, 2_970 - 2_794, 2_970)
+      + office_print_mul_div(cached_body, i64::from(100 - paper_scale_percent), 100);
+    let dpi = f64::from(units::OFFICE_FIXED_OUTPUT_DPI);
+    ((gap_dots as f64 / dpi * 100.0 + 0.5).trunc() / 100.0) / 2.0
   }
 
   pub(crate) fn fixed_output_chartsheet_origin_pt(&self) -> (f32, f32) {
@@ -993,18 +1087,78 @@ mod tests {
           ..CalcPageSettings::default()
         };
         let top = settings.fixed_output_body_top_pt(paper_scale_percent);
-        let expected_offset = if paper_scale_percent == 95 {
-          settings.printer_default_paper_body_offset_y_pt(0.95)
+        let physical_margin = office_margin_origin_pt(margin_top_in);
+        if paper_scale_percent == 95 {
+          assert!(top > physical_margin);
         } else {
-          0.0
-        };
-        assert!((top - margin_top_in as f32 * 72.0 - expected_offset).abs() < 1.0e-5);
+          assert_eq!(top, (margin_top_in * 72.0) as f32);
+        }
         for (header, footer) in [(true, false), (false, true), (true, true)] {
           settings.header_footer.odd_header = header.then(|| "&C&A".to_string());
           settings.header_footer.odd_footer = footer.then(|| "&CPage &P".to_string());
           assert_eq!(settings.fixed_output_body_top_pt(paper_scale_percent), top);
         }
       }
+    }
+  }
+
+  #[test]
+  fn worksheet_paper_mapping_uses_native_short_axis_boundaries() {
+    // Actual Office mapper percentages, including the old holdout whose
+    // quantized font size incorrectly suggested 93% instead of 92%.
+    for (leading, trailing, percent) in [
+      (0.25, 0.25, 96),
+      (0.398, 0.398, 96),
+      (0.399, 0.399, 95),
+      (1.391, 1.391, 95),
+      (1.392, 1.392, 94),
+      (2.4, 2.4, 92),
+    ] {
+      let mut settings = CalcPageSettings {
+        paper_size: MsPaperSize::Letter as u32,
+        implicit_microsoft_letter_canvas: true,
+        valid_printer_settings: true,
+        margin_left_in: leading,
+        margin_right_in: trailing,
+        ..CalcPageSettings::default()
+      };
+      assert_eq!(settings.fixed_output_paper_scale_percent(false), percent);
+      settings.orientation = Some(x::OrientationValues::Landscape);
+      settings.margin_top_in = leading;
+      settings.margin_bottom_in = trailing;
+      assert_eq!(settings.fixed_output_paper_scale_percent(false), percent);
+    }
+  }
+
+  #[test]
+  fn worksheet_paper_mapping_matches_native_margin_history_origins() {
+    // Native argument values and PatBlt origins from consecutive printed
+    // worksheets. The fourth transition preserves the f64 1 + 1.18 / 2
+    // result below 1.59, hence its origin is 953 dots rather than 954.
+    for (margin, reference, top_dots) in [
+      (1.0, 1.0, 930.0),
+      (0.5, 1.0, 630.0),
+      (2.0, 0.5, 1_545.0),
+      (0.25, 2.0, 450.0),
+      (1.0, 0.25, 953.0),
+    ] {
+      let settings = CalcPageSettings {
+        margin_left_in: 0.75,
+        margin_right_in: 0.75,
+        margin_top_in: margin,
+        margin_bottom_in: margin,
+        ..CalcPageSettings::default()
+      };
+      let reference = CalcPageSettings {
+        margin_top_in: reference,
+        margin_bottom_in: reference,
+        ..settings.clone()
+      };
+      let origin = settings.fixed_output_body_origin_pt_with_reference(95, &reference);
+      assert_eq!(
+        (origin.1 * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).floor(),
+        top_dots
+      );
     }
   }
 
@@ -1143,12 +1297,14 @@ mod tests {
     settings.margin_bottom_in = 0.75;
 
     // Office chart-sheet PDF controls: chart x=90.96pt at these margins.
-    // The worksheet origin retains its independent 23-dot mapping.
+    // The worksheet mapper rounds its full gap to 1.13in before halving.
+    // Its f64 0.7 + 1.13 / 2 converts to the same 758-dot origin; the former
+    // continuous 23-dot approximation incorrectly predicted 91.26pt.
     let chart = settings.fixed_output_chartsheet_origin_pt();
     let worksheet = settings.fixed_output_body_origin_pt(95);
     assert!((chart.0 - 90.96).abs() < 0.001);
     assert!((chart.1 - 54.0).abs() < 0.001);
-    assert!((worksheet.0 - 91.26).abs() < 0.001);
+    assert!((worksheet.0 - 90.96).abs() < 0.001);
   }
 
   #[test]

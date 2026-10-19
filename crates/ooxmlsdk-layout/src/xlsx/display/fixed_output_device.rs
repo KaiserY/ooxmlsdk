@@ -15,11 +15,13 @@ type BorderSegments = BTreeMap<BorderAxis, Vec<(i64, i64)>>;
 /// rounding the combined origin. The EMR_BITBLT's integer snapshot bounds
 /// do not replace the fractional picture bounds in the PDF stream.
 pub(super) fn printer_picture_page_origin(x_pt: f32, y_pt: f32) -> (f32, f32) {
-  let truncate = |point| {
-    let dots = (f64::from(point) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
-      / f64::from(units::POINTS_PER_INCH))
-    .floor();
-    (dots * f64::from(units::POINTS_PER_INCH) / f64::from(units::OFFICE_FIXED_OUTPUT_DPI)) as f32
+  let truncate = |point: f32| {
+    // This input is already a worksheet FLOAT. Promoting its representation
+    // error to double before truncation turns93.6pt into779 dots instead of
+    //780. Native margin phases0/.03/.09/.15pt establish the same origin
+    // until the next complete600dpi pixel.
+    let dots = (point * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).floor();
+    dots * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
   };
   (truncate(x_pt), truncate(y_pt))
 }
@@ -252,6 +254,13 @@ mod tests {
       assert!((x - expected_x * 0.12).abs() < 0.0001);
       assert!((y - expected_y * 0.12).abs() < 0.0001);
     }
+    // Actual continuation-page FLOAT origins: the double-promotion path
+    // incorrectly removed one complete printer pixel at these boundaries.
+    for (phase, expected) in [(0.0, 780.0), (0.03, 780.0), (0.09, 780.0), (0.15, 781.0)] {
+      let (_, y) = printer_picture_page_origin(50.4, 93.6 + phase);
+      assert!((y - expected * 0.12).abs() < 0.0001);
+    }
+    assert!((printer_picture_page_origin(54.0, 111.6).1 - 111.6).abs() < 0.0001);
   }
 
   #[test]

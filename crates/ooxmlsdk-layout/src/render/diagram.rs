@@ -9,7 +9,8 @@ use ooxmlsdk::schemas::{
 use ooxmlsdk::simple_type::Coordinate32Value;
 
 use crate::common::{
-  DrawingPath, drawingml_custom_geometry, drawingml_geometry, drawingml_preset_geometry,
+  DrawingPath, drawingml_custom_geometry, drawingml_geometry, drawingml_preset_data,
+  drawingml_preset_geometry,
 };
 use crate::model::RgbColor;
 use crate::model::common_point;
@@ -437,9 +438,16 @@ impl DiagramTextBody {
   }
 
   fn direct_primary_font_size_pt(&self) -> Option<f32> {
+    let parent_level = self
+      .paragraphs
+      .iter()
+      .filter_map(|paragraph| paragraph.level)
+      .min()
+      .unwrap_or(0);
     self
       .paragraphs
       .iter()
+      .filter(|paragraph| paragraph.level.unwrap_or(parent_level) == parent_level)
       .flat_map(|paragraph| &paragraph.runs)
       .filter_map(|run| {
         run
@@ -459,6 +467,24 @@ impl DiagramTextBody {
     data_node_type: Option<dgm::ElementValues>,
     constraints: &[DiagramConstraint],
   ) {
+    if let Some(font_size_pt) = self
+      .direct_primary_font_size_pt()
+      .filter(|size| *size > 0.0)
+    {
+      // Native SmartArt uses 0.56 em on every side, based on the parent
+      // text's primary size even when a descendant has larger type. An
+      // authored body inset or a layout margin constraint overrides it.
+      // AutoFit has no resolved primary size here; its defaults belong to
+      // the later fitting owner, not the requested layout font-size limit.
+      let margin = Coordinate32Value::Emu(points_to_emu(font_size_pt * 0.56));
+      let properties = self
+        .body_properties
+        .get_or_insert_with(|| Box::new(a::BodyProperties::default()));
+      properties.left_inset.get_or_insert(margin);
+      properties.right_inset.get_or_insert(margin);
+      properties.top_inset.get_or_insert(margin);
+      properties.bottom_inset.get_or_insert(margin);
+    }
     for constraint in constraints {
       if !constraint.for_name.is_empty()
         || constraint
@@ -607,34 +633,36 @@ impl DiagramTextBody {
     };
     for paragraph in &mut self.paragraphs {
       let child = paragraph.level.unwrap_or(base_level) > base_level;
+      // MS-OI29500 §21.4.7.49: omitted tx parameters use 90% line
+      // spacing and 35%/15% spacing after parent/child paragraphs. These
+      // are layout defaults; authored paragraph spacing remains authoritative.
       let line_spacing = if child {
         algorithm.line_spacing_children
       } else {
         algorithm.line_spacing_parent
-      };
+      }
+      .unwrap_or(90.0);
       let space_after = if child {
         algorithm.line_spacing_after_children
       } else {
         algorithm.line_spacing_after_parent
-      };
-      if line_spacing.is_none() && space_after.is_none() {
-        continue;
       }
+      .unwrap_or(if child { 15.0 } else { 35.0 });
       let mut properties = paragraph.paragraph_properties.clone().unwrap_or_default();
-      if let Some(value) = line_spacing {
+      if properties.line_spacing.is_none() {
         properties.line_spacing = Some(Box::new(a::LineSpacing {
           line_spacing_choice: Some(a::LineSpacingChoice::SpacingPercent(a::SpacingPercent {
             val: ooxmlsdk::units::DrawingmlPercentageValue::Decimal(
-              (value * 1_000.0).round().clamp(0.0, 13_200_000.0) as i32,
+              (line_spacing * 1_000.0).round().clamp(0.0, 13_200_000.0) as i32,
             ),
           })),
         }));
       }
-      if let Some(value) = space_after {
+      if properties.space_after.is_none() {
         properties.space_after = Some(Box::new(a::SpaceAfter {
           space_after_choice: Some(a::SpaceAfterChoice::SpacingPercent(a::SpacingPercent {
             val: ooxmlsdk::units::DrawingmlPercentageValue::Decimal(
-              (value * 1_000.0).round().clamp(0.0, 13_200_000.0) as i32,
+              (space_after * 1_000.0).round().clamp(0.0, 13_200_000.0) as i32,
             ),
           })),
         }));
@@ -2419,9 +2447,13 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
           .and_then(|colors| colors.text_fill_by_label.get(label))
       })
       .and_then(|fills| color_by_index(fills, self.current_index));
+    // ECMA-376 §21.4.3.4 / L.4.15.2.1: presAssocID identifies the
+    // semantic point even when an empty transition has no presOf content.
     let data_node_type = data_points
       .and_then(|points| points.first())
-      .map(|binding| binding.point.r#type.unwrap_or_default())
+      .map(|binding| binding.point)
+      .or_else(|| associated_data_point(presentation_point, self.point_by_id))
+      .map(|point| point.r#type.unwrap_or_default())
       .and_then(point_type_to_element_type);
     let mut text_order = usize::MAX;
     if let Some(data_points) = data_points {
@@ -3993,9 +4025,12 @@ fn layout_shape_children(
   rules: &[DiagramRule],
   inherited_vertical_alignment: Option<dgm::TextAnchorVerticalValues>,
 ) {
-  node
-    .children
-    .retain(|child| algorithm.kind == dgm::AlgorithmValues::Linear || !child.is_empty_group());
+  node.children.retain(|child| {
+    matches!(
+      algorithm.kind,
+      dgm::AlgorithmValues::Linear | dgm::AlgorithmValues::Snake
+    ) || !child.is_empty_group()
+  });
   match algorithm.kind {
     dgm::AlgorithmValues::Composite => composite_layout_tree(node, algorithm.clone(), constraints),
     dgm::AlgorithmValues::Linear => linear_layout_tree(node, algorithm.clone(), constraints, rules),
@@ -4208,12 +4243,16 @@ fn diagram_layout_preset_geometry(shape: &dgm::Shape) -> Option<Box<a::PresetGeo
   let adjust_value_list = (!adjustments.is_empty()).then(|| a::AdjustValueList {
     shape_guide: adjustments
       .into_iter()
-      .map(|adjustment| a::ShapeGuide {
-        name: format!("adj{}", adjustment.index),
-        formula: format!(
-          "val {}",
-          (adjustment.val * DRAWINGML_ADJUST_FULL_SCALE).round()
-        ),
+      .filter_map(|adjustment| {
+        Some(a::ShapeGuide {
+          // dgm:adj@idx addresses the preset definition, whose first guide
+          // may be `adj` (roundRect), `adj1`, or another authored name.
+          name: drawingml_preset_data::adjustment_name(preset, adjustment.index as usize)?.into(),
+          formula: format!(
+            "val {}",
+            (adjustment.val * DRAWINGML_ADJUST_FULL_SCALE).round()
+          ),
+        })
       })
       .collect(),
   });
@@ -5937,11 +5976,141 @@ fn child_contains_data_node_type(
       .any(|child| child_contains_data_node_type(child, data_node_type))
 }
 
+// Empty `sp` elements can own an authored inter-node width. An ordinary
+// visible shape using `sp` is a no-op shape, not a spacer (ECMA §21.4.7.1).
+fn is_pure_sibling_space(node: &DiagramShapeNode) -> bool {
+  node.is_empty_group()
+    && node.data_node_type == Some(dgm::ElementValues::SiblingTransition)
+    && node
+      .algorithms
+      .iter()
+      .any(|algorithm| algorithm.kind == dgm::AlgorithmValues::Space)
+}
+
+fn authored_spacer_snake_slots(
+  node: &DiagramShapeNode,
+  algorithm: &LayoutAlgorithm,
+  constraints: &[DiagramConstraint],
+) -> Option<(Vec<(f32, f32)>, f32)> {
+  // This path represents one-dimensional, interstitial spaces between leaf
+  // shapes. Padding, column flow and explicitly aligned groups retain their
+  // existing owners; they need different treatment of the spacer bounds.
+  if algorithm.flow_direction != dgm::FlowDirectionValues::Row
+    || algorithm.horizontal_alignment.is_some()
+    || algorithm.vertical_alignment.is_some()
+    || algorithm.offset == dgm::OffsetValues::Offset
+    || !node.width.is_finite()
+    || node.width <= 0.0
+    || !node.height.is_finite()
+    || node.height <= 0.0
+    || node.children.len() < 3
+    || node.children.len().is_multiple_of(2)
+  {
+    return None;
+  }
+  for (index, child) in node.children.iter().enumerate() {
+    if index % 2 == 1 {
+      if !is_pure_sibling_space(child) {
+        return None;
+      }
+    } else if !child.has_geometry
+      || !child.children.is_empty()
+      || !diagram_element_type_matches(child.data_node_type, dgm::ElementValues::Node)
+    {
+      return None;
+    }
+    // A child-authored coordinate basis is handled by normalized_children
+    // below. Do not change that path's parent/direct constraint precedence.
+    if child.direct_constraints.iter().any(|constraint| {
+      !matches!(
+        constraint.target,
+        dgm::ConstraintValues::PrimaryFontSize
+          | dgm::ConstraintValues::SecondaryFontSize
+          | dgm::ConstraintValues::LeftMargin
+          | dgm::ConstraintValues::RightMargin
+          | dgm::ConstraintValues::TopMargin
+          | dgm::ConstraintValues::BottomMargin
+      )
+    }) {
+      return None;
+    }
+  }
+  let expanded = expand_constraints_for_children(node, constraints);
+  if expanded.iter().any(|constraint| {
+    !matches!(
+      constraint.target,
+      dgm::ConstraintValues::Width
+        | dgm::ConstraintValues::Height
+        | dgm::ConstraintValues::Spacing
+        | dgm::ConstraintValues::PrimaryFontSize
+        | dgm::ConstraintValues::SecondaryFontSize
+        | dgm::ConstraintValues::LeftMargin
+        | dgm::ConstraintValues::RightMargin
+        | dgm::ConstraintValues::TopMargin
+        | dgm::ConstraintValues::BottomMargin
+    )
+  }) {
+    return None;
+  }
+  let constraints = expanded
+    .into_iter()
+    .filter(|constraint| {
+      matches!(
+        constraint.target,
+        dgm::ConstraintValues::Width
+          | dgm::ConstraintValues::Height
+          | dgm::ConstraintValues::Spacing
+      )
+    })
+    .collect::<Vec<_>>();
+  // Start with only the actual canvas. Seeding missing child dimensions from
+  // the canvas would let unresolved references masquerade as authored sizes.
+  let mut properties = HashMap::from([(
+    String::new(),
+    HashMap::from([
+      (dgm::ConstraintValues::Width, node.width),
+      (dgm::ConstraintValues::Height, node.height),
+    ]),
+  )]);
+  solve_layout_constraints(&constraints, &mut properties);
+  let mut sizes = Vec::with_capacity(node.children.len());
+  for child in &node.children {
+    let values = properties.get(&child.internal_name)?;
+    let width = layout_property_value(values, dgm::ConstraintValues::Width)?;
+    if !width.is_finite() || width < 0.0 {
+      return None;
+    }
+    if is_pure_sibling_space(child) {
+      if layout_property_value(values, dgm::ConstraintValues::Height).is_some() {
+        return None;
+      }
+      // The authored extent is along the row only. An invisible space must
+      // not inherit the canvas height and enlarge the row's cross-axis bounds.
+      sizes.push((width, 0.0));
+    } else {
+      let height = layout_property_value(values, dgm::ConstraintValues::Height)?;
+      if width == 0.0 || !height.is_finite() || height <= 0.0 {
+        return None;
+      }
+      sizes.push((width, height));
+    }
+  }
+  let spacing = layout_property_value(properties.get("")?, dgm::ConstraintValues::Spacing)?;
+  (spacing.is_finite() && spacing >= 0.0).then_some((sizes, spacing))
+}
+
 fn snake_layout_tree(
   node: &mut DiagramShapeNode,
   algorithm: LayoutAlgorithm,
   constraints: &[DiagramConstraint],
 ) {
+  if let Some((sizes, spacing)) = authored_spacer_snake_slots(node, &algorithm, constraints) {
+    layout_normalized_snake_slots(node, &algorithm, &sizes, Some(spacing));
+    return;
+  }
+  // A rejected or unresolved spacer layout retains exactly the prior pruning
+  // behavior; structural gaps must never become legacy equal-sized cells.
+  node.children.retain(|child| !child.is_empty_group());
   if node.children.is_empty() || node.width == 0.0 || node.height == 0.0 {
     return;
   }
@@ -6722,6 +6891,393 @@ fn flatten_diagram_shape_tree(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn direct_primary_text_margins_preserve_parent_owner_and_authored_overrides() {
+    use ooxmlsdk::sdk::SdkType;
+    let make_body = |parent: i32, child: i32| {
+      DiagramTextBody {
+      paragraphs: [parent, child].into_iter().enumerate().map(|(level, size)| {
+        let source = a::Paragraph::from_bytes(format!(r#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:r><a:rPr sz="{}"/><a:t>content</a:t></a:r></a:p>"#, size * 100).as_bytes()).unwrap();
+        let mut paragraph = DiagramTextParagraph::from_dml_runs(&source, None);
+        paragraph.level = Some(level as u8);
+        paragraph
+      }).collect(),
+      ..Default::default()
+    }
+    };
+    for (parent, child) in [(8, 8), (12, 12), (16, 14), (24, 24), (40, 40), (12, 24)] {
+      let mut body = make_body(parent, child);
+      let primary = body.direct_primary_font_size_pt();
+      assert_eq!(primary, Some(parent as f32));
+      body.apply_text_margins(188.0, 234.0, primary, None, &[]);
+      let p = body.body_properties.unwrap();
+      let expected = Some(Coordinate32Value::Emu(points_to_emu(parent as f32 * 0.56)));
+      assert_eq!(p.left_inset, expected);
+      assert_eq!(p.right_inset, expected);
+      assert_eq!(p.top_inset, expected);
+      assert_eq!(p.bottom_inset, expected);
+    }
+    let mut body = make_body(16, 14);
+    body.body_properties = Some(Box::new(a::BodyProperties::from_bytes(br#"<a:bodyPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" lIns="63500" tIns="76200" rIns="88900" bIns="101600"/>"#).unwrap()));
+    body.apply_text_margins(188.0, 234.0, Some(16.0), None, &[]);
+    let p = body.body_properties.as_ref().unwrap();
+    assert_eq!(p.left_inset, Some(Coordinate32Value::Emu(63_500)));
+    assert_eq!(p.top_inset, Some(Coordinate32Value::Emu(76_200)));
+    assert_eq!(p.right_inset, Some(Coordinate32Value::Emu(88_900)));
+    assert_eq!(p.bottom_inset, Some(Coordinate32Value::Emu(101_600)));
+    let constraint = parse_constraint(&dgm::Constraint::from_bytes(br#"<dgm:constr xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" type="lMarg" refType="primFontSz" fact="0.2"/>"#).unwrap(),false).unwrap();
+    body.apply_text_margins(188.0, 234.0, Some(16.0), None, &[constraint]);
+    assert_eq!(
+      body.body_properties.unwrap().left_inset,
+      Some(Coordinate32Value::Emu(40_640))
+    );
+    let mut automatic = DiagramTextBody::default();
+    automatic.apply_text_margins(188.0, 234.0, Some(65.0), None, &[]);
+    assert!(
+      automatic.body_properties.is_none(),
+      "requested AutoFit limit is not a resolved font size"
+    );
+  }
+
+  #[test]
+  fn text_algorithm_spacing_defaults_and_authored_paragraph_precedence() {
+    use ooxmlsdk::sdk::SdkType;
+    let make_body = || DiagramTextBody {
+      paragraphs: [0, 1]
+        .into_iter()
+        .map(|level| DiagramTextParagraph {
+          level: Some(level),
+          ..Default::default()
+        })
+        .collect(),
+      ..Default::default()
+    };
+    let spacing = |body: &DiagramTextBody| {
+      body
+        .paragraphs
+        .iter()
+        .map(|paragraph| {
+          let properties = paragraph.paragraph_properties.as_ref().unwrap();
+          let a::LineSpacingChoice::SpacingPercent(line) = properties
+            .line_spacing
+            .as_ref()
+            .unwrap()
+            .line_spacing_choice
+            .as_ref()
+            .unwrap()
+          else {
+            panic!("percentage line spacing")
+          };
+          let a::SpaceAfterChoice::SpacingPercent(after) = properties
+            .space_after
+            .as_ref()
+            .unwrap()
+            .space_after_choice
+            .as_ref()
+            .unwrap()
+          else {
+            panic!("percentage paragraph spacing")
+          };
+          (line.val, after.val)
+        })
+        .collect::<Vec<_>>()
+    };
+    let omitted = layout_algorithm(&dgm::Algorithm::from_bytes(br#"<dgm:alg xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" type="tx"/>"#).unwrap());
+    let explicit = layout_algorithm(&dgm::Algorithm::from_bytes(br#"<dgm:alg xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" type="tx"><dgm:param type="lnSpPar" val="90"/><dgm:param type="lnSpCh" val="90"/><dgm:param type="lnSpAfParP" val="35"/><dgm:param type="lnSpAfChP" val="15"/></dgm:alg>"#).unwrap());
+    let mut default_body = make_body();
+    default_body.apply_algorithm_spacing(&omitted);
+    let mut explicit_body = make_body();
+    explicit_body.apply_algorithm_spacing(&explicit);
+    assert_eq!(spacing(&default_body), spacing(&explicit_body));
+    use ooxmlsdk::units::DrawingmlPercentageValue::Decimal;
+    assert_eq!(
+      spacing(&default_body),
+      vec![
+        (Decimal(90_000), Decimal(35_000)),
+        (Decimal(90_000), Decimal(15_000))
+      ]
+    );
+    let mut custom_body = make_body();
+    custom_body.paragraphs[0].paragraph_properties = Some(Box::new(a::ParagraphProperties::from_bytes(br#"<a:pPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:lnSpc><a:spcPct val="120000"/></a:lnSpc><a:spcAft><a:spcPct val="70000"/></a:spcAft></a:pPr>"#).unwrap()));
+    custom_body.apply_algorithm_spacing(&explicit);
+    assert_eq!(
+      spacing(&custom_body),
+      vec![
+        (Decimal(120_000), Decimal(70_000)),
+        (Decimal(90_000), Decimal(15_000))
+      ]
+    );
+  }
+
+  #[test]
+  fn diagram_adjustment_indices_use_preset_guide_names() {
+    use ooxmlsdk::sdk::SdkType;
+    for (name, expected) in [
+      ("roundRect", vec!["adj"]),
+      ("round2SameRect", vec!["adj1", "adj2"]),
+      ("rect", vec![]),
+    ] {
+      let shape = dgm::Shape::from_bytes(format!(r#"<dgm:shape xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" type="{name}"><dgm:adjLst><dgm:adj idx="0" val="0.4"/><dgm:adj idx="3" val="0.4"/><dgm:adj idx="2" val="0.2"/><dgm:adj idx="1" val="0.1"/></dgm:adjLst></dgm:shape>"#).as_bytes()).unwrap();
+      let preset = diagram_layout_preset_geometry(&shape).unwrap();
+      let guides = &preset.adjust_value_list.as_ref().unwrap().shape_guide;
+      assert_eq!(
+        guides
+          .iter()
+          .map(|guide| guide.name.as_str())
+          .collect::<Vec<_>>(),
+        expected
+      );
+      if name == "roundRect" {
+        assert_eq!(guides[0].formula, "val 10000");
+        let rect = drawingml_preset_geometry::text_rectangle(&preset, 100.0, 200.0).unwrap();
+        assert!((rect.x0 - 2.9289).abs() < 0.00001);
+      }
+    }
+  }
+
+  fn spacer_snake_tree(
+    count: usize,
+    aspect: f32,
+    gap: f32,
+    explicit_transition_binding: bool,
+  ) -> DiagramShapeNode {
+    spacer_snake_tree_with_orphan(count, aspect, gap, explicit_transition_binding, false)
+  }
+
+  fn spacer_snake_tree_with_orphan(
+    count: usize,
+    aspect: f32,
+    gap: f32,
+    explicit_transition_binding: bool,
+    orphan_first_node: bool,
+  ) -> DiagramShapeNode {
+    use ooxmlsdk::sdk::SdkType;
+    let mut points = String::from(
+      r#"<dgm:pt modelId="0" type="doc"/><dgm:pt modelId="100" type="pres"><dgm:prSet presAssocID="0" presName="diagram"/></dgm:pt>"#,
+    );
+    let mut connections = String::from(
+      r#"<dgm:cxn modelId="0" type="presOf" srcId="0" destId="100" srcOrd="0" destOrd="0"/>"#,
+    );
+    for i in 1..=count {
+      let presentation = 100 + i;
+      if !orphan_first_node || i != 1 {
+        points.push_str(&format!(r#"<dgm:pt modelId="{i}"/>"#));
+      }
+      points.push_str(&format!(
+        r#"<dgm:pt modelId="{presentation}" type="pres"><dgm:prSet presAssocID="{i}" presName="item"/></dgm:pt>"#,
+      ));
+      connections.push_str(&format!(
+        r#"<dgm:cxn modelId="{i}" type="parOf" srcId="0" destId="{i}" srcOrd="{i}" destOrd="0"/><dgm:cxn modelId="{presentation}" type="presOf" srcId="{i}" destId="{presentation}" srcOrd="0" destOrd="0"/><dgm:cxn modelId="{}" type="presParOf" srcId="100" destId="{presentation}" srcOrd="{i}" destOrd="0"/>"#,
+        200 + i,
+      ));
+      if i < count {
+        let transition = 300 + i;
+        let transition_presentation = 400 + i;
+        points.push_str(&format!(
+          r#"<dgm:pt modelId="{transition}" type="sibTrans"/><dgm:pt modelId="{transition_presentation}" type="pres"><dgm:prSet presAssocID="{transition}" presName="gap"/></dgm:pt>"#,
+        ));
+        connections.push_str(&format!(
+          r#"<dgm:cxn modelId="{}" type="presParOf" srcId="100" destId="{transition_presentation}" srcOrd="{i}" destOrd="0"/>"#,
+          500 + i,
+        ));
+        if explicit_transition_binding {
+          connections.push_str(&format!(
+            r#"<dgm:cxn modelId="{}" type="presOf" srcId="{transition}" destId="{transition_presentation}" srcOrd="0" destOrd="0"/>"#,
+            600 + i,
+          ));
+        }
+      }
+    }
+    let data = dgm::DataModelRoot::from_bytes(format!(
+      r#"<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"><dgm:ptLst>{points}</dgm:ptLst><dgm:cxnLst>{connections}</dgm:cxnLst></dgm:dataModel>"#,
+    ).as_bytes()).expect("semantic and presentation nodes");
+    let layout = dgm::LayoutDefinition::from_bytes(format!(r#"
+      <dgm:layoutDef xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram">
+        <dgm:layoutNode name="diagram"><dgm:alg type="snake"/><dgm:shape/><dgm:presOf/>
+          <dgm:constrLst>
+            <dgm:constr type="w" for="ch" ptType="node" refType="w"/>
+            <dgm:constr type="h" for="ch" ptType="node" refType="w" refFor="ch" refPtType="node" fact="{aspect}"/>
+            <dgm:constr type="w" for="ch" ptType="sibTrans" refType="w" refFor="ch" refPtType="node" fact="{gap}"/>
+            <dgm:constr type="sp" refType="w" refFor="ch" refPtType="sibTrans"/>
+          </dgm:constrLst>
+          <dgm:forEach axis="ch" ptType="node">
+            <dgm:layoutNode name="item"><dgm:alg type="tx"/><dgm:shape type="rect"/><dgm:presOf axis="self" ptType="node"/></dgm:layoutNode>
+            <dgm:forEach axis="followSib" ptType="sibTrans" cnt="1"><dgm:layoutNode name="gap"><dgm:alg type="sp"/><dgm:shape/><dgm:presOf/></dgm:layoutNode></dgm:forEach>
+          </dgm:forEach>
+        </dgm:layoutNode>
+      </dgm:layoutDef>"#).as_bytes()).expect("layout with sibling spaces");
+    build_diagram_shape_tree(
+      &data,
+      &layout,
+      None,
+      None,
+      RgbColor { r: 0, g: 0, b: 255 },
+      DiagramBounds {
+        x: 0.0,
+        y: 0.0,
+        width: 300.0,
+        height: 150.0,
+      },
+    )
+    .expect("diagram tree")
+  }
+
+  #[test]
+  fn presentation_association_retains_spacer_type_without_pres_of_binding() {
+    for count in [2, 4] {
+      for explicit_binding in [false, true] {
+        let tree = spacer_snake_tree(count, 0.6, 0.1, explicit_binding);
+        assert_eq!(tree.children.len(), 2 * count - 1);
+        for (index, child) in tree.children.iter().enumerate() {
+          let expected = if index % 2 == 1 {
+            assert!(is_pure_sibling_space(child));
+            dgm::ElementValues::SiblingTransition
+          } else {
+            dgm::ElementValues::Node
+          };
+          assert_eq!(
+            child.data_node_type,
+            Some(expected),
+            "count={count}, explicit={explicit_binding}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn authored_snake_spacing_keeps_orphan_presentation_node() {
+    let mut tree = spacer_snake_tree_with_orphan(5, 0.6, 0.1, false, true);
+    assert_eq!(tree.children.len(), 9);
+    assert_eq!(tree.children[0].data_node_type, None);
+    assert!(tree.children[0].has_geometry);
+    let algorithm = tree.algorithms.last().expect("snake").clone();
+    let constraints = tree.constraints.clone();
+    assert!(authored_spacer_snake_slots(&tree, &algorithm, &constraints).is_some());
+    snake_layout_tree(&mut tree, algorithm, &constraints);
+    assert_eq!(tree.children.len(), 9);
+    let first = &tree.children[0];
+    assert!((first.height / first.width - 0.6).abs() < 0.00001);
+    for child in tree.children.iter().step_by(2) {
+      assert!((child.width - first.width).abs() < 0.0001);
+      assert!((child.height - first.height).abs() < 0.0001);
+    }
+    assert!((tree.children[4].y - first.y).abs() < 0.0001);
+    assert!(tree.children[6].y > first.y + first.height);
+  }
+
+  #[test]
+  fn authored_snake_spacing_preserves_source_ratios_and_canvas_bounds() {
+    for count in [2, 3, 4, 5, 6] {
+      for aspect in [0.2, 0.6, 0.8] {
+        for gap in [0.05, 0.15] {
+          let mut tree = spacer_snake_tree(count, aspect, gap, false);
+          let algorithm = tree.algorithms.last().expect("snake").clone();
+          let constraints = tree.constraints.clone();
+          assert!(authored_spacer_snake_slots(&tree, &algorithm, &constraints).is_some());
+          snake_layout_tree(&mut tree, algorithm, &constraints);
+          let content = tree
+            .children
+            .iter()
+            .filter(|child| child.has_geometry)
+            .collect::<Vec<_>>();
+          assert_eq!(content.len(), count);
+          let width = content[0].width;
+          for child in &content {
+            assert!((child.width - width).abs() < 0.001);
+            assert!((child.height / child.width - aspect).abs() < 0.0001);
+            assert!(child.x >= -0.001 && child.y >= -0.001);
+            assert!(child.x + child.width <= tree.width + 0.001);
+            assert!(child.y + child.height <= tree.height + 0.001);
+          }
+          for pair in content.windows(2) {
+            let distance = if (pair[1].y - pair[0].y).abs() < 0.001 {
+              pair[1].x - pair[0].x - pair[0].width
+            } else {
+              pair[1].y - pair[0].y - pair[0].height
+            };
+            assert!((distance / width - gap).abs() < 0.0001);
+          }
+          assert!(
+            tree
+              .children
+              .iter()
+              .filter(|child| is_pure_sibling_space(child))
+              .all(|child| child.height == 0.0)
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn authored_snake_spacing_rejects_unresolved_or_non_spacer_layouts() {
+    let tree = spacer_snake_tree(5, 0.6, 0.1, false);
+    let algorithm = tree.algorithms.last().expect("snake").clone();
+    assert!(authored_spacer_snake_slots(&tree, &algorithm, &tree.constraints).is_some());
+    let mut missing_height = tree.clone();
+    missing_height
+      .constraints
+      .retain(|constraint| constraint.target != dgm::ConstraintValues::Height);
+    assert!(
+      authored_spacer_snake_slots(&missing_height, &algorithm, &missing_height.constraints)
+        .is_none()
+    );
+    let constraints = missing_height.constraints.clone();
+    snake_layout_tree(&mut missing_height, algorithm.clone(), &constraints);
+    assert_eq!(
+      missing_height.children.len(),
+      5,
+      "rejected spaces cannot become legacy cells"
+    );
+    let mut visible = tree.clone();
+    visible.children[1].has_geometry = true;
+    assert!(!is_pure_sibling_space(&visible.children[1]));
+    assert!(authored_spacer_snake_slots(&visible, &algorithm, &visible.constraints).is_none());
+    let mut ordinary = tree.clone();
+    ordinary.children[1].data_node_type = Some(dgm::ElementValues::Node);
+    assert!(authored_spacer_snake_slots(&ordinary, &algorithm, &ordinary.constraints).is_none());
+    let mut unresolved = tree.clone();
+    unresolved
+      .constraints
+      .iter_mut()
+      .find(|constraint| constraint.target == dgm::ConstraintValues::Spacing)
+      .unwrap()
+      .ref_for_name = "absent".into();
+    assert!(
+      authored_spacer_snake_slots(&unresolved, &algorithm, &unresolved.constraints).is_none()
+    );
+    let mut nonfinite = tree.clone();
+    nonfinite
+      .constraints
+      .iter_mut()
+      .find(|constraint| constraint.target == dgm::ConstraintValues::Height)
+      .unwrap()
+      .factor = f32::NAN;
+    assert!(authored_spacer_snake_slots(&nonfinite, &algorithm, &nonfinite.constraints).is_none());
+    let mut positioned = tree.clone();
+    let mut position = positioned.constraints[0].clone();
+    position.target = dgm::ConstraintValues::Left;
+    positioned.constraints.push(position);
+    assert!(
+      authored_spacer_snake_slots(&positioned, &algorithm, &positioned.constraints).is_none()
+    );
+    let mut child_sized = tree.clone();
+    let mut child_width = child_sized.constraints[0].clone();
+    child_width.for_name.clear();
+    child_width.relationship = None;
+    child_sized.children[0].direct_constraints.push(child_width);
+    assert!(
+      authored_spacer_snake_slots(&child_sized, &algorithm, &child_sized.constraints).is_none()
+    );
+    let mut column = algorithm.clone();
+    column.flow_direction = dgm::FlowDirectionValues::Column;
+    assert!(authored_spacer_snake_slots(&tree, &column, &tree.constraints).is_none());
+    let mut aligned = algorithm;
+    aligned.vertical_alignment = Some(AxisAlignment::Center);
+    assert!(authored_spacer_snake_slots(&tree, &aligned, &tree.constraints).is_none());
+  }
 
   fn parameter(kind: dgm::ParameterIdValues, value: &str) -> dgm::Parameter {
     dgm::Parameter {

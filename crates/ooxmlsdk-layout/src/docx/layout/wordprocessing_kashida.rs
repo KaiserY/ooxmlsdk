@@ -424,6 +424,7 @@ mod tests {
           origin_is_baseline: false,
           line_metrics_participant: true,
           paint_clip: None,
+          page_culling_bounds: None,
           wordprocessing_effect_host: None,
           wordprocessing_terminal_effect_style: None,
           text: text.to_owned(),
@@ -841,9 +842,9 @@ mod tests {
       assert_eq!(actual, expected, "split={split}");
       let (left, right) = super::super::line_horizontal_bounds_for_alignment(
         &items,
-        line.y_pt,
+        super::super::ParagraphAlignmentLineKey::Coordinate(line.y_pt),
         &mut metrics,
-        false,
+        super::super::ParagraphAlignmentLineCoordinates::Top,
         true,
         false,
       )
@@ -910,9 +911,9 @@ mod tests {
       assert_eq!(full_pixels, 2772 + 21);
       let (left, right) = super::super::line_horizontal_bounds_for_alignment(
         &items,
-        line.y_pt,
+        super::super::ParagraphAlignmentLineKey::Coordinate(line.y_pt),
         &mut metrics,
-        false,
+        super::super::ParagraphAlignmentLineCoordinates::Top,
         true,
         false,
       )

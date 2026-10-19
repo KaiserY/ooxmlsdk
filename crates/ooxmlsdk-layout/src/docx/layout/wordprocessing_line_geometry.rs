@@ -3,11 +3,151 @@ use super::*;
 
 pub(super) struct Placement {
   pub frame_width_pt: f64,
+  pub cell_baseline_reference_pt: Option<f32>,
   pub y: f32,
   pub height: f32,
   pub before: f32,
   pub after: f32,
   pub text_extents: WordLineTextExtents,
+}
+
+#[derive(Debug, PartialEq)]
+struct LineBox {
+  height: f32,
+  below: f32,
+  before: f32,
+  after: f32,
+}
+
+impl LineBox {
+  fn exact(height: f32, before: f32, after: f32) -> Option<Self> {
+    // Native Exact-line inputs retain independently converted components.
+    // For example, 11.15pt + .15pt is 45670 + 614 ideal units, not the
+    // rounded conversion of their sum (46285). The fixed baseline leaves
+    // one fifth of the authored line below it, independent of the font.
+    let height = word_fixed_output_reference_units(height)?;
+    let before = word_fixed_output_reference_units(before)?;
+    let after = word_fixed_output_reference_units(after)?;
+    // Word truncates this fixed-line fraction in ideal units, before the
+    // separately converted lower paragraph space. Native plain/numbered
+    // 18pt controls retain14745 below, rather than rounding it to14746.
+    let below = (height / 5).checked_add(after)?;
+    let complete = height.checked_add(before)?.checked_add(after)?;
+    if height == 0 || complete > i64::from(i32::MAX) {
+      return None;
+    }
+    let points = |units: i64| units as f32 / 4096.0;
+    Some(Self {
+      height: points(complete),
+      below: points(below),
+      before: points(before),
+      after: points(after),
+    })
+  }
+}
+
+pub(super) struct CellLineFrame {
+  pub top: f32,
+  pub height: f32,
+  pub upper: f32,
+  pub lower: f32,
+  pub lower_border: f32,
+}
+
+/// Preserve a whole single-line cell's independently converted source box.
+/// Flow keeps its existing cursor; this endpoint belongs only to paint.
+pub(super) fn cell_line_bottom(
+  cell: &TableCell,
+  measured_height: f32,
+  frame: CellLineFrame,
+) -> Option<f32> {
+  let [Block::Paragraph(paragraph)] = cell.blocks.as_slice() else {
+    return None;
+  };
+  let format = &paragraph.format;
+  if !matches!(format.line_height_rule, LineHeightRule::Exact)
+    || format.vertical_text_flow.is_some()
+    || format
+      .spacing_before_lines
+      .is_some_and(|value| value != 0.0)
+    || format.spacing_after_lines.is_some_and(|value| value != 0.0)
+    || format.spacing_before_auto == Some(true)
+    || format.spacing_after_auto == Some(true)
+    || paragraph.list_label_image.is_some()
+    || paragraph
+      .inlines
+      .iter()
+      .any(|inline| matches!(inline, InlineItem::PageBreak))
+    || !paragraph
+      .inlines
+      .iter()
+      .all(InlineItem::leaves_host_line_metrics_text_owned)
+  {
+    return None;
+  }
+  let height = format.line_height_pt?;
+  let expected_height = cell.margins.top_pt
+    + format.spacing_before_pt
+    + height
+    + format.spacing_after_pt
+    + cell.margins.bottom_pt;
+  // The measurement must describe exactly one authored text box. Admit only
+  // f32 accumulation error, not an extra line, border, object or grid reserve.
+  let error = f32::EPSILON * measured_height.abs().max(expected_height.abs()).max(1.0) * 8.0;
+  if !measured_height.is_finite() || (measured_height - expected_height).abs() > error {
+    return None;
+  }
+  let line = LineBox::exact(height, format.spacing_before_pt, format.spacing_after_pt)?;
+  let units = |points| {
+    word_fixed_output_reference_units(points).filter(|value| *value <= i64::from(i32::MAX))
+  };
+  let line_height = units(line.height)?;
+  let top = units(frame.top)?;
+  let upper = units(frame.upper)?;
+  let lower = units(frame.lower)?;
+  let available = units(frame.height)? - upper - lower;
+  // Native fixed-cell controls retain the integer half of the available
+  // source space. Rounding a floating half can move the complete bottom by
+  // one ideal unit, enough to cross a later 600-DPI half-pixel boundary.
+  let offset = match cell.vertical_alignment {
+    TableCellVerticalAlignment::Top => 0,
+    TableCellVerticalAlignment::Center => {
+      (available - units(frame.lower_border)? - line_height).max(0) / 2
+    }
+    TableCellVerticalAlignment::Bottom => (available - line_height).max(0),
+  };
+  let bottom = top
+    .checked_add(upper)?
+    .checked_add(offset)?
+    .checked_add(line_height)?;
+  (bottom <= i64::from(i32::MAX)).then_some(bottom as f32 / 4096.0)
+}
+
+fn bind_text_metrics(
+  items: &mut [PageItem],
+  flow: FlowContext,
+  placement: &Placement,
+  bottom: f32,
+  line: LineBox,
+) {
+  for item in items {
+    let PageItem::Text(text) = item else { continue };
+    if text.wordprocessing_effect_host.is_some() {
+      // Flattening a floating WPS story does not transfer its baseline to
+      // the enclosing paragraph. Its host retains the native paint origin.
+      continue;
+    }
+    text.wordprocessing_line_metrics = Some(common::WordprocessingLineMetrics {
+      frame_origin_offset_x_pt: f64::from(flow.content_left_pt) - f64::from(text.x_pt),
+      frame_width_pt: placement.frame_width_pt,
+      alignment: None,
+      bottom_offset_pt: bottom - text.y_pt,
+      height_pt: line.height,
+      baseline_from_bottom_pt: line.below,
+      spacing_before_pt: line.before,
+      spacing_after_pt: line.after,
+    });
+  }
 }
 
 /// Recover an authored twip box only when its f32 representation is exact.
@@ -97,10 +237,32 @@ pub(super) fn bind(
   placement: Placement,
   text_metrics: &mut TextMetrics,
 ) {
-  // Native Line Services receives the complete line box for both natural
-  // and minimum-height text. Exact lines, grids and objects have separate
-  // contracts; preserve their existing owners.
+  // Native Line Services receives the complete line box for natural,
+  // minimum-height and ordinary fixed-height text, including text numbers.
+  // Story, grid and object lines keep their separate baseline contracts.
   let minimum = matches!(paragraph.format.line_height_rule, LineHeightRule::AtLeast);
+  let resolved_cell = flow.text_segmentation == TextSegmentation::TableCell
+    && flow.layout_cell_bounds.is_some()
+    && flow.horizontal_table_cell
+    && !flow.table_cell_cursor_is_line_top;
+  let exact_line = matches!(paragraph.format.line_height_rule, LineHeightRule::Exact)
+    && (flow.text_segmentation == TextSegmentation::Body || resolved_cell)
+    && paragraph.list_label_image.is_none()
+    && paragraph.format.vertical_text_flow.is_none()
+    && !paragraph.format.bidi
+    && placement.text_extents.has_text
+    // Page-top suppression can replace the authored fixed box. Its resolved
+    // first-line baseline is not the ordinary Exact-line input contract.
+    && paragraph.format.line_height_pt.is_some_and(|height| {
+      word_fixed_output_reference_units(height)
+        == word_fixed_output_reference_units(placement.height)
+    })
+    && !items.iter().any(|item| {
+      matches!(item, PageItem::Text(text)
+        if text.origin_is_baseline
+          || !matches!(text.style.line_vertical_alignment,
+            common::LineVerticalAlignment::Auto | common::LineVerticalAlignment::Baseline))
+    });
   // Ordinary body numbers share the completed text line's baseline. Their
   // ascent reserve is independent of proportional spacing; their descent
   // never replaces the body's. CJK gap, recovered and cell-cursor contracts
@@ -127,7 +289,7 @@ pub(super) fn bind(
     && paragraph.list_label_image.is_some()
     && paragraph.format.vertical_text_flow.is_none()
     && placement.text_extents.has_text;
-  let text_owned = if minimum || numbered_body || picture_body {
+  let text_owned = if minimum || numbered_body || picture_body || exact_line {
     (paragraph.list_label_image.is_none() || picture_body)
       && paragraph
         .inlines
@@ -136,7 +298,8 @@ pub(super) fn bind(
   } else {
     paragraph_line_spacing_base_covers_line_height(paragraph)
   };
-  if !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto | LineHeightRule::AtLeast)
+  if (!matches!(paragraph.format.line_height_rule, LineHeightRule::Auto | LineHeightRule::AtLeast)
+    && !exact_line)
     || paragraph.format.wordprocessing_shape_story
     || paragraph.format.word_text_frame_story
     // Shape text borrows TableCell segmentation and ancestor cell bounds.
@@ -170,6 +333,31 @@ pub(super) fn bind(
           || text.style.pdf_glyph_outline_options.is_some())
     })
   {
+    return;
+  }
+  if exact_line {
+    // A fixed line owns the number's baseline as well as the body font's.
+    // Native 4/12pt bodies and4/24pt labels receive the same completed box.
+    // Preserve each provisional origin and bind its distance to that box;
+    // realigning the number first would alter PDF's inferred font union.
+    if let Some(line) = LineBox::exact(placement.height, placement.before, placement.after) {
+      // Real horizontal cells retain a resolved baseline cursor. Native
+      // 34e78 controls use the same complete fixed box as body text, after
+      // removing its provisional 80% ascent. Convert the complete endpoints
+      // at paint instead of independently snapping that provisional baseline.
+      let cursor_offset = if resolved_cell {
+        placement.height * WORD_FIXED_LINE_ASCENT_RATIO
+      } else {
+        0.0
+      };
+      let bottom = if resolved_cell {
+        flow.table_cell_exact_line_bottom_pt
+      } else {
+        None
+      }
+      .unwrap_or(placement.y - cursor_offset + placement.height + placement.after);
+      bind_text_metrics(items, flow, &placement, bottom, line);
+    }
     return;
   }
   let metrics = if numbered_body || picture_body {
@@ -272,30 +460,29 @@ pub(super) fn bind(
         table_cell_initial_baseline_offset(&style, height, text_metrics)
           + flow.table_cell_baseline_delta_pt
       } else {
-        ascent
+        // A mixed-size cell line can still carry the first run's provisional
+        // baseline, plus its source-only hard-break coordinate conversion.
+        // Its common paint ascent is resolved above from the complete line.
+        // Keep this correction in paint geometry: native NEXT/AFTER controls
+        // establish that line advance and row height were already correct.
+        placement.cell_baseline_reference_pt.unwrap_or(ascent)
       }
     } else {
       0.0
     };
   let bottom = placement.y - cursor_offset + placement.height + placement.after;
-  for item in items.iter_mut() {
-    let PageItem::Text(text) = item else { continue };
-    if text.wordprocessing_effect_host.is_some() {
-      // Flattening a floating WPS story does not transfer its baseline to
-      // the enclosing paragraph. Its host retains the native paint origin.
-      continue;
-    }
-    text.wordprocessing_line_metrics = Some(common::WordprocessingLineMetrics {
-      frame_origin_offset_x_pt: f64::from(flow.content_left_pt) - f64::from(text.x_pt),
-      frame_width_pt: placement.frame_width_pt,
-      alignment: None,
-      bottom_offset_pt: bottom - text.y_pt,
-      height_pt: placement.before + placement.height + placement.after,
-      baseline_from_bottom_pt: placement.height - ascent + placement.after,
-      spacing_before_pt: placement.before + leading_above,
-      spacing_after_pt: placement.after + leading_below,
-    });
-  }
+  bind_text_metrics(
+    items,
+    flow,
+    &placement,
+    bottom,
+    LineBox {
+      height: placement.before + placement.height + placement.after,
+      below: placement.height - ascent + placement.after,
+      before: placement.before + leading_above,
+      after: placement.after + leading_below,
+    },
+  );
   if picture_body
     && let Some(label) = paragraph.list_label_image.as_ref()
     && let Some(baseline) = items.iter().find_map(|item| {
@@ -413,6 +600,32 @@ pub(super) fn align(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn exact_line_box_preserves_native_independent_components() {
+    // Current Word34104/34193 readbacks, two font families and eight
+    // paragraph-before phases. Font metrics do not own these fixed boxes.
+    for (height, before, expected) in [
+      (11.15, 0.0, [45670, 9134, 0, 0]),
+      (11.15, 0.05, [45875, 9134, 205, 0]),
+      (11.15, 0.15, [46284, 9134, 614, 0]),
+      (11.15, 0.35, [47104, 9134, 1434, 0]),
+      (11.2, 0.0, [45875, 9175, 0, 0]),
+      (11.2, 0.15, [46489, 9175, 614, 0]),
+      (11.2, 0.35, [47309, 9175, 1434, 0]),
+      (11.55, 0.0, [47309, 9461, 0, 0]),
+      (18.0, 0.0, [73728, 14745, 0, 0]),
+    ] {
+      let line = LineBox::exact(height, before, 0.0).expect("native fixed line");
+      assert_eq!(
+        [line.height, line.below, line.before, line.after].map(|pt| (pt * 4096.0) as i32),
+        expected,
+      );
+    }
+    assert!(LineBox::exact(f32::NAN, 0.0, 0.0).is_none());
+    assert!(LineBox::exact(0.0, 0.0, 0.0).is_none());
+    assert!(LineBox::exact(11.2, -1.0, 0.0).is_none());
+  }
 
   #[test]
   fn native_full_frame_width_keeps_its_source_precision() {

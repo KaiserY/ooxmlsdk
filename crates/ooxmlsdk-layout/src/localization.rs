@@ -59,6 +59,19 @@ impl OfficeLocaleContext {
     self.resource_locale
   }
 
+  pub(crate) fn excel_auxiliary_line_break_font(&self) -> Option<&'static str> {
+    // Excel's native edit formatter enables its East Asian character policy
+    // from the authoring language. The auxiliary face comes from application
+    // resources, independently of workbook Normal and theme major/minor fonts.
+    // Native zh-CN/en-US authoring controls and independent Normal/theme
+    // controls identify the zh-CN resource bitmap exactly as SimSun's cmap.
+    (self
+      .default_document_resource_locale()
+      .is_simplified_chinese()
+      && self.resource_locale().is_simplified_chinese())
+    .then_some("SimSun")
+  }
+
   pub(crate) fn field_invalid_citation_source(&self) -> &'static str {
     // This resource has independently verified language coverage. Resolve it
     // from the canonical UI tag, without changing the full resource pack or
@@ -698,5 +711,25 @@ fn resolve_resource_locale(ui_language: Option<&str>) -> OfficeResourceLocale {
       _ => {}
     }
     fallback.step();
+  }
+}
+
+#[cfg(test)]
+mod excel_auxiliary_line_break_tests {
+  use super::*;
+
+  #[test]
+  fn authoring_policy_and_application_font_resources_have_separate_owners() {
+    let chinese = OfficeLocaleContext::new(Some("zh-CN"), Some("en-US"), Some("zh-CN"));
+    assert_eq!(chinese.excel_auxiliary_line_break_font(), Some("SimSun"));
+    let english_authoring = OfficeLocaleContext::new(Some("zh-CN"), Some("zh-CN"), Some("en-US"));
+    assert_eq!(english_authoring.excel_auxiliary_line_break_font(), None);
+    // Other resource packs have not established the same auxiliary font.
+    let english_resources = OfficeLocaleContext::new(Some("en-US"), Some("zh-CN"), Some("zh-CN"));
+    assert_eq!(english_resources.excel_auxiliary_line_break_font(), None);
+    assert_eq!(
+      OfficeLocaleContext::default().excel_auxiliary_line_break_font(),
+      None
+    );
   }
 }

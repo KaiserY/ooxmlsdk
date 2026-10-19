@@ -620,7 +620,11 @@ pub struct ClusteredColumnChart<'a> {
   pub default_text_body_properties: Option<&'a a::BodyProperties>,
   pub title: Option<ChartTitleText>,
   pub title_overlay: bool,
+  /// Authored outer extents also constrain manual title placement; they do
+  /// not resize its fitted text or change the wrapping limit.
   pub title_layout: Option<ChartManualLayout>,
+  /// DrawingML title body geometry, including its wrapping policy and insets.
+  pub title_text_body_properties: Option<&'a a::BodyProperties>,
   /// Whether `c:title/c:layout` was authored, even when it contains no
   /// `c:manualLayout`. Office distinguishes that automatic-layout marker
   /// from a title with no layout element at all.
@@ -1092,6 +1096,7 @@ pub fn clustered_column_chart_for_ui_language<'a>(
       .and_then(|title| title.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
     title_layout: chart_title_layout(&chart_space.chart),
+    title_text_body_properties: chart_title_body_properties(&chart_space.chart),
     title_layout_container_present: chart_space
       .chart
       .title
@@ -2035,6 +2040,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
       .and_then(|title| title.overlay.as_ref())
       .is_some_and(|overlay| overlay.val.is_none_or(|value| value.as_bool())),
     title_layout: chart_title_layout(&chart_space.chart),
+    title_text_body_properties: chart_title_body_properties(&chart_space.chart),
     title_layout_container_present: chart_space
       .chart
       .title
@@ -2785,9 +2791,10 @@ fn chart_manual_layout(manual: &c::ManualLayout) -> Option<ChartManualLayout> {
   })
 }
 
-/// Office treats title and individual data-label manual layouts as positions,
-/// not resizable plot rectangles. MS-OI29500 §21.2.2.78/229 ignores `h` and
-/// `w` for those owners and §21.2.2.104 requires `x` and `y` together.
+/// Fitted text is positioned rather than resized by its manual layout.
+/// MS-OI29500 §21.2.2.78/229 ignores `h` and `w` for fitting and
+/// §21.2.2.104 requires `x` and `y` together. Main chart titles additionally
+/// retain authored outer extents for their position clamp in chart_title_layout.
 fn chart_text_layout(layout: Option<&c::Layout>) -> Option<ChartManualLayout> {
   chart_manual_text_layout(layout?.manual_layout.as_deref()?)
 }
@@ -3129,18 +3136,7 @@ pub fn pie_chart_model_for_host(
     view_3d,
     title,
     title_layout: chart_title_layout(&chart_space.chart),
-    title_text_body_properties: chart_space.chart.title.as_deref().and_then(|title| {
-      title
-        .text_properties
-        .as_deref()
-        .map(|text| text.body_properties.as_ref())
-        .or_else(
-          || match title.chart_text.as_deref()?.chart_text_choice.as_ref()? {
-            c::ChartTextChoice::RichText(rich) => Some(rich.body_properties.as_ref()),
-            _ => None,
-          },
-        )
-    }),
+    title_text_body_properties: chart_title_body_properties(&chart_space.chart),
     title_rotation_deg: chart_title_rotation_degrees(&chart_space.chart),
     series_formatting_index: series_ref.formatting_index,
     maximum_series_formatting_index,
@@ -4415,8 +4411,13 @@ pub(crate) fn linear_axis_scale_with_options(
   loop {
     let mut minimum =
       explicit_minimum.unwrap_or_else(|| increment_floor(temporary_minimum, major_unit));
-    let mut maximum =
-      explicit_maximum.unwrap_or_else(|| increment_ceil(temporary_maximum, major_unit));
+    let mut maximum = explicit_maximum.unwrap_or_else(|| {
+      // A fixed minimum owns the tick lattice. Native 500..1925.49 with a
+      // 200-unit increment ends at2100, not2000; ScaleAutomatism likewise
+      // uses the authored minimum as the increment's BaseValue.
+      let base = explicit_minimum.unwrap_or(0.0);
+      base + increment_ceil(temporary_maximum - base, major_unit)
+    });
     if options.expand_if_values_close_to_border
       && explicit_minimum.is_none()
       && minimum != 0.0
@@ -6105,6 +6106,33 @@ pub fn axis_titles(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::Titl
     })
 }
 
+/// Whether any plot group declares a series, including a series without data.
+pub(crate) fn has_series(chart_space: &c::ChartSpace) -> bool {
+  chart_space
+    .chart
+    .plot_area
+    .plot_area_choice1
+    .iter()
+    .any(|plot| match plot {
+      c::PlotAreaChoice::AreaChart(chart) => !chart.area_chart_series.is_empty(),
+      c::PlotAreaChoice::Area3DChart(chart) => !chart.area_chart_series.is_empty(),
+      c::PlotAreaChoice::LineChart(chart) => !chart.line_chart_series.is_empty(),
+      c::PlotAreaChoice::Line3DChart(chart) => !chart.line_chart_series.is_empty(),
+      c::PlotAreaChoice::StockChart(chart) => !chart.line_chart_series.is_empty(),
+      c::PlotAreaChoice::RadarChart(chart) => !chart.radar_chart_series.is_empty(),
+      c::PlotAreaChoice::ScatterChart(chart) => !chart.scatter_chart_series.is_empty(),
+      c::PlotAreaChoice::PieChart(chart) => !chart.pie_chart_series.is_empty(),
+      c::PlotAreaChoice::Pie3DChart(chart) => !chart.pie_chart_series.is_empty(),
+      c::PlotAreaChoice::DoughnutChart(chart) => !chart.pie_chart_series.is_empty(),
+      c::PlotAreaChoice::BarChart(chart) => !chart.bar_chart_series.is_empty(),
+      c::PlotAreaChoice::Bar3DChart(chart) => !chart.bar_chart_series.is_empty(),
+      c::PlotAreaChoice::OfPieChart(chart) => !chart.pie_chart_series.is_empty(),
+      c::PlotAreaChoice::SurfaceChart(chart) => !chart.surface_chart_series.is_empty(),
+      c::PlotAreaChoice::Surface3DChart(chart) => !chart.surface_chart_series.is_empty(),
+      c::PlotAreaChoice::BubbleChart(chart) => !chart.bubble_chart_series.is_empty(),
+    })
+}
+
 pub fn series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
   let mut series = Vec::new();
   for choice in &chart_space.chart.plot_area.plot_area_choice1 {
@@ -6323,11 +6351,38 @@ fn chart_title_vertical_anchor(chart: &c::Chart) -> Option<a::TextAnchoringTypeV
   rich.body_properties.anchor
 }
 
-fn chart_title_layout(chart: &c::Chart) -> Option<ChartManualLayout> {
-  chart
-    .title
+fn chart_title_body_properties(chart: &c::Chart) -> Option<&a::BodyProperties> {
+  title_body_properties(chart.title.as_deref()?)
+}
+
+pub(crate) fn title_body_properties(title: &c::Title) -> Option<&a::BodyProperties> {
+  title
+    .text_properties
     .as_deref()
-    .and_then(|title| chart_text_layout(title.layout.as_deref()))
+    .map(|text| text.body_properties.as_ref())
+    .or_else(
+      || match title.chart_text.as_deref()?.chart_text_choice.as_ref()? {
+        c::ChartTextChoice::RichText(rich) => Some(rich.body_properties.as_ref()),
+        _ => None,
+      },
+    )
+}
+
+fn chart_title_layout(chart: &c::Chart) -> Option<ChartManualLayout> {
+  let manual = chart
+    .title
+    .as_deref()?
+    .layout
+    .as_deref()?
+    .manual_layout
+    .as_deref()?;
+  let mut layout = chart_manual_text_layout(manual)?;
+  // Native main-title w/h controls keep the fitted text unchanged but use
+  // these outer extents when clamping x/y to the chart. Other text owners
+  // retain the existing position-only import contract.
+  layout.width = manual.width.as_ref().map(|width| width.val as f32);
+  layout.height = manual.height.as_ref().map(|height| height.val as f32);
+  Some(layout)
 }
 
 fn chart_title_rotation_degrees(chart: &c::Chart) -> f32 {
@@ -8139,6 +8194,75 @@ mod tests {
   };
   use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
   use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn main_title_retains_outer_clamp_extents_after_position_validation() {
+    for (x, y, valid) in [
+      ("0.2", Some("0.01"), true),
+      ("0.2", None, false),
+      ("1.1", Some("0.01"), false),
+    ] {
+      let y_xml = y.map_or(String::new(), |y| format!(r#"<c:y val="{y}"/>"#));
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+        <c:chart><c:title><c:layout><c:manualLayout><c:xMode val="edge"/><c:yMode val="edge"/>
+          <c:x val="{x}"/>{y_xml}<c:w val="0.9"/><c:h val="0.8"/>
+        </c:manualLayout></c:layout></c:title><c:plotArea/></c:chart></c:chartSpace>"#
+      );
+      let source = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+      let layout = super::chart_title_layout(&source.chart);
+      assert_eq!(layout.is_some(), valid);
+      if let Some(layout) = layout {
+        assert_eq!((layout.width, layout.height), (Some(0.9), Some(0.8)));
+        assert_eq!(layout.width_mode, super::ChartLayoutMode::Factor);
+        let positional =
+          super::chart_text_layout(source.chart.title.as_deref().unwrap().layout.as_deref())
+            .unwrap();
+        assert_eq!((positional.width, positional.height), (None, None));
+      }
+    }
+  }
+
+  #[test]
+  fn declared_empty_series_remain_distinct_from_an_absent_series_in_every_group() {
+    for (group, properties) in [
+      ("areaChart", "<c:grouping val=\"standard\"/>"),
+      ("area3DChart", "<c:grouping val=\"standard\"/>"),
+      ("lineChart", "<c:grouping val=\"standard\"/>"),
+      ("line3DChart", "<c:grouping val=\"standard\"/>"),
+      ("stockChart", ""),
+      ("radarChart", "<c:radarStyle val=\"standard\"/>"),
+      ("scatterChart", "<c:scatterStyle val=\"marker\"/>"),
+      ("pieChart", ""),
+      ("pie3DChart", ""),
+      ("doughnutChart", ""),
+      ("barChart", "<c:barDir val=\"col\"/>"),
+      ("bar3DChart", "<c:barDir val=\"col\"/>"),
+      ("ofPieChart", "<c:ofPieType val=\"pie\"/>"),
+      ("surfaceChart", ""),
+      ("surface3DChart", ""),
+      ("bubbleChart", ""),
+    ] {
+      for present in [false, true] {
+        let series = if present {
+          "<c:ser><c:idx val=\"0\"/><c:order val=\"0\"/></c:ser>"
+        } else {
+          ""
+        };
+        let trailing = if group == "doughnutChart" {
+          "<c:holeSize val=\"50\"/>"
+        } else {
+          ""
+        };
+        let xml = format!(
+          r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:{group}>{properties}{series}{trailing}</c:{group}></c:plotArea></c:chart></c:chartSpace>"#
+        );
+        let space = c::ChartSpace::from_bytes(xml.as_bytes()).expect("typed chart group");
+        assert_eq!(super::has_series(&space), present, "{group}");
+        assert_eq!(super::series(&space).len(), usize::from(present), "{group}");
+      }
+    }
+  }
 
   #[test]
   fn radar_default_label_position_follows_office_outside_end() {

@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use super::import::ExcelImport;
 use super::model::split_defined_name_ranges;
@@ -31,7 +32,12 @@ pub(super) fn fixed_output_content_scale(
   worksheet_scale_percent: u32,
   paper_scale_percent: u32,
 ) -> f32 {
-  worksheet_scale_percent as f32 * paper_scale_percent as f32 / 10_000.0
+  // Excel realizes the composed worksheet/paper scale as an integral
+  // percentage before positioning the grid and selecting printer fonts.
+  // Native Letter/A4 controls at eight zooms and five font sizes distinguish
+  // this truncation from merely rounding the final font to a device dot.
+  let percent = u64::from(worksheet_scale_percent) * u64::from(paper_scale_percent) / 100;
+  percent as f32 / 100.0
 }
 
 #[derive(Clone, Debug)]
@@ -52,13 +58,15 @@ pub(crate) struct CalcPrintPage<'a> {
   pub(crate) paper_scale_percent: u32,
   pub(crate) pagination_paper_scale_percent: u32,
   pub(crate) page_settings: &'a CalcPageSettings,
+  /// Margins retained from the preceding printed worksheet's printer context.
+  pub(crate) paper_mapping_settings: &'a CalcPageSettings,
   pub(crate) area: Option<CellRange>,
   pub(crate) repeated_rows: Option<CellRange>,
   pub(crate) repeated_columns: Option<CellRange>,
-  pub(crate) cells: Vec<CalcPrintCell<'a>>,
-  pub(crate) repeated_row_cells: Vec<CalcPrintCell<'a>>,
-  pub(crate) repeated_column_cells: Vec<CalcPrintCell<'a>>,
-  pub(crate) repeated_corner_cells: Vec<CalcPrintCell<'a>>,
+  pub(crate) cells: Vec<Arc<CalcPrintCell<'a>>>,
+  pub(crate) repeated_row_cells: Vec<Arc<CalcPrintCell<'a>>>,
+  pub(crate) repeated_column_cells: Vec<Arc<CalcPrintCell<'a>>>,
+  pub(crate) repeated_corner_cells: Vec<Arc<CalcPrintCell<'a>>>,
   pub(crate) drawing_anchor_count: usize,
   pub(crate) chart_count: usize,
 }
@@ -144,50 +152,59 @@ impl<'a> CalcPrintDocument<'a> {
     // This is the first ScPrintFunc-shaped owner. Full range, break, and page
     // count logic lands here; display only consumes the resulting print pages.
     let mut pages = Vec::new();
+    let mut sheet_page_counts = Vec::new();
+    let mut preflight_total_pages = 0;
     let mut text_metrics = TextMetrics::new();
     for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
       let mut conditional_eval_cache = ConditionalFormatEvalCache::default();
+      let mut prepared_cells = HashMap::new();
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
-      let ordinary_used_range = sheet.used_range(&import.styles);
       let areas = print_areas_for_sheet(import, sheet, &named_ranges, &mut text_metrics);
       let scale = print_scale_state(import, sheet, &areas, &named_ranges, &mut text_metrics);
-      let uses_formatted_implicit_header_footer_extent =
-        implicit_header_footer_uses_formatted_cell_extent(import, sheet, &named_ranges);
-      // An explicit print area gives an otherwise empty worksheet printable
-      // pages. Office preserves separate areas and manual page breaks even
-      // without cell paint, headings, or headers/footers. An implicit blank
-      // sheet still has no printable pages.
-      let keep_empty_explicit_sheet_pages =
-        !named_ranges.resolved_print_areas.is_empty() && sheet_body_is_empty(import, sheet);
       let page_areas = page_areas_for_sheet(
         import,
         sheet,
         &areas,
         &named_ranges,
-        fixed_output_content_scale(scale.zoom, scale.pagination_paper_scale_percent) * 100.0,
-        scale.top_down,
+        CalcPrintPageCanvas {
+          zoom_percent: fixed_output_content_scale(
+            scale.zoom,
+            scale.pagination_paper_scale_percent,
+          ) * 100.0,
+          top_down: scale.top_down,
+          page_size_pt: None,
+        },
         &mut text_metrics,
       );
-      let page_states = page_areas
-        .iter()
-        .map(|area| {
-          let drawing_summary = drawing_summary_for_area(sheet, *area);
-          let empty = area
-            .is_some_and(|area| print_area_is_empty(import, sheet, area, &mut text_metrics))
-            && drawing_summary.anchors == 0
-            && drawing_summary.charts == 0;
-          (drawing_summary, empty)
-        })
-        .collect::<Vec<_>>();
-      let last_implicit_printable_page = named_ranges
-        .resolved_print_areas
-        .is_empty()
-        .then(|| page_states.iter().rposition(|(_, empty)| !empty))
-        .flatten();
-      let mut sheet_page_index = 0usize;
-      for (page_area_index, (area, (drawing_summary, empty))) in
-        page_areas.into_iter().zip(page_states).enumerate()
-      {
+      let page_areas = printable_page_areas(
+        import,
+        sheet,
+        page_areas,
+        &named_ranges,
+        scale.skip_empty,
+        &mut text_metrics,
+      );
+      let preflight_page_count = scale.preflight.map_or(page_areas.len(), |canvas| {
+        let preflight_areas = page_areas_for_sheet(
+          import,
+          sheet,
+          &areas,
+          &named_ranges,
+          canvas,
+          &mut text_metrics,
+        );
+        printable_page_areas(
+          import,
+          sheet,
+          preflight_areas,
+          &named_ranges,
+          scale.skip_empty,
+          &mut text_metrics,
+        )
+        .len()
+      });
+      let first_sheet_page = pages.len();
+      for (sheet_page_index, (area, drawing_summary)) in page_areas.into_iter().enumerate() {
         let starts_print_area_row = area.is_some_and(|page_area| {
           areas.iter().any(|print_area| {
             print_area.contains(page_area.start) && page_area.start.row == print_area.start.row
@@ -195,59 +212,49 @@ impl<'a> CalcPrintDocument<'a> {
         });
         let cells = area
           .map(|area| {
-            print_cells_for_area(
+            print_cells_for_area_with_cache(
               import,
               sheet,
               page_cell_scan_area(area),
               &mut conditional_eval_cache,
+              &mut prepared_cells,
             )
           })
           .unwrap_or_default();
         let repeated_row_cells = repeat_rows_for_page(area, named_ranges.repeat_rows)
-          .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
+          .map(|area| {
+            print_cells_for_area_with_cache(
+              import,
+              sheet,
+              area,
+              &mut conditional_eval_cache,
+              &mut prepared_cells,
+            )
+          })
           .unwrap_or_default();
         let repeated_column_cells = repeat_columns_for_page(area, named_ranges.repeat_columns)
-          .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
+          .map(|area| {
+            print_cells_for_area_with_cache(
+              import,
+              sheet,
+              area,
+              &mut conditional_eval_cache,
+              &mut prepared_cells,
+            )
+          })
           .unwrap_or_default();
         let repeated_corner_cells =
           repeat_corner_for_page(area, named_ranges.repeat_rows, named_ranges.repeat_columns)
-            .map(|area| print_cells_for_area(import, sheet, area, &mut conditional_eval_cache))
+            .map(|area| {
+              print_cells_for_area_with_cache(
+                import,
+                sheet,
+                area,
+                &mut conditional_eval_cache,
+                &mut prepared_cells,
+              )
+            })
             .unwrap_or_default();
-        // ScPrintFunc::DoPrint. Empty sheet page ranges are hidden by
-        // ScDocument::IsPrintEmpty before PrintPage is called; header/footer
-        // content is painted only for page ranges that survive that test.
-        // Excel does not create an implicit print page solely for headers or
-        // footers (empty-noconf.xlsx and WorkbookProperties.xlsx). Keep the
-        // explicit empty-sheet print areas separate from this implicit case.
-        // Excel fixed output retains blank pages ahead of later printable
-        // cells or drawings in the actual page order. Ordinary implicit
-        // ranges exclude invisible blank-cell XF metadata, so a style-only
-        // tail such as tdf131536 does not create pages. A nonempty sheet with
-        // a configured header/footer uses the separately selected formatted-
-        // cell extent, but Office does not retain every empty rectangle in
-        // that Cartesian extent. Its fixed output keeps a horizontal
-        // continuation only when that page contains a directly authored XF
-        // delta. Vertical style tails, cross-product holes, and default-
-        // equivalent XFs remain hidden.
-        let implicit_page_before_content = last_implicit_printable_page
-          .is_some_and(|last_printable| page_area_index < last_printable);
-        let keep_formatted_horizontal_header_footer_page = area.is_some_and(|area| {
-          keep_formatted_horizontal_header_footer_page(
-            uses_formatted_implicit_header_footer_extent,
-            ordinary_used_range,
-            area,
-            sheet.has_nondefault_direct_cell_formatting_in_range(&import.styles, area),
-          )
-        });
-        if should_skip_empty_print_page(
-          scale.skip_empty,
-          empty,
-          implicit_page_before_content,
-          keep_formatted_horizontal_header_footer_page,
-          keep_empty_explicit_sheet_pages,
-        ) {
-          continue;
-        }
         pages.push(CalcPrintPage {
           sheet,
           sheet_page_index,
@@ -259,6 +266,7 @@ impl<'a> CalcPrintDocument<'a> {
           paper_scale_percent: scale.paper_scale_percent,
           pagination_paper_scale_percent: scale.pagination_paper_scale_percent,
           page_settings: &sheet.page_settings,
+          paper_mapping_settings: &sheet.page_settings,
           repeated_rows: named_ranges.repeat_rows,
           repeated_columns: named_ranges.repeat_columns,
           area,
@@ -269,15 +277,123 @@ impl<'a> CalcPrintDocument<'a> {
           drawing_anchor_count: drawing_summary.anchors,
           chart_count: drawing_summary.charts,
         });
-        sheet_page_index += 1;
       }
+      preflight_total_pages += preflight_page_count;
+      sheet_page_counts.push((first_sheet_page..pages.len(), preflight_page_count));
     }
-    let total_pages = pages.len();
-    for page in &mut pages {
-      page.total_pages = total_pages;
-    }
+    // Excel preflights width/height-fit sheets on their requested paper, then
+    // realizes the output printer canvas. &N replaces only the current
+    // sheet's preliminary count; it does not accumulate prior replacements.
+    // Native paper/margin controls distinguish both the fit boundary and this
+    // per-sheet substitution when several sheets change their page count.
+    assign_paper_mapping_settings(&mut pages);
+    assign_footer_total_pages(&mut pages, sheet_page_counts, preflight_total_pages);
     Self { pages }
   }
+}
+
+fn assign_paper_mapping_settings<'a>(pages: &mut [CalcPrintPage<'a>]) {
+  let mut previous = None::<(((f32, f32), u32), &'a CalcPageSettings)>;
+  for sheet_pages in pages.chunk_by_mut(|a, b| std::ptr::eq(a.sheet, b.sheet)) {
+    let page = &sheet_pages[0];
+    if page.sheet.sheet_type != super::worksheet::SheetType::Worksheet
+      || page.paper_scale_percent >= 100
+    {
+      previous = None;
+      continue;
+    }
+    let requested_context = (page.page_settings.requested_page_size_pt(), page.zoom);
+    // Native alternating-margin and hidden-sheet controls retain the previous
+    // printed worksheet's margins, then replace that context for the next
+    // worksheet. Different paper/orientation or requested print zoom initializes
+    // its own context. Native20/21 controls reset it even though both realize
+    // 19% after paper mapping. Returning to an earlier context does not restore
+    // an older cached margin. All pages of one sheet share the same reference.
+    let settings = previous
+      .filter(|(context, _)| *context == requested_context)
+      .map_or(page.page_settings, |(_, settings)| settings);
+    previous = Some((requested_context, page.page_settings));
+    for page in sheet_pages {
+      page.paper_mapping_settings = settings;
+    }
+  }
+}
+
+fn assign_footer_total_pages(
+  pages: &mut [CalcPrintPage<'_>],
+  sheet_page_counts: Vec<(std::ops::Range<usize>, usize)>,
+  preflight_total_pages: usize,
+) {
+  for (range, preflight_page_count) in sheet_page_counts {
+    let total_pages = preflight_total_pages - preflight_page_count + range.len();
+    for page in &mut pages[range] {
+      page.total_pages = total_pages;
+    }
+  }
+}
+
+fn printable_page_areas(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  page_areas: Vec<Option<CellRange>>,
+  named_ranges: &CalcPrintNamedRanges,
+  skip_empty: bool,
+  text_metrics: &mut TextMetrics,
+) -> Vec<(Option<CellRange>, CalcPrintDrawingSummary)> {
+  let ordinary_used_range = sheet.used_range(&import.styles);
+  let uses_formatted_extent =
+    implicit_header_footer_uses_formatted_cell_extent(import, sheet, named_ranges);
+  let keep_empty_explicit_pages = !named_ranges.resolved_print_areas.is_empty();
+  let page_states = page_areas
+    .iter()
+    .map(|area| {
+      let drawing_summary = drawing_summary_for_area(sheet, *area);
+      let empty = area.is_some_and(|area| print_area_is_empty(import, sheet, area, text_metrics))
+        && drawing_summary.anchors == 0
+        && drawing_summary.charts == 0
+        && [
+          repeat_rows_for_page(*area, named_ranges.repeat_rows),
+          repeat_columns_for_page(*area, named_ranges.repeat_columns),
+          repeat_corner_for_page(*area, named_ranges.repeat_rows, named_ranges.repeat_columns),
+        ]
+        .into_iter()
+        .flatten()
+        .all(|titles| print_area_is_empty(import, sheet, titles, text_metrics));
+      (drawing_summary, empty)
+    })
+    .collect::<Vec<_>>();
+  let last_implicit_printable_page = (!keep_empty_explicit_pages)
+    .then(|| page_states.iter().rposition(|(_, empty)| !empty))
+    .flatten();
+  // Headers alone do not make an implicit empty page printable. Retain blank
+  // explicit continuations, holes before later paint, repeated-title paint,
+  // and directly formatted horizontal header/footer continuations. Apply the
+  // same selection to the preliminary and realized printer canvases.
+  page_areas
+    .into_iter()
+    .zip(page_states)
+    .enumerate()
+    .filter_map(|(index, (area, (drawing_summary, empty)))| {
+      let implicit_page_before_content =
+        last_implicit_printable_page.is_some_and(|last| index < last);
+      let keep_formatted_page = area.is_some_and(|area| {
+        keep_formatted_horizontal_header_footer_page(
+          uses_formatted_extent,
+          ordinary_used_range,
+          area,
+          sheet.has_nondefault_direct_cell_formatting_in_range(&import.styles, area),
+        )
+      });
+      (!should_skip_empty_print_page(
+        skip_empty,
+        empty,
+        implicit_page_before_content,
+        keep_formatted_page,
+        keep_empty_explicit_pages,
+      ))
+      .then_some((area, drawing_summary))
+    })
+    .collect()
 }
 
 fn should_skip_empty_print_page(
@@ -285,13 +401,13 @@ fn should_skip_empty_print_page(
   empty: bool,
   implicit_page_before_content: bool,
   keep_implicit_header_footer_page: bool,
-  keep_empty_explicit_sheet_pages: bool,
+  keep_empty_explicit_pages: bool,
 ) -> bool {
   skip_empty
     && empty
     && !implicit_page_before_content
     && !keep_implicit_header_footer_page
-    && !keep_empty_explicit_sheet_pages
+    && !keep_empty_explicit_pages
 }
 
 fn keep_formatted_horizontal_header_footer_page(
@@ -333,6 +449,14 @@ struct CalcPrintScaleState {
   pagination_paper_scale_percent: u32,
   skip_empty: bool,
   top_down: bool,
+  preflight: Option<CalcPrintPageCanvas>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CalcPrintPageCanvas {
+  zoom_percent: f32,
+  top_down: bool,
+  page_size_pt: Option<(f32, f32)>,
 }
 
 fn print_scale_state(
@@ -351,6 +475,7 @@ fn print_scale_state(
       pagination_paper_scale_percent: 100,
       skip_empty: true,
       top_down: true,
+      preflight: None,
     };
   }
   // UpdatePages, CalcZoom. Full page-size based CalcPages is a later bridge;
@@ -394,6 +519,11 @@ fn print_scale_state(
   let mut zoom = sheet.page_settings.scale;
   let mut auto_page_columns = forced_break_min_columns.max(1);
   let mut auto_page_rows = forced_break_min_rows.max(1);
+  let top_down = matches!(
+    sheet.page_settings.page_order,
+    Some(x::PageOrderValues::DownThenOver) | None
+  );
+  let mut preflight = None;
 
   if fit_to_page && (fit_to_width > 0 || fit_to_height > 0) {
     // PageSettingsConverter writes OOXML fitToWidth/fitToHeight directly to
@@ -421,7 +551,24 @@ fn print_scale_state(
       named_ranges,
       auto_page_columns,
       auto_page_rows,
+      sheet.page_settings.page_size_pt(),
     );
+    let requested_page_size = sheet.page_settings.requested_page_size_pt();
+    if requested_page_size != sheet.page_settings.page_size_pt() {
+      preflight = Some(CalcPrintPageCanvas {
+        zoom_percent: fit_zoom_to_pages(
+          import,
+          sheet,
+          areas,
+          named_ranges,
+          auto_page_columns,
+          auto_page_rows,
+          requested_page_size,
+        ) as f32,
+        top_down,
+        page_size_pt: Some(requested_page_size),
+      });
+    }
     // ECMA-376 pageSetup says fitToWidth/fitToHeight override scale. Keep the
     // metric-derived fit zoom even when it happens to equal the serialized
     // scale; equality does not switch the worksheet back to 100 percent.
@@ -471,11 +618,8 @@ fn print_scale_state(
     paper_scale_percent,
     pagination_paper_scale_percent,
     skip_empty: true,
-    top_down: matches!(
-      sheet.page_settings.page_order,
-      Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PageOrderValues::DownThenOver)
-        | None
-    ),
+    top_down,
+    preflight,
   }
 }
 
@@ -499,6 +643,7 @@ fn actual_row_page_count(
           by_row: true,
           repeat: named_ranges.repeat_rows,
           zoom_percent: zoom as f32,
+          page_size_pt: None,
           text_metrics,
         },
       )
@@ -515,11 +660,12 @@ fn fit_zoom_to_pages(
   named_ranges: &CalcPrintNamedRanges,
   page_columns: usize,
   page_rows: usize,
+  page_size_pt: (f32, f32),
 ) -> u32 {
   let Some(area) = areas.first().copied() else {
     return 100;
   };
-  let content = print_content_size_pt(&sheet.page_settings);
+  let content = print_content_size_for_page(&sheet.page_settings, page_size_pt);
   let repeat_width = named_ranges
     .repeat_columns
     .map(|range| sheet.range_rect(range).width_pt)
@@ -530,9 +676,7 @@ fn fit_zoom_to_pages(
     .unwrap_or(0.0);
   let page_width = (content.0 - repeat_width).max(1.0);
   let page_height =
-    (print_row_capacity_pt(&sheet.page_settings, sheet.page_settings.page_size_pt().1)
-      - repeat_height)
-      .max(1.0);
+    (print_row_capacity_pt(&sheet.page_settings, page_size_pt.1) - repeat_height).max(1.0);
   let fit_area = fit_scale_area(import, sheet, area, named_ranges);
   let area_rect = sheet.range_rect(fit_area);
   let width_zoom = if page_columns > 0 && area_rect.width_pt > 0.0 {
@@ -567,6 +711,7 @@ fn fit_scale_area(
   })
 }
 
+#[cfg(test)]
 fn print_content_size_pt(page_settings: &CalcPageSettings) -> (f32, f32) {
   print_content_size_for_page(page_settings, page_settings.page_size_pt())
 }
@@ -1070,7 +1215,7 @@ fn vml_anchor_x_pt(
   });
   // ShapeAnchor::importVmlAnchor marks offsets as CellAnchorType::Pixel, and
   // calcCellAnchorEmu clamps them to the next cell minus one twip.
-  (cell.x_pt + sheet.vml_anchor_offset_pt(shape, offset_px))
+  (cell.x_pt + sheet.vml_anchor_offset_pt(shape, offset_px, true))
     .min(next_cell.x_pt - units::twips_to_points(1.0))
 }
 
@@ -1086,7 +1231,7 @@ fn vml_anchor_y_pt(
     col: 1,
     row: row.saturating_add(1),
   });
-  (cell.y_pt + sheet.vml_anchor_offset_pt(shape, offset_px))
+  (cell.y_pt + sheet.vml_anchor_offset_pt(shape, offset_px, false))
     .min(next_cell.y_pt - units::twips_to_points(1.0))
 }
 
@@ -1526,8 +1671,7 @@ fn page_areas_for_sheet(
   sheet: &CalcSheet,
   print_areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges,
-  zoom_percent: f32,
-  top_down: bool,
+  canvas: CalcPrintPageCanvas,
   text_metrics: &mut TextMetrics,
 ) -> Vec<Option<CellRange>> {
   if sheet.sheet_type == SheetType::Chartsheet {
@@ -1543,7 +1687,8 @@ fn page_areas_for_sheet(
         breaks: &sheet.metrics.row_breaks,
         by_row: true,
         repeat: named_ranges.repeat_rows,
-        zoom_percent,
+        zoom_percent: canvas.zoom_percent,
+        page_size_pt: canvas.page_size_pt,
         text_metrics,
       },
     );
@@ -1555,11 +1700,12 @@ fn page_areas_for_sheet(
         breaks: &sheet.metrics.column_breaks,
         by_row: false,
         repeat: named_ranges.repeat_columns,
-        zoom_percent,
+        zoom_percent: canvas.zoom_percent,
+        page_size_pt: canvas.page_size_pt,
         text_metrics,
       },
     );
-    if top_down {
+    if canvas.top_down {
       // bTopDown prints all Y pages for one X page before advancing rightward.
       for column_slice in &column_slices {
         for row_slice in &row_slices {
@@ -1595,6 +1741,7 @@ struct PageMetricSplit<'a> {
   by_row: bool,
   repeat: Option<CellRange>,
   zoom_percent: f32,
+  page_size_pt: Option<(f32, f32)>,
   text_metrics: &'a mut TextMetrics,
 }
 
@@ -1620,15 +1767,19 @@ fn split_range_by_page_metrics(
     .drawings
     .iter()
     .any(|drawing| !drawing.charts.is_empty() || !drawing.extended_charts.is_empty());
-  let page_size = sheet
-    .page_settings
-    .fixed_output_pagination_page_size_pt(has_chart);
+  let page_size = split.page_size_pt.unwrap_or_else(|| {
+    sheet
+      .page_settings
+      .fixed_output_pagination_page_size_pt(has_chart)
+  });
   let content_size = print_content_size_for_page(&sheet.page_settings, page_size);
+  let zoom_scale = split.zoom_percent.max(ZOOM_MIN as f32) / 100.0;
   let repeat_size = split
     .repeat
     .map(|range| {
       if split.by_row {
-        sheet.range_rect(range).height_pt
+        sheet.fixed_output_row_range_height_pt(range.start.row, range.end.row, zoom_scale)
+          / zoom_scale
       } else {
         sheet.range_rect(range).width_pt
       }
@@ -1675,7 +1826,17 @@ fn split_range_by_page_metrics(
       })
     .max(1.0);
     let size = if split.by_row {
-      print_row_height_pt(import, sheet, current, &mut *split.text_metrics)
+      let height = print_row_height_pt(import, sheet, current, &mut *split.text_metrics);
+      if height > sheet.row_height_pt(current) + f32::EPSILON {
+        // Preserve the older uncalibrated AutoFit path. Calibrated rows have
+        // already been measured by the worksheet's shared text/grid owner.
+        height
+      } else {
+        // Pagination realizes each row at worksheet zoom on the same device
+        // grid as paint, before the independent paper transform. Summing raw
+        // heights changes Native's 40-row Letter boundary at 86% to 39 rows.
+        sheet.fixed_output_row_height_pt(current, zoom_scale) / zoom_scale
+      }
     } else {
       sheet.column_width_pt(current)
     };
@@ -1747,15 +1908,22 @@ fn print_row_height_pt(
     if cell.display_text.is_empty() {
       continue;
     }
-    let address = cell.address().unwrap_or(CellAddress {
-      col: cell_position as u32 + 1,
-      row: row_index,
-    });
     let style_index = cell.style_index;
     let Some(alignment) = import.styles.alignment_for_cell(style_index) else {
       continue;
     };
     if !alignment.wrap_text {
+      continue;
+    }
+    let address = cell.address().unwrap_or(CellAddress {
+      col: cell_position as u32 + 1,
+      row: row_index,
+    });
+    // Excel does not AutoFit merged cells (Microsoft support, "You cannot
+    // use the AutoFit feature for rows or columns that contain merged
+    // cells"). Native horizontal/vertical merge controls retain their row
+    // height, including explicit line breaks; unmerged neighbors still fit.
+    if sheet.merged_range_for_cell(address).is_some() {
       continue;
     }
     let style = import.styles.text_style_for_cell(style_index);
@@ -1916,12 +2084,29 @@ fn repeat_corner_for_page(
   ))
 }
 
+#[cfg(test)]
 fn print_cells_for_area<'a>(
   import: &'a ExcelImport,
   sheet: &'a CalcSheet,
   area: CellRange,
   conditional_eval_cache: &mut ConditionalFormatEvalCache,
-) -> Vec<CalcPrintCell<'a>> {
+) -> Vec<Arc<CalcPrintCell<'a>>> {
+  print_cells_for_area_with_cache(
+    import,
+    sheet,
+    area,
+    conditional_eval_cache,
+    &mut HashMap::new(),
+  )
+}
+
+fn print_cells_for_area_with_cache<'a>(
+  import: &'a ExcelImport,
+  sheet: &'a CalcSheet,
+  area: CellRange,
+  conditional_eval_cache: &mut ConditionalFormatEvalCache,
+  prepared_cells: &mut HashMap<CellAddress, Arc<CalcPrintCell<'a>>>,
+) -> Vec<Arc<CalcPrintCell<'a>>> {
   let strings = OfficeStringCatalog::for_ui_language(Some(import.styles.output_ui_language()));
   let mut physical_cells = Vec::new();
   let mut occupied = HashSet::new();
@@ -1939,7 +2124,26 @@ fn print_cells_for_area<'a>(
       }
       occupied.insert(print_address);
       let hidden_column = column_hidden(sheet, address.col);
-      if row.hidden || hidden_column {
+      if (row.hidden || hidden_column)
+        && !sheet
+          .merged_range_for_cell(address)
+          .filter(|merged| merged.start == address)
+          .is_some_and(|merged| {
+            // A hidden anchor still owns the text of the visible merged
+            // rectangle. Native Excel row/column controls retain it whenever
+            // both dimensions have visible extent, including a hidden corner.
+            let rect = sheet.range_rect(merged);
+            rect.width_pt > 0.0 && rect.height_pt > 0.0
+          })
+      {
+        continue;
+      }
+      // A preceding cell can be scan context for thousands of horizontal
+      // pages. Its number format, pivot text and conditional result depend
+      // on the immutable sheet, not the page clip. Share the complete result
+      // while retaining each page's exact scan/occupancy order.
+      if let Some(prepared) = prepared_cells.get(&address) {
+        physical_cells.push(Arc::clone(prepared));
         continue;
       }
       let style_index = cell.style_index;
@@ -2017,7 +2221,7 @@ fn print_cells_for_area<'a>(
         .and_then(|value| {
           conditional_data_bar(import, sheet, address, value, conditional_eval_cache)
         });
-      physical_cells.push(CalcPrintCell {
+      let prepared = Arc::new(CalcPrintCell {
         address: print_address,
         text: Cow::Borrowed(cell.display_text.as_str()),
         data_type: cell.data_type,
@@ -2033,6 +2237,8 @@ fn print_cells_for_area<'a>(
         data_bar,
         color_scale_fill,
       });
+      prepared_cells.insert(address, Arc::clone(&prepared));
+      physical_cells.push(prepared);
     }
   };
   if sheet.resources.pivot_tables.tables.is_empty() {
@@ -2052,13 +2258,16 @@ fn print_cells_for_area<'a>(
   occupied.extend(virtual_cells.iter().map(|cell| cell.address));
   virtual_cells.extend(inherited_format_print_cells(import, sheet, area, &occupied));
   virtual_cells.sort_unstable_by_key(|cell| (cell.address.row, cell.address.col));
-  merge_print_cells_by_scan_order(physical_cells, virtual_cells)
+  merge_print_cells_by_scan_order(
+    physical_cells,
+    virtual_cells.into_iter().map(Arc::new).collect(),
+  )
 }
 
 fn merge_print_cells_by_scan_order<'a>(
-  physical_cells: Vec<CalcPrintCell<'a>>,
-  virtual_cells: Vec<CalcPrintCell<'a>>,
-) -> Vec<CalcPrintCell<'a>> {
+  physical_cells: Vec<Arc<CalcPrintCell<'a>>>,
+  virtual_cells: Vec<Arc<CalcPrintCell<'a>>>,
+) -> Vec<Arc<CalcPrintCell<'a>>> {
   let mut merged = Vec::with_capacity(physical_cells.len() + virtual_cells.len());
   let mut virtual_cells = virtual_cells.into_iter().peekable();
   for cell in physical_cells {
@@ -5713,6 +5922,351 @@ mod tests {
   use super::*;
 
   #[test]
+  fn workbook_paper_mapping_resets_margin_history_when_requested_zoom_changes() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // The32 native mapper controls retain these cached top/bottom margins.
+    //20/21 deliberately share the same post-mapping integer19% output scale.
+    let scales = [
+      63, 63, 63, 63, 63, 63, 63, 63, 20, 21, 20, 21, 20, 21, 20, 21, 63, 64, 63, 64, 63, 64, 63,
+      64, 63, 63, 64, 64, 63, 63, 64, 64,
+    ];
+    let expected_margins = [
+      1.0, 1.0, 0.5, 2.0, 0.25, 1.0, 0.5, 2.0, 1.0, 0.5, 2.0, 0.25, 1.0, 0.5, 2.0, 0.25, 1.0, 0.5,
+      2.0, 0.25, 1.0, 0.5, 2.0, 0.25, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0,
+    ];
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let mut sheets = String::new();
+    for (index, scale) in scales.into_iter().enumerate() {
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let id = workbook.get_id_of_part(&package, &worksheet).unwrap();
+      sheets.push_str(&format!(
+        r#"<sheet name="Sheet{index}" sheetId="{}" r:id="{id}"/>"#,
+        index + 1
+      ));
+      let margin = [1.0, 0.5, 2.0, 0.25][index % 4];
+      worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>probe{index}</t></is></c></row></sheetData><pageMargins left="0.75" right="0.75" top="{margin}" bottom="{margin}" header="0.5" footer="0.5"/><pageSetup paperSize="1" orientation="portrait" scale="{scale}" usePrinterDefaults="1"/></worksheet>"#).into_bytes()).unwrap();
+    }
+    workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>{sheets}</sheets></workbook>"#).into_bytes()).unwrap();
+    let mut import =
+      ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+    for sheet in &mut import.sheets {
+      sheet.page_settings.valid_printer_settings = true;
+    }
+    let print = CalcPrintDocument::from_import(&import);
+    assert_eq!(print.pages.len(), scales.len());
+    for (index, page) in print.pages.iter().enumerate() {
+      assert_eq!(page.zoom, scales[index]);
+      assert_eq!(page.paper_scale_percent, 95);
+      assert_eq!(
+        page.paper_mapping_settings.margin_top_in, expected_margins[index],
+        "worksheet{index} at requested zoom{}",
+        page.zoom
+      );
+      assert_eq!(
+        page.paper_mapping_settings.margin_bottom_in, expected_margins[index],
+        "worksheet{index} at requested zoom{}",
+        page.zoom
+      );
+    }
+  }
+
+  #[test]
+  fn workbook_paper_mapping_keeps_previous_printed_matching_canvas_margins() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Native controls: changing the first Letter portrait worksheet's top
+    // and bottom margins from 1in to 2in moves the following worksheet up
+    // 3.6pt. Changing the active tab preserves it; hiding that worksheet or
+    // giving it A4 or landscape paper removes that dependency. Alternating
+    // margin controls establish that the third worksheet reads the second,
+    // independently of the first. The reference is retained across page breaks.
+    for (hidden, first_paper, first_orientation, active_tab, expected_delta) in [
+      (false, 1, "portrait", 0, -3.6),
+      (false, 1, "portrait", 1, -3.6),
+      (true, 1, "portrait", 1, 0.0),
+      (false, 9, "portrait", 0, 0.0),
+      (false, 1, "landscape", 0, 0.0),
+    ] {
+      let mut origins = Vec::new();
+      let mut continuation_origins = Vec::new();
+      let mut third_origins = Vec::new();
+      for first_margin in [1.0, 2.0] {
+        let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+        let workbook = package.add_workbook_part().unwrap();
+        let mut sheets = String::new();
+        for index in 0..3 {
+          let worksheet = workbook
+            .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+            .unwrap();
+          let id = workbook.get_id_of_part(&package, &worksheet).unwrap();
+          let state = if index == 0 && hidden {
+            r#" state="hidden""#
+          } else {
+            ""
+          };
+          sheets.push_str(&format!(
+            r#"<sheet name="Sheet{index}" sheetId="{}" r:id="{id}"{state}/>"#,
+            index + 1
+          ));
+          let (paper, orientation, margin) = if index == 0 {
+            (first_paper, first_orientation, first_margin)
+          } else {
+            (1, "portrait", 0.75)
+          };
+          let (continuation, breaks) = if index == 1 {
+            (
+              r#"<row r="2"><c r="A2" t="inlineStr"><is><t>probe1tail</t></is></c></row>"#,
+              r#"<rowBreaks count="1" manualBreakCount="1"><brk id="1" min="0" max="16383" man="1"/></rowBreaks>"#,
+            )
+          } else {
+            ("", "")
+          };
+          worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>probe{index}</t></is></c></row>{continuation}</sheetData><pageMargins left="0.7" right="0.7" top="{margin}" bottom="{margin}" header="0.3" footer="0.3"/><pageSetup paperSize="{paper}" orientation="{orientation}" scale="63" usePrinterDefaults="1"/>{breaks}</worksheet>"#).into_bytes()).unwrap();
+        }
+        workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="{active_tab}"/></bookViews><sheets>{sheets}</sheets></workbook>"#).into_bytes()).unwrap();
+        let options = crate::LayoutOptions::default();
+        let mut import = ExcelImport::import_document(&package, &options).unwrap();
+        for sheet in &mut import.sheets {
+          sheet.page_settings.valid_printer_settings = true;
+        }
+        let layout = super::super::display::lower_to_layout_document(&import, &options);
+        for (label, samples) in [
+          ("probe1", &mut origins),
+          ("probe1tail", &mut continuation_origins),
+          ("probe2", &mut third_origins),
+        ] {
+          let text = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.items)
+            .find_map(|item| match item {
+              crate::common::DisplayItem::Text(text) if text.text == label => Some(text),
+              _ => None,
+            })
+            .unwrap();
+          samples.push(text.origin.y.0);
+        }
+      }
+      assert!(
+        (origins[1] - origins[0] - expected_delta).abs() < 0.025,
+        "hidden={hidden}, paper={first_paper}, orientation={first_orientation}, active={active_tab}: {origins:?}"
+      );
+      assert!(
+        (continuation_origins[1] - continuation_origins[0] - expected_delta).abs() < 0.025,
+        "continuation: {continuation_origins:?}"
+      );
+      assert!(
+        (third_origins[1] - third_origins[0]).abs() < 0.025,
+        "third worksheet must read the second worksheet: {third_origins:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn footer_total_replaces_only_current_sheet_requested_paper_preflight() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let id = workbook
+      .get_id_of_part(&package, &worksheet)
+      .unwrap()
+      .to_string();
+    workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+    worksheet.set_data(&mut package, br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#.to_vec()).unwrap();
+    let import = ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+    let page = CalcPrintDocument::from_import(&import).pages.remove(0);
+    // Native fixed-leading-sheet plus nine paper/margin fit controls: 19
+    // physical pages, preliminary total 22, and &N=21 only on the three
+    // sheets whose requested-paper preliminary count differs. This also
+    // rejects accumulating replacements from earlier sheets.
+    let mut pages = vec![page; 19];
+    let counts = [
+      (1, 1),
+      (2, 2),
+      (2, 2),
+      (2, 2),
+      (2, 2),
+      (2, 3),
+      (2, 3),
+      (2, 3),
+      (2, 2),
+      (2, 2),
+    ];
+    let mut start = 0;
+    let ranges = counts
+      .into_iter()
+      .map(|(actual, preliminary)| {
+        let range = start..start + actual;
+        start += actual;
+        (range, preliminary)
+      })
+      .collect();
+    assign_footer_total_pages(&mut pages, ranges, 22);
+    for (index, page) in pages.iter().enumerate() {
+      assert_eq!(
+        page.total_pages,
+        if (9..15).contains(&index) { 21 } else { 22 }
+      );
+    }
+  }
+
+  #[test]
+  fn hidden_merged_anchors_print_when_the_merged_rectangle_remains_visible() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let id = workbook
+      .get_id_of_part(&package, &worksheet)
+      .unwrap()
+      .to_string();
+    workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+    let styles = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="12"/><name val="Arial"/></font></fonts><cellXfs count="1"><xf fontId="0"/></cellXfs></styleSheet>"#.to_vec()).unwrap();
+    // Native nine-case matrix: each hidden row/column combination, plus a
+    // hidden corner in a two-dimensional merge. Ordinary hidden cells stay out.
+    for merge in ["A1:A2", "A1:B1", "A1:B2"] {
+      for (anchor_hidden, continuation_hidden) in
+        [(false, false), (true, false), (false, true), (true, true)]
+      {
+        let hidden = |value| if value { r#" hidden="1""# } else { "" };
+        let rows_hidden = merge != "A1:B1";
+        let cols_hidden = merge != "A1:A2";
+        worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetFormatPr defaultRowHeight="20"/>
+          <cols><col min="1" max="1" width="12"{} /><col min="2" max="2" width="12"{} /><col min="4" max="4" hidden="1"/></cols>
+          <sheetData><row r="1" ht="20" customHeight="1"{}><c r="A1" t="inlineStr"><is><t>TARGET</t></is></c></row>
+          <row r="2" ht="20" customHeight="1"{}/>
+          <row r="3" hidden="1"><c r="C3" t="inlineStr"><is><t>HIDDEN ROW</t></is></c></row>
+          <row r="4"><c r="D4" t="inlineStr"><is><t>HIDDEN COLUMN</t></is></c></row></sheetData>
+          <mergeCells><mergeCell ref="{merge}"/></mergeCells></worksheet>"#,
+          hidden(cols_hidden && anchor_hidden), hidden(cols_hidden && continuation_hidden),
+          hidden(rows_hidden && anchor_hidden), hidden(rows_hidden && continuation_hidden)).into_bytes()).unwrap();
+        let import =
+          ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+        let sheet = &import.sheets[0];
+        let merged = CellRange::parse_a1_range(merge).unwrap();
+        // Also exercise a later page containing only the continuation cell;
+        // the anchor need not be within that page's row/column bounds.
+        for area in [
+          CellRange::parse_a1_range("A1:D4").unwrap(),
+          CellRange::single(merged.end),
+        ] {
+          let cells = print_cells_for_area(
+            &import,
+            sheet,
+            area,
+            &mut ConditionalFormatEvalCache::default(),
+          );
+          let expected = !(anchor_hidden && continuation_hidden);
+          assert_eq!(
+            cells.iter().any(|cell| cell.text == "TARGET"),
+            expected,
+            "{merge}, anchor {anchor_hidden}, continuation {continuation_hidden}, {area:?}"
+          );
+          assert!(cells.iter().all(|cell| !cell.text.starts_with("HIDDEN")));
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn merged_cells_do_not_autofit_but_unmerged_neighbors_still_do() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let id = workbook
+      .get_id_of_part(&package, &worksheet)
+      .unwrap()
+      .to_string();
+    workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+    let styles = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="12"/><name val="Arial"/></font></fonts><cellXfs count="1"><xf fontId="0" applyAlignment="1"><alignment wrapText="1"/></xf></cellXfs></styleSheet>"#.to_vec()).unwrap();
+    let soft = "Alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu";
+    let hard = "Alpha\nBeta\nGamma";
+    // Native PDF/COM controls: horizontal and vertical merges never grow
+    // from wrapping, including hard breaks; an authored manual height wins.
+    for (merge, text, manual, neighbor) in [
+      ("", soft, false, false),
+      ("", hard, false, false),
+      ("A1:B1", soft, false, false),
+      ("A1:A2", soft, false, false),
+      ("A1:B1", hard, false, false),
+      ("A1:A2", hard, false, false),
+      ("A1:B1", soft, true, false),
+      ("", soft, true, false),
+      ("A1:B1", soft, false, true),
+      ("A1:B1", hard, false, true),
+    ] {
+      let merge_xml = if merge.is_empty() {
+        String::new()
+      } else {
+        format!(r#"<mergeCells><mergeCell ref="{merge}"/></mergeCells>"#)
+      };
+      let neighbor_xml = if neighbor {
+        format!(r#"<c r="C1" s="0" t="inlineStr"><is><t>{soft}</t></is></c>"#)
+      } else {
+        String::new()
+      };
+      let height = if manual { 60 } else { 16 };
+      worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="3" width="3" customWidth="1"/></cols><sheetData><row r="1" ht="{height}" customHeight="{}"><c r="A1" s="0" t="inlineStr"><is><t>{text}</t></is></c>{neighbor_xml}</row><row r="2" ht="16"/></sheetData>{merge_xml}</worksheet>"#, u8::from(manual)).into_bytes()).unwrap();
+      let import =
+        ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+      let sheet = &import.sheets[0];
+      let base = sheet.row_height_pt(1);
+      // The geometry's explicit-line shortcut must also exclude merges;
+      // testing pagination alone would miss an already enlarged base row.
+      if merge.is_empty() && text == hard {
+        assert!(base > height as f32);
+      } else {
+        assert_eq!(base, height as f32, "{merge} {text:?} {manual} {neighbor}");
+      }
+      let actual = print_row_height_pt(&import, sheet, 1, &mut TextMetrics::new());
+      if merge.is_empty() && text == hard {
+        assert!(actual >= base);
+      } else if !manual && (merge.is_empty() || neighbor) {
+        assert!(
+          actual > base,
+          "{merge} {text:?} {manual} {neighbor}: {actual}"
+        );
+      } else {
+        assert_eq!(actual, base, "{merge} {text:?} {manual} {neighbor}");
+      }
+    }
+  }
+
+  #[test]
   fn absent_cells_inherit_row_column_paint_without_creating_print_data() {
     use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
     use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
@@ -6381,7 +6935,15 @@ mod tests {
           if tail_style == 1 { 12 } else { 13 }
         );
       }
-      zooms.push(fit_zoom_to_pages(&import, sheet, &[area], &named, 1, 0));
+      zooms.push(fit_zoom_to_pages(
+        &import,
+        sheet,
+        &[area],
+        &named,
+        1,
+        0,
+        sheet.page_settings.page_size_pt(),
+      ));
       if !explicit {
         assert_eq!(CalcPrintDocument::from_import(&import).pages.len(), 1);
       }
@@ -6550,6 +7112,125 @@ mod tests {
     assert_eq!(with_footer, without_footer);
     assert!((with_footer.0 - (page_width - 72.0)).abs() <= f32::EPSILON);
     assert!((with_footer.1 - (page_height - 108.0)).abs() <= f32::EPSILON);
+  }
+
+  #[test]
+  fn native_letter_and_a4_row_breaks_share_the_realized_title_and_cell_grid() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Native 24 controls distinguish requested paper from the final A4 PDF,
+    // automatic caches from manual rows, and per-row from accumulated scale.
+    // Simplify paint without changing the measured fonts and title-row grid.
+    for (zoom, paper_size, manual, first_end) in [
+      (86, None, false, 49),
+      (86, None, true, 47),
+      (86, Some(1), false, 49),
+      (86, Some(1), true, 47),
+      (86, Some(9), false, 52),
+      (86, Some(9), true, 51),
+      (100, None, false, 42),
+      (100, None, true, 41),
+      (100, Some(1), false, 42),
+      (100, Some(1), true, 41),
+      (100, Some(9), false, 45),
+      (100, Some(9), true, 44),
+    ] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let properties = package.add_extended_file_properties_part().unwrap();
+      properties.set_data(&mut package, br#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Excel</Application><AppVersion>15.0300</AppVersion></Properties>"#.to_vec()).unwrap();
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let id = workbook
+        .get_id_of_part(&package, &worksheet)
+        .unwrap()
+        .to_string();
+      workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Rows" sheetId="1" r:id="{id}"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Rows!$A$1:$H$109</definedName><definedName name="_xlnm.Print_Titles" localSheetId="0">Rows!$1:$9</definedName></definedNames></workbook>"#).into_bytes()).unwrap();
+      let styles = workbook
+        .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+        .unwrap();
+      styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="6"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font><font><b/><sz val="18"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font><font><b/><sz val="12"/><name val="Arial"/></font><font><sz val="13"/><name val="Arial"/></font></fonts><cellXfs count="6"><xf fontId="0"/><xf fontId="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf fontId="2" applyAlignment="1"><alignment horizontal="center"/></xf><xf fontId="3" applyAlignment="1"><alignment horizontal="center"/></xf><xf fontId="4" applyAlignment="1"><alignment horizontal="center"/></xf><xf fontId="5" applyAlignment="1"><alignment horizontal="justify" vertical="top" wrapText="1"/></xf></cellXfs></styleSheet>"#.to_vec()).unwrap();
+      let manual_attribute = if manual { r#" customHeight="1""# } else { "" };
+      let rows = (10..=109)
+        .map(|row| format!(r#"<row r="{row}" ht="17"{manual_attribute}><c r="A{row}" s="5" t="inlineStr"><is><t>R{row:03}</t></is></c></row>"#))
+        .collect::<String>();
+      let paper_attribute =
+        paper_size.map_or_else(String::new, |paper| format!(r#" paperSize="{paper}""#));
+      worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"><sheetFormatPr defaultRowHeight="13" zeroHeight="1" x14ac:dyDescent="0.15"/><cols><col min="1" max="8" width="8" customWidth="1"/></cols><sheetData><row r="1"><c r="A1" s="2" t="inlineStr"><is><t>Title</t></is></c></row><row r="2"><c r="A2" s="2"/></row><row r="3" ht="18"><c r="A3" s="3" t="inlineStr"><is><t>Subtitle</t></is></c></row><row r="4" ht="17" thickBot="1"><c r="A4" s="4"/></row><row r="5"><c r="A5" s="1"/></row><row r="6"><c r="A6" s="1"/></row><row r="7"><c r="A7" s="1"/></row><row r="8" ht="14" thickBot="1"><c r="A8" s="1"/></row><row r="9" ht="7.5" customHeight="1"><c r="A9"/></row>{rows}</sheetData><mergeCells count="3"><mergeCell ref="A1:H2"/><mergeCell ref="A3:H3"/><mergeCell ref="A4:H4"/></mergeCells><pageMargins left="0.75" right="0.75" top="1" bottom="1" header="0.5" footer="0.5"/><pageSetup scale="{zoom}"{paper_attribute}/></worksheet>"#).into_bytes()).unwrap();
+      let import =
+        ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+      let print = CalcPrintDocument::from_import(&import);
+      assert_eq!(
+        print.pages[0].area.unwrap().end.row,
+        first_end,
+        "zoom={zoom}, paper={paper_size:?}, manual={manual}"
+      );
+      assert_eq!(print.pages[1].area.unwrap().start.row, first_end + 1);
+      assert_eq!(
+        print.pages[1].area.unwrap().end.row,
+        (first_end + first_end - 9).min(109),
+        "continuation: zoom={zoom}, paper={paper_size:?}, manual={manual}"
+      );
+    }
+  }
+
+  #[test]
+  fn explicit_print_area_keeps_blank_pages_after_nonempty_cells() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Native Normal Arial20 controls keep the empty horizontal page at 100%;
+    // 50/63% and the implicit used range each have a single page.
+    for explicit in [false, true] {
+      for zoom in [50, 63, 100] {
+        let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+        let properties = package.add_extended_file_properties_part().unwrap();
+        properties.set_data(&mut package, br#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Excel</Application><AppVersion>15.0300</AppVersion></Properties>"#.to_vec()).unwrap();
+        let workbook = package.add_workbook_part().unwrap();
+        let worksheet = workbook
+          .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+          .unwrap();
+        let id = workbook
+          .get_id_of_part(&package, &worksheet)
+          .unwrap()
+          .to_string();
+        let area = if explicit {
+          r#"<definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Area!$A$1:$E$13</definedName></definedNames>"#
+        } else {
+          ""
+        };
+        workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Area" sheetId="1" r:id="{id}"/></sheets>{area}</workbook>"#).into_bytes()).unwrap();
+        let styles = workbook
+          .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+          .unwrap();
+        styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="20"/><name val="Arial"/></font><font><sz val="12"/><name val="Arial"/></font></fonts><cellXfs count="2"><xf fontId="0"/><xf fontId="1"/></cellXfs></styleSheet>"#.to_vec()).unwrap();
+        worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetFormatPr baseColWidth="10" defaultColWidth="0" defaultRowHeight="13"/><cols><col min="1" max="1" width="2.6640625" customWidth="1"/><col min="2" max="2" width="30" customWidth="1"/><col min="3" max="3" width="6.5" customWidth="1"/><col min="4" max="4" width="10" customWidth="1"/><col min="5" max="5" width="2.6640625" customWidth="1"/></cols><sheetData><row r="6" ht="50" customHeight="1"><c r="B6" s="1" t="inlineStr"><is><t>TARGET</t></is></c></row></sheetData><pageMargins left="0.75" right="0.75" top="1" bottom="1" header="0.5" footer="0.5"/><pageSetup scale="{zoom}"/></worksheet>"#).into_bytes()).unwrap();
+        let import =
+          ExcelImport::import_document(&package, &crate::LayoutOptions::default()).unwrap();
+        let print = CalcPrintDocument::from_import(&import);
+        assert_eq!(
+          print.pages.len(),
+          if explicit && zoom == 100 { 2 } else { 1 },
+          "explicit={explicit}, zoom={zoom}"
+        );
+        assert!(
+          print.pages[0]
+            .cells
+            .iter()
+            .any(|cell| cell.rendered_text == "TARGET")
+        );
+        if print.pages.len() == 2 {
+          assert!(print.pages[1].area.unwrap().start.col > 2);
+          assert!(print.pages[1].has_explicit_print_area);
+        }
+      }
+    }
   }
 
   #[test]

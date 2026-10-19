@@ -8,12 +8,12 @@
 //!
 //! This is an altered, Rust, count-only adaptation of zlib's deflate_slow,
 //! longest_match, build_tree, scan_tree and _tr_flush_block. It implements only
-//! level 6, windowBits 15, memLevel 8, default strategy, and a final flush.
+//! level 6, windowBits 15, memLevel 7/8, default strategy, and a final flush.
 //! It neither produces nor decodes a compressed stream. See:
 //! https://github.com/madler/zlib/blob/v1.3.1/deflate.c
 //! https://github.com/madler/zlib/blob/v1.3.1/trees.c
 //!
-//! The three-byte rolling hash, lazy matches, heap tie-breaking, 16,383-token
+//! The three-byte rolling hash, lazy matches, heap tie-breaking, token-buffer
 //! blocks, stored-block availability and bit alignment are all significant.
 //! In particular, zlib-rs uses zlib-ng algorithms; its level 6 is not this model.
 
@@ -296,7 +296,7 @@ impl BlockSize {
 fn insert_string(input: &[u8], pos: usize, head: &mut [usize], prev: &mut [usize]) -> usize {
   let hash =
     ((input[pos] as usize) << 10 ^ (input[pos + 1] as usize) << 5 ^ input[pos + 2] as usize)
-      & 32767;
+      & (head.len() - 1);
   let h = head[hash];
   prev[pos & 32767] = h;
   head[hash] = pos;
@@ -305,10 +305,22 @@ fn insert_string(input: &[u8], pos: usize, head: &mut [usize], prev: &mut [usize
 /// Count the complete zlib stream (two-byte header and four-byte Adler trailer).
 /// Working memory is bounded independently of the RGB plane length.
 pub(super) fn compressed_size(input: &[u8]) -> usize {
+  compressed_size_with_memory(input, 32768)
+}
+
+/// Word Print's bounded sample uses memLevel 7, independently of Screen's
+/// memLevel-8 scanline chunks. Native sampled streams match stock zlib with
+/// the smaller hash/token tables, not a constant correction to their lengths.
+pub(super) fn compressed_size_mem7(input: &[u8]) -> usize {
+  compressed_size_with_memory(input, 16384)
+}
+
+fn compressed_size_with_memory(input: &[u8], hash_size: usize) -> usize {
   // Absolute positions avoid copying a 64 KiB window. `base` still models
   // each slide: index zero is the NIL sentinel, and old block bytes expire.
-  let mut head = vec![0; 32768];
+  let mut head = vec![0; hash_size];
   let mut prev = vec![0; 32768];
+  let token_limit = hash_size / 2 - 1;
   let mut pos = 0;
   let mut base = 0;
   let mut loaded = input.len().min(65536);
@@ -382,13 +394,13 @@ pub(super) fn compressed_size(input: &[u8]) -> usize {
       }
       available = false;
       match_len = 2;
-      // memLevel 8 flushes after 16,383 symbols, including literals/matches.
-      if block.tokens == 16383 {
+      // memLevel 7/8 flush after 8,191/16,383 literals and matches.
+      if block.tokens == token_limit {
         block.flush(pos, base);
       }
     } else if available {
       block.literal(input[pos - 1]);
-      if block.tokens == 16383 {
+      if block.tokens == token_limit {
         block.flush(pos, base);
       }
       pos += 1;

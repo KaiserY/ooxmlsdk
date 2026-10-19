@@ -44,6 +44,8 @@ pub(crate) struct SharedStringRun {
   pub(crate) fallback_font_family: Option<String>,
   pub(crate) font_size_pt: Option<f32>,
   pub(crate) color: Option<RgbColor>,
+  /// Retain indexed/theme/tint ownership until the workbook styles are known.
+  pub(crate) color_definition: Option<x::Color>,
   /// `None` preserves whether the corresponding element was absent. The
   /// renderer combines that fact with `has_properties` to distinguish a run
   /// that inherits the cell font from a regular property omitted from `rPr`.
@@ -320,6 +322,7 @@ pub(crate) fn shared_string_run(run: &x::Run) -> SharedStringRun {
         }
         x::RunPropertiesChoice::Color(value) => {
           model.color = run_color(value);
+          model.color_definition = Some(value.clone());
         }
         x::RunPropertiesChoice::RunFont(value) => {
           model.font_family = Some(value.val.clone());

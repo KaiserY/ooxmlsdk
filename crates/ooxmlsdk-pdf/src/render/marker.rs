@@ -204,7 +204,13 @@ pub(super) fn stroke_end_dimensions(marker: common::StrokeEnd, line_width: f32) 
   // millimetre here. `lineproperties.cxx::lclPushMarkerProperties` clamps the
   // marker baseline to 70 of those units before applying these multipliers.
   let is_open_arrow = marker.kind == Kind::Arrow;
-  let baseline = line_width.max(MIN_MARKER_BASE_PT);
+  // Native Word and PowerPoint triangle controls use exactly 2pt at the
+  // minimum, rather than LibreOffice's rounded 70 hundredths of a millimetre.
+  let baseline = line_width.max(if marker.kind == Kind::Triangle {
+    2.0
+  } else {
+    MIN_MARKER_BASE_PT
+  });
   if marker.kind == Kind::Arrow
     && marker.width == Size::Medium
     && marker.length == Size::Medium

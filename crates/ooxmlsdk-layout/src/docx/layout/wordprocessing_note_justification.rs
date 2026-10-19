@@ -283,6 +283,7 @@ mod tests {
           origin_is_baseline: false,
           line_metrics_participant: true,
           paint_clip: None,
+          page_culling_bounds: None,
           wordprocessing_effect_host: None,
           wordprocessing_terminal_effect_style: None,
           text: text.into(),

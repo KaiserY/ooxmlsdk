@@ -16,6 +16,16 @@ pub(crate) fn append_transformed_arc(path: &mut BezPath, arc: Arc, transform: Af
   );
 }
 
+/// The WordArt pathing-line renderer keeps one cubic per quadrant, including
+/// when its input coordinates are printer dots rather than page points.
+/// Kurbo's radius-sized tolerance selects that subdivision and its standard
+/// `4/3 * tan(sweep/4)` controls independently of the coordinate scale.
+pub(crate) fn append_transformed_quadrant_arc(path: &mut BezPath, arc: Arc, transform: Affine) {
+  arc.to_cubic_beziers(arc.radii.x.max(arc.radii.y), |control1, control2, end| {
+    path.curve_to(transform * control1, transform * control2, transform * end);
+  });
+}
+
 pub(crate) fn bez_path_commands(path: BezPath) -> Vec<PathCommand> {
   path_elements_to_commands(path.into_elements())
 }

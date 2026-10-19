@@ -1,5 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
 use ooxmlsdk::parts::dialogsheet_part::DialogsheetPart;
@@ -105,7 +106,7 @@ const OFFICE_AUTOMATIC_ROW_PRINTER_LEADING_PT: f32 = 0.018;
 const OFFICE_LEGACY_FONT_ROW_PRINTER_LEADING_PT: f32 = 0.125;
 // The configured Office worksheet device uses 200% display scaling. Explicit
 // automatic rows retain this screen grid before fixed-output quantization.
-const OFFICE_WORKSHEET_FONT_DPI: f32 = 192.0;
+pub(super) const OFFICE_WORKSHEET_FONT_DPI: f32 = 192.0;
 // Without sheetFormatPr, Office initializes unlisted rows to 13.875pt on
 // this worksheet device, independently of UI language and the Normal font.
 const OFFICE_MISSING_SHEET_FORMAT_ROW_HEIGHT_PX: f32 = 37.0;
@@ -136,15 +137,62 @@ pub(crate) struct SpreadsheetProducerProfile {
   pub(crate) lowest_edited_version: Option<u16>,
 }
 
+type FixedOutputRowOffsetDeltas = Rc<RefCell<HashMap<(u32, bool), Box<[f32]>>>>;
+type FixedOutputRowLowerExtents =
+  Rc<RefCell<HashMap<(u32, u32), Option<FixedOutputRowLowerExtent>>>>;
+
+// Imported sheets live inside one layout call. Clones share realized grids
+// across pages, but these private caches never enter the returned display list.
 #[derive(Clone, Debug)]
 struct SheetGeometry {
   column_offsets_pt: Box<[f32]>,
-  fixed_output_column_offsets: Arc<Mutex<HashMap<u32, Box<[f32]>>>>,
+  fixed_output_column_offsets: Rc<RefCell<HashMap<u32, Box<[f32]>>>>,
+  fixed_output_row_offset_deltas: FixedOutputRowOffsetDeltas,
+  fixed_output_row_lower_extents: FixedOutputRowLowerExtents,
+  fixed_output_screen_font_lower_extents: Rc<RefCell<HashMap<Option<u32>, Option<f32>>>>,
   row_overrides: Box<[RowGeometry]>,
   scaled_manual_rows: Box<[RowGeometry]>,
   merged_ranges: Box<[CellRange]>,
   default_row_height_pt: f32,
+  default_visible_row_height_pt: f32,
   quantize_default_row_scale: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct FixedOutputRowLowerExtent {
+  pub(super) printer_lower_px: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct FixedOutputRowLowerGrid {
+  pub(super) normal_screen_lower_px: f32,
+  pub(super) normal_printer_lower_px: f32,
+  pub(super) inherited_screen_descent_px: Option<f32>,
+}
+
+impl FixedOutputRowLowerGrid {
+  pub(super) fn scaled_printer_lower_px(
+    self,
+    screen_descent_px: f32,
+    thick_bottom: bool,
+    scale: f32,
+  ) -> f32 {
+    // Native Excel removes the row cache's one-pixel allowance before
+    // converting through the Normal font's lower extents, then adds eight
+    // printer dots. This ratio is independent of the Normal line-height
+    // ratio: Arial10 uses26/7 here, versus103/34 for complete row heights.
+    // thickBot contributes another screen allowance to the stored cache,
+    // which Excel removes before this ratio, and another eight printer dots.
+    // Our measured descent already excludes both screen allowances. Keep
+    // the printer band inside the later percentage rounding: native47%
+    // controls distinguish three- and four-dot shifts between font grids.
+    let nominal_lower = (f64::from(screen_descent_px) * f64::from(self.normal_printer_lower_px)
+      / f64::from(self.normal_screen_lower_px))
+    .round()
+      + if thick_bottom { 16.0 } else { 8.0 };
+    let percentage = (f64::from(scale) * 100.0).round();
+    (nominal_lower * percentage / 100.0).round() as f32
+  }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -214,6 +262,7 @@ pub(crate) struct SheetMetrics {
   screen_digit_width_px: u32,
   automatic_row_grid: Option<AutomaticRowGrid>,
   custom_row_print_grid: Option<AutomaticRowGrid>,
+  default_drawing_screen_row_height_pt: Option<f32>,
   pub(crate) default_digit_width_pt: f32,
   indexed_scatter_print_grid: bool,
   legacy_excel12_arial_screen_column_grid: bool,
@@ -245,6 +294,30 @@ pub(crate) struct SheetMetrics {
 struct PrinterColumnGrid {
   screen_digit_width_px: u32,
   printer_digit_width_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct NormalFontDeviceGrid {
+  screen_width_px: u32,
+  printer_width_px: u32,
+  screen_height_px: u32,
+  printer_height_px: u32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FixedOutputControlGeometry {
+  /// Scaled worksheet coordinates, before the physical page translation.
+  pub(crate) rect: CellRect,
+  pub(crate) source_width_px: u32,
+  pub(crate) source_height_px: u32,
+  pub(crate) painter_height_px: u32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ControlAnchorAxis {
+  logical_px: i64,
+  device_px: i64,
+  position_pt: f32,
 }
 
 impl PrinterColumnGrid {
@@ -408,6 +481,8 @@ pub(crate) struct CalcRow {
   pub(crate) dy_descent_pt: Option<f32>,
   explicit_wrapped_line_count: Option<usize>,
   automatic_font_height_pt: Option<f32>,
+  /// The realized worksheet extent before the Normal font's printer conversion.
+  automatic_screen_height_pt: Option<f32>,
   automatic_printer_height_pt: Option<f32>,
   pub(crate) custom_height: bool,
   pub(crate) thick_top: bool,
@@ -499,11 +574,30 @@ impl CalcSheet {
     let has_sheet_drawing = resources
       .drawings
       .iter()
-      .any(|drawing| !drawing.anchors.is_empty());
+      .flat_map(|drawing| &drawing.anchors)
+      // Hidden DrawingML companions of Forms controls do not select the
+      // visible-drawing row grid. Native control bounds retain the normal
+      // quarter-descent printer rows, as do the surrounding cells.
+      .any(|anchor| !anchor.object.hidden && anchor.print_with_sheet);
     let has_extended_chart = resources
       .drawings
       .iter()
       .any(|drawing| !drawing.extended_charts.is_empty());
+    if has_modern_control_anchors
+      && !has_sheet_drawing
+      && metrics.format.mso_document
+      && !metrics.format.custom_height
+      && let Some(grid) = metrics.automatic_row_grid
+    {
+      // Modern Forms controls and their hidden DrawingML companions use the
+      // realized font grid for automatic rows. Office SaveCopyAs changes the
+      // cached dyDescent from .25 to .4 without changing the 104-dot row or
+      // control bounds, and can serialize the theme font's localized name.
+      // Adding that cache to the font height instead grows
+      // unlisted rows and stretches controls across them. Explicit rows already
+      // use this grid; keep the sheet default on the same device conversion.
+      metrics.format.default_row_height = f64::from(grid.print_height_pt(grid.column_extents));
+    }
     apply_excel16_quarter_descent_row_printer_grid(
       &mut metrics,
       has_sheet_drawing && !has_extended_chart,
@@ -866,8 +960,13 @@ impl CalcSheet {
     self.metrics.modern_excel_arial11_column_grid
   }
 
+  pub(crate) fn uses_modern_excel_arial10_cell_text_grid(&self) -> bool {
+    self.metrics.modern_excel_arial_column_grid
+  }
+
   pub(crate) fn uses_printer_cell_text_horizontal_grid(&self) -> bool {
-    self.metrics.modern_excel_arial11_column_grid
+    self.metrics.modern_excel_arial_column_grid
+      || self.metrics.modern_excel_arial11_column_grid
       || self.metrics.modern_excel_theme_cell_text_grid
       || self.metrics.unprofiled_excel_font_grid
   }
@@ -938,12 +1037,20 @@ impl CalcSheet {
   }
 
   pub(crate) fn fixed_output_row_offset_pt(&self, row: u32, scale: f32) -> f32 {
-    self.geometry.fixed_output_row_offset_pt(
-      row,
-      scale,
-      self.metrics.legacy_excel12_calibri_fixed_output_grid
-        || self.metrics.modern_excel_arial_column_grid,
-    )
+    self
+      .geometry
+      .fixed_output_row_offset_pt(row, scale, self.uses_printer_cell_row_grid())
+  }
+
+  fn uses_printer_cell_row_grid(&self) -> bool {
+    // Native themed-row controls at 20..200% realize each scaled row before
+    // accumulating its position, just like the explicit Arial device grid.
+    // Rounding only the accumulated endpoint makes equal rows alternate in
+    // height and shifts the borders of subsequent thick automatic rows.
+    self.metrics.legacy_excel12_calibri_fixed_output_grid
+      || self.metrics.modern_excel_arial_column_grid
+      || self.metrics.modern_excel_theme_cell_text_grid
+      || self.metrics.unprofiled_excel_font_grid
   }
 
   pub(crate) fn fixed_output_column_range_width_pt(&self, start: u32, end: u32, scale: f32) -> f32 {
@@ -963,9 +1070,14 @@ impl CalcSheet {
       start,
       end,
       scale,
-      self.metrics.legacy_excel12_calibri_fixed_output_grid
-        || self.metrics.modern_excel_arial_column_grid,
+      self.uses_printer_cell_row_grid(),
     )
+  }
+
+  pub(crate) fn fixed_output_row_height_pt(&self, row: u32, scale: f32) -> f32 {
+    self
+      .geometry
+      .fixed_output_row_height_pt(row, scale, self.uses_printer_cell_row_grid())
   }
 
   pub(crate) fn fixed_output_centering_width_pt(&self, range: CellRange, scale: f32) -> f32 {
@@ -1037,28 +1149,53 @@ impl CalcSheet {
     marker: &super::drawing::DrawingMarkerModel,
     scale: f32,
   ) -> (f32, f32) {
-    if self.metrics.modern_excel_arial_column_grid || self.metrics.theme_column_grid.is_some() {
+    let font_device_grid =
+      self.metrics.modern_excel_arial_column_grid || self.metrics.unprofiled_excel_font_grid;
+    if font_device_grid || self.metrics.theme_column_grid.is_some() {
       let column = u32::try_from(marker.column).unwrap_or(0).saturating_add(1);
       let row = u32::try_from(marker.row).unwrap_or(0).saturating_add(1);
       let column_offset_pt = units::emu_to_points(marker.column_offset_emu);
       let row_offset_pt = units::emu_to_points(marker.row_offset_emu);
+      let font_grid = font_device_grid
+        .then(|| self.metrics.normal_font_device_grid())
+        .flatten();
       let x_pt = self.fixed_output_column_offset_pt(column, scale)
-        + fixed_output_drawing_marker_offset_pt(
-          column_offset_pt,
-          self
-            .theme_drawing_screen_column_width_pt(column)
-            .or_else(|| self.modern_excel_arial_drawing_screen_column_width_pt(column)),
-          self.fixed_output_column_range_width_pt(column, column, scale),
-          scale,
-        );
+        + font_grid
+          .and_then(|grid| {
+            fixed_output_drawing_marker_font_offset_pt(
+              marker.column_offset_emu,
+              (grid.screen_width_px, grid.printer_width_px),
+              scale,
+            )
+          })
+          .unwrap_or_else(|| {
+            fixed_output_drawing_marker_offset_pt(
+              column_offset_pt,
+              self
+                .theme_drawing_screen_column_width_pt(column)
+                .or_else(|| self.modern_excel_arial_drawing_screen_column_width_pt(column)),
+              self.fixed_output_column_range_width_pt(column, column, scale),
+              scale,
+            )
+          });
       let y_pt = self.fixed_output_row_offset_pt(row, scale)
-        + if self.metrics.modern_excel_arial_column_grid {
-          fixed_output_drawing_marker_offset_pt(
-            row_offset_pt,
-            self.modern_excel_arial_drawing_screen_row_height_pt(row),
-            self.fixed_output_row_range_height_pt(row, row, scale),
-            scale,
-          )
+        + if font_device_grid {
+          font_grid
+            .and_then(|grid| {
+              fixed_output_drawing_marker_font_offset_pt(
+                marker.row_offset_emu,
+                (grid.screen_height_px, grid.printer_height_px),
+                scale,
+              )
+            })
+            .unwrap_or_else(|| {
+              fixed_output_drawing_marker_offset_pt(
+                row_offset_pt,
+                self.modern_excel_arial_drawing_screen_row_height_pt(row),
+                self.fixed_output_row_range_height_pt(row, row, scale),
+                scale,
+              )
+            })
         } else {
           row_offset_pt * scale
         };
@@ -1106,14 +1243,23 @@ impl CalcSheet {
   }
 
   fn modern_excel_arial_drawing_screen_row_height_pt(&self, row: u32) -> Option<f32> {
-    let model = self
-      .rows
-      .iter()
-      .find(|model| model.row_index == Some(row))?;
-    if model.hidden || !model.custom_height {
+    let Some(model) = self.rows.iter().find(|model| model.row_index == Some(row)) else {
+      return self.metrics.default_drawing_screen_row_height_pt;
+    };
+    if model.hidden {
       return None;
     }
-    model.height.map(worksheet_device_manual_row_height_pt)
+    if model.custom_height {
+      model.height.map(worksheet_device_manual_row_height_pt)
+    } else if row_uses_custom_default_height(
+      self.metrics.format.custom_height,
+      self.metrics.format.default_row_height,
+      model.height,
+    ) {
+      self.metrics.default_drawing_screen_row_height_pt
+    } else {
+      model.automatic_screen_height_pt
+    }
   }
 
   pub(crate) fn object_anchor_rect_pt(
@@ -1138,6 +1284,67 @@ impl CalcSheet {
     Some((x1.min(x2), y1.min(y2), (x2 - x1).abs(), (y2 - y1).abs()))
   }
 
+  pub(crate) fn fixed_output_control_geometry(
+    &self,
+    shape: &super::object_resources::VmlShapeModel,
+    scale: f32,
+  ) -> Option<FixedOutputControlGeometry> {
+    let anchor = self.metrics.objects.anchor_for_vml_shape(shape)?;
+    let grid = self.metrics.normal_font_device_grid()?;
+    if !scale.is_finite() || scale <= 0.0 {
+      return None;
+    }
+    let percentage = (scale * 100.0).round() as u32;
+    if percentage == 0 {
+      return None;
+    }
+    let endpoint = |column, row, x, y| {
+      let column = u32::try_from(column).ok()?.checked_add(1)?;
+      let row = u32::try_from(row).ok()?.checked_add(1)?;
+      Some([
+        fixed_output_control_axis(
+          x,
+          (grid.screen_width_px, grid.printer_width_px),
+          (
+            self.fixed_output_column_offset_pt(column, 1.0),
+            self.fixed_output_column_range_width_pt(column, column, 1.0),
+          ),
+          (
+            self.fixed_output_column_offset_pt(column, scale),
+            self.fixed_output_column_range_width_pt(column, column, scale),
+          ),
+          percentage,
+        )?,
+        fixed_output_control_axis(
+          y,
+          (grid.screen_height_px, grid.printer_height_px),
+          (
+            self.fixed_output_row_offset_pt(row, 1.0),
+            self.fixed_output_row_range_height_pt(row, row, 1.0),
+          ),
+          (
+            self.fixed_output_row_offset_pt(row, scale),
+            self.fixed_output_row_range_height_pt(row, row, scale),
+          ),
+          percentage,
+        )?,
+      ])
+    };
+    let from = endpoint(
+      anchor.from_column,
+      anchor.from_row,
+      anchor.from_column_offset_emu,
+      anchor.from_row_offset_emu,
+    )?;
+    let to = endpoint(
+      anchor.to_column,
+      anchor.to_row,
+      anchor.to_column_offset_emu,
+      anchor.to_row_offset_emu,
+    )?;
+    fixed_output_control_geometry_from_axes(from, to, percentage)
+  }
+
   pub(crate) fn column_width_pt(&self, column: u32) -> f32 {
     self.geometry.column_width_pt(column)
   }
@@ -1150,10 +1357,6 @@ impl CalcSheet {
     self.geometry.row_height_pt(row_index)
   }
 
-  pub(crate) fn default_row_height_pt(&self) -> f32 {
-    self.geometry.default_row_height_pt
-  }
-
   pub(crate) fn default_text_line_height_pt(&self) -> f32 {
     if self.metrics.format.custom_height
       && let Some(grid) = self.metrics.custom_row_print_grid
@@ -1163,7 +1366,7 @@ impl CalcSheet {
       // when defaultRowHeight changes from 15 to 20 points.
       return grid.normal_print_height_px * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
     }
-    self.default_row_height_pt()
+    self.geometry.default_visible_row_height_pt
   }
 
   pub(crate) fn row_has_custom_height(&self, row_index: u32) -> bool {
@@ -1180,10 +1383,31 @@ impl CalcSheet {
     &self,
     shape: &super::object_resources::VmlShapeModel,
     value: i32,
+    horizontal: bool,
   ) -> f32 {
-    let dpi = if self.metrics.legacy_excel12_vml_control_snapshot_grid
-      || self.uses_legacy_excel12_vml_picture_snapshot_grid(shape)
+    let legacy_snapshot_grid = self.metrics.legacy_excel12_vml_control_snapshot_grid
+      || self.uses_legacy_excel12_vml_picture_snapshot_grid(shape);
+    if !legacy_snapshot_grid
+      && shape
+        .object_type
+        .as_deref()
+        .is_some_and(|kind| kind.eq_ignore_ascii_case("Shape"))
+      && let Some(grid) = self.metrics.normal_font_device_grid()
     {
+      // Ordinary VML vectors cache whole 192dpi worksheet pixels. Convert
+      // them through the Normal font with MulDiv rounding before the caller
+      // applies the continuous print scale. Native offset/scale controls
+      // distinguish this from both CSS pixels and a second device rounding.
+      let (screen, printer) = if horizontal {
+        (grid.screen_width_px, grid.printer_width_px)
+      } else {
+        (grid.screen_height_px, grid.printer_height_px)
+      };
+      return (f64::from(value) * f64::from(printer) / f64::from(screen)).round() as f32
+        * units::POINTS_PER_INCH
+        / units::OFFICE_FIXED_OUTPUT_DPI;
+    }
+    let dpi = if legacy_snapshot_grid {
       200.0
     } else {
       units::CSS_PIXELS_PER_INCH
@@ -1261,6 +1485,76 @@ impl CalcSheet {
       .binary_search_by_key(&row_index, |(index, _)| *index)
       .ok()?;
     self.rows[self.row_positions[position].1].style_index
+  }
+
+  pub(super) fn fixed_output_row_lower_grid(&self) -> Option<FixedOutputRowLowerGrid> {
+    let grid = self
+      .metrics
+      .custom_row_print_grid
+      .or(self.metrics.automatic_row_grid)?;
+    Some(FixedOutputRowLowerGrid {
+      normal_screen_lower_px: grid.normal_screen_lower_px?,
+      normal_printer_lower_px: grid.normal_print_lower_px?,
+      inherited_screen_descent_px: grid.column_baseline_descent_px,
+    })
+  }
+
+  pub(super) fn fixed_output_screen_font_lower_extent(
+    &self,
+    style_index: Option<u32>,
+    styles: &StylesCatalog,
+  ) -> Option<f32> {
+    if let Some(result) = self
+      .geometry
+      .fixed_output_screen_font_lower_extents
+      .borrow()
+      .get(&style_index)
+      .copied()
+    {
+      return result;
+    }
+    let style = styles.text_style_for_cell(style_index);
+    let result = (style.baseline_shift_pt.abs() <= f32::EPSILON)
+      .then(|| automatic_font_row_extents(styles, style_index).map(|font| font.descent_px))
+      .flatten();
+    self
+      .geometry
+      .fixed_output_screen_font_lower_extents
+      .borrow_mut()
+      .insert(style_index, result);
+    result
+  }
+
+  pub(super) fn fixed_output_row_lower_extent(
+    &self,
+    row_index: u32,
+    scale: f32,
+    measure: impl FnOnce(&CalcRow) -> Option<FixedOutputRowLowerExtent>,
+  ) -> Option<FixedOutputRowLowerExtent> {
+    let key = (row_index, scale.to_bits());
+    if let Some(result) = self
+      .geometry
+      .fixed_output_row_lower_extents
+      .borrow()
+      .get(&key)
+      .copied()
+    {
+      return result;
+    }
+    let position = self
+      .row_positions
+      .binary_search_by_key(&row_index, |(index, _)| *index)
+      .ok()?;
+    let result = measure(&self.rows[self.row_positions[position].1]);
+    // A wide row can span thousands of physical pages. Its complete font
+    // context includes cells outside each page and must be measured only once
+    // per sheet/scale. Uniform rows use the same native row-cache owner.
+    self
+      .geometry
+      .fixed_output_row_lower_extents
+      .borrow_mut()
+      .insert(key, result);
+    result
   }
 }
 
@@ -1429,42 +1723,55 @@ impl SheetGeometry {
     let default_manual_grid = metrics
       .custom_row_print_grid
       .filter(|_| metrics.format.custom_height);
-    let default_row_height_pt = quantize_points_to_printer_dpi(
-      if metrics.format.zero_height {
-        0.0
-      } else {
-        // sheetFormatPr can store the same manual height for many rows.
-        // Its omitted rows use the same screen-to-printer conversion as an
-        // explicit row@ht, rather than treating screen points as device points.
-        default_manual_grid.map_or(metrics.format.default_row_height as f32, |grid| {
-          grid.print_manual_height_pt(metrics.format.default_row_height)
-        })
-      },
+    // zeroHeight changes the visibility of omitted row records, not the
+    // fallback size or font line height of an explicit visible row. ECMA-376
+    // Part 1 §18.3.1.81 stores the visible exceptions to this hidden default;
+    // each explicit row then owns its own hidden attribute (§18.3.1.73).
+    let default_visible_row_height_pt = quantize_points_to_printer_dpi(
+      // Manual sheet defaults use the same screen-to-printer conversion as
+      // explicit row@ht before the worksheet print scale is applied.
+      default_manual_grid.map_or(metrics.format.default_row_height as f32, |grid| {
+        grid.print_manual_height_pt(metrics.format.default_row_height)
+      }),
       vertical_dpi,
     );
+    let default_row_height_pt = if metrics.format.zero_height {
+      0.0
+    } else {
+      default_visible_row_height_pt
+    };
     let mut row_overrides = rows
       .iter()
       .filter_map(|row| {
         let index = row.row_index?;
-        let height_pt = if metrics.format.zero_height || row.hidden {
+        let custom_default = row_uses_custom_default_height(
+          metrics.format.custom_height,
+          metrics.format.default_row_height,
+          row.height,
+        );
+        let height_pt = if row.hidden {
           0.0
-        } else if !row.custom_height && (row.thick_top || row.thick_bottom) {
+        } else if !row.custom_height && !custom_default && (row.thick_top || row.thick_bottom) {
           // The flags add one worksheet-device pixel each. Office recomputes
           // the automatic font box even for blank styled cells, ignoring the
           // cached ht. At 192dpi, 61652's 14pt row is 17.625 + 0.375 = 18pt.
           row.automatic_printer_height_pt.unwrap_or_else(|| {
             row
               .automatic_font_height_pt
-              .unwrap_or(default_row_height_pt)
+              .unwrap_or(default_visible_row_height_pt)
               + (u8::from(row.thick_top) + u8::from(row.thick_bottom)) as f32
                 * units::POINTS_PER_INCH
                 / OFFICE_WORKSHEET_FONT_DPI
           })
-        } else if row.custom_height {
+        } else if row.custom_height || custom_default {
           // ht remains authored screen-space points in CalcRow. Office's
           // fixed output converts manual sizes through the Normal font's
           // screen/printer grids before applying the worksheet print scale.
-          let height = row.height.unwrap_or(metrics.format.default_row_height);
+          let height = if !row.custom_height && custom_default {
+            metrics.format.default_row_height
+          } else {
+            row.height.unwrap_or(metrics.format.default_row_height)
+          };
           metrics.custom_row_print_grid.map_or_else(
             || height as f32 + vertical_dpi.and(row.dy_descent_pt).unwrap_or(0.0),
             |grid| grid.print_manual_height_pt(height),
@@ -1474,7 +1781,7 @@ impl SheetGeometry {
           // import. A cached ht without customHeight is therefore not a
           // manual size. For an explicitly line-broken wrapText cell, Calc's
           // optimal height is one default text line per retained paragraph.
-          default_row_height_pt * line_count as f32
+          default_visible_row_height_pt * line_count as f32
         } else if let Some(height) = row.automatic_printer_height_pt {
           height
         } else if metrics.format.recalculate_uncalibrated_letter_rows
@@ -1483,19 +1790,19 @@ impl SheetGeometry {
           // ECMA-376 Part 1 §18.3.1.73: ht is only a custom row
           // measurement when customHeight is true. Producers may retain a
           // cached automatic height while leaving customHeight false.
-          default_row_height_pt
+          default_visible_row_height_pt
         } else {
           // Preserve the established cached-height compatibility path for
           // calibrated A4 and printer-settings documents. It carries useful
           // per-row automatic font expansion such as a 17pt Tahoma row.
           row
             .height
-            .map_or(default_row_height_pt, |height| height as f32)
+            .map_or(default_visible_row_height_pt, |height| height as f32)
         };
         Some((
           index,
           quantize_points_to_printer_dpi(height_pt, vertical_dpi),
-          row.custom_height && metrics.custom_row_print_grid.is_some(),
+          (row.custom_height || custom_default) && metrics.custom_row_print_grid.is_some(),
         ))
       })
       .collect::<Vec<_>>();
@@ -1522,7 +1829,10 @@ impl SheetGeometry {
 
     Self {
       column_offsets_pt: column_offsets_pt.into_boxed_slice(),
-      fixed_output_column_offsets: Arc::new(Mutex::new(HashMap::new())),
+      fixed_output_column_offsets: Rc::new(RefCell::new(HashMap::new())),
+      fixed_output_row_offset_deltas: Rc::new(RefCell::new(HashMap::new())),
+      fixed_output_row_lower_extents: Rc::new(RefCell::new(HashMap::new())),
+      fixed_output_screen_font_lower_extents: Rc::new(RefCell::new(HashMap::new())),
       row_overrides,
       scaled_manual_rows,
       merged_ranges: metrics
@@ -1531,6 +1841,7 @@ impl SheetGeometry {
         .filter_map(|reference| CellRange::parse_a1_range(reference))
         .collect(),
       default_row_height_pt,
+      default_visible_row_height_pt,
       quantize_default_row_scale: default_manual_grid.is_some(),
     }
   }
@@ -1573,19 +1884,23 @@ impl SheetGeometry {
       return self.column_offset_pt(column) * scale;
     }
     let preceding_columns = column.saturating_sub(1) as usize;
-    let mut cache = self
-      .fixed_output_column_offsets
-      .lock()
-      .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut cache = self.fixed_output_column_offsets.borrow_mut();
     let offsets = cache.entry(scale.to_bits()).or_insert_with(|| {
-      // Keep the original f32 accumulation order, including Sum's negative
-      // zero identity. A worksheet repeatedly queries the same scale, so
-      // realize its immutable column grid once instead of rescanning every
-      // preceding column for each cell on each continuation page.
+      // Realize the integral nominal printer width and integral print
+      // percentage before rounding each scaled column. Multiplying f32
+      // points by 0.29/0.59 puts a native half-dot boundary just below it:
+      // Office's 5750-dot column becomes 1668/3393 dots, not 1667/3392.
+      // Retain the accumulation order and cache the immutable scaled grid.
+      let percentage = (f64::from(scale) * 100.0).round();
       let mut offsets = Vec::with_capacity(self.column_offsets_pt.len());
       offsets.push(-0.0);
       for columns in self.column_offsets_pt.windows(2) {
-        let width = units::quantize_points_to_office_print_grid((columns[1] - columns[0]) * scale);
+        let nominal_dots = (f64::from(columns[1] - columns[0])
+          * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+          / f64::from(units::POINTS_PER_INCH))
+        .round();
+        let scaled_dots = (nominal_dots * percentage / 100.0).round();
+        let width = scaled_dots as f32 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
         offsets.push(offsets.last().copied().unwrap_or(-0.0) + width);
       }
       offsets.into_boxed_slice()
@@ -1631,6 +1946,26 @@ impl SheetGeometry {
     preceding_rows as f32 * self.default_row_height_pt + override_delta
   }
 
+  fn fixed_output_row_height_pt(&self, row: u32, scale: f32, quantize_each_row: bool) -> f32 {
+    let (height, quantize) = self
+      .row_overrides
+      .binary_search_by_key(&row, |geometry| geometry.index)
+      .ok()
+      .map_or(
+        (self.default_row_height_pt, self.quantize_default_row_scale),
+        |index| {
+          let geometry = self.row_overrides[index];
+          (geometry.height_pt, geometry.quantize_print_scale)
+        },
+      );
+    let height = height * scale;
+    if quantize_each_row || quantize {
+      units::quantize_points_to_office_print_grid(height)
+    } else {
+      height
+    }
+  }
+
   fn fixed_output_row_offset_pt(&self, row: u32, scale: f32, quantize_each_row: bool) -> f32 {
     if !quantize_each_row {
       // Manual rows retain their individual printer-pixel sizes after
@@ -1656,9 +1991,7 @@ impl SheetGeometry {
       }
       return self.row_offset_pt(row) * scale + correction;
     }
-    self.mapped_row_offset_pt(row, |height| {
-      units::quantize_points_to_office_print_grid(height * scale)
-    })
+    self.mapped_row_offset_pt(row, scale, false)
   }
 
   fn fixed_output_drawing_row_offset_pt(
@@ -1675,26 +2008,47 @@ impl SheetGeometry {
     // drawing owner first realizes each row on its 600dpi device and then
     // realizes the scaled row. Office controls at 20/60/120/160% distinguish
     // this from both a single rounding and a blanket upward rounding.
-    self.mapped_row_offset_pt(row, |height| {
-      units::quantize_points_to_office_print_grid(
-        units::quantize_points_to_office_print_grid(height) * scale,
-      )
-    })
+    self.mapped_row_offset_pt(row, scale, true)
   }
 
-  fn mapped_row_offset_pt(&self, row: u32, map_height: impl Fn(f32) -> f32) -> f32 {
+  fn mapped_row_offset_pt(&self, row: u32, scale: f32, quantize_before_scale: bool) -> f32 {
+    let map_height = |height| {
+      let height = if quantize_before_scale {
+        units::quantize_points_to_office_print_grid(height)
+      } else {
+        height
+      };
+      units::quantize_points_to_office_print_grid(height * scale)
+    };
     let preceding_rows = row.saturating_sub(1);
     let default_height_pt = map_height(self.default_row_height_pt);
-    let mut offset_pt = preceding_rows as f32 * default_height_pt;
-    for geometry in self
+    let mut cache = self.fixed_output_row_offset_deltas.borrow_mut();
+    let deltas = cache
+      .entry((scale.to_bits(), quantize_before_scale))
+      .or_insert_with(|| {
+        // The geometry is immutable. Realize each override once and retain
+        // its cumulative difference from the default row, as row_offset_pt
+        // does for the logical grid. Repeated cell/page queries then need
+        // only a binary search rather than a scan of every preceding row.
+        // Cell and drawing grids own different nominal rounding stages.
+        let mut delta = 0.0;
+        self
+          .row_overrides
+          .iter()
+          .map(|geometry| {
+            delta += map_height(geometry.height_pt) - default_height_pt;
+            delta
+          })
+          .collect::<Vec<_>>()
+          .into_boxed_slice()
+      });
+    let override_count = self
       .row_overrides
-      .iter()
-      .take_while(|geometry| geometry.index <= preceding_rows)
-    {
-      let height_pt = map_height(geometry.height_pt);
-      offset_pt += height_pt - default_height_pt;
-    }
-    offset_pt
+      .partition_point(|geometry| geometry.index <= preceding_rows);
+    let delta = override_count
+      .checked_sub(1)
+      .map_or(0.0, |index| deltas[index]);
+    preceding_rows as f32 * default_height_pt + delta
   }
 
   fn fixed_output_row_range_height_pt(
@@ -2036,6 +2390,36 @@ impl CellRange {
 }
 
 impl SheetMetrics {
+  fn normal_font_device_grid(&self) -> Option<NormalFontDeviceGrid> {
+    // Reuse the worksheet's realized Normal font; do not measure fonts per
+    // control or substitute the older 96dpi screen_digit_width_px field.
+    let columns = self.theme_column_grid.or({
+      if self.modern_excel_arial_column_grid {
+        Some(PrinterColumnGrid {
+          screen_digit_width_px: 15,
+          printer_digit_width_pt: OFFICE_ARIAL_10_EXPLICIT_DIGIT_WIDTH_PT,
+        })
+      } else if self.modern_excel_arial11_column_grid {
+        Some(PrinterColumnGrid {
+          screen_digit_width_px: OFFICE_ARIAL_11_SCREEN_DIGIT_WIDTH_PX,
+          printer_digit_width_pt: OFFICE_ARIAL_11_EXPLICIT_DIGIT_WIDTH_PT,
+        })
+      } else {
+        None
+      }
+    })?;
+    let rows = self.custom_row_print_grid.or(self.automatic_row_grid)?;
+    Some(NormalFontDeviceGrid {
+      screen_width_px: columns.screen_digit_width_px,
+      printer_width_px: (columns.printer_digit_width_pt * units::OFFICE_FIXED_OUTPUT_DPI
+        / units::POINTS_PER_INCH)
+        .round() as u32,
+      screen_height_px: (rows.normal_extents.ascent_px + rows.normal_extents.descent_px).round()
+        as u32,
+      printer_height_px: rows.normal_print_height_px.round() as u32,
+    })
+  }
+
   fn from_worksheet(
     worksheet: &x::Worksheet,
     styles: &StylesCatalog,
@@ -2201,22 +2585,52 @@ impl SheetMetrics {
         && (styles.normal_style_uses_explicit_calibri_11()
           || styles.normal_style_uses_explicit_arial_10()
           || styles.normal_style_uses_explicit_arial_11());
-    let unprofiled_column_grid = (mso_document
-      && !producer.macintosh_excel
+    // Modern Mac-authored workbooks use the same font-device realization
+    // when opened by the configured Windows Excel exporter. Native cache,
+    // font and alignment controls agree after changing only Application.
+    // Uncalibrated A4 sheets with explicit fonts use the same device grids
+    // even when a third-party producer writes the package. Native WPS,
+    // Excel and LibreOffice metadata controls retain identical geometry;
+    // changing an automatic ht cache to 40pt or removing it is also inert.
+    // Keep authored printer settings, theme and legacy Mac profiles separate.
+    let uncalibrated_explicit_a4_font_grid = !producer.macintosh_excel
+      && column_font.is_some()
+      && !styles.default_font_uses_theme()
+      && worksheet
+        .page_setup
+        .as_ref()
+        .is_some_and(|setup| setup.id.is_none() && setup.paper_size == Some(9));
+    let printer_font_grid = (mso_document
+      && (!producer.macintosh_excel
+        || producer
+          .excel_major_version
+          .is_some_and(|version| version >= 14)))
+      || uncalibrated_explicit_a4_font_grid;
+    let unprofiled_column_grid = (printer_font_grid
       && !styles.default_font_uses_theme()
       && !styles.column_width_uses_application_default_minor_theme()
       && !has_known_column_grid)
       .then(|| column_font.as_ref().and_then(PrinterColumnGrid::from_style))
       .flatten();
     let unprofiled_excel_font_grid = unprofiled_column_grid.is_some();
-    let custom_row_print_grid = (mso_document && !producer.macintosh_excel)
+    // Office also realizes non-Excel-authored Letter sheets on these font
+    // devices when no printer-settings calibration is present. Native Calc/
+    // Excel controls at four fonts and three manual heights have identical
+    // printer rows; the producer label does not bypass this conversion.
+    let row_printer_font_grid = printer_font_grid || format.recalculate_uncalibrated_letter_rows;
+    let custom_row_print_grid = row_printer_font_grid
       .then(|| automatic_device_font_row_height_pt(styles))
       .flatten()
       .and_then(|height| AutomaticRowGrid::from_worksheet(worksheet, styles, height));
     let mut automatic_row_grid = if custom_row_print_grid.is_some()
       && (format.dy_descent_pt.is_some()
+        || format.recalculate_uncalibrated_letter_rows
         || styles.default_font_uses_theme() && !legacy_excel12_calibri_fixed_output_grid
-        || unprofiled_excel_font_grid)
+        || unprofiled_excel_font_grid
+        || producer
+          .excel_major_version
+          .is_some_and(|version| version >= 14)
+          && !columns_use_default_font(worksheet, styles))
     {
       // Excel rows can also carry stale automatic ht caches. The
       // 61605 Office replay prints its Tahoma 17 row at 20.64pt despite the
@@ -2226,6 +2640,9 @@ impl SheetMetrics {
       // BloodPressureTracker's themed Excel 12 rows do the same without
       // dyDescent: changing the title cache to 40pt leaves its native row
       // unchanged, while customHeight=true preserves the authored size.
+      // Modern Excel also realizes a different column font without dyDescent.
+      // Native mixed Arial 10/7 controls ignore altered default/automatic ht
+      // caches; the column and cell font boxes own these automatic heights.
       // A custom sheet default does not make explicit rows manual: their own
       // customHeight controls whether an ht cache is recalculated. Keep this
       // font grid available while retaining the default height below.
@@ -2342,6 +2759,19 @@ impl SheetMetrics {
       screen_digit_width_px,
       automatic_row_grid,
       custom_row_print_grid,
+      default_drawing_screen_row_height_pt: match &worksheet.sheet_format_properties {
+        Some(format) if format.custom_height.is_some_and(|value| value.as_bool()) => Some(
+          worksheet_device_manual_row_height_pt(format.default_row_height),
+        ),
+        format => automatic_row_grid.map(|grid| {
+          let pixels = if format.is_none() {
+            OFFICE_MISSING_SHEET_FORMAT_ROW_HEIGHT_PX
+          } else {
+            grid.column_extents.height_px()
+          };
+          pixels * units::POINTS_PER_INCH / OFFICE_WORKSHEET_FONT_DPI
+        }),
+      },
       default_digit_width_pt,
       indexed_scatter_print_grid: false,
       legacy_excel12_arial_screen_column_grid: legacy_excel12_arial_screen_column_grid(
@@ -2349,13 +2779,11 @@ impl SheetMetrics {
         styles.normal_style_uses_explicit_arial_10(),
       ),
       modern_excel_arial_column_grid: mso_document
-        && !producer.macintosh_excel
         && producer
           .excel_major_version
           .is_some_and(|version| version >= 14)
         && styles.normal_style_uses_explicit_arial_10(),
       modern_excel_arial11_column_grid: mso_document
-        && !producer.macintosh_excel
         && producer
           .excel_major_version
           .is_some_and(|version| version >= 14)
@@ -2493,16 +2921,125 @@ fn fixed_output_drawing_marker_offset_pt(
   output_cell_extent_pt: f32,
   scale: f32,
 ) -> f32 {
-  // Excel stores DrawingML marker offsets in the worksheet's screen-space
-  // cell grid. Fixed output first realizes the containing cell on the printer
-  // grid, then preserves the marker's fraction of that cell independently on
-  // each axis. Keep the prior direct scale when the source cell extent is not
-  // explicit enough to reconstruct without guessing.
+  // Retain the reconstructed cell-fraction fallback for profiles without a
+  // calibrated DrawingML Normal-font device grid. If the source cell extent
+  // is also unavailable, retain the authored physical offset and print scale.
   screen_cell_extent_pt
     .filter(|extent| *extent > f32::EPSILON)
     .map_or(screen_offset_pt * scale, |screen_cell_extent_pt| {
       screen_offset_pt * output_cell_extent_pt / screen_cell_extent_pt
     })
+}
+
+fn fixed_output_drawing_marker_font_offset_pt(
+  offset_emu: i64,
+  device_grid: (u32, u32),
+  scale: f32,
+) -> Option<f32> {
+  let (screen_unit, printer_unit) = device_grid;
+  if screen_unit == 0 || printer_unit == 0 || !scale.is_finite() || scale <= 0.0 {
+    return None;
+  }
+  // Native fractional one-cell controls separate these two terms: whole
+  // 192-DPI worksheet pixels use the Normal font's integer MulDiv mapping;
+  // the remaining authored fraction keeps its physical length. Mapping the
+  // entire offset by a cell-extent ratio loses both the printer-pixel jumps
+  // and the subpixel remainder. Two-cell endpoints use the same conversion.
+  let screen_offset = offset_emu as f64 * f64::from(OFFICE_WORKSHEET_FONT_DPI)
+    / ooxmlsdk::units::EMUS_PER_INCH as f64;
+  let whole_screen = screen_offset.round();
+  let whole_printer = (whole_screen * f64::from(printer_unit) / f64::from(screen_unit)).round();
+  let nominal_pt = whole_printer * f64::from(units::POINTS_PER_INCH)
+    / f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+    + (screen_offset - whole_screen) * f64::from(units::POINTS_PER_INCH)
+      / f64::from(OFFICE_WORKSHEET_FONT_DPI);
+  Some((nominal_pt * f64::from(scale)) as f32)
+}
+
+fn fixed_output_control_axis(
+  offset_emu: i64,
+  device_grid: (u32, u32),
+  nominal_cell: (f32, f32),
+  scaled_cell: (f32, f32),
+  percentage: u32,
+) -> Option<ControlAnchorAxis> {
+  let (screen_unit, printer_unit) = device_grid;
+  if screen_unit == 0 || printer_unit == 0 {
+    return None;
+  }
+  // The Forms client anchor caches signed 192dpi offsets. Excel's 43b310
+  // owner converts them with the Normal font's printer/screen unit ratio,
+  // then independently MulDiv-scales and clamps to the containing cell.
+  // This differs from a DrawingML marker's continuous cell fraction.
+  let cached = (offset_emu as f64 * f64::from(OFFICE_WORKSHEET_FONT_DPI)
+    / ooxmlsdk::units::EMUS_PER_INCH as f64)
+    .round();
+  if cached < f64::from(i16::MIN) || cached > f64::from(i16::MAX) {
+    return None;
+  }
+  let nominal_offset = (cached * f64::from(printer_unit) / f64::from(screen_unit)).round();
+  let dots = |points: f32| {
+    (f64::from(points) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+      / f64::from(units::POINTS_PER_INCH))
+    .round() as i64
+  };
+  let logical_offset = (nominal_offset as i64).min(dots(nominal_cell.1));
+  let device_offset =
+    ((nominal_offset * f64::from(percentage) / 100.0).round() as i64).min(dots(scaled_cell.1));
+  Some(ControlAnchorAxis {
+    logical_px: dots(nominal_cell.0) + logical_offset,
+    device_px: dots(scaled_cell.0) + device_offset,
+    // The PDF shape transform retains the fractional scaled logical offset;
+    // the independently rounded device offset only owns its bitmap host.
+    position_pt: scaled_cell.0
+      + logical_offset as f32 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
+        * (percentage as f32 / 100.0),
+  })
+}
+
+fn fixed_output_control_geometry_from_axes(
+  from: [ControlAnchorAxis; 2],
+  to: [ControlAnchorAxis; 2],
+  percentage: u32,
+) -> Option<FixedOutputControlGeometry> {
+  if percentage == 0 {
+    return None;
+  }
+  let extent = |axis: usize| {
+    let logical = to[axis].logical_px - from[axis].logical_px + 1;
+    let device = to[axis].device_px - from[axis].device_px + 1;
+    if logical <= 0 || device <= 0 {
+      return None;
+    }
+    // EXCEL 53a670 first includes the last device pixel, then truncates its
+    // f32 inverse-scale product. This host differs from the logical RECT
+    // used by MSO's physical shape transform, so keep both sizes.
+    let source = (device as f32 * (100.0 / percentage as f32)).trunc();
+    if source < 1.0 || source > i32::MAX as f32 {
+      return None;
+    }
+    Some((
+      logical as f32 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
+        * (percentage as f32 / 100.0),
+      source as u32,
+    ))
+  };
+  let (width_pt, source_width_px) = extent(0)?;
+  let (height_pt, source_height_px) = extent(1)?;
+  Some(FixedOutputControlGeometry {
+    rect: CellRect {
+      x_pt: from[0].position_pt,
+      y_pt: from[1].position_pt,
+      width_pt,
+      height_pt,
+    },
+    source_width_px,
+    source_height_px,
+    // The unit-scale snapshot passes its RECT directly to the painter.
+    // Inverse-scaled snapshots retain one additional endpoint there, even
+    // though the bitmap allocation truncates its width/height separately.
+    painter_height_px: source_height_px + u32::from(percentage != 100),
+  })
 }
 
 fn worksheet_device_manual_row_height_pt(height_pt: f64) -> f32 {
@@ -2511,6 +3048,26 @@ fn worksheet_device_manual_row_height_pt(height_pt: f64) -> f32 {
   .round();
   (screen_quarters / 4.0 * f64::from(units::POINTS_PER_INCH) / f64::from(OFFICE_WORKSHEET_FONT_DPI))
     as f32
+}
+
+fn row_uses_custom_default_height(
+  custom_default: bool,
+  default_height_pt: f64,
+  row_height_pt: Option<f64>,
+) -> bool {
+  if !custom_default {
+    return false;
+  }
+  // An absent height, or the default's own cached height, retains the custom
+  // sheet default even when row@customHeight is false. Native controls also
+  // retain it for a larger cell font. Excel stores this comparison in whole
+  // twips, then the worksheet quarter-pixel grid; neither raw f64 equality
+  // nor a point-size epsilon has the observed cache/default boundaries.
+  let normalized = |height: f64| {
+    let twips = (height * f64::from(units::TWIPS_PER_POINT)).trunc();
+    worksheet_device_manual_row_height_pt(twips / f64::from(units::TWIPS_PER_POINT))
+  };
+  row_height_pt.is_none_or(|height| normalized(height) == normalized(default_height_pt))
 }
 
 fn legacy_excel12_arial_screen_column_grid(
@@ -2841,12 +3398,22 @@ fn worksheet_rows(
             });
           let mut cell = CalcCell::from_cell(cell, shared_strings, Some(address));
           for run in &mut cell.rich_text_runs {
-            styles.resolve_rich_text_run_font(run);
+            styles.resolve_rich_text_run(run);
           }
           cell
         })
         .collect();
       let custom_height = row.custom_height.is_some_and(|value| value.as_bool());
+      let custom_default = worksheet
+        .sheet_format_properties
+        .as_ref()
+        .is_some_and(|format| {
+          row_uses_custom_default_height(
+            format.custom_height.is_some_and(|value| value.as_bool()),
+            format.default_row_height,
+            row.height,
+          )
+        });
       // Thick rows already require recalculation instead of their cached ht.
       // Keep ordinary automatic rows on their printer-metric path: COM's
       // screen height is not a printable lower bound (DengXian 11 reports
@@ -2891,13 +3458,22 @@ fn worksheet_rows(
                 .is_some_and(|alignment| alignment.wrap_text)
             })
             .filter(|cell| cell.display_text.contains('\r') || cell.display_text.contains('\n'))
+            // Explicit line breaks do not enable AutoFit for merged cells.
+            // Match the exclusion in apply_automatic_text_row_heights and
+            // pagination, while retaining other cells in the same row.
+            .filter(|cell| {
+              !cell
+                .address()
+                .is_some_and(|address| merged_ranges.iter().any(|range| range.contains(address)))
+            })
             .map(|cell| cell.display_text.lines().count().max(1))
             .max()
         })
         .flatten();
-      let automatic_printer_height_pt = automatic_row_grid
+      let automatic_row_extents = automatic_row_grid
         .filter(|_| {
           !custom_height
+            && !custom_default
             && (row.height.is_none()
               || recalculate_cached_font_rows
               || row.thick_top.is_some_and(|value| value.as_bool())
@@ -2917,7 +3493,7 @@ fn worksheet_rows(
             })
           {
             // Stacked text uses a separate vertical layout, not an angle.
-            return height as f32;
+            return (None, height as f32);
           }
           let mut fonts = row_style_index
             .and_then(|index| {
@@ -2928,59 +3504,24 @@ fn worksheet_rows(
               })
             })
             .unwrap_or(grid.column_extents);
-          for cell in &cells {
-            let Some(address) = cell.address() else {
-              continue;
-            };
-            // A horizontal merge still contributes its cell fonts, including
-            // formatted blanks. Only a merge spanning rows suppresses height
-            // growth: the text has several rows available to occupy.
-            if merged_ranges
-              .iter()
-              .any(|range| range.start.row != range.end.row && range.contains(address))
-            {
-              continue;
-            }
-            // Unstyled cells already use the row/column font box above.
-            if let Some(index) = cell.style_index
-              && let Some(font) = *font_extents
-                .entry(Some(index))
-                .or_insert_with(|| automatic_font_row_extents(styles, Some(index)))
-            {
-              fonts.include(font, styles.alignment_for_cell(Some(index)));
-            }
-            if !cell.rich_text_runs.is_empty() {
-              let base_style = styles.text_style_for_cell(cell.style_index);
-              for run in &cell.rich_text_runs {
-                if run.text.is_empty() {
-                  continue;
-                }
-                // AutoFit uses the authored screen fonts even when a text
-                // number format later paints the value in the cell font.
-                // Native Lucida 8 / Arial 10 controls enlarge only the rows
-                // containing those rich portions, not their empty neighbors.
-                let mut style = super::display::xlsx_rich_text_run_style(&base_style, run, 1.0);
-                if run
-                  .vertical_alignment
-                  .is_none_or(|alignment| alignment == x::VerticalAlignmentRunValues::Baseline)
-                {
-                  style.font_size_pt = run.font_size_pt.unwrap_or(base_style.font_size_pt);
-                }
-                let char_set = if style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
-                  2
-                } else {
-                  0
-                };
-                if let Some(font) = automatic_text_font_row_extents(&style, char_set) {
-                  fonts.include(font, styles.alignment_for_cell(cell.style_index));
-                }
-              }
-            }
-          }
+          fonts = automatic_row_cell_fonts(
+            &cells,
+            fonts,
+            styles,
+            &mut font_extents,
+            &merged_ranges,
+            &HashMap::new(),
+          );
           let extra_pixels = u8::from(row.thick_top.is_some_and(|value| value.as_bool()))
             + u8::from(row.thick_bot.is_some_and(|value| value.as_bool()));
-          grid.print_height_from_screen_pixels(fonts.height_px() + f32::from(extra_pixels))
+          let screen_height_px = fonts.height_px() + f32::from(extra_pixels);
+          (
+            Some(screen_height_px * units::POINTS_PER_INCH / OFFICE_WORKSHEET_FONT_DPI),
+            grid.print_height_from_screen_pixels(screen_height_px),
+          )
         });
+      let automatic_screen_height_pt = automatic_row_extents.and_then(|(screen, _)| screen);
+      let automatic_printer_height_pt = automatic_row_extents.map(|(_, printer)| printer);
       CalcRow {
         row_index: Some(row_index),
         // ECMA-376 Part 1 §18.3.1.73 defines ht in points. Do not replace
@@ -2994,6 +3535,7 @@ fn worksheet_rows(
           .map(|value| value as f32 * screen_pixel_width_pt()),
         explicit_wrapped_line_count,
         automatic_font_height_pt,
+        automatic_screen_height_pt,
         automatic_printer_height_pt,
         custom_height,
         thick_top: row.thick_top.is_some_and(|value| value.as_bool()),
@@ -3006,6 +3548,84 @@ fn worksheet_rows(
     .collect()
 }
 
+fn automatic_rich_run_style(
+  base_style: &crate::model::TextStyle,
+  run: &super::workbook::SharedStringRun,
+) -> crate::model::TextStyle {
+  let mut style = super::display::xlsx_rich_text_run_style(base_style, run, 1.0);
+  if run
+    .vertical_alignment
+    .is_none_or(|alignment| alignment == x::VerticalAlignmentRunValues::Baseline)
+  {
+    style.font_size_pt = run.font_size_pt.unwrap_or(base_style.font_size_pt);
+  }
+  style
+}
+
+fn automatic_row_cell_fonts(
+  cells: &[CalcCell],
+  mut fonts: AutomaticRowFonts,
+  styles: &StylesCatalog,
+  font_extents: &mut HashMap<Option<u32>, Option<AutomaticRowExtents>>,
+  merged_ranges: &[CellRange],
+  merged_last_lines: &HashMap<CellAddress, std::ops::Range<usize>>,
+) -> AutomaticRowFonts {
+  for cell in cells {
+    let Some(address) = cell.address() else {
+      continue;
+    };
+    // Horizontal merges retain cell fonts, including formatted blanks. Only
+    // a merge spanning rows suppresses the cell's ordinary font contribution.
+    if merged_ranges
+      .iter()
+      .any(|range| range.start.row != range.end.row && range.contains(address))
+    {
+      continue;
+    }
+    let alignment = styles.alignment_for_cell(cell.style_index);
+    if let Some(index) = cell.style_index
+      && let Some(font) = *font_extents
+        .entry(Some(index))
+        .or_insert_with(|| automatic_font_row_extents(styles, Some(index)))
+    {
+      fonts.include(font, alignment);
+    }
+    if cell.rich_text_runs.is_empty() {
+      continue;
+    }
+    let base_style = styles.text_style_for_cell(cell.style_index);
+    let last_line = merged_last_lines.get(&address);
+    let mut offset = 0;
+    for run in &cell.rich_text_runs {
+      let start = offset;
+      offset += run.text.len();
+      if run.text.is_empty()
+        || last_line.is_some_and(|range| start >= range.end || offset <= range.start)
+      {
+        continue;
+      }
+      // AutoFit measures authored screen fonts, even when a number format
+      // subsequently paints the value using the cell font.
+      let style = automatic_rich_run_style(&base_style, run);
+      let char_set = if style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+        2
+      } else {
+        0
+      };
+      if let Some(mut font) = automatic_text_font_row_extents(&style, char_set) {
+        if last_line.is_some() {
+          // Merged wrapped cells do not AutoFit their complete text block.
+          // Their cell font owns the upper extent; the final screen line
+          // contributes only its lower extent to the shared row baseline.
+          font.ascent_px = 0.0;
+        }
+        fonts.include(font, alignment);
+      }
+    }
+  }
+  fonts
+}
+
 fn apply_automatic_text_row_heights(
   rows: &mut [CalcRow],
   geometry: &SheetGeometry,
@@ -3016,15 +3636,111 @@ fn apply_automatic_text_row_heights(
     return false;
   };
   let mut text_metrics = TextMetrics::new();
+  let mut font_extents = HashMap::new();
   let mut changed = false;
   for row in rows {
+    if row_uses_custom_default_height(
+      metrics.format.custom_height,
+      metrics.format.default_row_height,
+      row.height,
+    ) {
+      continue;
+    }
     let Some(mut height) = row
       .automatic_printer_height_pt
       .filter(|_| !row.custom_height)
     else {
       continue;
     };
+    let mut screen_height_pt = row.automatic_screen_height_pt;
     let mut wrapped = false;
+    let mut merged_last_lines = HashMap::new();
+    for cell in &row.cells {
+      if screen_height_pt.is_none() || cell.rich_text_runs.is_empty() {
+        continue;
+      }
+      let Some(address) = cell.address() else {
+        continue;
+      };
+      let alignment = styles.alignment_for_cell(cell.style_index);
+      if !alignment.is_some_and(|alignment| {
+        alignment.wrap_text
+          && alignment
+            .vertical
+            .is_none_or(|vertical| vertical == x::VerticalAlignmentValues::Bottom)
+          && alignment.text_rotation.unwrap_or(0) == 0
+          && !alignment.shrink_to_fit
+      }) || !geometry.merged_ranges.iter().any(|range| {
+        range.start.row == range.end.row
+          && range.start.col != range.end.col
+          && range.start == address
+      }) {
+        continue;
+      }
+      let base_style = styles.text_style_for_cell(cell.style_index);
+      if base_style.baseline_shift_pt.abs() > f32::EPSILON
+        || cell.display_text.contains(['\r', '\n'])
+      {
+        continue;
+      }
+      let mut text = String::new();
+      let spans = cell
+        .rich_text_runs
+        .iter()
+        .map(|run| {
+          let start = text.len();
+          text.push_str(&run.text);
+          (
+            start..text.len(),
+            automatic_rich_run_style(&base_style, run),
+          )
+        })
+        .collect::<Vec<_>>();
+      if spans
+        .iter()
+        .any(|(_, style)| style.baseline_shift_pt.abs() > f32::EPSILON)
+      {
+        continue;
+      }
+      // Office's merged AutoFit limitation does not suppress the final
+      // line's baseline descent. Native font/width/tail controls distinguish
+      // the anchor column width from the merged range and the final line
+      // from a whole-string font maximum. Printing scale does not own it.
+      if let Some(range) = super::display::rich_cell_screen_last_line_range(
+        &text,
+        &spans,
+        geometry.column_width_pt(address.col),
+        &mut text_metrics,
+        styles.auxiliary_line_break_font(),
+      ) {
+        merged_last_lines.insert(address, range);
+      }
+    }
+    if !merged_last_lines.is_empty() {
+      let fonts = row
+        .style_index
+        .and_then(|index| {
+          automatic_font_row_extents(styles, Some(index)).map(|font| {
+            let mut fonts = AutomaticRowFonts::default();
+            fonts.include(font, styles.alignment_for_cell(Some(index)));
+            fonts
+          })
+        })
+        .unwrap_or(grid.column_extents);
+      let fonts = automatic_row_cell_fonts(
+        &row.cells,
+        fonts,
+        styles,
+        &mut font_extents,
+        &geometry.merged_ranges,
+        &merged_last_lines,
+      );
+      let screen_pixels =
+        fonts.height_px() + f32::from(u8::from(row.thick_top) + u8::from(row.thick_bottom));
+      height = grid.print_height_from_screen_pixels(screen_pixels);
+      screen_height_pt = Some(screen_pixels * units::POINTS_PER_INCH / OFFICE_WORKSHEET_FONT_DPI);
+      wrapped = true;
+    }
     for cell in &row.cells {
       let Some(address) = cell.address() else {
         continue;
@@ -3045,9 +3761,14 @@ fn apply_automatic_text_row_heights(
         });
         if let Some(screen_height) = measured {
           let extra_pixels = u8::from(row.thick_top) + u8::from(row.thick_bottom);
-          height = height
-            .max(grid.print_height_from_screen_pixels(screen_height + f32::from(extra_pixels)));
+          let screen_pixels = screen_height + f32::from(extra_pixels);
+          height = height.max(grid.print_height_from_screen_pixels(screen_pixels));
+          screen_height_pt = screen_height_pt
+            .map(|old| old.max(screen_pixels * units::POINTS_PER_INCH / OFFICE_WORKSHEET_FONT_DPI));
         } else if let Some(cached) = row.height {
+          if cached as f32 > height {
+            screen_height_pt = None;
+          }
           height = height.max(cached as f32);
         }
         wrapped = true;
@@ -3066,11 +3787,16 @@ fn apply_automatic_text_row_heights(
         });
         if let Some(screen_height) = measured {
           let extra_pixels = u8::from(row.thick_top) + u8::from(row.thick_bottom);
-          height = height
-            .max(grid.print_height_from_screen_pixels(screen_height + f32::from(extra_pixels)));
+          let screen_pixels = screen_height + f32::from(extra_pixels);
+          height = height.max(grid.print_height_from_screen_pixels(screen_pixels));
+          screen_height_pt = screen_height_pt
+            .map(|old| old.max(screen_pixels * units::POINTS_PER_INCH / OFFICE_WORKSHEET_FONT_DPI));
         } else if let Some(cached) = row.height {
           // Complex clusters or unavailable device metrics retain the prior
           // cache until their rotated measurement path is supported.
+          if cached as f32 > height {
+            screen_height_pt = None;
+          }
           height = height.max(cached as f32);
         }
         wrapped = true;
@@ -3089,6 +3815,7 @@ fn apply_automatic_text_row_heights(
         width,
         &style,
         &mut text_metrics,
+        styles.auxiliary_line_break_font(),
       );
       if lines <= 1 {
         continue;
@@ -3101,15 +3828,18 @@ fn apply_automatic_text_row_heights(
       // Convert the complete multiline font box through the Normal grid;
       // pagination and cell painting must use this same realized height.
       let extra_pixels = u8::from(row.thick_top) + u8::from(row.thick_bottom);
-      height = height.max(grid.print_height_from_screen_pixels(
-        (font.ascent_px + font.descent_px) * lines as f32 + f32::from(extra_pixels),
-      ));
+      let screen_pixels =
+        (font.ascent_px + font.descent_px) * lines as f32 + f32::from(extra_pixels);
+      height = height.max(grid.print_height_from_screen_pixels(screen_pixels));
+      screen_height_pt = screen_height_pt
+        .map(|old| old.max(screen_pixels * units::POINTS_PER_INCH / OFFICE_WORKSHEET_FONT_DPI));
       wrapped = true;
     }
     if wrapped {
       changed |= row.automatic_printer_height_pt != Some(height)
         || row.explicit_wrapped_line_count.is_some();
       row.automatic_printer_height_pt = Some(height);
+      row.automatic_screen_height_pt = screen_height_pt;
       row.explicit_wrapped_line_count = None;
     }
   }
@@ -3324,26 +4054,31 @@ fn automatic_device_font_row_height_pt(styles: &StylesCatalog) -> Option<f32> {
   let font_record = styles.font_records.first()?;
   let style = styles.default_font_text_style();
   let char_set = if font_record.charset == Some(2) { 2 } else { 0 };
-  printer_font_line_height_pt(&style, char_set)
+  printer_font_line_height_pt(&style, char_set, &mut TextMetrics::new())
 }
 
 pub(super) fn printer_font_line_height_pt(
   style: &crate::model::TextStyle,
   char_set: u8,
+  text_metrics: &mut TextMetrics,
 ) -> Option<f32> {
-  let metrics = printer_font_vertical_metrics(style, char_set)?;
-  let padding_pixels = (screen_pixel_width_pt() + OFFICE_LEGACY_FONT_ROW_PRINTER_LEADING_PT)
-    * units::OFFICE_FIXED_OUTPUT_DPI
-    / units::POINTS_PER_INCH;
-  // Excel realizes automatic rows on the fixed-output device. VDMX can grow
-  // the hinted descent beyond the scaled hhea/OS2 box (Times New Roman 10:
-  // 94px height + 4px leading + the rounded-up padding = 106px = 12.72pt).
-  // Office controls ignore cached defaultRowHeight/dyDescent for this path.
-  Some(
-    (metrics.height_px() + metrics.external_leading_px + padding_pixels).ceil()
-      * units::POINTS_PER_INCH
-      / units::OFFICE_FIXED_OUTPUT_DPI,
-  )
+  printer_font_line_extents_px(style, char_set, text_metrics)
+    .map(|(height, _)| height * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI)
+}
+
+pub(super) fn printer_font_line_extents_px(
+  style: &crate::model::TextStyle,
+  char_set: u8,
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32)> {
+  let metrics = printer_font_vertical_metrics(style, char_set, text_metrics)?;
+  Some(metrics.line_extents_px(f32::from(printer_font_ppem(style))))
+}
+
+fn printer_font_ppem(style: &crate::model::TextStyle) -> u16 {
+  (style.font_size_pt * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH)
+    .round()
+    .clamp(1.0, f32::from(u16::MAX)) as u16
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -3357,20 +4092,44 @@ impl PrinterFontVerticalMetrics {
   pub(super) fn height_px(self) -> f32 {
     self.ascent_px + self.descent_px
   }
+
+  fn line_extents_px(self, em_px: f32) -> (f32, f32) {
+    // Excel's nominal printer cache constructs the upper and lower extents
+    // independently before adding device padding. In particular, internal
+    // leading can exceed descent: Symbol18 has A151/D33/I34 and a193-dot
+    // complete line, one dot taller than TM height + external leading +8.
+    // Native constructor controls cover67 metric sets, including the split
+    // of odd external leading and the minimum extents of very small fonts.
+    // GDI's negative lfHeight selects the em box, so I = TM height - em.
+    let internal = self.height_px() - em_px;
+    let leading = self.external_leading_px;
+    let half_leading = (leading / 2.0).floor();
+    let padding = ((screen_pixel_width_pt() + OFFICE_LEGACY_FONT_ROW_PRINTER_LEADING_PT)
+      * units::OFFICE_FIXED_OUTPUT_DPI
+      / units::POINTS_PER_INCH)
+      .ceil();
+    let minimum_lower = if self.height_px() >= 2.0 { 2.0 } else { 1.0 };
+    let lower = (internal + half_leading)
+      .max(self.descent_px + (leading - half_leading - padding).max(0.0))
+      .max(minimum_lower);
+    let minimum_body = if self.descent_px == 1.0 { 0.0 } else { 2.0 };
+    let upper = (lower - internal + self.ascent_px)
+      .min(self.ascent_px - internal + (internal + leading).max(minimum_body));
+    (upper + lower + padding, upper)
+  }
 }
 
 pub(super) fn printer_font_vertical_metrics(
   style: &crate::model::TextStyle,
   char_set: u8,
+  text_metrics: &mut TextMetrics,
 ) -> Option<PrinterFontVerticalMetrics> {
   use skrifa::raw::TableProvider;
   use skrifa::raw::types::Tag;
 
-  let face_data = crate::fonts::cached_text_face(style)?;
+  let face_data = text_metrics.cached_text_face(style)?;
   let face = skrifa::FontRef::from_index(face_data.data.as_slice(), face_data.index).ok()?;
-  let ppem = (style.font_size_pt * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH)
-    .round()
-    .clamp(1.0, f32::from(u16::MAX)) as u16;
+  let ppem = printer_font_ppem(style);
   let units_per_em = f32::from(face.head().ok()?.units_per_em());
   if units_per_em <= 0.0 {
     return None;
@@ -3440,6 +4199,9 @@ impl AutomaticRowExtents {
 struct AutomaticRowGrid {
   normal_extents: AutomaticRowExtents,
   normal_print_height_px: f32,
+  normal_print_lower_px: Option<f32>,
+  normal_screen_lower_px: Option<f32>,
+  column_baseline_descent_px: Option<f32>,
   column_extents: AutomaticRowFonts,
 }
 
@@ -3486,6 +4248,21 @@ impl AutomaticRowGrid {
     normal_print_height_pt: f32,
   ) -> Option<Self> {
     let normal_extents = automatic_font_row_extents(styles, None)?;
+    let normal_style = styles.default_font_text_style();
+    let char_set = if normal_style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+      2
+    } else {
+      0
+    };
+    let normal_metrics =
+      printer_font_vertical_metrics(&normal_style, char_set, &mut TextMetrics::new());
+    let normal_print_height_px =
+      (normal_print_height_pt * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).round();
+    // The device conversion belongs to the Normal font, whereas unstyled
+    // cells can select a different font through cellXF0. Preserve the old
+    // row-height owner and measure the new lower ratio independently.
+    let normal_screen_lower_px =
+      automatic_text_font_row_extents(&normal_style, char_set).map(|font| font.descent_px + 1.0);
     let mut columns = worksheet
       .columns
       .iter()
@@ -3495,25 +4272,38 @@ impl AutomaticRowGrid {
     columns.sort_by_key(|column| column.min);
     let mut next_column = 1;
     let mut extents = AutomaticRowFonts::default();
+    let mut column_baseline_descent_px = Some(0.0_f32);
+    let mut include = |font: AutomaticRowExtents, style_index| {
+      let alignment = styles.alignment_for_cell(style_index);
+      extents.include(font, alignment);
+      if font_participates_in_fixed_output_row_baseline(alignment) {
+        let style = styles.text_style_for_cell(style_index);
+        column_baseline_descent_px = column_baseline_descent_px.and_then(|lower| {
+          (style.baseline_shift_pt.abs() <= f32::EPSILON).then_some(lower.max(font.descent_px))
+        });
+      }
+    };
     let mut fonts = HashMap::from([(None, Some(normal_extents))]);
     for column in columns {
       if column.min > next_column {
-        extents.include(normal_extents, styles.alignment_for_cell(None));
+        include(normal_extents, None);
       }
       let font = (*fonts
         .entry(column.style)
         .or_insert_with(|| automatic_font_row_extents(styles, column.style)))?;
-      extents.include(font, styles.alignment_for_cell(column.style));
+      include(font, column.style);
       next_column = next_column.max(column.max.min(XLSX_MAX_COLUMN) + 1);
     }
     if next_column <= XLSX_MAX_COLUMN {
-      extents.include(normal_extents, styles.alignment_for_cell(None));
+      include(normal_extents, None);
     }
     Some(Self {
       normal_extents,
-      normal_print_height_px: (normal_print_height_pt * units::OFFICE_FIXED_OUTPUT_DPI
-        / units::POINTS_PER_INCH)
-        .round(),
+      normal_print_height_px,
+      normal_print_lower_px: normal_metrics
+        .map(|metrics| normal_print_height_px - metrics.ascent_px - metrics.external_leading_px),
+      normal_screen_lower_px,
+      column_baseline_descent_px,
       column_extents: extents,
     })
   }
@@ -3609,6 +4399,27 @@ fn automatic_text_font_row_extents(
     descent + overshoot,
     leading,
   ))
+}
+
+pub(super) fn screen_text_font_lower_extent_px(style: &crate::model::TextStyle) -> Option<f32> {
+  let char_set = if style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+    2
+  } else {
+    0
+  };
+  automatic_text_font_row_extents(style, char_set).map(|font| font.descent_px)
+}
+
+pub(super) fn font_participates_in_fixed_output_row_baseline(
+  alignment: Option<super::styles::AlignmentRecord>,
+) -> bool {
+  alignment.is_none_or(|alignment| {
+    alignment
+      .vertical
+      .is_none_or(|vertical| vertical == x::VerticalAlignmentValues::Bottom)
+      && alignment.text_rotation.unwrap_or(0) == 0
+      && !alignment.shrink_to_fit
+  })
 }
 
 fn automatic_explicit_font_row_height_from_natural(
@@ -3869,7 +4680,217 @@ fn boolean_cell_value(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+  use std::sync::Arc;
+
   use super::*;
+
+  #[test]
+  fn drawing_marker_font_mapping_preserves_native_fractional_offsets() {
+    // Native PDF/XPS controls vary only one-cell start markers. COM verifies
+    // their authored deltas before printing; actual Normal grids are 15/46
+    // horizontally and 34/103 vertically. PDF coordinates round to 0.01pt.
+    for (delta_pt, native_x, native_y) in [
+      (-0.3, 134.83, 322.01298),
+      (-0.12, 134.93, 322.11299),
+      (-0.06, 134.97, 322.14299),
+      (0.0, 135.0, 322.18299),
+      (0.03, 135.02, 322.20298),
+      (0.06, 135.04, 322.21299),
+      (0.09, 135.06, 322.23298),
+      (0.12, 135.07, 322.25297),
+      (0.18, 135.11, 322.29298),
+      (0.24, 135.14, 322.31297),
+      (0.3, 135.17, 322.35298),
+      (0.375, 135.21, 322.39299),
+      (0.45, 135.26, 322.44297),
+      (0.6, 135.41, 322.52299),
+      (0.75, 135.5, 322.60298),
+      (1.0, 135.64, 322.74299),
+      (1.5, 135.92, 323.03297),
+      (3.0, 136.77, 323.88298),
+    ] {
+      let delta_emu = (delta_pt * 12_700.0_f64).round() as i64;
+      let x = 101.16
+        + fixed_output_drawing_marker_font_offset_pt(742_950 + delta_emu, (15, 46), 0.59).unwrap();
+      let y = 271.56
+        + fixed_output_drawing_marker_font_offset_pt(1_123_950 + delta_emu, (34, 103), 0.59)
+          .unwrap();
+      assert!((x - native_x).abs() < 0.0055, "x delta={delta_pt}: {x}");
+      assert!((y - native_y).abs() < 0.0055, "y delta={delta_pt}: {y}");
+    }
+    // Independent two-cell controls retain both mapped endpoints, including
+    // a nonintegral final screen pixel on the shorter picture.
+    for (to_x, from_y, to_y, width, height) in [
+      (6_134_100, 876_300, 1_171_575, 264.01, 13.31),
+      (6_286_500, 1_343_025, 1_598_502, 270.95, 11.532),
+    ] {
+      let x = |emu| fixed_output_drawing_marker_font_offset_pt(emu, (15, 46), 0.59).unwrap();
+      let y = |emu| fixed_output_drawing_marker_font_offset_pt(emu, (34, 103), 0.59).unwrap();
+      assert!((x(to_x) - x(342_900) - width).abs() < 0.0055);
+      assert!((y(to_y) - y(from_y) - height).abs() < 0.0055);
+    }
+  }
+
+  #[test]
+  fn nominal_printer_line_extents_preserve_internal_and_external_leading() {
+    // Raw GDI metrics and the completed Excel printer cache, observed in the
+    // same constructor calls. H/A are cache values, not raw font bounds.
+    for (height, ascent, descent, internal, leading, expected) in [
+      (122.0, 100.0, 22.0, 22.0, 0.0, (130.0, 100.0)),
+      (184.0, 151.0, 33.0, 34.0, 0.0, (193.0, 151.0)),
+      (112.0, 90.0, 22.0, 12.0, 3.0, (123.0, 93.0)),
+      (114.0, 90.0, 24.0, 14.0, 4.0, (126.0, 94.0)),
+      (92.0, 79.0, 13.0, 0.0, 13.0, (113.0, 92.0)),
+      (150.0, 129.0, 21.0, 0.0, 21.0, (182.0, 150.0)),
+      (10.0, 8.0, 2.0, 2.0, 0.0, (18.0, 8.0)),
+    ] {
+      let metrics = PrinterFontVerticalMetrics {
+        ascent_px: ascent,
+        descent_px: descent,
+        external_leading_px: leading,
+      };
+      assert_eq!(metrics.line_extents_px(height - internal), expected);
+    }
+    for (family, size, expected) in [
+      ("Symbol", 12.0, (130.0, 100.0)),
+      ("Symbol", 18.0, (193.0, 151.0)),
+      ("Arial", 12.0, (123.0, 93.0)),
+      ("Times New Roman", 12.0, (126.0, 94.0)),
+    ] {
+      let style = crate::model::TextStyle {
+        font_family: Some(Arc::from(family)),
+        font_size_pt: size,
+        ..Default::default()
+      };
+      assert_eq!(
+        printer_font_line_extents_px(&style, 0, &mut TextMetrics::new()),
+        Some(expected)
+      );
+    }
+  }
+
+  #[test]
+  fn printer_row_lower_uses_independent_normal_device_extents() {
+    for (family, size, screen_lower, printer_lower) in [
+      ("Arial", 10.0, 7.0, 26.0),
+      ("Calibri", 11.0, 9.0, 33.0),
+      ("Times New Roman", 10.0, 8.0, 28.0),
+      ("Lucida Sans Unicode", 10.0, 8.0, 26.0),
+      ("SimSun", 11.0, 6.0, 21.0),
+    ] {
+      let style = crate::model::TextStyle {
+        font_family: Some(Arc::from(family)),
+        font_size_pt: size,
+        ..Default::default()
+      };
+      let screen = automatic_text_font_row_extents(&style, 0).unwrap();
+      let mut text_metrics = TextMetrics::new();
+      let printer = printer_font_vertical_metrics(&style, 0, &mut text_metrics).unwrap();
+      let height =
+        (printer_font_line_height_pt(&style, 0, &mut text_metrics).unwrap() / 0.12).round();
+      assert_eq!(screen.descent_px + 1.0, screen_lower, "{family}");
+      assert_eq!(
+        height - printer.ascent_px - printer.external_leading_px,
+        printer_lower,
+        "{family}"
+      );
+    }
+    let grid = FixedOutputRowLowerGrid {
+      normal_screen_lower_px: 7.0,
+      normal_printer_lower_px: 26.0,
+      inherited_screen_descent_px: Some(6.0),
+    };
+    // Actual Arial14 regular/bold row-cache and fixed-output observations.
+    for (descent, thick_bottom, scale, expected) in [
+      (8.0, false, 0.47, 18.0),
+      (9.0, false, 0.47, 19.0),
+      (8.0, false, 1.0, 38.0),
+      (9.0, false, 1.0, 41.0),
+      (8.0, true, 0.47, 22.0),
+      (9.0, true, 0.47, 23.0),
+      (8.0, true, 1.0, 46.0),
+      (9.0, true, 1.0, 49.0),
+    ] {
+      assert_eq!(
+        grid.scaled_printer_lower_px(descent, thick_bottom, scale),
+        expected
+      );
+    }
+  }
+
+  #[test]
+  fn printer_row_lower_keeps_column_eligibility_separate_from_height() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><sz val="8"/><name val="Arial"/></font><font><sz val="30"/><name val="Arial"/><vertAlign val="superscript"/></font></fonts>
+      <cellStyleXfs count="1"><xf fontId="0"/></cellStyleXfs>
+      <cellXfs count="4"><xf fontId="0" xfId="0"/><xf fontId="1" xfId="0" applyFont="1"/><xf fontId="1" xfId="0" applyFont="1"><alignment textRotation="45"/></xf><xf fontId="2" xfId="0" applyFont="1"/></cellXfs>
+      <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#.to_vec()).unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::default(),
+    )
+    .unwrap();
+    for (style, expected_lower) in [(1, Some(5.0)), (2, Some(0.0)), (3, None)] {
+      let worksheet = x::Worksheet::from_bytes(format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="16384" style="{style}"/></cols><sheetData/></worksheet>"#).as_bytes()).unwrap();
+      let grid = AutomaticRowGrid::from_worksheet(&worksheet, &styles, 12.36).unwrap();
+      assert_eq!(grid.column_baseline_descent_px, expected_lower);
+      assert!(grid.column_extents.height_px() > 0.0);
+      assert_eq!(grid.normal_screen_lower_px, Some(7.0));
+      assert_eq!(grid.normal_print_lower_px, Some(26.0));
+    }
+  }
+
+  #[test]
+  fn printer_checkbox_anchor_keeps_logical_and_device_rectangles_separate() {
+    let x = |points: i64| {
+      fixed_output_control_axis(points * 12_700, (15, 46), (0.72, 42.36), (0.36, 19.92), 47)
+        .unwrap()
+    };
+    let y = |points: i64| {
+      fixed_output_control_axis(
+        points * 12_700,
+        (34, 103),
+        (53.28, 25.44),
+        (25.08, 12.0),
+        47,
+      )
+      .unwrap()
+    };
+    let from = [x(7), y(3)];
+    let to = [x(26), y(17)];
+    assert_eq!([from[0].logical_px, from[1].logical_px], [64, 468]);
+    assert_eq!([to[0].logical_px, to[1].logical_px], [218, 580]);
+    // The bitmap canvas translation is irrelevant to its endpoint difference.
+    assert_eq!([from[0].device_px, from[1].device_px], [30, 220]);
+    assert_eq!([to[0].device_px, to[1].device_px], [103, 273]);
+    let geometry = fixed_output_control_geometry_from_axes(from, to, 47).unwrap();
+    assert_eq!(
+      (geometry.source_width_px, geometry.source_height_px),
+      (157, 114)
+    );
+    assert_eq!(geometry.painter_height_px, 115);
+    assert!((geometry.rect.width_pt - 8.742).abs() < 0.0001);
+    assert!((geometry.rect.height_pt - 6.3732).abs() < 0.0001);
+    assert!((geometry.rect.x_pt - 3.6312).abs() < 0.0001);
+    assert!((geometry.rect.y_pt - 26.4336).abs() < 0.0001);
+  }
+
+  #[test]
+  fn printer_checkbox_offsets_clamp_after_each_device_conversion() {
+    let axis =
+      fixed_output_control_axis(100 * 12_700, (15, 46), (0.72, 42.36), (0.36, 19.92), 47).unwrap();
+    assert_eq!(axis.logical_px, 359);
+    assert_eq!(axis.device_px, 169);
+    assert!((axis.position_pt - 20.2692).abs() < 0.0001);
+  }
 
   #[test]
   fn shared_string_indexes_preserve_text_and_rich_runs() {
@@ -3972,6 +4993,7 @@ mod tests {
       dy_descent_pt: None,
       explicit_wrapped_line_count: None,
       automatic_font_height_pt: None,
+      automatic_screen_height_pt: None,
       automatic_printer_height_pt: None,
       custom_height: false,
       thick_top: false,
@@ -4232,6 +5254,177 @@ mod tests {
   }
 
   #[test]
+  fn uncalibrated_a4_explicit_fonts_ignore_automatic_caches_across_producers() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part
+      .set_data(
+        &mut package,
+        br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts><font><sz val="11"/><name val="SimSun"/><charset val="134"/></font>
+      <font><sz val="12"/><name val="SimSun"/><charset val="134"/></font></fonts>
+      <cellXfs><xf fontId="0"><alignment vertical="center"/></xf>
+      <xf fontId="1"><alignment vertical="center"/></xf></cellXfs></styleSheet>"#
+          .to_vec(),
+      )
+      .unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+    )
+    .unwrap();
+    // Native WPS/Excel/LO metadata controls retain 36/113 Normal grids,
+    // a 42px automatic font row (131 printer dots), and a manual 40pt row
+    // (335 dots). The cached automatic height is not a manual measurement.
+    for producer in [
+      SpreadsheetProducerProfile::default(),
+      SpreadsheetProducerProfile {
+        mso_document: true,
+        excel_major_version: Some(16),
+        ..Default::default()
+      },
+      SpreadsheetProducerProfile {
+        libreoffice_document: true,
+        ..Default::default()
+      },
+    ] {
+      for cache in ["", " ht=\"14.25\"", " ht=\"40\""] {
+        let worksheet = x::Worksheet::from_bytes(
+          format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetFormatPr defaultColWidth="9" defaultRowHeight="13.5"/>
+          <sheetData><row r="1"{cache}><c r="A1" s="1"/></row>
+          <row r="2" ht="40" customHeight="1"><c r="A2" s="1"/></row></sheetData>
+          <pageSetup paperSize="9"/></worksheet>"#
+          )
+          .as_bytes(),
+        )
+        .unwrap();
+        let sheet = CalcSheet::from_worksheet(
+          SheetIdentity {
+            workbook_index: 0,
+            name: "Font rows".into(),
+            state: None,
+            active: true,
+          },
+          worksheet,
+          SheetResourceCatalog::default(),
+          &[],
+          &styles,
+          producer,
+        );
+        assert!(sheet.uses_unprofiled_excel_font_grid());
+        for (row, expected) in [(1, 15.72), (2, 40.2), (3, 13.56)] {
+          assert!(
+            (sheet.row_height_pt(row) - expected).abs() < 0.0001,
+            "producer={producer:?}, cache={cache:?}, row={row}"
+          );
+        }
+        assert!((sheet.column_width_pt(1) - 49.68).abs() < 0.0001);
+        assert!((sheet.fixed_output_row_height_pt(1, 0.73) - 11.52).abs() < 0.0001);
+        assert!((sheet.fixed_output_row_height_pt(3, 0.73) - 9.84).abs() < 0.0001);
+        let vector = super::super::object_resources::VmlShapeModel {
+          object_type: Some("Shape".into()),
+          ..Default::default()
+        };
+        // Native 100/73/125% controls establish these nominal offsets;
+        // print scaling follows this conversion without a second rounding.
+        for (value, horizontal, expected) in [
+          (3, true, 1.08),
+          (9, true, 3.36),
+          (251, true, 92.4),
+          (1, false, 0.36),
+          (4, false, 1.56),
+          (18, false, 6.84),
+        ] {
+          assert!(
+            (sheet.vml_anchor_offset_pt(&vector, value, horizontal) - expected).abs() < 0.0001
+          );
+        }
+        let control = super::super::object_resources::VmlShapeModel {
+          object_type: Some("Checkbox".into()),
+          ..Default::default()
+        };
+        assert_eq!(sheet.vml_anchor_offset_pt(&control, 9, true), 6.75);
+      }
+    }
+  }
+
+  #[test]
+  fn unprofiled_drawingml_markers_follow_the_normal_font_device_grid() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part
+      .set_data(
+        &mut package,
+        br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts><font><sz val="10"/><name val="Arial"/></font></fonts>
+      <cellXfs><xf fontId="0"/></cellXfs></styleSheet>"#
+          .to_vec(),
+      )
+      .unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+    )
+    .unwrap();
+    let worksheet = x::Worksheet::from_bytes(
+      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <sheetFormatPr defaultRowHeight="12.8"/>
+      <cols><col min="1" max="20" width="11.5204081632653"/></cols>
+      <sheetData/><pageSetup paperSize="9"/></worksheet>"#,
+    )
+    .unwrap();
+    let sheet = CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Anchors".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog::default(),
+      &[],
+      &styles,
+      SpreadsheetProducerProfile {
+        libreoffice_document: true,
+        ..Default::default()
+      },
+    );
+    assert!(sheet.uses_unprofiled_excel_font_grid());
+    // Native PDF frame endpoints after removing the worksheet origin.
+    // Six printer/cache/editAs/xfrm controls retain these same endpoints.
+    for (column, row, column_offset_emu, row_offset_emu, expected_x, expected_y) in [
+      (3, 0, 36_360, 36_000, 194.023, 2.714_645_6),
+      (10, 20, 106_560, 60_120, 645.380_55, 251.738_86),
+    ] {
+      let marker = super::super::drawing::DrawingMarkerModel {
+        column,
+        row,
+        column_offset_emu,
+        row_offset_emu,
+      };
+      let (x, y) = sheet.fixed_output_drawing_marker_position_pt(&marker, 1.0);
+      assert!((x - expected_x).abs() < 0.0001, "{x} != {expected_x}");
+      assert!((y - expected_y).abs() < 0.0001, "{y} != {expected_y}");
+    }
+  }
+
+  #[test]
   fn explicit_excel_fonts_ignore_automatic_caches_and_preserve_manual_heights() {
     use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
     use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
@@ -4377,7 +5570,7 @@ mod tests {
   }
 
   #[test]
-  fn cached_printer_columns_preserve_the_original_accumulation_bits() {
+  fn cached_printer_columns_preserve_device_grid_accumulation() {
     let metrics = SheetMetrics {
       default_digit_width_pt: 5.52,
       ..Default::default()
@@ -4390,7 +5583,12 @@ mod tests {
           .windows(2)
           .take(column.saturating_sub(1) as usize)
           .map(|offsets| {
-            units::quantize_points_to_office_print_grid((offsets[1] - offsets[0]) * scale)
+            let nominal_dots = ((offsets[1] - offsets[0]) * units::OFFICE_FIXED_OUTPUT_DPI
+              / units::POINTS_PER_INCH)
+              .round();
+            let scaled_dots =
+              (f64::from(nominal_dots) * (f64::from(scale) * 100.0).round() / 100.0).round();
+            scaled_dots as f32 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
           })
           .sum::<f32>();
         assert_eq!(
@@ -4402,12 +5600,9 @@ mod tests {
         );
       }
     }
-    assert_eq!(
-      geometry.fixed_output_column_offsets.lock().unwrap().len(),
-      4
-    );
+    assert_eq!(geometry.fixed_output_column_offsets.borrow().len(), 4);
     let cloned = geometry.clone();
-    assert!(Arc::ptr_eq(
+    assert!(Rc::ptr_eq(
       &geometry.fixed_output_column_offsets,
       &cloned.fixed_output_column_offsets
     ));
@@ -4415,6 +5610,37 @@ mod tests {
       cloned.fixed_output_column_offset_pt(16_385, 0.95, true),
       geometry.fixed_output_column_offset_pt(16_385, 0.95, true)
     );
+  }
+
+  #[test]
+  fn printer_columns_round_native_half_dots_at_integral_percentages() {
+    let metrics = SheetMetrics {
+      modern_excel_arial_column_grid: true,
+      default_digit_width_pt: 5.52,
+      columns: vec![ColumnModel {
+        first: 4,
+        last: 4,
+        width: Some(125.019_531_25),
+        style_index: None,
+        hidden: false,
+        best_fit: false,
+        custom_width: true,
+        phonetic: false,
+        outline_level: 0,
+        collapsed: false,
+      }],
+      ..Default::default()
+    };
+    let geometry = SheetGeometry::new(&metrics, &[], None, None);
+    assert_eq!(geometry.column_width_pt(4), 690.0);
+    // Native left/right witnesses establish this 5750-dot column's widths;
+    // 29% and 59% end at half dots, independently of cell-font measurement.
+    for (percentage, expected_dots) in [(29, 1668), (44, 2530), (56, 3220), (59, 3393)] {
+      let width =
+        geometry.fixed_output_column_range_width_pt(4, 4, percentage as f32 / 100.0, true);
+      let dots = (width * units::OFFICE_FIXED_OUTPUT_DPI / units::POINTS_PER_INCH).round();
+      assert_eq!(dots as u32, expected_dots, "percentage {percentage}");
+    }
   }
 
   #[test]
@@ -4970,6 +6196,88 @@ mod tests {
   }
 
   #[test]
+  fn hidden_default_preserves_explicit_rows_and_their_visible_height_fallback() {
+    // Office zeroHeight=0/1 controls retain the same explicit row heights;
+    // only absent records become hidden. Include cached, manual and wrapped
+    // rows so the zero sparse default cannot leak into visible text metrics.
+    for zero_height in [false, true] {
+      let mut metrics = SheetMetrics::default();
+      metrics.format.default_row_height = 15.0;
+      metrics.format.zero_height = zero_height;
+      let mut rows = [1, 3, 5, 7, 9, 11, 13].map(|index| empty_row(Some(index)));
+      rows[2].custom_height = true;
+      rows[2].height = Some(30.0);
+      rows[3].height = Some(17.0);
+      rows[4].hidden = true;
+      rows[4].height = Some(35.0);
+      rows[5].explicit_wrapped_line_count = Some(3);
+      rows[6].automatic_printer_height_pt = Some(18.0);
+      let geometry = SheetGeometry::new(&metrics, &rows, None, None);
+      for (row, expected) in [
+        (1, 15.0),
+        (3, 15.0),
+        (5, 30.0),
+        (7, 17.0),
+        (9, 0.0),
+        (11, 45.0),
+        (13, 18.0),
+      ] {
+        assert_eq!(
+          geometry.row_height_pt(row),
+          expected,
+          "row={row} zeroHeight={zero_height}"
+        );
+      }
+      let omitted_height = if zero_height { 0.0 } else { 15.0 };
+      for row in [2, 4, 6, 8, 10, 12, 14] {
+        assert_eq!(geometry.row_height_pt(row), omitted_height);
+      }
+      assert_eq!(geometry.row_offset_pt(15), 140.0 + 7.0 * omitted_height);
+    }
+  }
+
+  #[test]
+  fn hidden_default_keeps_explicit_visibility_and_text_line_height() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let mut line_heights = Vec::new();
+    for zero_height in [0, 1] {
+      let worksheet = x::Worksheet::from_bytes(
+        format!(
+          r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <sheetFormatPr defaultRowHeight="15" zeroHeight="{zero_height}"/><sheetData>
+        <row r="1"><c r="A1" t="inlineStr"><is><t>Visible</t></is></c></row>
+        <row r="3" hidden="0"><c r="A3" t="inlineStr"><is><t>Visible false</t></is></c></row>
+        <row r="5" hidden="1"><c r="A5" t="inlineStr"><is><t>Hidden true</t></is></c></row>
+        </sheetData></worksheet>"#
+        )
+        .as_bytes(),
+      )
+      .unwrap();
+      let sheet = CalcSheet::from_worksheet(
+        SheetIdentity {
+          workbook_index: 0,
+          name: "Rows".into(),
+          state: None,
+          active: true,
+        },
+        worksheet,
+        SheetResourceCatalog::default(),
+        &[],
+        &StylesCatalog::default(),
+        SpreadsheetProducerProfile::default(),
+      );
+      assert!(sheet.row_height_pt(1) > 0.0);
+      assert!(sheet.row_height_pt(3) > 0.0);
+      assert_eq!(sheet.row_height_pt(5), 0.0);
+      assert_eq!(sheet.row_height_pt(2) == 0.0, zero_height == 1);
+      line_heights.push(sheet.default_text_line_height_pt());
+    }
+    assert!(line_heights[0] > 0.0);
+    assert_eq!(line_heights[0], line_heights[1]);
+  }
+
+  #[test]
   fn automatic_wrapped_row_uses_one_default_height_per_explicit_line() {
     let metrics = SheetMetrics::default();
     let mut row = empty_row(Some(2));
@@ -5059,6 +6367,231 @@ mod tests {
     // to compensate for this drawing-owner defect.
     assert_eq!(geometry.default_row_height_pt, 13.5);
     assert!((geometry.fixed_output_row_offset_pt(2, 1.14, true) - 15.36).abs() < 1.0e-4);
+  }
+
+  #[test]
+  fn automatic_drawing_markers_keep_realized_screen_row_extents() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part
+      .set_data(
+        &mut package,
+        br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <fonts count="1"><font><sz val="10"/><name val="Arial"/></font></fonts>
+          <cellXfs count="2"><xf fontId="0"/><xf fontId="0"><alignment wrapText="1"/></xf></cellXfs>
+        </styleSheet>"#
+          .to_vec(),
+      )
+      .unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+    )
+    .unwrap();
+    let worksheet = x::Worksheet::from_bytes(
+      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac">
+        <sheetFormatPr defaultRowHeight="13" x14ac:dyDescent="0.15"/>
+        <cols><col min="1" max="1" width="30"/></cols>
+        <sheetData>
+          <row r="1" ht="999"><c r="A1" t="inlineStr"><is><t>plain</t></is></c></row>
+          <row r="2" ht="45.75" customHeight="1"/>
+          <row r="4"><c r="A4" s="1" t="inlineStr"><is><t>first&#10;second</t></is></c></row>
+          <row r="5" hidden="1"/>
+        </sheetData>
+      </worksheet>"#,
+    )
+    .unwrap();
+    let sheet = CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Markers".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog::default(),
+      &[],
+      &styles,
+      SpreadsheetProducerProfile {
+        mso_document: true,
+        excel_major_version: Some(16),
+        ..Default::default()
+      },
+    );
+    // Native manual/automatic anchor controls give45.75/12.75pt. The stale
+    // ht cache must not become the screen marker denominator. Existing native
+    // two-line AutoFit controls give68 screen pixels and206 printer dots.
+    for (row, height) in [(1, 12.75), (2, 45.75), (3, 12.75), (4, 25.5)] {
+      assert_eq!(
+        sheet.modern_excel_arial_drawing_screen_row_height_pt(row),
+        Some(height)
+      );
+    }
+    assert_eq!(
+      sheet.modern_excel_arial_drawing_screen_row_height_pt(5),
+      None
+    );
+    assert!((sheet.row_height_pt(1) - 12.36).abs() < 0.0001);
+    assert!((sheet.row_height_pt(4) - 24.72).abs() < 0.0001);
+  }
+
+  #[test]
+  fn merged_wrapped_rich_rows_keep_cell_upper_and_final_screen_line_descent() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part
+      .set_data(
+        &mut package,
+        br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="3">
+        <font><sz val="10"/><name val="Arial"/></font>
+        <font><sz val="12"/><name val="Symbol"/><charset val="2"/></font>
+        <font><sz val="12"/><name val="Arial"/></font>
+      </fonts><cellXfs count="4">
+        <xf fontId="0"/>
+        <xf fontId="1"><alignment wrapText="1"/></xf>
+        <xf fontId="2"><alignment wrapText="1"/></xf>
+        <xf fontId="1"><alignment wrapText="0"/></xf>
+      </cellXfs></styleSheet>"#
+          .to_vec(),
+      )
+      .unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+    )
+    .unwrap();
+    // Office controls vary family, size, anchor width, tail and merge state.
+    // Screen COM heights are independent of print zoom and cached XML ht.
+    for (size, width, family, long, tail, merged, wrap, expected) in [
+      (
+        12,
+        20.0,
+        "Times New Roman",
+        false,
+        false,
+        true,
+        true,
+        15.375,
+      ),
+      (
+        24,
+        20.0,
+        "Times New Roman",
+        false,
+        false,
+        true,
+        true,
+        18.375,
+      ),
+      (
+        36,
+        20.0,
+        "Times New Roman",
+        false,
+        false,
+        true,
+        true,
+        21.375,
+      ),
+      (24, 80.0, "Times New Roman", true, false, true, true, 18.375),
+      (24, 6.5, "Times New Roman", true, true, true, true, 18.375),
+      (24, 1.5, "Times New Roman", false, false, true, true, 15.0),
+      (24, 20.0, "Arial", false, false, true, true, 17.625),
+      (
+        36,
+        20.0,
+        "Times New Roman",
+        false,
+        false,
+        false,
+        true,
+        45.75,
+      ),
+      (12, 6.5, "Times New Roman", true, false, true, true, 15.0),
+      (24, 6.5, "Times New Roman", true, false, true, true, 15.0),
+      (24, 6.5, "Times New Roman", false, false, true, true, 18.375),
+      (
+        24,
+        20.0,
+        "Times New Roman",
+        false,
+        false,
+        true,
+        false,
+        30.75,
+      ),
+    ] {
+      let text = if long {
+        "No incluya los ingresos del Tutor sin ser padre/madre."
+      } else {
+        "A"
+      };
+      let tail = if tail {
+        format!(r#"<r><rPr><sz val="{size}"/><rFont val="{family}"/></rPr><t>X</t></r>"#)
+      } else {
+        String::new()
+      };
+      let merge = if merged {
+        r#"<mergeCells count="1"><mergeCell ref="C1:D1"/></mergeCells>"#
+      } else {
+        ""
+      };
+      let index = if wrap { 1 } else { 3 };
+      let xml = format!(
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac">
+        <sheetFormatPr defaultRowHeight="13" x14ac:dyDescent="0.15"/>
+        <cols><col min="3" max="3" width="{width}"/><col min="4" max="4" width="124.83203125"/></cols>
+        <sheetData><row r="1" ht="999">
+          <c r="B1" s="0"/><c r="C1" s="{index}" t="inlineStr"><is>
+            <r><t>·</t></r>
+            <r><rPr><sz val="{size}"/><rFont val="{family}"/></rPr><t xml:space="preserve">&#160;&#160; </t></r>
+            <r><rPr><sz val="12"/><rFont val="Arial"/></rPr><t>{text}</t></r>{tail}
+          </is></c><c r="D1" s="2"/><c r="F1" s="0"/>
+        </row></sheetData>{merge}</worksheet>"#
+      );
+      let sheet = CalcSheet::from_worksheet(
+        SheetIdentity {
+          workbook_index: 0,
+          name: "Rich AutoFit".into(),
+          state: None,
+          active: true,
+        },
+        x::Worksheet::from_bytes(xml.as_bytes()).unwrap(),
+        SheetResourceCatalog::default(),
+        &[],
+        &styles,
+        SpreadsheetProducerProfile {
+          mso_document: true,
+          excel_major_version: Some(16),
+          ..Default::default()
+        },
+      );
+      assert_eq!(
+        sheet.rows[0].automatic_screen_height_pt,
+        Some(expected),
+        "{size} {width} {family} long={long} merged={merged} wrap={wrap}"
+      );
+      if long && size == 12 {
+        assert!((sheet.row_height_pt(1) - 14.52).abs() < 0.0001);
+      }
+    }
   }
 
   #[test]
@@ -5389,6 +6922,228 @@ mod tests {
   }
 
   #[test]
+  fn uncalibrated_letter_rows_match_native_font_devices_for_both_producers() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    // Native 24 PDF controls retain these physical row steps after changing
+    // only Calc/Excel metadata. The 95% paper transform follows the manual
+    // screen/printer conversion; it does not scale the authored ht directly.
+    for (family, size, expected) in [
+      ("Arial", 10, [7.32, 11.76, 16.56]),
+      ("Calibri", 11, [7.68, 12.48, 17.28]),
+      ("Times New Roman", 10, [7.32, 11.76, 16.56]),
+      ("SimSun", 11, [7.56, 12.24, 17.16]),
+    ] {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let part = workbook
+        .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+        .unwrap();
+      part.set_data(&mut package, format!(r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <fonts count="1"><font><sz val="{size}"/><name val="{family}"/><family val="2"/><charset val="1"/></font></fonts>
+        <cellStyleXfs count="1"><xf fontId="0"/></cellStyleXfs><cellXfs count="1"><xf fontId="0" xfId="0"/></cellXfs>
+        <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#).into_bytes()).unwrap();
+      let styles = StylesCatalog::from_workbook_part(
+        &package,
+        &workbook,
+        &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+      )
+      .unwrap();
+      for (height, expected) in [8.0, 12.8, 18.0].into_iter().zip(expected) {
+        for mso_document in [false, true] {
+          let worksheet = x::Worksheet::from_bytes(format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+            <sheetFormatPr defaultRowHeight="{height}" customHeight="1"/>
+            <sheetData><row r="1" ht="{height}" customHeight="1"><c r="A1"><v>1</v></c></row></sheetData>
+            <pageSetup paperSize="1"/></worksheet>"#).as_bytes()).unwrap();
+          let sheet = CalcSheet::from_worksheet(
+            SheetIdentity {
+              workbook_index: 0,
+              name: "Rows".into(),
+              state: None,
+              active: true,
+            },
+            worksheet,
+            SheetResourceCatalog::default(),
+            &[],
+            &styles,
+            SpreadsheetProducerProfile {
+              mso_document,
+              libreoffice_document: !mso_document,
+              excel_major_version: mso_document.then_some(16),
+              ..Default::default()
+            },
+          );
+          assert_eq!(sheet.rows[0].height, Some(height));
+          for row in [1, 2] {
+            let actual = sheet.fixed_output_row_height_pt(row, 0.95);
+            assert!(
+              (actual - expected).abs() < 0.0001,
+              "{family} {size}, ht={height}, mso={mso_document}, row={row}: {actual} != {expected}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn uncalibrated_letter_automatic_rows_do_not_inherit_a_manual_default_height() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="1"><font><sz val="10"/><name val="Arial"/></font></fonts>
+      <cellStyleXfs count="1"><xf fontId="0"/></cellStyleXfs><cellXfs count="1"><xf fontId="0" xfId="0"/></cellXfs>
+      <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#.to_vec()).unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::default(),
+    )
+    .unwrap();
+    // Independent native default-height and automatic-cache mutations retain
+    // 12.36pt Arial rows. Only omitted and explicitly manual rows use the
+    // manual sheet default; source automatic ht remains a cache.
+    for default in [8.0, 12.8, 18.0] {
+      for cache in [8.0, 12.8, 18.0] {
+        if cache == default {
+          // Equal-default caches retain the manual default's ownership,
+          // covered separately by the native cache-boundary controls.
+          continue;
+        }
+        let worksheet = x::Worksheet::from_bytes(
+          format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetFormatPr defaultRowHeight="{default}" customHeight="1"/>
+          <sheetData><row r="1" ht="{cache}"><c r="A1"><v>1</v></c></row></sheetData>
+          <pageSetup paperSize="1"/></worksheet>"#
+          )
+          .as_bytes(),
+        )
+        .unwrap();
+        let sheet = CalcSheet::from_worksheet(
+          SheetIdentity {
+            workbook_index: 0,
+            name: "Rows".into(),
+            state: None,
+            active: true,
+          },
+          worksheet,
+          SheetResourceCatalog::default(),
+          &[],
+          &styles,
+          SpreadsheetProducerProfile {
+            libreoffice_document: true,
+            ..Default::default()
+          },
+        );
+        assert_eq!(sheet.rows[0].height, Some(cache));
+        assert!(
+          (sheet.row_height_pt(1) - 12.36).abs() < 0.0001,
+          "default={default}, cache={cache}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn custom_default_row_cache_ownership_matches_native_twip_boundaries() {
+    // Independent native holdouts at three different sheet defaults. Row
+    // caches first enter the whole-twip store, then the worksheet's existing
+    // quarter-pixel height key. Raw point equality and direct pixel rounding
+    // both fail these observed boundaries.
+    for (default, cache, expected) in [
+      (20.0, None, true),
+      (20.0, Some(19.9249), false),
+      (20.0, Some(19.9251), false),
+      (20.0, Some(19.95), true),
+      (20.0, Some(20.0249), true),
+      (20.0, Some(20.0251), true),
+      (20.0, Some(20.05), false),
+      (8.0, Some(7.92), false),
+      (8.0, Some(7.95), true),
+      (8.0, Some(8.02), true),
+      (8.0, Some(8.05), false),
+      (30.0, Some(29.98), false),
+      (30.0, Some(30.02), true),
+      (30.0, Some(30.05), false),
+    ] {
+      assert_eq!(
+        row_uses_custom_default_height(true, default, cache),
+        expected,
+        "default={default}, cache={cache:?}"
+      );
+      assert!(!row_uses_custom_default_height(false, default, cache));
+    }
+  }
+
+  #[test]
+  fn styled_rows_keep_a_custom_default_until_their_cache_changes_owner() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    for size in [11, 36] {
+      part.set_data(&mut package, format!(r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="{size}"/><name val="Calibri"/></font></fonts>
+        <cellStyleXfs count="1"><xf fontId="0"/></cellStyleXfs>
+        <cellXfs count="2"><xf fontId="0" xfId="0"/><xf fontId="1" xfId="0" applyFont="1"/></cellXfs>
+        <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#).into_bytes()).unwrap();
+      let styles = StylesCatalog::from_workbook_part(
+        &package,
+        &workbook,
+        &crate::localization::OfficeLocaleContext::default(),
+      )
+      .unwrap();
+      for cache in [None, Some(19.95), Some(20.0), Some(20.0249)] {
+        let attr = cache.map_or_else(String::new, |height| {
+          format!(r#" ht="{height}" customHeight="0""#)
+        });
+        let worksheet = x::Worksheet::from_bytes(format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetFormatPr defaultRowHeight="20" customHeight="1"/>
+          <sheetData><row r="2" s="1" customFormat="1"{attr}/></sheetData><pageSetup paperSize="1"/></worksheet>"#).as_bytes()).unwrap();
+        let sheet = CalcSheet::from_worksheet(
+          SheetIdentity {
+            workbook_index: 0,
+            name: "Styles".into(),
+            state: None,
+            active: true,
+          },
+          worksheet,
+          SheetResourceCatalog::default(),
+          &[],
+          &styles,
+          SpreadsheetProducerProfile {
+            mso_document: true,
+            excel_major_version: Some(16),
+            ..Default::default()
+          },
+        );
+        // Native colored fill paths retain a19.32pt step at95%, including
+        // the36pt styled-font counterexample. Per-row scale rounding belongs
+        // to these inherited manual defaults just as to an explicit row ht.
+        for row in [1, 2, 3] {
+          assert!(
+            (sheet.fixed_output_row_height_pt(row, 0.95) - 19.32).abs() < 0.0001,
+            "size={size}, cache={cache:?}, row={row}"
+          );
+        }
+        assert!((sheet.fixed_output_row_offset_pt(4, 0.95) - 57.96).abs() < 0.0001);
+      }
+    }
+  }
+
+  #[test]
   fn authored_custom_row_height_reaches_the_printer_grid_without_import_rounding() {
     let mut metrics = SheetMetrics::default();
     metrics.format.default_row_height = 12.0;
@@ -5400,6 +7155,75 @@ mod tests {
     let geometry = SheetGeometry::new(&metrics, &[row], None, Some(300));
 
     assert_eq!(geometry.row_height_pt(3), 14.4);
+  }
+
+  #[test]
+  fn modern_excel_mixed_column_fonts_own_automatic_rows_without_descent_metadata() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><sz val="7"/><name val="Arial"/></font><font><sz val="9"/><name val="Arial"/></font></fonts>
+      <cellStyleXfs count="1"><xf fontId="0"/></cellStyleXfs>
+      <cellXfs count="3"><xf fontId="0" xfId="0"/><xf fontId="1" xfId="0" applyFont="1"/><xf fontId="2" xfId="0" applyFont="1"/></cellXfs>
+      <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#.to_vec()).unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+    )
+    .unwrap();
+    // Eight native controls retain the same automatic rows after changing
+    // defaultRowHeight and automatic ht caches. Explicit manual rows still
+    // retain their authored size. This applies to modern Windows and Mac files.
+    for macintosh_excel in [false, true] {
+      for (default_cache, row_cache) in [(9.6, 11.4), (30.0, 30.0)] {
+        let worksheet = x::Worksheet::from_bytes(
+          format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetFormatPr defaultRowHeight="{default_cache}"/>
+          <cols><col min="1" max="16384" style="1"/></cols><sheetData>
+          <row r="1"><c r="A1" s="1"/></row>
+          <row r="2" ht="{row_cache}"><c r="A2" s="2"/></row>
+          <row r="3" ht="16.5" customHeight="1"><c r="A3" s="2"/></row>
+          </sheetData></worksheet>"#
+          )
+          .as_bytes(),
+        )
+        .unwrap();
+        let sheet = CalcSheet::from_worksheet(
+          SheetIdentity {
+            workbook_index: 0,
+            name: "Mixed column fonts".into(),
+            state: None,
+            active: true,
+          },
+          worksheet,
+          SheetResourceCatalog::default(),
+          &[],
+          &styles,
+          SpreadsheetProducerProfile {
+            mso_document: true,
+            macintosh_excel,
+            excel_major_version: Some(16),
+            ..Default::default()
+          },
+        );
+        assert!(sheet.uses_printer_cell_text_horizontal_grid());
+        for (row, expected) in [(1, 8.64), (2, 11.16), (3, 15.96), (4, 8.64)] {
+          assert!(
+            (sheet.row_height_pt(row) - expected).abs() < 1.0e-4,
+            "row {row}, default {default_cache}, cache {row_cache}, Mac {macintosh_excel}: {}",
+            sheet.row_height_pt(row)
+          );
+        }
+      }
+    }
   }
 
   #[test]
@@ -5626,6 +7450,198 @@ mod tests {
           "row {row}: {}",
           geometry.row_height_pt(row)
         );
+      }
+    }
+  }
+
+  #[test]
+  fn realized_row_offsets_keep_sparse_hidden_rows_and_separate_drawing_grids() {
+    let mut metrics = SheetMetrics::default();
+    metrics.format.default_row_height = 13.5;
+    let mut hidden = empty_row(Some(2));
+    hidden.hidden = true;
+    let mut manual = empty_row(Some(5));
+    manual.custom_height = true;
+    manual.height = Some(17.25);
+    let geometry = SheetGeometry::new(&metrics, &[hidden, manual], None, None);
+    // The 81% boundary distinguishes scaling authored points from first
+    // realizing the nominal 113/144-dot drawing grid. Query in reverse order
+    // and alternate scales so neither a previous row nor another grid owns
+    // the cached result. Unlisted rows remain visible default rows.
+    for (scale, cell_default, cell_manual, drawing_default, drawing_manual) in [
+      (0.81, 91, 116, 92, 117),
+      (0.95, 107, 137, 107, 137),
+      (0.81, 91, 116, 92, 117),
+    ] {
+      for (row, defaults, manuals) in [(1000, 997, 1), (6, 3, 1), (1, 0, 0), (3, 1, 0)] {
+        let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+        let expected_cell = (defaults * cell_default + manuals * cell_manual) as f32 * dot;
+        let expected_drawing = (defaults * drawing_default + manuals * drawing_manual) as f32 * dot;
+        assert!(
+          (geometry.fixed_output_row_offset_pt(row, scale, true) - expected_cell).abs() < 0.002,
+          "cell scale={scale} row={row}"
+        );
+        assert!(
+          (geometry.fixed_output_drawing_row_offset_pt(row, scale, true) - expected_drawing).abs()
+            < 0.002,
+          "drawing scale={scale} row={row}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn themed_scaled_rows_accumulate_realized_printer_heights() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part
+      .set_data(
+        &mut package,
+        br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <fonts count="1"><font><sz val="11"/><name val="SimSun"/><scheme val="minor"/></font></fonts>
+        <cellXfs count="1"><xf fontId="0"/></cellXfs></styleSheet>"#
+          .to_vec(),
+      )
+      .unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+    )
+    .unwrap();
+    let worksheet = x::Worksheet::from_bytes(
+      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+      xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac">
+      <sheetFormatPr defaultRowHeight="15" x14ac:dyDescent="0.25"/>
+      <sheetData><row r="1"><c r="A1"/></row><row r="2"><c r="A2"/></row>
+      <row r="3" ht="15.75" thickBot="1"><c r="A3"/></row></sheetData></worksheet>"#,
+    )
+    .unwrap();
+    let sheet = CalcSheet::from_worksheet(
+      SheetIdentity {
+        workbook_index: 0,
+        name: "Rows".into(),
+        state: None,
+        active: true,
+      },
+      worksheet,
+      SheetResourceCatalog::default(),
+      &[],
+      &styles,
+      SpreadsheetProducerProfile {
+        mso_document: true,
+        excel_major_version: Some(14),
+        ..Default::default()
+      },
+    );
+    // Actual PatBlt row boundaries from eight native print-scale controls.
+    // The stored automatic ht is not a manual size; thickBot enlarges the
+    // font box before each row is realized on the scaled printer device.
+    for (scale, ordinary_dots, thick_dots) in [
+      (0.20, 23, 23),
+      (0.50, 57, 58),
+      (0.73, 82, 85),
+      (0.95, 107, 110),
+      (1.00, 113, 116),
+      (1.20, 136, 139),
+      (1.50, 170, 174),
+      (2.00, 226, 232),
+    ] {
+      let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+      for (row, dots) in [(1, ordinary_dots), (2, ordinary_dots), (3, thick_dots)] {
+        assert!(
+          (sheet.fixed_output_row_height_pt(row, scale) - dots as f32 * dot).abs() < 1.0e-4,
+          "scale={scale}, row={row}"
+        );
+      }
+      let height = (2 * ordinary_dots + thick_dots) as f32 * dot;
+      assert!((sheet.fixed_output_row_offset_pt(4, scale) - height).abs() < 1.0e-4);
+      assert!((sheet.fixed_output_row_range_height_pt(1, 3, scale) - height).abs() < 1.0e-4);
+    }
+  }
+
+  #[test]
+  fn modern_mac_automatic_and_manual_rows_use_the_native_printer_grid() {
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let part = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    part.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><sz val="13"/><name val="Arial"/></font><font><sz val="18"/><name val="Arial"/></font></fonts>
+      <cellStyleXfs count="1"><xf fontId="0"/></cellStyleXfs>
+      <cellXfs count="6"><xf fontId="0" applyAlignment="1"><alignment vertical="bottom"/></xf><xf fontId="1" applyAlignment="1"><alignment vertical="bottom"/></xf><xf fontId="2" applyAlignment="1"><alignment vertical="bottom"/></xf>
+      <xf fontId="0" applyAlignment="1"><alignment vertical="top"/></xf><xf fontId="1" applyAlignment="1"><alignment vertical="top"/></xf><xf fontId="2" applyAlignment="1"><alignment vertical="top"/></xf></cellXfs>
+      <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#.to_vec()).unwrap();
+    let styles = StylesCatalog::from_workbook_part(
+      &package,
+      &workbook,
+      &crate::localization::OfficeLocaleContext::new(None, Some("zh-CN"), None),
+    )
+    .unwrap();
+    // Native 86% Letter controls realize 81% composed output scale. The
+    // font owns automatic heights independently of ht caches; customHeight
+    // selects the established Normal-font screen/printer conversion.
+    for macintosh_excel in [false, true] {
+      for (font_index, auto_pitch) in [(0, 9.96), (1, 12.96), (2, 17.28)] {
+        for vertical_index in [0, 3] {
+          for (cache, custom_height, expected) in [
+            (None, false, auto_pitch),
+            (Some(17), false, auto_pitch),
+            (Some(30), false, auto_pitch),
+            (Some(17), true, 13.32),
+            (Some(30), true, 23.52),
+          ] {
+            let attributes = cache.map_or_else(String::new, |height| format!(r#" ht="{height}""#));
+            let manual = if custom_height {
+              r#" customHeight="1""#
+            } else {
+              ""
+            };
+            let style = font_index + vertical_index;
+            let worksheet = x::Worksheet::from_bytes(format!(
+              r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac">
+              <sheetFormatPr defaultRowHeight="13" x14ac:dyDescent="0.15"/>
+              <cols><col min="1" max="1" width="2.6640625" customWidth="1"/><col min="2" max="2" width="30" customWidth="1"/></cols>
+              <sheetData><row r="2"{attributes}{manual}><c r="B2" s="{style}" t="inlineStr"><is><t>ROW2</t></is></c></row>
+              <row r="3"{attributes}{manual}><c r="B3" s="{style}" t="inlineStr"><is><t>ROW3</t></is></c></row></sheetData></worksheet>"#
+            ).as_bytes()).unwrap();
+            let sheet = CalcSheet::from_worksheet(
+              SheetIdentity {
+                workbook_index: 0,
+                name: "Rows".into(),
+                state: None,
+                active: true,
+              },
+              worksheet,
+              SheetResourceCatalog::default(),
+              &[],
+              &styles,
+              SpreadsheetProducerProfile {
+                mso_document: true,
+                macintosh_excel,
+                excel_major_version: Some(15),
+                ..Default::default()
+              },
+            );
+            let pitch = sheet
+              .geometry
+              .fixed_output_row_range_height_pt(2, 2, 0.81, true);
+            assert!(
+              (pitch - expected).abs() < 0.001,
+              "mac={macintosh_excel}, font={font_index}, vertical={vertical_index}, cache={cache:?}, manual={custom_height}: {pitch} != {expected}"
+            );
+          }
+        }
       }
     }
   }

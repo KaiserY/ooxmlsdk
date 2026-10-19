@@ -11,12 +11,13 @@
 //! best-effort or left default. The regeneration oracle
 //! (`sdk_data::oracle`) compares only XSD-derivable projections.
 //!
-//! `additionalCharacteristics`, `bibliography`, and `pml` match that projection.
-//! For `pml`, the checked-in JSON still contains SDK rewrites the transitional
-//! XSD does not state (per-parent extension-list types, Office 2010 attributes
-//! and elements, versioned occurs, and renamed or subset enums). The `pml`
-//! acceptance test excludes those from the comparison. It does not rename them
-//! into the generator.
+//! `additionalCharacteristics`, `bibliography`, `pml`, `sml`, and `wml` match
+//! that projection. For `pml`, `sml`, and `wml`, the checked-in JSON still
+//! contains SDK rewrites the transitional XSD does not state (per-parent
+//! extension-list types, Office 2010 attributes and elements, versioned
+//! occurs, and renamed or subset enums). Those acceptance tests exclude the
+//! rewrites from the comparison. They do not rename them into the generator.
+//! `bibliography`'s `b:ST_String255` alias stays on that test.
 
 use std::{
   collections::{BTreeMap, BTreeSet, HashMap},
@@ -34,7 +35,7 @@ use crate::{
       OpenXmlSchemaTypeParticle, OpenXmlSchemaTypeParticleOccur,
     },
     xsd::{
-      ParsedAttribute, ParsedAttributeGroup, ParsedChildElement, ParsedComplexType,
+      ParsedAttribute, ParsedAttributeGroup, ParsedChildElement, ParsedComplexType, ParsedParticle,
       ParsedParticleKind, ParsedParticleNode, ParsedXsd,
     },
   },
@@ -364,6 +365,90 @@ fn collect_child_bindings(
   }
 }
 
+/// Inline `xs:complexContent` extension and `xs:simpleContent` so the projected
+/// type carries the base attributes, children, and particle. `is_derived` stays
+/// the shared-element flag and is not set from the derivation itself.
+fn flatten_type(
+  schemas: &Schemas<'_>,
+  owner_prefix: &str,
+  body: &ParsedComplexType,
+) -> ParsedComplexType {
+  flatten_type_rec(schemas, owner_prefix, body, &mut BTreeSet::new())
+}
+
+fn flatten_type_rec(
+  schemas: &Schemas<'_>,
+  owner_prefix: &str,
+  body: &ParsedComplexType,
+  stack: &mut BTreeSet<String>,
+) -> ParsedComplexType {
+  let Some(derivation) = &body.derivation else {
+    return body.clone();
+  };
+
+  if derivation.body.text_value_type.is_some() {
+    let mut flat = derivation.body.clone();
+    flat.derivation = None;
+    flat.is_abstract = body.is_abstract;
+    if flat.documentation.is_empty() {
+      flat.documentation = body.documentation.clone();
+    }
+    return flat;
+  }
+
+  let mut flat = if derivation.is_extension {
+    let base_key = qualified_type_key(owner_prefix, &derivation.base);
+    if stack.insert(base_key.clone()) {
+      let base = schemas
+        .complex_type(owner_prefix, &derivation.base)
+        .map(|(base, base_prefix)| flatten_type_rec(schemas, &base_prefix, base, stack))
+        .unwrap_or_default();
+      stack.remove(&base_key);
+      base
+    } else {
+      ParsedComplexType::default()
+    }
+  } else {
+    ParsedComplexType::default()
+  };
+
+  let extension = &derivation.body;
+  flat.attributes.extend(extension.attributes.clone());
+  flat
+    .attribute_group_refs
+    .extend(extension.attribute_group_refs.clone());
+  flat.children.extend(extension.children.clone());
+  flat.particle = merge_particles(flat.particle, extension.particle.clone());
+  if extension.text_value_type.is_some() {
+    flat.text_value_type = extension.text_value_type.clone();
+  }
+  flat.has_any_attribute = flat.has_any_attribute || extension.has_any_attribute;
+  flat.is_abstract = body.is_abstract;
+  if !body.documentation.is_empty() {
+    flat.documentation = body.documentation.clone();
+  }
+  flat.derivation = None;
+  flat
+}
+
+fn merge_particles(
+  base: Option<Box<ParsedParticleNode>>,
+  extension: Option<Box<ParsedParticleNode>>,
+) -> Option<Box<ParsedParticleNode>> {
+  match (base, extension) {
+    (None, None) => None,
+    (Some(particle), None) | (None, Some(particle)) => Some(particle),
+    (Some(base), Some(extension)) => Some(Box::new(ParsedParticleNode::Group {
+      particle: ParsedParticle {
+        kind: ParsedParticleKind::Sequence,
+        min_occurs: 1,
+        max_occurs: 1,
+      },
+      children: vec![*base, *extension],
+    })),
+  }
+}
+
 fn build_type(
   name: &str,
   element_local: &str,
@@ -372,20 +457,19 @@ fn build_type(
   type_owner: &str,
   body: &ParsedComplexType,
 ) -> OpenXmlSchemaType {
+  let flat = flatten_type(schemas, type_owner, body);
   let children = if shape.leaf_text {
     Vec::new()
   } else {
-    effective_children(schemas, type_owner, body)
+    effective_children(schemas, type_owner, &flat)
   };
-  let has_simple_content = body.text_value_type.is_some()
-    || body
-      .derivation
-      .as_ref()
-      .is_some_and(|derivation| derivation.body.text_value_type.is_some());
-  let is_leaf_text = shape.leaf_text || (has_simple_content && body.particle.is_none());
-  let is_leaf_element =
-    !is_leaf_text && children.is_empty() && body.particle.is_none() && body.derivation.is_none();
-  let is_derived = shape.derived || body.derivation.is_some();
+  let is_leaf_text = shape.leaf_text || (flat.text_value_type.is_some() && flat.particle.is_none());
+  let is_leaf_element = !is_leaf_text && children.is_empty() && flat.particle.is_none();
+  // `is_derived` means the element binding shares its complex type with other
+  // elements. An `xs:extension` base is inlined instead, matching the
+  // checked-in metadata. `sml` and `wml` depend on that. Marking every
+  // derivation derived would bring those projections back.
+  let is_derived = shape.derived;
 
   let cfg = schemas.cfg;
   let base_class = if shape.is_root && cfg.part_root_elements.contains_key(element_local) {
@@ -432,12 +516,12 @@ fn build_type(
     attributes: if shape.leaf_text || shape.shared_binding {
       Vec::new()
     } else {
-      build_attributes(schemas, type_owner, body)
+      build_attributes(schemas, type_owner, &flat)
     },
-    particle: if shape.leaf_text {
+    particle: if shape.leaf_text || is_leaf_text {
       OpenXmlSchemaTypeParticle::default()
     } else {
-      build_particle(schemas, type_owner, body)
+      build_particle(schemas, type_owner, &flat)
     },
     ..Default::default()
   }
@@ -446,11 +530,16 @@ fn build_type(
 fn attribute_qname(
   xsd: &ParsedXsd,
   cfg: &NamespaceGenConfig,
+  owner_prefix: &str,
   attribute: &ParsedAttribute,
 ) -> String {
   let (prefix, local) = split_qname(&attribute.q_name);
   if prefix.is_empty() {
-    format!(":{local}")
+    if xsd.attribute_form_qualified {
+      format!("{owner_prefix}:{local}")
+    } else {
+      format!(":{local}")
+    }
   } else {
     format!("{}:{local}", resolve_prefix(xsd, cfg, prefix))
   }
@@ -459,6 +548,7 @@ fn attribute_qname(
 fn open_xml_attribute(
   xsd: &ParsedXsd,
   cfg: &NamespaceGenConfig,
+  owner_prefix: &str,
   attribute: &ParsedAttribute,
 ) -> OpenXmlSchemaTypeAttribute {
   let (_, local) = split_qname(&attribute.q_name);
@@ -471,7 +561,7 @@ fn open_xml_attribute(
     Vec::new()
   };
   OpenXmlSchemaTypeAttribute {
-    q_name: attribute_qname(xsd, cfg, attribute),
+    q_name: attribute_qname(xsd, cfg, owner_prefix, attribute),
     property_name: local.to_upper_camel_case(),
     r#type: attribute.r#type.clone(),
     property_comments: attribute.documentation.clone(),
@@ -485,10 +575,13 @@ fn build_attributes(
   owner_prefix: &str,
   body: &ParsedComplexType,
 ) -> Vec<OpenXmlSchemaTypeAttribute> {
+  let schema = schemas
+    .schema_for_prefix(owner_prefix)
+    .unwrap_or(schemas.main);
   let mut attributes: Vec<OpenXmlSchemaTypeAttribute> = body
     .attributes
     .iter()
-    .map(|attribute| open_xml_attribute(schemas.main, schemas.cfg, attribute))
+    .map(|attribute| open_xml_attribute(schema, schemas.cfg, owner_prefix, attribute))
     .collect();
 
   let mut stack = BTreeSet::new();
@@ -521,10 +614,13 @@ fn expand_attribute_group(
   if !stack.insert(key.clone()) {
     return Vec::new();
   }
+  let schema = schemas
+    .schema_for_prefix(&group_prefix)
+    .unwrap_or(schemas.main);
   let mut attributes: Vec<_> = group
     .attributes
     .iter()
-    .map(|attribute| open_xml_attribute(schemas.main, schemas.cfg, attribute))
+    .map(|attribute| open_xml_attribute(schema, schemas.cfg, &group_prefix, attribute))
     .collect();
   for nested in &group.refs {
     attributes.extend(expand_attribute_group(

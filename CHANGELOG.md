@@ -1,5 +1,15 @@
 # Change Log
 
+## Unreleased
+
+### Added
+
+- Reproduced `sml` and `wml` on the XSD projection. `generator_reproduces_sml`
+  and `generator_reproduces_wml` match the checked-in JSON on the XSD-derivable
+  fields. Alias tables for those namespaces stay empty. The `bibliography`
+  name `b:ST_String255` remains an alias on that test only. SDK-only rewrites
+  stay out of the comparison.
+
 ## 0.13.2
 
 ### Breaking Changes

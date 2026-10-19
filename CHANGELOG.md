@@ -1,5 +1,33 @@
 # Change Log
 
+## Unreleased
+
+### Added
+
+- Added `VisioDocumentType` for the six Visio main-part content types. The part
+  JSON keeps the drawing content type. Macro-enabled packages can carry the
+  existing `VbaProjectPart` as an optional child of `VisioDocumentPart`.
+  `simpleContent` text follows the XSD base, so `Title` is `StringValue`.
+  The nineteen `Row` bindings each take the complex type's name (`UserRow`,
+  and the rest). The reader calls its start element `__ooxmlsdk_element`, so
+  an attribute field named `e` does not hide it.
+- Folded structural `xsd:alternative` bodies into the element a document reads.
+  Assert-only alternatives such as `PinX_Type` stay off the type list. `Section`
+  keeps one row that can hold `Del`, `N`, `LocalName`, `IX`, `T`, repeated cells,
+  and `Tab`. A page-contents round trip keeps a Geometry `LineTo` (`X`, `Y`) and
+  a User row (`Value`, `Prompt`).
+- Recognized all six Visio main content types on the document part. Drawing,
+  stencil, and template packages, including the macro-enabled forms, open
+  without a pages part. Macro-enabled packages keep `vbaProject` bytes.
+- Added `ooxmlsdk-visio` to look up pages, masters, and shapes by id and to read
+  and write stored ShapeSheet values. Formulas are not evaluated. A missing
+  instance cell uses the master shape's stored value. A local value wins. A row
+  or section marked deleted does not inherit. Page, master, and shape ids are
+  allocated from separate counters. Text marks and the character data between
+  them round-trip in order. Package, ShapeSheet, and authoring behavior is
+  described in `docs/specs/visio_parts.md`, `docs/specs/visio_shapesheet.md`,
+  and `docs/specs/visio_authoring.md`.
+
 ## 0.14.0
 
 ### Breaking Changes

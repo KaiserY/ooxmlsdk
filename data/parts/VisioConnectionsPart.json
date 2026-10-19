@@ -1,0 +1,12 @@
+{
+  "Root": "visio:DataConnections_Type",
+  "Name": "VisioConnectionsPart",
+  "Base": "OpenXmlPart",
+  "ContentType": "application/vnd.ms-visio.connections+xml",
+  "RelationshipType": "http://schemas.microsoft.com/visio/2010/relationships/connections",
+  "Target": "connections",
+  "RootElement": "DataConnections",
+  "Paths": {
+    "General": "visio"
+  }
+}

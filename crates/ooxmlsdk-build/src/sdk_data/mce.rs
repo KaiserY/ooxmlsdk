@@ -95,6 +95,7 @@ fn gen_alternate_content_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaTy
       },
     ],
     particle: OpenXmlSchemaTypeParticle::default(),
+    text_value_type: String::new(),
     module_name: String::new(),
   }
 }
@@ -118,6 +119,7 @@ fn gen_choice_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaType {
     attributes: schema_attributes(attributes),
     children: vec![],
     particle: any_particle(),
+    text_value_type: String::new(),
     module_name: String::new(),
   }
 }
@@ -141,6 +143,7 @@ fn gen_fallback_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaType {
     attributes: schema_attributes(attributes),
     children: vec![],
     particle: any_particle(),
+    text_value_type: String::new(),
     module_name: String::new(),
   }
 }
@@ -180,10 +183,12 @@ fn any_particle() -> OpenXmlSchemaTypeParticle {
       initial_version: "Office2007".to_string(),
       require_filter: false,
       namespace: String::new(),
+      alternative_tests: Vec::new(),
     }],
     initial_version: String::new(),
     require_filter: false,
     namespace: String::new(),
+    alternative_tests: Vec::new(),
   }
 }
 

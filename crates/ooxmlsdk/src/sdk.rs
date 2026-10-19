@@ -438,6 +438,9 @@ pub(crate) fn part_root_content_type_matches_bytes(
       b"application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml" => {
         PresentationDocumentType::from_content_type_bytes(part_content_type).is_some()
       }
+      b"application/vnd.ms-visio.drawing.main+xml" => {
+        VisioDocumentType::from_content_type_bytes(part_content_type).is_some()
+      }
       _ => false,
     }
 }
@@ -601,6 +604,50 @@ impl PresentationDocumentType {
         Some(Self::MacroEnabledSlideshow)
       }
       b"application/vnd.ms-powerpoint.addin.macroEnabled.main+xml" => Some(Self::AddIn),
+      _ => None,
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum VisioDocumentType {
+  #[default]
+  Drawing,
+  MacroEnabledDrawing,
+  Stencil,
+  MacroEnabledStencil,
+  Template,
+  MacroEnabledTemplate,
+}
+
+#[cfg(feature = "parts")]
+impl VisioDocumentType {
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Drawing => "application/vnd.ms-visio.drawing.main+xml",
+      Self::MacroEnabledDrawing => "application/vnd.ms-visio.drawing.macroEnabled.main+xml",
+      Self::Stencil => "application/vnd.ms-visio.stencil.main+xml",
+      Self::MacroEnabledStencil => "application/vnd.ms-visio.stencil.macroEnabled.main+xml",
+      Self::Template => "application/vnd.ms-visio.template.main+xml",
+      Self::MacroEnabledTemplate => "application/vnd.ms-visio.template.macroEnabled.main+xml",
+    }
+  }
+
+  pub fn from_content_type(content_type: &str) -> Option<Self> {
+    Self::from_content_type_bytes(content_type.as_bytes())
+  }
+
+  pub fn from_content_type_bytes(content_type: &[u8]) -> Option<Self> {
+    match content_type {
+      b"application/vnd.ms-visio.drawing.main+xml" => Some(Self::Drawing),
+      b"application/vnd.ms-visio.drawing.macroEnabled.main+xml" => Some(Self::MacroEnabledDrawing),
+      b"application/vnd.ms-visio.stencil.main+xml" => Some(Self::Stencil),
+      b"application/vnd.ms-visio.stencil.macroEnabled.main+xml" => Some(Self::MacroEnabledStencil),
+      b"application/vnd.ms-visio.template.main+xml" => Some(Self::Template),
+      b"application/vnd.ms-visio.template.macroEnabled.main+xml" => {
+        Some(Self::MacroEnabledTemplate)
+      }
       _ => None,
     }
   }

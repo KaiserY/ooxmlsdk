@@ -444,6 +444,10 @@
     "Uri": "urn:schemas-microsoft-com:vml"
   },
   {
+    "Prefix": "visio",
+    "Uri": "http://schemas.microsoft.com/office/visio/2012/main"
+  },
+  {
     "Prefix": "vt",
     "Uri": "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
   },

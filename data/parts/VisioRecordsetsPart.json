@@ -1,0 +1,12 @@
+{
+  "Root": "visio:DataRecordSets_Type",
+  "Name": "VisioRecordsetsPart",
+  "Base": "OpenXmlPart",
+  "ContentType": "application/vnd.ms-visio.recordsets+xml",
+  "RelationshipType": "http://schemas.microsoft.com/visio/2010/relationships/recordsets",
+  "Target": "recordsets",
+  "RootElement": "DataRecordSets",
+  "Paths": {
+    "General": "visio"
+  }
+}

@@ -43,6 +43,7 @@ pub(super) fn plan_kept_body_suffix(
   flow: FlowContext,
 ) {
   if flow.columns.count != 1
+    || footnote_columns::uses_columns(root.document, &root.current, flow)
     || flow.text_segmentation != TextSegmentation::Body
     || !root.current.pending_footnote_follows.is_empty()
     || root
@@ -230,15 +231,16 @@ fn format_pages<'a>(
     y = format_separator(document, note_flow, &mut current, &mut pages, metrics, y);
   }
   let separator_items = current.items.len();
+  let mut preceding_spacing = preceding.filter(|block| !block_is_paragraph_frame(block));
   for blocks in stories {
     for (i, block) in blocks.iter().enumerate() {
-      let previous = i.checked_sub(1).and_then(|j| blocks.get(j)).or(preceding);
+      let mut neighbors = BlockNeighbors::for_index(blocks, i).with_boundaries(preceding, None);
+      neighbors.spacing_previous = neighbors.spacing_previous.or(preceding_spacing);
       let first_page = pages.len();
       let first_fragment = current.frame_fragments.len();
       let (next_flow, next_y) = layout_document_block(
-        previous,
+        neighbors,
         block,
-        blocks.get(i + 1),
         note_flow,
         LayoutBlockTarget {
           current: &mut current,
@@ -266,9 +268,9 @@ fn format_pages<'a>(
             })
             .sum::<f32>();
           let top = if index == first_page {
-            y + paragraph_spacing_before(previous, paragraph, note_flow)
+            y + paragraph_spacing_before(neighbors.spacing_previous, paragraph, note_flow)
               + paragraph_border_layout_extent(
-                ParagraphBorderContext::for_blocks(previous, paragraph, blocks.get(i + 1))
+                ParagraphBorderContext::for_blocks(neighbors.previous, paragraph, neighbors.next)
                   .top(paragraph),
               )
           } else {
@@ -295,6 +297,9 @@ fn format_pages<'a>(
       y = next_y;
       current.footnote_flow_bottom_pt = Some(y);
       preceding = Some(block);
+      if !block_is_paragraph_frame(block) {
+        preceding_spacing = Some(block);
+      }
     }
   }
   pages.push(current);
@@ -460,11 +465,11 @@ pub(super) fn finish_pending_pages(pages: &mut Vec<Page>) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
   use super::*;
   use crate::docx::{Paragraph, ParagraphFormat};
 
-  fn paragraph(text: &str, keep: bool, widow: bool) -> Block {
+  pub(in crate::docx::layout) fn paragraph(text: &str, keep: bool, widow: bool) -> Block {
     let run = TextRun {
       text: text.into(),
       style: TextStyle::default(),
@@ -501,7 +506,7 @@ mod tests {
     })
   }
 
-  fn document() -> DocxDocument {
+  pub(in crate::docx::layout) fn document() -> DocxDocument {
     DocxDocument {
       page: PageSetup {
         width_pt: 360.0,

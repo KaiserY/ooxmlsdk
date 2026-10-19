@@ -1,19 +1,88 @@
 use std::borrow::Cow;
-use std::hash::{Hash, Hasher};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use ooxmlsdk_fonts::{
   FeatureValue, FontBytes, FontCharset, FontFallbackChain, FontFamilyClass, FontFamilySelection,
-  FontId, FontRegistry, FontRequest, FontScriptRun, FontSize, FontSlant, ResolvedFontChain,
-  ScriptScanOptions, ShapeOptions, ShapedRun, TextDirection, TextScript, WordprocessingFontSlot,
-  script_direction_runs_with_options,
+  FontId, FontRegistry, FontRequest, FontScriptRun, FontSize, FontSlant, FontSource,
+  ResolvedFontChain, ScriptScanOptions, ShapeOptions, ShapedRun, TextDirection, TextScript,
+  WordprocessingFontSlot, script_direction_runs_with_options,
 };
 use rustc_hash::FxHashMap as HashMap;
 use skrifa::raw::{FontRef, TableProvider};
 
 use crate::common;
 use crate::docx::TextStyle;
+
+/// Private fonts belonging to one document. These resources travel with text
+/// styles so fresh measurement and PDF resolvers see the same font collection.
+#[derive(Debug)]
+pub struct EmbeddedFontSet {
+  fingerprint: u64,
+  fonts: Vec<EmbeddedFont>,
+  registry: OnceLock<FontRegistry<'static>>,
+}
+
+impl PartialEq for EmbeddedFontSet {
+  fn eq(&self, other: &Self) -> bool {
+    self.fingerprint == other.fingerprint && self.fonts == other.fonts
+  }
+}
+
+impl Eq for EmbeddedFontSet {}
+
+#[derive(Debug, Eq, PartialEq)]
+struct EmbeddedFont {
+  id: Arc<str>,
+  data: FontBytes,
+}
+
+impl Hash for EmbeddedFontSet {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    self.fingerprint.hash(state);
+  }
+}
+
+impl EmbeddedFontSet {
+  pub(crate) fn new(sources: Vec<(String, Vec<u8>)>) -> Option<Arc<Self>> {
+    let fonts = sources
+      .into_iter()
+      .filter_map(|(name, data)| {
+        FontRef::from_index(&data, 0).ok()?;
+        let mut hash = DefaultHasher::new();
+        name.hash(&mut hash);
+        data.hash(&mut hash);
+        Some(EmbeddedFont {
+          id: Arc::from(format!("embedded-ooxml:{:016x}:{name}", hash.finish())),
+          data: data.into(),
+        })
+      })
+      .collect::<Vec<_>>();
+    if fonts.is_empty() {
+      return None;
+    }
+    let mut hash = DefaultHasher::new();
+    for font in &fonts {
+      font.id.hash(&mut hash);
+    }
+    Some(Arc::new(Self {
+      fingerprint: hash.finish(),
+      fonts,
+      registry: OnceLock::new(),
+    }))
+  }
+
+  fn registry(&self) -> &FontRegistry<'static> {
+    self.registry.get_or_init(|| {
+      let mut registry = FontRegistry::with_default_policy();
+      for font in &self.fonts {
+        let _ = registry.register_embedded_font(font.id.to_string(), font.data.clone());
+      }
+      registry
+    })
+  }
+}
 
 fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
   static ENABLED: OnceLock<bool> = OnceLock::new();
@@ -32,6 +101,7 @@ pub struct FontFaceData {
   pub index: u32,
   pub synthetic_bold: bool,
   pub synthetic_italic: bool,
+  pub document_embedded: bool,
   id: Arc<str>,
 }
 
@@ -76,6 +146,9 @@ impl Hash for FontFaceData {
 }
 
 pub trait FontStyleRef {
+  fn embedded_fonts(&self) -> Option<&Arc<EmbeddedFontSet>> {
+    None
+  }
   fn font_family(&self) -> Option<&str>;
   fn symbol_font_family(&self) -> Option<&str> {
     None
@@ -243,6 +316,9 @@ pub trait FontStyleRef {
 }
 
 impl<T: FontStyleRef + ?Sized> FontStyleRef for Box<T> {
+  fn embedded_fonts(&self) -> Option<&Arc<EmbeddedFontSet>> {
+    (**self).embedded_fonts()
+  }
   fn font_family(&self) -> Option<&str> {
     (**self).font_family()
   }
@@ -728,6 +804,9 @@ pub(crate) fn materialize_wordprocessingml_source_font_slot(
 }
 
 impl FontStyleRef for TextStyle {
+  fn embedded_fonts(&self) -> Option<&Arc<EmbeddedFontSet>> {
+    self.embedded_fonts.as_ref()
+  }
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
   }
@@ -985,6 +1064,9 @@ impl FontStyleRef for TextStyle {
 }
 
 impl FontStyleRef for common::TextStyle<'_> {
+  fn embedded_fonts(&self) -> Option<&Arc<EmbeddedFontSet>> {
+    self.embedded_fonts.as_ref()
+  }
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
   }
@@ -1598,6 +1680,25 @@ impl FontResolver {
       })
   }
 
+  pub(crate) fn exact_family_coverage(
+    &mut self,
+    family: &str,
+  ) -> Option<ooxmlsdk_fonts::FontCoverage> {
+    let style = TextStyle {
+      font_family: Some(Arc::from(family)),
+      ..TextStyle::default()
+    };
+    let request = font_request(&style, None);
+    let registry = self.style_font_registry(&style, None);
+    let resolved = registry.resolve(&request).ok()?;
+    let face = registry.face(&resolved.font_id)?;
+    face
+      .family_names
+      .iter()
+      .any(|name| name.trim().eq_ignore_ascii_case(family.trim()))
+      .then(|| face.coverage.clone())
+  }
+
   pub fn load_text_face(&mut self, style: &(impl FontStyleRef + ?Sized)) -> Option<FontFaceData> {
     let mut request = font_request(style, None);
     let registry = self.style_font_registry(style, None);
@@ -1689,6 +1790,13 @@ impl FontResolver {
     self
       .font_metrics(style, None)
       .map(|metrics| metrics.decoration)
+  }
+
+  pub(crate) fn script_metrics(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<ooxmlsdk_fonts::ScriptMetrics> {
+    self.font_metrics(style, None).map(|metrics| metrics.script)
   }
 
   pub(crate) fn text_vertical_metrics(
@@ -1918,6 +2026,7 @@ impl FontResolver {
     let metrics = FontMetrics {
       vertical: metrics_at_size.vertical,
       decoration: metrics_at_size.decoration,
+      script: metrics_at_size.script,
       wordprocessingml_default_charset: wordprocessingml_default_charset_metrics(
         &request, &resolved,
       ),
@@ -2695,7 +2804,12 @@ fn build_style_font_registry_for_slot(
   font_timing("build style font registry", || {
     let mut request = font_request_for_slot(style, script, wordprocessingml_font_slot);
     request.script = script;
-    let mut registry = FontRegistry::with_default_policy();
+    // Parsing the document's private font metadata belongs to its collection,
+    // not to each size/script/style key or each fresh PDF resolver.
+    let mut registry = style
+      .embedded_fonts()
+      .map(|embedded| embedded.registry().clone())
+      .unwrap_or_else(FontRegistry::with_default_policy);
     if style.wordprocessing_nominal_control_metrics() {
       // Read-only Word font creation and placement agree on MS Mincho
       // (256 units/em, U+202C glyph854/advance128) when the authored face
@@ -2852,12 +2966,16 @@ fn font_face_data_from_registry_binary(
     index,
     synthetic_bold: false,
     synthetic_italic: false,
+    document_embedded: registry.sources.iter().any(|source| {
+      matches!(source, FontSource::EmbeddedOoxml { id, .. } if id.as_ref() == font_id.0.as_ref())
+    }),
     id: font_id.0.clone(),
   })
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct FontFaceKey {
+  embedded_fonts: Option<Arc<EmbeddedFontSet>>,
   family: Option<String>,
   wordprocessingml_font_slots: bool,
   fallback_family: Option<String>,
@@ -2884,6 +3002,7 @@ impl FontFaceKey {
     wordprocessingml_font_slot: Option<WordprocessingFontSlot>,
   ) -> Self {
     Self {
+      embedded_fonts: style.embedded_fonts().cloned(),
       family: script_font_family_for_slot(style, script, wordprocessingml_font_slot)
         .map(str::to_string),
       wordprocessingml_font_slots: style.wordprocessingml_font_slots(),
@@ -2927,7 +3046,9 @@ impl FontFaceKey {
     script: Option<TextScript>,
     wordprocessingml_font_slot: Option<WordprocessingFontSlot>,
   ) -> bool {
-    self.family.as_deref() == script_font_family_for_slot(style, script, wordprocessingml_font_slot)
+    self.embedded_fonts.as_ref() == style.embedded_fonts()
+      && self.family.as_deref()
+        == script_font_family_for_slot(style, script, wordprocessingml_font_slot)
       && self.wordprocessingml_font_slots == style.wordprocessingml_font_slots()
       && self.fallback_family.as_deref()
         == script_fallback_font_family_for_slot(style, script, wordprocessingml_font_slot)
@@ -2956,6 +3077,7 @@ impl FontFaceKey {
 struct FontMetrics {
   vertical: ooxmlsdk_fonts::VerticalMetrics,
   decoration: ooxmlsdk_fonts::DecorationMetrics,
+  script: ooxmlsdk_fonts::ScriptMetrics,
   wordprocessingml_default_charset: Option<ooxmlsdk_fonts::VerticalMetrics>,
 }
 
@@ -3213,6 +3335,58 @@ mod tests {
     shape_text_runs, wordprocessing_line_metrics_font_slot,
     wordprocessingml_missing_family_fallback_for_slot,
   };
+
+  #[test]
+  fn embedded_font_collections_isolate_warm_face_caches_and_survive_style_adapters() {
+    let plain = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      ..Default::default()
+    };
+    let system = load_text_face(&plain).expect("font test environment has a default face");
+    let bytes = system.data.as_slice().to_vec();
+    let first = super::EmbeddedFontSet::new(vec![("first-document".into(), bytes.clone())])
+      .expect("valid system font");
+    let second = super::EmbeddedFontSet::new(vec![("second-document".into(), bytes)])
+      .expect("valid system font");
+    let first_style = TextStyle {
+      embedded_fonts: Some(first.clone()),
+      ..plain.clone()
+    };
+    let second_style = TextStyle {
+      embedded_fonts: Some(second),
+      ..plain.clone()
+    };
+    let mut resolver = super::FontResolver::default();
+    let first_face = resolver.cached_text_face(&first_style).unwrap();
+    let second_face = resolver
+      .cached_text_face(&Box::new(second_style.clone()))
+      .unwrap();
+    assert!(first_face.document_embedded && second_face.document_embedded);
+    assert_ne!(first_face.id(), second_face.id());
+    assert_eq!(first_face.data, second_face.data);
+    let mut metrics = crate::text_metrics::TextMetrics::new();
+    assert_eq!(
+      metrics.cached_text_face(&first_style).unwrap().id(),
+      first_face.id()
+    );
+    assert_eq!(
+      metrics.cached_text_face(&second_style).unwrap().id(),
+      second_face.id()
+    );
+    assert_eq!(
+      metrics.cached_text_face(&first_style).unwrap().id(),
+      first_face.id()
+    );
+    assert!(!metrics.cached_text_face(&plain).unwrap().document_embedded);
+    let common = crate::model::common_text_style(first_style);
+    assert!(Arc::ptr_eq(common.embedded_fonts.as_ref().unwrap(), &first));
+    assert_eq!(
+      resolver.cached_text_face(&common).unwrap().id(),
+      first_face.id()
+    );
+    assert!(!resolver.cached_text_face(&plain).unwrap().document_embedded);
+    assert!(super::EmbeddedFontSet::new(vec![("invalid".into(), vec![0; 32])]).is_none());
+  }
 
   #[test]
   fn word_primary_family_selection_has_distinct_face_and_metrics_caches() {
@@ -3804,7 +3978,7 @@ mod tests {
     );
     assert_eq!(
       variant_runs[0].wordprocessingml_font_slot,
-      Some(WordprocessingFontSlot::EastAsia)
+      Some(WordprocessingFontSlot::Ascii)
     );
     assert_eq!(
       font_request_for_slot(
@@ -4077,15 +4251,14 @@ mod tests {
 
   #[test]
   fn resolved_odd_bidi_level_reverses_the_complete_shaping_run_sequence() {
-    // Comment066.docx contains this exact w:rtl fragment. Word's ASCII font
-    // slot splits the leading neutral punctuation from the Arabic script, but
-    // both pieces have the same resolved level and form one visual RTL run.
+    // An odd paragraph level does not itself force w:rtl font formatting.
+    // The leading ASCII punctuation and Arabic retain separate physical
+    // faces, and their complete run sequence must follow the visual level.
     let text = "; اطفال ";
     let rtl_style = TextStyle {
       font_family: Some(Arc::from("Cambria")),
       high_ansi_font_family: Some(Arc::from("Cambria")),
       complex_font_family: Some(Arc::from("Times New Roman")),
-      right_to_left: Some(true),
       resolved_bidi_level: Some(1),
       wordprocessingml_font_slots: true,
       ..Default::default()
@@ -4096,13 +4269,33 @@ mod tests {
         .iter()
         .map(|run| run.text_range.clone())
         .collect::<Vec<_>>(),
-      vec![2..text.len(), 0..2]
+      vec![text.len() - 1..text.len(), 2..text.len() - 1, 0..2]
     );
     assert!(
       rtl
         .iter()
         .all(|run| run.direction == TextDirection::RightToLeft)
     );
+
+    // ECMA-376 §17.3.2.30 and MS-OI29500 §2.1.88: explicit w:rtl also
+    // selects the cs face for the punctuation, as in Comment066.docx.
+    let forced = shape_text_runs(
+      text,
+      &TextStyle {
+        right_to_left: Some(true),
+        ..rtl_style.clone()
+      },
+    )
+    .expect("explicit rtl formatting");
+    assert_eq!(forced.len(), 1);
+    assert_eq!(forced[0].text_range, 0..text.len());
+    let cs_face = load_text_face(&TextStyle {
+      font_family: Some(Arc::from("Times New Roman")),
+      ..Default::default()
+    })
+    .expect("explicit cs face");
+    assert_eq!(forced[0].font_id.0.as_ref(), cs_face.id());
+    assert_eq!(forced[0].direction, TextDirection::RightToLeft);
 
     let ltr_style = TextStyle {
       resolved_bidi_level: Some(0),
@@ -4114,7 +4307,7 @@ mod tests {
         .iter()
         .map(|run| run.text_range.clone())
         .collect::<Vec<_>>(),
-      vec![0..2, 2..text.len()]
+      vec![0..2, 2..text.len() - 1, text.len() - 1..text.len()]
     );
   }
 

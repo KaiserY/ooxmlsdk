@@ -65,7 +65,7 @@ subsetter = { version = "0.2.6", features = ["variable-fonts"] }
 pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
 png = "0.18.1"
 toml = "1.1.4"
-fontique = { version = "0.11.0", features = ["fontconfig-dlopen", "system"] }
+fontique = { version = "0.12.0", features = ["fontconfig-dlopen", "system"] }
 harfrust = { version = "0.13.3", default-features = false, features = ["std"] }
 html5ever = "0.39.0"
 cssparser = "0.37.0"
@@ -95,7 +95,7 @@ libm = "0.2.16"
 num-complex = "0.4.6"
 num-integer = "0.1.47"
 num-traits = "0.2.19"
-parley = { version = "0.11.0", default-features = false, features = [
+parley = { version = "0.12.0", default-features = false, features = [
   "std",
   "complex-scripts",
 ] }

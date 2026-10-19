@@ -96,6 +96,7 @@ impl WordFontAlias {
 #[derive(Clone, Debug)]
 struct DirectFontFace {
   word_alias: Option<WordFontAlias>,
+  word_names: bool,
   data: Arc<FontBytes>,
   index: u32,
   id: Arc<str>,
@@ -106,6 +107,7 @@ impl DirectFontFace {
   fn from_layout(face: &FontFaceData) -> Self {
     Self {
       word_alias: None,
+      word_names: false,
       data: face.data.clone(),
       index: face.index,
       id: Arc::from(face.id()),
@@ -117,6 +119,7 @@ impl DirectFontFace {
     DirectFontKey {
       integer_widths,
       word_alias: self.word_alias,
+      word_names: self.word_names,
       id: self.id.clone(),
       index: self.index,
       variations: self
@@ -148,6 +151,7 @@ impl DirectFontFace {
 struct DirectFontKey {
   integer_widths: bool,
   word_alias: Option<WordFontAlias>,
+  word_names: bool,
   id: Arc<str>,
   index: u32,
   variations: Vec<DirectFontVariationKey>,
@@ -240,17 +244,19 @@ impl DirectFontSet {
     face: &FontFaceData,
     integer_widths: bool,
     word_family: Option<&str>,
+    word_names: bool,
     alloc: impl FnMut() -> Result<Ref>,
   ) -> Result<FontHandle> {
-    let Some(alias) = word_family.and_then(WordFontAlias::from_family) else {
+    if word_family.is_none() && !word_names {
       return if integer_widths {
         self.register_word_device_face(face, alloc)
       } else {
         self.register_face(face, alloc)
       };
-    };
+    }
     let mut direct_face = DirectFontFace::from_layout(face);
-    direct_face.word_alias = Some(alias);
+    direct_face.word_alias = word_family.and_then(WordFontAlias::from_family);
+    direct_face.word_names = true;
     self.register_direct_face(direct_face, integer_widths, alloc)
   }
 
@@ -265,6 +271,7 @@ impl DirectFontSet {
     self.register_direct_face(
       DirectFontFace {
         word_alias: None,
+        word_names: false,
         data,
         index,
         id,
@@ -812,6 +819,8 @@ impl FontMetadata {
       .and_then(|alias| alias.postscript_name(&postscript_name))
     {
       alias_name.to_owned()
+    } else if face_data.word_names && is_glyf {
+      word_truetype_font_name(&face, &postscript_name).to_owned()
     } else {
       postscript_name
     };
@@ -828,6 +837,28 @@ impl FontMetadata {
       stem_v: 10.0 + 0.244 * (weight - 50.0),
       monospaced: metrics.is_monospace,
     })
+  }
+}
+
+fn word_truetype_font_name<'a>(face: &FontRef<'_>, postscript_name: &'a str) -> &'a str {
+  // Native Word preserves the physical TrueType outlines and italic
+  // descriptor but omits the terminal Oblique token from the PDF name.
+  // DejaVu Sans/Condensed/Mono and Miriam Mono CLM controls cover plain,
+  // bold and book subfamilies; Sans/Mono also cover both text orders. Serif/Arial Italic
+  // retain their names. Keep the intrinsic subfamily authoritative, and
+  // leave CFF, non-Word output and explicit legacy aliases alone.
+  let Some(name) = postscript_name.strip_suffix("Oblique") else {
+    return postscript_name;
+  };
+  let name = name.trim_end_matches('-');
+  let oblique = face
+    .localized_strings(skrifa::string::StringId::SUBFAMILY_NAME)
+    .english_or_first()
+    .is_some_and(|name| name.to_string().split_whitespace().next_back() == Some("Oblique"));
+  if oblique && !name.is_empty() {
+    name
+  } else {
+    postscript_name
   }
 }
 
@@ -867,6 +898,82 @@ mod tests {
   use pdf_writer::types::FontFlags;
 
   #[test]
+  fn word_oblique_names_keep_physical_faces_and_non_word_resources_distinct() {
+    let mut resolver = ooxmlsdk_layout::fonts::FontResolver::default();
+    let mut fonts = super::DirectFontSet::default();
+    let mut next_ref = 1;
+    let mut allocate = || {
+      let reference = pdf_writer::Ref::new(next_ref);
+      next_ref += 1;
+      Ok(reference)
+    };
+    for family in [
+      "DejaVu Sans",
+      "DejaVu Sans Condensed",
+      "DejaVu Sans Mono",
+      "Miriam Mono CLM",
+      "DejaVu Serif",
+      "Arial",
+    ] {
+      for (bold, italic) in [(false, false), (false, true), (true, false), (true, true)] {
+        let face = resolver
+          .cached_text_face(&ooxmlsdk_layout::common::TextStyle {
+            font_family: Some(family.into()),
+            bold,
+            italic,
+            ..Default::default()
+          })
+          .expect("native-control font face");
+        for integer_widths in [false, true] {
+          let physical = fonts
+            .register_text_face(&face, integer_widths, None, false, &mut allocate)
+            .unwrap();
+          let word = fonts
+            .register_text_face(&face, integer_widths, Some(family), false, &mut allocate)
+            .unwrap();
+          // Portion leaders use Word's spelling without opting into line
+          // placement, integer widths or requested-family aliasing.
+          let word_portion = fonts
+            .register_text_face(&face, integer_widths, None, true, &mut allocate)
+            .unwrap();
+          assert_eq!(word_portion, word);
+          let physical_font = &fonts.fonts[physical.0];
+          let word_font = &fonts.fonts[word.0];
+          let physical_name = &physical_font.metadata.postscript_name;
+          let expected = if italic && !matches!(family, "DejaVu Serif" | "Arial") {
+            physical_name
+              .strip_suffix("Oblique")
+              .expect("the native control selects a real Oblique face")
+              .trim_end_matches('-')
+          } else {
+            physical_name
+          };
+          assert_eq!(word_font.metadata.postscript_name, expected, "{family}");
+          assert_eq!(word_font.face.id, physical_font.face.id);
+          assert_eq!(word_font.face.data, physical_font.face.data);
+          assert_eq!(
+            word_font.metadata.italic_angle,
+            physical_font.metadata.italic_angle
+          );
+          assert_eq!(word_font.metadata.italic_angle != 0.0, italic);
+          assert_eq!(
+            fonts
+              .register_text_face(&face, integer_widths, Some(family), false, &mut allocate)
+              .unwrap(),
+            word
+          );
+          assert_eq!(
+            fonts
+              .register_text_face(&face, integer_widths, None, false, &mut allocate)
+              .unwrap(),
+            physical
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
   fn word_postscript_aliases_keep_distinct_resources_for_the_same_outline_face() {
     let style = ooxmlsdk_layout::common::TextStyle {
       font_family: Some("Arial".into()),
@@ -885,10 +992,10 @@ mod tests {
     let mut fonts = super::DirectFontSet::default();
     for integer in [false, true] {
       let physical = fonts
-        .register_text_face(&face, integer, Some("Arial"), &mut allocate)
+        .register_text_face(&face, integer, Some("Arial"), false, &mut allocate)
         .unwrap();
       let alias = fonts
-        .register_text_face(&face, integer, Some("Helvetica"), &mut allocate)
+        .register_text_face(&face, integer, Some("Helvetica"), false, &mut allocate)
         .unwrap();
       assert_ne!(physical, alias);
       assert_eq!(fonts.fonts[physical.0].metadata.postscript_name, "ArialMT");
@@ -899,13 +1006,13 @@ mod tests {
       );
       assert_eq!(
         fonts
-          .register_text_face(&face, integer, Some("Helv"), &mut allocate)
+          .register_text_face(&face, integer, Some("Helv"), false, &mut allocate)
           .unwrap(),
         physical
       );
       assert_eq!(
         fonts
-          .register_text_face(&face, integer, Some("Helvetica"), &mut allocate)
+          .register_text_face(&face, integer, Some("Helvetica"), false, &mut allocate)
           .unwrap(),
         alias
       );

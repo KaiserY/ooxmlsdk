@@ -136,6 +136,29 @@ fn validate_image(image: &DirectRasterImage) -> Result<()> {
   }
 
   match &image.encoding {
+    DirectRasterEncoding::BinaryStencil {
+      width,
+      height,
+      alpha,
+      ..
+    } => {
+      let length = u64::from(*width) * u64::from(*height);
+      if image.width != 2
+        || image.height != 2
+        || image.bits_per_component != 1
+        || image.color_space != DirectRasterColorSpace::Rgb
+        || *width == 0
+        || *height == 0
+        || i32::try_from(*width).is_err()
+        || i32::try_from(*height).is_err()
+        || length != alpha.len() as u64
+        || alpha.iter().any(|&sample| sample != 0 && sample != 255)
+      {
+        return Err(PdfError::Writer(
+          "invalid binary font-stencil planes".to_string(),
+        ));
+      }
+    }
     DirectRasterEncoding::Sampled { pixels } => {
       if image.bits_per_component != 8 || image.color_space != DirectRasterColorSpace::Rgb {
         return Err(PdfError::Writer(
@@ -228,6 +251,10 @@ fn write_image_object(pdf: &mut Pdf, object: &ImageObject) -> Result<()> {
   let image = object.image.direct();
   let encoded;
   let (stream, filter) = match &image.encoding {
+    DirectRasterEncoding::BinaryStencil { .. } => {
+      encoded = deflate(&[0, 0])?;
+      (encoded.as_slice(), Filter::FlateDecode)
+    }
     DirectRasterEncoding::Sampled { pixels } => {
       encoded = deflate(&pixels.rgb)?;
       (encoded.as_slice(), Filter::FlateDecode)
@@ -247,6 +274,9 @@ fn write_image_object(pdf: &mut Pdf, object: &ImageObject) -> Result<()> {
   }
 
   match &image.encoding {
+    DirectRasterEncoding::BinaryStencil { color, .. } => {
+      writer.color_space().indexed(Name(b"DeviceRGB"), 0, color);
+    }
     DirectRasterEncoding::IndexedPng { palette, .. } => {
       let high = i32::try_from(palette.len() / 3 - 1)
         .map_err(|_| PdfError::Writer("indexed image palette is too large".to_string()))?;
@@ -295,14 +325,41 @@ fn write_image_object(pdf: &mut Pdf, object: &ImageObject) -> Result<()> {
   writer.finish();
 
   if let (Some(mask_id), Some(alpha)) = (object.soft_mask_id, image.alpha()) {
+    let packed;
+    let (alpha, width, height, bits) = match &image.encoding {
+      DirectRasterEncoding::BinaryStencil { width, height, .. } => {
+        let row_bytes = (*width as usize).div_ceil(8);
+        packed = {
+          let mut packed = vec![0; row_bytes * *height as usize];
+          for (source, target) in alpha
+            .chunks_exact(*width as usize)
+            .zip(packed.chunks_exact_mut(row_bytes))
+          {
+            for (index, &sample) in source.iter().enumerate() {
+              if sample != 0 {
+                target[index / 8] |= 0x80 >> (index & 7);
+              }
+            }
+          }
+          packed
+        };
+        (packed.as_slice(), *width, *height, 1)
+      }
+      _ => (
+        alpha,
+        image.width,
+        image.height,
+        i32::from(image.bits_per_component),
+      ),
+    };
     let encoded_alpha = deflate(alpha)?;
     validate_stream_length(encoded_alpha.len())?;
     let mut mask = pdf.image_xobject(mask_id, &encoded_alpha);
     mask.filter(Filter::FlateDecode);
-    mask.width(image.width as i32);
-    mask.height(image.height as i32);
+    mask.width(width as i32);
+    mask.height(height as i32);
     mask.color_space().device_gray();
-    mask.bits_per_component(i32::from(image.bits_per_component));
+    mask.bits_per_component(bits);
     if image.soft_mask_interpolate {
       mask.interpolate(true);
     }
@@ -479,6 +536,44 @@ mod tests {
     let mut pdf = Pdf::with_settings(Settings { pretty: false });
     images.write_objects(&mut pdf).unwrap();
     pdf.finish()
+  }
+
+  #[test]
+  fn binary_stencil_retains_independent_mask_dimensions_and_row_padding() {
+    use std::io::Read;
+
+    let mut alpha = vec![0; 20];
+    for index in [0, 7, 9, 18, 19] {
+      alpha[index] = 255;
+    }
+    let pdf = serialized(PreparedRasterImage::font_bitmap(10, 2, [20, 40, 60], alpha));
+    let text = String::from_utf8_lossy(&pdf);
+    assert_eq!(text.matches("/Subtype/Image").count(), 2);
+    assert!(text.contains("/Width 2"));
+    assert!(text.contains("/Width 10"));
+    assert_eq!(text.matches("/BitsPerComponent 1").count(), 2);
+    assert!(text.contains("/ColorSpace[/Indexed/DeviceRGB 0"));
+    assert!(!text.contains("/Interpolate"));
+    let streams = pdf
+      .windows(8)
+      .enumerate()
+      .filter_map(|(index, value)| (value == b"\nstream\n").then_some(index + 8))
+      .collect::<Vec<_>>();
+    let mut mask = Vec::new();
+    flate2::read::ZlibDecoder::new(&pdf[streams[1]..])
+      .read_to_end(&mut mask)
+      .unwrap();
+    assert_eq!(mask, [0x81, 0x40, 0x00, 0xc0]);
+  }
+
+  #[test]
+  fn binary_stencil_rejects_nonbinary_and_mismatched_mask_planes() {
+    for alpha in [vec![0; 19], vec![64; 20]] {
+      assert!(matches!(
+        register_error(PreparedRasterImage::font_bitmap(10, 2, [0, 0, 0], alpha)),
+        PdfError::Writer(_)
+      ));
+    }
   }
 
   #[test]

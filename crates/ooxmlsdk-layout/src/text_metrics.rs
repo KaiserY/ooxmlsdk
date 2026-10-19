@@ -24,6 +24,9 @@ struct AutomaticEscapementMetricsStyle<'a, S: ?Sized> {
 }
 
 impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<'_, S> {
+  fn embedded_fonts(&self) -> Option<&Arc<crate::fonts::EmbeddedFontSet>> {
+    self.style.embedded_fonts()
+  }
   fn font_family(&self) -> Option<&str> {
     self.style.font_family()
   }
@@ -392,6 +395,7 @@ pub struct ShapedGlyphBounds {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct MeasureStyleKey {
+  embedded_fonts: Option<Arc<crate::fonts::EmbeddedFontSet>>,
   shaping_context: Option<crate::common::TextShapingContext>,
   font_family: Option<Box<str>>,
   high_ansi_font_family: Option<Box<str>>,
@@ -449,6 +453,7 @@ struct MeasureStyleKey {
 impl MeasureStyleKey {
   fn from_style(style: &(impl FontStyleRef + ?Sized)) -> Self {
     Self {
+      embedded_fonts: style.embedded_fonts().cloned(),
       shaping_context: style.shaping_context().cloned(),
       font_family: style.font_family().map(Into::into),
       high_ansi_font_family: style.high_ansi_font_family().map(Into::into),
@@ -517,7 +522,8 @@ impl MeasureStyleKey {
   }
 
   fn matches(&self, style: &(impl FontStyleRef + ?Sized)) -> bool {
-    self.shaping_context.as_ref() == style.shaping_context()
+    self.embedded_fonts.as_ref() == style.embedded_fonts()
+      && self.shaping_context.as_ref() == style.shaping_context()
       && self.font_family.as_deref() == style.font_family()
       && self.high_ansi_font_family.as_deref() == style.high_ansi_font_family()
       && self.fallback_font_family.as_deref() == style.fallback_font_family()
@@ -600,7 +606,15 @@ pub(crate) struct GdiHintedTextExtents {
   pub(crate) unpositioned_width_pt: f32,
 }
 
-type GdiHintedExtentCache = HashMap<u32, HashMap<Arc<str>, Option<GdiHintedTextExtents>>>;
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum GdiTextHintingTarget {
+  Smooth,
+  Mono,
+}
+
+type GdiHintingInstanceKey = (FontFaceCacheKey, u8, GdiTextHintingTarget);
+type GdiHintedExtentCache =
+  HashMap<(u32, GdiTextHintingTarget), HashMap<Arc<str>, Option<GdiHintedTextExtents>>>;
 
 #[derive(Debug, Default)]
 pub struct TextMetrics {
@@ -611,12 +625,61 @@ pub struct TextMetrics {
   gdi_hinting_instances: GdiHintingInstanceCache,
   word_natural_instances: WordNaturalMetricCache,
   excel_cell_text_insets: HashMap<usize, Option<f32>>,
+  auxiliary_font_coverages: HashMap<&'static str, Option<Arc<ooxmlsdk_fonts::FontCoverage>>>,
   last_measure_style: Option<usize>,
 }
 
 #[derive(Default)]
 struct GdiHintingInstanceCache {
-  instances: HashMap<(FontFaceCacheKey, u8), HintingInstance>,
+  instances: HashMap<GdiHintingInstanceKey, HintingInstance>,
+  glyph_advances: HashMap<(GdiHintingInstanceKey, u32), (f32, f32)>,
+}
+
+impl GdiHintingInstanceCache {
+  fn advances(
+    &mut self,
+    face: &FontFaceData,
+    glyph_id: u32,
+    ppem: u8,
+    target: GdiTextHintingTarget,
+  ) -> Option<(f32, f32)> {
+    let key = (face.cache_key(), ppem, target);
+    let glyph_key = (key.clone(), glyph_id);
+    if let Some(advances) = self.glyph_advances.get(&glyph_key) {
+      return Some(*advances);
+    }
+    let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
+    let outlines = font.outline_glyphs();
+    let instance = match self.instances.entry(key) {
+      std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+      std::collections::hash_map::Entry::Vacant(entry) => entry.insert(
+        HintingInstance::new(
+          &outlines,
+          Size::new(f32::from(ppem)),
+          LocationRef::default(),
+          match target {
+            GdiTextHintingTarget::Smooth => HintingOptions::default(),
+            GdiTextHintingTarget::Mono => skrifa::outline::Target::Mono.into(),
+          },
+        )
+        .ok()?,
+      ),
+    };
+    let outline = outlines.get(GlyphId::new(glyph_id))?;
+    let unhinted = outline
+      .draw(
+        DrawSettings::unhinted(Size::new(f32::from(ppem)), LocationRef::default()),
+        &mut NullPen,
+      )
+      .ok()?
+      .advance_width?;
+    let hinted = outline
+      .draw(DrawSettings::hinted(instance, false), &mut NullPen)
+      .ok()?
+      .advance_width?;
+    self.glyph_advances.insert(glyph_key, (unhinted, hinted));
+    Some((unhinted, hinted))
+  }
 }
 
 impl std::fmt::Debug for GdiHintingInstanceCache {
@@ -624,6 +687,7 @@ impl std::fmt::Debug for GdiHintingInstanceCache {
     formatter
       .debug_struct("GdiHintingInstanceCache")
       .field("len", &self.instances.len())
+      .field("glyphs", &self.glyph_advances.len())
       .finish()
   }
 }
@@ -707,6 +771,24 @@ impl TextMetrics {
 
   pub fn into_font_resolver(self) -> FontResolver {
     self.fonts
+  }
+
+  pub(crate) fn cached_text_face(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<FontFaceData> {
+    self.fonts.cached_text_face(style)
+  }
+
+  pub(crate) fn auxiliary_font_coverage(
+    &mut self,
+    family: &'static str,
+  ) -> Option<Arc<ooxmlsdk_fonts::FontCoverage>> {
+    self
+      .auxiliary_font_coverages
+      .entry(family)
+      .or_insert_with(|| self.fonts.exact_family_coverage(family).map(Arc::new))
+      .clone()
   }
 
   pub(crate) fn has_exact_ascii_face(&mut self, style: &(impl FontStyleRef + ?Sized)) -> bool {
@@ -892,12 +974,71 @@ impl TextMetrics {
 
   /// Returns Excel's unrotated fixed-output character advances.
   ///
-  /// Excel's worksheet edit paint path disables pair positioning and standard
-  /// ligatures, rounds each unpositioned outline advance to the nearest
-  /// printer pixel, and writes the resulting character positions to the PDF
-  /// `TJ` array. This differs from the hdmx/ceiling behavior exposed by the
-  /// classic GDI helper above and from the projected off-axis path below.
+  /// Native plain, inline and single-portion rich text share the printer
+  /// glyph metrics. Rounding the unhinted outline is insufficient: TrueType
+  /// instructions can change an advance by several device pixels. Reuse the
+  /// classic printer hinter used for complete string extents instead.
   pub(crate) fn excel_unrotated_character_advances_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<Arc<[f32]>> {
+    self.gdi_printer_character_advances_pt(text, style)
+  }
+
+  /// Ideal and GDI Natural metrics for simple Word line-service characters.
+  /// The caller balances a complete physical line before assigning cells;
+  /// summing ordinary GDI widths loses Word's neighbouring-error carry.
+  pub(crate) fn word_printer_character_metrics(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<Vec<(i32, i32)>> {
+    use crate::common::wordprocessing_device::MAX_IDEAL_ADVANCE;
+
+    if text.is_empty()
+      || style.character_spacing_pt().abs() > f32::EPSILON
+      || (style.horizontal_scale() - 1.0).abs() > f32::EPSILON
+      || style.kerning_enabled()
+    {
+      return None;
+    }
+    let shaped = self.shape_text(text, style)?;
+    let indices = one_glyph_per_character_indices(text, &shaped.glyphs)?;
+    let mut metrics = Vec::with_capacity(indices.len());
+    for (index, (glyph, character_index)) in shaped.glyphs.iter().zip(indices).enumerate() {
+      let source = text.get(glyph.text_range.clone())?;
+      if index != character_index
+        || glyph.x_offset_em != 0.0
+        || glyph.y_offset_em != 0.0
+        || source.chars().any(char::is_control)
+        || matches!(source, "\u{2004}" | "\u{2006}" | "\u{2028}" | "\u{2029}")
+      {
+        return None;
+      }
+      let face = shaped.font_faces.get(glyph.font_index)?;
+      if face.synthetic_bold || face.synthetic_italic {
+        return None;
+      }
+      let ideal = (glyph.x_advance_em * glyph.font_size_pt * 4096.0).round();
+      if !ideal.is_finite() || ideal < 0.0 || ideal > MAX_IDEAL_ADVANCE as f32 {
+        return None;
+      }
+      let pixels = gdi_device_ppem(glyph.font_size_pt, crate::units::OFFICE_FIXED_OUTPUT_DPI)?;
+      let natural = self
+        .word_natural_instances
+        .advance(face, u16::from(pixels), glyph.glyph_id)?;
+      if natural < 0 {
+        return None;
+      }
+      metrics.push((ideal as i32, natural));
+    }
+    Some(metrics)
+  }
+
+  /// Classic printer advances for ordinary cell text.
+  /// Hinting instances and glyph metrics remain local to this TextMetrics.
+  pub(crate) fn gdi_printer_character_advances_pt(
     &mut self,
     text: &str,
     style: &(impl FontStyleRef + ?Sized),
@@ -909,6 +1050,48 @@ impl TextMetrics {
       return None;
     }
 
+    let shaped = self.shape_text(text, style)?;
+    if shaped.font_faces.iter().any(|face| face.synthetic_bold) {
+      return None;
+    }
+    let character_indices = one_glyph_per_character_indices(text, &shaped.glyphs)?;
+    let dpi = crate::units::OFFICE_FIXED_OUTPUT_DPI;
+    let pixel_pt = crate::units::POINTS_PER_INCH / dpi;
+    let mut advances = vec![None; character_indices.len()];
+    for (glyph, character_index) in shaped.glyphs.iter().zip(character_indices) {
+      let face = shaped.font_faces.get(glyph.font_index)?;
+      let ppem = gdi_device_ppem(glyph.font_size_pt, dpi)?;
+      let (_, hinted) = self.gdi_hinting_instances.advances(
+        face,
+        glyph.glyph_id,
+        ppem,
+        GdiTextHintingTarget::Mono,
+      )?;
+      let device_pixels = hinted.round();
+      if !device_pixels.is_finite() {
+        return None;
+      }
+      advances[character_index] = Some(device_pixels * pixel_pt);
+    }
+    advances
+      .into_iter()
+      .collect::<Option<Vec<_>>>()
+      .map(Arc::from)
+  }
+
+  // Cell insets own an outline-derived digit grid, independently of the
+  // hinted per-character paint metrics above.
+  fn excel_outline_character_advances_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<Arc<[f32]>> {
+    if text.is_empty()
+      || style.character_spacing_pt().abs() > f32::EPSILON
+      || (style.horizontal_scale() - 1.0).abs() > f32::EPSILON
+    {
+      return None;
+    }
     let shaped = self.shape_text(text, style)?;
     if shaped.font_faces.iter().any(|face| face.synthetic_bold) {
       return None;
@@ -944,7 +1127,7 @@ impl TextMetrics {
       return *inset;
     }
     let inset = self
-      .excel_unrotated_character_advances_pt("0123456789", style)
+      .excel_outline_character_advances_pt("0123456789", style)
       .map(|advances| {
         let dot = crate::units::POINTS_PER_INCH / crate::units::OFFICE_FIXED_OUTPUT_DPI;
         let digit_dots = advances.iter().copied().fold(0.0_f32, f32::max) / dot;
@@ -1049,6 +1232,28 @@ impl TextMetrics {
     style: &(impl FontStyleRef + ?Sized),
     device_dpi: f32,
   ) -> Option<GdiHintedTextExtents> {
+    self.gdi_text_extents_pt(text, style, device_dpi, GdiTextHintingTarget::Smooth)
+  }
+
+  /// Classic printer GDI retains integer device metrics, including hdmx
+  /// records. Skrifa's default smooth target enables backward compatibility
+  /// and can deliberately ignore those records; it is a separate producer.
+  pub(crate) fn gdi_printer_text_extents_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    device_dpi: f32,
+  ) -> Option<GdiHintedTextExtents> {
+    self.gdi_text_extents_pt(text, style, device_dpi, GdiTextHintingTarget::Mono)
+  }
+
+  fn gdi_text_extents_pt(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    device_dpi: f32,
+    target: GdiTextHintingTarget,
+  ) -> Option<GdiHintedTextExtents> {
     if text.is_empty() {
       return Some(GdiHintedTextExtents {
         positioned_width_pt: 0.0,
@@ -1064,20 +1269,20 @@ impl TextMetrics {
     }
 
     let style_index = self.measure_style_index(style);
-    let device_dpi_bits = device_dpi.to_bits();
+    let device_key = (device_dpi.to_bits(), target);
     if let Some(cached) = self.gdi_hinted_extents[style_index]
-      .get(&device_dpi_bits)
+      .get(&device_key)
       .and_then(|extents| extents.get(text))
     {
       return *cached;
     }
 
-    let extent = self.compute_gdi_hinted_text_extents_pt(text, style, device_dpi);
+    let extent = self.compute_gdi_hinted_text_extents_pt(text, style, device_dpi, target);
     let text_key = self.measure_widths[style_index]
       .get_key_value(text)
       .map_or_else(|| Arc::from(text), |(text, _)| text.clone());
     self.gdi_hinted_extents[style_index]
-      .entry(device_dpi_bits)
+      .entry(device_key)
       .or_default()
       .insert(text_key, extent);
     extent
@@ -1088,6 +1293,7 @@ impl TextMetrics {
     text: &str,
     style: &(impl FontStyleRef + ?Sized),
     device_dpi: f32,
+    target: GdiTextHintingTarget,
   ) -> Option<GdiHintedTextExtents> {
     let shaped = self.shape_text(text, style)?;
     if shaped.font_faces.iter().any(|face| face.synthetic_bold) {
@@ -1095,49 +1301,16 @@ impl TextMetrics {
     }
     one_glyph_per_character_indices(text, &shaped.glyphs)?;
 
-    for glyph in &shaped.glyphs {
-      let ppem = gdi_device_ppem(glyph.font_size_pt, device_dpi)?;
-      let face = shaped.font_faces.get(glyph.font_index)?;
-      let key = (face.cache_key(), ppem);
-      if self.gdi_hinting_instances.instances.contains_key(&key) {
-        continue;
-      }
-      let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
-      let outlines = font.outline_glyphs();
-      let instance = HintingInstance::new(
-        &outlines,
-        Size::new(f32::from(ppem)),
-        LocationRef::default(),
-        HintingOptions::default(),
-      )
-      .ok()?;
-      // A configured TrueType hinter owns the font-level fpgm/prep state and
-      // can hint any number of glyphs for the same face and ppem. Recreating
-      // it per run repeats those programs for every line-fit probe.
-      self.gdi_hinting_instances.instances.insert(key, instance);
-    }
-
     let points_per_device_pixel = crate::units::POINTS_PER_INCH / device_dpi;
     let mut positioned_width_pt = shaped.width_pt;
     let mut unpositioned_width_pt = 0.0;
     for glyph in &shaped.glyphs {
       let ppem = gdi_device_ppem(glyph.font_size_pt, device_dpi)?;
       let face = shaped.font_faces.get(glyph.font_index)?;
-      let key = (face.cache_key(), ppem);
-      let instance = self.gdi_hinting_instances.instances.get(&key)?;
-      let font = FontRef::from_index(face.data.as_ref(), face.index).ok()?;
-      let outline = font.outline_glyphs().get(GlyphId::new(glyph.glyph_id))?;
-      let unhinted_advance = outline
-        .draw(
-          DrawSettings::unhinted(Size::new(f32::from(ppem)), LocationRef::default()),
-          &mut NullPen,
-        )
-        .ok()?
-        .advance_width?;
-      let hinted_advance = outline
-        .draw(DrawSettings::hinted(instance, false), &mut NullPen)
-        .ok()?
-        .advance_width?;
+      let (unhinted_advance, hinted_advance) =
+        self
+          .gdi_hinting_instances
+          .advances(face, glyph.glyph_id, ppem, target)?;
       positioned_width_pt += (hinted_advance - unhinted_advance) * points_per_device_pixel;
       unpositioned_width_pt += hinted_advance * points_per_device_pixel;
     }
@@ -2531,6 +2704,93 @@ mod tests {
     let extent_px = extent_pt * device_dpi / crate::units::POINTS_PER_INCH;
 
     assert!((extent_px - extent_px.round()).abs() < 0.0001);
+  }
+
+  #[test]
+  fn printer_gdi_keeps_native_small_font_device_metrics() {
+    let style = crate::docx::TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 3.48,
+      kerning_minimum_size_pt: Some(f32::INFINITY),
+      ligatures: Some(crate::common::OpenTypeLigatures::default()),
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    let extent = metrics
+      .gdi_printer_text_extents_pt("AV A", &style, 600.0)
+      .expect("Arial printer device record at 29ppem");
+    // Native printer GetTextExtentPoint32W at lfHeight=-29: 65 device dots.
+    assert!((extent.unpositioned_width_pt - 7.8).abs() < 1.0e-4);
+  }
+
+  #[test]
+  fn word_pathing_character_metrics_match_native_line_service_cells() {
+    let style = crate::model::TextStyle {
+      font_family: Some(Arc::from("DejaVu Sans")),
+      font_size_pt: 10.0,
+      kerning_minimum_size_pt: Some(f32::INFINITY),
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    // Word's private ITextPrimitive initialization inputs, not inferred PDF
+    // origins. Repeated spaces and the final e distinguish line balancing
+    // from independently rounded printer advances.
+    for (text, expected) in [
+      (
+        " Air Quality Roundtable",
+        &[
+          26, 57, 23, 34, 27, 65, 53, 51, 23, 23, 33, 50, 26, 58, 51, 53, 53, 53, 33, 51, 53, 23,
+          51,
+        ][..],
+      ),
+      (
+        "Williams Lake",
+        &[82, 23, 23, 23, 23, 51, 82, 43, 27, 46, 51, 48, 52][..],
+      ),
+    ] {
+      let input = metrics
+        .word_printer_character_metrics(text, &style)
+        .unwrap();
+      assert_eq!(
+        crate::common::wordprocessing_device::balance_advances(&input),
+        expected,
+        "{text}"
+      );
+    }
+    assert_eq!(metrics.word_natural_instances.instances.len(), 1);
+  }
+
+  #[test]
+  fn printer_character_advances_use_native_hint_programs() {
+    let style = crate::docx::TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 7.08,
+      kerning_minimum_size_pt: Some(f32::INFINITY),
+      ligatures: Some(crate::common::OpenTypeLigatures::default()),
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    let advances = metrics
+      .excel_unrotated_character_advances_pt("CS Worksheet  (the Child Support Worksheet)", &style)
+      .expect("Arial59 printer glyph metrics");
+    // Independent native GetTextExtentPoint32W single-character readback.
+    // In particular W is58dots, although its unhinted outline rounds to56.
+    let native_dots = [
+      43, 39, 16, 58, 33, 20, 30, 30, 33, 33, 33, 16, 16, 16, 20, 16, 33, 33, 16, 43, 33, 13, 13,
+      33, 16, 39, 33, 33, 33, 33, 20, 16, 16, 58, 33, 20, 30, 30, 33, 33, 33, 16, 20,
+    ];
+    assert_eq!(advances.len(), native_dots.len());
+    for (actual, dots) in advances.iter().zip(native_dots) {
+      assert!((actual - dots as f32 * 0.12).abs() < 1.0e-4);
+    }
+    let glyph_count = metrics.gdi_hinting_instances.glyph_advances.len();
+    metrics
+      .gdi_printer_text_extents_pt("CS Worksheet  (the Child Support Worksheet)", &style, 600.0)
+      .expect("same printer glyphs used for string extent");
+    assert_eq!(
+      metrics.gdi_hinting_instances.glyph_advances.len(),
+      glyph_count
+    );
   }
 
   #[test]

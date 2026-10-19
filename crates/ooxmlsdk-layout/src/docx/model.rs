@@ -123,6 +123,10 @@ pub(crate) struct SectionColumns {
   pub gap_pt: f32,
   pub separator: bool,
   pub unbalanced: bool,
+  /// Unlike final-section balancing, an implicit follow caused by a wrapping
+  /// drawing can rebalance an earlier section page. Only noColumnBalance
+  /// suppresses this; the absence of a following continuous section does not.
+  pub balance_on_wrap_follow: bool,
   pub balanced_height_pt: Option<f32>,
   /// Deferred balance of a multi-page section's final page. The page index
   /// is section-relative; earlier pages retain their full column height.
@@ -131,6 +135,12 @@ pub(crate) struct SectionColumns {
   /// current column. Import initializes this to zero; pagination distinguishes
   /// a naturally filled column from an authored early column break.
   pub completed_content_height_pt: f32,
+  /// Highest consumed column on the current physical page. An authored
+  /// column break preserves unequal column heights at a section boundary.
+  pub completed_column_max_height_pt: f32,
+  /// Authored breaks fix the partition only on the physical page containing
+  /// them. Later pages of the same section can still balance automatically.
+  pub authored_column_break_on_page: bool,
   pub explicit_count: usize,
   pub explicit_widths_pt: [f32; 45],
   pub explicit_gaps_pt: [f32; 44],
@@ -143,9 +153,12 @@ impl Default for SectionColumns {
       gap_pt: 36.0,
       separator: false,
       unbalanced: false,
+      balance_on_wrap_follow: true,
       balanced_height_pt: None,
       pending_balance: None,
       completed_content_height_pt: 0.0,
+      completed_column_max_height_pt: 0.0,
+      authored_column_break_on_page: false,
       explicit_count: 0,
       explicit_widths_pt: [0.0; 45],
       explicit_gaps_pt: [0.0; 44],
@@ -253,6 +266,11 @@ pub(crate) enum ParagraphFieldEvent {
   /// field that owns its boundary paragraphs from one embedded in surrounding
   /// paragraph text; the content itself remains in `Paragraph::inlines`.
   Content,
+  /// A source character whose reference belongs to the page after its break.
+  /// Keep it distinct from ordinary content without changing field boundaries.
+  PageBreak,
+  /// Derived range metadata: a break-only bookmark uses its caret for PAGEREF.
+  BookmarkReferenceUsesCaret(String),
   Begin {
     locked: bool,
     dirty: bool,
@@ -611,6 +629,11 @@ pub(crate) struct ParagraphFormat {
   /// otherwise empty line on the mark, while direct paragraph-mark formatting
   /// remains authoritative over application-recovered compatibility metrics.
   pub paragraph_mark_font_size_set: bool,
+  /// An empty continuous-section ending follows only floating tables in
+  /// this section. It can own a real mark in a side lane, but merges into
+  /// the preceding table anchor when that fly covers the whole body origin.
+  /// A sole mark in a following empty section has a different owner.
+  pub floating_table_section_end: bool,
   /// The active numbering level owns an explicit `w:lvl/w:rPr/w:sz` or
   /// `w:szCs`.  Word/Writer keep that synthesized number portion's font box
   /// independent from paragraph hard attributes; retain the source bit after
@@ -634,6 +657,11 @@ pub(crate) struct ParagraphFormat {
   /// Paragraphs in an actual table nested inside the textbox remain ordinary
   /// table-cell stories and deliberately leave this false.
   pub wordprocessing_shape_story: bool,
+  /// A standalone WPS story uses `bodyPr@vert=vert/vert270`. Its automatic
+  /// line spacing advances columns with Word's vertical font-height basis;
+  /// rotating a horizontal shape, grouped drawings, and nested table cells
+  /// do not acquire that text-frame owner.
+  pub wordprocessing_shape_vertical_text: bool,
   /// The WPS text story belongs to a shape nested in `wpg:wgp`. Word realizes
   /// bitmap children of that grouped drawing through the group's bitmap
   /// surface before fixed-output compression. A top-level `wps:wsp` textbox
@@ -687,7 +715,7 @@ pub(crate) struct ParagraphFormat {
   pub bidi: bool,
   pub bidi_set: bool,
   /// Direct layout properties differ from the paragraph style. Word treats
-  /// the resulting line frame as content in an otherwise empty header story;
+  /// the resulting line frame as content in an otherwise empty header/footer;
   /// matching overrides and run/paragraph-mark fonts do not activate it.
   pub header_layout_differs_from_style: bool,
   /// Presence records an authored/inherited `w:shd`; `None` inside the paint
@@ -727,6 +755,8 @@ pub(crate) struct ParagraphFormat {
   pub overflow_punctuation: Option<bool>,
   pub hidden_separator: bool,
   pub deleted_separator: bool,
+  /// The first hidden delimiter's inline boundary when its visible leading
+  /// paragraph retains format/outline ownership across subsequent joins.
   pub outline_text_inlines: Option<usize>,
   /// Effective outline level supplied by the paragraph style hierarchy,
   /// before direct paragraph properties are applied. TOC `\o` uses this
@@ -1370,7 +1400,6 @@ pub(crate) struct InlineShape {
   pub stroke: Option<BorderStyle>,
   pub stroke_pattern: Option<common::PatternFill>,
   pub stroke_override: Option<Box<common::Stroke<'static>>>,
-  pub suppress_zero_relative_background: bool,
   pub allow_outside_page: bool,
   /// VML `v:line` keeps its paragraph-relative origin inside a table cell
   /// even when `o:allowincell="f"` lets its stroke extend across cell edges.
@@ -1413,6 +1442,12 @@ pub(crate) struct InlineShape {
   /// Half the effective WPS outline width added to the text frame insets.
   /// Retain it even for `a:noFill`, whose outline has no drawable stroke.
   pub wordprocessing_shape_outline_text_inset_pt: f32,
+  /// Authored standalone `wp:docPr@id` joins the WPS geometry and rich story
+  /// import passes. Equal extents alone do not prove a shared drawing owner.
+  pub wordprocessing_shape_id: Option<u32>,
+  /// Native Word exports a linked WPS shape's title/description (or fallback
+  /// ScreenTip) as invisible searchable text, independently of its rich story.
+  pub wordprocessing_shape_hyperlink_description: Option<Arc<str>>,
   /// Whether the nearest `wpc:wpc` host owns background paint through
   /// `wpc:bg` or `wpc:whole`.
   ///
@@ -1699,7 +1734,51 @@ pub(crate) struct FloatingAlignmentExtent {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum FloatingPaintOrder {
+pub(crate) struct FloatingPaintOrder {
+  pub source: FloatingPaintOrderSource,
+  /// Import resolves mixed VML/DrawingML stories before pagination. Keep the
+  /// authored producer separately: wrap and text-frame ownership use it too.
+  pub normalized_key: Option<u32>,
+}
+
+impl FloatingPaintOrder {
+  pub const UNSPECIFIED: Self = Self {
+    source: FloatingPaintOrderSource::Unspecified,
+    normalized_key: None,
+  };
+
+  pub(crate) const fn drawing_ml_relative_height(value: u32) -> Self {
+    Self {
+      source: FloatingPaintOrderSource::DrawingMlRelativeHeight(value),
+      normalized_key: None,
+    }
+  }
+
+  pub(crate) const fn vml_z_index(value: Option<i32>) -> Self {
+    Self {
+      source: FloatingPaintOrderSource::VmlZIndex(value),
+      normalized_key: None,
+    }
+  }
+
+  pub(crate) fn is_vml(self) -> bool {
+    matches!(self.source, FloatingPaintOrderSource::VmlZIndex(_))
+  }
+
+  pub(crate) fn is_drawing_ml(self) -> bool {
+    matches!(
+      self.source,
+      FloatingPaintOrderSource::DrawingMlRelativeHeight(_)
+    )
+  }
+
+  pub(crate) fn has_vml_z_index(self) -> bool {
+    matches!(self.source, FloatingPaintOrderSource::VmlZIndex(Some(_)))
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum FloatingPaintOrderSource {
   #[default]
   Unspecified,
   DrawingMlRelativeHeight(u32),

@@ -36,8 +36,8 @@ use super::marker::{
 use super::page::{PageLabelSpec, PageSelection, page_label_spec, pdf_page_dimension};
 use crate::error::{PdfError, Result};
 use crate::options::{
-  PdfImageOptimizationPolicy, PdfOptions, PdfPageLayout, PdfStandard, PdfViewerMagnification,
-  PdfViewerPageMode,
+  PdfImageOptimizationPolicy, PdfOptimizeFor, PdfOptions, PdfPageLayout, PdfStandard,
+  PdfViewerMagnification, PdfViewerPageMode,
 };
 use crate::{
   PdfConversionDiagnostics, PdfConversionOutput, PdfFontAudit, PdfFontAuditOutput,
@@ -584,7 +584,7 @@ fn write_page_document(
   let mut fonts = DirectFontSet::default();
   let mut image_policy = ImageSet::default();
   if let Some(paint) = paint {
-    observe_word_jpeg_displays(paint, options, &mut image_policy);
+    observe_raster_displays(paint, options, &mut image_policy);
   }
   let mut images = DirectImageSet::default();
   let mut patterns = DirectPatternSet::new(
@@ -813,7 +813,7 @@ fn write_page_document(
   Ok(bytes)
 }
 
-fn observe_word_jpeg_displays(
+fn observe_raster_displays(
   paint: &super::paint::PaintDocument<'_>,
   options: &PdfOptions,
   image_policy: &mut ImageSet,
@@ -824,12 +824,12 @@ fn observe_word_jpeg_displays(
       .iter()
       .filter(|item| super::paint::paint_item_intersects_page(item, page.width_pt, page.height_pt))
     {
-      observe_word_jpeg_display_item(item, options, image_policy);
+      observe_raster_display_item(item, options, image_policy);
     }
   }
 }
 
-fn observe_word_jpeg_display_item(
+fn observe_raster_display_item(
   item: &super::paint::PaintItem<'_>,
   options: &PdfOptions,
   image_policy: &mut ImageSet,
@@ -848,10 +848,17 @@ fn observe_word_jpeg_display_item(
         display_size_pt,
         image.blip_compression_state,
       );
+      image_policy.observe_excel_png_display(
+        &image.data,
+        image.content_type.as_deref(),
+        options,
+        display_size_pt,
+        image.blip_compression_state,
+      );
     }
     super::paint::PaintItem::Group { items, .. } => {
       for item in items {
-        observe_word_jpeg_display_item(item, options, image_policy);
+        observe_raster_display_item(item, options, image_policy);
       }
     }
     super::paint::PaintItem::Text(_)
@@ -1406,6 +1413,16 @@ fn write_prepared_image(
   image: &super::paint::ImageItem<'_>,
   writer: &mut PreparedPageWriter<'_>,
 ) -> Result<()> {
+  if let Some(bitmap) = &image.font_bitmap {
+    return write_registered_raster_image(
+      content,
+      image,
+      writer,
+      bitmap.clone(),
+      image.width_pt,
+      image.height_pt,
+    );
+  }
   ensure_image_supported(image)?;
   if image.data.is_empty() {
     return write_missing_image_placeholder(content, image, writer);
@@ -1446,6 +1463,15 @@ fn write_missing_image_placeholder(
     return Ok(());
   }
 
+  // Word paints an opaque placeholder canvas before its frame and icon. A
+  // missing picture must therefore cover earlier page/shape backgrounds too.
+  content
+    .save_state()
+    .set_fill_rgb(1.0, 1.0, 1.0)
+    .rect(image.x_pt, image.y_pt, image.width_pt, image.height_pt)
+    .fill_nonzero()
+    .restore_state();
+
   let frame_width = (image.width_pt - FRAME_WIDTH_PT).max(0.0);
   let frame_height = (image.height_pt - FRAME_WIDTH_PT).max(0.0);
   if frame_width > f32::EPSILON && frame_height > f32::EPSILON {
@@ -1466,11 +1492,12 @@ fn write_missing_image_placeholder(
       .restore_state();
   }
 
-  let icon = if image.content_type.as_deref() == Some(common::MISSING_EMBEDDED_PICTURE_CONTENT_TYPE)
-  {
-    missing_embedded_picture_icon()
-  } else {
-    missing_linked_image_icon()
+  // Word rasterizes the same missing-picture icon at different resolutions
+  // for Print and Screen export. Embedded, linked and empty blips share this
+  // policy; the authored placeholder frame and icon extents stay unchanged.
+  let icon = match writer.options.optimize_for {
+    PdfOptimizeFor::Print => missing_image_icon_for_print(),
+    PdfOptimizeFor::Screen => missing_image_icon_for_screen(),
   };
   let icon = writer.images.register(icon, || writer.refs.alloc())?;
   writer.resources.register_image(&icon.name, icon.id);
@@ -1489,7 +1516,7 @@ fn write_missing_image_placeholder(
   Ok(())
 }
 
-fn missing_linked_image_icon() -> PreparedRasterImage {
+fn missing_image_icon_for_print() -> PreparedRasterImage {
   static ICON: OnceLock<PreparedRasterImage> = OnceLock::new();
   ICON
     .get_or_init(|| {
@@ -1522,7 +1549,7 @@ fn missing_linked_image_icon() -> PreparedRasterImage {
     .clone()
 }
 
-fn missing_embedded_picture_icon() -> PreparedRasterImage {
+fn missing_image_icon_for_screen() -> PreparedRasterImage {
   static ICON: OnceLock<PreparedRasterImage> = OnceLock::new();
   ICON
     .get_or_init(|| {
@@ -2370,8 +2397,10 @@ fn write_prepared_text(
       let variation_glyph_runs =
         super::paint::merge_variation_selector_font_runs(glyph_runs, &text.item.text);
       // Shaping can split one physical face by script or whitespace. Those
-      // bookkeeping boundaries must not reset Word's PDF width accumulator.
-      let word_glyph_runs = if !outlined && word_text_uses_fixed_output(text, writer) {
+      // bookkeeping boundaries must not reset Office's PDF width accumulator.
+      let word_glyph_runs = if !outlined
+        && (word_text_uses_fixed_output(text, writer) || cell_text_uses_office_array(text, writer))
+      {
         super::paint::merge_word_font_runs(variation_glyph_runs.as_ref())
       } else {
         Cow::Borrowed(variation_glyph_runs.as_ref())
@@ -2424,24 +2453,34 @@ fn write_prepared_text(
             .as_ref()
             .is_some_and(|options| options.semantic_text_overlay)
           {
-            write_prepared_font_run_as_text(
-              content,
-              PreparedTextRun {
-                word_font_family: None,
-                portion,
-                run,
-                semantic_text: run_semantic_text,
-                glyphs: run_glyphs,
-                horizontal_scale,
-                font_horizontal_scale,
-                color: super::paint::RgbColor { r: 0, g: 0, b: 0 },
-                kind: PreparedTextRunKind::TransparentSemanticOverlay,
-                device_coordinates: None,
-                word_text_spacing: false,
-                word_leader_spacing_scale: None,
-              },
-              writer,
-            )?;
+            let semantic_run = PreparedTextRun {
+              word_font_family: None,
+              word_font_names: false,
+              portion,
+              run,
+              semantic_text: run_semantic_text,
+              glyphs: run_glyphs,
+              horizontal_scale,
+              font_horizontal_scale,
+              color: super::paint::RgbColor { r: 0, g: 0, b: 0 },
+              kind: PreparedTextRunKind::TransparentSemanticOverlay,
+              device_coordinates: None,
+              word_text_spacing: false,
+              office_text_spacing: false,
+              word_leader_spacing_scale: None,
+            };
+            if let Some(warp) = text
+              .item
+              .style
+              .pdf_glyph_outline_options
+              .as_ref()
+              .and_then(|options| options.text_warp.as_deref())
+              .filter(|warp| warp.follow_path.is_some())
+            {
+              write_prepared_follow_path_font_run_as_text(content, semantic_run, warp, writer)?;
+            } else {
+              write_prepared_font_run_as_text(content, semantic_run, writer)?;
+            }
           }
         } else {
           let write_run = if text.item.style.explicit_symbol_character {
@@ -2455,6 +2494,17 @@ fn write_prepared_text(
               word_font_family: word_text_uses_fixed_output(text, writer)
                 .then(|| text.item.style.pdf_font_family())
                 .flatten(),
+              // Generated Word leaders preserve their own glyph positions
+              // as Portion text. Font naming follows the Word story, not its
+              // line grouping, device widths, rotation or legacy aliases.
+              word_font_names: ooxmlsdk_layout::fonts::FontStyleRef::wordprocessingml_font_slots(
+                &text.item.style,
+              ) && matches!(
+                writer.options.images.optimization_policy,
+                PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(
+                  crate::PdfDocumentKind::Docx
+                )
+              ),
               portion,
               run,
               semantic_text: run_semantic_text,
@@ -2462,10 +2512,22 @@ fn write_prepared_text(
               horizontal_scale,
               font_horizontal_scale,
               color,
-              kind: PreparedTextRunKind::Ordinary,
+              kind: if (text.item.style.semantic_only || text.item.style.bitmap_semantic_text)
+                && text.item.style.opacity <= f32::EPSILON
+              {
+                // Word's linked-shape descriptions are searchable alpha-zero
+                // text. Keep that state rather than making the semantic
+                // carrier opaque under its independent nonpainting clip.
+                PreparedTextRunKind::TransparentSemanticOverlay
+              } else {
+                PreparedTextRunKind::Ordinary
+              },
               device_coordinates: word_text_device_coordinates(text, writer),
               word_text_spacing: word_text_uses_fixed_output(text, writer)
                 || word_tab_leader_uses_fixed_output(text, writer),
+              office_text_spacing: word_text_uses_fixed_output(text, writer)
+                || word_tab_leader_uses_fixed_output(text, writer)
+                || cell_text_uses_office_array(text, writer),
               word_leader_spacing_scale: text
                 .item
                 .style
@@ -2497,7 +2559,7 @@ fn write_prepared_text(
         write_prepared_text_decoration(
           content,
           underline,
-          text.item.decoration_span_start_x_pt.is_some(),
+          text.item.decoration_span_start_x_pt.is_some() || text.item.style.office_text_array,
         )?;
       }
       if let Some(strikethrough) = portion.strikethrough.as_ref() {
@@ -2546,6 +2608,7 @@ enum PreparedTextRunKind {
 
 struct PreparedTextRun<'a> {
   word_font_family: Option<&'a str>,
+  word_font_names: bool,
   portion: &'a super::paint::PaintTextPortion,
   run: &'a super::paint::PaintGlyphFontRun,
   semantic_text: &'a str,
@@ -2556,7 +2619,85 @@ struct PreparedTextRun<'a> {
   kind: PreparedTextRunKind,
   device_coordinates: Option<common::wordprocessing_device::PageCoordinates>,
   word_text_spacing: bool,
+  office_text_spacing: bool,
   word_leader_spacing_scale: Option<f32>,
+}
+
+fn write_prepared_follow_path_font_run_as_text(
+  content: &mut Content,
+  text_run: PreparedTextRun<'_>,
+  warp: &common::TextWarp,
+  writer: &mut PreparedPageWriter<'_>,
+) -> Result<()> {
+  let face = skrifa::FontRef::from_index(
+    text_run.run.font_face.data.as_slice(),
+    text_run.run.font_face.index,
+  )
+  .map_err(|error| PdfError::Writer(format!("follow-path font could not be parsed: {error}")))?;
+  let cell = common::text_warp_projection::TextFollowPathFontCell::from_font(
+    &face,
+    text_run.run.font_size_pt,
+  )
+  .ok_or_else(|| PdfError::Writer("follow-path font has no printer cell".into()))?;
+  let mut cursor_x = scaled_text_x(
+    text_run.portion.x_pt,
+    text_run.run.x_offset_pt,
+    text_run.horizontal_scale,
+  )?;
+  let mut cursor_y = text_run.portion.baseline_y;
+  for glyph in text_run.glyphs {
+    let origin_x =
+      cursor_x + glyph.x_offset * text_run.run.font_size_pt * text_run.horizontal_scale;
+    let origin_y = cursor_y - glyph.y_offset * text_run.run.font_size_pt;
+    let transform = super::direct_glyph::follow_path_glyph_transform(
+      warp,
+      glyph,
+      kurbo::Point::new(f64::from(origin_x), f64::from(origin_y)),
+      f64::from(glyph.x_advance * text_run.run.font_size_pt * text_run.horizontal_scale),
+      cell,
+    );
+    if let Some(transform) = transform {
+      // Only the source origin is needed by the font serializer. Cloning
+      // the enclosing portion here would copy its complete glyph arrays for
+      // every character, making a long followed string quadratic.
+      let portion = super::paint::PaintTextPortion {
+        kind: text_run.portion.kind,
+        text_range: glyph.text_range.clone(),
+        x_pt: cursor_x,
+        baseline_y: cursor_y,
+        width_pt: glyph.x_advance * text_run.run.font_size_pt * text_run.horizontal_scale,
+        clip: None,
+        glyphs: None,
+        highlight: None,
+        underline: None,
+        strikethrough: None,
+        link: None,
+      };
+      let run = super::paint::PaintGlyphFontRun {
+        font_face: text_run.run.font_face.clone(),
+        font_size_pt: text_run.run.font_size_pt,
+        x_offset_pt: 0.0,
+        glyphs: Vec::new(),
+      };
+      content
+        .save_state()
+        .transform(transform.as_coeffs().map(|value| value as f32));
+      write_prepared_font_run_as_text(
+        content,
+        PreparedTextRun {
+          portion: &portion,
+          run: &run,
+          glyphs: std::slice::from_ref(glyph),
+          ..text_run
+        },
+        writer,
+      )?;
+      content.restore_state();
+    }
+    cursor_x += glyph.x_advance * text_run.run.font_size_pt * text_run.horizontal_scale;
+    cursor_y -= glyph.y_advance * text_run.run.font_size_pt;
+  }
+  Ok(())
 }
 
 fn word_missing_private_use_glyph(glyph: &super::paint::PaintGlyph, source: &str) -> bool {
@@ -2678,6 +2819,18 @@ fn word_tab_leader_uses_fixed_output(
     )
 }
 
+fn cell_text_uses_office_array(
+  text: &super::paint::PaintText<'_>,
+  writer: &PreparedPageWriter<'_>,
+) -> bool {
+  text.item.style.office_text_array
+    && text.item.style.rotation_deg.abs() <= f32::EPSILON
+    && matches!(
+      writer.options.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Xlsx)
+    )
+}
+
 fn word_text_device_coordinates(
   text: &super::paint::PaintText<'_>,
   writer: &PreparedPageWriter<'_>,
@@ -2697,10 +2850,7 @@ fn word_text_device_coordinates(
   {
     return None;
   }
-  common::wordprocessing_device::PageCoordinates::for_standard_size(
-    writer.page_width_pt,
-    writer.page_height_pt,
-  )
+  common::wordprocessing_device::page_coordinates(writer.page_width_pt, writer.page_height_pt)
 }
 
 fn write_prepared_font_run_as_text(
@@ -2710,6 +2860,7 @@ fn write_prepared_font_run_as_text(
 ) -> Result<()> {
   let PreparedTextRun {
     word_font_family,
+    word_font_names,
     portion,
     run,
     semantic_text,
@@ -2719,7 +2870,8 @@ fn write_prepared_font_run_as_text(
     color,
     kind,
     device_coordinates,
-    word_text_spacing,
+    word_text_spacing: _,
+    office_text_spacing,
     word_leader_spacing_scale,
   } = text_run;
   let visible_glyphs = without_nonprinting_control_glyphs(glyphs, semantic_text);
@@ -2727,10 +2879,10 @@ fn write_prepared_font_run_as_text(
   if glyphs.is_empty() {
     return Ok(());
   }
-  // The observed Word device-array contract covers independently advanced
+  // The observed Office device-array contract covers independently advanced
   // horizontal glyphs. Positioned marks and multi-glyph clusters retain
   // exact widths and placement, including their ActualText bounds.
-  let word_text_spacing = word_text_spacing
+  let office_text_spacing = office_text_spacing
     && glyphs.iter().all(|glyph| {
       glyph.x_advance > 0.0
         && glyph.x_offset == 0.0
@@ -2740,12 +2892,13 @@ fn write_prepared_font_run_as_text(
     && glyphs
       .windows(2)
       .all(|pair| pair[0].text_range != pair[1].text_range);
-  let handle =
-    writer
-      .fonts
-      .register_text_face(&run.font_face, word_text_spacing, word_font_family, || {
-        writer.refs.alloc()
-      })?;
+  let handle = writer.fonts.register_text_face(
+    &run.font_face,
+    office_text_spacing,
+    word_font_family,
+    word_font_names,
+    || writer.refs.alloc(),
+  )?;
   let (resource_name, font_id) = writer.fonts.resource(handle)?;
   let resource_name = resource_name.to_vec();
   writer.resources.register_font(&resource_name, font_id);
@@ -2778,7 +2931,7 @@ fn write_prepared_font_run_as_text(
   }
   synthesis.begin(content);
   let glyph_context = GlyphWriteContext {
-    word_text_spacing,
+    office_text_spacing,
     word_leader_spacing_scale,
     source: semantic_text,
     baseline_y,
@@ -3060,10 +3213,54 @@ fn write_glyph_outline_fill(
         _ => outlined_glyph_paint_bounds(text, portion, font_size_pt, options)?,
       };
       let gradient = resolved_glyph_outline_gradient(gradient, bounds);
+      // VML's containing block maps the brush; it does not clip the textpath.
+      // A custom envelope may extend far beyond that definition rectangle.
+      // Keep the brush transform while rasterizing its visible paint region,
+      // including the gradient's padded edge color outside the host box.
+      let mut raster_bounds = bounds;
+      if options
+        .and_then(|options| options.text_warp.as_deref())
+        .is_some_and(|warp| warp.vml_fit_path.is_some())
+        && let Some(paint) = path.paint_bounds()
+      {
+        let left = bounds.origin.x.0;
+        let top = bounds.origin.y.0;
+        let right = left + bounds.size.width.0;
+        let bottom = top + bounds.size.height.0;
+        let paint_right = paint.origin.x.0 + paint.size.width.0;
+        let paint_bottom = paint.origin.y.0 + paint.size.height.0;
+        if paint.origin.x.0 < left
+          || paint.origin.y.0 < top
+          || paint_right > right
+          || paint_bottom > bottom
+        {
+          // group_bounds is the physical page expressed in the active local
+          // coordinate system. Clipping here bounds memory without rebinding
+          // the brush or losing transformed-group paint.
+          let [view_left, view_top, view_right, view_bottom] = writer.group_bounds;
+          let left = left.min(paint.origin.x.0).max(view_left);
+          let top = top.min(paint.origin.y.0).max(view_top);
+          let right = right.max(paint_right).min(view_right);
+          let bottom = bottom.max(paint_bottom).min(view_bottom);
+          if right <= left || bottom <= top {
+            return Ok(());
+          }
+          raster_bounds = common::Rect {
+            origin: common::Point {
+              x: common::Pt(left),
+              y: common::Pt(top),
+            },
+            size: common::Size {
+              width: common::Pt(right - left),
+              height: common::Pt(bottom - top),
+            },
+          };
+        }
+      }
       match writer.resources.gradients.register_pattern(
         &gradient,
         bounds,
-        bounds,
+        raster_bounds,
         Some(path.commands()),
         writer.refs,
       )? {
@@ -3083,7 +3280,7 @@ fn write_glyph_outline_fill(
         RegisteredGradientPattern::Raster(image) => write_raster_gradient_pattern(
           content,
           image,
-          bounds,
+          raster_bounds,
           GradientPatternWriter {
             resources: &mut *writer.resources,
             images: &mut *writer.images,
@@ -3458,7 +3655,7 @@ fn write_prepared_text_highlight(
 fn write_prepared_text_decoration(
   content: &mut Content,
   line: &super::paint::PaintStrokeLine,
-  word_tab_underline: bool,
+  filled_underline: bool,
 ) -> Result<()> {
   if ![
     line.x1_pt,
@@ -3475,10 +3672,10 @@ fn write_prepared_text_decoration(
       "text decoration contains invalid line geometry".to_string(),
     ));
   }
-  if word_tab_underline {
-    // Word exports the underline across a preserved tab as a filled printer-
-    // grid rectangle beginning at the decoration coordinate. A centered PDF
-    // stroke covers a different device row even with the same nominal width.
+  if filled_underline {
+    // Word's preserved tabs and Excel's GDI cell strings export filled printer-
+    // grid underline bands beginning at the decoration coordinate. A centered
+    // PDF stroke covers a different device row with the same nominal width.
     let width_pt = ooxmlsdk_layout::units::quantize_points_to_office_print_grid(line.width_pt).max(
       ooxmlsdk_layout::units::POINTS_PER_INCH / ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_DPI,
     );
@@ -3678,7 +3875,7 @@ fn begin_actual_text(content: &mut Content, text: &str) {
 
 #[derive(Clone, Copy)]
 struct GlyphWriteContext<'a> {
-  word_text_spacing: bool,
+  office_text_spacing: bool,
   word_leader_spacing_scale: Option<f32>,
   source: &'a str,
   baseline_y: f32,
@@ -3939,8 +4136,8 @@ fn write_horizontal_glyph_segment(
   if glyphs.is_empty() {
     return 0.0;
   }
-  if context.word_text_spacing && glyphs.iter().all(|glyph| glyph.glyph.x_offset == 0.0) {
-    return write_word_horizontal_glyph_segment(content, glyphs, x_pt, context);
+  if context.office_text_spacing && glyphs.iter().all(|glyph| glyph.glyph.x_offset == 0.0) {
+    return write_office_horizontal_glyph_segment(content, glyphs, x_pt, context);
   }
   // PDF glyph-space uses the realized font width; source advances and marks
   // retain their independently measured physical positions.
@@ -4005,7 +4202,7 @@ fn write_horizontal_glyph_segment(
 
 const PDF_TEXT_UNITS_PER_EM: f32 = 1000.0;
 
-fn write_word_horizontal_glyph_segment(
+fn write_office_horizontal_glyph_segment(
   content: &mut Content,
   glyphs: &[PreparedGlyph<'_>],
   x_pt: f32,
@@ -4019,7 +4216,7 @@ fn write_word_horizontal_glyph_segment(
     .iter()
     .map(|glyph| glyph.glyph.x_advance * context.font_size_pt * context.horizontal_scale)
     .collect::<Vec<_>>();
-  let positioning = super::direct_word_text::WordTextPositioning::new(
+  let positioning = super::direct_word_text::OfficeTextPositioning::new(
     &widths,
     &advances,
     context.font_size_pt,
@@ -4678,6 +4875,24 @@ fn write_prepared_polyline(
   writer: &mut PreparedPageWriter<'_>,
 ) -> Result<()> {
   if path.commands.is_empty() && path.points.len() < 2 {
+    return Ok(());
+  }
+  if let Some(stroke) = path.stroke
+    && let Some(outline) =
+      common::drawingml_triangle_stroke_outline(path.commands, path.points, path.closed, stroke)
+  {
+    write_prepared_polyline_fill_only(content, path, writer)?;
+    content.save_state();
+    set_alpha(
+      content,
+      writer.resources,
+      writer.refs,
+      None,
+      Some(stroke.color.a),
+    )?;
+    set_fill_color(content, stroke.color);
+    append_path_commands(content, &outline);
+    content.fill_nonzero().restore_state();
     return Ok(());
   }
   if let Some(stroke) = path.stroke
@@ -6005,6 +6220,7 @@ mod tests {
 
   fn paint_metafile_item() -> super::super::paint::ImageItem<'static> {
     super::super::paint::ImageItem {
+      font_bitmap: None,
       x_pt: 10.0,
       y_pt: 20.0,
       width_pt: 30.0,
@@ -7429,57 +7645,47 @@ mod tests {
   }
 
   #[test]
-  fn direct_writer_paints_the_office_missing_linked_image_frame_and_icon() {
-    let mut image = test_image_item(Vec::new());
-    image.content_type = "application/octet-stream".into();
-    image.relationship_id = Some("rId5".into());
-    let pdf =
-      String::from_utf8_lossy(&render(&image_document(image), &uncompressed_options()).unwrap())
-        .into_owned();
+  fn direct_writer_paints_missing_picture_at_the_configured_export_quality() {
+    for (quality, dimensions) in [
+      (PdfOptimizeFor::Print, "/Width 4/Height 5"),
+      (PdfOptimizeFor::Screen, "/Width 2/Height 2"),
+    ] {
+      for (content_type, relationship_id) in [
+        ("application/octet-stream", Some("rId5")),
+        (common::MISSING_EMBEDDED_PICTURE_CONTENT_TYPE, Some("rId6")),
+        (common::MISSING_EMBEDDED_PICTURE_CONTENT_TYPE, None),
+      ] {
+        let mut image = test_image_item(Vec::new());
+        image.content_type = content_type.into();
+        image.relationship_id = relationship_id.map(Into::into);
+        let mut options = uncompressed_options();
+        options.optimize_for = quality;
+        let pdf =
+          String::from_utf8_lossy(&render(&image_document(image), &options).unwrap()).into_owned();
 
-    assert_eq!(pdf.matches("/Subtype/Image").count(), 1, "{pdf}");
-    assert!(
-      pdf.contains("/Width 4/Height 5/BitsPerComponent 8/ColorSpace/DeviceRGB"),
-      "{pdf}"
-    );
-    assert!(!pdf.contains("/Interpolate"), "{pdf}");
-    assert!(
-      pdf.contains("0 0 0 RG 0.14 w 0 J 0 j[]0 d 10.07 20.07 29.86 39.86 re\nS"),
-      "{pdf}"
-    );
-    assert!(
-      pdf.contains("1.68 0 0 -1.92 10.84 22.76 cm/Im0 Do"),
-      "{pdf}"
-    );
+        assert_eq!(pdf.matches("/Subtype/Image").count(), 1, "{pdf}");
+        assert!(
+          pdf.contains(&format!(
+            "{dimensions}/BitsPerComponent 8/ColorSpace/DeviceRGB"
+          )),
+          "{quality:?} {content_type}: {pdf}"
+        );
+        assert!(!pdf.contains("/Interpolate"), "{pdf}");
+        assert!(pdf.contains("1 1 1 rg 10 20 30 40 re\nf"), "{pdf}");
+        assert!(
+          pdf.contains("0 0 0 RG 0.14 w 0 J 0 j[]0 d 10.07 20.07 29.86 39.86 re\nS"),
+          "{pdf}"
+        );
+        assert!(
+          pdf.contains("1.68 0 0 -1.92 10.84 22.76 cm/Im0 Do"),
+          "{pdf}"
+        );
+      }
+    }
   }
 
   #[test]
-  fn direct_writer_paints_the_office_missing_embedded_picture_frame_and_icon() {
-    let mut image = test_image_item(Vec::new());
-    image.content_type = common::MISSING_EMBEDDED_PICTURE_CONTENT_TYPE.into();
-    image.relationship_id = Some("rId6".into());
-    let pdf =
-      String::from_utf8_lossy(&render(&image_document(image), &uncompressed_options()).unwrap())
-        .into_owned();
-
-    assert_eq!(pdf.matches("/Subtype/Image").count(), 1, "{pdf}");
-    assert!(
-      pdf.contains("/Width 2/Height 2/BitsPerComponent 8/ColorSpace/DeviceRGB"),
-      "{pdf}"
-    );
-    assert!(!pdf.contains("/Interpolate"), "{pdf}");
-    assert!(
-      pdf.contains("0 0 0 RG 0.14 w 0 J 0 j[]0 d 10.07 20.07 29.86 39.86 re\nS"),
-      "{pdf}"
-    );
-    assert!(
-      pdf.contains("1.68 0 0 -1.92 10.84 22.76 cm/Im0 Do"),
-      "{pdf}"
-    );
-  }
-
-  #[test]
-  fn missing_linked_image_icon_is_the_fixed_office_rgb_sample_plane() {
+  fn missing_image_icon_for_print_is_the_fixed_office_rgb_sample_plane() {
     const EXPECTED: [u8; 60] = [
       128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, // row 1
       128, 128, 128, 255, 255, 255, 255, 255, 255, 255, 255, 255, // row 2
@@ -7487,7 +7693,7 @@ mod tests {
       128, 128, 128, 255, 204, 204, 255, 255, 255, 255, 255, 255, // row 4
       128, 128, 128, 255, 255, 255, 255, 255, 255, 255, 255, 255, // row 5
     ];
-    let icon = missing_linked_image_icon();
+    let icon = missing_image_icon_for_print();
     let direct = icon.direct();
 
     assert_eq!((direct.width, direct.height), (4, 5));
@@ -7504,12 +7710,12 @@ mod tests {
   }
 
   #[test]
-  fn missing_embedded_picture_icon_is_the_fixed_office_rgb_sample_plane() {
+  fn missing_image_icon_for_screen_is_the_fixed_office_rgb_sample_plane() {
     const EXPECTED: [u8; 12] = [
       128, 128, 128, 128, 128, 128, // row 1
       128, 128, 128, 255, 0, 0, // row 2
     ];
-    let icon = missing_embedded_picture_icon();
+    let icon = missing_image_icon_for_screen();
     let direct = icon.direct();
 
     assert_eq!((direct.width, direct.height), (2, 2));
@@ -7518,7 +7724,7 @@ mod tests {
     assert!(!direct.interpolate);
     assert!(direct.matte.is_none());
     let DirectRasterEncoding::Sampled { pixels } = &direct.encoding else {
-      panic!("missing embedded-picture icon must use the unencoded sampled transport");
+      panic!("missing-image icon must use the unencoded sampled transport");
     };
     assert_eq!(pixels.rgb, EXPECTED);
     assert!(pixels.alpha.is_none());
@@ -8133,6 +8339,77 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_single_path_semantics_follow_each_rigid_glyph() {
+    let point = |x, y| common::Point { x: Pt(x), y: Pt(y) };
+    let warp = common::TextWarp {
+      source_bounds: common::Rect {
+        origin: point(72.0, 74.0),
+        size: Size {
+          width: Pt(100.0),
+          height: Pt(12.0),
+        },
+      },
+      paint_bounds: common::Rect {
+        origin: point(72.0, 72.0),
+        size: Size {
+          width: Pt(100.0),
+          height: Pt(50.0),
+        },
+      },
+      boundaries: vec![vec![
+        common::PathCommand::MoveTo(point(72.0, 122.0)),
+        common::PathCommand::CubicTo {
+          control1: point(82.0, 72.0),
+          control2: point(162.0, 72.0),
+          end: point(172.0, 122.0),
+        },
+      ]],
+      follow_path: None,
+      vml_fit_path: None,
+      vml_trim_band: None,
+    };
+    let mut warp = warp;
+    warp.follow_path = common::TextFollowPath::from_path(0.8, &warp.boundaries[0]);
+    let style = common::TextStyle {
+      font_family: Some("Liberation Serif".into()),
+      font_size: Pt(12.0),
+      color: color(0, 0, 0, u8::MAX),
+      pdf_glyph_outlines: true,
+      pdf_glyph_outline_options: Some(Arc::new(common::PdfGlyphOutlineOptions {
+        semantic_text_overlay: true,
+        text_warp: Some(Arc::new(warp)),
+        ..Default::default()
+      })),
+      ..Default::default()
+    };
+    let pdf = render(&text_document("A B", style), &uncompressed_options()).unwrap();
+    let pdf = String::from_utf8_lossy(&pdf);
+    assert!(pdf.contains("/ToUnicode"));
+    assert!(pdf.contains("/ca 0"));
+    let content = object_body(&pdf, 4);
+    assert_eq!(content.matches("BT").count(), 2, "{content}");
+    assert!(content.split_ascii_whitespace().any(|token| token == "f*"));
+    let tokens = content.split_ascii_whitespace().collect::<Vec<_>>();
+    let transforms = tokens
+      .iter()
+      .enumerate()
+      .filter_map(|(index, token)| {
+        if *token != "cm" || index < 6 {
+          return None;
+        }
+        let values = tokens[index - 6..index]
+          .iter()
+          .map(|value| value.parse::<f32>())
+          .collect::<std::result::Result<Vec<_>, _>>()
+          .ok()?;
+        ((values[0].hypot(values[1]) - 0.8).abs() < 0.0001).then_some(values)
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(transforms.len(), 2, "{content}");
+    assert_ne!(transforms[0][..4], transforms[1][..4]);
+  }
+
+  #[test]
   fn direct_writer_paints_solid_glyph_paths_and_keeps_only_the_requested_semantic_layer() {
     let outlined_style = |semantic_text_overlay| common::TextStyle {
       font_family: Some("Liberation Serif".into()),
@@ -8167,6 +8444,7 @@ mod tests {
     .into_owned();
     assert!(semantic.contains("/Subtype/Type0"), "{semantic}");
     assert!(semantic.contains("/ToUnicode"), "{semantic}");
+    assert!(semantic.contains("/ca 0"), "{semantic}");
     assert!(semantic.contains("/ca 0"), "{semantic}");
     let semantic_content = object_body(&semantic, 4);
     let semantic_tokens = semantic_content
@@ -10104,6 +10382,57 @@ mod tests {
       render(&invalid, &uncompressed_options()),
       Err(PdfError::Writer(message)) if message.contains("text clip rectangle")
     ));
+  }
+
+  #[test]
+  fn direct_writer_matches_native_excel_font_underline_bands() {
+    // Independent plain/rich Office controls, three lines per font. These
+    // are the observed top offsets and filled heights at the printed sizes.
+    for (family, size, offset, thickness) in [
+      ("Arial", 7.08, 0.72, 0.48),
+      ("Calibri", 7.08, 0.84, 0.48),
+      ("Cambria", 14.16, 0.84, 0.84),
+      ("Times New Roman", 21.24, 2.28, 1.08),
+    ] {
+      let mut document = text_document(
+        "Hxgj",
+        common::TextStyle {
+          font_family: Some(family.into()),
+          font_size: Pt(size),
+          color: color(0, 0, 0, u8::MAX),
+          underline: true,
+          office_text_array: true,
+          ..Default::default()
+        },
+      );
+      let common::DisplayItem::Text(run) = &mut document.pages[0].items[0] else {
+        panic!("text control");
+      };
+      run.origin.y = Pt(100.0);
+      run.origin_is_baseline = true;
+      let pdf =
+        String::from_utf8_lossy(&render(&document, &uncompressed_options()).unwrap()).into_owned();
+      let glyph_end = pdf.find("ET").unwrap();
+      let rectangles = pdf[glyph_end..]
+        .lines()
+        .filter(|line| line.split_whitespace().last() == Some("re"))
+        .map(|line| {
+          let values = line.split_whitespace().collect::<Vec<_>>();
+          values[values.len() - 5..values.len() - 1]
+            .iter()
+            .map(|value| value.parse::<f32>().unwrap())
+            .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(rectangles.len(), 1, "{family}: {pdf}");
+      assert!(
+        (rectangles[0][1] - (100.0 + offset)).abs() < 0.0001,
+        "{family}"
+      );
+      assert!((rectangles[0][3] - thickness).abs() < 0.0001, "{family}");
+      assert!(pdf[glyph_end..].contains("\nf\n"), "{family}: {pdf}");
+      assert!(!pdf[glyph_end..].contains("\nS\n"), "{family}: {pdf}");
+    }
   }
 
   #[test]

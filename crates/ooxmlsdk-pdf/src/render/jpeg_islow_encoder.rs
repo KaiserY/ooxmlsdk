@@ -312,9 +312,15 @@ fn component_planes(image: &RgbaImage) -> Option<ComponentPlanes> {
   let chroma_len = chroma_width.checked_mul(chroma_height)?;
   let mut downsampled_cb = Vec::with_capacity(chroma_len);
   let mut downsampled_cr = Vec::with_capacity(chroma_len);
+  let last_chroma_row = height.div_ceil(2) - 1;
   for output_y in 0..chroma_height {
-    let y0 = (output_y * 2).min(height - 1);
-    let y1 = (output_y * 2 + 1).min(height - 1);
+    // IJG jcprepct.c pads the completed downsampled row group to an iMCU.
+    // Repeating raw RGB rows first changes the last chroma pair for an even
+    // source height. Horizontal padding remains before the 2x2 box filter,
+    // as in jcsample.c, including its alternating rounding bias.
+    let chroma_y = output_y.min(last_chroma_row);
+    let y0 = (chroma_y * 2).min(height - 1);
+    let y1 = (chroma_y * 2 + 1).min(height - 1);
     for output_x in 0..chroma_width {
       let x0 = (output_x * 2).min(width - 1);
       let x1 = (output_x * 2 + 1).min(width - 1);
@@ -641,6 +647,46 @@ fn write_segment(output: &mut Vec<u8>, marker: u8, payload: &[u8]) -> Option<()>
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn chroma_bottom_padding_matches_native_row_group_output() {
+    // Independent GDI+ JPEG75 captures use exactly these generated RGB
+    // samples. Check the complete entropy scan, including partial iMCUs;
+    // JFIF density metadata has a separate owner.
+    for (width, height, scan_length, scan_crc32) in [
+      (8, 2, 44, 0xef9c28d6),
+      (16, 10, 137, 0xa70847ec),
+      (9, 3, 68, 0xaa988475),
+      (15, 16, 144, 0xdf13d456),
+      (17, 24, 314, 0xc9e8257a),
+      (41, 39, 1052, 0xec3d7c0b),
+      (13, 8, 98, 0x97657507),
+      (7, 1, 31, 0x8bf86cb3),
+    ] {
+      let source = RgbaImage::from_fn(width, height, |x, y| {
+        image::Rgba([
+          (x * 17 + y * 131) as u8,
+          (x * 37 + y * 61) as u8,
+          (x * 71 + y * 23) as u8,
+          255,
+        ])
+      });
+      let jpeg = encode_rgba_h2v2(&source, 75).unwrap();
+      let sos = jpeg
+        .windows(2)
+        .position(|bytes| bytes == [0xff, 0xda])
+        .unwrap();
+      let header_length = usize::from(u16::from_be_bytes([jpeg[sos + 2], jpeg[sos + 3]]));
+      let scan = &jpeg[sos + 2 + header_length..jpeg.len() - 2];
+      let mut crc = flate2::Crc::new();
+      crc.update(scan);
+      assert_eq!(
+        (scan.len(), crc.sum()),
+        (scan_length, scan_crc32),
+        "{width}x{height}"
+      );
+    }
+  }
 
   #[test]
   fn gray_scan_has_no_chroma_or_interleaved_padding() {

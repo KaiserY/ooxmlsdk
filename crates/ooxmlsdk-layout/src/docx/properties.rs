@@ -57,7 +57,7 @@ pub(super) fn paragraph_format(
   direct_properties: Option<ParagraphProps<'_>>,
 ) -> ParagraphFormat {
   let mut format = styles.paragraph_format_with_base(style_id, base_format);
-  // Word ignores a sole empty header paragraph while its layout properties
+  // Word ignores a sole empty header/footer paragraph while its layout properties
   // retain the paragraph style. Native controls activate that story when
   // direct alignment, direction, spacing, pagination, indent or tabs differ.
   // Run/paragraph-mark fonts and merely authoring the same value do not.
@@ -126,7 +126,9 @@ pub(super) fn paragraph_run_style(
   base_style: TextStyle,
   base_overrides: RunStyleOverrides,
 ) -> TextStyle {
-  styles.run_style_with_base(style_id, base_style, base_overrides)
+  let mut style = styles.run_style_with_base(style_id, base_style, base_overrides);
+  styles.automatic_escapement_fonts.resolve(&mut style);
+  style
 }
 
 pub(super) fn run_style(
@@ -153,6 +155,7 @@ fn run_style_with_character_style_policy(
 ) -> TextStyle {
   let mut style = base_style;
   let Some(properties) = properties else {
+    styles.automatic_escapement_fonts.resolve(&mut style);
     return style;
   };
 
@@ -170,6 +173,7 @@ fn run_style_with_character_style_policy(
     &styles.theme_colors,
   );
   styles.apply_word_font_table_mappings(&mut style, RunProps::Direct(properties).run_fonts());
+  styles.automatic_escapement_fonts.resolve(&mut style);
   style
 }
 
@@ -180,6 +184,7 @@ pub(super) fn paragraph_mark_run_style(
 ) -> TextStyle {
   let mut style = base_style;
   let Some(properties) = properties else {
+    styles.automatic_escapement_fonts.resolve(&mut style);
     return style;
   };
 
@@ -196,6 +201,7 @@ pub(super) fn paragraph_mark_run_style(
   );
   styles
     .apply_word_font_table_mappings(&mut style, RunProps::ParagraphMark(properties).run_fonts());
+  styles.automatic_escapement_fonts.resolve(&mut style);
   style
 }
 
@@ -230,6 +236,7 @@ pub(super) fn paragraph_mark_run_style_for_numbering(
   );
   styles
     .apply_word_font_table_mappings(&mut style, RunProps::ParagraphMark(properties).run_fonts());
+  styles.automatic_escapement_fonts.resolve(&mut style);
   style
 }
 
@@ -786,7 +793,13 @@ fn merge_run_style_with_policy(
     // displacement from the surrounding text baseline without resizing the
     // font. LibreOffice defers this property until the final run size is
     // known, then imports the same physical displacement as CharEscapement.
-    style.baseline_shift_pt = position.val.to_points() as f32;
+    let position_pt = position.val.to_points() as f32;
+    let previous = style.wordprocessingml_position_pt.replace(position_pt);
+    if style.automatic_escapement_font_size_pt.is_some() {
+      style.baseline_shift_pt += position_pt - previous.unwrap_or(0.0);
+    } else {
+      style.baseline_shift_pt = position_pt;
+    }
   }
   if policy.underline
     && let Some(underline) = properties.underline()
@@ -844,9 +857,11 @@ pub(super) fn apply_vertical_text_alignment(
         style.font_size_pt = original_size;
         style.complex_font_size_pt = style.automatic_escapement_complex_font_size_pt;
       }
-      style.baseline_shift_pt = 0.0;
+      style.baseline_shift_pt = style.wordprocessingml_position_pt.unwrap_or(0.0);
       style.automatic_escapement_font_size_pt = None;
       style.automatic_escapement_complex_font_size_pt = None;
+      style.automatic_escapement_is_subscript = false;
+      style.automatic_escapement_baseline_normalized = false;
     }
   }
 }
@@ -874,14 +889,30 @@ fn apply_automatic_escapement(style: &mut TextStyle, baseline_shift_scale: f32) 
 
   style.automatic_escapement_font_size_pt = Some(original_font_size);
   style.automatic_escapement_complex_font_size_pt = original_complex_font_size;
-  style.baseline_shift_pt = effective_original_size * baseline_shift_scale;
+  style.automatic_escapement_is_subscript = baseline_shift_scale < 0.0;
+  style.automatic_escapement_baseline_normalized = false;
+  style.baseline_shift_pt = effective_original_size * baseline_shift_scale
+    + style.wordprocessingml_position_pt.unwrap_or(0.0);
   let legacy_rounding = style.wordprocessingml_legacy_escapement_rounding;
-  style.font_size_pt = automatic_escapement_glyph_size(original_font_size, legacy_rounding);
-  style.complex_font_size_pt =
-    original_complex_font_size.map(|size| automatic_escapement_glyph_size(size, legacy_rounding));
+  style.font_size_pt = automatic_escapement_glyph_size(
+    original_font_size,
+    WORD_DEFAULT_ESCAPEMENT_HEIGHT_PERCENT,
+    legacy_rounding,
+  );
+  style.complex_font_size_pt = original_complex_font_size.map(|size| {
+    automatic_escapement_glyph_size(
+      size,
+      WORD_DEFAULT_ESCAPEMENT_HEIGHT_PERCENT,
+      legacy_rounding,
+    )
+  });
 }
 
-fn automatic_escapement_glyph_size(original_size: f32, legacy_rounding: bool) -> f32 {
+pub(super) fn automatic_escapement_glyph_size(
+  original_size: f32,
+  height_percent: u32,
+  legacy_rounding: bool,
+) -> f32 {
   // Word first realizes the reduced size in half points; this owns layout
   // advances as well as the later PDF em. Native controls across four fonts,
   // both vertical alignments and 35 sizes resolve exact half-point ties down
@@ -890,8 +921,7 @@ fn automatic_escapement_glyph_size(original_size: f32, legacy_rounding: bool) ->
   // Single-setting Office controls and native LOGFONT captures establish
   // this additional compatibility behavior; mode 15 ignores that switch.
   // Keep the percentage arithmetic exact for authored half-point sizes.
-  let half_points =
-    f64::from(original_size) * 2.0 * f64::from(WORD_DEFAULT_ESCAPEMENT_HEIGHT_PERCENT) / 100.0;
+  let half_points = f64::from(original_size) * 2.0 * f64::from(height_percent) / 100.0;
   let realized_half_points = if legacy_rounding {
     half_points.round()
   } else {
@@ -925,7 +955,7 @@ pub(super) fn set_complex_font_size_preserving_automatic_escapement(
 }
 
 fn reapply_automatic_escapement(style: &mut TextStyle) {
-  let shift_scale = if style.baseline_shift_pt < 0.0 {
+  let shift_scale = if style.automatic_escapement_is_subscript {
     LO_SUBSCRIPT_BASELINE_SHIFT_SCALE
   } else {
     LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE

@@ -23,6 +23,8 @@ use ooxmlsdk_layout::common;
 use ooxmlsdk_layout::fonts::{FontFaceData, FontStyleRef};
 use ooxmlsdk_layout::text_metrics::{TextMetrics, TextVerticalMetrics};
 
+#[path = "paint_embedded_fonts.rs"]
+mod embedded_fonts;
 #[path = "paint_word_advances.rs"]
 mod word_advances;
 #[path = "paint_word_baselines.rs"]
@@ -102,6 +104,9 @@ pub(super) struct TextItem<'doc> {
 
 #[derive(Clone, Debug)]
 pub(super) struct ImageItem<'doc> {
+  /// A font raster is already realized at Word's glyph device resolution;
+  /// source-picture JPEG selection and downsampling do not apply to it.
+  pub(super) font_bitmap: Option<super::image::PreparedRasterImage>,
   pub(super) x_pt: f32,
   pub(super) y_pt: f32,
   pub(super) width_pt: f32,
@@ -219,6 +224,7 @@ pub(super) struct RgbColor {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct TextStyle<'doc> {
+  embedded_fonts: Option<Arc<ooxmlsdk_layout::fonts::EmbeddedFontSet>>,
   font_family: Option<Cow<'doc, str>>,
   high_ansi_font_family: Option<Cow<'doc, str>>,
   fallback_font_family: Option<Cow<'doc, str>>,
@@ -249,6 +255,7 @@ pub(super) struct TextStyle<'doc> {
   wordprocessing_legacy_font_measurement: Option<bool>,
   pub(super) wordprocessing_tab_leader: Option<common::wordprocessing_device::TabLeader>,
   semantic_character_advances_pt: Option<Arc<[f32]>>,
+  pub(super) office_text_array: bool,
   shaping_context: Option<Arc<common::TextShapingContext>>,
   kashida_expansions: Option<Arc<[common::KashidaExpansion]>>,
   wordprocessing_kashida: Option<Arc<common::WordprocessingKashida>>,
@@ -256,6 +263,7 @@ pub(super) struct TextStyle<'doc> {
   baseline_shift_pt: f32,
   automatic_escapement_font_size_pt: Option<f32>,
   automatic_escapement_complex_font_size_pt: Option<f32>,
+  automatic_escapement_baseline_normalized: bool,
   line_vertical_alignment: common::LineVerticalAlignment,
   use_windows_font_metrics: bool,
   wordprocessingml_font_slots: bool,
@@ -289,6 +297,7 @@ pub(super) struct TextStyle<'doc> {
   pub(super) small_caps: bool,
   pub(super) hidden: bool,
   pub(super) semantic_only: bool,
+  pub(super) bitmap_semantic_text: bool,
   pub(super) pdf_painted_artifact: bool,
   /// The text origin is already the metafile playback baseline rather than a
   /// document-layout line-box origin.
@@ -304,6 +313,9 @@ pub(super) struct TextStyle<'doc> {
 }
 
 impl FontStyleRef for TextStyle<'_> {
+  fn embedded_fonts(&self) -> Option<&Arc<ooxmlsdk_layout::fonts::EmbeddedFontSet>> {
+    self.embedded_fonts.as_ref()
+  }
   fn font_family(&self) -> Option<&str> {
     self.font_family.as_deref()
   }
@@ -953,7 +965,9 @@ pub(super) fn symbol_font_semantic_text<'a>(
         '\u{f0a3}' if symbol => '\u{2264}',
         '\u{f0b3}' if symbol => '\u{2265}',
         '\u{f0b4}' if symbol => '\u{00d7}',
-        '\u{f0b7}' if symbol => '\u{2022}',
+        // Symbol's legacy byte B7 and its F000-offset form select the same
+        // bullet. Native Excel and fontcvt.cxx map both to Unicode 2022.
+        '\u{00b7}' | '\u{f0b7}' if symbol => '\u{2022}',
         '\u{f0b9}' if symbol => '\u{2260}',
         '\u{f0c9}' if symbol => '\u{2283}',
         '\u{f0ca}' if symbol => '\u{2287}',
@@ -1665,6 +1679,7 @@ impl<'doc> PaintDocument<'doc> {
     let conversion = super::metafile::word_wmf_conversion_profile(options);
     let separate_path_fill_and_stroke = document.engine_kind == common::LayoutEngineKind::Pptx;
     let mut natural_metrics = word_advances::NaturalMetricsCache::default();
+    let mut font_bitmaps = embedded_fonts::FontBitmaps::default();
     let word_fixed_output = matches!(
       options.images.optimization_policy,
       crate::PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
@@ -1780,6 +1795,15 @@ impl<'doc> PaintDocument<'doc> {
           .collect();
         if word_fixed_output {
           word_advances::realize(&mut items, &mut natural_metrics);
+          if options.bitmap_missing_fonts {
+            font_bitmaps.realize(
+              &mut items,
+              options.optimize_for,
+              page.setup.size.width.0,
+              page.setup.size.height.0,
+              text_metrics,
+            );
+          }
         }
         PaintPage {
           width_pt: pdf_page_dimension(document.engine_kind, page.setup.size.width.0),
@@ -1977,6 +2001,7 @@ fn expand_metafile_semantic_text_item<'doc>(
         let data =
           super::image::powerpoint_activex_bitmap_png(&layer.data, 75).unwrap_or(layer.data);
         PageItem::Image(ImageItem {
+          font_bitmap: None,
           x_pt: image.x_pt + layer.x * image.width_pt,
           y_pt: image.y_pt + layer.y * image.height_pt,
           width_pt: layer.width * image.width_pt,
@@ -2568,6 +2593,7 @@ pub(super) fn image_item_from_common<'doc>(
   image: &'doc common::ImageItem<'static>,
 ) -> ImageItem<'doc> {
   ImageItem {
+    font_bitmap: None,
     x_pt: image.bounds.origin.x.0,
     y_pt: image.bounds.origin.y.0,
     width_pt: image.bounds.size.width.0,
@@ -2730,6 +2756,7 @@ fn link_area_from_common<'doc>(link: &'doc common::LinkArea<'static>) -> LinkAre
 
 fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> TextStyle<'doc> {
   TextStyle {
+    embedded_fonts: style.embedded_fonts.clone(),
     font_family: style
       .font_family
       .as_ref()
@@ -2790,6 +2817,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     wordprocessing_legacy_font_measurement: style.wordprocessing_legacy_font_measurement,
     wordprocessing_tab_leader: style.wordprocessing_tab_leader,
     semantic_character_advances_pt: style.semantic_character_advances_pt.clone(),
+    office_text_array: style.office_text_array,
     shaping_context: style.shaping_context.clone(),
     kashida_expansions: style.kashida_expansions.clone(),
     wordprocessing_kashida: style.wordprocessing_kashida.clone(),
@@ -2799,6 +2827,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     automatic_escapement_complex_font_size_pt: style
       .automatic_escapement_complex_font_size
       .map(|size| size.0),
+    automatic_escapement_baseline_normalized: style.automatic_escapement_baseline_normalized,
     line_vertical_alignment: style.line_vertical_alignment,
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
@@ -2836,6 +2865,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     small_caps: style.small_caps,
     hidden: style.hidden,
     semantic_only: style.semantic_only,
+    bitmap_semantic_text: false,
     pdf_painted_artifact: style.pdf_painted_artifact,
     metafile_reference_baseline: false,
     rotation_deg: style.rotation_degrees,
@@ -3087,7 +3117,7 @@ fn writer_item_line_metrics(
         ) =>
     {
       let normalized_automatic_escapement = text.style.automatic_escapement_font_size_pt.is_some()
-        && text.style.baseline_shift_pt.abs() <= f32::EPSILON;
+        && text.style.automatic_escapement_baseline_normalized;
       let metrics = if normalized_automatic_escapement {
         text_metrics.vertical_metrics_for_text(&text.text, &text.style)
       } else {
@@ -3283,7 +3313,17 @@ impl<'doc> PaintText<'doc> {
     });
     let decoration_metrics = text_metrics.text_decoration_metrics(&text_ref.style);
     let decoration_start_x_pt = text_ref.decoration_span_start_x_pt.unwrap_or(text_ref.x_pt);
-    let underline_y_pt = baseline_y + decoration_metrics.underline_offset_pt;
+    // Native Excel GDI controls realize the post-table underscore position on
+    // the 600dpi device. It is the top of a filled band, rather than the centre
+    // of the generic PDF stroke. Keep this independent of cell baseline layout.
+    let underline_offset_pt = if text_ref.style.office_text_array {
+      ooxmlsdk_layout::units::quantize_points_to_office_print_grid(
+        decoration_metrics.underline_offset_pt,
+      )
+    } else {
+      decoration_metrics.underline_offset_pt
+    };
+    let underline_y_pt = baseline_y + underline_offset_pt;
     let underline = text_ref.style.underline.then_some(PaintStrokeLine {
       x1_pt: decoration_start_x_pt,
       y1_pt: underline_y_pt,
@@ -4111,6 +4151,7 @@ fn rotate_point(x: f32, y: f32, rotation_x: f32, rotation_y: f32, angle: f32) ->
 
 pub(super) fn text_has_visible_glyph_paint(style: &TextStyle<'_>) -> bool {
   style.semantic_only
+    || style.bitmap_semantic_text
     || style.opacity > f32::EPSILON
     || (style.outline_color.is_some()
       && style.outline_width_pt > f32::EPSILON
@@ -4667,6 +4708,26 @@ mod tests {
   }
 
   #[test]
+  fn cell_text_array_owner_survives_the_common_pdf_style_adapter() {
+    let common_style = common::TextStyle {
+      office_text_array: true,
+      semantic_character_advances_pt: Some([5.16, 6.96].into()),
+      ..Default::default()
+    };
+    let painted = super::text_style_from_common(&common_style);
+    assert!(painted.office_text_array);
+    assert_eq!(
+      painted.semantic_character_advances_pt.as_deref(),
+      Some([5.16, 6.96].as_slice())
+    );
+    let semantic_only_owner = common::TextStyle {
+      office_text_array: false,
+      ..common_style
+    };
+    assert!(!super::text_style_from_common(&semantic_only_owner).office_text_array);
+  }
+
+  #[test]
   fn drawingml_chart_theme_fonts_reach_the_pdf_glyph_runs() {
     let common_style = common::TextStyle {
       font_family: Some("Calibri".into()),
@@ -5125,6 +5186,28 @@ mod tests {
   }
 
   #[test]
+  fn symbol_bullet_byte_alias_preserves_glyphs_and_remaps_utf8_clusters() {
+    let source = "A\u{00b7}B\u{f0b7}";
+    for family in ["Symbol", "SymbolMT", "sYmBoL"] {
+      let semantic = symbol_font_semantic_text(source, Some(family));
+      assert_eq!(semantic, "A\u{2022}B\u{2022}");
+      let glyphs = [glyph(0..1), glyph(1..3), glyph(3..4), glyph(4..7)];
+      let remapped = remap_glyph_text_ranges(&glyphs, source, &semantic).unwrap();
+      for (index, range) in [0..1, 1..4, 4..5, 5..8].into_iter().enumerate() {
+        assert_eq!(remapped[index].text_range, range);
+        assert_eq!(remapped[index].glyph_id, glyphs[index].glyph_id);
+        assert_eq!(remapped[index].x_advance, glyphs[index].x_advance);
+      }
+    }
+    for family in [None, Some("Arial"), Some("Calibri"), Some("Symbol Bold")] {
+      assert!(matches!(
+        symbol_font_semantic_text(source, family),
+        Cow::Borrowed(_)
+      ));
+    }
+  }
+
+  #[test]
   fn webdings_map_symbols_remap_semantics_without_changing_glyphs() {
     let source = "\u{f045}\u{f04a}\u{f049}";
     let semantic = symbol_font_semantic_text(source, Some("wEbDiNgS"));
@@ -5303,6 +5386,27 @@ mod tests {
       paint_style,
       text_style_from_common(&common::TextStyle::default())
     );
+  }
+
+  #[test]
+  fn word_automatic_escapement_zero_shift_keeps_its_original_line_box() {
+    let common::DisplayItem::Text(mut run) = text_item(point(20.0, 30.0), None, 0.0) else {
+      unreachable!()
+    };
+    run.style.font_family = Some(Cow::Borrowed("Miriam Mono CLM"));
+    run.style.font_size = common::Pt(3.0);
+    run.style.automatic_escapement_font_size = Some(common::Pt(4.0));
+    run.style.use_windows_font_metrics = true;
+    let mut metrics = super::TextMetrics::new();
+    let item = super::PageItem::Text(Box::new(super::text_item_from_common(&run)));
+    let original = super::writer_item_line_metrics(&item, &mut metrics).unwrap();
+    assert!(!original.top_aligned);
+    run.style.automatic_escapement_baseline_normalized = true;
+    let item = super::PageItem::Text(Box::new(super::text_item_from_common(&run)));
+    let normalized = super::writer_item_line_metrics(&item, &mut metrics).unwrap();
+    assert!(normalized.top_aligned);
+    assert!(original.ascent_pt > normalized.ascent_pt + 0.5);
+    assert!(original.descent_pt >= normalized.descent_pt);
   }
 
   #[test]

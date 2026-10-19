@@ -63,6 +63,9 @@ fn collect_run(run: &w::Run, events: &mut Vec<ParagraphFieldEvent>) {
         }
       }
       w::RunChoice::Run(nested) => collect_run(nested, events),
+      w::RunChoice::Break(br) if br.r#type == Some(w::BreakValues::Page) => {
+        events.push(ParagraphFieldEvent::PageBreak);
+      }
       // Everything else in w:r is visible story content or a visible layout
       // control (text, tab, break, drawing, note reference, and so on).
       _ => events.push(ParagraphFieldEvent::Content),
@@ -196,6 +199,39 @@ fn collect_move_to_run(moved: &w::MoveToRun, events: &mut Vec<ParagraphFieldEven
       _ => {}
     }
   }
+}
+
+pub(super) fn bookmark_page_break_prefix(paragraph: &crate::docx::Paragraph, name: &str) -> usize {
+  use crate::docx::ParagraphFieldEvent;
+  if paragraph.field_events.iter().any(|event| {
+    matches!(event, ParagraphFieldEvent::BookmarkReferenceUsesCaret(candidate) if candidate == name)
+  }) {
+    return 0;
+  }
+  let Some((start, id)) = paragraph
+    .field_events
+    .iter()
+    .enumerate()
+    .find_map(|(index, event)| match event {
+      ParagraphFieldEvent::BookmarkStart {
+        id,
+        name: candidate,
+      } if candidate == name => Some((index + 1, id)),
+      _ => None,
+    })
+  else {
+    return 0;
+  };
+  let mut count = 0;
+  for event in &paragraph.field_events[start..] {
+    match event {
+      ParagraphFieldEvent::PageBreak => count += 1,
+      ParagraphFieldEvent::Content => break,
+      ParagraphFieldEvent::BookmarkEnd { id: candidate } if candidate == id => break,
+      _ => {}
+    }
+  }
+  count
 }
 
 fn collect_bookmark_start(bookmark: &w::BookmarkStart, events: &mut Vec<ParagraphFieldEvent>) {
@@ -516,6 +552,7 @@ struct StoryScan {
   fields: Vec<StoryField>,
   toc_spans: Vec<TocSpan>,
   bookmark_names: HashSet<String>,
+  caret_reference_bookmarks: HashSet<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -624,8 +661,13 @@ fn scan_story_paragraph(
 
   for (event_index, event) in paragraph.field_events.iter().enumerate() {
     match event {
-      ParagraphFieldEvent::Content => {
+      ParagraphFieldEvent::Content | ParagraphFieldEvent::PageBreak => {
         content_bookmark_scopes.extend(active_bookmarks.values().cloned());
+        if matches!(event, ParagraphFieldEvent::Content) {
+          for name in active_bookmarks.values() {
+            scan.caret_reference_bookmarks.remove(name);
+          }
+        }
       }
       ParagraphFieldEvent::Begin { locked, dirty } => fields.push(OpenStoryField {
         start_ordinal: ordinal,
@@ -633,9 +675,12 @@ fn scan_story_paragraph(
         locked: *locked,
         dirty: *dirty,
         separated: false,
-        starts_at_paragraph_start: !paragraph.field_events[..event_index]
-          .iter()
-          .any(|event| matches!(event, ParagraphFieldEvent::Content)),
+        starts_at_paragraph_start: !paragraph.field_events[..event_index].iter().any(|event| {
+          matches!(
+            event,
+            ParagraphFieldEvent::Content | ParagraphFieldEvent::PageBreak
+          )
+        }),
       }),
       ParagraphFieldEvent::Instruction(text) => {
         if let Some(field) = fields.last_mut()
@@ -663,7 +708,12 @@ fn scan_story_paragraph(
             starts_at_paragraph_start: field.starts_at_paragraph_start,
             ends_at_paragraph_end: !paragraph.field_events[event_index + 1..]
               .iter()
-              .any(|event| matches!(event, ParagraphFieldEvent::Content)),
+              .any(|event| {
+                matches!(
+                  event,
+                  ParagraphFieldEvent::Content | ParagraphFieldEvent::PageBreak
+                )
+              }),
           });
         }
       }
@@ -680,15 +730,24 @@ fn scan_story_paragraph(
         inside_toc_result: fields
           .iter()
           .any(|parent| parent.separated && TocSpec::parse(&parent.instruction).is_some()),
-        starts_at_paragraph_start: !paragraph.field_events[..event_index]
-          .iter()
-          .any(|event| matches!(event, ParagraphFieldEvent::Content)),
+        starts_at_paragraph_start: !paragraph.field_events[..event_index].iter().any(|event| {
+          matches!(
+            event,
+            ParagraphFieldEvent::Content | ParagraphFieldEvent::PageBreak
+          )
+        }),
         ends_at_paragraph_end: !paragraph.field_events[event_index + 1..]
           .iter()
-          .any(|event| matches!(event, ParagraphFieldEvent::Content)),
+          .any(|event| {
+            matches!(
+              event,
+              ParagraphFieldEvent::Content | ParagraphFieldEvent::PageBreak
+            )
+          }),
       }),
       ParagraphFieldEvent::BookmarkStart { id, name } => {
         scan.bookmark_names.insert(name.clone());
+        scan.caret_reference_bookmarks.insert(name.clone());
         bookmark_scopes.insert(name.clone());
         source_bookmarks.push(name.clone());
         active_bookmarks.insert(id.clone(), name.clone());
@@ -700,7 +759,8 @@ fn scan_story_paragraph(
           bookmark_scopes.insert(name);
         }
       }
-      ParagraphFieldEvent::SuppressParagraphBreak { .. }
+      ParagraphFieldEvent::BookmarkReferenceUsesCaret(_)
+      | ParagraphFieldEvent::SuppressParagraphBreak { .. }
       | ParagraphFieldEvent::SuppressReferenceParagraphBreak { .. }
       | ParagraphFieldEvent::DeferredParagraphBreak { .. }
       | ParagraphFieldEvent::DeferredReferenceParagraphBreak { .. }
@@ -860,6 +920,32 @@ pub(super) fn refresh_tables_of_contents(
   } else {
     scan
   };
+  for (ordinal, source) in scan.paragraphs.iter().enumerate() {
+    let Some(paragraph) = paragraph(sections, &scan, ordinal) else {
+      continue;
+    };
+    let caret_names = source
+      .source_bookmarks
+      .iter()
+      .filter(|name| {
+        scan.caret_reference_bookmarks.contains(*name)
+          && bookmark_page_break_prefix(paragraph, name) > 0
+      })
+      .cloned()
+      .collect::<Vec<_>>();
+    if !caret_names.is_empty()
+      && let Some(paragraph) = paragraph_mut(sections, &scan, ordinal)
+    {
+      // Native control-only ranges retain the original caret even when the
+      // range end has advanced. Determine this over the complete main story,
+      // so a break-only start paragraph can still reference later range text.
+      paragraph.field_events.extend(
+        caret_names
+          .into_iter()
+          .map(ParagraphFieldEvent::BookmarkReferenceUsesCaret),
+      );
+    }
+  }
   if scan.toc_spans.is_empty() {
     return;
   }
@@ -975,10 +1061,12 @@ pub(super) fn refresh_tables_of_contents(
       let absent_result = toc_span_has_clean_empty_result(sections, &scan, span)
         && (span.start_ordinal..=span.end_ordinal).all(|ordinal| {
           paragraph(sections, &scan, ordinal).is_some_and(|paragraph| {
-            !paragraph
-              .field_events
-              .iter()
-              .any(|event| matches!(event, ParagraphFieldEvent::Content))
+            !paragraph.field_events.iter().any(|event| {
+              matches!(
+                event,
+                ParagraphFieldEvent::Content | ParagraphFieldEvent::PageBreak
+              )
+            })
           })
         });
       let empty_template = templates.get(&1).or_else(|| {
@@ -2269,10 +2357,12 @@ fn toc_span_has_empty_result_placeholder(
 ) -> bool {
   (span.start_ordinal.saturating_add(1)..=span.end_ordinal).any(|ordinal| {
     paragraph(sections, scan, ordinal).is_some_and(|paragraph| {
-      let has_cached_content = paragraph
-        .field_events
-        .iter()
-        .any(|event| matches!(event, ParagraphFieldEvent::Content));
+      let has_cached_content = paragraph.field_events.iter().any(|event| {
+        matches!(
+          event,
+          ParagraphFieldEvent::Content | ParagraphFieldEvent::PageBreak
+        )
+      });
       let has_visible_content = paragraph.inlines.iter().any(|inline| match inline {
         InlineItem::Text(run) => !run.text.trim().is_empty(),
         InlineItem::BookmarkStart(_) => false,

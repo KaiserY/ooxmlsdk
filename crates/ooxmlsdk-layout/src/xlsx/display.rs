@@ -44,7 +44,7 @@ use crate::pptx::chart::{
   CartesianChartGroupDecorationStyle, ChartFrame, ChartLayoutProfile, ClusteredColumnStyle,
   RadialChartStyle, lower_clustered_column_chart, lower_radial_chart, solid_chart_shape_style,
 };
-use crate::pptx::drawingml::color::{Color, RgbHexColor, SchemeColor};
+use crate::pptx::drawingml::color::{Color, ResolvedColor, RgbHexColor, SchemeColor};
 use crate::pptx::drawingml::fill::FillKind;
 use crate::pptx::drawingml::line::LineFill;
 
@@ -154,6 +154,10 @@ pub(crate) fn lower_to_layout_document(
   options: &LayoutOptions,
 ) -> common::LayoutDocument<'static> {
   let mut pages = Vec::new();
+  // Font selection, TrueType prep programs and device advances belong to
+  // the workbook's printer context. Recreating them for every horizontal
+  // continuation page repeats the same work thousands of times.
+  let mut text_metrics = TextMetrics::new();
   let print_document = CalcPrintDocument::from_import(import);
   let debug_records = if options.diagnostics.collect_debug_records {
     print_document
@@ -167,7 +171,16 @@ pub(crate) fn lower_to_layout_document(
   };
   pages.extend(print_document.pages.iter().map(|page| {
     let setup = page_setup_from_calc(page);
-    (setup, print_page_items(import, page, setup))
+    (
+      setup,
+      print_page_items_with_metrics(
+        import,
+        page,
+        setup,
+        &mut text_metrics,
+        options.fixed_output_raster_dpi,
+      ),
+    )
   }));
   common_fixed_pages_with_items(pages, debug_records, options)
 }
@@ -403,15 +416,27 @@ fn common_line_item(item: LineItem) -> common::LineItem<'static> {
   }
 }
 
+#[cfg(test)]
 fn print_page_items(
   import: &ExcelImport,
   page: &CalcPrintPage<'_>,
   setup: PageSetup,
 ) -> Vec<PageItem> {
+  print_page_items_with_metrics(import, page, setup, &mut TextMetrics::new(), None)
+}
+
+fn print_page_items_with_metrics(
+  import: &ExcelImport,
+  page: &CalcPrintPage<'_>,
+  setup: PageSetup,
+  text_metrics: &mut TextMetrics,
+  fixed_output_raster_dpi: Option<u32>,
+) -> Vec<PageItem> {
   let mut items = Vec::new();
-  // The render layouts retain their historical `zoom_scale` field name, but
-  // fixed output composes worksheet zoom and the paper transform as floats.
-  // Keeping the stages separate avoids rounding 90% × 95% to 86%.
+  let raster_dpi = fixed_output_raster_dpi.unwrap_or(units::OFFICE_FIXED_OUTPUT_RASTER_DPI as u32);
+  // Keep the authored worksheet zoom and paper mapping separate in the
+  // model; Excel truncates their composed content percentage at the output
+  // device before both grid placement and font realization.
   let zoom_scale = fixed_output_content_scale(page.zoom, page.paper_scale_percent);
   let heading_width = if page.page_settings.print_headings {
     page
@@ -447,17 +472,20 @@ fn print_page_items(
     .area
     .map(|area| page.sheet.fixed_output_range_rect(area, zoom_scale))
     .map_or((0.0, 0.0), |rect| (rect.width_pt, rect.height_pt));
-  // Center the worksheet on the unmapped output-paper canvas, then apply
-  // the paper scale to that distance. Centering already-scaled columns
-  // incorrectly moves the page center when Letter is mapped onto A4.
+  // On a portrait worksheet's short paper axis, Excel centers the realized
+  // printer grid. Native zoom/margin controls retain that distance when the
+  // Letter canvas maps onto A4. The mapped long axis (landscape) and
+  // chartsheets retain their separate pre-mapping centering distance.
   let paper_scale = page.paper_scale_percent as f32 / 100.0;
   let centering_scale = page.zoom as f32 / 100.0;
-  let horizontal_centering = if page.page_settings.horizontal_centered {
-    calc_axis_centering_offset(
-      true,
-      setup.width_pt
-        - units::quantize_points_to_office_print_grid(setup.margin_left_pt)
-        - units::quantize_points_to_office_print_grid(setup.margin_right_pt),
+  let center_realized_grid = page.sheet.sheet_type == super::worksheet::SheetType::Worksheet
+    && page.page_settings.orientation != Some(x::OrientationValues::Landscape);
+  let (centering_width, centering_output_scale) = if !page.page_settings.horizontal_centered {
+    (0.0, 1.0)
+  } else if center_realized_grid {
+    (heading_width + repeat_width + area_size.0, 1.0)
+  } else {
+    (
       heading_width / paper_scale
         + effective_repeated_columns(page).map_or(0.0, |range| {
           page
@@ -469,6 +497,16 @@ fn print_page_items(
             .sheet
             .fixed_output_centering_width_pt(range, centering_scale)
         }),
+      paper_scale,
+    )
+  };
+  let horizontal_centering = if page.page_settings.horizontal_centered {
+    calc_axis_centering_offset(
+      true,
+      setup.width_pt
+        - units::quantize_points_to_office_print_grid(setup.margin_left_pt)
+        - units::quantize_points_to_office_print_grid(setup.margin_right_pt),
+      centering_width,
     )
   } else {
     0.0
@@ -476,7 +514,7 @@ fn print_page_items(
   let horizontal_centering = if page.page_settings.horizontal_centered {
     page
       .sheet
-      .fixed_output_centering_offset_pt(horizontal_centering * paper_scale)
+      .fixed_output_centering_offset_pt(horizontal_centering * centering_output_scale)
   } else {
     0.0
   };
@@ -497,7 +535,10 @@ fn print_page_items(
     } else {
       page
         .page_settings
-        .fixed_output_body_origin_pt(page.paper_scale_percent)
+        .fixed_output_body_origin_pt_with_reference(
+          page.paper_scale_percent,
+          page.paper_mapping_settings,
+        )
         .0
     }) + horizontal_centering
       + heading_width
@@ -517,7 +558,11 @@ fn print_page_items(
   } else {
     page
       .page_settings
-      .fixed_output_body_top_pt(page.paper_scale_percent)
+      .fixed_output_body_origin_pt_with_reference(
+        page.paper_scale_percent,
+        page.paper_mapping_settings,
+      )
+      .1
   } + vertical_centering
     + heading_height;
   let physical_page = CellRect {
@@ -532,8 +577,6 @@ fn print_page_items(
     width_pt: body_width,
     height_pt: repeat_height + area_size.1,
   };
-  let mut text_metrics = TextMetrics::new();
-
   // ECMA-376 §18.3.1.46 defines these as the printed page header and
   // footer. Keep the PDF content stream in the same semantic order exposed
   // by Microsoft Office fixed output: header, sheet body, then footer.
@@ -548,7 +591,7 @@ fn print_page_items(
       source_file_name: import.source_file_name.as_deref(),
       field_update_datetime: import.field_update_datetime,
     },
-    &mut text_metrics,
+    text_metrics,
   );
 
   if let Some(area) = repeat_corner_for_page(page) {
@@ -565,7 +608,7 @@ fn print_page_items(
         physical_page,
         fill_page,
       },
-      &mut text_metrics,
+      text_metrics,
     );
   }
   if let Some(area) = repeat_rows_for_page(page) {
@@ -582,7 +625,7 @@ fn print_page_items(
         physical_page,
         fill_page,
       },
-      &mut text_metrics,
+      text_metrics,
     );
   }
   if let Some(area) = repeat_columns_for_page(page) {
@@ -599,7 +642,7 @@ fn print_page_items(
         physical_page,
         fill_page,
       },
-      &mut text_metrics,
+      text_metrics,
     );
   }
   if let Some(area) = page.area {
@@ -616,7 +659,7 @@ fn print_page_items(
         physical_page,
         fill_page,
       },
-      &mut text_metrics,
+      text_metrics,
     );
     if page.page_settings.print_headings {
       render_headings(
@@ -649,6 +692,7 @@ fn print_page_items(
         origin_x_pt: repeated_origin_x,
         origin_y_pt: body_origin_y,
         zoom_scale,
+        raster_dpi,
       },
     );
   }
@@ -663,6 +707,7 @@ fn print_page_items(
         origin_x_pt: repeated_origin_x,
         origin_y_pt: body_origin_y + repeat_height,
         zoom_scale,
+        raster_dpi,
       },
     );
   }
@@ -677,6 +722,7 @@ fn print_page_items(
         origin_x_pt: main_origin_x,
         origin_y_pt: body_origin_y,
         zoom_scale,
+        raster_dpi,
       },
     );
   }
@@ -690,6 +736,7 @@ fn print_page_items(
       origin_x_pt: main_origin_x,
       origin_y_pt: body_origin_y + repeat_height,
       zoom_scale,
+      raster_dpi,
     },
   );
   render_header_or_footer(
@@ -703,7 +750,7 @@ fn print_page_items(
       source_file_name: import.source_file_name.as_deref(),
       field_update_datetime: import.field_update_datetime,
     },
-    &mut text_metrics,
+    text_metrics,
   );
   items
 }
@@ -714,6 +761,13 @@ struct DrawingAreaRenderLayout {
   origin_x_pt: f32,
   origin_y_pt: f32,
   zoom_scale: f32,
+  raster_dpi: u32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct XlsxPictureOutputProfile {
+  zoom_scale: f32,
+  raster_dpi: u32,
 }
 
 impl DrawingAreaRenderLayout {
@@ -872,10 +926,17 @@ fn print_page_drawingml_items(
         continue;
       }
       let output_scale = legacy_output_scale.or_else(|| {
-        (printer_picture_grid
-          && anchor.kind == super::drawing::DrawingAnchorKind::TwoCell
+        ((printer_picture_grid
+          && (anchor.kind == super::drawing::DrawingAnchorKind::TwoCell
+            || (anchor.kind == super::drawing::DrawingAnchorKind::OneCell
+              && page
+                .sheet
+                .uses_modern_excel_arial_fixed_output_picture_grid()))
           && anchor.object.kind == super::drawing::DrawingObjectKind::Picture)
-          .then_some(layout.zoom_scale)
+          || (page.sheet.uses_unprofiled_excel_font_grid()
+            && anchor.object.graphic_uri.as_deref()
+              == Some("http://schemas.openxmlformats.org/drawingml/2006/chart")))
+        .then_some(layout.zoom_scale)
       });
       let page_transform = if output_scale.is_some() {
         layout.fixed_output_drawing_page_transform(page)
@@ -903,7 +964,10 @@ fn print_page_drawingml_items(
         drawing,
         anchor,
         drawing_rect,
-        layout.zoom_scale,
+        XlsxPictureOutputProfile {
+          zoom_scale: layout.zoom_scale,
+          raster_dpi: layout.raster_dpi,
+        },
       ) {
         continue;
       }
@@ -961,7 +1025,9 @@ fn print_page_vml_shape_items(
     };
     match legacy_vml_form_control_kind(shape) {
       Some(LegacyVmlFormControlKind::Checkbox) => {
-        push_vml_checkbox_items(&mut items, shape, rect);
+        if push_vml_printer_checkbox_items(&mut items, page, layout, shape).is_none() {
+          push_vml_checkbox_items(&mut items, shape, rect);
+        }
         continue;
       }
       Some(LegacyVmlFormControlKind::OptionButton) => {
@@ -1087,6 +1153,87 @@ fn legacy_vml_form_control_snapshot_rect(
     y_pt,
     width_pt: rect.width_pt,
     height_pt: (bottom_pt - y_pt).max(0.0),
+  }
+}
+
+fn push_vml_printer_checkbox_items(
+  items: &mut Vec<PageItem>,
+  page: &CalcPrintPage<'_>,
+  layout: DrawingAreaRenderLayout,
+  shape: &super::object_resources::VmlShapeModel,
+) -> Option<()> {
+  // Native state controls share the same indicator geometry. The checked
+  // glyph and mixed interior are painted on that source before resampling.
+  let interior_gray = match shape.checked.unwrap_or(0) {
+    0 | 1 => 255,
+    2 => 128,
+    _ => return None,
+  };
+  let geometry = page
+    .sheet
+    .fixed_output_control_geometry(shape, layout.zoom_scale)?;
+  let output_width = vml_printer_checkbox_output_pixels(
+    geometry.source_width_px,
+    geometry.rect.width_pt,
+    layout.raster_dpi,
+  );
+  let output_height = vml_printer_checkbox_output_pixels(
+    geometry.source_height_px,
+    geometry.rect.height_pt,
+    layout.raster_dpi,
+  );
+  let image = vml_checkbox_printer_bitmap(
+    geometry.source_width_px,
+    geometry.source_height_px,
+    geometry.painter_height_px,
+    output_width,
+    output_height,
+    interior_gray,
+    shape.checked == Some(1),
+  )?;
+  let data = encode_vml_control_snapshot_png(image)?;
+  let start = layout
+    .area
+    .map_or(CellAddress { col: 1, row: 1 }, |area| area.start);
+  let rect = CellRect {
+    x_pt: layout.origin_x_pt + geometry.rect.x_pt
+      - page
+        .sheet
+        .fixed_output_column_offset_pt(start.col, layout.zoom_scale),
+    y_pt: layout.origin_y_pt + geometry.rect.y_pt
+      - page
+        .sheet
+        .fixed_output_row_offset_pt(start.row, layout.zoom_scale),
+    ..geometry.rect
+  };
+  let rect = sheet_horizontal_rect(
+    rect,
+    layout.origin_x_pt,
+    layout.area_width(page),
+    sheet_right_to_left(page.sheet),
+  );
+  push_vml_control_snapshot_image(items, rect, data);
+  push_vml_checkable_control_text_item(items, shape, rect, false);
+  Some(())
+}
+
+fn vml_printer_checkbox_output_pixels(
+  source_pixels: u32,
+  physical_extent_pt: f32,
+  raster_dpi: u32,
+) -> u32 {
+  // MSO 6a37c8 obtains effective DPI from the physical shape transform.
+  // Keep the observed 275ppi trigger; the caller's fixed-output quality owns
+  // the target density. Sample directly from the printer bitmap once: a
+  // second resize of the 200ppi intermediate loses the Screen pixel phase.
+  // Preserve its f32 operation order at integer bitmap-size boundaries.
+  let effective_dpi = source_pixels as f32 / (physical_extent_pt / units::POINTS_PER_INCH);
+  if effective_dpi > 275.0 {
+    (source_pixels as f32 * raster_dpi as f32 / effective_dpi)
+      .trunc()
+      .max(1.0) as u32
+  } else {
+    source_pixels
   }
 }
 
@@ -1547,6 +1694,253 @@ fn vml_shape_text_style(
     style.color = color;
   }
   style
+}
+
+fn vml_checkbox_printer_bitmap(
+  source_width: u32,
+  source_height: u32,
+  painter_height: u32,
+  output_width: u32,
+  output_height: u32,
+  interior_gray: u8,
+  checked: bool,
+) -> Option<image::RgbaImage> {
+  if source_width == 0 || source_height == 0 || output_width == 0 || output_height == 0 {
+    return None;
+  }
+  const DEVICE_DPI: u32 = 600;
+  const WORKSHEET_DPI: u32 = 192;
+  const NOMINAL_SIZE: u32 = (13 * DEVICE_DPI + WORKSHEET_DPI / 2) / WORKSHEET_DPI;
+  const LEADING: i64 = ((5 * DEVICE_DPI + WORKSHEET_DPI / 2) / WORKSHEET_DPI) as i64;
+  const INK_SIZE: i64 = (NOMINAL_SIZE - 1) as i64;
+  const BORDER: i64 = 4;
+  // Center in the actual painter RECT, independently from the bitmap's
+  // allocation height. Only inverse-scaled snapshots add a far endpoint;
+  // treating every painter height as source_height + 1 shifts unit-scale
+  // interiors and ticks by one dot. Preserve the native signed shift.
+  let top = (i64::from(painter_height) + 1 - i64::from(NOMINAL_SIZE)) >> 1;
+  let tick = checked.then(|| vml_checkbox_printer_tick_polygons(i64::from(NOMINAL_SIZE)));
+  let classify = |x: u32, y: u32| {
+    let x = i64::from(x) - LEADING;
+    let y = i64::from(y) - top;
+    let opaque = (0..INK_SIZE).contains(&x) && (0..INK_SIZE).contains(&y);
+    let mut interior =
+      (BORDER..INK_SIZE - BORDER).contains(&x) && (BORDER..INK_SIZE - BORDER).contains(&y);
+    if interior
+      && tick.as_ref().is_some_and(|polygons| {
+        polygons
+          .iter()
+          .any(|polygon| vml_checkbox_printer_tick_contains(polygon, x * 16, y * 16))
+      })
+    {
+      interior = false;
+    }
+    (interior, opaque)
+  };
+  // GDI+ changes to its fixed-point area scaler on either 420px source
+  // axis. Captioned Forms controls expose this same boundary owner as the
+  // fixed-output image writer: both Print/Screen densities, two widths and
+  // all three states retain the same 600dpi indicator before filtering.
+  if source_width.max(source_height) >= 420
+    && let Some(image) = vml_checkbox_printer_area_bitmap(
+      (source_width, source_height),
+      (output_width, output_height),
+      [LEADING, top, LEADING + INK_SIZE, top + INK_SIZE],
+      interior_gray,
+      &classify,
+    )
+  {
+    return Some(image);
+  }
+  let denominator = u64::from(output_width) * u64::from(output_height);
+  let byte = |weight: u64, value: u8| {
+    ((u128::from(weight) * u128::from(value) + u128::from(denominator / 2))
+      / u128::from(denominator)) as u8
+  };
+  // GDI+'s explicit full-bitmap rectangle maps x to x*source/output, with no
+  // half-pixel shift. This is different from the existing Metafile overload.
+  // Evaluate the flat source analytically: allocation stays at output DPI.
+  let image = image::RgbaImage::from_fn(output_width, output_height, |x, y| {
+    let sx = u64::from(x) * u64::from(source_width);
+    let sy = u64::from(y) * u64::from(source_height);
+    let ix = (sx / u64::from(output_width)) as u32;
+    let iy = (sy / u64::from(output_height)) as u32;
+    let fx = sx % u64::from(output_width);
+    let fy = sy % u64::from(output_height);
+    let mut interior_weight = 0;
+    let mut opaque_weight = 0;
+    for (py, wy) in [
+      (iy, u64::from(output_height) - fy),
+      (iy.saturating_add(1).min(source_height - 1), fy),
+    ] {
+      for (px, wx) in [
+        (ix, u64::from(output_width) - fx),
+        (ix.saturating_add(1).min(source_width - 1), fx),
+      ] {
+        let (interior, opaque) = classify(px, py);
+        let weight = wx * wy;
+        if interior {
+          interior_weight += weight;
+        }
+        if opaque {
+          opaque_weight += weight;
+        }
+      }
+    }
+    let value = byte(interior_weight, interior_gray);
+    image::Rgba([value, value, value, byte(opaque_weight, u8::MAX)])
+  });
+  Some(image)
+}
+
+fn vml_checkbox_printer_area_bitmap(
+  source_size: (u32, u32),
+  output_size: (u32, u32),
+  ink_bounds: [i64; 4],
+  interior_gray: u8,
+  classify: &impl Fn(u32, u32) -> (bool, bool),
+) -> Option<image::RgbaImage> {
+  const ONE: u64 = 1 << 16;
+  let axis = |source, output| {
+    let step = u64::from(source) * ONE / u64::from(output);
+    let reciprocal = u64::from(output) * ONE / u64::from(source);
+    (step > 0 && reciprocal > 0).then_some((step, reciprocal))
+  };
+  let (x_step, x_reciprocal) = axis(source_size.0, output_size.0)?;
+  let (y_step, y_reciprocal) = axis(source_size.1, output_size.1)?;
+  let [left, top, right, bottom] = ink_bounds;
+  let left = left.clamp(0, i64::from(source_size.0)) as u64;
+  let right = right.clamp(0, i64::from(source_size.0)) as u64;
+  let top = top.clamp(0, i64::from(source_size.1)) as u64;
+  let bottom = bottom.clamp(0, i64::from(source_size.1)) as u64;
+  let overlap = |start: u64, end: u64, sample: u64| {
+    end
+      .min((sample + 1) * ONE)
+      .saturating_sub(start.max(sample * ONE))
+  };
+  let byte = |value: u64, reciprocal: u64| {
+    ((value * reciprocal + (1 << 31)) >> 32).min(u64::from(u8::MAX)) as u8
+  };
+  // Use GDI+'s independently truncated Q16 coverage/normalization factors
+  // and round once per separable pass. Only the bounded 40x40 ink support
+  // can contribute: no full printer bitmap or intermediate is allocated.
+  let mut image = image::RgbaImage::new(output_size.0, output_size.1);
+  let first_x = (left * ONE / x_step).min(u64::from(output_size.0)) as u32;
+  let last_x = (right * ONE).div_ceil(x_step).min(u64::from(output_size.0)) as u32;
+  let first_y = (top * ONE / y_step).min(u64::from(output_size.1)) as u32;
+  let last_y = (bottom * ONE)
+    .div_ceil(y_step)
+    .min(u64::from(output_size.1)) as u32;
+  let sample = |x, y| {
+    let x_start = u64::from(x) * x_step;
+    let x_end = x_start + x_step;
+    let y_start = u64::from(y) * y_step;
+    let y_end = y_start + y_step;
+    let mut gray_sum = 0;
+    let mut alpha_sum = 0;
+    for source_y in (y_start / ONE).max(top)..((y_end - 1) / ONE + 1).min(bottom) {
+      let mut gray_row = 0;
+      let mut alpha_row = 0;
+      for source_x in (x_start / ONE).max(left)..((x_end - 1) / ONE + 1).min(right) {
+        let (interior, opaque) = classify(source_x as u32, source_y as u32);
+        let weight = overlap(x_start, x_end, source_x);
+        if interior {
+          gray_row += u64::from(interior_gray) * weight;
+        }
+        if opaque {
+          alpha_row += u64::from(u8::MAX) * weight;
+        }
+      }
+      let weight = overlap(y_start, y_end, source_y);
+      gray_sum += u64::from(byte(gray_row, x_reciprocal)) * weight;
+      alpha_sum += u64::from(byte(alpha_row, x_reciprocal)) * weight;
+    }
+    let alpha = byte(alpha_sum, y_reciprocal);
+    let associated = byte(gray_sum, y_reciprocal);
+    // The native ARGB readback and black-matte PDF transport each truncate
+    // their conversion. Skipping this round trip loses one color byte at
+    // partially covered interiors, independently of the exact alpha plane.
+    let gray = if alpha == 0 {
+      0
+    } else {
+      let straight = u32::from(associated) * 255 / u32::from(alpha);
+      (straight * u32::from(alpha) / 255) as u8
+    };
+    image::Rgba([gray, gray, gray, alpha])
+  };
+  for y in first_y..last_y {
+    for x in first_x..last_x {
+      image.put_pixel(x, y, sample(x, y));
+    }
+  }
+  Some(image)
+}
+
+fn vml_checkbox_printer_tick_polygons(nominal_size: i64) -> [[(i64, i64); 14]; 2] {
+  // Excel's 600-DPI control painter obtains these endpoints by integer
+  // division of its nominal extent by six. The fixed 4px round pen is a
+  // control glyph resource: retain its native widened half-caps in 28.4
+  // device coordinates, as read through WidenPath/GetPath. Separate GDI
+  // LineTo paints reproduce the captured checked source exactly at both
+  // print scales; the two widened figures therefore combine as a union.
+  let unit = nominal_size / 6;
+  let points = [
+    (2 * unit, 3 * unit + unit / 2),
+    (3 * unit, nominal_size - 2 * unit),
+    (nominal_size - 2 * unit, 2 * unit),
+  ];
+  const HALF_CAPS: [[(i64, i64); 7]; 2] = [
+    [
+      (24, -24),
+      (7, -31),
+      (-7, -31),
+      (-23, -23),
+      (-31, -7),
+      (-31, 7),
+      (-24, 24),
+    ],
+    [
+      (-24, -24),
+      (-31, -7),
+      (-31, 7),
+      (-23, 23),
+      (-7, 31),
+      (7, 31),
+      (24, 24),
+    ],
+  ];
+  std::array::from_fn(|segment| {
+    std::array::from_fn(|index| {
+      let (origin, sign) = if index < 7 {
+        (points[segment], 1)
+      } else {
+        (points[segment + 1], -1)
+      };
+      let cap = HALF_CAPS[segment][index % 7];
+      (origin.0 * 16 + sign * cap.0, origin.1 * 16 + sign * cap.1)
+    })
+  })
+}
+
+fn vml_checkbox_printer_tick_contains(polygon: &[(i64, i64); 14], x: i64, y: i64) -> bool {
+  // GDI's binary region includes the left/top edge and excludes right/bottom.
+  // Evaluate at integer device pixels with exact rational intersections;
+  // half-pixel or antialiased path sampling changes the native glyph.
+  let mut inside = false;
+  for index in 0..polygon.len() {
+    let (mut a, mut b) = (polygon[index], polygon[(index + 1) % polygon.len()]);
+    if a.1 > b.1 {
+      std::mem::swap(&mut a, &mut b);
+    }
+    if a.1 <= y && y < b.1 {
+      let denominator = b.1 - a.1;
+      let intersection = a.0 * denominator + (y - a.1) * (b.0 - a.0);
+      if intersection <= x * denominator {
+        inside = !inside;
+      }
+    }
+  }
+  inside
 }
 
 fn vml_checkbox_snapshot_png(
@@ -2719,7 +3113,7 @@ fn render_cell_area(
   items: &mut Vec<PageItem>,
   import: &ExcelImport,
   page: &CalcPrintPage<'_>,
-  cells: &[super::print::CalcPrintCell<'_>],
+  cells: &[std::sync::Arc<super::print::CalcPrintCell<'_>>],
   area: super::worksheet::CellRange,
   layout: CellAreaRenderLayout,
   text_metrics: &mut TextMetrics,
@@ -2793,6 +3187,7 @@ fn render_cell_area(
     .iter()
     .any(|drawing| !drawing.anchors.is_empty());
   let mut deferred_edit_text_items = Vec::new();
+  let mut cell_background_items = Vec::new();
   let mut border_paints = Vec::new();
   let mut conditional_eval_cache = super::print::ConditionalFormatEvalCache::default();
   let cell_baseline_grid = page
@@ -2800,10 +3195,13 @@ fn render_cell_area(
     .uses_modern_excel_arial11_cell_text_grid()
     .then_some(ExcelCellBaselineGrid::ModernArial11)
     .or_else(|| {
-      page
-        .sheet
-        .uses_unprofiled_excel_font_grid()
-        .then_some(ExcelCellBaselineGrid::ExplicitNormalFont)
+      // Native four-family/three-size/two-zoom controls also use printer
+      // font baselines with modern Arial10 Normal. The horizontal grid was
+      // already selected for this profile; retain the same font-box owner
+      // vertically instead of centering natural font metrics in the line.
+      (page.sheet.uses_unprofiled_excel_font_grid()
+        || page.sheet.uses_modern_excel_arial10_cell_text_grid())
+      .then_some(ExcelCellBaselineGrid::ExplicitNormalFont)
     })
     .or_else(|| {
       page
@@ -2811,7 +3209,15 @@ fn render_cell_area(
         .uses_legacy_excel12_japanese_fixed_output_profile()
         .then_some(ExcelCellBaselineGrid::LegacyExcel12Japanese)
     });
-  let printer_normal_descent_px = cell_baseline_grid.and_then(|_| {
+  let bottom_cell_baseline_grid = cell_baseline_grid.or_else(|| {
+    // Explicit Calibri11 Normal publishes the same independent printer/
+    // screen row-lower cache as the other explicit Normal fonts. Native
+    // bottom controls establish this owner without extending TOP/CENTER.
+    (import.styles.normal_style_uses_explicit_calibri_11()
+      && page.sheet.fixed_output_row_lower_grid().is_some())
+    .then_some(ExcelCellBaselineGrid::ExplicitNormalFont)
+  });
+  let printer_normal_descent_px = bottom_cell_baseline_grid.and_then(|_| {
     let mut style = import.styles.default_font_text_style();
     super::text::scale_text_style_for_fixed_output(&mut style, layout.zoom_scale);
     let char_set = if import.styles.font_charset_for_cell(None) == Some(2) {
@@ -2819,7 +3225,7 @@ fn render_cell_area(
     } else {
       0
     };
-    super::worksheet::printer_font_vertical_metrics(&style, char_set)
+    super::worksheet::printer_font_vertical_metrics(&style, char_set, text_metrics)
       .map(|metrics| metrics.descent_px)
   });
   for cell in cells {
@@ -2937,8 +3343,45 @@ fn render_cell_area(
       .sheet
       .merged_range_for_cell(cell.address)
       .is_some_and(|merged| merged.intersects(area));
+    if scan_context_only
+      && !owns_merged_text
+      && cell.address.col < area.start.col
+      && (calc_cell_is_value(cell) || calc_cell_is_logical_value(cell))
+      && !alignment
+        .and_then(|a| a.text_rotation)
+        .is_some_and(|rotation| rotation != 0)
+    {
+      // Values never extend their clip into neighbouring columns. The
+      // later scan-context predicate therefore rejects these cells before
+      // any glyph can be retained. Apply that same predicate before font
+      // realization; keep the cells in occupied_cells to block strings.
+      let rect = CellRect {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+      };
+      let reaches_scan = if page.sheet.uses_printer_cell_text_horizontal_grid() {
+        printer_cell_clip_reaches_overflow_scan(
+          printer_cell_text_clip_rect(rect, layout.fill_page),
+          page_clip_rect,
+          overflow_scan_rect,
+        )
+      } else {
+        rect_intersects_clip(
+          x_pt,
+          y_pt,
+          x_pt + width_pt,
+          y_pt + height_pt,
+          overflow_scan_rect,
+        )
+      };
+      if !reaches_scan {
+        continue;
+      }
+    }
     if !scan_context_only {
-      let fill_start = items.len();
+      let fill_start = cell_background_items.len();
       let solid = |color| super::styles::FillRecord {
         color: Some(color),
         ..Default::default()
@@ -2960,7 +3403,7 @@ fn render_cell_area(
         .or_else(|| table_builtin_style.fill.map(solid))
         .unwrap_or_else(|| import.styles.fill_for_cell(cell.style_index));
       if let Some(pattern) = fill.pattern {
-        items.push(PageItem::Path(common::PathItem {
+        cell_background_items.push(PageItem::Path(common::PathItem {
           bounds: common_rect(x_pt, y_pt, width_pt, height_pt),
           points: vec![
             common_point(x_pt, y_pt),
@@ -2984,7 +3427,7 @@ fn render_cell_area(
           layout.fill_page,
         )
       {
-        items.push(PageItem::Rect(RectItem {
+        cell_background_items.push(PageItem::Rect(RectItem {
           x_pt: fill_rect.x_pt,
           y_pt: fill_rect.y_pt,
           width_pt: fill_rect.width_pt,
@@ -2997,7 +3440,7 @@ fn render_cell_area(
       }
       if let Some(shear) = shear {
         shear_cell_paint(
-          &mut items[fill_start..],
+          &mut cell_background_items[fill_start..],
           CellRect {
             x_pt,
             y_pt,
@@ -3065,6 +3508,10 @@ fn render_cell_area(
     // Excel fixed output creates the print font on its 600dpi device. The
     // 11pt legacy workbook font is consequently emitted and measured as
     // 11.04pt (92/600in), which also decides borderline wrap opportunities.
+    let mut font_print_context = CellFontPrintContext {
+      style: measurement_style.clone(),
+      print_scale: layout.zoom_scale,
+    };
     super::text::scale_text_style_for_fixed_output(&mut measurement_style, layout.zoom_scale);
     if let Some(spacing_pt) = text_metrics.gdi_synthetic_bold_character_spacing_pt(
       &cell.rendered_text,
@@ -3109,20 +3556,18 @@ fn render_cell_area(
       i64::from(alignment.indent.unwrap_or(0)) + i64::from(alignment.relative_indent.unwrap_or(0))
     });
     let alignment_indent_pt = if alignment_indent > 0 {
-      let normal_style = import.styles.default_font_text_style();
-      // ECMA-376 §18.8.1 defines one alignment-indent increment as three
-      // space widths in the Normal style font. Any relativeIndent reaching
-      // this point came from a differential format and adjusts that count.
+      // The reference Normal-font indent is independent of worksheet zoom.
+      // relativeIndent reaching this point came from a differential format
+      // and adjusts the same count of three-space increments.
       import
         .styles
-        .fixed_output_alignment_indent_increment_pt(text_metrics.measure_text("   ", &normal_style))
-        * layout.zoom_scale
+        .fixed_output_alignment_indent_increment_pt(text_metrics)
         * alignment_indent as f32
     } else {
       0.0
     };
-    let text_indent_pt =
-      pivot_builtin_style.text_indent_pt() * layout.zoom_scale + alignment_indent_pt;
+    let pivot_text_indent_pt = pivot_builtin_style.text_indent_pt() * layout.zoom_scale;
+    let text_indent_pt = pivot_text_indent_pt + alignment_indent_pt;
     let cell_text_rect = if page.sheet.uses_printer_cell_text_horizontal_grid() {
       excel_printer_cell_text_horizontal_rect(
         cell_rect,
@@ -3136,22 +3581,30 @@ fn render_cell_area(
       cell_rect
     };
     let text_cell_rect = if text_indent_pt > 0.0 {
-      let inset = text_indent_pt.min(cell_text_rect.width_pt);
-      if calc_cell_horizontal_alignment(cell, alignment) == x::HorizontalAlignmentValues::Right {
-        CellRect {
-          width_pt: cell_text_rect.width_pt - inset,
-          ..cell_text_rect
+      // Indentation owns the full origin displacement, even beyond a narrow
+      // cell. Keep the signed fitting capacity until neighbor overflow is
+      // resolved; clamping the origin would paint a different cell's text.
+      let inset = text_indent_pt;
+      let leading_shift = match calc_cell_horizontal_alignment(cell, alignment) {
+        x::HorizontalAlignmentValues::Right => 0.0,
+        x::HorizontalAlignmentValues::Center | x::HorizontalAlignmentValues::CenterContinuous => {
+          // Applied indent is limited to left/right/distributed in ECMA-376.
+          // Native centered indent ramps still reserve trailing capacity,
+          // without shifting the leading edge. Pivot-owned displacement
+          // remains independent from ordinary alignment indent.
+          pivot_text_indent_pt
         }
-      } else {
-        CellRect {
-          x_pt: cell_text_rect.x_pt + inset,
-          width_pt: cell_text_rect.width_pt - inset,
-          ..cell_text_rect
-        }
+        _ => inset,
+      };
+      CellRect {
+        x_pt: cell_text_rect.x_pt + leading_shift,
+        width_pt: cell_text_rect.width_pt - inset,
+        ..cell_text_rect
       }
     } else {
       cell_text_rect
     };
+    let original_print_font_size_pt = measurement_style.font_size_pt;
     apply_plain_cell_shrink_to_fit(
       cell,
       alignment,
@@ -3159,11 +3612,22 @@ fn render_cell_area(
       &mut measurement_style,
       text_metrics,
     );
+    if measurement_style.font_size_pt != original_print_font_size_pt {
+      let shrink_scale = measurement_style.font_size_pt / original_print_font_size_pt;
+      font_print_context.style.font_size_pt *= shrink_scale;
+      font_print_context.style.automatic_escapement_font_size_pt = font_print_context
+        .style
+        .automatic_escapement_font_size_pt
+        .map(|size| size * shrink_scale);
+    }
     let render_style = measurement_style.clone();
     let cell_clip_rect = if page.sheet.uses_printer_cell_text_horizontal_grid() {
       printer_cell_text_clip_rect(cell_rect, layout.fill_page)
     } else {
-      text_cell_rect
+      // Indentation moves the text origin, not the occupied cell's paint
+      // boundary. Native PDFs retain over-indented text operators beneath
+      // the original cell clip, including when fitting capacity is negative.
+      cell_text_rect
     };
     let output_area = calc_cell_output_area(
       CalcCellOutputContext {
@@ -3190,8 +3654,64 @@ fn render_cell_area(
     let formula_text_layout = cell.formula
       && !(calc_cell_is_logical_value(cell)
         && alignment.is_some_and(|alignment| alignment.wrap_text && alignment.shrink_to_fit));
+    // Native automatic/cache/manual-height and plain/rich controls limit
+    // wrapped payload to the realized row box too. Automatic row measurement
+    // happens before the printer's edit layout; it can still leave a last
+    // line outside that box. Retain only its visible leading prefix.
+    let clip_wrapped_text = page.sheet.row_has_custom_height(cell.address.row)
+      || merged_range.is_some()
+      || alignment.is_some_and(|alignment| alignment.wrap_text);
     let mut rendered_text_items = Vec::new();
     let mut number_layout_rendered = false;
+    let cell_text_baseline_grid = cell_baseline_grid.or_else(|| {
+      (alignment.is_none_or(|alignment| {
+        alignment.text_rotation.unwrap_or(0) == 0
+          && !alignment.shrink_to_fit
+          && alignment
+            .vertical
+            .is_none_or(|vertical| vertical == x::VerticalAlignmentValues::Bottom)
+      }) && merged_range.is_none_or(|range| range.start.row == range.end.row))
+      .then_some(bottom_cell_baseline_grid)
+      .flatten()
+    });
+    let track_bottom_line_extents = cell_text_baseline_grid
+      == Some(ExcelCellBaselineGrid::ExplicitNormalFont)
+      && merged_range.is_some_and(|range| range.start.row == range.end.row)
+      && (alignment.is_some_and(|alignment| alignment.wrap_text)
+        || (!cell.rich_text_runs.is_empty()
+          && cell.number_format_layout.is_none()
+          && rendered_text.as_ref() == cell.text.as_ref()))
+      && alignment.is_none_or(|alignment| {
+        alignment.text_rotation.unwrap_or(0) == 0
+          && alignment
+            .vertical
+            .is_none_or(|vertical| vertical == x::VerticalAlignmentValues::Bottom)
+      })
+      && !formula_text_layout;
+    let track_center_line_extents = cell_text_baseline_grid
+      == Some(ExcelCellBaselineGrid::ExplicitNormalFont)
+      && merged_range.is_none_or(|range| range.start.row == range.end.row)
+      && alignment.is_some_and(|alignment| {
+        alignment.vertical == Some(x::VerticalAlignmentValues::Center)
+          && alignment.text_rotation.unwrap_or(0) == 0
+          && !alignment.shrink_to_fit
+          && (alignment.wrap_text || !cell.rich_text_runs.is_empty())
+      })
+      && (!formula_text_layout || calc_cell_is_value(cell));
+    let track_top_line_extents = cell_baseline_grid
+      == Some(ExcelCellBaselineGrid::ExplicitNormalFont)
+      && merged_range.is_none_or(|range| range.start.row == range.end.row)
+      && !cell.rich_text_runs.is_empty()
+      && !formula_text_layout
+      && alignment.is_some_and(|alignment| {
+        alignment.vertical == Some(x::VerticalAlignmentValues::Top)
+          && alignment.wrap_text
+          && alignment.text_rotation.unwrap_or(0) == 0
+          && !alignment.shrink_to_fit
+      });
+    let track_printer_line_extents =
+      track_bottom_line_extents || track_center_line_extents || track_top_line_extents;
+    let mut text_layout_result = CellTextLayoutResult::default();
     // Excel's text-format spacing owns a new string in the cell font, even
     // when its visible characters equal the shared-string value. Native
     // General/@ and color-only controls retain the rich runs; reserve/fill
@@ -3201,18 +3721,21 @@ fn render_cell_area(
       && cell.number_format_layout.is_none()
       && rendered_text.as_ref() == cell.text.as_ref()
     {
-      render_cell_rich_text(
+      text_layout_result = render_cell_rich_text(
         &mut rendered_text_items,
         cell.rich_text_runs,
         output_area.align_rect,
         render_style,
         CellTextRenderOptions {
+          auxiliary_line_break_font: import.styles.auxiliary_line_break_font(),
+          track_printer_line_extents,
           alignment,
           horizontal_alignment,
           hyperlink_url: hyperlink_url.clone(),
           formula: formula_text_layout,
           default_line_height_pt: page.sheet.default_text_line_height_pt() * layout.zoom_scale,
-          clip_wrapped_text: page.sheet.row_has_custom_height(cell.address.row),
+          font_print_context: Some(font_print_context.clone()),
+          clip_wrapped_text,
           has_outer_border: borders.left.is_some()
             || borders.right.is_some()
             || borders.top.is_some()
@@ -3225,46 +3748,58 @@ fn render_cell_area(
       .number_format_layout
       .as_deref()
       .is_some_and(|number_layout| {
-        number_layout_rendered = rendered_text.as_ref() == cell.rendered_text
-          && render_number_format_layout(
-            &mut rendered_text_items,
-            NumberFormatCellLayout {
-              items: number_layout,
-              value_state: cell.number_format_state,
-            },
-            output_area.align_rect,
-            &render_style,
-            CellTextRenderOptions {
-              alignment,
-              horizontal_alignment,
-              hyperlink_url: hyperlink_url.clone(),
-              formula: formula_text_layout,
-              default_line_height_pt: page.sheet.default_text_line_height_pt() * layout.zoom_scale,
-              clip_wrapped_text: page.sheet.row_has_custom_height(cell.address.row),
-              has_outer_border: borders.left.is_some()
-                || borders.right.is_some()
-                || borders.top.is_some()
-                || borders.bottom.is_some(),
-            },
-            text_metrics,
-          );
-        number_layout_rendered
+        if rendered_text.as_ref() != cell.rendered_text {
+          return false;
+        }
+        let Some(result) = render_number_format_layout(
+          &mut rendered_text_items,
+          NumberFormatCellLayout {
+            items: number_layout,
+            value_state: cell.number_format_state,
+          },
+          output_area.align_rect,
+          &render_style,
+          CellTextRenderOptions {
+            auxiliary_line_break_font: import.styles.auxiliary_line_break_font(),
+            track_printer_line_extents: track_center_line_extents,
+            alignment,
+            horizontal_alignment,
+            hyperlink_url: hyperlink_url.clone(),
+            formula: formula_text_layout,
+            default_line_height_pt: page.sheet.default_text_line_height_pt() * layout.zoom_scale,
+            font_print_context: Some(font_print_context.clone()),
+            clip_wrapped_text,
+            has_outer_border: borders.left.is_some()
+              || borders.right.is_some()
+              || borders.top.is_some()
+              || borders.bottom.is_some(),
+          },
+          text_metrics,
+        ) else {
+          return false;
+        };
+        text_layout_result = result;
+        number_layout_rendered = true;
+        true
       })
     {
       // Number-format spacing is measured on the same printer font grid as text.
     } else {
-      render_cell_text(
+      text_layout_result = render_cell_text(
         &mut rendered_text_items,
         rendered_text.as_ref(),
         output_area.align_rect,
         render_style,
         CellTextRenderOptions {
+          auxiliary_line_break_font: import.styles.auxiliary_line_break_font(),
+          track_printer_line_extents,
           alignment,
           horizontal_alignment,
           hyperlink_url: hyperlink_url.clone(),
           formula: formula_text_layout,
           default_line_height_pt: page.sheet.default_text_line_height_pt() * layout.zoom_scale,
-          clip_wrapped_text: page.sheet.row_has_custom_height(cell.address.row),
+          font_print_context: Some(font_print_context.clone()),
+          clip_wrapped_text,
           has_outer_border: borders.left.is_some()
             || borders.right.is_some()
             || borders.top.is_some()
@@ -3273,19 +3808,68 @@ fn render_cell_area(
         text_metrics,
       );
     }
-    if let (Some(grid), Some(normal_descent_px)) = (cell_baseline_grid, printer_normal_descent_px) {
-      align_excel_printer_cell_text_vertically(
-        &mut rendered_text_items,
-        ExcelCellVerticalAlignmentContext {
-          alignment,
-          cell: cell_rect,
-          page: layout.fill_page,
-          vertically_merged: merged_range.is_some_and(|merged| merged.start.row < merged.end.row),
-          normal_descent_px,
-          grid_profile: grid,
-        },
-        text_metrics,
-      );
+    if let (Some(grid), Some(normal_descent_px)) =
+      (cell_text_baseline_grid, printer_normal_descent_px)
+    {
+      let vertically_merged = merged_range.is_some_and(|merged| merged.start.row < merged.end.row);
+      let row_lower_extent = (grid == ExcelCellBaselineGrid::ExplicitNormalFont
+        && !vertically_merged
+        && alignment
+          .and_then(|alignment| alignment.vertical)
+          .is_none_or(|vertical| vertical == x::VerticalAlignmentValues::Bottom))
+      .then(|| {
+        page
+          .sheet
+          .fixed_output_row_lower_extent(cell.address.row, layout.zoom_scale, |row| {
+            printer_row_lower_extent(page.sheet, row, &import.styles, layout.zoom_scale)
+          })
+      })
+      .flatten();
+      let top_baseline_offset_px = text_layout_result.top_edit_first_upper_px.or_else(|| {
+        (grid == ExcelCellBaselineGrid::ExplicitNormalFont
+          && alignment.and_then(|alignment| alignment.vertical)
+            == Some(x::VerticalAlignmentValues::Top)
+          && rendered_text_items.iter().all(|item| {
+            let PageItem::Text(text) = item else {
+              return false;
+            };
+            text.style.font_family == measurement_style.font_family
+              && text.style.font_size_pt == measurement_style.font_size_pt
+              && text.style.bold == measurement_style.bold
+              && text.style.italic == measurement_style.italic
+          }))
+        .then(|| cell_text_scaled_printer_baseline_offset_px(&font_print_context, text_metrics))
+        .flatten()
+      });
+      if !text_layout_result.centered_edit_block.is_some_and(|block| {
+        align_excel_printer_centered_edit_text(
+          &mut rendered_text_items,
+          cell_rect,
+          layout.fill_page,
+          merged_range.is_some_and(|range| range.start.col < range.end.col),
+          block,
+          text_metrics,
+        )
+      }) {
+        align_excel_printer_cell_text_vertically(
+          &mut rendered_text_items,
+          ExcelCellVerticalAlignmentContext {
+            alignment,
+            cell: cell_rect,
+            page: layout.fill_page,
+            vertically_merged,
+            horizontally_merged: merged_range.is_some_and(|range| range.start.col < range.end.col),
+            normal_descent_px,
+            grid_profile: grid,
+            row_lower_extent,
+            top_baseline_offset_px,
+            merged_last_line_lower_px: track_bottom_line_extents
+              .then_some(text_layout_result.last_line_lower_px)
+              .flatten(),
+          },
+          text_metrics,
+        );
+      }
     }
     if !number_layout_rendered {
       reorder_cell_text_items(
@@ -3390,6 +3974,10 @@ fn render_cell_area(
         ));
       }
       if let Some(clip) = calc_cell_overflow_paint_clip(output_area, alignment) {
+        // Office keeps the complete text operators even when this cell clip
+        // hides a rich portion or an overwide indent completely. Paint-trace
+        // tools can omit those operators; PDFium and the native PDF stream
+        // independently confirm that their semantic payload remains owned.
         intersect_text_paint_clip(text, clip);
       }
       true
@@ -3415,6 +4003,10 @@ fn render_cell_area(
       }));
     }
   }
+  // Cell formatting does not block strings spilling into empty neighbours.
+  // Native solid/no-fill controls paint all backgrounds before strings;
+  // interleaving them by cell would erase an earlier cell's overflow text.
+  items.splice(cell_paint_start..cell_paint_start, cell_background_items);
   items.append(&mut deferred_edit_text_items);
   // Office paints cell borders after the backgrounds and strings. A later
   // filled cell must not erase its neighbor's right or bottom border.
@@ -3803,11 +4395,22 @@ fn render_cell_icon_set(
 }
 
 fn calc_occupied_text_cells(
-  cells: &[super::print::CalcPrintCell<'_>],
+  cells: &[std::sync::Arc<super::print::CalcPrintCell<'_>>],
 ) -> HashMap<(u32, u32), bool> {
   cells
     .iter()
-    .filter(|cell| !cell.rendered_text.is_empty())
+    .filter(|cell| {
+      // Occupancy belongs to the stored value, not its displayed format.
+      // Native controls block on hidden numbers, empty strings and empty
+      // formula results, but retain overflow through an empty numeric cell.
+      !cell.text.is_empty()
+        || !cell.rendered_text.is_empty()
+        || cell.formula
+        || matches!(
+          cell.data_type,
+          Some(x::CellValues::String | x::CellValues::SharedString | x::CellValues::InlineString)
+        )
+    })
     .map(|cell| ((cell.address.row, cell.address.col), true))
     .collect()
 }
@@ -3848,7 +4451,20 @@ fn calc_cell_output_area(
       0.0
     };
   let mut output = CalcCellOutputArea {
-    align_rect: rect,
+    align_rect: CellRect {
+      // A negative capacity can arise from indentation. Rendering still
+      // receives a nonnegative box, with the full trailing displacement for
+      // right alignment; the signed capacity below owns overflow search.
+      x_pt: rect.x_pt
+        + if calc_cell_horizontal_alignment(cell, alignment) == x::HorizontalAlignmentValues::Right
+        {
+          rect.width_pt.min(0.0)
+        } else {
+          0.0
+        },
+      width_pt: rect.width_pt.max(0.0),
+      ..rect
+    },
     fit_width_pt,
     clip_rect,
     left_clip_pt: 0.0,
@@ -4168,10 +4784,13 @@ fn calc_cell_overflow_hash_count(
   hash_width_pt: f32,
   minimum_count: usize,
 ) -> usize {
-  if !available_width_pt.is_finite()
-    || !hash_width_pt.is_finite()
-    || available_width_pt <= f32::EPSILON
-    || hash_width_pt <= f32::EPSILON
+  // Office's narrow numeric/date/logical controls emit no hash when the
+  // text insets consume the whole cell. A minimum of one applies only to
+  // a positive fitting capacity, not an empty interior.
+  if available_width_pt <= f32::EPSILON {
+    return 0;
+  }
+  if !available_width_pt.is_finite() || !hash_width_pt.is_finite() || hash_width_pt <= f32::EPSILON
   {
     return minimum_count;
   }
@@ -4335,12 +4954,13 @@ fn format_general_scientific_with_significant_digits(
 }
 
 fn calc_text_can_shape_as_line(text: &str) -> bool {
-  text.chars().all(|ch| {
-    ch.is_ascii_alphanumeric()
-      || ch.is_ascii_whitespace()
-      || matches!(ch, '/' | '-' | '+' | '.' | ',' | ':' | ';' | '(' | ')')
-      || !ch.is_ascii()
-  })
+  // Printable ASCII punctuation does not require word-by-word portions.
+  // Otherwise adding an accent to Latin text containing a quote, apostrophe,
+  // ampersand or percent sign changes its placement policy. Native paired
+  // controls retain continuous glyph origins through all those words.
+  text
+    .chars()
+    .all(|ch| !ch.is_ascii_control() || ch.is_ascii_whitespace())
 }
 
 fn reorder_cell_text_items(
@@ -4454,7 +5074,22 @@ fn render_cell_rich_text(
   options: CellTextRenderOptions,
   print_scale: f32,
   text_metrics: &mut TextMetrics,
-) {
+) -> CellTextLayoutResult {
+  if options
+    .alignment
+    .is_some_and(|alignment| alignment.wrap_text)
+    && !options.formula
+  {
+    return render_wrapped_cell_rich_text(
+      items,
+      runs,
+      rect,
+      base_style,
+      options,
+      print_scale,
+      text_metrics,
+    );
+  }
   let first_item = items.len();
   let mut rendered_runs = runs
     .iter()
@@ -4480,29 +5115,86 @@ fn render_cell_rich_text(
           _ => 0.0,
         };
       }
-      let width_pt = text_metrics.measure_text(&text, &style);
-      Some((text, style, width_pt))
+      // Unrotated rich text uses the same printer edit portions with or
+      // without wrapping. Native mixed-font/NBSP and identical-style split
+      // controls pin both each portion's device extent and its paint advances.
+      let width_pt = if !options.formula && style.rotation_deg.abs() <= f32::EPSILON {
+        if let Some((gdi_style, width)) =
+          fixed_output_gdi_cell_text_style(&text, &style, text_metrics)
+        {
+          style = gdi_style;
+          width
+        } else {
+          text_metrics.measure_text(&text, &style)
+        }
+      } else {
+        text_metrics.measure_text(&text, &style)
+      };
+      let line_height = cell_rich_text_run_line_height_pt(&style, run, &options, text_metrics);
+      Some((text, style, width_pt, line_height))
     })
     .collect::<Vec<_>>();
   if rendered_runs.is_empty() {
-    return;
+    return CellTextLayoutResult::default();
   }
+  // A rich single line uses Excel's edit formatter even without wrapText.
+  // Native merged controls give the same printer-lower bound with wrapping
+  // enabled or disabled; a plain unwrapped cell retains its direct path.
+  let printer_extents_px = options
+    .track_printer_line_extents
+    .then(|| {
+      let context = options.font_print_context.as_ref()?;
+      combine_cell_printer_line_extents(
+        runs
+          .iter()
+          .filter(|run| run.text.chars().any(|ch| !matches!(ch, '\r' | '\n')))
+          .map(|run| {
+            let style = xlsx_rich_text_run_style(&context.style, run, 1.0);
+            if tracks_centered_edit_lines(&options) && style.baseline_shift_pt.abs() > f32::EPSILON
+            {
+              return None;
+            }
+            cell_text_scaled_printer_line_extents_px(
+              &CellFontPrintContext {
+                style,
+                print_scale: context.print_scale,
+              },
+              text_metrics,
+            )
+          }),
+      )
+    })
+    .flatten();
+  let last_line_lower_px = printer_extents_px.map(|(height, upper)| height - upper);
+  let centered_line = tracks_centered_edit_lines(&options)
+    .then_some(printer_extents_px)
+    .flatten();
 
-  let line_height = rendered_runs
-    .iter()
-    .map(|(_, style, _)| cell_text_line_height_pt(style, &options, true))
-    .fold(1.0_f32, f32::max);
+  let line_height = centered_line.map_or_else(
+    || {
+      rendered_runs
+        .iter()
+        .map(|(_, _, _, line_height)| *line_height)
+        .fold(1.0_f32, f32::max)
+    },
+    |(height, _)| height * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI,
+  );
   // Rich portions of one cell share a logical baseline. The text metrics
   // helper already subtracts superscript/subscript's painted shift, so add it
   // back while finding the common unescaped baseline and retain the shift when
   // each TextItem is painted.
-  let common_baseline_offset_pt = rendered_runs
-    .iter()
-    .map(|(text, style, _)| {
-      text_metrics.baseline_offset_in_line_for_text(text, style, line_height)
-        + style.baseline_shift_pt
-    })
-    .fold(0.0_f32, f32::max);
+  let common_baseline_offset_pt = centered_line.map_or_else(
+    || {
+      rendered_runs
+        .iter()
+        .map(|(text, style, _, _)| {
+          text_metrics.baseline_offset_in_line_for_text(text, style, line_height)
+            + style.baseline_shift_pt
+        })
+        .fold(0.0_f32, f32::max)
+    },
+    |(_, upper)| upper * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI,
+  );
   let vertical_alignment = options.alignment.and_then(|alignment| alignment.vertical);
   let y_pt = match vertical_alignment {
     Some(x::VerticalAlignmentValues::Center) => rect.y_pt + (rect.height_pt - line_height) / 2.0,
@@ -4514,18 +5206,18 @@ fn render_cell_rich_text(
   };
   let total_width_pt = rendered_runs
     .iter()
-    .map(|(_, _, width_pt)| *width_pt)
+    .map(|(_, _, width_pt, _)| *width_pt)
     .sum::<f32>();
   let mut x_pt = cell_text_x_pt(rect, total_width_pt, options.horizontal_alignment, 0.0);
   let rotation_center_pt = rendered_runs
     .iter()
-    .any(|(_, style, _)| style.rotation_deg != 0.0)
+    .any(|(_, style, _, _)| style.rotation_deg != 0.0)
     .then_some((
       rect.x_pt + rect.width_pt / 2.0,
       rect.y_pt + rect.height_pt / 2.0,
     ));
 
-  for (text, style, width_pt) in rendered_runs.drain(..) {
+  for (text, style, width_pt, _) in rendered_runs.drain(..) {
     let preserve_text_portion = !text.is_ascii() && !calc_text_can_shape_as_line(&text);
     let run_baseline_offset_pt =
       text_metrics.baseline_offset_in_line_for_text(&text, &style, line_height)
@@ -4555,6 +5247,457 @@ fn render_cell_rich_text(
     x_pt += width_pt;
   }
   position_rotated_cell_text(&mut items[first_item..], rect, &options, text_metrics);
+  CellTextLayoutResult {
+    last_line_lower_px,
+    top_edit_first_upper_px: None,
+    centered_edit_block: centered_line.map(|(height_px, first_upper_px)| CellCenteredEditBlock {
+      height_px,
+      first_upper_px,
+    }),
+  }
+}
+
+#[derive(Default)]
+struct CellTextLayoutResult {
+  last_line_lower_px: Option<f32>,
+  centered_edit_block: Option<CellCenteredEditBlock>,
+  top_edit_first_upper_px: Option<f32>,
+}
+
+#[derive(Clone, Copy)]
+struct CellCenteredEditBlock {
+  height_px: f32,
+  first_upper_px: f32,
+}
+
+fn tracks_centered_edit_lines(options: &CellTextRenderOptions) -> bool {
+  // Numeric formula eligibility is established by the cell owner. Native
+  // wrapText controls keep the same cached line box for formulas and values.
+  options.track_printer_line_extents
+    && options.alignment.is_some_and(|alignment| {
+      alignment.vertical == Some(x::VerticalAlignmentValues::Center)
+        && alignment.text_rotation.unwrap_or(0) == 0
+        && !alignment.shrink_to_fit
+    })
+}
+
+fn tracks_top_edit_lines(options: &CellTextRenderOptions) -> bool {
+  options.track_printer_line_extents
+    && options.alignment.is_some_and(|alignment| {
+      alignment.vertical == Some(x::VerticalAlignmentValues::Top)
+        && alignment.wrap_text
+        && alignment.text_rotation.unwrap_or(0) == 0
+        && !alignment.shrink_to_fit
+    })
+}
+
+fn tracks_bottom_edit_lines(options: &CellTextRenderOptions) -> bool {
+  options.track_printer_line_extents
+    && options.alignment.is_some_and(|alignment| {
+      alignment
+        .vertical
+        .is_none_or(|vertical| vertical == x::VerticalAlignmentValues::Bottom)
+        && alignment.wrap_text
+        && alignment.text_rotation.unwrap_or(0) == 0
+        && !alignment.shrink_to_fit
+    })
+}
+
+fn combine_cell_printer_line_extents(
+  extents: impl IntoIterator<Item = Option<(f32, f32)>>,
+) -> Option<(f32, f32)> {
+  // Native mixed Arial/Calibri/SimSun controls publish independent maxima
+  // above and below the baseline. Taking the tallest complete font box
+  // loses the other font's lower extent when its upper is smaller.
+  let (upper, lower) =
+    extents
+      .into_iter()
+      .try_fold((0.0_f32, 0.0_f32), |(upper, lower), next| {
+        let (height, next_upper) = next?;
+        Some((upper.max(next_upper), lower.max(height - next_upper)))
+      })?;
+  Some((upper + lower, upper))
+}
+
+struct CellRichTextLine {
+  portions: Vec<(String, TextStyle, f32)>,
+  height_pt: f32,
+  baseline_offset_pt: f32,
+  printer_lower_px: Option<f32>,
+  printer_extents_px: Option<(f32, f32)>,
+}
+
+struct CellRichTextSpan {
+  range: std::ops::Range<usize>,
+  style: TextStyle,
+  height_pt: f32,
+  printer_extents_px: Option<(f32, f32)>,
+}
+
+fn render_wrapped_cell_rich_text(
+  items: &mut Vec<PageItem>,
+  runs: &[super::workbook::SharedStringRun],
+  rect: CellRect,
+  base_style: TextStyle,
+  options: CellTextRenderOptions,
+  print_scale: f32,
+  text_metrics: &mut TextMetrics,
+) -> CellTextLayoutResult {
+  let first_item = items.len();
+  let mut text = String::new();
+  let mut spans = Vec::new();
+  for run in runs {
+    if run.text.is_empty() {
+      continue;
+    }
+    let start = text.len();
+    text.push_str(&run.text);
+    let mut style = xlsx_rich_text_run_style(&base_style, run, print_scale);
+    if run.has_properties {
+      style.character_spacing_pt = text_metrics
+        .gdi_synthetic_bold_character_spacing_pt(&run.text, &style, units::OFFICE_FIXED_OUTPUT_DPI)
+        .unwrap_or(0.0);
+    }
+    let height_pt = cell_rich_text_run_line_height_pt(&style, run, &options, text_metrics);
+    let printer_extents_px = options
+      .track_printer_line_extents
+      .then(|| {
+        let context = options.font_print_context.as_ref()?;
+        cell_text_scaled_printer_line_extents_px(
+          &CellFontPrintContext {
+            style: xlsx_rich_text_run_style(&context.style, run, 1.0),
+            print_scale: context.print_scale,
+          },
+          text_metrics,
+        )
+      })
+      .flatten();
+    spans.push(CellRichTextSpan {
+      range: start..text.len(),
+      style,
+      height_pt,
+      printer_extents_px,
+    });
+  }
+  if text.is_empty() {
+    return CellTextLayoutResult::default();
+  }
+  let printer_lines_available = (tracks_centered_edit_lines(&options)
+    || tracks_top_edit_lines(&options)
+    || tracks_bottom_edit_lines(&options))
+    && spans.iter().all(|span| {
+      span.printer_extents_px.is_some() && span.style.baseline_shift_pt.abs() <= f32::EPSILON
+    });
+  let center_lines_available = printer_lines_available && tracks_centered_edit_lines(&options);
+  let top_lines_available = printer_lines_available && tracks_top_edit_lines(&options);
+
+  let rotation = options
+    .alignment
+    .and_then(|alignment| alignment.text_rotation)
+    .unwrap_or(0);
+  // Fixed-output edit layout retains authored portions: each italic portion
+  // owns a per-string overhang, even when its font matches its neighbor.
+  // Runs still do not create word-break opportunities. Preserve the natural
+  // coalescing policy for the independently positioned rotation path.
+  let mut measuring_spans = Vec::<(std::ops::Range<usize>, &TextStyle)>::new();
+  for span in &spans {
+    let (range, style) = (&span.range, &span.style);
+    if rotation != 0
+      && let Some((previous, previous_style)) = measuring_spans.last_mut()
+      && *previous_style == style
+    {
+      previous.end = range.end;
+    } else {
+      measuring_spans.push((range.clone(), style));
+    }
+  }
+  let fixed_output_styles = (rotation == 0).then(|| {
+    measuring_spans
+      .iter()
+      .map(|(_, style)| {
+        (
+          fixed_output_gdi_base_cell_text_style(style),
+          excel_printer_cell_text_overhang_pt(style, text_metrics),
+        )
+      })
+      .collect::<Vec<_>>()
+  });
+
+  // ECMA-376 §18.8.1 applies wrapText to the entire cell, including rich
+  // strings. LO's richstring.cxx/DrawEdit and EditEngine CreateLines likewise
+  // keep run attributes over one paragraph: a run boundary cannot break a
+  // word. Use the same worksheet break/whitespace rules as plain strings.
+  let auxiliary_coverage = options
+    .auxiliary_line_break_font
+    .filter(|_| !text.is_ascii())
+    .and_then(|family| text_metrics.auxiliary_font_coverage(family));
+  let ranges = wrapped_cell_text_ranges(
+    &text,
+    (rect.width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(1.0),
+    false,
+    auxiliary_coverage.as_deref(),
+    true,
+    |range| {
+      measuring_spans
+        .iter()
+        .enumerate()
+        .map(|(index, (span, style))| {
+          let start = span.start.max(range.start);
+          let end = span.end.min(range.end);
+          if start < end {
+            let portion = &text[start..end];
+            if let Some(styles) = &fixed_output_styles {
+              let (device_style, overhang) = &styles[index];
+              text_metrics
+                .gdi_printer_text_extents_pt(portion, device_style, units::OFFICE_FIXED_OUTPUT_DPI)
+                .map_or_else(
+                  || text_metrics.measure_text(portion, *style),
+                  |extent| extent.unpositioned_width_pt + overhang,
+                )
+            } else {
+              text_metrics.measure_text(portion, *style)
+            }
+          } else {
+            0.0
+          }
+        })
+        .sum()
+    },
+  );
+  let mut lines = Vec::with_capacity(ranges.len());
+  for range in ranges {
+    let mut empty_line_lower_px = None;
+    let mut empty_line_extents_px = None;
+    let mut portions = spans
+      .iter()
+      .filter_map(|span| {
+        let start = span.range.start.max(range.start);
+        let end = span.range.end.min(range.end);
+        (start < end).then(|| {
+          (
+            text[start..end].to_string(),
+            span.style.clone(),
+            span.height_pt,
+          )
+        })
+      })
+      .collect::<Vec<_>>();
+    if portions.is_empty() {
+      let (style, height, extents) = spans
+        .iter()
+        .find(|span| span.range.contains(&range.start))
+        .map(|span| (&span.style, span.height_pt, span.printer_extents_px))
+        .unwrap_or_else(|| {
+          (
+            &base_style,
+            cell_text_line_height_pt(&base_style, &options, true, text_metrics),
+            options
+              .track_printer_line_extents
+              .then(|| {
+                cell_text_scaled_printer_line_extents_px(
+                  options.font_print_context.as_ref()?,
+                  text_metrics,
+                )
+              })
+              .flatten(),
+          )
+        });
+      // Empty hard lines still have the font owner used for their height.
+      // An empty span intersection does not establish a zero lower extent.
+      empty_line_extents_px = (style.baseline_shift_pt.abs() <= f32::EPSILON)
+        .then_some(extents)
+        .flatten();
+      empty_line_lower_px = empty_line_extents_px.map(|(height, upper)| height - upper);
+      portions.push((String::new(), style.clone(), height));
+    }
+    let printer_extents_px = options
+      .track_printer_line_extents
+      .then(|| {
+        if range.is_empty() {
+          return empty_line_extents_px;
+        }
+        combine_cell_printer_line_extents(
+          spans
+            .iter()
+            .filter(|span| span.range.start < range.end && span.range.end > range.start)
+            .map(|span| {
+              (span.style.baseline_shift_pt.abs() <= f32::EPSILON)
+                .then_some(span.printer_extents_px)
+                .flatten()
+            }),
+        )
+      })
+      .flatten();
+    let printer_line = printer_lines_available
+      .then_some(printer_extents_px)
+      .flatten();
+    let height_pt = printer_line.map_or_else(
+      || {
+        portions
+          .iter()
+          .map(|(_, _, height)| *height)
+          .fold(1.0_f32, f32::max)
+      },
+      |(height, _)| height * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI,
+    );
+    let baseline_offset_pt = printer_line.map_or_else(
+      || {
+        portions
+          .iter()
+          .map(|(text, style, _)| {
+            text_metrics.baseline_offset_in_line_for_text(text, style, height_pt)
+              + style.baseline_shift_pt
+          })
+          .fold(0.0_f32, f32::max)
+      },
+      |(_, upper)| upper * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI,
+    );
+    let portions = portions
+      .into_iter()
+      .map(|(text, mut style, _)| {
+        style.rotation_deg = match rotation {
+          1..=90 => -(rotation as f32),
+          91..=180 => rotation as f32 - 90.0,
+          255 => 90.0,
+          _ => 0.0,
+        };
+        let (style, width) = if rotation == 0 {
+          fixed_output_gdi_cell_text_style(&text, &style, text_metrics)
+            .unwrap_or_else(|| (style.clone(), text_metrics.measure_text(&text, &style)))
+        } else {
+          let width = text_metrics.measure_text(&text, &style);
+          (style, width)
+        };
+        (text, style, width)
+      })
+      .collect();
+    let printer_lower_px = options
+      .track_printer_line_extents
+      .then(|| {
+        if range.is_empty() {
+          return empty_line_lower_px;
+        }
+        spans
+          .iter()
+          .filter(|span| span.range.start < range.end && span.range.end > range.start)
+          .try_fold(0.0_f32, |lower, span| {
+            (span.style.baseline_shift_pt.abs() <= f32::EPSILON)
+              .then(|| {
+                span
+                  .printer_extents_px
+                  .map(|(height, upper)| lower.max(height - upper))
+              })
+              .flatten()
+          })
+      })
+      .flatten();
+    lines.push(CellRichTextLine {
+      portions,
+      height_pt,
+      baseline_offset_pt,
+      printer_lower_px,
+      printer_extents_px,
+    });
+  }
+
+  let total_height: f32 = lines.iter().map(|line| line.height_pt).sum();
+  let clipped_wrap =
+    options.clip_wrapped_text && rotation == 0 && lines.len() > 1 && total_height > rect.height_pt;
+  let clip_inset = 4.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  if clipped_wrap {
+    // Native fixed-height rich controls select the same leading payload for
+    // top/center/bottom, then align it. Accumulate each line's own font box;
+    // a larger run on a later line must not enlarge an earlier one.
+    // The edit layout retains a line whose origin is inside the full row
+    // box. The four-dot paint inset must not remove its searchable payload.
+    let available = cell_text_printer_height_dots(rect.height_pt.max(0.0));
+    let mut used = 0.0;
+    let mut count = 0;
+    for line in &lines {
+      count += 1;
+      used += cell_text_printer_height_dots(line.height_pt);
+      if used >= available {
+        break;
+      }
+    }
+    lines.truncate(count);
+  }
+  let paint_clip = clipped_wrap.then(|| {
+    common_rect(
+      rect.x_pt + clip_inset,
+      rect.y_pt + clip_inset,
+      (rect.width_pt - 2.0 * clip_inset).max(0.0),
+      (rect.height_pt - 2.0 * clip_inset).max(0.0),
+    )
+  });
+  let text_height: f32 = lines.iter().map(|line| line.height_pt).sum();
+  let vertical_alignment = options.alignment.and_then(|alignment| alignment.vertical);
+  let mut y_pt = match vertical_alignment {
+    Some(x::VerticalAlignmentValues::Center) => rect.y_pt + (rect.height_pt - text_height) / 2.0,
+    Some(x::VerticalAlignmentValues::Top) => rect.y_pt,
+    Some(x::VerticalAlignmentValues::Bottom) | None => rect.y_pt + rect.height_pt - text_height,
+    Some(x::VerticalAlignmentValues::Justify | x::VerticalAlignmentValues::Distributed) => {
+      rect.y_pt
+    }
+  };
+  let rotation_center_pt = (rotation != 0).then_some((
+    rect.x_pt + rect.width_pt / 2.0,
+    rect.y_pt + rect.height_pt / 2.0,
+  ));
+  let result = CellTextLayoutResult {
+    last_line_lower_px: lines.last().and_then(|line| line.printer_lower_px),
+    top_edit_first_upper_px: top_lines_available
+      .then(|| lines.first()?.printer_extents_px.map(|(_, upper)| upper))
+      .flatten(),
+    centered_edit_block: center_lines_available
+      .then(|| {
+        let first_upper_px = lines.first()?.printer_extents_px?.1;
+        let height_px = lines
+          .iter()
+          .try_fold(0.0, |sum, line| Some(sum + line.printer_extents_px?.0))?;
+        Some(CellCenteredEditBlock {
+          height_px,
+          first_upper_px,
+        })
+      })
+      .flatten(),
+  };
+  for line in lines {
+    let width_pt = line.portions.iter().map(|(_, _, width)| *width).sum();
+    let mut x_pt = cell_text_x_pt(rect, width_pt, options.horizontal_alignment, 0.0);
+    for (text, style, width_pt) in line.portions {
+      let preserve_text_portion = !text.is_ascii() && !calc_text_can_shape_as_line(&text);
+      let run_baseline_offset_pt =
+        text_metrics.baseline_offset_in_line_for_text(&text, &style, line.height_pt)
+          + style.baseline_shift_pt;
+      items.push(PageItem::Text(TextItem {
+        x_pt,
+        y_pt: y_pt + line.baseline_offset_pt - run_baseline_offset_pt,
+        line_height_pt: line.height_pt,
+        drawingml_text_effect_anchor: None,
+        paint_clip,
+        page_culling_bounds: None,
+        discard_if_horizontally_clipped: false,
+        text,
+        style: Box::new(style),
+        rotation_center_pt,
+        hyperlink_url: options.hyperlink_url.clone(),
+        form_widget_id: None,
+        paragraph_bidi: false,
+        preserve_text_portion,
+        pdf_text_segmentation: if preserve_text_portion {
+          PdfTextSegmentation::Portion
+        } else {
+          PdfTextSegmentation::Line
+        },
+        source_path: Vec::new(),
+      }));
+      x_pt += width_pt;
+    }
+    y_pt += line.height_pt;
+  }
+  position_rotated_cell_text(&mut items[first_item..], rect, &options, text_metrics);
+  result
 }
 
 // Office aligns a rotated text block by its transformed extent. A bordered
@@ -4729,13 +5872,17 @@ pub(super) fn xlsx_rich_text_run_style(
     style.italic = run.italic.unwrap_or(false);
     style.underline = run.underline.unwrap_or(false);
     style.strikethrough = run.strikethrough.unwrap_or(false);
+    // A present rPr starts its own font state. Native Excel controls and
+    // POI XSSFFont#getColor resolve an omitted color to automatic black;
+    // only an absent rPr inherits the cell's color.
+    style.color = RgbColor::default();
   }
   if let Some(font_family) = run.font_family.as_deref() {
     style.font_family = Some(Arc::from(font_family));
     style.fallback_font_family = run.fallback_font_family.as_deref().map(Arc::from);
   }
   if let Some(font_size_pt) = run.font_size_pt {
-    style.font_size_pt = units::quantize_points_to_office_print_grid(font_size_pt * print_scale);
+    style.font_size_pt = super::text::fixed_output_font_size_pt(font_size_pt, print_scale);
   }
   if let Some(color) = run.color {
     style.color = color;
@@ -4916,14 +6063,23 @@ fn conditional_rule_matches(
 }
 
 #[derive(Clone, Debug)]
+struct CellFontPrintContext {
+  style: TextStyle,
+  print_scale: f32,
+}
+
+#[derive(Clone, Debug)]
 struct CellTextRenderOptions {
+  auxiliary_line_break_font: Option<&'static str>,
   alignment: Option<super::styles::AlignmentRecord>,
   horizontal_alignment: x::HorizontalAlignmentValues,
   hyperlink_url: Option<String>,
   formula: bool,
   default_line_height_pt: f32,
+  font_print_context: Option<CellFontPrintContext>,
   clip_wrapped_text: bool,
   has_outer_border: bool,
+  track_printer_line_extents: bool,
 }
 
 struct NumberFormatCellLayout<'a> {
@@ -4936,9 +6092,9 @@ fn render_number_format_layout(
   formatted: NumberFormatCellLayout<'_>,
   rect: CellRect,
   style: &TextStyle,
-  options: CellTextRenderOptions,
+  mut options: CellTextRenderOptions,
   text_metrics: &mut TextMetrics,
-) -> bool {
+) -> Option<CellTextLayoutResult> {
   use super::print::NumberFormatLayoutItem;
   let layout = formatted.items;
 
@@ -4946,7 +6102,7 @@ fn render_number_format_layout(
     .alignment
     .is_some_and(|alignment| alignment.text_rotation.unwrap_or(0) != 0)
   {
-    return false;
+    return None;
   }
   let visible_text = layout
     .iter()
@@ -4961,6 +6117,39 @@ fn render_number_format_layout(
     || visible_text
       .chars()
       .any(|ch| matches!(bidi_class(ch), BidiClass::R | BidiClass::AL));
+  let wrap_text = options
+    .alignment
+    .is_some_and(|alignment| alignment.wrap_text);
+  if wrap_text
+    && !rtl
+    && formatted.value_state == super::print::NumberFormatRenderState::Number
+    && let Some(formatted_text) = wrapped_number_format_payload(layout, rect, style, text_metrics)
+  {
+    // Native formula/value controls select the same edit producer for
+    // wrapped numbers. The formula-only direct string mode would retain
+    // glyph-width reservations and skip the printer's wrapped text layout.
+    options.formula = false;
+    // A numeric fill payload uses left alignment for Standard/General;
+    // an explicit Left/Center/Right setting still owns its edit alignment.
+    if layout
+      .iter()
+      .any(|item| matches!(item, NumberFormatLayoutItem::Fill(_)))
+      && options
+        .alignment
+        .and_then(|alignment| alignment.horizontal)
+        .is_none_or(|horizontal| horizontal == x::HorizontalAlignmentValues::General)
+    {
+      options.horizontal_alignment = x::HorizontalAlignmentValues::Left;
+    }
+    return Some(render_wrapped_number_format_payload(
+      items,
+      &formatted_text,
+      rect,
+      style,
+      options,
+      text_metrics,
+    ));
+  }
   if rtl
     || formatted.value_state == super::print::NumberFormatRenderState::Text
       && options
@@ -4970,20 +6159,14 @@ fn render_number_format_layout(
     // Native underscore controls distinguish the two output owners:
     // direct strings reserve physical widths; wrapped formatted strings
     // insert spaces into the edit payload and keep its line-break spaces.
-    let Some(text_index) = layout
+    let text_index = layout
       .iter()
-      .position(|item| matches!(item, NumberFormatLayoutItem::Text(_)))
-    else {
-      return false;
-    };
+      .position(|item| matches!(item, NumberFormatLayoutItem::Text(_)))?;
     if layout.iter().enumerate().any(|(index, item)| {
       index != text_index && !matches!(item, NumberFormatLayoutItem::Reserve(_))
     }) {
-      return false;
+      return None;
     }
-    let wrap_text = options
-      .alignment
-      .is_some_and(|alignment| alignment.wrap_text);
     if wrap_text {
       let formatted_text = format!(
         "{}{}{}",
@@ -4991,30 +6174,14 @@ fn render_number_format_layout(
         visible_text,
         " ".repeat(layout.len() - text_index - 1),
       );
-      let horizontal_alignment = options.horizontal_alignment;
-      let mut portions = Vec::new();
-      render_cell_text_with_break_whitespace(
-        &mut portions,
+      return Some(render_wrapped_number_format_payload(
+        items,
         &formatted_text,
         rect,
-        style.clone(),
-        (options, true),
+        style,
+        options,
         text_metrics,
-      );
-      // Native wrapped-format controls retain logical portion order and
-      // shape each script portion, including explicit readingOrder1/2.
-      // The first-line '+' follows Hebrew on the physical right; changing
-      // the whole edit payload to an RTL paragraph reverses those portions.
-      reorder_cell_text_items(
-        &mut portions,
-        Some(1),
-        &formatted_text,
-        rect,
-        horizontal_alignment,
-        text_metrics,
-      );
-      items.extend(portions);
-      return true;
+      ));
     }
     let reservation = |items: &[NumberFormatLayoutItem], metrics: &mut TextMetrics| {
       items.iter().try_fold(0.0, |width, item| {
@@ -5031,12 +6198,8 @@ fn render_number_format_layout(
         Some(width + advance)
       })
     };
-    let Some(left) = reservation(&layout[..text_index], text_metrics) else {
-      return false;
-    };
-    let Some(right) = reservation(&layout[text_index + 1..], text_metrics) else {
-      return false;
-    };
+    let left = reservation(&layout[..text_index], text_metrics)?;
+    let right = reservation(&layout[text_index + 1..], text_metrics)?;
     let inner_rect = CellRect {
       x_pt: rect.x_pt + left,
       width_pt: (rect.width_pt - left - right).max(0.0),
@@ -5047,7 +6210,7 @@ fn render_number_format_layout(
       .and_then(|alignment| alignment.reading_order);
     let horizontal_alignment = options.horizontal_alignment;
     let mut portions = Vec::new();
-    render_cell_text(
+    let result = render_cell_text(
       &mut portions,
       &visible_text,
       inner_rect,
@@ -5064,7 +6227,7 @@ fn render_number_format_layout(
       text_metrics,
     );
     items.extend(portions);
-    return true;
+    return Some(result);
   }
   let widths = layout
     .iter()
@@ -5077,7 +6240,7 @@ fn render_number_format_layout(
   let fixed_width: f32 = widths.iter().sum();
   let available = (rect.width_pt - 2.0 * XLSX_CELL_TEXT_INSET_PT).max(0.0);
   if fixed_width > available {
-    return false;
+    return None;
   }
   let has_fill = layout
     .iter()
@@ -5094,7 +6257,7 @@ fn render_number_format_layout(
     0.0,
   );
   let mut template_items = Vec::new();
-  render_cell_text(
+  let result = render_cell_text(
     &mut template_items,
     &visible_text,
     rect,
@@ -5103,7 +6266,7 @@ fn render_number_format_layout(
     text_metrics,
   );
   let [PageItem::Text(template)] = template_items.as_slice() else {
-    return false;
+    return None;
   };
   for (item, width) in layout.iter().zip(widths) {
     let (text, advance) = match item {
@@ -5130,10 +6293,162 @@ fn render_number_format_layout(
     }
     x += advance;
   }
-  true
+  Some(result)
 }
 
-fn cell_text_line_height_pt(style: &TextStyle, options: &CellTextRenderOptions, rich: bool) -> f32 {
+fn wrapped_number_format_payload(
+  layout: &[super::print::NumberFormatLayoutItem],
+  rect: CellRect,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> Option<String> {
+  use super::print::NumberFormatLayoutItem;
+  // Native paired wrap/nowrap accounting controls distinguish two producers:
+  // the edit payload replaces each _x / missing ? reservation with one space.
+  // The direct producer below continues to reserve the referenced glyph width.
+  let mut payload = String::new();
+  let mut fill = None;
+  for item in layout {
+    match item {
+      NumberFormatLayoutItem::Text(text) => payload.push_str(text),
+      NumberFormatLayoutItem::Reserve(_) => payload.push(' '),
+      NumberFormatLayoutItem::Fill(ch) => {
+        if matches!(bidi_class(*ch), BidiClass::R | BidiClass::AL) {
+          return None;
+        }
+        if fill.replace((payload.len(), *ch)).is_some() {
+          // Multiple fills have not been established for the edit producer.
+          return None;
+        }
+      }
+    }
+  }
+  if let Some((offset, ch)) = fill {
+    let device_style = fixed_output_gdi_base_cell_text_style(style);
+    let overhang = excel_printer_cell_text_overhang_pt(&device_style, text_metrics);
+    let mut measure = |text: &str| {
+      text_metrics
+        .gdi_printer_text_extents_pt(text, &device_style, units::OFFICE_FIXED_OUTPUT_DPI)
+        .map_or_else(
+          || text_metrics.measure_text(text, style),
+          |extent| extent.unpositioned_width_pt,
+        )
+    };
+    // The caller's printer-cell rectangle already owns the realized font's
+    // quarter-digit inset. Budget the complete payload, including trailing
+    // reservations, before adding integral copies of the fill character.
+    let fixed_width = measure(&payload) + overhang;
+    let fill_text = ch.to_string();
+    let unit = measure(&fill_text);
+    let available = (rect.width_pt - 2.0 * XLSX_CELL_TEXT_INSET_PT).max(0.0);
+    let count = if unit > 0.0 {
+      ((available - fixed_width) / unit)
+        .floor()
+        .clamp(0.0, 65_536.0) as usize
+    } else {
+      0
+    };
+    payload.insert_str(offset, &fill_text.repeat(count));
+  }
+  // Native edit measurement receives the generated visible string after
+  // trailing format reservations have consumed their fill budget.
+  let trailing_reservations = layout
+    .iter()
+    .rev()
+    .take_while(|item| matches!(item, NumberFormatLayoutItem::Reserve(_)))
+    .count();
+  payload.truncate(payload.len() - trailing_reservations);
+  Some(payload)
+}
+
+fn render_wrapped_number_format_payload(
+  items: &mut Vec<PageItem>,
+  formatted_text: &str,
+  rect: CellRect,
+  style: &TextStyle,
+  options: CellTextRenderOptions,
+  text_metrics: &mut TextMetrics,
+) -> CellTextLayoutResult {
+  let horizontal_alignment = options.horizontal_alignment;
+  let mut portions = Vec::new();
+  let result = render_cell_text_with_break_whitespace(
+    &mut portions,
+    formatted_text,
+    rect,
+    style.clone(),
+    (options, true),
+    text_metrics,
+  );
+  // Native wrapped-format controls retain logical portion order and shape
+  // each script portion, including explicit readingOrder1/2. The first-line
+  // '+' follows Hebrew on the physical right; an RTL paragraph would reverse
+  // those portions. Numeric edit payloads share this existing text owner.
+  reorder_cell_text_items(
+    &mut portions,
+    Some(1),
+    formatted_text,
+    rect,
+    horizontal_alignment,
+    text_metrics,
+  );
+  items.extend(portions);
+  result
+}
+
+fn cell_text_line_height_pt(
+  style: &TextStyle,
+  options: &CellTextRenderOptions,
+  rich: bool,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  cell_text_line_height_with_context_pt(
+    style,
+    options,
+    rich,
+    options.font_print_context.as_ref(),
+    text_metrics,
+  )
+}
+
+fn cell_text_printer_height_dots(height_pt: f32) -> f64 {
+  (f64::from(height_pt) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+    / f64::from(units::POINTS_PER_INCH))
+  .round()
+}
+
+fn cell_text_visible_line_count(height_pt: f32, line_height_pt: f32) -> usize {
+  // The row box and each edit line own integer printer dots. Subtracting
+  // accumulated f32 row endpoints can put an exact 73-dot row just above
+  // its 73-dot line pitch; a floating ceil then retains a second payload
+  // line that Office omits. Keep partially visible lines, on the same grid.
+  let available = cell_text_printer_height_dots(height_pt.max(0.0));
+  let pitch = cell_text_printer_height_dots(line_height_pt).max(1.0);
+  (available / pitch).ceil().max(1.0) as usize
+}
+
+fn cell_rich_text_run_line_height_pt(
+  style: &TextStyle,
+  run: &super::workbook::SharedStringRun,
+  options: &CellTextRenderOptions,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let context = options
+    .font_print_context
+    .as_ref()
+    .map(|context| CellFontPrintContext {
+      style: xlsx_rich_text_run_style(&context.style, run, 1.0),
+      print_scale: context.print_scale,
+    });
+  cell_text_line_height_with_context_pt(style, options, true, context.as_ref(), text_metrics)
+}
+
+fn cell_text_line_height_with_context_pt(
+  style: &TextStyle,
+  options: &CellTextRenderOptions,
+  rich: bool,
+  context: Option<&CellFontPrintContext>,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
   let font_size = if rich {
     style
       .automatic_escapement_font_size_pt
@@ -5157,11 +6472,39 @@ fn cell_text_line_height_pt(style: &TextStyle, options: &CellTextRenderOptions, 
     } else {
       0
     };
-    super::worksheet::printer_font_line_height_pt(&font_style, charset)
+    super::worksheet::printer_font_line_height_pt(&font_style, charset, text_metrics)
       .unwrap_or(fallback)
       .max(1.0)
   } else {
-    fallback.max(options.default_line_height_pt).max(1.0)
+    let mut font_style = context.map_or(style, |context| &context.style).clone();
+    if rich {
+      font_style.font_size_pt = font_style
+        .automatic_escapement_font_size_pt
+        .unwrap_or(font_style.font_size_pt);
+    }
+    let charset = if font_style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+      2
+    } else {
+      0
+    };
+    // Excel's four-family/three-size/two-zoom controls first realize the
+    // nominal font's printer line box, then scale that integer dot count.
+    // Recreating the line box from the scaled glyph font scales neither its
+    // padding nor its hinting correctly. Normal's row height is not a floor
+    // for a smaller cell font. TEXTMETRIC's external leading belongs to this
+    // box; it is not represented by a fixed 1.15 font-size multiplier.
+    super::worksheet::printer_font_line_height_pt(&font_style, charset, text_metrics)
+      .map(|height| {
+        let nominal_dots = (f64::from(height) * f64::from(units::OFFICE_FIXED_OUTPUT_DPI)
+          / f64::from(units::POINTS_PER_INCH))
+        .round();
+        let scale = context.map_or(1.0, |context| context.print_scale);
+        let percentage = (f64::from(scale) * 100.0).round();
+        ((nominal_dots * percentage / 100.0).round() * f64::from(units::POINTS_PER_INCH)
+          / f64::from(units::OFFICE_FIXED_OUTPUT_DPI)) as f32
+      })
+      .unwrap_or(fallback.max(options.default_line_height_pt))
+      .max(1.0)
   }
 }
 
@@ -5200,7 +6543,7 @@ fn render_stacked_cell_text(
   // EditEngine line each; a whitespace character consumes its line without
   // contributing a PDF text object.
   style.rotation_deg = 0.0;
-  let line_height = cell_text_line_height_pt(&style, options, false);
+  let line_height = cell_text_line_height_pt(&style, options, false, text_metrics);
   let text_height = line_height * graphemes.len() as f32;
   let vertical_alignment = options.alignment.and_then(|alignment| alignment.vertical);
   let mut y_pt = match vertical_alignment {
@@ -5257,8 +6600,8 @@ fn render_cell_text(
   style: TextStyle,
   options: CellTextRenderOptions,
   text_metrics: &mut TextMetrics,
-) {
-  render_cell_text_with_break_whitespace(items, text, rect, style, (options, false), text_metrics);
+) -> CellTextLayoutResult {
+  render_cell_text_with_break_whitespace(items, text, rect, style, (options, false), text_metrics)
 }
 
 fn render_cell_text_with_break_whitespace(
@@ -5268,17 +6611,23 @@ fn render_cell_text_with_break_whitespace(
   mut style: TextStyle,
   (options, preserve_break_whitespace): (CellTextRenderOptions, bool),
   text_metrics: &mut TextMetrics,
-) {
+) -> CellTextLayoutResult {
   if options
     .alignment
     .and_then(|alignment| alignment.text_rotation)
     == Some(255)
   {
     render_stacked_cell_text(items, text, rect, style, &options, text_metrics);
-    return;
+    return CellTextLayoutResult::default();
   }
   let first_item = items.len();
-  let line_height = cell_text_line_height_pt(&style, &options, false);
+  let line_height = cell_text_line_height_pt(&style, &options, false, text_metrics);
+  let printer_extents_px = options
+    .track_printer_line_extents
+    .then(|| {
+      cell_text_scaled_printer_line_extents_px(options.font_print_context.as_ref()?, text_metrics)
+    })
+    .flatten();
   let alignment = options.alignment;
   let wrap_text = alignment.is_some_and(|alignment| alignment.wrap_text);
   let fill_text;
@@ -5302,10 +6651,19 @@ fn render_cell_text_with_break_whitespace(
     // width (ScOutputData::DrawEdit in sc/source/ui/view/output2.cxx).
     wrapped_lines = wrap_cell_text_with_break_whitespace(
       text,
+      // Plain and rich edit layouts use the same printer-cell interior.
+      // Native width/zoom controls and GDB printer extents separate this
+      // geometry from the per-string italic overhang below.
       (rect.width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(1.0),
       &style,
       text_metrics,
       preserve_break_whitespace,
+      if fixed_output_gdi_paint {
+        CellTextWrapMetrics::FixedOutput
+      } else {
+        CellTextWrapMetrics::Natural
+      },
+      CellTextBreakPolicy::worksheet(options.auxiliary_line_break_font),
     );
     wrapped_lines.iter().map(String::as_str).collect::<Vec<_>>()
   } else if text.contains('\n') || text.contains('\r') {
@@ -5334,9 +6692,7 @@ fn render_cell_text_with_break_whitespace(
     && line_height * lines.len() as f32 > rect.height_pt;
   let clip_inset = 4.0 * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
   let line_count = if clipped_wrap {
-    ((rect.height_pt - 2.0 * clip_inset).max(0.0) / line_height)
-      .ceil()
-      .max(1.0) as usize
+    cell_text_visible_line_count(rect.height_pt, line_height)
   } else {
     lines.len()
   };
@@ -5350,6 +6706,15 @@ fn render_cell_text_with_break_whitespace(
     )
   });
   let text_height = line_height * lines.len().max(1) as f32;
+  let centered_line = (tracks_centered_edit_lines(&options)
+    && wrap_text
+    && style.baseline_shift_pt.abs() <= f32::EPSILON)
+    .then_some(printer_extents_px)
+    .flatten();
+  let centered_edit_block = centered_line.map(|(height, first_upper_px)| CellCenteredEditBlock {
+    height_px: height * lines.len().max(1) as f32,
+    first_upper_px,
+  });
   let vertical_alignment = alignment.and_then(|alignment| alignment.vertical);
   let mut y_pt = match vertical_alignment {
     Some(x::VerticalAlignmentValues::Center) => rect.y_pt + (rect.height_pt - text_height) / 2.0,
@@ -5374,25 +6739,29 @@ fn render_cell_text_with_break_whitespace(
   }
   for line in lines {
     let (line_style, full_line_width_pt) = if fixed_output_gdi_paint {
-      if wrap_text {
-        fixed_output_gdi_cell_text_style(line, &style, text_metrics)
-          .unwrap_or_else(|| (style.clone(), text_metrics.measure_text(line, &style)))
-      } else {
-        // Excel's direct-string fixed-output pass disables GDI pair
-        // positioning and ligatures while retaining the natural outline
-        // advances represented by the PDF font. Its wrapped EditEngine pass
-        // below additionally writes explicit printer-grid character positions.
-        let gdi_style = fixed_output_gdi_base_cell_text_style(&style);
-        let width = text_metrics.measure_text(line, &gdi_style);
-        (gdi_style, width)
-      }
+      // Native shared/inline strings and single rich portions have the same
+      // glyph positions across fonts, zooms and both horizontal alignments.
+      // Wrapping changes line ownership, not the printer font's advances.
+      fixed_output_gdi_cell_text_style(line, &style, text_metrics).unwrap_or_else(|| {
+        let fallback = if wrap_text {
+          style.clone()
+        } else {
+          fixed_output_gdi_base_cell_text_style(&style)
+        };
+        let width = text_metrics.measure_text(line, &fallback);
+        (fallback, width)
+      })
     } else {
       (style.clone(), text_metrics.measure_text(line, &style))
     };
     let preserve_text_portion = !line.is_ascii() && !calc_text_can_shape_as_line(line);
+    let line_y_pt = centered_line.map_or(y_pt, |(_, upper)| {
+      y_pt + upper * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
+        - text_metrics.baseline_offset_in_line_for_text(line, &line_style, line_height)
+    });
     items.push(PageItem::Text(TextItem {
       x_pt: cell_text_x_pt(rect, full_line_width_pt, options.horizontal_alignment, 0.0),
-      y_pt,
+      y_pt: line_y_pt,
       line_height_pt: line_height,
       drawingml_text_effect_anchor: None,
       paint_clip,
@@ -5418,6 +6787,11 @@ fn render_cell_text_with_break_whitespace(
     y_pt += line_height;
   }
   position_rotated_cell_text(&mut items[first_item..], rect, &options, text_metrics);
+  CellTextLayoutResult {
+    last_line_lower_px: printer_extents_px.map(|(height, upper)| height - upper),
+    centered_edit_block,
+    top_edit_first_upper_px: None,
+  }
 }
 
 pub(super) fn cell_text_wrapped_line_count(
@@ -5425,14 +6799,67 @@ pub(super) fn cell_text_wrapped_line_count(
   cell_width_pt: f32,
   style: &TextStyle,
   text_metrics: &mut TextMetrics,
+  auxiliary_line_break_font: Option<&'static str>,
 ) -> usize {
-  wrap_cell_text(
+  wrap_cell_text_with_break_whitespace(
     text,
     (cell_width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(1.0),
     style,
     text_metrics,
+    false,
+    CellTextWrapMetrics::Natural,
+    CellTextBreakPolicy::worksheet(auxiliary_line_break_font),
   )
   .len()
+}
+
+pub(super) fn rich_cell_screen_last_line_range(
+  text: &str,
+  spans: &[(std::ops::Range<usize>, TextStyle)],
+  cell_width_pt: f32,
+  text_metrics: &mut TextMetrics,
+  auxiliary_line_break_font: Option<&'static str>,
+) -> Option<std::ops::Range<usize>> {
+  if !cell_width_pt.is_finite() || cell_width_pt <= 0.0 || text.is_empty() {
+    return None;
+  }
+  let coverage = auxiliary_line_break_font
+    .filter(|_| !text.is_ascii())
+    .and_then(|family| text_metrics.auxiliary_font_coverage(family));
+  let mut known_metrics = true;
+  let ranges = wrapped_cell_text_ranges(
+    text,
+    (cell_width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(1.0),
+    false,
+    coverage.as_deref(),
+    true,
+    |range| {
+      spans
+        .iter()
+        .map(|(span, style)| {
+          let start = span.start.max(range.start);
+          let end = span.end.min(range.end);
+          if start >= end {
+            return 0.0;
+          }
+          text_metrics
+            .gdi_hinted_text_extents_pt(
+              &text[start..end],
+              style,
+              super::worksheet::OFFICE_WORKSHEET_FONT_DPI,
+            )
+            .map_or_else(
+              || {
+                known_metrics = false;
+                0.0
+              },
+              |extent| extent.unpositioned_width_pt,
+            )
+        })
+        .sum()
+    },
+  );
+  known_metrics.then(|| ranges.last().cloned()).flatten()
 }
 
 fn wrap_cell_text(
@@ -5441,7 +6868,35 @@ fn wrap_cell_text(
   style: &TextStyle,
   text_metrics: &mut TextMetrics,
 ) -> Vec<String> {
-  wrap_cell_text_with_break_whitespace(text, available_width_pt, style, text_metrics, false)
+  wrap_cell_text_with_break_whitespace(
+    text,
+    available_width_pt,
+    style,
+    text_metrics,
+    false,
+    CellTextWrapMetrics::Natural,
+    CellTextBreakPolicy::default(),
+  )
+}
+
+enum CellTextWrapMetrics {
+  Natural,
+  FixedOutput,
+}
+
+#[derive(Clone, Copy, Default)]
+struct CellTextBreakPolicy {
+  auxiliary_font: Option<&'static str>,
+  emergency: bool,
+}
+
+impl CellTextBreakPolicy {
+  fn worksheet(auxiliary_font: Option<&'static str>) -> Self {
+    Self {
+      auxiliary_font,
+      emergency: true,
+    }
+  }
 }
 
 fn wrap_cell_text_with_break_whitespace(
@@ -5450,63 +6905,184 @@ fn wrap_cell_text_with_break_whitespace(
   style: &TextStyle,
   text_metrics: &mut TextMetrics,
   preserve_break_whitespace: bool,
+  measurement: CellTextWrapMetrics,
+  break_policy: CellTextBreakPolicy,
 ) -> Vec<String> {
+  let auxiliary_coverage = break_policy
+    .auxiliary_font
+    .filter(|_| !text.is_ascii())
+    .and_then(|family| text_metrics.auxiliary_font_coverage(family));
+  let device_style = fixed_output_gdi_base_cell_text_style(style);
+  let overhang = excel_printer_cell_text_overhang_pt(&device_style, text_metrics);
+  wrapped_cell_text_ranges(
+    text,
+    available_width_pt,
+    preserve_break_whitespace,
+    auxiliary_coverage.as_deref(),
+    break_policy.emergency,
+    |range| {
+      let portion = &text[range];
+      if matches!(measurement, CellTextWrapMetrics::Natural) {
+        return text_metrics.measure_text(portion, style);
+      }
+      // Excel's plain wrapped-cell layout uses GetTextExtentPoint32W on
+      // the realized print font. Natural outline widths and pair positioning
+      // can keep a word that does not fit its unpositioned device extent.
+      // Keep the shaping fallback for complex clusters/unavailable metrics.
+      text_metrics
+        .gdi_printer_text_extents_pt(portion, &device_style, units::OFFICE_FIXED_OUTPUT_DPI)
+        .map_or_else(
+          || text_metrics.measure_text(portion, style),
+          |extent| extent.unpositioned_width_pt + overhang,
+        )
+    },
+  )
+  .into_iter()
+  .map(|range| text[range].to_string())
+  .collect()
+}
+
+fn wrapped_cell_text_ranges(
+  text: &str,
+  available_width_pt: f32,
+  preserve_break_whitespace: bool,
+  auxiliary_coverage: Option<&ooxmlsdk_fonts::FontCoverage>,
+  emergency: bool,
+  mut measure: impl FnMut(std::ops::Range<usize>) -> f32,
+) -> Vec<std::ops::Range<usize>> {
   let mut lines = Vec::new();
-  for paragraph in text
-    .split('\n')
-    .map(|line| line.strip_suffix('\r').unwrap_or(line))
-  {
-    if paragraph.is_empty() || text_metrics.measure_text(paragraph, style) <= available_width_pt {
-      lines.push(paragraph.to_string());
+  let mut paragraph_start = 0;
+  for source in text.split('\n') {
+    let paragraph = source.strip_suffix('\r').unwrap_or(source);
+    let paragraph_end = paragraph_start + paragraph.len();
+    if paragraph.is_empty() || measure(paragraph_start..paragraph_end) <= available_width_pt {
+      lines.push(paragraph_start..paragraph_end);
+      paragraph_start += source.len() + 1;
       continue;
     }
-
-    let mut current = String::new();
-    let break_points = office_line_break_points(paragraph);
-    let mut start = 0;
+    let mut break_points = office_line_break_points(paragraph, auxiliary_coverage);
+    if break_points.last().copied() != Some(paragraph.len()) {
+      break_points.push(paragraph.len());
+    }
+    let mut line_start = paragraph_start;
+    let mut segment_start = paragraph_start;
     for end in break_points.into_iter().filter(|end| *end > 0) {
-      let segment = &paragraph[start..end];
-      let previous_len = current.len();
-      current.push_str(segment);
-      if previous_len > 0
-        && text_metrics.measure_text(current.trim_end(), style) > available_width_pt
-      {
-        current.truncate(previous_len);
-        lines.push(if preserve_break_whitespace {
-          current.clone()
+      let end = paragraph_start + end;
+      let mut trimmed_end = line_start + text[line_start..end].trim_end().len();
+      let mut overflow = (segment_start > line_start || emergency)
+        && measure(line_start..trimmed_end) > available_width_pt;
+      if segment_start > line_start && overflow {
+        let previous_end = if preserve_break_whitespace {
+          segment_start
         } else {
-          current.trim_end().to_string()
-        });
-        current.clear();
-        current.push_str(segment.trim_start());
+          line_start + text[line_start..segment_start].trim_end().len()
+        };
+        lines.push(line_start..previous_end);
+        let segment = &text[segment_start..end];
+        line_start = segment_start + segment.len() - segment.trim_start().len();
+        trimmed_end = line_start + text[line_start..end].trim_end().len();
+        overflow = emergency && measure(line_start..trimmed_end) > available_width_pt;
       }
-      start = end;
-    }
-    if start < paragraph.len() {
-      let segment = &paragraph[start..];
-      let previous_len = current.len();
-      current.push_str(segment);
-      if previous_len > 0
-        && text_metrics.measure_text(current.trim_end(), style) > available_width_pt
-      {
-        current.truncate(previous_len);
-        lines.push(if preserve_break_whitespace {
-          current.clone()
-        } else {
-          current.trim_end().to_string()
-        });
-        current.clear();
-        current.push_str(segment.trim_start());
+      if emergency && line_start < trimmed_end && overflow {
+        // Excel's edit formatter retains the maximum fitted scalar when no
+        // legal separator precedes it. Its caller forces at least one scalar
+        // when even that character is wider than the cell. Native plain/rich
+        // controls also split Latin combining sequences in this emergency
+        // path; grapheme boundaries would incorrectly leave them overfull.
+        // Rust scalar boundaries preserve the native surrogate-pair guard.
+        let boundaries = text[line_start..trimmed_end]
+          .char_indices()
+          .map(|(offset, character)| line_start + offset + character.len_utf8())
+          .collect::<Vec<_>>();
+        let mut consumed = 0;
+        while consumed < boundaries.len() {
+          let count = fitted_cell_text_scalar_count(
+            line_start,
+            &boundaries[consumed..],
+            available_width_pt,
+            &mut measure,
+          );
+          consumed += count;
+          // Excel follows scalar fitting with a separate Devanagari tail
+          // step, even when its other script-tail flag is clear. Native controls
+          // retain these vowel signs/marks with the preceding scalar; virama
+          // does not also retain the following consonant. The native step
+          // checks only while a further character follows the candidate mark.
+          while consumed < boundaries.len()
+            && boundaries[consumed] < paragraph_end
+            && text[boundaries[consumed - 1]..boundaries[consumed]]
+              .chars()
+              .next()
+              .is_some_and(excel_devanagari_line_tail)
+          {
+            consumed += 1;
+          }
+          if consumed == boundaries.len() {
+            break;
+          }
+          let split = boundaries[consumed - 1];
+          lines.push(line_start..split);
+          line_start = split;
+        }
       }
+      segment_start = end;
     }
-    if !current.is_empty() {
-      lines.push(current.trim_end().to_string());
+    if line_start < paragraph_end {
+      lines.push(line_start..line_start + text[line_start..paragraph_end].trim_end().len());
     }
+    paragraph_start += source.len() + 1;
   }
   if lines.is_empty() {
-    lines.push(String::new());
+    lines.push(0..0);
   }
   lines
+}
+
+fn excel_devanagari_line_tail(character: char) -> bool {
+  matches!(
+    character,
+    '\u{901}'..='\u{903}'
+      | '\u{93c}'
+      | '\u{93e}'..='\u{94d}'
+      | '\u{951}'..='\u{954}'
+      | '\u{962}'..='\u{963}'
+  )
+}
+
+fn fitted_cell_text_scalar_count(
+  start: usize,
+  boundaries: &[usize],
+  available_width_pt: f32,
+  measure: &mut impl FnMut(std::ops::Range<usize>) -> f32,
+) -> usize {
+  if boundaries.len() == 1 || measure(start..boundaries[0]) > available_width_pt {
+    return 1;
+  }
+  // Probe from the line start, rather than repeatedly bisecting the entire
+  // remaining word. A long word in a narrow cell then measures bounded
+  // prefixes instead of doing quadratic work over progressively shorter tails.
+  let mut fitted = 1;
+  let mut probe = 2;
+  loop {
+    probe = probe.min(boundaries.len());
+    if measure(start..boundaries[probe - 1]) > available_width_pt {
+      break;
+    }
+    fitted = probe;
+    if fitted == boundaries.len() {
+      return fitted;
+    }
+    probe = probe.saturating_mul(2);
+  }
+  while fitted + 1 < probe {
+    let middle = fitted + (probe - fitted) / 2;
+    if measure(start..boundaries[middle - 1]) <= available_width_pt {
+      fitted = middle;
+    } else {
+      probe = middle;
+    }
+  }
+  fitted
 }
 
 fn fixed_output_gdi_cell_text_style(
@@ -5519,8 +7095,18 @@ fn fixed_output_gdi_cell_text_style(
   }
   let mut gdi_style = fixed_output_gdi_base_cell_text_style(style);
   let advances = text_metrics.excel_unrotated_character_advances_pt(text, &gdi_style)?;
-  let width = advances.iter().sum();
+  // Each authored edit portion owns a device extent and a per-string
+  // overhang. The overhang advances the next portion as well as contributing
+  // to wrapping/right alignment; it does not alter glyph paint advances.
+  let width = text_metrics
+    .gdi_printer_text_extents_pt(text, &gdi_style, units::OFFICE_FIXED_OUTPUT_DPI)
+    .map_or_else(
+      || advances.iter().sum::<f32>(),
+      |extent| extent.unpositioned_width_pt,
+    )
+    + excel_printer_cell_text_overhang_pt(&gdi_style, text_metrics);
   gdi_style.semantic_character_advances_pt = Some(advances);
+  gdi_style.office_text_array = true;
   Some((gdi_style, width))
 }
 
@@ -5531,7 +7117,31 @@ fn fixed_output_gdi_base_cell_text_style(style: &TextStyle) -> TextStyle {
   gdi_style
 }
 
-fn office_line_break_points(text: &str) -> Vec<usize> {
+fn excel_printer_cell_text_overhang_pt(style: &TextStyle, text_metrics: &mut TextMetrics) -> f32 {
+  if !style.italic {
+    return 0.0;
+  }
+  let char_set = if style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+    2
+  } else {
+    0
+  };
+  // Excel's native font cache supplies ascent / 5, truncated to integer
+  // device units, when an italic TrueType font reports tmOverhang=0.
+  // The hash-pinned native cache observer verifies 310 such input/output
+  // pairs; independent split/color/underline controls retain this extra
+  // width for every authored rich portion, even with identical fonts.
+  super::worksheet::printer_font_vertical_metrics(style, char_set, text_metrics)
+    .map(|metrics| {
+      (metrics.ascent_px / 5.0).trunc() * units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI
+    })
+    .unwrap_or(0.0)
+}
+
+fn office_line_break_points(
+  text: &str,
+  auxiliary_coverage: Option<&ooxmlsdk_fonts::FontCoverage>,
+) -> Vec<usize> {
   thread_local! {
     // Parley, Typst, and LibreOffice's BreakIterator all derive soft wrapping
     // opportunities from Unicode line breaking.
@@ -5540,6 +7150,73 @@ fn office_line_break_points(text: &str) -> Vec<usize> {
   }
 
   let mut points = LINE_SEGMENTER.with(|segmenter| segmenter.segment_str(text).collect::<Vec<_>>());
+  if let Some(coverage) = auxiliary_coverage {
+    // Native Excel augments its authoring-language codepage classification
+    // with the application auxiliary font's cmap. This is independent of
+    // the cell's paint face and the workbook's Normal/theme fonts. ASCII
+    // bypasses that classifier. The native zh-CN prefix/width and combining
+    // controls establish scalar boundaries, including after accented letters
+    // before a following combining mark. The native auxiliary bitmap is BMP;
+    // supplementary characters retain ICU's independent policy. Parsed cmap
+    // ranges are sorted, so each character needs just one binary lookup.
+    let ranges = &coverage.unicode_ranges;
+    let classify = |ch: char| {
+      let scalar = u32::from(ch);
+      if ch.is_ascii() || scalar > 0xffff {
+        return false;
+      }
+      let index = ranges.partition_point(|range| range.end <= scalar);
+      ranges.get(index).is_some_and(|range| range.start <= scalar)
+    };
+    let mut previous = None;
+    for (offset, current) in text.char_indices() {
+      let current_class = classify(current);
+      if let Some((previous_char, previous_class)) = previous
+        && (previous_class || current_class)
+        && !matches!(previous_char, '(' | '[' | '{' | '（' | '［' | '｛')
+        && !matches!(
+          current,
+          '!'
+            | '%'
+            | ')'
+            | ','
+            | '.'
+            | ':'
+            | ';'
+            | '?'
+            | ']'
+            | '}'
+            | '！'
+            | '％'
+            | '）'
+            | '，'
+            | '．'
+            | '：'
+            | '；'
+            | '？'
+            | '］'
+            | '｝'
+        )
+      {
+        points.push(offset);
+      }
+      previous = Some((current, current_class));
+    }
+  }
+  if text.contains(['\u{201c}', '\u{201d}']) {
+    // Excel's edit formatter allows either side of curly double quotes to
+    // end a line. Native font/width controls split “X” after “ and before ”,
+    // while straight ASCII quotes keep their quoted word together. The
+    // default Unicode quotation rules do not provide these opportunities.
+    // Keep combining sequences intact when adding the Office boundaries.
+    let mut start = 0;
+    for end in GraphemeClusterSegmenter::new().segment_str(text).skip(1) {
+      if matches!(&text[start..end], "\u{201c}" | "\u{201d}") {
+        points.extend([start, end]);
+      }
+      start = end;
+    }
+  }
   // LibreOffice i18npool line.txt customization i#83229 restores a break
   // after the embedded hyphen in a numeric range; default ICU LB25 treats
   // `100-199` as one token. Office's Excel output follows the same behavior.
@@ -5960,10 +7637,12 @@ fn excel_printer_cell_text_horizontal_rect(
   // digit inset from the realized cell font, not a fixed Normal-font margin.
   // The rotated AutoFit path independently uses the same quarter-digit rule.
   let mut rect = printer_cell_text_horizontal_rect(cell, page, wrap_text, inset);
-  if horizontal_alignment == x::HorizontalAlignmentValues::Right {
+  if horizontal_alignment == x::HorizontalAlignmentValues::Right && !wrap_text {
     // Native numeric/string controls keep the eight-dot leading/centering
     // phase out of right alignment. The right origin is the cell's trailing
     // grid boundary minus the quarter-digit inset and the string advance.
+    // Wrapped edit text retains this phase, as native left/right witnesses
+    // establish independently of the string's per-portion overhang.
     rect.width_pt = (rect.width_pt - 8.0 * dot).max(0.0);
   }
   rect
@@ -6005,8 +7684,166 @@ struct ExcelCellVerticalAlignmentContext {
   cell: CellRect,
   page: CellRect,
   vertically_merged: bool,
+  horizontally_merged: bool,
   normal_descent_px: f32,
   grid_profile: ExcelCellBaselineGrid,
+  row_lower_extent: Option<super::worksheet::FixedOutputRowLowerExtent>,
+  top_baseline_offset_px: Option<f32>,
+  merged_last_line_lower_px: Option<f32>,
+}
+
+fn cell_text_scaled_printer_baseline_offset_px(
+  context: &CellFontPrintContext,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  cell_text_scaled_printer_line_extents_px(context, text_metrics).map(|(_, baseline)| baseline)
+}
+
+fn cell_text_scaled_printer_line_extents_px(
+  context: &CellFontPrintContext,
+  text_metrics: &mut TextMetrics,
+) -> Option<(f32, f32)> {
+  let charset = if context.style.font_charset == Some(ooxmlsdk_fonts::FontCharset::Symbol) {
+    2
+  } else {
+    0
+  };
+  let (height_px, upper_px) =
+    super::worksheet::printer_font_line_extents_px(&context.style, charset, text_metrics)?;
+  let height_px = f64::from(height_px);
+  let lower_px = height_px - f64::from(upper_px);
+  let percentage = (f64::from(context.print_scale) * 100.0).round();
+  // Excel scales the complete printer line box and its lower extent
+  // separately, then subtracts their rounded device values. Scaling the
+  // ascent alone or recreating metrics from the printed glyph font loses
+  // that composition: Arial11 regular/bold at59% give50/53 dots, while
+  // Arial13 gives60/61. Native cached-line arrays and all four-family
+  // top-alignment controls independently establish this order.
+  let scaled_height_px = (height_px * percentage / 100.0).round();
+  let scaled_lower_px = (lower_px * percentage / 100.0).round();
+  Some((
+    scaled_height_px as f32,
+    (scaled_height_px - scaled_lower_px) as f32,
+  ))
+}
+
+fn printer_row_lower_extent(
+  sheet: &CalcSheet,
+  row: &super::worksheet::CalcRow,
+  styles: &super::styles::StylesCatalog,
+  scale: f32,
+) -> Option<super::worksheet::FixedOutputRowLowerExtent> {
+  let grid = sheet.fixed_output_row_lower_grid()?;
+  let participates = super::worksheet::font_participates_in_fixed_output_row_baseline;
+  // Unformatted columns inherit the Normal font. Explicit whole-row or
+  // whole-column styles can replace that contribution, so Normal is not
+  // an unconditional lower bound. Reuse the imported column extent cache.
+  let mut screen_descent = if let Some(index) = row.style_index {
+    if participates(styles.alignment_for_cell(Some(index))) {
+      sheet.fixed_output_screen_font_lower_extent(Some(index), styles)?
+    } else {
+      0.0
+    }
+  } else {
+    grid.inherited_screen_descent_px?
+  };
+  let mut rich_fonts: Vec<(TextStyle, f32)> = Vec::new();
+  for cell in &row.cells {
+    let address = cell.address()?;
+    let style_index = sheet.effective_cell_style_index_at(address);
+    if !participates(styles.alignment_for_cell(style_index))
+      || sheet
+        .merged_range_for_cell(address)
+        .is_some_and(|merged| merged.start.row < merged.end.row)
+    {
+      continue;
+    }
+    // Formatted blanks, empty formulas and hidden/off-print columns all
+    // retain their font contribution. Font tables are measured once per
+    // effective style for the sheet, not once per cell or physical page.
+    screen_descent =
+      screen_descent.max(sheet.fixed_output_screen_font_lower_extent(style_index, styles)?);
+    if cell.rich_text_runs.is_empty() {
+      continue;
+    }
+    let nominal = styles.text_style_for_cell(style_index);
+    for run in &cell.rich_text_runs {
+      if run.text.is_empty() {
+        continue;
+      }
+      let style = xlsx_rich_text_run_style(&nominal, run, 1.0);
+      if style.baseline_shift_pt.abs() > f32::EPSILON {
+        return None;
+      }
+      let lower = if let Some((_, lower)) = rich_fonts.iter().find(|(font, _)| font == &style) {
+        *lower
+      } else {
+        let lower = super::worksheet::screen_text_font_lower_extent_px(&style)?;
+        rich_fonts.push((style, lower));
+        lower
+      };
+      screen_descent = screen_descent.max(lower);
+    }
+  }
+  Some(super::worksheet::FixedOutputRowLowerExtent {
+    printer_lower_px: grid.scaled_printer_lower_px(screen_descent, row.thick_bottom, scale),
+  })
+}
+
+fn align_excel_printer_centered_edit_text(
+  items: &mut [PageItem],
+  cell: CellRect,
+  page: CellRect,
+  horizontally_merged: bool,
+  block: CellCenteredEditBlock,
+  text_metrics: &mut TextMetrics,
+) -> bool {
+  if items.is_empty()
+    || items.iter().any(|item| {
+      let PageItem::Text(text) = item else {
+        return true;
+      };
+      text.style.rotation_deg.abs() > f32::EPSILON
+        || text.style.baseline_shift_pt.abs() > f32::EPSILON
+    })
+  {
+    return false;
+  }
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let grid = cell_border_device_rect(cell, page);
+  let cell_height_px = (grid.height_pt / dot).round();
+  // Native final-draw caches retain the four-dot origin band for both
+  // formatters, but a horizontal merge removes eight dots from its usable
+  // height. Signed integer division also keeps overflowing blocks centered.
+  // Collapsing these bands to an origin adjustment is equivalent only when
+  // the block fits: a237-dot block in a240-dot merged row has232 usable dots
+  // and -2 leading dots, rather than the simplified formula's +1.
+  let origin = grid.y_pt + 4.0 * dot;
+  let edit_height_px = cell_height_px - if horizontally_merged { 8.0 } else { 0.0 };
+  let leading_px = ((edit_height_px - block.height_px) / 2.0).trunc();
+  let desired = origin + (leading_px + block.first_upper_px) * dot;
+  let actual = items
+    .iter()
+    .filter_map(|item| {
+      let PageItem::Text(text) = item else {
+        return None;
+      };
+      Some(
+        text.y_pt
+          + text_metrics.baseline_offset_in_line_for_text(
+            &text.text,
+            &text.style,
+            text.line_height_pt,
+          ),
+      )
+    })
+    .fold(f32::INFINITY, f32::min);
+  for item in items {
+    if let PageItem::Text(text) = item {
+      text.y_pt += desired - actual;
+    }
+  }
+  true
 }
 
 fn align_excel_printer_cell_text_vertically(
@@ -6019,8 +7856,12 @@ fn align_excel_printer_cell_text_vertically(
     cell,
     page,
     vertically_merged,
+    horizontally_merged,
     normal_descent_px,
     grid_profile,
+    row_lower_extent,
+    top_baseline_offset_px,
+    merged_last_line_lower_px,
   } = context;
   let Some(PageItem::Text(text)) = items.first() else {
     return;
@@ -6032,10 +7873,12 @@ fn align_excel_printer_cell_text_vertically(
     let PageItem::Text(portion) = item else {
       return true;
     };
-    portion.style.font_family != text.style.font_family
-      || portion.style.font_size_pt != text.style.font_size_pt
-      || portion.style.bold != text.style.bold
-      || portion.style.italic != text.style.italic
+    (row_lower_extent.is_none()
+      && top_baseline_offset_px.is_none()
+      && (portion.style.font_family != text.style.font_family
+        || portion.style.font_size_pt != text.style.font_size_pt
+        || portion.style.bold != text.style.bold
+        || portion.style.italic != text.style.italic))
       || portion.style.rotation_deg.abs() > f32::EPSILON
       || portion.style.baseline_shift_pt.abs() > f32::EPSILON
   }) {
@@ -6051,7 +7894,9 @@ fn align_excel_printer_cell_text_vertically(
   } else {
     0
   };
-  let Some(metrics) = super::worksheet::printer_font_vertical_metrics(&text.style, char_set) else {
+  let Some(metrics) =
+    super::worksheet::printer_font_vertical_metrics(&text.style, char_set, text_metrics)
+  else {
     return;
   };
   let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
@@ -6089,17 +7934,60 @@ fn align_excel_printer_cell_text_vertically(
     .collect::<Vec<_>>();
   let first_baseline = baselines.iter().copied().fold(f32::INFINITY, f32::min);
   let last_baseline = baselines.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+  if let Some(row_lower_extent) = row_lower_extent {
+    // The row cache publishes its shared baseline from the ordinary
+    // formatter bottom, eight printer dots below the authored row endpoint.
+    // A horizontal merge changes its later edit rectangle, not this shared
+    // owner. Native direct and edit producers independently establish both.
+    let authored_bottom = cell.y_pt + cell.height_pt;
+    let row_baseline = authored_bottom + (8.0 - row_lower_extent.printer_lower_px) * dot;
+    // The merged edit block has its own last-line lower extent measured
+    // from the authored endpoint. Compare baselines, not lower extents that
+    // have different rectangle owners; this also preserves clipped lines.
+    let desired_last_baseline = merged_last_line_lower_px.map_or(row_baseline, |lower| {
+      row_baseline.min(authored_bottom - lower * dot)
+    });
+    let offset = desired_last_baseline - last_baseline;
+    for item in items {
+      if let PageItem::Text(text) = item {
+        text.y_pt += offset;
+      }
+    }
+    return;
+  }
   let line_advance_px = ((last_baseline - first_baseline) / dot).round();
-  let Some(baseline_offset_px) = excel_printer_cell_baseline_offset_px(
-    vertical,
-    cell_height_px - line_advance_px,
-    metrics,
-    normal_descent_px,
-    grid_profile,
-  ) else {
+  let Some(baseline_offset_px) = top_baseline_offset_px
+    .map(|offset| 4.0 + offset)
+    .or_else(|| {
+      excel_printer_cell_baseline_offset_px(
+        vertical,
+        cell_height_px - line_advance_px,
+        metrics,
+        normal_descent_px,
+        grid_profile,
+      )
+    })
+  else {
     return;
   };
-  let desired_baseline_pt = grid.y_pt + baseline_offset_px * dot;
+  // The merged CENTER formatter owns the authored row's
+  // printer origin, without the ordinary cell's four-dot border band.
+  // Native horizontal/vertical/two-axis, hidden/visible-row and47/100%
+  // controls keep the same row endpoints while both formatter edges move
+  // up exactly four dots.
+  // This is independent of the scaled font's own line-box composition.
+  let baseline_origin_pt = if grid_profile == ExcelCellBaselineGrid::ExplicitNormalFont
+    && (horizontally_merged || vertically_merged)
+    && vertical == Some(x::VerticalAlignmentValues::Center)
+  {
+    grid.y_pt - 4.0 * dot
+  } else {
+    grid.y_pt
+  };
+  let row_baseline_pt = baseline_origin_pt + baseline_offset_px * dot;
+  let desired_baseline_pt = merged_last_line_lower_px.map_or(row_baseline_pt, |lower| {
+    row_baseline_pt.min(cell.y_pt + cell.height_pt - lower * dot - (last_baseline - first_baseline))
+  });
   let offset = desired_baseline_pt - first_baseline;
   for item in items {
     if let PageItem::Text(text) = item {
@@ -6702,7 +8590,7 @@ fn push_page_drawing_anchor_image_items(
   drawing: &super::drawing::DrawingResourceCatalog,
   anchor: &super::drawing::DrawingAnchorModel,
   rect: CellRect,
-  zoom_scale: f32,
+  profile: XlsxPictureOutputProfile,
 ) -> bool {
   if super::drawing::is_web_extension_graphic_frame(&anchor.object) {
     let placeholder = anchor
@@ -6712,14 +8600,14 @@ fn push_page_drawing_anchor_image_items(
       .and_then(|relationship_id| drawing.image_resources.get(relationship_id))
       .and_then(web_extension_placeholder_png)
       .map(|placeholder_data| {
-        let placeholder_size = XLSX_WEB_EXTENSION_PLACEHOLDER_SIZE_PT * zoom_scale;
+        let placeholder_size = XLSX_WEB_EXTENSION_PLACEHOLDER_SIZE_PT * profile.zoom_scale;
         ImageItem {
           x_pt: rect.x_pt
             + (rect.width_pt - placeholder_size) / 2.0
-            + XLSX_WEB_EXTENSION_HOST_OFFSET_X_PT * zoom_scale,
+            + XLSX_WEB_EXTENSION_HOST_OFFSET_X_PT * profile.zoom_scale,
           y_pt: rect.y_pt
             + (rect.height_pt - placeholder_size) / 2.0
-            + XLSX_WEB_EXTENSION_HOST_OFFSET_Y_PT * zoom_scale,
+            + XLSX_WEB_EXTENSION_HOST_OFFSET_Y_PT * profile.zoom_scale,
           width_pt: placeholder_size,
           height_pt: placeholder_size,
           crop: ImageCrop::default(),
@@ -6762,6 +8650,7 @@ fn push_page_drawing_anchor_image_items(
       &anchor.object,
       rect,
       Affine::IDENTITY,
+      profile,
     );
     return false;
   }
@@ -6783,6 +8672,7 @@ fn push_page_drawing_anchor_image_items(
   let clip_path = drawing_object_clip_path(rect, &anchor.object);
   let (image_data, image_content_type) =
     xlsx_image_data_with_effects(import, drawing, resource, &anchor.object);
+  let item_start = items.len();
   items.extend(drawingml_image_fill_items(
     &anchor.object,
     DrawingMlImageFillInput {
@@ -6801,6 +8691,25 @@ fn push_page_drawing_anchor_image_items(
       hyperlink_url: hyperlink_url.as_deref().map(ToString::to_string),
     },
   ));
+  push_xlsx_picture_outline(
+    import,
+    items,
+    &anchor.object,
+    rect,
+    drawing_object_path_transform(rect, &anchor.object),
+    profile.zoom_scale,
+  );
+  if anchor.object.kind == super::drawing::DrawingObjectKind::Picture {
+    finish_xlsx_shape_effects(
+      (import, drawing),
+      items,
+      item_start,
+      &anchor.object,
+      drawing_rect_bounds(rect, drawing_object_path_transform(rect, &anchor.object)),
+      drawing_object_visual_rotation_degrees(&anchor.object),
+      XlsxShapeEffectSource::Picture(profile),
+    );
+  }
   false
 }
 
@@ -6889,11 +8798,20 @@ fn push_group_image_items(
   group: &super::drawing::DrawingObjectModel,
   rect: CellRect,
   parent_transform: Affine,
+  profile: XlsxPictureOutputProfile,
 ) {
   let group_transform = parent_transform * drawing_object_path_transform(rect, group);
   for (child, child_rect) in drawing_group_child_rects(group, rect) {
     if child.kind == super::drawing::DrawingObjectKind::GroupShape {
-      push_group_image_items(items, import, drawing, child, child_rect, group_transform);
+      push_group_image_items(
+        items,
+        import,
+        drawing,
+        child,
+        child_rect,
+        group_transform,
+        profile,
+      );
       continue;
     }
     if !matches!(
@@ -6927,6 +8845,7 @@ fn push_group_image_items(
     let hyperlink_url = drawing_object_hyperlink_url(drawing, child);
     let (image_data, image_content_type) =
       xlsx_image_data_with_effects(import, drawing, resource, child);
+    let item_start = items.len();
     items.extend(drawingml_image_fill_items(
       child,
       DrawingMlImageFillInput {
@@ -6946,6 +8865,116 @@ fn push_group_image_items(
         hyperlink_url: hyperlink_url.as_deref().map(ToString::to_string),
       },
     ));
+    push_xlsx_picture_outline(
+      import,
+      items,
+      child,
+      child_rect,
+      transform,
+      profile.zoom_scale,
+    );
+    if child.kind == super::drawing::DrawingObjectKind::Picture {
+      finish_xlsx_shape_effects(
+        (import, drawing),
+        items,
+        item_start,
+        child,
+        drawing_rect_bounds(child_rect, transform),
+        affine_rotation_degrees(transform),
+        XlsxShapeEffectSource::Picture(profile),
+      );
+    }
+  }
+}
+
+fn push_xlsx_picture_outline(
+  import: &ExcelImport,
+  items: &mut Vec<PageItem>,
+  object: &super::drawing::DrawingObjectModel,
+  image_rect: CellRect,
+  transform: Affine,
+  zoom_scale: f32,
+) {
+  if object.kind != super::drawing::DrawingObjectKind::Picture {
+    return;
+  }
+  let Some(mut border) = shape_stroke(import, object) else {
+    return;
+  };
+  // Native picture controls keep the bitmap viewport unchanged. The line
+  // scales with the composed worksheet zoom and sits wholly outside it,
+  // so its centreline is displaced outwards by half the printed width.
+  border.width_pt *= zoom_scale;
+  let half_width = border.width_pt / 2.0;
+  let rect = CellRect {
+    x_pt: image_rect.x_pt - half_width,
+    y_pt: image_rect.y_pt - half_width,
+    width_pt: image_rect.width_pt + border.width_pt,
+    height_pt: image_rect.height_pt + border.width_pt,
+  };
+  let (paths, outline) = match object.geometry.as_ref() {
+    Some(super::drawing::DrawingGeometryModel::Custom { geometry, outline }) => (
+      common::drawingml_custom_geometry::paths(
+        geometry,
+        rect.x_pt,
+        rect.y_pt,
+        rect.width_pt,
+        rect.height_pt,
+      ),
+      outline.as_deref(),
+    ),
+    Some(super::drawing::DrawingGeometryModel::Preset { geometry, outline }) => (
+      common::drawingml_preset_geometry::paths(
+        Some(geometry),
+        rect.x_pt,
+        rect.y_pt,
+        rect.width_pt,
+        rect.height_pt,
+      ),
+      outline.as_deref(),
+    ),
+    None => (
+      common::drawingml_preset_geometry::paths(
+        None,
+        rect.x_pt,
+        rect.y_pt,
+        rect.width_pt,
+        rect.height_pt,
+      ),
+      None,
+    ),
+  };
+  let Some(paths) = paths else {
+    return;
+  };
+  let bounds = common::drawingml_geometry::transform_rect_bounds(
+    KurboRect::new(
+      f64::from(rect.x_pt),
+      f64::from(rect.y_pt),
+      f64::from(rect.x_pt + rect.width_pt),
+      f64::from(rect.y_pt + rect.height_pt),
+    ),
+    transform,
+  );
+  let stroke = drawing_object_common_stroke(import, object, border, rect, transform, outline);
+  for path in paths.into_iter().filter(|path| path.stroke) {
+    let closed = path
+      .commands
+      .iter()
+      .any(|command| matches!(command, common::PathCommand::Close));
+    items.push(PageItem::Path(common::PathItem {
+      bounds: common_rect(
+        bounds.x0 as f32,
+        bounds.y0 as f32,
+        bounds.width() as f32,
+        bounds.height() as f32,
+      ),
+      points: Vec::new(),
+      commands: common::drawingml_geometry::transform_commands(path.commands, transform),
+      closed,
+      fill: common::Fill::None,
+      stroke: Some(stroke.clone()),
+    }));
   }
 }
 
@@ -7497,7 +9526,7 @@ fn push_page_drawing_anchor_shape_items(
       &anchor.object,
       path_bounds,
       affine_rotation_degrees(shape_transform),
-      false,
+      XlsxShapeEffectSource::Vector,
     );
     return;
   }
@@ -7551,7 +9580,7 @@ fn push_page_drawing_anchor_shape_items(
     &anchor.object,
     path_bounds,
     affine_rotation_degrees(shape_transform),
-    false,
+    XlsxShapeEffectSource::Vector,
   );
 }
 
@@ -7621,7 +9650,7 @@ fn push_group_shape_items(
       bounds.height() as f32,
     ),
     affine_rotation_degrees(group_transform),
-    true,
+    XlsxShapeEffectSource::Group,
   );
 }
 
@@ -7754,7 +9783,7 @@ fn push_drawing_object_shape(
       object,
       path_bounds,
       affine_rotation_degrees(transform),
-      false,
+      XlsxShapeEffectSource::Vector,
     );
     return;
   }
@@ -7787,13 +9816,38 @@ fn push_drawing_object_shape(
     object,
     path_bounds,
     affine_rotation_degrees(transform),
-    false,
+    XlsxShapeEffectSource::Vector,
   );
 }
 
 fn affine_rotation_degrees(transform: Affine) -> f32 {
   let [m11, m12, _, _, _, _] = transform.as_coeffs();
   m12.atan2(m11).to_degrees() as f32
+}
+
+fn drawing_rect_bounds(rect: CellRect, transform: Affine) -> common::Rect {
+  let bounds = common::drawingml_geometry::transform_rect_bounds(
+    KurboRect::new(
+      f64::from(rect.x_pt),
+      f64::from(rect.y_pt),
+      f64::from(rect.x_pt + rect.width_pt),
+      f64::from(rect.y_pt + rect.height_pt),
+    ),
+    transform,
+  );
+  common_rect(
+    bounds.x0 as f32,
+    bounds.y0 as f32,
+    bounds.width() as f32,
+    bounds.height() as f32,
+  )
+}
+
+#[derive(Clone, Copy, Debug)]
+enum XlsxShapeEffectSource {
+  Vector,
+  Group,
+  Picture(XlsxPictureOutputProfile),
 }
 
 fn finish_xlsx_shape_effects(
@@ -7803,9 +9857,14 @@ fn finish_xlsx_shape_effects(
   object: &super::drawing::DrawingObjectModel,
   content_bounds: common::Rect,
   rotation_degrees: f32,
-  children_source: bool,
+  source: XlsxShapeEffectSource,
 ) {
   let (import, drawing) = resources;
+  let children_source = matches!(source, XlsxShapeEffectSource::Group);
+  let picture_profile = match source {
+    XlsxShapeEffectSource::Picture(profile) => Some(profile),
+    XlsxShapeEffectSource::Vector | XlsxShapeEffectSource::Group => None,
+  };
   let effect_reference = object
     .shape_effects
     .is_none()
@@ -7872,6 +9931,15 @@ fn finish_xlsx_shape_effects(
     return;
   }
   common::drawingml_image_effects::rotate_container_with_shape(&mut effects, rotation_degrees);
+  if let Some(profile) = picture_profile {
+    // The picture's shape effects belong to worksheet coordinates, unlike
+    // the already-applied blip effects. Native scale controls retain the
+    // same proportional blur and distance as the bitmap and outside line.
+    common::drawingml_image_effects::scale_container_pixel_lengths(
+      &mut effects,
+      profile.zoom_scale,
+    );
+  }
   let preserve_vector_source = if object.scene3d.is_none() && object.shape3d.is_none() {
     if let Some(backdrop) = common::drawingml_image_effects::unchanged_foreground_backdrop(&effects)
     {
@@ -7883,13 +9951,63 @@ fn finish_xlsx_shape_effects(
   } else {
     false
   };
-  let Some(output_bounds) = common::drawingml_image_effects::container_output_bounds(
-    &effects,
-    content_bounds.size.width.0,
-    content_bounds.size.height.0,
-  ) else {
+  let display_items = items[content_start..]
+    .iter()
+    .cloned()
+    .map(common_display_item)
+    .collect::<Vec<_>>();
+  let anchor_bounds = common::drawingml_image_effects::EffectOutputBounds {
+    left_pt: 0.0,
+    top_pt: 0.0,
+    right_pt: content_bounds.size.width.0,
+    bottom_pt: content_bounds.size.height.0,
+  };
+  let mut picture_paint_bounds = anchor_bounds;
+  let output_bounds = if picture_profile.is_some() {
+    let paint = &mut picture_paint_bounds;
+    if let Some(stroke) = common::drawingml_stroke::display_items_stroke_bounds(&display_items) {
+      paint.left_pt = paint
+        .left_pt
+        .min(stroke.origin.x.0 - content_bounds.origin.x.0);
+      paint.top_pt = paint
+        .top_pt
+        .min(stroke.origin.y.0 - content_bounds.origin.y.0);
+      paint.right_pt = paint
+        .right_pt
+        .max(stroke.origin.x.0 + stroke.size.width.0 - content_bounds.origin.x.0);
+      paint.bottom_pt = paint
+        .bottom_pt
+        .max(stroke.origin.y.0 + stroke.size.height.0 - content_bounds.origin.y.0);
+    }
+    common::drawingml_image_effects::container_output_bounds_with_anchor(
+      &effects,
+      picture_paint_bounds,
+      anchor_bounds,
+    )
+  } else {
+    common::drawingml_image_effects::container_output_bounds(
+      &effects,
+      content_bounds.size.width.0,
+      content_bounds.size.height.0,
+    )
+  };
+  let Some(output_bounds) = output_bounds else {
     return;
   };
+  let picture_shadow = picture_profile
+    .filter(|_| preserve_vector_source)
+    .and_then(|profile| {
+      common::drawingml_image_effects::simple_outer_shadow_translation(&effects).map(|shadow| {
+        // Excel picture radius/zoom/height controls use the same balanced
+        // Gaussian tiers as Word and PowerPoint; bitmap dimensions and
+        // source-image resolution do not choose the tier.
+        let divisor = common::drawingml_image_effects::direct2d_balanced_blur_prescale_divisor(
+          shadow.blur_radius_px,
+        );
+        let pixels_per_point = profile.raster_dpi as f32 / units::POINTS_PER_INCH / divisor as f32;
+        (shadow, pixels_per_point)
+      })
+    });
   let static_padding = object
     .scene3d
     .as_deref()
@@ -7919,19 +10037,62 @@ fn finish_xlsx_shape_effects(
       height: common::Pt(relative_bottom - relative_top),
     },
   };
-  if preserve_vector_source {
+  let picture_sample_bounds = picture_shadow.map(|(shadow, pixels_per_point)| {
+    common::drawingml_shape_raster::office_shape_shadow_bitmap_sample_bounds(
+      content_bounds,
+      output_bounds,
+      shadow.blur_radius_px * units::POINTS_PER_CSS_PIXEL,
+      pixels_per_point,
+    )
+  });
+  if let Some((sample, (shadow, pixels_per_point))) = picture_sample_bounds.zip(picture_shadow) {
+    // The shadow blurs the complete caster before translating it. Its final
+    // output bounds alone can omit the caster or clip the untranslated blur,
+    // especially when the distance exceeds the picture's height.
+    let radius_pt = shadow.blur_radius_px * units::POINTS_PER_CSS_PIXEL;
+    let left = relative_left.min(picture_paint_bounds.left_pt - radius_pt);
+    let top = relative_top.min(picture_paint_bounds.top_pt - radius_pt);
+    let right = relative_right.max(picture_paint_bounds.right_pt + radius_pt);
+    let bottom = relative_bottom.max(picture_paint_bounds.bottom_pt + radius_pt);
+    let required = common_rect(
+      content_bounds.origin.x.0 + left,
+      content_bounds.origin.y.0 + top,
+      right - left,
+      bottom - top,
+    );
+    raster_bounds = common::drawingml_shape_raster::office_shape_shadow_working_bounds(
+      required,
+      sample,
+      pixels_per_point,
+    );
+  } else if preserve_vector_source {
     raster_bounds = excel_fixed_output_backdrop_bounds(raster_bounds);
   }
-  let display_items = items[content_start..]
-    .iter()
-    .cloned()
-    .map(common_display_item)
-    .collect::<Vec<_>>();
+  let mut raster_source_bounds = raster_bounds;
+  if let Some((shadow, _)) = picture_shadow {
+    // A pure translation commutes with Gaussian convolution. Native picture
+    // distance/phase controls rasterize the translated caster once: resolving
+    // its coverage first and bilinearly shifting that A8 texture introduces
+    // a second edge ramp. Keep the output bounds, but lift this translation
+    // into the source mapping before rasterization.
+    raster_source_bounds.origin.x.0 -= shadow.offset_x_px * units::POINTS_PER_CSS_PIXEL;
+    raster_source_bounds.origin.y.0 -= shadow.offset_y_px * units::POINTS_PER_CSS_PIXEL;
+    if let [ImageEffect::OuterShadow { distance_px, .. }] = effects.effects.as_mut_slice() {
+      *distance_px = 0.0;
+    }
+  }
   let raster = if children_source {
     common::drawingml_shape_raster::rasterize_group_items_for_effects(
       &display_items,
       raster_bounds,
       &effects,
+    )
+  } else if let Some((_, pixels_per_point)) = picture_shadow {
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_fixed_output_pixels_per_point(
+      &display_items,
+      raster_source_bounds,
+      &effects,
+      pixels_per_point,
     )
   } else if preserve_vector_source {
     // Excel's fixed-format writer keeps the unchanged foreground as vector
@@ -8002,8 +10163,16 @@ fn finish_xlsx_shape_effects(
   common::drawingml_image_effects::apply_container_to_padded_image_with_sources(
     &mut raster.image,
     &effects,
-    -relative_left * raster.pixels_per_point,
-    -relative_top * raster.pixels_per_point,
+    if picture_profile.is_some() {
+      (content_bounds.origin.x.0 - raster_source_bounds.origin.x.0) * raster.pixels_per_point
+    } else {
+      -relative_left * raster.pixels_per_point
+    },
+    if picture_profile.is_some() {
+      (content_bounds.origin.y.0 - raster_source_bounds.origin.y.0) * raster.pixels_per_point
+    } else {
+      -relative_top * raster.pixels_per_point
+    },
     content_bounds.size.width.0 * raster.pixels_per_point,
     content_bounds.size.height.0 * raster.pixels_per_point,
     common::drawingml_image_effects::ImageEffectSourceImages {
@@ -8016,6 +10185,38 @@ fn finish_xlsx_shape_effects(
       bounds: Default::default(),
     },
   );
+  let mut image_bounds = raster_bounds;
+  if let Some(sample) = picture_sample_bounds {
+    let bounds = |rect: common::Rect| common::drawingml_image_effects::EffectOutputBounds {
+      left_pt: rect.origin.x.0,
+      top_pt: rect.origin.y.0,
+      right_pt: rect.origin.x.0 + rect.size.width.0,
+      bottom_pt: rect.origin.y.0 + rect.size.height.0,
+    };
+    let Some(target) = common::drawingml_image_effects::effect_bitmap_target_with_rounding_modes(
+      bounds(sample),
+      bounds(raster_bounds),
+      raster.pixels_per_point,
+      raster.image.width(),
+      raster.image.height(),
+      common::drawingml_image_effects::EffectBitmapTargetRounding {
+        offset_x: common::drawingml_image_effects::EffectBitmapOffsetRounding::Nearest,
+        offset_y: common::drawingml_image_effects::EffectBitmapOffsetRounding::Nearest,
+        extent: common::drawingml_image_effects::EffectBitmapExtentRounding::Ceil,
+      },
+    ) else {
+      return;
+    };
+    raster.image = image::imageops::crop_imm(
+      &raster.image,
+      target.left_px,
+      target.top_px,
+      target.width_px,
+      target.height_px,
+    )
+    .to_image();
+    image_bounds = sample;
+  }
   let mut png = Cursor::new(Vec::new());
   if PngEncoder::new(&mut png)
     .write_image(
@@ -8029,10 +10230,10 @@ fn finish_xlsx_shape_effects(
     return;
   }
   let effect_image = PageItem::Image(ImageItem {
-    x_pt: raster_bounds.origin.x.0,
-    y_pt: raster_bounds.origin.y.0,
-    width_pt: raster_bounds.size.width.0,
-    height_pt: raster_bounds.size.height.0,
+    x_pt: image_bounds.origin.x.0,
+    y_pt: image_bounds.origin.y.0,
+    width_pt: image_bounds.size.width.0,
+    height_pt: image_bounds.size.height.0,
     crop: ImageCrop::default(),
     clip_path: Vec::new(),
     rotation_deg: 0.0,
@@ -8886,6 +11087,7 @@ fn transform_group_text_items(items: &mut [PageItem], transform: Affine, rect: C
         })
         .collect(),
       vml_fit_path: warp.vml_fit_path,
+      follow_path: warp.follow_path.clone(),
       vml_trim_band: warp.vml_trim_band,
     }));
     text.style.pdf_glyph_outline_options = Some(Arc::new(options));
@@ -8940,7 +11142,7 @@ fn lower_drawing_chart(
   let chart_space = resource.chart_space.as_deref()?;
   let chart_style = xlsx_chart_style_id(chart_space);
 
-  if !excel_chart_has_series(chart_space) {
+  if !shared_chart::has_series(chart_space) {
     // Office's tdf107586 PDF contains the chart-area fill and border only.
     // A title without any series must not become generic drawing text when
     // the data-bearing chart model returns None. Authored empty series are
@@ -10245,32 +12447,6 @@ fn lower_drawing_chart(
   Some(items)
 }
 
-fn excel_chart_has_series(chart_space: &c::ChartSpace) -> bool {
-  chart_space
-    .chart
-    .plot_area
-    .plot_area_choice1
-    .iter()
-    .any(|plot| match plot {
-      c::PlotAreaChoice::AreaChart(chart) => !chart.area_chart_series.is_empty(),
-      c::PlotAreaChoice::Area3DChart(chart) => !chart.area_chart_series.is_empty(),
-      c::PlotAreaChoice::LineChart(chart) => !chart.line_chart_series.is_empty(),
-      c::PlotAreaChoice::Line3DChart(chart) => !chart.line_chart_series.is_empty(),
-      c::PlotAreaChoice::StockChart(chart) => !chart.line_chart_series.is_empty(),
-      c::PlotAreaChoice::RadarChart(chart) => !chart.radar_chart_series.is_empty(),
-      c::PlotAreaChoice::ScatterChart(chart) => !chart.scatter_chart_series.is_empty(),
-      c::PlotAreaChoice::PieChart(chart) => !chart.pie_chart_series.is_empty(),
-      c::PlotAreaChoice::Pie3DChart(chart) => !chart.pie_chart_series.is_empty(),
-      c::PlotAreaChoice::DoughnutChart(chart) => !chart.pie_chart_series.is_empty(),
-      c::PlotAreaChoice::BarChart(chart) => !chart.bar_chart_series.is_empty(),
-      c::PlotAreaChoice::Bar3DChart(chart) => !chart.bar_chart_series.is_empty(),
-      c::PlotAreaChoice::OfPieChart(chart) => !chart.pie_chart_series.is_empty(),
-      c::PlotAreaChoice::SurfaceChart(chart) => !chart.surface_chart_series.is_empty(),
-      c::PlotAreaChoice::Surface3DChart(chart) => !chart.surface_chart_series.is_empty(),
-      c::PlotAreaChoice::BubbleChart(chart) => !chart.bubble_chart_series.is_empty(),
-    })
-}
-
 fn excel_empty_automatic_title_is_visible(chart_space: &c::ChartSpace) -> bool {
   let Some(title) = chart_space.chart.title.as_deref() else {
     return false;
@@ -10582,40 +12758,13 @@ fn chart_reference_text_values(import: &ExcelImport, formula: &str) -> Option<Ve
 }
 
 fn xlsx_chart_latin_typeface(chart_space: &c::ChartSpace) -> Option<&str> {
-  for properties in [
-    chart_space.text_properties.as_deref(),
-    chart_space
-      .chart
-      .title
-      .as_deref()
-      .and_then(|title| title.text_properties.as_deref()),
-    chart_space
-      .chart
-      .legend
-      .as_deref()
-      .and_then(|legend| legend.text_properties.as_deref()),
-  ]
-  .into_iter()
-  .flatten()
-  {
-    if let Some(typeface) = chart_text_properties_latin_typeface(properties) {
-      return Some(typeface);
-    }
-  }
+  // ChartSpace defaults flow down to the individual chart elements. A local
+  // title, legend or axis font never supplies defaults to its siblings.
+  // Native independent-font controls also retain their original plot bands.
   chart_space
-    .chart
-    .plot_area
-    .plot_area_choice2
-    .iter()
-    .find_map(|axis| {
-      let properties = match axis {
-        c::PlotAreaChoice2::ValueAxis(axis) => axis.text_properties.as_deref(),
-        c::PlotAreaChoice2::CategoryAxis(axis) => axis.text_properties.as_deref(),
-        c::PlotAreaChoice2::DateAxis(axis) => axis.text_properties.as_deref(),
-        c::PlotAreaChoice2::SeriesAxis(axis) => axis.text_properties.as_deref(),
-      }?;
-      chart_text_properties_latin_typeface(properties)
-    })
+    .text_properties
+    .as_deref()
+    .and_then(chart_text_properties_latin_typeface)
 }
 
 fn chart_text_properties_latin_typeface(properties: &c::TextProperties) -> Option<&str> {
@@ -12417,12 +14566,12 @@ fn render_drawing_rich_text(
     .iter()
     .map(|line| {
       if line.portions.is_empty() {
-        drawing_text_line_height(&line.fallback_style)
+        drawing_text_line_height(&line.fallback_style, &mut text_metrics)
       } else {
         line
           .portions
           .iter()
-          .map(|(_, style)| drawing_text_line_height(style))
+          .map(|(_, style)| drawing_text_line_height(style, &mut text_metrics))
           .fold(1.0_f32, f32::max)
       }
     })
@@ -12572,8 +14721,8 @@ fn render_drawing_text(
   let layout = layout.unwrap_or_default();
   let vertical_rotation_deg = configure_drawing_text_style(&mut style, layout);
   let vertical_text = vertical_rotation_deg != 0.0;
-  let line_height = drawing_text_line_height(&style);
   let mut text_metrics = TextMetrics::new();
+  let line_height = drawing_text_line_height(&style, &mut text_metrics);
   let available_width = if vertical_text {
     (rect.height_pt - layout.top_inset_pt - layout.bottom_inset_pt).max(0.0)
   } else {
@@ -12679,8 +14828,8 @@ fn configure_drawing_text_style(style: &mut TextStyle, layout: DrawingTextLayout
   vertical_rotation_deg
 }
 
-fn drawing_text_line_height(style: &TextStyle) -> f32 {
-  super::worksheet::printer_font_vertical_metrics(style, 0)
+fn drawing_text_line_height(style: &TextStyle, text_metrics: &mut TextMetrics) -> f32 {
+  super::worksheet::printer_font_vertical_metrics(style, 0, text_metrics)
     .map(|metrics| {
       (metrics.height_px() + metrics.external_leading_px) * units::POINTS_PER_INCH
         / units::OFFICE_FIXED_OUTPUT_DPI
@@ -13095,7 +15244,7 @@ fn vml_anchor_x(
     col: col.saturating_add(1),
     row: 1,
   });
-  let x = cell.x_pt + sheet.vml_anchor_offset_pt(shape, offset_px);
+  let x = cell.x_pt + sheet.vml_anchor_offset_pt(shape, offset_px, true);
   x.min(next_cell.x_pt - units::twips_to_points(1.0))
 }
 
@@ -13111,7 +15260,7 @@ fn vml_anchor_y(
     col: 1,
     row: row.saturating_add(1),
   });
-  let y = cell.y_pt + sheet.vml_anchor_offset_pt(shape, offset_px);
+  let y = cell.y_pt + sheet.vml_anchor_offset_pt(shape, offset_px, false);
   y.min(next_cell.y_pt - units::twips_to_points(1.0))
 }
 
@@ -13204,7 +15353,7 @@ fn fixed_output_vml_anchor_x(
   let col = zero_based_col.saturating_add(1);
   let base = sheet.fixed_output_column_offset_pt(col, scale);
   let next = sheet.fixed_output_column_offset_pt(col.saturating_add(1), scale);
-  let x = base + sheet.vml_anchor_offset_pt(shape, offset_px) * scale;
+  let x = base + sheet.vml_anchor_offset_pt(shape, offset_px, true) * scale;
   x.min(next - units::twips_to_points(1.0) * scale)
 }
 
@@ -13218,7 +15367,7 @@ fn fixed_output_vml_anchor_y(
   let row = zero_based_row.saturating_add(1);
   let base = sheet.fixed_output_row_offset_pt(row, scale);
   let next = sheet.fixed_output_row_offset_pt(row.saturating_add(1), scale);
-  let y = base + sheet.vml_anchor_offset_pt(shape, offset_px) * scale;
+  let y = base + sheet.vml_anchor_offset_pt(shape, offset_px, false) * scale;
   y.min(next - units::twips_to_points(1.0) * scale)
 }
 
@@ -13453,35 +15602,31 @@ struct XlsxImageEffectColorResolver<'a> {
 
 impl XlsxImageEffectColorResolver<'_> {
   fn resolve(&self, color: Option<Color>) -> Option<ResolvedEffectColor> {
-    if let Some(chart_resource) = self.chart_resource {
-      let color = xlsx_chart_resolved_color_with_placeholder_policy(
+    let color = if let Some(chart_resource) = self.chart_resource {
+      xlsx_chart_resolved_color_with_placeholder_policy(
         color?,
         self.import,
         chart_resource,
         self.placeholder_color.as_ref(),
         false,
-      )?;
-      // Office chart shadow controls round the final effect opacity to A8.
-      // Passing through the ordinary paint color truncates 43.137% to 109
-      // instead of 110 and makes the entire blurred shadow too light.
-      return Some(ResolvedEffectColor {
-        color: RgbColor {
-          r: color.r,
-          g: color.g,
-          b: color.b,
-        },
-        alpha: ((color.alpha.clamp(0, 100_000) as u32 * 255 + 50_000) / 100_000) as u8,
-      });
-    }
-    let color =
-      xlsx_drawing_color_with_placeholder(color?, self.import, self.placeholder_color.as_ref())?;
+      )?
+    } else {
+      xlsx_drawing_resolved_color_with_placeholder(
+        color?,
+        self.import,
+        self.placeholder_color.as_ref(),
+      )?
+    };
+    // Native chart and picture shadow controls round effect opacity to A8.
+    // Ordinary drawing paint truncates instead; preserve the percentage until
+    // this effect boundary so 43% and 50% become 110 and 128, respectively.
     Some(ResolvedEffectColor {
       color: RgbColor {
         r: color.r,
         g: color.g,
         b: color.b,
       },
-      alpha: color.a,
+      alpha: ((color.alpha.clamp(0, 100_000) as u32 * 255 + 50_000) / 100_000) as u8,
     })
   }
 }
@@ -13972,6 +16117,20 @@ fn xlsx_drawing_color_with_placeholder(
   import: &ExcelImport,
   placeholder_color: Option<&Color>,
 ) -> Option<common::Color> {
+  let color = xlsx_drawing_resolved_color_with_placeholder(color, import, placeholder_color)?;
+  Some(common::Color {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
+  })
+}
+
+fn xlsx_drawing_resolved_color_with_placeholder(
+  color: Color,
+  import: &ExcelImport,
+  placeholder_color: Option<&Color>,
+) -> Option<ResolvedColor> {
   let mut scheme_resolver = |value| {
     let index = xlsx_scheme_color_index(value)?;
     let color = import.styles.theme_color(index, 0.0)?;
@@ -13980,13 +16139,7 @@ fn xlsx_drawing_color_with_placeholder(
       transformations: Vec::new(),
     }))
   };
-  let color = color.resolve_rgb(&mut scheme_resolver, placeholder_color)?;
-  Some(common::Color {
-    r: color.r,
-    g: color.g,
-    b: color.b,
-    a: ((color.alpha.clamp(0, 100_000) as u32 * u32::from(u8::MAX)) / 100_000) as u8,
-  })
+  color.resolve_rgb(&mut scheme_resolver, placeholder_color)
 }
 
 fn xlsx_drawing_rgb_color(color: Color, import: &ExcelImport) -> Option<RgbColor> {
@@ -14078,6 +16231,9 @@ fn anchor_rect_in_coordinate_space_pt(
       let from = anchor.from.as_ref()?;
       let (x, y) = marker_position(from);
       let (cx, cy) = anchor.extent?;
+      // Native Arial printer controls give one-cell and two-cell pictures
+      // the same mapped start marker. Only a one-cell picture retains its
+      // explicit EMU extent; it does not contract with the containing cells.
       Some((x, y, length_pt(cx), length_pt(cy)))
     }
     super::drawing::DrawingAnchorKind::Absolute => {
@@ -14367,10 +16523,16 @@ fn render_header_footer_line(
       })
       .collect::<Vec<_>>();
     for line in &mut lines {
-      for run in line {
+      for run in line.iter_mut() {
         run.style.font_size_pt =
           fixed_output_header_font_size_pt(run.style.font_size_pt, font_scale);
       }
+      trim_header_footer_line_end_spaces(line);
+    }
+    if lines.len() == 1
+      && render_plain_header_footer_line(items, &lines[0], &context, align, text_metrics)
+    {
+      continue;
     }
     let line_heights = lines
       .iter()
@@ -14429,6 +16591,74 @@ fn render_header_footer_line(
   }
 }
 
+fn render_plain_header_footer_line(
+  items: &mut Vec<PageItem>,
+  line: &[HeaderFooterTextRun],
+  context: &HeaderFooterRenderContext<'_, '_>,
+  align: HeaderFooterAlign,
+  text_metrics: &mut TextMetrics,
+) -> bool {
+  let [run] = line else {
+    return false;
+  };
+  // Native descriptor/colour/line controls distinguish the uniform GDI
+  // path from edit layout. Keep complex text and italic portions on the
+  // existing path until their own printer contracts are established.
+  if !run.text.is_ascii() || run.style.italic {
+    return false;
+  }
+  let Some(metrics) = super::worksheet::printer_font_vertical_metrics(&run.style, 0, text_metrics)
+  else {
+    return false;
+  };
+  let measurement_style = fixed_output_gdi_base_cell_text_style(&run.style);
+  let Some(extent) = text_metrics.gdi_printer_text_extents_pt(
+    &run.text,
+    &measurement_style,
+    units::OFFICE_FIXED_OUTPUT_DPI,
+  ) else {
+    return false;
+  };
+  let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  let setup = context.setup;
+  let (left, right) = header_footer_horizontal_edges(
+    setup,
+    context.page.page_settings.header_footer.align_with_margins,
+  );
+  let width = extent.unpositioned_width_pt;
+  let x = match align {
+    HeaderFooterAlign::Left => left + 8.0 * dot,
+    HeaderFooterAlign::Center => (setup.width_pt - width - 8.0 * dot) / 2.0,
+    HeaderFooterAlign::Right => right - width - 8.0 * dot,
+  };
+  // Native single-portion baselines use the realized GDI metrics and fixed
+  // printer bands, independently of tight glyph boxes. The 8/15-dot bands
+  // hold across font sizes, header/footer distances and mapped/native paper.
+  let baseline = if context.header {
+    setup.header_distance_pt + (metrics.ascent_px + metrics.external_leading_px + 8.0) * dot
+  } else {
+    setup.height_pt - setup.footer_distance_pt - (metrics.descent_px + 15.0) * dot
+  };
+  let line_height = text_metrics.inline_text_box_height(&run.style);
+  let baseline_offset = if run.style.use_windows_font_metrics {
+    text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+      &run.text,
+      &run.style,
+      line_height,
+    )
+  } else {
+    text_metrics.baseline_offset_in_line_for_text(&run.text, &run.style, line_height)
+  };
+  items.push(styled_header_text_with_line_height(
+    x,
+    baseline - baseline_offset,
+    run.text.clone(),
+    run.style.clone(),
+    line_height,
+  ));
+  true
+}
+
 fn fixed_output_header_font_size_pt(size_pt: f32, scale: f32) -> f32 {
   // Excel scales header/footer point sizes through an integral twip before
   // creating the printer font. Office's 48-size matrix at 45/71/90/100%
@@ -14449,7 +16679,7 @@ fn fixed_output_header_line_advance_pt(
   // Header/footer baseline intervals use the realized font line grid, not
   // the tight glyph box. Independent plain/Regular/Gras controls all retain
   // Arial 10 intervals of 12.36pt at 100% and 8.76pt at 71%.
-  let height = super::worksheet::printer_font_line_height_pt(style, 0)
+  let height = super::worksheet::printer_font_line_height_pt(style, 0, text_metrics)
     .unwrap_or_else(|| text_metrics.inline_text_box_height(style));
   units::quantize_points_to_office_print_grid(height * scale)
 }
@@ -14511,8 +16741,10 @@ fn push_header_footer_section(
   buffer: &mut String,
 ) {
   if !buffer.is_empty() {
-    output.push((align, buffer.trim().to_string()));
-    buffer.clear();
+    // Leading/trailing line breaks are authored empty lines. In particular,
+    // a footer's final empty line contributes its inherited font height to
+    // the bottom-aligned block; trimming it moves every visible line down.
+    output.push((align, std::mem::take(buffer)));
   }
 }
 
@@ -14532,6 +16764,20 @@ struct HeaderFooterFieldValues<'a> {
 struct HeaderFooterTextRun {
   text: String,
   style: TextStyle,
+}
+
+fn trim_header_footer_line_end_spaces(line: &mut [HeaderFooterTextRun]) {
+  // Native paired footer controls retain inter-run spaces but omit every
+  // terminal space from both the PDF payload and the aligned line width.
+  // Keep empty runs and their styles: font metrics and authored empty lines
+  // own vertical spacing even when they have no painted characters.
+  for run in line.iter_mut().rev() {
+    let length = run.text.trim_end_matches(' ').len();
+    run.text.truncate(length);
+    if !run.text.is_empty() {
+      break;
+    }
+  }
 }
 
 fn split_header_footer_lines(runs: Vec<HeaderFooterTextRun>) -> Vec<Vec<HeaderFooterTextRun>> {
@@ -14703,6 +16949,362 @@ mod drawing_page_tests {
   use super::*;
 
   #[test]
+  fn printer_checkbox_bitmap_matches_native_bilinear_phases() {
+    // Native BGRA captures, including the 37.5 -> 38 half-up corner and
+    // the different transparent-border phase of the shorter second host.
+    let cases = [
+      (
+        (157, 114, 24, 17),
+        6,
+        ["233331", "455551", "455551", "455551", "455551", "111111"],
+        [
+          [0, 0, 0, 0],
+          [0, 0, 0, 255],
+          [38, 38, 38, 255],
+          [60, 60, 60, 255],
+          [159, 159, 159, 255],
+          [255, 255, 255, 255],
+        ],
+      ),
+      (
+        (155, 108, 24, 16),
+        5,
+        ["111111", "344442", "344442", "344442", "344442", "344442"],
+        [
+          [0, 0, 0, 0],
+          [0, 0, 0, 191],
+          [85, 85, 85, 255],
+          [96, 96, 96, 255],
+          [255, 255, 255, 255],
+          [0, 0, 0, 0],
+        ],
+      ),
+    ];
+    for ((sw, sh, width, height), top, rows, palette) in cases {
+      let actual = vml_checkbox_printer_bitmap(sw, sh, sh + 1, width, height, 255, false).unwrap();
+      for (x, y, pixel) in actual.enumerate_pixels() {
+        let index = if (3..9).contains(&x) && (top..top + 6).contains(&y) {
+          usize::from(rows[(y - top) as usize].as_bytes()[(x - 3) as usize] - b'0')
+        } else {
+          0
+        };
+        assert_eq!(pixel.0, palette[index], "source={sw}x{sh} at ({x},{y})");
+      }
+    }
+  }
+
+  #[test]
+  fn printer_checkbox_mixed_fill_matches_native_at_two_print_scales() {
+    // COM Mixed controls at 47/100% retain the same 155x113 source surface.
+    // Only the 32x32 interior changes from white to gray 128. These native
+    // final samples also cover the missing top border at the coarser grid.
+    let cases = [
+      (
+        (23, 16),
+        (3, 6),
+        ["222221", "222221", "222221", "222221", "222221"].as_slice(),
+        [[0, 0, 0, 0], [0, 0, 0, 255], [128, 128, 128, 255]].as_slice(),
+      ),
+      (
+        (49, 36),
+        (5, 12),
+        [
+          "1222222222222",
+          "1233333333332",
+          "1244444444442",
+          "1244444444442",
+          "1244444444442",
+          "1244444444442",
+          "1244444444442",
+          "1244444444442",
+          "1244444444442",
+          "1244444444442",
+          "1244444444442",
+          "1233333333332",
+          "1222222222222",
+        ]
+        .as_slice(),
+        [
+          [0, 0, 0, 0],
+          [0, 0, 0, 208],
+          [0, 0, 0, 255],
+          [103, 103, 103, 255],
+          [128, 128, 128, 255],
+        ]
+        .as_slice(),
+      ),
+    ];
+    for ((width, height), (left, top), rows, palette) in cases {
+      let actual = vml_checkbox_printer_bitmap(155, 113, 114, width, height, 128, false).unwrap();
+      let unchecked =
+        vml_checkbox_printer_bitmap(155, 113, 114, width, height, 255, false).unwrap();
+      for (x, y, pixel) in actual.enumerate_pixels() {
+        let index = if (left..left + rows[0].len() as u32).contains(&x)
+          && (top..top + rows.len() as u32).contains(&y)
+        {
+          usize::from(rows[(y - top) as usize].as_bytes()[(x - left) as usize] - b'0')
+        } else {
+          0
+        };
+        assert_eq!(
+          pixel.0, palette[index],
+          "output={width}x{height} at ({x},{y})"
+        );
+        assert_eq!(pixel[3], unchecked.get_pixel(x, y)[3]);
+      }
+    }
+  }
+
+  #[test]
+  fn printer_checkbox_checked_glyph_matches_complete_native_rgba_at_two_scales() {
+    // Independently captured Office state controls, including every final
+    // RGBA sample. The source is155x113 at both47/100% print scales.
+    let cases = [
+      (
+        (23, 16),
+        (3, 6),
+        ["222220", "222220", "212020", "220220", "222220"].as_slice(),
+        [[0, 0, 0, 255], [133, 133, 133, 255], [255, 255, 255, 255]].as_slice(),
+      ),
+      (
+        (49, 36),
+        (5, 12),
+        [
+          "0111111111111",
+          "0188888888881",
+          "01dddddddddd1",
+          "01dddddddbdd1",
+          "01dddddd91dd1",
+          "01dddddd15dd1",
+          "01dd7dd21ddd1",
+          "01dd14d1dddd1",
+          "01dda131dddd1",
+          "01ddd61cdddd1",
+          "01dddddddddd1",
+          "0188888888881",
+          "0111111111111",
+        ]
+        .as_slice(),
+        [
+          [0, 0, 0, 208],
+          [0, 0, 0, 255],
+          [10, 10, 10, 255],
+          [12, 12, 12, 255],
+          [58, 58, 58, 255],
+          [73, 73, 73, 255],
+          [86, 86, 86, 255],
+          [128, 128, 128, 255],
+          [205, 205, 205, 255],
+          [224, 224, 224, 255],
+          [228, 228, 228, 255],
+          [234, 234, 234, 255],
+          [254, 254, 254, 255],
+          [255, 255, 255, 255],
+        ]
+        .as_slice(),
+      ),
+    ];
+    for ((width, height), (left, top), rows, palette) in cases {
+      let actual = vml_checkbox_printer_bitmap(155, 113, 114, width, height, 255, true).unwrap();
+      let unchecked =
+        vml_checkbox_printer_bitmap(155, 113, 114, width, height, 255, false).unwrap();
+      for (x, y, pixel) in actual.enumerate_pixels() {
+        let expected = if (left..left + rows[0].len() as u32).contains(&x)
+          && (top..top + rows.len() as u32).contains(&y)
+        {
+          let index = char::from(rows[(y - top) as usize].as_bytes()[(x - left) as usize])
+            .to_digit(16)
+            .unwrap() as usize;
+          palette[index]
+        } else {
+          [0, 0, 0, 0]
+        };
+        assert_eq!(pixel.0, expected, "output={width}x{height} at({x},{y})");
+        assert_eq!(pixel[3], unchecked.get_pixel(x, y)[3]);
+      }
+    }
+  }
+
+  #[test]
+  fn printer_checkbox_unit_scale_matches_native_height_and_state_controls() {
+    // Six complete native RGBA payloads from three independently opened
+    // implicit-100% controls: to-marker heights -1/0/+1 worksheet pixel,
+    // each unchecked/checked. The painter RECT is not enlarged by a dot.
+    let cases = [
+      (
+        (129, 116, 116, 20, 18, false),
+        (3, 6),
+        [
+          "222222", "355554", "355554", "355554", "355554", "355554", "111111",
+        ]
+        .as_slice(),
+        [
+          [0, 0, 0, 0],
+          [0, 0, 0, 170],
+          [0, 0, 0, 255],
+          [89, 89, 89, 255],
+          [102, 102, 102, 255],
+          [255, 255, 255, 255],
+        ]
+        .as_slice(),
+      ),
+      (
+        (129, 116, 116, 20, 18, true),
+        (3, 6),
+        [
+          "222222", "366664", "366624", "366264", "362564", "366664", "111111",
+        ]
+        .as_slice(),
+        [
+          [0, 0, 0, 0],
+          [0, 0, 0, 170],
+          [0, 0, 0, 255],
+          [89, 89, 89, 255],
+          [102, 102, 102, 255],
+          [213, 213, 213, 255],
+          [255, 255, 255, 255],
+        ]
+        .as_slice(),
+      ),
+      (
+        (129, 119, 119, 20, 19, false),
+        (3, 7),
+        ["244443", "244443", "244443", "244443", "244443", "111111"].as_slice(),
+        [
+          [0, 0, 0, 0],
+          [0, 0, 0, 255],
+          [89, 89, 89, 255],
+          [102, 102, 102, 255],
+          [255, 255, 255, 255],
+        ]
+        .as_slice(),
+      ),
+      (
+        (129, 119, 119, 20, 19, true),
+        (3, 7),
+        ["377774", "377714", "377674", "372174", "375774", "111111"].as_slice(),
+        [
+          [0, 0, 0, 0],
+          [0, 0, 0, 255],
+          [64, 64, 64, 255],
+          [89, 89, 89, 255],
+          [102, 102, 102, 255],
+          [171, 171, 171, 255],
+          [189, 189, 189, 255],
+          [255, 255, 255, 255],
+        ]
+        .as_slice(),
+      ),
+      (
+        (129, 121, 121, 20, 19, false),
+        (3, 7),
+        ["244443", "244443", "244443", "244443", "244443", "111111"].as_slice(),
+        [
+          [0, 0, 0, 0],
+          [0, 0, 0, 255],
+          [89, 89, 89, 255],
+          [102, 102, 102, 255],
+          [255, 255, 255, 255],
+        ]
+        .as_slice(),
+      ),
+      (
+        (129, 121, 121, 20, 19, true),
+        (3, 7),
+        ["488885", "488825", "488785", "483185", "486885", "111111"].as_slice(),
+        [
+          [0, 0, 0, 0],
+          [0, 0, 0, 255],
+          [13, 13, 13, 255],
+          [64, 64, 64, 255],
+          [89, 89, 89, 255],
+          [102, 102, 102, 255],
+          [195, 195, 195, 255],
+          [199, 199, 199, 255],
+          [255, 255, 255, 255],
+        ]
+        .as_slice(),
+      ),
+    ];
+    for ((sw, sh, painter_height, width, height, checked), (left, top), rows, palette) in cases {
+      let actual =
+        vml_checkbox_printer_bitmap(sw, sh, painter_height, width, height, 255, checked).unwrap();
+      for (x, y, pixel) in actual.enumerate_pixels() {
+        let index = if (left..left + rows[0].len() as u32).contains(&x)
+          && (top..top + rows.len() as u32).contains(&y)
+        {
+          char::from(rows[(y - top) as usize].as_bytes()[(x - left) as usize])
+            .to_digit(16)
+            .unwrap() as usize
+        } else {
+          0
+        };
+        assert_eq!(
+          pixel.0, palette[index],
+          "source={sw}x{sh}, checked={checked}, ({x},{y})"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn printer_checkbox_area_sampler_matches_native_density_width_and_state_controls() {
+    // Native complete-RGBA FNV-1a vectors: Print/Screen x2 control widths
+    // x3 COM-verified states. The large source selects the Q16 area path;
+    // partial interior alpha also pins the ARGB/matte truncation boundary.
+    let cases = [
+      (922, 302, 302, 307, 100, 0, 0x39fade5c270b512d_u64),
+      (922, 302, 302, 307, 100, 1, 0x1d38521321f106c4_u64),
+      (922, 302, 302, 307, 100, 2, 0xfba8b96b47860675_u64),
+      (928, 302, 302, 309, 100, 0, 0x7335e8b20448f42d_u64),
+      (928, 302, 302, 309, 100, 1, 0x25e960959de3b812_u64),
+      (928, 302, 302, 309, 100, 2, 0xc239e7a8f3339ab5_u64),
+      (922, 302, 302, 147, 48, 0, 0x754ffd5b95722a95_u64),
+      (922, 302, 302, 147, 48, 1, 0xc82f5174920c26ab_u64),
+      (922, 302, 302, 147, 48, 2, 0xe7f2d555e2086d55_u64),
+      (928, 302, 302, 148, 48, 0, 0xc4e7ec6303be2a55_u64),
+      (928, 302, 302, 148, 48, 1, 0x11bc0088c1c9a979_u64),
+      (928, 302, 302, 148, 48, 2, 0x92516c0651a474e5_u64),
+    ];
+    for (sw, sh, painter_height, width, height, state, expected) in cases {
+      let image = vml_checkbox_printer_bitmap(
+        sw,
+        sh,
+        painter_height,
+        width,
+        height,
+        if state == 2 { 128 } else { 255 },
+        state == 1,
+      )
+      .unwrap();
+      let actual = image
+        .as_raw()
+        .iter()
+        .fold(0xcbf29ce484222325_u64, |hash, byte| {
+          (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+        });
+      assert_eq!(
+        actual, expected,
+        "source={sw}x{sh}, target={width}x{height}, state={state}"
+      );
+    }
+  }
+
+  #[test]
+  fn printer_checkbox_resampling_uses_physical_extent_and_dpi_threshold() {
+    assert_eq!(vml_printer_checkbox_output_pixels(157, 8.742, 200), 24);
+    assert_eq!(vml_printer_checkbox_output_pixels(114, 6.3732, 200), 17);
+    assert_eq!(vml_printer_checkbox_output_pixels(108, 6.0348, 200), 16);
+    // Screen quality owns the direct source-to-final sample count. These
+    // physical extents are the independent tdf161365 checkbox frame.
+    assert_eq!(vml_printer_checkbox_output_pixels(129, 15.48, 96), 20);
+    assert_eq!(vml_printer_checkbox_output_pixels(119, 14.28, 96), 19);
+    // Each axis retains the source at or below the configured threshold.
+    assert_eq!(vml_printer_checkbox_output_pixels(275, 72.0, 200), 275);
+    assert_eq!(vml_printer_checkbox_output_pixels(276, 72.0, 200), 200);
+  }
+
+  #[test]
   fn drawing_text_run_must_reach_the_print_clip_after_entering_the_physical_page() {
     let physical_page = CellRect {
       x_pt: 0.0,
@@ -14858,7 +17460,7 @@ mod drawing_page_tests {
   }
 
   #[test]
-  fn chart_effect_opacity_preserves_native_alpha_rounding() {
+  fn drawing_and_chart_effect_opacity_preserves_native_alpha_rounding() {
     use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
     use ooxmlsdk::sdk::{SdkType, SpreadsheetDocumentType};
 
@@ -14875,19 +17477,80 @@ mod drawing_page_tests {
     let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
     let resource = super::super::drawing::ChartResourceCatalog::default();
     let images = HashMap::new();
-    let resolver = XlsxImageEffectColorResolver {
-      import: &import,
-      image_resources: &images,
-      chart_resource: Some(&resource),
-      placeholder_color: None,
-    };
-    let shadow = a::OuterShadow::from_bytes(
-      br#"<a:outerShdw xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" blurRad="63500" dist="25400" dir="5400000"><a:srgbClr val="000000"><a:alpha val="43137"/></a:srgbClr></a:outerShdw>"#,
-    ).unwrap();
-    let color = resolver
-      .outer_shadow(shadow.outer_shadow_choice.as_ref().unwrap())
-      .unwrap();
-    assert_eq!(color.alpha, 110);
+    for chart_resource in [None, Some(&resource)] {
+      let resolver = XlsxImageEffectColorResolver {
+        import: &import,
+        image_resources: &images,
+        chart_resource,
+        placeholder_color: None,
+      };
+      // Picture controls use six independent authored opacities, with and
+      // without blur. Keep the original 43.137% chart control as well.
+      for (alpha, expected) in [
+        (10_000, 26),
+        (25_000, 64),
+        (43_000, 110),
+        (43_137, 110),
+        (50_000, 128),
+        (75_000, 191),
+        (100_000, 255),
+      ] {
+        let xml = format!(
+          r#"<a:outerShdw xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" blurRad="63500" dist="25400" dir="5400000"><a:srgbClr val="000000"><a:alpha val="{alpha}"/></a:srgbClr></a:outerShdw>"#
+        );
+        let shadow = a::OuterShadow::from_bytes(xml.as_bytes()).unwrap();
+        let choice = shadow.outer_shadow_choice.as_ref().unwrap();
+        let color = resolver.outer_shadow(choice).unwrap();
+        assert_eq!(
+          color.alpha,
+          expected,
+          "alpha={alpha}, chart={}",
+          chart_resource.is_some()
+        );
+        // The effect repair must not change ordinary drawing paint opacity.
+        let paint =
+          xlsx_drawing_color(Color::from_outer_shadow_choice(choice).unwrap(), &import).unwrap();
+        assert_eq!(paint.a, ((alpha * 255) / 100_000) as u8);
+      }
+    }
+  }
+
+  #[test]
+  fn local_chart_fonts_do_not_supply_chart_space_defaults() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let local = r#"<c:txPr><a:bodyPr/><a:p><a:pPr><a:defRPr>
+      <a:latin typeface="Arial"/></a:defRPr></a:pPr></a:p></c:txPr>"#;
+    let global = local.replace("Arial", "Times New Roman");
+    for role in ["title", "legend", "catAx", "valAx"] {
+      let element = if role.ends_with("Ax") {
+        let position = if role == "catAx" { "b" } else { "l" };
+        format!(
+          r#"<c:{role}><c:axId val="1"/><c:scaling/><c:axPos val="{position}"/>
+          {local}<c:crossAx val="2"/></c:{role}>"#
+        )
+      } else {
+        format!("<c:{role}>{local}</c:{role}>")
+      };
+      for inherited in [false, true] {
+        let source = format!(
+          r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <c:chart>{title}<c:plotArea>{axis}</c:plotArea>{legend}</c:chart>
+          {global}</c:chartSpace>"#,
+          title = if role == "title" { &element } else { "" },
+          axis = if role.ends_with("Ax") { &element } else { "" },
+          legend = if role == "legend" { &element } else { "" },
+          global = if inherited { &global } else { "" },
+        );
+        let chart = c::ChartSpace::from_bytes(source.as_bytes()).unwrap();
+        assert_eq!(
+          xlsx_chart_latin_typeface(&chart),
+          inherited.then_some("Times New Roman"),
+          "role={role}, inherited={inherited}"
+        );
+      }
+    }
   }
 
   #[test]
@@ -15451,6 +18114,888 @@ mod drawing_page_tests {
   }
 
   #[test]
+  fn scaled_printer_baselines_compose_rounded_height_and_lower_extent() {
+    // Independent Office A4 controls: font11/13, regular/bold,59/100%.
+    // Each vector is the first baseline relative to the same cell grid.
+    let variants = [
+      (11.0, false, 0.59),
+      (11.0, false, 1.0),
+      (11.0, true, 0.59),
+      (11.0, true, 1.0),
+      (13.0, false, 0.59),
+      (13.0, false, 1.0),
+      (13.0, true, 0.59),
+      (13.0, true, 1.0),
+    ];
+    for (family, baselines) in [
+      ("Arial", [54.0, 90.0, 57.0, 93.0, 64.0, 105.0, 65.0, 108.0]),
+      (
+        "Times New Roman",
+        [54.0, 90.0, 55.0, 92.0, 64.0, 106.0, 66.0, 108.0],
+      ),
+      (
+        "Calibri",
+        [56.0, 92.0, 56.0, 92.0, 65.0, 107.0, 65.0, 107.0],
+      ),
+      (
+        "Cambria",
+        [55.0, 91.0, 55.0, 91.0, 65.0, 107.0, 65.0, 107.0],
+      ),
+    ] {
+      for ((font_size_pt, bold, print_scale), expected) in variants.into_iter().zip(baselines) {
+        let actual = cell_text_scaled_printer_baseline_offset_px(
+          &CellFontPrintContext {
+            style: TextStyle {
+              font_family: Some(Arc::from(family)),
+              font_size_pt,
+              bold,
+              ..Default::default()
+            },
+            print_scale,
+          },
+          &mut TextMetrics::new(),
+        )
+        .unwrap();
+        assert_eq!(
+          4.0 + actual,
+          expected,
+          "{family} {font_size_pt} bold={bold} scale={print_scale}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn merged_center_text_uses_the_authored_row_origin() {
+    // Native paired controls keep identical green row endpoints. Across
+    // regular/bold and47/100%, horizontal, vertical and two-axis merges move
+    // the formatter origin up four600dpi dots. A hidden anchor row retains
+    // the same vertical-merge owner as a visible one.
+    for (size, bold) in [
+      (6.6, false),
+      (6.6, true),
+      (14.0, false),
+      (14.0, true),
+      (6.36, false),
+      (6.36, true),
+      (13.44, false),
+      (13.44, true),
+    ] {
+      let style = TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        font_size_pt: size,
+        bold,
+        ..Default::default()
+      };
+      let cell = CellRect {
+        x_pt: 30.0,
+        y_pt: 72.0,
+        width_pt: 180.0,
+        height_pt: 40.0,
+      };
+      let mut metrics = TextMetrics::new();
+      let mut baselines = Vec::new();
+      for (horizontally_merged, vertically_merged) in
+        [(false, false), (true, false), (false, true), (true, true)]
+      {
+        let alignment = Some(super::super::styles::AlignmentRecord {
+          vertical: Some(x::VerticalAlignmentValues::Center),
+          ..Default::default()
+        });
+        let mut items = Vec::new();
+        render_cell_text(
+          &mut items,
+          "Hxgj",
+          cell,
+          style.clone(),
+          CellTextRenderOptions {
+            auxiliary_line_break_font: None,
+            alignment,
+            horizontal_alignment: x::HorizontalAlignmentValues::Left,
+            hyperlink_url: None,
+            formula: false,
+            default_line_height_pt: 18.0,
+            font_print_context: None,
+            clip_wrapped_text: false,
+            has_outer_border: false,
+            track_printer_line_extents: false,
+          },
+          &mut metrics,
+        );
+        align_excel_printer_cell_text_vertically(
+          &mut items,
+          ExcelCellVerticalAlignmentContext {
+            alignment,
+            cell,
+            page: cell,
+            vertically_merged,
+            horizontally_merged,
+            normal_descent_px: 20.0,
+            grid_profile: ExcelCellBaselineGrid::ExplicitNormalFont,
+            row_lower_extent: None,
+            top_baseline_offset_px: None,
+            merged_last_line_lower_px: None,
+          },
+          &mut metrics,
+        );
+        let [PageItem::Text(text)] = items.as_slice() else {
+          panic!("one text line expected");
+        };
+        baselines.push(
+          text.y_pt
+            + metrics.baseline_offset_in_line_for_text(
+              &text.text,
+              &text.style,
+              text.line_height_pt,
+            ),
+        );
+      }
+      for merged_baseline in &baselines[1..] {
+        assert!((baselines[0] - merged_baseline - 0.48).abs() < 1.0e-4);
+      }
+    }
+  }
+
+  fn centered_rich_native_test_baselines(
+    family: &str,
+    bold: bool,
+    runs: &[super::super::workbook::SharedStringRun],
+    scale: f32,
+    merged: bool,
+  ) -> (CellCenteredEditBlock, Vec<f32>) {
+    let nominal = TextStyle {
+      font_family: Some(Arc::from(family)),
+      font_size_pt: 14.0,
+      bold,
+      ..Default::default()
+    };
+    let mut printed = nominal.clone();
+    super::super::text::scale_text_style_for_fixed_output(&mut printed, scale);
+    let cell = CellRect {
+      x_pt: 54.0,
+      y_pt: 72.0,
+      width_pt: 166.08,
+      height_pt: if scale < 1.0 { 18.24 } else { 38.76 },
+    };
+    let mut metrics = TextMetrics::new();
+    let mut items = Vec::new();
+    let result = render_cell_rich_text(
+      &mut items,
+      runs,
+      cell,
+      printed,
+      CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        alignment: Some(super::super::styles::AlignmentRecord {
+          vertical: Some(x::VerticalAlignmentValues::Center),
+          wrap_text: true,
+          ..Default::default()
+        }),
+        horizontal_alignment: x::HorizontalAlignmentValues::Left,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 18.0,
+        font_print_context: Some(CellFontPrintContext {
+          style: nominal,
+          print_scale: scale,
+        }),
+        clip_wrapped_text: false,
+        has_outer_border: false,
+        track_printer_line_extents: true,
+      },
+      scale,
+      &mut metrics,
+    );
+    let block = result.centered_edit_block.expect("native printer block");
+    assert!(align_excel_printer_centered_edit_text(
+      &mut items,
+      cell,
+      cell,
+      merged,
+      block,
+      &mut metrics,
+    ));
+    let baselines = items
+      .iter()
+      .map(|item| {
+        let PageItem::Text(text) = item else {
+          panic!("text portion expected");
+        };
+        text.y_pt
+          + metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt)
+      })
+      .collect();
+    (block, baselines)
+  }
+
+  #[test]
+  fn bottom_wrapped_rich_lines_keep_native_printer_baseline_intervals() {
+    use super::super::workbook::SharedStringRun;
+
+    // Actual BOTTOM C94/C95 producer arrays: H78/U59 on the first line,
+    // H73/U55 thereafter. The exported baselines are separated by74 then73
+    // dots; natural scalar font boxes shorten the first interval by two dots.
+    for (prefix, body, height, expected) in [
+      (
+        "\u{a0} ",
+        "Si aplican Menores Calificados, seleccione el cuadro debajo de “Mark X if Mother or Father is Claiming Credit” (Marque \n    con una X si la madre o el padre está reclamando el crédito) para indicar cuál padre está reclamando al menor.",
+        17.16,
+        &[74.0][..],
+      ),
+      (
+        "\u{a0}\u{a0}",
+        "Seleccione “X” bajo la columna “Date of Birth” (Fecha de Nacimiento) para “Total number of QUALIFIED children for whom \n    adjustment is being claimed” (Número total de menores CALIFICADOS para quienes se está reclamando un ajuste).  Si el \n    cuadro no muestra una “X,” no ocurrirá un cálculo aquí.",
+        25.68,
+        &[74.0, 73.0][..],
+      ),
+    ] {
+      let runs = [
+        SharedStringRun {
+          text: "·".into(),
+          ..Default::default()
+        },
+        SharedStringRun {
+          text: prefix.into(),
+          has_properties: true,
+          font_family: Some("Times New Roman".into()),
+          font_size_pt: Some(12.0),
+          ..Default::default()
+        },
+        SharedStringRun {
+          text: body.into(),
+          has_properties: true,
+          font_family: Some("Arial".into()),
+          font_size_pt: Some(12.0),
+          ..Default::default()
+        },
+      ];
+      let nominal = TextStyle {
+        font_family: Some(Arc::from("Symbol")),
+        font_size_pt: 12.0,
+        ..Default::default()
+      };
+      let mut printed = nominal.clone();
+      super::super::text::scale_text_style_for_fixed_output(&mut printed, 0.59);
+      let mut metrics = TextMetrics::new();
+      let mut items = Vec::new();
+      let result = render_cell_rich_text(
+        &mut items,
+        &runs,
+        CellRect {
+          x_pt: 80.58,
+          y_pt: 228.12,
+          width_pt: 428.16,
+          height_pt: height,
+        },
+        printed,
+        CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          alignment: Some(super::super::styles::AlignmentRecord {
+            horizontal: Some(x::HorizontalAlignmentValues::Left),
+            wrap_text: true,
+            ..Default::default()
+          }),
+          horizontal_alignment: x::HorizontalAlignmentValues::Left,
+          hyperlink_url: None,
+          formula: false,
+          default_line_height_pt: 8.76,
+          font_print_context: Some(CellFontPrintContext {
+            style: nominal,
+            print_scale: 0.59,
+          }),
+          clip_wrapped_text: true,
+          has_outer_border: false,
+          track_printer_line_extents: true,
+        },
+        0.59,
+        &mut metrics,
+      );
+      assert_eq!(result.last_line_lower_px, Some(18.0));
+      assert!(result.top_edit_first_upper_px.is_none());
+      assert!(result.centered_edit_block.is_none());
+      let mut baselines = items
+        .iter()
+        .filter_map(|item| {
+          let PageItem::Text(text) = item else {
+            return None;
+          };
+          Some(
+            (text.y_pt
+              + metrics.baseline_offset_in_line_for_text(
+                &text.text,
+                &text.style,
+                text.line_height_pt,
+              ))
+              / 0.12,
+          )
+        })
+        .collect::<Vec<_>>();
+      baselines.sort_by(f32::total_cmp);
+      baselines.dedup_by(|a, b| (*a - *b).abs() < 0.001);
+      assert_eq!(baselines.len(), expected.len() + 1);
+      for (pair, expected) in baselines.windows(2).zip(expected) {
+        assert!((pair[1] - pair[0] - expected).abs() < 0.001);
+      }
+    }
+  }
+
+  #[test]
+  fn top_wrapped_rich_lines_use_nominal_printer_extents_for_each_line() {
+    use super::super::workbook::SharedStringRun;
+
+    // Four actual Office producer controls share a941dot formatter origin.
+    // Their first upper/height arrays are59/78,55/73,89/114 and83/109.
+    // Later Arial12 lines retain upper55/height73. Native PDF adds its
+    // independently verified page-frame phase, not part of these cache values.
+    for (flat, bullet_size, space_size, upper, height) in [
+      (false, 12.0, 12.0, 59.0, 78.0),
+      (true, 12.0, 12.0, 55.0, 73.0),
+      (false, 18.0, 12.0, 89.0, 114.0),
+      (false, 12.0, 18.0, 83.0, 109.0),
+    ] {
+      let body = "“Self-Employment income” (Ingresos de trabajo por cuenta propia) se pueden ingresar en \"Schedule A\", Línea 3 o se pueden \n      ingresar y calcular usando la “Self-Employment Calculator” (Calculadora de trabajo por cuenta propia).\n      Haga clic en                              para obtener acceso a la pestaña “Self Employment Calculator” (Calculadora de trabajo por \n      cuenta propia).";
+      let runs = if flat {
+        vec![SharedStringRun {
+          text: format!("·\u{a0}\u{a0} {body}"),
+          has_properties: true,
+          font_family: Some("Arial".into()),
+          font_size_pt: Some(12.0),
+          ..Default::default()
+        }]
+      } else {
+        vec![
+          SharedStringRun {
+            text: "·".into(),
+            has_properties: bullet_size != 12.0,
+            font_family: (bullet_size != 12.0).then(|| "Symbol".into()),
+            font_size_pt: (bullet_size != 12.0).then_some(bullet_size),
+            ..Default::default()
+          },
+          SharedStringRun {
+            text: "\u{a0}\u{a0} ".into(),
+            has_properties: true,
+            font_family: Some("Times New Roman".into()),
+            font_size_pt: Some(space_size),
+            ..Default::default()
+          },
+          SharedStringRun {
+            text: body.into(),
+            has_properties: true,
+            font_family: Some("Arial".into()),
+            font_size_pt: Some(12.0),
+            ..Default::default()
+          },
+        ]
+      };
+      let nominal = TextStyle {
+        font_family: Some(Arc::from(if flat { "Arial" } else { "Symbol" })),
+        font_size_pt: 12.0,
+        ..Default::default()
+      };
+      let mut printed = nominal.clone();
+      super::super::text::scale_text_style_for_fixed_output(&mut printed, 0.59);
+      let cell = CellRect {
+        x_pt: 80.58,
+        y_pt: 111.96,
+        width_pt: 428.16,
+        height_pt: 36.0,
+      };
+      let page = CellRect {
+        x_pt: 50.4,
+        y_pt: 93.6,
+        width_pt: 457.92,
+        height_pt: 605.76,
+      };
+      let alignment = Some(super::super::styles::AlignmentRecord {
+        vertical: Some(x::VerticalAlignmentValues::Top),
+        wrap_text: true,
+        ..Default::default()
+      });
+      let mut items = Vec::new();
+      let mut metrics = TextMetrics::new();
+      let result = render_cell_rich_text(
+        &mut items,
+        &runs,
+        cell,
+        printed,
+        CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          alignment,
+          horizontal_alignment: x::HorizontalAlignmentValues::Left,
+          hyperlink_url: None,
+          formula: false,
+          default_line_height_pt: 8.76,
+          font_print_context: Some(CellFontPrintContext {
+            style: nominal,
+            print_scale: 0.59,
+          }),
+          clip_wrapped_text: true,
+          has_outer_border: false,
+          track_printer_line_extents: true,
+        },
+        0.59,
+        &mut metrics,
+      );
+      assert_eq!(result.top_edit_first_upper_px, Some(upper));
+      assert!(result.centered_edit_block.is_none());
+      align_excel_printer_cell_text_vertically(
+        &mut items,
+        ExcelCellVerticalAlignmentContext {
+          alignment,
+          cell,
+          page,
+          vertically_merged: false,
+          horizontally_merged: true,
+          normal_descent_px: 0.0,
+          grid_profile: ExcelCellBaselineGrid::ExplicitNormalFont,
+          row_lower_extent: None,
+          top_baseline_offset_px: result.top_edit_first_upper_px,
+          merged_last_line_lower_px: None,
+        },
+        &mut metrics,
+      );
+      let mut baselines = items
+        .iter()
+        .filter_map(|item| {
+          let PageItem::Text(text) = item else {
+            return None;
+          };
+          Some(
+            (text.y_pt
+              + metrics.baseline_offset_in_line_for_text(
+                &text.text,
+                &text.style,
+                text.line_height_pt,
+              ))
+              / 0.12,
+          )
+        })
+        .collect::<Vec<_>>();
+      baselines.sort_by(f32::total_cmp);
+      baselines.dedup_by(|a, b| (*a - *b).abs() < 0.001);
+      assert_eq!(baselines.len(), 4);
+      let expected = [
+        941.0 + upper,
+        941.0 + height + 55.0,
+        941.0 + height + 73.0 + 55.0,
+        941.0 + height + 146.0 + 55.0,
+      ];
+      for (actual, expected) in baselines.into_iter().zip(expected) {
+        assert!(
+          (actual - expected).abs() < 0.001,
+          "flat={flat} bullet={bullet_size} space={space_size}: {actual} != {expected}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn centered_edit_mixed_fonts_keep_independent_printer_uppers_and_lowers() {
+    // Actual native final-draw arrays,32 Office controls: SimSun owns the
+    // upper while Arial/Calibri owns the lower. All portions share a baseline.
+    for (family, second_family, second_size, scale, height, upper, baseline) in [
+      ("Arial", "Arial", 12.0, 0.47, 67.0, 51.0, 701.0),
+      ("Arial", "Arial", 12.0, 1.0, 143.0, 109.0, 807.0),
+      ("Arial", "SimSun", 14.0, 0.47, 71.0, 55.0, 703.0),
+      ("Arial", "SimSun", 14.0, 1.0, 151.0, 117.0, 811.0),
+      ("Calibri", "SimSun", 14.0, 0.47, 73.0, 55.0, 702.0),
+      ("Calibri", "SimSun", 14.0, 1.0, 156.0, 117.0, 808.0),
+    ] {
+      let runs = [
+        super::super::workbook::SharedStringRun {
+          text: "Hx".into(),
+          ..Default::default()
+        },
+        super::super::workbook::SharedStringRun {
+          text: "gj".into(),
+          has_properties: true,
+          font_family: Some(second_family.into()),
+          font_size_pt: Some(second_size),
+          ..Default::default()
+        },
+      ];
+      for merged in [false, true] {
+        let (block, baselines) =
+          centered_rich_native_test_baselines(family, false, &runs, scale, merged);
+        assert_eq!(block.height_px, height, "{family}, {scale}");
+        assert_eq!(block.first_upper_px, upper, "{family}, {scale}");
+        let expected = (baseline - if merged { 4.0 } else { 0.0 }) * 0.12;
+        assert!(
+          baselines
+            .iter()
+            .all(|value| (value - expected).abs() < 0.0001)
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn centered_edit_bold_first_line_keeps_each_lines_cached_upper() {
+    let runs = [
+      super::super::workbook::SharedStringRun {
+        text: "Hx\n".into(),
+        ..Default::default()
+      },
+      super::super::workbook::SharedStringRun {
+        text: "gj".into(),
+        has_properties: true,
+        font_size_pt: Some(14.0),
+        font_family: Some("Arial".into()),
+        ..Default::default()
+      },
+    ];
+    // Native draw origins/uppers:616+53,736 and625+112,880.
+    for (scale, height, upper, expected) in [
+      (0.47, 136.0, 53.0, [669.0, 736.0]),
+      (1.0, 289.0, 112.0, [737.0, 880.0]),
+    ] {
+      for merged in [false, true] {
+        let (block, baselines) =
+          centered_rich_native_test_baselines("Arial", true, &runs, scale, merged);
+        assert_eq!(block.height_px, height);
+        assert_eq!(block.first_upper_px, upper);
+        assert_eq!(baselines.len(), 2);
+        for (actual, expected) in baselines.iter().zip(expected) {
+          assert!((actual - (expected - if merged { 4.0 } else { 0.0 }) * 0.12).abs() < 0.0001);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn centered_edit_overflow_keeps_native_signed_rectangle_alignment() {
+    let nominal = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 14.0,
+      ..Default::default()
+    };
+    // Ten Office final-draw controls: original merged row52 and adjacent
+    // authored heights, plus independent unmerged three-line controls.
+    // The row grid starts at934dots; cached total/first upper are237/60.
+    for (height_px, merged, native_origin_px) in [
+      (227.0, true, 929.0),
+      (231.0, true, 931.0),
+      (235.0, true, 933.0),
+      (240.0, true, 936.0),
+      (244.0, true, 938.0),
+      (249.0, true, 940.0),
+      (227.0, false, 933.0),
+      (235.0, false, 937.0),
+      (240.0, false, 939.0),
+      (249.0, false, 944.0),
+    ] {
+      let mut printed = nominal.clone();
+      super::super::text::scale_text_style_for_fixed_output(&mut printed, 0.55);
+      let cell = CellRect {
+        x_pt: 54.0,
+        y_pt: 111.6,
+        width_pt: 166.08,
+        height_pt: height_px * 0.12,
+      };
+      let mut metrics = TextMetrics::new();
+      let mut items = Vec::new();
+      let result = render_cell_text(
+        &mut items,
+        "Hx\ngj\nQx",
+        cell,
+        printed,
+        CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          alignment: Some(super::super::styles::AlignmentRecord {
+            vertical: Some(x::VerticalAlignmentValues::Center),
+            wrap_text: true,
+            ..Default::default()
+          }),
+          horizontal_alignment: x::HorizontalAlignmentValues::Left,
+          hyperlink_url: None,
+          formula: false,
+          default_line_height_pt: 18.0,
+          font_print_context: Some(CellFontPrintContext {
+            style: nominal.clone(),
+            print_scale: 0.55,
+          }),
+          clip_wrapped_text: true,
+          has_outer_border: false,
+          track_printer_line_extents: true,
+        },
+        &mut metrics,
+      );
+      let block = result
+        .centered_edit_block
+        .expect("three native printer lines");
+      assert_eq!(block.height_px, 237.0);
+      assert_eq!(block.first_upper_px, 60.0);
+      assert_eq!(items.len(), 3);
+      assert!(align_excel_printer_centered_edit_text(
+        &mut items,
+        cell,
+        cell,
+        merged,
+        block,
+        &mut metrics,
+      ));
+      for (index, item) in items.iter().enumerate() {
+        let PageItem::Text(text) = item else {
+          panic!("native text line expected");
+        };
+        let baseline = text.y_pt
+          + metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt);
+        let expected = (native_origin_px + 60.0 + index as f32 * 79.0) * 0.12;
+        assert!(
+          (baseline - expected).abs() < 0.0001,
+          "{height_px}, merged={merged}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn printer_row_lower_keeps_shared_and_merged_endpoints_separate() {
+    // Native direct/edit producers share the ordinary row's bottom+8-dot
+    // baseline owner. A merged edit line separately uses the authored bottom.
+    for (scale, bold, height_dots, lower_dots, expected_dots, edit_lower) in [
+      (0.47, false, 152.0, 18.0, 742.0_f32, 16.0),
+      (0.47, true, 152.0, 19.0, 741.0, 16.0),
+      (1.0, false, 323.0, 38.0, 893.0, 34.0),
+      (1.0, true, 323.0, 41.0, 890.0, 34.0),
+    ] {
+      for merged in [false, true] {
+        let cell = CellRect {
+          x_pt: 30.0,
+          y_pt: 72.0,
+          width_pt: 180.0,
+          height_pt: height_dots * 0.12,
+        };
+        let alignment = Some(super::super::styles::AlignmentRecord {
+          vertical: Some(x::VerticalAlignmentValues::Bottom),
+          ..Default::default()
+        });
+        let mut metrics = TextMetrics::new();
+        let mut items = Vec::new();
+        render_cell_text(
+          &mut items,
+          "Hxgj",
+          cell,
+          TextStyle {
+            font_family: Some(Arc::from("Arial")),
+            font_size_pt: 14.0 * scale,
+            bold,
+            ..Default::default()
+          },
+          CellTextRenderOptions {
+            auxiliary_line_break_font: None,
+            alignment,
+            horizontal_alignment: x::HorizontalAlignmentValues::Left,
+            hyperlink_url: None,
+            formula: false,
+            default_line_height_pt: 18.0 * scale,
+            font_print_context: None,
+            clip_wrapped_text: false,
+            has_outer_border: false,
+            track_printer_line_extents: false,
+          },
+          &mut metrics,
+        );
+        align_excel_printer_cell_text_vertically(
+          &mut items,
+          ExcelCellVerticalAlignmentContext {
+            alignment,
+            cell,
+            page: cell,
+            vertically_merged: false,
+            horizontally_merged: merged,
+            normal_descent_px: 20.0,
+            grid_profile: ExcelCellBaselineGrid::ExplicitNormalFont,
+            row_lower_extent: Some(super::super::worksheet::FixedOutputRowLowerExtent {
+              printer_lower_px: lower_dots,
+            }),
+            top_baseline_offset_px: None,
+            merged_last_line_lower_px: merged.then_some(edit_lower),
+          },
+          &mut metrics,
+        );
+        let [PageItem::Text(text)] = items.as_slice() else {
+          panic!("one line expected")
+        };
+        let baseline = text.y_pt
+          + metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt);
+        let expected = if merged {
+          expected_dots.min(600.0 + height_dots - edit_lower)
+        } else {
+          expected_dots
+        } * 0.12;
+        assert!(
+          (baseline - expected).abs() < 1.0e-4,
+          "scale={scale} bold={bold} merged={merged}: {baseline} != {expected}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn merged_bottom_blocks_bound_the_last_baseline_by_its_printer_line() {
+    let nominal = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 13.0,
+      bold: true,
+      ..Default::default()
+    };
+    let print_context = CellFontPrintContext {
+      style: nominal.clone(),
+      print_scale: 0.59,
+    };
+    let style = TextStyle {
+      font_size_pt: 7.68,
+      ..nominal
+    };
+    let alignment = Some(super::super::styles::AlignmentRecord {
+      vertical: Some(x::VerticalAlignmentValues::Bottom),
+      wrap_text: true,
+      ..Default::default()
+    });
+    // Native title height controls straddle the two80-dot lines; the same
+    //19-dot last-line lower extent applies on both sides of that threshold.
+    // An off-print large font instead contributes a36-dot shared-row lower
+    // extent, which must continue to dominate this independent line bound.
+    for height_dots in [143.0, 157.0, 171.0, 186.0] {
+      for row_lower_px in [14.0_f32, 36.0] {
+        let cell = CellRect {
+          width_pt: 400.0,
+          height_pt: height_dots * 0.12,
+          ..CellRect::default()
+        };
+        let mut metrics = TextMetrics::new();
+        let mut items = Vec::new();
+        let result = render_cell_text(
+          &mut items,
+          "Line1\nLine2",
+          cell,
+          style.clone(),
+          CellTextRenderOptions {
+            auxiliary_line_break_font: None,
+            track_printer_line_extents: true,
+            alignment,
+            horizontal_alignment: x::HorizontalAlignmentValues::Left,
+            hyperlink_url: None,
+            formula: false,
+            default_line_height_pt: 10.0,
+            font_print_context: Some(print_context.clone()),
+            clip_wrapped_text: true,
+            has_outer_border: false,
+          },
+          &mut metrics,
+        );
+        assert_eq!(items.len(), 2);
+        assert_eq!(result.last_line_lower_px, Some(19.0));
+        align_excel_printer_cell_text_vertically(
+          &mut items,
+          ExcelCellVerticalAlignmentContext {
+            alignment,
+            cell,
+            page: cell,
+            vertically_merged: false,
+            horizontally_merged: true,
+            normal_descent_px: 11.0,
+            grid_profile: ExcelCellBaselineGrid::ExplicitNormalFont,
+            row_lower_extent: Some(super::super::worksheet::FixedOutputRowLowerExtent {
+              printer_lower_px: row_lower_px + 8.0,
+            }),
+            top_baseline_offset_px: None,
+            merged_last_line_lower_px: result.last_line_lower_px,
+          },
+          &mut metrics,
+        );
+        let last = (height_dots - row_lower_px.max(19.0)) * 0.12;
+        for (item, expected) in items.iter().zip([last - 9.6, last]) {
+          let PageItem::Text(text) = item else {
+            panic!("text expected");
+          };
+          let baseline = text.y_pt
+            + metrics.baseline_offset_in_line_for_text(
+              &text.text,
+              &text.style,
+              text.line_height_pt,
+            );
+          assert!(
+            (baseline - expected).abs() < 1.0e-4,
+            "{baseline} != {expected}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn merged_rich_line_bound_uses_the_last_retained_line() {
+    let nominal = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 13.0,
+      bold: true,
+      ..Default::default()
+    };
+    let style = TextStyle {
+      font_size_pt: 7.68,
+      ..nominal.clone()
+    };
+    // A larger earlier line must not own the final line's descent. Nor may
+    // a later line that was discarded by fixed-height clipping own it.
+    // A trailing empty hard line still owns a font box, as a plain line does.
+    for (sizes, height, texts, wrap_text, expected_items) in [
+      ([30.0, 13.0], 1000.0, ["First\n", "Last"], true, 2),
+      ([13.0, 30.0], 9.6, ["First\n", "Last"], true, 1),
+      ([30.0, 13.0], 1000.0, ["First\n", "\n"], true, 3),
+      // Rich text retains its edit-line bound when wrapText is disabled.
+      ([13.0, 13.0], 1000.0, ["One", "Line"], false, 2),
+    ] {
+      let runs = sizes
+        .into_iter()
+        .enumerate()
+        .map(|(index, size)| super::super::workbook::SharedStringRun {
+          text: texts[index].into(),
+          has_properties: true,
+          font_size_pt: Some(size),
+          bold: Some(true),
+          ..Default::default()
+        })
+        .collect::<Vec<_>>();
+      let mut items = Vec::new();
+      let result = render_cell_rich_text(
+        &mut items,
+        &runs,
+        CellRect {
+          width_pt: 400.0,
+          height_pt: height,
+          ..CellRect::default()
+        },
+        style.clone(),
+        CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          track_printer_line_extents: true,
+          alignment: Some(super::super::styles::AlignmentRecord {
+            wrap_text,
+            vertical: Some(x::VerticalAlignmentValues::Bottom),
+            ..Default::default()
+          }),
+          horizontal_alignment: x::HorizontalAlignmentValues::Left,
+          hyperlink_url: None,
+          formula: false,
+          default_line_height_pt: 10.0,
+          font_print_context: Some(CellFontPrintContext {
+            style: nominal.clone(),
+            print_scale: 0.59,
+          }),
+          clip_wrapped_text: true,
+          has_outer_border: false,
+        },
+        0.59,
+        &mut TextMetrics::new(),
+      );
+      assert_eq!(result.last_line_lower_px, Some(19.0));
+      assert_eq!(items.len(), expected_items);
+    }
+  }
+
+  #[test]
   fn modern_arial11_cell_baselines_match_office_gdi_controls() {
     let regular8 = super::super::worksheet::PrinterFontVerticalMetrics {
       ascent_px: 60.0,
@@ -15521,6 +19066,151 @@ mod drawing_page_tests {
     };
     assert_eq!(japanese(ms_pgothic), 90.0);
     assert_eq!(japanese(simsun), 96.0);
+  }
+
+  #[test]
+  fn bottom_row_fonts_share_the_rich_line_baseline_outside_the_print_area() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Native controls: a bottom-aligned TNR12 blank in an off-print column
+    // contributes exactly like the same font in a rich portion. Centered
+    // blanks do not participate in that row's shared baseline.
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    package
+      .add_extended_file_properties_part()
+      .unwrap()
+      .set_data(
+        &mut package,
+        br#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Excel</Application><AppVersion>16.0300</AppVersion></Properties>"#.to_vec(),
+      )
+      .unwrap();
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let styles = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    let id = workbook
+      .get_id_of_part(&package, &worksheet)
+      .unwrap()
+      .to_owned();
+    workbook
+      .set_data(
+        &mut package,
+        format!(
+          r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <fileVersion appName="xl" lastEdited="7" lowestEdited="7"/>
+          <sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets>
+          <definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Sheet1!$A$1:$B$3</definedName></definedNames></workbook>"#
+        )
+        .into_bytes(),
+      )
+      .unwrap();
+    styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><sz val="12"/><name val="Arial"/></font><font><sz val="12"/><name val="Times New Roman"/></font></fonts>
+      <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+      <cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+      <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"><alignment horizontal="left" vertical="bottom"/></xf>
+      <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"><alignment horizontal="left" vertical="bottom"/></xf>
+      <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"><alignment horizontal="left" vertical="center"/></xf></cellXfs>
+      <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#.to_vec()).unwrap();
+    worksheet.set_data(&mut package, br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="4" width="30" customWidth="1"/></cols>
+      <sheetData>
+      <row r="1" ht="60" customHeight="1"><c r="A1" s="1" t="inlineStr"><is><r><t>6)</t></r><r><rPr><rFont val="Times New Roman"/><sz val="12"/></rPr><t xml:space="preserve">   </t></r><r><t>label</t></r></is></c><c r="B1" s="1" t="inlineStr"><is><t>label</t></is></c></row>
+      <row r="2" ht="60" customHeight="1"><c r="A2" s="1" t="inlineStr"><is><t>label</t></is></c><c r="B2" s="1" t="inlineStr"><is><t>label</t></is></c><c r="D2" s="2"/></row>
+      <row r="3" ht="60" customHeight="1"><c r="A3" s="1" t="inlineStr"><is><t>label</t></is></c><c r="B3" s="1" t="inlineStr"><is><t>label</t></is></c><c r="D3" s="3"/></row>
+      </sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9"/></worksheet>"#.to_vec()).unwrap();
+    let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+    let print = CalcPrintDocument::from_import(&import);
+    assert_eq!(print.pages.len(), 1);
+    let page = &print.pages[0];
+    assert!(page.sheet.uses_modern_excel_arial10_cell_text_grid());
+    let area = page.area.unwrap();
+    let fill_page = page.sheet.fixed_output_range_rect(area, 1.0);
+    let mut metrics = TextMetrics::new();
+    let mut items = Vec::new();
+    render_cell_area(
+      &mut items,
+      &import,
+      page,
+      &page.cells,
+      area,
+      CellAreaRenderLayout {
+        origin_x_pt: 0.0,
+        origin_y_pt: 0.0,
+        zoom_scale: 1.0,
+        fill_page,
+        physical_page: CellRect {
+          width_pt: 595.32,
+          height_pt: 841.92,
+          ..CellRect::default()
+        },
+      },
+      &mut metrics,
+    );
+    let mut baselines = HashMap::<usize, Vec<f32>>::new();
+    for item in &items {
+      if let PageItem::Text(text) = item
+        && text.text == "label"
+      {
+        let row = text.source_path[0];
+        let rect = page.sheet.fixed_output_cell_rect(
+          CellAddress {
+            col: 1,
+            row: row as u32 + 1,
+          },
+          1.0,
+        );
+        let baseline = units::quantize_points_to_office_print_grid(
+          text.y_pt
+            + metrics.baseline_offset_in_line_for_text(
+              &text.text,
+              &text.style,
+              text.line_height_pt,
+            ),
+        ) - units::quantize_points_to_office_print_grid(rect.y_pt);
+        baselines.entry(row).or_default().push(baseline);
+      }
+    }
+    assert_eq!(baselines.len(), 3);
+    for row in baselines.values() {
+      assert_eq!(row.len(), 2);
+      assert!((row[0] - row[1]).abs() < 1.0e-4, "{baselines:?}");
+    }
+    assert!(
+      (baselines[&0][0] - baselines[&1][0]).abs() < 1.0e-4,
+      "{baselines:?}"
+    );
+    assert!((baselines[&1][0] - baselines[&2][0]).abs() > 0.01);
+    // Native row-cache conversion, independent of the edit-line renderer:
+    // Arial12 has screen D7 and Times New Roman12 D8 (VDMX ppem32, E1).
+    // Normal Arial10 contributes the26/7 lower ratio. The first two rows
+    // therefore use MulDiv(8,26,7)+8=38; the center-aligned blank in row3
+    // is excluded, leaving MulDiv(7,26,7)+8=34. Ordinary formatter bottom
+    // is eight dots below the authored endpoint (native v184-v190).
+    // The earlier rich-line self-reference proved sharing but retained the
+    // separate natural-outline offset; it is not the cached printer owner.
+    for (row, printer_lower_px) in [(0, 38.0), (1, 38.0), (2, 34.0)] {
+      let rect = page.sheet.fixed_output_cell_rect(
+        CellAddress {
+          col: 1,
+          row: row as u32 + 1,
+        },
+        1.0,
+      );
+      let expected = units::quantize_points_to_office_print_grid(
+        rect.height_pt + (8.0 - printer_lower_px) * 0.12,
+      );
+      assert!(
+        (baselines[&row][0] - expected).abs() < 1.0e-4,
+        "row={row}: {baselines:?}, expected={expected}"
+      );
+    }
   }
 
   #[test]
@@ -16043,7 +19733,7 @@ mod drawing_page_tests {
     assert_eq!(text.style.rotation_deg, 0.0);
     assert!(!text.style.pdf_glyph_outlines);
     assert_eq!(text.rotation_center_pt, None);
-    let line_height = drawing_text_line_height(&text.style);
+    let line_height = drawing_text_line_height(&text.style, &mut TextMetrics::new());
     let expected_y = rect.y_pt
       + XLSX_CELL_TEXT_INSET_PT
       + (rect.height_pt - XLSX_CELL_TEXT_INSET_PT * 2.0 - line_height) / 2.0;
@@ -16512,11 +20202,14 @@ mod cell_alignment_tests {
         rect,
         TextStyle::default(),
         CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          track_printer_line_extents: false,
           alignment: None,
           horizontal_alignment: x::HorizontalAlignmentValues::Left,
           hyperlink_url: None,
           formula: false,
           default_line_height_pt: 15.0,
+          font_print_context: None,
           clip_wrapped_text: false,
           has_outer_border: false,
         },
@@ -16733,6 +20426,152 @@ mod cell_alignment_tests {
     assert_eq!(neighboring_column(3, false, true), Some(4));
     assert_eq!(neighboring_column(1, true, true), None);
     assert_eq!(neighboring_column(16_384, false, true), None);
+  }
+
+  #[test]
+  fn cell_indentation_and_rich_portions_keep_native_overflow_ownership() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut origins = Vec::new();
+    for application in ["Microsoft Excel", "Microsoft Macintosh Excel"] {
+      for width in [6.5, 30.0] {
+        for indent in [0, 4] {
+          for occupied in [false, true] {
+            for rich in [false, true] {
+              let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+              let properties = package.add_extended_file_properties_part().unwrap();
+              properties.set_data(&mut package, format!(
+              r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>{application}</Application><AppVersion>15.0300</AppVersion></Properties>"#
+            ).into_bytes()).unwrap();
+              let workbook = package.add_workbook_part().unwrap();
+              let worksheet = workbook
+                .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+                .unwrap();
+              let styles = workbook
+                .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+                .unwrap();
+              let id = workbook
+                .get_id_of_part(&package, &worksheet)
+                .unwrap()
+                .to_owned();
+              workbook.set_data(&mut package, format!(
+              r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <fileVersion appName="xl" lastEdited="5"/><sheets><sheet name="Sheet1" sheetId="1" r:id="{id}"/></sheets>
+              <definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Sheet1!$A$1:$E$1</definedName></definedNames></workbook>"#
+            ).into_bytes()).unwrap();
+              styles.set_data(&mut package, format!(
+              r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+              <fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><sz val="12"/><name val="Arial"/></font></fonts>
+              <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+              <cellXfs count="2"><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" indent="{indent}"/></xf>
+              <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>
+              <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#
+            ).into_bytes()).unwrap();
+              let target = if rich {
+                r#"<r><t>TARGET</t></r><r><rPr><sz val="12"/><rFont val="Arial"/><color rgb="FFFF0000"/></rPr><t>12</t></r>"#
+              } else {
+                "<t>TARGET12</t>"
+              };
+              let neighbor = if occupied {
+                r#"<c r="C1" s="1" t="inlineStr"><is><t>BLOCK</t></is></c>"#
+              } else {
+                ""
+              };
+              worksheet.set_data(&mut package, format!(
+              r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+              <cols><col min="1" max="1" width="2.6640625" customWidth="1"/><col min="2" max="2" width="{width}" customWidth="1"/>
+              <col min="3" max="3" width="6.5" customWidth="1"/><col min="4" max="5" width="20" customWidth="1"/></cols>
+              <sheetData><row r="1" ht="40" customHeight="1"><c r="B1" s="0" t="inlineStr"><is>{target}</is></c>{neighbor}</row></sheetData>
+              <pageMargins left="0.75" right="0.75" top="1" bottom="1" header="0.5" footer="0.5"/><pageSetup paperSize="9" scale="63"/></worksheet>"#
+            ).into_bytes()).unwrap();
+              let import =
+                ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+              let print = CalcPrintDocument::from_import(&import);
+              assert_eq!(print.pages.len(), 1);
+              let page = &print.pages[0];
+              let area = page.area.unwrap();
+              let mut items = Vec::new();
+              let mut metrics = TextMetrics::new();
+              render_cell_area(
+                &mut items,
+                &import,
+                page,
+                &page.cells,
+                area,
+                CellAreaRenderLayout {
+                  origin_x_pt: 54.0,
+                  origin_y_pt: 72.0,
+                  zoom_scale: 0.63,
+                  fill_page: CellRect {
+                    x_pt: 54.0,
+                    y_pt: 72.0,
+                    ..page.sheet.fixed_output_range_rect(area, 0.63)
+                  },
+                  physical_page: CellRect {
+                    x_pt: 0.0,
+                    y_pt: 0.0,
+                    width_pt: 595.32,
+                    height_pt: 841.92,
+                  },
+                },
+                &mut metrics,
+              );
+              let target_items = items
+                .iter()
+                .filter_map(|item| match item {
+                  PageItem::Text(text) if text.source_path == [0, 1] => Some(text),
+                  _ => None,
+                })
+                .collect::<Vec<_>>();
+              let payload = target_items
+                .iter()
+                .map(|text| text.text.as_str())
+                .collect::<String>();
+              // Native PDFium and decompressed content retain both portions,
+              // including a whole string hidden by an occupied-cell clip.
+              assert_eq!(
+                payload, "TARGET12",
+                "producer={application}, width={width}, indent={indent}, occupied={occupied}, rich={rich}"
+              );
+              if width == 6.5 && occupied {
+                for text in &target_items {
+                  let clip = text.paint_clip.expect("blocked overflow owns a cell clip");
+                  assert!(clip.size.width.0 > 0.0 && clip.size.height.0 > 0.0);
+                  if indent == 4 {
+                    // The Native 63% controls put the entire text origin
+                    // beyond this occupied cell, beneath a valid cell clip.
+                    assert!(
+                      clip.origin.x.0 + clip.size.width.0 < text.x_pt,
+                      "producer={application}, width={width}, rich={rich}, clip={clip:?}, x={}",
+                      text.x_pt
+                    );
+                  }
+                }
+              }
+              if indent == 4 && !occupied {
+                origins.push((application, rich, width, target_items[0].x_pt));
+              }
+            }
+          }
+        }
+      }
+    }
+    // Empty neighbors expose the same full indent in wide and narrow cells;
+    // changing the cell width must never clamp the text to a different origin.
+    for application in ["Microsoft Excel", "Microsoft Macintosh Excel"] {
+      for rich in [false, true] {
+        let positions = origins
+          .iter()
+          .filter(|(producer, is_rich, _, _)| *producer == application && *is_rich == rich)
+          .map(|(_, _, _, x)| *x)
+          .collect::<Vec<_>>();
+        assert_eq!(positions.len(), 2);
+        assert!((positions[0] - positions[1]).abs() < 0.001);
+      }
+    }
   }
 
   #[test]
@@ -17117,6 +20956,8 @@ mod cell_alignment_tests {
             ..Default::default()
           },
           CellTextRenderOptions {
+            auxiliary_line_break_font: None,
+            track_printer_line_extents: false,
             alignment: Some(super::super::styles::AlignmentRecord {
               text_rotation: Some(rotation),
               vertical: Some(x::VerticalAlignmentValues::Bottom),
@@ -17126,6 +20967,7 @@ mod cell_alignment_tests {
             hyperlink_url: None,
             formula: false,
             default_line_height_pt: 12.36,
+            font_print_context: None,
             clip_wrapped_text: false,
             has_outer_border,
           },
@@ -17168,6 +21010,8 @@ mod cell_alignment_tests {
         ..Default::default()
       },
       CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        track_printer_line_extents: false,
         alignment: Some(super::super::styles::AlignmentRecord {
           text_rotation: Some(45),
           ..Default::default()
@@ -17176,6 +21020,7 @@ mod cell_alignment_tests {
         hyperlink_url: None,
         formula: false,
         default_line_height_pt: 13.68,
+        font_print_context: None,
         clip_wrapped_text: false,
         has_outer_border: false,
       },
@@ -17199,7 +21044,7 @@ mod cell_alignment_tests {
   }
 
   #[test]
-  fn plain_and_wrapped_cell_text_use_distinct_gdi_advance_paths() {
+  fn plain_and_wrapped_cell_text_share_printer_advances() {
     let mut metrics = TextMetrics::new();
     let mut items = Vec::new();
     let value = "WrapText";
@@ -17218,6 +21063,8 @@ mod cell_alignment_tests {
         ..Default::default()
       },
       CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        track_printer_line_extents: false,
         alignment: Some(super::super::styles::AlignmentRecord {
           wrap_text: true,
           ..Default::default()
@@ -17226,6 +21073,7 @@ mod cell_alignment_tests {
         hyperlink_url: None,
         formula: false,
         default_line_height_pt: 13.68,
+        font_print_context: None,
         clip_wrapped_text: false,
         has_outer_border: false,
       },
@@ -17234,6 +21082,7 @@ mod cell_alignment_tests {
     let PageItem::Text(text) = &items[0] else {
       panic!("wrapped text");
     };
+    assert!(text.style.office_text_array);
     assert_eq!(
       text.style.ligatures,
       Some(common::OpenTypeLigatures::default())
@@ -17268,11 +21117,14 @@ mod cell_alignment_tests {
         ..Default::default()
       },
       CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        track_printer_line_extents: false,
         alignment: None,
         horizontal_alignment: x::HorizontalAlignmentValues::Left,
         hyperlink_url: None,
         formula: false,
         default_line_height_pt: 13.68,
+        font_print_context: None,
         clip_wrapped_text: false,
         has_outer_border: false,
       },
@@ -17286,7 +21138,10 @@ mod cell_alignment_tests {
       Some(common::OpenTypeLigatures::default())
     );
     assert_eq!(text.style.kerning_minimum_size_pt, Some(f32::INFINITY));
-    assert!(text.style.semantic_character_advances_pt.is_none());
+    assert_eq!(
+      text.style.semantic_character_advances_pt.as_deref(),
+      Some(advances)
+    );
   }
 
   #[test]
@@ -17311,6 +21166,8 @@ mod cell_alignment_tests {
           ..Default::default()
         },
         CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          track_printer_line_extents: false,
           alignment: Some(super::super::styles::AlignmentRecord {
             text_rotation: Some(45),
             vertical: Some(x::VerticalAlignmentValues::Bottom),
@@ -17320,6 +21177,7 @@ mod cell_alignment_tests {
           hyperlink_url: None,
           formula: false,
           default_line_height_pt,
+          font_print_context: None,
           clip_wrapped_text: false,
           has_outer_border: true,
         },
@@ -17369,6 +21227,8 @@ mod cell_alignment_tests {
         ..TextStyle::default()
       },
       CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        track_printer_line_extents: false,
         alignment: Some(super::super::styles::AlignmentRecord {
           horizontal: Some(x::HorizontalAlignmentValues::Center),
           text_rotation: Some(255),
@@ -17378,6 +21238,7 @@ mod cell_alignment_tests {
         hyperlink_url: None,
         formula: false,
         default_line_height_pt: 40.0,
+        font_print_context: None,
         clip_wrapped_text: false,
         has_outer_border: false,
       },
@@ -17417,7 +21278,9 @@ mod cell_alignment_tests {
     ] {
       for (height, manual, expected) in [
         (8.0, true, 1),
-        (12.75, true, 1),
+        // Like the native14.88pt/14.76pt boundary, a partial second line
+        // remains in the payload even when the paint inset hides its ink.
+        (12.75, true, 2),
         (18.0, true, 2),
         (24.0, true, 2),
         (36.0, true, 3),
@@ -17439,6 +21302,8 @@ mod cell_alignment_tests {
             ..Default::default()
           },
           CellTextRenderOptions {
+            auxiliary_line_break_font: None,
+            track_printer_line_extents: false,
             alignment: Some(super::super::styles::AlignmentRecord {
               vertical: Some(vertical),
               wrap_text: true,
@@ -17448,6 +21313,7 @@ mod cell_alignment_tests {
             hyperlink_url: None,
             formula: false,
             default_line_height_pt: 12.36,
+            font_print_context: None,
             clip_wrapped_text: manual,
             has_outer_border: false,
           },
@@ -17476,6 +21342,232 @@ mod cell_alignment_tests {
   }
 
   #[test]
+  fn wrapped_numeric_reservations_and_fill_share_one_edit_payload() {
+    use super::super::print::{
+      NumberFormatLayoutItem::{Fill, Reserve, Text},
+      NumberFormatRenderState,
+    };
+    let options = CellTextRenderOptions {
+      auxiliary_line_break_font: None,
+      track_printer_line_extents: false,
+      alignment: Some(super::super::styles::AlignmentRecord {
+        wrap_text: true,
+        ..Default::default()
+      }),
+      horizontal_alignment: x::HorizontalAlignmentValues::Left,
+      hyperlink_url: None,
+      formula: false,
+      default_line_height_pt: 8.28,
+      font_print_context: None,
+      clip_wrapped_text: false,
+      has_outer_border: false,
+    };
+    let mut metrics = TextMetrics::new();
+    // Native original-width accounting controls at47/100%: missing ?, _W
+    // and the leading/trailing reservation changes integer edit spaces only.
+    // These rectangles/font are captured from the actual SDK printer owner.
+    for (font_size_pt, width_pt, original_fill) in [
+      (6.6, 65.88, 27_usize),
+      (6.6, 67.32, 28),
+      (14.04, 137.28, 26),
+      (14.04, 140.28, 27),
+    ] {
+      let style = TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        font_size_pt,
+        ..Default::default()
+      };
+      for (leading, questions, trailing, fill_extra) in [
+        (true, 2, Some(')'), 0_isize),
+        (true, 2, Some('W'), 0),
+        (true, 0, Some(')'), 2),
+        (true, 1, Some(')'), 1),
+        (true, 4, Some(')'), -2),
+        (true, 2, None, 1),
+        (false, 2, Some(')'), 1),
+      ] {
+        let mut layout = Vec::new();
+        if leading {
+          layout.push(Reserve('('));
+        }
+        layout.extend([Text("$".into()), Fill(' '), Text("-".into())]);
+        layout.extend(std::iter::repeat_n(Reserve('0'), questions));
+        if let Some(ch) = trailing {
+          layout.push(Reserve(ch));
+        }
+        let expected = format!(
+          "{}${}-",
+          if leading { " " } else { "" },
+          " ".repeat(original_fill.checked_add_signed(fill_extra).unwrap()),
+        );
+        let mut items = Vec::new();
+        assert!(
+          render_number_format_layout(
+            &mut items,
+            NumberFormatCellLayout {
+              items: &layout,
+              value_state: NumberFormatRenderState::Number,
+            },
+            CellRect {
+              x_pt: 10.0,
+              y_pt: 20.0,
+              width_pt,
+              height_pt: 29.76
+            },
+            &style,
+            options.clone(),
+            &mut metrics,
+          )
+          .is_some()
+        );
+        let [PageItem::Text(text)] = items.as_slice() else {
+          panic!("wrapped accounting must retain one edit payload");
+        };
+        assert_eq!(
+          text.text, expected,
+          "{width_pt}, {leading}, {questions}, {trailing:?}"
+        );
+        assert!(text.style.office_text_array);
+      }
+    }
+  }
+
+  #[test]
+  fn wrapped_number_format_retains_native_centered_line_box() {
+    use super::super::print::NumberFormatLayoutItem::{Fill, Reserve, Text};
+    use super::super::print::NumberFormatRenderState;
+    let nominal = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 14.0,
+      ..Default::default()
+    };
+    let mut printed = nominal.clone();
+    super::super::text::scale_text_style_for_fixed_output(&mut printed, 0.55);
+    for (value_state, formula) in [
+      (NumberFormatRenderState::Number, false),
+      (NumberFormatRenderState::Number, true),
+      (NumberFormatRenderState::Text, false),
+    ] {
+      let layout = if value_state == NumberFormatRenderState::Number {
+        vec![
+          Reserve('('),
+          Text("$".into()),
+          Fill(' '),
+          Text("-".into()),
+          Reserve(')'),
+        ]
+      } else {
+        vec![Reserve('('), Text("0".into()), Reserve(')')]
+      };
+      let cell = CellRect {
+        x_pt: 54.0,
+        y_pt: 111.6,
+        width_pt: 65.88,
+        height_pt: 28.8,
+      };
+      let mut metrics = TextMetrics::new();
+      let mut items = Vec::new();
+      let result = render_number_format_layout(
+        &mut items,
+        NumberFormatCellLayout {
+          items: &layout,
+          value_state,
+        },
+        cell,
+        &printed,
+        CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          track_printer_line_extents: true,
+          alignment: Some(super::super::styles::AlignmentRecord {
+            vertical: Some(x::VerticalAlignmentValues::Center),
+            wrap_text: true,
+            ..Default::default()
+          }),
+          horizontal_alignment: x::HorizontalAlignmentValues::Right,
+          hyperlink_url: None,
+          formula,
+          default_line_height_pt: 18.0,
+          font_print_context: Some(CellFontPrintContext {
+            style: nominal.clone(),
+            print_scale: 0.55,
+          }),
+          clip_wrapped_text: true,
+          has_outer_border: false,
+        },
+        &mut metrics,
+      )
+      .expect("supported formatted value");
+      let block = result.centered_edit_block.expect("native edit line box");
+      // The eight native type/format/wrap controls share cached79/60dots
+      // and the wrapped baseline1018+60; nowrap uses a separate producer.
+      assert_eq!(block.height_px, 79.0);
+      assert_eq!(block.first_upper_px, 60.0);
+      assert!(align_excel_printer_centered_edit_text(
+        &mut items,
+        cell,
+        cell,
+        false,
+        block,
+        &mut metrics,
+      ));
+      for item in items {
+        let PageItem::Text(text) = item else {
+          panic!("formatted text portion expected");
+        };
+        let baseline = text.y_pt
+          + metrics.baseline_offset_in_line_for_text(&text.text, &text.style, text.line_height_pt);
+        assert!((baseline - 1078.0 * 0.12).abs() < 0.0001);
+      }
+    }
+  }
+
+  #[test]
+  fn wrapped_numeric_fill_leaves_multiple_fill_layouts_to_existing_owner() {
+    use super::super::print::NumberFormatLayoutItem::{Fill, Reserve, Text};
+    let rect = CellRect {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: 65.88,
+      height_pt: 20.0,
+    };
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 6.6,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    assert_eq!(
+      wrapped_number_format_payload(
+        &[
+          Reserve('('),
+          Text("$ -".into()),
+          Reserve('0'),
+          Reserve('0'),
+          Reserve('W')
+        ],
+        rect,
+        &style,
+        &mut metrics,
+      )
+      .as_deref(),
+      Some(" $ -"),
+    );
+    assert!(
+      wrapped_number_format_payload(
+        &[Text("$".into()), Fill(' '), Text("-".into()), Fill('.')],
+        rect,
+        &style,
+        &mut metrics,
+      )
+      .is_none()
+    );
+    assert!(
+      wrapped_number_format_payload(&[Fill('א'), Text("0".into())], rect, &style, &mut metrics,)
+        .is_none()
+    );
+  }
+
+  #[test]
   fn wrapped_accounting_numbers_keep_the_numeric_fill_owner() {
     use super::super::print::{
       NumberFormatLayoutItem::{Fill, Reserve, Text},
@@ -17496,37 +21588,43 @@ mod cell_alignment_tests {
     ];
     let mut metrics = TextMetrics::new();
     let mut items = Vec::new();
-    assert!(render_number_format_layout(
-      &mut items,
-      NumberFormatCellLayout {
-        items: &layout,
-        value_state: NumberFormatRenderState::Number
-      },
-      CellRect {
-        x_pt: 10.0,
-        y_pt: 20.0,
-        width_pt: 60.0,
-        height_pt: 20.0
-      },
-      &TextStyle {
-        font_family: Some(Arc::from("Gill Sans MT")),
-        font_size_pt: 10.56,
-        ..Default::default()
-      },
-      CellTextRenderOptions {
-        alignment: Some(super::super::styles::AlignmentRecord {
-          wrap_text: true,
+    assert!(
+      render_number_format_layout(
+        &mut items,
+        NumberFormatCellLayout {
+          items: &layout,
+          value_state: NumberFormatRenderState::Number
+        },
+        CellRect {
+          x_pt: 10.0,
+          y_pt: 20.0,
+          width_pt: 60.0,
+          height_pt: 20.0
+        },
+        &TextStyle {
+          font_family: Some(Arc::from("Gill Sans MT")),
+          font_size_pt: 10.56,
           ..Default::default()
-        }),
-        horizontal_alignment: x::HorizontalAlignmentValues::Right,
-        hyperlink_url: None,
-        formula: true,
-        default_line_height_pt: 16.0,
-        clip_wrapped_text: false,
-        has_outer_border: false,
-      },
-      &mut metrics,
-    ));
+        },
+        CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          track_printer_line_extents: false,
+          alignment: Some(super::super::styles::AlignmentRecord {
+            wrap_text: true,
+            ..Default::default()
+          }),
+          horizontal_alignment: x::HorizontalAlignmentValues::Right,
+          hyperlink_url: None,
+          formula: true,
+          default_line_height_pt: 16.0,
+          font_print_context: None,
+          clip_wrapped_text: false,
+          has_outer_border: false,
+        },
+        &mut metrics,
+      )
+      .is_some()
+    );
     let text = items
       .iter()
       .filter_map(|item| match item {
@@ -17534,9 +21632,116 @@ mod cell_alignment_tests {
         _ => None,
       })
       .collect::<Vec<_>>();
-    let currency = text.iter().find(|item| item.text == "$").unwrap();
-    let zero = text.iter().find(|item| item.text == "-").unwrap();
-    assert!(zero.x_pt - currency.x_pt > 20.0);
+    let glyph_x = |ch: char, metrics: &mut TextMetrics| {
+      text.iter().find_map(|item| {
+        let index = item.text.find(ch)?;
+        Some(item.x_pt + metrics.measure_text(&item.text[..index], &item.style))
+      })
+    };
+    let currency = glyph_x('$', &mut metrics).unwrap();
+    let zero = glyph_x('-', &mut metrics).unwrap();
+    assert!(zero - currency > 20.0);
+  }
+
+  #[test]
+  fn wrapped_numeric_formula_and_value_share_native_alignment_owners() {
+    use super::super::print::{
+      NumberFormatLayoutItem::{Fill, Reserve, Text},
+      NumberFormatRenderState,
+    };
+    // Native F3 controls vary formula/value, wrap and alignment with identical
+    // Arial14/45% and accounting format. Standard/General uses the left edit
+    // owner, while an explicit Right retains its distinct payload origin.
+    let rect = CellRect {
+      x_pt: 499.62,
+      y_pt: 161.52,
+      width_pt: 57.0,
+      height_pt: 36.24,
+    };
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 6.36,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    for value in [0, 1] {
+      let mut layout = vec![Reserve('('), Text("$".into()), Fill(' ')];
+      layout.push(Text(if value == 0 { "-" } else { "1.00" }.into()));
+      if value == 0 {
+        layout.extend([Reserve('0'), Reserve('0')]);
+      }
+      layout.push(Reserve(')'));
+      let mut left_positions = None;
+      for horizontal in [
+        None,
+        Some(x::HorizontalAlignmentValues::General),
+        Some(x::HorizontalAlignmentValues::Left),
+        Some(x::HorizontalAlignmentValues::Right),
+      ] {
+        let right = horizontal == Some(x::HorizontalAlignmentValues::Right);
+        // Compare layout origins here; the native absolute coordinates also
+        // include PDF device replay and positioned glyph advances.
+        let expected_shift = if right {
+          if value == 0 { 6.96 } else { 2.28 }
+        } else {
+          0.0
+        };
+        for formula in [false, true] {
+          let mut items = Vec::new();
+          render_number_format_layout(
+            &mut items,
+            NumberFormatCellLayout {
+              items: &layout,
+              value_state: NumberFormatRenderState::Number,
+            },
+            rect,
+            &style,
+            CellTextRenderOptions {
+              auxiliary_line_break_font: None,
+              alignment: Some(super::super::styles::AlignmentRecord {
+                horizontal,
+                wrap_text: true,
+                ..Default::default()
+              }),
+              horizontal_alignment: if horizontal == Some(x::HorizontalAlignmentValues::Left) {
+                x::HorizontalAlignmentValues::Left
+              } else {
+                x::HorizontalAlignmentValues::Right
+              },
+              hyperlink_url: None,
+              formula,
+              default_line_height_pt: 15.0,
+              font_print_context: None,
+              clip_wrapped_text: false,
+              has_outer_border: false,
+              track_printer_line_extents: false,
+            },
+            &mut metrics,
+          )
+          .expect("wrapped numeric formatter");
+          let glyph_x = |ch: char, metrics: &mut TextMetrics| {
+            items.iter().find_map(|item| {
+              let PageItem::Text(text) = item else {
+                return None;
+              };
+              let index = text.text.find(ch)?;
+              Some(text.x_pt + metrics.measure_text(&text.text[..index], &text.style))
+            })
+          };
+          let positions = [
+            glyph_x('$', &mut metrics).expect("currency"),
+            glyph_x(if value == 0 { '-' } else { '1' }, &mut metrics).expect("amount"),
+          ];
+          let reference = *left_positions.get_or_insert(positions);
+          for (actual, expected) in positions.into_iter().zip(reference) {
+            assert!(
+              (actual - expected - expected_shift).abs() < 1.0e-4,
+              "value={value} formula={formula} horizontal={horizontal:?}: {actual} != {expected}+{expected_shift}"
+            );
+          }
+        }
+      }
+    }
   }
 
   #[test]
@@ -17562,25 +21767,31 @@ mod cell_alignment_tests {
       vec![Reserve(' '), Text("ועד בית".into()), Reserve(' ')],
     ] {
       let mut items = Vec::new();
-      assert!(render_number_format_layout(
-        &mut items,
-        NumberFormatCellLayout {
-          items: &layout,
-          value_state: super::super::print::NumberFormatRenderState::Text,
-        },
-        rect,
-        &style,
-        CellTextRenderOptions {
-          alignment: None,
-          horizontal_alignment: x::HorizontalAlignmentValues::Right,
-          hyperlink_url: None,
-          formula: false,
-          default_line_height_pt: 12.75,
-          clip_wrapped_text: false,
-          has_outer_border: false,
-        },
-        &mut metrics,
-      ));
+      assert!(
+        render_number_format_layout(
+          &mut items,
+          NumberFormatCellLayout {
+            items: &layout,
+            value_state: super::super::print::NumberFormatRenderState::Text,
+          },
+          rect,
+          &style,
+          CellTextRenderOptions {
+            auxiliary_line_break_font: None,
+            track_printer_line_extents: false,
+            alignment: None,
+            horizontal_alignment: x::HorizontalAlignmentValues::Right,
+            hyperlink_url: None,
+            formula: false,
+            default_line_height_pt: 12.75,
+            font_print_context: None,
+            clip_wrapped_text: false,
+            has_outer_border: false,
+          },
+          &mut metrics,
+        )
+        .is_some()
+      );
       let PageItem::Text(text) = &items[0] else {
         panic!("reserved RTL text must render");
       };
@@ -17670,6 +21881,599 @@ mod cell_alignment_tests {
   }
 
   #[test]
+  fn rich_text_rpr_omitted_color_uses_automatic_color_instead_of_cell_color() {
+    let blue = RgbColor {
+      r: 0,
+      g: 102,
+      b: 204,
+    };
+    let red = RgbColor { r: 255, g: 0, b: 0 };
+    let base = TextStyle {
+      color: blue,
+      bold: true,
+      italic: true,
+      ..Default::default()
+    };
+    // Native absent-rPr / present-rPr / explicit-red / explicit-auto controls.
+    for (has_properties, color, expected) in [
+      (false, None, blue),
+      (true, None, RgbColor::default()),
+      (true, Some(red), red),
+      (true, Some(RgbColor::default()), RgbColor::default()),
+    ] {
+      let style = xlsx_rich_text_run_style(
+        &base,
+        &super::super::workbook::SharedStringRun {
+          text: "Welcome".into(),
+          has_properties,
+          color,
+          ..Default::default()
+        },
+        1.0,
+      );
+      assert_eq!(style.color, expected);
+      assert_eq!(style.bold, !has_properties);
+      assert_eq!(style.italic, !has_properties);
+    }
+  }
+
+  #[test]
+  fn rich_text_wraps_the_whole_paragraph_across_run_boundaries() {
+    let text = "Alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu. The worksheet keeps the run colors and wraps the whole text across formatting boundaries.";
+    let mut metrics = TextMetrics::new();
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 8.28,
+      ..Default::default()
+    };
+    let options = CellTextRenderOptions {
+      auxiliary_line_break_font: None,
+      track_printer_line_extents: false,
+      alignment: Some(super::super::styles::AlignmentRecord {
+        wrap_text: true,
+        vertical: Some(x::VerticalAlignmentValues::Top),
+        ..Default::default()
+      }),
+      horizontal_alignment: x::HorizontalAlignmentValues::Left,
+      hyperlink_url: None,
+      formula: false,
+      default_line_height_pt: 10.08,
+      font_print_context: None,
+      clip_wrapped_text: false,
+      has_outer_border: false,
+    };
+    // Native equal-font plain/rich controls have identical line payloads.
+    // Split inside words as well as at spaces: XML runs are not break points.
+    for split in [3, 13, 37, 100] {
+      let runs = [
+        super::super::workbook::SharedStringRun {
+          text: text[..split].into(),
+          ..Default::default()
+        },
+        super::super::workbook::SharedStringRun {
+          text: text[split..].into(),
+          ..Default::default()
+        },
+      ];
+      for width_pt in [110.0, 185.0, 360.0] {
+        let rect = CellRect {
+          x_pt: 20.0,
+          y_pt: 30.0,
+          width_pt,
+          height_pt: 180.0,
+        };
+        let mut plain = Vec::new();
+        let mut rich = Vec::new();
+        render_cell_text(
+          &mut plain,
+          text,
+          rect,
+          style.clone(),
+          options.clone(),
+          &mut metrics,
+        );
+        render_cell_rich_text(
+          &mut rich,
+          &runs,
+          rect,
+          style.clone(),
+          options.clone(),
+          1.0,
+          &mut metrics,
+        );
+        let line_text = |items: &[PageItem]| {
+          let mut lines = Vec::<(f32, String)>::new();
+          for item in items {
+            let PageItem::Text(item) = item else {
+              panic!("text expected");
+            };
+            if let Some((y, text)) = lines.last_mut()
+              && (*y - item.y_pt).abs() < 0.001
+            {
+              text.push_str(&item.text);
+            } else {
+              lines.push((item.y_pt, item.text.clone()));
+            }
+          }
+          lines
+        };
+        let rich_lines = line_text(&rich);
+        let plain_lines = line_text(&plain);
+        assert_eq!(
+          rich_lines.len(),
+          plain_lines.len(),
+          "split={split}, width={width_pt}"
+        );
+        for ((rich_y, rich_text), (plain_y, plain_text)) in rich_lines.iter().zip(&plain_lines) {
+          assert_eq!(rich_text, plain_text, "split={split}, width={width_pt}");
+          assert!(
+            (rich_y - plain_y).abs() < 0.001,
+            "split={split}, width={width_pt}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn wrapped_payload_uses_integer_printer_height_at_an_exact_line_boundary() {
+    // Native SimSun 10 at71% has a73-dot pitch. The original and12.6..12.8
+    // row controls retain only Consolidated; a75-dot row retains Messenger
+    // too. GDB captures both signs of endpoint-subtraction noise in that row.
+    let mut metrics = TextMetrics::new();
+    let nominal_style = TextStyle {
+      font_family: Some(Arc::from("SimSun")),
+      font_size_pt: 10.0,
+      ..Default::default()
+    };
+    let style = TextStyle {
+      font_size_pt: 7.08,
+      ..nominal_style.clone()
+    };
+    let options = CellTextRenderOptions {
+      auxiliary_line_break_font: None,
+      track_printer_line_extents: false,
+      alignment: Some(super::super::styles::AlignmentRecord {
+        wrap_text: true,
+        vertical: Some(x::VerticalAlignmentValues::Center),
+        ..Default::default()
+      }),
+      horizontal_alignment: x::HorizontalAlignmentValues::Left,
+      hyperlink_url: None,
+      formula: false,
+      default_line_height_pt: 40.0,
+      font_print_context: Some(CellFontPrintContext {
+        style: nominal_style,
+        print_scale: 0.71,
+      }),
+      clip_wrapped_text: true,
+      has_outer_border: false,
+    };
+    assert!(
+      (cell_text_line_height_pt(&style, &options, false, &mut TextMetrics::new()) - 8.76).abs()
+        < 0.0001
+    );
+    for (height, expected) in [
+      (8.759_994_5, vec!["Consolidated"]),
+      (8.760_002, vec!["Consolidated"]),
+      (9.0, vec!["Consolidated", "Messenger"]),
+    ] {
+      let mut items = Vec::new();
+      render_cell_text(
+        &mut items,
+        "Consolidated\nMessenger",
+        CellRect {
+          x_pt: 0.0,
+          y_pt: 0.0,
+          width_pt: 100.0,
+          height_pt: height,
+        },
+        style.clone(),
+        options.clone(),
+        &mut metrics,
+      );
+      let actual = items
+        .iter()
+        .filter_map(|item| {
+          if let PageItem::Text(text) = item {
+            Some(text.text.as_str())
+          } else {
+            None
+          }
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(actual, expected, "height={height}");
+    }
+  }
+
+  #[test]
+  fn native_multiline_cell_pitch_uses_each_font_instead_of_the_default_row_box() {
+    // Office's four-family, three-size, two-zoom matrix. Sizes below are the
+    // nominal source sizes; pitches are consecutive native PDF baselines.
+    let sizes = [
+      (6.0, 0.59),
+      (6.0, 0.95),
+      (12.0, 0.59),
+      (12.0, 0.95),
+      (24.0, 0.59),
+      (24.0, 0.95),
+    ];
+    for (family, pitches) in [
+      ("Arial", [4.8, 7.68, 8.76, 14.04, 16.8, 27.12]),
+      ("Verdana", [4.8, 7.8, 9.12, 14.76, 17.64, 28.44]),
+      ("Calibri", [4.92, 7.92, 9.24, 14.88, 17.88, 28.68]),
+      ("Times New Roman", [4.8, 7.68, 8.88, 14.4, 17.04, 27.48]),
+    ] {
+      for ((size, print_scale), expected) in sizes.into_iter().zip(pitches) {
+        let style = TextStyle {
+          font_family: Some(Arc::from(family)),
+          font_size_pt: super::super::text::fixed_output_font_size_pt(size, print_scale),
+          ..Default::default()
+        };
+        let options = CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          track_printer_line_extents: false,
+          alignment: Some(super::super::styles::AlignmentRecord {
+            wrap_text: true,
+            vertical: Some(x::VerticalAlignmentValues::Top),
+            ..Default::default()
+          }),
+          horizontal_alignment: x::HorizontalAlignmentValues::Left,
+          hyperlink_url: None,
+          formula: false,
+          default_line_height_pt: 40.0,
+          font_print_context: Some(CellFontPrintContext {
+            style: TextStyle {
+              font_size_pt: size,
+              ..style.clone()
+            },
+            print_scale,
+          }),
+          clip_wrapped_text: false,
+          has_outer_border: false,
+        };
+        let actual = cell_text_line_height_pt(&style, &options, false, &mut TextMetrics::new());
+        assert!(
+          (actual - expected).abs() < 1.0e-4,
+          "{family} {size}: {actual}, native {expected}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn rich_text_retains_hard_breaks_and_aligns_only_the_visible_prefix() {
+    let mut metrics = TextMetrics::new();
+    // The native 6pt Arial / 95% control has a 5.76pt glyph font and a
+    // 7.68pt line pitch, even when Normal's line height is larger.
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 5.76,
+      ..Default::default()
+    };
+    let runs = [
+      super::super::workbook::SharedStringRun {
+        text: "Alpha\r".into(),
+        ..Default::default()
+      },
+      super::super::workbook::SharedStringRun {
+        text: "\nBeta\n\nGamma".into(),
+        has_properties: true,
+        color: Some(RgbColor { r: 255, g: 0, b: 0 }),
+        ..Default::default()
+      },
+    ];
+    for vertical in [
+      x::VerticalAlignmentValues::Top,
+      x::VerticalAlignmentValues::Center,
+      x::VerticalAlignmentValues::Bottom,
+    ] {
+      for (wrap_text, fixed, height, expected) in [
+        (true, false, 80.0, vec!["Alpha", "Beta", "", "Gamma"]),
+        (true, true, 7.56, vec!["Alpha"]),
+        (false, true, 7.56, vec!["Alpha", "BetaGamma"]),
+      ] {
+        let rect = CellRect {
+          x_pt: 10.0,
+          y_pt: 20.0,
+          width_pt: 150.0,
+          height_pt: height,
+        };
+        let mut items = Vec::new();
+        render_cell_rich_text(
+          &mut items,
+          &runs,
+          rect,
+          style.clone(),
+          CellTextRenderOptions {
+            auxiliary_line_break_font: None,
+            track_printer_line_extents: false,
+            alignment: Some(super::super::styles::AlignmentRecord {
+              wrap_text,
+              vertical: Some(vertical),
+              ..Default::default()
+            }),
+            horizontal_alignment: x::HorizontalAlignmentValues::Left,
+            hyperlink_url: None,
+            formula: false,
+            default_line_height_pt: 10.08,
+            font_print_context: Some(CellFontPrintContext {
+              style: TextStyle {
+                font_size_pt: 6.0,
+                ..style.clone()
+              },
+              print_scale: 0.95,
+            }),
+            clip_wrapped_text: fixed,
+            has_outer_border: false,
+          },
+          0.95,
+          &mut metrics,
+        );
+        let items = items
+          .iter()
+          .map(|item| {
+            let PageItem::Text(item) = item else {
+              panic!("text expected")
+            };
+            item
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(
+          items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>(),
+          expected
+        );
+        assert!(
+          items
+            .iter()
+            .all(|item| item.paint_clip.is_some() == (fixed && wrap_text))
+        );
+        if fixed && wrap_text {
+          let expected_y = match vertical {
+            x::VerticalAlignmentValues::Top => 20.0,
+            x::VerticalAlignmentValues::Center => 20.0 + (height - 7.68) / 2.0,
+            _ => 20.0 + height - 7.68,
+          };
+          assert!((items[0].y_pt - expected_y).abs() < 0.001);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn wrapped_payload_keeps_native_partial_last_lines_before_paint_clipping() {
+    // Office's Verdana12 / 95% boundary controls retain two lines at14.88pt
+    // and three at29.64pt. Its original automatic-row control retains eleven
+    // at148.08pt, including the last line hidden by the separate paint inset.
+    let style = TextStyle {
+      font_family: Some(Arc::from("Verdana")),
+      font_size_pt: 11.4,
+      ..Default::default()
+    };
+    let text = (1..=12)
+      .map(|index| format!("Line{index}"))
+      .collect::<Vec<_>>()
+      .join("\n");
+    let runs = [super::super::workbook::SharedStringRun {
+      text: text.clone(),
+      ..Default::default()
+    }];
+    let mut metrics = TextMetrics::new();
+    for (height, expected) in [
+      (14.64, 1),
+      (14.88, 2),
+      (29.4, 2),
+      (29.64, 3),
+      (147.24, 10),
+      (148.08, 11),
+    ] {
+      let rect = CellRect {
+        x_pt: 10.0,
+        y_pt: 20.0,
+        width_pt: 150.0,
+        height_pt: height,
+      };
+      let options = CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        track_printer_line_extents: false,
+        alignment: Some(super::super::styles::AlignmentRecord {
+          wrap_text: true,
+          vertical: Some(x::VerticalAlignmentValues::Top),
+          ..Default::default()
+        }),
+        horizontal_alignment: x::HorizontalAlignmentValues::Left,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 10.08,
+        font_print_context: Some(CellFontPrintContext {
+          style: TextStyle {
+            font_size_pt: 12.0,
+            ..style.clone()
+          },
+          print_scale: 0.95,
+        }),
+        clip_wrapped_text: true,
+        has_outer_border: false,
+      };
+      for rich in [false, true] {
+        let mut items = Vec::new();
+        if rich {
+          render_cell_rich_text(
+            &mut items,
+            &runs,
+            rect,
+            style.clone(),
+            options.clone(),
+            0.95,
+            &mut metrics,
+          );
+        } else {
+          render_cell_text(
+            &mut items,
+            &text,
+            rect,
+            style.clone(),
+            options.clone(),
+            &mut metrics,
+          );
+        }
+        let texts = items
+          .iter()
+          .map(|item| {
+            let PageItem::Text(text) = item else {
+              panic!("text expected")
+            };
+            assert!(text.paint_clip.is_some());
+            text.text.as_str()
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(texts.len(), expected, "height={height}, rich={rich}");
+        assert_eq!(texts[0], "Line1");
+        assert_eq!(
+          texts.last().copied(),
+          Some(format!("Line{expected}").as_str())
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn rich_text_wrapping_keeps_font_metrics_local_to_each_line() {
+    let mut metrics = TextMetrics::new();
+    let runs = [
+      super::super::workbook::SharedStringRun {
+        text: "Small\n".into(),
+        ..Default::default()
+      },
+      super::super::workbook::SharedStringRun {
+        text: "Large\n".into(),
+        has_properties: true,
+        font_size_pt: Some(24.0),
+        ..Default::default()
+      },
+      super::super::workbook::SharedStringRun {
+        text: "Small".into(),
+        ..Default::default()
+      },
+    ];
+    let mut items = Vec::new();
+    render_cell_rich_text(
+      &mut items,
+      &runs,
+      CellRect {
+        x_pt: 10.0,
+        y_pt: 20.0,
+        width_pt: 200.0,
+        height_pt: 120.0,
+      },
+      TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        font_size_pt: 9.96,
+        ..Default::default()
+      },
+      CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        track_printer_line_extents: false,
+        alignment: Some(super::super::styles::AlignmentRecord {
+          wrap_text: true,
+          vertical: Some(x::VerticalAlignmentValues::Top),
+          ..Default::default()
+        }),
+        horizontal_alignment: x::HorizontalAlignmentValues::Left,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 12.36,
+        font_print_context: None,
+        clip_wrapped_text: false,
+        has_outer_border: false,
+      },
+      1.0,
+      &mut metrics,
+    );
+    let items = items
+      .iter()
+      .map(|item| {
+        let PageItem::Text(item) = item else {
+          panic!("text expected")
+        };
+        item
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(items.len(), 3);
+    assert_eq!(items[0].line_height_pt, 12.36);
+    assert_eq!(items[2].line_height_pt, 12.36);
+    assert!(items[1].line_height_pt > 2.0 * items[0].line_height_pt);
+    assert!((items[1].y_pt - items[0].y_pt - items[0].line_height_pt).abs() < 0.001);
+    assert!((items[2].y_pt - items[1].y_pt - items[1].line_height_pt).abs() < 0.001);
+  }
+
+  #[test]
+  fn merged_wrapping_uses_the_fixed_row_prefix_without_manual_height() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    // Native merged/ordinary AutoFit controls: a merged automatic row keeps
+    // its fixed box, whereas an ordinary cell grows to contain hard lines.
+    for (merge, manual_height, expected) in
+      [(false, None, 3), (true, None, 1), (true, Some(60.0), 3)]
+    {
+      let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+      let workbook = package.add_workbook_part().unwrap();
+      let worksheet = workbook
+        .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+        .unwrap();
+      let styles = workbook
+        .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+        .unwrap();
+      let id = workbook
+        .get_id_of_part(&package, &worksheet)
+        .unwrap()
+        .to_owned();
+      workbook.set_data(&mut package, format!(
+        r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Wrap" sheetId="1" r:id="{id}"/></sheets></workbook>"#
+      ).into_bytes()).unwrap();
+      styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <fonts count="1"><font><sz val="10"/><name val="Arial"/></font></fonts>
+        <cellXfs count="1"><xf fontId="0" applyAlignment="1"><alignment wrapText="1" vertical="bottom"/></xf></cellXfs>
+      </styleSheet>"#.to_vec()).unwrap();
+      let height = manual_height
+        .map(|height| format!(r#" ht="{height}" customHeight="1""#))
+        .unwrap_or_default();
+      let merged = if merge {
+        r#"<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#
+      } else {
+        ""
+      };
+      worksheet.set_data(&mut package, format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <sheetFormatPr defaultRowHeight="12.75"/><cols><col min="1" max="2" width="30" customWidth="1"/></cols>
+        <sheetData><row r="1"{height}><c r="A1" s="0" t="inlineStr"><is><t>Alpha&#10;Beta&#10;Gamma</t></is></c></row></sheetData>{merged}</worksheet>"#).into_bytes()).unwrap();
+      let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+      let print = CalcPrintDocument::from_import(&import);
+      let page = &print.pages[0];
+      let items = print_page_items(&import, page, page_setup_from_calc(page));
+      let words = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) if ["Alpha", "Beta", "Gamma"].contains(&text.text.as_str()) => {
+            Some(text.text.as_str())
+          }
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(
+        words,
+        ["Alpha", "Beta", "Gamma"][..expected],
+        "merge={merge}, height={manual_height:?}"
+      );
+    }
+  }
+
+  #[test]
   fn rich_text_renderer_keeps_runs_separate_on_one_shared_line() {
     let runs = [
       super::super::workbook::SharedStringRun {
@@ -17705,11 +22509,14 @@ mod cell_alignment_tests {
       },
       base_style,
       CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        track_printer_line_extents: false,
         alignment: None,
         horizontal_alignment: x::HorizontalAlignmentValues::Left,
         hyperlink_url: None,
         formula: false,
         default_line_height_pt: 12.0,
+        font_print_context: None,
         clip_wrapped_text: false,
         has_outer_border: false,
       },
@@ -17816,11 +22623,14 @@ mod cell_alignment_tests {
         ..TextStyle::default()
       },
       CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        track_printer_line_extents: false,
         alignment: None,
         horizontal_alignment: x::HorizontalAlignmentValues::Left,
         hyperlink_url: None,
         formula: false,
         default_line_height_pt: 12.0,
+        font_print_context: None,
         clip_wrapped_text: false,
         has_outer_border: false,
       },
@@ -17847,6 +22657,7 @@ mod cell_alignment_tests {
     assert_eq!(calc_cell_overflow_hash_count(90.0, 6.0, 1), 15);
     assert_eq!(calc_cell_overflow_hash_count(5.0, 6.0, 1), 1);
     assert_eq!(calc_cell_overflow_hash_count(5.0, 6.0, 0), 0);
+    assert_eq!(calc_cell_overflow_hash_count(0.0, 6.0, 1), 0);
   }
 
   #[test]
@@ -17854,6 +22665,194 @@ mod cell_alignment_tests {
     assert_eq!(calc_axis_centering_offset(true, 500.0, 300.0), 100.0);
     assert_eq!(calc_axis_centering_offset(false, 500.0, 300.0), 0.0);
     assert_eq!(calc_axis_centering_offset(true, 300.0, 500.0), 0.0);
+  }
+
+  #[test]
+  fn picture_outline_scales_with_print_zoom_and_stays_outside_the_bitmap() {
+    use ooxmlsdk::parts::drawings_part::DrawingsPart;
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let drawing = worksheet
+      .add_new_part_auto_id::<_, DrawingsPart>(&mut package)
+      .unwrap();
+    let id = workbook
+      .get_id_of_part(&package, &worksheet)
+      .unwrap()
+      .to_owned();
+    workbook.set_data(&mut package, format!(r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Picture" sheetId="1" r:id="{id}"/></sheets></workbook>"#).into_bytes()).unwrap();
+    worksheet.set_data(&mut package, br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#.to_vec()).unwrap();
+    drawing.set_data(&mut package, br#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:absoluteAnchor><xdr:pos x="0" y="0"/><xdr:ext cx="5791200" cy="295275"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="10" name="Picture"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill/><xdr:spPr><a:prstGeom prst="rect"/><a:ln w="38100" cap="sq"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln></xdr:spPr></xdr:pic><xdr:clientData/></xdr:absoluteAnchor></xdr:wsDr>"#.to_vec()).unwrap();
+    let catalog =
+      super::super::drawing::DrawingResourceCatalog::from_part(&package, &drawing, None).unwrap();
+    let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+    let object = &catalog.anchors[0].object;
+    let image = CellRect {
+      x_pt: 120.41,
+      y_pt: 275.48,
+      width_pt: 264.01,
+      height_pt: 13.31,
+    };
+    // Native source63/100% controls print the 3pt line at1.77/2.85pt.
+    // Their picture viewport remains unchanged as line visibility toggles.
+    for (zoom, expected_width) in [(0.59, 1.77), (0.95, 2.85)] {
+      let mut items = Vec::new();
+      push_xlsx_picture_outline(&import, &mut items, object, image, Affine::IDENTITY, zoom);
+      let [PageItem::Path(path)] = items.as_slice() else {
+        panic!("one picture border");
+      };
+      let stroke = path.stroke.as_ref().unwrap();
+      assert!((stroke.width.0 - expected_width).abs() < 1.0e-5);
+      assert_eq!(stroke.cap, Some(common::StrokeCap::Square));
+      assert!(matches!(path.fill, common::Fill::None));
+      assert!((path.bounds.origin.x.0 - image.x_pt + expected_width / 2.0).abs() < 1.0e-4);
+      assert!((path.bounds.origin.y.0 - image.y_pt + expected_width / 2.0).abs() < 1.0e-4);
+      assert!((path.bounds.size.width.0 - image.width_pt - expected_width).abs() < 1.0e-4);
+      assert!((path.bounds.size.height.0 - image.height_pt - expected_width).abs() < 1.0e-4);
+    }
+  }
+
+  #[test]
+  fn overflow_occupancy_retains_stored_values_with_empty_display() {
+    let controls = [
+      (None, "", false, false),
+      (Some(x::CellValues::String), "", true, true),
+      (Some(x::CellValues::InlineString), "", false, true),
+      (Some(x::CellValues::SharedString), "", false, true),
+      (Some(x::CellValues::Number), "0", false, true),
+      (Some(x::CellValues::Number), "", false, false),
+      (Some(x::CellValues::InlineString), " ", false, true),
+    ];
+    let mut cells = Vec::new();
+    let mut expected = Vec::new();
+    for (index, (data_type, raw_text, formula, occupied)) in controls.into_iter().enumerate() {
+      let mut cell = print_cell(super::super::print::NumberFormatRenderState::Raw);
+      cell.address = CellAddress {
+        row: index as u32 + 1,
+        col: 2,
+      };
+      cell.data_type = data_type;
+      cell.text = Cow::Borrowed(raw_text);
+      cell.rendered_text.clear();
+      cell.formula = formula;
+      cells.push(Arc::new(cell));
+      expected.push(occupied);
+    }
+    let occupied = calc_occupied_text_cells(&cells);
+    for (index, expected) in expected.into_iter().enumerate() {
+      assert_eq!(occupied.contains_key(&(index as u32 + 1, 2)), expected);
+    }
+  }
+
+  #[test]
+  fn overflowing_cell_text_is_painted_after_neighboring_empty_cell_fill() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let styles = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    let id = workbook.get_id_of_part(&package, &worksheet).unwrap();
+    let xml = format!(
+      r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Grid" sheetId="1" r:id="{id}"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Grid!$A$1:$B$1</definedName></definedNames></workbook>"#
+    );
+    workbook.set_data(&mut package, xml.into_bytes()).unwrap();
+    styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFF0000"/></patternFill></fill></fills><cellXfs count="2"><xf fontId="0"/><xf fontId="0" fillId="1" applyFill="1"/></cellXfs></styleSheet>"#.to_vec()).unwrap();
+    worksheet.set_data(&mut package, br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="6"/><col min="2" max="2" width="40"/></cols><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Overflow into a filled blank</t></is></c><c r="B1" s="1"/></row></sheetData></worksheet>"#.to_vec()).unwrap();
+    let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+    let print = CalcPrintDocument::from_import(&import);
+    assert_eq!(print.pages.len(), 1);
+    let page = &print.pages[0];
+    let items = print_page_items(&import, page, page_setup_from_calc(page));
+    let fill_index = items
+      .iter()
+      .position(|item| matches!(item, PageItem::Rect(rect) if rect.fill_color == Some(RgbColor { r: 255, g: 0, b: 0 })))
+      .expect("neighbor's direct fill");
+    let text_index = items
+      .iter()
+      .position(
+        |item| matches!(item, PageItem::Text(text) if text.text == "Overflow into a filled blank"),
+      )
+      .expect("complete overflowing text");
+    assert!(fill_index < text_index);
+    let (PageItem::Rect(fill), PageItem::Text(text)) = (&items[fill_index], &items[text_index])
+    else {
+      unreachable!();
+    };
+    assert!(
+      text.x_pt + TextMetrics::new().measure_text(&text.text, &text.style) > fill.x_pt,
+      "witness must actually overlap the neighboring fill"
+    );
+  }
+
+  #[test]
+  fn portrait_page_centering_uses_the_realized_grid_after_paper_mapping() {
+    use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+    use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
+    use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+    use ooxmlsdk::sdk::SpreadsheetDocumentType;
+
+    let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+    let properties = package.add_extended_file_properties_part().unwrap();
+    properties.set_data(&mut package, br#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Macintosh Excel</Application><AppVersion>15.0300</AppVersion></Properties>"#.to_vec()).unwrap();
+    let workbook = package.add_workbook_part().unwrap();
+    let worksheet = workbook
+      .add_new_part_auto_id::<_, WorksheetPart>(&mut package)
+      .unwrap();
+    let styles = workbook
+      .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut package)
+      .unwrap();
+    let id = workbook.get_id_of_part(&package, &worksheet).unwrap();
+    let xml = format!(
+      r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Grid" sheetId="1" r:id="{id}"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Grid!$A$1:$F$1</definedName></definedNames></workbook>"#
+    );
+    workbook.set_data(&mut package, xml.into_bytes()).unwrap();
+    styles.set_data(&mut package, br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="10"/><name val="Arial"/></font></fonts><cellStyleXfs count="1"><xf fontId="0"/></cellStyleXfs><cellXfs count="1"><xf fontId="0" xfId="0"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#.to_vec()).unwrap();
+    worksheet.set_data(&mut package, br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="7.33203125" customWidth="1"/><col min="2" max="2" width="110.5" customWidth="1"/><col min="3" max="6" width="22.6640625" customWidth="1"/></cols><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>X</t></is></c></row></sheetData><pageMargins left="0.25" right="0.25" top="1" bottom="1" header="0.5" footer="0.5"/><pageSetup paperSize="9" orientation="portrait" scale="47"/></worksheet>"#.to_vec()).unwrap();
+    let import = ExcelImport::import_document(&package, &LayoutOptions::default()).unwrap();
+    let print = CalcPrintDocument::from_import(&import);
+    assert_eq!(print.pages.len(), 1);
+    // Native paired portrait exports keep all column widths and cell content
+    // fixed. Mapping Letter at 96% changes the centering displacement from
+    // 8.28pt (explicit A4) to 19.80pt; it does not scale the old displacement.
+    for (paper_percent, expected_shift) in [(96, 19.8), (100, 8.28)] {
+      let mut origins = Vec::new();
+      for centered in [false, true] {
+        let mut page = print.pages[0].clone();
+        page.paper_scale_percent = paper_percent;
+        let mut settings = (*page.page_settings).clone();
+        settings.horizontal_centered = centered;
+        page.page_settings = &settings;
+        let setup = page_setup_from_calc(&page);
+        let items = print_page_items(&import, &page, setup);
+        let origin = items
+          .iter()
+          .find_map(|item| match item {
+            PageItem::Text(text) if text.text == "X" => Some(text.x_pt),
+            _ => None,
+          })
+          .expect("printed witness");
+        origins.push(origin);
+      }
+      let shift = origins[1] - origins[0];
+      assert!(
+        (shift - expected_shift).abs() <= 0.12 + 1.0e-4,
+        "paper={paper_percent}: {shift} != {expected_shift}"
+      );
+    }
   }
 
   #[test]
@@ -18643,6 +23642,395 @@ mod cell_alignment_tests {
   }
 
   #[test]
+  fn unwrapped_mixed_font_portions_use_native_printer_extents() {
+    let runs = [
+      super::super::workbook::SharedStringRun {
+        text: "1)".into(),
+        ..Default::default()
+      },
+      super::super::workbook::SharedStringRun {
+        text: format!("{} ", "\u{a0}".repeat(12)),
+        has_properties: true,
+        font_family: Some("Times New Roman".into()),
+        font_size_pt: Some(12.0),
+        ..Default::default()
+      },
+      super::super::workbook::SharedStringRun {
+        text: "Start Here  ".into(),
+        has_properties: true,
+        font_family: Some("Arial".into()),
+        font_size_pt: Some(12.0),
+        ..Default::default()
+      },
+      super::super::workbook::SharedStringRun {
+        text: "(view only)".into(),
+        has_properties: true,
+        font_family: Some("Arial".into()),
+        font_size_pt: Some(12.0),
+        italic: Some(true),
+        ..Default::default()
+      },
+    ];
+    let mut items = Vec::new();
+    let mut metrics = TextMetrics::new();
+    render_cell_rich_text(
+      &mut items,
+      &runs,
+      CellRect {
+        x_pt: 0.0,
+        y_pt: 0.0,
+        width_pt: 200.0,
+        height_pt: 20.0,
+      },
+      TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        font_size_pt: 7.08,
+        ..Default::default()
+      },
+      CellTextRenderOptions {
+        auxiliary_line_break_font: None,
+        track_printer_line_extents: false,
+        alignment: None,
+        horizontal_alignment: x::HorizontalAlignmentValues::Left,
+        hyperlink_url: None,
+        formula: false,
+        default_line_height_pt: 15.0,
+        font_print_context: None,
+        clip_wrapped_text: false,
+        has_outer_border: false,
+      },
+      0.59,
+      &mut metrics,
+    );
+    let text = items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Text(text) => Some(text),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(text.len(), 4);
+    // Native600dpi Arial/TNR font59: "1)"=53 dots, thirteen spaces=195,
+    // "Start Here  "=301. These extents own the following run's origin.
+    assert!((text[2].x_pt - text[0].x_pt - 29.76).abs() < 1.0e-4);
+    assert!((text[3].x_pt - text[2].x_pt - 36.12).abs() < 1.0e-4);
+    // The native unpositioned paint advance of 'S' is39 printer dots.
+    let advances = text[2]
+      .style
+      .semantic_character_advances_pt
+      .as_ref()
+      .unwrap();
+    assert!((advances[0] - 4.68).abs() < 1.0e-4);
+  }
+
+  #[test]
+  fn italic_edit_portions_keep_native_per_string_overhang() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 8.28,
+      bold: true,
+      italic: true,
+      ..Default::default()
+    };
+    // Native printer font69: ascent64, tmOverhang0; Excel's cache supplies
+    // 12 dots. Native "AV A" is165 dots, so one portion fits 22pt after
+    // adding its overhang (21.24pt); splitting it adds another overhang
+    // (22.68pt) and moves the last word. Independent Office equal-style,
+    // color-only and underline-only split controls confirm this behavior.
+    assert!(
+      (excel_printer_cell_text_overhang_pt(&style, &mut TextMetrics::new()) - 1.44).abs() < 1.0e-4
+    );
+    let mut metrics = TextMetrics::new();
+    for split in [false, true] {
+      let runs = if split {
+        vec![
+          super::super::workbook::SharedStringRun {
+            text: "AV ".into(),
+            ..Default::default()
+          },
+          super::super::workbook::SharedStringRun {
+            text: "A".into(),
+            ..Default::default()
+          },
+        ]
+      } else {
+        vec![super::super::workbook::SharedStringRun {
+          text: "AV A".into(),
+          ..Default::default()
+        }]
+      };
+      let mut items = Vec::new();
+      render_cell_rich_text(
+        &mut items,
+        &runs,
+        CellRect {
+          x_pt: 0.0,
+          y_pt: 0.0,
+          width_pt: 25.0,
+          height_pt: 40.0,
+        },
+        style.clone(),
+        CellTextRenderOptions {
+          auxiliary_line_break_font: None,
+          track_printer_line_extents: false,
+          alignment: Some(super::super::styles::AlignmentRecord {
+            wrap_text: true,
+            vertical: Some(x::VerticalAlignmentValues::Top),
+            ..Default::default()
+          }),
+          horizontal_alignment: x::HorizontalAlignmentValues::Left,
+          hyperlink_url: None,
+          formula: false,
+          default_line_height_pt: 10.08,
+          font_print_context: None,
+          clip_wrapped_text: false,
+          has_outer_border: false,
+        },
+        1.0,
+        &mut metrics,
+      );
+      let texts = items
+        .iter()
+        .map(|item| match item {
+          PageItem::Text(text) => text,
+          _ => panic!("text expected"),
+        })
+        .collect::<Vec<_>>();
+      if split {
+        assert_eq!(texts.len(), 2);
+        assert_eq!(texts[0].text, "AV");
+        assert_eq!(texts[1].text, "A");
+        assert!(texts[1].y_pt > texts[0].y_pt);
+      } else {
+        assert_eq!(texts.len(), 1);
+        assert_eq!(texts[0].text, "AV A");
+      }
+    }
+  }
+
+  #[test]
+  fn wrapped_plain_text_uses_unpositioned_native_printer_extent() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 7.08,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    let device_style = fixed_output_gdi_base_cell_text_style(&style);
+    // Native GetTextExtentPoint32W: Arial, lfHeight=-59, 600dpi, 133 dots.
+    // The narrower pair-positioned outline width incorrectly keeps both
+    // words at this boundary.
+    let extent = metrics
+      .gdi_printer_text_extents_pt("AV A", &device_style, units::OFFICE_FIXED_OUTPUT_DPI)
+      .expect("Arial native printer metrics");
+    assert!((extent.unpositioned_width_pt - 15.96).abs() < 1.0e-4);
+    assert_eq!(
+      wrap_cell_text_with_break_whitespace(
+        "AV A",
+        15.84,
+        &style,
+        &mut metrics,
+        false,
+        CellTextWrapMetrics::FixedOutput,
+        CellTextBreakPolicy::worksheet(None),
+      ),
+      ["AV", "A"]
+    );
+  }
+
+  #[test]
+  fn wrapped_cells_split_overlong_first_tokens_and_reuse_the_remaining_line() {
+    let text = "ab abcde xy\r\n\nUVWXYZ";
+    let ranges = wrapped_cell_text_ranges(text, 4.0, false, None, true, |range| {
+      text[range].chars().count() as f32
+    });
+    assert_eq!(
+      ranges
+        .iter()
+        .map(|range| &text[range.clone()])
+        .collect::<Vec<_>>(),
+      ["ab", "abcd", "e xy", "", "UVWX", "YZ"]
+    );
+    let unchanged = wrapped_cell_text_ranges("UVWXYZ", 4.0, false, None, false, |range| {
+      range.len() as f32
+    });
+    assert_eq!(unchanged.len(), 1);
+    assert_eq!(unchanged[0], 0..6);
+  }
+
+  #[test]
+  fn wrapped_cell_emergency_breaks_match_native_scalars_including_combining_marks() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 7.68,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    // Native96 plain/rich controls in two authoring languages: when the
+    // first glyph itself exceeds the width, Latin combining marks become
+    // separate lines. A supplementary character remains one scalar.
+    for text in [
+      "WXYZ",
+      "a\u{301}bc",
+      "á\u{301}bc",
+      "a\u{308}bc",
+      "a\u{327}bc",
+      "𝐀bc",
+    ] {
+      let lines = wrap_cell_text_with_break_whitespace(
+        text,
+        1.0,
+        &style,
+        &mut metrics,
+        false,
+        CellTextWrapMetrics::FixedOutput,
+        CellTextBreakPolicy::worksheet(None),
+      );
+      assert_eq!(
+        lines,
+        text
+          .chars()
+          .map(|character| character.to_string())
+          .collect::<Vec<_>>(),
+        "{text}"
+      );
+    }
+    let width = metrics
+      .gdi_printer_text_extents_pt("WX", &style, units::OFFICE_FIXED_OUTPUT_DPI)
+      .expect("Arial printer extent")
+      .unpositioned_width_pt;
+    assert_eq!(
+      wrap_cell_text_with_break_whitespace(
+        "WXYZ",
+        width,
+        &style,
+        &mut metrics,
+        false,
+        CellTextWrapMetrics::FixedOutput,
+        CellTextBreakPolicy::worksheet(None),
+      ),
+      ["WX", "YZ"]
+    );
+  }
+
+  #[test]
+  fn wrapped_cell_emergency_breaks_keep_native_devanagari_tails() {
+    // Native24 controls, both authoring languages, actual NirmalaUI fallback:
+    // helper fits the base at index0, the independent tail step selects1.
+    // In particular, this splits a virama conjunct after the virama rather
+    // than applying ICU's broader grapheme-cluster boundary.
+    for text in ["काकक", "क़कक", "क्कक", "कँकक", "क॑कक", "कॢकक"]
+    {
+      let ranges = wrapped_cell_text_ranges(text, 1.0, false, None, true, |range| {
+        text[range].chars().count() as f32
+      });
+      let lines = ranges
+        .iter()
+        .map(|range| &text[range.clone()])
+        .collect::<Vec<_>>();
+      let first_end = text.char_indices().nth(2).expect("four scalars").0;
+      assert_eq!(lines, [&text[..first_end], "क", "क"], "{text}");
+    }
+  }
+
+  #[test]
+  fn wrapped_cell_emergency_search_measures_bounded_prefixes_of_long_words() {
+    let text = "N".repeat(32_768);
+    let mut measured_characters = 0;
+    let lines = wrapped_cell_text_ranges(&text, 3.0, false, None, true, |range| {
+      measured_characters += range.len();
+      range.len() as f32
+    });
+    assert_eq!(lines.len(), text.len().div_ceil(3));
+    assert!(lines.iter().all(|range| (1..=3).contains(&range.len())));
+    assert!(
+      measured_characters < text.len() * 8,
+      "{measured_characters}"
+    );
+  }
+
+  #[test]
+  fn wrapped_cells_use_native_auxiliary_font_boundaries_and_punctuation() {
+    let mut metrics = TextMetrics::new();
+    let coverage = metrics
+      .auxiliary_font_coverage("SimSun")
+      .expect("SimSun coverage");
+    for character in ['á', 'ä', 'é', 'ñ', 'ü', 'ß', 'α', 'Ж', '©'] {
+      let text = format!("Test c{character}lmn");
+      let start = "Test c".len();
+      let end = start + character.len_utf8();
+      let enabled = office_line_break_points(&text, Some(&coverage));
+      assert!(
+        enabled.contains(&start) && enabled.contains(&end),
+        "{character}"
+      );
+      let disabled = office_line_break_points(&text, None);
+      assert!(
+        !disabled.contains(&start) && !disabled.contains(&end),
+        "{character}"
+      );
+    }
+    for character in ['a', '7', 'Ā', 'ı'] {
+      let text = format!("Test c{character}lmn");
+      let points = office_line_break_points(&text, Some(&coverage));
+      assert!(!points.contains(&"Test c".len()), "{character}");
+      assert!(
+        !points.contains(&("Test c".len() + character.len_utf8())),
+        "{character}"
+      );
+    }
+    for character in ['ä', 'α'] {
+      let text = format!("Test ({character})nnn");
+      let points = office_line_break_points(&text, Some(&coverage));
+      assert!(!points.contains(&"Test (".len()));
+      assert!(!points.contains(&("Test (".len() + character.len_utf8())));
+    }
+    let decomposed = "Test ca\u{301}lmn";
+    assert!(!office_line_break_points(decomposed, Some(&coverage)).contains(&"Test ca".len()));
+    let precomposed = "Test cá\u{301}lmn";
+    assert!(office_line_break_points(precomposed, Some(&coverage)).contains(&"Test cá".len()));
+  }
+
+  #[test]
+  fn wrapped_cells_allow_native_curly_quote_edges_and_keep_ascii_quoted_words() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 12.0,
+      ..TextStyle::default()
+    };
+    let device_style = fixed_output_gdi_base_cell_text_style(&style);
+    let mut metrics = TextMetrics::new();
+    // Native width interpolation leaves the opening quote or quoted letter
+    // on the previous line; the remaining quoted token starts the next one.
+    for prefix in ["AB “", "AB “X"] {
+      let width = metrics
+        .gdi_printer_text_extents_pt(prefix, &device_style, units::OFFICE_FIXED_OUTPUT_DPI)
+        .unwrap()
+        .unpositioned_width_pt;
+      let lines = wrap_cell_text_with_break_whitespace(
+        "AB “X” CD",
+        width,
+        &style,
+        &mut metrics,
+        false,
+        CellTextWrapMetrics::FixedOutput,
+        CellTextBreakPolicy::worksheet(None),
+      );
+      assert_eq!(lines[0], prefix);
+      let straight = wrap_cell_text_with_break_whitespace(
+        "AB \"X\" CD",
+        width,
+        &style,
+        &mut metrics,
+        false,
+        CellTextWrapMetrics::FixedOutput,
+        CellTextBreakPolicy::worksheet(None),
+      );
+      assert_eq!(straight[0], "AB");
+    }
+  }
+
+  #[test]
   fn wrapped_cell_text_uses_unicode_hyphen_break_opportunities() {
     let style = TextStyle::default();
     let mut metrics = TextMetrics::new();
@@ -18752,10 +24140,31 @@ mod header_footer_tests {
   }
 
   #[test]
-  fn fixed_output_content_scale_preserves_separate_fractional_stages() {
-    assert!((fixed_output_content_scale(100, 95) - 0.95).abs() < f32::EPSILON);
+  fn fixed_output_content_scale_realizes_native_integral_percentages() {
+    // Native zoom20/50/59/63/73/86/100/150 × implicit/explicit Letter/A4.
+    // The 24pt and36pt fonts distinguish percentage truncation from flooring
+    // only the final 600dpi font size (63×95% gives14.16, not14.28pt).
+    for (zoom, percent, font_12, font_24, font_36) in [
+      (20, 19, 2.28, 4.56, 6.84),
+      (50, 47, 5.64, 11.28, 16.92),
+      (59, 56, 6.72, 13.44, 20.16),
+      (63, 59, 7.08, 14.16, 21.24),
+      (73, 69, 8.28, 16.56, 24.84),
+      (86, 81, 9.72, 19.44, 29.16),
+      (100, 95, 11.4, 22.8, 34.2),
+      (150, 142, 17.04, 34.08, 51.12),
+    ] {
+      let scale = fixed_output_content_scale(zoom, 95);
+      assert!((scale - percent as f32 / 100.0).abs() < f32::EPSILON);
+      for (nominal, native) in [(12.0, font_12), (24.0, font_24), (36.0, font_36)] {
+        assert!(
+          (units::quantize_points_to_office_print_grid(nominal * scale) - native).abs() < 0.0001
+        );
+      }
+      assert!((fixed_output_content_scale(zoom, 100) - zoom as f32 / 100.0).abs() < f32::EPSILON);
+    }
     assert!((fixed_output_content_scale(80, 95) - 0.76).abs() < f32::EPSILON);
-    assert!((fixed_output_content_scale(90, 95) - 0.855).abs() < f32::EPSILON);
+    assert!((fixed_output_content_scale(90, 95) - 0.85).abs() < f32::EPSILON);
   }
 
   #[test]
@@ -18845,8 +24254,11 @@ mod header_footer_tests {
 
   #[test]
   fn header_footer_line_breaks_preserve_styles_fields_and_empty_lines() {
+    let sections = split_header_footer_sections("&R&20Title\n&8Page &P&B of &N\n\nEnd\n");
+    assert_eq!(sections.len(), 1);
+    assert!(matches!(sections[0].0, HeaderFooterAlign::Right));
     let runs = parse_header_footer_runs(
-      "&20Title\n&8Page &P&B of &N\n\nEnd",
+      &sections[0].1,
       TextStyle::default(),
       HeaderFooterFieldValues {
         page_number: 2,
@@ -18861,7 +24273,7 @@ mod header_footer_tests {
       .iter()
       .map(|line| line.iter().map(|run| run.text.as_str()).collect::<String>())
       .collect::<Vec<_>>();
-    assert_eq!(text, ["Title", "Page 2 of 3", "", "End"]);
+    assert_eq!(text, ["Title", "Page 2 of 3", "", "End", ""]);
     assert_eq!(lines[0][0].style.font_size_pt, 20.0);
     assert_eq!(lines[1].len(), 2);
     assert!(!lines[1][0].style.bold);
@@ -18873,6 +24285,29 @@ mod header_footer_tests {
     }
     assert!(lines[2][0].style.bold);
     assert!(lines[3][0].style.bold);
+    assert!(lines[4][0].style.bold);
+  }
+
+  #[test]
+  fn header_footer_line_end_spaces_keep_internal_gaps_and_empty_line_fonts() {
+    let sections = split_header_footer_sections("&R&BTitle &BYear   &16   \n\n");
+    let runs = parse_header_footer_runs(
+      &sections[0].1,
+      TextStyle::default(),
+      HeaderFooterFieldValues::default(),
+    );
+    let mut lines = split_header_footer_lines(runs);
+    for line in &mut lines {
+      trim_header_footer_line_end_spaces(line);
+    }
+    assert_eq!(lines.len(), 3);
+    assert_eq!(lines[0][0].text, "Title ");
+    assert_eq!(lines[0][1].text, "Year");
+    assert!(lines[0][2].text.is_empty());
+    for line in &lines[1..] {
+      assert!(line[0].text.is_empty());
+      assert_eq!(line[0].style.font_size_pt, 16.0);
+    }
   }
 
   #[test]

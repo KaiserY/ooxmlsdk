@@ -1,8 +1,21 @@
 //! Word separated-cell coordinates and their independent rounding owners.
+use crate::model::CellBordersModel;
+
 use super::*;
 
 pub(super) fn border_width(border: Option<BorderStyle>) -> f32 {
   border.map_or(0.0, |border| (border.width_pt * 20.0).floor() / 20.0)
+}
+
+pub(super) fn paint_width(border: Option<BorderStyle>) -> f32 {
+  border
+    .filter(|border| border.width_pt > 0.0)
+    .map_or(0.0, |border| {
+      let twips = (f64::from(border.width_pt) * 20.0).floor() as i64;
+      // Native separated rules use whole-twip integer division, like collapsed
+      // rules: sz12 paints12 source dots, not the nearest13; sz13 paints13.
+      (twips * 5 / 12).max(1) as f32 * 0.12
+    })
 }
 
 fn device_coordinate(pt: f32) -> i64 {
@@ -46,6 +59,79 @@ impl RowVertical {
         * 0.12,
     )
   }
+}
+
+pub(super) fn paint_cell_borders(
+  page: &mut Page,
+  bounds: (f32, f32, f32, f32),
+  cell: &TableCell,
+  borders: CellBordersModel,
+) {
+  let plain = [borders.top, borders.right, borders.bottom, borders.left]
+    .into_iter()
+    .flatten()
+    .all(|border| !border.compound && border.dash_pattern == BorderDashPattern::Solid);
+  let Some(paint) = cell
+    .shading
+    .filter(|paint| paint.is_visible())
+    .filter(|_| plain && (cell.margins.top_pt > 0.0 || cell.margins.bottom_pt > 0.0))
+  else {
+    push_separate_table_border_box(page, bounds, borders, false);
+    return;
+  };
+  let device =
+    wordprocessing_table_device::page_coordinates(page.setup.width_pt, page.setup.height_pt);
+  push_separate_table_border_box_with_device(
+    page,
+    bounds,
+    CellBordersModel {
+      top: borders.top,
+      bottom: borders.bottom,
+      ..CellBordersModel::default()
+    },
+    false,
+    device.as_ref(),
+  );
+  let (left, top, right, bottom) = bounds;
+  let top = top + paint_width(borders.top);
+  let bottom = (bottom - paint_width(borders.bottom)).max(top);
+  // Native shaded-cell controls paint horizontal faces, bottom/top margin
+  // backgrounds, then the vertical interiors. These are distinct fills even
+  // when the background was already painted: device coverage at touching
+  // edges otherwise leaves extra visible horizontal rules.
+  for (margin, leading) in [(cell.margins.bottom_pt, false), (cell.margins.top_pt, true)] {
+    let height = (device_coordinate(margin).max(0) as f32 * 0.12).min(bottom - top);
+    if height <= 0.0 || right <= left {
+      continue;
+    }
+    let rectangle = (
+      left,
+      if leading { top } else { bottom - height },
+      right - left,
+      height,
+    );
+    let (x_pt, y_pt, width_pt, height_pt) = device
+      .as_ref()
+      .map_or(rectangle, |device| device.map_rectangle(rectangle));
+    page.items.push(PageItem::Fill(FillItem {
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+      paint,
+    }));
+  }
+  push_separate_table_border_box_with_device(
+    page,
+    (left, top, right, bottom),
+    CellBordersModel {
+      left: borders.left,
+      right: borders.right,
+      ..CellBordersModel::default()
+    },
+    false,
+    device.as_ref(),
+  );
 }
 
 pub(super) struct Frame {
@@ -137,6 +223,89 @@ pub(super) fn text_left(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn separated_cell_margin_backgrounds_follow_native_face_order() {
+    let blocks =
+      crate::docx::html::import_blocks("<table><tr><td><p>Cell</p></td></tr></table>", false);
+    let Block::Table(table) = &blocks[0] else {
+      panic!("table")
+    };
+    let mut cell = table.rows[0].cells[0].clone();
+    cell.margins.top_pt = 3.0;
+    cell.margins.bottom_pt = 3.0;
+    let border = BorderStyle {
+      width_pt: 0.25,
+      ..BorderStyle::default()
+    };
+    let borders = CellBordersModel {
+      top: Some(border),
+      right: Some(border),
+      bottom: Some(border),
+      left: Some(border),
+    };
+    for shade in [192, 255] {
+      let paint = ShadingPaint::Solid(RgbColor {
+        r: shade,
+        g: shade,
+        b: shade,
+      });
+      cell.shading = Some(paint);
+      let mut page = empty_page(
+        PageSetup {
+          width_pt: 1190.7,
+          height_pt: 842.0,
+          ..PageSetup::default()
+        },
+        0,
+      );
+      // Native source box481,333..1078,655, borders2dots, margins25dots:
+      // horizontal faces, bottom/top background bands, vertical interiors.
+      paint_cell_borders(&mut page, (57.72, 39.96, 129.36, 78.6), &cell, borders);
+      let expected = [
+        [57.72, 39.96, 71.664, 0.24],
+        [57.72, 78.36, 71.664, 0.24],
+        [57.72, 75.36, 71.664, 3.0],
+        [57.72, 40.2, 71.664, 3.0],
+        [57.72, 40.2, 0.24, 38.16],
+        [129.144, 40.2, 0.24, 38.16],
+      ];
+      assert_eq!(page.items.len(), expected.len());
+      for (index, (item, expected)) in page.items.iter().zip(expected).enumerate() {
+        let PageItem::Fill(fill) = item else {
+          panic!("native cell face/band")
+        };
+        for (actual, expected) in [fill.x_pt, fill.y_pt, fill.width_pt, fill.height_pt]
+          .into_iter()
+          .zip(expected)
+        {
+          assert!(
+            (actual - expected).abs() < 0.0001,
+            "item{index}: {actual} != {expected}"
+          );
+        }
+        assert_eq!(
+          fill.paint,
+          if index == 2 || index == 3 {
+            paint
+          } else {
+            ShadingPaint::Solid(border.color)
+          }
+        );
+      }
+    }
+    for (eighth_points, dots) in [(1, 1), (2, 2), (6, 6), (12, 12), (13, 13), (24, 25)] {
+      assert!(
+        (paint_width(Some(BorderStyle {
+          width_pt: eighth_points as f32 / 8.0,
+          ..border
+        }))
+          - dots as f32 * 0.12)
+          .abs()
+          < 0.00001
+      );
+    }
+  }
 
   #[test]
   fn separated_row_vertical_owners_match_native_word_coordinates() {

@@ -7,7 +7,9 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use crate::common::PathCommand;
 use crate::common::{DrawingPath, DrawingPathFillMode};
 
-use super::drawingml_geometry::{append_transformed_arc, bez_path_commands};
+use super::drawingml_geometry::{
+  append_transformed_arc, append_transformed_quadrant_arc, bez_path_commands,
+};
 
 /// ECMA-376 Part 1 §20.1.9.22: the text rectangle uses the shape's EMU
 /// coordinate system, independently of any individual path's viewport.
@@ -39,6 +41,28 @@ pub(crate) fn paths(
   top: f32,
   width: f32,
   height: f32,
+) -> Option<Vec<DrawingPath>> {
+  paths_with_arc_subdivision(geometry, left, top, width, height, false)
+}
+
+/// Word's text centerlines use quadrant cubics, not a page-space tolerance.
+pub(crate) fn paths_with_quadrant_arcs(
+  geometry: &a::CustomGeometry,
+  left: f32,
+  top: f32,
+  width: f32,
+  height: f32,
+) -> Option<Vec<DrawingPath>> {
+  paths_with_arc_subdivision(geometry, left, top, width, height, true)
+}
+
+fn paths_with_arc_subdivision(
+  geometry: &a::CustomGeometry,
+  left: f32,
+  top: f32,
+  width: f32,
+  height: f32,
+  quadrant_arcs: bool,
 ) -> Option<Vec<DrawingPath>> {
   let mut paths = Vec::with_capacity(geometry.path_list.path.len());
   for path in &geometry.path_list.path {
@@ -163,7 +187,11 @@ pub(crate) fn paths(
           }
           let arc = drawingml_arc(start, radius_x, radius_y, start_angle, sweep_angle)?;
           let end = arc.eval(1.0);
-          append_transformed_arc(&mut output, arc, map_coordinates);
+          if quadrant_arcs {
+            append_transformed_quadrant_arc(&mut output, arc, map_coordinates);
+          } else {
+            append_transformed_arc(&mut output, arc, map_coordinates);
+          }
           current = Some((end.x, end.y));
         }
       }

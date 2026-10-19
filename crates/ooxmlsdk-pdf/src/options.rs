@@ -208,6 +208,10 @@ pub struct PdfOptions {
   /// Whether fixed-format bitmap surfaces target print or screen output.
   pub optimize_for: PdfOptimizeFor,
 
+  /// Rasterize document-private fonts that Word cannot embed directly in
+  /// fixed-format output, retaining transparent searchable text.
+  pub bitmap_missing_fonts: bool,
+
   /// JPEG quality used when the PDF filter asks raster graphics to be stored as JPEG.
   pub jpeg_quality: Option<u8>,
 
@@ -264,6 +268,7 @@ impl Default for PdfOptions {
       standards: Vec::new(),
       compress_content_streams: true,
       optimize_for: PdfOptimizeFor::Print,
+      bitmap_missing_fonts: true,
       jpeg_quality: None,
       source_file_name: None,
       ui_language: None,

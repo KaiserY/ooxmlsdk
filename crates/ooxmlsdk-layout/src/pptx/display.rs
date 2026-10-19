@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::ops::Range;
+use std::rc::Rc;
 use std::sync::{Arc, OnceLock};
 
 use crate::common::drawingml_geometry::{
@@ -14,6 +15,7 @@ use crate::common::{self, DebugProperty, DebugRecord, DebugShape, DebugValue, Po
 use crate::common::{
   drawingml_custom_geometry as custom_geometry, drawingml_preset_geometry as preset_geometry,
 };
+use crate::docx::{DrawingmlMathLayout, drawingml_math_layout};
 use crate::field_datetime;
 use crate::localization::OfficeLocaleContext;
 use crate::model::{
@@ -4674,6 +4676,7 @@ fn diagram_text_body(source: &shared_diagram::DiagramTextBody) -> TextBody {
             hyperlink_url: None,
             field_type: run.field_type.clone(),
             run_properties: run.run_properties.clone(),
+            math_source: None,
             field_paragraph_properties: run.field_paragraph_properties.clone(),
           })
           .collect(),
@@ -8415,7 +8418,11 @@ fn finish_shape_effect_raster(
     {
       sample
     } else {
-      shape_shadow_working_bounds(raster_bounds, sample, pixels_per_point)
+      common::drawingml_shape_raster::office_shape_shadow_working_bounds(
+        raster_bounds,
+        sample,
+        pixels_per_point,
+      )
     };
     relative_left = raster_bounds.origin.x.0 - context.bounds.origin.x.0;
     relative_top = raster_bounds.origin.y.0 - context.bounds.origin.y.0;
@@ -8972,38 +8979,6 @@ fn shape_behind_effects(
     kind: ImageEffectContainerKind::Sibling,
     effects: behind,
   })
-}
-
-fn shape_shadow_working_bounds(
-  required: common::Rect,
-  sample: common::Rect,
-  pixels_per_point: f32,
-) -> common::Rect {
-  let axis = |near: f32, length: f32, origin: f32, sample_length: f32| {
-    let scale = f64::from(pixels_per_point);
-    let far =
-      (f64::from(near) + f64::from(length)).max(f64::from(origin) + f64::from(sample_length));
-    let near = f64::from(near).min(f64::from(origin));
-    let first = ((near - f64::from(origin)) * scale).floor();
-    let last = ((far - f64::from(origin)) * scale).ceil();
-    (
-      (f64::from(origin) + first / scale) as f32,
-      ((last - first) / scale) as f32,
-    )
-  };
-  let (left, width) = axis(
-    required.origin.x.0,
-    required.size.width.0,
-    sample.origin.x.0,
-    sample.size.width.0,
-  );
-  let (top, height) = axis(
-    required.origin.y.0,
-    required.size.height.0,
-    sample.origin.y.0,
-    sample.size.height.0,
-  );
-  common_rect(left, top, width, height)
 }
 
 fn simple_shape_glow(
@@ -10400,10 +10375,9 @@ fn lower_text_body(
       image_resources: Some(&context.slide.image_resources),
       page_index: context.page_index,
       fixed_output: context.fixed_output,
-      camera_text_shape_rotation_deg: text_body
-        .display_properties
-        .text_camera_z_rotation
-        .is_some()
+      // ECMA-376 §21.1.2.1.1: ordinary shape xfrm also rotates its text;
+      // only bodyPr@upright opts out. Camera rotation is an additional pivot.
+      shape_text_rotation_deg: (!text_body.display_properties.upright)
         .then_some(visible_shape_rotation),
     },
     text_box,
@@ -10471,7 +10445,7 @@ fn lower_text_body_at_with_font_ref(
       font_reference,
       shape_hyperlink_url,
       word_art_target_frame: Some(word_art_target_frame),
-      camera_text_shape_rotation_deg: context.camera_text_shape_rotation_deg,
+      shape_text_rotation_deg: context.shape_text_rotation_deg,
       ..TextStyleLoweringInputs::default()
     },
     TextLoweringRuntime {
@@ -10492,7 +10466,7 @@ struct TextBodyLoweringContext<'a> {
   image_resources: Option<&'a HashMap<String, ImageResource>>,
   page_index: usize,
   fixed_output: PptxFixedOutputProfile,
-  camera_text_shape_rotation_deg: Option<f32>,
+  shape_text_rotation_deg: Option<f32>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -10505,7 +10479,7 @@ struct TextStyleLoweringInputs<'a> {
   auto_fit_font_scale: Option<f32>,
   rotation_center_pt: Option<(f32, f32)>,
   word_art_target_frame: Option<TextFrame>,
-  camera_text_shape_rotation_deg: Option<f32>,
+  shape_text_rotation_deg: Option<f32>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -10640,12 +10614,11 @@ fn lower_text_body_at_with_style_and_scale(
     text_body.display_properties.camera_z_rotation_degrees(),
     &mut text_metrics,
   );
-  if let Some(rotation_deg) = style_inputs.camera_text_shape_rotation_deg {
+  if let Some(rotation_deg) = style_inputs.shape_text_rotation_deg {
     let shape_frame = style_inputs.word_art_target_frame.unwrap_or(frame);
-    // Camera revolution rotates the laid-out content about its own center;
-    // the owning xfrm rotates that result about the outer shape center, not
-    // the inset text frame. Adding their angles while replacing the pivot
-    // loses the translation between these independent coordinate systems.
+    // The owning xfrm rotates laid-out text about the outer shape center,
+    // independently of bodyPr and camera rotations. Replacing either inner
+    // pivot with this one loses the translation between coordinate systems.
     rotate_text_items_about(
       &mut items[item_start..],
       (
@@ -10741,6 +10714,25 @@ fn rotate_text_items_about(items: &mut [PageItem], center: (f32, f32), rotation_
     return;
   }
   for item in items {
+    if let PageItem::Image(image) = item {
+      // Native math is a vector-backed inline image. It follows the same
+      // owning shape transform as the surrounding searchable text.
+      let old_center = (
+        image.x_pt + image.width_pt / 2.0,
+        image.y_pt + image.height_pt / 2.0,
+      );
+      let new_center = rotate_point(
+        old_center.0,
+        old_center.1,
+        center.0,
+        center.1,
+        rotation_deg.to_radians(),
+      );
+      image.x_pt += new_center.0 - old_center.0;
+      image.y_pt += new_center.1 - old_center.1;
+      image.rotation_deg += rotation_deg;
+      continue;
+    }
     let PageItem::Text(text) = item else {
       continue;
     };
@@ -12028,6 +12020,7 @@ struct TextLineRun<'a> {
   width_pt: f32,
   style: TextStyle,
   kind: TextLineRunKind,
+  math: Option<Rc<DrawingmlMathLayout>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -12048,7 +12041,7 @@ struct TextLoweringOptions {
   line_scale: f32,
   use_first_last_paragraph_spacing: bool,
   compatible_line_spacing: bool,
-  round_font_size_to_pt: bool,
+  shape_auto_fit: bool,
   rotation_deg: f32,
   rotation_center_pt: Option<(f32, f32)>,
   column_count: usize,
@@ -12076,7 +12069,7 @@ impl TextLoweringOptions {
         .display_properties
         .use_first_last_paragraph_spacing,
       compatible_line_spacing: text_body.display_properties.compatible_line_spacing,
-      round_font_size_to_pt: text_body.display_properties.auto_fit == TextAutoFit::Shape,
+      shape_auto_fit: text_body.display_properties.auto_fit == TextAutoFit::Shape,
       rotation_deg: text_body.display_properties.rotation_degrees(),
       rotation_center_pt: None,
       column_count: text_body.display_properties.column_count.max(1),
@@ -12385,6 +12378,8 @@ fn lower_paragraph(
 
     for (line_index, text_line) in text_lines.iter().enumerate() {
       let line_item_start = items.len();
+      let math_alignment = math_line_alignment(text_line);
+      let alignment = math_alignment.unwrap_or(alignment);
       let line_adjustment = paragraph_line_adjustment(
         alignment,
         line_index + 1 == text_lines.len(),
@@ -12403,16 +12398,24 @@ fn lower_paragraph(
       // placeholders.
       let mut max_line_height = if text_line.runs.is_empty() {
         if is_soft_break_empty_line {
-          paragraph_style.soft_break_empty_line_height(&base_line_style, context.options)
+          paragraph_style.soft_break_empty_line_height(
+            &base_line_style,
+            context.options,
+            text_metrics,
+          )
         } else {
-          paragraph_style.line_height(&base_line_style, context.options)
+          paragraph_style.line_height(&base_line_style, context.options, text_metrics)
         }
       } else {
         0.0
       };
       for line_run in &text_line.runs {
-        max_line_height =
-          max_line_height.max(paragraph_style.line_height(&line_run.style, context.options));
+        max_line_height = max_line_height.max(line_run_height(
+          line_run,
+          &paragraph_style,
+          context.options,
+          text_metrics,
+        ));
       }
       // A column must fit the next complete line. A paragraph can span
       // columns, so resolve its horizontal origin after each line's fit check.
@@ -12440,13 +12443,22 @@ fn lower_paragraph(
         alignment,
         context.options.word_wrap,
       );
+      // Native m:jc centers only the available slack. An oversized equation
+      // starts at the host's left edge even when bodyPr disables wrapping.
+      if math_alignment.is_some() {
+        run_x = run_x.max(paragraph_x);
+      }
       let common_baseline_offset = if matches!(
         paragraph_style.font_alignment,
         a::TextFontAlignmentValues::Automatic | a::TextFontAlignmentValues::Baseline
       ) && !text_line.runs.is_empty()
       {
         Some(text_line.runs.iter().fold(0.0_f32, |offset, line_run| {
-          let run_line_height = paragraph_style.line_height(&line_run.style, context.options);
+          if let Some(math) = &line_run.math {
+            return offset.max(math.ascent_pt);
+          }
+          let run_line_height =
+            paragraph_style.line_height(&line_run.style, context.options, text_metrics);
           // A run-level baseline shift positions only that run relative to
           // the line baseline (ECMA-376 §21.1.2.3.9). It must not select a
           // different common baseline for every other run in the line.
@@ -12521,7 +12533,8 @@ fn lower_paragraph(
           bullet_style.opacity = paint.opacity;
         }
         apply_character_bullet_size(&mut bullet_style, bullet.size);
-        let bullet_line_height = paragraph_style.line_height(&bullet_style, context.options);
+        let bullet_line_height =
+          paragraph_style.line_height(&bullet_style, context.options, text_metrics);
         let bullet_text_height = text_metrics.vertical_metrics(&bullet_style).ink_height_pt();
         // The bullet is positioned relative to the paragraph baseline, but
         // its buSzPct/buSzPts size does not participate in the line's text
@@ -12604,12 +12617,29 @@ fn lower_paragraph(
 
       for line_run in &text_line.runs {
         let style = &line_run.style;
-        let run_line_height = paragraph_style.line_height(style, context.options);
+        let run_line_height =
+          line_run_height(line_run, &paragraph_style, context.options, text_metrics);
         max_line_height = max_line_height.max(run_line_height);
         let raw_baseline_offset = raw_baseline_offset(style, run_line_height, text_metrics);
         let baseline_offset = common_baseline_offset
           .unwrap_or_else(|| paragraph_style.baseline_offset(style, run_line_height, text_metrics));
         let run_y_pt = cursor.y_pt + baseline_offset - raw_baseline_offset;
+        if let Some(math) = &line_run.math {
+          push_office_math_item(
+            items,
+            math,
+            run_x,
+            cursor.y_pt + common_baseline_offset.unwrap_or(math.ascent_pt),
+            context.options,
+            line_run
+              .run
+              .hyperlink_url
+              .as_deref()
+              .or(context.shape_hyperlink_url),
+          );
+          run_x += line_run.width_pt;
+          continue;
+        }
         if line_run.kind == TextLineRunKind::Text
           && !line_run.text.is_empty()
           && line_run.run.kind == TextRunKind::Math
@@ -12793,7 +12823,10 @@ fn layout_text_lines<'a>(
   // DrawingML tabs are positional controls, not glyph advances. Parley's
   // Unicode line breaker does not carry paragraph tab-stop geometry, so keep
   // tabbed paragraphs on the Office-aware path below.
-  if visible_runs.iter().any(|run| run.text.contains('\t')) {
+  if visible_runs
+    .iter()
+    .any(|run| run.text.contains('\t') || run.math_source.is_some())
+  {
     return legacy_lines;
   }
 
@@ -13221,7 +13254,7 @@ fn push_bidi_text_line_segment<'a>(
   };
   let mut style = run.style.clone();
   style.resolved_bidi_level = Some(level.number());
-  let width_pt = if run.kind == TextLineRunKind::Tab {
+  let width_pt = if run.kind == TextLineRunKind::Tab || run.math.is_some() {
     run.width_pt
   } else {
     text_metrics.measure_text(text, &style)
@@ -13232,6 +13265,7 @@ fn push_bidi_text_line_segment<'a>(
     width_pt,
     style,
     kind: run.kind,
+    math: run.math.clone(),
   });
   levels.push(level);
 }
@@ -13251,6 +13285,9 @@ fn layout_text_lines_legacy<'a>(
     })
     .collect::<Vec<_>>();
 
+  let display_math = visible_runs
+    .iter()
+    .all(|run| run.math_source.is_some() || run.text.trim().is_empty());
   let mut tokens = Vec::new();
   for run in visible_runs {
     let style = styled_text_run(
@@ -13260,6 +13297,39 @@ fn layout_text_lines_legacy<'a>(
       context.options,
       run,
     );
+    if let Some(source) = run.math_source.as_deref()
+      && let Some(math) =
+        drawingml_math_layout(source, &style, display_math, &|properties, style| {
+          apply_drawingml_run_properties(context.import, context.slide, properties, style);
+          // The enclosing run has already been scaled. Scale only properties
+          // introduced inside OMML, so inherited values are not scaled twice.
+          if properties.font_size.is_some() {
+            style.drawingml_effect_font_size_pt = Some(scaled_text_font_size_before_print_grid(
+              style.font_size_pt,
+              context.options.font_scale,
+            ));
+            style.font_size_pt =
+              scaled_text_font_size_pt(style.font_size_pt, context.options.font_scale);
+          }
+          if properties.spacing.is_some() {
+            style.character_spacing_pt *= context.options.font_scale;
+          }
+          if properties.baseline.is_some() {
+            style.baseline_shift_pt *= context.options.font_scale;
+          }
+        })
+    {
+      tokens.push(LegacyTextToken {
+        run,
+        // U+FFFC gives bidi and wrapping one atomic inline object. Its
+        // searchable contents come from the realized OfficeMath SVG.
+        text: "\u{fffc}".to_string(),
+        style: math.style.clone(),
+        kind: LegacyTextTokenKind::Text,
+        math: Some(Rc::new(math)),
+      });
+      continue;
+    }
     let field_text = presentation_field_text(
       run,
       context.slide_number,
@@ -13280,6 +13350,7 @@ fn layout_text_lines_legacy<'a>(
           run,
           text: token.to_string(),
           style: style.clone(),
+          math: None,
           kind: if token == "\t" {
             LegacyTextTokenKind::Tab
           } else {
@@ -13293,6 +13364,7 @@ fn layout_text_lines_legacy<'a>(
           text: String::new(),
           style: style.clone(),
           kind: LegacyTextTokenKind::HardBreak,
+          math: None,
         });
       }
     }
@@ -13327,17 +13399,24 @@ fn layout_text_lines_legacy<'a>(
         push_text_line_tab(&mut current, token.run, advance_pt, &token.style);
       }
       LegacyTextTokenKind::Text => {
-        let width_pt = text_metrics.measure_text(&token.text, &token.style);
+        let width_pt = token.math.as_ref().map_or_else(
+          || text_metrics.measure_text(&token.text, &token.style),
+          |math| math.width_pt,
+        );
         // The token's trailing whitespace is discarded if this becomes the
         // end of the line, so it must not force an otherwise fitting word to
         // the next line. Whitespace already accumulated after the previous
         // token remains part of current.width_pt and still separates words.
-        let fit_width_pt = hanging_punctuation_fit_width(
-          token.text.trim_end(),
-          &token.style,
-          context.hanging_punctuation,
-          text_metrics,
-        );
+        let fit_width_pt = if token.math.is_some() {
+          width_pt
+        } else {
+          hanging_punctuation_fit_width(
+            token.text.trim_end(),
+            &token.style,
+            context.hanging_punctuation,
+            text_metrics,
+          )
+        };
         if context.options.word_wrap
           && current.width_pt > f32::EPSILON
           && current.width_pt + fit_width_pt > context.column_width
@@ -13346,7 +13425,19 @@ fn layout_text_lines_legacy<'a>(
           lines.push(current);
           current = TextLine::default();
         }
-        push_text_line_token(&mut current, token.run, &token.text, width_pt, &token.style);
+        if let Some(math) = &token.math {
+          current.width_pt += width_pt;
+          current.runs.push(TextLineRun {
+            run: token.run,
+            text: token.text.clone(),
+            width_pt,
+            style: token.style.clone(),
+            kind: TextLineRunKind::Text,
+            math: Some(math.clone()),
+          });
+        } else {
+          push_text_line_token(&mut current, token.run, &token.text, width_pt, &token.style);
+        }
       }
     }
   }
@@ -13391,6 +13482,7 @@ struct LegacyTextToken<'a> {
   text: String,
   style: TextStyle,
   kind: LegacyTextTokenKind,
+  math: Option<Rc<DrawingmlMathLayout>>,
 }
 
 fn paragraph_tab_stop(
@@ -13433,7 +13525,10 @@ fn tab_aligned_text_width(
     } else {
       token.text.as_str()
     };
-    width_pt += text_metrics.measure_text(text, &token.style);
+    width_pt += token.math.as_ref().map_or_else(
+      || text_metrics.measure_text(text, &token.style),
+      |math| math.width_pt,
+    );
     if alignment == a::TextTabAlignmentValues::Decimal && text.len() != token.text.len() {
       break;
     }
@@ -13467,6 +13562,7 @@ fn push_text_line_token<'a>(
     width_pt,
     style: style.clone(),
     kind: TextLineRunKind::Text,
+    math: None,
   });
 }
 
@@ -13483,6 +13579,7 @@ fn push_text_line_tab<'a>(
     width_pt,
     style: style.clone(),
     kind: TextLineRunKind::Tab,
+    math: None,
   });
 }
 
@@ -13653,38 +13750,23 @@ fn apply_text_scale(style: &mut TextStyle, options: &TextLoweringOptions) {
     .drawingml_effect_font_size_pt
     .unwrap_or(style.font_size_pt);
   style.drawingml_effect_font_size_pt = Some(
-    scaled_text_font_size_before_print_grid(
-      effect_font_size_pt,
-      options.font_scale,
-      options.round_font_size_to_pt,
-    )
-    .max(MINIMUM_TEXT_FONT_SIZE_PT),
+    scaled_text_font_size_before_print_grid(effect_font_size_pt, options.font_scale)
+      .max(MINIMUM_TEXT_FONT_SIZE_PT),
   );
-  style.font_size_pt = scaled_text_font_size_pt(
-    style.font_size_pt,
-    options.font_scale,
-    options.round_font_size_to_pt,
-  );
+  style.font_size_pt = scaled_text_font_size_pt(style.font_size_pt, options.font_scale);
   style.character_spacing_pt *= options.font_scale;
   style.baseline_shift_pt *= options.font_scale;
 }
 
-fn scaled_text_font_size_before_print_grid(
-  font_size_pt: f32,
-  font_scale: f32,
-  round_to_pt: bool,
-) -> f32 {
-  if round_to_pt {
-    // setRoundFontSizeToPt(true) for AUTOFIT; editeng then rounds the
-    // unscaled font size and the scaled font size to the nearest point.
-    (font_size_pt.round() * font_scale).round()
-  } else {
-    font_size_pt * font_scale
-  }
+fn scaled_text_font_size_before_print_grid(font_size_pt: f32, font_scale: f32) -> f32 {
+  // DrawingML sz preserves hundredths of a point. PowerPoint's independent
+  // fractional-size/autofit controls keep that precision; the whole-point
+  // rounding used by LibreOffice's AUTOFIT outliner is a different contract.
+  font_size_pt * font_scale
 }
 
-fn scaled_text_font_size_pt(font_size_pt: f32, font_scale: f32, round_to_pt: bool) -> f32 {
-  let scaled = scaled_text_font_size_before_print_grid(font_size_pt, font_scale, round_to_pt);
+fn scaled_text_font_size_pt(font_size_pt: f32, font_scale: f32) -> f32 {
+  let scaled = scaled_text_font_size_before_print_grid(font_size_pt, font_scale);
   // PowerPoint's PDF path lays out type on its 600 dpi print grid. Preserve
   // that device-space quantization before shaping: e.g. 40 pt becomes
   // 333/600 in and 20 pt becomes 167/600 in, matching the emitted Office PDF
@@ -13721,6 +13803,7 @@ fn paragraph_line_adjustment(
       && (justified || alignment == a::TextAlignmentTypeValues::ThaiDistributed))
     || line.runs.iter().any(|run| {
       run.kind == TextLineRunKind::Tab
+        || run.math.is_some()
         || run
           .style
           .resolved_bidi_level
@@ -14199,10 +14282,15 @@ fn estimate_wrapped_text_body_height(
     for segment in text_segments {
       for line in segment.lines {
         let line_height = if line.runs.is_empty() {
-          paragraph_style.line_height(&paragraph_base_style, context.options)
+          paragraph_style.line_height(&paragraph_base_style, context.options, text_metrics)
         } else {
           line.runs.iter().fold(0.0_f32, |height, run| {
-            height.max(paragraph_style.line_height(&run.style, context.options))
+            height.max(line_run_height(
+              run,
+              &paragraph_style,
+              context.options,
+              text_metrics,
+            ))
           })
         };
         height += line_height;
@@ -14341,6 +14429,87 @@ fn advance_text_column_if_needed(
   }
   cursor.column_index += 1;
   cursor.y_pt = frame.y_pt;
+}
+
+fn math_line_alignment(line: &TextLine<'_>) -> Option<a::TextAlignmentTypeValues> {
+  if line
+    .runs
+    .iter()
+    .any(|run| run.math.is_none() && !run.text.trim().is_empty())
+  {
+    return None;
+  }
+  line
+    .runs
+    .iter()
+    .find_map(|run| run.math.as_ref())
+    .map(|math| match math.alignment {
+      ooxmlsdk::schemas::m::JustificationValues::Left => a::TextAlignmentTypeValues::Left,
+      ooxmlsdk::schemas::m::JustificationValues::Right => a::TextAlignmentTypeValues::Right,
+      ooxmlsdk::schemas::m::JustificationValues::Center
+      | ooxmlsdk::schemas::m::JustificationValues::CenterGroup => {
+        a::TextAlignmentTypeValues::Center
+      }
+    })
+}
+
+fn line_run_height(
+  run: &TextLineRun<'_>,
+  paragraph: &ParagraphDisplayStyle,
+  options: &TextLoweringOptions,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  run.math.as_ref().map_or_else(
+    || paragraph.line_height(&run.style, options, text_metrics),
+    |math| (math.ascent_pt + math.descent_pt) * options.line_scale,
+  )
+}
+
+fn push_office_math_item(
+  items: &mut Vec<PageItem>,
+  math: &DrawingmlMathLayout,
+  x_pt: f32,
+  baseline_y_pt: f32,
+  options: &TextLoweringOptions,
+  hyperlink_url: Option<&str>,
+) {
+  let image = &math.image;
+  let mut x_pt = x_pt - math.paint_padding_pt;
+  let mut y_pt = baseline_y_pt - math.ascent_pt - math.paint_padding_pt;
+  if let Some((center_x, center_y)) = options.rotation_center_pt {
+    let (rotated_x, rotated_y) = rotate_point(
+      x_pt + image.width_pt / 2.0,
+      y_pt + image.height_pt / 2.0,
+      center_x,
+      center_y,
+      options.rotation_deg.to_radians(),
+    );
+    x_pt = rotated_x - image.width_pt / 2.0;
+    y_pt = rotated_y - image.height_pt / 2.0;
+  }
+  items.push(PageItem::Image(ImageItem {
+    x_pt,
+    y_pt,
+    width_pt: image.width_pt,
+    height_pt: image.height_pt,
+    crop: ImageCrop::default(),
+    clip_path: Vec::new(),
+    rotation_deg: options.rotation_deg,
+    flip_horizontal: false,
+    flip_vertical: false,
+    data: image.data.clone(),
+    content_type: image.content_type.clone(),
+    blip_compression_state: common::BlipCompressionState::Unspecified,
+    metafile_monochrome_dib_palette_override: None,
+    metafile_background_color: None,
+    metafile_external_header: None,
+    metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
+    metafile_semantic_text_includes_raster_backdrop: false,
+    alt_text: image.alt_text.clone(),
+    hyperlink_url: hyperlink_url.map(ToString::to_string),
+    floating: false,
+    behind_text: false,
+  }));
 }
 
 fn push_math_ole_preview_item(
@@ -15060,7 +15229,7 @@ impl ParagraphDisplayStyle {
     if paragraph.diagram_synthesized_bullet_left_margin
       || paragraph.diagram_synthesized_bullet_indent
     {
-      let scale = if options.round_font_size_to_pt {
+      let scale = if options.shape_auto_fit {
         options
           .font_scale
           .max(POWERPOINT_SMARTART_MINIMUM_AUTOFIT_SPACING_SCALE)
@@ -15125,8 +15294,26 @@ impl ParagraphDisplayStyle {
     }
   }
 
-  fn line_height(&self, style: &TextStyle, options: &TextLoweringOptions) -> f32 {
-    self.line_height_with_scale(style, options.line_scale)
+  fn line_height(
+    &self,
+    style: &TextStyle,
+    options: &TextLoweringOptions,
+    text_metrics: &mut TextMetrics,
+  ) -> f32 {
+    // ECMA-376 §21.1.2.1.1: compatLnSpc selects the simplified font scene.
+    // PowerPoint uses 1.2 em for that scene, but an explicit false measures
+    // the font's natural cell before applying lnSpc. Use the same owner for
+    // measurement, column fitting and the final line advance.
+    let natural_height = if options.compatible_line_spacing {
+      line_height(style, 1.0)
+    } else {
+      text_metrics.line_vertical_metrics(style).line_height_pt()
+    };
+    match self.line_spacing {
+      ParagraphLineSpacing::Default => natural_height * options.line_scale,
+      ParagraphLineSpacing::Percent(ratio) => natural_height * ratio * options.line_scale,
+      ParagraphLineSpacing::Points(points) => points * options.line_scale,
+    }
   }
 
   fn spacing_points(
@@ -15150,7 +15337,12 @@ impl ParagraphDisplayStyle {
     spacing.points(percentage_basis)
   }
 
-  fn soft_break_empty_line_height(&self, style: &TextStyle, options: &TextLoweringOptions) -> f32 {
+  fn soft_break_empty_line_height(
+    &self,
+    style: &TextStyle,
+    options: &TextLoweringOptions,
+    text_metrics: &mut TextMetrics,
+  ) -> f32 {
     match self.line_spacing {
       // PowerPoint's fixed-output path advances an empty line introduced by
       // a:br by one em under automatic spacing. The br/rPr is insertion-point
@@ -15159,16 +15351,7 @@ impl ParagraphDisplayStyle {
       ParagraphLineSpacing::Default => {
         automatic_soft_break_empty_line_height(style, options.line_scale)
       }
-      _ => self.line_height(style, options),
-    }
-  }
-
-  fn line_height_with_scale(&self, style: &TextStyle, line_scale: f32) -> f32 {
-    let natural_height = line_height(style, 1.0);
-    match self.line_spacing {
-      ParagraphLineSpacing::Default => line_height(style, line_scale),
-      ParagraphLineSpacing::Percent(ratio) => natural_height * ratio * line_scale,
-      ParagraphLineSpacing::Points(points) => points * line_scale,
+      _ => self.line_height(style, options, text_metrics),
     }
   }
 
@@ -15180,12 +15363,21 @@ impl ParagraphDisplayStyle {
   ) -> f32 {
     let offset = raw_baseline_offset(style, line_height_pt, text_metrics);
     match self.line_spacing {
-      // LibreOffice's EditEngine mirrors the Windows/PPT proportional-line
-      // path by capping ascent at 80% of the reduced text height. Without
-      // this cap an OS/2 usWinAscent can exceed a sub-100% DrawingML line
-      // box and place the glyph baseline outside that box.
-      // See editeng/source/editeng/impedit3.cxx (ImpBreakLine formatting).
-      ParagraphLineSpacing::Percent(ratio) if ratio < 1.0 => offset.min(line_height_pt * 0.8),
+      // PowerPoint's proportional line formatter positions the baseline at
+      // three quarters of the selected cell, including compressed spacing.
+      // Single spacing retains the normal font baseline. This is independent
+      // of the glyph ascent and must not split enlarged leading in half.
+      ParagraphLineSpacing::Percent(ratio) if ratio != 1.0 => {
+        line_height_pt * 0.75 - style.baseline_shift_pt
+      }
+      // Expanded fixed spacing has the same cell allocation. Short fixed
+      // cells retain the existing font-fitting path; their clipping/leading
+      // policy is separate from proportional line spacing.
+      ParagraphLineSpacing::Points(_)
+        if line_height_pt >= text_metrics.line_vertical_metrics(style).line_height_pt() =>
+      {
+        line_height_pt * 0.75 - style.baseline_shift_pt
+      }
       ParagraphLineSpacing::Default
       | ParagraphLineSpacing::Percent(_)
       | ParagraphLineSpacing::Points(_) => offset,
@@ -15956,9 +16148,9 @@ fn apply_run_properties(
   style: &mut TextStyle,
 ) {
   if run.kind == TextRunKind::Math {
-    // Math OLE object. Use the Office math face for text extraction/rendering
-    // of the flattened math text instead of inheriting the surrounding
-    // DrawingML paragraph font.
+    // The native OMML entry resolves its nested character properties later.
+    // Seed both native zones and legacy flattened diagram runs with the
+    // Office math face instead of the enclosing paragraph's text face.
     style.font_family = Some(Arc::from("Cambria Math"));
   }
   let Some(properties) = run.run_properties.as_deref() else {
@@ -16894,6 +17086,93 @@ mod tests {
   use super::*;
 
   #[test]
+  fn native_math_survives_import_and_bidi_as_an_inline_object() {
+    use ooxmlsdk::sdk::SdkType;
+    let source = r#"<a:txBody xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><a:bodyPr/><a:p><a14:m><m:oMathPara><m:oMathParaPr><m:jc m:val="right"/></m:oMathParaPr><m:oMath><m:rad><m:radPr><m:degHide m:val="1"/></m:radPr><m:deg/><m:e><m:r><a:rPr sz="3600"/><m:t>x+1</m:t></m:r></m:e></m:rad></m:oMath></m:oMathPara></a14:m></a:p></a:txBody>"#;
+    let body = TextBody::from_dml(&a::TextBody::from_bytes(source.as_bytes()).unwrap());
+    let run = &body.paragraphs[0].runs[0];
+    assert_eq!(run.kind, TextRunKind::Math);
+    assert!(run.text.contains('√'));
+    let math = Rc::new(
+      drawingml_math_layout(
+        run.math_source.as_deref().unwrap(),
+        &TextStyle {
+          font_size_pt: 18.0,
+          ..TextStyle::default()
+        },
+        true,
+        &|properties, style| {
+          if let Some(size) = properties.font_size {
+            style.font_size_pt = size as f32 / 100.0;
+          }
+        },
+      )
+      .unwrap(),
+    );
+    assert_eq!(math.style.font_size_pt, 36.0);
+    let width = math.width_pt;
+    assert!(width > 0.0);
+    let mut line = TextLine {
+      width_pt: width,
+      runs: vec![TextLineRun {
+        run,
+        text: "\u{fffc}".into(),
+        width_pt: width,
+        style: math.style.clone(),
+        kind: TextLineRunKind::Text,
+        math: Some(math.clone()),
+      }],
+    };
+    let mut metrics = TextMetrics::new();
+    reorder_text_line_bidi(&mut line, true, &mut metrics);
+    assert_eq!(line.runs.len(), 1);
+    assert_eq!(line.width_pt, width);
+    assert_eq!(
+      math_line_alignment(&line),
+      Some(a::TextAlignmentTypeValues::Right)
+    );
+    let mut items = Vec::new();
+    push_office_math_item(
+      &mut items,
+      &math,
+      10.0,
+      60.0,
+      &TextLoweringOptions::from_text_body(&body),
+      None,
+    );
+    let [PageItem::Image(image)] = items.as_slice() else {
+      panic!("one native math image");
+    };
+    assert_eq!(
+      image.content_type.as_deref(),
+      Some("application/vnd.ooxmlsdk.office-math+xml")
+    );
+    let svg = std::str::from_utf8(&image.data).unwrap();
+    assert!(svg.contains("ooxmlsdk-math-visible-"));
+    assert!(svg.contains("font-size=\"36.0000\""));
+    let original_center = (
+      image.x_pt + image.width_pt / 2.0,
+      image.y_pt + image.height_pt / 2.0,
+    );
+    let original_size = (image.width_pt, image.height_pt);
+    // Both vector math and picture bullets remain inline painted content:
+    // rotating the host keeps their size and rotates their placement/pixels.
+    let mut picture_bullet = image.clone();
+    picture_bullet.content_type = Some("image/png".to_string());
+    items.push(PageItem::Image(picture_bullet));
+    rotate_text_items_about(&mut items, (0.0, 0.0), 90.0);
+    for item in &items {
+      let PageItem::Image(image) = item else {
+        unreachable!();
+      };
+      assert_eq!((image.width_pt, image.height_pt), original_size);
+      assert_eq!(image.rotation_deg, 90.0);
+      assert!((image.x_pt + image.width_pt / 2.0 + original_center.1).abs() < 0.001);
+      assert!((image.y_pt + image.height_pt / 2.0 - original_center.0).abs() < 0.001);
+    }
+  }
+
+  #[test]
   fn smartart_text_transform_keeps_its_rectangle_and_composes_rotations() {
     use ooxmlsdk::sdk::SdkType;
 
@@ -17258,7 +17537,11 @@ mod tests {
       (0.0, 15.0),
     ] {
       let sample = common_rect(92.64 + dx, 249.24 + dy, 125.97, 7.89);
-      let working = shape_shadow_working_bounds(source, sample, pixels_per_point);
+      let working = common::drawingml_shape_raster::office_shape_shadow_working_bounds(
+        source,
+        sample,
+        pixels_per_point,
+      );
       for (near, length, sample_near, sample_length, source_near, source_length) in [
         (
           working.origin.x.0,
@@ -17299,7 +17582,11 @@ mod tests {
     for sample_left in [461.4, 487.68, 513.84, 540.12, 566.4] {
       let sample = common_rect(sample_left, 503.52, 25.68, 26.28);
       let required = common_rect(sample_left - 2.0, 501.54, 27.8, 28.3);
-      let working = shape_shadow_working_bounds(required, sample, pixels_per_point);
+      let working = common::drawingml_shape_raster::office_shape_shadow_working_bounds(
+        required,
+        sample,
+        pixels_per_point,
+      );
       let bounds = |rect: common::Rect| EffectOutputBounds {
         left_pt: rect.origin.x.0,
         top_pt: rect.origin.y.0,
@@ -17968,7 +18255,7 @@ mod tests {
       line_scale: 1.0,
       use_first_last_paragraph_spacing: false,
       compatible_line_spacing: false,
-      round_font_size_to_pt: false,
+      shape_auto_fit: false,
       rotation_deg: 0.0,
       rotation_center_pt: None,
       column_count: 1,
@@ -18027,6 +18314,7 @@ mod tests {
           hyperlink_url: None,
           field_type: Some("slidenum".to_string()),
           run_properties: None,
+          math_source: None,
           field_paragraph_properties: None,
         }],
         ..TextParagraph::default()
@@ -18110,13 +18398,59 @@ mod tests {
       (paragraph.spacing_points(ParagraphSpacing::Percent(0.2), 48.0, &compatible) - 11.52).abs()
         < 0.000_1
     );
-    assert!((paragraph.line_height(&style, &compatible) - 34.56).abs() < 0.000_1);
+    assert!(
+      (paragraph.line_height(&style, &compatible, &mut TextMetrics::new()) - 34.56).abs() < 0.000_1
+    );
 
     for options in [&standard, &compatible] {
       assert_eq!(
         paragraph.spacing_points(ParagraphSpacing::Points(5.0), style.font_size_pt, options),
         5.0
       );
+    }
+  }
+
+  #[test]
+  fn explicit_line_spacing_uses_the_native_cell_baseline() {
+    let options = TextLoweringOptions::from_text_body(&TextBody::default());
+    let mut metrics = TextMetrics::new();
+    for (spacing, height, baseline) in [
+      (ParagraphLineSpacing::Percent(0.75), 21.6, 16.2),
+      (ParagraphLineSpacing::Percent(1.01), 29.088, 21.816),
+      (ParagraphLineSpacing::Percent(1.1), 31.68, 23.76),
+      (ParagraphLineSpacing::Percent(1.5), 43.2, 32.4),
+      (ParagraphLineSpacing::Percent(2.0), 57.6, 43.2),
+      (ParagraphLineSpacing::Percent(3.0), 86.4, 64.8),
+      (ParagraphLineSpacing::Points(72.0), 72.0, 54.0),
+    ] {
+      let paragraph = ParagraphDisplayStyle {
+        line_spacing: spacing,
+        ..ParagraphDisplayStyle::default()
+      };
+      for family in ["Calibri Light", "Arial", "Arial Black"] {
+        let style = TextStyle {
+          font_family: Some(Arc::from(family)),
+          font_size_pt: 24.0,
+          use_windows_font_metrics: true,
+          ..TextStyle::default()
+        };
+        let actual_height = paragraph.line_height(&style, &options, &mut metrics);
+        assert!((actual_height - height).abs() < 0.000_1);
+        assert!(
+          (paragraph.baseline_offset(&style, actual_height, &mut metrics) - baseline).abs()
+            < 0.000_1,
+          "{family}, {spacing:?}",
+        );
+        let shifted = TextStyle {
+          baseline_shift_pt: 6.0,
+          ..style
+        };
+        assert!(
+          (paragraph.baseline_offset(&shifted, actual_height, &mut metrics) - (baseline - 6.0))
+            .abs()
+            < 0.000_1,
+        );
+      }
     }
   }
 
@@ -18146,6 +18480,7 @@ mod tests {
       hyperlink_url: None,
       field_type: None,
       run_properties: None,
+      math_source: None,
       field_paragraph_properties: None,
     });
     let mut visible_style = TextStyle {
@@ -18165,6 +18500,7 @@ mod tests {
       hyperlink_url: None,
       field_type: None,
       run_properties: None,
+      math_source: None,
       field_paragraph_properties: None,
     };
     let line_run = |font_size_pt| TextLineRun {
@@ -18176,6 +18512,7 @@ mod tests {
         ..TextStyle::default()
       },
       kind: TextLineRunKind::Text,
+      math: None,
     };
     let segments = vec![
       TextLineSegment {
@@ -18358,6 +18695,7 @@ mod tests {
       hyperlink_url: None,
       field_type: Some("slidenum".to_string()),
       run_properties: None,
+      math_source: None,
       field_paragraph_properties: None,
     };
     assert_eq!(presentation_field_text(&run, 7, None, None, None), "7");
@@ -18387,9 +18725,48 @@ mod tests {
   }
 
   #[test]
-  fn rounded_autofit_never_produces_a_zero_point_font() {
-    assert_eq!(scaled_text_font_size_pt(2.0, 0.1, true), 1.0);
-    assert_eq!(scaled_text_font_size_pt(12.0, 0.5, true), 6.0);
+  fn fractional_font_sizes_survive_every_autofit_mode() {
+    for auto_fit in [
+      TextAutoFit::Unspecified,
+      TextAutoFit::NoAutoFit,
+      TextAutoFit::Shape,
+      TextAutoFit::Normal {
+        font_scale: 100_000,
+        line_space_reduction: 0,
+      },
+    ] {
+      let body = TextBody {
+        display_properties: TextBodyDisplayProperties {
+          auto_fit,
+          ..Default::default()
+        },
+        ..Default::default()
+      };
+      let options = TextLoweringOptions::from_text_body(&body);
+      // Native Calibri regular/bold controls distinguish hundredth-point
+      // character sizes from LO's whole-point AUTOFIT rounding. Only the
+      // existing printer-grid conversion follows the authored/scaled size.
+      for (nominal, printed) in [(12.5, 12.48), (13.5, 13.56), (18.25, 18.24)] {
+        let mut style = TextStyle {
+          font_size_pt: nominal,
+          ..Default::default()
+        };
+        apply_text_scale(&mut style, &options);
+        assert!(
+          (style.font_size_pt - printed).abs() < 0.0001,
+          "autofit={auto_fit:?}, source={nominal}, printed={}",
+          style.font_size_pt
+        );
+        assert_eq!(style.drawingml_effect_font_size_pt, Some(nominal));
+      }
+    }
+    assert!((scaled_text_font_size_pt(36.0, 0.73) - 26.28).abs() < 0.0001);
+  }
+
+  #[test]
+  fn scaled_autofit_preserves_the_minimum_font_size() {
+    assert_eq!(scaled_text_font_size_pt(2.0, 0.1), 1.0);
+    assert_eq!(scaled_text_font_size_pt(12.0, 0.5), 6.0);
   }
 
   #[test]
@@ -18424,6 +18801,7 @@ mod tests {
       hyperlink_url: None,
       field_type: None,
       run_properties: None,
+      math_source: None,
       field_paragraph_properties: None,
     };
     let mut line = TextLine {
@@ -18437,6 +18815,7 @@ mod tests {
           ..TextStyle::default()
         },
         kind: TextLineRunKind::Text,
+        math: None,
       }],
     };
 
@@ -18465,6 +18844,7 @@ mod tests {
         hyperlink_url: None,
         field_type: None,
         run_properties: None,
+        math_source: None,
         field_paragraph_properties: None,
       }],
       ..TextParagraph::default()
@@ -18680,6 +19060,7 @@ mod tests {
         hyperlink_url: None,
         field_type: None,
         run_properties: None,
+        math_source: None,
         field_paragraph_properties: None,
       }],
       ..TextParagraph::default()
@@ -18717,6 +19098,7 @@ mod tests {
         hyperlink_url: None,
         field_type: None,
         run_properties: None,
+        math_source: None,
         field_paragraph_properties: None,
       }],
       ..TextParagraph::default()
@@ -18751,6 +19133,7 @@ mod tests {
         hyperlink_url: None,
         field_type: None,
         run_properties: None,
+        math_source: None,
         field_paragraph_properties: None,
       }],
       ..TextParagraph::default()
@@ -18784,6 +19167,7 @@ mod tests {
         hyperlink_url: None,
         field_type: None,
         run_properties: None,
+        math_source: None,
         field_paragraph_properties: None,
       }],
       ..TextParagraph::default()

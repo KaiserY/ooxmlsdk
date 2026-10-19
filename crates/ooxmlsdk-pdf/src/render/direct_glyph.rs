@@ -13,8 +13,9 @@ use super::paint::{PaintGlyph, PaintGlyphFontRun};
 use crate::error::{PdfError, Result};
 use ooxmlsdk_layout::common;
 use ooxmlsdk_layout::common::text_warp_projection::{
-  GlyphOutlinePath as SkrifaGlyphOutline, TextWarpBoundary, common_commands_to_bez_path,
-  split_outline_at_warp_seams, text_warp_point, text_warp_source_seams,
+  GlyphOutlinePath as SkrifaGlyphOutline, TextFollowPathFontCell, TextWarpBoundary,
+  common_commands_to_bez_path, split_outline_at_warp_seams, text_follow_path_glyph_transform,
+  text_warp_point, text_warp_source_seams,
 };
 
 const SYNTHETIC_ITALIC_SHEAR: f32 = 1.0 / 3.0;
@@ -738,7 +739,11 @@ pub(super) fn build_glyph_outline_path(
       .max(0.0)
       * f64::from(design_scale)
   });
+  let follow_path_cell = warp
+    .filter(|warp| warp.follow_path.is_some())
+    .and_then(|_| TextFollowPathFontCell::from_font(&face, run.font_size_pt));
   let warp_boundaries = warp
+    .filter(|warp| warp.follow_path.is_none())
     .map(|warp| {
       warp
         .boundaries
@@ -760,7 +765,9 @@ pub(super) fn build_glyph_outline_path(
   };
   let source_seams = match (warp, warp_boundaries.as_deref(), vml_fit_path) {
     (_, _, Some(_)) => Vec::new(),
-    (Some(warp), Some(boundaries), None) if warp.vml_trim_band.is_none() => {
+    (Some(warp), Some(boundaries), None)
+      if warp.vml_trim_band.is_none() && warp.follow_path.is_none() =>
+    {
       text_warp_source_seams(warp, boundaries)
     }
     _ => Vec::new(),
@@ -796,6 +803,15 @@ pub(super) fn build_glyph_outline_path(
 
     let origin_x_pt = cursor_x_pt + glyph.x_offset * run.font_size_pt * placement.horizontal_scale;
     let origin_y_pt = cursor_y_pt - glyph.y_offset * run.font_size_pt * placement.vertical_scale;
+    let follow_path_transform = warp.zip(follow_path_cell).and_then(|(warp, cell)| {
+      follow_path_glyph_transform(
+        warp,
+        glyph,
+        kurbo::Point::new(f64::from(origin_x_pt), f64::from(origin_y_pt)),
+        f64::from(glyph.x_advance * run.font_size_pt * placement.horizontal_scale),
+        cell,
+      )
+    });
     let glyph_center_x = f64::from(origin_x_pt)
       + f64::from(glyph.x_advance * run.font_size_pt * placement.horizontal_scale) / 2.0;
     let centerline_y = f64::from(origin_y_pt) - vml_centerline_offset_pt;
@@ -812,7 +828,9 @@ pub(super) fn build_glyph_outline_path(
     };
     let map = |point: kurbo::Point| {
       let point = glyph_to_page(point);
-      if let (Some(fit), Some([boundary])) = (vml_fit_path, warp_boundaries.as_deref()) {
+      if let Some(transform) = follow_path_transform {
+        transform * point
+      } else if let (Some(fit), Some([boundary])) = (vml_fit_path, warp_boundaries.as_deref()) {
         vml_fit_path_glyph_point(fit, boundary, glyph_center_x, centerline_y, point)
       } else if let (Some(warp), Some(boundaries)) = (warp, warp_boundaries.as_deref()) {
         text_warp_point(warp, boundaries, point)
@@ -837,6 +855,20 @@ pub(super) fn build_glyph_outline_path(
   }
 
   Ok(DirectOutlinePath { commands })
+}
+
+pub(super) fn follow_path_glyph_transform(
+  warp: &common::TextWarp,
+  glyph: &PaintGlyph,
+  origin: kurbo::Point,
+  advance_pt: f64,
+  cell: TextFollowPathFontCell,
+) -> Option<kurbo::Affine> {
+  let bounds = glyph.bounds_em?;
+  if bounds.x_min_em >= bounds.x_max_em || bounds.y_min_em >= bounds.y_max_em {
+    return None;
+  }
+  text_follow_path_glyph_transform(warp, origin, advance_pt, cell)
 }
 
 fn office_dashed_glyph_contours(source: &BezPath) -> BezPath {

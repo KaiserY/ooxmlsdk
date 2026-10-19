@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use ooxmlsdk::schemas::{m, schemas_openxmlformats_org_wordprocessingml_2006_main as w};
+use ooxmlsdk::schemas::{a, a14, m, schemas_openxmlformats_org_wordprocessingml_2006_main as w};
 use ooxmlsdk_fonts::FeatureValue;
 use skrifa::{
   FontRef, GlyphId, MetadataProvider,
@@ -318,6 +318,7 @@ pub(super) fn wordprocessing_math_zone_image<'a>(
   display_math: bool,
 ) -> Option<InlineImage> {
   let parser = MathParser {
+    drawingml_properties: None,
     base_style,
     styles,
     math_font_family: styles
@@ -371,6 +372,76 @@ pub(super) fn wordprocessing_math_zone_image<'a>(
   image.office_math_line_layout = line_layout;
   image.office_math_display_layout = display_layout;
   Some(image)
+}
+
+/// A realized DrawingML equation, with paint padding separate from its
+/// mathematical advance and external line metrics.
+#[derive(Clone)]
+pub(crate) struct DrawingmlMathLayout {
+  pub(crate) image: InlineImage,
+  pub(crate) width_pt: f32,
+  pub(crate) ascent_pt: f32,
+  pub(crate) descent_pt: f32,
+  pub(crate) style: TextStyle,
+  pub(crate) alignment: m::JustificationValues,
+  pub(crate) paint_padding_pt: f32,
+}
+
+/// `a14:m` shares the OfficeMath tree and MATH typesetter with Word, while
+/// its DrawingML host owns the character cascade and script-size grid.
+pub(crate) fn drawingml_math_layout(
+  source: &a14::TextMath,
+  base_style: &TextStyle,
+  display_math: bool,
+  resolve_properties: DrawingmlMathProperties<'_>,
+) -> Option<DrawingmlMathLayout> {
+  let styles = StylesCatalog::default();
+  let parser = MathParser {
+    base_style,
+    styles: &styles,
+    math_font_family: Arc::from("Cambria Math"),
+    drawingml_properties: Some(resolve_properties),
+  };
+  let node = MathNode::row(source.text_math_choice.iter().map(|choice| match choice {
+    a14::TextMathChoice::Paragraph(value) => parser.paragraph(value),
+    a14::TextMathChoice::OfficeMath(value) => parser.office_math(value),
+    a14::TextMathChoice::Run(value) => parser.run(value),
+  }));
+  let style = representative_style(&node)
+    .cloned()
+    .unwrap_or_else(|| parser.default_math_style());
+  let mut metrics = TextMetrics::new();
+  // Native PowerPoint keeps a sole inline zone in display style and a zone
+  // adjacent to ordinary a:r text in text style, even with m:oMathPara.
+  let context = MathLayoutContext::root(display_math, false, false).with_drawingml_host();
+  let mut math_box = layout_node(&node, context, &mut metrics);
+  finish_math_box(&mut math_box, &node, &style, 0.0, 0.0, &mut metrics);
+  if math_box.width_pt <= f32::EPSILON || math_box.ascent_pt + math_box.descent_pt <= f32::EPSILON {
+    return None;
+  }
+  let alignment = source
+    .text_math_choice
+    .iter()
+    .find_map(|choice| {
+      let a14::TextMathChoice::Paragraph(paragraph) = choice else {
+        return None;
+      };
+      paragraph
+        .paragraph_properties
+        .as_deref()
+        .and_then(|properties| properties.justification.as_ref())
+        .map(|justification| justification.val)
+    })
+    .unwrap_or(m::JustificationValues::CenterGroup);
+  Some(DrawingmlMathLayout {
+    width_pt: math_box.width_pt,
+    ascent_pt: math_box.ascent_pt,
+    descent_pt: math_box.descent_pt,
+    image: inline_image_from_math_box(math_box, node.semantic_text()),
+    style,
+    alignment,
+    paint_padding_pt: MATH_CANVAS_PADDING_PT,
+  })
 }
 
 /// Materialize the active OfficeMath face as one coherent font-binding state.
@@ -848,7 +919,10 @@ fn replace_first_math_atom_character(node: &mut MathNode, source: char, replacem
   }
 }
 
+type DrawingmlMathProperties<'a> = &'a dyn Fn(&a::RunProperties, &mut TextStyle);
+
 struct MathParser<'a> {
+  drawingml_properties: Option<DrawingmlMathProperties<'a>>,
   base_style: &'a TextStyle,
   styles: &'a StylesCatalog,
   math_font_family: Arc<str>,
@@ -1046,7 +1120,13 @@ impl MathParser<'_> {
       }
       Some(m::ControlPropertiesChoice::DrawingRunProperties(properties)) => {
         let mut style = self.base_style.clone();
-        super::apply_drawingml_run_properties(&mut style, properties, self.styles);
+        if let Some(resolve) = self.drawingml_properties {
+          resolve(properties, &mut style);
+          style.bold = false;
+          style.italic = false;
+        } else {
+          super::apply_drawingml_run_properties(&mut style, properties, self.styles);
+        }
         style
       }
       _ => self.base_style.clone(),
@@ -1080,6 +1160,13 @@ impl MathParser<'_> {
       self.base_style.clone(),
       self.styles,
     );
+    if let Some(resolve) = self.drawingml_properties {
+      for choice in &run.run_choice {
+        if let m::RunChoice::DrawingRunProperties(properties) = choice {
+          resolve(properties, &mut style);
+        }
+      }
+    }
     // Materialize the active OfficeMath face after the ordinary run cascade.
     // Other run properties still participate, while none of the four inherited
     // Word font slots can redirect a covered math character to a text face.
@@ -1094,6 +1181,13 @@ impl MathParser<'_> {
         m::RunPropertiesChoice::NormalText(normal) => math_on(normal.val),
         m::RunPropertiesChoice::Sequence(_) => false,
       });
+    // OfficeMath's m:sty supplies mathematical alphabets; host b/i is only
+    // ordinary text formatting inside m:nor. Native PowerPoint controls with
+    // a:rPr i=0/1 and b=0/1 keep the same built math glyphs and matrices.
+    if self.drawingml_properties.is_some() && !normal {
+      style.bold = false;
+      style.italic = false;
+    }
     let plain_math_style = properties
       .and_then(|properties| properties.run_properties_choice.as_ref())
       .and_then(|choice| match choice {
@@ -2996,6 +3090,7 @@ struct MathLayoutContext {
   small_fraction: bool,
   explicit_math_paragraph: bool,
   compatibility_mode: u16,
+  drawingml_host: bool,
   parent_fraction: ParentFractionKind,
 }
 
@@ -3014,7 +3109,15 @@ impl MathLayoutContext {
       // without w:compatSetting uses Word 2007 / mode 12, matching the
       // document-level resolver in docx::settings.
       compatibility_mode: 12,
+      drawingml_host: false,
       parent_fraction: ParentFractionKind::None,
+    }
+  }
+
+  const fn with_drawingml_host(self) -> Self {
+    Self {
+      drawingml_host: true,
+      ..self
     }
   }
 
@@ -3044,7 +3147,8 @@ impl MathLayoutContext {
   }
 
   const fn fraction_argument(self, kind: m::FractionTypeValues) -> Self {
-    let nested_word_fraction = self.explicit_math_paragraph
+    let nested_word_fraction = !self.drawingml_host
+      && self.explicit_math_paragraph
       && self.display_math
       && matches!(
         kind,
@@ -3521,6 +3625,15 @@ fn shaped_math_text_single_face_style(
 }
 
 fn layout_shaped_math_text(text: &str, style: &TextStyle, shaped: ShapedText) -> Option<MathBox> {
+  layout_shaped_math_glyphs(text, style, shaped, true)
+}
+
+fn layout_shaped_math_glyphs(
+  text: &str,
+  style: &TextStyle,
+  shaped: ShapedText,
+  searchable: bool,
+) -> Option<MathBox> {
   if shaped.glyphs.is_empty() {
     return None;
   }
@@ -3563,7 +3676,7 @@ fn layout_shaped_math_text(text: &str, style: &TextStyle, shaped: ShapedText) ->
       && glyph.text_range == text_range
     {
       let geometry = math_glyph_geometry(&face, GlyphId::new(glyph.glyph_id));
-      if single_source_glyph && glyph.bounds_em.is_some() && geometry.is_some() {
+      if searchable && single_source_glyph && glyph.bounds_em.is_some() && geometry.is_some() {
         // A single source scalar with one selected MATH glyph can remain real
         // PDF text. Keep the exact GID selected by `ssty` or a variant while
         // preserving the glyph's own shaped origin and Unicode mapping.
@@ -3613,7 +3726,7 @@ fn layout_shaped_math_text(text: &str, style: &TextStyle, shaped: ShapedText) ->
       if semantic_ranges.contains(&text_range) {
         return None;
       }
-      if !cluster_text.is_empty() {
+      if searchable && !cluster_text.is_empty() {
         if !painted_text_glyph {
           let cluster_advance_pt = cursor_x_pt - cluster_origin_x_pt;
           items.push(math_variant_semantic_text(
@@ -3692,13 +3805,24 @@ fn math_script_style(
     } else {
       math.script_script_scale
     };
-    style.font_size_pt = wordprocessing_math_script_size(style.font_size_pt, scale);
+    style.font_size_pt = math_script_size(style.font_size_pt, scale, context);
     if let Some(size) = &mut style.complex_font_size_pt {
-      *size = wordprocessing_math_script_size(*size, scale);
+      *size = math_script_size(*size, scale, context);
     }
   }
   style.baseline_shift_pt = 0.0;
   style
+}
+
+fn math_script_size(font_size_pt: f32, scale: f32, context: MathLayoutContext) -> f32 {
+  if context.drawingml_host {
+    // DrawingML sz uses hundredths of a point. PowerPoint's 36pt/73%
+    // native control realizes 26.28pt, preserving the MATH percentage;
+    // Word's half-point storage grid is a different host contract.
+    (font_size_pt * scale).max(MIN_MATH_SIZE_PT)
+  } else {
+    wordprocessing_math_script_size(font_size_pt, scale)
+  }
 }
 
 fn wordprocessing_math_script_size(font_size_pt: f32, scale: f32) -> f32 {
@@ -6307,6 +6431,93 @@ fn layout_nary(
   result
 }
 
+/// PowerPoint paints the built-up radical control as a path joined to its
+/// rule. This applies to the generated m:rad control only: a literal U+221A
+/// inside m:r remains text, and Word's existing text transport is unchanged.
+fn drawingml_radical_control_paths(radical: &mut MathBox, metrics: &mut TextMetrics) {
+  let mut items = Vec::new();
+  let mut logical_advance: Option<f32> = None;
+  for item in std::mem::take(&mut radical.items) {
+    match &item {
+      MathPaintItem::Text {
+        text,
+        style,
+        x_pt,
+        baseline_y_pt,
+        opacity,
+        exact_glyph_id,
+        ..
+      } => {
+        let paths = metrics.shape_text(text, style).and_then(|mut shaped| {
+          if shaped.glyphs.len() == 1
+            && let Some(glyph_id) = exact_glyph_id
+          {
+            shaped.glyphs[0].glyph_id = *glyph_id;
+            // The exact-GID paint item's origin already includes the
+            // original glyph placement. Do not apply the reshaped source
+            // character's offsets a second time when replaying that GID.
+            shaped.glyphs[0].x_offset_em = 0.0;
+            shaped.glyphs[0].y_offset_em = 0.0;
+          }
+          layout_shaped_math_glyphs(text, style, shaped, false)
+        });
+        if let Some(mut paths) = paths {
+          set_box_opacity(&mut paths, *opacity);
+          items.extend(
+            paths
+              .items
+              .into_iter()
+              .map(|path| path.translated(*x_pt, *baseline_y_pt)),
+          );
+        } else {
+          // Preserve visible ink if a non-outline font cannot supply paths.
+          items.push(item);
+        }
+      }
+      MathPaintItem::SemanticText {
+        style,
+        x_pt,
+        horizontal_scale,
+        glyph_id: Some(glyph_id),
+        ..
+      } => {
+        // A prepared surd's top arm overhangs its hmtx advance so it
+        // overlaps the rule. Its ink edge is not extra horizontal spacing.
+        if let Some(advance) = drawingml_radical_glyph_advance(style, *glyph_id, metrics) {
+          let advance = x_pt + advance * horizontal_scale;
+          logical_advance = Some(logical_advance.map_or(advance, |old| old.max(advance)));
+        }
+      }
+      MathPaintItem::SemanticText { .. } => {}
+      _ => items.push(item),
+    }
+  }
+  radical.items = items;
+  if let Some(advance) = logical_advance {
+    radical.width_pt = advance;
+  }
+}
+
+fn drawingml_radical_glyph_advance(
+  style: &TextStyle,
+  glyph_id: u32,
+  metrics: &mut TextMetrics,
+) -> Option<f32> {
+  // Resolve the same face as the vertical construction, including fallback,
+  // before reading the selected variant or assembly part's exact advance.
+  let shaped = metrics.shape_text("\u{221a}", style)?;
+  let [glyph] = shaped.glyphs.as_slice() else {
+    return None;
+  };
+  let font_face = shaped.font_faces.get(glyph.font_index)?;
+  let face = FontRef::from_index(font_face.data.as_ref(), font_face.index).ok()?;
+  let units_per_em = f32::from(face.head().ok()?.units_per_em()).max(1.0);
+  let advance = face
+    .glyph_metrics(Size::unscaled(), LocationRef::default())
+    .advance_width(GlyphId::new(glyph_id))?;
+  Some(advance * glyph.font_size_pt.max(MIN_MATH_SIZE_PT) / units_per_em)
+}
+
 fn layout_radical(
   degree: Option<&MathNode>,
   base: &MathNode,
@@ -6321,32 +6532,58 @@ fn layout_radical(
   else {
     return MathBox::empty();
   };
-  let math = metrics.math_font_metrics(style);
+  let drawingml_style = context
+    .drawingml_host
+    .then(|| math_script_style(style, context, metrics));
+  let effective_style = drawingml_style.as_ref().unwrap_or(style);
+  let math = metrics.math_font_metrics(effective_style);
+  let rule = math.radical_rule_thickness_pt;
   let radical_gap = if context.style == MathLayoutStyle::Display {
     math.radical_display_style_vertical_gap_pt
   } else {
     math.radical_vertical_gap_pt
   };
   let radicand_height = base_box.ascent_pt + base_box.descent_pt;
-  // Microsoft's *Mathematical Typesetting* describes Office's radical rule
-  // separately from MathML Core: the math handler measures the expression
-  // contained by a radical and selects the MATH variant whose height most
-  // closely matches that expression. RadicalVerticalGap and
-  // RadicalRuleThickness place the overbar after that glyph choice; adding
-  // them to the requested variant height selects an oversized Cambria Math
-  // surd. The Word fixed output for math-mso2k7.docx confirms the boundary:
-  // its 2147-unit radicand keeps the 1972-unit base radical (GID 958), whereas
-  // a 2624-unit request would choose the 2544-unit prepared form (GID 3493).
-  let mut radical = layout_stretched_symbol(
-    "\u{221a}",
-    style,
-    context,
-    radicand_height,
-    0.0,
-    MathVariantSizePolicy::Closest,
-    metrics,
-  );
-  apply_control_background(&mut radical, style);
+  let mut radical = if context.drawingml_host {
+    // PowerPoint's built-up radical covers the radicand plus the MATH gap
+    // and rule. The strict lower bound matters at prepared-form boundaries;
+    // do not apply the legacy normal-symbol tolerance on this host path.
+    layout_vertical_math_variant(
+      "\u{221a}",
+      effective_style,
+      radicand_height + radical_gap + rule,
+      0.0,
+      MathVariantSizePolicy::AtLeast,
+      metrics,
+    )
+    .unwrap_or_else(|| layout_text("\u{221a}", style, context, metrics))
+  } else {
+    // Word's math-mso2k7.docx output follows the closest-height selection
+    // described in Microsoft's *Mathematical Typesetting*: its 2147-unit
+    // radicand retains the 1972-unit base radical (GID 958). Adding the gap
+    // and rule here would instead request the 2544-unit form (GID 3493).
+    layout_stretched_symbol(
+      "\u{221a}",
+      style,
+      context,
+      radicand_height,
+      0.0,
+      MathVariantSizePolicy::Closest,
+      metrics,
+    )
+  };
+  if context.drawingml_host {
+    drawingml_radical_control_paths(&mut radical, metrics);
+  }
+  apply_control_background(&mut radical, effective_style);
+  let radical_gap = if context.drawingml_host {
+    // PowerPoint divides a prepared surd's surplus ink height equally above
+    // and below its radicand, while retaining the specified minimum gap.
+    // This is distinct from TeX's (height - rule - base + gap) / 2 policy.
+    radical_gap.max((radical.ascent_pt + radical.descent_pt - radicand_height) / 2.0)
+  } else {
+    radical_gap
+  };
   let degree_box = degree.map(|node| layout_node(node, context.script_script(), metrics));
   let degree_width = degree_box.as_ref().map_or(0.0, |value| value.width_pt);
   let degree_prefix = if degree_box.is_some() {
@@ -6360,14 +6597,25 @@ fn layout_radical(
   // exactly at the surd advance. Word's PDF uses the same coordinate for the
   // radicand and overbar and contains no additional radical/base gap.
   let base_x = degree_prefix + radical.width_pt;
-  let bar_y = -(base_box.ascent_pt + radical_gap);
+  let bar_y = -(base_box.ascent_pt
+    + radical_gap
+    + if context.drawingml_host {
+      rule / 2.0
+    } else {
+      0.0
+    });
   let base_descent = base_box.descent_pt;
   let mut result = MathBox::empty();
-  let radical_descent = radical.descent_pt;
-  result.append(radical, degree_prefix, base_descent - radical_descent);
+  let radical_y = if context.drawingml_host {
+    // MATH gap ends at the rule's lower edge. Align the surd and overbar
+    // tops; independently bottom-aligning the surd disconnects the contour.
+    radical.ascent_pt + bar_y - rule / 2.0
+  } else {
+    base_descent - radical.descent_pt
+  };
+  result.append(radical, degree_prefix, radical_y);
   let base_width = base_box.width_pt;
   result.append(base_box, base_x, 0.0);
-  let rule = math.radical_rule_thickness_pt;
   let mut overbar = MathBox::empty();
   overbar.width_pt = base_width;
   overbar.ascent_pt = rule / 2.0;
@@ -6381,7 +6629,7 @@ fn layout_radical(
     color: style.color,
     opacity: style.opacity,
   });
-  apply_control_background(&mut overbar, style);
+  apply_control_background(&mut overbar, effective_style);
   result.append(overbar, base_x, bar_y);
   if let Some(degree) = degree_box {
     let completed_radical_height = radicand_height + radical_gap + rule;
@@ -6390,9 +6638,15 @@ fn layout_radical(
     result.append(degree, 0.0, y);
   }
   result.width_pt = base_x + base_width;
-  result.ascent_pt = result
-    .ascent_pt
-    .max(-bar_y + rule + math.radical_extra_ascender_pt);
+  result.ascent_pt = result.ascent_pt.max(
+    -bar_y
+      + if context.drawingml_host {
+        rule / 2.0
+      } else {
+        rule
+      }
+      + math.radical_extra_ascender_pt,
+  );
   result
 }
 
@@ -6722,6 +6976,146 @@ mod tests {
     representative_style, resolve_vary_math_classes, split_math_text, text_math_classes,
     wordprocessing_math_script_size, wordprocessing_math_zone_image,
   };
+
+  #[test]
+  fn drawingml_math_keeps_nested_character_properties_and_math_alphabet_style() {
+    use ooxmlsdk::schemas::a;
+    let source = r#"<m:r xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:rPr sz="3600" b="1" i="1"/><m:t>x+1</m:t></m:r>"#;
+    let run = m::Run::from_bytes(source.as_bytes()).unwrap();
+    let base = TextStyle {
+      font_size_pt: 18.0,
+      ..TextStyle::default()
+    };
+    let styles = StylesCatalog::default();
+    let resolver = |properties: &a::RunProperties, style: &mut TextStyle| {
+      if let Some(size) = properties.font_size {
+        style.font_size_pt = size as f32 / 100.0;
+      }
+      style.bold = properties
+        .bold
+        .as_ref()
+        .is_some_and(|value| value.as_bool());
+      style.italic = properties
+        .italic
+        .as_ref()
+        .is_some_and(|value| value.as_bool());
+    };
+    let parser = MathParser {
+      drawingml_properties: Some(&resolver),
+      base_style: &base,
+      styles: &styles,
+      math_font_family: Arc::from("Cambria Math"),
+    };
+    let built = parser.run(&run);
+    let style = representative_style(&built).unwrap();
+    assert_eq!(style.font_size_pt, 36.0);
+    assert!(!style.bold && !style.italic);
+    assert_eq!(style.font_family.as_deref(), Some("Cambria Math"));
+    // m:nor restores ordinary host b/i; built-up math uses m:sty alphabets.
+    let normal_xml = source.replace("<a:rPr", "<m:rPr><m:nor/></m:rPr><a:rPr");
+    let normal = parser.run(&m::Run::from_bytes(normal_xml.as_bytes()).unwrap());
+    let style = representative_style(&normal).unwrap();
+    assert_eq!(style.font_size_pt, 36.0);
+    assert!(style.bold && style.italic);
+  }
+
+  #[test]
+  fn drawingml_math_radical_control_is_a_path_but_literal_surd_remains_text() {
+    use ooxmlsdk::schemas::a14;
+    let source = |body: &str| {
+      a14::TextMath::from_bytes(format!(
+      r#"<a14:m xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath>{body}</m:oMath></a14:m>"#
+    ).as_bytes()).unwrap()
+    };
+    let built = source(
+      r#"<m:rad><m:radPr><m:degHide m:val="1"/></m:radPr><m:deg/><m:e><m:r><m:t>x</m:t></m:r></m:e></m:rad>"#,
+    );
+    let literal = source("<m:r><m:t>√x</m:t></m:r>");
+    let style = TextStyle {
+      font_size_pt: 36.0,
+      ..TextStyle::default()
+    };
+    let built = super::drawingml_math_layout(&built, &style, true, &|_, _| {}).unwrap();
+    let literal = super::drawingml_math_layout(&literal, &style, true, &|_, _| {}).unwrap();
+    let built_svg = std::str::from_utf8(&built.image.data).unwrap();
+    let literal_svg = std::str::from_utf8(&literal.image.data).unwrap();
+    assert!(built_svg.contains("<path"));
+    assert!(!built_svg.contains("√"));
+    assert!(literal_svg.contains("√"));
+    assert!(built.image.alt_text.as_ref().unwrap().contains('√'));
+  }
+
+  #[test]
+  fn drawingml_math_radical_surd_joins_the_overbar_for_short_and_tall_bases() {
+    use kurbo::Shape as _;
+    let mut metrics = TextMetrics::new();
+    for (text, control_size, base_size, display) in [
+      ("𝑥", 36.0, 36.0, true),
+      ("1", 36.0, 36.0, true),
+      ("𝑔", 36.0, 36.0, false),
+      ("𝑗", 36.0, 36.0, true),
+      ("1", 24.0, 36.0, true),
+    ] {
+      let control_style = TextStyle {
+        font_family: Some(Arc::from("Cambria Math")),
+        font_size_pt: control_size,
+        ..TextStyle::default()
+      };
+      let base = MathNode::Text {
+        text: text.to_string(),
+        style: TextStyle {
+          font_size_pt: base_size,
+          ..control_style.clone()
+        },
+        math_class_override: None,
+      };
+      let radical = super::layout_radical(
+        None,
+        &base,
+        Some(&control_style),
+        MathLayoutContext::root(display, false, false).with_drawingml_host(),
+        &mut metrics,
+      );
+      let surd_top = radical
+        .items
+        .iter()
+        .find_map(|item| match item {
+          MathPaintItem::GlyphPath {
+            path_data,
+            baseline_y_pt,
+            scale_pt_per_unit,
+            ..
+          } => {
+            let path = kurbo::BezPath::from_svg(path_data).unwrap();
+            Some(baseline_y_pt - path.bounding_box().y1 as f32 * scale_pt_per_unit)
+          }
+          _ => None,
+        })
+        .expect("the built-up radical must have a visible outline");
+      let rule_top = radical
+        .items
+        .iter()
+        .find_map(|item| match item {
+          MathPaintItem::Line {
+            y1_pt, width_pt, ..
+          } => Some(y1_pt - width_pt / 2.0),
+          _ => None,
+        })
+        .expect("the built-up radical must have an overbar");
+      assert!(
+        (surd_top - rule_top).abs() < 0.001,
+        "{text}: surd and rule must join"
+      );
+    }
+  }
+
+  #[test]
+  fn drawingml_math_script_size_preserves_native_hundredth_points() {
+    let word = MathLayoutContext::root(true, false, true);
+    let drawing = word.with_drawingml_host();
+    assert!((super::math_script_size(36.0, 0.73, drawing) - 26.28).abs() < 0.0001);
+    assert_eq!(super::math_script_size(36.0, 0.73, word), 26.0);
+  }
 
   #[test]
   fn office_math_font_binding_replaces_every_word_slot_as_one_state() {
@@ -7303,6 +7697,7 @@ mod tests {
     let base_style = TextStyle::default();
     let styles = StylesCatalog::default();
     let parser = MathParser {
+      drawingml_properties: None,
       base_style: &base_style,
       styles: &styles,
       math_font_family: Arc::from("Cambria Math"),
@@ -7485,6 +7880,7 @@ mod tests {
     let base_style = TextStyle::default();
     let styles = StylesCatalog::default();
     let parser = MathParser {
+      drawingml_properties: None,
       base_style: &base_style,
       styles: &styles,
       math_font_family: Arc::from("Cambria Math"),
@@ -7543,6 +7939,7 @@ mod tests {
     let base_style = TextStyle::default();
     let styles = StylesCatalog::default();
     let parser = MathParser {
+      drawingml_properties: None,
       base_style: &base_style,
       styles: &styles,
       math_font_family: Arc::from("Cambria Math"),
@@ -7791,6 +8188,7 @@ mod tests {
     let base_style = TextStyle::default();
     let styles = StylesCatalog::default();
     let parser = MathParser {
+      drawingml_properties: None,
       base_style: &base_style,
       styles: &styles,
       math_font_family: Arc::from("Cambria Math"),
@@ -7937,6 +8335,7 @@ mod tests {
       ..StylesCatalog::default()
     };
     let document_parser = MathParser {
+      drawingml_properties: None,
       base_style: &base_style,
       styles: &document_styles,
       math_font_family: Arc::from("Cambria Math"),
@@ -8191,6 +8590,7 @@ mod tests {
     };
     let styles = StylesCatalog::default();
     let parser = MathParser {
+      drawingml_properties: None,
       base_style: &base_style,
       styles: &styles,
       math_font_family: Arc::from("Cambria Math"),
@@ -8219,6 +8619,7 @@ mod tests {
     let base_style = TextStyle::default();
     let styles = StylesCatalog::default();
     let parser = MathParser {
+      drawingml_properties: None,
       base_style: &base_style,
       styles: &styles,
       math_font_family: Arc::from("Cambria Math"),

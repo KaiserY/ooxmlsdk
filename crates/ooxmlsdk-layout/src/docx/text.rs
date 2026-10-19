@@ -2087,7 +2087,7 @@ mod tests {
       layout_in_cell: true,
       layout_in_cell_forced: false,
       allow_overlap: true,
-      paint_order: FloatingPaintOrder::Unspecified,
+      paint_order: FloatingPaintOrder::UNSPECIFIED,
       relative_width_to: None,
       relative_width_pct: None,
       relative_height_to: None,

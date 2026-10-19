@@ -65,6 +65,14 @@ pub(crate) fn geometry(preset: &a::PresetGeometry) -> a::CustomGeometry {
   geometry
 }
 
+/// Diagram adjustments address the preset's declared guides by one-based index.
+pub(crate) fn adjustment_name(preset: a::ShapeTypeValues, index: usize) -> Option<&'static str> {
+  generated::definition(preset)
+    .adjustments
+    .get(index.checked_sub(1)?)
+    .map(|guide| guide.name)
+}
+
 /// Text layout needs the same adjusted guides, but not allocated path commands.
 pub(super) fn text_geometry(preset: &a::PresetGeometry) -> a::CustomGeometry {
   let definition = generated::definition(preset.preset);

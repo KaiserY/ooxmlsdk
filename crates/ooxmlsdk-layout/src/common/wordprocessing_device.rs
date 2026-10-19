@@ -6,12 +6,33 @@
 //! arithmetic and POINTFIX conversion below. This is a paint transform, not a
 //! correction to row heights or table placement.
 
-// Retain the Word-facing API while sharing the unchanged replay algorithm
-// with Excel's ordinary worksheet-cell output.
+// Share replay arithmetic with Excel; Word selects its reference DC separately.
 pub use super::fixed_output_device::PageCoordinates;
 
 mod line_baseline;
 pub use line_baseline::realize as line_baseline;
+
+mod line_advances;
+pub use line_advances::{MAX_IDEAL_ADVANCE, balance_advances};
+
+/// Select a verified standard reference DC without replacing the page viewport.
+/// Word retains that DC when the authored size rounds to the same whole-mm
+/// dimensions. Native controls cover all six stocks in both orientations.
+/// This conservative recognition does not infer other custom-paper profiles.
+pub fn page_coordinates(width_pt: f32, height_pt: f32) -> Option<PageCoordinates> {
+  let size = [width_pt, height_pt];
+  let millimeters = size.map(|pt| (f64::from(pt) * 25.4 / 72.0).round() as i32);
+  for (dots, mm) in super::fixed_output_device::STANDARD_REFERENCES {
+    for (dots, mm) in [(dots, mm), ([dots[1], dots[0]], [mm[1], mm[0]])] {
+      if millimeters == mm {
+        let viewport = size
+          .map(|pt| (f64::from(pt) * super::fixed_output_device::SOURCE_DPI / 72.0).round() as i32);
+        return Some(PageCoordinates::from_reference(viewport, dots, mm));
+      }
+    }
+  }
+  None
+}
 
 /// Convert one integral Word layout point to the source printer coordinate.
 /// Frame points and paragraph-local distances retain independent ownership.
@@ -206,7 +227,60 @@ impl ArabicMeasurement {
 
 #[cfg(test)]
 mod tests {
-  use super::ArabicMeasurement;
+  use super::{ArabicMeasurement, PageCoordinates, page_coordinates};
+
+  #[test]
+  fn rounded_standard_pages_retain_native_reference_device_and_viewport() {
+    // Actual Word EMF/PDF controls: source page sizes in twips and integral
+    // printer references. The page viewport differs from its reference DC.
+    for (twips, source, expected) in [
+      ([23814, 16840], [1078, 331], [129.384, 39.72]),
+      ([11926, 16858], [761, 331], [91.344, 39.72]),
+      ([12218, 15790], [769, 331], [92.304, 39.72]),
+      ([20210, 12273], [981, 331], [117.744, 39.72]),
+      ([8418, 11933], [667, 331], [80.064, 39.72]),
+      ([14542, 10290], [830, 331], [99.624, 39.72]),
+    ] {
+      let device = page_coordinates(twips[0] as f32 / 20.0, twips[1] as f32 / 20.0).unwrap();
+      let (x, y) = device.map_device_point(source[0], source[1]);
+      assert!((x - expected[0]).abs() < 0.0001, "{twips:?}: {x}");
+      assert!((y - expected[1]).abs() < 0.0001, "{twips:?}: {y}");
+    }
+    let device = page_coordinates(1190.7, 842.0).unwrap();
+    let (x, y, width, height) = device.map_device_rectangle((482, 331, 596, 2));
+    for (actual, expected) in [x, y, width, height]
+      .into_iter()
+      .zip([57.84, 39.72, 71.544, 0.24])
+    {
+      assert!((actual - expected).abs() < 0.0001);
+    }
+    // Excel's existing exact-profile policy remains independently selected.
+    assert!(PageCoordinates::for_standard_size(1190.7, 842.0).is_none());
+  }
+
+  #[test]
+  fn word_reference_selection_preserves_known_pages_and_unknown_custom_path() {
+    for size in [
+      [612.0, 792.0],
+      [612.0, 1008.0],
+      [595.32, 841.92],
+      [841.92, 1190.52],
+    ] {
+      for [width, height] in [size, [size[1], size[0]]] {
+        let original = PageCoordinates::for_standard_size(width, height).unwrap();
+        let selected = page_coordinates(width, height).unwrap();
+        for source in [[481, 331], [2459, 5141], [5000, 7000]] {
+          assert_eq!(
+            selected.map_device_point(source[0], source[1]),
+            original.map_device_point(source[0], source[1]),
+          );
+        }
+      }
+    }
+    for size in [[600.0, 800.0], [1214.55, 841.9], [f32::NAN, 842.0]] {
+      assert!(page_coordinates(size[0], size[1]).is_none());
+    }
+  }
 
   #[test]
   fn word_arabic_measurement_uses_compatibility_font_and_native_ideal_units() {

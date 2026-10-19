@@ -344,6 +344,7 @@ mod tests {
 
   fn test_image() -> ImageItem<'static> {
     ImageItem {
+      font_bitmap: None,
       x_pt: 0.0,
       y_pt: 0.0,
       width_pt: 72.0,

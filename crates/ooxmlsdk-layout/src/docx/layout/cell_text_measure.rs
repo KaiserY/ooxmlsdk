@@ -9,7 +9,6 @@ use super::{
   FlowContext, FrameFragmentKind, InlineItem, PageSetup, TextFrameLayout, TextMetrics,
   TextSegmentation, UNBOUNDED_LAYOUT_EXTENT_PT, cell_horizontal_border_widths, empty_section_page,
   paragraph_content_width, paragraph_frame, resolved_paragraph_indents, row_has_separate_borders,
-  table_cell_soft_break_line_height_delta, table_cell_soft_break_next_line_styles,
   wordprocessing_line_geometry,
 };
 
@@ -95,26 +94,6 @@ pub(super) fn paragraph_extents(
     }
     count += 1;
   }
-  if count == 2
-    && let Some((index, offset)) = paragraph
-      .inlines
-      .iter()
-      .enumerate()
-      .filter_map(|(index, inline)| match inline {
-        InlineItem::Text(run) => run.text.rfind('\n').map(|offset| (index, offset + 1)),
-        _ => None,
-      })
-      .next_back()
-    && let Some((first, following)) =
-      table_cell_soft_break_next_line_styles(paragraph, index, offset, flow, layout.frame)
-  {
-    // Line fragments retain the baseline formatter's paragraph font box.
-    // Preserve the independently established following-font row-growth
-    // owner, also used by the object/field-aware estimator.
-    let delta = table_cell_soft_break_line_height_delta(&first, following, text_metrics);
-    height += delta;
-    leading[1] += delta;
-  }
   Some(EstimatedParagraphContentExtents {
     flow_height: height,
     floating_bottom: 0.0,
@@ -148,6 +127,7 @@ pub(super) fn supports_paragraph(paragraph: &crate::docx::Paragraph) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::docx::layout::BlockNeighbors;
   use crate::docx::{ParagraphFormat, TextRun, TextStyle};
 
   #[test]
@@ -208,8 +188,14 @@ mod tests {
     assert_eq!(extents.line_count, 2);
     assert_eq!(extents.flow_height, 36.0);
     assert_eq!(extents.leading_line_heights_pt, [18.0, 18.0]);
-    let (height, floating_bottom) =
-      table_cell_paragraph_height(None, &paragraph, None, flow, &mut metrics, false, false);
+    let (height, floating_bottom) = table_cell_paragraph_height(
+      BlockNeighbors::direct(None, None),
+      &paragraph,
+      flow,
+      &mut metrics,
+      false,
+      false,
+    );
     assert_eq!(height, 48.0);
     assert_eq!(floating_bottom, 0.0);
   }

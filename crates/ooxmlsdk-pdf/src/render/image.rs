@@ -1,4 +1,5 @@
 mod office_deflate_size;
+mod word_print_codec;
 
 use std::hash::{Hash, Hasher};
 use std::io::{Cursor, Write};
@@ -12,7 +13,7 @@ use image::{
   ImageFormat as RasterImageFormat, ImageReader, Rgba, imageops::FilterType,
 };
 use jpeg_encoder::{ColorType as JpegColorType, Encoder as JpegEncoder, SamplingFactor};
-use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 use crate::error::{PdfError, Result};
 use crate::options::{PdfDocumentKind, PdfImageOptimizationPolicy, PdfOptimizeFor, PdfOptions};
@@ -101,6 +102,14 @@ impl DirectRasterColorSpace {
 
 #[derive(Clone, Debug)]
 pub(super) enum DirectRasterEncoding {
+  /// A constant color plane and an independently sized binary glyph mask.
+  /// PDF soft masks have their own dimensions and component depth.
+  BinaryStencil {
+    color: [u8; 3],
+    width: u32,
+    height: u32,
+    alpha: Arc<[u8]>,
+  },
   /// Unencoded component samples. The direct writer compresses each color and
   /// alpha plane once when it writes the shared image object.
   Sampled { pixels: Arc<PdfRasterPixels> },
@@ -140,6 +149,7 @@ pub(super) struct DirectRasterImage {
 impl DirectRasterImage {
   pub(super) fn icc_profile(&self) -> Option<&[u8]> {
     let profile = match &self.encoding {
+      DirectRasterEncoding::BinaryStencil { .. } => None,
       DirectRasterEncoding::Sampled { pixels } => pixels.icc_profile.as_deref(),
       DirectRasterEncoding::Dct { icc_profile, .. }
       | DirectRasterEncoding::IndexedPng { icc_profile, .. } => icc_profile.as_deref(),
@@ -149,6 +159,7 @@ impl DirectRasterImage {
 
   pub(super) fn alpha(&self) -> Option<&[u8]> {
     match &self.encoding {
+      DirectRasterEncoding::BinaryStencil { alpha, .. } => Some(alpha),
       DirectRasterEncoding::Sampled { pixels } => pixels.alpha.as_deref(),
       DirectRasterEncoding::Dct { alpha, .. } => alpha.as_deref(),
       DirectRasterEncoding::IndexedPng { .. } => None,
@@ -157,6 +168,23 @@ impl DirectRasterImage {
 }
 
 impl PreparedRasterImage {
+  pub(super) fn font_bitmap(width: u32, height: u32, color: [u8; 3], alpha: Vec<u8>) -> Self {
+    Self::new(DirectRasterImage {
+      width: 2,
+      height: 2,
+      color_space: DirectRasterColorSpace::Rgb,
+      bits_per_component: 1,
+      encoding: DirectRasterEncoding::BinaryStencil {
+        color,
+        width,
+        height,
+        alpha: alpha.into(),
+      },
+      interpolate: false,
+      soft_mask_interpolate: false,
+      matte: None,
+    })
+  }
   pub(super) fn new(direct: DirectRasterImage) -> Self {
     Self(Arc::new(PreparedRasterImageInner { direct }))
   }
@@ -179,6 +207,7 @@ impl PreparedRasterImage {
 pub(super) struct ImageSet {
   rasters: HashMap<(usize, usize), Vec<CachedRaster>>,
   word_print_jpeg_displays: HashMap<(usize, usize), (f32, f32)>,
+  excel_full_resolution_pngs: HashSet<(usize, usize)>,
   svgs: HashMap<(usize, usize), Arc<super::direct_svg::PreparedSvg>>,
   svg_rasters: HashMap<(usize, usize, u32, u32), PreparedRasterImage>,
   office_math_svgs: HashMap<(usize, usize), Arc<super::direct_svg::PreparedOfficeMathSvg>>,
@@ -246,6 +275,16 @@ impl RasterExportProfile {
       self,
       Self::MicrosoftOfficeFixedOutput {
         document_kind: PdfDocumentKind::Docx,
+        optimize_for: PdfOptimizeFor::Print,
+      }
+    )
+  }
+
+  fn is_excel_print(self) -> bool {
+    matches!(
+      self,
+      Self::MicrosoftOfficeFixedOutput {
+        document_kind: PdfDocumentKind::Xlsx,
         optimize_for: PdfOptimizeFor::Print,
       }
     )
@@ -621,6 +660,31 @@ impl RasterExportOptions {
     self
   }
 
+  fn for_source_format(
+    mut self,
+    owner: RasterOwner,
+    format: Option<RasterImageFormat>,
+    display_width_pt: f32,
+    display_height_pt: f32,
+  ) -> Self {
+    if owner == RasterOwner::Source
+      && self.profile.is_excel_print()
+      && format == Some(RasterImageFormat::Png)
+    {
+      // Excel's source PNG controls allocate the reduced bitmap from the
+      // physical picture transform, independently on each axis. Word/PPT's
+      // twip-inclusive allocation and small-source exception have separate
+      // owners. Retain fractional extents until the native integer truncation.
+      self.max_size_px =
+        RasterPixelLimits::from_display_size(display_width_pt, display_height_pt, 200);
+      self.downsample_trigger_px =
+        RasterPixelLimits::from_display_size(display_width_pt, display_height_pt, 275);
+      self.exact_downsample_trigger = true;
+      self.use_gdiplus_jpeg_resampler = true;
+    }
+    self
+  }
+
   fn without_downsampling(mut self) -> Self {
     self.max_size_px = None;
     self.downsample_trigger_px = None;
@@ -667,6 +731,29 @@ impl RasterExportOptions {
     format: RasterImageFormat,
     owner: RasterOwner,
   ) -> Option<(u32, u32)> {
+    if owner == RasterOwner::Source
+      && self.profile.is_excel_print()
+      && format == RasterImageFormat::Png
+    {
+      let (target_width, target_height) = self.max_size_px?.pixels();
+      let (trigger_width, trigger_height) = self.downsample_trigger_px?.pixels();
+      // Native Excel PNG controls retain an axis below 275ppi even when the
+      // other axis reduces. A short source axis does not exempt the picture.
+      // MSO's bitmap producer compares source DPI strictly and truncates the
+      // requested-DPI extent, without a four-pixel allocation allowance.
+      let axis = |source: u32, threshold: f64, target: f64| {
+        if f64::from(source) > threshold {
+          (target as u32).clamp(1, source)
+        } else {
+          source
+        }
+      };
+      let target = (
+        axis(size.0, trigger_width, target_width),
+        axis(size.1, trigger_height, target_height),
+      );
+      return (target != size).then_some(target);
+    }
     if owner == RasterOwner::Source
       && self.profile.is_word()
       && self.profile.is_office_screen()
@@ -719,6 +806,55 @@ impl RasterExportOptions {
 }
 
 impl ImageSet {
+  pub(super) fn observe_excel_png_display(
+    &mut self,
+    data: &[u8],
+    content_type: Option<&str>,
+    options: &PdfOptions,
+    display_size_pt: (f32, f32),
+    blip_compression_state: BlipCompressionState,
+  ) {
+    let owner = RasterOwner::from_content_type(content_type);
+    if owner != RasterOwner::Source
+      || !RasterExportProfile::from_options(options).is_excel_print()
+      || raster_format(data, content_type) != Some(RasterImageFormat::Png)
+    {
+      return;
+    }
+    let key = image_data_key(data);
+    let (width_pt, height_pt) = display_size_pt;
+    if self.excel_full_resolution_pngs.contains(&key)
+      || !width_pt.is_finite()
+      || width_pt <= 0.0
+      || !height_pt.is_finite()
+      || height_pt <= 0.0
+    {
+      return;
+    }
+    let Ok(size) =
+      ImageReader::with_format(Cursor::new(data), RasterImageFormat::Png).into_dimensions()
+    else {
+      // The ordinary decode path reports malformed images. This prepass only
+      // plans resolution reuse and must not change error ownership.
+      return;
+    };
+    let policy = RasterExportOptions::new(options, width_pt, height_pt)
+      .for_owner(owner, width_pt, height_pt)
+      .for_source_format(owner, Some(RasterImageFormat::Png), width_pt, height_pt)
+      .for_blip_compression_state(blip_compression_state);
+    if policy
+      .downsample_source_size(size, RasterImageFormat::Png, owner)
+      .is_none()
+    {
+      // Repeated native Excel exports reuse a source-resolution realization
+      // on every reference after its cache is warm. Plan that realization
+      // before writing resources so cold-cache traversal order cannot choose
+      // lower-quality duplicates. Only selected output pages contribute; an
+      // unexported larger occurrence does not prevent downsampling.
+      self.excel_full_resolution_pngs.insert(key);
+    }
+  }
+
   pub(super) fn observe_word_jpeg_display(
     &mut self,
     data: &[u8],
@@ -901,9 +1037,18 @@ impl ImageSet {
       display_width_pt = display_width_pt.max(planned_display.0);
       display_height_pt = display_height_pt.max(planned_display.1);
     }
-    let export_options = RasterExportOptions::new(options, display_width_pt, display_height_pt)
+    let mut export_options = RasterExportOptions::new(options, display_width_pt, display_height_pt)
       .for_owner(owner, display_width_pt, display_height_pt)
+      .for_source_format(
+        owner,
+        raster_format(data, content_type),
+        display_width_pt,
+        display_height_pt,
+      )
       .for_blip_compression_state(blip_compression_state);
+    if self.excel_full_resolution_pngs.contains(&key) {
+      export_options = export_options.without_downsampling();
+    }
     if let Some(image) = self.rasters.get(&key).and_then(|images| {
       images.iter().find(|image| {
         image.content_type.as_deref() == content_type
@@ -1166,6 +1311,18 @@ fn decode_image(
         } else {
           decode_dynamic_image(data, format)?
         };
+        if owner == RasterOwner::Source
+          && format_export_options.profile.is_word_print()
+          && should_try_jpeg(format, format_export_options, owner)
+          && raster.image.color() == image::ColorType::Rgb8
+          && metadata.is_some_and(|value| value.orientation == Orientation::NoTransforms)
+          && format_export_options
+            .downsample_source_size(raster.image.dimensions(), format, owner)
+            .is_none()
+          && let Some(trial_metadata_bytes) = word_print_codec::trial_metadata_size(data, format)
+        {
+          return export_word_print_rgb_image(raster, format_export_options, trial_metadata_bytes);
+        }
         return export_decoded_image(raster, format, format_export_options, owner);
       }
       RasterRealization::NativeJpeg => {
@@ -1740,6 +1897,38 @@ fn prepare_encoded_jpeg_image_with_soft_mask(
     soft_mask_interpolate,
     matte: Some(matte),
   }))
+}
+
+fn export_word_print_rgb_image(
+  raster: DecodedRasterImage,
+  export_options: RasterExportOptions,
+  trial_metadata_bytes: usize,
+) -> Result<PreparedRasterImage> {
+  let rgba = raster.image.to_rgba8();
+  let selection = word_print_codec::select(&rgba);
+  if selection != word_print_codec::Selection::Lossless {
+    let jpeg = encode_office_h2v2_jpeg(&rgba, export_options.jpeg_quality.unwrap_or(90))?;
+    let keep_jpeg = match selection {
+      word_print_codec::Selection::Jpeg => true,
+      word_print_codec::Selection::JpegTrial { limit } => jpeg
+        .len()
+        .checked_add(trial_metadata_bytes)
+        .is_some_and(|bytes| bytes < limit),
+      word_print_codec::Selection::Lossless => false,
+    };
+    if keep_jpeg {
+      return prepare_encoded_jpeg_image(
+        jpeg,
+        raster.icc_profile,
+        export_options.allow_interpolation,
+      );
+    }
+  }
+  prepare_sampled_image(
+    PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile),
+    false,
+    None,
+  )
 }
 
 fn export_decoded_image(
@@ -2742,10 +2931,9 @@ fn office_fixed_output_prefers_lossless(
     return false;
   }
 
-  // The next type-dependent gate uses uncompressed image size. Word and
-  // PowerPoint agree that 154x141 RGB (65,142 bytes) remains lossless while
-  // 155x142 RGB (66,030 bytes) enters JPEG analysis; 150x150 independently
-  // rules out a longest-edge threshold and pins the boundary at 64 KiB.
+  // This is a preliminary gate for the remaining legacy owners. The complete
+  // Word Print RGB policy is dispatched above: crossing 64 KiB starts a
+  // bounded compression estimate and does not by itself select JPEG.
   // Unlike the color histogram, this gate owns the complete stored plane.
   let stored_samples = u64::from(image.width()) * u64::from(image.height());
   if stored_samples.saturating_mul(3) > OFFICE_SMALL_RASTER_UNCOMPRESSED_RGB_BYTES {
@@ -2922,9 +3110,123 @@ struct GdiplusAreaAxis {
 fn resize_for_gdiplus_bitmap(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
   let source_size = image.dimensions();
   if source_size.0.max(source_size.1) < GDIPLUS_BITMAP_AREA_THRESHOLD {
-    return resize_for_office_screen(image, target_size);
+    let source = image.into_rgba8();
+    if source.pixels().all(|pixel| pixel[3] == 255) {
+      return resize_for_gdiplus_opaque_bilinear(source, target_size);
+    }
+    return resize_for_office_screen(DynamicImage::ImageRgba8(source), target_size);
   }
   resize_for_gdiplus_fixed_area(image, target_size)
+}
+
+fn gdiplus_round_down_f32(value: f64) -> f32 {
+  // GDI+ raster spans run with MXCSR rounding toward negative infinity.
+  // Preserve that operation locally without changing the caller's FP state.
+  let rounded = value as f32;
+  if f64::from(rounded) > value {
+    rounded.next_down()
+  } else {
+    rounded
+  }
+}
+
+fn resize_for_gdiplus_opaque_bilinear(
+  source: image::RgbaImage,
+  target_size: (u32, u32),
+) -> DynamicImage {
+  let (source_width, source_height) = source.dimensions();
+  let (target_width, target_height) = target_size;
+  if source_width == 0
+    || source_height == 0
+    || target_width == 0
+    || target_height == 0
+    || source.dimensions() == target_size
+  {
+    return DynamicImage::ImageRgba8(source);
+  }
+
+  let add = |a: f32, b: f32| gdiplus_round_down_f32(f64::from(a) + f64::from(b));
+  let mul = |a: f32, b: f32| gdiplus_round_down_f32(f64::from(a) * f64::from(b));
+  let div = |a: f32, b: f32| gdiplus_round_down_f32(f64::from(a) / f64::from(b));
+  let sw = source_width as f32;
+  let sh = source_height as f32;
+  let tw = target_width as f32;
+  let th = target_height as f32;
+
+  // Native DrawImage first maps the far rectangle corner, normalizes its
+  // three destination points, then inverts that affine matrix. These f32
+  // operations do not reduce to a direct source/target ratio under round-down.
+  let point_x = add(tw, -mul(div(tw, sw), sw));
+  let point_y = add(th, -mul(div(th, sh), sh));
+  let area = mul(sw, sh);
+  let reciprocal_area = div(1.0, area);
+  let forward_x = mul(add(mul(sh, tw), mul(-sh, point_x)), reciprocal_area);
+  let forward_y = mul(add(mul(sw, th), mul(-sw, point_y)), reciprocal_area);
+  let forward_dx = mul(mul(area, point_x), reciprocal_area);
+  let forward_dy = mul(mul(area, point_y), reciprocal_area);
+  let reciprocal_determinant = div(1.0, mul(forward_x, forward_y));
+  let scale_x = mul(forward_y, reciprocal_determinant);
+  let scale_y = mul(forward_x, reciprocal_determinant);
+  let origin_x = mul(-mul(forward_dx, forward_y), reciprocal_determinant);
+  let origin_y = mul(-mul(forward_dy, forward_x), reciprocal_determinant);
+
+  const ONE: u32 = 1 << 11;
+  let axis_sample = |position: f32, size: u32| {
+    let first = position.floor() as i32;
+    let fraction = add(position, -(first as f32));
+    let weight = add(mul(fraction, ONE as f32), 0.5).floor() as u32;
+    (
+      first.clamp(0, size as i32 - 1) as u32,
+      (first + 1).clamp(0, size as i32 - 1) as u32,
+      weight,
+    )
+  };
+  let end_x = add(mul(tw, scale_x), origin_x);
+  let step_x = div(add(end_x, -origin_x), tw);
+  let mut position_x = origin_x;
+  let horizontal = (0..target_width)
+    .map(|_| {
+      let sample = axis_sample(position_x, source_width);
+      position_x = add(position_x, step_x);
+      sample
+    })
+    .collect::<Vec<_>>();
+  let vertical = (0..target_height)
+    .map(|y| axis_sample(add(mul(y as f32, scale_y), origin_y), source_height))
+    .collect::<Vec<_>>();
+
+  // Native bilinear spans retain both Q11 axes until the final rounded Q22
+  // result; rounding the horizontal colors first changes otherwise opaque RGB.
+  DynamicImage::ImageRgba8(image::RgbaImage::from_fn(
+    target_width,
+    target_height,
+    |x, y| {
+      let (left, right, fx) = horizontal[x as usize];
+      let (top, bottom, fy) = vertical[y as usize];
+      let samples = [
+        source.get_pixel(left, top),
+        source.get_pixel(right, top),
+        source.get_pixel(left, bottom),
+        source.get_pixel(right, bottom),
+      ];
+      let weights = [
+        (ONE - fx) * (ONE - fy),
+        fx * (ONE - fy),
+        (ONE - fx) * fy,
+        fx * fy,
+      ];
+      let mut result = [0, 0, 0, 255];
+      for (channel, output) in result[..3].iter_mut().enumerate() {
+        let accumulated = samples
+          .iter()
+          .zip(weights)
+          .map(|(sample, weight)| u32::from(sample[channel]) * weight)
+          .sum::<u32>();
+        *output = ((accumulated + (1 << 21)) >> 22) as u8;
+      }
+      Rgba(result)
+    },
+  ))
 }
 
 fn resize_for_word_screen_bitmap(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
@@ -4118,6 +4420,88 @@ mod tests {
   }
 
   #[test]
+  fn excel_print_source_png_reduces_only_high_density_axes_without_short_axis_exemption() {
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Xlsx);
+    // Native Excel Print controls retain the physical viewport while varying
+    // only source PNG pixels. Both one-axis reductions and heights<=50 are
+    // covered by observed outputs, independently of this implementation.
+    for (source, expected) in [
+      ((120, 31), None),
+      ((166, 43), None),
+      ((168, 44), None),
+      ((170, 44), Some((123, 44))),
+      ((168, 45), Some((168, 32))),
+      ((172, 45), Some((123, 32))),
+      ((180, 47), Some((123, 32))),
+      ((192, 50), Some((123, 32))),
+      ((195, 51), Some((123, 32))),
+    ] {
+      let policy = RasterExportOptions::new(&options, 44.321, 11.575).for_source_format(
+        RasterOwner::Source,
+        Some(RasterImageFormat::Png),
+        44.321,
+        11.575,
+      );
+      assert_eq!(
+        policy.downsample_source_size(source, RasterImageFormat::Png, RasterOwner::Source),
+        expected,
+        "source={source:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn excel_print_png_policy_keeps_fractional_allocation_and_other_owners_independent() {
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Xlsx);
+    let base = RasterExportOptions::new(&options, 44.291536, 11.674561);
+    let source = base.for_source_format(
+      RasterOwner::Source,
+      Some(RasterImageFormat::Png),
+      44.291536,
+      11.674561,
+    );
+    assert_eq!(
+      source.downsample_source_size((180, 47), RasterImageFormat::Png, RasterOwner::Source),
+      Some((123, 32))
+    );
+    assert!(source.use_gdiplus_jpeg_resampler);
+    for (owner, format) in [
+      (RasterOwner::Source, RasterImageFormat::Jpeg),
+      (RasterOwner::Source, RasterImageFormat::Gif),
+      (RasterOwner::WordStatic3d, RasterImageFormat::Png),
+      (RasterOwner::ExcelChartsheetMarker, RasterImageFormat::Png),
+    ] {
+      assert_eq!(
+        base.for_source_format(owner, Some(format), 44.291536, 11.674561),
+        base
+      );
+    }
+    for (kind, intent) in [
+      (PdfDocumentKind::Docx, PdfOptimizeFor::Print),
+      (PdfDocumentKind::Pptx, PdfOptimizeFor::Print),
+      (PdfDocumentKind::Xlsx, PdfOptimizeFor::Screen),
+    ] {
+      options.optimize_for = intent;
+      options.images.optimization_policy =
+        PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(kind);
+      let base = RasterExportOptions::new(&options, 44.291536, 11.674561);
+      assert_eq!(
+        base.for_source_format(
+          RasterOwner::Source,
+          Some(RasterImageFormat::Png),
+          44.291536,
+          11.674561
+        ),
+        base
+      );
+    }
+  }
+
+  #[test]
   fn office_screen_reduction_uses_the_gdiplus_bilinear_phase() {
     let vertical = image::RgbaImage::from_fn(116, 72, |x, _| {
       if x == 50 {
@@ -4326,7 +4710,7 @@ mod tests {
           .unwrap();
         let actual = decode_image(&png, Some("image/png"), export, None).unwrap();
         let expected = if width.max(height) < GDIPLUS_BITMAP_AREA_THRESHOLD {
-          resize_for_office_screen(dynamic, (55, 34))
+          resize_for_gdiplus_opaque_bilinear(dynamic.into_rgba8(), (55, 34))
         } else {
           resize_for_gdiplus_fixed_area(dynamic, (55, 34))
         };
@@ -4488,15 +4872,56 @@ mod tests {
   }
 
   #[test]
+  fn gdiplus_opaque_bilinear_matches_native_color_samples() {
+    // Native Bilinear/PixelOffsetDefault output for an independently generated
+    // RGB pattern, including both integer and fractional source coordinates.
+    let source = image::RgbaImage::from_fn(7, 5, |x, y| {
+      Rgba([
+        ((37 * x + 19 * y + 11) % 256) as u8,
+        ((13 * x + 29 * y + 37) % 256) as u8,
+        ((71 * x + 7 * y + 83) % 256) as u8,
+        255,
+      ])
+    });
+    let reduced = resize_for_gdiplus_bitmap(DynamicImage::ImageRgba8(source), (4, 3)).to_rgba8();
+    let expected = [
+      [11, 37, 83],
+      [76, 60, 207],
+      [141, 83, 76],
+      [205, 105, 200],
+      [43, 85, 95],
+      [107, 108, 219],
+      [172, 131, 87],
+      [194, 154, 147],
+      [74, 134, 106],
+      [139, 156, 231],
+      [204, 179, 99],
+      [141, 202, 159],
+    ];
+    for (actual, expected) in reduced.pixels().zip(expected) {
+      assert_eq!(actual.0, [expected[0], expected[1], expected[2], 255]);
+    }
+  }
+
+  #[test]
   fn word_print_jpeg_bitmap_scaler_switches_on_either_420_pixel_axis() {
     let target = (298, 1);
     let below = DynamicImage::ImageRgba8(image::RgbaImage::from_fn(419, 1, |x, _| {
       Rgba([(x & 1) as u8 * 255, (x % 7) as u8 * 31, 19, 255])
     }));
-    assert_eq!(
-      resize_for_gdiplus_bitmap(below.clone(), target).to_rgba8(),
-      resize_for_office_screen(below, target).to_rgba8()
-    );
+    let reduced = resize_for_gdiplus_bitmap(below, target).to_rgba8();
+    // Native 419x1 to298x1 samples distinguish the small-bitmap bilinear
+    // owner from the floating approximation used by the Screen alpha path.
+    for (x, expected) in [
+      (0, [0, 0, 19, 255]),
+      (1, [152, 44, 19, 255]),
+      (16, [127, 46, 19, 255]),
+      (73, [163, 144, 19, 255]),
+      (149, [128, 93, 19, 255]),
+      (297, [104, 142, 19, 255]),
+    ] {
+      assert_eq!(reduced.get_pixel(x, 0).0, expected);
+    }
 
     let wide = DynamicImage::ImageRgba8(image::RgbaImage::from_fn(420, 1, |x, _| {
       Rgba([(x & 1) as u8 * 255, (x % 7) as u8 * 31, 19, 255])
@@ -5850,6 +6275,56 @@ mod tests {
       )
       .unwrap();
     assert_eq!(images.rasters.values().map(Vec::len).sum::<usize>(), 2);
+  }
+
+  #[test]
+  fn excel_print_png_reuses_source_resolution_on_selected_pages() {
+    let source = image::RgbImage::from_fn(41, 39, |x, y| {
+      image::Rgb([x.wrapping_mul(17) as u8, y.wrapping_mul(29) as u8, 127])
+    });
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(source.as_raw(), 41, 39, ColorType::Rgb8.into())
+      .unwrap();
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Xlsx);
+    // Native page-range controls: P4 and P5 share the full 41x39 source;
+    // exporting only P5 yields 41x24, even if P4 exists in the workbook.
+    // Repeating a full export on the same workbook shares 41x39 on every
+    // occurrence. The prepass chooses that warmed-cache realization.
+    let smaller = (10.832, 8.8344);
+    let larger = (10.832, 11.299);
+    for (include_larger, expected) in [(false, (41, 24)), (true, (41, 39))] {
+      let mut images = ImageSet::default();
+      images.observe_excel_png_display(
+        &png,
+        Some("image/png"),
+        &options,
+        smaller,
+        BlipCompressionState::Unspecified,
+      );
+      if include_larger {
+        images.observe_excel_png_display(
+          &png,
+          Some("image/png"),
+          &options,
+          larger,
+          BlipCompressionState::Unspecified,
+        );
+      }
+      let image = images
+        .raster_direct(
+          &png,
+          Some("image/png"),
+          &options,
+          None,
+          smaller,
+          BlipCompressionState::Unspecified,
+        )
+        .unwrap();
+      assert_eq!(image.size(), expected, "larger selected: {include_larger}");
+    }
   }
 
   #[test]

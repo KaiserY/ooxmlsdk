@@ -10,6 +10,7 @@ use crate::common::{
 };
 
 const MIN_MARKER_BASE_PT: f32 = 70.0 * 72.0 / 2_540.0;
+const MIN_TRIANGLE_BASE_PT: f32 = 2.0;
 // Match the path-flattening accuracy used by the DrawingML effect masks.  This
 // is intentionally expressed in page points: the widened bounds are a logical
 // image boundary and must not change when Direct2D/Word pre-scales a blur.
@@ -458,6 +459,152 @@ pub(crate) fn stroke_end_shaft_insets(stroke: &Stroke<'_>) -> (f32, f32) {
   )
 }
 
+/// Realizes a solid, straight DrawingML triangle-ended line as one filled path.
+///
+/// Word and PowerPoint fixed output consume the shaft up to half a marker
+/// baseline inside each triangle's base. They fill the shaft and decorations
+/// together with nonzero winding, applying opacity once to their overlap.
+/// Square caps extend only undecorated ends; round caps remain round at the
+/// consumed shaft endpoints. Unsupported stroke/path forms retain their own
+/// realization by returning `None`.
+pub fn drawingml_triangle_stroke_outline(
+  commands: &[PathCommand],
+  points: &[Point],
+  closed: bool,
+  stroke: &Stroke<'_>,
+) -> Option<Vec<PathCommand>> {
+  if closed
+    || !stroke.width.0.is_finite()
+    || stroke.width.0 <= 0.0
+    || stroke.gradient.is_some()
+    || stroke.pattern.is_some()
+    || stroke
+      .compound
+      .is_some_and(|value| value != StrokeCompound::Single)
+    || stroke.alignment == Some(StrokeAlignment::Inside)
+  {
+    return None;
+  }
+  let ends = [stroke.head_end, stroke.tail_end];
+  if ends
+    .iter()
+    .flatten()
+    .any(|marker| !matches!(marker.kind, StrokeEndKind::None | StrokeEndKind::Triangle))
+    || !ends
+      .iter()
+      .flatten()
+      .any(|marker| marker.kind == StrokeEndKind::Triangle)
+  {
+    return None;
+  }
+  if stroke.resolved_dash().is_some() {
+    return None;
+  }
+  let (start, end) = if commands.is_empty() {
+    let [start, end] = points else { return None };
+    (*start, *end)
+  } else {
+    let [PathCommand::MoveTo(start), PathCommand::LineTo(end)] = commands else {
+      return None;
+    };
+    (*start, *end)
+  };
+  if ![start.x.0, start.y.0, end.x.0, end.y.0]
+    .into_iter()
+    .all(f32::is_finite)
+  {
+    return None;
+  }
+  let dx = f64::from(end.x.0) - f64::from(start.x.0);
+  let dy = f64::from(end.y.0) - f64::from(start.y.0);
+  let length = dx.hypot(dy);
+  let baseline = stroke.width.0.max(MIN_TRIANGLE_BASE_PT);
+  let insets = ends.map(|marker| {
+    marker
+      .filter(|marker| marker.kind == StrokeEndKind::Triangle)
+      .map_or(0.0, |marker| {
+        f64::from(marker_dimensions(marker, stroke.width.0).1 - baseline / 2.0)
+      })
+  });
+  if length <= insets[0] + insets[1] || !length.is_finite() {
+    return None;
+  }
+  let radius = f64::from(stroke.width.0) / 2.0;
+  let mut left = insets[0];
+  let mut right = length - insets[1];
+  if stroke.cap == Some(StrokeCap::Square) {
+    if insets[0] == 0.0 {
+      left -= radius;
+    }
+    if insets[1] == 0.0 {
+      right += radius;
+    }
+  }
+  let mut outline = BezPath::new();
+  outline.move_to((left, -radius));
+  outline.line_to((right, -radius));
+  if stroke.cap == Some(StrokeCap::Round) {
+    // Standard quarter-circle cubic, also used for Office's round line caps.
+    let tangent = radius * 4.0 * (2.0_f64.sqrt() - 1.0) / 3.0;
+    outline.curve_to(
+      (right + tangent, -radius),
+      (right + radius, -tangent),
+      (right + radius, 0.0),
+    );
+    outline.curve_to(
+      (right + radius, tangent),
+      (right + tangent, radius),
+      (right, radius),
+    );
+    outline.line_to((left, radius));
+    outline.curve_to(
+      (left - tangent, radius),
+      (left - radius, tangent),
+      (left - radius, 0.0),
+    );
+    outline.curve_to(
+      (left - radius, -tangent),
+      (left - tangent, -radius),
+      (left, -radius),
+    );
+  } else {
+    outline.line_to((right, radius));
+    outline.line_to((left, radius));
+  }
+  outline.close_path();
+  for (index, marker) in ends.into_iter().enumerate() {
+    let Some(marker) = marker.filter(|marker| marker.kind == StrokeEndKind::Triangle) else {
+      continue;
+    };
+    let (width, marker_length) = marker_dimensions(marker, stroke.width.0);
+    let half_width = f64::from(width) / 2.0;
+    let marker_length = f64::from(marker_length);
+    // All contours have the same orientation, including the reversed head.
+    if index == 0 {
+      outline.move_to((0.0, 0.0));
+      outline.line_to((marker_length, -half_width));
+      outline.line_to((marker_length, half_width));
+    } else {
+      outline.move_to((length, 0.0));
+      outline.line_to((length - marker_length, half_width));
+      outline.line_to((length - marker_length, -half_width));
+    }
+    outline.close_path();
+  }
+  let direction = (dx / length, dy / length);
+  let transform = kurbo::Affine::new([
+    direction.0,
+    direction.1,
+    -direction.1,
+    direction.0,
+    f64::from(start.x.0),
+    f64::from(start.y.0),
+  ]);
+  Some(super::drawingml_geometry::bez_path_commands(
+    transform * outline,
+  ))
+}
+
 pub(crate) fn stroke_end_marker_bounds(path: &PathItem<'_>, stroke: &Stroke<'_>) -> Option<Rect> {
   let mut bounds = None;
   for polygon in stroke_end_marker_polygons(path, stroke) {
@@ -841,7 +988,11 @@ fn normalized_direction(from_x: f32, from_y: f32, to_x: f32, to_y: f32) -> Optio
 
 fn marker_dimensions(marker: StrokeEnd, line_width: f32) -> (f32, f32) {
   let is_open_arrow = marker.kind == StrokeEndKind::Arrow;
-  let baseline = line_width.max(MIN_MARKER_BASE_PT);
+  let baseline = line_width.max(if marker.kind == StrokeEndKind::Triangle {
+    MIN_TRIANGLE_BASE_PT
+  } else {
+    MIN_MARKER_BASE_PT
+  });
   if marker.kind == StrokeEndKind::Arrow
     && marker.width == StrokeEndSize::Medium
     && marker.length == StrokeEndSize::Medium
@@ -1000,6 +1151,97 @@ fn marker_polygon(
 mod tests {
   use super::*;
   use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn triangle_stroke_consumes_shaft_and_preserves_marker_winding() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let triangle = StrokeEnd {
+      kind: StrokeEndKind::Triangle,
+      width: StrokeEndSize::Medium,
+      length: StrokeEndSize::Medium,
+    };
+    for width in [1.0, 2.0, 6.0, 12.0] {
+      for cap in [StrokeCap::Flat, StrokeCap::Square, StrokeCap::Round] {
+        for ends in [(true, false), (false, true), (true, true)] {
+          let stroke = Stroke {
+            width: Pt(width),
+            cap: Some(cap),
+            head_end: ends.0.then_some(triangle),
+            tail_end: ends.1.then_some(triangle),
+            ..Stroke::default()
+          };
+          let commands = drawingml_triangle_stroke_outline(
+            &[],
+            &[point(0.0, 0.0), point(120.0, 0.0)],
+            false,
+            &stroke,
+          )
+          .unwrap();
+          let path = BezPath::from_vec(super::super::drawingml_geometry::mapped_path_elements(
+            &commands,
+            |point| kurbo::Point::new(f64::from(point.x.0), f64::from(point.y.0)),
+          ));
+          assert_ne!(path.winding(kurbo::Point::new(60.0, 0.0)), 0);
+          let marker_length = f64::from(width.max(2.0) * 3.0);
+          for (head, enabled) in [(true, ends.0), (false, ends.1)] {
+            if !enabled {
+              continue;
+            }
+            let x = if head {
+              marker_length - 0.25
+            } else {
+              120.0 - marker_length + 0.25
+            };
+            assert_eq!(
+              path.winding(kurbo::Point::new(x, 0.0)),
+              2,
+              "same winding in shaft/marker overlap"
+            );
+            let x = if head { 0.1 } else { 119.9 };
+            assert_eq!(
+              path.winding(kurbo::Point::new(x, f64::from(width) * 0.4)),
+              0,
+              "shaft must not leave a square corner at the triangle tip"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn triangle_stroke_retains_rotation_and_unsupported_stroke_owners() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let mut stroke = Stroke {
+      width: Pt(1.0),
+      tail_end: Some(StrokeEnd {
+        kind: StrokeEndKind::Triangle,
+        width: StrokeEndSize::Medium,
+        length: StrokeEndSize::Small,
+      }),
+      ..Stroke::default()
+    };
+    let input = [
+      PathCommand::MoveTo(point(30.0, 20.0)),
+      PathCommand::LineTo(point(30.0, 140.0)),
+    ];
+    let commands = drawingml_triangle_stroke_outline(&input, &[], false, &stroke).unwrap();
+    let path = BezPath::from_vec(super::super::drawingml_geometry::mapped_path_elements(
+      &commands,
+      |point| kurbo::Point::new(f64::from(point.x.0), f64::from(point.y.0)),
+    ));
+    let bounds = path.bounding_box();
+    assert_eq!(bounds, kurbo::Rect::new(27.0, 20.0, 33.0, 140.0));
+    stroke.preset_dash = Some(StrokeDashPreset::Dash);
+    assert!(drawingml_triangle_stroke_outline(&input, &[], false, &stroke).is_none());
+    stroke.preset_dash = None;
+    assert!(drawingml_triangle_stroke_outline(&input, &[], true, &stroke).is_none());
+    stroke.head_end = Some(StrokeEnd {
+      kind: StrokeEndKind::Arrow,
+      ..stroke.tail_end.unwrap()
+    });
+    assert!(drawingml_triangle_stroke_outline(&input, &[], false, &stroke).is_none());
+  }
 
   #[test]
   fn marker_endpoint_directions_ignore_repeated_vertices() {

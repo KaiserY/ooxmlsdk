@@ -270,14 +270,7 @@ impl ReadContext {
       return false;
     };
     let actual = self.namespace_for_prefix(&qname[..separator]);
-    let actual_uri = actual.parts().1;
-    match (
-      crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(actual_uri),
-      crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(uri),
-    ) {
-      (Some(actual), Some(expected)) => actual.schema_namespace() == expected.schema_namespace(),
-      _ => actual_uri == uri,
-    }
+    namespace_uris_match(actual.parts().1, uri)
   }
 
   #[cold]
@@ -406,6 +399,93 @@ pub(crate) fn xml_local_name<'a>(name: quick_xml::name::QName<'a>) -> &'a [u8] {
   } else {
     name.local_name().into_inner()
   }
+}
+
+fn namespace_uris_match(actual: &[u8], expected: &[u8]) -> bool {
+  match (
+    crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(actual),
+    crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(expected),
+  ) {
+    (Some(actual), Some(expected)) => actual.schema_namespace() == expected.schema_namespace(),
+    _ => actual == expected,
+  }
+}
+
+pub(crate) fn alternate_content_contains_element(
+  content: &crate::schemas::mc::AlternateContent,
+  read_context: &ReadContext,
+  elements: &[(&[u8], &[u8])],
+) -> Result<bool, SdkError> {
+  use crate::schemas::mc::AlternateContentChoice;
+
+  fn declared_uri<'a>(declarations: &'a [super::XmlNamespace], prefix: &[u8]) -> Option<&'a [u8]> {
+    declarations
+      .iter()
+      .map(super::XmlNamespace::parts)
+      .find_map(|(declared, uri)| (declared == prefix).then_some(uri))
+  }
+
+  let contains =
+    |xml: &[u8], branch_declarations: &[super::XmlNamespace]| -> Result<bool, SdkError> {
+      let mut reader = quick_xml::Reader::from_reader(xml);
+      let start = loop {
+        match reader.read_event()? {
+          Event::Start(start) | Event::Empty(start) => break start,
+          Event::Eof => return Ok(false),
+          _ => {}
+        }
+      };
+      let name = start.name();
+      let local_name = name.local_name().into_inner();
+      if !elements.iter().any(|(_, local)| *local == local_name) {
+        return Ok(false);
+      }
+      let prefix = name.prefix().map_or(&[][..], |prefix| prefix.into_inner());
+      let mut own_uri = None;
+      for attr in start.attributes().with_checks(false) {
+        let attr = attr?;
+        let declares_prefix = match attr.key.as_ref().strip_prefix(b"xmlns") {
+          Some([]) => prefix.is_empty(),
+          Some([b':', declared @ ..]) => declared == prefix,
+          _ => false,
+        };
+        if declares_prefix {
+          own_uri = Some(parse_xml_namespace_uri(&attr, prefix, reader.decoder())?.0);
+          break;
+        }
+      }
+      let root_namespace;
+      let uri = match &own_uri {
+        Some(uri) => uri.as_ref(),
+        None => match declared_uri(branch_declarations, prefix)
+          .or_else(|| declared_uri(&content.xmlns, prefix))
+        {
+          Some(uri) => uri,
+          None => {
+            root_namespace = read_context.namespace_for_prefix(prefix);
+            root_namespace.parts().1
+          }
+        },
+      };
+      Ok(
+        elements
+          .iter()
+          .any(|(namespace, local)| *local == local_name && namespace_uris_match(uri, namespace)),
+      )
+    };
+
+  for branch in &content.alternate_content_choice {
+    let (children, declarations) = match branch {
+      AlternateContentChoice::Choice(choice) => (&choice.xml_children, &choice.xmlns),
+      AlternateContentChoice::Fallback(fallback) => (&fallback.xml_children, &fallback.xmlns),
+    };
+    for child in children {
+      if contains(child, declarations)? {
+        return Ok(true);
+      }
+    }
+  }
+  Ok(false)
 }
 
 #[inline]

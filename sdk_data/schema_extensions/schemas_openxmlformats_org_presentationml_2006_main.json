@@ -53,6 +53,12 @@
           "Children": [
             "transition"
           ]
+        },
+        {
+          "AfterField": "transition",
+          "Children": [
+            "timing"
+          ]
         }
       ]
     },
@@ -65,6 +71,12 @@
           "AfterField": "color_map_override",
           "Children": [
             "transition"
+          ]
+        },
+        {
+          "AfterField": "transition",
+          "Children": [
+            "timing"
           ]
         }
       ]
@@ -94,6 +106,12 @@
           "AfterField": "slide_layout_id_list",
           "Children": [
             "transition"
+          ]
+        },
+        {
+          "AfterField": "transition",
+          "Children": [
+            "timing"
           ]
         }
       ]

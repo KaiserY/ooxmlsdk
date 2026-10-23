@@ -5044,7 +5044,12 @@ fn expand_named_struct(
   }
 
   if let Some(first_mce_field) = mce_fields.first() {
-    let mut mce_slot_parse_tokens = Vec::new();
+    let first_payload_ty = unwrap_option_vec_type(&first_mce_field.ty);
+    let first_child_ty =
+      box_inner_type(&first_payload_ty).unwrap_or_else(|| first_payload_ty.clone());
+    let mut mce_slot_assign_tokens = Vec::new();
+    let mut mce_slot_open_tokens = Vec::new();
+    let mut mce_slot_contains_tokens = Vec::new();
     for (index, field) in mce_fields.iter().enumerate() {
       if field.qname != first_mce_field.qname {
         return Err(syn::Error::new_spanned(
@@ -5052,32 +5057,75 @@ fn expand_named_struct(
           "all static MCE fields must use the same AlternateContent QName",
         ));
       }
+      let payload_ty = unwrap_option_vec_type(&field.ty);
+      let child_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
+      if quote! { #child_ty }.to_string() != quote! { #first_child_ty }.to_string() {
+        return Err(syn::Error::new_spanned(
+          &field.ty,
+          "all static MCE fields must use the same AlternateContent type",
+        ));
+      }
       let field_ident = &field.ident;
       let xml_child_slot = xml_child_slot_by_field
         .get(&field_ident.to_string())
         .copied()
         .unwrap_or_default();
-      let payload_ty = unwrap_option_vec_type(&field.ty);
-      let child_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
       let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
         quote! { std::boxed::Box::new(parsed_child) }
       } else {
         quote! { parsed_child }
       };
-      let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty);
       let assign = if field.repeated {
         quote! { #field_ident.push(#parsed_child_expr); }
       } else {
         quote! { #field_ident = Some(#parsed_child_expr); }
       };
-      let condition = if index + 1 == mce_fields.len() {
-        quote! { true }
-      } else {
-        quote! { __xml_child_slot < #xml_child_slot }
-      };
-      mce_slot_parse_tokens.push(quote! {
-        if #condition {
-          let parsed_child = #deserialize_call(xml_reader, e, next_empty, read_context)?;
+      mce_slot_open_tokens.push(quote! { __xml_child_slot <= #xml_child_slot });
+      let contained_elements = field
+        .children
+        .iter()
+        .map(|child| {
+          let qname = child_fields
+            .iter()
+            .map(|child_field| (&child_field.ident, &child_field.qname))
+            .chain(
+              empty_child_fields
+                .iter()
+                .map(|field| (&field.ident, &field.qname)),
+            )
+            .chain(
+              text_child_fields
+                .iter()
+                .map(|field| (&field.ident, &field.qname)),
+            )
+            .find_map(|(ident, qname)| (ident == child).then_some(qname))
+            .ok_or_else(|| {
+              syn::Error::new_spanned(
+                child,
+                "sdk mce child must name a child, empty_child, or text_child field",
+              )
+            })?;
+          let QNameInfo {
+            tag_prefix,
+            local_name,
+          } = parse_qname_info(qname);
+          let namespace = namespaces::uri_by_prefix(&tag_prefix).ok_or_else(|| {
+            syn::Error::new_spanned(child, "sdk mce child must use a known namespace prefix")
+          })?;
+          let namespace = LitByteStr::new(namespace.as_bytes(), Span::call_site());
+          let local_name = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+          Ok(quote! { (#namespace, #local_name) })
+        })
+        .collect::<syn::Result<Vec<_>>>()?;
+      mce_slot_contains_tokens.push(quote! {
+        crate::common::alternate_content_contains_element(
+          &parsed_child,
+          read_context,
+          &[#( #contained_elements ),*],
+        )?
+      });
+      mce_slot_assign_tokens.push(quote! {
+        if __mce_target == #index {
           #assign
           __xml_child_slot = #xml_child_slot;
         } else
@@ -5103,10 +5151,31 @@ fn expand_named_struct(
         }
       }
     }
+    let deserialize_call = sdk_type_read_inner_call_tokens(&first_child_ty);
+    let last_index = mce_fields.len() - 1;
+    let mce_target_tokens = if last_index == 0 {
+      quote! { 0usize }
+    } else {
+      let open = &mce_slot_open_tokens[..last_index];
+      let contains = &mce_slot_contains_tokens[..last_index];
+      let last_contains = &mce_slot_contains_tokens[last_index];
+      let indices = 0..last_index;
+      let fallback_indices = indices.clone();
+      quote! {
+        #( if #open && #contains { #indices } else )*
+        if #last_contains { #last_index } else
+        #( if #open { #fallback_indices } else )*
+        { #last_index }
+      }
+    };
     push_qname_dispatch_arm(
       &mut child_match_tokens_borrowed,
       &first_mce_field.qname,
-      quote! { #( #mce_slot_parse_tokens )* {} },
+      quote! {
+        let parsed_child = #deserialize_call(xml_reader, e, next_empty, read_context)?;
+        let __mce_target: usize = #mce_target_tokens;
+        #( #mce_slot_assign_tokens )* {}
+      },
     );
   }
 

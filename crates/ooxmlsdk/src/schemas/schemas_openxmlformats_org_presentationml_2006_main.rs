@@ -1133,10 +1133,13 @@ pub struct Slide {
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// Markup Compatibility alternate content at this schema position.
   #[sdk(mce(qname = "mc:AlternateContent", children = [transition]))]
-  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
+  pub alternate_content_0: Vec<crate::schemas::mc::AlternateContent>,
   /// Slide Transition
   #[sdk(child(qname = "p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [timing]))]
+  pub alternate_content_1: Vec<crate::schemas::mc::AlternateContent>,
   /// Slide Timing Information for a Slide
   #[sdk(child(qname = "p:timing"))]
   pub timing: Option<std::boxed::Box<Timing>>,
@@ -1178,10 +1181,13 @@ pub struct SlideLayout {
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// Markup Compatibility alternate content at this schema position.
   #[sdk(mce(qname = "mc:AlternateContent", children = [transition]))]
-  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
+  pub alternate_content_0: Vec<crate::schemas::mc::AlternateContent>,
   /// Slide Transition.
   #[sdk(child(qname = "p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [timing]))]
+  pub alternate_content_1: Vec<crate::schemas::mc::AlternateContent>,
   /// Slide Timing Information for a Slide.
   #[sdk(child(qname = "p:timing"))]
   pub timing: Option<std::boxed::Box<Timing>>,
@@ -1213,10 +1219,13 @@ pub struct SlideMaster {
   pub slide_layout_id_list: Option<SlideLayoutIdList>,
   /// Markup Compatibility alternate content at this schema position.
   #[sdk(mce(qname = "mc:AlternateContent", children = [transition]))]
-  pub alternate_content: Vec<crate::schemas::mc::AlternateContent>,
+  pub alternate_content_0: Vec<crate::schemas::mc::AlternateContent>,
   /// Slide Transition.
   #[sdk(child(qname = "p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [timing]))]
+  pub alternate_content_1: Vec<crate::schemas::mc::AlternateContent>,
   /// Slide Timing Information for a Slide.
   #[sdk(child(qname = "p:timing"))]
   pub timing: Option<std::boxed::Box<Timing>>,

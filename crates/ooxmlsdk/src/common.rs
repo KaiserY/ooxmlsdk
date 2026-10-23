@@ -25,6 +25,8 @@ pub(crate) use package::{
 pub use package::{
   ReadAt, ReferenceRelationshipKind, Relationship, RelationshipRef, RelationshipTargetKind,
 };
+#[cfg(feature = "mce")]
+pub(crate) use xml::namespace_uris_match;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{

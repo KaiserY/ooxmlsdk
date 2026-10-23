@@ -2462,7 +2462,6 @@ mod tests {
               } else {
                 String::new()
               },
-              // Declaration order must not affect the schema-order check.
               children: vec!["last".to_string(), "first".to_string()],
             }],
             ..Default::default()

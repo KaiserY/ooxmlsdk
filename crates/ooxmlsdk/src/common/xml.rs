@@ -401,14 +401,16 @@ pub(crate) fn xml_local_name<'a>(name: quick_xml::name::QName<'a>) -> &'a [u8] {
   }
 }
 
-fn namespace_uris_match(actual: &[u8], expected: &[u8]) -> bool {
-  match (
-    crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(actual),
-    crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(expected),
-  ) {
-    (Some(actual), Some(expected)) => actual.schema_namespace() == expected.schema_namespace(),
-    _ => actual == expected,
+#[inline]
+pub(crate) fn namespace_uris_match(left: &[u8], right: &[u8]) -> bool {
+  if left == right {
+    return true;
   }
+  let Some(left) = crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(left) else {
+    return false;
+  };
+  crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(right)
+    .is_some_and(|right| left.schema_namespace() == right.schema_namespace())
 }
 
 pub(crate) fn alternate_content_contains_element(
@@ -450,8 +452,6 @@ pub(crate) fn alternate_content_contains_element(
           _ => false,
         };
         if declares_prefix {
-          // Routing inspects otherwise opaque payloads. An undecodable local
-          // declaration cannot identify a slot or inherit an ancestor binding.
           let Ok((uri, _, _)) = parse_xml_namespace_uri(&attr, prefix, reader.decoder()) else {
             return Ok(false);
           };

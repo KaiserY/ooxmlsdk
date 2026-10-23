@@ -1,4 +1,4 @@
-use crate::common::{SdkError, XmlNamespace};
+use crate::common::{SdkError, XmlNamespace, namespace_uris_match};
 use crate::sdk::{FileFormatVersion, MarkupCompatibilityProcessSettings};
 
 #[cfg(test)]
@@ -304,18 +304,6 @@ impl<'a> MceContext<'a> {
         .parent
         .is_some_and(|parent| parent.is_ignorable_namespace_bytes(namespace))
   }
-}
-
-#[inline]
-fn namespace_uris_match(left: &[u8], right: &[u8]) -> bool {
-  if left == right {
-    return true;
-  }
-  let Some(left) = crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(left) else {
-    return false;
-  };
-  crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(right)
-    .is_some_and(|right| left.schema_namespace() == right.schema_namespace())
 }
 
 pub(crate) fn namespace_supported(ns: &[u8], target: FileFormatVersion) -> bool {

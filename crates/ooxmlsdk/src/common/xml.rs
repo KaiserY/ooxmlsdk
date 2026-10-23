@@ -450,7 +450,12 @@ pub(crate) fn alternate_content_contains_element(
           _ => false,
         };
         if declares_prefix {
-          own_uri = Some(parse_xml_namespace_uri(&attr, prefix, reader.decoder())?.0);
+          // Routing inspects otherwise opaque payloads. An undecodable local
+          // declaration cannot identify a slot or inherit an ancestor binding.
+          let Ok((uri, _, _)) = parse_xml_namespace_uri(&attr, prefix, reader.decoder()) else {
+            return Ok(false);
+          };
+          own_uri = Some(uri);
           break;
         }
       }

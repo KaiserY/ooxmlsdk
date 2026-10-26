@@ -1037,6 +1037,18 @@ pub(crate) fn vml_rectangle_model(shape: &vml::Rectangle) -> VmlShapeModel {
   vml_shape_from_typed(shape, VmlShapeKind::Rectangle)
 }
 
+pub(crate) fn vml_background_model(background: &vml::Background) -> VmlShapeModel {
+  let mut model = VmlShapeModel {
+    fill_color: background.fillcolor.clone(),
+    filled: background.filled.is_none_or(|value| value.as_bool()),
+    ..VmlShapeModel::default()
+  };
+  if let Some(fill) = background.fill.as_deref() {
+    collect_typed_vml_fill(&mut model, fill);
+  }
+  model
+}
+
 pub(crate) fn vml_polyline_model(shape: &vml::PolyLine) -> VmlShapeModel {
   let mut model = vml_shape_from_typed(shape, VmlShapeKind::Polyline);
   model.coordinate_origin.clone_from(&shape.coordinate_origin);

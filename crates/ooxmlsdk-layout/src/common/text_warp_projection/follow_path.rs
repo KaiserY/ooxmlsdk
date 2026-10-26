@@ -487,6 +487,7 @@ mod tests {
       },
       paint_bounds: super::super::super::Rect::default(),
       boundaries: Vec::new(),
+      word_envelope: false,
       follow_path: Some(fit),
       vml_fit_path: None,
       vml_trim_band: None,

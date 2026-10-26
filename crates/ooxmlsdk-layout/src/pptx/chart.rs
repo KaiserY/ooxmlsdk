@@ -409,8 +409,8 @@ fn word_parallel_value_axis_capacity_length(
   projection.vertical_axis_length(viewport, false)
 }
 
-fn maximum_word_parallel_increment_count(axis_length_pt: f32, label_extent_pt: f32) -> usize {
-  // The native automatic-scale producer divides the initial projected axis
+fn maximum_word_initial_increment_count(axis_length_pt: f32, label_extent_pt: f32) -> usize {
+  // The native automatic-scale producer divides the initial axis
   // length by its font line height, reserves two endpoints, then clamps to
   // 1..10 intervals. This precedes nice-number selection and table layout.
   ((axis_length_pt / label_extent_pt.max(f32::EPSILON)).floor() - 2.0).clamp(1.0, 10.0) as usize
@@ -879,7 +879,7 @@ pub(crate) fn lower_clustered_column_chart(
     && style.title.rotation_deg.abs() <= f32::EPSILON;
   let word_title_layout = title_text
     .filter(|title| {
-      (word_automatic_titled_column_layout(chart, style) || word_manual_title)
+      (word_automatic_titled_column_layout(chart, style, Some(automatic_title)) || word_manual_title)
         // East Asian titles retain their independently established ink-box
         // side leading and baseline owner.
         && east_asian_title_script(title, &style.title).is_none()
@@ -1118,22 +1118,36 @@ pub(crate) fn lower_clustered_column_chart(
     unwrapped_category_label_maximum_width,
     style.category_label.font_size_pt,
   );
-  let category_label_lines: Vec<Vec<String>> = if category_label_rotation.abs() > f32::EPSILON {
+  let word_quarter_turn_labels = word_quarter_turn_category_label_layout(
+    frame,
+    chart,
+    style,
+    &category_label_texts,
+    &mut metrics,
+  );
+  let category_label_lines: Cow<'_, [Vec<String>]> = if let Some(labels) = &word_quarter_turn_labels
+  {
+    Cow::Borrowed(&labels.body.lines)
+  } else if category_label_rotation.abs() > f32::EPSILON {
     // A rotated chart label owns one text line. Wrapping it against the
     // unrotated category slot before applying the transform turns
     // `Sep 2013` into two independently rotated objects and under-reserves
     // the category band. Excel and PowerPoint retain the complete line and
     // let its rotated extent determine the automatic plot reservation.
-    category_label_texts
-      .into_iter()
-      .map(|label| vec![label])
-      .collect()
+    Cow::Owned(
+      category_label_texts
+        .into_iter()
+        .map(|label| vec![label])
+        .collect(),
+    )
   } else {
     let slot_width = frame.width_pt / category_count as f32 * 0.9;
-    category_label_texts
-      .iter()
-      .map(|label| wrap_chart_label(label, slot_width, &style.category_label, &mut metrics))
-      .collect()
+    Cow::Owned(
+      category_label_texts
+        .iter()
+        .map(|label| wrap_chart_label(label, slot_width, &style.category_label, &mut metrics))
+        .collect(),
+    )
   };
   let category_label_line_count =
     category_label_lines.iter().map(Vec::len).max().unwrap_or(1) as f32;
@@ -1143,7 +1157,9 @@ pub(crate) fn lower_clustered_column_chart(
     .flatten()
     .map(|line| metrics.measure_text(line, &style.category_label))
     .fold(0.0f32, f32::max);
-  let category_leaf_label_height = if category_label_rotation.abs() <= f32::EPSILON {
+  let category_leaf_label_height = if let Some(labels) = &word_quarter_turn_labels {
+    labels.body.band_height - labels.body.label_gap
+  } else if category_label_rotation.abs() <= f32::EPSILON {
     category_label_unrotated_height
   } else {
     let rotation = category_label_rotation.to_radians();
@@ -1736,7 +1752,10 @@ pub(crate) fn lower_clustered_column_chart(
     // plot's bottom gridline (also observed in the Office PDF vector paths).
     plot_bottom = category_top;
   }
-  if plot_bottom <= plot_top {
+  // Quarter-turn Word labels have their own bounded text body and physical
+  // plot margins below. Validate that rectangle after its owner has run,
+  // rather than discarding the chart against the generic label reservation.
+  if plot_bottom <= plot_top && word_quarter_turn_labels.is_none() {
     return Vec::new();
   }
 
@@ -1751,8 +1770,17 @@ pub(crate) fn lower_clustered_column_chart(
     scale.logarithmic_base,
     value_display_unit,
   );
+  // An authored inner column rectangle changes the nominal scene bounds,
+  // not Word's model-space margins, automatic aspect or scene materials.
+  // Independent native manual-plot controls use the same volume fit.
   let word_parallel_layout_base = style.layout_profile == ChartLayoutProfile::Word
-    && chart.plot_layout.is_none()
+    && chart.plot_layout.is_none_or(|layout| {
+      layout.targets_inner_plot
+        && chart
+          .series
+          .iter()
+          .all(|series| series.kind == ChartSeriesKind::Column)
+    })
     && category_hierarchy.is_none()
     && chart.axis_sets.len() == 1
     && (matches!(
@@ -1813,7 +1841,9 @@ pub(crate) fn lower_clustered_column_chart(
         if word_parallel_column_layout
           || word_perspective_column_layout
           || word_category_title_column_layout
-          || word_automatic_titled_column_layout(chart, style)
+          || word_quarter_turn_labels.is_some()
+          || word_automatic_titled_column_layout(chart, style, Some(automatic_title))
+          || word_automatic_untitled_column_layout(chart, style)
           || word_manual_filled_column_layout(chart, style)
         {
           word_chart_tick_label_width(label, &style.value_label, &mut metrics)
@@ -1866,7 +1896,24 @@ pub(crate) fn lower_clustered_column_chart(
     })
     .collect::<Vec<_>>();
   let word_combination_layout = word_automatic_combination_layout(chart, style);
-  let word_titled_column_layout = word_automatic_titled_column_layout(chart, style);
+  let word_titled_column_layout =
+    word_automatic_titled_column_layout(chart, style, Some(automatic_title));
+  let word_untitled_column_initial_layout = word_automatic_untitled_column_layout(chart, style);
+  let word_untitled_category_rotation = if word_untitled_column_initial_layout {
+    word_untitled_column_category_rotation(
+      chart,
+      style,
+      frame.width_pt,
+      maximum_tick_width,
+      scale,
+      &mut metrics,
+    )
+  } else {
+    category_label_rotation
+  };
+  let word_untitled_column_layout =
+    word_untitled_column_initial_layout && word_untitled_category_rotation.abs() <= f32::EPSILON;
+  let word_column_layout = word_titled_column_layout || word_untitled_column_layout;
   let word_bottom_column_categories = word_automatic_bottom_column_category_layout(chart, style);
   let word_manual_bottom_layout = word_manual_bottom_cartesian_layout(chart, style);
   let word_manual_filled_column_layout = word_manual_filled_column_layout(chart, style);
@@ -1926,7 +1973,7 @@ pub(crate) fn lower_clustered_column_chart(
   let word_scatter_value_line = value_vertical.line_height_pt();
   let word_scatter_value_line = if word_parallel_layout || word_perspective_column_layout {
     word_chart_layout_metric(word_scatter_value_line)
-  } else if word_titled_column_layout {
+  } else if word_column_layout || word_quarter_turn_labels.is_some() {
     word_chart_natural_line_height(value_vertical)
   } else {
     word_scatter_value_line
@@ -1935,7 +1982,7 @@ pub(crate) fn lower_clustered_column_chart(
   let word_scatter_category_line = category_vertical.line_height_pt();
   let word_scatter_category_line = if word_parallel_layout {
     word_chart_layout_metric(word_scatter_category_line)
-  } else if word_titled_column_layout {
+  } else if word_column_layout {
     word_chart_natural_line_height(category_vertical)
   } else {
     word_scatter_category_line
@@ -2127,8 +2174,9 @@ pub(crate) fn lower_clustered_column_chart(
   let tick_gap = if (word_parallel_column_layout
     || word_perspective_column_layout
     || word_area_layout
-    || word_titled_column_layout
+    || word_column_layout
     || word_category_title_column_layout
+    || word_quarter_turn_labels.is_some()
     || word_manual_filled_column_layout
     || word_manual_inner_layout)
     && value_tick_labels_visible
@@ -2479,7 +2527,16 @@ pub(crate) fn lower_clustered_column_chart(
     category_top = plot_bottom + style.category_label.font_size_pt * 0.7;
   }
   let mut word_category_labels = None;
-  if word_combination_layout || word_manual_bottom_layout || word_titled_column_layout {
+  if let Some(labels) = &word_quarter_turn_labels {
+    let device = style.stroke_scale;
+    tick_left = frame.x_pt + 6.5 * device;
+    plot_left = tick_left + maximum_tick_width + tick_gap;
+    plot_right = frame.x_pt + frame.width_pt - 11.0 * device;
+    plot_top = frame.y_pt + (11.0 * device).max(5.0 * device + word_scatter_value_line * 0.5);
+    plot_bottom = frame.y_pt + frame.height_pt - 6.5 * device - labels.body.band_height;
+    category_top = plot_bottom + labels.body.label_gap;
+  }
+  if word_combination_layout || word_manual_bottom_layout || word_column_layout {
     // Each numeric axis owns a measured label band, regardless of chart-group
     // order. Word COM width/height/font controls preserve the 6.5pt outer
     // label inset; a right legend adds its measured frame and plot clearance.
@@ -2488,9 +2545,9 @@ pub(crate) fn lower_clustered_column_chart(
     plot_left = tick_left + left_value_axis_band_width;
     plot_right = frame.x_pt + frame.width_pt
       - right_value_axis_band_width
-      - if word_titled_column_layout && has_side_legend {
+      - if word_column_layout && has_side_legend {
         side_legend_width + 17.0 * device
-      } else if word_titled_column_layout {
+      } else if word_column_layout {
         11.0 * device
       } else {
         6.5 * device + word_fixed_line_legend_frame_width.map_or(0.0, |width| width + 6.0 * device)
@@ -2501,7 +2558,7 @@ pub(crate) fn lower_clustered_column_chart(
       } else {
         11.0 * device
       }
-      + if word_titled_column_layout {
+      + if word_column_layout {
         word_title_layout.as_ref().map_or_else(
           || word_scatter_title_band(chart, style, &mut metrics),
           |title| title.bounds.height + 6.0 * device,
@@ -2535,6 +2592,32 @@ pub(crate) fn lower_clustered_column_chart(
       category_top = plot_bottom + style.category_label.font_size_pt * 0.7;
       word_category_labels = Some(labels);
     }
+  }
+  if word_untitled_column_layout
+    && category_label_rotation.abs() <= f32::EPSILON
+    && let Some(axis) = chart.category_axis
+  {
+    let natural_line = word_scatter_category_line;
+    let offset = axis
+      .label_offset
+      .as_ref()
+      .and_then(|offset| offset.val)
+      .unwrap_or(100);
+    let label_gap = natural_line * (0.27 + offset as f32 / 400.0);
+    let band_height = natural_line * category_label_line_count.max(1.0) + label_gap;
+    // Native font controls retain these initial logical captions even when
+    // the final numeric/legend bands narrow the plot. Rewrapping at that
+    // final slot would turn the 12pt single-line control into two lines.
+    word_category_labels = Some(WordHorizontalCategoryLabels {
+      lines: category_label_lines.to_vec(),
+      alignment_widths: Vec::new(),
+      rotation: 0.0,
+      natural_line,
+      label_gap,
+      band_height,
+    });
+    plot_bottom = frame.y_pt + frame.height_pt - 6.5 * style.stroke_scale - band_height;
+    category_top = plot_bottom + label_gap;
   }
   if word_bottom_column_categories && let Some(axis) = chart.category_axis {
     let slot = (plot_right - plot_left)
@@ -3184,12 +3267,13 @@ pub(crate) fn lower_clustered_column_chart(
     0.0
   };
   let primary_value_label_gap = if word_combination_layout
-    || word_titled_column_layout
+    || word_column_layout
     || word_manual_filled_column_layout
     || word_manual_bottom_layout
     || word_manual_inner_layout
     || word_parallel_column_layout
     || word_perspective_column_layout
+    || word_quarter_turn_labels.is_some()
   {
     tick_gap
   } else if primary_value_axis_on_right {
@@ -3239,9 +3323,16 @@ pub(crate) fn lower_clustered_column_chart(
     .value_axis
     .and_then(|axis| axis.text_properties.as_deref());
   let value_axis_label_rotation = category_axis_text_rotation_degrees(value_axis_text_properties);
-  let word_parallel_initial_capacity =
-    word_parallel_column_layout && value_axis_label_rotation.abs() <= f32::EPSILON;
-  let available_value_axis_length = if word_parallel_initial_capacity {
+  // The native initial-frame capacity is established for automatic plots.
+  // An authored inner rectangle retains its physical-axis budget below.
+  let word_parallel_initial_capacity = word_parallel_column_layout
+    && chart.plot_layout.is_none()
+    && value_axis_label_rotation.abs() <= f32::EPSILON;
+  let available_value_axis_length = if let Some(labels) = &word_quarter_turn_labels {
+    // Native height/wrap/font controls retain the initial numeric capacity
+    // before the rotated category body narrows the painted plot.
+    labels.initial_axis_length
+  } else if word_parallel_initial_capacity {
     word_parallel_value_axis_capacity_length(
       frame,
       chart,
@@ -3251,6 +3342,11 @@ pub(crate) fn lower_clustered_column_chart(
       scale,
       &mut metrics,
     )
+  } else if word_untitled_column_initial_layout {
+    // Native height thresholds and independent category-font controls use
+    // the outer automatic plot (11pt at each end), before category labels
+    // determine the final inside rectangle. This also precedes auto rotation.
+    (frame.height_pt - 22.0 * style.stroke_scale).max(0.0)
   } else if let Some((_, outer_diameter)) = word_radar_plot {
     // Office's automatic polar capacity precedes the category-label inset.
     // Native category-font controls shrink the painted net while retaining
@@ -3284,24 +3380,25 @@ pub(crate) fn lower_clustered_column_chart(
       projection.vertical_axis_length(plot, primary_value_axis_on_right)
     })
   };
-  let value_axis_label_extent = if word_parallel_initial_capacity {
-    // Native unrotated numeric labels use the realized natural font line,
-    // including its metric quantization. The 1.2-em PDF paint box is separate
-    // and would incorrectly enlarge shorter faces such as Arial.
-    word_chart_natural_line_height(metrics.vertical_metrics_for_text("0", &style.value_label))
-  } else {
-    maximum_tick_label_axis_pitch(
-      &tick_labels,
-      &style.value_label,
-      style.layout_profile,
-      value_axis_label_rotation,
-      value_axis_is_horizontal,
-      &mut metrics,
-    )
-  };
+  let value_axis_label_extent =
+    if word_parallel_initial_capacity || word_untitled_column_initial_layout {
+      // Native unrotated numeric labels use the realized natural font line,
+      // including its metric quantization. The 1.2-em PDF paint box is separate
+      // and would incorrectly enlarge shorter faces such as Arial.
+      word_chart_natural_line_height(metrics.vertical_metrics_for_text("0", &style.value_label))
+    } else {
+      maximum_tick_label_axis_pitch(
+        &tick_labels,
+        &style.value_label,
+        style.layout_profile,
+        value_axis_label_rotation,
+        value_axis_is_horizontal,
+        &mut metrics,
+      )
+    };
   let maximum_auto_increment_count = suppress_duplicate_formatted_tick_budget(
-    if word_parallel_initial_capacity {
-      maximum_word_parallel_increment_count(available_value_axis_length, value_axis_label_extent)
+    if word_parallel_initial_capacity || word_untitled_column_initial_layout {
+      maximum_word_initial_increment_count(available_value_axis_length, value_axis_label_extent)
     } else {
       maximum_auto_main_increment_count(
         style.layout_profile,
@@ -3431,7 +3528,13 @@ pub(crate) fn lower_clustered_column_chart(
     let final_maximum_tick_width = if value_tick_labels_visible {
       tick_labels
         .iter()
-        .map(|(_, label)| metrics.measure_text(label, &style.value_label))
+        .map(|(_, label)| {
+          if word_quarter_turn_labels.is_some() || word_untitled_column_layout {
+            word_chart_tick_label_width(label, &style.value_label, &mut metrics)
+          } else {
+            metrics.measure_text(label, &style.value_label)
+          }
+        })
         .fold(0.0_f32, f32::max)
     } else {
       0.0
@@ -4256,7 +4359,7 @@ pub(crate) fn lower_clustered_column_chart(
   {
     let tick_length = if word_scatter_layout
       || word_area_layout
-      || word_titled_column_layout
+      || word_column_layout
       || word_manual_inner_layout
     {
       word_scatter_value_line * 0.26
@@ -4371,7 +4474,7 @@ pub(crate) fn lower_clustered_column_chart(
         .unwrap_or(true)
     {
       let category_tick_length =
-        if word_area_layout || word_titled_column_layout || word_manual_inner_layout {
+        if word_area_layout || word_column_layout || word_manual_inner_layout {
           word_scatter_category_line * 0.26
         } else {
           tick_length
@@ -5072,17 +5175,65 @@ pub(crate) fn lower_clustered_column_chart(
       &mut metrics,
     );
   }
+  let generated_word_3d_labels = style.layout_profile == ChartLayoutProfile::Word
+    && category_tick_labels_visible
+    && category_hierarchy.is_none()
+    && chart
+      .category_axis
+      .is_some_and(|axis| axis.text_properties.is_none())
+    && axis_text_projection_3d.is_some();
+  if generated_word_3d_labels
+    && let Some(axis) = chart.category_axis
+    && let Some(projection) = axis_text_projection_3d
+  {
+    // Generated Word labels wrap in the final projected category slot before
+    // choosing an automatic angle. Native narrow/wide and manual/automatic
+    // plot controls distinguish a wrapped horizontal label from an oblique
+    // unbroken label. The earlier whole-chart width does not own this slot.
+    let spacing = chart_3d_category_label_spacing(
+      chart,
+      category_count,
+      PlotRect {
+        left: plot_left,
+        top: plot_top,
+        width: plot_width,
+        height: plot_height,
+      },
+      zero_y,
+      projection,
+    );
+    word_category_labels = Some(word_horizontal_category_label_layout(
+      axis,
+      &chart.categories,
+      spacing,
+      &style.category_label,
+      &mut metrics,
+    ));
+  }
+  let category_label_line_height = if generated_word_3d_labels {
+    word_category_labels
+      .as_ref()
+      .map_or(category_label_line_height, |labels| labels.natural_line)
+  } else {
+    category_label_line_height
+  };
   let category_label_lines = word_category_labels
     .as_ref()
-    .map_or(category_label_lines.as_slice(), |labels| {
+    .map_or(category_label_lines.as_ref(), |labels| {
       labels.lines.as_slice()
     });
   let mut painted_category_label_style = style.category_label.clone();
+  if word_quarter_turn_labels.is_some() {
+    // Native 12/18pt quarter-turn axis controls paint identical glyph
+    // positions for absent, disabled and enabled DrawingML kern values.
+    painted_category_label_style.kerning_minimum_size_pt = Some(f32::INFINITY);
+  }
   painted_category_label_style.rotation_deg = word_category_labels
     .as_ref()
     .map_or(category_label_rotation, |labels| labels.rotation);
   if style.layout_profile == ChartLayoutProfile::Word
     && category_tick_labels_visible
+    && !generated_word_3d_labels
     && let Some(projection) = axis_text_projection_3d
   {
     painted_category_label_style.rotation_deg = chart_3d_category_label_rotation(
@@ -5172,14 +5323,21 @@ pub(crate) fn lower_clustered_column_chart(
         )
       };
       for (line_index, line) in lines.iter().enumerate() {
-        let width = word_category_labels
-          .as_ref()
-          .and_then(|labels| labels.alignment_widths.get(category_index))
-          .copied()
-          .flatten()
-          .unwrap_or_else(|| metrics.measure_text(line, &painted_category_label_style));
+        let width = if word_quarter_turn_labels.is_some() {
+          word_chart_tick_label_width(line, &painted_category_label_style, &mut metrics)
+        } else {
+          word_category_labels
+            .as_ref()
+            .and_then(|labels| labels.alignment_widths.get(category_index))
+            .copied()
+            .flatten()
+            .unwrap_or_else(|| metrics.measure_text(line, &painted_category_label_style))
+        };
         let (x, mut y, rotation_center) = axis_text_projection_3d.map_or_else(
           || {
+            if let Some(labels) = &word_quarter_turn_labels {
+              return labels.text_origin(center, plot_bottom, width, category_index, line_index);
+            }
             if let Some(labels) = word_category_labels.as_ref() {
               return labels.text_origin(center, plot_bottom, width, line_index);
             }
@@ -5234,7 +5392,7 @@ pub(crate) fn lower_clustered_column_chart(
             }
           },
         );
-        if word_category_labels.is_some() {
+        if word_category_labels.is_some() || word_quarter_turn_labels.is_some() {
           // Every natural Word category frame uses the DirectWrite alignment
           // baseline, including automatic combinations and manual inner plots.
           // Apply it before rotation, keeping the frame's rotation anchor fixed.
@@ -7522,7 +7680,11 @@ pub(crate) fn lower_radial_chart(
     None => None,
   };
   let host_defaults = radial_host_defaults(style.layout_profile);
-  let title_height = title.map_or(0.0, |_| {
+  // Word's IncludeInLayout=false title still paints, but does not shift the
+  // plot or legend. Preserve that independent owner for 2-D and 3-D pies.
+  let layout_title =
+    title.filter(|_| style.layout_profile != ChartLayoutProfile::Word || !chart.title_overlay);
+  let title_height = layout_title.map_or(0.0, |_| {
     line_height(&style.title) * host_defaults.title_height_scale
   });
   let legend = chart.legend_position;
@@ -7573,7 +7735,7 @@ pub(crate) fn lower_radial_chart(
   };
   let word_pie_3d_layout = word_automatic_pie_3d_layout(chart, style);
   let word_pie_3d_title_band = word_pie_3d_layout.then(|| {
-    title.map_or(0.0, |text| {
+    layout_title.map_or(0.0, |text| {
       word_chart_title_band(text, &style.title, 1.0, &mut metrics)
     })
   });
@@ -7620,7 +7782,7 @@ pub(crate) fn lower_radial_chart(
     && chart.plot_layout.is_none()
     && matches!(chart.kind, RadialChartKind::Pie | RadialChartKind::Doughnut);
   if word_automatic_radial_plot {
-    let title_band = title.map_or(0.0, |text| {
+    let title_band = layout_title.map_or(0.0, |text| {
       // Native 10/14/18/24pt controls reserve the realized natural title
       // line plus its fixed frame clearance, just like Word's 3-D charts.
       word_chart_title_band(text, &style.title, 1.0, &mut metrics)
@@ -7658,7 +7820,7 @@ pub(crate) fn lower_radial_chart(
     plot.top = frame.y_pt + title_band + (available_height - side) * 0.5;
     plot.width = side;
     plot.height = side;
-    if !chart.data_labels.is_empty()
+    if (chart.data_label_layout_present || !chart.data_labels.is_empty())
       && matches!(
         chart.data_label_default_position,
         None | Some(c::DataLabelPositionValues::BestFit | c::DataLabelPositionValues::OutsideEnd)
@@ -21494,6 +21656,162 @@ struct WordHorizontalCategoryLabels {
   band_height: f32,
 }
 
+struct WordQuarterTurnCategoryLabels {
+  body: WordHorizontalCategoryLabels,
+  maximum_widths: Vec<f32>,
+  initial_axis_length: f32,
+}
+
+impl WordQuarterTurnCategoryLabels {
+  fn text_origin(
+    &self,
+    center: f32,
+    axis_y: f32,
+    width: f32,
+    category_index: usize,
+    line_index: usize,
+  ) -> (f32, f32, Option<(f32, f32)>) {
+    // Rotate the complete centered text body. Its natural lines become
+    // columns, while shorter lines remain centered along the body's width.
+    // Rotating each line at a separate Y would instead stack them below the
+    // chart, and fails independently at both signs of a quarter turn.
+    let line_count = self.body.lines[category_index].len();
+    let column = line_index as f32 - line_count.saturating_sub(1) as f32 * 0.5;
+    let center = center - self.body.rotation.signum() * column * self.body.natural_line;
+    let axis_y = axis_y + (self.maximum_widths[category_index] - width) * 0.5;
+    self.body.text_origin(center, axis_y, width, 0)
+  }
+}
+
+fn word_quarter_turn_category_label_layout(
+  frame: ChartFrame,
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  texts: &[String],
+  metrics: &mut TextMetrics,
+) -> Option<WordQuarterTurnCategoryLabels> {
+  if style.layout_profile != ChartLayoutProfile::Word
+    || chart.title.is_some()
+    || chart.legend_position.is_some()
+    || chart.plot_layout.is_some()
+    || chart.data_table.is_some()
+    || chart.view_3d.is_some()
+    || chart.category_hierarchy.is_some()
+    || chart.category_axis_title.is_some()
+    || chart.value_axis_title.is_some()
+    || !chart.additional_axis_titles.is_empty()
+    || chart.axis_sets.len() > 1
+    || texts.is_empty()
+    || !chart.series.iter().all(|series| {
+      series.kind == ChartSeriesKind::Column
+        && !series.is_3d
+        && series.grouping == ChartSeriesGrouping::Clustered
+    })
+  {
+    return None;
+  }
+  let axis = chart.category_axis?;
+  let properties = axis.text_properties.as_deref()?;
+  if !matches!(
+    properties.body_properties.rotation,
+    Some(-5_400_000 | 5_400_000)
+  ) || !category_axis_is_visible(axis)
+    || axis.axis_position.val != c::AxisPositionValues::Bottom
+    || axis.tick_label_position.as_ref().is_some_and(|position| {
+      matches!(
+        position.val,
+        Some(c::TickLabelPositionValues::None | c::TickLabelPositionValues::High)
+      )
+    })
+    || !chart.value_axis.is_some_and(|axis| {
+      value_axis_is_visible(axis)
+        && !value_axis_is_on_right(axis)
+        && axis.tick_label_position.as_ref().is_none_or(|position| {
+          !matches!(
+            position.val,
+            Some(c::TickLabelPositionValues::None | c::TickLabelPositionValues::High)
+          )
+        })
+    })
+  {
+    return None;
+  }
+  // Word's ordinary chart starts with 11pt outer plot margins. At a quarter
+  // turn its label text box receives half that initial vertical space, not
+  // the category's horizontal slot. Native independent height, wrap, font,
+  // label-content and opposite-angle controls establish this reservation.
+  let initial_axis_length = frame.height_pt - 22.0 * style.stroke_scale;
+  if initial_axis_length <= 0.0 {
+    return None;
+  }
+  let maximum_width = initial_axis_length * 0.5;
+  // The generated quarter-turn axis body ignores run kerning in both its
+  // layout and paint. Native omitted/0/100/2400 controls distinguish this
+  // from the ordinary DrawingML inclusive size threshold. Keep it local to
+  // this owner; titles and other chart text retain their authored kerning.
+  let mut text_style = style.category_label.clone();
+  text_style.kerning_minimum_size_pt = Some(f32::INFINITY);
+  let natural_line =
+    word_chart_natural_line_height(metrics.vertical_metrics_for_text("0", &text_style));
+  let skip = axis
+    .tick_label_skip
+    .as_ref()
+    .map_or(1, |skip| skip.val.max(1) as usize);
+  let wrap = properties.body_properties.wrap != Some(a::TextWrappingValues::None);
+  let lines = texts
+    .iter()
+    .enumerate()
+    .map(|(index, text)| {
+      if index % skip != 0 {
+        Vec::new()
+      } else if wrap {
+        word_chart_text_lines(text, &text_style, maximum_width, metrics)
+      } else {
+        text.split('\n').map(str::to_owned).collect()
+      }
+    })
+    .collect::<Vec<_>>();
+  let maximum_widths = lines
+    .iter()
+    .map(|lines| {
+      lines
+        .iter()
+        .map(|line| word_chart_tick_label_width(line, &text_style, metrics))
+        .fold(0.0_f32, f32::max)
+    })
+    .collect::<Vec<_>>();
+  let offset = axis
+    .label_offset
+    .as_ref()
+    .and_then(|offset| offset.val)
+    .unwrap_or(100);
+  // Independent 6/9/12/18pt and 0/50/100/200% native controls expose the
+  // generated 3pt minimum offset step. The default tick gap remains the
+  // established 0.52 natural lines; larger fonts use their quarter-line step.
+  let offset_step = (3.0 * style.stroke_scale).max(natural_line * 0.25);
+  let label_gap = natural_line * 0.52 + (offset as f32 - 100.0) * 0.01 * offset_step;
+  // wrap=none paints the complete string even when it overflows this band.
+  // Capping layout space must not invent clipping or an ellipsis in its text.
+  let band_height = maximum_widths
+    .iter()
+    .copied()
+    .fold(0.0_f32, f32::max)
+    .min(maximum_width)
+    + label_gap;
+  Some(WordQuarterTurnCategoryLabels {
+    body: WordHorizontalCategoryLabels {
+      lines,
+      alignment_widths: Vec::new(),
+      rotation: category_axis_text_rotation_degrees(Some(properties)),
+      natural_line,
+      label_gap,
+      band_height,
+    },
+    maximum_widths,
+    initial_axis_length,
+  })
+}
+
 impl WordHorizontalCategoryLabels {
   fn endpoint_plot_bounds(
     &self,
@@ -21635,12 +21953,8 @@ fn word_horizontal_category_label_layout_with_padding(
   // axis text body retains Word's generated automatic label layout.
   let rotation = if !automatic {
     category_axis_text_rotation_degrees(properties)
-  } else if maximum_word_width <= spacing {
-    0.0
-  } else if natural_line <= spacing * std::f32::consts::FRAC_1_SQRT_2 {
-    -45.0
   } else {
-    -90.0
+    word_automatic_category_label_rotation(maximum_word_width, natural_line, spacing)
   };
   let lines = texts
     .iter()
@@ -21963,26 +22277,31 @@ fn chart_3d_category_label_rotation(
     .flatten()
     .map(|line| metrics.measure_text(line, style))
     .fold(0.0_f32, f32::max);
-  let first_x = category_point_x(
-    chart,
-    category_display_index(chart, 0, label_lines.len()),
-    label_lines.len(),
-    plot,
-  );
-  let second_x = category_point_x(
-    chart,
-    category_display_index(chart, 1, label_lines.len()),
-    label_lines.len(),
-    plot,
-  );
-  let first = projection.project(first_x, axis_y, 0.0);
-  let second = projection.project(second_x, axis_y, 0.0);
-  let spacing = (second.0 - first.0).hypot(second.1 - first.1);
+  let spacing = chart_3d_category_label_spacing(chart, label_lines.len(), plot, axis_y, projection);
   if maximum_width > spacing * 0.9 {
     -45.0
   } else {
     0.0
   }
+}
+
+fn chart_3d_category_label_spacing(
+  chart: &ClusteredColumnChart<'_>,
+  count: usize,
+  plot: PlotRect,
+  axis_y: f32,
+  projection: Chart3DProjection,
+) -> f32 {
+  if count <= 1 {
+    let left = projection.project(plot.left, axis_y, 0.0);
+    let right = projection.project(plot.left + plot.width, axis_y, 0.0);
+    return (right.0 - left.0).hypot(right.1 - left.1);
+  }
+  let first_x = category_point_x(chart, category_display_index(chart, 0, count), count, plot);
+  let second_x = category_point_x(chart, category_display_index(chart, 1, count), count, plot);
+  let first = projection.project(first_x, axis_y, 0.0);
+  let second = projection.project(second_x, axis_y, 0.0);
+  (second.0 - first.0).hypot(second.1 - first.1)
 }
 
 fn wrap_chart_label(
@@ -23170,29 +23489,12 @@ fn word_automatic_bottom_column_category_layout(
       .all(|series| series.kind == ChartSeriesKind::Column)
 }
 
-fn word_automatic_titled_column_layout(
+fn word_automatic_column_plot(
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
 ) -> bool {
-  // Independent Word title/axis/legend-font and width/height controls retain
-  // physical outer margins and natural font bands. This ordinary one-axis
-  // column layout must not inherit a frame-height ratio from older profiles.
   style.layout_profile == ChartLayoutProfile::Word
-    && matches!(chart.title, Some(ChartTitleText::Explicit(_)))
-    && !chart.title_overlay
-    && chart.title_layout.is_none()
-    && chart.title_rotation_deg.abs() <= f32::EPSILON
-    && style.title.rotation_deg.abs() <= f32::EPSILON
     && chart.plot_layout.is_none()
-    && chart.legend_layout.is_none()
-    && !chart.legend_overlay
-    && (chart.legend_position == Some(ChartLegendPosition::Right)
-      || (chart.legend_position.is_none()
-        && style.has_explicit_title
-        && chart.title.as_ref().is_some_and(|title| {
-          matches!(title, ChartTitleText::Explicit(text)
-            if east_asian_title_script(text, &style.title).is_none())
-        })))
     && chart.data_table.is_none()
     && chart.view_3d.is_none()
     && chart.category_hierarchy.is_none()
@@ -23222,6 +23524,141 @@ fn word_automatic_titled_column_layout(
       .series
       .iter()
       .all(|series| series.kind == ChartSeriesKind::Column)
+}
+
+fn word_automatic_titled_column_layout(
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  automatic_title: Option<&str>,
+) -> bool {
+  // Title source and legend ownership remain separate from the ordinary
+  // planar column geometry shared with an untitled plot.
+  // Native size controls give an unnamed default title the same physical
+  // bands as an authored title with identical text. Keep its Automatic
+  // provenance and exclude East Asian/generated-series-name title owners.
+  let generated_title = matches!(chart.title, Some(ChartTitleText::Automatic))
+    && !style.has_explicit_title
+    && chart.legend_position.is_none()
+    && automatic_title.is_some_and(|title| east_asian_title_script(title, &style.title).is_none());
+  word_automatic_column_plot(chart, style)
+    && (matches!(chart.title, Some(ChartTitleText::Explicit(_))) || generated_title)
+    && !chart.title_overlay
+    && chart.title_layout.is_none()
+    && chart.title_rotation_deg.abs() <= f32::EPSILON
+    && style.title.rotation_deg.abs() <= f32::EPSILON
+    && chart.legend_layout.is_none()
+    && !chart.legend_overlay
+    && (chart.legend_position == Some(ChartLegendPosition::Right)
+      || (chart.legend_position.is_none()
+        && (generated_title
+          || (style.has_explicit_title
+            && chart.title.as_ref().is_some_and(|title| {
+              matches!(title, ChartTitleText::Explicit(text)
+                if east_asian_title_script(text, &style.title).is_none())
+            })))))
+}
+
+fn word_automatic_untitled_column_layout(
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+) -> bool {
+  // Independent Word height, numeric/category/legend-font and overlay
+  // controls retain the same physical bands as titled planar columns.
+  // Keep projected, stacked, dated, rotated and authored-layout owners out.
+  word_automatic_column_plot(chart, style)
+    && chart.title.is_none()
+    && chart.title_layout.is_none()
+    && chart.legend_layout.is_none()
+    && matches!(
+      chart.legend_position,
+      None | Some(ChartLegendPosition::Right)
+    )
+    && chart.date_axis.is_none()
+    && chart.category_axis.is_some_and(|axis| {
+      category_axis_text_rotation_degrees(axis.text_properties.as_deref()).abs() <= f32::EPSILON
+    })
+    && chart.value_axis.is_some_and(|axis| {
+      category_axis_text_rotation_degrees(axis.text_properties.as_deref()).abs() <= f32::EPSILON
+    })
+    && chart
+      .categories
+      .iter()
+      .all(|text| east_asian_title_script(text, &style.category_label).is_none())
+    && chart.series.iter().all(|series| {
+      series.grouping == ChartSeriesGrouping::Clustered
+        && east_asian_title_script(&series.name, &style.legend).is_none()
+    })
+}
+
+fn word_untitled_column_category_rotation(
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  frame_width: f32,
+  maximum_tick_width: f32,
+  scale: crate::render::chart::LinearAxisScale,
+  metrics: &mut TextMetrics,
+) -> f32 {
+  let Some(axis) = chart.category_axis else {
+    return 0.0;
+  };
+  let properties = axis.text_properties.as_deref();
+  if properties.is_some_and(|properties| {
+    properties
+      .body_properties
+      .rotation
+      .is_some_and(|rotation| rotation != -60_000_000)
+  }) {
+    return category_axis_text_rotation_degrees(properties);
+  }
+  // This ordinary untitled owner treats both a missing rotation and the
+  // automatic sentinel as automatic. Native controls distinguish these
+  // oblique labels from the horizontal physical-band owner below; their
+  // wrap/ellipsis layout remains with the existing category-label path.
+  let natural_value =
+    word_chart_natural_line_height(metrics.vertical_metrics_for_text("0", &style.value_label));
+  let left = 6.5 * style.stroke_scale + maximum_tick_width + 0.76 * natural_value;
+  let right = if chart.legend_position.is_some() && !chart.legend_overlay {
+    word_filled_vertical_legend(chart, style, scale, metrics)
+      .map_or(0.0, |legend| legend.frame_width)
+      + 17.0 * style.stroke_scale
+  } else {
+    11.0 * style.stroke_scale
+  };
+  let count = chart.categories.len().max(1);
+  let slots = if chart.category_axis_shifted {
+    count
+  } else {
+    count.saturating_sub(1).max(1)
+  };
+  let skip = axis
+    .tick_label_skip
+    .as_ref()
+    .map_or(1, |skip| skip.val.max(1) as usize);
+  let spacing = ((frame_width - left - right) / slots as f32).max(0.0) * skip as f32;
+  let maximum_word = chart
+    .categories
+    .iter()
+    .step_by(skip)
+    .flat_map(|text| text.split([' ', '\t', '\r', '\n']))
+    .map(|word| word_chart_tick_label_width(word, &style.category_label, metrics))
+    .fold(0.0_f32, f32::max);
+  let natural_category =
+    word_chart_natural_line_height(metrics.vertical_metrics_for_text("0", &style.category_label));
+  word_automatic_category_label_rotation(maximum_word, natural_category, spacing)
+}
+
+fn word_automatic_category_label_rotation(
+  maximum_word: f32,
+  natural_line: f32,
+  spacing: f32,
+) -> f32 {
+  if maximum_word <= spacing {
+    0.0
+  } else if natural_line <= spacing * std::f32::consts::FRAC_1_SQRT_2 {
+    -45.0
+  } else {
+    -90.0
+  }
 }
 
 fn word_manual_filled_column_layout(
@@ -25176,9 +25613,10 @@ fn word_filled_vertical_legend(
     || (style.layout_profile == ChartLayoutProfile::Word
       && (chart.view_3d.is_some()
         || word_automatic_area_layout(chart, style)
-        || word_automatic_titled_column_layout(chart, style))))
+        || word_automatic_titled_column_layout(chart, style, None)
+        || word_automatic_untitled_column_layout(chart, style))))
     || chart.legend_layout.is_some()
-    || chart.legend_overlay
+    || (chart.legend_overlay && !word_automatic_untitled_column_layout(chart, style))
     || chart.legend_position != Some(ChartLegendPosition::Right)
   {
     return None;
@@ -27186,6 +27624,168 @@ mod tests {
   }
 
   #[test]
+  fn word_manual_inner_parallel_scene_retains_native_category_pitch() {
+    let categories = (0..6)
+      .map(|index| format!(r#"<c:pt idx="{index}"><c:v>A</c:v></c:pt>"#))
+      .collect::<String>();
+    let values = (0..6)
+      .map(|index| format!(r#"<c:pt idx="{index}"><c:v>3</c:v></c:pt>"#))
+      .collect::<String>();
+    let series = (0..4)
+      .map(|index| format!(r#"<c:ser><c:idx val="{index}"/><c:order val="{index}"/><c:cat><c:strLit><c:ptCount val="6"/>{categories}</c:strLit></c:cat><c:val><c:numLit><c:ptCount val="6"/>{values}</c:numLit></c:val></c:ser>"#))
+      .collect::<String>();
+    let xml = format!(
+      r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:autoTitleDeleted val="1"/><c:view3D><c:rotX val="15"/><c:rotY val="20"/><c:rAngAx val="1"/></c:view3D><c:plotArea><c:layout><c:manualLayout><c:layoutTarget val="inner"/><c:xMode val="edge"/><c:yMode val="edge"/><c:x val="0.16768719014351852"/><c:y val="0.04405761777777778"/><c:w val="0.72224372995042286"/><c:h val="0.47643597181931211"/></c:manualLayout></c:layout><c:bar3DChart><c:barDir val="col"/><c:grouping val="clustered"/>{series}<c:gapWidth val="150"/><c:axId val="1"/><c:axId val="2"/></c:bar3DChart><c:catAx><c:axId val="1"/><c:scaling/><c:axPos val="b"/><c:crossAx val="2"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#
+    );
+    let source = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+    let chart = crate::render::chart::cartesian_chart_for_host_locales(
+      &source,
+      crate::render::chart::ChartHostApplication::Wordprocessing,
+      None,
+      None,
+    )
+    .unwrap();
+    // Native manual-plot controls retain the model-space volume fit at three
+    // physical widths, including both fitting axes. Equal labels isolate
+    // projected category pitch from glyph bearings and automatic wrapping.
+    for (width, native_pitch) in [(216.0, 24.501_472), (432.0, 48.216_602), (462.0, 51.420_18)] {
+      let items = super::lower_clustered_column_chart(
+        super::ChartFrame {
+          x_pt: 72.0,
+          y_pt: 97.44,
+          width_pt: width,
+          height_pt: 304.0,
+        },
+        &chart,
+        "Chart title",
+        &word_cartesian_test_style(),
+      );
+      let labels = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) if text.text == "A" => Some(text),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(labels.len(), 6);
+      for pair in labels.windows(2) {
+        assert!(
+          (pair[1].x_pt - pair[0].x_pt - native_pitch).abs() < 0.001,
+          "manual width {width}: {} versus {native_pitch}",
+          pair[1].x_pt - pair[0].x_pt,
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn word_generated_3d_category_labels_wrap_before_rotating() {
+    let categories = [
+      "Red Pen",
+      "Blue Pen",
+      "Black Pen",
+      "Pencil",
+      "Crayon",
+      "Colored Pencil",
+    ];
+    let points = categories
+      .iter()
+      .enumerate()
+      .map(|(index, text)| format!(r#"<c:pt idx="{index}"><c:v>{text}</c:v></c:pt>"#))
+      .collect::<String>();
+    let values = (0..categories.len())
+      .map(|index| format!(r#"<c:pt idx="{index}"><c:v>3</c:v></c:pt>"#))
+      .collect::<String>();
+    // Native generated-axis controls retain a two-line horizontal final
+    // category in both manual and automatic plots; narrowing the physical
+    // chart changes the automatic owner to an unbroken oblique label.
+    for (width, authored) in [
+      (216.0, false),
+      (432.0, false),
+      (462.0, false),
+      (432.0, true),
+    ] {
+      let text_properties = if authored {
+        r#"<c:txPr><a:bodyPr rot="-2700000"/><a:lstStyle/><a:p/></c:txPr>"#
+      } else {
+        ""
+      };
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:autoTitleDeleted val="1"/><c:view3D><c:rotX val="15"/><c:rotY val="20"/><c:rAngAx val="1"/></c:view3D><c:plotArea><c:layout><c:manualLayout><c:layoutTarget val="inner"/><c:xMode val="edge"/><c:yMode val="edge"/><c:x val="0.16"/><c:y val="0.05"/><c:w val="0.72"/><c:h val="0.48"/></c:manualLayout></c:layout><c:bar3DChart><c:barDir val="col"/><c:grouping val="clustered"/><c:ser><c:idx val="0"/><c:order val="0"/><c:cat><c:strLit><c:ptCount val="6"/>{points}</c:strLit></c:cat><c:val><c:numLit><c:ptCount val="6"/>{values}</c:numLit></c:val></c:ser><c:gapWidth val="150"/><c:axId val="1"/><c:axId val="2"/></c:bar3DChart><c:catAx><c:axId val="1"/><c:scaling/><c:axPos val="b"/>{text_properties}<c:crossAx val="2"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#
+      );
+      let space = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+      let chart = crate::render::chart::cartesian_chart_for_host_locales(
+        &space,
+        crate::render::chart::ChartHostApplication::Wordprocessing,
+        None,
+        None,
+      )
+      .unwrap();
+      for profile in [ChartLayoutProfile::Word, ChartLayoutProfile::PowerPoint] {
+        let mut style = word_cartesian_test_style();
+        style.layout_profile = profile;
+        style.category_label.font_size_pt = 10.0;
+        let items = super::lower_clustered_column_chart(
+          super::ChartFrame {
+            x_pt: 17.0,
+            y_pt: 23.0,
+            width_pt: width,
+            height_pt: 304.0,
+          },
+          &chart,
+          "Chart title",
+          &style,
+        );
+        let labels = items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text)
+              if categories.contains(&text.text.as_str()) || text.text == "Colored" =>
+            {
+              Some(text)
+            }
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        if profile == ChartLayoutProfile::Word && !authored && width >= 432.0 {
+          assert_eq!(
+            labels
+              .iter()
+              .map(|text| text.text.as_str())
+              .collect::<Vec<_>>(),
+            [
+              "Red Pen",
+              "Blue Pen",
+              "Black Pen",
+              "Pencil",
+              "Crayon",
+              "Colored",
+              "Pencil"
+            ]
+          );
+          assert!(
+            labels
+              .iter()
+              .all(|text| text.style.rotation_deg == 0.0 && !text.style.pdf_glyph_outlines)
+          );
+          assert!(labels[6].y_pt > labels[5].y_pt + 10.0);
+        } else if profile == ChartLayoutProfile::Word {
+          assert_eq!(labels.len(), 6);
+          assert!(
+            labels
+              .iter()
+              .all(|text| text.style.rotation_deg == -45.0 && text.style.pdf_glyph_outlines)
+          );
+        } else if width >= 432.0 {
+          // Non-Word and authored-angle owners retain their previous paths.
+          assert!(labels.iter().any(|text| text.text == "Colored Pencil"));
+          assert!(!labels.iter().any(|text| text.text == "Colored"));
+        }
+      }
+    }
+  }
+
+  #[test]
   fn word_category_automatic_sentinel_and_body_default_match_native() {
     let texts = [
       "All Students",
@@ -28093,6 +28693,691 @@ mod tests {
       floor_style: ShapeStyle::default(),
       side_wall_style: ShapeStyle::default(),
       back_wall_style: ShapeStyle::default(),
+    }
+  }
+
+  fn word_quarter_turn_test_chart_space(
+    rotation: i32,
+    wrap: &str,
+    offset: u32,
+    text: &str,
+  ) -> c::ChartSpace {
+    let xml = format!(
+      r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:ser><c:idx val="0"/><c:order val="0"/><c:cat><c:strLit><c:ptCount val="1"/><c:pt idx="0"><c:v>{text}</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:ptCount val="1"/><c:pt idx="0"><c:v>4.3</c:v></c:pt></c:numLit></c:val></c:ser><c:axId val="1"/><c:axId val="2"/></c:barChart><c:catAx><c:axId val="1"/><c:scaling/><c:axPos val="b"/><c:txPr><a:bodyPr rot="{rotation}" wrap="{wrap}"/><a:lstStyle/><a:p/></c:txPr><c:crossAx val="2"/><c:crosses val="autoZero"/><c:lblOffset val="{offset}"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:majorGridlines/><c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#
+    );
+    c::ChartSpace::from_bytes(xml.as_bytes()).unwrap()
+  }
+
+  #[test]
+  fn word_quarter_turn_category_body_matches_native_reservations() {
+    let original = "really really long data label 1 made even longer";
+    // Independent Word height, font, offset, wrapping and content controls.
+    // Native bottoms are relative to the drawing, including ChartArea's 4pt
+    // origin. The same label body applies to both authored rotation signs.
+    for (height, size, wrap, offset, text, native_bottom) in [
+      (120.0, 9.0, "square", 100, original, 60.796_61),
+      (120.0, 9.0, "none", 100, original, 58.786_77),
+      (183.0, 9.0, "square", 100, original, 92.271_26),
+      (183.0, 9.0, "none", 100, original, 90.286_77),
+      (240.0, 9.0, "square", 100, original, 122.991_104),
+      (360.0, 9.0, "square", 100, original, 200.455_98),
+      (400.0, 9.0, "none", 100, original, 215.025_83),
+      (183.0, 6.0, "square", 100, original, 102.859_13),
+      (183.0, 12.0, "square", 100, original, 88.722_916),
+      (183.0, 18.0, "square", 100, original, 89.198_19),
+      (183.0, 9.0, "square", 50, original, 93.771_26),
+      (183.0, 6.0, "square", 0, original, 105.859_13),
+      (183.0, 12.0, "square", 200, original, 85.060_394),
+      (183.0, 18.0, "square", 0, original, 94.691_89),
+      (183.0, 18.0, "square", 200, original, 83.704_49),
+      (183.0, 9.0, "square", 100, "A", 165.576_77),
+      (
+        183.0,
+        9.0,
+        "square",
+        100,
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        92.816_46,
+      ),
+    ] {
+      for rotation in [-5_400_000, 5_400_000] {
+        let space = word_quarter_turn_test_chart_space(rotation, wrap, offset, text);
+        let chart = crate::render::chart::cartesian_chart_for_host_locales(
+          &space,
+          crate::render::chart::ChartHostApplication::Wordprocessing,
+          Some("es-MX"),
+          Some("zh-CN"),
+        )
+        .unwrap();
+        let mut style = word_cartesian_test_style();
+        style.category_label.font_size_pt = size;
+        style.category_label.kerning_minimum_size_pt = Some(12.0);
+        let frame = super::ChartFrame {
+          x_pt: 17.0,
+          y_pt: 23.0,
+          width_pt: 432.0,
+          height_pt: height,
+        };
+        let labels = super::word_quarter_turn_category_label_layout(
+          frame,
+          &chart,
+          &style,
+          &chart.categories,
+          &mut TextMetrics::new(),
+        )
+        .expect("explicit Word quarter-turn label body");
+        let bottom = height - 6.5 - labels.body.band_height;
+        assert!(
+          (bottom - native_bottom).abs() < 0.06,
+          "{height}/{size}/{wrap}/{offset}/{text}/{rotation}: {bottom} vs {native_bottom}"
+        );
+        if height == 183.0 && size == 9.0 && wrap == "square" && text == original {
+          assert_eq!(
+            labels.body.lines[0],
+            ["really really long data", "label 1 made even", "longer"]
+          );
+        }
+        if text == "ABCDEFGHIJKLMNOPQRSTUVWXYZ" {
+          assert_eq!(labels.body.lines[0], ["ABCDEFGHIJKLMNOP", "QRSTUVWXYZ"]);
+        }
+        if height == 183.0 && matches!(size, 12.0 | 18.0) && offset == 100 {
+          // Eight independent native controls retain byte-identical painted
+          // text and identical plot bounds across these kerning requests.
+          for kerning in [None, Some(f32::INFINITY), Some(1.0), Some(24.0)] {
+            style.category_label.kerning_minimum_size_pt = kerning;
+            let other = super::word_quarter_turn_category_label_layout(
+              frame,
+              &chart,
+              &style,
+              &chart.categories,
+              &mut TextMetrics::new(),
+            )
+            .unwrap();
+            assert_eq!(other.body.lines, labels.body.lines);
+            assert_eq!(other.body.band_height, labels.body.band_height);
+          }
+        }
+        if wrap == "none" {
+          assert_eq!(labels.body.lines[0], [original]);
+        }
+        style.layout_profile = ChartLayoutProfile::Excel;
+        assert!(
+          super::word_quarter_turn_category_label_layout(
+            frame,
+            &chart,
+            &style,
+            &chart.categories,
+            &mut TextMetrics::new(),
+          )
+          .is_none()
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn word_quarter_turn_plot_preserves_numeric_capacity_and_text_columns() {
+    let original = "really really long data label 1 made even longer";
+    for (height, native_left, native_bottom, tick_count, expected_lines) in [
+      (
+        120.0,
+        19.409_134,
+        60.796_61,
+        6,
+        vec!["really really", "long data", "label 1 made", "even longer"],
+      ),
+      (
+        183.0,
+        26.239_134,
+        92.271_26,
+        11,
+        vec!["really really long data", "label 1 made even", "longer"],
+      ),
+    ] {
+      for rotation in [-5_400_000, 5_400_000] {
+        let space = word_quarter_turn_test_chart_space(rotation, "square", 100, original);
+        let chart = crate::render::chart::cartesian_chart_for_host_locales(
+          &space,
+          crate::render::chart::ChartHostApplication::Wordprocessing,
+          Some("es-MX"),
+          Some("zh-CN"),
+        )
+        .unwrap();
+        let mut style = word_cartesian_test_style();
+        style.category_label.kerning_minimum_size_pt = Some(12.0);
+        style.value_label.kerning_minimum_size_pt = Some(12.0);
+        let items = super::lower_clustered_column_chart(
+          super::ChartFrame {
+            x_pt: 17.0,
+            y_pt: 23.0,
+            width_pt: 432.0,
+            height_pt: height,
+          },
+          &chart,
+          "Chart Title",
+          &style,
+        );
+        let axis = items
+          .iter()
+          .find_map(|item| match item {
+            PageItem::Line(line)
+              if (line.x1_pt - line.x2_pt).abs() < 0.001 && line.y2_pt - line.y1_pt > 30.0 =>
+            {
+              Some(line)
+            }
+            _ => None,
+          })
+          .expect("the label body must not discard the chart");
+        for (actual, native) in [
+          (axis.x1_pt - 17.0, native_left),
+          (axis.y1_pt - 23.0, 11.0),
+          (axis.y2_pt - 23.0, native_bottom),
+        ] {
+          assert!(
+            (actual - native).abs() < 0.06,
+            "{height}/{rotation}: {actual} vs {native}"
+          );
+        }
+        let text = items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text) => Some(text),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(
+          text
+            .iter()
+            .filter(|text| text.style.rotation_deg == 0.0)
+            .count(),
+          tick_count
+        );
+        let labels = text
+          .iter()
+          .filter(|text| text.style.rotation_deg != 0.0)
+          .collect::<Vec<_>>();
+        assert_eq!(
+          labels
+            .iter()
+            .map(|label| label.text.as_str())
+            .collect::<Vec<_>>(),
+          expected_lines
+        );
+        assert!(labels.iter().all(|text| !text.style.pdf_glyph_outlines));
+        let signed_pitch =
+          labels[1].rotation_center_pt.unwrap().0 - labels[0].rotation_center_pt.unwrap().0;
+        assert!((signed_pitch + (rotation as f32).signum() * 10.985).abs() < 0.02);
+      }
+    }
+  }
+
+  #[test]
+  fn word_generated_default_title_uses_native_column_bands() {
+    use crate::render::chart::ChartTitleText;
+    // Native generated/explicit-title pairs paint identical glyphs and grids
+    // at these four dimensions. Retain the title's source provenance while
+    // sharing its physical measurement, reservation and numeric capacity.
+    for authored in [false, true] {
+      let text = if authored {
+        r#"<c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Titre du graphique</a:t></a:r></a:p></c:rich></c:tx>"#
+      } else {
+        ""
+      };
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:title>{text}<c:layout/><c:overlay val="0"/><c:txPr><a:bodyPr wrap="square" anchor="ctr" anchorCtr="1"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400" b="0" kern="1200"/></a:pPr></a:p></c:txPr></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:ptCount val="3"/><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt><c:pt idx="2"><c:v>3</c:v></c:pt></c:numLit></c:val></c:ser><c:gapWidth val="219"/><c:overlap val="-27"/><c:axId val="1"/><c:axId val="2"/></c:barChart><c:catAx><c:axId val="1"/><c:scaling/><c:axPos val="b"/><c:crossAx val="2"/><c:crosses val="autoZero"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:majorGridlines/><c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#
+      );
+      let space = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+      let mut chart = crate::render::chart::cartesian_chart_for_host_locales(
+        &space,
+        crate::render::chart::ChartHostApplication::Wordprocessing,
+        Some("fr-CA"),
+        Some("zh-CN"),
+      )
+      .unwrap();
+      if !authored {
+        // Mirror the DOCX consumer's authored empty c:title placeholder.
+        assert!(crate::render::chart::has_word_automatic_title_placeholder(
+          &space.chart
+        ));
+        chart.title = Some(ChartTitleText::Automatic);
+      }
+      let mut style = word_cartesian_test_style();
+      style.has_explicit_title = authored;
+      style.title.bold = false;
+      style.title.kerning_minimum_size_pt = Some(12.0);
+      assert!(super::word_automatic_titled_column_layout(
+        &chart,
+        &style,
+        Some("Titre du graphique"),
+      ));
+      for (width, height, expected_bottom, ticks) in [
+        (170.3, 102.2, 79.001_73, &[0.0, 2.0, 4.0][..]),
+        (170.3, 80.0, 56.801_73, &[0.0, 5.0][..]),
+        (170.3, 140.0, 116.801_7, &[0.0, 1.0, 2.0, 3.0, 4.0][..]),
+        (240.0, 102.2, 79.001_73, &[0.0, 2.0, 4.0][..]),
+      ] {
+        let items = super::lower_clustered_column_chart(
+          super::ChartFrame {
+            x_pt: 0.0,
+            y_pt: 0.0,
+            width_pt: width,
+            height_pt: height,
+          },
+          &chart,
+          "Titre du graphique",
+          &style,
+        );
+        let axis = items
+          .iter()
+          .find_map(|item| match item {
+            PageItem::Line(line)
+              if (line.x1_pt - line.x2_pt).abs() < 0.001 && line.y2_pt - line.y1_pt > 15.0 =>
+            {
+              Some(line)
+            }
+            _ => None,
+          })
+          .expect("physical value axis");
+        let right = items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Line(line)
+              if (line.y1_pt - line.y2_pt).abs() < 0.001 && line.x2_pt - line.x1_pt > 100.0 =>
+            {
+              Some(line.x2_pt)
+            }
+            _ => None,
+          })
+          .fold(f32::NEG_INFINITY, f32::max);
+        for (actual, native) in [axis.x1_pt, axis.y1_pt, right, axis.y2_pt]
+          .into_iter()
+          .zip([19.409_13, 37.09, width - 11.0, expected_bottom])
+        {
+          assert!(
+            (actual - native).abs() < 0.03,
+            "authored {authored}, frame {width}/{height}: {actual} versus {native}"
+          );
+        }
+        let mut numeric = items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text) if text.x_pt < axis.x1_pt => text.text.parse::<f32>().ok(),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        numeric.sort_by(f32::total_cmp);
+        assert_eq!(numeric, ticks);
+        assert!(
+          items
+            .iter()
+            .any(|item| matches!(item, PageItem::Text(text) if text.text == "Titre du graphique"))
+        );
+      }
+      // Localized East Asian defaults and series-name-derived Explicit
+      // titles retain their separate owners. Do not relabel them authored.
+      style.has_explicit_title = false;
+      chart.title = Some(ChartTitleText::Automatic);
+      assert!(!super::word_automatic_titled_column_layout(
+        &chart,
+        &style,
+        Some("グラフ タイトル")
+      ));
+      assert!(!super::word_automatic_titled_column_layout(
+        &chart, &style, None
+      ));
+      chart.title = Some(ChartTitleText::Explicit("Series name".into()));
+      assert!(!super::word_automatic_titled_column_layout(
+        &chart,
+        &style,
+        Some("Titre du graphique")
+      ));
+      chart.title = Some(ChartTitleText::Automatic);
+      style.layout_profile = ChartLayoutProfile::PowerPoint;
+      assert!(!super::word_automatic_titled_column_layout(
+        &chart,
+        &style,
+        Some("Titre du graphique")
+      ));
+    }
+  }
+
+  #[test]
+  fn word_untitled_columns_use_native_physical_bands_without_final_slot_rewrap() {
+    use crate::render::chart::{ChartSeriesGrouping, ChartTitleText};
+    // Twelve independent Word footer COM/PDF controls, plus seven initial
+    // capacity controls across two natural-font thresholds. The 12pt category control
+    // remains a single caption even when it overlaps the final plot slot.
+    for (height, value_size, category_size, legend_size, legend, expected, ticks) in [
+      (
+        77.0,
+        10.0,
+        10.0,
+        10.0,
+        "r",
+        [25.91583, 11.10252, 233.3003, 51.94835],
+        &[0.0, 5.0, 10.0][..],
+      ),
+      (
+        64.0,
+        10.0,
+        10.0,
+        10.0,
+        "r",
+        [25.91583, 11.10252, 233.3003, 38.94835],
+        &[0.0, 10.0][..],
+      ),
+      (
+        96.0,
+        10.0,
+        10.0,
+        10.0,
+        "r",
+        [20.84583, 11.10252, 233.3003, 70.94835],
+        &[0.0, 2.0, 4.0, 6.0][..],
+      ),
+      (
+        120.0,
+        10.0,
+        10.0,
+        10.0,
+        "r",
+        [20.84583, 11.10252, 233.3003, 94.94835],
+        &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0][..],
+      ),
+      (
+        77.0,
+        6.0,
+        10.0,
+        10.0,
+        "r",
+        [15.10748, 11.0, 233.3003, 51.94835],
+        &[0.0, 2.0, 4.0, 6.0][..],
+      ),
+      (
+        77.0,
+        12.0,
+        10.0,
+        10.0,
+        "r",
+        [29.79339, 12.32504, 233.3003, 51.94835],
+        &[0.0, 10.0][..],
+      ),
+      (
+        77.0,
+        10.0,
+        6.0,
+        10.0,
+        "r",
+        [25.91583, 11.10252, 233.3003, 59.36504],
+        &[0.0, 5.0, 10.0][..],
+      ),
+      (
+        77.0,
+        10.0,
+        12.0,
+        10.0,
+        "r",
+        [25.91583, 11.10252, 233.3003, 48.23323],
+        &[0.0, 5.0, 10.0][..],
+      ),
+      (
+        77.0,
+        10.0,
+        10.0,
+        6.0,
+        "r",
+        [25.91583, 11.10252, 250.3272, 51.94835],
+        &[0.0, 5.0, 10.0][..],
+      ),
+      (
+        77.0,
+        10.0,
+        10.0,
+        12.0,
+        "r",
+        [25.91583, 11.10252, 224.7798, 51.94835],
+        &[0.0, 5.0, 10.0][..],
+      ),
+      (
+        77.0,
+        10.0,
+        10.0,
+        10.0,
+        "none",
+        [25.91583, 11.10252, 287.85, 51.94835],
+        &[0.0, 5.0, 10.0][..],
+      ),
+      (
+        77.0,
+        10.0,
+        10.0,
+        10.0,
+        "overlay",
+        [25.91583, 11.10252, 287.85, 51.94835],
+        &[0.0, 5.0, 10.0][..],
+      ),
+      (
+        119.5,
+        10.0,
+        10.0,
+        10.0,
+        "r",
+        [20.84583, 11.10252, 233.3003, 94.44835],
+        &[0.0, 2.0, 4.0, 6.0][..],
+      ),
+      (
+        119.75,
+        10.0,
+        10.0,
+        10.0,
+        "r",
+        [20.84583, 11.10252, 233.3003, 94.69835],
+        &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0][..],
+      ),
+      (
+        121.5,
+        10.0,
+        10.0,
+        10.0,
+        "r",
+        [20.84583, 11.10252, 233.3003, 96.44835],
+        &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0][..],
+      ),
+      (
+        121.75,
+        10.0,
+        10.0,
+        10.0,
+        "r",
+        [20.84583, 11.10252, 233.3003, 96.69835],
+        &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0][..],
+      ),
+      (
+        96.0,
+        10.0,
+        6.0,
+        10.0,
+        "r",
+        [20.84583, 11.10252, 233.3003, 78.36504],
+        &[0.0, 2.0, 4.0, 6.0][..],
+      ),
+      (
+        80.5,
+        6.0,
+        10.0,
+        10.0,
+        "r",
+        [15.10748, 11.0, 233.3003, 55.44835],
+        &[0.0, 2.0, 4.0, 6.0][..],
+      ),
+      (
+        80.75,
+        6.0,
+        10.0,
+        10.0,
+        "r",
+        [15.10748, 11.0, 233.3003, 55.69835],
+        &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0][..],
+      ),
+    ] {
+      let series = [[4.3, 2.5, 3.5, 4.5], [2.4, 4.4, 1.8, 2.8], [2.0, 2.0, 3.0, 5.0]]
+        .iter().enumerate().map(|(index, values)| {
+          let categories = (0..4).map(|i| format!(r#"<c:pt idx="{i}"><c:v>Category {}</c:v></c:pt>"#, i + 1)).collect::<String>();
+          let values = values.iter().enumerate().map(|(i, value)| format!(r#"<c:pt idx="{i}"><c:v>{value}</c:v></c:pt>"#)).collect::<String>();
+          format!(r#"<c:ser><c:idx val="{index}"/><c:order val="{index}"/><c:tx><c:v>Series {}</c:v></c:tx><c:cat><c:strLit><c:ptCount val="4"/>{categories}</c:strLit></c:cat><c:val><c:numLit><c:ptCount val="4"/>{values}</c:numLit></c:val></c:ser>"#, index + 1)
+        }).collect::<String>();
+      let legend_xml = if legend == "none" {
+        String::new()
+      } else {
+        format!(
+          r#"<c:legend><c:legendPos val="r"/><c:overlay val="{}"/></c:legend>"#,
+          u8::from(legend == "overlay")
+        )
+      };
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/>{series}<c:gapWidth val="150"/><c:axId val="1"/><c:axId val="2"/></c:barChart><c:catAx><c:axId val="1"/><c:scaling/><c:axPos val="b"/><c:majorTickMark val="out"/><c:crossAx val="2"/><c:crosses val="autoZero"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:majorGridlines/><c:majorTickMark val="out"/><c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>{legend_xml}</c:chart></c:chartSpace>"#
+      );
+      let space = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+      let mut chart = crate::render::chart::cartesian_chart_for_host_locales(
+        &space,
+        crate::render::chart::ChartHostApplication::Wordprocessing,
+        Some("ko-KR"),
+        Some("ko-KR"),
+      )
+      .unwrap();
+      // This is the no-c:title state produced by the DOCX consumer; a
+      // generated title from an authored empty c:title has another owner.
+      chart.title = None;
+      let mut style = word_cartesian_test_style();
+      style.value_label.font_size_pt = value_size;
+      style.category_label.font_size_pt = category_size;
+      style.legend.font_size_pt = legend_size;
+      assert!(super::word_automatic_untitled_column_layout(&chart, &style));
+      if height == 77.0
+        && value_size == 10.0
+        && category_size == 10.0
+        && legend_size == 10.0
+        && legend == "r"
+      {
+        let scale =
+          super::cartesian_axis_scales(&chart, style.layout_profile, 4, 10, 10, None)[0].y;
+        let mut metrics = super::TextMetrics::new();
+        // Native absent/sentinel rotation controls both become oblique when
+        // the maximum category word cannot fit the physical slot. Neither
+        // wrap mode may enter the newly proven horizontal-band owner.
+        for rotation in ["", r#"rot="-60000000""#] {
+          for wrap in ["none", "square"] {
+            let axis = c::CategoryAxis::from_bytes(format!(
+              r#"<c:catAx xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:axId val="1"/><c:scaling/><c:axPos val="b"/><c:crossAx val="2"/><c:txPr><a:bodyPr {rotation} wrap="{wrap}"/><a:lstStyle/><a:p/></c:txPr></c:catAx>"#
+            ).as_bytes()).unwrap();
+            let mut control = chart.clone();
+            control.category_axis = Some(&axis);
+            style.category_label.font_size_pt = 18.0;
+            assert_eq!(
+              super::word_untitled_column_category_rotation(
+                &control,
+                &style,
+                298.85,
+                5.07,
+                scale,
+                &mut metrics,
+              ),
+              -45.0
+            );
+            style.category_label.font_size_pt = 12.0;
+            assert_eq!(
+              super::word_untitled_column_category_rotation(
+                &control,
+                &style,
+                298.85,
+                5.07,
+                scale,
+                &mut metrics,
+              ),
+              0.0
+            );
+          }
+        }
+        style.category_label.font_size_pt = category_size;
+        let rotated_value = c::ValueAxis::from_bytes(br#"<c:valAx xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:crossAx val="1"/><c:txPr><a:bodyPr rot="2700000"/><a:lstStyle/><a:p/></c:txPr></c:valAx>"#).unwrap();
+        let mut control = chart.clone();
+        control.value_axis = Some(&rotated_value);
+        assert!(!super::word_automatic_untitled_column_layout(
+          &control, &style
+        ));
+      }
+      let items = super::lower_clustered_column_chart(
+        super::ChartFrame {
+          x_pt: 0.0,
+          y_pt: 0.0,
+          width_pt: 298.85,
+          height_pt: height,
+        },
+        &chart,
+        "Chart Title",
+        &style,
+      );
+      let axis = items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Line(line)
+            if (line.x1_pt - line.x2_pt).abs() < 0.001 && line.y2_pt - line.y1_pt > 15.0 =>
+          {
+            Some(line)
+          }
+          _ => None,
+        })
+        .expect("physical value axis");
+      let right = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Line(line)
+            if (line.y1_pt - line.y2_pt).abs() < 0.001 && line.x2_pt - line.x1_pt > 150.0 =>
+          {
+            Some(line.x2_pt)
+          }
+          _ => None,
+        })
+        .fold(f32::NEG_INFINITY, f32::max);
+      for (actual, native) in [axis.x1_pt, axis.y1_pt, right, axis.y2_pt]
+        .into_iter()
+        .zip(expected)
+      {
+        assert!(
+          (actual - native).abs() < 0.03,
+          "height {height}, value {value_size}, category {category_size}, legend {legend}/{legend_size}: {actual} vs {native}"
+        );
+      }
+      let mut numeric = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) if text.x_pt < axis.x1_pt => text.text.parse::<f32>().ok(),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      numeric.sort_by(f32::total_cmp);
+      assert_eq!(numeric, ticks);
+      assert!(
+        items
+          .iter()
+          .any(|item| matches!(item, PageItem::Text(text) if text.text == "Category 1"))
+      );
+      // Authored titles, other hosts and stacked series do not gain this
+      // newly proven untitled clustered owner.
+      chart.title = Some(ChartTitleText::Automatic);
+      assert!(!super::word_automatic_untitled_column_layout(
+        &chart, &style
+      ));
+      chart.title = None;
+      chart.series[0].grouping = ChartSeriesGrouping::Stacked;
+      assert!(!super::word_automatic_untitled_column_layout(
+        &chart, &style
+      ));
+      chart.series[0].grouping = ChartSeriesGrouping::Clustered;
+      style.layout_profile = ChartLayoutProfile::PowerPoint;
+      assert!(!super::word_automatic_untitled_column_layout(
+        &chart, &style
+      ));
     }
   }
 
@@ -29311,6 +30596,110 @@ mod tests {
       let key_y = bounds.top + (bounds.height - key_width) * 0.5;
       assert!((key_y - expected_y).abs() < 0.01, "{key_y} != {expected_y}");
     }
+  }
+
+  #[test]
+  fn word_pie_overlay_and_empty_labels_retain_independent_layout_owners() {
+    let text = TextStyle {
+      font_family: Some("Cambria".into()),
+      font_size_pt: 10.0,
+      use_windows_font_metrics: true,
+      ..TextStyle::default()
+    };
+    let mut style = super::RadialChartStyle {
+      layout_profile: ChartLayoutProfile::Word,
+      fixed_output_raster_dpi: 96.0,
+      title: text.clone(),
+      legend: text.clone(),
+      data_label: text,
+      data_label_styles: Vec::new(),
+      data_label_rich_text_styles: Vec::new(),
+      point_colors: vec![RgbColor {
+        r: 80,
+        g: 120,
+        b: 180,
+      }],
+      point_styles: Vec::new(),
+      point_image_effects: Vec::new(),
+      data_label_fill_colors: Vec::new(),
+      data_label_shape_styles: Vec::new(),
+      data_label_image_effects: Vec::new(),
+      leader_line_style: super::solid_chart_shape_style(None, None),
+      legend_frame_style: super::solid_chart_shape_style(None, None),
+      chart_area_style: super::solid_chart_shape_style(None, None),
+      plot_area_style: super::solid_chart_shape_style(None, None),
+    };
+    let mut bounds = Vec::new();
+    // Native controls: omitted/true overlay keep the same circle when
+    // title size changes. A blank BestFit label container reserves space;
+    // absent, deleted, Center and fully disabled label containers do not.
+    for overlay in [
+      "",
+      "<c:overlay/>",
+      "<c:overlay val=\"1\"/>",
+      "<c:overlay val=\"0\"/>",
+    ] {
+      let mut sizes = Vec::new();
+      for title_size in [10.0, 18.0] {
+        style.title.font_size_pt = title_size;
+        let mut labels_bounds = Vec::new();
+        for labels in [
+          "",
+          "<c:dLbls><c:delete val=\"1\"/></c:dLbls>",
+          "<c:dLbls><c:dLblPos val=\"ctr\"/><c:showVal val=\"0\"/></c:dLbls>",
+          "<c:dLbls><c:showVal val=\"0\"/></c:dLbls>",
+          "<c:dLbls><c:showVal val=\"0\"/><c:showCatName val=\"0\"/><c:showSerName val=\"0\"/><c:showPercent val=\"0\"/><c:showBubbleSize val=\"0\"/><c:showLeaderLines val=\"1\"/></c:dLbls>",
+        ] {
+          let xml = format!(
+            r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>Sales</a:t></a:r></a:p></c:rich></c:tx>{overlay}</c:title><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/>{labels}<c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#
+          );
+          let source = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+          let chart = crate::render::chart::pie_chart_model_for_host(
+            &source,
+            crate::render::chart::ChartHostApplication::Wordprocessing,
+          )
+          .unwrap();
+          assert!(chart.data_labels.is_empty());
+          let items = super::lower_radial_chart(
+            super::ChartFrame {
+              x_pt: 0.0,
+              y_pt: 0.0,
+              width_pt: 235.0,
+              height_pt: 181.0,
+            },
+            &chart,
+            "",
+            &style,
+          );
+          assert!(
+            items
+              .iter()
+              .any(|item| matches!(item, PageItem::Text(text) if text.text == "Sales"))
+          );
+          let sector = items
+            .iter()
+            .find_map(|item| match item {
+              PageItem::Path(path) => Some(path),
+              _ => None,
+            })
+            .unwrap();
+          let hub = sector.points[0];
+          labels_bounds.push((hub.x.0, hub.y.0, hub.y.0 - sector.points[1].y.0));
+        }
+        assert_eq!(labels_bounds[0], labels_bounds[1]);
+        assert_eq!(labels_bounds[0], labels_bounds[2]);
+        assert_eq!(labels_bounds[0].1, labels_bounds[3].1);
+        assert!(labels_bounds[3].2 < labels_bounds[0].2);
+        assert_eq!(labels_bounds[0], labels_bounds[4]);
+        sizes.push(labels_bounds);
+      }
+      bounds.push(sizes);
+    }
+    assert_eq!(bounds[0], bounds[1]);
+    assert_eq!(bounds[0], bounds[2]);
+    assert_eq!(bounds[0][0], bounds[0][1]);
+    assert!(bounds[3][1][0].1 > bounds[3][0][0].1);
+    assert!(bounds[3][0][0].1 > bounds[0][0][0].1);
   }
 
   #[test]
@@ -32760,6 +34149,7 @@ mod tests {
   #[test]
   fn word_east_asian_title_adds_ink_overflow_without_double_counting_line_gap() {
     let simsun = TextVerticalMetrics {
+      font_design_unit_pt: 0.0,
       ascent_pt: 12.031_25,
       descent_pt: 1.968_75,
       windows_line_height_pt: 14.0,
@@ -32771,6 +34161,7 @@ mod tests {
     assert_eq!(word_chart_title_ink_box_excess(simsun, 14.0), 0.0);
 
     let dengxian = TextVerticalMetrics {
+      font_design_unit_pt: 0.0,
       ascent_pt: 11.340_82,
       descent_pt: 3.247_07,
       windows_line_height_pt: 14.587_89,
@@ -33821,7 +35212,7 @@ mod tests {
         "{font_size}: {pitch}"
       );
       assert_eq!(
-        super::maximum_word_parallel_increment_count(
+        super::maximum_word_initial_increment_count(
           projection.vertical_axis_length(viewport, false),
           pitch,
         ),
@@ -33839,7 +35230,7 @@ mod tests {
       super::word_chart_natural_line_height(metrics.vertical_metrics_for_text("0", &arial));
     assert!((pitch - 11.500_079).abs() < 0.000_12, "Arial: {pitch}");
     assert_eq!(
-      super::maximum_word_parallel_increment_count(145.852_68, pitch),
+      super::maximum_word_initial_increment_count(145.852_68, pitch),
       10
     );
   }

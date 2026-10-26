@@ -191,6 +191,34 @@ pub fn word_static_3d_fixed_output_raster_dimensions(
   Some((dimension(width_pt)?, dimension(height_pt)?))
 }
 
+/// Ordinary W14 text's Screen bitmap, after resolving its printer rectangle.
+///
+/// Native Screen/Print pairs and independent character-size, effect, camera
+/// and paragraph-origin controls establish exclusive far samples here. This
+/// is distinct from a WPS scene's natural, origin-dependent raster window.
+pub(crate) fn word_unhosted_3d_screen_raster_dimensions(
+  width_pt: f32,
+  height_pt: f32,
+) -> Option<(u32, u32)> {
+  let dimension = |points: f32| {
+    if !points.is_finite() || points <= 0.0 {
+      return None;
+    }
+    // Recover the already resolved 600-DPI extent before changing devices;
+    // f32 PDF widths can otherwise cross an exact Screen-sample boundary.
+    let printer_dots = (f64::from(points) * 600.0 / 72.0).round();
+    if printer_dots > f64::from(i32::MAX) {
+      return None;
+    }
+    let samples = (printer_dots as u64 * 96)
+      .div_ceil(600)
+      .saturating_sub(1)
+      .max(1);
+    u32::try_from(samples).ok()
+  };
+  Some((dimension(width_pt)?, dimension(height_pt)?))
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -240,6 +268,39 @@ mod tests {
       word_static_3d_fixed_output_raster_dimensions(212.265, 133.8, 96),
       Some((285, 180))
     );
+  }
+
+  #[test]
+  fn ordinary_word_3d_screen_allocation_matches_native_printer_rectangles() {
+    // Distinct actual Word Screen rectangles from source-derived 18/24/36/
+    // 48/72/96pt gradient, solid and spatial-effect controls. The exact68-
+    // sample height is a stopping counterexample to floor(extent) and +1.
+    for (width, height, expected) in [
+      (41.28, 39.6, (55, 52)),
+      (32.88, 14.04, (43, 18)),
+      (53.28, 51.0, (71, 67)),
+      (43.44, 18.24, (57, 24)),
+      (77.16, 72.96, (102, 97)),
+      (64.2, 26.4, (85, 35)),
+      (100.44, 94.44, (133, 125)),
+      (85.08, 34.68, (113, 46)),
+      (146.76, 137.16, (195, 182)),
+      (126.72, 51.24, (168, 68)),
+      (192.72, 179.16, (256, 238)),
+      (168.48, 67.8, (224, 90)),
+    ] {
+      assert_eq!(
+        word_unhosted_3d_screen_raster_dimensions(width, height),
+        Some(expected),
+      );
+    }
+    assert_eq!(
+      word_unhosted_3d_screen_raster_dimensions(0.01, 0.01),
+      Some((1, 1))
+    );
+    assert!(word_unhosted_3d_screen_raster_dimensions(f32::NAN, 1.0).is_none());
+    assert!(word_unhosted_3d_screen_raster_dimensions(0.0, 1.0).is_none());
+    assert!(word_unhosted_3d_screen_raster_dimensions(f32::MAX, 1.0).is_none());
   }
 
   #[test]

@@ -88,7 +88,7 @@ than skipped files.
 | ClosedXML | 286 | 284 | 0 | 2 | 286 passed / 0 failed |
 | **Total** | **5477** | **5366** | **16** | **95** | **5477 passed / 0 failed** |
 
-Last full run: 2026-10-19. Per-corpus commands, classifications, and run history
+Last full run: 2026-10-26. Per-corpus commands, classifications, and run history
 are maintained in the test-suite documentation.
 
 ## Status

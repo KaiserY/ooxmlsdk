@@ -45,6 +45,7 @@ pub(super) fn restore_omitted_preset_geometry(
     inline.geometry = InlineShapeGeometry::Path {
       paths,
       outline: None,
+      preset: Some(kind),
     };
   }
 }

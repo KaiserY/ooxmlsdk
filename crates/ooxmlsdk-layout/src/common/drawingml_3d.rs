@@ -12,6 +12,7 @@ mod physical_curve;
 mod raster_boundary;
 mod raster_extrusion;
 mod winding;
+mod wireframe;
 pub(crate) use backdrop::BackdropTexturePlan;
 pub(crate) use material_texture::{
   TextMaterialTexture, TextMaterialTexturePlan, TextSurfaceRealizationPlan,
@@ -32,6 +33,9 @@ use super::{
 use crate::model::RgbColor;
 
 const EMUS_PER_POINT: f32 = 12_700.0;
+// Native GFX uses a decimal camera scale of 6.28 inches, not mathematical TAU.
+// Preserve its single-precision value in camera projection and output bounds.
+pub(crate) const WORD_SHAPE_PERSPECTIVE_SCALE_INCHES: f32 = 628.0 / 100.0;
 const TEXT_3D_CURVE_FLATTENING_TOLERANCE_PX: f64 = 0.1;
 // Physical text meshes retain floating-point source coordinates through projection.
 // Office's indexed front/back contours at 0.5/1/2 pt reject a translated
@@ -274,6 +278,8 @@ pub(crate) struct Static3dTextGeometry {
   /// Perspective profile precision belongs to the projected solid, not the
   /// source bitmap density. Both geometry and material lookup consume it.
   bevel_profile_tolerance_px: Option<f32>,
+  /// The smooth convex WPS outline was expanded from its source centerline.
+  shape_outline_widened: bool,
   solid_on_right: bool,
   page_plane_scale_x: f32,
   page_plane_scale_y: f32,
@@ -625,6 +631,7 @@ impl Static3dTextGeometry {
       contours,
       source_coverage_path,
       bevel_profile_tolerance_px: None,
+      shape_outline_widened: false,
       solid_on_right,
       page_plane_scale_x,
       page_plane_scale_y,
@@ -640,6 +647,86 @@ impl Static3dTextGeometry {
       page_x * target.page_plane_scale_x + target.page_plane_translate_x,
       page_y * target.page_plane_scale_y + target.page_plane_translate_y,
     )
+  }
+
+  pub(crate) fn with_shape_profile_realization(
+    mut self,
+    realization: TextSurfaceRealizationPlan,
+    pixels_per_point: f32,
+  ) -> Self {
+    self.bevel_profile_tolerance_px =
+      Some(realization.bevel_profile_tolerance_px(pixels_per_point));
+    self
+  }
+
+  /// Realize a smooth, convex stroked shape before expanding its physical
+  /// outline. GFX's projected-density FlattenPath precedes pen widening;
+  /// flattening an already widened curve changes the vertices and lighting.
+  /// Paint coverage retains the independent continuous widened path.
+  pub(crate) fn realize_shape_outline(
+    &self,
+    path: &super::PathItem<'_>,
+    realization: TextSurfaceRealizationPlan,
+    pixels_per_point: f32,
+  ) -> Option<Self> {
+    if !matches!(path.fill, super::Fill::Solid(color) if color.a == 255)
+      || (self.page_plane_scale_x - self.page_plane_scale_y).abs() > f32::EPSILON
+    {
+      return None;
+    }
+    // Reuse the solid-outline eligibility rules (opaque, centered, continuous
+    // pen). Hollow/compound outlines retain their existing region owner.
+    super::drawingml_stroke::closed_shape_solid_geometry(path)?;
+    let stroke = path.stroke.as_ref()?;
+    let elements = drawingml_geometry::mapped_path_elements(&path.commands, |point| {
+      kurbo::Point::new(
+        f64::from(point.x.0 * self.page_plane_scale_x + self.page_plane_translate_x),
+        f64::from(point.y.0 * self.page_plane_scale_y + self.page_plane_translate_y),
+      )
+    });
+    let mut source = Self::from_mapped_path_elements(
+      elements,
+      self.page_plane_scale_x,
+      self.page_plane_scale_y,
+      self.page_plane_translate_x,
+      self.page_plane_translate_y,
+      Some((
+        realization.curve_tolerance_px,
+        f64::from(pixels_per_point) * 72.0,
+      )),
+    )?;
+    let [contour] = source.contours.as_mut_slice() else {
+      return None;
+    };
+    if contour.longitudinal_contour_joins.iter().any(|join| *join)
+      || contour.incoming_curve_edges.iter().any(|curve| !curve)
+    {
+      // Authored corners require their own cap/join tessellation. Inserting
+      // a smooth-curve offset there would erase the authored join style.
+      return None;
+    }
+    let points = &contour.points;
+    for i in 0..points.len() {
+      let a = points[i];
+      let b = points[(i + 1) % points.len()];
+      let c = points[(i + 2) % points.len()];
+      let turn = (b.0 - a.0) * (c.1 - b.1) - (b.1 - a.1) * (c.0 - b.0);
+      if turn != 0.0 && (turn > 0.0) != source.solid_on_right {
+        // Concave widening needs region intersection/union, rather than
+        // treating a self-intersecting offset as a simple solid boundary.
+        return None;
+      }
+    }
+    contour.points = offset_text_3d_contour(
+      points,
+      -stroke.width.0 * self.page_plane_scale_x * 0.5,
+      source.solid_on_right,
+    );
+    contour.bounds = text_3d_contour_bounds(&contour.points);
+    contour.source_path_range = 0..self.source_coverage_path.elements().len();
+    source.source_coverage_path = self.source_coverage_path.clone();
+    source.shape_outline_widened = true;
+    Some(source)
   }
 }
 
@@ -1115,6 +1202,8 @@ pub(crate) struct Static3dProjection {
   pub(crate) field_of_view_degrees: Option<f32>,
   /// Perspective camera distance in points when the preset defines one.
   pub(crate) perspective_distance_pt: Option<f32>,
+  /// Uniform scene magnification after camera projection, before the device viewport.
+  pub(crate) zoom: f32,
   rotation: [[f32; 3]; 3],
   skew_x_per_depth: f32,
   skew_y_per_depth: f32,
@@ -1122,6 +1211,9 @@ pub(crate) struct Static3dProjection {
   origin_y: f32,
   viewpoint_x_pt: f32,
   viewpoint_y_pt: f32,
+  model_translation_pt: [f32; 2],
+  viewport_scale_x: f32,
+  viewport_scale_y: f32,
   viewport_translation_x_px: f32,
   viewport_translation_y_px: f32,
   silhouette_translation_x_px: f32,
@@ -1143,6 +1235,14 @@ impl Static3dProjection {
   pub(crate) fn with_viewport_translation_px(mut self, x: f32, y: f32) -> Self {
     self.viewport_translation_x_px = x;
     self.viewport_translation_y_px = y;
+    self
+  }
+
+  /// Maps the continuous camera window to its independently allocated target.
+  /// This device transform must not distort model normals, depth or materials.
+  pub(crate) fn with_viewport_scale(mut self, x: f32, y: f32) -> Self {
+    self.viewport_scale_x = x;
+    self.viewport_scale_y = y;
     self
   }
 
@@ -1310,13 +1410,18 @@ pub(crate) fn camera_projection(
     // 1/100 mm to points.
     distance_hmm * 72.0 / 2_540.0
   });
+  let zoom = scene
+    .camera
+    .zoom
+    .map_or(1.0, |value| value.as_ratio().max(0.0) as f32);
   Static3dProjection {
-    offset_x_per_depth: rotation[0][2] + skew_x_per_depth,
-    offset_y_per_depth: rotation[1][2] + skew_y_per_depth,
+    offset_x_per_depth: (rotation[0][2] + skew_x_per_depth) * zoom,
+    offset_y_per_depth: (rotation[1][2] + skew_y_per_depth) * zoom,
     face_rotation_degrees: face_rotation.to_degrees() as f32,
     parallel: preset.parallel,
     field_of_view_degrees,
     perspective_distance_pt,
+    zoom,
     rotation,
     skew_x_per_depth,
     skew_y_per_depth,
@@ -1324,11 +1429,42 @@ pub(crate) fn camera_projection(
     origin_y: preset.origin_y,
     viewpoint_x_pt: preset.viewpoint_x * 72.0 / 2_540.0,
     viewpoint_y_pt: preset.viewpoint_y * 72.0 / 2_540.0,
+    model_translation_pt: [0.0; 2],
+    viewport_scale_x: 1.0,
+    viewport_scale_y: 1.0,
     viewport_translation_x_px: 0.0,
     viewport_translation_y_px: 0.0,
     silhouette_translation_x_px: 0.0,
     silhouette_translation_y_px: 0.0,
   }
+}
+
+/// Word's modern WPS camera uses a 6.28-inch view-plane half extent.
+/// Native GFX camera/mesh/window observations establish both this distance
+/// and the effect-root center. The final window restores the authored source
+/// center after projection; material UVs remain in the original source frame.
+/// Legacy camera offsets retain their independently owned preset mapping.
+pub(crate) fn word_shape_camera_projection(
+  scene: &a::Scene3DType,
+  shape_rotation_degrees: f32,
+  model_translation_pt: [f32; 2],
+) -> Option<Static3dProjection> {
+  if is_legacy_perspective(scene.camera.preset) {
+    return None;
+  }
+  let mut projection = camera_projection(scene, shape_rotation_degrees);
+  if !projection.parallel {
+    let fov = projection
+      .field_of_view_degrees
+      .unwrap_or(camera_preset(scene.camera.preset).default_field_of_view_degrees);
+    projection.perspective_distance_pt = Some(
+      (f64::from(WORD_SHAPE_PERSPECTIVE_SCALE_INCHES) / (f64::from(fov) * 0.5).to_radians().tan())
+        as f32
+        * 72.0,
+    );
+    projection.model_translation_pt = model_translation_pt;
+  }
+  Some(projection)
 }
 
 fn is_legacy_perspective(preset: a::PresetCameraValues) -> bool {
@@ -1424,6 +1560,26 @@ pub(crate) fn output_padding(
   }
 }
 
+fn static_3d_extrusion_depth_pt(shape: &a::Shape3DType) -> f32 {
+  let depth = shape
+    .extrusion_height
+    .map(|value| value.to_emu() as f32 / EMUS_PER_POINT)
+    .unwrap_or(0.0);
+  if shape.preset_material == Some(a::PresetMaterialTypeValues::LegacyWireframe)
+    && shape.bevel_top.is_none()
+    && shape.bevel_bottom.is_none()
+    && shape.contour_width.is_none_or(|width| width.to_emu() == 0)
+  {
+    // Word's actual line-list meshes retain a one-point minimum depth.
+    // Omitted/0/.5/1/5-pt extrusion controls produce 1/1/1/1/5-pt solids;
+    // their model transforms keep the front at z and the back at z-depth.
+    // Bounds and mesh construction must consume the same physical depth.
+    depth.max(1.0)
+  } else {
+    depth
+  }
+}
+
 /// Returns the projected range of the complete model surface.
 pub(crate) fn projected_output_bounds(
   projection: Static3dProjection,
@@ -1456,10 +1612,7 @@ pub(crate) fn projected_region_output_bounds(
   model_height_pt: f32,
   region: Static3dOutputBounds,
 ) -> Static3dOutputBounds {
-  let depth_pt = shape
-    .extrusion_height
-    .map(|value| value.to_emu() as f32 / EMUS_PER_POINT)
-    .unwrap_or(0.0);
+  let depth_pt = static_3d_extrusion_depth_pt(shape);
   let z_pt = shape
     .z
     .map(|value| value.to_emu() as f32 / EMUS_PER_POINT)
@@ -1535,7 +1688,7 @@ pub(crate) fn projected_region_output_bounds(
   // `contourW` is the width of the complete contour line, not the radius by
   // which each side of the silhouette grows. The line is centered on the
   // boundary, so only half of its width contributes to an outer bound.
-  let edge = contour_pt * 0.5;
+  let edge = contour_pt * 0.5 * projection.zoom;
   Static3dOutputBounds {
     left_pt: min_x + model_width_pt * 0.5 - edge,
     top_pt: min_y + model_height_pt * 0.5 - edge,
@@ -1589,7 +1742,7 @@ pub(crate) fn projected_wordprocessing_effect_region_output_bounds(
   projected_plane_region_output_bounds(projection, z_pt, model_width_pt, model_height_pt, region)
 }
 
-fn projected_plane_region_output_bounds(
+pub(crate) fn projected_plane_region_output_bounds(
   projection: Static3dProjection,
   z_pt: f32,
   model_width_pt: f32,
@@ -1681,7 +1834,7 @@ pub(crate) fn project_wordprocessing_static_3d_effect_plane(
   )
 }
 
-fn project_static_3d_plane(
+pub(crate) fn project_static_3d_plane(
   source: &RgbaImage,
   projection: Static3dProjection,
   plane_z_pt: f32,
@@ -1760,6 +1913,7 @@ fn resolve_bevel(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Static3dGeometryLighting {
   Shape,
+  WordShape,
   Text,
 }
 
@@ -1772,6 +1926,8 @@ pub(crate) enum Static3dShapeRasterization {
 
 #[derive(Clone, Copy)]
 pub(crate) struct Static3dShapeSurface<'a> {
+  pub(crate) wordprocessing_shape: bool,
+  pub(crate) material_texture: Option<&'a TextMaterialTexture>,
   pub(crate) geometry: &'a Static3dTextGeometry,
   pub(crate) material_geometry: &'a Static3dTextGeometry,
   pub(crate) rasterization: Static3dShapeRasterization,
@@ -1800,6 +1956,7 @@ struct Static3dGeometryInput<'a> {
   front_outline_has_authored_transparency: bool,
   lighting: Static3dGeometryLighting,
   shape_rasterization: Static3dShapeRasterization,
+  text_output: Static3dTextOutput,
 }
 
 /// Lowers DrawingML static 3-D to a bounded RGBA layer. This follows the
@@ -1849,6 +2006,7 @@ pub(crate) fn apply_static_3d_with_source_boundary(
       front_outline_has_authored_transparency: false,
       lighting: Static3dGeometryLighting::Shape,
       shape_rasterization: Static3dShapeRasterization::SourceAntialias,
+      text_output: Static3dTextOutput::Color,
     },
     None,
   );
@@ -1872,7 +2030,7 @@ pub(crate) fn apply_static_3d_shape_geometry(
       source_boundary: None,
       two_sided_extrusion: surface.two_sided_extrusion,
       geometry: Some(surface.geometry),
-      surface_material_texture: None,
+      surface_material_texture: surface.material_texture,
       material_geometry: Some(surface.material_geometry),
       page_geometry: None,
       front_fill_material: None,
@@ -1884,11 +2042,25 @@ pub(crate) fn apply_static_3d_shape_geometry(
       front_outline_material_inset_px: None,
       front_fill_has_authored_transparency: false,
       front_outline_has_authored_transparency: false,
-      lighting: Static3dGeometryLighting::Shape,
+      lighting: if surface.wordprocessing_shape {
+        Static3dGeometryLighting::WordShape
+      } else {
+        Static3dGeometryLighting::Shape
+      },
       shape_rasterization: surface.rasterization,
+      text_output: Static3dTextOutput::Color,
     },
     None,
   );
+}
+
+/// Channels requested from a static text surface.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Static3dTextOutput {
+  Color,
+  /// Only alpha is consumed. An unprojected solid can resolve the independent
+  /// front coverage directly; other projections retain the complete renderer.
+  Coverage,
 }
 
 /// Geometry and independently painted materials on the same text surface.
@@ -1898,6 +2070,7 @@ pub(crate) struct Static3dTextSurface<'a> {
   pub(crate) front_fill_material: Option<&'a RgbaImage>,
   pub(crate) front_outline_material: Option<&'a RgbaImage>,
   pub(crate) front_outline_coverage: Option<&'a RgbaImage>,
+  pub(crate) output: Static3dTextOutput,
 }
 
 #[cfg(test)]
@@ -1912,6 +2085,7 @@ fn apply_static_3d_text(
   apply_static_3d_text_with_outline_material(
     image,
     crate::common::drawingml_3d::Static3dTextSurface {
+      output: Static3dTextOutput::Color,
       geometry,
       front_fill_material: None,
       front_outline_material: None,
@@ -1976,6 +2150,7 @@ fn apply_static_3d_text_with_outline_material_impl(
     front_fill_material,
     front_outline_material,
     front_outline_coverage,
+    output,
   } = surface;
   debug_assert!(
     front_fill_material.is_none_or(|material| material.dimensions() == image.dimensions())
@@ -2014,6 +2189,7 @@ fn apply_static_3d_text_with_outline_material_impl(
       front_outline_has_authored_transparency: geometry.front_outline_has_authored_transparency,
       lighting: Static3dGeometryLighting::Text,
       shape_rasterization: Static3dShapeRasterization::SourceAntialias,
+      text_output: output,
     },
     final_grid,
   );
@@ -2056,6 +2232,7 @@ pub(crate) fn apply_static_3d_text_paint(
       front_outline_has_authored_transparency: false,
       lighting: Static3dGeometryLighting::Text,
       shape_rasterization: Static3dShapeRasterization::SourceAntialias,
+      text_output: Static3dTextOutput::Color,
     },
     None,
   );
@@ -2149,7 +2326,7 @@ fn apply_static_3d_impl(
     two_sided_extrusion,
     source_boundary,
     geometry: text_geometry,
-    surface_material_texture,
+    surface_material_texture: _,
     material_geometry,
     page_geometry,
     front_fill_material,
@@ -2163,6 +2340,7 @@ fn apply_static_3d_impl(
     front_outline_has_authored_transparency,
     lighting: geometry_lighting,
     shape_rasterization,
+    text_output,
   } = geometry_input;
   let Static3dRenderOptions {
     extrusion_color,
@@ -2170,10 +2348,7 @@ fn apply_static_3d_impl(
     pixels_per_point,
     model_surface,
   } = options;
-  let depth_pt = shape
-    .extrusion_height
-    .map(|value| value.to_emu() as f32 / EMUS_PER_POINT)
-    .unwrap_or(0.0);
+  let depth_pt = static_3d_extrusion_depth_pt(shape);
   let z_pt = shape
     .z
     .map(|value| value.to_emu() as f32 / EMUS_PER_POINT)
@@ -2216,7 +2391,7 @@ fn apply_static_3d_impl(
   }
   let contour_radius_px = shape
     .contour_width
-    .map(|_| contour_width_px * 0.5)
+    .map(|_| contour_width_px * 0.5 * projection.zoom)
     .unwrap_or(0.0)
     .round()
     .clamp(0.0, 32.0) as i32;
@@ -2239,6 +2414,9 @@ fn apply_static_3d_impl(
   let planar_front_z_px = visible_top_bevel.map_or(front_z_px, |bevel| {
     if geometry_lighting == Static3dGeometryLighting::Text {
       extrusion_front_z_px + word_text_bevel_terminal_profile(bevel.preset).height * bevel.height_px
+    } else if geometry_lighting == Static3dGeometryLighting::WordShape {
+      extrusion_front_z_px
+        + word_shape_bevel_terminal_profile(bevel.preset).height * bevel.height_px
     } else {
       front_z_px
     }
@@ -2246,6 +2424,8 @@ fn apply_static_3d_impl(
   let planar_back_z_px = visible_bottom_bevel.map_or(extrusion_back_z_px, |bevel| {
     let terminal_height = if geometry_lighting == Static3dGeometryLighting::Text {
       word_text_bevel_terminal_profile(bevel.preset).height
+    } else if geometry_lighting == Static3dGeometryLighting::WordShape {
+      word_shape_bevel_terminal_profile(bevel.preset).height
     } else {
       1.0
     };
@@ -2273,6 +2453,35 @@ fn apply_static_3d_impl(
       alpha: 255,
     })
   });
+  // A legacy wireframe uses the visible contour material, or black when no
+  // contour is active. Word's extrusion-color and zero-width contour-color
+  // controls leave the frame black; neither the shape fill nor its extrusion
+  // paint supplies a fallback (also documented by LO's Scene3DHelper).
+  let wireframe_color = text_contour.unwrap_or(Static3dColor {
+    color: RgbColor { r: 0, g: 0, b: 0 },
+    alpha: 255,
+  });
+  if wireframe
+    && !word_text_lighting
+    && visible_top_bevel.is_none()
+    && visible_bottom_bevel.is_none()
+    && contour_width_px <= f32::EPSILON
+    && let Some(geometry) = text_geometry
+  {
+    wireframe::composite(
+      image,
+      geometry,
+      wireframe::Options {
+        projection,
+        model_surface,
+        pixels_per_point,
+        front_z_px,
+        back_z_px: front_z_px - depth_pt * pixels_per_point,
+        color: wireframe_color,
+      },
+    );
+    return;
+  }
   // Direct2D's text extruder submits front, back, and side triangles in one
   // back-face-culled mesh. A separately projected back bitmap bypasses both
   // culling and the shared multisample/depth grid, so even a camera-facing
@@ -2292,10 +2501,38 @@ fn apply_static_3d_impl(
     && projection_preserves_source_plane_coverage(projection);
   let material_geometry = material_geometry.or(text_geometry);
   let page_geometry = page_geometry.or(material_geometry);
+  if text_output == Static3dTextOutput::Coverage
+    && word_text_lighting
+    && !wireframe
+    && final_grid.is_none()
+    && projection_preserves_source_plane_coverage(projection)
+    && let Some(surface_input) = geometry_input.front_surface(
+      scene,
+      &front,
+      shape.preset_material,
+      ProjectedImageOptions {
+        projection,
+        z: planar_front_z_px,
+        bounds,
+        model_surface,
+        pixels_per_point,
+        tint: None,
+      },
+    )
+  {
+    // The fixed-output consumer uses alpha only. Native orthographic controls
+    // and the front-coverage invariant below establish that bevel/extrusion
+    // alter neither this plane nor its contour alpha. Do not build or shade a
+    // complete solid merely to overwrite its alpha and discard its RGB.
+    *image = text_source_plane_coverage(&front, surface_input, contour_width_px, contour_color);
+    return;
+  }
   let mut text_surface_triangles = Vec::new();
   let text_back_planar_inset_px = visible_bottom_bevel.map_or(0.0, |bevel| {
     if geometry_lighting == Static3dGeometryLighting::Text {
       bevel.authored_width_px * word_text_bevel_terminal_profile(bevel.preset).inset
+    } else if geometry_lighting == Static3dGeometryLighting::WordShape {
+      bevel.authored_width_px * word_shape_bevel_terminal_profile(bevel.preset).inset
     } else {
       bevel.terminal_inset_px
     }
@@ -2309,7 +2546,11 @@ fn apply_static_3d_impl(
       bounds_height,
       pixels_per_point,
     );
-    let extrusion = extrusion_color.unwrap_or_else(|| average_extrusion_color(&front));
+    let extrusion = if wireframe {
+      wireframe_color
+    } else {
+      extrusion_color.unwrap_or_else(|| average_extrusion_color(&front))
+    };
     let back_normal = lighting_surface_normal(scene, projection, [0.0, 0.0, -1.0]);
     let back_view_direction = surface_view_direction(
       scene,
@@ -2431,7 +2672,7 @@ fn apply_static_3d_impl(
       pixels_per_point,
       steps,
       tint: extrusion,
-      opacity_source: if geometry_lighting == Static3dGeometryLighting::Shape
+      opacity_source: if geometry_lighting != Static3dGeometryLighting::Text
         && extrusion_color.is_some()
         && shape
           .extrusion_color
@@ -2446,6 +2687,13 @@ fn apply_static_3d_impl(
       material: shape.preset_material,
       wireframe,
       geometry_lighting,
+      texture_geometry: (geometry_lighting == Static3dGeometryLighting::WordShape
+        && shape
+          .extrusion_color
+          .as_ref()
+          .is_none_or(|color| color.extrusion_color_choice.is_none()))
+      .then_some(material_geometry)
+      .flatten(),
       outline_contour: text_contour.map(|color| TextExtrusionOutlineContour {
         width_px: contour_width_px,
         color,
@@ -2495,6 +2743,8 @@ fn apply_static_3d_impl(
   if let (Some(_geometry), Some(bevel)) = (text_geometry, visible_top_bevel) {
     text_planar_inset_px = if geometry_lighting == Static3dGeometryLighting::Text {
       bevel.authored_width_px * word_text_bevel_terminal_profile(bevel.preset).inset
+    } else if geometry_lighting == Static3dGeometryLighting::WordShape {
+      bevel.authored_width_px * word_shape_bevel_terminal_profile(bevel.preset).inset
     } else {
       bevel.terminal_inset_px
     };
@@ -2561,15 +2811,7 @@ fn apply_static_3d_impl(
   }
   if wireframe {
     let mut outline = RgbaImage::new(image.width(), image.height());
-    composite_outline(
-      &mut outline,
-      &front,
-      1,
-      contour_color.or(extrusion_color).unwrap_or(Static3dColor {
-        color: RgbColor { r: 0, g: 0, b: 0 },
-        alpha: 255,
-      }),
-    );
+    composite_outline(&mut outline, &front, 1, wireframe_color);
     composite_projected_image(
       image,
       &outline,
@@ -2648,24 +2890,22 @@ fn apply_static_3d_impl(
       &options,
       [0.0, 0.0, 1.0],
       shape.preset_material,
-      word_text_lighting,
+      geometry_lighting,
     );
-    let planar_fill_material = separated_front_text_materials
-      .then_some(front_fill_material)
-      .flatten();
-    let planar_outline_material = separated_front_text_materials
-      .then_some(front_outline_material)
-      .flatten();
-    if let (Some(geometry), Some(material_geometry)) = (text_geometry, material_geometry) {
-      let page_geometry = page_geometry.unwrap_or(geometry);
+    if let Some(geometry) = text_geometry {
       let contour = text_contour;
       let source_plane_contour = projection_preserves_source_plane_coverage(projection);
-      let has_physical_contour_host =
-        depth_pt > f32::EPSILON || visible_top_bevel.is_some() || visible_bottom_bevel.is_some();
+      // WPS contour-only controls submit a real tube even without a bevel
+      // or authored extrusion; the inactive contour-only exception is W14.
+      let has_physical_contour_host = geometry_lighting == Static3dGeometryLighting::WordShape
+        || depth_pt > f32::EPSILON
+        || visible_top_bevel.is_some()
+        || visible_bottom_bevel.is_some();
       if let Some(color) = contour.filter(|_| !source_plane_contour && has_physical_contour_host) {
         text_surface_triangles.extend(text_projected_contour_triangles(
           geometry,
           TextProjectedContourOptions {
+            wordprocessing_shape: geometry_lighting == Static3dGeometryLighting::WordShape,
             width_px: contour_width_px,
             base_z: extrusion_front_z_px,
             color,
@@ -2683,6 +2923,7 @@ fn apply_static_3d_impl(
           text_surface_triangles.extend(text_projected_contour_triangles(
             geometry,
             TextProjectedContourOptions {
+              wordprocessing_shape: geometry_lighting == Static3dGeometryLighting::WordShape,
               width_px: contour_width_px,
               base_z: extrusion_back_z_px,
               color,
@@ -2703,24 +2944,6 @@ fn apply_static_3d_impl(
           });
       let mut solid = RgbaImage::new(image.width(), image.height());
       let surface_input = TextSolidSurfaceInput {
-        scene,
-        material: shape.preset_material,
-        bevel_material_source: &front,
-        surface_material_texture,
-        source_geometry: geometry,
-        material_geometry,
-        paint_opacity_geometry: page_geometry,
-        planar_fill_material,
-        planar_outline_material,
-        planar_outline_coverage: front_outline_coverage,
-        planar_fill_uniform_paint_opacity: front_fill_uniform_paint_opacity,
-        planar_outline_uniform_paint_opacity: front_outline_uniform_paint_opacity,
-        planar_outline_material_inset_px: front_outline_material_inset_px,
-        fill_has_authored_transparency: front_fill_has_authored_transparency,
-        outline_has_authored_transparency: front_outline_has_authored_transparency,
-        uniform_paint_opacity,
-        planar_geometry: geometry,
-        planar_coverage_geometry: geometry,
         planar_inset_px: text_planar_inset_px,
         direct_inset_cells: text_planar_inset_cells.as_deref(),
         planar_coverage: TextPlanarCoverageResolve::BoxSamples8x4,
@@ -2728,8 +2951,9 @@ fn apply_static_3d_impl(
         direct_inset_bevel: text_bevel
           .filter(|_| geometry_lighting == Static3dGeometryLighting::Text),
         contour: contour_surface,
-        options,
-        geometry_lighting,
+        ..geometry_input
+          .front_surface(scene, &front, shape.preset_material, options)
+          .expect("physical text surface")
       };
       composite_text_solid_surfaces(
         &mut solid,
@@ -2760,6 +2984,7 @@ fn apply_static_3d_impl(
               triangles.extend(text_projected_contour_triangles(
                 geometry,
                 TextProjectedContourOptions {
+                  wordprocessing_shape: geometry_lighting == Static3dGeometryLighting::WordShape,
                   width_px: contour_width_px,
                   base_z,
                   color,
@@ -2790,40 +3015,7 @@ fn apply_static_3d_impl(
       let source_plane_coverage = (geometry_lighting == Static3dGeometryLighting::Text
         && projection_preserves_source_plane_coverage(projection))
       .then(|| {
-        // Word's fixed-output alpha remains the raw front-face geometry when
-        // an orthographic camera maps every depth to the same x/y plane.
-        // Extrusion and bevel meshes still own RGB and depth, but cannot
-        // become additional alpha layers. Resolve the uninset front plane
-        // independently so overlapping back/bevel surfaces cannot compound
-        // its antialias coverage.
-        let mut coverage = RgbaImage::new(image.width(), image.height());
-        composite_text_solid_surfaces(
-          &mut coverage,
-          &front_face,
-          surface_input.independent_front_coverage(),
-          TextSurfaceRasterization::Source,
-        );
-        if contour_width_px > 0.0 {
-          let contour = contour_color.unwrap_or(Static3dColor {
-            color: RgbColor { r: 0, g: 0, b: 0 },
-            alpha: 255,
-          });
-          let mut contoured = RgbaImage::new(image.width(), image.height());
-          composite_text_contour_stroke(
-            &mut contoured,
-            geometry,
-            contour_width_px,
-            // The exact natural XPS/PDF controls and no-bevel contour matrix
-            // freeze the source-plane mask on the physical glyph path with
-            // no second phase adjustment. The raised RGB contour separately
-            // reverses HPC-to-IPC while competing with the 3-D mesh above.
-            0.0,
-            contour,
-          );
-          composite_image(&mut contoured, &coverage);
-          coverage = contoured;
-        }
-        coverage
+        text_source_plane_coverage(&front_face, surface_input, contour_width_px, contour_color)
       });
       // The contour competes with the lit front mesh in the same subpixel
       // depth buffer. Identity output retains its independently pinned AreaA8;
@@ -2839,7 +3031,7 @@ fn apply_static_3d_impl(
     }
   }
 
-  if (text_geometry.is_none() || geometry_lighting == Static3dGeometryLighting::Shape)
+  if (text_geometry.is_none() || geometry_lighting != Static3dGeometryLighting::Text)
     && contour_radius_px == 0
     && !wireframe
     && projection_preserves_source_plane_coverage(projection)
@@ -2852,6 +3044,43 @@ fn apply_static_3d_impl(
     // holes, and authored fractional alpha instead of assuming a rectangle.
     replace_surface_alpha(image, &front);
   }
+}
+
+fn text_source_plane_coverage(
+  source: &RgbaImage,
+  input: TextSolidSurfaceInput<'_>,
+  contour_width_px: f32,
+  contour_color: Option<Static3dColor>,
+) -> RgbaImage {
+  // Word's fixed-output alpha remains the raw front-face geometry when an
+  // orthographic camera maps every depth to the same x/y plane. Resolve the
+  // uninset front independently of the solid's depth/material mesh.
+  let mut coverage = RgbaImage::new(source.width(), source.height());
+  composite_text_solid_surfaces(
+    &mut coverage,
+    source,
+    input.independent_front_coverage(),
+    TextSurfaceRasterization::Source,
+  );
+  if contour_width_px > 0.0 {
+    let contour = contour_color.unwrap_or(Static3dColor {
+      color: RgbColor { r: 0, g: 0, b: 0 },
+      alpha: 255,
+    });
+    let mut contoured = RgbaImage::new(source.width(), source.height());
+    // The frozen physical glyph path owns phase-0 AreaA8 coverage. RGB
+    // contour depth registration remains independent in the solid renderer.
+    composite_text_contour_stroke(
+      &mut contoured,
+      input.source_geometry,
+      contour_width_px,
+      0.0,
+      contour,
+    );
+    composite_image(&mut contoured, &coverage);
+    coverage = contoured;
+  }
+  coverage
 }
 
 fn replace_surface_alpha(surface: &mut RgbaImage, coverage: &RgbaImage) {
@@ -3417,8 +3646,44 @@ fn word_text_bevel_segment_parameters(
   segment_index: usize,
   tolerance_px: f32,
 ) -> Vec<f32> {
+  let terminal_height =
+    bevel_segment_endpoint(*bevel_profile(preset).last().expect("bevel profile"))[0];
+  bevel_segment_parameters(preset, segment_index, tolerance_px, |point| {
+    let [profile_height, profile_inset] =
+      word_text_bevel_geometry_point(preset, terminal_height, point);
+    [
+      f64::from(profile_height * height.abs()),
+      f64::from(profile_inset * normal_width.abs()),
+    ]
+  })
+}
+
+fn word_shape_bevel_segment_parameters(
+  width: f32,
+  height: f32,
+  preset: Option<a::BevelPresetValues>,
+  segment_index: usize,
+  tolerance_px: f32,
+) -> Vec<f32> {
+  // GFX's completed WPS profile vectors use the published raw x/y axes,
+  // flattened at four times the independently projected path tolerance.
+  // Native Cross/RelaxedInset controls at 100/150% zoom pin the resulting
+  // parameters and endpoint tangents, independently of the final bitmap.
+  bevel_segment_parameters(preset, segment_index, tolerance_px, |point| {
+    [
+      f64::from(point[0] * width.abs()),
+      f64::from(point[1] * height.abs()),
+    ]
+  })
+}
+
+fn bevel_segment_parameters(
+  preset: Option<a::BevelPresetValues>,
+  segment_index: usize,
+  tolerance_px: f32,
+  transform: impl Fn([f32; 2]) -> [f64; 2],
+) -> Vec<f32> {
   let profile = bevel_profile(preset);
-  let terminal_height = bevel_segment_endpoint(*profile.last().expect("bevel profile"))[0];
   let start = if segment_index == 0 {
     [0.0, 0.0]
   } else {
@@ -3444,15 +3709,41 @@ fn word_text_bevel_segment_parameters(
       to,
     } => [start, control_1, control_2, to],
   };
-  let points = cubic.map(|point| {
-    let [profile_height, profile_inset] =
-      word_text_bevel_geometry_point(preset, terminal_height, point);
-    [
-      f64::from(profile_height * height.abs()),
-      f64::from(profile_inset * normal_width.abs()),
-    ]
-  });
-  flatten_cubic_profile_parameters(points, tolerance_px)
+  flatten_cubic_profile_parameters(cubic.map(transform), tolerance_px)
+}
+
+fn word_shape_bevel_has_native_axes(preset: Option<a::BevelPresetValues>) -> bool {
+  matches!(
+    preset,
+    Some(a::BevelPresetValues::Cross | a::BevelPresetValues::RelaxedInset)
+  )
+}
+
+fn word_shape_bevel_geometry_profile(
+  preset: Option<a::BevelPresetValues>,
+  profile: BevelProfileSample,
+) -> BevelProfileSample {
+  if !word_shape_bevel_has_native_axes(preset) {
+    return profile;
+  }
+  // MS-OI29500 supplies the preset curve. Actual WPS vertex buffers establish
+  // its consumer's axes: raw x is inward width and raw y is height. Cross's
+  // 11pt x 7pt controls end at (6.6pt, 7pt), with the straight ledge at
+  // (4.4pt, .7pt); RelaxedInset's 6pt x 7pt cap ends at (6pt, 4.48pt).
+  // Recover raw x from the generic height-normalized sample. Keep unobserved
+  // presets and other hosts on their existing, independently verified path.
+  let terminal_x = bevel_segment_endpoint(*bevel_profile(preset).last().expect("bevel profile"))[0];
+  BevelProfileSample {
+    height: profile.inset,
+    inset: profile.height * terminal_x,
+    height_tangent: profile.inset_tangent,
+    inset_tangent: profile.height_tangent * terminal_x,
+  }
+}
+
+fn word_shape_bevel_terminal_profile(preset: Option<a::BevelPresetValues>) -> BevelProfileSample {
+  let profile = bevel_profile(preset);
+  word_shape_bevel_geometry_profile(preset, bevel_profile_sample(preset, profile.len() - 1, 1.0))
 }
 
 fn word_text_bevel_geometry_profile(
@@ -3774,6 +4065,25 @@ fn word_text_surface_specular(
   std::array::from_fn(|channel| (incident[channel] * material_reflectance[channel]).clamp(0.0, 1.0))
 }
 
+/// The fixed normal/view of a parallel plane leaves only its byte-valued
+/// material color variable. The Word reflectance and Gouraud equations are
+/// channel independent, so tabulate their exact existing result per channel.
+fn word_text_planar_color_table(
+  diffuse: [f32; 3],
+  incident: [f32; 3],
+  material: Option<a::PresetMaterialTypeValues>,
+) -> [[u8; 256]; 3] {
+  let mut table = [[0; 256]; 3];
+  for value in 0..=255_u8 {
+    let specular = word_text_surface_specular(incident, material, [value; 3]);
+    for channel in 0..3 {
+      table[channel][usize::from(value)] =
+        shade_gouraud_channel_with_specular(value, diffuse[channel], specular[channel]);
+    }
+  }
+  table
+}
+
 /// The established shape path retains its independently calibrated minimum
 /// illumination, while both shape and W14 text use D3D's light-travel vector
 /// convention.
@@ -3824,7 +4134,10 @@ fn legacy_light_rig_surface_specular(
     let mut toward_light = [-direction[0], -direction[1], -direction[2]];
     normalize3(&mut toward_light);
     let normal_light = dot3(normal, toward_light);
-    if normal_light <= 0.0 {
+    // Native picture controls, including black extrusion faces, retain the
+    // reflection-vector highlight on both sides of the rectangular frame.
+    // Diffuse rejection only gates the Blinn path, as it does for W14 text.
+    if blinn_highlight && normal_light <= 0.0 {
       continue;
     }
     let highlight = if blinn_highlight {
@@ -4382,12 +4695,17 @@ fn material_surface_alpha(
   view_direction: [f32; 3],
   material: Option<a::PresetMaterialTypeValues>,
 ) -> u8 {
+  quantize_material_surface_alpha(
+    authored_opacity,
+    material_surface_alpha_factor(normal, view_direction, material),
+  )
+}
+
+fn quantize_material_surface_alpha(authored_opacity: f32, factor: f32) -> u8 {
   // Word quantizes the material/vertex alpha before resolving antialias
   // coverage. The h/w=1 softEdge control distinguishes this floor from
   // round-to-nearest: 255 * 0.99999535f is emitted as 254.
-  (authored_opacity.clamp(0.0, 1.0)
-    * material_surface_alpha_factor(normal, view_direction, material)
-    * 255.0)
+  (authored_opacity.clamp(0.0, 1.0) * factor * 255.0)
     .floor()
     .clamp(0.0, 255.0) as u8
 }
@@ -4496,6 +4814,9 @@ pub(crate) fn projection_preserves_source_plane_coverage(projection: Static3dPro
   // depth translation excludes rotated and oblique cameras, even when their
   // front plane happens to cross z=0 without an offset.
   projection.parallel
+    && nearly(projection.zoom, 1.0)
+    && nearly(projection.viewport_scale_x, 1.0)
+    && nearly(projection.viewport_scale_y, 1.0)
     && nearly(projection.rotation[0][0], 1.0)
     && nearly(projection.rotation[0][1], 0.0)
     && nearly(projection.rotation[1][0], 0.0)
@@ -4554,6 +4875,40 @@ fn plane_homography(
     ]
   };
 
+  if projection.model_translation_pt != [0.0; 2] {
+    let [dx, dy] = projection
+      .model_translation_pt
+      .map(|value| value * pixels_per_point);
+    let distance = projection.perspective_distance_pt.unwrap_or(0.0) * pixels_per_point;
+    let denominator = distance - rotation[2][0] * dx - rotation[2][1] * dy;
+    let center = [
+      (matrix[0][0] * dx + matrix[0][1] * dy) / denominator,
+      (matrix[1][0] * dx + matrix[1][1] * dy) / denominator,
+    ];
+    for row in &mut matrix {
+      row[2] += row[0] * dx + row[1] * dy;
+    }
+    let denominator_row = matrix[2];
+    for (row, center) in matrix[..2].iter_mut().zip(center) {
+      for (value, denominator) in row.iter_mut().zip(denominator_row) {
+        *value -= center * denominator;
+      }
+    }
+  }
+
+  // ECMA-376 §20.1.5.5 applies zoom to the complete scene. Office's parallel,
+  // oblique and perspective controls scale the projected x/y coordinates,
+  // including their z displacement, while preserving the camera distance.
+  // Keep this out of the rotation matrix: normals, lighting and perspective
+  // depth interpolation still belong to the unscaled model/view space.
+  if projection.zoom != 1.0 {
+    for row in &mut matrix[..2] {
+      for value in row {
+        *value *= projection.zoom;
+      }
+    }
+  }
+
   // A viewport translation is an affine transform after the homogeneous
   // projection. Adding dx/dy times the denominator row is equivalent for
   // both parallel and perspective cameras and cannot alter model-space
@@ -4561,8 +4916,8 @@ fn plane_homography(
   let denominator_row = matrix[2];
   let [x_row, y_row, _] = &mut matrix;
   for ((x, y), denominator) in x_row.iter_mut().zip(y_row).zip(denominator_row) {
-    *x += projection.viewport_translation_x_px * denominator;
-    *y += projection.viewport_translation_y_px * denominator;
+    *x = *x * projection.viewport_scale_x + projection.viewport_translation_x_px * denominator;
+    *y = *y * projection.viewport_scale_y + projection.viewport_translation_y_px * denominator;
   }
   matrix
 }
@@ -4617,8 +4972,10 @@ fn shade_planar_surface(
   options: &ProjectedImageOptions,
   model_normal: [f32; 3],
   material: Option<a::PresetMaterialTypeValues>,
-  word_text_lighting: bool,
+  geometry_lighting: Static3dGeometryLighting,
 ) {
+  let word_text_lighting = geometry_lighting == Static3dGeometryLighting::Text;
+  let word_shape_lighting = geometry_lighting == Static3dGeometryLighting::WordShape;
   let normal = lighting_surface_normal(scene, options.projection, model_normal);
   let legacy_shade =
     (!word_text_lighting).then(|| legacy_material_diffuse_shade(scene, normal, material));
@@ -4626,8 +4983,42 @@ fn shade_planar_surface(
   let center_y = options.model_surface.top_px + options.model_surface.height_px * 0.5;
   let width = options.model_surface.width_px.max(1.0);
   let height = options.model_surface.height_px.max(1.0);
+  let parallel_word_colors = (geometry_lighting != Static3dGeometryLighting::Shape
+    && options.projection.parallel)
+    .then(|| {
+      let view_direction = surface_view_direction(
+        scene,
+        options.projection,
+        [0.0, 0.0, options.z],
+        width,
+        height,
+        options.pixels_per_point,
+      );
+      if word_shape_lighting {
+        let shade = material_diffuse_shade(scene, normal, view_direction, material);
+        let incident = light_rig_surface_specular_incident(scene, normal, view_direction, material);
+        std::array::from_fn(|channel| {
+          std::array::from_fn(|value| {
+            let specular = word_shape_surface_specular(incident, material, [value as u8; 3]);
+            word_shape_textured_channel(value as u8, shade[channel], specular[channel])
+          })
+        })
+      } else {
+        word_text_planar_color_table(
+          material_diffuse_shade(scene, normal, view_direction, material),
+          light_rig_surface_specular_incident(scene, normal, view_direction, material),
+          material,
+        )
+      }
+    });
   for (x, y, pixel) in image.enumerate_pixels_mut() {
     if pixel[3] == 0 {
+      continue;
+    }
+    if let Some(colors) = parallel_word_colors.as_ref() {
+      for channel in 0..3 {
+        pixel[channel] = colors[channel][usize::from(pixel[channel])];
+      }
       continue;
     }
     let view_direction = surface_view_direction(
@@ -4642,7 +5033,7 @@ fn shade_planar_surface(
       height,
       options.pixels_per_point,
     );
-    let shade = if word_text_lighting {
+    let shade = if word_text_lighting || word_shape_lighting {
       material_diffuse_shade(scene, normal, view_direction, material)
     } else {
       legacy_shade.expect("legacy planar shade")
@@ -4655,6 +5046,12 @@ fn shade_planar_surface(
         material,
         [pixel[0], pixel[1], pixel[2]],
       )
+    } else if word_shape_lighting {
+      word_shape_surface_specular(
+        light_rig_surface_specular_incident(scene, normal, view_direction, material),
+        material,
+        [pixel[0], pixel[1], pixel[2]],
+      )
     } else {
       legacy_light_rig_surface_specular(scene, normal, view_direction, material)
     };
@@ -4662,6 +5059,8 @@ fn shade_planar_surface(
     for channel in 0..3 {
       pixel[channel] = if word_text_lighting {
         shade_gouraud_channel_with_specular(pixel[channel], shade[channel], specular[channel])
+      } else if word_shape_lighting {
+        word_shape_textured_channel(pixel[channel], shade[channel], specular[channel])
       } else {
         // The cap and its bevel are surfaces of the same shape material.
         // Keep their fixed-function color conversion identical; using the
@@ -5904,6 +6303,7 @@ fn sample_bilinear_clamped(image: &RgbaImage, x: f32, y: f32) -> Option<Rgba<u8>
 
 #[derive(Clone, Copy)]
 struct TextProjectedContourOptions {
+  wordprocessing_shape: bool,
   width_px: f32,
   base_z: f32,
   color: Static3dColor,
@@ -5917,6 +6317,7 @@ fn text_projected_contour_triangles(
   options: TextProjectedContourOptions,
 ) -> Vec<TextSurfaceTriangle> {
   let TextProjectedContourOptions {
+    wordprocessing_shape,
     width_px,
     base_z,
     color,
@@ -5963,7 +6364,18 @@ fn text_projected_contour_triangles(
   geometry
     .contours
     .iter()
-    .flat_map(|contour| contour_mesh::triangles(contour, radius, base_z))
+    .flat_map(|contour| {
+      let sweep = if wordprocessing_shape {
+        if geometry.shape_outline_widened {
+          contour_mesh::Sweep::WidenedShape
+        } else {
+          contour_mesh::Sweep::Shape
+        }
+      } else {
+        contour_mesh::Sweep::Text
+      };
+      contour_mesh::triangles(contour, radius, base_z, sweep)
+    })
     .map(|triangle| TextSurfaceTriangle {
       vertices: triangle.map(|point| project((point[0], point[1]), point[2])),
       bevel_source: None,
@@ -6002,6 +6414,7 @@ struct ExtrusionEdgeOptions<'a> {
   material: Option<a::PresetMaterialTypeValues>,
   wireframe: bool,
   geometry_lighting: Static3dGeometryLighting,
+  texture_geometry: Option<&'a Static3dTextGeometry>,
   outline_contour: Option<TextExtrusionOutlineContour>,
 }
 
@@ -6152,6 +6565,7 @@ fn text_extrusion_edge_triangles(
     material,
     wireframe: _,
     geometry_lighting,
+    texture_geometry,
     outline_contour,
   } = options;
   let center_x = model_surface.left_px + model_surface.width_px * 0.5;
@@ -6267,7 +6681,7 @@ fn text_extrusion_edge_triangles(
           height,
           pixels_per_point,
         );
-        let shade = if geometry_lighting == Static3dGeometryLighting::Text {
+        let shade = if geometry_lighting != Static3dGeometryLighting::Shape {
           material_diffuse_shade(scene, surface_normal, view_direction, material)
         } else {
           legacy_material_diffuse_shade(scene, surface_normal, material)
@@ -6280,6 +6694,12 @@ fn text_extrusion_edge_triangles(
             material,
             [tint.color.r, tint.color.g, tint.color.b],
           )
+        } else if geometry_lighting == Static3dGeometryLighting::WordShape {
+          word_shape_surface_specular(
+            light_rig_surface_specular_incident(scene, surface_normal, view_direction, material),
+            material,
+            [tint.color.r, tint.color.g, tint.color.b],
+          )
         } else {
           legacy_light_rig_surface_specular(scene, surface_normal, view_direction, material)
         };
@@ -6289,15 +6709,39 @@ fn text_extrusion_edge_triangles(
           view_direction,
           material,
         );
-        shaded_geometry_pixel_with_specular(tint, shade, specular, alpha, geometry_lighting)
+        if geometry_lighting == Static3dGeometryLighting::WordShape {
+          let color = [tint.color.r, tint.color.g, tint.color.b];
+          let mut result = [0.0; 4];
+          for channel in 0..3 {
+            result[channel] = 255.0
+              * (word_shape_diffuse_attribute(f32::from(color[channel]) / 255.0 * shade[channel])
+                + word_shape_specular_attribute(specular[channel]));
+          }
+          result[3] = f32::from(alpha);
+          let texture = texture_geometry.map(|material_geometry| TextSurfaceMaterialVertex {
+            source: TextSurfaceMaterialSource::Combined,
+            material_point: geometry.map_point_to(material_geometry, point),
+            diffuse: shade.map(word_shape_diffuse_attribute),
+            specular_incident: specular.map(word_shape_specular_attribute),
+            packed_specular: true,
+            material_opacity: f32::from(alpha) / 255.0,
+            alpha_texture_fraction: 0.0,
+          });
+          (result, texture)
+        } else {
+          (
+            shaded_geometry_pixel_with_specular(tint, shade, specular, alpha, geometry_lighting)
+              .0
+              .map(f32::from),
+            None,
+          )
+        }
       };
       let (start_normal, end_normal) = edge_normals[index];
-      let front_start_color = endpoint_color(first, front_z, start_normal)
-        .0
-        .map(f32::from);
-      let front_end_color = endpoint_color(second, front_z, end_normal).0.map(f32::from);
-      let back_start_color = endpoint_color(first, back_z, start_normal).0.map(f32::from);
-      let back_end_color = endpoint_color(second, back_z, end_normal).0.map(f32::from);
+      let (front_start_color, front_start_material) = endpoint_color(first, front_z, start_normal);
+      let (front_end_color, front_end_material) = endpoint_color(second, front_z, end_normal);
+      let (back_start_color, back_start_material) = endpoint_color(first, back_z, start_normal);
+      let (back_end_color, back_end_material) = endpoint_color(second, back_z, end_normal);
       let point_at = |parameter: f32| text_extrusion_edge_point(first, second, parameter);
       let color_at = |start: [f32; 4], end: [f32; 4], parameter: f32| {
         std::array::from_fn(|channel| start[channel] + (end[channel] - start[channel]) * parameter)
@@ -6316,26 +6760,38 @@ fn text_extrusion_edge_triangles(
         }
         let start_point = point_at(start);
         let end_point = point_at(end);
-        let front_start = project(
+        let mut front_start = project(
           start_point,
           front_z,
           color.unwrap_or_else(|| color_at(front_start_color, front_end_color, start)),
         );
-        let front_end = project(
+        let mut front_end = project(
           end_point,
           front_z,
           color.unwrap_or_else(|| color_at(front_start_color, front_end_color, end)),
         );
-        let back_end = project(
+        let mut back_end = project(
           end_point,
           back_z,
           color.unwrap_or_else(|| color_at(back_start_color, back_end_color, end)),
         );
-        let back_start = project(
+        let mut back_start = project(
           start_point,
           back_z,
           color.unwrap_or_else(|| color_at(back_start_color, back_end_color, start)),
         );
+        if color.is_none() {
+          let interpolate = |first: Option<TextSurfaceMaterialVertex>, second, t| {
+            first
+              .zip(second)
+              .map(|(first, second)| interpolate_text_surface_material(first, second, t))
+          };
+          front_start.textured_material =
+            interpolate(front_start_material, front_end_material, start);
+          front_end.textured_material = interpolate(front_start_material, front_end_material, end);
+          back_start.textured_material = interpolate(back_start_material, back_end_material, start);
+          back_end.textured_material = interpolate(back_start_material, back_end_material, end);
+        }
         triangles.push(TextSurfaceTriangle {
           vertices: [front_start, front_end, back_end],
           bevel_source: None,
@@ -6478,6 +6934,7 @@ fn composite_extrusion_edges(
     material,
     wireframe,
     geometry_lighting: _,
+    texture_geometry: _,
     outline_contour: _,
   } = options;
   let _ = bounds;
@@ -6740,6 +7197,11 @@ fn camera_view_direction(
   if projection.parallel {
     return [0.0, 0.0, 1.0];
   }
+  let model_point = [
+    model_point[0] + projection.model_translation_pt[0] * pixels_per_point,
+    model_point[1] + projection.model_translation_pt[1] * pixels_per_point,
+    model_point[2],
+  ];
   let rotated_point = [
     dot3(projection.rotation[0], model_point),
     dot3(projection.rotation[1], model_point),
@@ -6849,11 +7311,48 @@ fn shaded_geometry_pixel_with_specular(
   alpha: u8,
   geometry_lighting: Static3dGeometryLighting,
 ) -> Rgba<u8> {
-  if geometry_lighting == Static3dGeometryLighting::Shape {
+  if geometry_lighting != Static3dGeometryLighting::Text {
     shaded_fixed_gouraud_pixel_with_specular(color, shade, specular, alpha)
   } else {
     shaded_pixel_with_specular(color, shade, specular, alpha)
   }
+}
+
+/// WPS submits independent packed COLOR0/COLOR1 values. COLOR0 has 128
+/// representing unity and COLOR1 is ordinary UNORM8. Quantize before texture
+/// modulation/interpolation, not after adding the lit material channels.
+fn word_shape_diffuse_attribute(value: f32) -> f32 {
+  (value * 128.0).floor().clamp(0.0, 255.0) / 128.0
+}
+
+fn word_shape_specular_attribute(value: f32) -> f32 {
+  (value * 255.0).floor().clamp(0.0, 255.0) / 255.0
+}
+
+fn word_shape_textured_channel(color: u8, diffuse: f32, specular: f32) -> u8 {
+  shade_gouraud_channel_with_specular(
+    color,
+    word_shape_diffuse_attribute(diffuse),
+    word_shape_specular_attribute(specular),
+  )
+}
+
+/// MS-OI29500 20.1.10.50 defines metallic specular colors separately from
+/// diffuse paint. Native WPS material buffers retain these table values,
+/// including Metal's overbright Brighten(Lerp(Shape, White, .2), 1.4).
+fn word_shape_surface_specular(
+  incident: [f32; 3],
+  material: Option<a::PresetMaterialTypeValues>,
+  color: [u8; 3],
+) -> [f32; 3] {
+  use a::PresetMaterialTypeValues as M;
+  let reflectance = match material.unwrap_or(M::WarmMatte) {
+    M::Metal => color.map(|v| (f32::from(v) / 255.0 * 0.8 + 0.2) * (1.0 - 1.4) + 1.4),
+    M::LegacyMetal => color.map(|v| f32::from(v) / 255.0),
+    M::SoftMetal => color.map(|v| f32::from(v) / 255.0 * 0.5 + 0.5),
+    _ => [material_specularity(material); 3],
+  };
+  std::array::from_fn(|channel| incident[channel] * reflectance[channel])
 }
 
 fn shade_fixed_gouraud_channel_with_specular(channel: u8, shade: f32, specular: f32) -> u8 {
@@ -6999,6 +7498,8 @@ struct TextSurfaceMaterialVertex {
   material_point: (f32, f32),
   diffuse: [f32; 3],
   specular_incident: [f32; 3],
+  /// WPS has already applied material reflectance and packed COLOR1.
+  packed_specular: bool,
   /// Diffuse material alpha, excluding paint opacity already in the RGBA
   /// texture. Interpolate this alongside the lighting, not glyph coverage.
   material_opacity: f32,
@@ -7115,6 +7616,7 @@ fn shade_text_bevel_material_endpoint(
         material_point: endpoint.material_point,
         diffuse: vertex_diffuse,
         specular_incident,
+        packed_specular: false,
         material_opacity: f32::from(material_surface_alpha(
           1.0,
           normal,
@@ -7126,6 +7628,31 @@ fn shade_text_bevel_material_endpoint(
         } else {
           0.0
         },
+      }),
+    )
+  } else if geometry_lighting == Static3dGeometryLighting::WordShape {
+    let shade = material_diffuse_shade(scene, normal, view_direction, material);
+    let specular = word_shape_surface_specular(
+      light_rig_surface_specular_incident(scene, normal, view_direction, material),
+      material,
+      endpoint.source_color,
+    );
+    (
+      specular,
+      shade,
+      Some(TextSurfaceMaterialVertex {
+        source: endpoint.source,
+        material_point: endpoint.material_point,
+        diffuse: shade.map(word_shape_diffuse_attribute),
+        specular_incident: specular.map(word_shape_specular_attribute),
+        packed_specular: true,
+        material_opacity: f32::from(material_surface_alpha(
+          1.0,
+          normal,
+          view_direction,
+          material,
+        )) / 255.0,
+        alpha_texture_fraction: 0.0,
       }),
     )
   } else {
@@ -7176,6 +7703,7 @@ fn interpolate_text_surface_material(
   debug_assert_eq!(first.source, second.source);
   TextSurfaceMaterialVertex {
     source: first.source,
+    packed_specular: first.packed_specular,
     material_point: (
       first.material_point.0 + (second.material_point.0 - first.material_point.0) * parameter,
       first.material_point.1 + (second.material_point.1 - first.material_point.1) * parameter,
@@ -7229,7 +7757,11 @@ fn resolve_text_surface_material_color(
     TextSurfaceMaterialSource::Combined => alpha_texture,
     TextSurfaceMaterialSource::Independent => images.independent_alpha,
   };
-  let specular = word_text_surface_specular(vertex.specular_incident, material, source_color);
+  let specular = if vertex.packed_specular {
+    vertex.specular_incident
+  } else {
+    word_text_surface_specular(vertex.specular_incident, material, source_color)
+  };
   let alpha = alpha_texture.map_or(alpha, |texture| {
     let texture_alpha = sample_text_geometry_area_mask(
       texture,
@@ -7281,7 +7813,11 @@ fn shade_associated_text_material(
       .round()
       .clamp(0.0, 255.0) as u8
   });
-  let specular = word_text_surface_specular(vertex.specular_incident, material, shape_color);
+  let specular = if vertex.packed_specular {
+    vertex.specular_incident
+  } else {
+    word_text_surface_specular(vertex.specular_incident, material, shape_color)
+  };
   let mut color = [0.0; 4];
   for channel in 0..3 {
     let associated = texture[channel] * vertex.diffuse[channel] + 255.0 * specular[channel];
@@ -7695,6 +8231,11 @@ fn text_surface_visibility_depth(
   model_point: [f32; 3],
   pixels_per_point: f32,
 ) -> f32 {
+  let model_point = [
+    model_point[0] + projection.model_translation_pt[0] * pixels_per_point,
+    model_point[1] + projection.model_translation_pt[1] * pixels_per_point,
+    model_point[2],
+  ];
   let camera_depth = dot3(projection.rotation[2], model_point);
   if projection.parallel {
     return camera_depth;
@@ -7752,6 +8293,51 @@ fn text_geometry_contains(geometry: &Static3dTextGeometry, point: (f32, f32)) ->
     }
   }
   winding != 0
+}
+
+struct TextContourWinding {
+  bounds: (f32, f32, f32, f32),
+  edges: BoundaryWinding,
+}
+
+/// Preserve each contour's existing bounds test and signed contribution while
+/// reusing the cap scanner's exact, height-bucketed edge queries.
+struct TextGeometryWinding(Vec<TextContourWinding>);
+
+impl TextGeometryWinding {
+  fn new(geometry: &Static3dTextGeometry) -> Self {
+    Self(
+      geometry
+        .contours
+        .iter()
+        .map(|contour| TextContourWinding {
+          bounds: contour.bounds,
+          edges: BoundaryWinding::new(
+            contour
+              .points
+              .iter()
+              .copied()
+              .zip(contour.points.iter().copied().cycle().skip(1))
+              .map(|(first, second)| [first, second])
+              .collect(),
+          ),
+        })
+        .collect(),
+    )
+  }
+
+  fn contains(&self, point: (f32, f32)) -> bool {
+    self
+      .0
+      .iter()
+      .filter(|contour| {
+        let (left, top, right, bottom) = contour.bounds;
+        !(point.0 < left || point.0 > right || point.1 < top || point.1 > bottom)
+      })
+      .map(|contour| contour.edges.winding(point))
+      .sum::<i32>()
+      != 0
+  }
 }
 
 fn point_segment_distance(point: (f32, f32), first: (f32, f32), second: (f32, f32)) -> f32 {
@@ -7880,7 +8466,12 @@ struct TextDirectInsetGraphSample {
 }
 
 impl TextDirectInsetGraphSample {
-  fn consider(&mut self, visibility_depth: f32, color: [f32; 4], owner: TextDirectInsetGraphOwner) {
+  fn consider(
+    &mut self,
+    visibility_depth: f32,
+    color: impl FnOnce() -> [f32; 4],
+    owner: TextDirectInsetGraphOwner,
+  ) -> bool {
     // The source-plane inset graph has already resolved merges and splits.
     // Its projected triangles may overlap at DIFFERENT source points, even
     // on a single smooth edge. Select their camera-visible surface, keeping
@@ -7890,11 +8481,14 @@ impl TextDirectInsetGraphSample {
     if !self.surface.covered || visibility_depth > self.surface.visibility_depth {
       self.surface = TextSurfaceRasterSample {
         visibility_depth,
-        color,
+        color: color(),
         covered: true,
         tie_priority: TEXT_SURFACE_TRIANGLE_TIE_PRIORITY,
       };
       self.owner = Some(owner);
+      true
+    } else {
+      false
     }
   }
 }
@@ -8400,6 +8994,7 @@ impl TextDirectInsetMaterialCells {
 struct TextSolidSurfaceInput<'a> {
   scene: &'a a::Scene3DType,
   material: Option<a::PresetMaterialTypeValues>,
+  planar_source_over: bool,
   bevel_material_source: &'a RgbaImage,
   surface_material_texture: Option<&'a TextMaterialTexture>,
   source_geometry: &'a Static3dTextGeometry,
@@ -8444,6 +9039,48 @@ impl<'a> TextSolidSurfaceInput<'a> {
       contour: None,
       ..self
     }
+  }
+}
+
+impl<'a> Static3dGeometryInput<'a> {
+  fn front_surface(
+    self,
+    scene: &'a a::Scene3DType,
+    source: &'a RgbaImage,
+    material: Option<a::PresetMaterialTypeValues>,
+    options: ProjectedImageOptions,
+  ) -> Option<TextSolidSurfaceInput<'a>> {
+    let geometry = self.geometry?;
+    let material_geometry = self.material_geometry.unwrap_or(geometry);
+    Some(TextSolidSurfaceInput {
+      scene,
+      material,
+      planar_source_over: self.two_sided_extrusion,
+      bevel_material_source: source,
+      surface_material_texture: self.surface_material_texture,
+      source_geometry: geometry,
+      material_geometry,
+      paint_opacity_geometry: self.page_geometry.unwrap_or(material_geometry),
+      planar_fill_material: self.front_fill_material,
+      planar_outline_material: self.front_outline_material,
+      planar_outline_coverage: self.front_outline_coverage,
+      planar_fill_uniform_paint_opacity: self.front_fill_uniform_paint_opacity,
+      planar_outline_uniform_paint_opacity: self.front_outline_uniform_paint_opacity,
+      planar_outline_material_inset_px: self.front_outline_material_inset_px,
+      fill_has_authored_transparency: self.front_fill_has_authored_transparency,
+      outline_has_authored_transparency: self.front_outline_has_authored_transparency,
+      uniform_paint_opacity: self.uniform_paint_opacity,
+      planar_geometry: geometry,
+      planar_coverage_geometry: geometry,
+      planar_inset_px: 0.0,
+      direct_inset_cells: None,
+      planar_coverage: TextPlanarCoverageResolve::AreaA8,
+      triangles: &[],
+      direct_inset_bevel: None,
+      contour: None,
+      options,
+      geometry_lighting: self.lighting,
+    })
   }
 }
 
@@ -8673,15 +9310,137 @@ fn resolve_text_surface_pixel(
   })
 }
 
+#[derive(Clone, Copy)]
+struct TextSurfaceShadingInput<'a> {
+  vertices: [TextSurfaceVertex; 3],
+  textured_material: Option<(
+    TextSurfaceMaterialVertex,
+    TextSurfaceMaterialVertex,
+    TextSurfaceMaterialVertex,
+  )>,
+  material_images: TextSurfaceMaterialImages<'a>,
+  alpha_texture: Option<&'a TextGeometryAreaMask>,
+  material: Option<a::PresetMaterialTypeValues>,
+  screen_weights: [f32; 3],
+  text_color_weights: [f32; 3],
+  source_weights: Option<[f32; 3]>,
+  pixel_color: Option<[f32; 4]>,
+}
+
+#[inline]
+fn text_surface_sample_color(input: TextSurfaceShadingInput<'_>) -> [f32; 4] {
+  let TextSurfaceShadingInput {
+    vertices: [first, second, third],
+    textured_material,
+    material_images,
+    alpha_texture,
+    material,
+    screen_weights,
+    text_color_weights,
+    source_weights,
+    pixel_color,
+  } = input;
+  let interpolated_color = pixel_color.unwrap_or_else(|| {
+    std::array::from_fn(|channel| {
+      first.color[channel] * text_color_weights[0]
+        + second.color[channel] * text_color_weights[1]
+        + third.color[channel] * text_color_weights[2]
+    })
+  });
+  let sample_material = match textured_material {
+    Some((first_material, second_material, third_material)) => {
+      // D3D9 iterates both texture coordinates and COLOR inputs with
+      // perspective correction. COLOR remains centroid-qualified at
+      // the final multisample grid; this source-grid branch evaluates
+      // both streams at the current sample.
+      let [
+        source_first_weight,
+        source_second_weight,
+        source_third_weight,
+      ] = source_weights.unwrap_or(screen_weights);
+      Some(TextSurfaceMaterialVertex {
+        source: first_material.source,
+        packed_specular: first_material.packed_specular,
+        material_point: (
+          first_material.material_point.0 * source_first_weight
+            + second_material.material_point.0 * source_second_weight
+            + third_material.material_point.0 * source_third_weight,
+          first_material.material_point.1 * source_first_weight
+            + second_material.material_point.1 * source_second_weight
+            + third_material.material_point.1 * source_third_weight,
+        ),
+        diffuse: std::array::from_fn(|channel| {
+          first_material.diffuse[channel] * text_color_weights[0]
+            + second_material.diffuse[channel] * text_color_weights[1]
+            + third_material.diffuse[channel] * text_color_weights[2]
+        }),
+        specular_incident: std::array::from_fn(|channel| {
+          first_material.specular_incident[channel] * text_color_weights[0]
+            + second_material.specular_incident[channel] * text_color_weights[1]
+            + third_material.specular_incident[channel] * text_color_weights[2]
+        }),
+        material_opacity: first_material.material_opacity * text_color_weights[0]
+          + second_material.material_opacity * text_color_weights[1]
+          + third_material.material_opacity * text_color_weights[2],
+        alpha_texture_fraction: first_material.alpha_texture_fraction * source_first_weight
+          + second_material.alpha_texture_fraction * source_second_weight
+          + third_material.alpha_texture_fraction * source_third_weight,
+      })
+    }
+    _ => None,
+  };
+  pixel_color.unwrap_or_else(|| {
+    sample_material
+      .and_then(|vertex| {
+        resolve_text_surface_material_color(
+          material_images,
+          alpha_texture,
+          material,
+          vertex,
+          interpolated_color[3],
+        )
+      })
+      .unwrap_or(interpolated_color)
+  })
+}
+
+#[derive(Clone, Copy)]
+struct TextDeferredSurfaceColor {
+  triangle_index: usize,
+  screen_weights: [f32; 3],
+}
+
 fn composite_text_solid_surfaces(
   destination: &mut RgbaImage,
   source: &RgbaImage,
   input: TextSolidSurfaceInput<'_>,
   rasterization: TextSurfaceRasterization,
 ) {
+  // As in raster_extrusion's tiles, bound the sample working set rather than
+  // allocating every depth/material witness for the complete framebuffer.
+  const MAX_TILE_SAMPLES: usize = 128 * 1024;
+  composite_text_solid_surfaces_with_tile_samples(
+    destination,
+    source,
+    input,
+    rasterization,
+    MAX_TILE_SAMPLES,
+    true,
+  );
+}
+
+fn composite_text_solid_surfaces_with_tile_samples(
+  destination: &mut RgbaImage,
+  source: &RgbaImage,
+  input: TextSolidSurfaceInput<'_>,
+  rasterization: TextSurfaceRasterization,
+  maximum_tile_samples: usize,
+  defer_source_colors: bool,
+) {
   let TextSolidSurfaceInput {
     scene,
     material,
+    planar_source_over,
     bevel_material_source,
     surface_material_texture,
     source_geometry,
@@ -8741,6 +9500,10 @@ fn composite_text_solid_surfaces(
     geometry_lighting == Static3dGeometryLighting::Text,
   );
   let source_grid = !matches!(rasterization, TextSurfaceRasterization::Final(_));
+  let defer_source_colors = defer_source_colors
+    && geometry_lighting == Static3dGeometryLighting::Text
+    && rasterization == TextSurfaceRasterization::Source;
+  let source_winding = TextGeometryWinding::new(source_geometry);
   // Both composed paint and separate fill/outline/coverage images use the
   // caller's page-space sampling contract. Only the physical mesh receives
   // its device-space conversion. Select the geometry belonging to the paint
@@ -8798,6 +9561,44 @@ fn composite_text_solid_surfaces(
     .as_ref()
     .and_then(|_| text_geometry_area_mask(source_geometry));
   let planar_surface_normal = lighting_surface_normal(scene, projection, [0.0, 0.0, 1.0]);
+  // Parallel projection has one view direction over this entire plane. Keep
+  // the same light/material functions and float operation order, but resolve
+  // their point-independent terms once rather than at every8x4 sample. The
+  // local source color still supplies the specular reflectance below.
+  let planar_view_direction = projection.parallel.then(|| {
+    surface_view_direction(
+      scene,
+      projection,
+      [0.0, 0.0, planar_z],
+      model_width,
+      model_height,
+      pixels_per_point,
+    )
+  });
+  let planar_alpha_factor = planar_view_direction
+    .map(|view| material_surface_alpha_factor(planar_surface_normal, view, material));
+  let planar_diffuse = planar_view_direction
+    .map(|view| material_diffuse_shade(scene, planar_surface_normal, view, material));
+  let planar_specular_incident = planar_view_direction
+    .map(|view| light_rig_surface_specular_incident(scene, planar_surface_normal, view, material));
+  let planar_word_colors = planar_diffuse
+    .zip(planar_specular_incident)
+    .map(|(diffuse, incident)| word_text_planar_color_table(diffuse, incident, material));
+  let material_has_opacity_coordinates =
+    std::ptr::eq(planar_material_geometry, paint_opacity_geometry);
+  // Outline paint only queries a bounded band of the physical glyph. Use the
+  // same exact edge predicates as the contour/inset indexes instead of
+  // scanning every glyph segment at each of the 8x4 plane samples.
+  let planar_outline_boundary_index = planar_outline_material_inset_px.and_then(|inset| {
+    TextGeometryBoundaryIndex::new(
+      source_geometry,
+      0,
+      0,
+      source.width() as usize,
+      source.height() as usize,
+      inset + 1.0 + f32::EPSILON,
+    )
+  });
 
   let triangle_bounds = triangles
     .iter()
@@ -8876,8 +9677,6 @@ fn composite_text_solid_surfaces(
   }
   let raster_width = (right - left) as usize;
   let raster_height = (bottom - top) as usize;
-  let mut samples =
-    vec![TextSurfaceRasterSample::default(); raster_width * raster_height * sample_count];
   // The complete graph is authoritative for coverage and source-edge
   // ownership. Keep the unsplit source mesh alongside it solely as the
   // material-attribute witness: subdividing a face at an inset event must not
@@ -8931,28 +9730,7 @@ fn composite_text_solid_surfaces(
         maximum_inset + TEXT_3D_CURVE_FLATTENING_TOLERANCE_PX as f32,
       )
     });
-  let mut direct_inset_samples =
-    direct_inset_bevel.map(|_| vec![TextSurfaceRasterSample::default(); samples.len()]);
-  let mut direct_inset_topology =
-    direct_inset_bevel.map(|_| vec![TextDirectInsetTopologySample::default(); samples.len()]);
-  let mut direct_inset_graph_samples =
-    has_direct_inset_graph.then(|| vec![TextDirectInsetGraphSample::default(); samples.len()]);
-  let text_surface_contour =
-    contour_area_mask.is_some() && geometry_lighting == Static3dGeometryLighting::Text;
-  let mut bevel_surface_distances = (text_surface_contour
-    && triangles.iter().any(|triangle| {
-      triangle
-        .vertices
-        .iter()
-        .any(|vertex| vertex.bevel_collision.is_some())
-    }))
-  .then(|| vec![f32::INFINITY; samples.len()]);
-  let mut contour_surface_samples =
-    text_surface_contour.then(|| vec![TextContourSurfaceSample::default(); samples.len()]);
-  let mut contour_depth_samples = (contour_area_mask.is_some()
-    && geometry_lighting == Static3dGeometryLighting::Shape)
-    .then(|| vec![f32::NEG_INFINITY; samples.len()]);
-  let fully_occluded_triangles = (geometry_lighting == Static3dGeometryLighting::Shape)
+  let fully_occluded_triangles = (geometry_lighting != Static3dGeometryLighting::Text)
     .then(|| fully_occluded_text_surface_triangles(triangles));
   // The legacy shape source grid uses D3D9 integer-center material inputs.
   // MultisampleSourceGrid instead retains image-space geometry: its standard
@@ -8962,7 +9740,7 @@ fn composite_text_solid_surfaces(
   // details without moving the silhouette. The independent Office picture
   // controls (arrow/rectangle, textured/solid, flat/extruded) isolate this
   // color-only mismatch; their geometric alpha remains unchanged.
-  let pixel_center_offset = if geometry_lighting == Static3dGeometryLighting::Shape
+  let pixel_center_offset = if geometry_lighting != Static3dGeometryLighting::Text
     && rasterization == TextSurfaceRasterization::Source
   {
     0.0
@@ -8970,203 +9748,273 @@ fn composite_text_solid_surfaces(
     0.5
   };
 
-  // Microsoft's Direct2D 3-D text samples emit one shared triangle mesh and
-  // explicitly require that adjacent faces neither overlap nor leave
-  // T-junctions. Rasterizing every quad through source-over violates that
-  // contract at each antialiased shared edge. Give each subpixel sample one
-  // surface owner instead, and use camera-space depth for folded Office
-  // profiles whose branches overlap after projection.
-  for (triangle_index, triangle) in triangles.iter().enumerate() {
-    if fully_occluded_triangles
-      .as_ref()
-      .is_some_and(|occluded| occluded[triangle_index])
-    {
+  let source_mask = if uniform_paint_opacity.is_some() {
+    None
+  } else {
+    text_geometry_path(paint_opacity_geometry, |point| point)
+      .and_then(|path| text_geometry_mask(source.width(), source.height(), &path))
+  };
+  let contour_boundary_index =
+    contour
+      .zip(contour_area_mask.as_ref())
+      .and_then(|(contour, mask)| {
+        let contour_left = mask.left.max(left);
+        let contour_top = mask.top.max(top);
+        let contour_right = (mask.left + mask.width as i32).min(right);
+        let contour_bottom = (mask.top + mask.height as i32).min(bottom);
+        TextGeometryBoundaryIndex::new(
+          source_geometry,
+          contour_left,
+          contour_top,
+          (contour_right - contour_left).max(0) as usize,
+          (contour_bottom - contour_top).max(0) as usize,
+          contour.width_px * 0.5,
+        )
+      });
+  // Shape silhouette translation reads adjacent rows and retains its complete
+  // grid. Text keeps absolute coordinates and per-pixel primitive order while
+  // reusing bounded sample storage for successive row bands.
+  let rows_per_tile = if geometry_lighting == Static3dGeometryLighting::Text {
+    (maximum_tile_samples / raster_width.saturating_mul(sample_count)).max(1)
+  } else {
+    raster_height
+  };
+  // Retain submission order within each band, as in raster_extrusion's bins.
+  // These are exactly the integer Y bounds of the pixel loop below: outside
+  // a band, a triangle cannot submit any sample or depth/material witness.
+  let mut triangle_bins = vec![Vec::new(); raster_height.div_ceil(rows_per_tile)];
+  for (index, triangle) in triangles.iter().enumerate() {
+    let [first, second, third] = triangle.vertices.map(|vertex| {
+      rasterization
+        .surface_to_raster(vertex.point, destination_dimensions)
+        .1
+    });
+    let triangle_top = (first.min(second).min(third).floor() as i32).max(top);
+    let triangle_bottom = (first.max(second).max(third).ceil() as i32).min(bottom);
+    if triangle_bottom <= triangle_top {
       continue;
     }
-    let [first, second, third] = triangle.vertices;
-    let first_point = rasterization.surface_to_raster(first.point, destination_dimensions);
-    let second_point = rasterization.surface_to_raster(second.point, destination_dimensions);
-    let third_point = rasterization.surface_to_raster(third.point, destination_dimensions);
-    let direct_inset_graph_triangle =
-      direct_inset_bevel
-        .zip(triangle.bevel_source)
-        .is_some_and(|(bevel, source)| {
-          source.back_face == bevel.back_face && source.direct_inset_graph
-        });
-    let direct_inset_triangle =
-      direct_inset_bevel
-        .zip(triangle.bevel_source)
-        .is_some_and(|(bevel, source)| {
-          source.back_face == bevel.back_face && !source.direct_inset_graph
-        });
-    let signed_area = text_surface_edge(first_point, second_point, third_point);
-    if signed_area.abs() <= 1.0e-6 {
-      continue;
+    let first_band = (triangle_top - top) as usize / rows_per_tile;
+    let last_band = (triangle_bottom - 1 - top) as usize / rows_per_tile;
+    for bin in &mut triangle_bins[first_band..=last_band] {
+      bin.push(index);
     }
-    let has_bevel_collision = first.bevel_collision.is_some()
-      && second.bevel_collision.is_some()
-      && third.bevel_collision.is_some();
-    let textured_material = match (
-      first.textured_material,
-      second.textured_material,
-      third.textured_material,
-    ) {
-      (Some(first), Some(second), Some(third)) => Some((first, second, third)),
-      _ => None,
-    };
-    let has_source_attributes = has_bevel_collision || textured_material.is_some();
-    let final_grid_text_msaa = geometry_lighting == Static3dGeometryLighting::Text
-      && matches!(rasterization, TextSurfaceRasterization::Final(_));
-    let triangle_left = first_point.0.min(second_point.0).min(third_point.0).floor() as i32;
-    let triangle_top = first_point.1.min(second_point.1).min(third_point.1).floor() as i32;
-    let triangle_right = first_point.0.max(second_point.0).max(third_point.0).ceil() as i32;
-    let triangle_bottom = first_point.1.max(second_point.1).max(third_point.1).ceil() as i32;
-    for pixel_y in triangle_top.max(top)..triangle_bottom.min(bottom) {
-      for pixel_x in triangle_left.max(left)..triangle_right.min(right) {
-        let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
-        let center_point = (
-          pixel_x as f32 + pixel_center_offset,
-          pixel_y as f32 + pixel_center_offset,
-        );
-        let center_second_weight =
-          text_surface_edge(third_point, first_point, center_point) / signed_area;
-        let center_third_weight =
-          text_surface_edge(first_point, second_point, center_point) / signed_area;
-        let mut coverage_mask = 0_u32;
-        if final_grid_text_msaa {
-          for sample_index in 0..sample_count {
-            let (sample_x, sample_y) = sample_pattern.position(sample_index);
-            let point = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
-            if text_surface_triangle_covers_sample(
-              first_point,
-              second_point,
-              third_point,
-              point,
-              signed_area,
-            ) {
-              coverage_mask |= 1_u32 << sample_index;
+  }
+  let tile_sample_count = raster_width * rows_per_tile.min(raster_height) * sample_count;
+  // Source-cell reconstruction normally supplies the final bevel color. Keep
+  // the winning raw/graph interpolation witness for its exact fallback, rather
+  // than sampling a texture for every triangle and immediately discarding it.
+  let mut direct_inset_donor_colors =
+    (defer_source_colors && direct_inset_bevel.is_some()).then(|| vec![None; tile_sample_count]);
+  let mut direct_inset_graph_colors =
+    (defer_source_colors && has_direct_inset_graph).then(|| vec![None; tile_sample_count]);
+  let resolve_deferred_color = |deferred: Option<TextDeferredSurfaceColor>, fallback| {
+    deferred.map_or_else(
+      || fallback,
+      |witness| {
+        let [first, second, third] = triangles[witness.triangle_index].vertices;
+        let weights = perspective_correct_text_surface_weights(
+          projection.parallel,
+          [
+            first.visibility_depth,
+            second.visibility_depth,
+            third.visibility_depth,
+          ],
+          witness.screen_weights,
+        )
+        .expect("stored valid source interpolation");
+        let textured_material = match (
+          first.textured_material,
+          second.textured_material,
+          third.textured_material,
+        ) {
+          (Some(first), Some(second), Some(third)) => Some((first, second, third)),
+          _ => None,
+        };
+        text_surface_sample_color(TextSurfaceShadingInput {
+          vertices: [first, second, third],
+          textured_material,
+          material_images,
+          alpha_texture: material_alpha_mask.as_ref(),
+          material,
+          screen_weights: witness.screen_weights,
+          text_color_weights: weights,
+          source_weights: Some(weights),
+          pixel_color: None,
+        })
+      },
+    )
+  };
+  let mut samples = vec![TextSurfaceRasterSample::default(); tile_sample_count];
+  let mut direct_inset_samples =
+    direct_inset_bevel.map(|_| vec![TextSurfaceRasterSample::default(); tile_sample_count]);
+  let mut direct_inset_topology =
+    direct_inset_bevel.map(|_| vec![TextDirectInsetTopologySample::default(); tile_sample_count]);
+  let mut direct_inset_graph_samples =
+    has_direct_inset_graph.then(|| vec![TextDirectInsetGraphSample::default(); tile_sample_count]);
+  let text_surface_contour =
+    contour_area_mask.is_some() && geometry_lighting == Static3dGeometryLighting::Text;
+  let mut bevel_surface_distances = (text_surface_contour
+    && triangles.iter().any(|triangle| {
+      triangle
+        .vertices
+        .iter()
+        .any(|vertex| vertex.bevel_collision.is_some())
+    }))
+  .then(|| vec![f32::INFINITY; tile_sample_count]);
+  let mut contour_surface_samples =
+    text_surface_contour.then(|| vec![TextContourSurfaceSample::default(); tile_sample_count]);
+  let mut contour_depth_samples = (contour_area_mask.is_some()
+    && geometry_lighting != Static3dGeometryLighting::Text)
+    .then(|| vec![f32::NEG_INFINITY; tile_sample_count]);
+  let full_top = top;
+  let mut area_resolved_samples = planar_area_mask
+    .as_ref()
+    .map(|_| vec![None; raster_width * raster_height]);
+  let mut render_rows = |destination: &mut RgbaImage,
+                         top: i32,
+                         bottom: i32,
+                         triangle_indices: &[usize],
+                         area_resolved_samples: &mut Option<
+    Vec<Option<TextAreaResolvedSample>>,
+  >| {
+    let raster_height = (bottom - top) as usize;
+    let sample_len = raster_width * raster_height * sample_count;
+    let mut direct_inset_donor_colors = direct_inset_donor_colors.as_mut().map(|buffer| {
+      let colors = &mut buffer[..sample_len];
+      colors.fill(None);
+      colors
+    });
+    let mut direct_inset_graph_colors = direct_inset_graph_colors.as_mut().map(|buffer| {
+      let colors = &mut buffer[..sample_len];
+      colors.fill(None);
+      colors
+    });
+    let samples = &mut samples[..sample_len];
+    samples.fill(TextSurfaceRasterSample::default());
+    let mut direct_inset_samples = direct_inset_samples.as_mut().map(|buffer| {
+      let samples = &mut buffer[..sample_len];
+      samples.fill(TextSurfaceRasterSample::default());
+      samples
+    });
+    let mut direct_inset_topology = direct_inset_topology.as_mut().map(|buffer| {
+      let samples = &mut buffer[..sample_len];
+      samples.fill(TextDirectInsetTopologySample::default());
+      samples
+    });
+    let mut direct_inset_graph_samples = direct_inset_graph_samples.as_mut().map(|buffer| {
+      let samples = &mut buffer[..sample_len];
+      samples.fill(TextDirectInsetGraphSample::default());
+      samples
+    });
+    let mut bevel_surface_distances = bevel_surface_distances.as_mut().map(|buffer| {
+      let distances = &mut buffer[..sample_len];
+      distances.fill(f32::INFINITY);
+      distances
+    });
+    let mut contour_surface_samples = contour_surface_samples.as_mut().map(|buffer| {
+      let samples = &mut buffer[..sample_len];
+      samples.fill(TextContourSurfaceSample::default());
+      samples
+    });
+    let mut contour_depth_samples = contour_depth_samples.as_mut().map(|buffer| {
+      let depths = &mut buffer[..sample_len];
+      depths.fill(f32::NEG_INFINITY);
+      depths
+    });
+    // Microsoft's Direct2D 3-D text samples emit one shared triangle mesh and
+    // explicitly require that adjacent faces neither overlap nor leave
+    // T-junctions. Rasterizing every quad through source-over violates that
+    // contract at each antialiased shared edge. Give each subpixel sample one
+    // surface owner instead, and use camera-space depth for folded Office
+    // profiles whose branches overlap after projection.
+    for &triangle_index in triangle_indices {
+      let triangle = &triangles[triangle_index];
+      if fully_occluded_triangles
+        .as_ref()
+        .is_some_and(|occluded| occluded[triangle_index])
+      {
+        continue;
+      }
+      let [first, second, third] = triangle.vertices;
+      let first_point = rasterization.surface_to_raster(first.point, destination_dimensions);
+      let second_point = rasterization.surface_to_raster(second.point, destination_dimensions);
+      let third_point = rasterization.surface_to_raster(third.point, destination_dimensions);
+      let direct_inset_graph_triangle =
+        direct_inset_bevel
+          .zip(triangle.bevel_source)
+          .is_some_and(|(bevel, source)| {
+            source.back_face == bevel.back_face && source.direct_inset_graph
+          });
+      let direct_inset_triangle =
+        direct_inset_bevel
+          .zip(triangle.bevel_source)
+          .is_some_and(|(bevel, source)| {
+            source.back_face == bevel.back_face && !source.direct_inset_graph
+          });
+      let signed_area = text_surface_edge(first_point, second_point, third_point);
+      if signed_area.abs() <= 1.0e-6 {
+        continue;
+      }
+      let has_bevel_collision = first.bevel_collision.is_some()
+        && second.bevel_collision.is_some()
+        && third.bevel_collision.is_some();
+      let textured_material = match (
+        first.textured_material,
+        second.textured_material,
+        third.textured_material,
+      ) {
+        (Some(first), Some(second), Some(third)) => Some((first, second, third)),
+        _ => None,
+      };
+      let has_source_attributes = has_bevel_collision || textured_material.is_some();
+      let final_grid_text_msaa = geometry_lighting == Static3dGeometryLighting::Text
+        && matches!(rasterization, TextSurfaceRasterization::Final(_));
+      let triangle_left = first_point.0.min(second_point.0).min(third_point.0).floor() as i32;
+      let triangle_top = first_point.1.min(second_point.1).min(third_point.1).floor() as i32;
+      let triangle_right = first_point.0.max(second_point.0).max(third_point.0).ceil() as i32;
+      let triangle_bottom = first_point.1.max(second_point.1).max(third_point.1).ceil() as i32;
+      for pixel_y in triangle_top.max(top)..triangle_bottom.min(bottom) {
+        for pixel_x in triangle_left.max(left)..triangle_right.min(right) {
+          let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
+          let center_point = (
+            pixel_x as f32 + pixel_center_offset,
+            pixel_y as f32 + pixel_center_offset,
+          );
+          let center_second_weight =
+            text_surface_edge(third_point, first_point, center_point) / signed_area;
+          let center_third_weight =
+            text_surface_edge(first_point, second_point, center_point) / signed_area;
+          let mut coverage_mask = 0_u32;
+          if final_grid_text_msaa {
+            for sample_index in 0..sample_count {
+              let (sample_x, sample_y) = sample_pattern.position(sample_index);
+              let point = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
+              if text_surface_triangle_covers_sample(
+                first_point,
+                second_point,
+                third_point,
+                point,
+                signed_area,
+              ) {
+                coverage_mask |= 1_u32 << sample_index;
+              }
+            }
+            if coverage_mask == 0 {
+              continue;
             }
           }
-          if coverage_mask == 0 {
-            continue;
-          }
-        }
-        let pixel_color = if geometry_lighting == Static3dGeometryLighting::Shape {
-          // Direct3D MSAA interpolates vertex attributes once at the integer
-          // pixel center—even when that center requires extrapolation—and
-          // replicates the shader result to every covered sub-sample.
-          let color = interpolate_shape_surface_color(
-            first.color,
-            second.color,
-            third.color,
-            center_second_weight,
-            center_third_weight,
-          );
-          Some(color)
-        } else if final_grid_text_msaa {
-          // Ordinary Direct3D multisampling runs the pixel shader once per
-          // covered primitive/pixel. Coverage and depth remain per sample,
-          // but the resulting color is replicated to every passing sample.
-          // Word's captured shader declares BOTH COLOR and TEXCOORD centroid.
-          // Testing the triangle center alone is not equivalent to the actual
-          // full-coverage centroid selection at a partially covered pixel.
-          let (centroid_x, centroid_y) = sample_pattern
-            .centroid(coverage_mask)
-            .expect("covered primitive pixel");
-          let centroid_point = (pixel_x as f32 + centroid_x, pixel_y as f32 + centroid_y);
-          let screen_color_weights = [
-            text_surface_edge(second_point, third_point, centroid_point) / signed_area,
-            text_surface_edge(third_point, first_point, centroid_point) / signed_area,
-            text_surface_edge(first_point, second_point, centroid_point) / signed_area,
-          ];
-          let Some(color_weights) = perspective_correct_text_surface_weights(
-            projection.parallel,
-            [
-              first.visibility_depth,
-              second.visibility_depth,
-              third.visibility_depth,
-            ],
-            screen_color_weights,
-          ) else {
-            continue;
-          };
-          let interpolated_color = std::array::from_fn(|channel| {
-            first.color[channel] * color_weights[0]
-              + second.color[channel] * color_weights[1]
-              + third.color[channel] * color_weights[2]
-          });
-          // Native direct-inset meshes carry diffuse/specular attributes on
-          // the final graph vertices. Interpolate those attributes at the
-          // primitive centroid, just like its texture coordinates. Looking up
-          // the unsplit source cell here replaces collision-ridge highlights
-          // with another surface's lighting.
-          let resolved =
-            textured_material.and_then(|(first_material, second_material, third_material)| {
-              let source_weights = color_weights;
-              let vertex = TextSurfaceMaterialVertex {
-                source: first_material.source,
-                material_point: (
-                  first_material.material_point.0 * source_weights[0]
-                    + second_material.material_point.0 * source_weights[1]
-                    + third_material.material_point.0 * source_weights[2],
-                  first_material.material_point.1 * source_weights[0]
-                    + second_material.material_point.1 * source_weights[1]
-                    + third_material.material_point.1 * source_weights[2],
-                ),
-                diffuse: std::array::from_fn(|channel| {
-                  first_material.diffuse[channel] * color_weights[0]
-                    + second_material.diffuse[channel] * color_weights[1]
-                    + third_material.diffuse[channel] * color_weights[2]
-                }),
-                specular_incident: std::array::from_fn(|channel| {
-                  first_material.specular_incident[channel] * color_weights[0]
-                    + second_material.specular_incident[channel] * color_weights[1]
-                    + third_material.specular_incident[channel] * color_weights[2]
-                }),
-                material_opacity: first_material.material_opacity * color_weights[0]
-                  + second_material.material_opacity * color_weights[1]
-                  + third_material.material_opacity * color_weights[2],
-                alpha_texture_fraction: first_material.alpha_texture_fraction * source_weights[0]
-                  + second_material.alpha_texture_fraction * source_weights[1]
-                  + third_material.alpha_texture_fraction * source_weights[2],
-              };
-              resolve_text_surface_material_color(
-                material_images,
-                material_alpha_mask.as_ref(),
-                material,
-                vertex,
-                interpolated_color[3],
-              )
-            });
-          Some(resolved.unwrap_or(interpolated_color))
-        } else {
-          None
-        };
-        for sample_index_in_pixel in 0..sample_count {
-          let (sample_x, sample_y) = sample_pattern.position(sample_index_in_pixel);
-          let point = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
-          let first_weight = text_surface_edge(second_point, third_point, point) / signed_area;
-          let second_weight = text_surface_edge(third_point, first_point, point) / signed_area;
-          let third_weight = text_surface_edge(first_point, second_point, point) / signed_area;
-          if if final_grid_text_msaa {
-            coverage_mask & (1_u32 << sample_index_in_pixel) == 0
-          } else {
-            !text_surface_triangle_covers_sample(
-              first_point,
-              second_point,
-              third_point,
-              point,
-              signed_area,
-            )
-          } {
-            continue;
-          }
-          let visibility_depth = first.visibility_depth * first_weight
-            + second.visibility_depth * second_weight
-            + third.visibility_depth * third_weight;
-          let sample_index = local_pixel * sample_count + sample_index_in_pixel;
-          let screen_weights = [first_weight, second_weight, third_weight];
-          let text_color_weights = if geometry_lighting == Static3dGeometryLighting::Text {
+          let pixel_color = if geometry_lighting == Static3dGeometryLighting::WordShape
+            && textured_material.is_some()
+          {
+            // WPS meshes carry independent packed diffuse/specular and UV
+            // streams. Sample the paint after interpolating those streams;
+            // interpolating already shaded endpoint RGB loses the texture.
+            let screen_weights = [
+              1.0 - center_second_weight - center_third_weight,
+              center_second_weight,
+              center_third_weight,
+            ];
             let Some(weights) = perspective_correct_text_surface_weights(
               projection.parallel,
               [
@@ -9178,77 +10026,97 @@ fn composite_text_solid_surfaces(
             ) else {
               continue;
             };
-            weights
-          } else {
-            screen_weights
-          };
-          let source_weights = if has_source_attributes {
-            perspective_correct_text_surface_weights(
+            Some(text_surface_sample_color(TextSurfaceShadingInput {
+              vertices: [first, second, third],
+              textured_material,
+              material_images,
+              alpha_texture: material_alpha_mask.as_ref(),
+              material,
+              screen_weights,
+              text_color_weights: weights,
+              source_weights: Some(weights),
+              pixel_color: None,
+            }))
+          } else if geometry_lighting != Static3dGeometryLighting::Text {
+            // Direct3D MSAA interpolates vertex attributes once at the integer
+            // pixel center—even when that center requires extrapolation—and
+            // replicates the shader result to every covered sub-sample.
+            let color = interpolate_shape_surface_color(
+              first.color,
+              second.color,
+              third.color,
+              center_second_weight,
+              center_third_weight,
+            );
+            Some(color)
+          } else if final_grid_text_msaa {
+            // Ordinary Direct3D multisampling runs the pixel shader once per
+            // covered primitive/pixel. Coverage and depth remain per sample,
+            // but the resulting color is replicated to every passing sample.
+            // Word's captured shader declares BOTH COLOR and TEXCOORD centroid.
+            // Testing the triangle center alone is not equivalent to the actual
+            // full-coverage centroid selection at a partially covered pixel.
+            let (centroid_x, centroid_y) = sample_pattern
+              .centroid(coverage_mask)
+              .expect("covered primitive pixel");
+            let centroid_point = (pixel_x as f32 + centroid_x, pixel_y as f32 + centroid_y);
+            let screen_color_weights = [
+              text_surface_edge(second_point, third_point, centroid_point) / signed_area,
+              text_surface_edge(third_point, first_point, centroid_point) / signed_area,
+              text_surface_edge(first_point, second_point, centroid_point) / signed_area,
+            ];
+            let Some(color_weights) = perspective_correct_text_surface_weights(
               projection.parallel,
               [
                 first.visibility_depth,
                 second.visibility_depth,
                 third.visibility_depth,
               ],
-              screen_weights,
-            )
-          } else {
-            None
-          };
-          if has_source_attributes && source_weights.is_none() {
-            continue;
-          }
-          let interpolated_color = pixel_color.unwrap_or_else(|| {
-            std::array::from_fn(|channel| {
-              first.color[channel] * text_color_weights[0]
-                + second.color[channel] * text_color_weights[1]
-                + third.color[channel] * text_color_weights[2]
-            })
-          });
-          let sample_material = match textured_material {
-            Some((first_material, second_material, third_material)) => {
-              // D3D9 iterates both texture coordinates and COLOR inputs with
-              // perspective correction. COLOR remains centroid-qualified at
-              // the final multisample grid; this source-grid branch evaluates
-              // both streams at the current sample.
-              let [
-                source_first_weight,
-                source_second_weight,
-                source_third_weight,
-              ] = source_weights.unwrap_or(screen_weights);
-              Some(TextSurfaceMaterialVertex {
-                source: first_material.source,
-                material_point: (
-                  first_material.material_point.0 * source_first_weight
-                    + second_material.material_point.0 * source_second_weight
-                    + third_material.material_point.0 * source_third_weight,
-                  first_material.material_point.1 * source_first_weight
-                    + second_material.material_point.1 * source_second_weight
-                    + third_material.material_point.1 * source_third_weight,
-                ),
-                diffuse: std::array::from_fn(|channel| {
-                  first_material.diffuse[channel] * text_color_weights[0]
-                    + second_material.diffuse[channel] * text_color_weights[1]
-                    + third_material.diffuse[channel] * text_color_weights[2]
-                }),
-                specular_incident: std::array::from_fn(|channel| {
-                  first_material.specular_incident[channel] * text_color_weights[0]
-                    + second_material.specular_incident[channel] * text_color_weights[1]
-                    + third_material.specular_incident[channel] * text_color_weights[2]
-                }),
-                material_opacity: first_material.material_opacity * text_color_weights[0]
-                  + second_material.material_opacity * text_color_weights[1]
-                  + third_material.material_opacity * text_color_weights[2],
-                alpha_texture_fraction: first_material.alpha_texture_fraction * source_first_weight
-                  + second_material.alpha_texture_fraction * source_second_weight
-                  + third_material.alpha_texture_fraction * source_third_weight,
-              })
-            }
-            _ => None,
-          };
-          let sample_color = pixel_color.unwrap_or_else(|| {
-            sample_material
-              .and_then(|vertex| {
+              screen_color_weights,
+            ) else {
+              continue;
+            };
+            let interpolated_color = std::array::from_fn(|channel| {
+              first.color[channel] * color_weights[0]
+                + second.color[channel] * color_weights[1]
+                + third.color[channel] * color_weights[2]
+            });
+            // Native direct-inset meshes carry diffuse/specular attributes on
+            // the final graph vertices. Interpolate those attributes at the
+            // primitive centroid, just like its texture coordinates. Looking up
+            // the unsplit source cell here replaces collision-ridge highlights
+            // with another surface's lighting.
+            let resolved =
+              textured_material.and_then(|(first_material, second_material, third_material)| {
+                let source_weights = color_weights;
+                let vertex = TextSurfaceMaterialVertex {
+                  source: first_material.source,
+                  packed_specular: first_material.packed_specular,
+                  material_point: (
+                    first_material.material_point.0 * source_weights[0]
+                      + second_material.material_point.0 * source_weights[1]
+                      + third_material.material_point.0 * source_weights[2],
+                    first_material.material_point.1 * source_weights[0]
+                      + second_material.material_point.1 * source_weights[1]
+                      + third_material.material_point.1 * source_weights[2],
+                  ),
+                  diffuse: std::array::from_fn(|channel| {
+                    first_material.diffuse[channel] * color_weights[0]
+                      + second_material.diffuse[channel] * color_weights[1]
+                      + third_material.diffuse[channel] * color_weights[2]
+                  }),
+                  specular_incident: std::array::from_fn(|channel| {
+                    first_material.specular_incident[channel] * color_weights[0]
+                      + second_material.specular_incident[channel] * color_weights[1]
+                      + third_material.specular_incident[channel] * color_weights[2]
+                  }),
+                  material_opacity: first_material.material_opacity * color_weights[0]
+                    + second_material.material_opacity * color_weights[1]
+                    + third_material.material_opacity * color_weights[2],
+                  alpha_texture_fraction: first_material.alpha_texture_fraction * source_weights[0]
+                    + second_material.alpha_texture_fraction * source_weights[1]
+                    + third_material.alpha_texture_fraction * source_weights[2],
+                };
                 resolve_text_surface_material_color(
                   material_images,
                   material_alpha_mask.as_ref(),
@@ -9256,739 +10124,944 @@ fn composite_text_solid_surfaces(
                   vertex,
                   interpolated_color[3],
                 )
-              })
-              .unwrap_or(interpolated_color)
-          });
-          let mut bevel_surface_distance_px = f32::INFINITY;
-          let mut graph_owner = None;
-          if direct_inset_triangle {
-            let donor =
-              &mut direct_inset_samples.as_mut().expect("direct inset samples")[sample_index];
-            if !donor.covered || visibility_depth > donor.visibility_depth {
-              donor.covered = true;
-              donor.visibility_depth = visibility_depth;
-              donor.color = sample_color;
-              donor.tie_priority = TEXT_SURFACE_TRIANGLE_TIE_PRIORITY;
-            }
-          }
-          if let (Some(first_collision), Some(second_collision), Some(third_collision)) = (
-            first.bevel_collision,
-            second.bevel_collision,
-            third.bevel_collision,
-          ) {
-            // Offset contours cease to be valid when opposite glyph edges
-            // meet. Interpolate the originating source-space point and its
-            // requested inset, then reject the part of a swept quad that
-            // has crossed the nearest original edge. This is the portable
-            // equivalent of outlining the offset geometry before
-            // tessellation: narrow strokes end in a shared medial ridge,
-            // while the independently authored width still controls the
-            // bevel normal and therefore its material lighting.
-            let [
-              source_first_weight,
-              source_second_weight,
-              source_third_weight,
-            ] = source_weights.expect("bevel collision requires source weights");
-            let source_point = (
-              first_collision.source_point.0 * source_first_weight
-                + second_collision.source_point.0 * source_second_weight
-                + third_collision.source_point.0 * source_third_weight,
-              first_collision.source_point.1 * source_first_weight
-                + second_collision.source_point.1 * source_second_weight
-                + third_collision.source_point.1 * source_third_weight,
-            );
-            let inset_px = first_collision.inset_px * source_first_weight
-              + second_collision.inset_px * source_second_weight
-              + third_collision.inset_px * source_third_weight;
-            bevel_surface_distance_px = first_collision.surface_distance_px * source_first_weight
-              + second_collision.surface_distance_px * source_second_weight
-              + third_collision.surface_distance_px * source_third_weight;
-            let inside_inset = if direct_inset_graph_triangle {
-              true
-            } else if direct_inset_triangle {
-              direct_inset_boundary_index
-                .as_ref()
-                .is_some_and(|boundary_index| {
-                  text_geometry_contains(source_geometry, source_point)
-                    && boundary_index
-                      .owner_at(source_geometry, source_point)
-                      .is_some_and(|boundary| {
-                        boundary.distance + TEXT_3D_CURVE_FLATTENING_TOLERANCE_PX as f32 >= inset_px
-                      })
-                })
-            } else {
-              text_geometry_inset_contains(source_geometry, source_point, inset_px)
-            };
-            if !inside_inset {
-              continue;
-            }
-            if direct_inset_graph_triangle || direct_inset_triangle {
-              let source = triangle
-                .bevel_source
-                .expect("direct inset triangle requires a bevel source");
-              let owner = TextGeometryBoundaryOwner {
-                distance: inset_px,
-                contour_index: source.contour_index as usize,
-                edge_index: source.edge_index as usize,
-              };
-              if direct_inset_graph_triangle {
-                graph_owner = Some(TextDirectInsetGraphOwner {
-                  boundary: owner,
-                  source_point,
-                  profile_strip_index: usize::from(source.profile_strip_index),
-                  surface_distance_px: bevel_surface_distance_px,
-                });
-              } else {
-                direct_inset_topology
-                  .as_mut()
-                  .expect("direct inset topology")[sample_index]
-                  .consider(owner, source_point);
-              }
-            }
-          }
-          if direct_inset_graph_triangle {
-            let graph = &mut direct_inset_graph_samples
-              .as_mut()
-              .expect("direct inset graph samples")[sample_index];
-            graph.consider(
-              visibility_depth,
-              sample_color,
-              graph_owner.expect("graph triangle requires source attributes"),
-            );
-            continue;
-          }
-          // Raw direct-inset triangles above are material/topology
-          // witnesses, not independently depth-resolved painter surfaces.
-          // Their rings can overlap after separate glyph contours merge.
-          // Submit one graph-owned surface below after all witnesses have
-          // been seen; other bevel/extrusion triangles keep the ordinary
-          // depth path here.
-          if direct_inset_triangle {
-            continue;
-          }
-          if material_images.surface_material_texture.is_some()
-            && sample_material.is_some()
-            && sample_color[3] < 1.0
-          {
-            continue;
-          }
-          let sample = &mut samples[sample_index];
-          if sample.covered && visibility_depth <= sample.visibility_depth {
-            continue;
-          }
-          sample.covered = true;
-          sample.visibility_depth = visibility_depth;
-          sample.tie_priority = TEXT_SURFACE_TRIANGLE_TIE_PRIORITY;
-          sample.color = sample_color;
-          if let Some(surface_distances) = bevel_surface_distances.as_mut() {
-            surface_distances[sample_index] = bevel_surface_distance_px;
-          }
-        }
-      }
-    }
-  }
-
-  if let (
-    Some(bevel),
-    Some(profile_strips),
-    Some(direct_samples),
-    Some(topology_samples),
-    Some(material_cells),
-    Some(boundary_index),
-  ) = (
-    direct_inset_bevel,
-    direct_inset_profile_strips.as_deref(),
-    direct_inset_samples.as_deref(),
-    direct_inset_topology.as_deref(),
-    direct_inset_material_cells.as_ref(),
-    direct_inset_boundary_index.as_ref(),
-  ) {
-    // Microsoft's direct-inset bevel algorithm constructs the complete inset
-    // graph before triangulation, including merges, splits, and interacting
-    // outer/inner glyph contours. When available, that graph alone admits a
-    // surface sample and supplies its camera-visible source owner. Final-grid
-    // samples retain the final triangle's interpolated vertex material. The
-    // source-grid path and unsupported graph construction retain the bounded
-    // source-cell reconstruction below.
-    let center = (center_x, center_y);
-    for sample_index in 0..samples.len() {
-      let donor = &direct_samples[sample_index];
-      let graph_sample = direct_inset_graph_samples
-        .as_deref()
-        .map(|graph_samples| &graph_samples[sample_index]);
-      let graph_witness = graph_sample.map(|graph| &graph.surface);
-      if graph_witness.is_some_and(|graph| !graph.covered) {
-        continue;
-      }
-      let pixel_index = sample_index / sample_count;
-      let subpixel = sample_index % sample_count;
-      let local_pixel_x = pixel_index % raster_width;
-      let local_pixel_y = pixel_index / raster_width;
-      let (sample_x, sample_y) = sample_pattern.position(subpixel);
-      let raster_point = (
-        left as f32 + local_pixel_x as f32 + sample_x,
-        top as f32 + local_pixel_y as f32 + sample_y,
-      );
-      let point = rasterization.raster_to_surface(raster_point, destination_dimensions);
-      let graph_owner = graph_sample.and_then(|graph| graph.owner);
-      let raw_topology = topology_samples[sample_index];
-      let fallback = projection_preserves_source_plane_coverage(projection)
-        .then(|| {
-          boundary_index
-            .owner_at(source_geometry, point)
-            .map(|owner| (owner, point))
-        })
-        .flatten();
-      let Some((boundary, source_point)) = graph_owner
-        .map(|owner| (owner.boundary, owner.source_point))
-        .or_else(|| raw_topology.owner.zip(raw_topology.source_point))
-        .or(fallback)
-      else {
-        continue;
-      };
-      let Some(mut surface_sample) = text_direct_inset_surface_sample(
-        bevel,
-        profile_strips,
-        source_point,
-        center,
-        boundary.distance,
-        graph_owner.map(|owner| owner.profile_strip_index),
-      ) else {
-        continue;
-      };
-      if let (Some(owner), Some(witness)) = (graph_owner, graph_witness) {
-        // Depth belongs to the actual projected, snapped triangle. Profile
-        // interpolation above is only for its material coordinates; it must
-        // not select another branch or reproject an unsnapped source point.
-        surface_sample.visibility_depth = witness.visibility_depth;
-        surface_sample.surface_distance_px = owner.surface_distance_px;
-      }
-      if !text_geometry_contains(source_geometry, source_point) {
-        continue;
-      }
-      // Final-grid graph samples already carry the graph-vertex shader result
-      // evaluated at their winning primitive's centroid. Keep that result
-      // paired with the graph depth; re-evaluating at this coverage sample
-      // would silently turn MSAA into supersampled material shading.
-      let fragment_color = (!source_grid)
-        .then(|| {
-          graph_witness
-            .filter(|graph| graph.covered)
-            .map(|graph| graph.color)
-        })
-        .flatten();
-      let material_color = match fragment_color.or_else(|| {
-        material_cells.color_at(
-          triangles,
-          material_images,
-          material_alpha_mask.as_ref(),
-          material,
-          TextDirectInsetMaterialPoint {
-            boundary,
-            surface: surface_sample,
-            point,
-          },
-        )
-      }) {
-        Some(color) => color,
-        None if donor.covered => donor.color,
-        None if graph_witness.is_some_and(|graph| graph.covered) => {
-          graph_witness.expect("covered graph witness").color
-        }
-        None => continue,
-      };
-      let sample = &mut samples[sample_index];
-      if material_images.surface_material_texture.is_some() && material_color[3] < 1.0 {
-        continue;
-      }
-      if sample.covered && surface_sample.visibility_depth <= sample.visibility_depth {
-        continue;
-      }
-      // Office submits solid contour geometry without blending, then enables
-      // premultiplied SourceOver for the material pass. A nearer translucent
-      // bevel must retain the already visible contour/side colour. Resolve the
-      // bevel's topology and nearest owner first, so overlapping candidate
-      // triangles cannot accumulate the same material more than once.
-      // Shape lighting has a separate surface/alpha contract.
-      let material_color = if geometry_lighting == Static3dGeometryLighting::Text && sample.covered
-      {
-        text_material_surface_over(material_color, sample.color)
-      } else {
-        material_color
-      };
-      sample.covered = true;
-      sample.visibility_depth = surface_sample.visibility_depth;
-      sample.color = material_color;
-      sample.tie_priority = TEXT_SURFACE_TRIANGLE_TIE_PRIORITY;
-      if let Some(surface_distances) = bevel_surface_distances.as_mut() {
-        surface_distances[sample_index] = surface_sample.surface_distance_px;
-      }
-    }
-  }
-
-  if let (Some(contour), Some(contour_area_mask), Some(contour_depth_samples)) = (
-    contour,
-    contour_area_mask.as_ref(),
-    contour_depth_samples.as_mut(),
-  ) {
-    // ECMA-376 makes the contour an unlit solid-filled line. Exact-config
-    // Word controls additionally pin its front surface as a centered raised
-    // band that participates in the same depth buffer as the bevel. The
-    // quadratic cap below is the current bounded fallback: corrected analysis
-    // of the 720-case Angle matrix and a separate 1,001-value sweep do not pin
-    // its 1.1 peak coefficient, and varying that coefficient cannot explain
-    // the remaining PASS residual. Keep source alpha on the independent
-    // AreaA8 path: this surface owns RGB/depth only.
-    let radius = contour.width_px * 0.5;
-    if radius > f32::EPSILON && contour.color.alpha != 0 {
-      let contour_left = contour_area_mask.left.max(left);
-      let contour_top = contour_area_mask.top.max(top);
-      let contour_right = (contour_area_mask.left + contour_area_mask.width as i32).min(right);
-      let contour_bottom = (contour_area_mask.top + contour_area_mask.height as i32).min(bottom);
-      for pixel_y in contour_top..contour_bottom {
-        for pixel_x in contour_left..contour_right {
-          if contour_area_mask.alpha_at(pixel_x, pixel_y) == 0 {
-            continue;
-          }
-          let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
+              });
+            Some(resolved.unwrap_or(interpolated_color))
+          } else {
+            None
+          };
           for sample_index_in_pixel in 0..sample_count {
             let (sample_x, sample_y) = sample_pattern.position(sample_index_in_pixel);
-            let source_point = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
-            // WPF converts the physical mesh from half-pixel-center device
-            // coordinates to Direct3D integer-pixel centers. Its 2-D
-            // antialiased edge path explicitly reverses that conversion
-            // before resolving a semantic line. Word's contour is that
-            // line: retain the frozen physical mesh, but evaluate the
-            // centered raised band in the original antialiased phase.
-            let contour_point = (
-              source_point.0 - contour_depth_phase_px,
-              source_point.1 - contour_depth_phase_px,
-            );
-            let boundary_distance = text_geometry_boundary_distance(source_geometry, contour_point);
-            if boundary_distance > radius {
+            let point = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
+            let first_weight = text_surface_edge(second_point, third_point, point) / signed_area;
+            let second_weight = text_surface_edge(third_point, first_point, point) / signed_area;
+            let third_weight = text_surface_edge(first_point, second_point, point) / signed_area;
+            if if final_grid_text_msaa {
+              coverage_mask & (1_u32 << sample_index_in_pixel) == 0
+            } else {
+              !text_surface_triangle_covers_sample(
+                first_point,
+                second_point,
+                third_point,
+                point,
+                signed_area,
+              )
+            } {
               continue;
             }
-            let normalized_distance = (boundary_distance / radius).clamp(0.0, 1.0);
-            let surface_z = contour.base_z
-              + radius
-                * WORD_CONTOUR_HEIGHT_OVER_RADIUS
-                * (1.0 - normalized_distance * normalized_distance);
-            let model_point = [
-              source_point.0 - center_x,
-              source_point.1 - center_y,
-              surface_z,
-            ];
-            let visibility_depth =
-              text_surface_visibility_depth(projection, model_point, pixels_per_point);
+            let visibility_depth = first.visibility_depth * first_weight
+              + second.visibility_depth * second_weight
+              + third.visibility_depth * third_weight;
             let sample_index = local_pixel * sample_count + sample_index_in_pixel;
-            contour_depth_samples[sample_index] = visibility_depth;
-          }
-        }
-      }
-    }
-  }
-
-  // The cap is a vector plane rather than another painter layer. Test each
-  // destination subpixel against the inset winding path, map it back through
-  // the same homography used for projection, and submit it to the same depth
-  // samples as the bevel and extrusion walls. This is the software analogue
-  // of Microsoft's one-mesh/one-depth-stencil text samples.
-  let source_mask = if uniform_paint_opacity.is_some() {
-    None
-  } else {
-    text_geometry_path(paint_opacity_geometry, |point| point)
-      .and_then(|path| text_geometry_mask(source.width(), source.height(), &path))
-  };
-  if let Some(planar_inverse) = planar_inverse
-    && (uniform_paint_opacity.is_some() || source_mask.is_some())
-  {
-    let (planar_left, planar_top, planar_right, planar_bottom) =
-      planar_bounds.unwrap_or((left as f32, top as f32, right as f32, bottom as f32));
-    let planar_left = (planar_left.floor() as i32).max(left);
-    let planar_top = (planar_top.floor() as i32).max(top);
-    let planar_right = (planar_right.ceil() as i32).min(right);
-    let planar_bottom = (planar_bottom.ceil() as i32).min(bottom);
-    for pixel_y in planar_top..planar_bottom {
-      for pixel_x in planar_left..planar_right {
-        let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
-        let center_source = if geometry_lighting == Static3dGeometryLighting::Shape {
-          let raster_target = (
-            pixel_x as f32 + pixel_center_offset,
-            pixel_y as f32 + pixel_center_offset,
-          );
-          let target = rasterization.raster_to_surface(raster_target, destination_dimensions);
-          let source_local =
-            map_homogeneous(planar_inverse, target.0 - center_x, target.1 - center_y);
-          Some((
-            (center_x + source_local.0, center_y + source_local.1),
-            source_local,
-          ))
-        } else {
-          None
-        };
-        let pixel_color = if geometry_lighting == Static3dGeometryLighting::Shape {
-          (|| {
-            let (source_point, source_local) = center_source?;
-            let material_point = source_geometry.map_point_to(material_geometry, source_point);
-            let mut color =
-              sample_bilinear(source, material_point.0 - 0.5, material_point.1 - 0.5)?;
-            let paint_opacity = sample_text_paint_opacity(
-              source,
-              source_mask.as_ref(),
-              uniform_paint_opacity,
-              source_geometry,
-              paint_opacity_geometry,
-              source_point,
-            )?;
-            if paint_opacity <= f32::EPSILON {
-              return None;
-            }
-            let view_direction = surface_view_direction(
-              scene,
-              projection,
-              [source_local.0, source_local.1, planar_z],
-              model_width,
-              model_height,
-              pixels_per_point,
-            );
-            color[3] = material_surface_alpha(
-              paint_opacity,
-              planar_surface_normal,
-              view_direction,
-              material,
-            );
-            let color = color.0.map(f32::from);
-            Some(color)
-          })()
-        } else {
-          None
-        };
-        for sample_index_in_pixel in 0..sample_count {
-          let (sample_x, sample_y) = sample_pattern.position(sample_index_in_pixel);
-          let raster_target = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
-          let target = rasterization.raster_to_surface(raster_target, destination_dimensions);
-          let source_local =
-            map_homogeneous(planar_inverse, target.0 - center_x, target.1 - center_y);
-          let source_point = (center_x + source_local.0, center_y + source_local.1);
-          let model_point = [source_local.0, source_local.1, planar_z];
-          if !planar_inset.contains(planar_geometry, source_point, planar_inset_px) {
-            continue;
-          }
-          let sample_color = if let Some(color) = pixel_color {
-            color
-          } else {
-            let material_point =
-              source_geometry.map_point_to(planar_material_geometry, source_point);
-            let material_endpoint = |material_source: &RgbaImage,
-                                     uniform_material_opacity: Option<f32>,
-                                     has_authored_transparency: bool,
-                                     source| {
-              let pixel = sample_bilinear(
-                material_source,
-                material_point.0 - 0.5,
-                material_point.1 - 0.5,
-              )?;
-              let paint_opacity = sample_text_paint_opacity(
-                material_source,
-                source_mask.as_ref(),
-                uniform_material_opacity.or(uniform_paint_opacity),
-                source_geometry,
-                paint_opacity_geometry,
-                source_point,
-              )?;
-              (paint_opacity > f32::EPSILON).then_some(TextBevelMaterialEndpoint {
-                source,
-                source_point,
-                material_point,
-                outward: [0.0, 0.0],
-                source_color: [pixel[0], pixel[1], pixel[2]],
-                paint_opacity,
-                alpha_texture_opacity: if has_authored_transparency {
-                  paint_opacity
-                } else {
-                  0.0
-                },
-              })
+            let screen_weights = [first_weight, second_weight, third_weight];
+            let text_color_weights = if geometry_lighting == Static3dGeometryLighting::Text {
+              let Some(weights) = perspective_correct_text_surface_weights(
+                projection.parallel,
+                [
+                  first.visibility_depth,
+                  second.visibility_depth,
+                  third.visibility_depth,
+                ],
+                screen_weights,
+              ) else {
+                continue;
+              };
+              weights
+            } else {
+              screen_weights
             };
-            let base = if let Some(material) = planar_fill_material {
-              material_endpoint(
-                material,
-                planar_fill_uniform_paint_opacity,
-                fill_has_authored_transparency,
-                TextSurfaceMaterialSource::Independent,
-              )
-            } else if planar_outline_material.is_none() {
-              material_endpoint(
-                source,
-                uniform_paint_opacity,
-                fill_has_authored_transparency || outline_has_authored_transparency,
-                TextSurfaceMaterialSource::Combined,
+            let source_weights = if has_source_attributes {
+              perspective_correct_text_surface_weights(
+                projection.parallel,
+                [
+                  first.visibility_depth,
+                  second.visibility_depth,
+                  third.visibility_depth,
+                ],
+                screen_weights,
               )
             } else {
               None
             };
-            let outline = planar_outline_material
-              .zip(planar_outline_coverage)
-              .filter(|_| {
-                planar_outline_material_inset_px.is_some_and(|inset_px| {
-                  text_geometry_boundary_distance(source_geometry, source_point)
-                    <= inset_px + 1.0 + f32::EPSILON
-                })
-              })
-              .and_then(|(material, coverage)| {
-                let endpoint = material_endpoint(
-                  material,
-                  planar_outline_uniform_paint_opacity,
-                  outline_has_authored_transparency,
-                  TextSurfaceMaterialSource::Independent,
-                )?;
-                let coverage =
-                  sample_bilinear(coverage, material_point.0 - 0.5, material_point.1 - 0.5)?;
-                let coverage = f32::from(coverage[3]) / 255.0;
-                (coverage > f32::EPSILON).then_some((endpoint, coverage))
-              });
-            let Some(composed) = composite_text_bevel_material_endpoint(base, outline) else {
-              continue;
-            };
-            let alpha_mask = match composed.source {
-              TextSurfaceMaterialSource::Combined => material_alpha_mask.as_ref(),
-              TextSurfaceMaterialSource::Independent => independent_alpha_mask.as_ref(),
-            };
-            let texture_alpha = alpha_mask.map_or(1.0, |texture| {
-              sample_text_geometry_area_mask(
-                texture,
-                material_point.0 - 0.5,
-                material_point.1 - 0.5,
-              )
-            });
-            let paint_opacity = (composed.paint_opacity
-              - composed.alpha_texture_opacity * (1.0 - texture_alpha))
-              .clamp(0.0, 1.0);
-            let view_direction = surface_view_direction(
-              scene,
-              projection,
-              model_point,
-              model_width,
-              model_height,
-              pixels_per_point,
-            );
-            let alpha = material_surface_alpha(
-              paint_opacity,
-              planar_surface_normal,
-              view_direction,
-              material,
-            );
-            // Independent images are unlit paint inputs. Compose the paint
-            // before lighting: clamping each lit input before source-over
-            // loses the highlight contribution on translucent outlines.
-            // Word's black/white fill x outline controls distinguish these
-            // orders even with identical geometry and alpha planes.
-            let color = if composed.source == TextSurfaceMaterialSource::Independent {
-              let diffuse =
-                material_diffuse_shade(scene, planar_surface_normal, view_direction, material);
-              let specular = light_rig_surface_specular(
-                scene,
-                planar_surface_normal,
-                view_direction,
-                material,
-                composed.source_color,
-              );
-              std::array::from_fn(|channel| {
-                shade_gouraud_channel_with_specular(
-                  composed.source_color[channel],
-                  diffuse[channel],
-                  specular[channel],
-                )
-              })
-            } else {
-              composed.source_color
-            };
-            [
-              f32::from(color[0]),
-              f32::from(color[1]),
-              f32::from(color[2]),
-              f32::from(alpha),
-            ]
-          };
-          let visibility_depth =
-            text_surface_visibility_depth(projection, model_point, pixels_per_point);
-          let sample_index = local_pixel * sample_count + sample_index_in_pixel;
-          let sample = &mut samples[sample_index];
-          if sample.covered && visibility_depth <= sample.visibility_depth {
-            continue;
-          }
-          sample.covered = true;
-          sample.visibility_depth = visibility_depth;
-          sample.tie_priority = TEXT_SURFACE_PLANAR_TIE_PRIORITY;
-          sample.color = sample_color;
-          if let Some(surface_distances) = bevel_surface_distances.as_mut() {
-            surface_distances[sample_index] = f32::INFINITY;
-          }
-        }
-      }
-    }
-  }
-
-  if let (Some(contour), Some(contour_area_mask), Some(contour_surface_samples)) = (
-    contour,
-    contour_area_mask.as_ref(),
-    contour_surface_samples.as_mut(),
-  ) {
-    // Microsoft's 2-D/3-D Office pipeline (US7999807B2) generates the
-    // contour from the underlying outline and then applies that contour to
-    // extrusion and beveling. It is therefore not an independent raised cap:
-    // the outer half of the centered line supplies new front geometry, while
-    // the inner half follows the authored bevel for the same physical
-    // distance. The profile-distance attribute above keeps folded presets on
-    // the actually visible branch instead of reducing them to one inset.
-    //
-    // Preserve the independently pinned phase-0 AreaA8 line as the absolute
-    // RGB area. These 8x4 samples only provide its conditional surface
-    // visibility, exactly as the no-bevel controls require.
-    let radius = contour.width_px * 0.5;
-    if radius > f32::EPSILON && contour.color.alpha != 0 {
-      let contour_left = contour_area_mask.left.max(left);
-      let contour_top = contour_area_mask.top.max(top);
-      let contour_right = (contour_area_mask.left + contour_area_mask.width as i32).min(right);
-      let contour_bottom = (contour_area_mask.top + contour_area_mask.height as i32).min(bottom);
-      for pixel_y in contour_top..contour_bottom {
-        for pixel_x in contour_left..contour_right {
-          if contour_area_mask.alpha_at(pixel_x, pixel_y) == 0 {
-            continue;
-          }
-          let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
-          for sample_index_in_pixel in 0..sample_count {
-            let (sample_x, sample_y) = sample_pattern.position(sample_index_in_pixel);
-            let point = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
-            if text_geometry_boundary_distance(source_geometry, point) > radius {
+            if has_source_attributes && source_weights.is_none() {
               continue;
             }
-            let sample_index = local_pixel * sample_count + sample_index_in_pixel;
-            let inside = text_geometry_contains(source_geometry, point);
-            let visible = !inside
-              || bevel_surface_distances
-                .as_ref()
-                .is_none_or(|distances| distances[sample_index] <= radius);
-            contour_surface_samples[sample_index] = TextContourSurfaceSample {
-              active: true,
-              visible,
+            let sample_color = || {
+              text_surface_sample_color(TextSurfaceShadingInput {
+                vertices: [first, second, third],
+                textured_material,
+                material_images,
+                alpha_texture: material_alpha_mask.as_ref(),
+                material,
+                screen_weights,
+                text_color_weights,
+                source_weights,
+                pixel_color,
+              })
             };
+            let mut bevel_surface_distance_px = f32::INFINITY;
+            let mut graph_owner = None;
+            if direct_inset_triangle {
+              let donor =
+                &mut direct_inset_samples.as_mut().expect("direct inset samples")[sample_index];
+              if !donor.covered || visibility_depth > donor.visibility_depth {
+                donor.covered = true;
+                donor.visibility_depth = visibility_depth;
+                donor.color = if let Some(colors) = direct_inset_donor_colors.as_mut() {
+                  colors[sample_index] = Some(TextDeferredSurfaceColor {
+                    triangle_index,
+                    screen_weights,
+                  });
+                  [0.0; 4]
+                } else {
+                  sample_color()
+                };
+                donor.tie_priority = TEXT_SURFACE_TRIANGLE_TIE_PRIORITY;
+              }
+            }
+            if let (Some(first_collision), Some(second_collision), Some(third_collision)) = (
+              first.bevel_collision,
+              second.bevel_collision,
+              third.bevel_collision,
+            ) {
+              // Offset contours cease to be valid when opposite glyph edges
+              // meet. Interpolate the originating source-space point and its
+              // requested inset, then reject the part of a swept quad that
+              // has crossed the nearest original edge. This is the portable
+              // equivalent of outlining the offset geometry before
+              // tessellation: narrow strokes end in a shared medial ridge,
+              // while the independently authored width still controls the
+              // bevel normal and therefore its material lighting.
+              let [
+                source_first_weight,
+                source_second_weight,
+                source_third_weight,
+              ] = source_weights.expect("bevel collision requires source weights");
+              let source_point = (
+                first_collision.source_point.0 * source_first_weight
+                  + second_collision.source_point.0 * source_second_weight
+                  + third_collision.source_point.0 * source_third_weight,
+                first_collision.source_point.1 * source_first_weight
+                  + second_collision.source_point.1 * source_second_weight
+                  + third_collision.source_point.1 * source_third_weight,
+              );
+              let inset_px = first_collision.inset_px * source_first_weight
+                + second_collision.inset_px * source_second_weight
+                + third_collision.inset_px * source_third_weight;
+              bevel_surface_distance_px = first_collision.surface_distance_px * source_first_weight
+                + second_collision.surface_distance_px * source_second_weight
+                + third_collision.surface_distance_px * source_third_weight;
+              let inside_inset = if direct_inset_graph_triangle {
+                true
+              } else if direct_inset_triangle {
+                direct_inset_boundary_index
+                  .as_ref()
+                  .is_some_and(|boundary_index| {
+                    source_winding.contains(source_point)
+                      && boundary_index
+                        .owner_at(source_geometry, source_point)
+                        .is_some_and(|boundary| {
+                          boundary.distance + TEXT_3D_CURVE_FLATTENING_TOLERANCE_PX as f32
+                            >= inset_px
+                        })
+                  })
+              } else {
+                text_geometry_inset_contains(source_geometry, source_point, inset_px)
+              };
+              if !inside_inset {
+                continue;
+              }
+              if direct_inset_graph_triangle || direct_inset_triangle {
+                let source = triangle
+                  .bevel_source
+                  .expect("direct inset triangle requires a bevel source");
+                let owner = TextGeometryBoundaryOwner {
+                  distance: inset_px,
+                  contour_index: source.contour_index as usize,
+                  edge_index: source.edge_index as usize,
+                };
+                if direct_inset_graph_triangle {
+                  graph_owner = Some(TextDirectInsetGraphOwner {
+                    boundary: owner,
+                    source_point,
+                    profile_strip_index: usize::from(source.profile_strip_index),
+                    surface_distance_px: bevel_surface_distance_px,
+                  });
+                } else {
+                  direct_inset_topology
+                    .as_mut()
+                    .expect("direct inset topology")[sample_index]
+                    .consider(owner, source_point);
+                }
+              }
+            }
+            if direct_inset_graph_triangle {
+              let graph = &mut direct_inset_graph_samples
+                .as_mut()
+                .expect("direct inset graph samples")[sample_index];
+              if graph.consider(
+                visibility_depth,
+                || {
+                  if defer_source_colors {
+                    [0.0; 4]
+                  } else {
+                    sample_color()
+                  }
+                },
+                graph_owner.expect("graph triangle requires source attributes"),
+              ) && let Some(colors) = direct_inset_graph_colors.as_mut()
+              {
+                colors[sample_index] = Some(TextDeferredSurfaceColor {
+                  triangle_index,
+                  screen_weights,
+                });
+              }
+              continue;
+            }
+            // Raw direct-inset triangles above are material/topology
+            // witnesses, not independently depth-resolved painter surfaces.
+            // Their rings can overlap after separate glyph contours merge.
+            // Submit one graph-owned surface below after all witnesses have
+            // been seen; other bevel/extrusion triangles keep the ordinary
+            // depth path here.
+            if direct_inset_triangle {
+              continue;
+            }
+            let sample = &mut samples[sample_index];
+            if sample.covered && visibility_depth <= sample.visibility_depth {
+              continue;
+            }
+            let sample_color = sample_color();
+            if material_images.surface_material_texture.is_some()
+              && textured_material.is_some()
+              && sample_color[3] < 1.0
+            {
+              continue;
+            }
+            sample.covered = true;
+            sample.visibility_depth = visibility_depth;
+            sample.tie_priority = TEXT_SURFACE_TRIANGLE_TIE_PRIORITY;
+            sample.color = sample_color;
+            if let Some(surface_distances) = bevel_surface_distances.as_mut() {
+              surface_distances[sample_index] = bevel_surface_distance_px;
+            }
           }
         }
       }
     }
-  }
 
-  let silhouette_coverage_masks =
-    (geometry_lighting == Static3dGeometryLighting::Shape).then(|| {
-      let surface_masks = samples
-        .chunks_exact(sample_count)
-        .enumerate()
-        .map(|(pixel_index, pixel_samples)| {
-          let contour_depths = contour_depth_samples.as_ref().map(|depths| {
-            let start = pixel_index * sample_count;
-            &depths[start..start + sample_count]
-          });
-          pixel_samples
-            .iter()
-            .enumerate()
-            .fold(0_u32, |mask, (index, sample)| {
-              let covered = sample.covered
-                || contour_depths.is_some_and(|depths| contour_depth_wins(sample, depths[index]));
-              mask | (u32::from(covered) << index)
-            })
-        })
-        .collect::<Vec<_>>();
-      translate_text_surface_coverage_masks(
-        &surface_masks,
-        raster_width,
-        raster_height,
-        (
-          projection.silhouette_translation_x_px,
-          projection.silhouette_translation_y_px,
-        ),
-      )
-    });
-  let mut area_resolved_samples = planar_area_mask
-    .as_ref()
-    .map(|_| vec![None; raster_width * raster_height]);
-  let resolved_contour_color = contour.map(|contour| {
-    [
-      f32::from(contour.color.color.r),
-      f32::from(contour.color.color.g),
-      f32::from(contour.color.color.b),
-      f32::from(contour.color.alpha),
-    ]
-  });
-
-  for local_y in 0..raster_height {
-    for local_x in 0..raster_width {
-      let pixel_index = local_y * raster_width + local_x;
-      let sample_start = pixel_index * sample_count;
-      let sample_end = sample_start + sample_count;
-      let contour_samples = contour_surface_samples
-        .as_ref()
-        .map(|samples| TextContourSamples::Surface(&samples[sample_start..sample_end]))
-        .or_else(|| {
-          contour_depth_samples
-            .as_ref()
-            .map(|depths| TextContourSamples::Depth(&depths[sample_start..sample_end]))
-        });
-      let pixel_x = left + local_x as i32;
-      let pixel_y = top + local_y as i32;
-      let contour_area_alpha = contour_area_mask
-        .as_ref()
-        .map_or(0, |mask| mask.alpha_at(pixel_x, pixel_y));
-      let source_area_alpha = contour_source_area_mask
-        .as_ref()
-        .map(|mask| mask.alpha_at(pixel_x, pixel_y));
-      let Some(resolved) = resolve_text_surface_pixel(
-        &samples[sample_start..sample_end],
-        contour_samples,
-        contour_area_alpha,
-        source_area_alpha,
-        resolved_contour_color,
-      ) else {
-        continue;
-      };
-      // Resolve authored opacity and geometric coverage independently. Office
-      // Screen controls with a nonzero top inset retain fractional SMask
-      // values at the two terminal bevel corners; promoting every majority
-      // pixel to opaque creates a disconnected outer extrusion island once
-      // the inset crosses a pixel boundary.
-      let alpha = if let Some(area_mask) = planar_area_mask.as_ref() {
-        resolved.authored_opacity * f32::from(area_mask.alpha_at(pixel_x, pixel_y)) / 255.0
-      } else if let Some(silhouette_masks) = silhouette_coverage_masks.as_ref() {
-        resolved.authored_opacity * silhouette_masks[pixel_index].count_ones() as f32
-          / sample_count as f32
-      } else {
-        resolved.alpha
-      };
-      let color = Rgba([
-        resolved.rgb[0],
-        resolved.rgb[1],
-        resolved.rgb[2],
-        (alpha * 255.0).round().clamp(0.0, 255.0) as u8,
-      ]);
-      if color[3] == 0 {
-        continue;
+    if let (
+      Some(bevel),
+      Some(profile_strips),
+      Some(direct_samples),
+      Some(topology_samples),
+      Some(material_cells),
+      Some(boundary_index),
+    ) = (
+      direct_inset_bevel,
+      direct_inset_profile_strips.as_deref(),
+      direct_inset_samples.as_deref(),
+      direct_inset_topology.as_deref(),
+      direct_inset_material_cells.as_ref(),
+      direct_inset_boundary_index.as_ref(),
+    ) {
+      // Microsoft's direct-inset bevel algorithm constructs the complete inset
+      // graph before triangulation, including merges, splits, and interacting
+      // outer/inner glyph contours. When available, that graph alone admits a
+      // surface sample and supplies its camera-visible source owner. Final-grid
+      // samples retain the final triangle's interpolated vertex material. The
+      // source-grid path and unsupported graph construction retain the bounded
+      // source-cell reconstruction below.
+      let center = (center_x, center_y);
+      for sample_index in 0..samples.len() {
+        let donor = &direct_samples[sample_index];
+        let graph_sample = direct_inset_graph_samples
+          .as_deref()
+          .map(|graph_samples| &graph_samples[sample_index]);
+        let graph_witness = graph_sample.map(|graph| &graph.surface);
+        if graph_witness.is_some_and(|graph| !graph.covered) {
+          continue;
+        }
+        let pixel_index = sample_index / sample_count;
+        let subpixel = sample_index % sample_count;
+        let local_pixel_x = pixel_index % raster_width;
+        let local_pixel_y = pixel_index / raster_width;
+        let (sample_x, sample_y) = sample_pattern.position(subpixel);
+        let raster_point = (
+          left as f32 + local_pixel_x as f32 + sample_x,
+          top as f32 + local_pixel_y as f32 + sample_y,
+        );
+        let point = rasterization.raster_to_surface(raster_point, destination_dimensions);
+        let graph_owner = graph_sample.and_then(|graph| graph.owner);
+        let raw_topology = topology_samples[sample_index];
+        let Some((boundary, source_point)) = graph_owner
+          .map(|owner| (owner.boundary, owner.source_point))
+          .or_else(|| raw_topology.owner.zip(raw_topology.source_point))
+          .or_else(|| {
+            projection_preserves_source_plane_coverage(projection)
+              .then(|| {
+                boundary_index
+                  .owner_at(source_geometry, point)
+                  .map(|owner| (owner, point))
+              })
+              .flatten()
+          })
+        else {
+          continue;
+        };
+        let Some(mut surface_sample) = text_direct_inset_surface_sample(
+          bevel,
+          profile_strips,
+          source_point,
+          center,
+          boundary.distance,
+          graph_owner.map(|owner| owner.profile_strip_index),
+        ) else {
+          continue;
+        };
+        if let (Some(owner), Some(witness)) = (graph_owner, graph_witness) {
+          // Depth belongs to the actual projected, snapped triangle. Profile
+          // interpolation above is only for its material coordinates; it must
+          // not select another branch or reproject an unsnapped source point.
+          surface_sample.visibility_depth = witness.visibility_depth;
+          surface_sample.surface_distance_px = owner.surface_distance_px;
+        }
+        if !source_winding.contains(source_point) {
+          continue;
+        }
+        // Final-grid graph samples already carry the graph-vertex shader result
+        // evaluated at their winning primitive's centroid. Keep that result
+        // paired with the graph depth; re-evaluating at this coverage sample
+        // would silently turn MSAA into supersampled material shading.
+        let fragment_color = (!source_grid)
+          .then(|| {
+            graph_witness
+              .filter(|graph| graph.covered)
+              .map(|graph| graph.color)
+          })
+          .flatten();
+        let material_color = match fragment_color.or_else(|| {
+          material_cells.color_at(
+            triangles,
+            material_images,
+            material_alpha_mask.as_ref(),
+            material,
+            TextDirectInsetMaterialPoint {
+              boundary,
+              surface: surface_sample,
+              point,
+            },
+          )
+        }) {
+          Some(color) => color,
+          None if donor.covered => resolve_deferred_color(
+            direct_inset_donor_colors
+              .as_ref()
+              .and_then(|colors| colors[sample_index]),
+            donor.color,
+          ),
+          None if graph_witness.is_some_and(|graph| graph.covered) => resolve_deferred_color(
+            direct_inset_graph_colors
+              .as_ref()
+              .and_then(|colors| colors[sample_index]),
+            graph_witness.expect("covered graph witness").color,
+          ),
+          None => continue,
+        };
+        let sample = &mut samples[sample_index];
+        if material_images.surface_material_texture.is_some() && material_color[3] < 1.0 {
+          continue;
+        }
+        if sample.covered && surface_sample.visibility_depth <= sample.visibility_depth {
+          continue;
+        }
+        // Office submits solid contour geometry without blending, then enables
+        // premultiplied SourceOver for the material pass. A nearer translucent
+        // bevel must retain the already visible contour/side colour. Resolve the
+        // bevel's topology and nearest owner first, so overlapping candidate
+        // triangles cannot accumulate the same material more than once.
+        // Shape lighting has a separate surface/alpha contract.
+        let material_color =
+          if geometry_lighting == Static3dGeometryLighting::Text && sample.covered {
+            text_material_surface_over(material_color, sample.color)
+          } else {
+            material_color
+          };
+        sample.covered = true;
+        sample.visibility_depth = surface_sample.visibility_depth;
+        sample.color = material_color;
+        sample.tie_priority = TEXT_SURFACE_TRIANGLE_TIE_PRIORITY;
+        if let Some(surface_distances) = bevel_surface_distances.as_mut() {
+          surface_distances[sample_index] = surface_sample.surface_distance_px;
+        }
       }
-      if let Some(samples) = area_resolved_samples.as_mut() {
-        samples[pixel_index] = Some(TextAreaResolvedSample {
-          rgb: resolved.rgb,
-          authored_opacity: resolved.authored_opacity,
-        });
-      }
-      blend_over(
-        destination.get_pixel_mut(
-          (left as usize + local_x) as u32,
-          (top as usize + local_y) as u32,
-        ),
-        color,
-      );
     }
+
+    if let (Some(contour), Some(contour_area_mask), Some(contour_depth_samples)) = (
+      contour,
+      contour_area_mask.as_ref(),
+      contour_depth_samples.as_mut(),
+    ) {
+      // ECMA-376 makes the contour an unlit solid-filled line. Exact-config
+      // Word controls additionally pin its front surface as a centered raised
+      // band that participates in the same depth buffer as the bevel. The
+      // quadratic cap below is the current bounded fallback: corrected analysis
+      // of the 720-case Angle matrix and a separate 1,001-value sweep do not pin
+      // its 1.1 peak coefficient, and varying that coefficient cannot explain
+      // the remaining PASS residual. Keep source alpha on the independent
+      // AreaA8 path: this surface owns RGB/depth only.
+      let radius = contour.width_px * 0.5;
+      if radius > f32::EPSILON && contour.color.alpha != 0 {
+        let contour_left = contour_area_mask.left.max(left);
+        let contour_top = contour_area_mask.top.max(top);
+        let contour_right = (contour_area_mask.left + contour_area_mask.width as i32).min(right);
+        let contour_bottom = (contour_area_mask.top + contour_area_mask.height as i32).min(bottom);
+        for pixel_y in contour_top..contour_bottom {
+          for pixel_x in contour_left..contour_right {
+            if contour_area_mask.alpha_at(pixel_x, pixel_y) == 0 {
+              continue;
+            }
+            let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
+            for sample_index_in_pixel in 0..sample_count {
+              let (sample_x, sample_y) = sample_pattern.position(sample_index_in_pixel);
+              let source_point = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
+              // WPF converts the physical mesh from half-pixel-center device
+              // coordinates to Direct3D integer-pixel centers. Its 2-D
+              // antialiased edge path explicitly reverses that conversion
+              // before resolving a semantic line. Word's contour is that
+              // line: retain the frozen physical mesh, but evaluate the
+              // centered raised band in the original antialiased phase.
+              let contour_point = (
+                source_point.0 - contour_depth_phase_px,
+                source_point.1 - contour_depth_phase_px,
+              );
+              let boundary_distance =
+                text_geometry_boundary_distance(source_geometry, contour_point);
+              if boundary_distance > radius {
+                continue;
+              }
+              let normalized_distance = (boundary_distance / radius).clamp(0.0, 1.0);
+              let surface_z = contour.base_z
+                + radius
+                  * WORD_CONTOUR_HEIGHT_OVER_RADIUS
+                  * (1.0 - normalized_distance * normalized_distance);
+              let model_point = [
+                source_point.0 - center_x,
+                source_point.1 - center_y,
+                surface_z,
+              ];
+              let visibility_depth =
+                text_surface_visibility_depth(projection, model_point, pixels_per_point);
+              let sample_index = local_pixel * sample_count + sample_index_in_pixel;
+              contour_depth_samples[sample_index] = visibility_depth;
+            }
+          }
+        }
+      }
+    }
+
+    // The cap is a vector plane rather than another painter layer. Test each
+    // destination subpixel against the inset winding path, map it back through
+    // the same homography used for projection, and submit it to the same depth
+    // samples as the bevel and extrusion walls. This is the software analogue
+    // of Microsoft's one-mesh/one-depth-stencil text samples.
+    if let Some(planar_inverse) = planar_inverse
+      && (uniform_paint_opacity.is_some() || source_mask.is_some())
+    {
+      let (planar_left, planar_top, planar_right, planar_bottom) =
+        planar_bounds.unwrap_or((left as f32, top as f32, right as f32, bottom as f32));
+      let planar_left = (planar_left.floor() as i32).max(left);
+      let planar_top = (planar_top.floor() as i32).max(top);
+      let planar_right = (planar_right.ceil() as i32).min(right);
+      let planar_bottom = (planar_bottom.ceil() as i32).min(bottom);
+      for pixel_y in planar_top..planar_bottom {
+        for pixel_x in planar_left..planar_right {
+          let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
+          let center_source = if geometry_lighting != Static3dGeometryLighting::Text {
+            let raster_target = (
+              pixel_x as f32 + pixel_center_offset,
+              pixel_y as f32 + pixel_center_offset,
+            );
+            let target = rasterization.raster_to_surface(raster_target, destination_dimensions);
+            let source_local =
+              map_homogeneous(planar_inverse, target.0 - center_x, target.1 - center_y);
+            Some((
+              (center_x + source_local.0, center_y + source_local.1),
+              source_local,
+            ))
+          } else {
+            None
+          };
+          let pixel_color = if geometry_lighting != Static3dGeometryLighting::Text {
+            (|| {
+              let (source_point, source_local) = center_source?;
+              let material_point = source_geometry.map_point_to(material_geometry, source_point);
+              if geometry_lighting == Static3dGeometryLighting::WordShape
+                && let Some(texture) = surface_material_texture
+              {
+                let texel = texture.sample_associated(material_point);
+                let view = planar_view_direction.unwrap_or_else(|| {
+                  surface_view_direction(
+                    scene,
+                    projection,
+                    [source_local.0, source_local.1, planar_z],
+                    model_width,
+                    model_height,
+                    pixels_per_point,
+                  )
+                });
+                let diffuse = planar_diffuse.unwrap_or_else(|| {
+                  material_diffuse_shade(scene, planar_surface_normal, view, material)
+                });
+                let incident = planar_specular_incident.unwrap_or_else(|| {
+                  light_rig_surface_specular_incident(scene, planar_surface_normal, view, material)
+                });
+                let source_color = std::array::from_fn(|channel| {
+                  (texel[channel] * 255.0 / texel[3].max(1.0))
+                    .round()
+                    .clamp(0.0, 255.0) as u8
+                });
+                let specular = word_shape_surface_specular(incident, material, source_color);
+                let opacity = planar_alpha_factor.unwrap_or_else(|| {
+                  material_surface_alpha_factor(planar_surface_normal, view, material)
+                });
+                return Some(shade_associated_text_material(
+                  texel,
+                  TextSurfaceMaterialVertex {
+                    source: TextSurfaceMaterialSource::Combined,
+                    material_point,
+                    diffuse: diffuse.map(word_shape_diffuse_attribute),
+                    specular_incident: specular.map(word_shape_specular_attribute),
+                    packed_specular: true,
+                    material_opacity: opacity,
+                    alpha_texture_fraction: 0.0,
+                  },
+                  material,
+                ));
+              }
+              let mut color =
+                sample_bilinear(source, material_point.0 - 0.5, material_point.1 - 0.5)?;
+              let paint_opacity = sample_text_paint_opacity(
+                source,
+                source_mask.as_ref(),
+                uniform_paint_opacity,
+                source_geometry,
+                paint_opacity_geometry,
+                source_point,
+              )?;
+              if paint_opacity <= f32::EPSILON {
+                return None;
+              }
+              let factor = planar_alpha_factor.unwrap_or_else(|| {
+                let view_direction = surface_view_direction(
+                  scene,
+                  projection,
+                  [source_local.0, source_local.1, planar_z],
+                  model_width,
+                  model_height,
+                  pixels_per_point,
+                );
+                material_surface_alpha_factor(planar_surface_normal, view_direction, material)
+              });
+              color[3] = quantize_material_surface_alpha(paint_opacity, factor);
+              let color = color.0.map(f32::from);
+              Some(color)
+            })()
+          } else {
+            None
+          };
+          for sample_index_in_pixel in 0..sample_count {
+            let (sample_x, sample_y) = sample_pattern.position(sample_index_in_pixel);
+            let raster_target = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
+            let target = rasterization.raster_to_surface(raster_target, destination_dimensions);
+            let source_local =
+              map_homogeneous(planar_inverse, target.0 - center_x, target.1 - center_y);
+            let source_point = (center_x + source_local.0, center_y + source_local.1);
+            let model_point = [source_local.0, source_local.1, planar_z];
+            if !planar_inset.contains(planar_geometry, source_point, planar_inset_px) {
+              continue;
+            }
+            let sample_color = if let Some(color) = pixel_color {
+              color
+            } else {
+              let material_point =
+                source_geometry.map_point_to(planar_material_geometry, source_point);
+              let material_endpoint = |material_source: &RgbaImage,
+                                       uniform_material_opacity: Option<f32>,
+                                       has_authored_transparency: bool,
+                                       source| {
+                let pixel = sample_bilinear(
+                  material_source,
+                  material_point.0 - 0.5,
+                  material_point.1 - 0.5,
+                )?;
+                let uniform_opacity = uniform_material_opacity.or(uniform_paint_opacity);
+                let paint_opacity = if material_has_opacity_coordinates {
+                  if let Some(opacity) = uniform_opacity {
+                    opacity.clamp(0.0, 1.0)
+                  } else {
+                    let source_coverage = sample_pixmap_alpha(
+                      source_mask.as_ref()?,
+                      material_point.0 - 0.5,
+                      material_point.1 - 0.5,
+                    )?;
+                    recover_text_paint_opacity(pixel[3], source_coverage)
+                  }
+                } else {
+                  sample_text_paint_opacity(
+                    material_source,
+                    source_mask.as_ref(),
+                    uniform_opacity,
+                    source_geometry,
+                    paint_opacity_geometry,
+                    source_point,
+                  )?
+                };
+                (paint_opacity > f32::EPSILON).then_some(TextBevelMaterialEndpoint {
+                  source,
+                  source_point,
+                  material_point,
+                  outward: [0.0, 0.0],
+                  source_color: [pixel[0], pixel[1], pixel[2]],
+                  paint_opacity,
+                  alpha_texture_opacity: if has_authored_transparency {
+                    paint_opacity
+                  } else {
+                    0.0
+                  },
+                })
+              };
+              let base = if let Some(material) = planar_fill_material {
+                material_endpoint(
+                  material,
+                  planar_fill_uniform_paint_opacity,
+                  fill_has_authored_transparency,
+                  TextSurfaceMaterialSource::Independent,
+                )
+              } else if planar_outline_material.is_none() {
+                material_endpoint(
+                  source,
+                  uniform_paint_opacity,
+                  fill_has_authored_transparency || outline_has_authored_transparency,
+                  TextSurfaceMaterialSource::Combined,
+                )
+              } else {
+                None
+              };
+              let outline = planar_outline_material
+                .zip(planar_outline_coverage)
+                .filter(|_| {
+                  planar_outline_material_inset_px.is_some_and(|inset_px| {
+                    planar_outline_boundary_index
+                      .as_ref()
+                      .filter(|_| {
+                        source_point.0 >= 0.0
+                          && source_point.1 >= 0.0
+                          && source_point.0 < source.width() as f32
+                          && source_point.1 < source.height() as f32
+                      })
+                      .map_or_else(
+                        || text_geometry_boundary_distance(source_geometry, source_point),
+                        |index| {
+                          index
+                            .owner_at(source_geometry, source_point)
+                            .map_or(f32::INFINITY, |owner| owner.distance)
+                        },
+                      )
+                      <= inset_px + 1.0 + f32::EPSILON
+                  })
+                })
+                .and_then(|(material, coverage)| {
+                  let endpoint = material_endpoint(
+                    material,
+                    planar_outline_uniform_paint_opacity,
+                    outline_has_authored_transparency,
+                    TextSurfaceMaterialSource::Independent,
+                  )?;
+                  let coverage =
+                    sample_bilinear(coverage, material_point.0 - 0.5, material_point.1 - 0.5)?;
+                  let coverage = f32::from(coverage[3]) / 255.0;
+                  (coverage > f32::EPSILON).then_some((endpoint, coverage))
+                });
+              let Some(composed) = composite_text_bevel_material_endpoint(base, outline) else {
+                continue;
+              };
+              let alpha_mask = match composed.source {
+                TextSurfaceMaterialSource::Combined => material_alpha_mask.as_ref(),
+                TextSurfaceMaterialSource::Independent => independent_alpha_mask.as_ref(),
+              };
+              let texture_alpha = alpha_mask.map_or(1.0, |texture| {
+                sample_text_geometry_area_mask(
+                  texture,
+                  material_point.0 - 0.5,
+                  material_point.1 - 0.5,
+                )
+              });
+              let paint_opacity = (composed.paint_opacity
+                - composed.alpha_texture_opacity * (1.0 - texture_alpha))
+                .clamp(0.0, 1.0);
+              let view_direction = planar_view_direction.unwrap_or_else(|| {
+                surface_view_direction(
+                  scene,
+                  projection,
+                  model_point,
+                  model_width,
+                  model_height,
+                  pixels_per_point,
+                )
+              });
+              let factor = planar_alpha_factor.unwrap_or_else(|| {
+                material_surface_alpha_factor(planar_surface_normal, view_direction, material)
+              });
+              let alpha = quantize_material_surface_alpha(paint_opacity, factor);
+              // Independent images are unlit paint inputs. Compose the paint
+              // before lighting: clamping each lit input before source-over
+              // loses the highlight contribution on translucent outlines.
+              // Word's black/white fill x outline controls distinguish these
+              // orders even with identical geometry and alpha planes.
+              let color = if composed.source == TextSurfaceMaterialSource::Independent {
+                if let Some(colors) = planar_word_colors.as_ref() {
+                  std::array::from_fn(|channel| {
+                    colors[channel][usize::from(composed.source_color[channel])]
+                  })
+                } else {
+                  let diffuse = planar_diffuse.unwrap_or_else(|| {
+                    material_diffuse_shade(scene, planar_surface_normal, view_direction, material)
+                  });
+                  let incident = planar_specular_incident.unwrap_or_else(|| {
+                    light_rig_surface_specular_incident(
+                      scene,
+                      planar_surface_normal,
+                      view_direction,
+                      material,
+                    )
+                  });
+                  let specular =
+                    word_text_surface_specular(incident, material, composed.source_color);
+                  std::array::from_fn(|channel| {
+                    shade_gouraud_channel_with_specular(
+                      composed.source_color[channel],
+                      diffuse[channel],
+                      specular[channel],
+                    )
+                  })
+                }
+              } else {
+                composed.source_color
+              };
+              [
+                f32::from(color[0]),
+                f32::from(color[1]),
+                f32::from(color[2]),
+                f32::from(alpha),
+              ]
+            };
+            let visibility_depth =
+              text_surface_visibility_depth(projection, model_point, pixels_per_point);
+            let sample_index = local_pixel * sample_count + sample_index_in_pixel;
+            let sample = &mut samples[sample_index];
+            if sample.covered && visibility_depth <= sample.visibility_depth {
+              continue;
+            }
+            // A picture's translucent texels reveal the independently painted
+            // rectangular frame. Native alpha0/64/128/255 controls preserve
+            // opaque side coverage and blend the front color over it; replacing
+            // that sample instead punches a translucent hole through the solid.
+            let sample_color = if planar_source_over && sample.covered {
+              text_material_surface_over(sample_color, sample.color)
+            } else {
+              sample_color
+            };
+            sample.covered = true;
+            sample.visibility_depth = visibility_depth;
+            sample.tie_priority = TEXT_SURFACE_PLANAR_TIE_PRIORITY;
+            sample.color = sample_color;
+            if let Some(surface_distances) = bevel_surface_distances.as_mut() {
+              surface_distances[sample_index] = f32::INFINITY;
+            }
+          }
+        }
+      }
+    }
+
+    if let (Some(contour), Some(contour_area_mask), Some(contour_surface_samples)) = (
+      contour,
+      contour_area_mask.as_ref(),
+      contour_surface_samples.as_mut(),
+    ) {
+      // Microsoft's 2-D/3-D Office pipeline (US7999807B2) generates the
+      // contour from the underlying outline and then applies that contour to
+      // extrusion and beveling. It is therefore not an independent raised cap:
+      // the outer half of the centered line supplies new front geometry, while
+      // the inner half follows the authored bevel for the same physical
+      // distance. The profile-distance attribute above keeps folded presets on
+      // the actually visible branch instead of reducing them to one inset.
+      //
+      // Preserve the independently pinned phase-0 AreaA8 line as the absolute
+      // RGB area. These 8x4 samples only provide its conditional surface
+      // visibility, exactly as the no-bevel controls require.
+      let radius = contour.width_px * 0.5;
+      if radius > f32::EPSILON && contour.color.alpha != 0 {
+        let contour_left = contour_area_mask.left.max(left);
+        let contour_top = contour_area_mask.top.max(top);
+        let contour_right = (contour_area_mask.left + contour_area_mask.width as i32).min(right);
+        let contour_bottom = (contour_area_mask.top + contour_area_mask.height as i32).min(bottom);
+        for pixel_y in contour_top..contour_bottom {
+          for pixel_x in contour_left..contour_right {
+            if contour_area_mask.alpha_at(pixel_x, pixel_y) == 0 {
+              continue;
+            }
+            let local_pixel = (pixel_y - top) as usize * raster_width + (pixel_x - left) as usize;
+            for sample_index_in_pixel in 0..sample_count {
+              let (sample_x, sample_y) = sample_pattern.position(sample_index_in_pixel);
+              let point = (pixel_x as f32 + sample_x, pixel_y as f32 + sample_y);
+              let distance = contour_boundary_index.as_ref().map_or_else(
+                || text_geometry_boundary_distance(source_geometry, point),
+                |index| {
+                  index
+                    .owner_at(source_geometry, point)
+                    .map_or(f32::INFINITY, |owner| owner.distance)
+                },
+              );
+              if distance > radius {
+                continue;
+              }
+              let sample_index = local_pixel * sample_count + sample_index_in_pixel;
+              let inside = source_winding.contains(point);
+              let visible = !inside
+                || bevel_surface_distances
+                  .as_ref()
+                  .is_none_or(|distances| distances[sample_index] <= radius);
+              contour_surface_samples[sample_index] = TextContourSurfaceSample {
+                active: true,
+                visible,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    let silhouette_coverage_masks =
+      (geometry_lighting != Static3dGeometryLighting::Text).then(|| {
+        let surface_masks = samples
+          .chunks_exact(sample_count)
+          .enumerate()
+          .map(|(pixel_index, pixel_samples)| {
+            let contour_depths = contour_depth_samples.as_ref().map(|depths| {
+              let start = pixel_index * sample_count;
+              &depths[start..start + sample_count]
+            });
+            pixel_samples
+              .iter()
+              .enumerate()
+              .fold(0_u32, |mask, (index, sample)| {
+                let covered = sample.covered
+                  || contour_depths.is_some_and(|depths| contour_depth_wins(sample, depths[index]));
+                mask | (u32::from(covered) << index)
+              })
+          })
+          .collect::<Vec<_>>();
+        translate_text_surface_coverage_masks(
+          &surface_masks,
+          raster_width,
+          raster_height,
+          (
+            projection.silhouette_translation_x_px,
+            projection.silhouette_translation_y_px,
+          ),
+        )
+      });
+    let resolved_contour_color = contour.map(|contour| {
+      [
+        f32::from(contour.color.color.r),
+        f32::from(contour.color.color.g),
+        f32::from(contour.color.color.b),
+        f32::from(contour.color.alpha),
+      ]
+    });
+
+    for local_y in 0..raster_height {
+      for local_x in 0..raster_width {
+        let pixel_index = local_y * raster_width + local_x;
+        let sample_start = pixel_index * sample_count;
+        let sample_end = sample_start + sample_count;
+        let contour_samples = contour_surface_samples
+          .as_ref()
+          .map(|samples| TextContourSamples::Surface(&samples[sample_start..sample_end]))
+          .or_else(|| {
+            contour_depth_samples
+              .as_ref()
+              .map(|depths| TextContourSamples::Depth(&depths[sample_start..sample_end]))
+          });
+        let pixel_x = left + local_x as i32;
+        let pixel_y = top + local_y as i32;
+        let contour_area_alpha = contour_area_mask
+          .as_ref()
+          .map_or(0, |mask| mask.alpha_at(pixel_x, pixel_y));
+        let source_area_alpha = contour_source_area_mask
+          .as_ref()
+          .map(|mask| mask.alpha_at(pixel_x, pixel_y));
+        let Some(resolved) = resolve_text_surface_pixel(
+          &samples[sample_start..sample_end],
+          contour_samples,
+          contour_area_alpha,
+          source_area_alpha,
+          resolved_contour_color,
+        ) else {
+          continue;
+        };
+        // Resolve authored opacity and geometric coverage independently. Office
+        // Screen controls with a nonzero top inset retain fractional SMask
+        // values at the two terminal bevel corners; promoting every majority
+        // pixel to opaque creates a disconnected outer extrusion island once
+        // the inset crosses a pixel boundary.
+        let alpha = if let Some(area_mask) = planar_area_mask.as_ref() {
+          resolved.authored_opacity * f32::from(area_mask.alpha_at(pixel_x, pixel_y)) / 255.0
+        } else if let Some(silhouette_masks) = silhouette_coverage_masks.as_ref() {
+          resolved.authored_opacity * silhouette_masks[pixel_index].count_ones() as f32
+            / sample_count as f32
+        } else {
+          resolved.alpha
+        };
+        let color = Rgba([
+          resolved.rgb[0],
+          resolved.rgb[1],
+          resolved.rgb[2],
+          (alpha * 255.0).round().clamp(0.0, 255.0) as u8,
+        ]);
+        if color[3] == 0 {
+          continue;
+        }
+        if let Some(samples) = area_resolved_samples.as_mut() {
+          samples[(top - full_top) as usize * raster_width + pixel_index] =
+            Some(TextAreaResolvedSample {
+              rgb: resolved.rgb,
+              authored_opacity: resolved.authored_opacity,
+            });
+        }
+        blend_over(
+          destination.get_pixel_mut(
+            (left as usize + local_x) as u32,
+            (top as usize + local_y) as u32,
+          ),
+          color,
+        );
+      }
+    }
+  };
+  for (band_index, first_row) in (0..raster_height).step_by(rows_per_tile).enumerate() {
+    let last_row = first_row.saturating_add(rows_per_tile).min(raster_height);
+    render_rows(
+      destination,
+      full_top + first_row as i32,
+      full_top + last_row as i32,
+      &triangle_bins[band_index],
+      &mut area_resolved_samples,
+    );
   }
 
+  // Keep the AreaA8 fringe's nearest donor/default search on the whole image.
+  // A row boundary must not change which material supplies a thin terminal.
   if let (Some(area_mask), Some(resolved_samples)) =
     (planar_area_mask.as_ref(), area_resolved_samples.as_ref())
   {
@@ -10064,7 +11137,7 @@ fn text_bevel_profile_strips(
   realized_profile_tolerance_px: Option<f32>,
 ) -> (bool, Vec<TextBevelProfileStrip>) {
   let profile = bevel_profile(preset);
-  let shape_circle_lighting = geometry_lighting == Static3dGeometryLighting::Shape
+  let shape_circle_lighting = geometry_lighting != Static3dGeometryLighting::Text
     && preset.unwrap_or(a::BevelPresetValues::Circle) == a::BevelPresetValues::Circle;
   // US7639249B2 describes the Office direct-inset contract: the profile object
   // flattens the authored profile, computes a normal at every flattened point,
@@ -10097,6 +11170,11 @@ fn text_bevel_profile_strips(
         segment_index,
         realized_profile_tolerance_px.unwrap_or(TEXT_BEVEL_PROFILE_FLATTENING_TOLERANCE_PX),
       )
+    } else if geometry_lighting == Static3dGeometryLighting::WordShape
+      && word_shape_bevel_has_native_axes(preset)
+      && let Some(tolerance) = realized_profile_tolerance_px
+    {
+      word_shape_bevel_segment_parameters(normal_width, height, preset, segment_index, tolerance)
     } else {
       (0..=uniform_subdivisions)
         .map(|subdivision| subdivision as f32 / uniform_subdivisions as f32)
@@ -10130,6 +11208,12 @@ fn text_bevel_profile_strips(
           word_text_bevel_geometry_profile(preset, authored_inner),
           word_text_bevel_geometry_profile(preset, authored_middle),
         )
+      } else if geometry_lighting == Static3dGeometryLighting::WordShape {
+        (
+          word_shape_bevel_geometry_profile(preset, authored_outer),
+          word_shape_bevel_geometry_profile(preset, authored_inner),
+          word_shape_bevel_geometry_profile(preset, authored_middle),
+        )
       } else {
         (authored_outer, authored_inner, authored_middle)
       };
@@ -10151,7 +11235,10 @@ fn text_bevel_profile_strips(
     }
   }
   (
-    geometry_lighting == Static3dGeometryLighting::Text || shape_circle_lighting,
+    geometry_lighting == Static3dGeometryLighting::Text
+      || shape_circle_lighting
+      || (geometry_lighting == Static3dGeometryLighting::WordShape
+        && word_shape_bevel_has_native_axes(preset)),
     profile_strips,
   )
 }
@@ -10501,6 +11588,11 @@ fn text_bevel_triangles(
       if geometry_lighting == Static3dGeometryLighting::Text {
         return word_text_bevel_lighting_profile(preset, profile);
       }
+      if geometry_lighting == Static3dGeometryLighting::WordShape
+        && word_shape_bevel_has_native_axes(preset)
+      {
+        return profile;
+      }
       if !interpolate_profile_lighting {
         return middle_profile;
       }
@@ -10718,7 +11810,7 @@ fn text_bevel_triangles(
     let inner_z = surface_z + inner_profile.height * height * height_direction;
     let outer_inset_px = geometry_width * outer_profile.inset;
     let inner_inset_px = geometry_width * inner_profile.inset;
-    let use_textured_material = geometry_lighting == Static3dGeometryLighting::Text;
+    let use_textured_material = geometry_lighting != Static3dGeometryLighting::Shape;
     let outer_first = project(
       outer_first,
       outer_z,
@@ -11185,6 +12277,196 @@ mod tests {
   use crate::model::RgbColor;
 
   #[test]
+  fn word_shape_contour_only_survives_device_viewport_transform() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let geometry = Static3dTextGeometry::from_page_path(
+      &[
+        PathCommand::MoveTo(point(8.0, 8.0)),
+        PathCommand::LineTo(point(24.0, 8.0)),
+        PathCommand::LineTo(point(24.0, 24.0)),
+        PathCommand::LineTo(point(8.0, 24.0)),
+        PathCommand::Close,
+      ],
+      Rect {
+        origin: point(0.0, 0.0),
+        size: Size {
+          width: Pt(32.0),
+          height: Pt(32.0),
+        },
+      },
+      1.0,
+    )
+    .unwrap();
+    let scene = scene(a::PresetCameraValues::OrthographicFront);
+    let shape = a::Shape3DType {
+      preset_material: Some(a::PresetMaterialTypeValues::Matte),
+      contour_width: Some(CoordinateValue::Emu(50_800)),
+      ..Default::default()
+    };
+    for scale in [1.0, 1.05] {
+      let mut image = RgbaImage::from_pixel(32, 32, Rgba([0, 0, 255, 255]));
+      super::apply_static_3d_shape_geometry(
+        &mut image,
+        super::Static3dShapeSurface {
+          material_texture: None,
+          wordprocessing_shape: true,
+          geometry: &geometry,
+          material_geometry: &geometry,
+          rasterization: super::Static3dShapeRasterization::Multisample8,
+          two_sided_extrusion: false,
+          uniform_paint_opacity: Some(1.0),
+        },
+        &scene,
+        camera_projection(&scene, 0.0)
+          .with_viewport_scale(scale, scale)
+          .with_viewport_translation_px(0.2, 0.3),
+        &shape,
+        Static3dRenderOptions {
+          pixels_per_point: 1.0,
+          model_surface: Some(Static3dSurface {
+            left_px: 8.0,
+            top_px: 8.0,
+            width_px: 16.0,
+            height_px: 16.0,
+          }),
+          extrusion_color: None,
+          contour_color: Some(Static3dColor {
+            color: RgbColor { r: 255, g: 0, b: 0 },
+            alpha: 255,
+          }),
+        },
+      );
+      assert!(
+        image
+          .pixels()
+          .filter(|p| p[0] > 200 && p[2] < 20 && p[3] > 200)
+          .count()
+          > 80
+      );
+      let center = image.get_pixel(16, 16);
+      assert!(
+        center[2] > 100 && center[0] < 20,
+        "scale={scale}, center={center:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn device_viewport_scale_is_after_camera_and_does_not_preserve_source_coverage() {
+    for camera in [
+      a::PresetCameraValues::OrthographicFront,
+      a::PresetCameraValues::IsometricLeftDown,
+      a::PresetCameraValues::PerspectiveLeft,
+    ] {
+      let scene = a::Scene3DType {
+        camera: Box::new(a::Camera {
+          preset: camera,
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      let projection = camera_projection(&scene, 0.0);
+      let scaled = projection
+        .with_viewport_scale(1.02, 0.97)
+        .with_viewport_translation_px(-2.5, 3.75);
+      assert!(!super::projection_preserves_source_plane_coverage(scaled));
+      for (x, y, z) in [(0.0, 0.0, 0.0), (-20.0, 35.0, 7.0), (18.0, -31.0, -4.0)] {
+        let before = super::project_local(projection, x, y, z, 113.0, 111.0);
+        let after = super::project_local(scaled, x, y, z, 113.0, 111.0);
+        assert!((after.0 - (before.0 * 1.02 - 2.5)).abs() < 1e-4);
+        assert!((after.1 - (before.1 * 0.97 + 3.75)).abs() < 1e-4);
+      }
+    }
+  }
+
+  #[test]
+  fn word_shape_bevel_axes_match_native_cross_and_relaxed_inset_vertices() {
+    let preset = Some(a::BevelPresetValues::Cross);
+    for (segment, width, height) in [
+      (0, 1.1, 0.7),
+      (1, 4.4, 0.7),
+      (2, 5.5, 1.4),
+      (3, 5.5, 6.3),
+      (4, 6.6, 7.0),
+    ] {
+      let point = super::word_shape_bevel_geometry_profile(
+        preset,
+        bevel_profile_sample(preset, segment, 1.0),
+      );
+      assert!((point.inset * 11.0 - width).abs() < 1e-4);
+      assert!((point.height * 7.0 - height).abs() < 1e-4);
+    }
+    let cap = super::word_shape_bevel_terminal_profile(Some(a::BevelPresetValues::RelaxedInset));
+    assert!((cap.inset * 6.0 - 6.0).abs() < 1e-4);
+    assert!((cap.height * 7.0 - 4.48).abs() < 1e-4);
+    // The generic DrawingML consumer retains its documented axis contract.
+    let generic = bevel_profile_sample(preset, 4, 1.0);
+    assert_eq!(generic.height, 1.0);
+    assert_eq!(generic.inset, 1.0);
+  }
+
+  #[test]
+  fn word_shape_profile_realization_matches_native_completed_vectors() {
+    // GFX's actual completed profile vectors, in physical points. Remove
+    // the independently observed -1pt pen-center translation from raw x;
+    // preserve each profile's inward width and front-facing height.
+    let native_cross = [
+      [0.0, 0.0],
+      [0.320_526_3, 0.496_028_75],
+      [1.1, 0.7],
+      [4.4, 0.7],
+      [5.179_474, 0.903_971_25],
+      [5.5, 1.4],
+      [5.5, 6.3],
+      [5.820_526, 6.796_029],
+      [6.6, 7.0],
+    ];
+    for pixels_per_point in [1.0, 4.0 / 3.0, 2.0] {
+      let preset = Some(a::BevelPresetValues::Cross);
+      let (_, strips) = super::text_bevel_profile_strips(
+        11.0 * pixels_per_point,
+        7.0 * pixels_per_point,
+        preset,
+        super::Static3dGeometryLighting::WordShape,
+        None,
+        None,
+        Some(0.362_223_15 * pixels_per_point),
+      );
+      let actual = std::iter::once(strips[0].outer)
+        .chain(strips.iter().map(|strip| strip.inner))
+        .collect::<Vec<_>>();
+      assert_eq!(actual.len(), native_cross.len());
+      for (point, [width, height]) in actual.into_iter().zip(native_cross) {
+        assert!((point.inset * 11.0 - width).abs() < 1e-5);
+        assert!((point.height * 7.0 - height).abs() < 1e-5);
+      }
+    }
+    // The 150% zoom control refines both RelaxedInset curves. The authored
+    // dimensions stay unchanged; the projected realization sets precision.
+    for (tolerance, first, second) in [
+      (0.362_223_15, vec![0.0, 0.5, 0.75, 1.0], vec![0.0, 0.5, 1.0]),
+      (
+        0.241_482_11,
+        vec![0.0, 0.25, 0.5, 0.75, 1.0],
+        vec![0.0, 0.25, 0.5, 1.0],
+      ),
+    ] {
+      for (segment, expected) in [first, second].into_iter().enumerate() {
+        assert_eq!(
+          super::word_shape_bevel_segment_parameters(
+            6.0,
+            7.0,
+            Some(a::BevelPresetValues::RelaxedInset),
+            segment,
+            tolerance,
+          ),
+          expected
+        );
+      }
+    }
+  }
+
+  #[test]
   fn vector_side_material_is_not_culled_by_zero_source_coverage() {
     use kurbo::Shape;
     let mut boundary = super::RasterSourceBoundary::default();
@@ -11227,6 +12509,7 @@ mod tests {
           material: None,
           wireframe: false,
           geometry_lighting: Static3dGeometryLighting::Shape,
+          texture_geometry: None,
           outline_contour: None,
         },
       );
@@ -11288,6 +12571,7 @@ mod tests {
           material: None,
           wireframe: false,
           geometry_lighting: Static3dGeometryLighting::Shape,
+          texture_geometry: None,
           outline_contour: None,
         },
       )
@@ -11342,6 +12626,59 @@ mod tests {
   }
 
   #[test]
+  fn picture_specular_reflection_lights_both_extrusion_faces() {
+    // Office controls vary camera, material and extrusion color independently.
+    // With a black source, warmMatte contributes a 45-byte white highlight to
+    // both X faces for RightUp, and both Y faces for LeftUp. Matte contributes
+    // none. This isolates specular light from diffuse color and coverage.
+    for (camera, normals) in [
+      (
+        a::PresetCameraValues::IsometricRightUp,
+        [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]],
+      ),
+      (
+        a::PresetCameraValues::IsometricLeftUp,
+        [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],
+      ),
+    ] {
+      let mut scene = scene(camera);
+      scene.light_rig.rig = a::LightRigValues::ThreePoints;
+      scene.light_rig.direction = a::LightRigDirectionValues::Top;
+      let view = super::surface_view_direction(
+        &scene,
+        camera_projection(&scene, 0.0),
+        [0.0; 3],
+        140.0,
+        161.0,
+        1.0,
+      );
+      for normal in normals {
+        let specular = super::legacy_light_rig_surface_specular(
+          &scene,
+          normal,
+          view,
+          Some(a::PresetMaterialTypeValues::WarmMatte),
+        );
+        for value in specular {
+          assert!(
+            (value * 255.0 - 45.0).abs() < 2.0,
+            "{camera:?}: {specular:?}"
+          );
+        }
+        assert_eq!(
+          super::legacy_light_rig_surface_specular(
+            &scene,
+            normal,
+            view,
+            Some(a::PresetMaterialTypeValues::Matte),
+          ),
+          [0.0; 3],
+        );
+      }
+    }
+  }
+
+  #[test]
   fn shape_surface_interpolation_preserves_constant_attributes() {
     let color = [0.0, 129.0, 58.0, 255.0];
     for (second, third) in [(0.25, 0.25), (-17.321, 18.991), (1000.125, -999.875)] {
@@ -11360,6 +12697,106 @@ mod tests {
       ),
       [75.0, 128.0, 64.0, 255.0]
     );
+  }
+
+  #[test]
+  fn translucent_picture_preserves_the_opaque_extrusion_behind_it() {
+    let canvas = Rect {
+      origin: Point {
+        x: Pt(0.0),
+        y: Pt(0.0),
+      },
+      size: Size {
+        width: Pt(144.0),
+        height: Pt(144.0),
+      },
+    };
+    let bounds = Rect {
+      origin: Point {
+        x: Pt(32.0),
+        y: Pt(32.0),
+      },
+      size: Size {
+        width: Pt(64.0),
+        height: Pt(80.0),
+      },
+    };
+    let path = crate::common::drawingml_shape_raster::static_3d_picture_frame(bounds, 0.0);
+    let geometry = Static3dTextGeometry::from_page_path(&path, canvas, 1.0).unwrap();
+    let mut scene = scene(a::PresetCameraValues::IsometricRightUp);
+    scene.light_rig.rig = a::LightRigValues::ThreePoints;
+    scene.light_rig.direction = a::LightRigDirectionValues::Top;
+    let shape = a::Shape3DType {
+      extrusion_height: Some(CoordinateValue::Emu(152_400)),
+      preset_material: Some(a::PresetMaterialTypeValues::Matte),
+      ..a::Shape3DType::default()
+    };
+    let render = |alpha, rasterization| {
+      let mut image = RgbaImage::new(144, 144);
+      for y in 32..112 {
+        for x in 32..96 {
+          image.put_pixel(x, y, Rgba([0, 0, 255, alpha]));
+        }
+      }
+      image.put_pixel(64, 72, Rgba([0, 0, 255, 255]));
+      super::apply_static_3d_shape_geometry(
+        &mut image,
+        super::Static3dShapeSurface {
+          material_texture: None,
+          wordprocessing_shape: false,
+          two_sided_extrusion: true,
+          geometry: &geometry,
+          material_geometry: &geometry,
+          rasterization,
+          uniform_paint_opacity: None,
+        },
+        &scene,
+        camera_projection(&scene, 0.0),
+        &shape,
+        Static3dRenderOptions {
+          extrusion_color: Some(Static3dColor {
+            color: RgbColor { r: 255, g: 0, b: 0 },
+            alpha: 255,
+          }),
+          contour_color: None,
+          pixels_per_point: 1.0,
+          model_surface: Some(Static3dSurface {
+            left_px: 32.0,
+            top_px: 32.0,
+            width_px: 64.0,
+            height_px: 80.0,
+          }),
+        },
+      );
+      image
+    };
+    for rasterization in [
+      super::Static3dShapeRasterization::SourceAntialias,
+      super::Static3dShapeRasterization::Multisample8,
+    ] {
+      let transparent = render(0, rasterization);
+      let translucent = render(128, rasterization);
+      let opaque = render(255, rasterization);
+      let mut overlap = 0;
+      for ((back, half), front) in transparent
+        .pixels()
+        .zip(translucent.pixels())
+        .zip(opaque.pixels())
+      {
+        if back[3] == 255 && back[0] > 0 && back[2] == 0 && front.0 == [0, 0, 255, 255] {
+          overlap += 1;
+          assert_eq!(half[3], 255);
+          assert!((f32::from(half[0]) - f32::from(back[0]) * 127.0 / 255.0).abs() <= 1.0);
+          assert_eq!(half[1], 0);
+          // The coverage resolve performs its final byte conversion separately.
+          assert!(half[2].abs_diff(128) <= 1);
+        }
+      }
+      assert!(
+        overlap > 20,
+        "{rasterization:?}: expected covered picture/frame samples, got {overlap}"
+      );
+    }
   }
 
   #[test]
@@ -11392,6 +12829,8 @@ mod tests {
     super::apply_static_3d_shape_geometry(
       &mut image,
       super::Static3dShapeSurface {
+        material_texture: None,
+        wordprocessing_shape: false,
         two_sided_extrusion: false,
         geometry: &geometry,
         material_geometry: &geometry,
@@ -11535,6 +12974,7 @@ mod tests {
       contours: Vec::new(),
       source_coverage_path: kurbo::BezPath::new(),
       bevel_profile_tolerance_px: None,
+      shape_outline_widened: false,
       solid_on_right: true,
       page_plane_scale_x: 1.0,
       page_plane_scale_y: 1.0,
@@ -11549,6 +12989,7 @@ mod tests {
       TextSolidSurfaceInput {
         scene: &scene,
         material: None,
+        planar_source_over: false,
         bevel_material_source: &source,
         surface_material_texture: None,
         source_geometry: &geometry,
@@ -11596,6 +13037,193 @@ mod tests {
   }
 
   #[test]
+  fn text_surface_row_tiles_preserve_depth_contours_and_global_area_donors() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let geometry = Static3dTextGeometry::from_page_path(
+      &[
+        PathCommand::MoveTo(point(3.23, 2.19)),
+        PathCommand::LineTo(point(27.6, 2.19)),
+        PathCommand::LineTo(point(27.6, 21.77)),
+        PathCommand::LineTo(point(3.23, 21.77)),
+        PathCommand::Close,
+        PathCommand::MoveTo(point(9.37, 7.23)),
+        PathCommand::LineTo(point(9.37, 16.61)),
+        PathCommand::LineTo(point(18.51, 16.61)),
+        PathCommand::LineTo(point(18.51, 7.23)),
+        PathCommand::Close,
+        // AreaA8 sees this terminal; none of the 8x4 sample columns do.
+        // Its material donor must remain visible across row tile boundaries.
+        PathCommand::MoveTo(point(29.001, 21.2)),
+        PathCommand::LineTo(point(29.02, 21.2)),
+        PathCommand::LineTo(point(29.02, 21.9)),
+        PathCommand::LineTo(point(29.001, 21.9)),
+        PathCommand::Close,
+      ],
+      Rect {
+        origin: Point::default(),
+        size: Size {
+          width: Pt(32.0),
+          height: Pt(24.0),
+        },
+      },
+      1.0,
+    )
+    .expect("fractional holed outline and thin terminal");
+    let source = RgbaImage::from_fn(32, 24, |x, y| {
+      Rgba([30 + x as u8 * 6, 40 + y as u8 * 7, 170, 90 + x as u8 * 4])
+    });
+    let scene = scene(a::PresetCameraValues::OrthographicFront);
+    let mut triangles = text_surface_quad(2.0, [220.0, 60.0, 30.0, 140.0]);
+    for vertex in triangles
+      .iter_mut()
+      .flat_map(|triangle| &mut triangle.vertices)
+    {
+      vertex.point = (4.2 + vertex.point.0 * 20.0, 3.3 + vertex.point.1 * 15.0);
+    }
+    let final_grid =
+      Static3dTextFinalGrid::new(32, 24, 0.0, 0.0, 32.0, 24.0).expect("identity final grid");
+    for rasterization in [
+      TextSurfaceRasterization::Source,
+      TextSurfaceRasterization::MultisampleSource,
+      TextSurfaceRasterization::Final(final_grid),
+    ] {
+      for coverage in [
+        TextPlanarCoverageResolve::BoxSamples8x4,
+        TextPlanarCoverageResolve::AreaA8,
+      ] {
+        for contour_enabled in [false, true] {
+          let input = TextSolidSurfaceInput {
+            scene: &scene,
+            material: Some(a::PresetMaterialTypeValues::Metal),
+            planar_source_over: false,
+            bevel_material_source: &source,
+            surface_material_texture: None,
+            source_geometry: &geometry,
+            material_geometry: &geometry,
+            paint_opacity_geometry: &geometry,
+            planar_fill_material: None,
+            planar_outline_material: None,
+            planar_outline_coverage: None,
+            planar_fill_uniform_paint_opacity: None,
+            planar_outline_uniform_paint_opacity: None,
+            planar_outline_material_inset_px: None,
+            fill_has_authored_transparency: true,
+            outline_has_authored_transparency: false,
+            uniform_paint_opacity: None,
+            planar_geometry: &geometry,
+            planar_coverage_geometry: &geometry,
+            planar_inset_px: 0.0,
+            direct_inset_cells: None,
+            planar_coverage: coverage,
+            triangles: &triangles,
+            direct_inset_bevel: None,
+            contour: contour_enabled.then_some(super::TextContourSurfaceInput {
+              width_px: 0.8,
+              base_z: 0.0,
+              color: Static3dColor {
+                color: RgbColor {
+                  r: 40,
+                  g: 160,
+                  b: 70,
+                },
+                alpha: 173,
+              },
+            }),
+            options: ProjectedImageOptions {
+              projection: camera_projection(&scene, 0.0),
+              z: 0.0,
+              bounds: (0, 0, 32, 24),
+              model_surface: Static3dSurface {
+                left_px: 0.0,
+                top_px: 0.0,
+                width_px: 32.0,
+                height_px: 24.0,
+              },
+              pixels_per_point: 1.0,
+              tint: None,
+            },
+            geometry_lighting: Static3dGeometryLighting::Text,
+          };
+          let render = |maximum_tile_samples| {
+            let mut destination = RgbaImage::new(32, 24);
+            super::composite_text_solid_surfaces_with_tile_samples(
+              &mut destination,
+              &source,
+              input,
+              rasterization,
+              maximum_tile_samples,
+              true,
+            );
+            destination
+          };
+          let expected = render(usize::MAX);
+          assert!(expected.pixels().any(|pixel| pixel[3] != 0));
+          if rasterization == TextSurfaceRasterization::Source
+            && coverage == TextPlanarCoverageResolve::AreaA8
+            && !contour_enabled
+          {
+            assert!(
+              expected.get_pixel(29, 21)[3] > 0,
+              "AreaA8 donor fixture is active"
+            );
+          }
+          for rows in [1, 3, 7, 8, 15, 17] {
+            assert_eq!(
+              render(rows * 32 * rasterization.sample_pattern().count()),
+              expected,
+              "{rasterization:?} {coverage:?} contour={contour_enabled}, rows={rows}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn parallel_word_color_table_matches_scalar_equations_for_every_byte_channel() {
+    use a::PresetMaterialTypeValues as M;
+    for material in [
+      M::Metal,
+      M::SoftMetal,
+      M::LegacyMetal,
+      M::WarmMatte,
+      M::Clear,
+      M::Plastic,
+      M::LegacyPlastic,
+      M::Matte,
+      M::DarkEdge,
+      M::SoftEdge,
+      M::Flat,
+      M::TranslucentPowder,
+      M::Powder,
+      M::LegacyMatte,
+      M::LegacyWireframe,
+    ] {
+      for (diffuse, incident) in [
+        ([0.0, 0.2, 0.8], [0.5, 1.1, 0.0]),
+        ([0.67, 1.3, 2.5], [0.03, 0.2, 0.9]),
+      ] {
+        let table = super::word_text_planar_color_table(diffuse, incident, Some(material));
+        for value in 0..=255_u8 {
+          let color = [value, value.wrapping_add(67), value.wrapping_add(149)];
+          let specular = super::word_text_surface_specular(incident, Some(material), color);
+          for channel in 0..3 {
+            assert_eq!(
+              table[channel][usize::from(color[channel])],
+              super::shade_gouraud_channel_with_specular(
+                color[channel],
+                diffuse[channel],
+                specular[channel]
+              ),
+              "{material:?}, color={color:?}, channel={channel}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn clamped_material_sampling_extends_the_edge_texel() {
     let mut image = RgbaImage::new(2, 1);
     image.put_pixel(0, 0, Rgba([255, 0, 0, 255]));
@@ -11619,6 +13247,7 @@ mod tests {
       contours: Vec::new(),
       source_coverage_path: kurbo::BezPath::new(),
       bevel_profile_tolerance_px: None,
+      shape_outline_widened: false,
       solid_on_right: true,
       page_plane_scale_x: 1.306_076,
       page_plane_scale_y: 1.307_189_5,
@@ -11629,6 +13258,7 @@ mod tests {
       contours: Vec::new(),
       source_coverage_path: kurbo::BezPath::new(),
       bevel_profile_tolerance_px: None,
+      shape_outline_widened: false,
       solid_on_right: true,
       page_plane_scale_x: 1.304_347_9,
       page_plane_scale_y: 1.305_555_6,
@@ -12412,6 +14042,7 @@ mod tests {
       material_point: (1.0, 1.0),
       diffuse: [1.0; 3],
       specular_incident: [0.0; 3],
+      packed_specular: false,
       material_opacity: 1.0,
       alpha_texture_fraction: 1.0,
     };
@@ -12508,7 +14139,7 @@ mod tests {
         },
         [0.0, 0.0, 1.0],
         shape.preset_material,
-        true,
+        Static3dGeometryLighting::Text,
       );
       assert_ne!(expected.get_pixel(6, 6), source.get_pixel(6, 6));
       // Both the combined fallback and the independent fill-material owner
@@ -12518,6 +14149,7 @@ mod tests {
         super::apply_static_3d_text_with_outline_material(
           &mut actual,
           crate::common::drawingml_3d::Static3dTextSurface {
+            output: super::Static3dTextOutput::Color,
             geometry: &geometry,
             front_fill_material: separate_fill.then_some(&source),
             front_outline_material: None,
@@ -12560,6 +14192,7 @@ mod tests {
           super::apply_static_3d_text_with_outline_material(
             &mut actual,
             crate::common::drawingml_3d::Static3dTextSurface {
+              output: super::Static3dTextOutput::Color,
               geometry: &layered_geometry,
               front_fill_material: Some(&fill_image),
               front_outline_material: Some(&outline_image),
@@ -12574,6 +14207,7 @@ mod tests {
           super::apply_static_3d_text_with_outline_material(
             &mut expected,
             crate::common::drawingml_3d::Static3dTextSurface {
+              output: super::Static3dTextOutput::Color,
               geometry: &geometry,
               front_fill_material: None,
               front_outline_material: None,
@@ -12610,13 +14244,14 @@ mod tests {
       },
       [0.0, 0.0, 1.0],
       shape.preset_material,
-      true,
+      Static3dGeometryLighting::Text,
     );
     for separate_fill in [false, true] {
       let mut actual = source.clone();
       super::apply_static_3d_text_with_outline_material(
         &mut actual,
         crate::common::drawingml_3d::Static3dTextSurface {
+          output: super::Static3dTextOutput::Color,
           geometry: &geometry,
           front_fill_material: separate_fill.then_some(&source),
           front_outline_material: None,
@@ -12673,6 +14308,7 @@ mod tests {
       let final_image = super::apply_static_3d_text_with_outline_material_and_final_grid(
         &mut source,
         super::Static3dTextSurface {
+          output: super::Static3dTextOutput::Color,
           geometry: &geometry,
           front_fill_material: None,
           front_outline_material: None,
@@ -12809,40 +14445,54 @@ mod tests {
             }),
             ..a::Shape3DType::default()
           };
+          let options = Static3dRenderOptions {
+            extrusion_color: Some(Static3dColor {
+              color: RgbColor {
+                r: 210,
+                g: 220,
+                b: 240,
+              },
+              alpha: 255,
+            }),
+            contour_color: Some(Static3dColor {
+              color: RgbColor {
+                r: 20,
+                g: 80,
+                b: 140,
+              },
+              alpha: 255,
+            }),
+            pixels_per_point: 1.0,
+            model_surface: Some(Static3dSurface {
+              left_px: 0.0,
+              top_px: 0.0,
+              width_px: 12.0,
+              height_px: 10.0,
+            }),
+          };
           let mut image = source.clone();
-          apply_static_3d_text(
-            &mut image,
-            &geometry,
+          apply_static_3d_text(&mut image, &geometry, &scene, projection, &shape, options);
+          let alpha = image.pixels().map(|pixel| pixel[3]).collect::<Vec<_>>();
+          let mut coverage = source.clone();
+          super::apply_static_3d_text_with_outline_material(
+            &mut coverage,
+            super::Static3dTextSurface {
+              geometry: &geometry,
+              front_fill_material: None,
+              front_outline_material: None,
+              front_outline_coverage: None,
+              output: super::Static3dTextOutput::Coverage,
+            },
             &scene,
             projection,
             &shape,
-            Static3dRenderOptions {
-              extrusion_color: Some(Static3dColor {
-                color: RgbColor {
-                  r: 210,
-                  g: 220,
-                  b: 240,
-                },
-                alpha: 255,
-              }),
-              contour_color: Some(Static3dColor {
-                color: RgbColor {
-                  r: 20,
-                  g: 80,
-                  b: 140,
-                },
-                alpha: 255,
-              }),
-              pixels_per_point: 1.0,
-              model_surface: Some(Static3dSurface {
-                left_px: 0.0,
-                top_px: 0.0,
-                width_px: 12.0,
-                height_px: 10.0,
-              }),
-            },
+            options,
           );
-          let alpha = image.pixels().map(|pixel| pixel[3]).collect::<Vec<_>>();
+          assert_eq!(
+            coverage.pixels().map(|pixel| pixel[3]).collect::<Vec<_>>(),
+            alpha,
+            "coverage-only phase={phase}, contour={contour_enabled}, preset={preset:?}, mask={mask:03b}"
+          );
           if let Some(reference) = reference_alpha.as_ref() {
             assert_eq!(
               &alpha, reference,
@@ -12852,6 +14502,104 @@ mod tests {
             reference_alpha = Some(alpha);
           }
         }
+      }
+    }
+  }
+
+  #[test]
+  fn coverage_request_preserves_projected_wireframe_and_final_grid_outputs() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let geometry = Static3dTextGeometryPaths::from_page_path_for_direct3d9(
+      &[
+        PathCommand::MoveTo(point(2.2, 2.3)),
+        PathCommand::LineTo(point(9.7, 2.3)),
+        PathCommand::LineTo(point(9.7, 9.8)),
+        PathCommand::LineTo(point(2.2, 9.8)),
+        PathCommand::Close,
+      ],
+      Rect {
+        origin: Point::default(),
+        size: Size {
+          width: Pt(12.0),
+          height: Pt(12.0),
+        },
+      },
+      1.0,
+    )
+    .expect("source geometry")
+    .with_uniform_paint_opacity(Some(0.6));
+    let source = RgbaImage::from_pixel(12, 12, Rgba([80, 140, 210, 153]));
+    for (preset, material) in [
+      (
+        a::PresetCameraValues::PerspectiveLeft,
+        a::PresetMaterialTypeValues::Metal,
+      ),
+      (
+        a::PresetCameraValues::IsometricRightUp,
+        a::PresetMaterialTypeValues::Metal,
+      ),
+      (
+        a::PresetCameraValues::OrthographicFront,
+        a::PresetMaterialTypeValues::LegacyWireframe,
+      ),
+    ] {
+      let scene = scene(preset);
+      let shape = a::Shape3DType {
+        extrusion_height: Some(CoordinateValue::Emu(12_700)),
+        preset_material: Some(material),
+        ..Default::default()
+      };
+      let options = Static3dRenderOptions {
+        extrusion_color: None,
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: Some(Static3dSurface {
+          left_px: 0.0,
+          top_px: 0.0,
+          width_px: 12.0,
+          height_px: 12.0,
+        }),
+      };
+      for final_grid in [false, true] {
+        let render = |output| {
+          let mut image = source.clone();
+          let surface = super::Static3dTextSurface {
+            geometry: &geometry,
+            front_fill_material: None,
+            front_outline_material: None,
+            front_outline_coverage: None,
+            output,
+          };
+          let grid = if final_grid {
+            super::apply_static_3d_text_with_outline_material_and_final_grid(
+              &mut image,
+              surface,
+              &scene,
+              camera_projection(&scene, 0.0),
+              &shape,
+              options,
+              Static3dTextFinalGrid::new(8, 8, 0.0, 0.0, 12.0, 12.0).unwrap(),
+            )
+          } else {
+            super::apply_static_3d_text_with_outline_material(
+              &mut image,
+              surface,
+              &scene,
+              camera_projection(&scene, 0.0),
+              &shape,
+              options,
+            );
+            None
+          };
+          (image, grid)
+        };
+        let expected = render(super::Static3dTextOutput::Color);
+        assert!(expected.0.pixels().any(|pixel| pixel[3] != 0));
+        assert_eq!(
+          expected,
+          render(super::Static3dTextOutput::Coverage),
+          "{preset:?}/{material:?}, final={final_grid}"
+        );
       }
     }
   }
@@ -13643,6 +15391,155 @@ mod tests {
   }
 
   #[test]
+  fn source_winding_buckets_preserve_contours_counters_and_adjacent_floats() {
+    let mut commands = Vec::new();
+    for (center, radius, reverse) in [(0.0, 12.0, false), (0.0, 4.0, true), (24.0, 3.0, false)] {
+      for index in 0..64 {
+        let angle = index as f32 * std::f32::consts::TAU / 64.0 * if reverse { -1.0 } else { 1.0 };
+        let point = Point {
+          x: Pt(center + radius * angle.cos()),
+          y: Pt(radius * angle.sin()),
+        };
+        commands.push(if index == 0 {
+          PathCommand::MoveTo(point)
+        } else {
+          PathCommand::LineTo(point)
+        });
+      }
+      commands.push(PathCommand::Close);
+    }
+    let geometry = Static3dTextGeometry::from_page_path(
+      &commands,
+      Rect {
+        origin: Point {
+          x: Pt(-16.0),
+          y: Pt(-16.0),
+        },
+        size: Size {
+          width: Pt(48.0),
+          height: Pt(32.0),
+        },
+      },
+      1.0,
+    )
+    .expect("multiple contours with a counter");
+    assert!(
+      geometry
+        .contours
+        .iter()
+        .any(|contour| contour.points.len() >= 32)
+    );
+    let winding = super::TextGeometryWinding::new(&geometry);
+    let mut queries = (-32..128)
+      .flat_map(|x| (-32..96).map(move |y| (x as f32 * 0.5, y as f32 * 0.5)))
+      .collect::<Vec<_>>();
+    for contour in &geometry.contours {
+      for (&first, &second) in contour
+        .points
+        .iter()
+        .zip(contour.points.iter().cycle().skip(1))
+      {
+        for (x, y) in [
+          first,
+          second,
+          ((first.0 + second.0) * 0.5, (first.1 + second.1) * 0.5),
+        ] {
+          for xx in [x.next_down(), x, x.next_up()] {
+            for yy in [y.next_down(), y, y.next_up()] {
+              queries.push((xx, yy));
+            }
+          }
+        }
+      }
+    }
+    queries.extend([
+      (0.0, f32::NAN),
+      (0.0, f32::INFINITY),
+      (0.0, f32::NEG_INFINITY),
+    ]);
+    for point in queries {
+      assert_eq!(
+        winding.contains(point),
+        text_geometry_contains(&geometry, point),
+        "{point:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn text_boundary_index_preserves_the_contour_band_at_tiles_vertices_and_counters() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let geometry = Static3dTextGeometry::from_page_path(
+      &[
+        PathCommand::MoveTo(point(-3.125, 2.25)),
+        PathCommand::LineTo(point(23.75, 2.25)),
+        PathCommand::CubicTo {
+          control1: point(32.0, 3.0),
+          control2: point(31.25, 20.5),
+          end: point(23.75, 24.0),
+        },
+        PathCommand::LineTo(point(-3.125, 24.0)),
+        PathCommand::Close,
+        PathCommand::MoveTo(point(5.125, 7.75)),
+        PathCommand::LineTo(point(5.125, 18.0)),
+        PathCommand::LineTo(point(17.25, 18.0)),
+        PathCommand::LineTo(point(17.25, 7.75)),
+        PathCommand::Close,
+      ],
+      Rect {
+        origin: point(-8.0, -8.0),
+        size: Size {
+          width: Pt(64.0),
+          height: Pt(64.0),
+        },
+      },
+      1.0,
+    )
+    .expect("curved outline with a counter");
+    for radius in [0.0_f32, 0.125, 0.5, 2.75, 8.0] {
+      let index = super::TextGeometryBoundaryIndex::new(&geometry, -16, -16, 96, 96, radius)
+        .expect("bounded contour index");
+      let mut queries = (-16..112)
+        .flat_map(|x| (-16..112).map(move |y| (x as f32 * 0.5, y as f32 * 0.5)))
+        .collect::<Vec<_>>();
+      for contour in &geometry.contours {
+        for &(x, y) in &contour.points {
+          for (x, y) in [
+            (x - radius, y),
+            (x + radius, y),
+            (x, y - radius),
+            (x, y + radius),
+          ] {
+            for xx in [x.next_down(), x, x.next_up()] {
+              for yy in [y.next_down(), y, y.next_up()] {
+                queries.push((xx, yy));
+              }
+            }
+          }
+        }
+      }
+      for point in queries {
+        let expected = text_geometry_boundary_distance(&geometry, point);
+        let actual = index
+          .owner_at(&geometry, point)
+          .map_or(f32::INFINITY, |owner| owner.distance);
+        assert_eq!(
+          actual <= radius,
+          expected <= radius,
+          "point={point:?},radius={radius}"
+        );
+        if expected <= radius {
+          assert_eq!(
+            actual.to_bits(),
+            expected.to_bits(),
+            "point={point:?},radius={radius}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
   fn text_bevel_inset_stops_when_opposite_edges_reach_the_medial_boundary() {
     let point = |x, y| Point { x: Pt(x), y: Pt(y) };
     let geometry = Static3dTextGeometry::from_page_path(
@@ -13738,6 +15635,7 @@ mod tests {
     let triangles = super::text_projected_contour_triangles(
       &geometry,
       super::TextProjectedContourOptions {
+        wordprocessing_shape: false,
         width_px: 4.0,
         base_z: 0.0,
         color: Static3dColor {
@@ -13852,6 +15750,156 @@ mod tests {
   }
 
   #[test]
+  fn deferred_source_material_preserves_complete_and_missing_cell_fallbacks() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let geometry = Static3dTextGeometry::from_page_path(
+      &[
+        PathCommand::MoveTo(point(3.23, 2.19)),
+        PathCommand::LineTo(point(27.6, 2.19)),
+        PathCommand::LineTo(point(27.6, 21.77)),
+        PathCommand::LineTo(point(3.23, 21.77)),
+        PathCommand::Close,
+        PathCommand::MoveTo(point(9.37, 7.23)),
+        PathCommand::LineTo(point(9.37, 16.61)),
+        PathCommand::LineTo(point(18.51, 16.61)),
+        PathCommand::LineTo(point(18.51, 7.23)),
+        PathCommand::Close,
+      ],
+      Rect {
+        origin: Point::default(),
+        size: Size {
+          width: Pt(32.0),
+          height: Pt(24.0),
+        },
+      },
+      1.0,
+    )
+    .expect("fractional face with a counter");
+    let source = RgbaImage::from_fn(32, 24, |x, y| {
+      Rgba([30 + x as u8 * 5, 40 + y as u8 * 6, 170, 70 + x as u8 * 5])
+    });
+    let surface = Static3dSurface {
+      left_px: 0.0,
+      top_px: 0.0,
+      width_px: 32.0,
+      height_px: 24.0,
+    };
+    for camera in [
+      a::PresetCameraValues::OrthographicFront,
+      a::PresetCameraValues::PerspectiveLeft,
+    ] {
+      let scene = scene(camera);
+      let projection = camera_projection(&scene, 0.0);
+      for material in [
+        a::PresetMaterialTypeValues::Metal,
+        a::PresetMaterialTypeValues::Clear,
+      ] {
+        for preset in [
+          a::BevelPresetValues::Angle,
+          a::BevelPresetValues::Circle,
+          a::BevelPresetValues::RelaxedInset,
+        ] {
+          let bevel = super::TextBevelOptions {
+            geometry_width: 2.75,
+            normal_width: 2.75,
+            height: 2.5,
+            preset: Some(preset),
+            scene: &scene,
+            projection,
+            model_surface: surface,
+            pixels_per_point: 1.0,
+            surface_z: -2.5,
+            material: Some(material),
+            geometry_lighting: Static3dGeometryLighting::Text,
+            back_face: false,
+            height_direction: 1.0,
+            fill_material: Some(&source),
+            outline_material: None,
+            outline_coverage: None,
+            fill_uniform_paint_opacity: None,
+            outline_uniform_paint_opacity: None,
+            outline_material_inset_px: None,
+            fill_has_authored_transparency: true,
+            outline_has_authored_transparency: false,
+          };
+          let mesh =
+            super::text_bevel_triangles(&source, &geometry, &geometry, &geometry, None, bevel);
+          assert!(!mesh.triangles.is_empty());
+          let terminal = super::word_text_bevel_terminal_profile(Some(preset));
+          for missing_pairs in [false, true] {
+            let triangles = mesh
+              .triangles
+              .iter()
+              .copied()
+              .filter(|triangle| {
+                !missing_pairs
+                  || !triangle
+                    .bevel_source
+                    .is_some_and(|source| !source.direct_inset_graph && source.second_half)
+              })
+              .collect::<Vec<_>>();
+            let input = TextSolidSurfaceInput {
+              scene: &scene,
+              material: Some(material),
+              planar_source_over: false,
+              bevel_material_source: &source,
+              surface_material_texture: None,
+              source_geometry: &geometry,
+              material_geometry: &geometry,
+              paint_opacity_geometry: &geometry,
+              planar_fill_material: Some(&source),
+              planar_outline_material: None,
+              planar_outline_coverage: None,
+              planar_fill_uniform_paint_opacity: None,
+              planar_outline_uniform_paint_opacity: None,
+              planar_outline_material_inset_px: None,
+              fill_has_authored_transparency: true,
+              outline_has_authored_transparency: false,
+              uniform_paint_opacity: None,
+              planar_geometry: &geometry,
+              planar_coverage_geometry: &geometry,
+              planar_inset_px: 2.75 * terminal.inset,
+              direct_inset_cells: mesh.direct_inset_cells.as_deref(),
+              planar_coverage: TextPlanarCoverageResolve::BoxSamples8x4,
+              triangles: &triangles,
+              direct_inset_bevel: Some(bevel),
+              contour: None,
+              options: ProjectedImageOptions {
+                projection,
+                z: -2.5 + 2.5 * terminal.height,
+                bounds: (0, 0, 32, 24),
+                model_surface: surface,
+                pixels_per_point: 1.0,
+                tint: None,
+              },
+              geometry_lighting: Static3dGeometryLighting::Text,
+            };
+            let render = |defer| {
+              let mut output = RgbaImage::new(32, 24);
+              super::composite_text_solid_surfaces_with_tile_samples(
+                &mut output,
+                &source,
+                input,
+                TextSurfaceRasterization::Source,
+                3 * 32 * 32,
+                defer,
+              );
+              output
+            };
+            let eager = render(false);
+            assert!(eager.pixels().any(|pixel| pixel[3] != 0));
+            assert_eq!(
+              render(true),
+              eager,
+              "camera={camera:?}, material={material:?}, preset={preset:?}, missing={missing_pairs}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn direct_inset_graph_retains_one_camera_visible_hit_with_all_attributes() {
     let far = super::TextDirectInsetGraphOwner {
       boundary: super::TextGeometryBoundaryOwner {
@@ -13884,7 +15932,7 @@ mod tests {
       }
       let mut graph = super::TextDirectInsetGraphSample::default();
       for (depth, color, owner) in hits {
-        graph.consider(depth, color, owner);
+        graph.consider(depth, || color, owner);
       }
       assert!(graph.surface.covered);
       assert_eq!(graph.surface.visibility_depth, 0.000_110_68);
@@ -13905,7 +15953,11 @@ mod tests {
         },
         ..far
       };
-      graph.consider(graph.surface.visibility_depth, [120.0; 4], duplicate);
+      assert!(!graph.consider(
+        graph.surface.visibility_depth,
+        || panic!("a tied graph surface must not evaluate its shader"),
+        duplicate
+      ));
       let selected = graph.owner.expect("stable equal-depth owner");
       assert_eq!(selected.boundary.contour_index, near.boundary.contour_index);
       assert_eq!(selected.boundary.edge_index, near.boundary.edge_index);
@@ -14151,6 +16203,95 @@ mod tests {
     assert!((defaults.authored_width_px - 8.0).abs() < f32::EPSILON);
     assert!((defaults.height_px - 8.0).abs() < f32::EPSILON);
     assert_eq!(defaults.preset, Some(a::BevelPresetValues::Circle));
+  }
+
+  #[test]
+  fn camera_zoom_scales_projected_scene_without_changing_camera_or_lighting() {
+    for preset in [
+      a::PresetCameraValues::OrthographicFront,
+      a::PresetCameraValues::IsometricLeftDown,
+      a::PresetCameraValues::ObliqueTopLeft,
+      a::PresetCameraValues::PerspectiveRelaxedModerately,
+      a::PresetCameraValues::LegacyPerspectiveLeft,
+    ] {
+      let input = scene(preset);
+      let base = camera_projection(&input, 0.0);
+      for lexical in ["50%", "75000", "100000", "150%", "200000"] {
+        let mut input = input.clone();
+        input.camera.zoom = Some(lexical.parse().unwrap());
+        let zoomed = camera_projection(&input, 0.0);
+        let ratio = input.camera.zoom.unwrap().as_ratio() as f32;
+        assert_eq!(base.rotation, zoomed.rotation);
+        assert_eq!(base.perspective_distance_pt, zoomed.perspective_distance_pt);
+        for z in [-12.0, 0.0, 38.5] {
+          for pixels_per_point in [1.0, 96.0 / 72.0, 200.0 / 72.0] {
+            let args = (23.0, -19.0, z, 113.05, 111.4, pixels_per_point);
+            let original =
+              super::project_local_pixels(base, args.0, args.1, args.2, args.3, args.4, args.5);
+            let actual = super::project_local_pixels(
+              zoomed.with_viewport_translation_px(-0.5, 0.25),
+              args.0,
+              args.1,
+              args.2,
+              args.3,
+              args.4,
+              args.5,
+            );
+            assert!((actual.0 - (original.0 * ratio - 0.5)).abs() < 0.0001);
+            assert!((actual.1 - (original.1 * ratio + 0.25)).abs() < 0.0001);
+            assert_eq!(
+              super::camera_view_direction(base, [23.0, -19.0, z], 113.05, 111.4, pixels_per_point),
+              super::camera_view_direction(
+                zoomed,
+                [23.0, -19.0, z],
+                113.05,
+                111.4,
+                pixels_per_point
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn camera_zoom_identity_and_source_coverage_are_distinct_from_magnification() {
+    let mut input = scene(a::PresetCameraValues::OrthographicFront);
+    let base = camera_projection(&input, 0.0);
+    for lexical in ["100%", "100000"] {
+      input.camera.zoom = Some(lexical.parse().unwrap());
+      assert_eq!(camera_projection(&input, 0.0), base);
+    }
+    assert!(super::projection_preserves_source_plane_coverage(base));
+    for lexical in ["75%", "150000"] {
+      input.camera.zoom = Some(lexical.parse().unwrap());
+      assert!(!super::projection_preserves_source_plane_coverage(
+        camera_projection(&input, 0.0)
+      ));
+    }
+  }
+
+  #[test]
+  fn camera_zoom_keeps_contour_and_complete_solid_inside_projected_bounds() {
+    let mut input = scene(a::PresetCameraValues::PerspectiveLeft);
+    let shape = a::Shape3DType {
+      z: Some(CoordinateValue::Emu(152_400)),
+      extrusion_height: Some(CoordinateValue::Emu(63_500)),
+      contour_width: Some(CoordinateValue::Emu(50_800)),
+      ..a::Shape3DType::default()
+    };
+    let base = super::projected_output_bounds(camera_projection(&input, 0.0), &shape, 80.0, 60.0);
+    input.camera.zoom = Some("150%".parse().unwrap());
+    let actual = super::projected_output_bounds(camera_projection(&input, 0.0), &shape, 80.0, 60.0);
+    for (before, after, center) in [
+      (base.left_pt, actual.left_pt, 40.0),
+      (base.right_pt, actual.right_pt, 40.0),
+      (base.top_pt, actual.top_pt, 30.0),
+      (base.bottom_pt, actual.bottom_pt, 30.0),
+    ] {
+      assert!((after - (center + (before - center) * 1.5)).abs() < 0.0001);
+    }
   }
 
   #[test]
@@ -14998,6 +17139,155 @@ mod tests {
   }
 
   #[test]
+  fn legacy_wireframe_minimum_depth_matches_native_mesh_controls() {
+    for (depth, expected) in [
+      (None, 1.0),
+      (Some(0), 1.0),
+      (Some(6_350), 1.0),
+      (Some(12_700), 1.0),
+      (Some(63_500), 5.0),
+    ] {
+      let shape = a::Shape3DType {
+        preset_material: Some(a::PresetMaterialTypeValues::LegacyWireframe),
+        extrusion_height: depth.map(CoordinateValue::Emu),
+        ..Default::default()
+      };
+      assert_eq!(super::static_3d_extrusion_depth_pt(&shape), expected);
+      let ordinary = a::Shape3DType {
+        preset_material: None,
+        ..shape
+      };
+      assert_eq!(
+        super::static_3d_extrusion_depth_pt(&ordinary),
+        depth.unwrap_or(0) as f32 / 12_700.0
+      );
+    }
+  }
+
+  #[test]
+  fn legacy_wireframe_edges_are_independent_of_fill_raster_coverage() {
+    let point = |x, y| Point { x: Pt(x), y: Pt(y) };
+    let geometry = Static3dTextGeometry::from_page_path(
+      &[
+        PathCommand::MoveTo(point(4.3, 5.2)),
+        PathCommand::LineTo(point(24.6, 5.2)),
+        PathCommand::LineTo(point(24.6, 22.5)),
+        PathCommand::LineTo(point(4.3, 22.5)),
+        PathCommand::Close,
+      ],
+      Rect {
+        origin: point(0.0, 0.0),
+        size: Size {
+          width: Pt(32.0),
+          height: Pt(32.0),
+        },
+      },
+      1.0,
+    )
+    .unwrap();
+    let shape = a::Shape3DType {
+      preset_material: Some(a::PresetMaterialTypeValues::LegacyWireframe),
+      ..Default::default()
+    };
+    for preset in [
+      a::PresetCameraValues::OrthographicFront,
+      a::PresetCameraValues::IsometricLeftDown,
+      a::PresetCameraValues::PerspectiveLeft,
+    ] {
+      let scene = scene(preset);
+      let render = |mut image| {
+        super::apply_static_3d_shape_geometry(
+          &mut image,
+          super::Static3dShapeSurface {
+            material_texture: None,
+            wordprocessing_shape: false,
+            geometry: &geometry,
+            material_geometry: &geometry,
+            rasterization: super::Static3dShapeRasterization::SourceAntialias,
+            uniform_paint_opacity: None,
+            two_sided_extrusion: false,
+          },
+          &scene,
+          camera_projection(&scene, 0.0),
+          &shape,
+          Static3dRenderOptions {
+            extrusion_color: None,
+            contour_color: None,
+            pixels_per_point: 1.0,
+            model_surface: Some(Static3dSurface {
+              left_px: 4.3,
+              top_px: 5.2,
+              width_px: 20.3,
+              height_px: 17.3,
+            }),
+          },
+        );
+        image
+      };
+      let filled = render(RgbaImage::from_pixel(32, 32, Rgba([30, 90, 220, 255])));
+      let mut sparse = RgbaImage::new(32, 32);
+      sparse.put_pixel(16, 16, Rgba([220, 40, 10, 1]));
+      assert_eq!(filled, render(sparse), "camera={preset:?}");
+      assert!(filled.pixels().any(|pixel| pixel[3] > 0));
+      assert!(filled.pixels().all(|pixel| pixel.0[..3] == [0, 0, 0]
+        && [0, 32, 64, 96, 128, 159, 191, 223, 255].contains(&pixel[3])));
+    }
+  }
+
+  #[test]
+  fn legacy_wireframe_does_not_inherit_extrusion_or_inactive_contour_paint() {
+    for preset in [
+      a::PresetCameraValues::OrthographicFront,
+      a::PresetCameraValues::IsometricLeftDown,
+    ] {
+      let scene = scene(preset);
+      for depth in [0, 127_000] {
+        let shape = a::Shape3DType {
+          preset_material: Some(a::PresetMaterialTypeValues::LegacyWireframe),
+          extrusion_height: Some(CoordinateValue::Emu(depth)),
+          ..Default::default()
+        };
+        for contour_color in [
+          None,
+          Some(Static3dColor {
+            color: RgbColor { r: 0, g: 255, b: 0 },
+            alpha: 255,
+          }),
+        ] {
+          let mut image = RgbaImage::new(40, 40);
+          for y in 15..25 {
+            for x in 15..25 {
+              image.put_pixel(x, y, Rgba([40, 90, 220, 255]));
+            }
+          }
+          apply_static_3d(
+            &mut image,
+            &scene,
+            camera_projection(&scene, 0.0),
+            &shape,
+            Static3dRenderOptions {
+              extrusion_color: Some(Static3dColor {
+                color: RgbColor { r: 255, g: 0, b: 0 },
+                alpha: 255,
+              }),
+              contour_color,
+              pixels_per_point: 1.0,
+              model_surface: None,
+            },
+          );
+          assert!(image.pixels().any(|pixel| pixel[3] != 0));
+          assert!(
+            image
+              .pixels()
+              .filter(|pixel| pixel[3] != 0)
+              .all(|pixel| pixel.0[..3] == [0, 0, 0])
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
   fn legacy_wireframe_does_not_retain_a_solid_front_face() {
     let scene = scene(a::PresetCameraValues::OrthographicFront);
     let shape = a::Shape3DType {
@@ -15172,7 +17462,14 @@ mod tests {
       ([60, 140, 147], [63, 140, 146]),
     ] {
       let mut image = RgbaImage::from_pixel(1, 1, Rgba([input[0], input[1], input[2], 255]));
-      super::shade_planar_surface(&mut image, &scene, &options, [0.0, 0.0, 1.0], None, false);
+      super::shade_planar_surface(
+        &mut image,
+        &scene,
+        &options,
+        [0.0, 0.0, 1.0],
+        None,
+        Static3dGeometryLighting::Shape,
+      );
       let pixel = image.get_pixel(0, 0);
       for (actual, expected) in pixel.0[..3].iter().zip(office) {
         assert!(
@@ -15231,6 +17528,38 @@ mod tests {
     // cross-check the inverse-transpose transform rather than a color offset.
     assert_eq!(device_channel(4.0), 195);
     assert_eq!(device_channel(5.0), 211);
+  }
+
+  #[test]
+  fn word_shape_native_packed_lighting_keeps_diffuse_and_specular_separate() {
+    let scene = scene(a::PresetCameraValues::OrthographicFront);
+    let normal = [0.0, 0.0, 1.0];
+    let material = Some(a::PresetMaterialTypeValues::Plastic);
+    // Explicit ThreePoints matches the independently captured front-cap stream.
+    let mut scene = scene;
+    scene.light_rig.rig = a::LightRigValues::ThreePoints;
+    let shade = super::legacy_material_diffuse_shade(&scene, normal, material)
+      .map(super::word_shape_diffuse_attribute);
+    let specular = super::word_shape_surface_specular(
+      super::light_rig_surface_specular_incident(&scene, normal, normal, material),
+      material,
+      [79, 129, 189],
+    )
+    .map(super::word_shape_specular_attribute);
+    assert_eq!(shade.map(|v| (v * 128.0) as u8), [133; 3]);
+    assert_eq!(specular.map(|v| (v * 255.0).round() as u8), [2; 3]);
+    let metal = super::word_shape_surface_specular(
+      [1.0; 3],
+      Some(a::PresetMaterialTypeValues::Metal),
+      [183, 222, 232],
+    );
+    for (actual, expected) in metal.into_iter().zip([1.0903529, 1.0414118, 1.0288627]) {
+      assert!((actual - expected).abs() < 1.0e-6);
+    }
+    assert_eq!(
+      super::word_shape_textured_channel(129, 133.0 / 128.0, 2.0 / 255.0),
+      136
+    );
   }
 
   #[test]

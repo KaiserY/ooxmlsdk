@@ -641,6 +641,10 @@ pub enum GradientInterpolation {
   /// uses the same gamma-correct sigma falloff exposed by the Windows GDI+
   /// linear gradient brush.
   PowerPointGammaSigma,
+  /// OfficeArt interpolates each RGB channel toward its brighter endpoint
+  /// using a directional 1.875 power curve. This differs from a GDI+ gamma
+  /// corrected sigma brush, especially when neither endpoint is black.
+  OfficeArtPerChannelGamma,
 }
 
 #[derive(Clone, Debug, PartialEq)]

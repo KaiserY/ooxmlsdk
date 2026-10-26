@@ -20,43 +20,73 @@ pub(crate) fn natural_size_pt(data: &[u8]) -> Option<(f32, f32)> {
 }
 
 pub(crate) fn jpeg_density_dpi(data: &[u8]) -> Option<(f32, f32)> {
-  if !data.starts_with(&[0xff, 0xd8]) {
+  let (unit, horizontal, vertical) = jpeg_jfif_density(data)?;
+  if horizontal == 0 || vertical == 0 {
     return None;
   }
-  let mut offset = 2usize;
-  while offset + 4 <= data.len() {
-    while offset < data.len() && data[offset] == 0xff {
-      offset += 1;
-    }
-    let marker = *data.get(offset)?;
-    offset += 1;
-    if marker == 0xd9 || marker == 0xda {
-      break;
-    }
-    let length = usize::from(u16::from_be_bytes([
-      *data.get(offset)?,
-      *data.get(offset + 1)?,
-    ]));
-    if length < 2 || offset + length > data.len() {
-      return None;
-    }
-    let payload = &data[offset + 2..offset + length];
-    if marker == 0xe0 && payload.len() >= 12 && payload.starts_with(b"JFIF\0") {
-      let unit = payload[7];
-      let horizontal = f32::from(u16::from_be_bytes([payload[8], payload[9]]));
-      let vertical = f32::from(u16::from_be_bytes([payload[10], payload[11]]));
-      if horizontal <= 0.0 || vertical <= 0.0 {
+  let (horizontal, vertical) = (f32::from(horizontal), f32::from(vertical));
+  match unit {
+    1 => Some((horizontal, vertical)),
+    2 => Some((horizontal * 2.54, vertical * 2.54)),
+    _ => None,
+  }
+}
+
+// Borrow header segments only. In contrast to image::JpegDecoder::new, this
+// neither copies the complete compressed image nor reads its entropy payload.
+fn jpeg_header_segments(data: &[u8]) -> impl Iterator<Item = (u8, &[u8])> {
+  let mut rest = data.strip_prefix(&[0xff, 0xd8]).unwrap_or_default();
+  std::iter::from_fn(move || {
+    loop {
+      if rest.first() != Some(&0xff) {
         return None;
       }
-      return match unit {
-        1 => Some((horizontal, vertical)),
-        2 => Some((horizontal * 2.54, vertical * 2.54)),
-        _ => None,
-      };
+      let marker_index = rest.iter().position(|&byte| byte != 0xff)?;
+      let marker = rest[marker_index];
+      rest = &rest[marker_index + 1..];
+      if matches!(marker, 0xda | 0xd9) {
+        rest = &[];
+        return None;
+      }
+      if matches!(marker, 0x01 | 0xd0..=0xd8) {
+        continue;
+      }
+      let length = usize::from(u16::from_be_bytes([*rest.first()?, *rest.get(1)?]));
+      let payload = rest.get(2..length)?;
+      rest = &rest[length..];
+      return Some((marker, payload));
     }
-    offset += length;
-  }
-  None
+  })
+}
+
+pub(crate) fn jpeg_jfif_density(data: &[u8]) -> Option<(u8, u16, u16)> {
+  jpeg_header_segments(data).find_map(|(marker, payload)| {
+    if marker != 0xe0 || payload.len() < 12 || !payload.starts_with(b"JFIF\0") {
+      return None;
+    }
+    Some((
+      payload[7],
+      u16::from_be_bytes([payload[8], payload[9]]),
+      u16::from_be_bytes([payload[10], payload[11]]),
+    ))
+  })
+}
+
+pub(crate) fn jpeg_dimensions(data: &[u8]) -> Option<(u32, u32)> {
+  jpeg_header_segments(data).find_map(|(marker, payload)| {
+    // Baseline, extended sequential and progressive DCT share this frame
+    // header. Lossless/hierarchical producers keep their existing fallback.
+    if !matches!(marker, 0xc0..=0xc2) || payload.len() < 6 {
+      return None;
+    }
+    let components = usize::from(payload[5]);
+    if components == 0 || payload.len() < 6 + 3 * components {
+      return None;
+    }
+    let height = u16::from_be_bytes([payload[1], payload[2]]);
+    let width = u16::from_be_bytes([payload[3], payload[4]]);
+    (width != 0 && height != 0).then_some((u32::from(width), u32::from(height)))
+  })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -225,6 +255,44 @@ pub(crate) fn rotate_placement_about_frame(
 
 #[cfg(test)]
 mod tests {
+  #[test]
+  fn jpeg_metadata_is_available_without_reading_the_entropy_stream() {
+    let mut bytes = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new(&mut bytes)
+      .encode_image(&image::RgbImage::new(120, 106))
+      .unwrap();
+    let scan = bytes
+      .windows(2)
+      .position(|pair| pair == [0xff, 0xda])
+      .unwrap();
+    let headers = &bytes[..scan];
+    assert_eq!(super::jpeg_dimensions(headers), Some((120, 106)));
+    assert_eq!(super::jpeg_jfif_density(headers), Some((0, 1, 1)));
+    assert_eq!(super::jpeg_density_dpi(headers), None);
+    bytes[13] = 1;
+    bytes[14..16].copy_from_slice(&150_u16.to_be_bytes());
+    bytes[16..18].copy_from_slice(&300_u16.to_be_bytes());
+    assert_eq!(
+      super::jpeg_density_dpi(&bytes[..scan]),
+      Some((150.0, 300.0))
+    );
+  }
+
+  #[test]
+  fn jpeg_metadata_rejects_truncated_segments_and_stops_at_scan_data() {
+    for data in [
+      &[0xff, 0xd8, 0xff][..],
+      &[0xff, 0xd8, 0xff, 0xc0, 0, 1][..],
+      &[0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 0, 106][..],
+      &[
+        0xff, 0xd8, 0xff, 0xda, 0xff, 0xc0, 0, 11, 8, 0, 106, 0, 120, 1, 1, 0x11, 0,
+      ][..],
+    ] {
+      assert_eq!(super::jpeg_dimensions(data), None);
+      assert_eq!(super::jpeg_jfif_density(data), None);
+    }
+  }
+
   use super::*;
 
   #[test]

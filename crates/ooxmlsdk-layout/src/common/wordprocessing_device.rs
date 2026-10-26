@@ -108,16 +108,16 @@ pub struct TabLeader {
   pub paragraph_bidi: bool,
 }
 
-/// Ideal Arabic glyph advances in Word's document measurement coordinates.
+/// Glyph advances in Word's document measurement font.
 /// This is independent of the 600-DPI font used to paint the resulting line.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct ArabicMeasurement {
+pub(crate) struct MeasurementFont {
   units_per_em: f64,
   measurement_em: f64,
   width_ratio: f64,
 }
 
-impl ArabicMeasurement {
+impl MeasurementFont {
   pub(crate) fn new(
     face: &crate::fonts::FontFaceData,
     legacy_font_measurement: bool,
@@ -186,6 +186,30 @@ impl ArabicMeasurement {
     scale: f32,
     character_spacing_pt: f32,
   ) {
+    self.apply_with(run, scale, character_spacing_pt, Self::advance_pt);
+  }
+
+  /// The legacy simple-character path quantizes the measurement width at
+  /// 1/16 pixel before its integer conversion. Native MSLS arrays cover all
+  /// 95 printable ASCII characters in Arial, Times New Roman and Calibri,
+  /// six font sizes, modes 11/12/14/15 and Word97 on/off. Calibri S distinguishes
+  /// this from rounding the design advance directly (460 versus 459).
+  /// Keep the shaped Arabic path's separately verified conversion unchanged.
+  pub(crate) fn apply_simple_latin(self, run: &mut ooxmlsdk_fonts::ShapedRun<'_, '_>) {
+    self.apply_with(run, 1.0, 0.0, |font, advance, size| {
+      let pixels = advance * font.measurement_em / font.units_per_em;
+      let measured = glyph_advance(glyph_advance(pixels * 16.0) / 16.0);
+      ((measured * size * 4096.0 / font.measurement_em).trunc() / 4096.0) as f32
+    });
+  }
+
+  fn apply_with(
+    self,
+    run: &mut ooxmlsdk_fonts::ShapedRun<'_, '_>,
+    scale: f32,
+    character_spacing_pt: f32,
+    realize: impl Fn(Self, f64, f64) -> f32,
+  ) {
     let size = f64::from(run.font_size_pt.0);
     if run.approximate
       || !size.is_finite()
@@ -218,7 +242,7 @@ impl ArabicMeasurement {
       // those inputs before realization, avoiding a second f32 half-tie.
       let design_advance =
         ((f64::from(glyph.x_advance_pt) - f64::from(pitch)) * recover_design_units).round();
-      glyph.x_advance_pt = self.advance_pt(design_advance, size) + pitch;
+      glyph.x_advance_pt = realize(self, design_advance, size) + pitch;
       total += glyph.x_advance_pt;
     }
     run.advance_pt = total;
@@ -227,7 +251,7 @@ impl ArabicMeasurement {
 
 #[cfg(test)]
 mod tests {
-  use super::{ArabicMeasurement, PageCoordinates, page_coordinates};
+  use super::{MeasurementFont, PageCoordinates, page_coordinates};
 
   #[test]
   fn rounded_standard_pages_retain_native_reference_device_and_viewport() {
@@ -294,7 +318,7 @@ mod tests {
       (false, 5.0, [8230, 6310, 5150]),
       (false, 15.0, [24690, 18930, 15450]),
     ] {
-      let measurement = ArabicMeasurement::from_metrics(2048, 942, legacy, 103).unwrap();
+      let measurement = MeasurementFont::from_metrics(2048, 942, legacy, 103).unwrap();
       assert_eq!(
         [799.0, 613.0, 500.0]
           .map(|advance| (measurement.advance_pt(advance, size) * 4096.0) as i32),
@@ -302,15 +326,15 @@ mod tests {
         "legacy {legacy}, size {size}"
       );
     }
-    let legacy = ArabicMeasurement::from_metrics(2048, 942, true, 100).unwrap();
-    let modern = ArabicMeasurement::from_metrics(2048, 942, false, 100).unwrap();
+    let legacy = MeasurementFont::from_metrics(2048, 942, true, 100).unwrap();
+    let modern = MeasurementFont::from_metrics(2048, 942, false, 100).unwrap();
     assert_eq!(legacy.advance_pt(500.0, 15.0) * 4096.0, 14991.0);
     assert_eq!(modern.advance_pt(500.0, 15.0) * 4096.0, 15000.0);
 
     // Native Traditional Arabic cursive attachment: the placement API
     // returns -6.024966 measurement pixels, converted to -5, not -6.
     // The 13/15pt printer equivalents -0.6454687/-0.74527144 become zero.
-    let legacy = ArabicMeasurement::from_metrics(2048, 942, true, 103).unwrap();
+    let legacy = MeasurementFont::from_metrics(2048, 942, true, 103).unwrap();
     assert_eq!(legacy.advance_pt(-12.0, 13.0) * 4096.0, -266.0);
     assert_eq!(legacy.advance_pt(-12.0, 15.0) * 4096.0, -307.0);
     assert_eq!(super::glyph_advance(-6.024966), -5.0);

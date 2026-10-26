@@ -29,6 +29,8 @@ pub mod text_warp_projection;
 mod units;
 mod vml_path_bounds;
 pub mod wordprocessing_device;
+mod wordprocessing_emphasis;
+pub use wordprocessing_emphasis::*;
 
 /// Internal paint marker for a DrawingML picture whose embedded image part is
 /// absent while its authored host frame remains visible.

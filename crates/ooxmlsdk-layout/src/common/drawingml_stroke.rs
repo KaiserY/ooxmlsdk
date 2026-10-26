@@ -676,6 +676,70 @@ pub(crate) fn path_stroke_bounds(path: &PathItem<'_>, stroke: &Stroke<'_>) -> Op
   path_stroke_geometry_bounds(path, stroke)
 }
 
+/// Physical boundary of a closed shape with an opaque continuous outline.
+/// Word's 0/1/4pt outline controls enlarge the 3-D solid by the centered pen.
+/// A filled primitive absorbs the inner stroke boundary; a noFill primitive
+/// retains both boundaries, as its native wireframe makes directly visible.
+pub(crate) fn closed_shape_solid_geometry(path: &PathItem<'_>) -> Option<(Vec<PathCommand>, Rect)> {
+  let stroke = path.stroke.as_ref()?;
+  if !path.closed
+    || stroke.width.0 <= 0.0
+    || stroke.color.a != 255
+    || stroke.gradient.is_some()
+    || stroke.pattern.is_some()
+    || stroke.resolved_dash().is_some()
+    || stroke
+      .compound
+      .is_some_and(|compound| compound != StrokeCompound::Single)
+    || stroke.alignment == Some(StrokeAlignment::Inside)
+    || !stroke_end_marker_polygons(path, stroke).is_empty()
+    || !stroked_open_arrow_markers(path, stroke).is_empty()
+  {
+    return None;
+  }
+  let filled = match &path.fill {
+    super::Fill::None => false,
+    super::Fill::Solid(color) if color.a == 255 => true,
+    _ => return None,
+  };
+  let mut source = BezPath::from_vec(path_kurbo_elements(path));
+  if source.subpaths().count() != 1 || source.area().abs() <= f64::EPSILON {
+    return None;
+  }
+  if source.elements().last() != Some(&kurbo::PathEl::ClosePath) {
+    source.close_path();
+  }
+  let widened = widen_path(
+    source.iter(),
+    &kurbo_stroke_style(stroke, 1.0),
+    &StrokeOpts::default(),
+    STROKE_BOUNDS_FLATTENING_TOLERANCE_PT,
+  );
+  let geometry = if filled {
+    // The two contours of this closed pen are its outer and inner edges.
+    // Compound/multipart paths need a full region union and retain their
+    // existing owner instead of silently discarding additional contours.
+    if widened.subpaths().count() != 2 {
+      return None;
+    }
+    let mut outer = widened
+      .subpaths()
+      .map(|elements| BezPath::from_vec(elements.to_vec()))
+      .max_by(|left, right| left.area().abs().total_cmp(&right.area().abs()))?;
+    if outer.area().is_sign_positive() != source.area().is_sign_positive() {
+      outer = outer.reverse_subpaths();
+    }
+    outer
+  } else {
+    widened
+  };
+  let bounds = kurbo_rect(geometry.bounding_box())?;
+  Some((
+    super::drawingml_geometry::bez_path_commands(geometry),
+    bounds,
+  ))
+}
+
 #[derive(Clone, Copy)]
 enum DisplayStrokeBoundsKind {
   Painted,
@@ -1525,6 +1589,114 @@ mod tests {
     assert!((actual.origin.y.0 - expected.origin.y.0).abs() < 0.001);
     assert!((actual.size.width.0 - expected.size.width.0).abs() < 0.001);
     assert!((actual.size.height.0 - expected.size.height.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn closed_shape_solid_geometry_keeps_fill_and_hollow_outline_distinct() {
+    for curve in [false, true] {
+      for reverse in [false, true] {
+        for width in [1.0, 2.0, 4.0] {
+          let mut path = rectangle_path();
+          if curve {
+            path.commands = super::super::drawingml_geometry::bez_path_commands(
+              kurbo::Ellipse::new((20.0, 30.0), (10.0, 10.0), 0.0).to_path(0.00001),
+            );
+          }
+          if reverse {
+            path.commands = super::super::drawingml_geometry::bez_path_commands(
+              BezPath::from_vec(path_kurbo_elements(&path)).reverse_subpaths(),
+            );
+          }
+          path.stroke = Some(visible_stroke(width));
+          for filled in [false, true] {
+            path.fill = if filled {
+              Fill::Solid(Color {
+                r: 1,
+                g: 2,
+                b: 3,
+                a: 255,
+              })
+            } else {
+              Fill::None
+            };
+            let (commands, bounds) = closed_shape_solid_geometry(&path).unwrap();
+            let geometry =
+              BezPath::from_vec(super::super::drawingml_geometry::mapped_path_elements(
+                &commands,
+                super::super::drawingml_geometry::kurbo_point,
+              ));
+            assert_eq!(geometry.winding(kurbo::Point::new(20.0, 30.0)) != 0, filled);
+            assert_ne!(
+              geometry.winding(kurbo::Point::new(10.0 - f64::from(width) * 0.25, 30.0)),
+              0
+            );
+            assert_eq!(
+              geometry.winding(kurbo::Point::new(10.0 - f64::from(width), 30.0)),
+              0
+            );
+            assert_rect_close(
+              bounds,
+              Rect {
+                origin: Point {
+                  x: Pt(10.0 - width * 0.5),
+                  y: Pt(20.0 - width * 0.5),
+                },
+                size: Size {
+                  width: Pt(20.0 + width),
+                  height: Pt(20.0 + width),
+                },
+              },
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn closed_shape_solid_geometry_preserves_other_paint_and_path_owners() {
+    let mut path = rectangle_path();
+    path.stroke = Some(visible_stroke(2.0));
+    path.fill = Fill::Solid(Color {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: 128,
+    });
+    assert!(closed_shape_solid_geometry(&path).is_none());
+    path.fill = Fill::None;
+    for stroke in [
+      Stroke {
+        color: Color {
+          r: 0,
+          g: 0,
+          b: 0,
+          a: 128,
+        },
+        ..visible_stroke(2.0)
+      },
+      Stroke {
+        alignment: Some(StrokeAlignment::Inside),
+        ..visible_stroke(2.0)
+      },
+      Stroke {
+        compound: Some(StrokeCompound::Double),
+        ..visible_stroke(2.0)
+      },
+      Stroke {
+        preset_dash: Some(StrokeDashPreset::Dash),
+        ..visible_stroke(2.0)
+      },
+    ] {
+      path.stroke = Some(stroke);
+      assert!(closed_shape_solid_geometry(&path).is_none());
+    }
+    path.stroke = Some(visible_stroke(2.0));
+    path.closed = false;
+    assert!(closed_shape_solid_geometry(&path).is_none());
+    path.closed = true;
+    path.commands.extend(rectangle_path().commands);
+    assert!(closed_shape_solid_geometry(&path).is_none());
   }
 
   #[test]

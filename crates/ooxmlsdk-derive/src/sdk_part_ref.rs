@@ -160,13 +160,23 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         }
       };
 
-      let guard = if relationship_type
-        == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
-      {
-        office_document_guard
-      } else {
-        part_ref_guard
-      };
+      let guard =
+        if relationship_type == "http://schemas.microsoft.com/visio/2010/relationships/document" {
+          let root_content_type =
+            LitByteStr::new(descriptor.content_type.as_bytes(), Span::call_site());
+          quote! {
+            crate::sdk::part_root_content_type_matches_bytes(
+              #root_content_type,
+              content_type,
+            )
+          }
+        } else if relationship_type
+          == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+        {
+          office_document_guard
+        } else {
+          part_ref_guard
+        };
       quote! {
         #( #attrs )*
         if #guard {

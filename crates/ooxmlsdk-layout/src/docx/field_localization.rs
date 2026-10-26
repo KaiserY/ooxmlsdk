@@ -18,10 +18,56 @@ pub(super) enum FieldMessage<'a> {
   UndefinedBookmark,
   ReferenceSourceNotFound,
   BookmarkNameNotSpecified,
+  UnknownDocumentProperty,
+  ScalarError(ScalarFieldError),
   MissingStyle(&'a str),
   EmptyTableOfContents,
   PageRefRelative { bookmark_is_above: bool },
   PageRefOnPage(&'a str),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum ScalarFieldError {
+  DocumentVariableArgument,
+  DocumentVariableValue,
+  AutoTextEntry,
+  BarcodeArgument,
+}
+
+pub(super) fn localized_scalar_field_error(
+  message: ScalarFieldError,
+  ui_language: Option<&str>,
+) -> Option<&'static str> {
+  use ScalarFieldError::*;
+  let locale = ui_language.and_then(crate::localization::canonical_locale);
+  let language = locale
+    .as_ref()
+    .map(|locale| locale.id.language.as_str())
+    .unwrap_or("en");
+  // Application resources observed in paired print-update/locked controls.
+  // An unobserved UI keeps its persisted result rather than inventing text.
+  match (language, message) {
+    ("en", DocumentVariableArgument) => Some("Error! Document Variable not defined."),
+    ("en", DocumentVariableValue) => Some("Error! No document variable supplied."),
+    ("en", AutoTextEntry) => Some("Error! AutoText entry not defined."),
+    ("en", BarcodeArgument) => Some("Error!"),
+    ("de", DocumentVariableArgument) => Some("Fehler! Dokumentvariable nicht definiert."),
+    ("de", DocumentVariableValue) => Some("Fehler! Keine Dokumentvariable verfügbar."),
+    ("de", AutoTextEntry) => Some("Fehler! AutoText-Eintrag nicht definiert."),
+    ("de", BarcodeArgument) => Some("Fehler!"),
+    ("zh", message)
+      if OfficeStringCatalog::for_ui_language(ui_language).resource_locale()
+        == OfficeResourceLocale::SimplifiedChinese =>
+    {
+      Some(match message {
+        DocumentVariableArgument => "错误!未定义文档变量。",
+        DocumentVariableValue => "错误!未提供文档变量。",
+        AutoTextEntry => "错误!未定义“自动图文集”词条。",
+        BarcodeArgument => "错误!",
+      })
+    }
+    _ => None,
+  }
 }
 
 pub(super) fn localized_field_message(
@@ -35,6 +81,7 @@ pub(super) fn localized_field_message(
     .and_then(crate::localization::canonical_locale)
     .and_then(|locale| match (locale.id.language.as_str(), message) {
       ("de", FieldMessage::UndefinedBookmark) => Some("Fehler! Textmarke nicht definiert."),
+      ("es", FieldMessage::UndefinedBookmark) => Some("¡Error! Marcador no definido."),
       ("de", FieldMessage::ReferenceSourceNotFound) => {
         Some("Fehler! Verweisquelle konnte nicht gefunden werden.")
       }
@@ -44,6 +91,9 @@ pub(super) fn localized_field_message(
       ("ja", FieldMessage::UndefinedBookmark) => Some("エラー! ブックマークが定義されていません。"),
       ("ja", FieldMessage::ReferenceSourceNotFound) => Some("エラー! 参照元が見つかりません。"),
       ("ja", FieldMessage::EmptyTableOfContents) => Some("目次項目が見つかりません。"),
+      ("ja", FieldMessage::UnknownDocumentProperty) => {
+        Some("エラー! プロパティ名に誤りがあります。")
+      }
       ("fr", FieldMessage::EmptyTableOfContents) => {
         Some("Aucune entrée de table des matières n'a été trouvée.")
       }
@@ -66,6 +116,16 @@ pub(super) fn localized_field_message(
     FieldMessage::BookmarkNameNotSpecified => {
       strings.field_bookmark_name_not_specified().to_string()
     }
+    FieldMessage::UnknownDocumentProperty => match strings.resource_locale() {
+      OfficeResourceLocale::SimplifiedChinese => "错误!未知的文档属性名称",
+      OfficeResourceLocale::TraditionalChinese => "錯誤! 無法識別文件摘要資訊名稱。",
+      _ => "Error! Unknown document property name.",
+    }
+    .to_string(),
+    FieldMessage::ScalarError(message) => localized_scalar_field_error(message, ui_language)
+      .or_else(|| localized_scalar_field_error(message, Some("en-US")))
+      .expect("English scalar field resources")
+      .to_string(),
     FieldMessage::MissingStyle(style_name) if is_japanese_ui_language(ui_language) => {
       format!(
         "エラー! [ホーム] タブを使用して、ここに表示する文字列に {style_name} を適用してください。"
@@ -73,6 +133,24 @@ pub(super) fn localized_field_message(
     }
     FieldMessage::MissingStyle(style_name) if is_korean_ui_language(ui_language) => {
       format!("오류! 여기에 표시할 텍스트에 {style_name} 을(를) 적용하려면 홈 탭을 사용하세요.")
+    }
+    FieldMessage::MissingStyle(style_name)
+      if ui_language
+        .and_then(crate::localization::canonical_locale)
+        .is_some_and(|locale| locale.id.language.as_str() == "fr") =>
+    {
+      format!(
+        "Erreur! Utilisez l'onglet Accueil pour appliquer {style_name} au texte que vous souhaitez faire apparaître ici."
+      )
+    }
+    FieldMessage::MissingStyle(style_name)
+      if ui_language
+        .and_then(crate::localization::canonical_locale)
+        .is_some_and(|locale| locale.id.language.as_str() == "de") =>
+    {
+      format!(
+        "Fehler! Verwenden Sie die Registerkarte 'Start', um {style_name} dem Text zuzuweisen, der hier angezeigt werden soll."
+      )
     }
     FieldMessage::MissingStyle(style_name) => strings.field_missing_style(style_name),
     FieldMessage::EmptyTableOfContents => {
@@ -106,6 +184,16 @@ pub(super) fn localized_clean_empty_toc_message(ui_language: Option<&str>) -> St
   // Word as ordinary result text. Its en-US resource keeps sentence case,
   // unlike the all-caps application error used when Word replaces a blank
   // cached result run.
+  // Ordinary print reconstruction uses the application resource. Keep this
+  // distinct from inserted-redline field creation, whose existing cached
+  // diagnostic has a separate owner (including the Korean English fallback).
+  if let Some(locale) = ui_language.and_then(crate::localization::canonical_locale) {
+    match locale.id.language.as_str() {
+      "de" => return "Es wurden keine Einträge für das Inhaltsverzeichnis gefunden.".to_string(),
+      "ko" => return "목차 항목을 찾을 수 없습니다.".to_string(),
+      _ => {}
+    }
+  }
   if ui_language
     .and_then(crate::localization::canonical_locale)
     .is_some_and(|locale| locale.to_string().eq_ignore_ascii_case("en-US"))
@@ -191,6 +279,67 @@ pub(super) fn localized_ui_english_heading_reference(
       .is_some_and(|level| matches!(level.as_bytes(), [b'1'..=b'9']))
 }
 
+pub(super) const NATIVE_STYLE_REF_KEY_PREFIX: &str = "\0native-style:";
+pub(super) const NUMERIC_HEADING_STYLE_REF_KEY_PREFIX: &str = "\0numeric-heading:";
+pub(super) const SOURCE_STYLE_REF_KEY_PREFIX: &str = "\0source-style:";
+
+#[derive(Clone, Copy)]
+pub(super) struct NativeBuiltinStyleRef {
+  pub name: &'static str,
+  pub heading_level: Option<u8>,
+}
+
+pub(super) fn native_builtin_style_ref_name(
+  canonical_name: &str,
+  style_type: Option<super::w::StyleValues>,
+  ui_language: Option<&str>,
+) -> Option<NativeBuiltinStyleRef> {
+  // The styles part stores canonical names, while Word's printed STYLEREF
+  // uses Style.NameLocal. Native en/de controls distinguish the display name
+  // (including its spaces) from XML ids and from foreign-UI builtin names.
+  const NAMES: [(&str, &str, Option<u8>); 11] = [
+    ("heading 1", "Überschrift 1", Some(1)),
+    ("heading 2", "Überschrift 2", Some(2)),
+    ("heading 3", "Überschrift 3", Some(3)),
+    ("heading 4", "Überschrift 4", Some(4)),
+    ("heading 5", "Überschrift 5", Some(5)),
+    ("heading 6", "Überschrift 6", Some(6)),
+    ("heading 7", "Überschrift 7", Some(7)),
+    ("heading 8", "Überschrift 8", Some(8)),
+    ("heading 9", "Überschrift 9", Some(9)),
+    ("Subtitle", "Untertitel", None),
+    ("Intense Emphasis", "Intensive Hervorhebung", None),
+  ];
+  let (english, german, heading_level) = NAMES
+    .iter()
+    .find(|(english, _, _)| canonical_name.eq_ignore_ascii_case(english))?;
+  let expected_type = if *english == "Intense Emphasis" {
+    super::w::StyleValues::Character
+  } else {
+    super::w::StyleValues::Paragraph
+  };
+  if style_type != Some(expected_type) {
+    return None;
+  }
+  let locale = ui_language.and_then(crate::localization::canonical_locale)?;
+  let name = match locale.id.language.as_str() {
+    "de" => *german,
+    "en" => *english,
+    _ => return None,
+  };
+  Some(NativeBuiltinStyleRef {
+    name,
+    heading_level: *heading_level,
+  })
+}
+
+pub(super) fn native_style_ref_name_matches(name: &str, requested: &str) -> bool {
+  name
+    .chars()
+    .flat_map(char::to_lowercase)
+    .eq(requested.trim().chars().flat_map(char::to_lowercase))
+}
+
 pub(super) fn apply_japanese_diagnostic_font_slots(
   style: &mut TextStyle,
   ui_language: Option<&str>,
@@ -215,6 +364,29 @@ pub(super) fn apply_japanese_diagnostic_font_slots(
   true
 }
 
+pub(super) fn apply_korean_diagnostic_font_slots(
+  style: &mut TextStyle,
+  ui_language: Option<&str>,
+) -> bool {
+  let Some(language) = ui_language
+    .and_then(crate::localization::canonical_locale)
+    .filter(|locale| locale.id.language.as_str() == "ko")
+  else {
+    return false;
+  };
+  // Native missing-style and ordinary empty-TOC resources use Batang for
+  // Korean text while retaining the field's independent Latin font slots.
+  style.wordprocessingml_font_slots = true;
+  style.wordprocessingml_font_hint = Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia);
+  style.east_asia_font_family = Some(Arc::from("Batang"));
+  style.east_asia_language = Some(Arc::from(language.to_string()));
+  style.east_asia_fallback_font_family = None;
+  style.east_asia_font_family_class = None;
+  style.east_asia_font_charset = None;
+  style.east_asia_font_pitch = None;
+  true
+}
+
 pub(super) fn apply_generated_field_message_style(
   style: &mut TextStyle,
   message: FieldMessage<'_>,
@@ -225,6 +397,8 @@ pub(super) fn apply_generated_field_message_style(
     FieldMessage::UndefinedBookmark
       | FieldMessage::ReferenceSourceNotFound
       | FieldMessage::BookmarkNameNotSpecified
+      | FieldMessage::UnknownDocumentProperty
+      | FieldMessage::ScalarError(_)
   );
   if matches!(message, FieldMessage::EmptyTableOfContents) {
     // Writer emits the empty-TOC diagnostic through its generated field error
@@ -257,6 +431,8 @@ pub(super) fn apply_generated_field_message_style(
     FieldMessage::UndefinedBookmark
       | FieldMessage::ReferenceSourceNotFound
       | FieldMessage::BookmarkNameNotSpecified
+      | FieldMessage::UnknownDocumentProperty
+      | FieldMessage::ScalarError(_)
   ) {
     // Word's generated bookmark diagnostics use a bold application-resource
     // run in every UI locale. An authored field-level w:b=false remains an
@@ -269,6 +445,8 @@ pub(super) fn apply_generated_field_message_style(
     message,
     FieldMessage::UndefinedBookmark
       | FieldMessage::ReferenceSourceNotFound
+      | FieldMessage::UnknownDocumentProperty
+      | FieldMessage::ScalarError(_)
       | FieldMessage::MissingStyle(_)
       | FieldMessage::EmptyTableOfContents
   ) && apply_japanese_diagnostic_font_slots(style, ui_language)
@@ -294,21 +472,13 @@ pub(super) fn apply_generated_field_message_style(
     }
     return;
   }
-  if matches!(message, FieldMessage::MissingStyle(_)) && is_korean_ui_language(ui_language) {
+  if matches!(message, FieldMessage::MissingStyle(_))
+    && apply_korean_diagnostic_font_slots(style, ui_language)
+  {
     // Word's Korean missing-style resource uses bold Batang for Hangul while
     // retaining the cached result's Latin face for the requested style name
     // and Basic Latin punctuation. Batang has no bold face in the configured
     // Office output, so the ordinary synthetic-bold path supplies its stroke.
-    style.wordprocessingml_font_slots = true;
-    style.wordprocessingml_font_hint = Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia);
-    style.east_asia_font_family = Some(Arc::<str>::from("Batang"));
-    style.east_asia_language = ui_language
-      .and_then(crate::localization::canonical_locale)
-      .map(|language| Arc::<str>::from(language.to_string()));
-    style.east_asia_fallback_font_family = None;
-    style.east_asia_font_family_class = None;
-    style.east_asia_font_charset = None;
-    style.east_asia_font_pitch = None;
     style.bold = true;
     style.complex_bold = Some(true);
     return;
@@ -316,7 +486,10 @@ pub(super) fn apply_generated_field_message_style(
   let resource_locale = OfficeStringCatalog::for_ui_language(ui_language).resource_locale();
   if matches!(
     message,
-    FieldMessage::UndefinedBookmark | FieldMessage::EmptyTableOfContents
+    FieldMessage::UndefinedBookmark
+      | FieldMessage::UnknownDocumentProperty
+      | FieldMessage::ScalarError(_)
+      | FieldMessage::EmptyTableOfContents
   ) && apply_traditional_chinese_diagnostic_font_slots(style, ui_language)
   {
     return;
@@ -339,7 +512,9 @@ pub(super) fn apply_generated_field_message_style(
   match message {
     FieldMessage::UndefinedBookmark
     | FieldMessage::ReferenceSourceNotFound
-    | FieldMessage::BookmarkNameNotSpecified => {
+    | FieldMessage::BookmarkNameNotSpecified
+    | FieldMessage::UnknownDocumentProperty
+    | FieldMessage::ScalarError(_) => {
       // Word emits Simplified Chinese field diagnostics through the East
       // Asian slot. Keep the field's Latin face for punctuation while using
       // the legacy Office SimSun resource face for Han glyphs.
@@ -358,7 +533,9 @@ pub(super) fn apply_generated_field_message_style(
       }
 
       match message {
-        FieldMessage::UndefinedBookmark => {
+        FieldMessage::UndefinedBookmark
+        | FieldMessage::UnknownDocumentProperty
+        | FieldMessage::ScalarError(_) => {
           // The locale-independent generated diagnostic style was applied
           // above; this branch only supplies its Simplified-Chinese slots.
         }
@@ -431,6 +608,12 @@ mod tests {
 
   #[test]
   fn bookmark_diagnostics_preserve_office_ui_language_and_field_kind() {
+    for language in ["es-MX", "ES_es"] {
+      assert_eq!(
+        localized_field_message(FieldMessage::UndefinedBookmark, Some(language)),
+        "¡Error! Marcador no definido.",
+      );
+    }
     for (language, bookmark, reference) in [
       (
         "DE_de",
@@ -561,6 +744,38 @@ mod tests {
   }
 
   #[test]
+  fn german_missing_style_resource_keeps_the_requested_name() {
+    for language in ["de-DE", "de-AT", "DE_de"] {
+      for name in ["heading 1", "berschrift1", "Intense Emphasis", "Missing 7"] {
+        assert_eq!(
+          localized_field_message(FieldMessage::MissingStyle(name), Some(language)),
+          format!(
+            "Fehler! Verwenden Sie die Registerkarte 'Start', um {name} dem Text zuzuweisen, der hier angezeigt werden soll."
+          )
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn french_missing_style_resource_keeps_the_requested_name() {
+    for language in ["fr-CA", "FR_ca", "fr-FR", "fr_FR"] {
+      for name in ["Überschrift 1", "Missing 7"] {
+        assert_eq!(
+          localized_field_message(FieldMessage::MissingStyle(name), Some(language)),
+          format!(
+            "Erreur! Utilisez l'onglet Accueil pour appliquer {name} au texte que vous souhaitez faire apparaître ici."
+          )
+        );
+      }
+    }
+    assert_eq!(
+      localized_field_message(FieldMessage::MissingStyle("Missing 7"), Some("en-US")),
+      "Error! Use the Home tab to apply Missing 7 to the text that you want to appear here."
+    );
+  }
+
+  #[test]
   fn localized_east_asian_missing_style_resources_preserve_the_requested_style_name() {
     assert_eq!(
       localized_field_message(FieldMessage::MissingStyle("Heading 1"), Some("ja-JP")),
@@ -602,6 +817,32 @@ mod tests {
       localized_field_message(FieldMessage::UndefinedBookmark, Some("nl-NL")),
       "Error! Bookmark not defined."
     );
+  }
+
+  #[test]
+  fn missing_document_property_resources_follow_ui_and_generated_font_slots() {
+    for (language, expected, font) in [
+      ("en-US", "Error! Unknown document property name.", None),
+      (
+        "ja-JP",
+        "エラー! プロパティ名に誤りがあります。",
+        Some("MS Mincho"),
+      ),
+      ("zh-CN", "错误!未知的文档属性名称", Some("SimSun")),
+      (
+        "zh-TW",
+        "錯誤! 無法識別文件摘要資訊名稱。",
+        Some("PMingLiU"),
+      ),
+    ] {
+      let message = FieldMessage::UnknownDocumentProperty;
+      assert_eq!(localized_field_message(message, Some(language)), expected);
+      let mut style = TextStyle::default();
+      apply_generated_field_message_style(&mut style, message, Some(language));
+      assert!(style.bold);
+      assert_eq!(style.east_asia_font_family.as_deref(), font);
+      assert!(style.wordprocessingml_generated_field_diagnostic);
+    }
   }
 
   #[test]
@@ -656,6 +897,24 @@ mod tests {
     assert_eq!(
       localized_field_message(FieldMessage::EmptyTableOfContents, Some("zh-Hant-HK")),
       "找不到目錄項目。"
+    );
+  }
+
+  #[test]
+  fn ordinary_empty_toc_uses_native_german_and_korean_print_resources() {
+    for (language, expected) in [
+      (
+        "de-DE",
+        "Es wurden keine Einträge für das Inhaltsverzeichnis gefunden.",
+      ),
+      ("ko-KR", "목차 항목을 찾을 수 없습니다."),
+    ] {
+      assert_eq!(localized_clean_empty_toc_message(Some(language)), expected);
+    }
+    // The established inserted-redline diagnostic owner remains separate.
+    assert_eq!(
+      localized_field_message(FieldMessage::EmptyTableOfContents, Some("ko-KR")),
+      "No table of contents entries found."
     );
   }
 

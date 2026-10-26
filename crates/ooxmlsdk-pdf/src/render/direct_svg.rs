@@ -383,7 +383,7 @@ pub(super) struct OfficeMathWriteContext<'a> {
   pub(super) fonts: &'a mut DirectFontSet,
   pub(super) refs: &'a mut RefAllocator,
   pub(super) requires_codepoint_mappings: bool,
-  pub(super) forbids_private_use_mappings: bool,
+  pub(super) requires_actual_text_for_private_use: bool,
 }
 
 pub(super) struct SvgWriteContext<'a> {
@@ -998,10 +998,15 @@ fn write_registered_glyph(
   context: &mut OfficeMathWriteContext<'_>,
   glyph: OfficeMathGlyphWrite<'_>,
 ) -> Result<()> {
+  let private_use_actual_text = super::direct::private_use_requires_actual_text(
+    glyph.semantic_text,
+    context.requires_actual_text_for_private_use,
+  );
   super::direct::ensure_glyph_semantic_mapping_supported(
     glyph.semantic_text,
     context.requires_codepoint_mappings,
-    context.forbids_private_use_mappings,
+    context.requires_actual_text_for_private_use,
+    private_use_actual_text,
   )?;
   let registered =
     context
@@ -1024,7 +1029,7 @@ fn write_registered_glyph(
     None,
     Some(opacity_byte(glyph.opacity)),
   )?;
-  if registered.semantic_conflict {
+  if registered.semantic_conflict || private_use_actual_text {
     begin_actual_text(content, glyph.semantic_text);
   }
   let encoded = [(registered.cid >> 8) as u8, registered.cid as u8];
@@ -1035,7 +1040,7 @@ fn write_registered_glyph(
     .set_text_matrix(glyph.matrix)
     .show(Str(&encoded))
     .end_text();
-  if registered.semantic_conflict {
+  if registered.semantic_conflict || private_use_actual_text {
     content.end_marked_content();
   }
   content.restore_state();

@@ -30,16 +30,88 @@ use crate::{
   Result,
   sdk_data::{
     open_xml::{
-      OpenXmlSchema, OpenXmlSchemaEnum, OpenXmlSchemaEnumFacet, OpenXmlSchemaType,
+      OpenXmlPart, OpenXmlSchema, OpenXmlSchemaEnum, OpenXmlSchemaEnumFacet, OpenXmlSchemaType,
       OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeAttributeValidator, OpenXmlSchemaTypeChild,
       OpenXmlSchemaTypeParticle, OpenXmlSchemaTypeParticleOccur,
     },
     xsd::{
-      ParsedAttribute, ParsedAttributeGroup, ParsedChildElement, ParsedComplexType, ParsedParticle,
-      ParsedParticleKind, ParsedParticleNode, ParsedXsd,
+      ParsedAlternative, ParsedAttribute, ParsedAttributeGroup, ParsedChildElement,
+      ParsedComplexType, ParsedParticle, ParsedParticleKind, ParsedParticleNode, ParsedXsd,
     },
   },
 };
+
+pub(crate) const VISIO_MODULE_NAME: &str = "schemas_microsoft_com_office_visio_2012_main";
+const VISIO_PREFIX: &str = "visio";
+const VISIO_EMITTED_TARGET_NAMESPACE: &str = "http://schemas.microsoft.com/office/visio/2012/main";
+const VISIO_RELATIONSHIP_PREFIX: &str = "http://schemas.microsoft.com/visio/2010/relationships/";
+
+/// Load Visio stage-1 metadata from `schemas/VisioXMLSchema/visio-main.xsd`
+/// when that file is next to `data_dir`. Returns `None` when the XSD is absent
+/// so OOXML generation still runs. The result stays in memory: this function
+/// does not write `data/schemas`.
+///
+/// `simple_type_aliases` and `class_name_overrides` stay empty. An
+/// `xsd:alternative` that only adds `xsd:assert` stays on the declared type, so
+/// `Cell` does not grow a `PinX_Type`. An alternative that adds elements is
+/// folded into the element the document reads, so `Section` carries one row
+/// shape with cells. The XSD file keeps
+/// `http://schemas.microsoft.com/office/visio/2011/1/core`. The emitted schema
+/// URI is `http://schemas.microsoft.com/office/visio/2012/main`.
+pub(crate) fn gen_visio_schema(
+  data_dir: &Path,
+  parts: &[OpenXmlPart],
+  namespace_prefixes: &HashMap<String, String>,
+) -> Result<Option<OpenXmlSchema>> {
+  let Some(xsd_path) = data_dir
+    .parent()
+    .map(|root| root.join("schemas/VisioXMLSchema/visio-main.xsd"))
+  else {
+    return Ok(None);
+  };
+  if !xsd_path.is_file() {
+    return Ok(None);
+  }
+
+  let source = std::fs::read_to_string(&xsd_path)?;
+  let mut part_root_elements = HashMap::new();
+  for part in parts {
+    if part
+      .relationship_type
+      .starts_with(VISIO_RELATIONSHIP_PREFIX)
+      && !part.root_element.is_empty()
+    {
+      part_root_elements.insert(part.root_element.clone(), part.name.clone());
+    }
+  }
+  let cfg = NamespaceGenConfig {
+    prefix: VISIO_PREFIX.to_string(),
+    emitted_target_namespace: Some(VISIO_EMITTED_TARGET_NAMESPACE.to_string()),
+    namespace_prefixes: namespace_prefixes.clone(),
+    part_root_elements,
+    schema_dir: xsd_path.parent().map(Path::to_path_buf),
+    ..Default::default()
+  };
+  let mut schema = gen_open_xml_schema_from_xsd(&source, &cfg)?;
+  schema.module_name = VISIO_MODULE_NAME.to_string();
+  widen_visio_rel(&mut schema);
+  // `Comments` is also a child of the document, so the element binding is not
+  // the part-root pass. The comments part still uses that element as its root.
+  for schema_type in &mut schema.types {
+    if schema_type.part.is_empty()
+      && let Some(part_name) = cfg.part_root_elements.get(&schema_type.class_name)
+    {
+      schema_type.part = part_name.clone();
+    }
+  }
+  for schema_type in &mut schema.types {
+    schema_type.module_name = schema.module_name.clone();
+  }
+  for schema_enum in &mut schema.enums {
+    schema_enum.module_name = schema.module_name.clone();
+  }
+  Ok(Some(schema))
+}
 
 /// Configuration supplied by the caller (namespace prefix, part roots, overrides).
 #[derive(Clone, Debug, Default)]
@@ -60,6 +132,82 @@ pub struct NamespaceGenConfig {
   /// Directory of the XSD being generated, so `xsd:import/@schemaLocation`
   /// siblings can be loaded. Unset when the source is not a file.
   pub schema_dir: Option<std::path::PathBuf>,
+  /// URI written on the generated `OpenXmlSchema`. When unset, the parsed XSD
+  /// `targetNamespace` is emitted. Prefix resolution and imports keep the
+  /// parsed URI.
+  pub emitted_target_namespace: Option<String>,
+}
+
+/// Drawing files store the package relationship id on `Rel`. The published
+/// `Rel_Type` has no attributes, so this stays off the alias table and off the
+/// generic XSD projection.
+fn widen_visio_rel(schema: &mut OpenXmlSchema) {
+  for schema_type in &mut schema.types {
+    if schema_type.class_name != "Rel" {
+      continue;
+    }
+    if schema_type
+      .attributes
+      .iter()
+      .any(|attribute| attribute.q_name == "r:id")
+    {
+      continue;
+    }
+    schema_type.attributes.push(OpenXmlSchemaTypeAttribute {
+      q_name: "r:id".to_string(),
+      property_name: "Id".to_string(),
+      r#type: "StringValue".to_string(),
+      property_comments: "Relationship identifier.".to_string(),
+      ..Default::default()
+    });
+  }
+}
+
+/// Character data between `cp`, `pp`, `tp`, and `fld` is not in the published
+/// `Text_Type`. Add it only to this module's choice, not through an alias.
+pub(crate) fn widen_visio_text_choice(
+  ir: &mut crate::sdk_code::codegen_ir::SchemaModuleDecl,
+) -> Result<()> {
+  use crate::sdk_code::codegen_ir::{
+    MemberDecl, TypeKind, TypeRefDecl, VariantDecl, VariantWireDecl,
+  };
+
+  let Some(text_choice) = ir.types.iter_mut().find(|type_decl| {
+    type_decl.kind == TypeKind::ChoiceEnum
+      && type_decl.members.iter().any(|member| {
+        matches!(
+          member,
+          MemberDecl::Variant(variant) if variant.rust_name == "Cp"
+        )
+      })
+      && type_decl.members.iter().any(|member| {
+        matches!(
+          member,
+          MemberDecl::Variant(variant) if variant.rust_name == "Fld"
+        )
+      })
+  }) else {
+    return Err("visio Text choice is missing".into());
+  };
+  if text_choice.members.iter().any(|member| {
+    matches!(
+      member,
+      MemberDecl::Variant(variant) if variant.wire == VariantWireDecl::Text
+    )
+  }) {
+    return Ok(());
+  }
+  text_choice.members.push(MemberDecl::Variant(VariantDecl {
+    rust_name: "Text".to_string(),
+    docs: "Character data between text marks.".to_string(),
+    version: String::new(),
+    wire: VariantWireDecl::Text,
+    payload: TypeRefDecl {
+      rust_type: "StringValue".to_string(),
+      module_path: Some("crate::simple_type".to_string()),
+    },
+  }));
+  Ok(())
 }
 
 /// Produce an `OpenXmlSchema` (stage 1) from XSD source text.
@@ -204,6 +352,7 @@ fn build_open_xml_schema(
       element_local,
       complex_type,
       true,
+      &[],
     );
   }
 
@@ -255,9 +404,13 @@ fn build_open_xml_schema(
   }
 
   let enums = build_enums(xsd, cfg);
+  disambiguate_shared_element_class_names(&mut types);
 
   OpenXmlSchema {
-    target_namespace: xsd.target_namespace.clone(),
+    target_namespace: cfg
+      .emitted_target_namespace
+      .clone()
+      .unwrap_or_else(|| xsd.target_namespace.clone()),
     types,
     enums,
     ..Default::default()
@@ -276,6 +429,7 @@ fn push_type(
   element_local: &str,
   fallback_body: &ParsedComplexType,
   is_root: bool,
+  alternatives: &[ParsedAlternative],
 ) {
   let name = element_type_name(
     schemas,
@@ -289,10 +443,15 @@ fn push_type(
   }
 
   let resolved = schemas.complex_type(owner_prefix, type_qname);
-  let (body, type_owner) = match resolved {
+  let (base_body, type_owner) = match resolved {
     Some((body, prefix)) => (body, prefix),
     None => (fallback_body, owner_prefix.to_string()),
   };
+  let folded = fold_structural_alternatives(schemas, owner_prefix, base_body, alternatives);
+  if let Some(folded) = &folded {
+    register_inline_types(types, seen, schemas, shared, owner_prefix, folded);
+  }
+  let body = folded.as_ref().unwrap_or(base_body);
   let leaf_text = is_simple_element_type(schemas, owner_prefix, type_qname);
   let shared_binding = !leaf_text && shared.contains(&qualified_type_key(owner_prefix, type_qname));
   let derived = if leaf_text {
@@ -323,6 +482,34 @@ fn push_type(
     &type_owner,
     body,
   ));
+}
+
+fn register_inline_types(
+  types: &mut Vec<OpenXmlSchemaType>,
+  seen: &mut BTreeMap<String, ()>,
+  schemas: &Schemas<'_>,
+  shared: &BTreeSet<String>,
+  owner_prefix: &str,
+  body: &ParsedComplexType,
+) {
+  for child in &body.children {
+    let Some(inline) = &child.complex_type else {
+      continue;
+    };
+    push_type(
+      types,
+      seen,
+      schemas,
+      shared,
+      owner_prefix,
+      &child.r#type,
+      &child.element_prefix,
+      qname_local(&child.q_name),
+      inline,
+      false,
+      &[],
+    );
+  }
 }
 
 #[derive(Default)]
@@ -357,6 +544,7 @@ fn collect_child_bindings(
       qname_local(&child.q_name),
       &ParsedComplexType::default(),
       false,
+      &child.alternatives,
     );
   }
 
@@ -429,6 +617,212 @@ fn flatten_type_rec(
   }
   flat.derivation = None;
   flat
+}
+
+/// An `xsd:alternative` that only adds `xsd:assert` does not change the
+/// particle. PinX is one of those. An alternative that adds elements is not.
+fn alternative_is_assert_only(schemas: &Schemas<'_>, owner_prefix: &str, type_name: &str) -> bool {
+  let Some((body, _)) = schemas.complex_type(owner_prefix, type_name) else {
+    return true;
+  };
+  let Some(derivation) = &body.derivation else {
+    return body.particle.is_none()
+      && body.children.is_empty()
+      && body.attributes.is_empty()
+      && body.attribute_group_refs.is_empty();
+  };
+  let extra = &derivation.body;
+  extra.text_value_type.is_none()
+    && extra.particle.is_none()
+    && extra.children.is_empty()
+    && extra.attributes.is_empty()
+    && extra.attribute_group_refs.is_empty()
+    && extra.derivation.is_none()
+}
+
+fn fold_structural_alternatives(
+  schemas: &Schemas<'_>,
+  owner_prefix: &str,
+  declared: &ParsedComplexType,
+  alternatives: &[ParsedAlternative],
+) -> Option<ParsedComplexType> {
+  if !alternatives.iter().any(|alternative| {
+    !alternative.type_name.is_empty()
+      && !alternative_is_assert_only(schemas, owner_prefix, &alternative.type_name)
+  }) {
+    return None;
+  }
+
+  let mut folded = flatten_type(schemas, owner_prefix, declared);
+  let mut children = BTreeMap::<String, ChildAcc>::new();
+  for child in effective_children(schemas, owner_prefix, &folded) {
+    absorb_child(&mut children, child);
+  }
+  for alternative in alternatives {
+    if alternative.type_name.is_empty()
+      || alternative_is_assert_only(schemas, owner_prefix, &alternative.type_name)
+    {
+      continue;
+    }
+    let Some((body, prefix)) = schemas.complex_type(owner_prefix, &alternative.type_name) else {
+      continue;
+    };
+    let flat = flatten_type(schemas, &prefix, body);
+    merge_missing_attributes(&mut folded, &flat, true);
+    for child in effective_children(schemas, &prefix, &flat) {
+      absorb_child(&mut children, child);
+    }
+  }
+  let finalized: Vec<ParsedChildElement> = children
+    .into_values()
+    .map(|child| finalize_child(schemas, owner_prefix, child))
+    .collect();
+  folded.particle = particle_for_children(&finalized);
+  folded.children = finalized;
+  folded.derivation = None;
+  Some(folded)
+}
+
+struct ChildAcc {
+  child: ParsedChildElement,
+  type_names: BTreeSet<String>,
+}
+
+fn absorb_child(children: &mut BTreeMap<String, ChildAcc>, child: ParsedChildElement) {
+  let local = qname_local(&child.q_name).to_string();
+  if let Some(existing) = children.get_mut(&local) {
+    if !child.r#type.is_empty() {
+      existing.type_names.insert(child.r#type.clone());
+    }
+    existing.child.alternatives.extend(child.alternatives);
+    return;
+  }
+  let mut type_names = BTreeSet::new();
+  if !child.r#type.is_empty() {
+    type_names.insert(child.r#type.clone());
+  }
+  children.insert(local, ChildAcc { child, type_names });
+}
+
+fn finalize_child(
+  schemas: &Schemas<'_>,
+  owner_prefix: &str,
+  mut acc: ChildAcc,
+) -> ParsedChildElement {
+  let structural: Vec<ParsedAlternative> = acc
+    .child
+    .alternatives
+    .iter()
+    .filter(|alternative| {
+      !alternative.type_name.is_empty()
+        && !alternative_is_assert_only(schemas, owner_prefix, &alternative.type_name)
+    })
+    .cloned()
+    .collect();
+  let assert_only: Vec<ParsedAlternative> = acc
+    .child
+    .alternatives
+    .iter()
+    .filter(|alternative| {
+      alternative.type_name.is_empty()
+        || alternative_is_assert_only(schemas, owner_prefix, &alternative.type_name)
+    })
+    .cloned()
+    .collect();
+  acc.child.min_occurs = 0;
+  acc.child.max_occurs = u64::MAX;
+  if structural.is_empty() && acc.type_names.len() <= 1 {
+    acc.child.alternatives = assert_only;
+    return acc.child;
+  }
+
+  let mut union = ParsedComplexType::default();
+  let mut nested = BTreeMap::<String, ChildAcc>::new();
+  for type_name in &acc.type_names {
+    merge_type_into_union(schemas, owner_prefix, type_name, &mut union, &mut nested);
+  }
+  for alternative in &structural {
+    merge_type_into_union(
+      schemas,
+      owner_prefix,
+      &alternative.type_name,
+      &mut union,
+      &mut nested,
+    );
+  }
+  let nested_children: Vec<ParsedChildElement> = nested
+    .into_values()
+    .map(|child| finalize_child(schemas, owner_prefix, child))
+    .collect();
+  union.particle = particle_for_children(&nested_children);
+  union.children = nested_children;
+  let local = qname_local(&acc.child.q_name);
+  acc.child.r#type = format!("{local}Union_Type");
+  acc.child.element_prefix.clear();
+  acc.child.complex_type = Some(union);
+  acc.child.alternatives = assert_only;
+  acc.child
+}
+
+fn merge_type_into_union(
+  schemas: &Schemas<'_>,
+  owner_prefix: &str,
+  type_name: &str,
+  union_body: &mut ParsedComplexType,
+  children: &mut BTreeMap<String, ChildAcc>,
+) {
+  let Some((body, prefix)) = schemas.complex_type(owner_prefix, type_name) else {
+    return;
+  };
+  let flat = flatten_type(schemas, &prefix, body);
+  merge_missing_attributes(union_body, &flat, true);
+  for child in effective_children(schemas, &prefix, &flat) {
+    absorb_child(children, child);
+  }
+}
+
+fn merge_missing_attributes(
+  target: &mut ParsedComplexType,
+  extra: &ParsedComplexType,
+  force_optional: bool,
+) {
+  for attribute in &extra.attributes {
+    if target
+      .attributes
+      .iter()
+      .any(|existing| existing.q_name == attribute.q_name)
+    {
+      continue;
+    }
+    let mut attribute = attribute.clone();
+    if force_optional {
+      attribute.required = false;
+    }
+    target.attributes.push(attribute);
+  }
+}
+
+fn particle_for_children(children: &[ParsedChildElement]) -> Option<Box<ParsedParticleNode>> {
+  if children.is_empty() {
+    return None;
+  }
+  let kind = if children.len() == 1 {
+    ParsedParticleKind::Sequence
+  } else {
+    ParsedParticleKind::Choice
+  };
+  Some(Box::new(ParsedParticleNode::Group {
+    particle: ParsedParticle {
+      kind,
+      min_occurs: 0,
+      max_occurs: u64::MAX,
+    },
+    children: children
+      .iter()
+      .cloned()
+      .map(|child| ParsedParticleNode::Element(Box::new(child)))
+      .collect(),
+  }))
 }
 
 fn merge_particles(
@@ -523,6 +917,7 @@ fn build_type(
     } else {
       build_particle(schemas, type_owner, &flat)
     },
+    text_value_type: flat.text_value_type.clone().unwrap_or_default(),
     ..Default::default()
   }
 }
@@ -667,6 +1062,12 @@ fn build_particle_node(
     ParsedParticleNode::Element(child) => OpenXmlSchemaTypeParticle {
       name: child_name(schemas, owner_prefix, child),
       occurs: occur_list(child.min_occurs, child.max_occurs),
+      alternative_tests: child
+        .alternatives
+        .iter()
+        .map(|alternative| alternative.test.clone())
+        .filter(|test| !test.is_empty())
+        .collect(),
       ..Default::default()
     },
     ParsedParticleNode::GroupRef {
@@ -1051,6 +1452,38 @@ fn resolve_prefix(xsd: &ParsedXsd, cfg: &NamespaceGenConfig, prefix: &str) -> St
   prefix.to_string()
 }
 
+/// Element bindings that share a local name (`visio:Row` on nineteen complex
+/// types) cannot share one Rust class name. Use the complex type's local name,
+/// without a trailing `_Type`, for those bindings only.
+fn disambiguate_shared_element_class_names(types: &mut [OpenXmlSchemaType]) {
+  let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+  for schema_type in types.iter() {
+    *counts.entry(schema_type.class_name.as_str()).or_insert(0) += 1;
+  }
+  let shared: BTreeSet<String> = counts
+    .into_iter()
+    .filter(|(_, count)| *count > 1)
+    .map(|(name, _)| name.to_string())
+    .collect();
+  if shared.is_empty() {
+    return;
+  }
+  for schema_type in types.iter_mut() {
+    if !shared.contains(schema_type.class_name.as_str()) {
+      continue;
+    }
+    let Some((type_name, _)) = schema_type.name.split_once('/') else {
+      continue;
+    };
+    if type_name.is_empty() {
+      continue;
+    }
+    let local = qname_local(type_name);
+    let local = local.strip_suffix("_Type").unwrap_or(local);
+    schema_type.class_name = local.to_upper_camel_case();
+  }
+}
+
 fn occur_list(min: u64, max: u64) -> Vec<OpenXmlSchemaTypeParticleOccur> {
   if min == 1 && max == 1 {
     return Vec::new();
@@ -1083,7 +1516,361 @@ fn qname_local(q_name: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    path::{Path, PathBuf},
+    time::SystemTime,
+  };
+
+  use super::{
+    NamespaceGenConfig, VISIO_MODULE_NAME, VISIO_RELATIONSHIP_PREFIX, gen_open_xml_schema_from_xsd,
+    gen_visio_schema,
+  };
+  use crate::sdk_data::open_xml::{
+    OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeParticle,
+  };
+
+  fn workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .parent()
+      .and_then(|path| path.parent())
+      .expect("workspace root")
+      .to_path_buf()
+  }
+
+  fn schema_fingerprint(dir: &Path) -> BTreeMap<String, (u64, SystemTime)> {
+    let mut files = BTreeMap::new();
+    for entry in fs::read_dir(dir).expect("read data/schemas") {
+      let entry = entry.expect("schema dir entry");
+      let meta = entry.metadata().expect("schema metadata");
+      if meta.is_file() {
+        files.insert(
+          entry.file_name().to_string_lossy().into_owned(),
+          (meta.len(), meta.modified().expect("schema mtime")),
+        );
+      }
+    }
+    files
+  }
+
+  fn class_name<'a>(schema: &'a OpenXmlSchema, name: &str) -> &'a str {
+    schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.name == name)
+      .unwrap_or_else(|| panic!("missing {name}"))
+      .class_name
+      .as_str()
+  }
+
+  fn assert_unique_class_names(schema: &OpenXmlSchema) {
+    let mut seen = BTreeMap::new();
+    for schema_type in &schema.types {
+      if schema_type.class_name.is_empty() {
+        continue;
+      }
+      let count = seen.entry(schema_type.class_name.clone()).or_insert(0);
+      *count += 1;
+    }
+    let duplicates: Vec<_> = seen
+      .into_iter()
+      .filter(|(_, count)| *count > 1)
+      .map(|(name, _)| name)
+      .collect();
+    assert!(
+      duplicates.is_empty(),
+      "duplicate class names: {duplicates:?}"
+    );
+  }
+
+  fn text_value_type<'a>(schema: &'a OpenXmlSchema, name: &str) -> &'a str {
+    schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.name == name)
+      .unwrap_or_else(|| panic!("missing {name}"))
+      .text_value_type
+      .as_str()
+  }
+
+  fn assert_generic_cell_and_section(schema: &OpenXmlSchema) {
+    assert!(
+      schema
+        .types
+        .iter()
+        .any(|schema_type| schema_type.name == "visio:Cell_Type/visio:Cell")
+    );
+    assert!(
+      schema
+        .types
+        .iter()
+        .any(|schema_type| schema_type.name == "visio:Section_Type/visio:Section")
+    );
+    assert!(
+      schema
+        .types
+        .iter()
+        .all(|schema_type| !schema_type.name.contains("PinX_Type"))
+    );
+  }
+
+  #[test]
+  fn visio_text_choice_keeps_character_data() {
+    use crate::sdk_code::codegen_ir::{
+      MemberDecl, SchemaModuleDecl, TypeDecl, TypeKind, VariantDecl, VariantWireDecl,
+    };
+
+    let mut ir = SchemaModuleDecl::default();
+    ir.types.push(TypeDecl {
+      rust_name: "TextChoice".to_string(),
+      kind: TypeKind::ChoiceEnum,
+      members: vec![
+        MemberDecl::Variant(VariantDecl {
+          rust_name: "Cp".to_string(),
+          wire: VariantWireDecl::Child {
+            qnames: vec!["visio:cp".to_string()],
+          },
+          ..Default::default()
+        }),
+        MemberDecl::Variant(VariantDecl {
+          rust_name: "Fld".to_string(),
+          wire: VariantWireDecl::Child {
+            qnames: vec!["visio:fld".to_string()],
+          },
+          ..Default::default()
+        }),
+      ],
+      ..Default::default()
+    });
+    super::widen_visio_text_choice(&mut ir).expect("add character data");
+    super::widen_visio_text_choice(&mut ir).expect("stay idempotent");
+    let text_variants = ir.types[0]
+      .members
+      .iter()
+      .filter(|member| {
+        matches!(
+          member,
+          MemberDecl::Variant(variant) if variant.wire == VariantWireDecl::Text
+        )
+      })
+      .count();
+    assert_eq!(text_variants, 1);
+  }
+
+  #[test]
+  fn visio_cell_and_section_stay_generic() {
+    let root = workspace_root();
+    let schemas_dir = root.join("data/schemas");
+    let before = schema_fingerprint(&schemas_dir);
+    assert!(!before.is_empty());
+
+    let xsd_path = root.join("schemas/VisioXMLSchema/visio-main.xsd");
+    let source = fs::read_to_string(&xsd_path).expect("read visio-main.xsd");
+    let cfg = NamespaceGenConfig {
+      prefix: "visio".to_string(),
+      schema_dir: xsd_path.parent().map(Path::to_path_buf),
+      ..Default::default()
+    };
+    assert!(cfg.simple_type_aliases.is_empty());
+    assert!(cfg.class_name_overrides.is_empty());
+    assert!(cfg.emitted_target_namespace.is_none());
+    let parsed = crate::sdk_data::xsd::parse_xsd(&source).expect("parse visio-main.xsd");
+    let direct = gen_open_xml_schema_from_xsd(&source, &cfg).expect("generate visio schema");
+    let wired = gen_visio_schema(&root.join("data"), &[], &HashMap::new())
+      .expect("load visio schema")
+      .expect("visio-main.xsd is present");
+
+    assert_eq!(
+      parsed.target_namespace,
+      "http://schemas.microsoft.com/office/visio/2011/1/core"
+    );
+    assert_eq!(direct.target_namespace, parsed.target_namespace);
+    assert_eq!(wired.module_name, VISIO_MODULE_NAME);
+    assert_eq!(
+      wired.target_namespace,
+      "http://schemas.microsoft.com/office/visio/2012/main"
+    );
+    assert_generic_cell_and_section(&direct);
+    assert_generic_cell_and_section(&wired);
+    assert_eq!(
+      text_value_type(&wired, "visio:Title_Type/visio:Title"),
+      "xsd:string"
+    );
+    assert_eq!(
+      text_value_type(&wired, "visio:PreviewPicture_Type/visio:PreviewPicture"),
+      "xsd:base64Binary"
+    );
+    assert_eq!(
+      text_value_type(&wired, "visio:GlueSettings_Type/visio:GlueSettings"),
+      "xsd:int"
+    );
+    assert_unique_class_names(&wired);
+    assert_eq!(
+      class_name(&wired, "visio:UserRow_Type/visio:Row"),
+      "UserRow"
+    );
+    assert_eq!(class_name(&wired, "visio:Cell_Type/visio:Cell"), "Cell");
+    assert!(
+      direct
+        .types
+        .iter()
+        .filter(|schema_type| schema_type.class_name == "Rel")
+        .all(|schema_type| {
+          schema_type
+            .attributes
+            .iter()
+            .all(|attribute| attribute.q_name != "r:id")
+        })
+    );
+    assert!(
+      wired
+        .types
+        .iter()
+        .any(|schema_type| schema_type.class_name == "Rel"
+          && schema_type
+            .attributes
+            .iter()
+            .any(|attribute| attribute.q_name == "r:id"
+              && !attribute
+                .validators
+                .iter()
+                .any(|validator| validator.name == "RequiredValidator")))
+    );
+    assert_eq!(before, schema_fingerprint(&schemas_dir));
+  }
+
+  #[test]
+  fn visio_section_rows_keep_line_and_user_cells() {
+    let root = workspace_root();
+    let xsd_path = root.join("schemas/VisioXMLSchema/visio-main.xsd");
+    let source = fs::read_to_string(&xsd_path).expect("read visio-main.xsd");
+    let cfg = NamespaceGenConfig {
+      prefix: "visio".to_string(),
+      schema_dir: xsd_path.parent().map(Path::to_path_buf),
+      ..Default::default()
+    };
+    let schema = gen_open_xml_schema_from_xsd(&source, &cfg).expect("generate visio schema");
+    assert_generic_cell_and_section(&schema);
+
+    let section = schema_type(&schema, "visio:Section_Type/visio:Section");
+    assert!(
+      particle_child_name(&section.particle, "/visio:Cell").is_some(),
+      "section keeps direct cells"
+    );
+    let row_name = particle_child_name(&section.particle, "/visio:Row").expect("section row");
+    let row = schema_type(&schema, &row_name);
+    for q_name in [":Del", ":N", ":LocalName", ":IX", ":T"] {
+      assert!(
+        row
+          .attributes
+          .iter()
+          .any(|attribute| attribute.q_name == q_name),
+        "row missing {q_name}"
+      );
+    }
+    let cell = find_particle(&row.particle, "/visio:Cell").expect("row cells");
+    assert!(
+      cell.occurs.iter().any(|occur| occur.max.is_none()),
+      "row cells are unbounded"
+    );
+    let tests = alternative_tests(&row.particle);
+    for test in ["@N = 'X'", "@N = 'Y'", "@N = 'Value'", "@N = 'Prompt'"] {
+      assert!(
+        tests.iter().any(|value| value == test),
+        "missing {test} in {tests:?}"
+      );
+    }
+    assert!(
+      particle_child_name(&row.particle, "/visio:Tab").is_some(),
+      "tabs row keeps Tab"
+    );
+  }
+
+  fn schema_type<'a>(schema: &'a OpenXmlSchema, name: &str) -> &'a OpenXmlSchemaType {
+    schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.name == name)
+      .unwrap_or_else(|| panic!("missing {name}"))
+  }
+
+  fn particle_child_name(particle: &OpenXmlSchemaTypeParticle, suffix: &str) -> Option<String> {
+    find_particle(particle, suffix).map(|found| found.name.clone())
+  }
+
+  fn find_particle<'a>(
+    particle: &'a OpenXmlSchemaTypeParticle,
+    suffix: &str,
+  ) -> Option<&'a OpenXmlSchemaTypeParticle> {
+    if particle.name.ends_with(suffix) {
+      return Some(particle);
+    }
+    particle
+      .items
+      .iter()
+      .find_map(|item| find_particle(item, suffix))
+  }
+
+  fn alternative_tests(particle: &OpenXmlSchemaTypeParticle) -> Vec<String> {
+    let mut tests = particle.alternative_tests.clone();
+    for item in &particle.items {
+      tests.extend(alternative_tests(item));
+    }
+    tests
+  }
+
+  #[test]
+  fn visio_part_roots_follow_relationship_parts() {
+    let root = workspace_root();
+    let mut parts = Vec::new();
+    for entry in fs::read_dir(root.join("data/parts")).expect("read data/parts") {
+      let path = entry.expect("part dir entry").path();
+      let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+      if !file_name.starts_with("Visio")
+        || path.extension().and_then(|ext| ext.to_str()) != Some("json")
+      {
+        continue;
+      }
+      let file = fs::File::open(&path).expect("open visio part");
+      parts.push(serde_json::from_reader::<_, OpenXmlPart>(file).expect("parse visio part"));
+    }
+    assert!(!parts.is_empty());
+
+    let schema = gen_visio_schema(&root.join("data"), &parts, &HashMap::new())
+      .expect("load visio schema")
+      .expect("visio-main.xsd is present");
+
+    let mut marked = 0usize;
+    for part in &parts {
+      if !part
+        .relationship_type
+        .starts_with(VISIO_RELATIONSHIP_PREFIX)
+        || part.root_element.is_empty()
+      {
+        continue;
+      }
+      let binding = format!(
+        "visio:{}_Type/visio:{}",
+        part.root_element, part.root_element
+      );
+      let schema_type = schema
+        .types
+        .iter()
+        .find(|schema_type| schema_type.name == binding)
+        .unwrap_or_else(|| panic!("missing {binding}"));
+      assert_eq!(schema_type.part, part.name);
+      if part.root_element != "Comments" {
+        assert_eq!(schema_type.base_class, "OpenXmlPartRootElement");
+      }
+      assert_eq!(schema_type.class_name, part.root_element);
+      marked += 1;
+    }
+    assert_eq!(marked, 9);
+  }
 
   fn generate(body: &str) -> OpenXmlSchema {
     let source = format!(

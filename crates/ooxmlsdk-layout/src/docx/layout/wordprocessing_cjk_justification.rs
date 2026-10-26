@@ -16,11 +16,10 @@ pub(super) fn adjust(
   text_metrics: &mut TextMetrics,
 ) -> bool {
   let extra = line.right_pt - natural_right;
-  if extra <= LAYOUT_EPSILON_PT {
+  if extra <= LAYOUT_EPSILON_PT || line.has_character_grid {
     return false;
   }
   let mut portions = Vec::new();
-  let mut size = None;
   for (index, item) in items.iter().enumerate().skip(line.item_start) {
     let PageItem::Text(text) = item else {
       return false;
@@ -45,12 +44,6 @@ pub(super) fn adjust(
     {
       return false;
     }
-    // Mixed ems and complex clusters retain their existing line owner until
-    // its expansion priorities are established independently.
-    if size.is_some_and(|size| size != text.style.font_size_pt) {
-      return false;
-    }
-    size = Some(text.style.font_size_pt);
     let Some(shaped) = text_metrics.shape_text(&text.text, &text.style) else {
       return false;
     };
@@ -72,11 +65,8 @@ pub(super) fn adjust(
       text: chars,
     });
   }
-  // Existing singleton grid portions have their own column-pitch algorithm.
-  if portions.iter().all(|p| p.text.len() == 1) {
-    return false;
-  }
-  let Some(size) = size else { return false };
+  // A source grid has a separate column-pitch owner. Ordinary singleton
+  // formatting runs and mixed script ems still receive Word's character glue.
   if !portions
     .iter()
     .any(|p| p.text.iter().any(|&ch| cjk_line_character(ch)))
@@ -121,9 +111,17 @@ pub(super) fn adjust(
         )
       );
       if mixed && gap > LAYOUT_EPSILON_PT {
-        // Native Word expands an existing automatic script gap to half an
-        // em before spreading the remaining glue between CJK characters.
-        capacity = ((size * 0.5 - gap).max(0.0) * 4096.0).round() as i64;
+        let PageItem::Text(text) = &items[portions[p].index] else {
+          unreachable!()
+        };
+        if let Some(edge) = auto_script_edge(left, &text.style, false, text_metrics)
+          && gap <= edge.normal_gap_pt + LAYOUT_EPSILON_PT
+          && gap >= edge.normal_gap_pt * 0.5 - LAYOUT_EPSILON_PT
+        {
+          // Native expands automatic gaps to the preceding logical average
+          // width (twice their nominal width), independently of the next em.
+          capacity = ((edge.normal_gap_pt * 2.0 - gap).max(0.0) * 4096.0).round() as i64;
+        }
       }
     }
     slots.push((p, c, capacity));
@@ -136,19 +134,15 @@ pub(super) fn adjust(
   let priority = total.min(capacity);
   let remainder = total - priority;
   let count = slots.len() as i64;
-  let mut accumulated = 0i64;
-  let mut allocated = 0i64;
+  let (contraction, mut residual_contraction) =
+    common_contraction(slots.iter().map(|slot| slot.2), capacity - priority);
   for (index, &(p, c, cap)) in slots.iter().enumerate() {
-    accumulated += cap;
-    let target = if capacity == 0 {
-      0
-    } else {
-      priority * accumulated / capacity
-    };
-    let units =
-      target - allocated + remainder / count + i64::from((index as i64) < remainder % count);
+    let residual = i64::from(cap > contraction && residual_contraction > 0);
+    residual_contraction -= residual;
+    let units = cap - cap.min(contraction) - residual
+      + remainder / count
+      + i64::from((index as i64) < remainder % count);
     portions[p].expansion[c] += units as f32 / 4096.0;
-    allocated = target;
   }
   let mut preceding = 0.0;
   for portion in portions {
@@ -160,4 +154,55 @@ pub(super) fn adjust(
     text.style.wordprocessing_justification_expansion_pt = Some(portion.expansion.into());
   }
   true
+}
+
+fn common_contraction(capacities: impl Iterator<Item = i64> + Clone, loss: i64) -> (i64, i64) {
+  // Native heterogeneous-gap arrays subtract one common amount from their
+  // maximum capacities, saturating smaller capacities at zero. They do not
+  // allocate a proportional share of the available expansion. Find that
+  // integer water level without per-gap allocation or quadratic retries.
+  let mut low = 0;
+  let mut high = capacities.clone().max().unwrap_or(0);
+  while low < high {
+    let middle = low + (high - low + 1) / 2;
+    let used: i64 = capacities.clone().map(|cap| cap.min(middle)).sum();
+    if used <= loss {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  let used: i64 = capacities.map(|cap| cap.min(low)).sum();
+  (low, loss - used)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::common_contraction;
+
+  #[test]
+  fn heterogeneous_native_gaps_contract_from_their_maximum_capacity() {
+    let capacities = [10752, 8620, 8620, 10752, 8620, 8620];
+    let loss = capacities.iter().sum::<i64>() - 28189;
+    let (level, mut remainder) = common_contraction(capacities.into_iter(), loss);
+    let actual = capacities.map(|cap| {
+      let extra = i64::from(cap > level && remainder > 0);
+      remainder -= extra;
+      cap - cap.min(level) - extra
+    });
+    assert_eq!(actual, [6119, 3987, 3987, 6120, 3988, 3988]);
+    assert_eq!(actual.iter().sum::<i64>(), 28189);
+    for keep in [0, 1, 4000, 55984] {
+      let loss = capacities.iter().sum::<i64>() - keep;
+      let (level, remainder) = common_contraction(capacities.into_iter(), loss);
+      assert_eq!(
+        capacities
+          .into_iter()
+          .map(|cap| cap.min(level))
+          .sum::<i64>()
+          + remainder,
+        loss
+      );
+    }
+  }
 }

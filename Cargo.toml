@@ -8,6 +8,7 @@ members = [
   "crates/ooxmlsdk-formula",
   "crates/ooxmlsdk-layout",
   "crates/ooxmlsdk-pdf",
+  "crates/ooxmlsdk-visio",
 ]
 
 [workspace.package]
@@ -31,6 +32,7 @@ ooxmlsdk-fonts = { version = "0.14.0", path = "crates/ooxmlsdk-fonts" }
 ooxmlsdk-formula = { version = "0.14.0", path = "crates/ooxmlsdk-formula" }
 ooxmlsdk-layout = { version = "0.14.0", path = "crates/ooxmlsdk-layout" }
 ooxmlsdk-pdf = { version = "0.14.0", path = "crates/ooxmlsdk-pdf" }
+ooxmlsdk-visio = { version = "0.14.0", path = "crates/ooxmlsdk-visio" }
 emfsdk = { path = "../emfsdk/crates/emfsdk", features = ["render"] }
 olecfsdk = { path = "../olecfsdk/crates/olecfsdk" }
 base64 = "0.23.1"
@@ -75,6 +77,7 @@ hypher = "0.1.7"
 icu_collator = { version = "2.2.1", features = ["compiled_data"] }
 icu_calendar = { version = "2.2.1", features = ["compiled_data"] }
 icu_datetime = { version = "2.2.0", features = ["compiled_data"] }
+icu_decimal = { version = "2.2.0", features = ["compiled_data"] }
 icu_locale = { version = "2.2.0", features = ["compiled_data"] }
 icu_properties = { version = "2.2.0", features = ["compiled_data"] }
 icu_segmenter = { version = "2.2.0", features = ["compiled_data"] }

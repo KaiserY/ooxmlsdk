@@ -5,19 +5,21 @@ const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
 /// The subset of a PNG which a PDF image XObject can consume directly.
 ///
 /// The concatenated IDAT zlib stream is paired with PDF's PNG predictor, while
-/// an indexed palette becomes an `/Indexed` color space. The direct writer
+/// an indexed palette becomes an `/Indexed` color space and one-bit grayscale
+/// retains `/DeviceGray`. The direct writer
 /// consumes this validated representation without decoding and recompressing
 /// the source samples.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct NativeIndexedPng {
+pub(super) struct NativePng {
   pub width: u32,
   pub height: u32,
   pub bit_depth: BitDepth,
+  pub color_type: ColorType,
   pub palette: Vec<u8>,
   pub idat: Vec<u8>,
 }
 
-impl NativeIndexedPng {
+impl NativePng {
   pub(super) fn parse(data: &[u8]) -> Option<Self> {
     let mut cursor = data.strip_prefix(PNG_SIGNATURE)?;
     let mut header = None;
@@ -45,7 +47,8 @@ impl NativeIndexedPng {
           let color_type = ColorType::from_u8(payload[9])?;
           if width == 0
             || height == 0
-            || color_type != ColorType::Indexed
+            || !(color_type == ColorType::Indexed
+              || (color_type == ColorType::Grayscale && bit_depth == BitDepth::One))
             || !matches!(
               bit_depth,
               BitDepth::One | BitDepth::Two | BitDepth::Four | BitDepth::Eight
@@ -56,12 +59,13 @@ impl NativeIndexedPng {
           {
             return None;
           }
-          header = Some((width, height, bit_depth));
+          header = Some((width, height, bit_depth, color_type));
         }
         b"PLTE" => {
-          let (_, _, bit_depth) = header?;
+          let (_, _, bit_depth, color_type) = header?;
           let max_entries = 1_usize << bit_depth as usize;
-          if palette.is_some()
+          if color_type != ColorType::Indexed
+            || palette.is_some()
             || !idat.is_empty()
             || payload.is_empty()
             || payload.len() % 3 != 0
@@ -73,8 +77,10 @@ impl NativeIndexedPng {
         }
         b"tRNS" => return None,
         b"IDAT" => {
-          header?;
-          palette.as_ref()?;
+          let (_, _, _, color_type) = header?;
+          if color_type == ColorType::Indexed {
+            palette.as_ref()?;
+          }
           idat.extend_from_slice(payload);
         }
         b"IEND" => {
@@ -89,12 +95,13 @@ impl NativeIndexedPng {
       }
     }
 
-    let (width, height, bit_depth) = header?;
+    let (width, height, bit_depth, color_type) = header?;
     (reached_iend && !idat.is_empty()).then_some(Self {
       width,
       height,
       bit_depth,
-      palette: palette?,
+      color_type,
+      palette: palette.unwrap_or_default(),
       idat,
     })
   }

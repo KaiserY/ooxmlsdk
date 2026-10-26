@@ -383,6 +383,7 @@ mod tests {
             right_pt: 442.25 - tab as f32 * 0.05 + shift,
             terminal_overhang_pt: 0.0,
             source_frame_right_pt: Some(538.65 + shift),
+            has_character_grid: false,
             preserve_foreign_tail: true,
           };
           assert_eq!(device_target_width(line), *target);
@@ -490,6 +491,7 @@ mod tests {
             right_pt: right,
             terminal_overhang_pt: 0.0,
             source_frame_right_pt: None,
+            has_character_grid: false,
             preserve_foreign_tail: true,
           },
           Some(1),
@@ -597,6 +599,7 @@ mod tests {
             right_pt: 476.3,
             terminal_overhang_pt: 0.0,
             source_frame_right_pt: None,
+            has_character_grid: false,
             preserve_foreign_tail: false,
           },
           Some(0),
@@ -656,6 +659,7 @@ mod tests {
             right_pt: left + width,
             terminal_overhang_pt: 0.0,
             source_frame_right_pt: None,
+            has_character_grid: false,
             preserve_foreign_tail: false,
           };
           assert_eq!(adjust(&mut items, line, Some(0), &mut metrics), Some(true));
@@ -754,6 +758,7 @@ mod tests {
         right_pt: 488.9,
         terminal_overhang_pt: 0.0,
         source_frame_right_pt: None,
+        has_character_grid: false,
         preserve_foreign_tail: false,
       };
       assert_eq!(adjust(&mut items, line, Some(2), &mut metrics), Some(true));
@@ -816,6 +821,7 @@ mod tests {
         right_pt: 455.75,
         terminal_overhang_pt: 0.0,
         source_frame_right_pt: None,
+        has_character_grid: false,
         preserve_foreign_tail: true,
       };
       let last = items.len() - 1;
@@ -881,6 +887,7 @@ mod tests {
         right_pt: 455.75,
         terminal_overhang_pt: 0.0,
         source_frame_right_pt: None,
+        has_character_grid: false,
         preserve_foreign_tail: false,
       };
       let last = items.len() - 1;
@@ -961,6 +968,7 @@ mod tests {
         right_pt,
         terminal_overhang_pt: 0.0,
         source_frame_right_pt: None,
+        has_character_grid: false,
         preserve_foreign_tail: false,
       };
       assert_eq!(adjust(&mut items, line, Some(2), &mut metrics), Some(true));
@@ -1017,6 +1025,7 @@ mod tests {
         right_pt: 273.1,
         terminal_overhang_pt: 0.0,
         source_frame_right_pt: None,
+        has_character_grid: false,
         preserve_foreign_tail: false,
       };
       assert_eq!(adjust(&mut items, line, Some(1), &mut metrics), Some(true));
@@ -1056,6 +1065,7 @@ mod tests {
         right_pt: 123.1 + (555 + extra) as f32 * PIXEL_PT,
         terminal_overhang_pt: 0.0,
         source_frame_right_pt: None,
+        has_character_grid: false,
         preserve_foreign_tail: false,
       };
       assert_eq!(adjust(&mut items, line, Some(0), &mut metrics), Some(true));
@@ -1091,6 +1101,7 @@ mod tests {
       right_pt: 123.1 + 337.0 * PIXEL_PT,
       terminal_overhang_pt: 0.0,
       source_frame_right_pt: None,
+      has_character_grid: false,
       preserve_foreign_tail: false,
     };
     assert_eq!(adjust(&mut items, line, Some(0), &mut metrics), Some(true));
@@ -1135,6 +1146,7 @@ mod tests {
       right_pt: 488.9,
       terminal_overhang_pt: 0.0,
       source_frame_right_pt: None,
+      has_character_grid: false,
       preserve_foreign_tail: false,
     };
     let mut leading = items.clone();

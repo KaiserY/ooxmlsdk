@@ -27,8 +27,8 @@ pub(super) fn push_drawing_shapes(
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
-) {
-  super::push_drawing_shapes_impl(drawing, inlines, styles, images, hyperlinks);
+) -> bool {
+  super::push_drawing_shapes_impl(drawing, inlines, styles, images, hyperlinks)
 }
 
 pub(super) fn pict_image(

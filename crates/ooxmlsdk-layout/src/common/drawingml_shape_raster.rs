@@ -34,6 +34,11 @@ const OFFICE_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX: f32 = 16.0;
 const OFFICE_ANTIALIAS_8X4_HORIZONTAL_SAMPLES: u32 = 8;
 const OFFICE_ANTIALIAS_8X4_VERTICAL_SAMPLES: u32 = 4;
 
+/// Checks actual storage independently of the density policy's minimum tier.
+pub(crate) fn fixed_output_effect_raster_size_fits(width: u32, height: u32) -> bool {
+  u64::from(width) * u64::from(height) <= MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS as u64
+}
+
 /// Selects Office's fixed-output working density for a simple shape glow.
 ///
 /// Office evaluates the authored radius against a 200-DPI reference surface,
@@ -1691,6 +1696,53 @@ pub(crate) fn place_drawing_raster_on_transparent_surface(
 
 /// Paint directly on the independently allocated 3-D material bitmap. This
 /// does not resize a completed effect source or change the geometry grid.
+pub(crate) fn rasterize_shape_surface_material_texture(
+  item: &PathItem<'static>,
+  plan: super::drawingml_3d::TextMaterialTexturePlan,
+) -> Option<super::drawingml_3d::TextMaterialTexture> {
+  let mut pixmap = Pixmap::new(plan.width, plan.height)?;
+  let mut fill = item.clone();
+  fill.stroke = None;
+  let mut line = item.clone();
+  line.fill = Fill::None;
+  // The independent WPS material source expands the authored pen by two
+  // 600-DPI printer dots. Native GDI+ calls for 1/2/4pt outlines receive
+  // 15748/28448/53848 EMU; noFill creates no pen. The physical solid and the
+  // shadow source keep the authored width, so apply this only to the paint.
+  if let Some(stroke) = line.stroke.as_mut()
+    && stroke.width.0.is_finite()
+    && stroke.width.0 > 0.0
+  {
+    stroke.width.0 += 2.0 * 72.0 / 600.0;
+  }
+  let sample_width = plan.width.checked_mul(8)?;
+  for top in (0..plan.height).step_by(64) {
+    let rows = (plan.height - top).min(64);
+    let mut samples = Pixmap::new(sample_width, rows * 4)?;
+    let t = plan.page_to_texture;
+    let transform = SkTransform::from_row(
+      t.sx * 8.0,
+      t.ky * 4.0,
+      t.kx * 8.0,
+      t.sy * 4.0,
+      t.tx * 8.0 - 4.0,
+      t.ty * 4.0 - (top * 4) as f32 - 2.0,
+    );
+    for layer in [&fill, &line] {
+      samples.fill(SkColor::TRANSPARENT);
+      draw_path(
+        &mut samples,
+        layer,
+        transform,
+        RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+      )?;
+      composite_material_sample_band(&mut pixmap, &samples, top);
+    }
+  }
+  plan.finish(pixmap)
+}
+
+/// Text paint retains its separate inner-outline material rule.
 pub(crate) fn rasterize_text_surface_material_texture(
   item: &TextRun<'static>,
   plan: super::drawingml_3d::TextMaterialTexturePlan,
@@ -3531,13 +3583,7 @@ fn draw_text(
       height: super::Pt(item.line_height.0.max(item.style.font_size.0)),
     },
   };
-  let mut fill = item
-    .style
-    .pdf_glyph_outline_options
-    .as_ref()
-    .and_then(|options| options.fill.clone())
-    .unwrap_or(Fill::Solid(item.color));
-  resolve_text_raster_fill(&mut fill, bounds);
+  let (fill, stroke) = text_raster_paint(item, bounds);
   if primitive_antialiasing == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
     draw_office_8x4_fill(
       pixmap,
@@ -3558,6 +3604,42 @@ fn draw_text(
       primitive_antialiasing,
     )?;
   }
+  if let Some(stroke) = &stroke {
+    if primitive_antialiasing == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
+      draw_office_8x4_stroke(
+        pixmap,
+        &path,
+        stroke,
+        bounds,
+        Some(&commands),
+        page_to_raster,
+      )?;
+    } else {
+      draw_stroke(
+        pixmap,
+        &path,
+        stroke,
+        bounds,
+        Some(&commands),
+        page_to_raster,
+        primitive_antialiasing,
+      )?;
+    }
+  }
+  Some(())
+}
+
+fn text_raster_paint(
+  item: &TextRun<'static>,
+  bounds: Rect,
+) -> (Fill<'static>, Option<Stroke<'static>>) {
+  let mut fill = item
+    .style
+    .pdf_glyph_outline_options
+    .as_ref()
+    .and_then(|options| options.fill.clone())
+    .unwrap_or(Fill::Solid(item.color));
+  resolve_text_raster_fill(&mut fill, bounds);
   let mut stroke = item
     .style
     .pdf_glyph_outline_options
@@ -3600,34 +3682,72 @@ fn draw_text(
       Fill::None | Fill::Theme(_) | Fill::Image { .. } | Fill::Texture(_) => {}
     }
   }
-  if let Some(stroke) = &stroke {
-    if primitive_antialiasing == RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 {
-      draw_office_8x4_stroke(
-        pixmap,
-        &path,
-        stroke,
-        bounds,
-        Some(&commands),
-        page_to_raster,
-      )?;
-    } else {
-      draw_stroke(
-        pixmap,
-        &path,
-        stroke,
-        bounds,
-        Some(&commands),
-        page_to_raster,
-        primitive_antialiasing,
-      )?;
-    }
+  (fill, stroke)
+}
+
+/// The effect source is the completed warped paint, including an outline when
+/// the glyph fill is absent. Reuse the PDF projection's seam splitting and
+/// boundary sampler, then let the ordinary raster paint own its fill/stroke.
+pub(crate) fn warped_text_effect_source(
+  item: &TextRun<'static>,
+  text_metrics: &mut TextMetrics,
+) -> Option<PathItem<'static>> {
+  let options = item.style.pdf_glyph_outline_options.as_deref()?;
+  let warp = options.text_warp.as_deref()?;
+  if warp.boundaries.len() < 2 && warp.follow_path.is_none() {
+    return None;
   }
-  Some(())
+  let path = vml_envelope_text_outline(item, warp, text_metrics)?;
+  if path.is_empty() {
+    return None;
+  }
+  let bounds = path.bounding_box();
+  let (fill, stroke) = text_raster_paint(item, warp.paint_bounds);
+  Some(PathItem {
+    bounds: Rect {
+      origin: super::Point {
+        x: super::Pt(bounds.x0 as f32),
+        y: super::Pt(bounds.y0 as f32),
+      },
+      size: super::Size {
+        width: super::Pt(bounds.width() as f32),
+        height: super::Pt(bounds.height() as f32),
+      },
+    },
+    points: Vec::new(),
+    commands: super::drawingml_geometry::bez_path_commands(path),
+    closed: true,
+    fill,
+    stroke,
+  })
 }
 
 struct RasterTextOutline {
   commands: Vec<PathCommand>,
   width_pt: f32,
+}
+
+fn text_baseline_y(item: &TextRun<'static>, text_metrics: &mut TextMetrics) -> f32 {
+  if item.origin_is_baseline {
+    // Nested stories can retain a formatter-resolved baseline after losing
+    // their line frame. Effects must use the same origin as vector PDF paint,
+    // applying the run's escapement without adding the font ascent again.
+    return item.origin.y.0 - item.style.baseline_shift.0;
+  }
+  let offset = if item.style.use_windows_font_metrics {
+    text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+      item.text.as_ref(),
+      &item.style,
+      item.line_height.0,
+    )
+  } else {
+    text_metrics.baseline_offset_in_line_for_text(
+      item.text.as_ref(),
+      &item.style,
+      item.line_height.0,
+    )
+  };
+  item.origin.y.0 + offset
 }
 
 fn text_outline(
@@ -3641,25 +3761,18 @@ fn text_outline(
       width_pt: 0.0,
     });
   }
-  let shaped = text_metrics.shape_text(item.text.as_ref(), &item.style)?;
-  let baseline_offset = if item.style.use_windows_font_metrics {
-    text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-      item.text.as_ref(),
-      &item.style,
-      item.line_height.0,
-    )
-  } else {
-    text_metrics.baseline_offset_in_line_for_text(
-      item.text.as_ref(),
-      &item.style,
-      item.line_height.0,
-    )
-  };
-  let baseline_y = item.origin.y.0 + baseline_offset;
+  let mut shaped = text_metrics.shape_text(item.text.as_ref(), &item.style)?;
+  let explicit_advances = apply_explicit_character_advances(
+    &mut shaped,
+    item.text.as_ref(),
+    item.style.semantic_character_advances_pt.as_deref(),
+  )?;
+  let baseline_y = text_baseline_y(item, text_metrics);
   let horizontal_scale = item.style.horizontal_scale.unwrap_or(1.0);
   let gdi_device_advances = text_hinting
     .filter(|(mode, _)| {
-      !item.paragraph_bidi
+      !explicit_advances
+        && !item.paragraph_bidi
         && matches!(
           mode,
           RasterTextHinting::GdiDeviceAdvances | RasterTextHinting::GdiDeviceAdvancesHinted
@@ -3770,10 +3883,11 @@ fn text_outline(
       .and_then(|advances| advances.get(glyph_index))
       .copied()
       .unwrap_or(glyph.x_advance_em * glyph.font_size_pt);
-    if item
-      .text
-      .get(glyph.text_range.clone())
-      .is_some_and(|cluster| cluster.contains(' '))
+    if !explicit_advances
+      && item
+        .text
+        .get(glyph.text_range.clone())
+        .is_some_and(|cluster| cluster.contains(' '))
     {
       cursor_x += item.word_spacing_pt;
     }
@@ -3793,6 +3907,37 @@ pub(crate) struct VmlWordartPaintBounds {
   pub layout_bounds: Option<Rect>,
 }
 
+/// Reference-device enclosure of a fitted VML envelope, before page placement.
+/// The caller supplies the authored-frame transform: printer realization and
+/// page coordinates must not determine the legacy 96-DPI layout enclosure.
+pub(crate) fn vml_fitted_text_layout_bounds(
+  item: &TextRun<'static>,
+  transform: Affine,
+  text_metrics: &mut TextMetrics,
+) -> Option<kurbo::Rect> {
+  let options = item.style.pdf_glyph_outline_options.as_deref()?;
+  let warp = options.text_warp.as_deref()?;
+  if !options.vml_fitted_text || warp.vml_fit_path.is_some() || warp.boundaries.len() != 2 {
+    return None;
+  }
+  let path = transform * vml_envelope_text_outline(item, warp, text_metrics)?;
+  // Reuse the native collector's cubic control-point enclosure. There is no
+  // pen on this route; stroked/effected shapes keep their existing owner.
+  super::vml_path_bounds::stroked_bounds(&path, 0.0, 0.0)
+}
+
+/// Unstroked warped glyph bounds, shared by all lines of a legacy text brush.
+pub(crate) fn vml_text_warp_glyph_bounds(
+  item: &TextRun<'static>,
+  text_metrics: &mut TextMetrics,
+) -> Option<kurbo::Rect> {
+  let options = item.style.pdf_glyph_outline_options.as_deref()?;
+  let warp = options.text_warp.as_deref()?;
+  warp.vml_fit_path?;
+  let path = vml_envelope_text_outline(item, warp, text_metrics)?;
+  (!path.is_empty()).then(|| path.bounding_box())
+}
+
 /// Painted bounds of a legacy VML WordArt envelope. Word's inline formatter
 /// encloses the outline and effects. Curved envelopes retain raw quadratic
 /// segments until seam splitting and deformation, using the direct writer's
@@ -3803,16 +3948,24 @@ pub(crate) fn vml_wordart_paint_bounds(
 ) -> Option<VmlWordartPaintBounds> {
   let options = item.style.pdf_glyph_outline_options.as_deref()?;
   let warp = options.text_warp.as_deref()?;
-  if warp.vml_fit_path.is_none() || warp.boundaries.len() != 2 {
+  // Multi-line VML envelopes have one boundary pair per band. They use the
+  // same projected glyph, outline and shadow enclosure as a single band.
+  // Excluding them loses the inline advance and auto-fit host's effect bounds.
+  if warp.vml_fit_path.is_none()
+    || warp.boundaries.len() < 2
+    || !warp.boundaries.len().is_multiple_of(2)
+  {
     return None;
   }
   let straight = |commands: &[PathCommand]| match commands {
     [PathCommand::MoveTo(start), PathCommand::LineTo(end)] => Some((*start, *end)),
     _ => None,
   };
-  let flat = warp.boundaries.iter().all(|path| straight(path).is_some());
-  let path = if let (Some((upper_start, upper_end)), Some((lower_start, lower_end))) =
-    (straight(&warp.boundaries[0]), straight(&warp.boundaries[1]))
+  let flat =
+    warp.boundaries.len() == 2 && warp.boundaries.iter().all(|path| straight(path).is_some());
+  let path = if flat
+    && let (Some((upper_start, upper_end)), Some((lower_start, lower_end))) =
+      (straight(&warp.boundaries[0]), straight(&warp.boundaries[1]))
   {
     let source = warp.source_bounds;
     let source_width = source.size.width.0;
@@ -3980,7 +4133,23 @@ fn vml_envelope_shaped_text(
       paint.width_pt = logical.width_pt;
     }
   }
-  if let Some(advances) = style.semantic_character_advances_pt.as_deref()
+  apply_explicit_character_advances(
+    &mut paint,
+    text,
+    style.semantic_character_advances_pt.as_deref(),
+  )?;
+  Some(paint)
+}
+
+// Completed GDI/Word line cells already own the distances between source
+// characters. Both rigid shape outlines and WordArt effect sources must use
+// those cells just as the PDF foreground does, including multi-byte clusters.
+fn apply_explicit_character_advances(
+  paint: &mut crate::text_metrics::ShapedText,
+  text: &str,
+  advances: Option<&[f32]>,
+) -> Option<bool> {
+  if let Some(advances) = advances
     && advances.len() == text.chars().count()
   {
     let mut offsets: Vec<_> = text.char_indices().map(|(index, _)| index).collect();
@@ -3996,8 +4165,9 @@ fn vml_envelope_shaped_text(
       glyph.x_advance_em = (prefix[end] - prefix[start]) / glyph.font_size_pt;
     }
     paint.width_pt = prefix.last().copied().unwrap_or(0.0);
+    return Some(true);
   }
-  Some(paint)
+  Some(false)
 }
 
 fn vml_envelope_text_outline(
@@ -4023,20 +4193,7 @@ fn vml_envelope_text_outline(
     Vec::new()
   };
   let shaped = vml_envelope_shaped_text(item.text.as_ref(), &item.style, text_metrics)?;
-  let baseline_offset = if item.style.use_windows_font_metrics {
-    text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
-      item.text.as_ref(),
-      &item.style,
-      item.line_height.0,
-    )
-  } else {
-    text_metrics.baseline_offset_in_line_for_text(
-      item.text.as_ref(),
-      &item.style,
-      item.line_height.0,
-    )
-  };
-  let baseline_y = item.origin.y.0 + baseline_offset;
+  let baseline_y = text_baseline_y(item, text_metrics);
   let horizontal_scale = item.style.horizontal_scale.unwrap_or(1.0);
   let mut cursor_x = item.origin.x.0;
   let mut commands = Vec::new();
@@ -4069,7 +4226,6 @@ fn vml_envelope_text_outline(
           f64::from(origin_y) - point.y * f64::from(scale),
         )
       };
-      let split = split_outline_at_warp_seams(&raw.path, glyph_to_page, &seams);
       let follow_path_transform = if warp.follow_path.is_some() {
         let cell = TextFollowPathFontCell::from_font(&face, glyph.font_size_pt)?;
         Some(text_follow_path_glyph_transform(
@@ -4081,18 +4237,30 @@ fn vml_envelope_text_outline(
       } else {
         None
       };
-      append_mapped_outline(
-        split.as_ref().unwrap_or(&raw.path),
-        |point| {
-          let point = glyph_to_page(point);
-          follow_path_transform.map_or_else(
-            || text_warp_point(warp, &boundaries, point),
-            |transform| transform * point,
-          )
-        },
-        &mut commands,
-      )
-      .ok()?;
+      if warp.word_envelope {
+        super::text_warp_projection::append_word_envelope_outline(
+          &raw.path,
+          glyph_to_page,
+          warp,
+          &boundaries,
+          &mut commands,
+        )
+        .ok()?;
+      } else {
+        let split = split_outline_at_warp_seams(&raw.path, glyph_to_page, &seams);
+        append_mapped_outline(
+          split.as_ref().unwrap_or(&raw.path),
+          |point| {
+            let point = glyph_to_page(point);
+            follow_path_transform.map_or_else(
+              || text_warp_point(warp, &boundaries, point),
+              |transform| transform * point,
+            )
+          },
+          &mut commands,
+        )
+        .ok()?;
+      }
     }
     cursor_x += glyph.x_advance_em * glyph.font_size_pt;
     if item
@@ -4211,30 +4379,68 @@ impl OutlinePen for RasterGlyphOutline<'_> {
   }
 }
 
+fn decode_effect_source_image(data: &[u8], content_type: Option<&str>) -> Option<RgbaImage> {
+  let raster_data = crate::render::emf_wmf::decode_metafile_as_raster(data, content_type)
+    .ok()
+    .flatten()
+    .map(|decoded| decoded.data);
+  let source_data = raster_data.as_deref().unwrap_or(data);
+  // Fixed-output image effects must consume the same decoded JPEG samples
+  // as direct PDF pictures. The generic decoder uses a different IDCT;
+  // reflecting or blurring its RGB cannot recover the Office source plane.
+  Some(
+    if let Some(rgb) = crate::render::jpeg_islow::decode_rgb(source_data) {
+      image::DynamicImage::ImageRgb8(rgb).to_rgba8()
+    } else if let Some(gray) = crate::render::jpeg_islow::decode_gray(source_data) {
+      image::DynamicImage::ImageLuma8(gray).to_rgba8()
+    } else {
+      image::load_from_memory(source_data).ok()?.to_rgba8()
+    },
+  )
+}
+
+fn texture_source_pixmap(texture: &super::TextureFill) -> Option<Pixmap> {
+  let source = decode_effect_source_image(&texture.bytes, texture.content_type.as_deref())?;
+  let mut pixmap = Pixmap::new(source.width(), source.height())?;
+  for (source, target) in source.pixels().zip(pixmap.pixels_mut()) {
+    *target =
+      tiny_skia::ColorU8::from_rgba(source[0], source[1], source[2], source[3]).premultiply();
+  }
+  Some(pixmap)
+}
+
+fn texture_paint<'a>(texture: &super::TextureFill, tile: &'a Pixmap) -> Option<Paint<'a>> {
+  let width = texture.tile_size.width.0;
+  let height = texture.tile_size.height.0;
+  if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {
+    return None;
+  }
+  Some(Paint {
+    shader: Pattern::new(
+      tile.as_ref(),
+      SpreadMode::Repeat,
+      FilterQuality::Bilinear,
+      1.0,
+      SkTransform::from_row(
+        width / tile.width() as f32,
+        0.0,
+        0.0,
+        height / tile.height() as f32,
+        texture.origin.x.0,
+        texture.origin.y.0,
+      ),
+    ),
+    ..Paint::default()
+  })
+}
+
 fn draw_image(
   pixmap: &mut Pixmap,
   item: &ImageItem<'static>,
   page_to_raster: SkTransform,
   primitive_antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
-  let raster_data = crate::render::emf_wmf::decode_metafile_as_raster(
-    item.bytes.as_ref(),
-    Some(item.content_type.as_ref()),
-  )
-  .ok()
-  .flatten()
-  .map(|decoded| decoded.data);
-  let source_data = raster_data.as_deref().unwrap_or(item.bytes.as_ref());
-  // Fixed-output image effects must consume the same decoded JPEG samples
-  // as direct PDF pictures. The generic decoder uses a different IDCT;
-  // reflecting or blurring its RGB cannot recover the Office source plane.
-  let source = if let Some(rgb) = crate::render::jpeg_islow::decode_rgb(source_data) {
-    image::DynamicImage::ImageRgb8(rgb).to_rgba8()
-  } else if let Some(gray) = crate::render::jpeg_islow::decode_gray(source_data) {
-    image::DynamicImage::ImageLuma8(gray).to_rgba8()
-  } else {
-    image::load_from_memory(source_data).ok()?.to_rgba8()
-  };
+  let source = decode_effect_source_image(&item.bytes, Some(item.content_type.as_ref()))?;
   let crop = item.crop.unwrap_or_default();
   let visible_width = 1.0 - crop.left - crop.right;
   let visible_height = 1.0 - crop.top - crop.bottom;
@@ -4732,7 +4938,14 @@ fn draw_fill(
       pixmap.fill_path(path, &paint, FillRule::EvenOdd, page_to_raster, None);
       Some(())
     }
-    Fill::Theme(_) | Fill::Image { .. } | Fill::Texture(_) => None,
+    Fill::Texture(texture) => {
+      let tile = texture_source_pixmap(texture)?;
+      let mut paint = texture_paint(texture, &tile)?;
+      paint.anti_alias = anti_alias;
+      pixmap.fill_path(path, &paint, FillRule::EvenOdd, page_to_raster, None);
+      Some(())
+    }
+    Fill::Theme(_) | Fill::Image { .. } => None,
   }
 }
 
@@ -4794,6 +5007,7 @@ fn exact_aliased_sample_mask(
     );
   }
   let exact_path = tiny_path_as_kurbo(transformed);
+  let winding_index = ExactPathWinding::new(&exact_path);
   let width = pixmap.width() as usize;
   let height = pixmap.height() as usize;
 
@@ -4831,7 +5045,7 @@ fn exact_aliased_sample_mask(
         continue;
       }
 
-      let winding = exact_path.winding(KurboPoint::new(
+      let winding = winding_index.winding(KurboPoint::new(
         x as f64 + sample_offset,
         y as f64 + sample_offset,
       ));
@@ -4843,6 +5057,73 @@ fn exact_aliased_sample_mask(
     }
   }
   Some(mask)
+}
+
+/// Height buckets only select candidates: kurbo still evaluates each original
+/// curve's exact winding contribution, including extrema and endpoint ties.
+/// This is the active-edge principle used by the WPF geometry scanner, without
+/// flattening curves or changing the sample grid. The control hull is a
+/// conservative bound even when an extremum lies very close to a sample.
+struct ExactPathWinding<'a> {
+  original: &'a BezPath,
+  segments: Vec<(BezPath, kurbo::Rect)>,
+  buckets: Vec<Vec<usize>>,
+  top: f64,
+  scale: f64,
+}
+
+impl<'a> ExactPathWinding<'a> {
+  fn new(original: &'a BezPath) -> Self {
+    let mut result = Self {
+      original,
+      segments: Vec::new(),
+      buckets: Vec::new(),
+      top: 0.0,
+      scale: 0.0,
+    };
+    let bounds = original.control_box();
+    if original.elements().len() < 32 || !bounds.is_finite() || bounds.height() <= 0.0 {
+      return result;
+    }
+    result.segments = original
+      .segments()
+      .map(|segment| {
+        // PathSeg's Shape::winding is zero; its open two-element BezPath
+        // instead exposes the same segment contribution as the original path.
+        let path = segment.to_path(0.0);
+        let bounds = path.control_box();
+        (path, bounds)
+      })
+      .collect();
+    let count = result.segments.len().div_ceil(16).clamp(1, 128);
+    result.top = bounds.y0;
+    result.scale = count as f64 / bounds.height();
+    result.buckets = vec![Vec::new(); count];
+    for (index, (_, bounds)) in result.segments.iter().enumerate() {
+      let first = result.bucket(bounds.y0);
+      let last = result.bucket(bounds.y1);
+      for bucket in &mut result.buckets[first..=last] {
+        bucket.push(index);
+      }
+    }
+    result
+  }
+
+  fn bucket(&self, y: f64) -> usize {
+    (((y - self.top) * self.scale) as usize).min(self.buckets.len() - 1)
+  }
+
+  fn winding(&self, point: KurboPoint) -> i32 {
+    if self.buckets.is_empty() || !point.is_finite() {
+      return self.original.winding(point);
+    }
+    self.buckets[self.bucket(point.y)]
+      .iter()
+      .map(|&index| &self.segments[index])
+      .filter(|(_, bounds)| point.y >= bounds.y0 && point.y <= bounds.y1 && point.x >= bounds.x0)
+      .map(|(path, _)| path.winding(point))
+      .sum()
+  }
 }
 
 fn tiny_path_as_kurbo(path: &Path) -> BezPath {
@@ -4979,7 +5260,11 @@ fn paint_fill_mask(
       };
       paint_sample_mask(pixmap, mask, paint, page_to_raster)
     }
-    Fill::Theme(_) | Fill::Image { .. } | Fill::Texture(_) => None,
+    Fill::Texture(texture) => {
+      let tile = texture_source_pixmap(texture)?;
+      paint_sample_mask(pixmap, mask, texture_paint(texture, &tile)?, page_to_raster)
+    }
+    Fill::Theme(_) | Fill::Image { .. } => None,
   }
 }
 
@@ -5790,6 +6075,85 @@ mod tests {
   use tiny_skia::{FillRule as SkFillRule, PathBuilder as SkPathBuilder, Pixmap as SkPixmap};
 
   #[test]
+  fn curve_winding_index_preserves_open_closed_and_boundary_queries() {
+    use kurbo::{BezPath, Point, Shape};
+    let mut path = BezPath::new();
+    for i in 0..40 {
+      let x = f64::from(i % 5) * 7.0;
+      let y = f64::from(i / 5) * 3.125;
+      path.move_to((x, y));
+      path.curve_to((x + 4.0, y - 5.0), (x - 3.0, y + 8.0), (x + 5.0, y + 2.0));
+      path.quad_to((x - 5.0, y + 6.0), (x + 3.0, y));
+      if i % 3 != 0 {
+        path.close_path();
+      }
+    }
+    let indexed = super::ExactPathWinding::new(&path);
+    assert!(!indexed.buckets.is_empty());
+    for y in -40..160 {
+      for x in -40..180 {
+        let x = f64::from(x) / 4.0;
+        let y = f64::from(y) / 4.0;
+        for y in [y.next_down(), y, y.next_up()] {
+          let point = Point::new(x, y);
+          assert_eq!(indexed.winding(point), path.winding(point), "{point:?}");
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn texture_effect_source_preserves_physical_period_phase_alpha_and_clip() {
+    let pixels = [
+      255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 255, 255, 255, 255, 0,
+    ];
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(&pixels, 2, 2, ColorType::Rgba8.into())
+      .unwrap();
+    let rectangle = RectItem {
+      bounds: rect(1.0, 1.0, 12.0, 12.0),
+      fill: Fill::Texture(Box::new(crate::common::TextureFill {
+        bytes: png.into(),
+        content_type: Some("image/png".into()),
+        tile_size: crate::common::Size {
+          width: Pt(4.0),
+          height: Pt(4.0),
+        },
+        origin: crate::common::Point {
+          x: Pt(0.25),
+          y: Pt(0.5),
+        },
+        blip_compression_state: crate::common::BlipCompressionState::NotApplicable,
+      })),
+      stroke: None,
+    };
+    for antialiasing in [
+      RasterPrimitiveAntialiasing::PerPrimitive,
+      RasterPrimitiveAntialiasing::Direct2dStandard4,
+      RasterPrimitiveAntialiasing::ExactAliasedFill,
+    ] {
+      let mut canvas = SkPixmap::new(16, 16).unwrap();
+      super::draw_rect(
+        &mut canvas,
+        &rectangle,
+        super::SkTransform::identity(),
+        antialiasing,
+      )
+      .expect("texture paint remains an effect source");
+      assert_eq!(canvas.pixel(0, 0).unwrap().alpha(), 0);
+      assert!(canvas.pixel(2, 2).unwrap().alpha() > 0);
+      assert_ne!(canvas.pixel(2, 2), canvas.pixel(4, 2));
+      for y in 2..8 {
+        for x in 2..8 {
+          assert_eq!(canvas.pixel(x, y), canvas.pixel(x + 4, y));
+          assert_eq!(canvas.pixel(x, y), canvas.pixel(x, y + 4));
+        }
+      }
+    }
+  }
+
+  #[test]
   fn native_source_rejects_unbounded_group_coordinates_before_allocation() {
     let effects = ImageEffectContainer {
       kind: ImageEffectContainerKind::Tree,
@@ -6062,6 +6426,18 @@ mod tests {
     let large = effect_pixels_per_point_with_max(500.0, 500.0, 200.0 / 72.0);
     assert!(large < 200.0 / 72.0);
     assert!(500.0 * 500.0 * large * large <= MAX_EFFECT_RASTER_PIXELS + 1.0);
+  }
+
+  #[test]
+  fn fixed_output_effect_raster_size_guard_checks_actual_area_without_overflow() {
+    assert!(super::fixed_output_effect_raster_size_fits(4000, 4000));
+    assert!(super::fixed_output_effect_raster_size_fits(8000, 2000));
+    assert!(!super::fixed_output_effect_raster_size_fits(4001, 4001));
+    assert!(!super::fixed_output_effect_raster_size_fits(8000, 2001));
+    assert!(!super::fixed_output_effect_raster_size_fits(
+      u32::MAX,
+      u32::MAX
+    ));
   }
 
   #[test]
@@ -7097,6 +7473,229 @@ mod tests {
 
     assert_eq!((raster.image.width(), raster.image.height()), (20, 30));
     assert!(raster.image.pixels().all(|pixel| pixel[3] == 255));
+  }
+
+  #[test]
+  fn text_effect_sources_preserve_resolved_baselines_and_escapement() {
+    let effects = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![
+        ImageEffect::SourceReference(ImageEffectSourceReference::Fill),
+        ImageEffect::SourceReference(ImageEffectSourceReference::Line),
+      ],
+    };
+    let mapping = PageToRasterMapping {
+      width_px: 160,
+      height_px: 80,
+      scale_x: 2.0,
+      scale_y: 2.0,
+      translate_x: 0.0,
+      translate_y: 0.0,
+      text_hinting: None,
+    };
+    for windows_metrics in [false, true] {
+      for shift in [-2.0, 0.0, 2.0] {
+        let top = TextRun {
+          text: Cow::Borrowed("Hg 12"),
+          origin: Point {
+            x: Pt(8.0),
+            y: Pt(8.0),
+          },
+          origin_is_baseline: false,
+          line_height: Pt(18.0),
+          wordprocessing_line_metrics: None,
+          line_metrics_participant: true,
+          paint_clip: None,
+          page_culling_bounds: None,
+          style: TextStyle {
+            font_family: Some("Liberation Serif".into()),
+            font_size: Pt(12.0),
+            baseline_shift: Pt(shift),
+            use_windows_font_metrics: windows_metrics,
+            outline_width: Pt(0.5),
+            outline_color: Some(Color {
+              r: 20,
+              g: 80,
+              b: 220,
+              a: 180,
+            }),
+            ..TextStyle::default()
+          },
+          color: Color {
+            r: 220,
+            g: 80,
+            b: 20,
+            a: 180,
+          },
+          font_id: None,
+          rotation_center: None,
+          hyperlink_url: None,
+          dynamic_field: None,
+          form_widget_id: None,
+          paragraph_bidi: false,
+          word_spacing_pt: 0.0,
+          preserve_text_portion: false,
+          pdf_text_segmentation: Default::default(),
+          decoration_span_start_x: None,
+          source: None,
+        };
+        let mut metrics = crate::text_metrics::TextMetrics::new();
+        let offset = if windows_metrics {
+          metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+            &top.text,
+            &top.style,
+            top.line_height.0,
+          )
+        } else {
+          metrics.baseline_offset_in_line_for_text(&top.text, &top.style, top.line_height.0)
+        };
+        let mut baseline = top.clone();
+        baseline.origin.y = Pt(top.origin.y.0 + offset + shift);
+        baseline.origin_is_baseline = true;
+        let render = |text| {
+          rasterize_vector_items_for_effects_with_mapping(
+            &[DisplayItem::Text(Box::new(text))],
+            &effects,
+            2.0,
+            mapping,
+          )
+          .unwrap()
+        };
+        let top = render(top);
+        let baseline = render(baseline);
+        assert!(top.image.pixels().any(|pixel| pixel[3] > 0));
+        assert_eq!(top.image, baseline.image);
+        for (top, baseline) in [
+          (top.fill_image, baseline.fill_image),
+          (top.line_image, baseline.line_image),
+        ] {
+          let top = top.expect("effect source must be present");
+          assert!(top.pixels().any(|pixel| pixel[3] > 0));
+          assert_eq!(top, baseline.unwrap());
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn text_effect_sources_preserve_explicit_character_cells_before_rotation() {
+    let mut metrics = crate::text_metrics::TextMetrics::new();
+    for (source, advances, rotation) in [
+      (
+        "textbox",
+        vec![3.72, 5.52, 4.8, 3.72, 5.64, 5.88, 4.68],
+        32.8283,
+      ),
+      ("té", vec![3.72, 5.52], 32.8283),
+      ("t t", vec![3.72, 2.52, 3.72], 32.8283),
+      // Axis-aligned Native GFX input has these same glyph origins. This
+      // ordinary text source is consumed by reflection before PDF emission;
+      // neither rotation nor PDF outline mode should be needed to use cells.
+      (
+        "[Grab your reader’s",
+        [
+          28, 58, 32, 44, 48, 21, 42, 49, 48, 31, 21, 32, 46, 44, 48, 46, 31, 23, 35,
+        ]
+        .map(|advance| (f64::from(advance) * 72.0 / 600.0) as f32)
+        .to_vec(),
+        0.0,
+      ),
+    ] {
+      let text = TextRun {
+        text: Cow::Borrowed(source),
+        origin: Point {
+          x: Pt(99.8),
+          y: Pt(173.04),
+        },
+        origin_is_baseline: true,
+        line_height: Pt(13.427734),
+        wordprocessing_line_metrics: None,
+        line_metrics_participant: true,
+        paint_clip: None,
+        page_culling_bounds: None,
+        style: TextStyle {
+          font_family: Some("Calibri".into()),
+          font_size: Pt(11.04),
+          use_windows_font_metrics: true,
+          wordprocessingml_font_slots: true,
+          kerning_minimum_size: Some(Pt(f32::INFINITY)),
+          ligatures: Some(crate::common::OpenTypeLigatures::default()),
+          rotation_degrees: rotation,
+          pdf_glyph_outlines: rotation != 0.0,
+          semantic_character_advances_pt: Some(advances.clone().into()),
+          ..TextStyle::default()
+        },
+        color: Color {
+          r: 0,
+          g: 0,
+          b: 0,
+          a: 255,
+        },
+        font_id: None,
+        rotation_center: (rotation != 0.0).then_some(Point {
+          x: Pt(143.125),
+          y: Pt(148.04076),
+        }),
+        hyperlink_url: None,
+        dynamic_field: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        // Explicit cells already include spacing; it must not be added again.
+        word_spacing_pt: 2.0,
+        preserve_text_portion: false,
+        pdf_text_segmentation: Default::default(),
+        decoration_span_start_x: None,
+        source: None,
+      };
+      let actual = super::text_outline(&text, None, &mut metrics).unwrap();
+      assert!((actual.width_pt - advances.iter().sum::<f32>()).abs() < 0.0001);
+      let mut expected = Vec::new();
+      let mut x = text.origin.x.0;
+      for (ch, advance) in source.chars().zip(&advances) {
+        let mut single = text.clone();
+        single.text = Cow::Owned(ch.to_string());
+        single.origin.x = Pt(x);
+        single.style.semantic_character_advances_pt = None;
+        single.word_spacing_pt = 0.0;
+        expected.extend(
+          super::text_outline(&single, None, &mut metrics)
+            .unwrap()
+            .commands,
+        );
+        x += advance;
+      }
+      assert_eq!(actual.commands.len(), expected.len());
+      let points = |command: &PathCommand| match *command {
+        PathCommand::MoveTo(point) | PathCommand::LineTo(point) => vec![point],
+        PathCommand::CubicTo {
+          control1,
+          control2,
+          end,
+        } => vec![control1, control2, end],
+        PathCommand::Close => Vec::new(),
+      };
+      for (actual, expected) in actual.commands.iter().zip(&expected) {
+        assert_eq!(
+          std::mem::discriminant(actual),
+          std::mem::discriminant(expected)
+        );
+        for (actual, expected) in points(actual).into_iter().zip(points(expected)) {
+          assert!((actual.x.0 - expected.x.0).abs() < 0.0001);
+          assert!((actual.y.0 - expected.y.0).abs() < 0.0001);
+        }
+      }
+      // The existing WordArt consumer shares the same cells, while ordinary
+      // shapes and invalid-length metadata retain their unpositioned route.
+      let warped = super::vml_envelope_shaped_text(source, &text.style, &mut metrics).unwrap();
+      assert!((warped.width_pt - actual.width_pt).abs() < 0.0001);
+      let mut ordinary = text.clone();
+      ordinary.style.semantic_character_advances_pt = None;
+      let natural = super::text_outline(&ordinary, None, &mut metrics).unwrap();
+      ordinary.style.semantic_character_advances_pt = Some(vec![20.0].into());
+      let mismatched = super::text_outline(&ordinary, None, &mut metrics).unwrap();
+      assert_eq!(natural.commands, mismatched.commands);
+      assert_eq!(natural.width_pt, mismatched.width_pt);
+    }
   }
 
   #[test]

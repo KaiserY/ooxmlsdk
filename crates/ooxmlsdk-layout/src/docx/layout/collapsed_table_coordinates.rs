@@ -31,20 +31,55 @@ fn simple(border: Option<BorderStyle>) -> bool {
   })
 }
 
+fn simple_row(table: &Table, row: &TableRow) -> bool {
+  row_table_borders(table, row).is_none_or(|borders| {
+    [
+      borders.top,
+      borders.right,
+      borders.bottom,
+      borders.left,
+      borders.inside_horizontal,
+      borders.inside_vertical,
+    ]
+    .into_iter()
+    .all(simple)
+  }) && row.cells.iter().all(|cell| {
+    [
+      cell.borders.top,
+      cell.borders.right,
+      cell.borders.bottom,
+      cell.borders.left,
+    ]
+    .into_iter()
+    .all(simple)
+  })
+}
+
 impl Coordinates {
   pub(super) fn for_row(table: &Table, frame: &TableFrame, row: &TableRow) -> Option<Self> {
     // Cell-authored and inherited table edges share the same grid producer
     // (native table-grid controls, two widths across eight frame phases).
-    // Legacy print-edge alignment and floating/nested stories keep their
-    // different frame producers.
-    if table.placement.is_some()
+    // Legacy content alignment changes the grid origin, not the device
+    // painter. Paired inline/floating Native controls retain that same grid
+    // for legacy top-level flies. Their overflow flag changes width budgeting,
+    // not the rule producer. Other floating/nested stories stay independent.
+    let legacy_floating_grid = table.placement.is_some()
+      && table.align_leading_cell_content
+      && frame.block.compatibility_mode < 15
+      && table.containing_table_layout.is_none()
+      && simple_row(table, row)
+      && wordprocessing_table_device::page_coordinates(
+        frame.block.setup.width_pt,
+        frame.block.setup.height_pt,
+      )
+      .is_some();
+    if (table.placement.is_some() && !legacy_floating_grid)
       || table.following_text_flow
       || table.right_to_left
-      || table.align_leading_cell_content
       || table.alignment != TableAlignment::Left
       || table.in_header_footer
       || frame.direct_text_frame_story_owner
-      || frame.full_width_horizontal_borders
+      || (frame.full_width_horizontal_borders && !legacy_floating_grid)
       // Margin-consuming rows partition their print frame before drawing
       // the rule (native table-indent controls). Their vertical parent is
       // not the unpartitioned grid supplied to this primitive.
@@ -64,7 +99,15 @@ impl Coordinates {
     if !simple(first) || !simple(leading) {
       return None;
     }
-    let first_half = first.map_or(0.0, |border| f64::from(border.width_pt) / 2.0);
+    // A legacy top-level grid already aligns the first cell's print edge.
+    // Its positioned centre converts independently of the row pen. Modern
+    // frames instead include the first physical row's leading border half.
+    // Native mode12/omitted-mode controls cover three widths and four phases.
+    let first_half = if table.align_leading_cell_content {
+      0.0
+    } else {
+      first.map_or(0.0, |border| f64::from(border.width_pt) / 2.0)
+    };
     Some(Self {
       logical_grid_left: f64::from(frame.left_pt),
       body_x: wordprocessing_table_device::source_coordinate_precise(
@@ -73,7 +116,11 @@ impl Coordinates {
       // Native cell coordinates contain the first physical row's leading
       // half in whole twips, including the odd twip. Later rows retain that
       // grid, even when their own leading rule differs or the first is nil.
-      first_grid_twips: (border_twips(first) + 1) / 2,
+      first_grid_twips: if table.align_leading_cell_content {
+        0
+      } else {
+        (border_twips(first) + 1) / 2
+      },
       leading_half_pixels: (paint_width(leading) + 1) / 2,
     })
   }

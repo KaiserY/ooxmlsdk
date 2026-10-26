@@ -1274,7 +1274,7 @@ fn push_vml_control_snapshot_image(items: &mut Vec<PageItem>, rect: CellRect, da
     flip_vertical: false,
     data,
     content_type: Some("image/png".to_string()),
-    blip_compression_state: common::BlipCompressionState::Unspecified,
+    blip_compression_state: common::BlipCompressionState::NotApplicable,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -2394,7 +2394,7 @@ fn parse_vml_opacity(value: &str) -> Option<f32> {
   Some(opacity.clamp(0.0, 1.0))
 }
 
-fn parse_vml_ratio(value: &str) -> Option<f32> {
+pub(crate) fn parse_vml_ratio(value: &str) -> Option<f32> {
   let value = value.trim();
   if let Some(value) = value.strip_suffix('%') {
     return Some(value.trim().parse::<f32>().ok()? / 100.0);
@@ -2622,6 +2622,7 @@ fn xlsx_vml_special_geometry(
       ];
       let points = map_vml_coordinates(shape, &points, rect)?;
       Some(crate::docx::InlineShapeGeometry::Path {
+        preset: None,
         paths: vec![common::DrawingPath {
           commands: vec![
             common::PathCommand::MoveTo(common_point(points[0].0, points[0].1)),
@@ -2930,6 +2931,7 @@ fn vml_arc_geometry(
     angle = next;
   }
   Some(crate::docx::InlineShapeGeometry::Path {
+    preset: None,
     paths: vec![common::DrawingPath {
       commands,
       fill_mode: common::DrawingPathFillMode::None,
@@ -2986,6 +2988,7 @@ fn vml_round_rectangle_geometry(
     common::PathCommand::Close,
   ];
   Some(crate::docx::InlineShapeGeometry::Path {
+    preset: None,
     paths: vec![common::DrawingPath {
       commands,
       fill_mode: common::DrawingPathFillMode::Normal,
@@ -4381,7 +4384,7 @@ fn render_cell_icon_set(
     flip_vertical: false,
     data,
     content_type: Some("image/png".to_string()),
-    blip_compression_state: common::BlipCompressionState::Unspecified,
+    blip_compression_state: common::BlipCompressionState::NotApplicable,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -8617,7 +8620,7 @@ fn push_page_drawing_anchor_image_items(
           flip_vertical: false,
           data: placeholder_data,
           content_type: Some("image/png".to_string()),
-          blip_compression_state: common::BlipCompressionState::Unspecified,
+          blip_compression_state: common::BlipCompressionState::NotApplicable,
           metafile_monochrome_dib_palette_override: None,
           metafile_background_color: None,
           metafile_external_header: None,
@@ -9039,7 +9042,7 @@ fn drawingml_blip_fill_items(
       flip_vertical: flip_vertical ^ placement.flip_vertical,
       data: data.clone(),
       content_type: content_type.clone(),
-      blip_compression_state: common::BlipCompressionState::Unspecified,
+      blip_compression_state: common::BlipCompressionState::NotApplicable,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -9168,7 +9171,7 @@ fn vml_image_items(
       flip_vertical: is_fill && shape.fill_rotate_with_shape == Some(true) && flip_vertical,
       data: image_data.clone(),
       content_type: content_type.clone(),
-      blip_compression_state: common::BlipCompressionState::Unspecified,
+      blip_compression_state: common::BlipCompressionState::NotApplicable,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -10241,7 +10244,7 @@ fn finish_xlsx_shape_effects(
     flip_vertical: false,
     data: Bytes::from(png.into_inner()),
     content_type: Some("image/png".to_string()),
-    blip_compression_state: common::BlipCompressionState::Unspecified,
+    blip_compression_state: common::BlipCompressionState::NotApplicable,
     metafile_monochrome_dib_palette_override: None,
     metafile_background_color: None,
     metafile_external_header: None,
@@ -11087,6 +11090,7 @@ fn transform_group_text_items(items: &mut [PageItem], transform: Affine, rect: C
         })
         .collect(),
       vml_fit_path: warp.vml_fit_path,
+      word_envelope: warp.word_envelope,
       follow_path: warp.follow_path.clone(),
       vml_trim_band: warp.vml_trim_band,
     }));

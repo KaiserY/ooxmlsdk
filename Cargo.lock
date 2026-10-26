@@ -1376,6 +1376,7 @@ dependencies = [
  "hypher",
  "icu_calendar",
  "icu_datetime",
+ "icu_decimal",
  "icu_locale",
  "icu_properties",
  "icu_segmenter",
@@ -1434,6 +1435,13 @@ dependencies = [
  "uuid",
  "xmp-writer",
  "zune-jpeg",
+]
+
+[[package]]
+name = "ooxmlsdk-visio"
+version = "0.14.0"
+dependencies = [
+ "ooxmlsdk",
 ]
 
 [[package]]

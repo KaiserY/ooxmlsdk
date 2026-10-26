@@ -470,6 +470,8 @@ mod tests {
     };
     p.inlines.insert(0, InlineItem::Image(image));
     DocxDocument {
+      num_pages_excludes_cover: false,
+      toc_print_cache: None,
       page: PageSetup {
         width_pt: 595.3,
         height_pt: page_height,

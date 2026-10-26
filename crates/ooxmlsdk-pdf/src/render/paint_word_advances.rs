@@ -66,7 +66,7 @@ impl NaturalMetricsCache {
     (advance >= 0.0 && advance <= f64::from(i32::MAX)).then_some(advance as i32)
   }
 
-  fn advance(
+  pub(super) fn advance(
     &mut self,
     face: &FontFaceData,
     size_pt: f32,
@@ -121,23 +121,84 @@ impl NaturalMetricsCache {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum LineOwner {
+  Frame {
+    frame: usize,
+    line: usize,
+  },
+  /// A completed nested story can outlive its page-level frame. Its group,
+  /// resolved baseline and clip still keep unrelated stories independent.
+  Detached {
+    group: usize,
+    baseline: u32,
+  },
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct LineKey {
-  frame: usize,
-  line: usize,
+  owner: LineOwner,
   clip: Option<[u32; 4]>,
 }
 
 fn collect_text<'a, 'doc>(
   items: &'a mut [PaintItem<'doc>],
   transformed: bool,
+  group: usize,
+  next_group: &mut usize,
   out: &mut Vec<(bool, &'a mut PaintText<'doc>)>,
+  lines: &mut HashMap<LineKey, Vec<usize>>,
 ) {
   for item in items {
     match item {
-      PaintItem::Text(text) => out.push((transformed, text)),
+      PaintItem::Text(text) => {
+        let owner = match (text.source_frame_index, text.source_line_index) {
+          (Some(frame), Some(line)) => Some(LineOwner::Frame { frame, line }),
+          (None, None)
+            if text.item.origin_is_baseline
+              && text.item.style.use_windows_font_metrics
+              && text.item.style.wordprocessingml_font_slots
+              && text.item.pdf_text_segmentation == common::PdfTextSegmentation::WordLine =>
+          {
+            Some(LineOwner::Detached {
+              group,
+              baseline: text.item.y_pt.to_bits(),
+            })
+          }
+          _ => None,
+        };
+        if let Some(owner) = owner {
+          let clip = text
+            .portions
+            .first()
+            .and_then(|portion| portion.clip)
+            .map(|clip| {
+              [
+                clip.x_pt.to_bits(),
+                clip.y_pt.to_bits(),
+                clip.width_pt.to_bits(),
+                clip.height_pt.to_bits(),
+              ]
+            });
+          lines
+            .entry(LineKey { owner, clip })
+            .or_default()
+            .push(out.len());
+        }
+        out.push((transformed, text));
+      }
       PaintItem::Group {
         transform, items, ..
-      } => collect_text(items, transformed || transform.is_some(), out),
+      } => {
+        *next_group += 1;
+        collect_text(
+          items,
+          transformed || transform.is_some(),
+          *next_group,
+          next_group,
+          out,
+          lines,
+        );
+      }
       _ => {}
     }
   }
@@ -145,41 +206,34 @@ fn collect_text<'a, 'doc>(
 
 pub(super) fn realize(items: &mut [PaintItem<'_>], cache: &mut NaturalMetricsCache) {
   let mut texts = Vec::new();
-  collect_text(items, false, &mut texts);
+  let mut lines = HashMap::<LineKey, Vec<usize>>::default();
+  let mut next_group = 0;
+  collect_text(items, false, 0, &mut next_group, &mut texts, &mut lines);
   // Vertical metrics belong to each completed Word line independently of
   // horizontal segmentation. Number portions use Line rather than WordLine;
   // they must not disable native baseline realization for the whole line.
   for (transformed, text) in &mut texts {
     realize_text_baseline(text, *transformed);
   }
-  let mut lines = HashMap::<LineKey, Vec<usize>>::default();
-  for (index, (_, text)) in texts.iter().enumerate() {
-    let (Some(frame), Some(line)) = (text.source_frame_index, text.source_line_index) else {
-      continue;
-    };
-    let clip = text
-      .portions
-      .first()
-      .and_then(|portion| portion.clip)
-      .map(|clip| {
-        [
-          clip.x_pt.to_bits(),
-          clip.y_pt.to_bits(),
-          clip.width_pt.to_bits(),
-          clip.height_pt.to_bits(),
-        ]
-      });
-    lines
-      .entry(LineKey { frame, line, clip })
-      .or_default()
-      .push(index);
-  }
-  for indices in lines.values_mut() {
+  for (key, indices) in &mut lines {
     indices.sort_by(|&a, &b| texts[a].1.item.x_pt.total_cmp(&texts[b].1.item.x_pt));
+    // A shared baseline/clip is only a candidate for a detached line. Cells
+    // inside the same flattened story can have real gaps or overlap. Confirm
+    // uninterrupted logical advances before moving any of their origins.
+    // Explicit frame owners retain their independent origin realization even
+    // when custom spacing prevents natural-width balancing.
+    let measured = if matches!(key.owner, LineOwner::Detached { .. }) {
+      let Some(advances) = measure_line(&texts, indices, cache) else {
+        continue;
+      };
+      Some(advances)
+    } else {
+      None
+    };
     let Some(anchor) = realize_line_origin(&mut texts, indices) else {
       continue;
     };
-    let Some(advances) = measure_line(&texts, indices, cache) else {
+    let Some(advances) = measured.or_else(|| measure_line(&texts, indices, cache)) else {
       continue;
     };
     let advances = balance_advances(&advances);
@@ -300,7 +354,7 @@ fn measure_line(
   for &index in indices {
     let (transformed, text) = &texts[index];
     let style = &text.item.style;
-    let terminal_adjustment = terminal_compression(&text.item.text, style);
+    let adjustments = style.wordprocessing_justification_expansion_pt.as_deref();
     if *transformed
       || text.item.pdf_text_segmentation != common::PdfTextSegmentation::WordLine
       || text.item.paragraph_bidi
@@ -309,8 +363,6 @@ fn measure_line(
       || style.horizontal_scale.unwrap_or(1.0) != 1.0
       || style.character_spacing_pt != 0.0
       || text.item.word_spacing_pt != 0.0
-      || (style.wordprocessing_justification_expansion_pt.is_some()
-        && terminal_adjustment.is_none())
       || style.pdf_glyph_outline_options.is_some()
       || style.semantic_character_advances_pt.is_some()
       || ooxmlsdk_layout::fonts::wordprocessingml_punctuation_affects_advances(
@@ -329,6 +381,20 @@ fn measure_line(
     let logical_size = style
       .layout_font_sizes
       .map_or(style.font_size_pt, |sizes| sizes.primary.0);
+    let character_starts = if let Some(adjustments) = adjustments {
+      let starts = text
+        .item
+        .text
+        .char_indices()
+        .map(|(start, _)| start)
+        .collect::<Vec<_>>();
+      if starts.len() != adjustments.len() || adjustments.iter().any(|value| !value.is_finite()) {
+        return None;
+      }
+      Some(starts)
+    } else {
+      None
+    };
     for portion in &text.portions {
       if portion.kind == PaintTextPortionKind::Tab {
         return None;
@@ -352,8 +418,13 @@ fn measure_line(
           // Completed-line adjustments already preserve logical positions in
           // glyph advances normalized by the realized PDF em. Do not scale
           // them a second time by the unrounded layout em.
+          let adjustment = if let (Some(values), Some(starts)) = (adjustments, &character_starts) {
+            values[starts.binary_search(&glyph.text_range.start).ok()?]
+          } else {
+            0.0
+          };
           let ideal_pt = glyph.x_advance
-            * if terminal_adjustment.is_some() {
+            * if adjustments.is_some() {
               run.font_size_pt
             } else {
               logical_size
@@ -363,16 +434,11 @@ fn measure_line(
             return None;
           }
           let kerning_advance_em = style.kerning_enabled().then(|| {
-            if let Some(adjustment) = terminal_adjustment {
+            if adjustments.is_some() {
               // A completed-line correction is normalized by the PDF em.
               // Recover its unadjusted logical design advance; the existing
               // independent device correction below still owns compression.
-              let own_adjustment = if glyph.text_range.end == text.item.text.len() {
-                adjustment
-              } else {
-                0.0
-              };
-              (ideal_pt - own_adjustment) / logical_size
+              (ideal_pt - adjustment) / logical_size
             } else {
               glyph.x_advance
             }
@@ -384,14 +450,19 @@ fn measure_line(
             cluster,
             kerning_advance_em,
           )?;
-          if glyph.text_range.end == text.item.text.len()
-            && let Some(adjustment) = terminal_adjustment
-          {
+          if adjustment != 0.0 {
             // Line Services compresses the realized trailing bearing before
             // balancing ideal/device widths; the quarter-em comma keeps its
             // origin and its natural advance changes from 88px to 66px.
-            natural +=
-              (adjustment / logical_size * run.font_size_pt / POINTS_PER_PIXEL).round() as i32;
+            let device_adjustment = if adjustment < 0.0 {
+              adjustment / logical_size * run.font_size_pt
+            } else {
+              // Native automatic-gap/CJK-justification arrays convert the
+              // completed source adjustment independently of the realized em.
+              // A4.11987pt gap adds34dots to a10.56pt font, not35.
+              adjustment
+            };
+            natural += (device_adjustment / POINTS_PER_PIXEL).round() as i32;
           }
           if natural < 0 {
             return None;
@@ -405,15 +476,6 @@ fn measure_line(
     }
   }
   (!values.is_empty()).then_some(values)
-}
-
-fn terminal_compression(text: &str, style: &super::TextStyle<'_>) -> Option<f32> {
-  let adjustments = style.wordprocessing_justification_expansion_pt.as_deref()?;
-  let (&last, preceding) = adjustments.split_last()?;
-  (last < 0.0
-    && adjustments.len() == text.chars().count()
-    && preceding.iter().all(|&value| value == 0.0))
-  .then_some(last)
 }
 
 #[cfg(test)]

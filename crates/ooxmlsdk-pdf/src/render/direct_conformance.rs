@@ -119,12 +119,12 @@ impl DirectConformance {
     self.pdf_ua1 || matches!(self.pdf_a3, Some(PdfA3Level::A | PdfA3Level::U))
   }
 
-  pub(super) const fn forbids_private_use_mappings(self) -> bool {
-    // PDF/A-3a requires portable Unicode semantics for tagged text.  Keep
-    // this separate from `requires_codepoint_mappings`: PDF/A-3u and PDF/UA-1
-    // require mappings too, but Krilla's profile matrix permits PUA mappings
-    // for those profiles.  Known legacy symbol selectors are translated to
-    // standard Unicode before this policy is evaluated.
+  pub(super) const fn requires_actual_text_for_private_use(self) -> bool {
+    // ISO19005-3,6.2.11.7.3 requires covering ActualText for PUA mappings
+    // at levelA, including invisible text. This is separate from the A/U/UA
+    // codepoint requirement. Unlike Krilla's simplified blanket rejection,
+    // the direct writer can provide the required marked-content property.
+    // Known legacy symbol selectors are remapped before this check.
     matches!(self.pdf_a3, Some(PdfA3Level::A))
   }
 

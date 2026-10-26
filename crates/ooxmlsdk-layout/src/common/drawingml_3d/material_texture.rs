@@ -46,6 +46,46 @@ impl TextSurfaceRealizationPlan {
     options: Static3dRenderOptions,
     target_pixels_per_point: f32,
   ) -> Option<Self> {
+    Self::for_geometry(
+      &geometry.page,
+      projection,
+      shape,
+      options,
+      target_pixels_per_point,
+      false,
+    )
+  }
+
+  pub(crate) fn for_shape(
+    geometry: &Static3dTextGeometry,
+    projection: Static3dProjection,
+    shape: &a::Shape3DType,
+    options: Static3dRenderOptions,
+    target_pixels_per_point: f32,
+  ) -> Option<Self> {
+    Self::for_geometry(
+      geometry,
+      // GFX realizes source geometry before enclosing the continuous window
+      // in integer device pixels. That final viewport stretch is not another
+      // camera zoom; including it changes native curve vertices and normals.
+      projection
+        .with_viewport_scale(1.0, 1.0)
+        .with_viewport_translation_px(0.0, 0.0),
+      shape,
+      options,
+      target_pixels_per_point,
+      true,
+    )
+  }
+
+  fn for_geometry(
+    geometry: &Static3dTextGeometry,
+    projection: Static3dProjection,
+    shape: &a::Shape3DType,
+    options: Static3dRenderOptions,
+    target_pixels_per_point: f32,
+    word_shape: bool,
+  ) -> Option<Self> {
     // Projected density owns curve and bevel subdivision for both camera
     // families. Native orthographic vertex buffers use this same realization;
     // falling back to the working bitmap's fixed tolerance changes their mesh.
@@ -58,7 +98,7 @@ impl TextSurfaceRealizationPlan {
     if !scale.is_finite() || scale <= 0.0 {
       return None;
     }
-    let bounds = geometry.page.source_coverage_path.bounding_box();
+    let bounds = geometry.source_coverage_path.bounding_box();
     if bounds.width() <= 0.0 || bounds.height() <= 0.0 {
       return None;
     }
@@ -101,14 +141,16 @@ impl TextSurfaceRealizationPlan {
       .filter(|v| v.has_authored_surface());
     let front = z - top.map_or(0.0, |v| v.height_px);
     let back = front - depth;
-    let cap_front = front
-      + top.map_or(0.0, |v| {
-        v.height_px * word_text_bevel_terminal_profile(v.preset).height
-      });
-    let cap_back = back
-      - bottom.map_or(0.0, |v| {
-        v.height_px * word_text_bevel_terminal_profile(v.preset).height
-      });
+    let terminal_height = |v: ResolvedBevel| {
+      v.height_px
+        * if word_shape {
+          word_shape_bevel_terminal_profile(v.preset).height
+        } else {
+          word_text_bevel_terminal_profile(v.preset).height
+        }
+    };
+    let cap_front = front + top.map_or(0.0, terminal_height);
+    let cap_back = back - bottom.map_or(0.0, terminal_height);
     let zs = [cap_back.min(back - contour), cap_front.max(front + contour)];
     let xs = [bounds.x0 as f32 - contour, bounds.x1 as f32 + contour];
     let ys = [bounds.y0 as f32 - contour, bounds.y1 as f32 + contour];
@@ -161,6 +203,13 @@ impl TextMaterialTexturePlan {
     geometry: &Static3dTextGeometryPaths,
     realization: TextSurfaceRealizationPlan,
   ) -> Option<Self> {
+    Self::from_shape_realization(&geometry.page, realization)
+  }
+
+  pub(crate) fn from_shape_realization(
+    geometry: &Static3dTextGeometry,
+    realization: TextSurfaceRealizationPlan,
+  ) -> Option<Self> {
     let TextSurfaceRealizationPlan {
       bounds,
       width_request,
@@ -179,7 +228,7 @@ impl TextMaterialTexturePlan {
       -bounds.x0 as f32 * sx,
       -bounds.y0 as f32 * sy,
     );
-    let page = &geometry.page;
+    let page = geometry;
     Some(Self {
       width,
       height,
@@ -259,6 +308,82 @@ mod tests {
   use super::*;
 
   #[test]
+  fn word_shape_material_sizes_match_native_perspective_and_parallel_controls() {
+    let point = |x, y| super::super::Point {
+      x: crate::common::Pt(x),
+      y: crate::common::Pt(y),
+    };
+    let bounds = Rect {
+      origin: point(0.0, 0.0),
+      size: crate::common::Size {
+        width: crate::common::Pt(115.05),
+        height: crate::common::Pt(113.4),
+      },
+    };
+    let geometry = Static3dTextGeometry::from_page_path(
+      &[
+        PathCommand::MoveTo(point(0.0, 0.0)),
+        PathCommand::LineTo(point(115.05, 0.0)),
+        PathCommand::LineTo(point(115.05, 113.4)),
+        PathCommand::LineTo(point(0.0, 113.4)),
+        PathCommand::Close,
+      ],
+      bounds,
+      1.0,
+    )
+    .unwrap();
+    for (zoom, offset, perspective, expected) in [
+      (150_000, -3.0_f32 / 2.0_f32.sqrt(), true, (256, 256)),
+      (100_000, 0.0, true, (256, 128)),
+      (100_000, 0.0, false, (128, 128)),
+    ] {
+      let scene = a::Scene3DType {
+        camera: Box::new(a::Camera {
+          preset: if perspective {
+            a::PresetCameraValues::PerspectiveRelaxedModerately
+          } else {
+            a::PresetCameraValues::OrthographicFront
+          },
+          zoom: Some(ooxmlsdk::units::DrawingmlPercentageValue::Decimal(zoom)),
+          rotation: perspective.then_some(a::Rotation {
+            latitude: 19_490_639,
+            longitude: 0,
+            revolution: 12_900_001,
+          }),
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      let shape = a::Shape3DType {
+        z: perspective.then_some(ooxmlsdk::units::CoordinateValue::Emu(488_950)),
+        extrusion_height: perspective.then_some(ooxmlsdk::units::CoordinateValue::Emu(63_500)),
+        ..Default::default()
+      };
+      let projection = word_shape_camera_projection(&scene, 0.0, [offset; 2]).unwrap();
+      let options = Static3dRenderOptions {
+        extrusion_color: None,
+        contour_color: None,
+        pixels_per_point: 1.0,
+        model_surface: Some(Static3dSurface {
+          left_px: 0.0,
+          top_px: 0.0,
+          width_px: 115.05,
+          height_px: 113.4,
+        }),
+      };
+      let realization =
+        TextSurfaceRealizationPlan::for_shape(&geometry, projection, &shape, options, 96.0 / 72.0)
+          .unwrap();
+      let plan = TextMaterialTexturePlan::from_shape_realization(&geometry, realization).unwrap();
+      assert_eq!(
+        (plan.width, plan.height),
+        expected,
+        "zoom={zoom}, perspective={perspective}"
+      );
+    }
+  }
+
+  #[test]
   fn profile_precision_uses_realized_density_and_rounds_in_physical_units() {
     let glyph_tolerance_inches = 0.001_227_676_602_013_887_1;
     let expected_profile_inches = 0.004_910_706_542_432_308;
@@ -284,6 +409,7 @@ mod tests {
 
   fn material_vertex() -> TextSurfaceMaterialVertex {
     TextSurfaceMaterialVertex {
+      packed_specular: false,
       source: TextSurfaceMaterialSource::Combined,
       material_point: (0.5, 0.5),
       diffuse: [1.0; 3],

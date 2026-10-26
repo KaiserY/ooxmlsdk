@@ -107,6 +107,7 @@ pub(crate) enum ImageEffect {
     distance_px: f32,
     direction_degrees: f32,
     color: ResolvedEffectColor,
+    composite_source: bool,
   },
   OuterShadow {
     blur_radius_px: f32,
@@ -192,7 +193,13 @@ pub(crate) enum ShadowBlurKernel {
   /// select a different profile. Keep this distinct from ordinary DrawingML
   /// shape shadows, which expose Direct2D's unoptimized finite Gaussian
   /// followed by its documented 2-D affine stage.
-  WordTextBalanced { prescale_divisor: u32 },
+  WordTextBalanced {
+    prescale_divisor: u32,
+    /// Hosted effect textures align their padded output rectangle. Ordinary
+    /// W14 character effects retain the original character-cell pivot:
+    /// native signed-scale/blur controls keep their shadow centroid fixed.
+    align_padded_output: bool,
+  },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -498,6 +505,36 @@ pub(crate) fn simple_reflection_blur_radius(container: &ImageEffectContainer) ->
   .then_some(effect.blur_radius_px)
 }
 
+/// A flat Word shape list can materialize a direct reflection or a generated
+/// Tree(completed spatial paint, Reflection). Its terminal filter owns the
+/// output range independently of the completed source's inner effects.
+pub(crate) fn word_shape_terminal_reflection_blur_radius(
+  container: &ImageEffectContainer,
+) -> Option<f32> {
+  let effect = match container.kind {
+    ImageEffectContainerKind::Sibling => {
+      let [effect] = container.effects.as_slice() else {
+        return None;
+      };
+      effect
+    }
+    ImageEffectContainerKind::Tree => container.effects.last()?,
+  };
+  let reflection = match effect {
+    ImageEffect::Reflection(reflection) => reflection,
+    ImageEffect::Container(nested) if nested.kind == ImageEffectContainerKind::Tree => {
+      return word_shape_terminal_reflection_blur_radius(nested);
+    }
+    _ => return None,
+  };
+  (reflection.raster_length_scale == 1.0
+    && reflection.bounds_radius_scale == 1.0
+    && reflection.bounds_radius_offset_px == 0.0
+    && reflection.blur_radius_px.is_finite()
+    && reflection.blur_radius_px > 0.0)
+    .then_some(reflection.blur_radius_px)
+}
+
 /// PowerPoint's isolated reflection uses the Direct2D three-sigma radius.
 /// Its native A8 edge sweeps are narrower than Word's radial Gaussian even
 /// when the input, output rectangle and density agree. Do not change the
@@ -683,6 +720,135 @@ pub(crate) fn unchanged_foreground_backdrop(
   })
 }
 
+/// A standalone inner shadow is an alpha-clipped overlay on the source.
+/// Word preserves the vector fill and emits the shadow color/mask separately;
+/// rasterizing both also subjects the original fill to bitmap compression.
+/// Keep combined foreground effects and authored multi-branch graphs intact.
+pub(crate) fn unchanged_foreground_overlay(
+  container: &ImageEffectContainer,
+) -> Option<ImageEffectContainer> {
+  if container.kind != ImageEffectContainerKind::Sibling {
+    return None;
+  }
+  let [ImageEffect::Container(foreground)] = container.effects.as_slice() else {
+    return None;
+  };
+  if foreground.kind != ImageEffectContainerKind::Tree {
+    return None;
+  }
+  let [ImageEffect::InnerShadow { .. }] = foreground.effects.as_slice() else {
+    return None;
+  };
+  let mut overlay = foreground.clone();
+  if let ImageEffect::InnerShadow {
+    composite_source, ..
+  } = &mut overlay.effects[0]
+  {
+    *composite_source = false;
+  }
+  Some(overlay)
+}
+
+/// Resolves the dependency order of a flat WPS spatial-effect list.
+///
+/// ECMA-376 §20.1.8.26 groups glow with the unchanged source before outer
+/// shadow, then reflects the completed visible object. Word's eight-way
+/// glow/shadow/reflection controls retain the original object's reflection
+/// alignment while the fade spans the completed glow/shadow paint rectangle.
+/// Authored DAGs and foreground-modifying lists keep their existing owners.
+pub(crate) fn word_shape_spatial_effect_list(
+  container: &ImageEffectContainer,
+) -> Option<ImageEffectContainer> {
+  let backdrop = unchanged_foreground_backdrop(container)?;
+  if backdrop.effects.len() < 2 {
+    return None;
+  }
+  let mut glow = None;
+  let mut shadow = None;
+  let mut reflection = None;
+  for effect in backdrop.effects {
+    match effect {
+      effect @ ImageEffect::Glow { .. } if glow.is_none() => glow = Some(effect),
+      effect @ ImageEffect::OuterShadow { .. } if shadow.is_none() => shadow = Some(effect),
+      ImageEffect::Reflection(effect) if reflection.is_none() => reflection = Some(effect),
+      _ => return None,
+    }
+  }
+  let mut visible = Vec::new();
+  if let Some(shadow) = shadow {
+    visible.push(if let Some(glow) = &glow {
+      ImageEffect::Container(ImageEffectContainer {
+        kind: ImageEffectContainerKind::Tree,
+        effects: vec![
+          ImageEffect::Container(ImageEffectContainer {
+            kind: ImageEffectContainerKind::Sibling,
+            effects: vec![glow.clone(), ImageEffect::Identity],
+          }),
+          shadow,
+        ],
+      })
+    } else {
+      shadow
+    });
+  }
+  if let Some(glow) = glow {
+    visible.push(glow);
+  }
+  visible.push(container.effects.last()?.clone());
+  if let Some(mut reflection) = reflection {
+    // Shape alignment and fade have different owners. Expanded glow/shadow
+    // changes the fade span without moving the original reflection pivot.
+    // W14 text instead retains its separately established root metric ramp.
+    reflection.reference = ReflectionReference::WordShape;
+    let source = ImageEffect::Container(ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: visible.clone(),
+    });
+    visible.insert(
+      0,
+      ImageEffect::Container(ImageEffectContainer {
+        kind: ImageEffectContainerKind::Tree,
+        effects: vec![source, ImageEffect::Reflection(reflection)],
+      }),
+    );
+  }
+  Some(ImageEffectContainer {
+    kind: ImageEffectContainerKind::Sibling,
+    effects: visible,
+  })
+}
+
+/// The last spatial filter owns a separately materialized branch's output
+/// DPI. Its already completed input can have a different working density.
+pub(crate) fn terminal_backdrop_blur_radius_px(container: &ImageEffectContainer) -> f32 {
+  fn radius(effect: &ImageEffect) -> f32 {
+    let radius = match effect {
+      ImageEffect::Glow {
+        radius_px,
+        raster_length_scale,
+        ..
+      } => radius_px * raster_length_scale * 0.5,
+      ImageEffect::OuterShadow {
+        blur_radius_px,
+        raster_length_scale,
+        ..
+      } => blur_radius_px * raster_length_scale,
+      ImageEffect::Reflection(reflection) => reflection.blur_radius_px,
+      ImageEffect::Container(nested) => return terminal_backdrop_blur_radius_px(nested),
+      _ => 0.0,
+    };
+    if radius.is_finite() {
+      radius.max(0.0)
+    } else {
+      0.0
+    }
+  }
+  match container.kind {
+    ImageEffectContainerKind::Tree => container.effects.last().map_or(0.0, radius),
+    ImageEffectContainerKind::Sibling => container.effects.iter().map(radius).fold(0.0, f32::max),
+  }
+}
+
 pub(crate) fn contains_reflection(container: &ImageEffectContainer) -> bool {
   container.effects.iter().any(|effect| match effect {
     ImageEffect::Reflection(_) => true,
@@ -852,6 +1018,9 @@ enum ReflectionDistanceMode {
 enum ReflectionReference {
   /// Use the geometry propagated through the preceding effect nodes.
   EffectInput,
+  /// Reflect and fade the completed shape paint about the original shape's
+  /// alignment rectangle, independently of any preceding spatial effects.
+  WordShape,
   /// Reflect the completed paint, but retain the root text's coordinate domains.
   /// This does not select how the polar distance is applied. In particular,
   /// Word's metric-bound reflection can retain text coordinates while applying
@@ -1148,7 +1317,10 @@ pub(crate) fn from_wordprocessing_text_effects(
       } else {
         WORD_TEXT_EFFECT_TERMINAL_BOUNDS_PX
       },
-      blur_kernel: ShadowBlurKernel::WordTextBalanced { prescale_divisor },
+      blur_kernel: ShadowBlurKernel::WordTextBalanced {
+        prescale_divisor,
+        align_padded_output: host != WordprocessingTextEffectHost::FlatText,
+      },
       direction_degrees: shadow.direction_degrees,
       distance_mode: ShadowDistanceMode::PreTransformOffset,
       transform: ImageEffectTransform {
@@ -1290,6 +1462,53 @@ pub(crate) fn split_wordprocessing_shadow_of_glow_dpi_stages(
       effects: vec![shadow.clone()],
     },
   ))
+}
+
+/// Borrows the completed input and terminal range of a generated WPS
+/// shadow-of-glow branch. This describes output geometry only: it does not
+/// prescribe an intermediate bitmap or change the evaluator's source DPI.
+pub(crate) fn word_shape_shadow_of_glow_source_and_blur_radius(
+  container: &ImageEffectContainer,
+) -> Option<(&ImageEffectContainer, f32)> {
+  let [ImageEffect::Container(branch)] = container.effects.as_slice() else {
+    return None;
+  };
+  let [
+    ImageEffect::Container(source),
+    ImageEffect::OuterShadow {
+      blur_radius_px,
+      bounds_radius_scale,
+      bounds_radius_offset_px,
+      distance_px,
+      distance_length_scale,
+      direction_degrees,
+      transform,
+      ..
+    },
+  ] = branch.effects.as_slice()
+  else {
+    return None;
+  };
+  if container.kind != ImageEffectContainerKind::Sibling
+    || branch.kind != ImageEffectContainerKind::Tree
+    || source.kind != ImageEffectContainerKind::Sibling
+    || !matches!(
+      source.effects.as_slice(),
+      [ImageEffect::Glow { .. }, ImageEffect::Identity]
+    )
+    || transform.scale_x != 1.0
+    || transform.scale_y != 1.0
+    || transform.skew_x != 0.0
+    || transform.skew_y != 0.0
+    || transform.shift_x_px != 0.0
+    || transform.shift_y_px != 0.0
+    || !(distance_px * distance_length_scale).is_finite()
+    || !direction_degrees.is_finite()
+  {
+    return None;
+  }
+  let radius = blur_radius_px.mul_add(*bounds_radius_scale, *bounds_radius_offset_px);
+  (radius.is_finite() && radius > f32::EPSILON).then_some((source, radius))
 }
 
 /// Extracts the generated W14 outer-shadow branch and replaces every copy of
@@ -1908,6 +2127,7 @@ fn inner_shadow(
       .unwrap_or_default(),
     direction_degrees: effect.direction.unwrap_or_default() as f32 / 60_000.0,
     color: resolver.inner_shadow(effect.inner_shadow_choice.as_ref()?)?,
+    composite_source: true,
   })
 }
 
@@ -3094,6 +3314,15 @@ fn reflection_source_geometry(
 ) -> EffectGeometry {
   match reference {
     ReflectionReference::EffectInput => source,
+    ReflectionReference::WordShape => EffectGeometry {
+      // Word's independent glow/shadow/reflection presence controls preserve
+      // the pivot but fade over the completed painted input. Reusing RootText
+      // keeps the ramp too short and makes compound shape reflections too strong.
+      paint: source.paint,
+      shadow_anchor: root_source.shadow_anchor,
+      anchor: root_source.anchor,
+      ramp: source.paint,
+    },
     ReflectionReference::RootText => EffectGeometry {
       // W14 reflects the completed visible paint, but its `algn`, `dist`, and
       // fade coordinates remain relative to the owning text rather than a
@@ -3456,9 +3685,12 @@ fn effect_output_geometry_for_domain(
       };
       Some(match blur_kernel {
         ShadowBlurKernel::Direct2dGaussian => transformed,
-        ShadowBlurKernel::WordTextBalanced { .. } => {
+        ShadowBlurKernel::WordTextBalanced {
+          align_padded_output,
+          ..
+        } => {
           let alignment_radius = *blur_radius_px * *bounds_radius_scale;
-          let alignment_shift = if scene_geometry {
+          let alignment_shift = if scene_geometry || !align_padded_output {
             (0.0, 0.0)
           } else {
             word_text_balanced_output_alignment_shift(alignment_radius, *transform, *alignment)
@@ -4290,6 +4522,7 @@ fn apply_to_image_with_source_context(
       distance_px,
       direction_degrees,
       color,
+      composite_source,
     } = effect
     {
       *image = inner_shadow_image_on_raster(
@@ -4299,6 +4532,7 @@ fn apply_to_image_with_source_context(
         *direction_degrees,
         *color,
         raster_scale,
+        *composite_source,
       );
       continue;
     }
@@ -5494,13 +5728,48 @@ fn floating_point_gaussian_blur_alpha_xy(
   radius_y: usize,
   sigma_y: f32,
 ) -> image::GrayImage {
+  floating_point_gaussian_blur_alpha_xy_at_offset(
+    alpha,
+    radius_x,
+    sigma_x,
+    radius_y,
+    sigma_y,
+    (0.0, 0.0),
+  )
+}
+
+fn floating_point_gaussian_blur_alpha_xy_at_offset(
+  alpha: &image::GrayImage,
+  radius_x: usize,
+  sigma_x: f32,
+  radius_y: usize,
+  sigma_y: f32,
+  source_offset: (f32, f32),
+) -> image::GrayImage {
+  fn offset_kernel(kernel: Vec<f32>, offset: f32) -> (isize, Vec<f32>) {
+    let origin = offset.floor() as isize - (kernel.len() / 2) as isize;
+    let fraction = offset - offset.floor();
+    if fraction == 0.0 {
+      return (origin, kernel);
+    }
+    // Translation and Gaussian convolution are separable linear filters.
+    // Fold the fractional bilinear phase into the taps, without first
+    // clipping the translated caster to the final output rectangle.
+    let mut shifted = vec![0.0; kernel.len() + 1];
+    for (index, weight) in kernel.into_iter().enumerate() {
+      shifted[index] += weight * (1.0 - fraction);
+      shifted[index + 1] += weight * fraction;
+    }
+    (origin, shifted)
+  }
+
   let kernel_x = normalized_gaussian_kernel(radius_x, sigma_x);
   let kernel_y = normalized_gaussian_kernel(radius_y, sigma_y);
   // A zero/invalid axis is an identity convolution on that axis, not a
   // reason to drop the other axis. Use the actual kernel support below.
   let radius_x = kernel_x.len() / 2;
   let radius_y = kernel_y.len() / 2;
-  if radius_x == 0 && radius_y == 0 {
+  if radius_x == 0 && radius_y == 0 && source_offset == (0.0, 0.0) {
     return alpha.clone();
   }
   let width = alpha.width() as usize;
@@ -5508,6 +5777,15 @@ fn floating_point_gaussian_blur_alpha_xy(
   if width == 0 || height == 0 {
     return alpha.clone();
   }
+  if !source_offset.0.is_finite()
+    || !source_offset.1.is_finite()
+    || source_offset.0.abs() >= (width + radius_x + 1) as f32
+    || source_offset.1.abs() >= (height + radius_y + 1) as f32
+  {
+    return image::GrayImage::new(alpha.width(), alpha.height());
+  }
+  let (origin_x, kernel_x) = offset_kernel(kernel_x, source_offset.0);
+  let (origin_y, kernel_y) = offset_kernel(kernel_y, source_offset.1);
 
   // Direct2D defines a finite kernel radius of three standard deviations.
   // Preserve floating-point precision between the two separable passes; an
@@ -5519,7 +5797,7 @@ fn floating_point_gaussian_blur_alpha_xy(
     for x in 0..width {
       let mut sum = 0.0_f32;
       for (sample_index, weight) in kernel_x.iter().copied().enumerate() {
-        let source_x = x as isize + sample_index as isize - radius_x as isize;
+        let source_x = x as isize + sample_index as isize + origin_x;
         if (0..width as isize).contains(&source_x) {
           sum += f32::from(alpha.as_raw()[y * width + source_x as usize]) * weight;
         }
@@ -5533,7 +5811,7 @@ fn floating_point_gaussian_blur_alpha_xy(
     for x in 0..width {
       let mut sum = 0.0_f32;
       for (sample_index, weight) in kernel_y.iter().copied().enumerate() {
-        let source_y = y as isize + sample_index as isize - radius_y as isize;
+        let source_y = y as isize + sample_index as isize + origin_y;
         if (0..height as isize).contains(&source_y) {
           sum += horizontal[source_y as usize * width + x] * weight;
         }
@@ -5851,32 +6129,31 @@ fn inner_shadow_image_on_raster(
   direction_degrees: f32,
   color: ResolvedEffectColor,
   scale: EffectRasterScale,
+  composite_source: bool,
 ) -> image::RgbaImage {
   let radians = direction_degrees.to_radians();
-  let shifted = affine_image(
-    source,
-    ImageEffectTransform {
-      scale_x: 1.0,
-      scale_y: 1.0,
-      skew_x: 0.0,
-      skew_y: 0.0,
-      // MS-OI29500 defines inner-shadow direction clockwise from the left.
-      shift_x_px: -radians.cos() * distance_px * scale.x,
-      shift_y_px: -radians.sin() * distance_px * scale.y,
-    },
-  );
-  let shifted_alpha = image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
-    image::Luma([shifted.get_pixel(x, y).0[3]])
+  let alpha = image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
+    image::Luma([source.get_pixel(x, y).0[3]])
   });
-  let shifted_alpha = if blur_radius_px > f32::EPSILON {
-    blur_gray_xy(
-      &shifted_alpha,
-      blur_radius_px * scale.x,
-      blur_radius_px * scale.y,
-    )
-  } else {
-    shifted_alpha
-  };
+  // Like outerShdw, innerShdw supplies a support radius, not sigma.
+  // Evaluate the translated blur over the complete transparent source plane;
+  // only the final shadow is clipped by the original alpha. Cropping before
+  // convolution invents a dark edge wherever the caster leaves the bitmap.
+  let radius_x = blur_radius_px * scale.x;
+  let radius_y = blur_radius_px * scale.y;
+  let shifted_alpha = floating_point_gaussian_blur_alpha_xy_at_offset(
+    &alpha,
+    radius_x.floor() as usize,
+    direct2d_gaussian_sigma(radius_x),
+    radius_y.floor() as usize,
+    direct2d_gaussian_sigma(radius_y),
+    // MS-OI29500 defines inner-shadow direction clockwise from the left.
+    // These are inverse sampling offsets, opposite to the caster translation.
+    (
+      radians.cos() * distance_px * scale.x,
+      radians.sin() * distance_px * scale.y,
+    ),
+  );
   image::RgbaImage::from_fn(source.width(), source.height(), |x, y| {
     let clip = source.get_pixel(x, y).0[3];
     let inset = (u16::from(clip) * u16::from(u8::MAX - shifted_alpha.get_pixel(x, y).0[0])
@@ -5887,9 +6164,13 @@ fn inner_shadow_image_on_raster(
       color.color.b,
       ((u16::from(inset) * u16::from(color.alpha) + 127) / 255) as u8,
     ]);
-    let mut output = *source.get_pixel(x, y);
-    source_over(&mut output, &shadow);
-    output
+    if composite_source {
+      let mut output = *source.get_pixel(x, y);
+      source_over(&mut output, &shadow);
+      output
+    } else {
+      shadow
+    }
   })
 }
 
@@ -5947,10 +6228,11 @@ fn outer_shadow_image_with_scale(
     ),
   };
   let output_alignment_shift = match blur_kernel {
-    ShadowBlurKernel::Direct2dGaussian => (0.0, 0.0),
-    ShadowBlurKernel::WordTextBalanced { .. } => {
-      word_text_balanced_output_alignment_shift(blur_radius_px, transform, alignment)
-    }
+    ShadowBlurKernel::WordTextBalanced {
+      align_padded_output: true,
+      ..
+    } => word_text_balanced_output_alignment_shift(blur_radius_px, transform, alignment),
+    _ => (0.0, 0.0),
   };
   transform.shift_x_px += anchor_x - transform.scale_x * anchor_x - transform.skew_x * anchor_y
     + offset_x
@@ -5985,7 +6267,9 @@ fn outer_shadow_image_with_scale(
       };
       affine_gray_image(&alpha, transform)
     }
-    ShadowBlurKernel::WordTextBalanced { prescale_divisor } => {
+    ShadowBlurKernel::WordTextBalanced {
+      prescale_divisor, ..
+    } => {
       // W14 scale, skew, alignment and distance belong to the text plane. The
       // flat-host Office factorial exposes the complete shadow-only SMask and
       // pins its physical balanced blur after this affine, independently of
@@ -6304,56 +6588,39 @@ fn apply_soft_edge_on_raster(
   });
   let rx = radius_px * scale.x;
   let ry = radius_px * scale.y;
-  let eroded = erode_opaque_alpha_xy(
-    &alpha,
-    rx.ceil().max(1.0) as usize,
-    ry.ceil().max(1.0) as usize,
-  );
-  let blurred = blur_gray_xy(&eroded, rx, ry);
+  // Office's CreateSoftEdgesEffect builds alphaOutset(-R), a finite
+  // Gaussian blur(R), then alpha-modulates the original picture. Reuse the
+  // calibrated inset (ceil nonzero coverage, internal blur, floor), rather
+  // than eroding only fully opaque texels. The public Gaussian radius is
+  // three standard deviations; it is not itself sigma. Native 1/5/10pt
+  // opaque and semitransparent controls distinguish both errors.
+  let inset = alpha_outset_mask(&alpha, rx, ry, false);
+  if inset.as_raw().iter().all(|alpha| *alpha == 0) {
+    // A completely inset-away picture contributes no mask. In particular,
+    // an oversized authored radius must not allocate a huge Gaussian kernel
+    // after the bounded inset has already established an empty result.
+    for pixel in image.pixels_mut() {
+      pixel.0[3] = 0;
+    }
+    return;
+  }
+  let blurred = if rx == ry {
+    direct2d_gaussian_blur_alpha(&inset, rx)
+  } else {
+    floating_point_gaussian_blur_alpha_xy(
+      &inset,
+      rx.floor().max(0.0) as usize,
+      direct2d_gaussian_sigma(rx),
+      ry.floor().max(0.0) as usize,
+      direct2d_gaussian_sigma(ry),
+    )
+  };
   for ((pixel, original_alpha), blurred_alpha) in
     image.pixels_mut().zip(alpha.pixels()).zip(blurred.pixels())
   {
     pixel.0[3] =
       ((u16::from(original_alpha.0[0]) * u16::from(blurred_alpha.0[0]) + 127) / 255) as u8;
   }
-}
-
-fn erode_opaque_alpha_xy(
-  alpha: &image::GrayImage,
-  radius_x: usize,
-  radius_y: usize,
-) -> image::GrayImage {
-  let width = alpha.width() as usize;
-  let height = alpha.height() as usize;
-  let integral_width = width + 1;
-  let mut integral = vec![0_u64; integral_width * (height + 1)];
-  for y in 0..height {
-    let mut row_sum = 0_u64;
-    for x in 0..width {
-      row_sum += u64::from(alpha.get_pixel(x as u32, y as u32).0[0]);
-      integral[(y + 1) * integral_width + x + 1] = integral[y * integral_width + x + 1] + row_sum;
-    }
-  }
-  image::GrayImage::from_fn(alpha.width(), alpha.height(), |x, y| {
-    let x = x as usize;
-    let y = y as usize;
-    if x < radius_x
-      || y < radius_y
-      || x.saturating_add(radius_x) >= width
-      || y.saturating_add(radius_y) >= height
-    {
-      return image::Luma([0]);
-    }
-    let left = x - radius_x;
-    let top = y - radius_y;
-    let right = x + radius_x + 1;
-    let bottom = y + radius_y + 1;
-    let sum = integral[bottom * integral_width + right] + integral[top * integral_width + left]
-      - integral[top * integral_width + right]
-      - integral[bottom * integral_width + left];
-    let area = (right - left) as u64 * (bottom - top) as u64;
-    image::Luma([u8::from(sum == area * u64::from(u8::MAX)) * u8::MAX])
-  })
 }
 
 fn affine_image(source: &image::RgbaImage, transform: ImageEffectTransform) -> image::RgbaImage {
@@ -7054,11 +7321,297 @@ mod tests {
   struct NoColorResolver;
 
   #[test]
+  fn inner_shadow_does_not_depend_on_transparent_working_padding() {
+    let source = image::RgbaImage::from_fn(19, 17, |x, y| {
+      image::Rgba([80, 120, 200, if (x + y) % 5 == 0 { 128 } else { 255 }])
+    });
+    let mut padded = image::RgbaImage::new(67, 65);
+    image::imageops::replace(&mut padded, &source, 24, 24);
+    let color = ResolvedEffectColor {
+      color: RgbColor { r: 0, g: 0, b: 0 },
+      alpha: 128,
+    };
+    for radius in [0.0, 3.25, 6.666_666_5] {
+      for direction in [0.0, 45.0, 135.0, 225.0, 315.0] {
+        for scale in [
+          super::EffectRasterScale::default(),
+          super::EffectRasterScale { x: 1.5, y: 0.5 },
+        ] {
+          let clipped = super::inner_shadow_image_on_raster(
+            &source,
+            radius,
+            5.333_333_5,
+            direction,
+            color,
+            scale,
+            false,
+          );
+          let extended = super::inner_shadow_image_on_raster(
+            &padded,
+            radius,
+            5.333_333_5,
+            direction,
+            color,
+            scale,
+            false,
+          );
+          let cropped = image::imageops::crop_imm(&extended, 24, 24, 19, 17).to_image();
+          assert_eq!(
+            clipped, cropped,
+            "radius={radius} direction={direction} scale={scale:?}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn inner_shadow_overlay_preserves_foreground_and_rejects_combined_effects() {
+    let color = ResolvedEffectColor {
+      color: RgbColor { r: 0, g: 0, b: 0 },
+      alpha: 128,
+    };
+    let shadow = ImageEffect::InnerShadow {
+      blur_radius_px: 2.0,
+      distance_px: 3.0,
+      direction_degrees: 225.0,
+      color,
+      composite_source: true,
+    };
+    let container = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![ImageEffect::Container(ImageEffectContainer {
+        kind: ImageEffectContainerKind::Tree,
+        effects: vec![shadow.clone()],
+      })],
+    };
+    let overlay = super::unchanged_foreground_overlay(&container).unwrap();
+    assert!(matches!(
+      overlay.effects.as_slice(),
+      [ImageEffect::InnerShadow {
+        composite_source: false,
+        ..
+      }]
+    ));
+    let source = image::RgbaImage::from_fn(24, 24, |x, y| {
+      image::Rgba([
+        230,
+        110,
+        10,
+        if (3..21).contains(&x) && (3..21).contains(&y) {
+          255
+        } else {
+          0
+        },
+      ])
+    });
+    let full = super::inner_shadow_image_on_raster(
+      &source,
+      2.0,
+      3.0,
+      225.0,
+      color,
+      super::EffectRasterScale::default(),
+      true,
+    );
+    let mask = super::inner_shadow_image_on_raster(
+      &source,
+      2.0,
+      3.0,
+      225.0,
+      color,
+      super::EffectRasterScale::default(),
+      false,
+    );
+    let mut composited = source;
+    for (pixel, shadow) in composited.pixels_mut().zip(mask.pixels()) {
+      assert_eq!(&shadow.0[..3], &[0, 0, 0]);
+      super::source_over(pixel, shadow);
+    }
+    assert_eq!(full, composited);
+    let combined = ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![ImageEffect::Container(ImageEffectContainer {
+        kind: ImageEffectContainerKind::Tree,
+        effects: vec![ImageEffect::Grayscale, shadow],
+      })],
+    };
+    assert!(super::unchanged_foreground_overlay(&combined).is_none());
+    assert!(super::unchanged_foreground_overlay(&overlay).is_none());
+  }
+
+  #[test]
+  fn word_shape_reflection_uses_completed_paint_fade_domain() {
+    use ooxmlsdk::sdk::SdkType;
+
+    // NoFillAttrInImagedata's same-options Word controls: gradient/image fill,
+    // each with reflection
+    // alone, glow, shadow, or both. These are measured interior SMask samples
+    // on the 96-DPI output lattice, not a ramp calculated by this test.
+    // Native alpha falls as completed paint expands, despite an unchanged
+    // reflection pivot. The old RootText owner misses these by19..41 alpha.
+    let list = a::EffectList::from_bytes(
+      br#"<a:effectLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:reflection blurRad="6350" stA="52000" endA="300" endPos="35000" dir="5400000" sy="-100000" algn="bl" rotWithShape="0"/></a:effectLst>"#,
+    )
+    .unwrap();
+    for (mask, source_x, sample_x, sample_y, sample_rows, native_alpha) in [
+      (
+        0_u8,
+        60.0_f32,
+        57.0_f32,
+        309.6_f32,
+        [5_u32, 10, 15],
+        [112_u8, 90, 68],
+      ),
+      (1, 192.0, 184.08, 304.56, [12, 17, 22], [88, 69, 50]),
+      (2, 324.12, 319.32, 303.48, [13, 18, 23], [83, 64, 44]),
+      (3, 456.12, 446.28, 298.44, [20, 25, 30], [65, 48, 31]),
+    ] {
+      let mut original = from_effect_list(&list, None, &NoColorResolver);
+      if mask & 1 != 0 {
+        original.effects.insert(
+          0,
+          ImageEffect::Glow {
+            radius_px: 5.0 * (96.0 / 72.0),
+            raster_length_scale: 1.0,
+            bounds_radius_scale: 1.0,
+            bounds_radius_offset_px: 0.0,
+            spread_ratio: 0.5,
+            spread_kernel: super::GlowSpreadKernel::AlphaOutset,
+            spread_radius_rounding: GlowSpreadRadiusRounding::Inward,
+            blur_kernel: super::GlowBlurKernel::WordShapeGaussian,
+            color: ResolvedEffectColor {
+              color: RgbColor {
+                r: 255,
+                g: 111,
+                b: 0,
+              },
+              alpha: 102,
+            },
+          },
+        );
+      }
+      if mask & 2 != 0 {
+        original.effects.insert(
+          usize::from(mask & 1),
+          ImageEffect::OuterShadow {
+            blur_radius_px: 4.0 * (96.0 / 72.0),
+            distance_px: 3.0 * (96.0 / 72.0),
+            raster_length_scale: 1.0,
+            distance_length_scale: 1.0,
+            bounds_radius_scale: 1.0,
+            bounds_radius_offset_px: 0.0,
+            blur_kernel: ShadowBlurKernel::Direct2dGaussian,
+            direction_degrees: 45.0,
+            distance_mode: ShadowDistanceMode::PostTransformOffset,
+            transform: ImageEffectTransform {
+              scale_x: 1.0,
+              scale_y: 1.0,
+              skew_x: 0.0,
+              skew_y: 0.0,
+              shift_x_px: 0.0,
+              shift_y_px: 0.0,
+            },
+            alignment: (0.0, 0.0),
+            rotate_with_shape: false,
+            color: ResolvedEffectColor {
+              color: RgbColor { r: 0, g: 0, b: 0 },
+              alpha: 102,
+            },
+          },
+        );
+      }
+      let ordered = super::word_shape_spatial_effect_list(&original);
+      assert_eq!(ordered.is_some(), mask != 0);
+      let graph = ordered.as_ref().unwrap_or(&original);
+      // The host paints reflection as an independent output surface. Including
+      // upright siblings here would hide the reflected alpha near its start.
+      let branch = ImageEffectContainer {
+        kind: ImageEffectContainerKind::Sibling,
+        effects: vec![graph.effects[0].clone()],
+      };
+      let mut root_text_branch = branch.clone();
+      let reflected = match &mut root_text_branch.effects[0] {
+        ImageEffect::Reflection(reflection) => reflection,
+        ImageEffect::Container(container) => {
+          let Some(ImageEffect::Reflection(reflection)) = container.effects.last_mut() else {
+            panic!("completed paint followed by reflection");
+          };
+          reflection
+        }
+        _ => panic!("independent reflection branch"),
+      };
+      assert_eq!(
+        reflected.reference,
+        if mask == 0 {
+          ReflectionReference::EffectInput
+        } else {
+          ReflectionReference::WordShape
+        }
+      );
+      reflected.reference = ReflectionReference::RootText;
+      assert_eq!(
+        container_output_bounds(&branch, 84.5, 64.5),
+        container_output_bounds(&root_text_branch, 84.5, 64.5),
+        "fade ownership must not move the root alignment or painted support"
+      );
+
+      // Source paint includes the4.5pt outline; the measured central columns
+      // are opaque and clear of dashes, edge coverage, and glyph boundaries.
+      // Keep the Native crop lattice while allocating120 preceding rows.
+      let left_px = (source_x - 2.25 - (sample_x - 6.0)) * (96.0 / 72.0);
+      let top_px = (245.79 - (sample_y - 90.0)) * (96.0 / 72.0);
+      for textured in [false, true] {
+        let mut image = RgbaImage::from_fn(160, 256, |x, y| {
+          let inside = (x as f32 + 0.5) >= left_px
+            && (x as f32 + 0.5) < left_px + 84.5 * (96.0 / 72.0)
+            && (y as f32 + 0.5) >= top_px
+            && (y as f32 + 0.5) < top_px + 64.5 * (96.0 / 72.0);
+          if !inside {
+            return Rgba([0; 4]);
+          }
+          if textured {
+            if (x / 4 + y / 4).is_multiple_of(2) {
+              Rgba([210, 40, 80, 255])
+            } else {
+              Rgba([30, 100, 220, 255])
+            }
+          } else {
+            Rgba([x as u8, y as u8, 200, 255])
+          }
+        });
+        apply_container_to_padded_image(
+          &mut image,
+          &branch,
+          left_px,
+          top_px,
+          84.5 * (96.0 / 72.0),
+          64.5 * (96.0 / 72.0),
+        );
+        for fraction in [0.3, 0.5, 0.7] {
+          let x = (left_px + (2.25 + 80.0 * fraction) * (96.0 / 72.0)).floor() as u32;
+          for (row, expected) in sample_rows.into_iter().zip(native_alpha) {
+            let actual = image.get_pixel(x, 120 + row).0[3];
+            // Retain authored stops and existing blur: the independent Native
+            // models differ by<1.6 alpha in this interior. Do not fold A8 stop
+            // realization or a different kernel into this coordinate fix.
+            assert!(
+              actual.abs_diff(expected) <= 2,
+              "mask={mask}, textured={textured}, row={row}: {actual} vs Native {expected}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn outer_shadow_output_translation_reaches_pixels_and_bounds() {
     for kernel in [
       ShadowBlurKernel::Direct2dGaussian,
       ShadowBlurKernel::WordTextBalanced {
         prescale_divisor: 1,
+        align_padded_output: true,
       },
     ] {
       let effect = ImageEffect::OuterShadow {
@@ -7540,6 +8093,7 @@ mod tests {
         bounds_radius_offset_px: 0.0,
         blur_kernel: ShadowBlurKernel::WordTextBalanced {
           prescale_divisor: 1,
+          align_padded_output: true,
         },
         direction_degrees: 0.0,
         distance_mode: ShadowDistanceMode::PreTransformOffset,
@@ -7586,6 +8140,7 @@ mod tests {
         bounds_radius_offset_px: 0.0,
         blur_kernel: ShadowBlurKernel::WordTextBalanced {
           prescale_divisor: 1,
+          align_padded_output: true,
         },
         direction_degrees: 0.0,
         distance_mode: ShadowDistanceMode::PreTransformOffset,
@@ -8010,6 +8565,7 @@ mod tests {
           bounds_radius_offset_px,
           blur_kernel: ShadowBlurKernel::WordTextBalanced {
             prescale_divisor: 1,
+            align_padded_output: false,
           },
           ..
         },
@@ -8074,6 +8630,7 @@ mod tests {
           bounds_radius_offset_px,
           blur_kernel: ShadowBlurKernel::WordTextBalanced {
             prescale_divisor: 1,
+            align_padded_output: false,
           },
           ..
         }
@@ -8556,6 +9113,7 @@ mod tests {
         blur_radius_px: 2.099_737_6,
         blur_kernel: ShadowBlurKernel::WordTextBalanced {
           prescale_divisor: 1,
+          align_padded_output: true,
         },
         distance_px: 0.5,
         direction_degrees: 0.0,
@@ -9278,6 +9836,35 @@ mod tests {
     assert!((bounds.top_pt + 20.0).abs() < 0.01);
     assert!((bounds.right_pt - 100.0).abs() < 0.01);
     assert!((bounds.bottom_pt - 80.0).abs() < 0.01);
+  }
+
+  #[test]
+  fn soft_edge_preserves_translucent_interior_and_original_color() {
+    for opacity in [128, 255] {
+      let mut source = RgbaImage::from_pixel(97, 97, Rgba([40, 80, 160, 0]));
+      for y in 16..81 {
+        for x in 16..81 {
+          source.get_pixel_mut(x, y).0[3] = opacity;
+        }
+      }
+      let mut zero = source.clone();
+      apply_to_image(&mut zero, &[ImageEffect::SoftEdge(0.0)]);
+      assert_eq!(zero, source);
+      apply_to_image(&mut source, &[ImageEffect::SoftEdge(6.0)]);
+      assert_eq!(source.get_pixel(48, 48).0, [40, 80, 160, opacity]);
+      assert_eq!(source.get_pixel(29, 48).0[3], opacity);
+      assert!(source.get_pixel(19, 48).0[3] > 0);
+      assert!(source.get_pixel(19, 48).0[3] < opacity);
+      assert_eq!(source.get_pixel(15, 48).0[3], 0);
+      assert!(source.pixels().all(|pixel| pixel.0[..3] == [40, 80, 160]));
+    }
+  }
+
+  #[test]
+  fn soft_edge_oversized_inset_finishes_without_allocating_the_blur_kernel() {
+    let mut source = RgbaImage::from_pixel(7, 5, Rgba([40, 80, 160, 255]));
+    apply_to_image(&mut source, &[ImageEffect::SoftEdge(1_000_000.0)]);
+    assert!(source.pixels().all(|pixel| pixel.0 == [40, 80, 160, 0]));
   }
 
   #[test]

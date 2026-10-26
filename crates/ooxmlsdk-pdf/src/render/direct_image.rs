@@ -214,6 +214,16 @@ fn validate_image(image: &DirectRasterImage) -> Result<()> {
         }
       }
     }
+    DirectRasterEncoding::GrayPng { data, .. } => {
+      if image.color_space != DirectRasterColorSpace::Gray
+        || image.bits_per_component != 1
+        || data.is_empty()
+      {
+        return Err(PdfError::Writer(
+          "one-bit grayscale PNG has an invalid component depth or IDAT payload".to_string(),
+        ));
+      }
+    }
     DirectRasterEncoding::IndexedPng { data, palette, .. } => {
       let entries = palette.len() / 3;
       if image.color_space != DirectRasterColorSpace::Rgb
@@ -260,7 +270,9 @@ fn write_image_object(pdf: &mut Pdf, object: &ImageObject) -> Result<()> {
       (encoded.as_slice(), Filter::FlateDecode)
     }
     DirectRasterEncoding::Dct { data, .. } => (data.as_ref(), Filter::DctDecode),
-    DirectRasterEncoding::IndexedPng { data, .. } => (data.as_ref(), Filter::FlateDecode),
+    DirectRasterEncoding::IndexedPng { data, .. } | DirectRasterEncoding::GrayPng { data, .. } => {
+      (data.as_ref(), Filter::FlateDecode)
+    }
   };
   validate_stream_length(stream.len())?;
 
@@ -303,13 +315,23 @@ fn write_image_object(pdf: &mut Pdf, object: &ImageObject) -> Result<()> {
         .columns(image.width as i32);
       parameters.finish();
     }
-    DirectRasterEncoding::Sampled { .. } | DirectRasterEncoding::Dct { .. } => {
+    DirectRasterEncoding::Sampled { .. }
+    | DirectRasterEncoding::Dct { .. }
+    | DirectRasterEncoding::GrayPng { .. } => {
       if let Some(icc_id) = object.icc_id {
         writer.color_space().icc_based(icc_id);
       } else {
         write_device_color_space(writer.color_space(), image.color_space);
       }
     }
+  }
+  if matches!(image.encoding, DirectRasterEncoding::GrayPng { .. }) {
+    writer
+      .decode_parms()
+      .predictor(Predictor::PngOptimum)
+      .colors(1)
+      .bits_per_component(1)
+      .columns(image.width as i32);
   }
   if let DirectRasterEncoding::Dct {
     invert_cmyk: true, ..
@@ -651,6 +673,44 @@ mod tests {
     assert!(text.contains("/BitsPerComponent 1"));
     assert!(text.contains("/Filter/FlateDecode"));
     assert!(text.contains("/DecodeParms<</Predictor 15/Colors 1/BitsPerComponent 1/Columns 8>>"));
+  }
+
+  #[test]
+  fn grayscale_png_writes_packed_samples_with_a_one_component_predictor() {
+    let stream = deflate(&[0, 0x55, 0x80]).unwrap();
+    let image = DirectRasterImage {
+      width: 9,
+      height: 1,
+      color_space: DirectRasterColorSpace::Gray,
+      bits_per_component: 1,
+      encoding: DirectRasterEncoding::GrayPng {
+        data: stream.clone().into(),
+        icc_profile: None,
+      },
+      interpolate: false,
+      soft_mask_interpolate: false,
+      matte: None,
+    };
+    let pdf = serialized(prepared(image.clone()));
+    let text = String::from_utf8_lossy(&pdf);
+    assert!(text.contains("/ColorSpace/DeviceGray"));
+    assert!(text.contains("/BitsPerComponent 1"));
+    assert!(text.contains("/Filter/FlateDecode"));
+    assert!(text.contains("/DecodeParms<</Predictor 15/Colors 1/BitsPerComponent 1/Columns 9>>"));
+    assert!(!text.contains("/Interpolate true"));
+    assert!(!text.contains("/SMask"));
+    assert!(pdf.windows(stream.len()).any(|bytes| bytes == stream));
+    for (color_space, bits_per_component) in [
+      (DirectRasterColorSpace::Rgb, 1),
+      (DirectRasterColorSpace::Gray, 8),
+    ] {
+      let error = register_error(prepared(DirectRasterImage {
+        color_space,
+        bits_per_component,
+        ..image.clone()
+      }));
+      assert!(matches!(error, PdfError::Writer(message) if message.contains("one-bit grayscale")));
+    }
   }
 
   #[test]

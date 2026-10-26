@@ -2,6 +2,46 @@ use super::*;
 
 const MICROSOFT_WORD_COMPATIBILITY_URI: &str = "http://schemas.microsoft.com/office/word";
 
+pub(super) fn legacy_chart_defaults(package: &WordprocessingDocument) -> bool {
+  let Some(properties) = package
+    .extended_file_properties_part()
+    .and_then(|part| part.root_element(package).ok())
+  else {
+    return false;
+  };
+  // Office uses the producer's application/version for pre-2010 chart
+  // defaults, independently of w:compatibilityMode. Native PDF controls
+  // distinguish these exact application identifiers from a Microsoft
+  // prefix, case changes, missing metadata and versions >=13. LibreOffice's
+  // XmlFilterBase::checkDocumentProperties uses the same metadata owner,
+  // but its broader prefix test is not Word's actual recognition rule.
+  if !matches!(
+    properties.application.as_deref(),
+    Some(
+      "Microsoft Office Word"
+        | "Microsoft Excel"
+        | "Microsoft PowerPoint"
+        | "Microsoft Macintosh Word"
+        | "Microsoft Macintosh Excel"
+        | "Microsoft Macintosh PowerPoint"
+    )
+  ) {
+    return false;
+  }
+  properties
+    .application_version
+    .as_deref()
+    .and_then(|version| version.split_once('.'))
+    .filter(|(major, minor)| {
+      (1..=2).contains(&major.len())
+        && (1..=4).contains(&minor.len())
+        && major.bytes().all(|byte| byte.is_ascii_digit())
+        && minor.bytes().all(|byte| byte.is_ascii_digit())
+    })
+    .and_then(|(major, _)| major.parse::<u8>().ok())
+    .is_some_and(|major| major <= 12)
+}
+
 pub(super) fn hyphenation_settings(
   package: &WordprocessingDocument,
   main: &MainDocumentPart,
@@ -75,6 +115,44 @@ fn parse_compatibility_on_off(value: &str) -> Option<bool> {
   } else {
     None
   }
+}
+
+pub(super) fn enable_open_type_features(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      compatibility_setting_value(settings, w::CompatSettingNameValues::EnableOpenTypeFeatures)
+    })
+    // MS-DOCX 2.3.3 makes omission equivalent to false.
+    .unwrap_or(false)
+}
+
+pub(super) fn differentiate_multirow_table_headers(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+  mode: u16,
+) -> bool {
+  let settings = main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok());
+  differentiate_multirow_table_headers_value(settings, mode)
+}
+
+fn differentiate_multirow_table_headers_value(settings: Option<&w::Settings>, mode: u16) -> bool {
+  settings
+    .and_then(|settings| {
+      compatibility_setting_value(
+        settings,
+        w::CompatSettingNameValues::DifferentiateMultirowTableHeaders,
+      )
+    })
+    // MS-DOCX 2.3.4 documents the setting. Native Word controls resolve an
+    // omitted value to enabled in modern mode, disabled in Word 2007 mode.
+    .unwrap_or(mode >= 15)
 }
 
 fn page_bottom_hyphenation(
@@ -180,6 +258,24 @@ fn do_not_use_html_paragraph_auto_spacing_value(settings: &w::Settings) -> bool 
     .compatibility
     .iter()
     .find_map(|compat| compat.do_not_use_html_paragraph_auto_spacing.as_ref())
+    .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
+}
+
+pub(super) fn do_not_use_indent_as_numbering_tab_stop(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .is_some_and(do_not_use_indent_as_numbering_tab_stop_value)
+}
+
+fn do_not_use_indent_as_numbering_tab_stop_value(settings: &w::Settings) -> bool {
+  settings
+    .compatibility
+    .iter()
+    .find_map(|compat| compat.do_not_use_indent_as_numbering_tab_stop.as_ref())
     .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
 }
 
@@ -394,8 +490,9 @@ mod tests {
     MICROSOFT_WORD_COMPATIBILITY_URI, PageBottomHyphenation,
     balance_single_byte_double_byte_width_value, compatibility_setting_value,
     do_not_break_wrapped_tables_value, do_not_expand_shift_return_value,
-    do_not_use_html_paragraph_auto_spacing_value, no_leading_value, page_bottom_hyphenation,
-    parse_compatibility_on_off, resolve_adjust_line_height_in_table, use_far_east_layout_value, w,
+    do_not_use_html_paragraph_auto_spacing_value, do_not_use_indent_as_numbering_tab_stop_value,
+    no_leading_value, page_bottom_hyphenation, parse_compatibility_on_off,
+    resolve_adjust_line_height_in_table, use_far_east_layout_value, w,
   };
 
   #[test]
@@ -476,6 +573,38 @@ mod tests {
   }
 
   #[test]
+  fn opentype_feature_setting_preserves_omission_and_explicit_off() {
+    use ooxmlsdk::sdk::SdkType;
+    for (value, expected) in [
+      (None, None),
+      (Some("0"), Some(false)),
+      (Some("off"), Some(false)),
+      (Some("1"), Some(true)),
+      (Some("true"), Some(true)),
+    ] {
+      let content = value.map_or_else(String::new, |value| {
+        format!(
+          "<w:compatSetting w:name=\"enableOpenTypeFeatures\" w:uri=\"http://schemas.microsoft.com/office/word\" w:val=\"{value}\"/>"
+        )
+      });
+      let settings = w::Settings::from_bytes(
+        format!(
+          "<w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:compat>{content}</w:compat></w:settings>"
+        )
+        .as_bytes(),
+      )
+      .expect("settings");
+      assert_eq!(
+        compatibility_setting_value(
+          &settings,
+          w::CompatSettingNameValues::EnableOpenTypeFeatures
+        ),
+        expected
+      );
+    }
+  }
+
+  #[test]
   fn microsoft_compatibility_setting_requires_its_uri_and_last_value_wins() {
     let name = w::CompatSettingNameValues::AllowHyphenationAtTrackBottom;
     let setting = |uri: &str, value: &str| w::CompatibilitySetting {
@@ -504,6 +633,37 @@ mod tests {
   }
 
   #[test]
+  fn multirow_header_setting_preserves_explicit_values_and_mode_defaults() {
+    for mode in [12, 15] {
+      assert_eq!(
+        super::differentiate_multirow_table_headers_value(None, mode),
+        mode >= 15
+      );
+      assert_eq!(
+        super::differentiate_multirow_table_headers_value(Some(&w::Settings::default()), mode),
+        mode >= 15
+      );
+      for (val, expected) in [("1", true), ("0", false)] {
+        let settings = w::Settings {
+          compatibility: vec![w::Compatibility {
+            compatibility_setting: vec![w::CompatibilitySetting {
+              w_name: w::CompatSettingNameValues::DifferentiateMultirowTableHeaders,
+              w_uri: MICROSOFT_WORD_COMPATIBILITY_URI.to_owned(),
+              w_val: val.to_owned(),
+            }],
+            ..Default::default()
+          }],
+          ..Default::default()
+        };
+        assert_eq!(
+          super::differentiate_multirow_table_headers_value(Some(&settings), mode),
+          expected
+        );
+      }
+    }
+  }
+
+  #[test]
   fn do_not_break_wrapped_tables_honors_on_off_and_omission() {
     let settings = |value: Option<Option<ooxmlsdk::simple_type::OnOffValue>>| w::Settings {
       compatibility: vec![w::Compatibility {
@@ -521,6 +681,30 @@ mod tests {
       ooxmlsdk::simple_type::OnOffValue::False,
     )))));
     assert!(!do_not_break_wrapped_tables_value(&settings(None)));
+  }
+
+  #[test]
+  fn numbering_indent_tab_compatibility_honors_on_off_and_omission() {
+    let settings = |value: Option<Option<ooxmlsdk::simple_type::OnOffValue>>| w::Settings {
+      compatibility: vec![w::Compatibility {
+        do_not_use_indent_as_numbering_tab_stop: value
+          .map(|val| w::DoNotUseIndentAsNumberingTabStop { val }),
+        ..w::Compatibility::default()
+      }],
+      ..w::Settings::default()
+    };
+    assert!(do_not_use_indent_as_numbering_tab_stop_value(&settings(
+      Some(None)
+    )));
+    assert!(do_not_use_indent_as_numbering_tab_stop_value(&settings(
+      Some(Some(ooxmlsdk::simple_type::OnOffValue::True,))
+    )));
+    assert!(!do_not_use_indent_as_numbering_tab_stop_value(&settings(
+      Some(Some(ooxmlsdk::simple_type::OnOffValue::False,))
+    )));
+    assert!(!do_not_use_indent_as_numbering_tab_stop_value(&settings(
+      None
+    )));
   }
 
   #[test]

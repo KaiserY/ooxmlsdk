@@ -42,6 +42,8 @@ pub enum BorderCompoundPattern {
   ThickThinMediumGap,
   ThinThickLargeGap,
   ThickThinLargeGap,
+  ThreeDEmboss,
+  ThreeDEngrave,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -137,6 +139,9 @@ pub struct TextStyle {
   /// Effective Word run border. The outer option retains cascade presence;
   /// `Some(None)` explicitly clears an inherited border with `w:val="nil"`.
   pub word_run_border: Option<Option<BorderStyle>>,
+  /// Authored Word emphasis. Omission inherits; `Some(None)` explicitly
+  /// cancels an inherited mark without changing the text or its font.
+  pub wordprocessing_emphasis_mark: Option<w::EmphasisMarkValues>,
   pub font_family: Option<Arc<str>>,
   /// Effective WordprocessingML `w:rFonts/@w:hAnsi` face. Word classifies
   /// this slot independently from ASCII even when both usually resolve to
@@ -274,9 +279,20 @@ pub struct TextStyle {
   pub use_windows_font_metrics: bool,
   /// Select Common characters using the WordprocessingML rFonts slot table.
   pub wordprocessingml_font_slots: bool,
+  /// An alphabetic RTL numbering portion selects its font and size per script,
+  /// independently of the complex properties shared with its Latin suffix.
+  pub wordprocessingml_complex_numbering: bool,
+  /// OOXML `w:noBreakHyphen`: retain U+2011 for line breaking, but use
+  /// the U+002D font slot and glyph. Literal U+2011 text remains distinct.
+  pub wordprocessingml_no_break_hyphen: bool,
+  /// Use Word's missing-Han policy for a logical font without CJK charsets.
+  /// DrawingML also uses rFonts-like slots, with a separate fallback policy.
+  pub wordprocessingml_han_fallback: bool,
   /// Enable the CJK-capable font line metrics selected by the document-level
   /// WordprocessingML `w:noLeading` compatibility setting.
   pub wordprocessingml_cjk_line_metrics: bool,
+  /// Omit the font's extra line leading for legacy Word `w:noLeading`.
+  pub wordprocessingml_no_leading: bool,
   /// Fraction of Word's maximum full-width punctuation compression to apply.
   pub cjk_punctuation_compression_ratio: f32,
   /// Completed-line character adjustments, including negative trailing
@@ -289,6 +305,15 @@ pub struct TextStyle {
   /// Apply WordprocessingML's document-level half-width/full-width space
   /// balancing compatibility rule before line justification.
   pub wordprocessingml_balance_single_byte_double_byte_width: bool,
+  /// This whitespace-only portion owns a source-qualified balanced blank.
+  /// Trial shaping boundaries never infer this qualification.
+  pub wordprocessingml_balanced_space_portion: bool,
+  /// Physical font used to measure Word's balanced spaces, independently of
+  /// the face that paints the source characters.
+  pub wordprocessingml_balance_reference_font_family: Option<Arc<str>>,
+  /// Unresolved source theme for the balance reference during the DOCX
+  /// cascade. Fixed output receives only the resolved reference family.
+  pub(crate) wordprocessingml_balance_reference_theme: Option<w::ThemeFontValues>,
   pub pdf_glyph_outlines: bool,
   pub pdf_glyph_outline_options: Option<Arc<common::PdfGlyphOutlineOptions>>,
   pub(crate) text_glow: Option<common::drawingml_image_effects::WordprocessingTextGlow>,
@@ -367,11 +392,29 @@ pub struct TextStyle {
   pub underline_color: Option<RgbColor>,
 }
 
+impl TextStyle {
+  pub(crate) fn resolved_wordprocessing_emphasis(&self) -> Option<common::WordprocessingEmphasis> {
+    use common::EmphasisMark;
+    let mark = match self.wordprocessing_emphasis_mark? {
+      w::EmphasisMarkValues::None => return None,
+      w::EmphasisMarkValues::Dot => EmphasisMark::Dot,
+      w::EmphasisMarkValues::Comma => EmphasisMark::Comma,
+      w::EmphasisMarkValues::Circle => EmphasisMark::Circle,
+      w::EmphasisMarkValues::UnderDot => EmphasisMark::UnderDot,
+    };
+    Some(common::WordprocessingEmphasis::new(
+      mark,
+      self.east_asia_language.as_deref(),
+    ))
+  }
+}
+
 impl Default for TextStyle {
   fn default() -> Self {
     Self {
       embedded_fonts: None,
       word_run_border: None,
+      wordprocessing_emphasis_mark: None,
       font_family: None,
       high_ansi_font_family: None,
       fallback_font_family: None,
@@ -439,12 +482,19 @@ impl Default for TextStyle {
       pdf_painted_artifact: false,
       use_windows_font_metrics: false,
       wordprocessingml_font_slots: false,
+      wordprocessingml_complex_numbering: false,
+      wordprocessingml_no_break_hyphen: false,
+      wordprocessingml_han_fallback: false,
       wordprocessingml_cjk_line_metrics: false,
+      wordprocessingml_no_leading: false,
       cjk_punctuation_compression_ratio: 0.0,
       wordprocessing_justification_expansion_pt: None,
       wordprocessingml_legacy_punctuation_spacing: false,
       wordprocessingml_punctuation_spacing: false,
       wordprocessingml_balance_single_byte_double_byte_width: false,
+      wordprocessingml_balanced_space_portion: false,
+      wordprocessingml_balance_reference_font_family: None,
+      wordprocessingml_balance_reference_theme: None,
       pdf_glyph_outlines: false,
       pdf_glyph_outline_options: None,
       text_glow: None,
@@ -527,6 +577,8 @@ pub struct PageSetup {
   pub margin_left_pt: f32,
   pub gutter_pt: f32,
   pub gutter_at_top: bool,
+  /// Word's two-pages-per-sheet binding mode, independent of PDF imposition.
+  pub print_two_on_one: bool,
   pub rtl_gutter: bool,
   pub mirror_margins: bool,
   pub top_margin_was_negative: bool,
@@ -568,6 +620,7 @@ impl Default for PageSetup {
       margin_left_pt: 72.0,
       gutter_pt: 0.0,
       gutter_at_top: false,
+      print_two_on_one: false,
       rtl_gutter: false,
       mirror_margins: false,
       top_margin_was_negative: false,
@@ -814,7 +867,9 @@ pub(crate) fn common_page_setup(setup: PageSetup) -> common::PageSetup {
 }
 
 pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> {
+  let wordprocessing_emphasis = style.resolved_wordprocessing_emphasis();
   common::TextStyle {
+    wordprocessing_emphasis,
     embedded_fonts: style.embedded_fonts,
     font_family: style.font_family.map(|value| Cow::Owned(value.to_string())),
     high_ansi_font_family: style
@@ -904,7 +959,11 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     pdf_painted_artifact: style.pdf_painted_artifact,
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
+    wordprocessingml_complex_numbering: style.wordprocessingml_complex_numbering,
+    wordprocessingml_no_break_hyphen: style.wordprocessingml_no_break_hyphen,
+    wordprocessingml_han_fallback: style.wordprocessingml_han_fallback,
     wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics,
+    wordprocessingml_no_leading: style.wordprocessingml_no_leading,
     cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
     wordprocessing_justification_expansion_pt: style
       .wordprocessing_justification_expansion_pt
@@ -913,6 +972,11 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     wordprocessingml_punctuation_spacing: style.wordprocessingml_punctuation_spacing,
     wordprocessingml_balance_single_byte_double_byte_width: style
       .wordprocessingml_balance_single_byte_double_byte_width,
+    wordprocessingml_balanced_space_portion: style.wordprocessingml_balanced_space_portion,
+    wordprocessingml_balance_reference_font_family: style
+      .wordprocessingml_balance_single_byte_double_byte_width
+      .then_some(style.wordprocessingml_balance_reference_font_family)
+      .flatten(),
     pdf_glyph_outlines: style.pdf_glyph_outlines,
     pdf_glyph_outline_options: style.pdf_glyph_outline_options,
     bold: style.bold,
@@ -984,6 +1048,52 @@ pub(crate) fn common_rgb(color: RgbColor, opacity: f32) -> common::Color {
 #[cfg(test)]
 mod tests {
   use super::{TextStyle, common_text_style, drawingml_kerning_minimum_size_pt};
+
+  #[test]
+  fn word_balance_reference_survives_common_style_without_changing_painted_faces() {
+    use std::sync::Arc;
+
+    for family in [None, Some("SimSun"), Some("Times New Roman")] {
+      let reference = family.map(Arc::<str>::from);
+      let layout = TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        east_asia_font_family: Some(Arc::from("Microsoft YaHei")),
+        wordprocessingml_balance_single_byte_double_byte_width: true,
+        wordprocessingml_balance_reference_font_family: reference.clone(),
+        wordprocessingml_balance_reference_theme: Some(super::w::ThemeFontValues::MinorEastAsia),
+        ..Default::default()
+      };
+      let common = common_text_style(layout);
+      assert_eq!(common.font_family.as_deref(), Some("Arial"));
+      assert_eq!(
+        common.east_asia_font_family.as_deref(),
+        Some("Microsoft YaHei")
+      );
+      assert_eq!(
+        common
+          .wordprocessingml_balance_reference_font_family
+          .as_deref(),
+        family
+      );
+      if let Some(reference) = reference {
+        assert!(Arc::ptr_eq(
+          &reference,
+          common
+            .wordprocessingml_balance_reference_font_family
+            .as_ref()
+            .unwrap(),
+        ));
+      }
+    }
+    let disabled = common_text_style(TextStyle {
+      wordprocessingml_balance_reference_font_family: Some(Arc::from("SimSun")),
+      ..Default::default()
+    });
+    assert_eq!(
+      disabled.wordprocessingml_balance_reference_font_family,
+      None
+    );
+  }
 
   #[test]
   fn common_text_style_preserves_layout_font_size() {

@@ -1,0 +1,12 @@
+{
+  "Root": "visio:Extensions_Type",
+  "Name": "VisioExtensionsPart",
+  "Base": "OpenXmlPart",
+  "ContentType": "application/vnd.ms-visio.extensions+xml",
+  "RelationshipType": "http://schemas.microsoft.com/visio/2010/relationships/extensions",
+  "Target": "extensions",
+  "RootElement": "Extensions",
+  "Paths": {
+    "General": "visio"
+  }
+}

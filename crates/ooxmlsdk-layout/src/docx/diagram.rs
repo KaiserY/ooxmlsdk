@@ -73,13 +73,33 @@ pub(super) fn layout_shapes(
     return None;
   }
 
+  Some(wrap_in_host(
+    children,
+    width,
+    height,
+    placement,
+    context.effect_extent,
+  ))
+}
+
+pub(super) fn wrap_in_host(
+  children: Vec<InlineItem>,
+  width: f32,
+  height: f32,
+  placement: ImagePlacement,
+  effect_extent: DrawingEffectExtent,
+) -> Vec<InlineItem> {
   // wp:extent belongs to the whole diagram. In particular an inline
   // diagram advances once, and an anchored diagram has one wrap owner.
   // Children use the established canvas coordinate-space formatter.
   let mut host = chart_shape(width, height, 0.0, placement, None);
-  apply_drawing_effect_extent_to_shape(&mut host, context.effect_extent);
+  apply_drawing_effect_extent_to_shape(&mut host, effect_extent);
+  // Like a WordprocessingCanvas, SmartArt has one DrawingML content origin
+  // inside the inline effect frame (ECMA-376 Part 1 §20.4.2.6). The children
+  // must start after the host's left/top outsets, not at the line-frame edge.
+  host.wordprocessing_canvas_host = true;
   host.canvas_children = Some(children);
-  Some(vec![InlineItem::Shape(host)])
+  vec![InlineItem::Shape(host)]
 }
 
 fn style_colors(
@@ -256,6 +276,7 @@ fn import_shape(
         ..Default::default()
       }],
       outline: None,
+      preset: None,
     };
     if let Some(stroke) = imported.stroke_override.as_deref_mut() {
       source.apply_connector_ends(stroke);
@@ -353,9 +374,193 @@ fn text_body(shape: &shared::DiagramShape) -> dsp::TextBody {
   }
 }
 
+pub(super) fn apply_paragraph_spacing(
+  format: &mut ParagraphFormat,
+  properties: &a::ParagraphProperties,
+  font_size_pt: f32,
+  first: bool,
+  last: bool,
+) {
+  // ECMA-376 §21.1.2.2.5/10/11: percentage line spacing is relative to the
+  // natural line; paragraph spacing percentages refer to the text size.
+  if let Some(spacing) = properties
+    .line_spacing
+    .as_ref()
+    .and_then(|spacing| spacing.line_spacing_choice.as_ref())
+  {
+    let (value, rule) = match spacing {
+      a::LineSpacingChoice::SpacingPercent(spacing) => {
+        (spacing.val.as_ratio() as f32, LineHeightRule::Auto)
+      }
+      a::LineSpacingChoice::SpacingPoints(spacing) => (
+        sdk_units::points100_to_points(spacing.val) as f32,
+        LineHeightRule::Exact,
+      ),
+    };
+    format.line_height_pt = Some(value);
+    format.line_height_rule = rule;
+    format.line_height_set = true;
+  }
+  // Word SmartArt suppresses the first paragraph's preceding space and the
+  // last paragraph's following space, independently of vertical anchoring.
+  if !first
+    && let Some(spacing) = properties
+      .space_before
+      .as_ref()
+      .and_then(|spacing| spacing.space_before_choice.as_ref())
+  {
+    format.spacing_before_pt = match spacing {
+      a::SpaceBeforeChoice::SpacingPercent(spacing) => font_size_pt * spacing.val.as_ratio() as f32,
+      a::SpaceBeforeChoice::SpacingPoints(spacing) => {
+        sdk_units::points100_to_points(spacing.val) as f32
+      }
+    };
+    format.spacing_before_set = true;
+  }
+  if !last
+    && let Some(spacing) = properties
+      .space_after
+      .as_ref()
+      .and_then(|spacing| spacing.space_after_choice.as_ref())
+  {
+    format.spacing_after_pt = match spacing {
+      a::SpaceAfterChoice::SpacingPercent(spacing) => font_size_pt * spacing.val.as_ratio() as f32,
+      a::SpaceAfterChoice::SpacingPoints(spacing) => {
+        sdk_units::points100_to_points(spacing.val) as f32
+      }
+    };
+    format.spacing_after_set = true;
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn smartart_line_default_preserves_explicit_and_inherited_widths() {
+    let styles = StylesCatalog {
+      theme_lines: ThemeLineStyles {
+        outlines: vec![a::Outline::from_bytes(br#"<a:ln xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="25400"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>"#).unwrap()],
+      },
+      ..Default::default()
+    };
+    for (line, reference, expected) in [
+      (
+        "<a:ln><a:solidFill><a:srgbClr val=\"123456\"/></a:solidFill></a:ln>",
+        0,
+        Some(0.75),
+      ),
+      (
+        "<a:ln w=\"0\"><a:solidFill><a:srgbClr val=\"123456\"/></a:solidFill></a:ln>",
+        0,
+        Some(0.0),
+      ),
+      (
+        "<a:ln w=\"38100\"><a:solidFill><a:srgbClr val=\"123456\"/></a:solidFill></a:ln>",
+        0,
+        Some(3.0),
+      ),
+      (
+        "<a:ln><a:solidFill><a:srgbClr val=\"123456\"/></a:solidFill></a:ln>",
+        1,
+        Some(2.0),
+      ),
+      ("<a:ln><a:noFill/></a:ln>", 1, None),
+      ("", 0, None),
+    ] {
+      let shape = dsp::Shape::from_bytes(format!(r#"<dsp:sp xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" modelId="1"><dsp:nvSpPr><dsp:cNvPr id="1" name="outline"/><dsp:cNvSpPr/></dsp:nvSpPr><dsp:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>{line}</dsp:spPr><dsp:style><a:lnRef idx="{reference}"/><a:fillRef idx="0"/><a:effectRef idx="0"/><a:fontRef idx="minor"/></dsp:style></dsp:sp>"#).as_bytes()).unwrap();
+      let imported = drawingml_diagram_shape_shape(
+        &shape,
+        ImagePlacement::Inline,
+        DrawingMlGroupTransform::identity(),
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &ImageCatalog::default(),
+          hyperlinks: &HyperlinkCatalog::default(),
+          smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
+        },
+      )
+      .unwrap();
+      assert_eq!(
+        imported
+          .stroke_override
+          .as_ref()
+          .map(|stroke| stroke.width.0),
+        expected
+      );
+      assert_eq!(imported.stroke.map(|stroke| stroke.width_pt), expected);
+    }
+  }
+
+  #[test]
+  fn smartart_paragraph_spacing_keeps_percent_and_point_owners() {
+    for (line, expected, rule) in [
+      ("<a:spcPct val=\"90000\"/>", 0.9, LineHeightRule::Auto),
+      ("<a:spcPts val=\"1800\"/>", 18.0, LineHeightRule::Exact),
+    ] {
+      let properties = a::ParagraphProperties::from_bytes(format!(r#"<a:pPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:lnSpc>{line}</a:lnSpc><a:spcBef><a:spcPct val="25000"/></a:spcBef><a:spcAft><a:spcPts val="300"/></a:spcAft></a:pPr>"#).as_bytes()).unwrap();
+      for (first, last) in [(true, true), (false, false)] {
+        let mut format = ParagraphFormat::default();
+        apply_paragraph_spacing(&mut format, &properties, 9.0, first, last);
+        assert_eq!(format.line_height_pt, Some(expected));
+        assert_eq!(format.line_height_rule, rule);
+        assert_eq!(format.spacing_before_pt, if first { 0.0 } else { 2.25 });
+        assert_eq!(format.spacing_after_pt, if last { 0.0 } else { 3.0 });
+      }
+    }
+  }
+
+  #[test]
+  fn smartart_theme_effect_reference_yields_to_direct_effect_lists() {
+    let effect_styles = a::EffectStyleList::from_bytes(
+      br#"<a:effectStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:effectStyle><a:effectLst><a:outerShdw dist="12700"><a:schemeClr val="phClr"/></a:outerShdw></a:effectLst></a:effectStyle></a:effectStyleLst>"#,
+    )
+    .unwrap();
+    let styles = StylesCatalog {
+      theme_effects: ThemeEffectStyles {
+        styles: effect_styles.effect_style,
+      },
+      ..Default::default()
+    };
+    for (direct, inherited) in [("", true), ("<a:effectLst/>", false)] {
+      let xml = format!(
+        r#"<dsp:sp xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" modelId="1"><dsp:nvSpPr><dsp:cNvPr id="1" name="effect test"/><dsp:cNvSpPr/></dsp:nvSpPr><dsp:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>{direct}</dsp:spPr><dsp:style><a:lnRef idx="0"/><a:fillRef idx="0"/><a:effectRef idx="1"><a:srgbClr val="123456"/></a:effectRef><a:fontRef idx="minor"/></dsp:style></dsp:sp>"#
+      );
+      let shape = dsp::Shape::from_bytes(xml.as_bytes()).unwrap();
+      let imported = drawingml_diagram_shape_shape(
+        &shape,
+        ImagePlacement::Inline,
+        DrawingMlGroupTransform::identity(),
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &ImageCatalog::default(),
+          hyperlinks: &HyperlinkCatalog::default(),
+          smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
+        },
+      )
+      .unwrap();
+      let Some(common::DrawingEffectSource::List {
+        resolved: Some(effects),
+        ..
+      }) = imported.effects
+      else {
+        panic!("resolved direct or inherited effect list");
+      };
+      assert_eq!(!effects.effects.is_empty(), inherited);
+      if inherited {
+        assert!(effects.effects.iter().any(|effect| matches!(
+          effect,
+          common::drawingml_image_effects::ImageEffect::OuterShadow { color, .. }
+            if color.color == RgbColor { r: 0x12, g: 0x34, b: 0x56 }
+        )));
+      }
+    }
+  }
 
   fn diagram_catalog(count: usize) -> ImageCatalog {
     let mut points = String::from(
@@ -438,6 +643,7 @@ mod tests {
         (host.width_pt, host.height_pt, host.effect_left_pt),
         (120.0, 60.0, 3.0)
       );
+      assert!(host.wordprocessing_canvas_host);
       let children = host.canvas_children.as_ref().expect("layout children");
       assert_eq!(children.len(), count);
       let mut prior_x = None;
@@ -491,19 +697,111 @@ mod tests {
           </dsp:spPr></dsp:sp>
         </dsp:spTree>
       </dsp:drawing>"#).expect("persisted drawing");
-    catalog
-      .diagram_drawings_by_relationship_id
-      .insert("drawing".into(), drawing);
+    catalog.diagram_drawings_by_relationship_id.insert(
+      "drawing".into(),
+      crate::docx::package::DiagramDrawingResource {
+        drawing,
+        images: ImageCatalog::default(),
+      },
+    );
     let items = import(&catalog);
-    let [InlineItem::Shape(shape)] = items.as_slice() else {
-      panic!("persisted shape");
+    let [InlineItem::Shape(host)] = items.as_slice() else {
+      panic!("one persisted diagram host");
     };
-    assert!(
-      shape.canvas_children.is_none(),
-      "persisted import retains its existing representation"
+    assert_eq!(
+      (host.width_pt, host.height_pt, host.effect_left_pt),
+      (120.0, 60.0, 3.0)
+    );
+    let [InlineItem::Shape(shape)] = host.canvas_children.as_deref().unwrap() else {
+      panic!("persisted shape, not the three regenerated model nodes");
+    };
+    assert_eq!(
+      shape.effect_left_pt, 0.0,
+      "effect extent belongs to the host"
     );
     assert_eq!((shape.width_pt, shape.height_pt), (12.0, 8.0));
     assert_eq!((shape.offset_x_pt, shape.offset_y_pt), (1.0, 2.0));
     assert_eq!(shape.fill_color, Some(RgbColor { r: 255, g: 0, b: 0 }));
+  }
+
+  #[test]
+  fn persisted_smartart_images_resolve_in_the_drawing_part_only() {
+    let mut catalog = diagram_catalog(3);
+    let image = |bytes: &'static [u8]| crate::docx::package::ImageResource {
+      data: Bytes::from_static(bytes),
+      content_type: Some("image/png".into()),
+    };
+    catalog
+      .by_relationship_id
+      .insert("rId1".into(), image(b"main story image"));
+    let drawing = dsp::Drawing::from_bytes(
+      br#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <dsp:spTree><dsp:nvGrpSpPr><dsp:cNvPr id="0" name="diagram"/>
+          <dsp:cNvGrpSpPr/></dsp:nvGrpSpPr><dsp:grpSpPr/>
+          <dsp:sp modelId="1"><dsp:nvSpPr><dsp:cNvPr id="1" name="picture"/>
+            <dsp:cNvSpPr/></dsp:nvSpPr><dsp:spPr>
+            <a:xfrm><a:off x="12700" y="25400"/><a:ext cx="152400" cy="101600"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></a:blipFill>
+          </dsp:spPr></dsp:sp>
+        </dsp:spTree>
+      </dsp:drawing>"#,
+    )
+    .unwrap();
+    for (id, bytes) in [
+      ("first", Some(b"first drawing image".as_slice())),
+      ("second", Some(b"second drawing image".as_slice())),
+      ("missing", None),
+    ] {
+      let images = ImageCatalog {
+        by_relationship_id: bytes
+          .map(|bytes| ("rId1".into(), image(bytes)))
+          .into_iter()
+          .collect(),
+        ..Default::default()
+      };
+      catalog.diagram_drawings_by_relationship_id.insert(
+        id.into(),
+        crate::docx::package::DiagramDrawingResource {
+          drawing: drawing.clone(),
+          images,
+        },
+      );
+      catalog
+        .diagram_data_by_relationship_id
+        .get_mut("data")
+        .unwrap()
+        .data_model_extension_list = Some(
+        dgm::DataModelExtensionList::from_bytes(format!(
+          r#"<dgm:extLst xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram">
+            <a:ext uri="{{C3380CC4-5D6E-409C-BE32-E72D297353CC}}"><dsp:dataModelExt relId="{id}"/></a:ext>
+          </dgm:extLst>"#,
+        ).as_bytes()).unwrap(),
+      );
+      let items = import(&catalog);
+      let [InlineItem::Shape(host)] = items.as_slice() else {
+        panic!("one inline drawing owner");
+      };
+      let children = host.canvas_children.as_deref().unwrap();
+      if bytes.is_none() {
+        assert!(
+          children.is_empty(),
+          "an unresolved, otherwise unpainted child must not borrow the main story image"
+        );
+        continue;
+      }
+      let [InlineItem::Shape(child)] = children else {
+        panic!("persisted picture child: {id}");
+      };
+      assert_eq!(
+        child.fill_image.as_ref().map(|fill| fill.data.as_ref()),
+        bytes,
+        "part-scoped relationship {id} must not alias another drawing or the main story"
+      );
+    }
   }
 }

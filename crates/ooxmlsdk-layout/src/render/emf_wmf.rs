@@ -1,8 +1,8 @@
 pub use emfsdk::render::{
-  DecodedMetafile, EmfTextAdvanceQuantization, MetafileBitmapLayer, MetafilePhysicalSize,
-  MetafileSolidRect, MetafileVectorDraw, MetafileVectorDrawing, MetafileVectorFill,
-  MetafileVectorFillRule, MetafileVectorPoint, MetafileVectorScene, RenderOptions,
-  WmfConversionProfile, WmfExternalHeader,
+  DecodedMetafile, EmfTextAdvanceQuantization, MetafileBitmapLayer, MetafileBitmapPicture,
+  MetafilePhysicalSize, MetafileSolidRect, MetafileVectorDraw, MetafileVectorDrawing,
+  MetafileVectorFill, MetafileVectorFillRule, MetafileVectorPoint, MetafileVectorScene,
+  RenderOptions, WmfConversionProfile, WmfExternalHeader,
 };
 
 #[derive(Clone, Debug)]
@@ -164,6 +164,20 @@ pub fn extract_metafile_bitmap_layers_with_options(
   options: RenderOptions,
 ) -> Vec<MetafileBitmapLayer> {
   emfsdk::render::extract_metafile_bitmap_layers_with_options(data, content_type, options)
+}
+
+pub fn extract_metafile_bitmap_picture_with_options(
+  data: &[u8],
+  options: RenderOptions,
+) -> Option<MetafileBitmapPicture> {
+  emfsdk::render::extract_metafile_bitmap_picture_with_options(data, options)
+}
+
+pub fn extract_metafile_full_bitmap_with_options(
+  data: &[u8],
+  options: RenderOptions,
+) -> Option<MetafileBitmapLayer> {
+  emfsdk::render::extract_metafile_full_bitmap_with_options(data, options)
 }
 
 fn metafile_semantic_text(text: &str, font_family: Option<&str>) -> String {

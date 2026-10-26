@@ -849,8 +849,21 @@ pub(super) fn build_glyph_outline_path(
     } else {
       raw.path
     };
-    let split = split_outline_at_warp_seams(&source, glyph_to_page, &source_seams);
-    append_mapped_outline(split.as_ref().unwrap_or(&source), map, &mut commands)?;
+    if let (Some(warp), Some(boundaries)) = (warp, warp_boundaries.as_deref())
+      && warp.word_envelope
+    {
+      common::text_warp_projection::append_word_envelope_outline(
+        &source,
+        glyph_to_page,
+        warp,
+        boundaries,
+        &mut commands,
+      )
+      .map_err(|message| PdfError::Writer(message.into()))?;
+    } else {
+      let split = split_outline_at_warp_seams(&source, glyph_to_page, &source_seams);
+      append_mapped_outline(split.as_ref().unwrap_or(&source), map, &mut commands)?;
+    }
     advance_cursor(&mut cursor_x_pt, &mut cursor_y_pt, glyph, run, placement);
   }
 

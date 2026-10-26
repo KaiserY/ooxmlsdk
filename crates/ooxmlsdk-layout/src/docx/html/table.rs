@@ -327,6 +327,9 @@ impl TableBuilder {
         paragraph.explicit = true;
         cell.cell.blocks.extend(paragraph.into_block());
       }
+      if let Some(Block::Paragraph(paragraph)) = cell.cell.blocks.last_mut() {
+        paragraph.format.hidden_cell_end_mark = cell.cell.hide_end_mark;
+      }
       let row = self.row.as_mut().unwrap();
       row.model.cells.push(cell.cell);
       row.spans.push(cell.row_span);

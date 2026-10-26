@@ -4302,7 +4302,7 @@ fn expand_named_struct(
     || has_mc_must_understand_field;
   let tracks_xml_child_slot = !mce_fields.is_empty();
   let end_name_matches = quote! { e.name() == __end_qname };
-  let end_qname_decl = quote! { let __end_qname = e.name(); };
+  let end_qname_decl = quote! { let __end_qname = __ooxmlsdk_element.name(); };
 
   let mut xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
   let mut xml_child_slot_count = 0usize;
@@ -4339,7 +4339,11 @@ fn expand_named_struct(
       }
     } else {
       quote! {
-        crate::common::parse_xml_namespace_list_on(read_context, &e, value.as_bytes())
+        crate::common::parse_xml_namespace_list_on(
+          read_context,
+          &__ooxmlsdk_element,
+          value.as_bytes(),
+        )
       }
     };
     quote! {{
@@ -4909,7 +4913,7 @@ fn expand_named_struct(
           #( #attr_parse_tokens )*
           key => {
             match read_context.resolve_attribute_key(
-              &e,
+              &__ooxmlsdk_element,
               key,
               __OOXMLSDK_ATTRIBUTE_QNAME_TARGETS,
             ) {
@@ -4947,10 +4951,10 @@ fn expand_named_struct(
         #decoder_decl_tokens
         #xmlns_preparse_tokens
         if __ooxmlsdk_root_namespace_scope {
-          xmlns.reserve((e.attributes_raw().len() / 64).min(64));
+          xmlns.reserve((__ooxmlsdk_element.attributes_raw().len() / 64).min(64));
         }
         #attr_namespace_resolve_decl_tokens
-        for attr in e.attributes().with_checks(false) {
+        for attr in __ooxmlsdk_element.attributes().with_checks(false) {
           let attr = attr?;
           #attribute_loop_body_with_xmlns
         }
@@ -4967,7 +4971,7 @@ fn expand_named_struct(
         #mc_must_understand_decl_tokens
         #decoder_decl_tokens
         #attr_namespace_resolve_decl_tokens
-        for attr in e.attributes().with_checks(false) {
+        for attr in __ooxmlsdk_element.attributes().with_checks(false) {
           let attr = attr?;
           #attribute_loop_body_with_xmlns
         }
@@ -5321,14 +5325,14 @@ fn expand_named_struct(
       };
       if field.repeated {
         quote! {
-          #field_ident.push(#choice_ty::#text_variant(#string_expr.to_string()));
+          #field_ident.push(#choice_ty::#text_variant((#string_expr).to_string()));
           #xml_child_slot_assign
           handled_text = true;
         }
       } else {
         quote! {
           if !handled_text {
-            #field_ident = Some(#choice_ty::#text_variant(#string_expr.to_string()));
+            #field_ident = Some(#choice_ty::#text_variant((#string_expr).to_string()));
             #xml_child_slot_assign
             handled_text = true;
           }
@@ -7223,7 +7227,7 @@ fn expand_named_struct(
         #namespace_attr_parse_tokens
         #stack_attr_assign_tokens
         let _ = &mut *xml_reader;
-        let _ = &e;
+        let _ = &__ooxmlsdk_element;
 
         Ok(empty_tag)
     };
@@ -7233,7 +7237,7 @@ fn expand_named_struct(
           &mut self,
           xml_reader: &mut R,
           read_context: &mut crate::common::ReadContext,
-          e: quick_xml::events::BytesStart<'xml>,
+          __ooxmlsdk_element: quick_xml::events::BytesStart<'xml>,
           empty_tag: bool,
         ) -> Result<bool, crate::common::SdkError> {
           #stack_read_inner_start_body
@@ -7462,7 +7466,7 @@ fn expand_named_struct(
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
         xml_reader: &mut R,
-        e: quick_xml::events::BytesStart<'xml>,
+        __ooxmlsdk_element: quick_xml::events::BytesStart<'xml>,
         empty_tag: bool,
         read_context: &mut crate::common::ReadContext,
       ) -> Result<Self, crate::common::SdkError> {

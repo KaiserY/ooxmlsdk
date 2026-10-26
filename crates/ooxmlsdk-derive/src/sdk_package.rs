@@ -175,6 +175,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     "WordprocessingDocument" => parse_str("crate::sdk::WordprocessingDocumentType")?,
     "SpreadsheetDocument" => parse_str("crate::sdk::SpreadsheetDocumentType")?,
     "PresentationDocument" => parse_str("crate::sdk::PresentationDocumentType")?,
+    "VisioDocument" => parse_str("crate::sdk::VisioDocumentType")?,
     _ => {
       return Err(syn::Error::new_spanned(
         input,

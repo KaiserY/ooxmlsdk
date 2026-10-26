@@ -880,7 +880,11 @@ impl<'a> FontRegistry<'a> {
     let mut start = 0usize;
     let mut active = None::<usize>;
     for cluster in grapheme_clusters(text) {
-      let cluster_text = &text[cluster.clone()];
+      let coverage_text = wordprocessingml_no_break_hyphen_text(
+        &text[cluster.clone()],
+        options.wordprocessingml_no_break_hyphen,
+      );
+      let cluster_text = coverage_text.as_ref();
       let primary_supports_cluster = font_supports_text_cluster(
         &fonts[0],
         runtime_faces[0].as_deref().map(RuntimeFace::skrifa),
@@ -1020,6 +1024,9 @@ impl<'a> FontRegistry<'a> {
         .map(|chain| self.resolved_fonts_from_chain(&chain));
     }
 
+    let coverage_text =
+      wordprocessingml_no_break_hyphen_text(text, options.wordprocessingml_no_break_hyphen);
+    let text = coverage_text.as_ref();
     let variations = text_variation_sequences(text);
     let needs_presentation_fallback = !variations.is_empty() || text.chars().any(is_default_emoji);
     let mut missing_chars = self.missing_chars_for_fonts(&fonts, text);
@@ -2154,6 +2161,9 @@ pub struct ShapeOptions<'a> {
   /// Covered U+2004/U+2006 use Word's unshaped dash fractions when the
   /// selected face has East Asian code pages without Latin GPOS kerning.
   pub wordprocessingml_blank_separators: bool,
+  /// Source-qualified OOXML noBreakHyphen controls paint U+002D while
+  /// retaining their U+2011 text, source clusters and line-break semantics.
+  pub wordprocessingml_no_break_hyphen: bool,
   pub scan_registered_fallbacks: bool,
   pub features: Vec<FeatureValue<'a>>,
   pub variations: Vec<VariationValue<'a>>,
@@ -2177,6 +2187,7 @@ impl Default for ShapeOptions<'_> {
       preserve_arabic_mark_components: false,
       preserve_default_ignorables: false,
       wordprocessingml_blank_separators: false,
+      wordprocessingml_no_break_hyphen: false,
       scan_registered_fallbacks: true,
       features: Vec::new(),
       variations: Vec::new(),
@@ -2202,6 +2213,7 @@ impl<'a> ShapeOptions<'a> {
       preserve_arabic_mark_components: false,
       preserve_default_ignorables: false,
       wordprocessingml_blank_separators: false,
+      wordprocessingml_no_break_hyphen: false,
       scan_registered_fallbacks: true,
       features: request.features.clone(),
       variations: request.variations.clone(),
@@ -2297,7 +2309,12 @@ impl<'book> ResolvedFont<'book> {
       flags |= harfrust::BufferFlags::PRESERVE_DEFAULT_IGNORABLES;
     }
     buffer.set_flags(flags);
-    let mut normalization_barriers = if options.preserve_arabic_mark_components {
+    let mut normalization_barriers = if options.wordprocessingml_no_break_hyphen {
+      for (offset, ch) in shaped_text.char_indices() {
+        buffer.add(if ch == '\u{2011}' { '-' } else { ch }, offset as u32);
+      }
+      Vec::new()
+    } else if options.preserve_arabic_mark_components {
       push_arabic_normalization_barriers(&mut buffer, shaped_text.as_ref())
     } else {
       buffer.push_str(shaped_text.as_ref());
@@ -2484,6 +2501,20 @@ impl<'book> ResolvedFont<'book> {
   }
 }
 
+fn wordprocessingml_no_break_hyphen_text(text: &str, enabled: bool) -> Cow<'_, str> {
+  if !enabled {
+    Cow::Borrowed(text)
+  } else if text == "\u{2011}" {
+    // Imported controls usually occupy an isolated portion: no allocation
+    // is needed to test its painted glyph's coverage.
+    Cow::Borrowed("-")
+  } else if text.contains('\u{2011}') {
+    Cow::Owned(text.replace('\u{2011}', "-"))
+  } else {
+    Cow::Borrowed(text)
+  }
+}
+
 /// Dash glyph and integer divisor used by Word's unshaped fractional blanks.
 ///
 /// Native font-data controls establish the East Asian code-page test and the
@@ -2610,6 +2641,12 @@ pub struct ScriptScanOptions {
   /// Apply the explicit WordprocessingML rFonts slot classification before
   /// falling back to Unicode Script for Common characters.
   pub wordprocessingml_font_slots: bool,
+  /// Generated Hebrew/Arabic alphabetic numbering uses its complex font slot,
+  /// while ordinary Latin suffix characters retain their own slots.
+  pub wordprocessingml_complex_numbering: bool,
+  /// Classify source-qualified noBreakHyphen controls as their U+002D glyph;
+  /// keep original U+2011 byte ranges and literal Unicode text unchanged.
+  pub wordprocessingml_no_break_hyphen: bool,
   /// Resolve weak and ECMA-376 conditionally classified characters through
   /// the effective `w:rFonts/@w:hint` slot.
   pub wordprocessingml_font_hint: Option<WordprocessingFontTypeHint>,
@@ -2639,6 +2676,8 @@ impl Default for ScriptScanOptions {
       app_script: TextScript::Common,
       small_caps: false,
       wordprocessingml_font_slots: false,
+      wordprocessingml_complex_numbering: false,
+      wordprocessingml_no_break_hyphen: false,
       wordprocessingml_font_hint: None,
       wordprocessingml_resolved_font_slot: None,
       wordprocessingml_east_asia_language_is_chinese: false,
@@ -2773,6 +2812,14 @@ fn script_direction_runs_for_segment(
     } else {
       wordprocessing_font_slot(ch, options)
     };
+    let slot =
+      if options.wordprocessingml_complex_numbering && slot == WordprocessingFontSlot::HighAnsi {
+        // The generated number portion uses its Western face for Latin/Greek
+        // prefixes as well as punctuation; authored paragraph hAnsi is separate.
+        WordprocessingFontSlot::Ascii
+      } else {
+        slot
+      };
     if let Some(active) = active_slot
       && slot != active
     {
@@ -3007,6 +3054,8 @@ impl FontMetrics {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct VerticalMetrics {
+  /// Size of one font design unit in points; zero for synthetic metrics.
+  pub font_design_unit_pt: f32,
   pub ascent_pt: f32,
   pub descent_pt: f32,
   pub windows_line_height_pt: f32,
@@ -3030,6 +3079,7 @@ pub struct VerticalMetrics {
 impl VerticalMetrics {
   fn scaled(self, scale: f32) -> Self {
     Self {
+      font_design_unit_pt: self.font_design_unit_pt * scale,
       ascent_pt: self.ascent_pt * scale,
       descent_pt: self.descent_pt * scale,
       windows_line_height_pt: self.windows_line_height_pt * scale,
@@ -3430,7 +3480,6 @@ const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
   // missing family names use PowerPoint's ordinary Calibri fallback.
   ("Myriad Pro", "Segoe UI"),
   ("DINPro-Medium", "DINPro"),
-  ("Univers 45 Light", "Univers Light"),
 ];
 
 const DEFAULT_PDF_EMBED_TABLES: &[&str] = &[
@@ -3458,6 +3507,11 @@ fn default_family_specific_chains<'a>() -> Vec<FontFallbackChain<'a>> {
     // substitution chain: a font-table alternate for the complete authored
     // name precedes it, and an installed Albany face remains authoritative.
     office_family_fallback("Albany", &["Arial"]),
+    // These authored family names are not aliases of the installed Univers
+    // Light face. Native regular/bold/italic controls substitute Calibri when
+    // they are missing; a real installed family or document alternate wins.
+    office_family_fallback("Univers 45 Light", &["Calibri"]),
+    office_family_fallback("Univers 55", &["Calibri"]),
     office_family_fallback("Arial Black", &["Arial", "Liberation Sans"]),
     // Microsoft's SimSun family inventory lists SimSun-ExtB and SimSun as
     // members of the same family. Prefer the installed base face for covered
@@ -4838,6 +4892,7 @@ fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetri
   );
   FontMetrics {
     vertical: VerticalMetrics {
+      font_design_unit_pt: em_size / units_per_em,
       ascent_pt: ascender,
       descent_pt: descender,
       windows_line_height_pt: (windows_ascent + windows_descent).max(ascender + descender),
@@ -5095,6 +5150,11 @@ fn first_strong_text_script(text: &str, options: ScriptScanOptions) -> Option<Te
 }
 
 fn strong_text_script(ch: char, options: ScriptScanOptions) -> Option<TextScript> {
+  let ch = if options.wordprocessingml_no_break_hyphen && ch == '\u{2011}' {
+    '-'
+  } else {
+    ch
+  };
   // ECMA-376 Part 1 §17.3.2.26 assigns Basic Latin text to the ASCII font
   // slot. Unicode Script marks digits and punctuation as Common; leaving
   // printable characters weak would incorrectly attach a trailing
@@ -5191,6 +5251,11 @@ impl WordprocessingRtlFontContext {
 
 fn wordprocessing_font_slot(ch: char, options: ScriptScanOptions) -> WordprocessingFontSlot {
   use WordprocessingFontSlot::{Ascii, ComplexScript, HighAnsi};
+  let ch = if options.wordprocessingml_no_break_hyphen && ch == '\u{2011}' {
+    '-'
+  } else {
+    ch
+  };
 
   // [MS-OI29500] section 2.1.88 documents that either run-level property
   // forces the cs face for every Unicode value. The RTL-only numeric
@@ -5277,6 +5342,7 @@ fn wordprocessing_font_slot(ch: char, options: ScriptScanOptions) -> Wordprocess
         HighAnsi
       }
     }
+    0x0590..=0x07BF if options.wordprocessingml_complex_numbering => ComplexScript,
     0x0590..=0x07BF => Ascii,
     0x1100..=0x11FF => east_asia(),
     0x1E00..=0x1EFF => {
@@ -5735,6 +5801,49 @@ mod tests {
         registry.resolve(&request).unwrap().resolved_family,
         expected
       );
+    }
+  }
+
+  #[test]
+  fn univers_substitution_preserves_literal_families_and_document_alternates() {
+    for family in ["Univers 45 Light", "Univers 55"] {
+      let mut registry = FontRegistry::with_default_policy();
+      for name in ["Calibri", "Cambria", "Univers Light"] {
+        registry.register_face(FontSource::System, FontFaceInfo::synthetic(name, name));
+      }
+      let request = FontRequest {
+        family: Some(Cow::Borrowed(family)),
+        family_selection: FontFamilySelection::First,
+        ..FontRequest::default()
+      };
+      assert_eq!(
+        registry.resolve(&request).unwrap().resolved_family,
+        "Calibri"
+      );
+      assert_eq!(
+        registry
+          .resolve(&FontRequest {
+            family: Some(Cow::Borrowed("Univers Light")),
+            ..request.clone()
+          })
+          .unwrap()
+          .resolved_family,
+        "Univers Light"
+      );
+      registry.book.family_substitution_chains.insert(
+        0,
+        FontFallbackChain {
+          requested_family: Some(Cow::Borrowed(family)),
+          families: vec![Cow::Borrowed("Cambria")],
+          ..FontFallbackChain::default()
+        },
+      );
+      assert_eq!(
+        registry.resolve(&request).unwrap().resolved_family,
+        "Cambria"
+      );
+      registry.register_face(FontSource::System, FontFaceInfo::synthetic(family, family));
+      assert_eq!(registry.resolve(&request).unwrap().resolved_family, family);
     }
   }
 
@@ -6451,6 +6560,46 @@ mod tests {
     assert_eq!(shaped.glyphs[0].text_range, 0..1);
     assert_eq!(shaped.glyphs[0].x_advance_pt, 0.0);
     assert_eq!(shaped.safe_breaks, vec![2]);
+  }
+
+  #[test]
+  fn no_break_hyphen_control_keeps_source_clusters_and_nonbreaking_semantics() {
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Times New Roman")),
+      script: Some(TextScript::Latin),
+      size_pt: FontSize(12.0),
+      ..Default::default()
+    };
+    let mut registry = FontRegistry::new();
+    registry.register_system_query_fonts(&request).unwrap();
+    let chain = registry.resolve_font_chain(&request).unwrap();
+    let ordinary = ShapeOptions::from_request(&request, TextDirection::LeftToRight);
+    let control = ShapeOptions {
+      wordprocessingml_no_break_hyphen: true,
+      ..ordinary.clone()
+    };
+    let shape = |text, options| {
+      registry
+        .shape_text_runs_with_font_chain(&chain, text, options)
+        .unwrap()
+    };
+    let ascii = shape("A-B", &ordinary);
+    let literal = shape("A\u{2011}B", &ordinary);
+    let typed = shape("A\u{2011}B", &control);
+    assert_eq!(typed.len(), 1);
+    assert_eq!(typed[0].text, "A\u{2011}B");
+    assert_eq!(typed[0].text_range, 0..5);
+    assert_eq!(typed[0].safe_breaks, literal[0].safe_breaks);
+    assert!(!typed[0].safe_breaks.contains(&4));
+    assert_eq!(typed[0].advance_pt, ascii[0].advance_pt);
+    assert_eq!(typed[0].glyphs[1].glyph_id, ascii[0].glyphs[1].glyph_id);
+    assert_ne!(typed[0].glyphs[1].glyph_id, literal[0].glyphs[1].glyph_id);
+    assert_eq!(typed[0].glyphs[1].text_range, 1..4);
+    assert_eq!(typed[0].glyphs[1].source_char, Some('\u{2011}'));
+    assert_eq!(typed[0].glyphs[2].text_range, 4..5);
+    for text in ["A-B", "A\u{2010}B", "A\u{2212}B"] {
+      assert_eq!(shape(text, &ordinary), shape(text, &control));
+    }
   }
 
   #[test]

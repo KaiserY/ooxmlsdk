@@ -851,6 +851,7 @@ struct DiagramShapeNode {
   y: f32,
   width: f32,
   height: f32,
+  custom_scale: (f32, f32),
   algorithms: Vec<LayoutAlgorithm>,
   child_order: dgm::ChildOrderValues,
   has_geometry: bool,
@@ -1219,6 +1220,7 @@ fn build_diagram_shape_tree(
     colors,
     fallback_fill,
     current_point: root_point,
+    iteration_point: None,
     current_index: 0,
     current_step: 1,
     current_count: 1,
@@ -1231,6 +1233,7 @@ fn build_diagram_shape_tree(
       y: 0.0,
       width: bounds.width,
       height: bounds.height,
+      custom_scale: (1.0, 1.0),
       algorithms: Vec::new(),
       child_order: dgm::ChildOrderValues::Bottom,
       has_geometry: false,
@@ -1411,6 +1414,7 @@ struct DiagramShapeCreationVisitor<'a> {
   colors: Option<&'a DiagramStyleColors>,
   fallback_fill: RgbColor,
   current_point: &'a dgm::Point,
+  iteration_point: Option<&'a dgm::Point>,
   current_index: usize,
   current_step: usize,
   current_count: usize,
@@ -1428,9 +1432,22 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     let Some(points) = self.points_by_presentation_name.get(name) else {
       return;
     };
-    let indexed_point = points.get(self.current_index).copied();
-    let new_point = indexed_point
-      .filter(|point| self.has_connection(self.current_point, point))
+    let new_point = self
+      .iteration_point
+      .and_then(|data_point| {
+        points.iter().copied().find(|point| {
+          self.has_connection(self.current_point, point)
+            && presentation_association_id(point) == Some(data_point.model_id.as_str())
+        })
+      })
+      .or_else(|| {
+        self.iteration_point.is_none().then(|| {
+          points
+            .get(self.current_index)
+            .copied()
+            .filter(|point| self.has_connection(self.current_point, point))
+        })?
+      })
       .or_else(|| {
         let current_association = presentation_association_id(self.current_point)?;
         let mut connected = points.iter().copied().filter(|point| {
@@ -1513,6 +1530,32 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .and_then(|starts| starts.first())
       .copied()
       .unwrap_or(1);
+    // ECMA-376 21.4.2.14 / L.4.15.2.1: forEach selects data points;
+    // presName and presAssocID together identify their presentation. Different
+    // choose branches can have different names, so a position in the data
+    // sequence is not an index in each per-name presentation vector.
+    // Use the complete associated presentation graph when it is available.
+    // Older/sample models without that graph retain the template traversal.
+    if let Some(points) = self.for_each_data_points(for_each) {
+      let old_point = self.iteration_point;
+      let old_index = self.current_index;
+      let old_step = self.current_step;
+      let old_count = self.current_count;
+      self.current_step = 1;
+      self.current_count = points.len();
+      for (index, point) in points.into_iter().enumerate() {
+        self.current_index = index;
+        self.iteration_point = Some(point);
+        for choice in &for_each.for_each_choice {
+          self.visit_for_each_choice(choice);
+        }
+      }
+      self.iteration_point = old_point;
+      self.current_index = old_index;
+      self.current_step = old_step;
+      self.current_count = old_count;
+      return;
+    }
     let assistant_indices = (point_type == dgm::ElementValues::Assistant)
       .then(|| self.connected_assistant_template_indices());
     let mut children = 1usize;
@@ -1549,6 +1592,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     let old_index = self.current_index;
     let old_step = self.current_step;
     let old_count = self.current_count;
+    let old_point = self.iteration_point.take();
     self.current_step = step.unsigned_abs() as usize;
     self.current_count = iteration_count;
     for index in indices {
@@ -1560,6 +1604,74 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     self.current_index = old_index;
     self.current_step = old_step;
     self.current_count = old_count;
+    self.iteration_point = old_point;
+  }
+
+  fn for_each_data_points(&self, for_each: &dgm::ForEach) -> Option<Vec<&'a dgm::Point>> {
+    let axes = for_each.axis.as_deref().filter(|axes| !axes.is_empty())?;
+    // Resolve this parent's associations once. Re-scanning every connection
+    // for every presentation and semantic point makes repeated layouts cubic.
+    let associations: HashSet<_> = self
+      .connections
+      .connection
+      .iter()
+      .filter(|connection| connection.source_id == self.current_point.model_id)
+      .filter_map(|connection| self.point_by_id.get(connection.destination_id.as_str()))
+      .filter(|point| presentation_name(point).is_some())
+      .filter_map(|point| presentation_association_id(point))
+      .collect();
+    // Some producers retain presentation shapes whose semantic point was
+    // removed. Their visible cached model must not be shortened to the
+    // surviving data sequence. Likewise, a transition can have a presentation
+    // association without the semantic sibling-transition connection.
+    if associations
+      .iter()
+      .any(|id| !self.point_by_id.contains_key(id))
+    {
+      return None;
+    }
+    let start = self
+      .iteration_point
+      .or_else(|| self.condition_data_point(self.current_point))?;
+    let mut points = vec![start];
+    for (level, axis) in axes.iter().copied().enumerate() {
+      let point_type = for_each
+        .point_type
+        .as_deref()
+        .and_then(|types| types.get(level))
+        .copied()
+        .unwrap_or_default();
+      points = self.points_on_axis(&points, axis, point_type);
+      let start = for_each
+        .start
+        .as_deref()
+        .and_then(|v| v.get(level))
+        .copied()
+        .unwrap_or(1);
+      let count = for_each
+        .count
+        .as_deref()
+        .and_then(|v| v.get(level))
+        .copied()
+        .unwrap_or_default() as usize;
+      let step = for_each
+        .step
+        .as_deref()
+        .and_then(|v| v.get(level))
+        .copied()
+        .unwrap_or(1);
+      points = iterator_indices(points.len(), start, count, step)
+        .into_iter()
+        .filter_map(|index| points.get(index).copied())
+        .collect();
+    }
+    if points.is_empty() {
+      return None;
+    }
+    points
+      .iter()
+      .all(|data_point| associations.contains(data_point.model_id.as_str()))
+      .then_some(points)
   }
 
   fn connected_assistant_template_indices(&self) -> Vec<usize> {
@@ -2406,13 +2518,15 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .data_by_presentation
       .get(presentation_point.model_id.as_str());
     let mut text_body = DiagramTextBody::default();
-    let mut shape_properties =
-      presentation_point
-        .shape_properties
-        .as_ref()
-        .and_then(|properties| {
-          diagram_shape_properties_has_blip_fill(properties).then(|| properties.clone())
-        });
+    // Presentation-only shapes (for example a process marker or background)
+    // own their authored fill, outline and effects just as they own blipFill.
+    // A presAssocID alone does not bind the semantic point's shape formatting;
+    // the explicit data bindings below retain that separate ownership.
+    let mut shape_properties = presentation_point
+      .shape_properties
+      .as_ref()
+      .filter(|properties| properties.as_ref() != &dgm::ShapeProperties::default())
+      .cloned();
     let style_label = presentation_point
       .property_set
       .as_deref()
@@ -2523,6 +2637,22 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       y: 0.0,
       width: 0.0,
       height: 0.0,
+      custom_scale: presentation_point
+        .property_set
+        .as_ref()
+        .map_or((1.0, 1.0), |properties| {
+          // ECMA-376 L.4.15.2.4: these are thousandths of a percent,
+          // independently of the EMU-valued fixed-size customizations.
+          let scale = |value: Option<i32>| {
+            value
+              .filter(|value| *value >= 0)
+              .map_or(1.0, |value| value as f32 / 100_000.0)
+          };
+          (
+            scale(properties.width_scale),
+            scale(properties.height_scale),
+          )
+        }),
       algorithms: active_algorithms.clone(),
       child_order: layout_node.child_order.unwrap_or_default(),
       has_geometry,
@@ -3269,13 +3399,6 @@ fn diagram_node_fill(
     .unwrap_or(fallback_fill)
 }
 
-fn diagram_shape_properties_has_blip_fill(properties: &dgm::ShapeProperties) -> bool {
-  matches!(
-    properties.shape_properties_choice2.as_ref(),
-    Some(dgm::ShapePropertiesChoice2::BlipFill(_))
-  )
-}
-
 fn diagram_node_fill_opacity(
   presentation_point: &dgm::Point,
   colors: Option<&DiagramStyleColors>,
@@ -4000,6 +4123,14 @@ fn layout_diagram_shape_node(
   inherited_vertical_alignment: Option<dgm::TextAnchorVerticalValues>,
 ) {
   apply_direct_node_size_constraints(node);
+  // Presentation customizations resize about the constraint-selected center.
+  // Apply before the text algorithm so wrapping sees the customized frame.
+  let width = node.width * node.custom_scale.0;
+  let height = node.height * node.custom_scale.1;
+  node.x += (node.width - width) / 2.0;
+  node.y += (node.height - height) / 2.0;
+  node.width = width;
+  node.height = height;
   let mut constraints = inherited_constraints.to_vec();
   constraints.extend(node.constraints.clone());
   let mut rules = inherited_rules.to_vec();
@@ -4030,6 +4161,8 @@ fn layout_shape_children(
       algorithm.kind,
       dgm::AlgorithmValues::Linear | dgm::AlgorithmValues::Snake
     ) || !child.is_empty_group()
+      || (algorithm.kind == dgm::AlgorithmValues::Composite
+        && child.has_spatial_constraint(constraints))
   });
   match algorithm.kind {
     dgm::AlgorithmValues::Composite => composite_layout_tree(node, algorithm.clone(), constraints),
@@ -4057,8 +4190,22 @@ fn layout_shape_children(
   }
   align_children_in_parent(
     node,
-    algorithm.horizontal_alignment,
-    algorithm.vertical_alignment,
+    algorithm.horizontal_alignment.or_else(|| {
+      (algorithm.kind == dgm::AlgorithmValues::Linear
+        && matches!(
+          algorithm.linear_direction,
+          LinearDirection::Left | LinearDirection::Right
+        ))
+      .then_some(AxisAlignment::Center)
+    }),
+    algorithm.vertical_alignment.or_else(|| {
+      (algorithm.kind == dgm::AlgorithmValues::Linear
+        && matches!(
+          algorithm.linear_direction,
+          LinearDirection::Top | LinearDirection::Bottom
+        ))
+      .then_some(AxisAlignment::Center)
+    }),
   );
 }
 
@@ -4305,8 +4452,73 @@ fn text_pre_rotation_degrees(
 }
 
 impl DiagramShapeNode {
+  fn customized_slot_scale(&self, horizontal: bool) -> f32 {
+    let own_scale = if horizontal {
+      self.custom_scale.0
+    } else {
+      self.custom_scale.1
+    };
+    let mut descendant_scale = 1.0_f32;
+    if self
+      .algorithms
+      .iter()
+      .any(|algorithm| algorithm.kind == dgm::AlgorithmValues::Composite)
+    {
+      let dimension = if horizontal {
+        dgm::ConstraintValues::Width
+      } else {
+        dgm::ConstraintValues::Height
+      };
+      for child in &self.children {
+        // A full-axis composite child shares the parent's scalable extent.
+        // Its customized width/height therefore participates in linear fit.
+        // Cross-axis references (e.g. circle.w=circle.h) retain their own
+        // size; they must not become another multiplier on the text slot.
+        let shares_extent = self.constraints.iter().any(|constraint| {
+          constraint.for_name == child.internal_name
+            && constraint.target == dimension
+            && constraint.reference == dimension
+            && constraint.ref_for_name.is_empty()
+            && constraint.factor == 1.0
+            && constraint
+              .reference_relationship
+              .is_none_or(|relationship| relationship == dgm::ConstraintRelationshipValues::_Self)
+            && constraint.operator.is_none_or(|operator| {
+              matches!(
+                operator,
+                dgm::BoolOperatorValues::None | dgm::BoolOperatorValues::Equal
+              )
+            })
+        });
+        if shares_extent {
+          descendant_scale = descendant_scale.max(child.customized_slot_scale(horizontal));
+        }
+      }
+    }
+    // Shrinking a customized child leaves the original algorithm slot in
+    // place, as do the unmodified/invisible siblings in a composite.
+    (own_scale * descendant_scale).max(1.0)
+  }
+
   fn is_empty_group(&self) -> bool {
     self.text_body.is_empty() && self.children.is_empty() && !self.has_geometry
+  }
+
+  fn has_spatial_constraint(&self, constraints: &[DiagramConstraint]) -> bool {
+    constraints.iter().any(|constraint| {
+      constraint.for_name == self.internal_name
+        && matches!(
+          constraint.target,
+          dgm::ConstraintValues::Width
+            | dgm::ConstraintValues::Height
+            | dgm::ConstraintValues::Left
+            | dgm::ConstraintValues::Right
+            | dgm::ConstraintValues::Top
+            | dgm::ConstraintValues::Bottom
+            | dgm::ConstraintValues::CenterHeight
+            | dgm::ConstraintValues::CenterWidth
+        )
+    })
   }
 }
 
@@ -5073,7 +5285,12 @@ fn linear_layout_tree(
     shrink_names.clear();
   }
   if shrink_names.is_empty() {
-    node.children.retain(|child| !child.is_empty_group());
+    // A no-geometry `sp` node still occupies its constrained slot. Removing
+    // it here loses linear gaps; removing it from a composite also changes
+    // the extent that the algorithm centers inside its parent.
+    node
+      .children
+      .retain(|child| !child.is_empty_group() || child.has_spatial_constraint(&constraints));
   }
 
   let mut count = node.children.len() as f32;
@@ -5150,20 +5367,21 @@ fn linear_layout_tree(
     let height = child_properties
       .and_then(|properties| layout_property_value(properties, dgm::ConstraintValues::Height))
       .unwrap_or(base_height);
-    total_primary += if horizontal { width } else { height };
+    total_primary += f64::from(if horizontal { width } else { height })
+      * f64::from(child.customized_slot_scale(horizontal));
   }
   total_primary += if horizontal {
-    (count - 1.0).max(0.0) * space_width
+    f64::from((count - 1.0).max(0.0)) * f64::from(space_width)
   } else {
-    (count - 1.0).max(0.0) * space_height
+    f64::from((count - 1.0).max(0.0)) * f64::from(space_height)
   };
-  let mut width_scale = if horizontal && total_primary > node.width {
-    node.width / total_primary
+  let mut width_scale = if horizontal {
+    linear_layout_fit_scale(node.width, total_primary)
   } else {
     1.0
   };
-  let mut height_scale = if !horizontal && total_primary > node.height {
-    node.height / total_primary
+  let mut height_scale = if !horizontal {
+    linear_layout_fit_scale(node.height, total_primary)
   } else {
     1.0
   };
@@ -5193,16 +5411,18 @@ fn linear_layout_tree(
       width *= width_scale;
       height *= height_scale;
     }
+    let slot_scale = child.customized_slot_scale(horizontal);
     if horizontal {
+      let slot_width = width * slot_scale;
       let x = if reverse {
-        cursor -= width;
+        cursor -= slot_width;
         cursor
       } else {
         let x = cursor;
-        cursor += width;
+        cursor += slot_width;
         x
       };
-      child.x = x.max(0.0);
+      child.x = x.max(0.0) + (slot_width - width) / 2.0;
       let default_y = child_cross_axis_offset(
         node.height,
         height,
@@ -5236,12 +5456,13 @@ fn linear_layout_tree(
         cursor += space_width;
       }
     } else {
+      let slot_height = height * slot_scale;
       let y = if reverse {
-        cursor -= height;
+        cursor -= slot_height;
         cursor
       } else {
         let y = cursor;
-        cursor += height;
+        cursor += slot_height;
         y
       };
       let default_x = child_cross_axis_offset(
@@ -5266,7 +5487,7 @@ fn linear_layout_tree(
           )
         })
         .unwrap_or(default_x);
-      child.y = y.max(0.0);
+      child.y = y.max(0.0) + (slot_height - height) / 2.0;
       child.width = width.max(0.0);
       child.height = height.max(0.0);
       if child.is_connector {
@@ -5282,6 +5503,24 @@ fn linear_layout_tree(
   if node.child_order == dgm::ChildOrderValues::Top {
     node.children.reverse();
   }
+}
+
+fn linear_layout_fit_scale(available: f32, preferred: f64) -> f32 {
+  if preferred <= f64::from(available) {
+    return 1.0;
+  }
+  let scale = (f64::from(available) / preferred) as f32;
+  if !scale.is_finite() || scale <= 0.0 {
+    return scale;
+  }
+  // Word's linear SmartArt fitting retains ten significant binary digits,
+  // rounding toward the fitting side. Configured COM controls across adjacent
+  // exponent intervals distinguish this from a fixed position grid or a
+  // relative-error cutoff. Keep the resulting slack for ordinary alignment;
+  // expanding to the exact quotient moves the two ends in opposite directions.
+  // Accumulate preferred extents in f64 above so repeated f32 addition does not
+  // turn an exactly fitting boundary into the preceding quantization step.
+  f32::from_bits(scale.to_bits() & !((1 << (f32::MANTISSA_DIGITS - 10)) - 1))
 }
 
 fn constrained_axis_position(
@@ -5343,26 +5582,24 @@ fn align_children_in_parent_with_offset(
   if node.children.is_empty() {
     return;
   }
-  let left = node
-    .children
-    .iter()
-    .map(|child| child.x)
-    .fold(f32::INFINITY, f32::min);
-  let top = node
-    .children
-    .iter()
-    .map(|child| child.y)
-    .fold(f32::INFINITY, f32::min);
-  let right = node
-    .children
-    .iter()
-    .map(|child| child.x + child.width)
-    .fold(f32::NEG_INFINITY, f32::max);
-  let bottom = node
-    .children
-    .iter()
-    .map(|child| child.y + child.height)
-    .fold(f32::NEG_INFINITY, f32::max);
+  let (left, top, right, bottom) = node.children.iter().fold(
+    (
+      f32::INFINITY,
+      f32::INFINITY,
+      f32::NEG_INFINITY,
+      f32::NEG_INFINITY,
+    ),
+    |(left, top, right, bottom), child| {
+      let dx = child.width * (child.customized_slot_scale(true) - 1.0) / 2.0;
+      let dy = child.height * (child.customized_slot_scale(false) - 1.0) / 2.0;
+      (
+        left.min(child.x - dx),
+        top.min(child.y - dy),
+        right.max(child.x + child.width + dx),
+        bottom.max(child.y + child.height + dy),
+      )
+    },
+  );
   let dx = horizontal
     .filter(|alignment| *alignment != AxisAlignment::None)
     .map(|alignment| {
@@ -6891,6 +7128,301 @@ fn flatten_diagram_shape_tree(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn linear_fit_matches_native_precision_and_exact_boundaries() {
+    // Seven repeated composite slots, six 5% transitions. These are observed
+    // Office COM widths; the controls span both sides of 1/8 and 1/16 and a
+    // mixed customization, rather than asserting the implementation's bits.
+    for (custom_scale, native_width) in [
+      (1.0, 57.68874),
+      (1.01, 57.64244),
+      (1.1, 57.91496),
+      (1.11, 57.927795),
+      (1.2, 58.0589),
+      (1.5, 58.46),
+      (2.0, 58.81992),
+      (2.3, 59.069214),
+    ] {
+      let extent = 421.2_f32;
+      let preferred =
+        f64::from(extent) * f64::from(custom_scale) * 7.0 + f64::from(extent * 0.05) * 6.0;
+      let scale = linear_layout_fit_scale(extent, preferred);
+      assert!((extent * scale * custom_scale - native_width).abs() < 0.0002);
+    }
+    let custom_scales = [
+      2.00218_f32,
+      2.68571,
+      1.72122,
+      2.1198,
+      2.2688,
+      2.41642,
+      2.31627,
+    ];
+    let preferred = custom_scales.iter().map(|v| f64::from(*v)).sum::<f64>() * f64::from(421.2_f32)
+      + f64::from(421.2_f32 * 0.05) * 6.0;
+    let scale = linear_layout_fit_scale(421.2, preferred);
+    assert!((421.2 * scale * custom_scales[0] - 53.222046).abs() < 0.0002);
+    assert_eq!(linear_layout_fit_scale(300.0, 300.0), 1.0);
+    assert_eq!(linear_layout_fit_scale(300.0, 250.0), 1.0);
+    assert_eq!(linear_layout_fit_scale(0.0, 300.0), 0.0);
+  }
+
+  #[test]
+  fn customized_composite_slots_fit_without_resizing_cross_axis_markers() {
+    let constraint = |name: &str, target, reference, factor| {
+      parse_constraint_unfiltered(&dgm::Constraint {
+        for_name: Some(name.into()),
+        r#type: target,
+        reference_type: Some(reference),
+        fact: Some(factor),
+        ..Default::default()
+      })
+      .unwrap()
+    };
+    use dgm::ConstraintValues::{CenterHeight, CenterWidth, Height, Width};
+    for reverse in [false, true] {
+      let mut tree = spacer_snake_tree(3, 0.6, 0.1, true);
+      tree.children.retain(|child| child.internal_name == "item");
+      tree.width = 300.0;
+      tree.height = 60.0;
+      tree.algorithms[0].kind = dgm::AlgorithmValues::Linear;
+      tree.algorithms[0].linear_direction = if reverse {
+        LinearDirection::Right
+      } else {
+        LinearDirection::Left
+      };
+      tree.constraints = vec![
+        constraint("item", Width, Width, 1.0),
+        constraint("item", Height, Height, 1.0),
+      ];
+      for (group, scale) in tree.children.iter_mut().zip([0.5, 1.5, 2.0]) {
+        let mut label = group.clone();
+        label.internal_name = "label".into();
+        label.custom_scale = (scale, 1.0);
+        label.direct_constraints.clear();
+        let mut spacer = label.clone();
+        spacer.internal_name = "spacer".into();
+        spacer.custom_scale = (1.0, 1.0);
+        spacer.has_geometry = false;
+        spacer.algorithms[0].kind = dgm::AlgorithmValues::Space;
+        let mut marker = spacer.clone();
+        marker.internal_name = "marker".into();
+        marker.has_geometry = true;
+        group.has_geometry = false;
+        group.algorithms[0].kind = dgm::AlgorithmValues::Composite;
+        group.direct_constraints.clear();
+        group.constraints = vec![
+          constraint("label", Width, Width, 1.0),
+          constraint("label", Height, Height, 0.4),
+          constraint("spacer", Width, Width, 1.0),
+          constraint("spacer", Height, Height, 1.0),
+          constraint("marker", Width, Height, 0.1),
+          constraint("marker", Height, Height, 0.1),
+          constraint("marker", CenterHeight, Width, 0.5),
+          constraint("marker", CenterWidth, Height, 0.5),
+        ];
+        group.children = vec![label, spacer, marker];
+      }
+      layout_diagram_shape_node(&mut tree, &[], &[], None);
+      let base = 300.0 * (910.0 / 4096.0);
+      let slack = 300.0 - base * 4.5;
+      let mut cursor = if reverse {
+        300.0 - slack / 2.0
+      } else {
+        slack / 2.0
+      };
+      for (group, scale) in tree.children.iter().zip([0.5_f32, 1.5, 2.0]) {
+        let extent = base * scale.max(1.0);
+        if reverse {
+          cursor -= extent;
+        }
+        let label = &group.children[0];
+        let marker = &group.children[2];
+        assert!((label.width - base * scale).abs() < 0.001);
+        assert!((marker.width - 6.0).abs() < 0.001);
+        let expected_center = cursor + extent / 2.0;
+        assert!((group.x + label.x + label.width / 2.0 - expected_center).abs() < 0.001);
+        assert!((group.x + marker.x + marker.width / 2.0 - expected_center).abs() < 0.001);
+        if !reverse {
+          cursor += extent;
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn invisible_constrained_slots_retain_linear_gaps_and_composite_extent() {
+    let mut tree = spacer_snake_tree(3, 0.6, 0.1, true);
+    let mut algorithm = tree.algorithms[0].clone();
+    algorithm.kind = dgm::AlgorithmValues::Linear;
+    tree.algorithms = vec![algorithm.clone()];
+    // Replace type-selected snake constraints with named linear slots.
+    tree.constraints = vec![
+      parse_constraint_unfiltered(&dgm::Constraint {
+        r#type: dgm::ConstraintValues::Width,
+        for_name: Some("item".into()),
+        reference_type: Some(dgm::ConstraintValues::Width),
+        ..Default::default()
+      })
+      .unwrap(),
+      parse_constraint_unfiltered(&dgm::Constraint {
+        r#type: dgm::ConstraintValues::Width,
+        for_name: Some("gap".into()),
+        reference_type: Some(dgm::ConstraintValues::Width),
+        reference_for_name: Some("item".into()),
+        fact: Some(0.1),
+        ..Default::default()
+      })
+      .unwrap(),
+    ];
+    let constraints = tree.constraints.clone();
+    linear_layout_tree(&mut tree, algorithm.clone(), &constraints, &[]);
+    assert_eq!(tree.children.len(), 5);
+    let width = 300.0 / 3.2;
+    for (i, child) in tree.children.iter().enumerate() {
+      assert!((child.width - if i % 2 == 0 { width } else { width * 0.1 }).abs() < 0.0001);
+    }
+
+    tree.children.truncate(2);
+    tree.algorithms[0].kind = dgm::AlgorithmValues::Composite;
+    tree.width = 100.0;
+    tree.height = 100.0;
+    for child in &mut tree.children {
+      child.width = 0.0;
+      child.height = 0.0;
+    }
+    tree.constraints = [
+      (
+        "item",
+        dgm::ConstraintValues::Height,
+        dgm::ConstraintValues::Height,
+        0.4,
+      ),
+      (
+        "item",
+        dgm::ConstraintValues::Top,
+        dgm::ConstraintValues::Top,
+        1.0,
+      ),
+      (
+        "gap",
+        dgm::ConstraintValues::Height,
+        dgm::ConstraintValues::Height,
+        0.4,
+      ),
+      (
+        "gap",
+        dgm::ConstraintValues::Bottom,
+        dgm::ConstraintValues::Height,
+        1.0,
+      ),
+    ]
+    .into_iter()
+    .map(|(name, target, reference, factor)| {
+      parse_constraint_unfiltered(&dgm::Constraint {
+        r#type: target,
+        for_name: Some(name.into()),
+        reference_type: Some(reference),
+        fact: Some(factor),
+        ..Default::default()
+      })
+      .unwrap()
+    })
+    .collect();
+    layout_diagram_shape_node(&mut tree, &[], &[], None);
+    assert_eq!(tree.children.len(), 2);
+    assert!((tree.children[0].y).abs() < 0.0001);
+    assert!((tree.children[1].y - 60.0).abs() < 0.0001);
+  }
+
+  #[test]
+  fn data_iterations_bind_alternating_templates_and_each_following_transition() {
+    use ooxmlsdk::sdk::SdkType;
+    for count in 1..=8 {
+      for reverse_presentation_order in [false, true] {
+        let mut points = vec![String::from(r#"<dgm:pt modelId="0" type="doc"/>"#)];
+        let mut presentation = vec![String::from(
+          r#"<dgm:pt modelId="100" type="pres"><dgm:prSet presAssocID="0" presName="root"/></dgm:pt>"#,
+        )];
+        let mut connections = String::from(
+          r#"<dgm:cxn modelId="1000" type="presOf" srcId="0" destId="100" srcOrd="0" destOrd="0"/>"#,
+        );
+        for i in 1..=count {
+          let name = if i % 2 == 1 { "odd" } else { "even" };
+          let pres = 100 + i;
+          let trans = 200 + i;
+          let trans_pres = 300 + i;
+          points.push(format!(r#"<dgm:pt modelId="{i}"><dgm:t><a:bodyPr/><a:p><a:r><a:t>node{i}</a:t></a:r></a:p></dgm:t></dgm:pt><dgm:pt modelId="{trans}" type="sibTrans" cxnId="{i}"/>"#));
+          presentation.push(format!(r#"<dgm:pt modelId="{pres}" type="pres"><dgm:prSet presAssocID="{i}" presName="{name}"/></dgm:pt><dgm:pt modelId="{trans_pres}" type="pres"><dgm:prSet presAssocID="{trans}" presName="transition"/></dgm:pt>"#));
+          connections.push_str(&format!(r#"<dgm:cxn modelId="{i}" type="parOf" srcId="0" destId="{i}" srcOrd="{i}" destOrd="0" sibTransId="{trans}"/><dgm:cxn modelId="{pres}" type="presOf" srcId="{i}" destId="{pres}" srcOrd="0" destOrd="0"/><dgm:cxn modelId="{trans}" type="presParOf" srcId="100" destId="{pres}" srcOrd="{i}" destOrd="0"/><dgm:cxn modelId="{trans_pres}" type="presParOf" srcId="100" destId="{trans_pres}" srcOrd="{i}" destOrd="0"/>"#));
+        }
+        if reverse_presentation_order {
+          presentation.reverse();
+        }
+        points.extend(presentation);
+        let data = dgm::DataModelRoot::from_bytes(format!(r#"<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><dgm:ptLst>{}</dgm:ptLst><dgm:cxnLst>{connections}</dgm:cxnLst></dgm:dataModel>"#,points.join("")).as_bytes()).unwrap();
+        let layout = dgm::LayoutDefinition::from_bytes(br#"
+          <dgm:layoutDef xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram">
+            <dgm:layoutNode name="root"><dgm:alg type="lin"/><dgm:shape/><dgm:presOf/>
+              <dgm:forEach axis="ch" ptType="node"><dgm:choose>
+                <dgm:if axis="self" ptType="node" func="posOdd" op="equ" val="1">
+                  <dgm:layoutNode name="odd"><dgm:alg type="tx"/><dgm:shape type="rect"/><dgm:presOf axis="self" ptType="node"/></dgm:layoutNode>
+                </dgm:if><dgm:else>
+                  <dgm:layoutNode name="even"><dgm:alg type="tx"/><dgm:shape type="ellipse"/><dgm:presOf axis="self" ptType="node"/></dgm:layoutNode>
+                </dgm:else></dgm:choose>
+                <dgm:forEach axis="followSib" ptType="sibTrans" cnt="1">
+                  <dgm:layoutNode name="transition"><dgm:alg type="sp"/><dgm:shape/><dgm:presOf/></dgm:layoutNode>
+                </dgm:forEach>
+              </dgm:forEach>
+            </dgm:layoutNode>
+          </dgm:layoutDef>"#).unwrap();
+        let tree = build_diagram_shape_tree(
+          &data,
+          &layout,
+          None,
+          None,
+          RgbColor { r: 0, g: 0, b: 0 },
+          DiagramBounds {
+            x: 0.0,
+            y: 0.0,
+            width: 400.0,
+            height: 100.0,
+          },
+        )
+        .unwrap();
+        assert_eq!(tree.children.len(), count * 2 - 1);
+        let actual: Vec<_> = tree
+          .children
+          .iter()
+          .filter(|child| child.internal_name != "transition")
+          .map(|child| {
+            child
+              .text_body
+              .paragraphs
+              .iter()
+              .flat_map(|p| &p.runs)
+              .map(|r| r.text.as_str())
+              .collect::<String>()
+          })
+          .collect();
+        assert_eq!(
+          actual,
+          (1..=count).map(|i| format!("node{i}")).collect::<Vec<_>>()
+        );
+        for (i, child) in tree.children.iter().enumerate() {
+          let expected = if i % 2 == 1 {
+            "transition"
+          } else if (i / 2) % 2 == 0 {
+            "odd"
+          } else {
+            "even"
+          };
+          assert_eq!(child.internal_name, expected);
+        }
+      }
+    }
+  }
 
   #[test]
   fn direct_primary_text_margins_preserve_parent_owner_and_authored_overrides() {

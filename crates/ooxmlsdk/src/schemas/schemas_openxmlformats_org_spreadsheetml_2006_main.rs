@@ -2301,9 +2301,6 @@ pub struct Worksheet {
   /// Defines the LegacyDrawing Class.
   #[sdk(child(qname = "x:legacyDrawing"))]
   pub legacy_drawing: Option<LegacyDrawing>,
-  /// Markup Compatibility alternate content at this schema position.
-  #[sdk(mce(qname = "mc:AlternateContent", children = [controls]))]
-  pub alternate_content_1: Vec<crate::schemas::mc::AlternateContent>,
   /// Legacy Drawing Reference in  Header Footer.
   #[sdk(child(qname = "x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
@@ -2316,6 +2313,9 @@ pub struct Worksheet {
   /// Defines the OleObjects Class.
   #[sdk(child(qname = "x:oleObjects"))]
   pub ole_objects: Option<OleObjects>,
+  /// Markup Compatibility alternate content at this schema position.
+  #[sdk(mce(qname = "mc:AlternateContent", children = [controls]))]
+  pub alternate_content_1: Vec<crate::schemas::mc::AlternateContent>,
   /// Defines the Controls Class.
   #[sdk(child(qname = "x:controls"))]
   pub controls: Option<Controls>,

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `Slide`, `SlideLayout`, and `SlideMaster` rename `alternate_content` to
+  `alternate_content_0` for wrapped transitions and add `alternate_content_1`
+  for wrapped timing. Update field accesses and struct literals accordingly;
+  wrapped timing parsed from XML now belongs to the second field.
 ### Added
 
 - Added `VisioDocumentType` for the six Visio main-part content types. The part

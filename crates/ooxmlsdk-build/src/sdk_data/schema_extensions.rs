@@ -1083,6 +1083,78 @@ fn add_alternate_content_fields(
       }),
     );
   }
+
+  for (index, member) in type_decl.members.iter().enumerate() {
+    let MemberDecl::Field(field) = member else {
+      continue;
+    };
+    let Some(children) = type_decl
+      .support
+      .alternate_content_children
+      .get(&field.rust_name)
+    else {
+      continue;
+    };
+    let next_element = type_decl.members[index + 1..]
+      .iter()
+      .find_map(|member| match member {
+        MemberDecl::Field(field)
+          if matches!(
+            field.wire,
+            FieldWireDecl::Child { .. }
+              | FieldWireDecl::TextChild { .. }
+              | FieldWireDecl::Choice
+              | FieldWireDecl::Any
+          ) =>
+        {
+          Some(field.rust_name.as_str())
+        }
+        _ => None,
+      });
+    if !next_element.is_some_and(|next| children.iter().any(|child| child == next)) {
+      return Err(
+        format!(
+          "schema extension alternate content {module_name}.{}.{} must be placed immediately before one of its children {children:?}, found {}",
+          extension.class_name,
+          field.rust_name,
+          next_element.unwrap_or("end of type"),
+        )
+        .into(),
+      );
+    }
+
+    let mut seen_child = false;
+    let mut gap = None;
+    for member in &type_decl.members {
+      let MemberDecl::Field(candidate) = member else {
+        continue;
+      };
+      if children.contains(&candidate.rust_name) {
+        if let Some(gap) = gap {
+          return Err(format!(
+            "schema extension alternate content {module_name}.{}.{} children {children:?} are separated by unrelated element {gap}",
+            extension.class_name, field.rust_name,
+          ).into());
+        }
+        seen_child = true;
+      } else if seen_child
+        && gap.is_none()
+        && matches!(
+          candidate.wire,
+          FieldWireDecl::Child { .. }
+            | FieldWireDecl::TextChild { .. }
+            | FieldWireDecl::Choice
+            | FieldWireDecl::Any
+        )
+        && !type_decl
+          .support
+          .alternate_content_children
+          .contains_key(&candidate.rust_name)
+      {
+        gap = Some(candidate.rust_name.as_str());
+      }
+    }
+  }
   Ok(())
 }
 
@@ -2111,7 +2183,7 @@ mod tests {
         types: vec![SchemaTypeExtension {
           class_name: "Parent".to_string(),
           alternate_content: vec![SchemaTypeAlternateContentExtension {
-            after_field: "known_child".to_string(),
+            before_field: "known_child".to_string(),
             children: vec!["known_child".to_string()],
             ..Default::default()
           }],
@@ -2123,7 +2195,7 @@ mod tests {
 
     apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions).unwrap();
 
-    let MemberDecl::Field(field) = &ir.types[0].members[1] else {
+    let MemberDecl::Field(field) = &ir.types[0].members[0] else {
       panic!("expected alternate content field");
     };
     assert_eq!(field.rust_name, "alternate_content");
@@ -2177,12 +2249,12 @@ mod tests {
           class_name: "Parent".to_string(),
           alternate_content: vec![
             SchemaTypeAlternateContentExtension {
-              after_field: "first".to_string(),
+              before_field: "first".to_string(),
               children: vec!["first".to_string()],
               ..Default::default()
             },
             SchemaTypeAlternateContentExtension {
-              after_field: "second".to_string(),
+              before_field: "second".to_string(),
               children: vec!["second".to_string()],
               ..Default::default()
             },
@@ -2206,10 +2278,10 @@ mod tests {
     assert_eq!(
       names,
       [
-        "first",
         "alternate_content_0",
-        "second",
-        "alternate_content_1"
+        "first",
+        "alternate_content_1",
+        "second"
       ]
     );
   }
@@ -2257,6 +2329,158 @@ mod tests {
       let error = apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions)
         .expect_err("invalid static MCE children");
       assert!(error.to_string().contains("alternate content"));
+    }
+  }
+
+  #[test]
+  fn rejects_positioned_alternate_content_separated_from_its_children() {
+    let child = |rust_name: &str| {
+      MemberDecl::Field(FieldDecl {
+        rust_name: rust_name.to_string(),
+        wire: FieldWireDecl::Child {
+          qname: format!("t:{rust_name}"),
+        },
+        cardinality: Cardinality::Optional,
+        type_ref: TypeRefDecl {
+          rust_type: "KnownChild".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      })
+    };
+    let mut ir = SchemaModuleDecl {
+      module_name: "test_schema".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "Parent".to_string(),
+        kind: TypeKind::ElementStruct,
+        members: vec![child("first"), child("second"), child("third")],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Parent".to_string(),
+          alternate_content: vec![SchemaTypeAlternateContentExtension {
+            after_field: "first".to_string(),
+            children: vec!["third".to_string()],
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    let error = apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions)
+      .expect_err("slot separated from its children");
+    assert!(error.to_string().contains("immediately before"), "{error}");
+  }
+
+  #[test]
+  fn positioned_alternate_content_children_must_form_a_contiguous_region() {
+    let child = |name: &str| {
+      MemberDecl::Field(FieldDecl {
+        rust_name: name.to_string(),
+        wire: FieldWireDecl::Child {
+          qname: format!("t:{name}"),
+        },
+        cardinality: Cardinality::Optional,
+        type_ref: TypeRefDecl {
+          rust_type: "KnownChild".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      })
+    };
+    for (gap, after_first, accepted) in [
+      (None, false, true),
+      (None, true, true),
+      (
+        Some(FieldWireDecl::Attribute {
+          qname: ":marker".to_string(),
+          bit: None,
+          list: false,
+          read_aliases: Vec::new(),
+          empty_as_none: false,
+        }),
+        false,
+        true,
+      ),
+      (
+        Some(FieldWireDecl::Child {
+          qname: "t:gap".to_string(),
+        }),
+        false,
+        false,
+      ),
+      (
+        Some(FieldWireDecl::TextChild {
+          qname: "t:gap".to_string(),
+        }),
+        false,
+        false,
+      ),
+      (Some(FieldWireDecl::Choice), false, false),
+      (Some(FieldWireDecl::Any), false, false),
+    ] {
+      let label = format!("gap={gap:?}, after_first={after_first}");
+      let mut members = vec![child("first")];
+      if let Some(wire) = gap {
+        members.push(MemberDecl::Field(FieldDecl {
+          rust_name: "gap".to_string(),
+          wire,
+          ..Default::default()
+        }));
+      }
+      members.push(child("last"));
+      let mut ir = SchemaModuleDecl {
+        module_name: "test_schema".to_string(),
+        types: vec![TypeDecl {
+          rust_name: "Parent".to_string(),
+          kind: TypeKind::ElementStruct,
+          members,
+          ..Default::default()
+        }],
+        ..Default::default()
+      };
+      let extensions = vec![(
+        "test_schema".to_string(),
+        SchemaExtensions {
+          types: vec![SchemaTypeExtension {
+            class_name: "Parent".to_string(),
+            alternate_content: vec![SchemaTypeAlternateContentExtension {
+              before_field: if after_first {
+                String::new()
+              } else {
+                "first".to_string()
+              },
+              after_field: if after_first {
+                "first".to_string()
+              } else {
+                String::new()
+              },
+              children: vec!["last".to_string(), "first".to_string()],
+            }],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      )];
+      let result = apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions);
+      if accepted {
+        result.unwrap_or_else(|error| panic!("{label}: {error}"));
+      } else {
+        let error = result.expect_err(&label);
+        assert!(
+          error
+            .to_string()
+            .contains("separated by unrelated element gap"),
+          "{label}: {error}"
+        );
+      }
     }
   }
 }

@@ -438,7 +438,7 @@
           ]
         },
         {
-          "AfterField": "legacy_drawing",
+          "BeforeField": "controls",
           "Children": [
             "controls"
           ]

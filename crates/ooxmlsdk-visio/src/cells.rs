@@ -2,9 +2,8 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_visio_2012_main::{
   Cell, DocumentSheet, DocumentSheetChoice, PageSheet, PageSheetChoice, RowUnion, RowUnionChoice,
   Section, SectionChoice, Shape, ShapeChoice, StyleSheet, StyleSheetChoice, Tab,
 };
-use ooxmlsdk::simple_type::BooleanValue;
 
-use crate::sheet::CellRecord;
+use crate::sheet::{CellRecord, is_deleted, record};
 
 /// A `Section` addressed by `N`, and by `IX` when the caller sets one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1072,17 +1071,4 @@ fn store_value(cell: &mut Cell, value: &str, formula: Option<&str>) {
   if let Some(formula) = formula {
     cell.f = Some(formula.to_string());
   }
-}
-
-fn record(cell: &Cell) -> CellRecord<'_> {
-  CellRecord {
-    value: cell.v.as_deref(),
-    formula: cell.f.as_deref(),
-    unit: cell.u.as_deref(),
-    error: cell.e.as_deref(),
-  }
-}
-
-fn is_deleted(flag: Option<BooleanValue>) -> bool {
-  matches!(flag, Some(BooleanValue::True | BooleanValue::One))
 }
